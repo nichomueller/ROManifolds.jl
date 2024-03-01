@@ -659,9 +659,37 @@ function compress(A::AbstractMatrix{T},trial::RBSpace,test::RBSpace;combine=(x,y
   return st_proj_a
 end
 
-
 function compress(solver,fes::ArrayContribution,args::RBSpace...;kwargs...)
   sum(map(i->compress(fes[i],args...;kwargs...),eachindex(fes)))
+end
+
+function compress(solver,fes::ArrayContribution,test::BlockRBSpace;kwargs...)
+  active_block_ids = get_touched_blocks(fes[1])
+  block_map = BlockMap(size(fes[1]),active_block_ids)
+  rb_blocks = map(active_block_ids) do i
+    fesi = contribution(fes.trians) do trian
+      val = fes[trian]
+      val[i]
+    end
+    testi = test[i]
+    compress(solver,fesi,testi;kwargs...)
+  end
+  return_cache(block_map,rb_blocks...)
+end
+
+function compress(solver,fes::ArrayContribution,trial::BlockRBSpace,test::BlockRBSpace;kwargs...)
+  active_block_ids = get_touched_blocks(fes[1])
+  block_map = BlockMap(size(fes[1]),active_block_ids)
+  rb_blocks = map(Tuple.(active_block_ids)) do (i,j)
+    fesij = contribution(fes.trians) do trian
+      val = fes[trian]
+      val[i,j]
+    end
+    trialj = trial[j]
+    testi = test[i]
+    compress(solver,fesij,trialj,testi;kwargs...)
+  end
+  return_cache(block_map,rb_blocks...)
 end
 
 function compress(solver,fes::Tuple{Vararg{ArrayContribution}},trial,test)
@@ -710,9 +738,21 @@ function linear_combination_error(solver,feop,rbop,s)
   feA_comp = compress(solver,feA,get_trial(rbop),get_test(rbop))
   feb_comp = compress(solver,feb,get_test(rbop))
   rbA,rbb = _jacobian_and_residual(solver,rbop,s)
-  errA = norm(feA_comp - rbA) / norm(feA_comp)
-  errb = norm(feb_comp - rbb) / norm(feb_comp)
+  errA = _rel_norm(feA_comp,rbA)
+  errb = _rel_norm(feb_comp,rbb)
   Dict("projection error matrix" => errA),Dict("projection error vector" => errb)
+end
+
+function _rel_norm(fea,rba)
+  norm(fea - rba) / norm(fea)
+end
+
+function _rel_norm(fea::ArrayBlock,rba::ParamBlockArray)
+  active_block_ids = get_touched_blocks(fea)
+  block_map = BlockMap(size(fea),active_block_ids)
+  rb_array = get_array(rba)
+  norms = [_rel_norm(fea[i],rb_array[i]) for i in active_block_ids]
+  return_cache(block_map,norms...)
 end
 
 function _jacobian_and_residual(solver::ThetaMethodRBSolver,op::RBOperator{C},s) where C

@@ -912,6 +912,10 @@ function get_mode(s::BlockSnapshots)
   get_mode(testitem(s))
 end
 
+function get_touched_blocks(s::ArrayBlock)
+  findall(s.touched)
+end
+
 function get_touched_blocks(s::BlockSnapshots)
   findall(s.touched)
 end

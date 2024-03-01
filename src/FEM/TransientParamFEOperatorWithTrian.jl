@@ -273,7 +273,7 @@ function Algebra.jacobian!(
 end
 
 function ODETools.jacobians!(
-  A::Contribution,
+  A::Tuple{Vararg{Contribution}},
   op::TransientParamSaddlePointFEOperatorWithTrian,
   r::TransientParamRealization,
   xh::T,
