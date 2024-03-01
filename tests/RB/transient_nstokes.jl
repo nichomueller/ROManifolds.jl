@@ -17,7 +17,6 @@ using DrWatson
 using Mabla.FEM
 using Mabla.RB
 
-
 θ = 1
 dt = 0.01
 t0 = 0.0
@@ -95,7 +94,7 @@ nls = NewtonRaphsonSolver(LUSolver(),1e-10,20)
 fesolver = ThetaMethod(nls,dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","toy_mesh")))
 
 fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)

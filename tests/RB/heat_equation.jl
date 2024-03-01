@@ -52,8 +52,7 @@ trian_jac_t = (Ω,)
 
 induced_norm(du,v) = ∫(∇(v)⋅∇(du))dΩ
 
-T = Float64
-reffe = ReferenceFE(lagrangian,T,order)
+reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
 _feop = AffineTransientParamFEOperator(res,jac,jac_t,induced_norm,ptspace,trial,test)

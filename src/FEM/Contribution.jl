@@ -78,3 +78,14 @@ function LinearAlgebra.fillstored!(a::ArrayContribution,v)
   end
   a
 end
+
+# quite hacky, it's to deal with multiple jacobians at the same time
+Base.eltype(::Tuple{Vararg{ArrayContribution{T}}}) where T = T
+Base.eltype(::Type{<:Tuple{Vararg{ArrayContribution{T}}}}) where T = T
+
+function LinearAlgebra.fillstored!(a::Tuple{Vararg{A}},v) where {A<:ArrayContribution}
+  for ai in a
+    LinearAlgebra.fillstored!(ai,v)
+  end
+  a
+end

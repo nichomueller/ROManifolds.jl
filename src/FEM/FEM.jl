@@ -134,6 +134,7 @@ include("TransientParamSaddlePointFEOperator.jl")
 
 export FEOperatorWithTrian
 export TransientParamFEOperatorWithTrian
+export set_triangulation
 export change_triangulation
 include("TransientParamFEOperatorWithTrian.jl")
 

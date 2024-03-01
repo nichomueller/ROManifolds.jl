@@ -334,9 +334,7 @@ function Algebra.jacobian!(
 
   A_lin,cache_nl = cache
   fecache_nl, = cache_nl
-  for i = eachindex(fecache_nl)
-    LinearAlgebra.fillstored!(fecache_nl[i],zero(eltype(fecache_nl[i])))
-  end
+  LinearAlgebra.fillstored!(fecache_nl,zero(eltype(fecache_nl)))
   A_nlin = jacobian!(cache_nl,op.op_nonlinear,r,xhF,i,γᵢ,ode_cache)
   @. A_nlin = A_nlin + A_lin
   return A_nlin
@@ -352,9 +350,7 @@ function ODETools.jacobians!(
 
   A_lin,cache_nl = cache
   fecache_nl, = cache_nl
-  for i = eachindex(fecache_nl)
-    LinearAlgebra.fillstored!(fecache_nl[i],zero(eltype(fecache_nl[i])))
-  end
+  LinearAlgebra.fillstored!(fecache_nl,zero(eltype(fecache_nl)))
   A_nlin = jacobians!(cache_nl,op.op_nonlinear,r,xhF,γ,ode_cache)
   @. A_nlin = A_nlin + A_lin
   return A_nlin
@@ -428,9 +424,7 @@ end
 
 function ODETools._matrix!(cache,op::PODMDEIMOperator,r,dtθ,u0,ode_cache,vθ)
   fecache, = cache
-  for i = eachindex(fecache)
-    LinearAlgebra.fillstored!(fecache[i],zero(eltype(fecache[i])))
-  end
+  LinearAlgebra.fillstored!(fecache_nl,zero(eltype(fecache_nl)))
   A = ODETools.jacobians!(cache,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
   return A
 end

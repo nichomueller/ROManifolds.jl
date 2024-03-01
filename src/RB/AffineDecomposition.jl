@@ -18,37 +18,14 @@ function get_mdeim_indices(A::AbstractMatrix{T}) where T
   return I
 end
 
-function recast_indices(A::AbstractMatrix,indices::AbstractVector{Int})
+function recast_indices(A::AbstractMatrix,indices::AbstractVector)
   return indices
 end
 
-function recast_indices(A::NnzSnapshots,indices::AbstractVector{Int})
+function recast_indices(A::NnzSnapshots,indices::AbstractVector)
   nonzero_indices = get_nonzero_indices(A)
   entire_indices = nonzero_indices[indices]
   return entire_indices
-end
-
-function get_reduced_cells(indices::AbstractVector{T},cell_dof_ids) where T
-  cells = T[]
-  for cell = eachindex(cell_dof_ids)
-    dofs = cell_dof_ids[cell]
-    if !isempty(intersect(indices,dofs))
-      append!(cells,cell)
-    end
-  end
-  return unique(cells)
-end
-
-function reduce_triangulation(
-  fs::FESpace,
-  trian::Triangulation,
-  indices_space::AbstractVector)
-
-  cell_dof_ids = get_cell_dof_ids(fs,trian)
-  indices_space_rows = fast_index(indices_space,num_free_dofs(fs))
-  red_integr_cells = get_reduced_cells(indices_space_rows,cell_dof_ids)
-  red_trian = view(trian,red_integr_cells)
-  return red_trian
 end
 
 struct ReducedIntegrationDomain{S<:AbstractVector,T<:AbstractVector}
@@ -60,6 +37,49 @@ get_indices_space(i::ReducedIntegrationDomain) = i.indices_space
 get_indices_time(i::ReducedIntegrationDomain) = i.indices_time
 union_indices_space(i::ReducedIntegrationDomain...) = union(map(get_indices_space,i)...)
 union_indices_time(i::ReducedIntegrationDomain...) = union(map(get_indices_time,i)...)
+
+function get_reduced_cells(
+  cell_dof_ids::AbstractVector{<:AbstractVector{T}},
+  rows::AbstractVector) where T
+
+  cells = T[]
+  for (cell,dofs) = enumerate(cell_dof_ids)
+    if !isempty(intersect(rows,dofs))
+      append!(cells,cell)
+    end
+  end
+  return unique(cells)
+end
+
+function reduce_triangulation(
+  trian::Triangulation,
+  i::ReducedIntegrationDomain,
+  test::RBSpace)
+
+  cell_dof_ids = get_cell_dof_ids(test.space,trian)
+  indices_space_rows = fast_index(i.indices_space,num_free_dofs(test.space))
+  red_integr_cells = get_reduced_cells(cell_dof_ids,indices_space_rows)
+  red_trian = view(trian,red_integr_cells)
+  return red_trian
+end
+
+function reduce_triangulation(
+  trian::Triangulation,
+  i::ReducedIntegrationDomain,
+  trial::RBSpace,
+  test::RBSpace)
+
+  trial0 = trial.space(nothing)
+  cell_dof_ids_trial = get_cell_dof_ids(trial0,trian)
+  cell_dof_ids_test = get_cell_dof_ids(test.space,trian)
+  indices_space_cols = slow_index(i.indices_space,num_free_dofs(trial0))
+  indices_space_rows = fast_index(i.indices_space,num_free_dofs(test.space))
+  red_integr_cells_trial = get_reduced_cells(cell_dof_ids_trial,indices_space_cols)
+  red_integr_cells_test = get_reduced_cells(cell_dof_ids_test,indices_space_rows)
+  red_integr_cells = union(red_integr_cells_trial,red_integr_cells_test)
+  red_trian = view(trian,red_integr_cells)
+  return red_trian
+end
 
 abstract type AbstractAffineDecomposition end
 
@@ -98,20 +118,13 @@ function _time_indices_and_interp_matrix(::SpaceOnlyMDEIM,interp_basis_space,bas
   return indices_time,lu_interp
 end
 
-function mdeim(
-  solver::RBSolver,
-  fs::FESpace,
-  trian::Triangulation,
-  basis_space::AbstractMatrix,
-  basis_time::AbstractMatrix)
-
+function mdeim(solver::RBSolver,basis_space::AbstractMatrix,basis_time::AbstractMatrix)
   indices_space = get_mdeim_indices(basis_space)
   interp_basis_space = view(basis_space,indices_space,:)
   indices_time,lu_interp = _time_indices_and_interp_matrix(solver.mdeim_style,interp_basis_space,basis_time)
   recast_indices_space = recast_indices(basis_space,indices_space)
-  red_trian = reduce_triangulation(fs,trian,recast_indices_space)
   integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
-  return lu_interp,red_trian,integration_domain
+  return lu_interp,integration_domain
 end
 
 function FEM.Contribution(v::Tuple{Vararg{AffineDecomposition}},t::Tuple{Vararg{Triangulation}})
@@ -148,16 +161,16 @@ end
 
 function reduced_form(
   solver::RBSolver,
-  fs::FESpace,
   s::S,
   trian::T,
   args...;
   kwargs...) where {S,T}
 
   basis_space,basis_time = reduced_basis(s;ϵ=get_tol(solver))
-  lu_interp,red_trian,integration_domain = mdeim(solver,fs,trian,basis_space,basis_time)
+  lu_interp,integration_domain = mdeim(solver,basis_space,basis_time)
   proj_basis_space = compress_basis_space(basis_space,args...)
   comb_basis_time = combine_basis_time(args...;kwargs...)
+  red_trian = reduce_triangulation(trian,integration_domain,args...)
   ad = AffineDecomposition(
     solver.mdeim_style,
     proj_basis_space,
@@ -175,8 +188,7 @@ function reduced_vector_form(
   trian::T) where {S,T}
 
   test = get_test(op)
-  fe_test = get_fe_test(op)
-  reduced_form(solver,fe_test,s,trian,test)
+  reduced_form(solver,s,trian,test)
 end
 
 function reduced_matrix_form(
@@ -188,8 +200,7 @@ function reduced_matrix_form(
 
   trial = get_trial(op)
   test = get_test(op)
-  fe_test = get_fe_test(op)
-  reduced_form(solver,fe_test,s,trian,trial,test;kwargs...)
+  reduced_form(solver,s,trian,trial,test;kwargs...)
 end
 
 function reduced_vector_form(
@@ -530,11 +541,10 @@ function reduced_vector_form(
   trian::T) where T
 
   test = get_test(op)
-  fe_test = get_fe_test(op)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
   ads,red_trians = Any[
-    reduced_form(solver,fe_test[i],s[i],trian,test[i])
+    reduced_form(solver,s[i],trian,test[i])
     for i in active_block_ids] |> tuple_of_arrays
   red_trian = FEM.merge_triangulations(red_trians)
   ad = BlockAffineDecomposition(block_map,ads...)
@@ -550,11 +560,10 @@ function reduced_matrix_form(
 
   trial = get_trial(op)
   test = get_test(op)
-  fe_test = get_fe_test(op)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
   ads,red_trians = Any[
-    reduced_form(solver,fe_test[i],s[i,j],trian,trial[j],test[i];kwargs...)
+    reduced_form(solver,s[i,j],trian,trial[j],test[i];kwargs...)
     for (i,j) in Tuple.(active_block_ids)] |> tuple_of_arrays
   red_trian = FEM.merge_triangulations(red_trians)
   ad = BlockAffineDecomposition(block_map,ads...)
@@ -650,29 +659,102 @@ function compress(A::AbstractMatrix{T},trial::RBSpace,test::RBSpace;combine=(x,y
   return st_proj_a
 end
 
-function projection_error(test::RBSpace,a::AffineContribution,s::ArrayContribution)
-  srb = compress(s,test)
-  r = get_realization(s)
-  coeff_cache = allocate_mdeim_coeff(a,r)
-  coeff = mdeim_coeff!(coeff_cache,a,s)
-  lincomb_cache = allocate_mdeim_lincomb(test,r)
-  lincomb = mdeim_lincomb!(lincomb_cache,a,coeff)
-  norm(srb - lincomb) / norm(srb)
+function interpolation_error(a::AffineDecomposition,fes::AbstractSnapshots,rbs::AbstractSnapshots)
+  ids_space,ids_time = get_indices_space(a)
+  fes_ids = snapshots_at_indices(fes,ids_space,ids_time)
+  rbs_ids = snapshots_at_indices(rbs,ids_space,ids_time)
+  norm(fes_ids - rbs_ids)
 end
 
-function projection_error(trial::RBSpace,test::RBSpace,a::AffineContribution,s::ArrayContribution;kwargs...)
-  srb = compress(s,trial,test;kwargs...)
-  r = get_realization(s)
-  coeff_cache = allocate_mdeim_coeff(a,r)
-  coeff = mdeim_coeff!(coeff_cache,a,s)
-  lincomb_cache = allocate_mdeim_lincomb(test,r)
-  lincomb = mdeim_lincomb!(lincomb_cache,a,coeff)
-  norm(srb - lincomb) / norm(srb)
+function interpolation_error(a::AffineContribution,fes::ArrayContribution,rbs::ArrayContribution)
+  interp_err = sum([interpolation_error(a[i],fes[i],rbs[i] for i in eachindex(a))])
+  Dict("interpolation error" => interp_err)
 end
 
-# function ()
-#   contribs_mat,contribs_vec = fe_jacobian_and_residual(solver,op,s)
-#   mat_err = projection_error(lhs,contribs_mat)
-#   vec_err = projection_error(rhs,contribs_vec)
-#   Dict("err_space_jac"=>err_space,"err_time"=>err_time)
-# end
+function interpolation_error(a::Tuple,fes::Tuple,rbs::Tuple)
+  map(interpolation_error,a,fes,rbs)
+end
+
+function interpolation_error(solver,feop,rbop,s)
+  feA,feb = _jacobian_and_residual(get_fe_solver(solver),feop,s)
+  rbA,rbb = _jacobian_and_residual(solver,rbop.op,s)
+  errA = interpolation_error(rbop.lhs,feA,rbA)
+  errb = interpolation_error(rbop.rhs,feb,rbb)
+  return errA,errb
+end
+
+function projection_error(solver,feop,rbop,s)
+  feA,feb = _jacobian_and_residual(get_fe_solver(solver),feop,s)
+  feA_comp,feb_comp = compress(feop,feA),compress(feop,feb)
+  rbA,rbb = _jacobian_and_residual(solver,rbop,s)
+  errA = norm(feA_comp - rbA) / norm(feA_comp)
+  errb = norm(feb_comp - rbb) / norm(feb_comp)
+  Dict("projection error matrix" => errA),Dict("projection error vector" => errb)
+end
+
+function _jacobian_and_residual(
+  solver::ThetaMethodRBSolver,
+  op::RBOperator{C},
+  s::AbstractSnapshots) where C
+
+  fesolver = get_fe_solver(solver)
+  dt = fesolver.dt
+  θ = fesolver.θ
+  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+  r = copy(get_realization(s))
+  FEM.shift_time!(r,dtθ)
+  ode_cache = allocate_cache(op,r)
+  u0 = get_values(s)
+  if isa(C,Affine)
+    u0 .= 0.0
+  end
+  vθ = similar(u0)
+  vθ .= 0.0
+  nlop = RBThetaMethodParamOperator(op,r,dtθ,u0,ode_cache,vθ)
+  A = allocate_jacobian(nlop,u0)
+  b = allocate_residual(nlop,u0)
+  sA = jacobian!(A,nlop,u0)
+  sb = residual!(b,nlop,u0)
+  sA,sb
+end
+
+function _jacobian_and_residual(
+  solver::ThetaMethod,
+  op::ODEParamOperator{C},
+  s::AbstractSnapshots) where C
+
+  dt = solver.dt
+  θ = solver.θ
+  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+  r = copy(get_realization(s))
+  FEM.shift_time!(r,dtθ)
+  ode_cache = allocate_cache(op,r)
+  u0 = get_values(s)
+  if isa(C,Affine)
+    u0 .= 0.0
+  end
+  vθ = similar(u0)
+  vθ .= 0.0
+  nlop = ThetaMethodParamOperator(op,r,dtθ,u0,ode_cache,vθ)
+  A = allocate_jacobian(nlop,u0)
+  b = allocate_residual(nlop,u0)
+  jacobian!(A,nlop,u0)
+  residual!(b,nlop,u0)
+  A,b
+end
+
+function _jacobian_and_residual(
+  solver::ThetaMethod,
+  _feop::TransientParamFEOperator,
+  args...)
+
+  op = get_algebraic_operator(_feop)
+  _jacobian_and_residual(solver,op,args...)
+end
+
+function mdeim_error(solver,feop,rbop,s)
+  s1 = select_snapshots(s,1)
+  intp_err = interpolation_error(solver,feop,rbop,s1)
+  proj_err = projection_error(solver,feop,rbop,s1)
+  return intp_err,proj_err
+end
