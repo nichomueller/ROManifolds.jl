@@ -25,36 +25,43 @@ function Algebra.zero_initial_guess(op::RBThetaMethodParamOperator)
   x0
 end
 
-function Algebra.residual!(
-  cache::Tuple,
-  op::RBThetaMethodParamOperator,
-  x::AbstractVector)
+for T in (:AbstractVector,:Contribution,:Tuple)
+  @eval begin
+    function Algebra.residual!(
+      b::$T,
+      op::RBThetaMethodParamOperator,
+      x::AbstractVector)
 
-  uF = x
-  vθ = op.vθ
-  residual!(cache,op.odeop,op.r,(uF,vθ),op.ode_cache)
+      uF = x
+      vθ = op.vθ
+      residual!(b,op.odeop,op.r,(uF,vθ),op.ode_cache)
+    end
+  end
 end
+for T in (:AbstractMatrix,:(Tuple{Vararg{Contribution}}),:Tuple)
+  @eval begin
+    function Algebra.jacobian!(
+      A::$T,
+      op::RBThetaMethodParamOperator,
+      x::AbstractVector)
 
-function Algebra.jacobian!(
-  cache::Tuple,
-  op::RBThetaMethodParamOperator,
-  x::AbstractVector)
+      uF = x
+      vθ = op.vθ
+      jacobians!(A,op.odeop,op.r,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
+    end
 
-  uF = x
-  vθ = op.vθ
-  jacobians!(cache,op.odeop,op.r,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
-end
+    function Algebra.jacobian!(
+      A::$T,
+      op::RBThetaMethodParamOperator,
+      x::AbstractVector,
+      i::Int)
 
-function Algebra.jacobian!(
-  cache::Tuple,
-  op::RBThetaMethodParamOperator,
-  x::AbstractVector,
-  i::Int)
-
-  uF = x
-  vθ = op.vθ
-  γ = (1.0,1/op.dtθ)
-  jacobian!(cache,op.odeop,op.r,(uF,vθ),i,γ[i],op.ode_cache)
+      uF = x
+      vθ = op.vθ
+      γ = (1.0,1/op.dtθ)
+      jacobian!(A,op.odeop,op.r,(uF,vθ),i,γ[i],op.ode_cache)
+    end
+  end
 end
 
 function Algebra.solve!(

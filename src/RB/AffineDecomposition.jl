@@ -247,7 +247,7 @@ function reduced_matrix_vector_form(
   s::S) where S
 
   smdeim = select_snapshots(s,mdeim_params(solver))
-  contribs_mat,contribs_vec = fe_jacobian_and_residual(solver,op,smdeim)
+  contribs_mat,contribs_vec = jacobian_and_residual(solver,op,smdeim)
   red_mat = reduced_matrix_form(solver,op,contribs_mat)
   red_vec = reduced_vector_form(solver,op,contribs_vec)
   return red_mat,red_vec
@@ -659,15 +659,37 @@ function compress(A::AbstractMatrix{T},trial::RBSpace,test::RBSpace;combine=(x,y
   return st_proj_a
 end
 
+
+function compress(solver,fes::ArrayContribution,args::RBSpace...;kwargs...)
+  sum(map(i->compress(fes[i],args...;kwargs...),eachindex(fes)))
+end
+
+function compress(solver,fes::Tuple{Vararg{ArrayContribution}},trial,test)
+  fesolver = get_fe_solver(solver)
+  cmp = ()
+  for i = eachindex(fes)
+    combine = (x,y) -> i == 1 ? fesolver.θ*x+(1-fesolver.θ)*y : fesolver.θ*(x-y)
+    cmp = (cmp...,compress(solver,fes[i],trial,test;combine))
+  end
+  sum(cmp)
+end
+
 function interpolation_error(a::AffineDecomposition,fes::AbstractSnapshots,rbs::AbstractSnapshots)
-  ids_space,ids_time = get_indices_space(a)
-  fes_ids = snapshots_at_indices(fes,ids_space,ids_time)
-  rbs_ids = snapshots_at_indices(rbs,ids_space,ids_time)
+  ids_space,ids_time = get_indices_space(a),get_indices_time(a)
+  fes_ids = reverse_snapshots_at_indices(fes,ids_space)[:,ids_time]
+  rbs_ids = reverse_snapshots_at_indices(rbs,ids_space)[:,ids_time]
   norm(fes_ids - rbs_ids)
 end
 
+function interpolation_error(a::BlockAffineDecomposition,fes::BlockSnapshots,rbs::BlockSnapshots)
+  active_block_ids = get_touched_blocks(a)
+  block_map = BlockMap(size(a),active_block_ids)
+  errors = Any[interpolation_error(a[i],fes[i],rbs[i]) for i = get_touched_blocks(a)]
+  return_cache(block_map,errors...)
+end
+
 function interpolation_error(a::AffineContribution,fes::ArrayContribution,rbs::ArrayContribution)
-  interp_err = sum([interpolation_error(a[i],fes[i],rbs[i] for i in eachindex(a))])
+  interp_err = sum([interpolation_error(a[i],fes[i],rbs[i]) for i in eachindex(a)])
   Dict("interpolation error" => interp_err)
 end
 
@@ -683,33 +705,31 @@ function interpolation_error(solver,feop,rbop,s)
   return errA,errb
 end
 
-function projection_error(solver,feop,rbop,s)
+function linear_combination_error(solver,feop,rbop,s)
   feA,feb = _jacobian_and_residual(get_fe_solver(solver),feop,s)
-  feA_comp,feb_comp = compress(feop,feA),compress(feop,feb)
+  feA_comp = compress(solver,feA,get_trial(rbop),get_test(rbop))
+  feb_comp = compress(solver,feb,get_test(rbop))
   rbA,rbb = _jacobian_and_residual(solver,rbop,s)
   errA = norm(feA_comp - rbA) / norm(feA_comp)
   errb = norm(feb_comp - rbb) / norm(feb_comp)
   Dict("projection error matrix" => errA),Dict("projection error vector" => errb)
 end
 
-function _jacobian_and_residual(
-  solver::ThetaMethodRBSolver,
-  op::RBOperator{C},
-  s::AbstractSnapshots) where C
-
+function _jacobian_and_residual(solver::ThetaMethodRBSolver,op::RBOperator{C},s) where C
   fesolver = get_fe_solver(solver)
   dt = fesolver.dt
   θ = fesolver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-  r = copy(get_realization(s))
-  FEM.shift_time!(r,dtθ)
+  r = get_realization(s)
+  FEM.shift_time!(r,dt*(θ-1))
   ode_cache = allocate_cache(op,r)
   u0 = get_values(s)
-  if isa(C,Affine)
+  if C == Affine
     u0 .= 0.0
   end
   vθ = similar(u0)
   vθ .= 0.0
+  ode_cache = update_cache!(ode_cache,op,r)
   nlop = RBThetaMethodParamOperator(op,r,dtθ,u0,ode_cache,vθ)
   A = allocate_jacobian(nlop,u0)
   b = allocate_residual(nlop,u0)
@@ -718,29 +738,28 @@ function _jacobian_and_residual(
   sA,sb
 end
 
-function _jacobian_and_residual(
-  solver::ThetaMethod,
-  op::ODEParamOperator{C},
-  s::AbstractSnapshots) where C
-
+function _jacobian_and_residual(solver::ThetaMethod,op::ODEParamOperator{C},s) where C
   dt = solver.dt
   θ = solver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-  r = copy(get_realization(s))
-  FEM.shift_time!(r,dtθ)
+  r = get_realization(s)
+  FEM.shift_time!(r,dt*(θ-1))
   ode_cache = allocate_cache(op,r)
   u0 = get_values(s)
-  if isa(C,Affine)
+  if C == Affine
     u0 .= 0.0
   end
   vθ = similar(u0)
   vθ .= 0.0
+  ode_cache = update_cache!(ode_cache,op,r)
   nlop = ThetaMethodParamOperator(op,r,dtθ,u0,ode_cache,vθ)
   A = allocate_jacobian(nlop,u0)
   b = allocate_residual(nlop,u0)
   jacobian!(A,nlop,u0)
   residual!(b,nlop,u0)
-  A,b
+  sA = map(A->Snapshots(A,r),A)
+  sb = Snapshots(b,r)
+  sA,sb
 end
 
 function _jacobian_and_residual(
@@ -755,6 +774,6 @@ end
 function mdeim_error(solver,feop,rbop,s)
   s1 = select_snapshots(s,1)
   intp_err = interpolation_error(solver,feop,rbop,s1)
-  proj_err = projection_error(solver,feop,rbop,s1)
+  proj_err = linear_combination_error(solver,feop,rbop,s1)
   return intp_err,proj_err
 end

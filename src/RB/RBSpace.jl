@@ -350,7 +350,7 @@ end
 
 # for testing/visualization purposes
 
-function projection_error(r::RBSpace,s::AbstractSnapshots,norm_matrix::AbstractMatrix)
+function pod_error(r::RBSpace,s::AbstractSnapshots,norm_matrix::AbstractMatrix)
   s2 = change_mode(s)
   basis_space = get_basis_space(r)
   basis_time = get_basis_time(r)
@@ -359,9 +359,9 @@ function projection_error(r::RBSpace,s::AbstractSnapshots,norm_matrix::AbstractM
   Dict("err_space"=>err_space,"err_time"=>err_time)
 end
 
-function projection_error(r::BlockRBSpace,s::BlockSnapshots,norm_matrix::BlockMatrix)
+function pod_error(r::BlockRBSpace,s::BlockSnapshots,norm_matrix::BlockMatrix)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  errors = Any[projection_error(r[i],s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
+  errors = Any[pod_error(r[i],s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
   return_cache(block_map,errors...)
 end

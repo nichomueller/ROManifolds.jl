@@ -56,7 +56,7 @@ function Algebra.allocate_residual(
   ode_cache)
 
   test = get_test(op)
-  fe_b = allocate_fe_residual(op.op,r,x,ode_cache)
+  fe_b = allocate_residual(op.op,r,x,ode_cache)
   coeff_cache = allocate_mdeim_coeff(op.rhs,r)
   lincomb_cache = allocate_mdeim_lincomb(test,r)
   return fe_b,coeff_cache,lincomb_cache
@@ -70,7 +70,7 @@ function Algebra.allocate_jacobian(
 
   trial = get_trial(op)
   test = get_test(op)
-  fe_A = allocate_fe_jacobian(op.op,r,x,ode_cache)
+  fe_A = allocate_jacobian(op.op,r,x,ode_cache)
   coeff_cache = ()
   for i = 1:get_order(op)+1
     coeff_cache = (coeff_cache...,allocate_mdeim_coeff(op.lhs[i],r))
@@ -206,7 +206,7 @@ function fe_jacobians!(
   ode_cache)
 
   red_r,red_times,red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(op.lhs,r,xhF,ode_cache)
-  A = fe_jacobians!(cache,op.op,red_r,red_xhF,γ,red_ode_cache)
+  A = jacobians!(cache,op.op,red_r,red_xhF,γ,red_ode_cache)
   map(A,op.lhs) do A,lhs
     _select_snapshots_at_space_time_locations(A,lhs,red_times)
   end
@@ -220,7 +220,7 @@ function fe_residual!(
   ode_cache)
 
   red_r,red_times,red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(op.rhs,r,xhF,ode_cache)
-  b = fe_residual!(cache,op.op,red_r,red_xhF,red_ode_cache)
+  b = residual!(cache,op.op,red_r,red_xhF,red_ode_cache)
   bi = _select_snapshots_at_space_time_locations(b,op.rhs,red_times)
   return bi
 end
@@ -424,7 +424,7 @@ end
 
 function ODETools._matrix!(cache,op::PODMDEIMOperator,r,dtθ,u0,ode_cache,vθ)
   fecache, = cache
-  LinearAlgebra.fillstored!(fecache_nl,zero(eltype(fecache_nl)))
+  LinearAlgebra.fillstored!(fecache,zero(eltype(fecache)))
   A = ODETools.jacobians!(cache,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
   return A
 end
@@ -476,9 +476,8 @@ end
 
 # for testing/visualization purposes
 
-function projection_error(op::PODMDEIMOperator,s::AbstractArray)
-  sol_err = projection_error(op.op,s)
-  # res_err = projection_error(op.rhs,s)
-  # jac_err = projection_error(op.lhs,s)
-  # return sol_err,res_err,jac_err
+function pod_mdeim_error(solver,feop,op::PODMDEIMOperator,s::AbstractArray)
+  pod_err = pod_error(get_trial(op),s,assemble_norm_matrix(feop))
+  mdeim_err = mdeim_error(solver,feop,op,s)
+  return pod_err,mdeim_err
 end

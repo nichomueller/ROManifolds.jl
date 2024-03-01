@@ -18,8 +18,8 @@ Base.ndims(::AbstractSnapshots) = 2
 Base.ndims(::Type{<:AbstractSnapshots}) = 2
 Base.IndexStyle(::Type{<:AbstractSnapshots}) = IndexLinear()
 
-FEM.get_values(s::AbstractSnapshots) = s.values
-get_realization(s::AbstractSnapshots) = s.realization
+FEM.get_values(s::AbstractSnapshots) = copy(s.values)
+get_realization(s::AbstractSnapshots) = copy(s.realization)
 get_mode(s::AbstractSnapshots) = s.mode
 
 FEM.num_times(s::AbstractSnapshots) = num_times(get_realization(s))
@@ -663,7 +663,7 @@ function FEM.get_values(s::InnerTimeOuterParamTransientSnapshots)
     ip = slow_index(i,nt)
     array[i] = s.values[ip][it]
   end
-  return ParamArray(array)
+  return ParamArray(copy(array))
 end
 
 struct SelectedInnerTimeOuterParamTransientSnapshots{T,S,I} <: TransientSnapshotsSwappedColumns{T}
@@ -718,7 +718,7 @@ function FEM.get_values(s::SelectedInnerTimeOuterParamTransientSnapshots)
       @inbounds values[(i-1)*num_times(s)+j] = v[(ip-1)*num_times(s)+jt]
     end
   end
-  ParamArray(values)
+  ParamArray(copy(values))
 end
 
 function get_realization(s::SelectedInnerTimeOuterParamTransientSnapshots)

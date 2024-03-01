@@ -261,9 +261,9 @@ function get_fe_snaps(_r)
   return snapsA,snapsM,snapsR
 end
 
-s_mdeim = select_snapshots(snaps,RB.mdeim_params(rbsolver.info))
+s_mdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
 r_mdeim = RB.get_realization(s_mdeim)
-contribs_mat,contribs_vec = fe_jacobian_and_residual(rbsolver,op,s_mdeim)
+contribs_mat,contribs_vec = jacobian_and_residual(rbsolver,op,s_mdeim)
 snapsA,snapsM,snapsR = get_fe_snaps(r_mdeim)
 @check contribs_mat[1][Ω] ≈ snapsA
 @check contribs_mat[2][Ω] ≈ snapsM

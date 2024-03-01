@@ -62,7 +62,7 @@ function TransientFETools.update_cache!(
   update_cache!(ode_cache,op.feop,r)
 end
 
-function allocate_fe_residual(
+function Algebra.allocate_residual(
   op::PODOperator,
   r::TransientParamRealization,
   x::AbstractVector,
@@ -71,7 +71,7 @@ function allocate_fe_residual(
   allocate_residual(op.feop,r,x,ode_cache)
 end
 
-function allocate_fe_jacobian(
+function Algebra.allocate_jacobian(
   op::PODOperator,
   r::TransientParamRealization,
   x::AbstractVector,
@@ -80,13 +80,13 @@ function allocate_fe_jacobian(
   allocate_jacobian(op.feop,r,x,ode_cache)
 end
 
-function allocate_fe_jacobian_and_residual(op::PODOperator,r,u0,ode_cache)
-  A = allocate_fe_jacobian(op,r,u0,ode_cache)
-  b = allocate_fe_residual(op,r,u0,ode_cache)
+function allocate_jacobian_and_residual(op::PODOperator,r,u0,ode_cache)
+  A = allocate_jacobian(op,r,u0,ode_cache)
+  b = allocate_residual(op,r,u0,ode_cache)
   return A,b
 end
 
-function fe_residual!(
+function Algebra.residual!(
   b,
   op::PODOperator,
   r::TransientParamRealization,
@@ -97,7 +97,7 @@ function fe_residual!(
   Snapshots(b,r)
 end
 
-function fe_jacobian!(
+function Algebra.jacobian!(
   A,
   op::PODOperator,
   r::TransientParamRealization,
@@ -112,7 +112,7 @@ function fe_jacobian!(
   Snapshots(A,r)
 end
 
-function fe_jacobians!(
+function ODETools.jacobians!(
   A,
   op::PODOperator,
   r::TransientParamRealization,
@@ -121,7 +121,7 @@ function fe_jacobians!(
   ode_cache)
 
   map(eachindex(A)) do i
-    fe_jacobian!(A[i],op,r,xhF,i,γ[i],ode_cache)
+    jacobian!(A[i],op,r,xhF,i,γ[i],ode_cache)
   end |> Tuple
 end
 
@@ -129,7 +129,7 @@ end
 
 # FE jacobians and residuals computed from a RBOperator
 
-function fe_jacobian_and_residual(
+function jacobian_and_residual(
   solver::ThetaMethodRBSolver,
   op::RBOperator,
   s::S) where S
@@ -140,37 +140,37 @@ function fe_jacobian_and_residual(
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
   x = get_values(s)
-  r = copy(get_realization(s))
+  r = get_realization(s)
   FEM.shift_time!(r,dt*(θ-1))
 
   y = similar(x)
   y .= 0.0
   ode_cache = allocate_cache(op,r)
-  A,b = allocate_fe_jacobian_and_residual(op,r,x,ode_cache)
+  A,b = allocate_jacobian_and_residual(op,r,x,ode_cache)
 
   ode_cache = update_cache!(ode_cache,op,r)
-  fe_jacobian_and_residual!(A,b,op,r,dtθ,x,ode_cache,y)
+  jacobian_and_residual!(A,b,op,r,dtθ,x,ode_cache,y)
 end
 
-function fe_jacobians!(A,op::AffineRBOperator,r,dtθ,u0,ode_cache,vθ)
-  fe_jacobians!(A,op,r,(vθ,vθ),(1.0,1/dtθ),ode_cache)
+function ODETools.jacobians!(A,op::AffineRBOperator,r,dtθ,u0,ode_cache,vθ)
+  jacobians!(A,op,r,(vθ,vθ),(1.0,1/dtθ),ode_cache)
 end
 
-function fe_jacobians!(A,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
-  fe_jacobians!(A,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
+function ODETools.jacobians!(A,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
+  jacobians!(A,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
 end
 
-function fe_residual!(b,op::AffineRBOperator,r,dtθ,u0,ode_cache,vθ)
-  fe_residual!(b,op,r,(vθ,vθ),ode_cache)
+function Algebra.residual!(b,op::AffineRBOperator,r,dtθ,u0,ode_cache,vθ)
+  residual!(b,op,r,(vθ,vθ),ode_cache)
 end
 
-function fe_residual!(b,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
-  fe_residual!(b,op,r,(u0,vθ),ode_cache)
+function Algebra.residual!(b,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
+  residual!(b,op,r,(u0,vθ),ode_cache)
 end
 
-function fe_jacobian_and_residual!(A,b,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
-  sA = fe_jacobians!(A,op,r,dtθ,u0,ode_cache,vθ)
-  sb = fe_residual!(b,op,r,dtθ,u0,ode_cache,vθ)
+function jacobian_and_residual!(A,b,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
+  sA = jacobians!(A,op,r,dtθ,u0,ode_cache,vθ)
+  sb = residual!(b,op,r,dtθ,u0,ode_cache,vθ)
   return sA,sb
 end
 
