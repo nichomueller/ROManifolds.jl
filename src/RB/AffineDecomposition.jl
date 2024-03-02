@@ -354,6 +354,10 @@ function mdeim_coeff!(
   return coeff_recast
 end
 
+_fill_with_zeros!(a::AbstractArray{T}) where T = fill!(a,zero(T))
+_fill_with_zeros!(a::AbstractArray{<:AbstractArray}) = map(_fill_with_zeros!,a)
+_fill_with_zeros!(a::Tuple) = map(_fill_with_zeros!,a)
+
 function allocate_mdeim_lincomb(
   test::RBSpace,
   r::AbstractParamRealization)
@@ -391,6 +395,7 @@ function mdeim_lincomb!(
   time_prod_cache,lincomb_cache = cache
   basis_time = a.metadata
   basis_space = a.basis_space
+  println(norm(map(norm,coeff.array)))
 
   @inbounds for i = eachindex(lincomb_cache)
     lci = lincomb_cache[i]
@@ -410,6 +415,7 @@ function mdeim_lincomb!(
   time_prod_cache,lincomb_cache = cache
   basis_time = a.metadata
   basis_space = a.basis_space
+  println(norm(map(norm,coeff.array)))
 
   @inbounds for i = eachindex(lincomb_cache)
     lci = lincomb_cache[i]
@@ -586,6 +592,8 @@ function mdeim_coeff!(cache,a::BlockAffineDecomposition,b::BlockSnapshots)
   end
 end
 
+_fill_with_zeros!(a::ParamBlockArray) = map(_fill_with_zeros!,blocks(a))
+
 function allocate_mdeim_lincomb(
   test::BlockRBSpace,
   r::AbstractParamRealization)
@@ -717,15 +725,19 @@ function interpolation_error(a::BlockAffineDecomposition,fes::BlockSnapshots,rbs
 end
 
 function interpolation_error(a::AffineContribution,fes::ArrayContribution,rbs::ArrayContribution)
-  interp_err = sum([interpolation_error(a[i],fes[i],rbs[i]) for i in eachindex(a)])
-  Dict("interpolation error" => interp_err)
+  sum([interpolation_error(a[i],fes[i],rbs[i]) for i in eachindex(a)])
 end
 
 function interpolation_error(a::Tuple,fes::Tuple,rbs::Tuple)
-  map(interpolation_error,a,fes,rbs)
+  @check length(a) == length(fes) == length(rbs)
+  err = ()
+  for i = eachindex(a)
+    err = (err...,interpolation_error(a[i],fes[i],rbs[i]))
+  end
+  err
 end
 
-function interpolation_error(solver,feop,rbop,s)
+function _interpolation_error(solver,feop,rbop,s)
   feA,feb = _jacobian_and_residual(get_fe_solver(solver),feop,s)
   rbA,rbb = _jacobian_and_residual(solver,rbop.op,s)
   errA = interpolation_error(rbop.lhs,feA,rbA)
@@ -733,14 +745,44 @@ function interpolation_error(solver,feop,rbop,s)
   return errA,errb
 end
 
-function linear_combination_error(solver,feop,rbop,s)
+function interpolation_error(solver,feop,rbop,s)
+  errA,errb = _interpolation_error(solver,feop,rbop,s)
+  return Dict("interpolation error matrix" => errA),Dict("interpolation error vector" => errb)
+end
+
+function interpolation_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
+  errA_lin,errb_lin = _interpolation_error(solver,feop.op_linear,rbop.op_linear,s)
+  errA_nlin,errb_nlin = _interpolation_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s)
+  err_lin = (Dict("interpolation error linear matrix" => errA_lin),
+    Dict("interpolation error linear vector" => errb_lin))
+  err_nlin = (Dict("interpolation error nonlinear matrix" => errA_nlin),
+    Dict("interpolation error nonlinear vector" => errb_nlin))
+  return err_lin,err_nlin
+end
+
+function _linear_combination_error(solver,feop,rbop,s)
   feA,feb = _jacobian_and_residual(get_fe_solver(solver),feop,s)
   feA_comp = compress(solver,feA,get_trial(rbop),get_test(rbop))
   feb_comp = compress(solver,feb,get_test(rbop))
   rbA,rbb = _jacobian_and_residual(solver,rbop,s)
   errA = _rel_norm(feA_comp,rbA)
   errb = _rel_norm(feb_comp,rbb)
+  return errA,errb
+end
+
+function linear_combination_error(solver,feop,rbop,s)
+  errA,errb = _linear_combination_error(solver,feop,rbop,s)
   Dict("projection error matrix" => errA),Dict("projection error vector" => errb)
+end
+
+function linear_combination_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
+  errA_lin,errb_lin = _linear_combination_error(solver,feop.op_linear,rbop.op_linear,s)
+  errA_nlin,errb_nlin = _linear_combination_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s)
+  err_lin = (Dict("projection error linear matrix" => errA_lin),
+    Dict("projection error linear vector" => errb_lin))
+  err_nlin = (Dict("projection error nonlinear matrix" => errA_nlin),
+    Dict("projection error nonlinear vector" => errb_nlin))
+  return err_lin,err_nlin
 end
 
 function _rel_norm(fea,rba)

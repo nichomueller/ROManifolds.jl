@@ -92,7 +92,7 @@ end
 
 function _solve_rb_nr!(x,fex,A,b,dx,ns,nls,op,cache)
   jac_cache,res_cache = cache
-  trial = get_trial(op.odeop)
+  trial = get_trial(op.odeop)(op.r)
   isconv, conv0 = Algebra._check_convergence(nls,b)
   if isconv; return; end
 
@@ -100,12 +100,12 @@ function _solve_rb_nr!(x,fex,A,b,dx,ns,nls,op,cache)
     rmul!(b,-1)
     solve!(dx,ns,b)
     x .+= dx
-    fex .= recast(x,trial)
+    fex = recast(x,trial)
 
     b = residual!(res_cache,op,fex)
     isconv = Algebra._check_convergence(nls,b,conv0)
     if isconv; return; end
-
+    println(maximum(abs,b))
     if nliter == nls.max_nliters
       @unreachable
     end

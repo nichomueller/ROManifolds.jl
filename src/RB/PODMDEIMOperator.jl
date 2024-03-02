@@ -158,7 +158,7 @@ function _select_cache_at_time_locations(xhF::Tuple{Vararg{ParamBlockVector}},od
   Us,Uts,fecache = ode_cache
   new_xhF = ()
   new_Us = ()
-  for i = eachindex(xhF)
+  for i = eachindex(Us)
     spacei = Us[i]
     VT = spacei.vector_type
     style = spacei.multi_field_style
@@ -318,6 +318,8 @@ function Algebra.residual!(
   ode_cache)
 
   b_lin,cache_nl = cache
+  _,_,rbcache_nl = cache_nl
+  _fill_with_zeros!(rbcache_nl)
   b_nlin = residual!(cache_nl,op.op_nonlinear,r,xhF,ode_cache)
   @. b_nlin = b_nlin + b_lin
   return b_nlin
@@ -333,8 +335,9 @@ function Algebra.jacobian!(
   ode_cache)
 
   A_lin,cache_nl = cache
-  fecache_nl, = cache_nl
+  fecache_nl,_,rbcache_nl = cache_nl
   LinearAlgebra.fillstored!(fecache_nl,zero(eltype(fecache_nl)))
+  _fill_with_zeros!(rbcache_nl)
   A_nlin = jacobian!(cache_nl,op.op_nonlinear,r,xhF,i,γᵢ,ode_cache)
   @. A_nlin = A_nlin + A_lin
   return A_nlin
@@ -349,8 +352,9 @@ function ODETools.jacobians!(
   ode_cache)
 
   A_lin,cache_nl = cache
-  fecache_nl, = cache_nl
+  fecache_nl,_,rbcache_nl = cache_nl
   LinearAlgebra.fillstored!(fecache_nl,zero(eltype(fecache_nl)))
+  _fill_with_zeros!(rbcache_nl)
   A_nlin = jacobians!(cache_nl,op.op_nonlinear,r,xhF,γ,ode_cache)
   @. A_nlin = A_nlin + A_lin
   return A_nlin
@@ -423,13 +427,16 @@ function ODETools._matrix_and_vector!(cache_mat,cache_vec,op::PODMDEIMOperator,r
 end
 
 function ODETools._matrix!(cache,op::PODMDEIMOperator,r,dtθ,u0,ode_cache,vθ)
-  fecache, = cache
+  fecache,_,rbcache = cache
   LinearAlgebra.fillstored!(fecache,zero(eltype(fecache)))
+  _fill_with_zeros!(rbcache)
   A = ODETools.jacobians!(cache,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
   return A
 end
 
 function ODETools._vector!(cache,op::PODMDEIMOperator,r,dtθ,u0,ode_cache,vθ)
+  _,_,rbcache = cache
+  _fill_with_zeros!(rbcache)
   b = residual!(cache,op,r,(u0,vθ),ode_cache)
   b .*= -1.0
   return b
@@ -476,7 +483,7 @@ end
 
 # for testing/visualization purposes
 
-function pod_mdeim_error(solver,feop,op::PODMDEIMOperator,s::AbstractArray)
+function pod_mdeim_error(solver,feop,op::RBOperator,s::AbstractArray)
   pod_err = pod_error(get_trial(op),s,assemble_norm_matrix(feop))
   mdeim_err = mdeim_error(solver,feop,op,s)
   return pod_err,mdeim_err

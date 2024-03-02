@@ -79,7 +79,7 @@ reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial_u = TransientTrialParamFESpace(test_u,gμt)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:C0)
+test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -163,26 +163,60 @@ cache = cache_jac,cache_res
 
 # initial nonlinear res/jac
 b = residual!(cache_res,nlop,fex)
+b1 = copy(b)
 A = jacobian!(cache_jac,nlop,fex)
+A1 = copy(A)
 dx = similar(b)
 ss = symbolic_setup(LUSolver(),A)
 ns = numerical_setup(ss,A)
 
-trial = get_trial(nlop.odeop)
-isconv, conv0 = Algebra._check_convergence(nls,b)
+# trial = get_trial(nlop.odeop)(nlop.r)
+# isconv, conv0 = Algebra._check_convergence(nls,b)
 
-rmul!(b,-1)
-solve!(dx,ns,b)
-red_x .+= dx
-fex .= recast(red_x,trial)
+# rmul!(b,-1)
+# solve!(dx,ns,b)
+# red_x .+= dx
 
-b = residual!(res_cache,nlop,fex)
-isconv = Algebra._check_convergence(nls,b,conv0)
-if isconv; return; end
+# xr = recast(red_x,trial)
+# fex = xr
+# # fex .= recast(red_x,trial)
 
-if nliter == nls.max_nliters
-  @unreachable
+# b = residual!(cache_res,nlop,fex)
+# isconv = Algebra._check_convergence(nls,b,conv0)
+# if isconv; return; end
+# println(maximum(abs,b))
+
+# A = jacobian!(cache_jac,nlop,fex)
+# numerical_setup!(ns,A)
+
+# norm(b[1])
+# norm(A[1])
+
+function myloop(x,A,b,dx,ns,nls,op,cache)
+  jac_cache,res_cache = cache
+  trial = get_trial(op.odeop)(op.r)
+  rmul!(b,-1)
+  solve!(dx,ns,b)
+  x .+= dx
+  fex = recast(x,trial)
+  b = residual!(res_cache,op,fex)
+  A = jacobian!(jac_cache,op,fex)
+  numerical_setup!(ns,A)
+  # println(norm(A[1]))
+  # println(norm(b[1]))
+  # println(norm(dx[1]))
+  # println(norm(x[1]))
 end
 
-A = jacobian!(jac_cache,nlop,fex)
-numerical_setup!(ns,A)
+b = residual!(cache_res,nlop,fex)
+b1 = copy(b)
+A = jacobian!(cache_jac,nlop,fex)
+A1 = copy(A)
+dx = similar(b)
+ss = symbolic_setup(LUSolver(),A)
+ns = numerical_setup(ss,A)
+for i = 1:10
+  myloop(red_x,A,b,dx,ns,nls,nlop,cache)
+  red_x .= 0.0
+  fex .= 0.0
+end
