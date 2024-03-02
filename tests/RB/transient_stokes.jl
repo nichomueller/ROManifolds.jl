@@ -5,7 +5,7 @@ using Gridap.MultiField
 using Mabla.FEM
 using Mabla.RB
 
-θ = 0.5
+θ = 1
 dt = 0.01
 t0 = 0.0
 tf = 0.1
@@ -68,7 +68,7 @@ reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial_u = TransientTrialParamFESpace(test_u,gμt_in)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:C0)
+test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -112,3 +112,55 @@ err_space = RB.space_time_error(results_space)
 println(err_space)
 save(test_dir,rbop_space)
 save(test_dir,results_space)
+
+θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+son = select_snapshots(fesnaps,RB.online_params(rbsolver))
+r = copy(get_realization(son))
+FEM.shift_time!(r,dt*(θ-1))
+rtrial = get_trial(rbop)(r)
+fe_trial = get_fe_trial(rbop)(r)
+red_x = zero_free_values(rtrial)
+y = zero_free_values(fe_trial)
+z = similar(y)
+z .= 0.0
+ode_cache = allocate_cache(rbop,r)
+mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(rbop,r,y,ode_cache)
+stats = @timed begin
+  ode_cache = update_cache!(ode_cache,rbop,r)
+  A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,rbop,r,dtθ,y,ode_cache,z)
+  afop = AffineOperator(A,b)
+  solve!(red_x,fesolver.nls,afop)
+end
+
+x = recast(red_x,rtrial)
+s = Snapshots(x,r) |> reverse_snapshots
+
+function _recast(red_x::ParamBlockVector,r::RB.BlockRBSpace)
+  map(eachindex(red_x)) do i
+    red_xi = red_x[i]
+    block_xi = map(1:blocklength(red_xi)) do j
+      _recast(red_xi[Block(j)],r[j])
+    end
+    mortar(block_xi)
+  end
+end
+function _recast(red_x::AbstractVector,r::RBSpace)
+  basis_space = get_basis_space(r)
+  basis_time = get_basis_time(r)
+  ns = num_reduced_space_dofs(r)
+  nt = num_reduced_times(r)
+
+  red_xmat = reshape(red_x,nt,ns)
+  xmat = basis_space*(basis_time*red_xmat)'
+  x = eachcol(xmat) |> collect
+  ParamArray(x)
+end
+function _recast(red_x::ParamVector,r::RBSpace)
+  map(red_x) do red_x
+    _recast(red_x,r)
+  end
+end
+
+_x = _recast(red_x,rtrial)
+
+_s = reverse_snapshots(_x,r)

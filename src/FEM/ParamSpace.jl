@@ -105,7 +105,7 @@ end
 
 get_initial_time(r::TransientParamRealizationAt) = @notimplemented
 get_times(r::TransientParamRealizationAt) = r.t[]
-Base.copy(r::TransientParamRealizationAt) = TransientParamRealizationAt(copy(r.params),copy(r.t))
+Base.copy(r::TransientParamRealizationAt) = TransientParamRealizationAt(copy(r.params),Ref(copy(r.t)))
 Arrays.testitem(r::TransientParamRealizationAt) = testitem(get_params(r)),r.t[]
 
 function Base.getindex(r::TransientParamRealizationAt,i,j)

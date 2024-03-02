@@ -812,7 +812,7 @@ end
 function recast(s::NnzSnapshots{Mode1Axis},a::AbstractMatrix)
   s1 = first(s.values)
   r = get_realization(s)
-  r1 = r[1,axes(a,2)]
+  r1 = r[axes(a,2),Base.OneTo(1)]
   i,j, = findnz(s1)
   m,n = size(s1)
   asparse = map(eachcol(a)) do v
@@ -957,7 +957,7 @@ function reverse_snapshots(
   active_block_ids = findall(!iszero,block_vals)
   block_map = BlockMap(nblocks,active_block_ids)
   vec_block_values = map(blocks,values)
-  active_block_snaps = Any[InnerTimeOuterParamTransientSnapshots(map(x->x[i],vec_block_values),r) for i in active_block_ids]
+  active_block_snaps = Any[reverse_snapshots(map(x->x[i],vec_block_values),r) for i in active_block_ids]
   BlockSnapshots(block_map,active_block_snaps...)
 end
 

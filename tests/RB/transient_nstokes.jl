@@ -20,13 +20,13 @@ using Mabla.RB
 θ = 1
 dt = 0.01
 t0 = 0.0
-tf = 0.1
+tf = 0.05
 
 pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
-n = 10
+n = 5
 domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain, partition)
@@ -148,10 +148,10 @@ cache = cache_lin,cache_nlin
 
 ode_cache = update_cache!(ode_cache,rbop,r)
 nlop = RBThetaMethodParamOperator(rbop,r,dtθ,y,ode_cache,z)
-# solve!(red_x,fesolver.nls,nlop,nl_cache)
+# solve!(red_x,fesolver.nls,nlop,cache)
 
 fex = similar(nlop.u0)
-fex .= 0.0
+# fex .= 0.0
 (cache_jac_lin,cache_res_lin),(cache_jac_nlin,cache_res_nlin) = cache
 
 # linear res/jac, now they are treated as cache
@@ -161,37 +161,28 @@ cache_jac = A_lin,cache_jac_nlin
 cache_res = b_lin,cache_res_nlin
 cache = cache_jac,cache_res
 
-# # initial nonlinear res/jac
-# b = residual!(cache_res,nlop,fex)
-# A = jacobian!(cache_jac,nlop,fex)
-# dx = similar(b)
-# ss = symbolic_setup(LUSolver(),A)
-# ns = numerical_setup(ss,A)
+# initial nonlinear res/jac
+b = residual!(cache_res,nlop,fex)
+A = jacobian!(cache_jac,nlop,fex)
+dx = similar(b)
+ss = symbolic_setup(LUSolver(),A)
+ns = numerical_setup(ss,A)
 
-# opnl = feop.op_nonlinear.op
-# odeopopnl = get_algebraic_operator(opnl)
-# nopnl = ThetaMethodParamOperator(odeopopnl,r,dtθ,y,ode_cache,z)
-# J = jacobian(nopnl,y)
+trial = get_trial(nlop.odeop)
+isconv, conv0 = Algebra._check_convergence(nls,b)
 
-# rbopnl = rbop.op_nonlinear
-# LHS1 = rbopnl.lhs[1]
-# RHS1 = rbopnl.rhs
+rmul!(b,-1)
+solve!(dx,ns,b)
+red_x .+= dx
+fex .= recast(red_x,trial)
 
-# dC = LHS1[1]
-# C = RHS1[1]
+b = residual!(res_cache,nlop,fex)
+isconv = Algebra._check_convergence(nls,b,conv0)
+if isconv; return; end
 
-# dC1 = dC[1]
-
-# jacobian!(cache_jac,nlop,fex)
-uF = fex
-vθ = nlop.vθ
-# ODETools.jacobians!(cache_jac,nlop.odeop,nlop.r,(uF,vθ),(1.0,1/nlop.dtθ),nlop.ode_cache)
-A_lin,cache_nl = cache_jac
-fecache_nl, = cache_nl
-for i = eachindex(fecache_nl)
-  LinearAlgebra.fillstored!(fecache_nl[i],zero(eltype(fecache_nl[i])))
+if nliter == nls.max_nliters
+  @unreachable
 end
-# A_nlin = ODETools.jacobians!(cache_nl,nlop.odeop.op_nonlinear,nlop.r,(uF,vθ),(1.0,1/nlop.dtθ),ode_cache)
-op,r,xhF,γ = nlop.odeop.op_nonlinear,nlop.r,(uF,vθ),(1.0,1/nlop.dtθ)
-fe_A,coeff_cache,lincomb_cache = cache_nl
-fe_sA = fe_jacobians!(fe_A,op,r,xhF,γ,ode_cache)
+
+A = jacobian!(jac_cache,nlop,fex)
+numerical_setup!(ns,A)

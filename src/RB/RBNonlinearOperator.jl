@@ -92,8 +92,8 @@ end
 
 function _solve_rb_nr!(x,fex,A,b,dx,ns,nls,op,cache)
   jac_cache,res_cache = cache
-  trial = get_trial(op)
-  isconv, conv0 = _check_convergence(nls,b)
+  trial = get_trial(op.odeop)
+  isconv, conv0 = Algebra._check_convergence(nls,b)
   if isconv; return; end
 
   for nliter in 1:nls.max_nliters

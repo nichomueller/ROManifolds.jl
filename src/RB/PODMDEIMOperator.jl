@@ -411,7 +411,7 @@ function Algebra.solve(
   end
 
   x = recast(red_x,trial)
-  s = reverse_snapshots(x,r)
+  s = Snapshots(x,r)
   cs = ComputationalStats(stats,num_params(r))
   return s,cs
 end
@@ -469,7 +469,7 @@ function Algebra.solve(
   end
 
   x = recast(red_x,trial)
-  s = reverse_snapshots(x,r)
+  s = Snapshots(x,r)
   cs = ComputationalStats(stats,num_params(r))
   return s,cs
 end

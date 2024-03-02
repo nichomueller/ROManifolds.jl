@@ -99,6 +99,8 @@ FEM.num_times(r::RBSpace) = size(get_basis_time(r),1)
 function num_reduced_times end
 num_reduced_times(r::RBSpace) = size(get_basis_time(r),2)
 
+num_fe_free_dofs(r::RBSpace) = dot(num_space_dofs(r),num_times(r))
+
 FESpaces.num_free_dofs(r::RBSpace) = dot(num_reduced_space_dofs(r),num_reduced_times(r))
 
 FESpaces.get_free_dof_ids(r::RBSpace) = Base.OneTo(num_free_dofs(r))
@@ -118,6 +120,11 @@ function FESpaces.get_vector_type(r::RBSpace)
   V = get_vector_type(r.space)
   newV = change_length(V)
   return newV
+end
+
+function Algebra.allocate_in_domain(r::RBSpace)
+  V = get_vector_type(r.space)
+  allocate_vector(V,num_fe_free_dofs(r))
 end
 
 function compress_basis_space(A::AbstractMatrix,test::RBSpace)
@@ -161,22 +168,35 @@ function combine_basis_time(
   combine(bt_proj,bt_proj_shift)
 end
 
-function recast(red_x::AbstractVector,r::RBSpace)
+struct RecastMap <: Map end
+
+function Arrays.return_cache(k::RecastMap,x::ParamVector,r::RBSpace)
+  allocate_in_domain(r)
+end
+
+function Arrays.evaluate!(cache,k::RecastMap,x::ParamVector,r::RBSpace)
+  for ip in eachindex(x)
+    Xip = recast(x[ip],r)
+    for it in 1:num_times(r)
+      cache[(ip-1)*num_times(r)+it] = Xip[:,it]
+    end
+  end
+end
+
+function recast(x::Vector,r::RBSpace)
   basis_space = get_basis_space(r)
   basis_time = get_basis_time(r)
   ns = num_reduced_space_dofs(r)
   nt = num_reduced_times(r)
 
-  red_xmat = reshape(red_x,nt,ns)
-  xmat = basis_space*(basis_time*red_xmat)'
-  x = eachcol(xmat) |> collect
-  ParamArray(x)
+  X = reshape(x,nt,ns)
+  basis_space*(basis_time*X)'
 end
 
-function recast(red_x::ParamVector,r::RBSpace)
-  map(red_x) do red_x
-    recast(red_x,r)
-  end
+function recast(x::AbstractVector,r::RBSpace)
+  cache = return_cache(RecastMap(),x,r)
+  evaluate!(cache,RecastMap(),x,r)
+  return cache
 end
 
 # multi field interface
@@ -338,14 +358,18 @@ function add_time_supremizers(basis_time;tol=1e-2)
   return ArrayBlock([basis_primal,basis_dual],basis_time.touched)
 end
 
-function recast(red_x::ParamBlockVector,r::BlockRBSpace)
-  map(eachindex(red_x)) do i
-    red_xi = red_x[i]
-    block_xi = map(1:blocklength(red_xi)) do j
-      recast(red_xi[Block(j)],r[j])
-    end
-    mortar(block_xi)
+function Arrays.return_cache(k::RecastMap,x::ParamBlockVector,r::BlockRBSpace)
+  block_cache = map(1:blocklength(x)) do i
+    return_cache(k,x[Block(i)],r[i])
   end
+  mortar(block_cache)
+end
+
+function Arrays.evaluate!(cache,k::RecastMap,x::ParamBlockVector,r::BlockRBSpace)
+  @inbounds for i = 1:blocklength(cache)
+    evaluate!(cache[Block(i)],k,x[Block(i)],r[i])
+  end
+  return cache
 end
 
 # for testing/visualization purposes
