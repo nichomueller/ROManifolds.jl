@@ -127,7 +127,7 @@ println(RB.space_time_error(results_space))
 save(test_dir,rbop_space)
 save(test_dir,results_space)
 
-son = select_snapshots(fesnaps,RB.online_params(rbsolver))
+son = select_snapshots(fesnaps,1)
 ron = get_realization(son)
 θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
@@ -170,53 +170,20 @@ dx = similar(b)
 ss = symbolic_setup(LUSolver(),A)
 ns = numerical_setup(ss,A)
 
-# trial = get_trial(nlop.odeop)(nlop.r)
-# isconv, conv0 = Algebra._check_convergence(nls,b)
+trial = get_trial(nlop.odeop)(nlop.r)
+isconv, conv0 = Algebra._check_convergence(nls,b)
 
-# rmul!(b,-1)
-# solve!(dx,ns,b)
-# red_x .+= dx
+rmul!(b,-1)
+solve!(dx,ns,b)
+red_x .+= dx
 
-# xr = recast(red_x,trial)
-# fex = xr
-# # fex .= recast(red_x,trial)
-
-# b = residual!(cache_res,nlop,fex)
-# isconv = Algebra._check_convergence(nls,b,conv0)
-# if isconv; return; end
-# println(maximum(abs,b))
-
-# A = jacobian!(cache_jac,nlop,fex)
-# numerical_setup!(ns,A)
-
-# norm(b[1])
-# norm(A[1])
-
-function myloop(x,A,b,dx,ns,nls,op,cache)
-  jac_cache,res_cache = cache
-  trial = get_trial(op.odeop)(op.r)
-  rmul!(b,-1)
-  solve!(dx,ns,b)
-  x .+= dx
-  fex = recast(x,trial)
-  b = residual!(res_cache,op,fex)
-  A = jacobian!(jac_cache,op,fex)
-  numerical_setup!(ns,A)
-  # println(norm(A[1]))
-  # println(norm(b[1]))
-  # println(norm(dx[1]))
-  # println(norm(x[1]))
-end
+xr = recast(red_x,trial)
+fex = xr
+# fex .= recast(red_x,trial)
 
 b = residual!(cache_res,nlop,fex)
-b1 = copy(b)
+isconv = Algebra._check_convergence(nls,b,conv0)
+println(maximum(abs,b))
+
 A = jacobian!(cache_jac,nlop,fex)
-A1 = copy(A)
-dx = similar(b)
-ss = symbolic_setup(LUSolver(),A)
-ns = numerical_setup(ss,A)
-for i = 1:10
-  myloop(red_x,A,b,dx,ns,nls,nlop,cache)
-  red_x .= 0.0
-  fex .= 0.0
-end
+numerical_setup!(ns,A)

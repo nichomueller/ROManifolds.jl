@@ -321,7 +321,7 @@ function Algebra.residual!(
   _,_,rbcache_nl = cache_nl
   _fill_with_zeros!(rbcache_nl)
   b_nlin = residual!(cache_nl,op.op_nonlinear,r,xhF,ode_cache)
-  @. b_nlin = b_nlin + b_lin
+  @. b_nlin = b_nlin - b_lin
   return b_nlin
 end
 

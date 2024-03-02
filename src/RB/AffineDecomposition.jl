@@ -395,7 +395,6 @@ function mdeim_lincomb!(
   time_prod_cache,lincomb_cache = cache
   basis_time = a.metadata
   basis_space = a.basis_space
-  println(norm(map(norm,coeff.array)))
 
   @inbounds for i = eachindex(lincomb_cache)
     lci = lincomb_cache[i]
@@ -415,7 +414,6 @@ function mdeim_lincomb!(
   time_prod_cache,lincomb_cache = cache
   basis_time = a.metadata
   basis_space = a.basis_space
-  println(norm(map(norm,coeff.array)))
 
   @inbounds for i = eachindex(lincomb_cache)
     lci = lincomb_cache[i]

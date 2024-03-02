@@ -100,7 +100,7 @@ function _solve_rb_nr!(x,fex,A,b,dx,ns,nls,op,cache)
     rmul!(b,-1)
     solve!(dx,ns,b)
     x .+= dx
-    fex = recast(x,trial)
+    fex .= recast(x,trial)
 
     b = residual!(res_cache,op,fex)
     isconv = Algebra._check_convergence(nls,b,conv0)
