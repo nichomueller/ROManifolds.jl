@@ -55,8 +55,14 @@ export get_realization
 export compress
 include("Snapshots.jl")
 
+export TTSnapshots
+export BasicTTSnapshots
+export TransientTTSnapshots
+include("TTSnapshots.jl")
+
 export RBInfo
 export RBSolver
+export TTRBSolver
 export get_test_directory
 export fe_solutions
 export ode_solutions

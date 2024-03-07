@@ -57,7 +57,7 @@ struct TTPODMDEIMSolver{S,M} <: RBSolver{S}
     nsnaps_state=50,
     nsnaps_mdeim=20,
     nsnaps_test=10) where {S,M}
-    new{S,M}(fesolver,ϵ,δ,mdeim_style,nsnaps_state,nsnaps_mdeim,nsnaps_test)
+    new{S,M}(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_mdeim,nsnaps_test)
   end
 end
 

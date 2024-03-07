@@ -173,6 +173,11 @@ export TTArray
 export TTVector
 export TTMatrix
 export TTSparseMatrix
+export ParamTTArray
+export ParamTTVector
+export ParamTTMatrix
+export ParamTTSparseMatrix
+export ParamTTSparseMatrixCSC
 include("TTArray.jl")
 
 include("TTAlgebra.jl")

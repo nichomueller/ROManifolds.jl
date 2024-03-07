@@ -41,8 +41,8 @@ end
 # end
 
 function ttsvd(mat::AbstractArray{T,N},args...;kwargs...) where {T,N}
-  cores = Array{T,3}(undef,N)
-  rank = fill(1,N+1)
+  cores = Vector{Array{T,3}}(undef,N)
+  ranks = fill(1,N+1)
   sizes = size(mat)
   mat_k = copy(mat)
   for k = 1:N-1
@@ -50,7 +50,7 @@ function ttsvd(mat::AbstractArray{T,N},args...;kwargs...) where {T,N}
     U,Σ,V = svd(mat_k)
     rank = truncation(Σ;kwargs...)
     ranks[k+1] = rank
-    mat_k = reshape(Σ.*V',rank,sizes[k+1],:)
+    mat_k = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
     core_k = reshape(U[:,1:rank],ranks[k],sizes[k],rank)
     cores[k] = core_k
   end
@@ -59,8 +59,8 @@ function ttsvd(mat::AbstractArray{T,N},args...;kwargs...) where {T,N}
 end
 
 function ttsvd(mat::AbstractArray{T,N},X::AbstractMatrix;kwargs...) where {T,N}
-  cores = Array{T,3}(undef,N)
-  rank = fill(1,N+1)
+  cores = Vector{Array{T,3}}(undef,N)
+  ranks = fill(1,N+1)
   sizes = size(mat)
   mat_k = copy(mat)
   C = cholesky(X)
@@ -70,7 +70,7 @@ function ttsvd(mat::AbstractArray{T,N},X::AbstractMatrix;kwargs...) where {T,N}
     U,Σ,V = svd(Xmat_k)
     rank = truncation(Σ;kwargs...)
     ranks[k+1] = rank
-    mat_k = reshape(Σ.*V',rank,sizes[k+1],:)
+    mat_k = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
     core_k = reshape((L'\U[:,1:rank])[invperm(C.p),:],ranks[k],sizes[k],rank)
     cores[k] = core_k
   end
