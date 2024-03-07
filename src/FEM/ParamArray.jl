@@ -7,7 +7,7 @@ end
 
 const ParamVector{T,A,L} = ParamArray{T,1,A,L}
 const ParamMatrix{T,A,L} = ParamArray{T,2,A,L}
-const SparseParamMatrix = ParamArray{T,2,A,L} where {T,A<:AbstractVector{<:AbstractSparseMatrix},L}
+const ParamSparseMatrix = ParamArray{T,2,A,L} where {T,A<:AbstractVector{<:AbstractSparseMatrix},L}
 
 const AffineParamArray{T,N,A} = ParamArray{T,N,A,1}
 const AffineParamVector{T,A} = ParamVector{T,A,1}
@@ -88,7 +88,7 @@ end
 function Base.similar(::Type{ParamArray{T,N,A,L}},n::Integer...) where {T,N,A,L}
   array = Vector{eltype(A)}(undef,L)
   @inbounds for i = eachindex(array)
-    array[i] = zeros(T,n)
+    array[i] = similar(eltype(A),n...)
   end
   ParamArray(array)
 end

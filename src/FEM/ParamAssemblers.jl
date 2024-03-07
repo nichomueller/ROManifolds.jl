@@ -2,24 +2,32 @@ function get_param_matrix_builder(
   a::SparseMatrixAssembler,
   r::AbstractParamRealization)
 
-  L = length(r)
   mat = get_matrix_builder(a)
   M = get_array_type(mat)
-  elM = eltype(M)
-  pmatrix_type = ParamMatrix{elM,Vector{M},L}
+  pmatrix_type = _get_param_matrix_type(M,r)
   SparseMatrixBuilder(pmatrix_type)
+end
+
+function _get_param_matrix_type(::Type{M},r) where M
+  L = length(r)
+  elM = eltype(M)
+  ParamMatrix{elM,Vector{M},L}
 end
 
 function get_param_vector_builder(
   a::SparseMatrixAssembler,
   r::AbstractParamRealization)
 
-  L = length(r)
   vec = get_vector_builder(a)
   V = get_array_type(vec)
-  elV = eltype(V)
-  pvector_type = ParamVector{elV,Vector{V},L}
+  pvector_type = _get_param_vector_type(V,r)
   ArrayBuilder(pvector_type)
+end
+
+function _get_param_vector_type(::Type{V},r) where V
+  L = length(r)
+  elV = eltype(V)
+  ParamVector{elV,Vector{V},L}
 end
 
 function get_param_assembler(

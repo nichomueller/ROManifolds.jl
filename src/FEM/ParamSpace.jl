@@ -197,6 +197,16 @@ struct ParamFunction{P} <: AbstractParamFunction{P}
   params::P
 end
 
+const 𝑓ₚ = ParamFunction
+
+function ParamFunction(f::Function,p::AbstractArray)
+  @notimplemented "Use a ParamRealization as a parameter input"
+end
+
+function ParamFunction(f::Function,r::TrivialParamRealization)
+  f(r.params)
+end
+
 get_params(f::ParamFunction) = get_params(f.params)
 _get_params(f::ParamFunction) = _get_params(f.params)
 num_params(f::ParamFunction) = length(_get_params(f))
@@ -254,20 +264,24 @@ function Base.iterate(f::ParamFunction,state...)
   return f.fun(rstate),statenext
 end
 
-const 𝑓ₚ = ParamFunction
-
-function ParamFunction(f::Function,p::AbstractArray)
-  @notimplemented "Use a ParamRealization as a parameter input"
-end
-
-function ParamFunction(f::Function,r::TrivialParamRealization)
-  f(r.params)
-end
-
 struct TransientParamFunction{P,T} <: AbstractParamFunction{P}
   fun::Function
   params::P
   times::T
+end
+
+const 𝑓ₚₜ = TransientParamFunction
+
+function TransientParamFunction(f::Function,p::AbstractArray,t)
+  @notimplemented "Use a ParamRealization as a parameter input"
+end
+
+function TransientParamFunction(f::Function,r::TrivialParamRealization,t::Real)
+  f(r.params,t)
+end
+
+function TransientParamFunction(f::Function,r::TransientParamRealization)
+  TransientParamFunction(f,get_params(r),get_times(r))
 end
 
 get_params(f::TransientParamFunction) = get_params(f.params)
@@ -335,16 +349,6 @@ function Base.iterate(f::TransientParamFunction,iterstate)
   (pstate,tstate),state = statenext
   iterstatenext = iterator,state
   f.fun(pstate,tstate),iterstatenext
-end
-
-const 𝑓ₚₜ = TransientParamFunction
-
-function TransientParamFunction(f::Function,p::AbstractArray,t)
-  @notimplemented "Use a ParamRealization as a parameter input"
-end
-
-function TransientParamFunction(f::Function,r::TrivialParamRealization,t::Real)
-  f(r.params,t)
 end
 
 function Arrays.evaluate!(cache,f::AbstractParamFunction,x...)

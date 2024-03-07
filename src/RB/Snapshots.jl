@@ -728,15 +728,15 @@ end
 
 get_mode(s::SelectedInnerTimeOuterParamTransientSnapshots) = get_mode(s.snaps)
 
-const BasicNnzSnapshots = BasicSnapshots{M,T,P,R} where {M,T,P<:SparseParamMatrix,R}
-const TransientNnzSnapshots = TransientSnapshots{M,T,P,R} where {M,T,P<:SparseParamMatrix,R}
+const BasicNnzSnapshots = BasicSnapshots{M,T,P,R} where {M,T,P<:ParamSparseMatrix,R}
+const TransientNnzSnapshots = TransientSnapshots{M,T,P,R} where {M,T,P<:ParamSparseMatrix,R}
 const SelectedNnzSnapshotsAtIndices = SelectedSnapshotsAtIndices{M,T,S,I} where {M,T,S<:Union{BasicNnzSnapshots,TransientNnzSnapshots},I}
 const GenericNnzSnapshots = Union{
   BasicNnzSnapshots{M,T},
   TransientNnzSnapshots{M,T},
   SelectedNnzSnapshotsAtIndices{M,T}} where {M,T}
 
-const InnerTimeOuterParamTransientNnzSnapshots = InnerTimeOuterParamTransientSnapshots{T,P,R} where {T,P<:SparseParamMatrix,R}
+const InnerTimeOuterParamTransientNnzSnapshots = InnerTimeOuterParamTransientSnapshots{T,P,R} where {T,P<:ParamSparseMatrix,R}
 const SelectedInnerTimeOuterParamTransientNnzSnapshots = SelectedInnerTimeOuterParamTransientSnapshots{T,S} where {T,S<:InnerTimeOuterParamTransientNnzSnapshots}
 const NnzSnapshotsSwappedColumns = Union{
   InnerTimeOuterParamTransientNnzSnapshots{T},

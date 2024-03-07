@@ -317,7 +317,10 @@ function Algebra.create_from_nz(a::ParamCSSR{Tv,Ti,P}) where {Tv,Ti,P}
   nzvalscsc = Vector{Tv}(undef,cscnnz)
   pnzvalscsc = allocate_param_array(nzvalscsc,length(P))
   Algebra._csrr_to_csc_fill!(colptrs,rowvals,pnzvalscsc,a.rowptrs,a.colvals,a.nzvals)
-  SparseMatrixCSC(a.nrows,a.ncols,colptrs,rowvals,pnzvalscsc)
+  cssr = map(1:length(P)) do l
+    SparseMatrixCSC(a.nrows,a.ncols,colptr,rowval,pnzvalscsc[l])
+  end
+  ParamArray(cssr)
 end
 
 function Algebra._csrr_to_csc_count!(

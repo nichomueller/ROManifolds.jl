@@ -59,7 +59,7 @@ include("ParamContainer.jl")
 export ParamArray
 export ParamVector
 export ParamMatrix
-export SparseParamMatrix
+export ParamSparseMatrix
 export allocate_param_array
 export zero_param_array
 include("ParamArray.jl")
@@ -168,4 +168,12 @@ include("ParamVisualization.jl")
 
 export get_parent
 include("TriangulationParents.jl")
+
+export TTArray
+export TTVector
+export TTMatrix
+export TTSparseMatrix
+include("TTArray.jl")
+
+include("TTAlgebra.jl")
 end # module

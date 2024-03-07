@@ -18,7 +18,7 @@ using Gridap.MultiField
 using Gridap.ODEs.ODETools
 using Gridap.ODEs.TransientFETools
 
-import Base: *,\
+import Base: +,-,*,\
 import StaticArrays: SVector
 import UnPack: @unpack
 import Gridap.Helpers: @abstractmethod,@check,@notimplemented,@unreachable

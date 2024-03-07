@@ -2,6 +2,14 @@ abstract type RBSolver{S} end
 const ThetaMethodRBSolver = RBSolver{ThetaMethod}
 
 get_fe_solver(s::RBSolver) = s.fesolver
+num_offline_params(solver::RBSolver) = solver.nsnaps_state
+offline_params(solver::RBSolver) = 1:num_offline_params(solver)
+num_online_params(solver::RBSolver) = solver.nsnaps_test
+online_params(solver::RBSolver) = 1+num_offline_params(solver):num_online_params(solver)+num_offline_params(solver)
+FEM.num_params(solver::RBSolver) = num_offline_params(solver) + num_online_params(solver)
+num_mdeim_params(solver::RBSolver) = solver.nsnaps_mdeim
+mdeim_params(solver::RBSolver) = 1:num_mdeim_params(solver)
+get_tol(solver::RBSolver) = solver.ϵ
 
 struct SpaceOnlyMDEIM end
 struct SpaceTimeMDEIM end
@@ -28,17 +36,37 @@ function RBSolver(fesolver,ϵ=1e-4,st_mdeim=SpaceTimeMDEIM();kwargs...)
   PODMDEIMSolver(fesolver,ϵ,st_mdeim;kwargs...)
 end
 
-num_offline_params(solver::PODMDEIMSolver) = solver.nsnaps_state
-offline_params(solver::PODMDEIMSolver) = 1:num_offline_params(solver)
-num_online_params(solver::PODMDEIMSolver) = solver.nsnaps_test
-online_params(solver::PODMDEIMSolver) = 1+num_offline_params(solver):num_online_params(solver)+num_offline_params(solver)
-FEM.num_params(solver::PODMDEIMSolver) = num_offline_params(solver) + num_online_params(solver)
-num_mdeim_params(solver::PODMDEIMSolver) = solver.nsnaps_mdeim
-mdeim_params(solver::PODMDEIMSolver) = 1:num_mdeim_params(solver)
-get_tol(solver::PODMDEIMSolver) = solver.ϵ
-
 function get_test_directory(solver::PODMDEIMSolver;dir=datadir())
   keyword = solver.mdeim_style == SpaceOnlyMDEIM() ? "space_only_mdeim" : "space_time_mdeim"
+  test_dir = joinpath(dir,keyword * "_$(solver.ϵ)")
+  FEM.create_dir(test_dir)
+  test_dir
+end
+
+struct TTPODMDEIMSolver{S,M} <: RBSolver{S}
+  fesolver::S
+  ϵ::Float64
+  mdeim_style::M
+  nsnaps_state::Int
+  nsnaps_mdeim::Int
+  nsnaps_test::Int
+  function TTPODMDEIMSolver(
+    fesolver::S,
+    ϵ::Float64,
+    mdeim_style::M;
+    nsnaps_state=50,
+    nsnaps_mdeim=20,
+    nsnaps_test=10) where {S,M}
+    new{S,M}(fesolver,ϵ,δ,mdeim_style,nsnaps_state,nsnaps_mdeim,nsnaps_test)
+  end
+end
+
+function TTRBSolver(fesolver,ϵ=1e-4,st_mdeim=SpaceTimeMDEIM();kwargs...)
+  TTPODMDEIMSolver(fesolver,ϵ,st_mdeim;kwargs...)
+end
+
+function get_test_directory(solver::TTPODMDEIMSolver;dir=datadir())
+  keyword = solver.mdeim_style == SpaceOnlyMDEIM() ? "TT_space_only_mdeim" : "TT_space_time_mdeim"
   test_dir = joinpath(dir,keyword * "_$(solver.ϵ)")
   FEM.create_dir(test_dir)
   test_dir
