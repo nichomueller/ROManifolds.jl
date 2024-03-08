@@ -1,7 +1,3 @@
-function reduced_basis(s::AbstractSnapshots,args...;kwargs...)
-  Projection(s,args...;kwargs...)
-end
-
 abstract type Projection end
 
 get_basis_space(a::Projection) = @abstractmethod
@@ -23,7 +19,7 @@ end
 
 function Projection(s::NnzSnapshots,args...;kwargs...)
   basis = compute_bases_space_time(s,args...;kwargs...)
-  recast_basis(basis,s)
+  recast_basis(s,basis)
 end
 
 function compute_bases_space_time(s::AbstractSnapshots,norm_matrix=nothing;kwargs...)
@@ -58,22 +54,6 @@ function Projection(s::TTSnapshots,args...;kwargs...)
   TTSVDBasis(basis_spacetime)
 end
 
-function compress_basis_space(A::AbstractMatrix,b_test::PODBasis)
-  compress_basis_space(A,get_basis_space(b_test))
-end
-
-function compress_basis_space(A::AbstractMatrix,b_trial::PODBasis,b_test::PODBasis)
-  compress_basis_space(A,get_basis_space(b_trial),get_basis_space(b_test))
-end
-
-function combine_basis_time(A::AbstractMatrix,b_test::PODBasis;kwargs...)
-  combine_basis_time(A,get_basis_time(b_test))
-end
-
-function combine_basis_time(A::AbstractMatrix,b_trial::PODBasis,b_test::PODBasis;kwargs...)
-  combine_basis_time(A,get_basis_time(b_trial),get_basis_time(b_test);kwargs...)
-end
-
 function recast_basis(s::NnzSnapshots,b::PODBasis)
   basis_space = recast(s,get_basis_space(b))
   basis_time = get_basis_time(b)
@@ -88,6 +68,36 @@ function recast(x::Vector,b::PODBasis)
 
   X = reshape(x,nt,ns)
   basis_space*(basis_time*X)'
+end
+
+struct CompressedPODBasis{A,B,C} <: Projection
+  basis_space::A
+  basis_time::B
+  metadata::C
+end
+
+const VectorCompressedPODBasis = CompressedPODBasis{A,B,C} where {A,B,C<:AbstractMatrix}
+const MatrixCompressedPODBasis = CompressedPODBasis{A,B,C} where {A,B,C<:AbstractArray}
+
+get_basis_space(b::CompressedPODBasis) = b.basis_space
+get_basis_time(b::CompressedPODBasis) = b.basis_time
+num_space_dofs(b::CompressedPODBasis) = @notimplemented
+FEM.num_times(b::CompressedPODBasis) = size(get_basis_time(b),1)
+num_reduced_space_dofs(b::CompressedPODBasis) = @notimplemented
+num_reduced_times(b::CompressedPODBasis) = @notimplemented
+
+function compress_basis(b::PODBasis,b_test::PODBasis;kwargs...)
+  proj_basis_space = compress_basis_space(get_basis_space(b),get_basis_space(b_test))
+  proj_basis_time = get_basis_time(b)
+  metadata = combine_basis_time(get_basis_time(b_test);kwargs...)
+  CompressedPODBasis(proj_basis_space,proj_basis_time,metadata)
+end
+
+function compress_basis(b::PODBasis,b_trial::PODBasis,b_test::PODBasis;kwargs...)
+  proj_basis_space = compress_basis_space(get_basis_space(b),get_basis_space(b_trial),get_basis_space(b_test))
+  proj_basis_time = get_basis_time(b)
+  metadata = combine_basis_time(get_basis_time(b_trial),get_basis_time(b_test);kwargs...)
+  CompressedPODBasis(proj_basis_space,proj_basis_time,metadata)
 end
 
 # TT interface
@@ -129,11 +139,11 @@ end
 
 Base.size(b::BlockProjection,i...) = size(b.array,i...)
 Base.length(b::BlockProjection) = length(b.array)
-Base.eltype(::Type{<:BlockSnapshots{A}}) where A = A
+Base.eltype(::Type{<:BlockProjection{A}}) where A = A
 Base.eltype(b::BlockProjection{A}) where A = A
 Base.ndims(b::BlockProjection{A,N}) where {A,N} = N
-Base.ndims(::Type{BlockSnapshots{A,N}}) where {A,N} = N
-Base.copy(b::BlockProjection) = BlockSnapshots(copy(b.array),copy(b.touched))
+Base.ndims(::Type{BlockProjection{A,N}}) where {A,N} = N
+Base.copy(b::BlockProjection) = BlockProjection(copy(b.array),copy(b.touched))
 Base.eachindex(b::BlockProjection) = eachindex(b.array)
 function Base.getindex(b::BlockProjection,i...)
   if !s.touched[i...]
@@ -192,7 +202,7 @@ function num_reduced_space_dofs(b::BlockProjection)
   return dofs
 end
 
-FEM.num_times(r::BlockRBSpace) = num_times(r[findfirst(r.touched)])
+FEM.num_times(b::BlockProjection) = num_times(b[findfirst(b.touched)])
 
 function num_reduced_times(b::BlockProjection)
   dofs = zeros(length(b))

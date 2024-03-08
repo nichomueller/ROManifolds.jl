@@ -81,26 +81,22 @@ function reduce_triangulation(
   return red_trian
 end
 
-abstract type AbstractAffineDecomposition end
-
-struct AffineDecomposition{M,A,B,C,D,E} <: AbstractAffineDecomposition
+struct AffineDecomposition{M,A,B,C} <: Projection
   mdeim_style::M
-  basis_space::A
-  basis_time::B
-  mdeim_interpolation::C
-  integration_domain::D
-  metadata::E
+  basis::A
+  mdeim_interpolation::B
+  integration_domain::C
 end
 
-const VectorAffineDecomposition = AffineDecomposition{M,A,B,C,D,E} where {M,A,B,C,D,E<:AbstractMatrix}
-const MatrixAffineDecomposition = AffineDecomposition{M,A,B,C,D,E} where {M,A,B,C,D,E<:AbstractArray}
+const VectorAffineDecomposition = AffineDecomposition{M,A,B,C} where {M,A<:VectorCompressedPODBasis,B,C}
+const MatrixAffineDecomposition = AffineDecomposition{M,A,B,C} where {M,A<:MatrixCompressedPODBasis,B,C}
 
 get_integration_domain(a::AffineDecomposition) = a.integration_domain
 get_interp_matrix(a::AffineDecomposition) = a.mdeim_interpolation
 get_indices_space(a::AffineDecomposition) = get_indices_space(get_integration_domain(a))
 get_indices_time(a::AffineDecomposition) = get_indices_time(get_integration_domain(a))
 num_space_dofs(a::AffineDecomposition) = @notimplemented
-FEM.num_times(a::AffineDecomposition) = size(a.basis_time,1)
+FEM.num_times(a::AffineDecomposition) = num_times(a.basis)
 num_reduced_space_dofs(a::AffineDecomposition) = length(get_indices_space(a))
 num_reduced_times(a::AffineDecomposition) = length(get_indices_time(a))
 
@@ -125,6 +121,10 @@ function mdeim(solver::RBSolver,basis_space::AbstractMatrix,basis_time::Abstract
   recast_indices_space = recast_indices(basis_space,indices_space)
   integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
   return lu_interp,integration_domain
+end
+
+function mdeim(solver::RBSolver,basis::PODBasis)
+  mdeim(solver,get_basis_space(basis),get_basis_time(basis))
 end
 
 function FEM.Contribution(v::Tuple{Vararg{AffineDecomposition}},t::Tuple{Vararg{Triangulation}})
@@ -166,18 +166,11 @@ function reduced_form(
   args...;
   kwargs...) where {S,T}
 
-  basis_space,basis_time = reduced_basis(s;ϵ=get_tol(solver))
-  lu_interp,integration_domain = mdeim(solver,basis_space,basis_time)
-  proj_basis_space = compress_basis_space(basis_space,args...)
-  comb_basis_time = combine_basis_time(args...;kwargs...)
+  basis = reduced_basis(s;ϵ=get_tol(solver))
+  lu_interp,integration_domain = mdeim(solver,basis)
+  proj_basis = compress_basis(basis,args...;kwargs...)
   red_trian = reduce_triangulation(trian,integration_domain,args...)
-  ad = AffineDecomposition(
-    solver.mdeim_style,
-    proj_basis_space,
-    basis_time,
-    lu_interp,
-    integration_domain,
-    comb_basis_time)
+  ad = AffineDecomposition(solver.mdeim_style,proj_basis,lu_interp,integration_domain)
   return ad,red_trian
 end
 
@@ -260,6 +253,30 @@ function Algebra.allocate_matrix(::Type{V},m::Integer,n::Integer) where V
   zeros(T,m,n)
 end
 
+struct MDEIMCache{A,B,C}
+  fe_cache::A
+  coeff_cache::B
+  lincomb_cache::C
+end
+
+const ResidualMDEIMCache = MDEIMCache{A,B,C} where {A<:FEM.VectorContribution,B,C}
+const JacobianMDEIMCache = MDEIMCache{A,B,C} where {A<:Tuple{Vararg{FEM.MatrixContribution}},B,C}
+
+function fill_with_zeros!(cache::ResidualMDEIMCache)
+  z = zero(eltype(cache.fe_cache))
+  map(x->fill!(x,z),cache.coeff_cache)
+  map(x->fill!(x,z),cache.lincomb_cache)
+end
+
+function fill_with_zeros!(cache::JacobianMDEIMCache)
+  z = zero(eltype(first(cache.fe_cache)))
+  for i = 1:length(cache.fe_cache)
+    LinearAlgebra.fillstored!(cache.fe_cache[i],z)
+    map(x->fill!(x,z),cache.coeff_cache[i])
+  end
+  map(x->fill!(x,z),cache.lincomb_cache)
+end
+
 function allocate_coeff_matrix(
   a::AffineDecomposition{SpaceOnlyMDEIM},
   r::AbstractParamRealization)
@@ -306,58 +323,6 @@ function allocate_mdeim_coeff(a::AffineContribution,r::AbstractParamRealization)
   return cache_solve,cache_recast
 end
 
-function mdeim_coeff!(
-  cache,
-  a::AffineDecomposition{SpaceOnlyMDEIM},
-  b::AbstractMatrix)
-
-  coeff,coeff_recast = cache
-  mdeim_interpolation = a.mdeim_interpolation
-  ldiv!(coeff,mdeim_interpolation,b)
-  nt = num_times(a)
-  @inbounds for i = eachindex(coeff_recast)
-    coeff_recast[i] = transpose(coeff[:,(i-1)*nt+1:i*nt])
-  end
-end
-
-function mdeim_coeff!(
-  cache,
-  a::AffineDecomposition{SpaceTimeMDEIM},
-  b::AbstractMatrix)
-
-  coeff,coeff_recast = cache
-  mdeim_interpolation = a.mdeim_interpolation
-  ns = num_reduced_space_dofs(a)
-  nt = num_reduced_times(a)
-  np = length(coeff_recast)
-
-  bvec = reshape(b,:,np)
-  ldiv!(coeff,mdeim_interpolation,bvec)
-  @inbounds for i = eachindex(coeff_recast)
-    for j in 1:ns
-      coeff_recast[i][:,j] = a.basis_time*coeff[j:ns:ns*nt,i]
-    end
-  end
-end
-
-function mdeim_coeff!(
-  cache,
-  a::AffineContribution,
-  b::ArrayContribution)
-
-  @assert length(a) == length(b)
-  coeff,coeff_recast = cache
-  for i = eachindex(a)
-    cachei = coeff[i],coeff_recast[i]
-    mdeim_coeff!(cachei,a[i],b[i])
-  end
-  return coeff_recast
-end
-
-_fill_with_zeros!(a::AbstractArray{T}) where T = fill!(a,zero(T))
-_fill_with_zeros!(a::AbstractArray{<:AbstractArray}) = map(_fill_with_zeros!,a)
-_fill_with_zeros!(a::Tuple) = map(_fill_with_zeros!,a)
-
 function allocate_mdeim_lincomb(
   test::RBSpace,
   r::AbstractParamRealization)
@@ -387,14 +352,64 @@ function allocate_mdeim_lincomb(
   return time_prod_cache,lincomb_cache
 end
 
+function mdeim_coeff!(
+  cache,
+  a::AffineDecomposition{SpaceOnlyMDEIM},
+  b::AbstractMatrix)
+
+  coeff,coeff_recast = cache
+  mdeim_interpolation = a.mdeim_interpolation
+  ldiv!(coeff,mdeim_interpolation,b)
+  nt = num_times(a)
+  @inbounds for i = eachindex(coeff_recast)
+    coeff_recast[i] = transpose(coeff[:,(i-1)*nt+1:i*nt])
+  end
+end
+
+function mdeim_coeff!(
+  cache,
+  a::AffineDecomposition{SpaceTimeMDEIM},
+  b::AbstractMatrix)
+
+  coeff,coeff_recast = cache
+  mdeim_interpolation = a.mdeim_interpolation
+  basis_time = a.basis.basis_time
+
+  ns = num_reduced_space_dofs(a)
+  nt = num_reduced_times(a)
+  np = length(coeff_recast)
+
+  bvec = reshape(b,:,np)
+  ldiv!(coeff,mdeim_interpolation,bvec)
+  @inbounds for i = eachindex(coeff_recast)
+    for j in 1:ns
+      coeff_recast[i][:,j] = basis_time*coeff[j:ns:ns*nt,i]
+    end
+  end
+end
+
+function mdeim_coeff!(
+  cache,
+  a::AffineContribution,
+  b::ArrayContribution)
+
+  @assert length(a) == length(b)
+  coeff,coeff_recast = cache
+  for i = eachindex(a)
+    cachei = coeff[i],coeff_recast[i]
+    mdeim_coeff!(cachei,a[i],b[i])
+  end
+  return coeff_recast
+end
+
 function mdeim_lincomb!(
   cache,
   a::VectorAffineDecomposition,
   coeff::ParamMatrix)
 
   time_prod_cache,lincomb_cache = cache
-  basis_time = a.metadata
-  basis_space = a.basis_space
+  basis_time = a.basis.metadata
+  basis_space = a.basis.basis_space
 
   @inbounds for i = eachindex(lincomb_cache)
     lci = lincomb_cache[i]
@@ -412,8 +427,8 @@ function mdeim_lincomb!(
   coeff::ParamMatrix)
 
   time_prod_cache,lincomb_cache = cache
-  basis_time = a.metadata
-  basis_space = a.basis_space
+  basis_time = a.basis.metadata
+  basis_space = a.basis.basis_space
 
   @inbounds for i = eachindex(lincomb_cache)
     lci = lincomb_cache[i]
@@ -448,7 +463,7 @@ struct BlockAffineDecomposition{A,N}
   function BlockAffineDecomposition(
     array::Array{A,N},
     touched::Array{Bool,N}
-    ) where {A<:AbstractAffineDecomposition,N}
+    ) where {A<:AffineDecomposition,N}
 
     @check size(array) == size(touched)
     new{A,N}(array,touched)
@@ -567,8 +582,8 @@ function reduced_matrix_form(
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
   ads,red_trians = Any[
-    reduced_form(solver,s[i,j],trian,trial[j],test[i];kwargs...)
-    for (i,j) in Tuple.(active_block_ids)] |> tuple_of_arrays
+    reduced_form(solver,s[i,j],trian,trial[j],test[i];kwargs...) for (i,j) in Tuple.(active_block_ids)
+    ] |> tuple_of_arrays
   red_trian = FEM.merge_triangulations(red_trians)
   ad = BlockAffineDecomposition(block_map,ads...)
   return ad,red_trian
@@ -589,8 +604,6 @@ function mdeim_coeff!(cache,a::BlockAffineDecomposition,b::BlockSnapshots)
     mdeim_coeff!(cachei,a[acti],b[acti])
   end
 end
-
-_fill_with_zeros!(a::ParamBlockArray) = map(_fill_with_zeros!,blocks(a))
 
 function allocate_mdeim_lincomb(
   test::BlockRBSpace,

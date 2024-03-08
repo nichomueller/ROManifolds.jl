@@ -387,16 +387,16 @@ function tensor_setindex!(s::TransientSnapshotsWithDirichletValues,v,ispace,itim
   end
 end
 
-struct SelectedSnapshotsAtIndices{T,N,S,I} <: AbstractSnapshots{T,N}
+struct SelectedSnapshotsAtIndices{M,T,S,I} <: StandardSnapshots{M,T}
   snaps::S
   selected_indices::I
   function SelectedSnapshotsAtIndices(
-    snaps::AbstractSnapshots{T,N},
+    snaps::StandardSnapshots{M,T},
     selected_indices::I
-    ) where {T,N,I}
+    ) where {M,T,I}
 
     S = typeof(snaps)
-    new{T,N,S,I}(snaps,selected_indices)
+    new{M,T,S,I}(snaps,selected_indices)
   end
 end
 
@@ -409,7 +409,7 @@ function SelectedSnapshotsAtIndices(s::SelectedSnapshotsAtIndices,selected_indic
   SelectedSnapshotsAtIndices(s.snaps,selected_indices)
 end
 
-function select_snapshots(s::AbstractSnapshots,spacerange,timerange,paramrange)
+function select_snapshots(s::StandardSnapshots,spacerange,timerange,paramrange)
   srange = isa(spacerange,Colon) ? Base.OneTo(num_space_dofs(s)) : spacerange
   srange = isa(srange,Integer) ? [srange] : srange
   trange = isa(timerange,Colon) ? Base.OneTo(num_times(s)) : timerange
@@ -420,11 +420,11 @@ function select_snapshots(s::AbstractSnapshots,spacerange,timerange,paramrange)
   SelectedSnapshotsAtIndices(s,selected_indices)
 end
 
-function select_snapshots(s::AbstractSnapshots,timerange,paramrange;spacerange=:)
+function select_snapshots(s::StandardSnapshots,timerange,paramrange;spacerange=:)
   select_snapshots(s,spacerange,timerange,paramrange)
 end
 
-function select_snapshots(s::AbstractSnapshots,paramrange;spacerange=:,timerange=:)
+function select_snapshots(s::StandardSnapshots,paramrange;spacerange=:,timerange=:)
   select_snapshots(s,spacerange,timerange,paramrange)
 end
 
@@ -463,7 +463,7 @@ function tensor_setindex!(
   tensor_setindex!(s.snaps,v,is,it,ip)
 end
 
-function FEM.get_values(s::SelectedSnapshotsAtIndices{T,<:BasicSnapshots}) where T
+function FEM.get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapshots}) where T
   @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = get_values(s.snaps)
   array = Vector{typeof(first(v))}(undef,num_cols(s))
@@ -475,7 +475,7 @@ function FEM.get_values(s::SelectedSnapshotsAtIndices{T,<:BasicSnapshots}) where
   ParamArray(array)
 end
 
-function FEM.get_values(s::SelectedSnapshotsAtIndices{T,<:TransientSnapshots}) where {M,T}
+function FEM.get_values(s::SelectedSnapshotsAtIndices{M,T,<:TransientSnapshots}) where {M,T}
   get_values(BasicSnapshots(s))
 end
 
@@ -486,14 +486,14 @@ end
 
 get_mode(s::SelectedSnapshotsAtIndices) = get_mode(s.snaps)
 
-function BasicSnapshots(s::SelectedSnapshotsAtIndices{T,<:BasicSnapshots}) where T
+function BasicSnapshots(s::SelectedSnapshotsAtIndices{M,T,<:BasicSnapshots}) where {M,T}
   values = get_values(s)
   r = get_realization(s)
   mode = s.snaps.mode
   BasicSnapshots(values,r,mode)
 end
 
-function BasicSnapshots(s::SelectedSnapshotsAtIndices{T,<:TransientSnapshots}) where T
+function BasicSnapshots(s::SelectedSnapshotsAtIndices{M,T,<:TransientSnapshots}) where {M,T}
   @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = s.snaps.values
   basic_values = Vector{typeof(first(first(v)))}(undef,num_cols(s))
@@ -732,11 +732,11 @@ get_mode(s::SelectedInnerTimeOuterParamTransientSnapshots) = get_mode(s.snaps)
 
 const BasicNnzSnapshots = BasicSnapshots{M,T,P,R} where {M,T,P<:ParamSparseMatrix,R}
 const TransientNnzSnapshots = TransientSnapshots{M,T,P,R} where {M,T,P<:ParamSparseMatrix,R}
-const SelectedNnzSnapshotsAtIndices = SelectedSnapshotsAtIndices{T,S,I} where {T,S<:Union{BasicNnzSnapshots,TransientNnzSnapshots},I}
+const SelectedNnzSnapshotsAtIndices = SelectedSnapshotsAtIndices{M,T,S,I} where {M,T,S<:Union{BasicNnzSnapshots,TransientNnzSnapshots},I}
 const GenericNnzSnapshots = Union{
   BasicNnzSnapshots{M,T},
   TransientNnzSnapshots{M,T},
-  SelectedNnzSnapshotsAtIndices{T}} where {M,T}
+  SelectedNnzSnapshotsAtIndices{M,T}} where {M,T}
 
 const InnerTimeOuterParamTransientNnzSnapshots = InnerTimeOuterParamTransientSnapshots{T,P,R} where {T,P<:ParamSparseMatrix,R}
 const SelectedInnerTimeOuterParamTransientNnzSnapshots = SelectedInnerTimeOuterParamTransientSnapshots{T,S} where {T,S<:InnerTimeOuterParamTransientNnzSnapshots}
@@ -978,7 +978,7 @@ struct TensorTrainSnapshots{S,R}
   ranks::R
 end
 
-const AbstractSubTransientSnapshots = Union{A,SubArray{T,N,A}} where {T,A<:AbstractSnapshots{T,N}}
+const AbstractSubTransientSnapshots = Union{A,SubArray{T,N,A}} where {T,N,A<:AbstractSnapshots{T,N}}
 
 function (*)(
   a::Adjoint{<:Any,<:AbstractSubTransientSnapshots},

@@ -82,7 +82,7 @@ pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
 
 ϵ = 1e-4
 rbsolver_space = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-test_dir_space = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","toy_mesh")))
+test_dir_space = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
 # we can load & solve directly, if the offline structures have been previously saved to file
 # load_solve(rbsolver_space,dir=test_dir_space)

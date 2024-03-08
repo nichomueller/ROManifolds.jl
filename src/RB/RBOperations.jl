@@ -19,7 +19,7 @@ function combine_basis_time(A::AbstractMatrix,B::AbstractMatrix;combine=(x,y)->x
   nt_row = size(B,2)
   nt_col = size(A,2)
 
-  T = eltype(get_vector_type(test))
+  T = eltype(A)
   bt_proj = zeros(T,time_ndofs,nt_row,nt_col)
   bt_proj_shift = copy(bt_proj)
   @inbounds for jt = 1:nt_col, it = 1:nt_row

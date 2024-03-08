@@ -11,6 +11,10 @@ function reduced_fe_space(
   return reduced_trial,reduced_test
 end
 
+function reduced_basis(s::AbstractSnapshots,args...;kwargs...)
+  Projection(s,args...;kwargs...)
+end
+
 function reduced_basis(
   feop::TransientParamFEOperator,s::S,norm_matrix;kwargs...) where S
   reduced_basis(s,norm_matrix;kwargs...)
@@ -90,20 +94,12 @@ function Algebra.allocate_in_domain(r::RBSpace)
   allocate_vector(V,num_fe_free_dofs(r))
 end
 
-function compress_basis_space(A::AbstractMatrix,test::RBSpace)
-  compress_basis_space(A,test.basis)
+function compress_basis(b::Projection,test::RBSpace;kwargs...)
+  compress_basis(b,test.basis;kwargs...)
 end
 
-function compress_basis_space(A::AbstractMatrix,trial::RBSpace,test::RBSpace)
-  compress_basis_space(A,trial.basis,test.basis)
-end
-
-function combine_basis_time(test::RBSpace;kwargs...)
-  combine_basis_time(test.basis;kwargs...)
-end
-
-function combine_basis_time(trial::RBSpace,test::RBSpace;kwargs...)
-  combine_basis_time(trial.basis,test.basis;kwargs...)
+function compress_basis(b::Projection,trial::RBSpace,test::RBSpace;kwargs...)
+  compress_basis(b,trial.basis,test.basis;kwargs...)
 end
 
 struct RecastMap <: Map end

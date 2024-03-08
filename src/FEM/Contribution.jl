@@ -32,24 +32,29 @@ function Contribution(v::Tuple{Vararg{AbstractArray}},t::Tuple{Vararg{Triangulat
   ArrayContribution(v,t)
 end
 
-struct ArrayContribution{T,V,K} <: Contribution
+struct ArrayContribution{T,N,V,K} <: Contribution
   values::V
   trians::K
   function ArrayContribution(
     values::V,
     trians::K
-    ) where {T,V<:Tuple{Vararg{AbstractArray{T}}},K<:Tuple{Vararg{Triangulation}}}
+    ) where {T,N,V<:Tuple{Vararg{AbstractArray{T,N}}},K<:Tuple{Vararg{Triangulation}}}
 
     @check length(values) == length(trians)
     @check !any([t === first(trians) for t = trians[2:end]])
-    new{T,V,K}(values,trians)
+    new{T,N,V,K}(values,trians)
   end
 end
+
+const VectorContribution{T,V,K} = ArrayContribution{T,1,V,K}
+const MatrixContribution{T,V,K} = ArrayContribution{T,2,V,K}
 
 ArrayContribution(v::V,t::Triangulation) where V = ArrayContribution((v,),(t,))
 
 Base.eltype(::ArrayContribution{T}) where T = T
 Base.eltype(::Type{<:ArrayContribution{T}}) where T = T
+Base.ndims(::ArrayContribution{T,N}) where {T,N} = N
+Base.ndims(::Type{<:ArrayContribution{T,N}}) where {T,N} = N
 Base.copy(a::ArrayContribution) = ArrayContribution(copy(a.values),a.trians)
 
 struct ContributionBroadcast{D,T}
@@ -72,6 +77,13 @@ function Base.materialize!(a::ArrayContribution,c::ContributionBroadcast)
   a
 end
 
+function Base.fill!(a::ArrayContribution,v)
+  for vals in a.values
+    fill!(vals,v)
+  end
+  a
+end
+
 function LinearAlgebra.fillstored!(a::ArrayContribution,v)
   for vals in a.values
     LinearAlgebra.fillstored!(vals,v)
@@ -79,7 +91,8 @@ function LinearAlgebra.fillstored!(a::ArrayContribution,v)
   a
 end
 
-# quite hacky, it's to deal with multiple jacobians at the same time
+# for testing/visualization purposes
+
 Base.eltype(::Tuple{Vararg{ArrayContribution{T}}}) where T = T
 Base.eltype(::Type{<:Tuple{Vararg{ArrayContribution{T}}}}) where T = T
 

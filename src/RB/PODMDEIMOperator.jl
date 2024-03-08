@@ -56,10 +56,10 @@ function Algebra.allocate_residual(
   ode_cache)
 
   test = get_test(op)
-  fe_b = allocate_residual(op.op,r,x,ode_cache)
+  b = allocate_residual(op.op,r,x,ode_cache)
   coeff_cache = allocate_mdeim_coeff(op.rhs,r)
   lincomb_cache = allocate_mdeim_lincomb(test,r)
-  return fe_b,coeff_cache,lincomb_cache
+  MDEIMCache(b,coeff_cache,lincomb_cache)
 end
 
 function Algebra.allocate_jacobian(
@@ -70,13 +70,13 @@ function Algebra.allocate_jacobian(
 
   trial = get_trial(op)
   test = get_test(op)
-  fe_A = allocate_jacobian(op.op,r,x,ode_cache)
+  A = allocate_jacobian(op.op,r,x,ode_cache)
   coeff_cache = ()
   for i = 1:get_order(op)+1
     coeff_cache = (coeff_cache...,allocate_mdeim_coeff(op.lhs[i],r))
   end
   lincomb_cache = allocate_mdeim_lincomb(trial,test,r)
-  return fe_A,coeff_cache,lincomb_cache
+  MDEIMCache(A,coeff_cache,lincomb_cache)
 end
 
 function Algebra.residual!(
@@ -86,12 +86,11 @@ function Algebra.residual!(
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
-  fe_b,coeff_cache,lincomb_cache = cache
-  fe_sb = fe_residual!(fe_b,op,r,xhF,ode_cache)
-  b_coeff = mdeim_coeff!(coeff_cache,op.rhs,fe_sb)
-  mdeim_lincomb!(lincomb_cache,op.rhs,b_coeff)
-  b = last(lincomb_cache)
-  return b
+  fill_with_zeros!(cache)
+  fe_sb = fe_residual!(cache.fe_cache,op,r,xhF,ode_cache)
+  b_coeff = mdeim_coeff!(cache.coeff_cache,op.rhs,fe_sb)
+  mdeim_lincomb!(cache.lincomb_cache,op.rhs,b_coeff)
+  return last(cache.lincomb_cache)
 end
 
 function Algebra.jacobian!(
@@ -103,12 +102,11 @@ function Algebra.jacobian!(
   γᵢ::Real,
   ode_cache)
 
-  fe_A,coeff_cache,lincomb_cache = cache
-  fe_sA = fe_jacobian!(fe_A,op,r,xhF,γᵢ,ode_cache)
-  A_coeff = mdeim_coeff!(coeff_cache[i],op.lhs[i],fe_sA[i])
-  mdeim_lincomb!(lincomb_cache,op.lhs[i],A_coeff)
-  A = last(lincomb_cache)
-  return A
+  fill_with_zeros!(cache)
+  fe_sA = fe_jacobian!(cache.fe_cache[i],op,r,xhF,γᵢ,ode_cache)
+  A_coeff = mdeim_coeff!(cache.coeff_cache[i],op.lhs[i],fe_sA[i])
+  mdeim_lincomb!(cache.lincomb_cache,op.lhs[i],A_coeff)
+  return last(cache.lincomb_cache)
 end
 
 function ODETools.jacobians!(
@@ -119,14 +117,13 @@ function ODETools.jacobians!(
   γ::Tuple{Vararg{Real}},
   ode_cache)
 
-  fe_A,coeff_cache,lincomb_cache = cache
-  fe_sA = fe_jacobians!(fe_A,op,r,xhF,γ,ode_cache)
+  fill_with_zeros!(cache)
+  fe_sA = fe_jacobians!(cache.fe_cache,op,r,xhF,γ,ode_cache)
   for i = 1:get_order(op)+1
-    A_coeff = mdeim_coeff!(coeff_cache[i],op.lhs[i],fe_sA[i])
-    mdeim_lincomb!(lincomb_cache,op.lhs[i],A_coeff)
+    A_coeff = mdeim_coeff!(cache.coeff_cache[i],op.lhs[i],fe_sA[i])
+    mdeim_lincomb!(cache.lincomb_cache,op.lhs[i],A_coeff)
   end
-  A = last(lincomb_cache)
-  return A
+  return last(cache.lincomb_cache)
 end
 
 function _select_fe_space_at_time_locations(fs::FESpace,indices)
@@ -318,8 +315,6 @@ function Algebra.residual!(
   ode_cache)
 
   b_lin,cache_nl = cache
-  _,_,rbcache_nl = cache_nl
-  _fill_with_zeros!(rbcache_nl)
   b_nlin = residual!(cache_nl,op.op_nonlinear,r,xhF,ode_cache)
   @. b_nlin = b_nlin - b_lin
   return b_nlin
@@ -335,9 +330,6 @@ function Algebra.jacobian!(
   ode_cache)
 
   A_lin,cache_nl = cache
-  fecache_nl,_,rbcache_nl = cache_nl
-  LinearAlgebra.fillstored!(fecache_nl,zero(eltype(fecache_nl)))
-  _fill_with_zeros!(rbcache_nl)
   A_nlin = jacobian!(cache_nl,op.op_nonlinear,r,xhF,i,γᵢ,ode_cache)
   @. A_nlin = A_nlin + A_lin
   return A_nlin
@@ -352,9 +344,6 @@ function ODETools.jacobians!(
   ode_cache)
 
   A_lin,cache_nl = cache
-  fecache_nl,_,rbcache_nl = cache_nl
-  LinearAlgebra.fillstored!(fecache_nl,zero(eltype(fecache_nl)))
-  _fill_with_zeros!(rbcache_nl)
   A_nlin = jacobians!(cache_nl,op.op_nonlinear,r,xhF,γ,ode_cache)
   @. A_nlin = A_nlin + A_lin
   return A_nlin
@@ -427,16 +416,11 @@ function ODETools._matrix_and_vector!(cache_mat,cache_vec,op::PODMDEIMOperator,r
 end
 
 function ODETools._matrix!(cache,op::PODMDEIMOperator,r,dtθ,u0,ode_cache,vθ)
-  fecache,_,rbcache = cache
-  LinearAlgebra.fillstored!(fecache,zero(eltype(fecache)))
-  _fill_with_zeros!(rbcache)
   A = ODETools.jacobians!(cache,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
   return A
 end
 
 function ODETools._vector!(cache,op::PODMDEIMOperator,r,dtθ,u0,ode_cache,vθ)
-  _,_,rbcache = cache
-  _fill_with_zeros!(rbcache)
   b = residual!(cache,op,r,(u0,vθ),ode_cache)
   b .*= -1.0
   return b

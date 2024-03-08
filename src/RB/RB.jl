@@ -33,6 +33,10 @@ export orth_complement!
 export orth_projection
 include("BasisConstruction.jl")
 
+export compress_basis_space
+export combine_basis_time
+include("RBOperations.jl")
+
 export AbstractSnapshots
 export BasicSnapshots
 export TransientSnapshots
@@ -68,13 +72,19 @@ export fe_solutions
 export ode_solutions
 include("RBSolver.jl")
 
-export RBSpace
-export reduced_fe_space
-export reduced_basis
+export Projection
+export PODBasis
+export TTSVDCores
+export BlockProjection
 export get_basis_space
 export num_reduced_space_dofs
 export get_basis_time
 export num_reduced_times
+include("Projection.jl")
+
+export RBSpace
+export reduced_fe_space
+export reduced_basis
 export recast
 include("RBSpace.jl")
 
@@ -101,8 +111,6 @@ export BlockAffineDecomposition
 export mdeim
 export get_mdeim_indices
 export reduce_triangulation
-export compress_basis_space
-export combine_basis_time
 export reduced_matrix_vector_form
 export allocate_mdeim_coeff
 export mdeim_coeff!
