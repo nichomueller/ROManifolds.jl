@@ -5,9 +5,9 @@ function reduced_fe_space(
 
   soff = select_snapshots(s,offline_params(solver))
   norm_matrix = assemble_norm_matrix(feop)
-  bases = reduced_basis(feop,soff,norm_matrix;ϵ=get_tol(solver))
-  reduced_trial = reduced_fe_space(get_trial(feop),bases...)
-  reduced_test = reduced_fe_space(get_test(feop),bases...)
+  basis = reduced_basis(feop,soff,norm_matrix;ϵ=get_tol(solver))
+  reduced_trial = fe_subspace(get_trial(feop),basis)
+  reduced_test = fe_subspace(get_test(feop),basis)
   return reduced_trial,reduced_test
 end
 
@@ -32,71 +32,34 @@ function reduced_basis(
   reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
 end
 
-function reduced_basis(s::AbstractSnapshots,args...;kwargs...)
-  basis_space,basis_time = compute_bases(s,args...;kwargs...)
-  return basis_space,basis_time
+function fe_subspace(space,basis)
+  RBSpace(space,basis)
 end
 
-function reduced_basis(s::NnzSnapshots,args...;kwargs...)
-  basis_space,basis_time = compute_bases(s,args...;kwargs...)
-  sparse_basis_space = recast(s,basis_space)
-  return sparse_basis_space,basis_time
-end
+abstract type FESubspace <: FESpace end
 
-function compute_bases(s::AbstractSnapshots,args...;kwargs...)
-  if num_space_dofs(s) < num_times(s)
-    compute_bases_time_space(s,args...;kwargs...)
-  else
-    compute_bases_space_time(s,args...;kwargs...)
-  end
-end
-
-function compute_bases_space_time(s::AbstractSnapshots,norm_matrix=nothing;kwargs...)
-  basis_space = tpod(s,norm_matrix;kwargs...)
-  compressed_s2 = compress(s,basis_space,norm_matrix) |> change_mode
-  basis_time = tpod(compressed_s2;kwargs...)
-  return basis_space,basis_time
-end
-
-function compute_bases_time_space(s::AbstractSnapshots,norm_matrix=nothing;kwargs...)
-  s2 = change_mode(s)
-  basis_time = tpod(s2;kwargs...)
-  compressed_s = compress(s2,basis_time) |> change_mode
-  basis_space = tpod(compressed_s,norm_matrix;kwargs...)
-  return basis_space,basis_time
-end
-
-function reduced_fe_space(space,bases...)
-  RBSpace(space,bases...)
-end
-
-struct RBSpace{S,BS,BT} <: FESpace
-  space::S
-  basis_space::BS
-  basis_time::BT
+struct RBSpace{A,B} <: FESubspace
+  space::A
+  basis::B
 end
 
 function Arrays.evaluate(U::RBSpace,args...)
   space = evaluate(U.space,args...)
-  RBSpace(space,U.basis_space,U.basis_time)
+  RBSpace(space,U.basis)
 end
 
 (U::RBSpace)(r) = evaluate(U,r)
 (U::RBSpace)(μ,t) = evaluate(U,μ,t)
 
-ODETools.∂t(U::RBSpace) = RBSpace(∂t(U),U.basis_space,U.basis_time)
-ODETools.∂tt(U::RBSpace) = RBSpace(∂tt(U),U.basis_space,U.basis_time)
+ODETools.∂t(U::RBSpace) = RBSpace(∂t(U),U.basis)
+ODETools.∂tt(U::RBSpace) = RBSpace(∂tt(U),U.basis)
 
-function get_basis_space end
-get_basis_space(r::RBSpace) = r.basis_space
+get_basis_space(r::RBSpace) = get_basis_space(r.basis)
 num_space_dofs(r::RBSpace) = size(get_basis_space(r),1)
-function num_reduced_space_dofs end
 num_reduced_space_dofs(r::RBSpace) = size(get_basis_space(r),2)
 
-function get_basis_time end
-get_basis_time(r::RBSpace) = r.basis_time
+get_basis_time(r::RBSpace) = get_basis_time(r.basis)
 FEM.num_times(r::RBSpace) = size(get_basis_time(r),1)
-function num_reduced_times end
 num_reduced_times(r::RBSpace) = size(get_basis_time(r),2)
 
 num_fe_free_dofs(r::RBSpace) = dot(num_space_dofs(r),num_times(r))
@@ -128,44 +91,19 @@ function Algebra.allocate_in_domain(r::RBSpace)
 end
 
 function compress_basis_space(A::AbstractMatrix,test::RBSpace)
-  basis_test = get_basis_space(test)
-  map(eachcol(A)) do a
-    basis_test'*a
-  end
+  compress_basis_space(A,test.basis)
 end
 
 function compress_basis_space(A::AbstractMatrix,trial::RBSpace,test::RBSpace)
-  basis_test = get_basis_space(test)
-  basis_trial = get_basis_space(trial)
-  map(get_values(A)) do A
-    basis_test'*A*basis_trial
-  end
+  compress_basis_space(A,trial.basis,test.basis)
 end
 
 function combine_basis_time(test::RBSpace;kwargs...)
-  get_basis_time(test)
+  combine_basis_time(test.basis;kwargs...)
 end
 
-function combine_basis_time(
-  trial::RBSpace,
-  test::RBSpace;
-  combine=(x,y)->x)
-
-  test_basis = get_basis_time(test)
-  trial_basis = get_basis_time(trial)
-  time_ndofs = size(test_basis,1)
-  nt_test = size(test_basis,2)
-  nt_trial = size(trial_basis,2)
-
-  T = eltype(get_vector_type(test))
-  bt_proj = zeros(T,time_ndofs,nt_test,nt_trial)
-  bt_proj_shift = copy(bt_proj)
-  @inbounds for jt = 1:nt_trial, it = 1:nt_test
-    bt_proj[:,it,jt] .= test_basis[:,it].*trial_basis[:,jt]
-    bt_proj_shift[2:end,it,jt] .= test_basis[2:end,it].*trial_basis[1:end-1,jt]
-  end
-
-  combine(bt_proj,bt_proj_shift)
+function combine_basis_time(trial::RBSpace,test::RBSpace;kwargs...)
+  combine_basis_time(trial.basis,test.basis;kwargs...)
 end
 
 struct RecastMap <: Map end
@@ -184,13 +122,7 @@ function Arrays.evaluate!(cache,k::RecastMap,x::ParamVector,r::RBSpace)
 end
 
 function recast(x::Vector,r::RBSpace)
-  basis_space = get_basis_space(r)
-  basis_time = get_basis_time(r)
-  ns = num_reduced_space_dofs(r)
-  nt = num_reduced_times(r)
-
-  X = reshape(x,nt,ns)
-  basis_space*(basis_time*X)'
+  recast(x,r.basis)
 end
 
 function recast(x::AbstractVector,r::RBSpace)
@@ -201,30 +133,25 @@ end
 
 # multi field interface
 
-const BlockRBSpace = RBSpace{S,BS,BT} where {S,BS<:ArrayBlock,BT<:ArrayBlock}
+const BlockRBSpace = RBSpace{A,B} where {A,B<:BlockProjection}
 
 function Base.getindex(r::BlockRBSpace,i...)
-  @unpack space,basis_space,basis_time = r
-  @check basis_space.touched == basis_time.touched
-  @check basis_space.touched[i...]
   if isa(space,MultiFieldFESpace)
-    fs = space
+    fs = r.space
   else
-    fs = evaluate(space,nothing)
+    fs = evaluate(r.space,nothing)
   end
-  return RBSpace(fs.spaces[i...],basis_space[i...],basis_time[i...])
+  return RBSpace(fs.spaces[i...],r.basis[i...])
 end
 
 function Base.iterate(r::BlockRBSpace)
-  @unpack space,basis_space,basis_time = r
-  @check basis_space.touched == basis_time.touched
   if isa(space,MultiFieldFESpace)
-    fs = space
+    fs = r.space
   else
-    fs = evaluate(space,nothing)
+    fs = evaluate(r.space,nothing)
   end
   i = 1
-  ri = RBSpace(fs.spaces[i],basis_space[i],basis_time[i])
+  ri = RBSpace(fs.spaces[i],r.basis[i])
   state = i+1,fs
   return ri,state
 end
@@ -234,7 +161,7 @@ function Base.iterate(r::BlockRBSpace,state)
   if i > length(fs.spaces)
     return nothing
   end
-  ri = RBSpace(fs.spaces[i],r.basis_space[i],r.basis_time[i])
+  ri = RBSpace(fs.spaces[i],r.basis[i])
   state = i+1,fs
   return ri,state
 end
@@ -263,99 +190,13 @@ function FESpaces.zero_free_values(
   return values
 end
 
-function num_reduced_space_dofs(r::BlockRBSpace)
-  dofs = Int[]
-  for ri in r
-    push!(dofs,num_reduced_space_dofs(ri))
-  end
-  return dofs
-end
-
-FEM.num_times(r::BlockRBSpace) = num_times(first(r))
-
-function num_reduced_times(r::BlockRBSpace)
-  dofs = Int[]
-  for ri in r
-    push!(dofs,num_reduced_times(ri))
-  end
-  return dofs
-end
-
 function get_touched_blocks(r::BlockRBSpace)
-  fs = r.space
-  1:length(fs.spaces)
-end
-
-function reduced_basis(s::BlockSnapshots;kwargs...)
-  norm_matrix = fill(nothing,size(s))
-  reduced_basis(s,norm_matrix;kwargs...)
-end
-
-function reduced_basis(s::BlockSnapshots,norm_matrix;kwargs...)
-  active_block_ids = get_touched_blocks(s)
-  block_map = BlockMap(size(s),active_block_ids)
-  bases = Any[reduced_basis(s[i],norm_matrix[Block(i,i)];kwargs...) for i in active_block_ids]
-  bases_space,bases_time = tuple_of_arrays(bases)
-  return_cache(block_map,bases_space...),return_cache(block_map,bases_time...)
+  get_touched_blocks(r.basis)
 end
 
 function enrich_basis(feop::TransientParamFEOperator,bases,norm_matrix)
-  _basis_space,_basis_time = bases
   supr_op = assemble_coupling_matrix(feop)
-  basis_space = add_space_supremizers(_basis_space,supr_op,norm_matrix)
-  basis_time = add_time_supremizers(_basis_time)
-  return basis_space,basis_time
-end
-
-function add_space_supremizers(basis_space,supr_op::BlockMatrix,norm_matrix::BlockMatrix)
-  basis_primal,basis_dual... = basis_space.array
-  A = norm_matrix[Block(1,1)]
-  Chol = cholesky(A)
-  for i = eachindex(basis_dual)
-    b_i = supr_op[Block(1,i+1)] * basis_dual[i]
-    supr_i = Chol \ b_i
-    gram_schmidt!(supr_i,basis_primal,A)
-    basis_primal = hcat(basis_primal,supr_i)
-  end
-  return ArrayBlock([basis_primal,basis_dual...],basis_space.touched)
-end
-
-function add_time_supremizers(basis_time;tol=1e-2)
-  @check length(basis_time) == 2 "Have to extend this if dealing with more than 2 equations"
-  basis_primal,basis_dual = basis_time.array
-  basis_pd = basis_primal'*basis_dual
-
-  function enrich(basis_primal,basis_pd,v)
-    vnew = copy(v)
-    orth_complement!(vnew,basis_primal)
-    vnew /= norm(vnew)
-    hcat(basis_primal,vnew),vcat(basis_pd,vnew'*basis_dual)
-  end
-
-  count = 0
-  ntd_minus_ntp = size(basis_dual,2) - size(basis_primal,2)
-  if ntd_minus_ntp > 0
-    for ntd = 1:ntd_minus_ntp
-      basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,ntd])
-      count += 1
-    end
-  end
-
-  ntd = 1
-  while ntd ≤ size(basis_pd,2)
-    proj = ntd == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,ntd],basis_pd[:,1:ntd-1])
-    dist = norm(basis_pd[:,1]-proj)
-    if dist ≤ tol
-      basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,ntd])
-      count += 1
-      ntd = 0
-    else
-      basis_pd[:,ntd] .-= proj
-    end
-    ntd += 1
-  end
-
-  return ArrayBlock([basis_primal,basis_dual],basis_time.touched)
+  enrich_basis(bases,norm_matrix,supr_op)
 end
 
 function Arrays.return_cache(k::RecastMap,x::ParamBlockVector,r::BlockRBSpace)

@@ -41,10 +41,10 @@ end
 # end
 
 function ttsvd(mat::AbstractArray{T,N},args...;kwargs...) where {T,N}
-  cores = Vector{Array{T,3}}(undef,N)
   ranks = fill(1,N+1)
   sizes = size(mat)
   mat_k = copy(mat)
+  cores = ()
   for k = 1:N-1
     mat_k = reshape(mat,ranks[k]*sizes[k],:)
     U,Σ,V = svd(mat_k)
@@ -52,9 +52,9 @@ function ttsvd(mat::AbstractArray{T,N},args...;kwargs...) where {T,N}
     ranks[k+1] = rank
     mat_k = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
     core_k = reshape(U[:,1:rank],ranks[k],sizes[k],rank)
-    cores[k] = core_k
+    cores = (cores...,core_k)
   end
-  cores[N] = reshape(mat_k,ranks[N],sizes[N],1)
+  cores = (cores...,reshape(mat_k,ranks[N],sizes[N],1))
   return cores
 end
 

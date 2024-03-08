@@ -1,6 +1,12 @@
-abstract type TTSnapshots{M,T} <: AbstractSnapshots{M,T} end
+abstract type TTSnapshots{M,T,N} <: AbstractSnapshots{M,T,N} end
 
-struct BasicTTSnapshots{M,T,P,R} <: TTSnapshots{M,T}
+#= representation of a standard tensor-train snapshot
+   [ [u(x1,t1,μ1) ⋯ u(x1,t1,μP)] [u(x1,t2,μ1) ⋯ u(x1,t2,μP)] [u(x1,t3,μ1) ⋯] [⋯] [u(x1,tT,μ1) ⋯ u(x1,tT,μP)] ]
+         ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
+   [ [u(xN,t1,μ1) ⋯ u(xN,t1,μP)] [u(xN,t2,μ1) ⋯ u(xN,t2,μP)] [u(xN,t3,μ1) ⋯] [⋯] [u(xN,tT,μ1) ⋯ u(xN,tT,μP)] ]
+=#
+
+struct BasicTTSnapshots{M,T,N,P,R} <: TTSnapshots{M,T,N}
   mode::M
   values::P
   realization::R
@@ -8,10 +14,11 @@ struct BasicTTSnapshots{M,T,P,R} <: TTSnapshots{M,T}
     values::P,
     realization::R,
     mode::M=Mode1Axis(),
-    ) where {M,P<:AbstractParamContainer,R}
+    ) where {M,D,P<:ParamTTArray{D},R}
 
     T = eltype(P)
-    new{M,T,P,R}(mode,values,realization)
+    N = D+2
+    new{M,T,N,P,R}(mode,values,realization)
   end
 end
 
@@ -33,15 +40,15 @@ function change_mode(s::BasicTTSnapshots{Mode2Axis})
   BasicTTSnapshots(s.values,s.realization,Mode1Axis())
 end
 
-function tensor_getindex(s::BasicTTSnapshots,ispace::Integer,itime::Integer,iparam::Integer)
+function Base.getindex(s::BasicTTSnapshots,ispace::Integer,itime::Integer,iparam::Integer)
   s.values[iparam+(itime-1)*num_params(s)][ispace]
 end
 
-function tensor_setindex!(s::BasicTTSnapshots,v,ispace::Integer,itime::Integer,iparam::Integer)
+function Base.setindex!(s::BasicTTSnapshots,v,ispace::Integer,itime::Integer,iparam::Integer)
   s.values[iparam+(itime-1)*num_params(s)][ispace] = v
 end
 
-struct TransientTTSnapshots{M,T,P,R,V} <: TTSnapshots{M,T}
+struct TransientTTSnapshots{M,T,N,P,R,V} <: TTSnapshots{M,T,N}
   mode::M
   values::V
   realization::R
@@ -49,11 +56,12 @@ struct TransientTTSnapshots{M,T,P,R,V} <: TTSnapshots{M,T}
     values::AbstractVector{P},
     realization::R,
     mode::M=Mode1Axis(),
-    ) where {M,P<:AbstractParamContainer,R<:TransientParamRealization}
+    ) where {M,D,P<:ParamTTArray{D},R<:TransientParamRealization}
 
     V = typeof(values)
     T = eltype(P)
-    new{M,T,P,R,V}(mode,values,realization)
+    N = D+2
+    new{M,T,N,P,R,V}(mode,values,realization)
   end
 end
 
