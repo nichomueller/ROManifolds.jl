@@ -28,18 +28,26 @@ function Base.getindex(a::Contribution,trian::Triangulation...)
   getindex(a,perm...)
 end
 
-function Contribution(v::Tuple{Vararg{AbstractArray}},t::Tuple{Vararg{Triangulation}})
-  ArrayContribution(v,t)
+Contribution(v::V,t::Triangulation) where V = Contribution((v,),(t,))
+
+function Contribution(
+  v::Tuple{Vararg{AbstractArray{T,N}}},
+  t::Tuple{Vararg{Triangulation}}) where {T,N}
+
+  ArrayContribution{T,N}(v,t)
+end
+
+function Contribution(
+  v::Tuple{Vararg{ArrayBlock{T,N}}},
+  t::Tuple{Vararg{Triangulation}}) where {T,N}
+
+  ArrayContribution{T,N}(v,t)
 end
 
 struct ArrayContribution{T,N,V,K} <: Contribution
   values::V
   trians::K
-  function ArrayContribution(
-    values::V,
-    trians::K
-    ) where {T,N,V<:Tuple{Vararg{AbstractArray{T,N}}},K<:Tuple{Vararg{Triangulation}}}
-
+  function ArrayContribution{T,N}(values::V,trians::K) where {T,N,V,K}
     @check length(values) == length(trians)
     @check !any([t === first(trians) for t = trians[2:end]])
     new{T,N,V,K}(values,trians)
@@ -49,13 +57,11 @@ end
 const VectorContribution{T,V,K} = ArrayContribution{T,1,V,K}
 const MatrixContribution{T,V,K} = ArrayContribution{T,2,V,K}
 
-ArrayContribution(v::V,t::Triangulation) where V = ArrayContribution((v,),(t,))
-
 Base.eltype(::ArrayContribution{T}) where T = T
 Base.eltype(::Type{<:ArrayContribution{T}}) where T = T
 Base.ndims(::ArrayContribution{T,N}) where {T,N} = N
 Base.ndims(::Type{<:ArrayContribution{T,N}}) where {T,N} = N
-Base.copy(a::ArrayContribution) = ArrayContribution(copy(a.values),a.trians)
+Base.copy(a::ArrayContribution) = Contribution(copy(a.values),a.trians)
 
 struct ContributionBroadcast{D,T}
   contrib::D
@@ -67,13 +73,13 @@ function Base.broadcasted(f,a::ArrayContribution,b::Number)
 end
 
 function Base.materialize(c::ContributionBroadcast)
-  ArrayContribution(map(Base.materialize,c.contrib),c.trians)
+  Contribution(map(Base.materialize,c.contrib),c.trians)
 end
 
 function Base.materialize!(a::ArrayContribution,c::ContributionBroadcast)
   a.trians .= c.trians
   map(Base.materialize!,a.values,c.contrib.values)
-  a.values = ArrayContribution(map(Base.materialize,c.contrib),c.trians)
+  a.values = Contribution(map(Base.materialize,c.contrib),c.trians)
   a
 end
 
@@ -87,6 +93,13 @@ end
 function LinearAlgebra.fillstored!(a::ArrayContribution,v)
   for vals in a.values
     LinearAlgebra.fillstored!(vals,v)
+  end
+  a
+end
+
+function Fields._zero_entries!(a::ArrayContribution)
+  for vals in a.values
+    Fields._zero_entries!(vals)
   end
   a
 end

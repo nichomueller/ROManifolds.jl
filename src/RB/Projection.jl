@@ -133,8 +133,18 @@ struct BlockProjection{A,N}
     ) where {A<:Projection,N}
 
     @check size(array) == size(touched)
-    new{A,N}(basis_space,basis_time)
+    new{A,N}(array,touched)
   end
+end
+
+function BlockProjection(k::BlockMap{N},a::A...) where {A<:Projection,N}
+  array = Array{A,N}(undef,k.size)
+  touched = fill(false,k.size)
+  for (t,i) in enumerate(k.indices)
+    array[i] = a[t]
+    touched[i] = true
+  end
+  BlockProjection(array,touched)
 end
 
 Base.size(b::BlockProjection,i...) = size(b.array,i...)
@@ -146,7 +156,7 @@ Base.ndims(::Type{BlockProjection{A,N}}) where {A,N} = N
 Base.copy(b::BlockProjection) = BlockProjection(copy(b.array),copy(b.touched))
 Base.eachindex(b::BlockProjection) = eachindex(b.array)
 function Base.getindex(b::BlockProjection,i...)
-  if !s.touched[i...]
+  if !b.touched[i...]
     return nothing
   end
   b.array[i...]
@@ -161,25 +171,25 @@ function get_touched_blocks(b::BlockProjection)
 end
 
 function get_basis_space(b::BlockProjection{A,N}) where {A,N}
-  basis_space = Array{A,N}(undef,size(b))
+  basis_space = Array{Matrix{Float64},N}(undef,size(b))
   touched = b.touched
   for i in eachindex(b)
     if touched[i]
       basis_space[i] = get_basis_space(b[i])
     end
   end
-  return basis_space
+  return ArrayBlock(basis_space,b.touched)
 end
 
 function get_basis_time(b::BlockProjection{A,N}) where {A,N}
-  basis_time = Array{A,N}(undef,size(b))
+  basis_time = Array{Matrix{Float64},N}(undef,size(b))
   touched = b.touched
   for i in eachindex(b)
     if touched[i]
       basis_time[i] = get_basis_time(b[i])
     end
   end
-  return basis_time
+  return ArrayBlock(basis_time,b.touched)
 end
 
 function num_space_dofs(b::BlockProjection)
@@ -223,8 +233,7 @@ function Projection(s::BlockSnapshots,norm_matrix;kwargs...)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
   bases = Any[reduced_basis(s[i],norm_matrix[Block(i,i)];kwargs...) for i in active_block_ids]
-  block_bases = return_cache(block_map,bases...)
-  BlockProjection(block_bases,s.touched)
+  BlockProjection(block_map,bases...)
 end
 
 function enrich_basis(b::BlockProjection{<:PODBasis},norm_matrix::BlockMatrix,supr_op::BlockMatrix)
@@ -234,7 +243,7 @@ function enrich_basis(b::BlockProjection{<:PODBasis},norm_matrix::BlockMatrix,su
   return basis
 end
 
-function add_space_supremizers(basis_space,supr_op::BlockMatrix,norm_matrix::BlockMatrix)
+function add_space_supremizers(basis_space,norm_matrix::BlockMatrix,supr_op::BlockMatrix)
   basis_primal,basis_dual... = basis_space.array
   A = norm_matrix[Block(1,1)]
   Chol = cholesky(A)
@@ -244,7 +253,7 @@ function add_space_supremizers(basis_space,supr_op::BlockMatrix,norm_matrix::Blo
     gram_schmidt!(supr_i,basis_primal,A)
     basis_primal = hcat(basis_primal,supr_i)
   end
-  return ArrayBlock([basis_primal,basis_dual...],basis_space.touched)
+  return [basis_primal,basis_dual...]
 end
 
 function add_time_supremizers(basis_time;kwargs...)
@@ -252,7 +261,7 @@ function add_time_supremizers(basis_time;kwargs...)
   for i = eachindex(basis_dual)
     basis_primal = add_time_supremizers(basis_primal,basis_dual[i];kwargs...)
   end
-  return ArrayBlock([basis_primal,basis_dual...],basis_time.touched)
+  return [basis_primal,basis_dual...]
 end
 
 function add_time_supremizers(basis_primal,basis_dual;tol=1e-2)

@@ -83,3 +83,36 @@ end
 function FEM.get_values(s::TransientTTSnapshots)
   get_values(BasicSnapshots(s))
 end
+
+struct SelectedTTSnapshotsAtIndices{T,N,S,I} <: TTSnapshots{T,N}
+  snaps::S
+  selected_indices::I
+  function SelectedTTSnapshotsAtIndices(
+    snaps::TTSnapshots{T,N},
+    selected_indices::I
+    ) where {T,N,I}
+
+    S = typeof(snaps)
+    new{T,N,S,I}(snaps,selected_indices)
+  end
+end
+
+function SelectedSnapshotsAtIndices(snaps::TTSnapshots,args...)
+  SelectedTTSnapshotsAtIndices(snaps,args...)
+end
+
+function SelectedSnapshotsAtIndices(s::SelectedTTSnapshotsAtIndices,selected_indices)
+  new_srange,new_trange,new_prange = selected_indices
+  old_srange,old_trange,old_prange = s.selected_indices
+  @check intersect(old_srange,new_srange) == new_srange
+  @check intersect(old_trange,new_trange) == new_trange
+  @check intersect(old_prange,new_prange) == new_prange
+  SelectedTTSnapshotsAtIndices(s.snaps,selected_indices)
+end
+
+space_indices(s::SelectedTTSnapshotsAtIndices) = s.selected_indices[1]
+time_indices(s::SelectedTTSnapshotsAtIndices) = s.selected_indices[2]
+param_indices(s::SelectedTTSnapshotsAtIndices) = s.selected_indices[3]
+num_space_dofs(s::SelectedTTSnapshotsAtIndices) = length(space_indices(s))
+FEM.num_times(s::SelectedTTSnapshotsAtIndices) = length(time_indices(s))
+FEM.num_params(s::SelectedTTSnapshotsAtIndices) = length(param_indices(s))

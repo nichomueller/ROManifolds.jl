@@ -86,7 +86,7 @@ function Algebra.residual!(
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
-  fill_with_zeros!(cache)
+  Fields._zero_entries!(cache)
   fe_sb = fe_residual!(cache.fe_cache,op,r,xhF,ode_cache)
   b_coeff = mdeim_coeff!(cache.coeff_cache,op.rhs,fe_sb)
   mdeim_lincomb!(cache.lincomb_cache,op.rhs,b_coeff)
@@ -102,7 +102,7 @@ function Algebra.jacobian!(
   γᵢ::Real,
   ode_cache)
 
-  fill_with_zeros!(cache)
+  Fields._zero_entries!(cache)
   fe_sA = fe_jacobian!(cache.fe_cache[i],op,r,xhF,γᵢ,ode_cache)
   A_coeff = mdeim_coeff!(cache.coeff_cache[i],op.lhs[i],fe_sA[i])
   mdeim_lincomb!(cache.lincomb_cache,op.lhs[i],A_coeff)
@@ -117,7 +117,7 @@ function ODETools.jacobians!(
   γ::Tuple{Vararg{Real}},
   ode_cache)
 
-  fill_with_zeros!(cache)
+  Fields._zero_entries!(cache)
   fe_sA = fe_jacobians!(cache.fe_cache,op,r,xhF,γ,ode_cache)
   for i = 1:get_order(op)+1
     A_coeff = mdeim_coeff!(cache.coeff_cache[i],op.lhs[i],fe_sA[i])

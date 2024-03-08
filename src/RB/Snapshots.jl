@@ -409,7 +409,7 @@ function SelectedSnapshotsAtIndices(s::SelectedSnapshotsAtIndices,selected_indic
   SelectedSnapshotsAtIndices(s.snaps,selected_indices)
 end
 
-function select_snapshots(s::StandardSnapshots,spacerange,timerange,paramrange)
+function select_snapshots(s::AbstractSnapshots,spacerange,timerange,paramrange)
   srange = isa(spacerange,Colon) ? Base.OneTo(num_space_dofs(s)) : spacerange
   srange = isa(srange,Integer) ? [srange] : srange
   trange = isa(timerange,Colon) ? Base.OneTo(num_times(s)) : timerange
@@ -420,11 +420,11 @@ function select_snapshots(s::StandardSnapshots,spacerange,timerange,paramrange)
   SelectedSnapshotsAtIndices(s,selected_indices)
 end
 
-function select_snapshots(s::StandardSnapshots,timerange,paramrange;spacerange=:)
+function select_snapshots(s::AbstractSnapshots,timerange,paramrange;spacerange=:)
   select_snapshots(s,spacerange,timerange,paramrange)
 end
 
-function select_snapshots(s::StandardSnapshots,paramrange;spacerange=:,timerange=:)
+function select_snapshots(s::AbstractSnapshots,paramrange;spacerange=:,timerange=:)
   select_snapshots(s,spacerange,timerange,paramrange)
 end
 

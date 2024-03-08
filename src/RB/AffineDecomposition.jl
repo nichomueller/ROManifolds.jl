@@ -145,8 +145,6 @@ struct AffineContribution{A,V,K} <: Contribution
   end
 end
 
-AffineContribution(v::V,t::Triangulation) where V = AffineContribution((v,),(t,))
-
 function union_reduced_times(a::AffineContribution)
   idom = ()
   for values in get_values(a)
@@ -204,7 +202,7 @@ function reduced_vector_form(
   a,trians = map(get_domains(c),get_values(c)) do trian,values
     reduced_vector_form(solver,op,values,trian)
   end |> tuple_of_arrays
-  return AffineContribution(a,trians)
+  return Contribution(a,trians)
 end
 
 function reduced_matrix_form(
@@ -216,7 +214,7 @@ function reduced_matrix_form(
   a,trians = map(get_domains(c),get_values(c)) do trian,values
     reduced_matrix_form(solver,op,values,trian;kwargs...)
   end |> tuple_of_arrays
-  return AffineContribution(a,trians)
+  return Contribution(a,trians)
 end
 
 function reduced_matrix_form(
@@ -262,19 +260,18 @@ end
 const ResidualMDEIMCache = MDEIMCache{A,B,C} where {A<:FEM.VectorContribution,B,C}
 const JacobianMDEIMCache = MDEIMCache{A,B,C} where {A<:Tuple{Vararg{FEM.MatrixContribution}},B,C}
 
-function fill_with_zeros!(cache::ResidualMDEIMCache)
-  z = zero(eltype(cache.fe_cache))
-  map(x->fill!(x,z),cache.coeff_cache)
-  map(x->fill!(x,z),cache.lincomb_cache)
+function Fields._zero_entries!(cache::ResidualMDEIMCache)
+  map(Fields._zero_entries!,cache.coeff_cache)
+  map(Fields._zero_entries!,cache.lincomb_cache)
 end
 
-function fill_with_zeros!(cache::JacobianMDEIMCache)
-  z = zero(eltype(first(cache.fe_cache)))
+function Fields._zero_entries!(cache::JacobianMDEIMCache)
   for i = 1:length(cache.fe_cache)
+    z = zero(eltype(cache.fe_cache[i]))
     LinearAlgebra.fillstored!(cache.fe_cache[i],z)
-    map(x->fill!(x,z),cache.coeff_cache[i])
+    map(Fields._zero_entries!,cache.coeff_cache[i])
   end
-  map(x->fill!(x,z),cache.lincomb_cache)
+  map(Fields._zero_entries!,cache.lincomb_cache)
 end
 
 function allocate_coeff_matrix(
@@ -508,6 +505,10 @@ function Arrays.testitem(a::BlockAffineDecomposition)
   end
 end
 
+function FEM.Contribution(v::Tuple{Vararg{BlockAffineDecomposition}},t::Tuple{Vararg{Triangulation}})
+  AffineContribution(v,t)
+end
+
 function get_touched_blocks(a::BlockAffineDecomposition)
   findall(a.touched)
 end
@@ -563,8 +564,8 @@ function reduced_vector_form(
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
   ads,red_trians = Any[
-    reduced_form(solver,s[i],trian,test[i])
-    for i in active_block_ids] |> tuple_of_arrays
+    reduced_form(solver,s[i],trian,test[i]) for i in active_block_ids
+    ] |> tuple_of_arrays
   red_trian = FEM.merge_triangulations(red_trians)
   ad = BlockAffineDecomposition(block_map,ads...)
   return ad,red_trian
@@ -591,17 +592,19 @@ end
 
 function allocate_mdeim_coeff(a::BlockAffineDecomposition,r::AbstractParamRealization)
   active_block_ids = get_touched_blocks(a)
+  block_map = BlockMap(size(a),active_block_ids)
   active_block_coeff = Any[allocate_mdeim_coeff(a[i],r) for i in active_block_ids]
-  tuple_of_arrays(active_block_coeff)
+  cache_solve,cache_recast = tuple_of_arrays(active_block_coeff)
+  return_cache(block_map,cache_solve...),return_cache(block_map,cache_recast...)
 end
 
 function mdeim_coeff!(cache,a::BlockAffineDecomposition,b::BlockSnapshots)
   @check get_touched_blocks(a) == get_touched_blocks(b)
   active_block_ids = get_touched_blocks(a)
   coeff,coeff_recast = cache
-  for (i,acti) = enumerate(active_block_ids)
+  for i in active_block_ids
     cachei = coeff[i],coeff_recast[i]
-    mdeim_coeff!(cachei,a[acti],b[acti])
+    mdeim_coeff!(cachei,a[i],b[i])
   end
 end
 
@@ -610,10 +613,10 @@ function allocate_mdeim_lincomb(
   r::AbstractParamRealization)
 
   active_block_ids = get_touched_blocks(test)
+  block_map = BlockMap((num_fields(test),),active_block_ids)
   block_lincomb = Any[allocate_mdeim_lincomb(test[i],r) for i in active_block_ids]
   block_tc,block_lc = tuple_of_arrays(block_lincomb)
-  lc = mortar(block_lc)
-  return block_tc,lc
+  return return_cache(block_map,block_tc...),mortar(block_lc)
 end
 
 function allocate_mdeim_lincomb(
@@ -622,24 +625,22 @@ function allocate_mdeim_lincomb(
   r::AbstractParamRealization)
 
   active_block_ids = Iterators.product(get_touched_blocks(test),get_touched_blocks(trial))
+  block_map = BlockMap((num_fields(test),num_fields(trial)),vec(collect(active_block_ids)))
   block_lincomb = Any[allocate_mdeim_lincomb(trial[j],test[i],r) for (i,j) in active_block_ids]
   block_tc,block_lc = tuple_of_arrays(block_lincomb)
-  lc = mortar(block_lc)
-  return block_tc,lc
+  return return_cache(block_map,block_tc...),mortar(block_lc)
 end
 
 function mdeim_lincomb!(
   cache,
   a::BlockAffineDecomposition,
-  coeff::AbstractArray{<:ParamMatrix})
+  coeff::ArrayBlock)
 
   time_prod_cache,lincomb_cache = cache
   active_block_ids = get_touched_blocks(a)
-  @check length(active_block_ids) == length(coeff)
-
-  for i = eachindex(coeff)
+  for i in active_block_ids
     cachei = time_prod_cache[i],lincomb_cache[Block(i)]
-    mdeim_lincomb!(cachei,a[active_block_ids[i]],coeff[i])
+    mdeim_lincomb!(cachei,a[i],coeff[i])
   end
 end
 

@@ -11,7 +11,7 @@ function reduced_fe_space(
   return reduced_trial,reduced_test
 end
 
-function reduced_basis(s::AbstractSnapshots,args...;kwargs...)
+function reduced_basis(s::S,args...;kwargs...) where S
   Projection(s,args...;kwargs...)
 end
 
@@ -132,7 +132,7 @@ end
 const BlockRBSpace = RBSpace{A,B} where {A,B<:BlockProjection}
 
 function Base.getindex(r::BlockRBSpace,i...)
-  if isa(space,MultiFieldFESpace)
+  if isa(r.space,MultiFieldFESpace)
     fs = r.space
   else
     fs = evaluate(r.space,nothing)
@@ -141,7 +141,7 @@ function Base.getindex(r::BlockRBSpace,i...)
 end
 
 function Base.iterate(r::BlockRBSpace)
-  if isa(space,MultiFieldFESpace)
+  if isa(r.space,MultiFieldFESpace)
     fs = r.space
   else
     fs = evaluate(r.space,nothing)
@@ -189,6 +189,8 @@ end
 function get_touched_blocks(r::BlockRBSpace)
   get_touched_blocks(r.basis)
 end
+
+num_fields(r::BlockRBSpace) = length(get_touched_blocks(r))
 
 function enrich_basis(feop::TransientParamFEOperator,bases,norm_matrix)
   supr_op = assemble_coupling_matrix(feop)
