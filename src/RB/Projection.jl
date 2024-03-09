@@ -61,8 +61,6 @@ function recast(x::Vector,b::PODBasis)
   ns = num_reduced_space_dofs(b)
   nt = num_reduced_times(b)
 
-  # X = reshape(x,nt,ns)
-  # basis_space*(basis_time*X)'
   X = reshape(x,ns,nt)
   (basis_space*X)*basis_time'
 end
@@ -105,16 +103,6 @@ function Projection(s::TTSnapshots,args...;kwargs...)
   TTSVDCores(cores,basis_spacetime)
 end
 
-# for the time being, N = 3: space-time-parameter
-struct TTSVDCores{T,N} <: Projection
-  cores::Vector{Array{T,3}}
-  basis_spacetime::Matrix{T}
-  function TTSVDCores(cores::Vector{Array{T,3}},basis_spacetime::Matrix{T}) where T
-    N = length(cores)
-    new{T,N}(cores,basis_spacetime)
-  end
-end
-
 function get_basis_spacetime(cores::Vector{Array{T,3}}) where T
   nrows = size(cores[1],2)*size(cores[2],2)
   ncols = size(cores[2],3)
@@ -127,8 +115,19 @@ function get_basis_spacetime(cores::Vector{Array{T,3}}) where T
   basis
 end
 
+# for the time being, N = 3: space-time-parameter
+struct TTSVDCores{T,N} <: Projection
+  cores::Vector{Array{T,3}}
+  basis_spacetime::Matrix{T}
+  function TTSVDCores(cores::Vector{Array{T,3}},basis_spacetime::Matrix{T}) where T
+    N = length(cores)
+    new{T,N}(cores,basis_spacetime)
+  end
+end
+
 get_basis_space(b::TTSVDCores) = Core2Matrix(b.cores[1])
 get_basis_time(b::TTSVDCores) = Core2Matrix(b.cores[2])
+get_basis_spacetime(b::TTSVDCores) = b.basis_spacetime
 num_space_dofs(b::TTSVDCores) = size(b.cores[1],2)
 FEM.num_times(b::TTSVDCores) = size(b.cores[2],2)
 num_reduced_space_dofs(b::TTSVDCores) = size(b.cores[1],3)

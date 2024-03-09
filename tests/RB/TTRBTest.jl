@@ -167,11 +167,14 @@ n_space_dofs = num_free_dofs(test)
 # ## proj test
 
 A1 = A[1][1]
-A1_red = zeros(4,4)
-for n = 1:num_times(r)
+BDA1 = RB.BDiagonal(getproperty.(A1.array,:values))
+A1_red = θ*B'*(BDA1*B)
+for n = 2:num_times(r)
+  m = n-1
   A1_n = A1[n]
   B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
-  A1_red += B_n'*A1_n*B_n
+  B_m = B[(m-1)*n_space_dofs+1:m*n_space_dofs,:]
+  A1_red += (1-θ)*B_n'*A1_n*B_m
 end
 
 A2 = A[2][1]
@@ -179,14 +182,14 @@ A2_red = zeros(4,4)
 for n = 1:num_times(r)
   A2_n = A2[n]
   B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
-  A2_red += B_n'*A2_n*B_n
+  A2_red += θ*B_n'*A2_n*B_n
 end
 for n = 2:num_times(r)
   m = n-1
   A2_n = A2[n]
   B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
   B_m = B[(m-1)*n_space_dofs+1:m*n_space_dofs,:]
-  A2_red -= B_n'*A2_n*B_m
+  A2_red -= θ*B_n'*A2_n*B_m
 end
 
 b1 = b[1]
@@ -203,10 +206,6 @@ u_red = A_red \ b_red
 u_rec = B*u_red
 
 U_rec = reshape(u_rec,n_space_dofs,:)
-
-bd = BDiagonal(getproperty.(A1.array,:values))
-
-
 
 #############################
 

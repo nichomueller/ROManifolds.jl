@@ -64,6 +64,9 @@ export BasicTTSnapshots
 export TransientTTSnapshots
 include("TTSnapshots.jl")
 
+export BDiagonal
+include("BDiagonal.jl")
+
 export RBInfo
 export RBSolver
 export TTRBSolver

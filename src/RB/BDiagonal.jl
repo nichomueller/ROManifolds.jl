@@ -7,6 +7,7 @@ BDiagonal(V) = BDiagonal{eltype(first(V)),eltype(V)}(mapreduce(size,(x,y)->x.+y,
 
 Base.getindex(BD::BDiagonal{T,MT},j::Int64) where{T,MT} = BD.V[j]
 Base.size(BD::BDiagonal{T,MT}) where {T,MT} = BD.sz
+Base.size(BD::BDiagonal{T,MT},i::Integer...) where {T,MT} = BD.sz[i...]
 
 function Base.collect(BD::BDiagonal{T,MT}) where{T,MT}
   (out,ri,ci) = zeros(T,size(BD)),1,1
@@ -23,9 +24,9 @@ end
 LinearAlgebra.factorize(BD::BDiagonal{T,MT}) where{T,MT} = BDiagonal(factorize.(BD.V))
 LinearAlgebra.adjoint(BD::BDiagonal{T,MT}) where{T,MT} = BDiagonal(adjoint.(BD.V))
 
-for (fn,ar) in Iterators.product((:ldiv!,:mul!),(:StridedVector,:StridedMatrix))
+for (f,A) in Iterators.product((:(LinearAlgebra.ldiv!),:(LinearAlgebra.mul!)),(:StridedVector,:StridedMatrix))
   @eval begin
-    function $fn(target::$ar{T},BD::BDiagonal{T,MT},src::$ar{T}) where{T,MT}
+    function $f(target::$A{T},BD::BDiagonal{T,MT},src::$A{T}) where{T,MT}
       ri = 1
       for Dj in BD.V
         (sz1,sz2) = size(Dj)
@@ -44,3 +45,14 @@ function LinearAlgebra.:\(BD::BDiagonal{T,MT},src::StridedArray{T}) where{T,MT}
 end
 
 Base.:*(BD::BDiagonal{T,MT},src::StridedArray{T}) where{T,MT} = mul!(similar(src),BD,src)
+
+function Base.:*(src::Adjoint{T,<:StridedArray{T}},BD::BDiagonal{T,MT}) where{T,MT}
+  target = similar(src,T,(size(src,1),size(BD,2)))
+  ri = 1
+  for Dj in BD.V
+    (sz1,sz2) = size(Dj)
+    @inbounds mul!(view(target,:,ri:(ri+sz2-1)),view(src,:,ri:(ri+sz2-1)),Dj)
+    ri += sz2
+  end
+  target
+end

@@ -114,17 +114,23 @@ function _time_indices_and_interp_matrix(::SpaceOnlyMDEIM,interp_basis_space,bas
   return indices_time,lu_interp
 end
 
-function mdeim(solver::RBSolver,basis_space::AbstractMatrix,basis_time::AbstractMatrix)
-  indices_space = get_mdeim_indices(basis_space)
-  interp_basis_space = view(basis_space,indices_space,:)
-  indices_time,lu_interp = _time_indices_and_interp_matrix(solver.mdeim_style,interp_basis_space,basis_time)
-  recast_indices_space = recast_indices(basis_space,indices_space)
+function mdeim(solver::RBSolver,b::PODBasis)
+  indices_space = get_mdeim_indices(b.basis_space)
+  interp_basis_space = view(b.basis_space,indices_space,:)
+  indices_time,lu_interp = _time_indices_and_interp_matrix(solver.mdeim_style,interp_basis_space,b.basis_time)
+  recast_indices_space = recast_indices(b.basis_space,indices_space)
   integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
   return lu_interp,integration_domain
 end
 
-function mdeim(solver::RBSolver,basis::PODBasis)
-  mdeim(solver,get_basis_space(basis),get_basis_time(basis))
+function mdeim(solver::RBSolver,b::TTSVDCores)
+  indices_spacetime = get_mdeim_indices(b.basis_spacetime)
+  indices_space = fast_index(indices_spacetime,num_space_dofs(b))
+  indices_time = slow_index(indices_spacetime,num_space_dofs(b))
+  lu_interp = view(b.basis_spacetime,indices_spacetime,:)
+  recast_indices_space = recast_indices(b.basis_space,indices_space)
+  integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
+  return lu_interp,integration_domain
 end
 
 function FEM.Contribution(v::Tuple{Vararg{AffineDecomposition}},t::Tuple{Vararg{Triangulation}})
@@ -413,7 +419,6 @@ function mdeim_lincomb!(
     ci = coeff[i]
     for j = axes(coeff,2)
       time_prod_cache .= basis_time'*ci[:,j]
-      # lci .+= kronecker(basis_space[j],time_prod_cache)
       lci .+= kronecker(time_prod_cache,basis_space[j])
     end
   end
@@ -437,7 +442,6 @@ function mdeim_lincomb!(
           time_prod_cache[row,col] = sum(basis_time[:,row,col].*ci[:,j])
         end
       end
-      # lci .+= kronecker(basis_space[j],time_prod_cache)
       lci .+= kronecker(time_prod_cache,basis_space[j])
     end
   end
