@@ -96,14 +96,7 @@ function LinearAlgebra.fillstored!(a::ArrayContribution,v)
   a
 end
 
-function Fields._zero_entries!(a::ArrayContribution)
-  for vals in a.values
-    Fields._zero_entries!(vals)
-  end
-  a
-end
-
-# for testing/visualization purposes
+# quite hacky
 
 Base.eltype(::Tuple{Vararg{ArrayContribution{T}}}) where T = T
 Base.eltype(::Type{<:Tuple{Vararg{ArrayContribution{T}}}}) where T = T

@@ -55,11 +55,7 @@ function Algebra.allocate_residual(
   x::AbstractVector,
   ode_cache)
 
-  test = get_test(op)
-  b = allocate_residual(op.op,r,x,ode_cache)
-  coeff_cache = allocate_mdeim_coeff(op.rhs,r)
-  lincomb_cache = allocate_mdeim_lincomb(test,r)
-  MDEIMCache(b,coeff_cache,lincomb_cache)
+  allocate_residual(op.op,r,x,ode_cache)
 end
 
 function Algebra.allocate_jacobian(
@@ -68,33 +64,23 @@ function Algebra.allocate_jacobian(
   x::AbstractVector,
   ode_cache)
 
-  trial = get_trial(op)
-  test = get_test(op)
-  A = allocate_jacobian(op.op,r,x,ode_cache)
-  coeff_cache = ()
-  for i = 1:get_order(op)+1
-    coeff_cache = (coeff_cache...,allocate_mdeim_coeff(op.lhs[i],r))
-  end
-  lincomb_cache = allocate_mdeim_lincomb(trial,test,r)
-  MDEIMCache(A,coeff_cache,lincomb_cache)
+  allocate_jacobian(op.op,r,x,ode_cache)
 end
 
 function Algebra.residual!(
-  cache,
+  b,
   op::PODMDEIMOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
-  Fields._zero_entries!(cache)
-  fe_sb = fe_residual!(cache.fe_cache,op,r,xhF,ode_cache)
-  b_coeff = mdeim_coeff!(cache.coeff_cache,op.rhs,fe_sb)
-  mdeim_lincomb!(cache.lincomb_cache,op.rhs,b_coeff)
-  return last(cache.lincomb_cache)
+  fill!(b,zero(eltype(b)))
+  fe_sb = fe_residual!(b,op,r,xhF,ode_cache)
+  mdeim_residual(op.rhs,fe_sb)
 end
 
 function Algebra.jacobian!(
-  cache,
+  A,
   op::PODMDEIMOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
@@ -102,28 +88,22 @@ function Algebra.jacobian!(
   γᵢ::Real,
   ode_cache)
 
-  Fields._zero_entries!(cache)
-  fe_sA = fe_jacobian!(cache.fe_cache[i],op,r,xhF,γᵢ,ode_cache)
-  A_coeff = mdeim_coeff!(cache.coeff_cache[i],op.lhs[i],fe_sA[i])
-  mdeim_lincomb!(cache.lincomb_cache,op.lhs[i],A_coeff)
-  return last(cache.lincomb_cache)
+  LinearAlgebra.fillstored!(A[i],zero(eltype(A[i])))
+  fe_sA = fe_jacobian!(A[i],op,r,xhF,γᵢ,ode_cache)
+  mdeim_jacobian(op.lhs[i],fe_sA)
 end
 
 function ODETools.jacobians!(
-  cache,
+  A,
   op::PODMDEIMOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   γ::Tuple{Vararg{Real}},
   ode_cache)
 
-  Fields._zero_entries!(cache)
-  fe_sA = fe_jacobians!(cache.fe_cache,op,r,xhF,γ,ode_cache)
-  for i = 1:get_order(op)+1
-    A_coeff = mdeim_coeff!(cache.coeff_cache[i],op.lhs[i],fe_sA[i])
-    mdeim_lincomb!(cache.lincomb_cache,op.lhs[i],A_coeff)
-  end
-  return last(cache.lincomb_cache)
+  LinearAlgebra.fillstored!(A,zero(eltype(A)))
+  fe_sA = fe_jacobians!(A,op,r,xhF,γ,ode_cache)
+  mdeim_jacobian(op.lhs,fe_sA)
 end
 
 function _select_fe_space_at_time_locations(fs::FESpace,indices)

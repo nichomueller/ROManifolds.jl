@@ -71,9 +71,6 @@ struct CompressedPODBasis{A,B,C} <: Projection
   metadata::C
 end
 
-const VectorCompressedPODBasis = CompressedPODBasis{A,B,C} where {A,B,C<:AbstractMatrix}
-const MatrixCompressedPODBasis = CompressedPODBasis{A,B,C} where {A,B,C<:AbstractArray}
-
 get_basis_space(b::CompressedPODBasis) = b.basis_space
 get_basis_time(b::CompressedPODBasis) = b.basis_time
 num_space_dofs(b::CompressedPODBasis) = @notimplemented
