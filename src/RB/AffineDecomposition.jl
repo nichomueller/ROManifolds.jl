@@ -22,7 +22,7 @@ function recast_indices(A::AbstractMatrix,indices::AbstractVector)
   return indices
 end
 
-function recast_indices(A::NnzSnapshots,indices::AbstractVector)
+function recast_indices(A::AbstractSparseMatrix,indices::AbstractVector)
   nonzero_indices = get_nonzero_indices(A)
   entire_indices = nonzero_indices[indices]
   return entire_indices
@@ -127,8 +127,8 @@ function mdeim(solver::RBSolver,b::TTSVDCores)
   indices_spacetime = get_mdeim_indices(b.basis_spacetime)
   indices_space = fast_index(indices_spacetime,num_space_dofs(b))
   indices_time = slow_index(indices_spacetime,num_space_dofs(b))
-  lu_interp = view(b.basis_spacetime,indices_spacetime,:)
-  recast_indices_space = recast_indices(b.basis_space,indices_space)
+  lu_interp = lu(view(b.basis_spacetime,indices_spacetime,:))
+  recast_indices_space = recast_indices(b.basis_spacetime,indices_space)
   integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
   return lu_interp,integration_domain
 end

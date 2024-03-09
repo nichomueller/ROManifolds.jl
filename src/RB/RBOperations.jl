@@ -29,3 +29,23 @@ function combine_basis_time(A::AbstractMatrix,B::AbstractMatrix;combine=(x,y)->x
 
   combine(bt_proj,bt_proj_shift)
 end
+
+function shift(A::AbstractMatrix,indices::AbstractVector,ns::Integer)
+  A_shift = zeros(eltype(A),size(A))
+  for i in indices
+    A_shift[(i-1)*ns+1:i*ns,:] = A[(i-1)*ns+1:i*ns,:]
+  end
+  return A_shift
+end
+
+function compress_combine_basis_space_time(A,B;kwargs...)
+  map(eachcol(A)) do a
+    B'*a
+  end
+end
+
+function compress_combine_basis_space_time(A,B,C,B_shift,C_shift;combine=(x,y)->x)
+  map(get_values(A)) do A
+    combine(C'*A*B,C_shift'*A*B_shift)
+  end
+end

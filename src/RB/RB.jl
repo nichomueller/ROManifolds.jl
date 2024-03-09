@@ -59,13 +59,13 @@ export get_realization
 export compress
 include("Snapshots.jl")
 
+export BDiagonal
+include("BDiagonal.jl")
+
 export TTSnapshots
 export BasicTTSnapshots
 export TransientTTSnapshots
 include("TTSnapshots.jl")
-
-export BDiagonal
-include("BDiagonal.jl")
 
 export RBInfo
 export RBSolver

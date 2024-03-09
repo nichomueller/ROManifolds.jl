@@ -103,109 +103,133 @@ soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
 
 red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
 
-## proj test
-cores = RB.ttsvd(soff)
-B = RB.get_basis_spacetime(cores)
-x = reshape(son,200,1)
-norm(x - B*B'*x) / norm(x)
-##
+# ## proj test --> works
+# cores = RB.ttsvd(soff)
+# B = RB.get_basis_spacetime(cores)
+# x = reshape(son,200,1)
+# norm(x - B*B'*x) / norm(x)
+# ##
 
 pop = RB.PODOperator(get_algebraic_operator(feop),red_trial,red_test)
 smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
 contribs_mat,contribs_vec = RB.jacobian_and_residual(rbsolver,pop,smdeim)
+red_mat = RB.reduced_matrix_form(rbsolver,pop,contribs_mat)
+red_vec = RB.reduced_vector_form(rbsolver,pop,contribs_vec)
+rbop = RB.PODMDEIMOperator(pop,red_mat,red_vec)
 
-basis_mat_1 = reduced_basis(contribs_mat[1][1];ϵ)
-basis_mat_2 = reduced_basis(contribs_mat[2][1];ϵ)
+ciao
+# Affine Decomposition part
+# basis_mat_1 = reduced_basis(contribs_mat[1][1];ϵ)
+# # lu_interp,integration_domain = RB.mdeim(rbsolver,basis_mat_1)
+# b = basis_mat_1
+# indices_spacetime = get_mdeim_indices(b.basis_spacetime)
+# indices_space = fast_index(indices_spacetime,RB.num_space_dofs(b))
+# indices_time = slow_index(indices_spacetime,RB.num_space_dofs(b))
+# lu_interp = lu(view(b.basis_spacetime,indices_spacetime,:))
+# recast_indices_space = RB.recast_indices(b.basis_spacetime,indices_space)
+# integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
 
-basis_vec_1 = reduced_basis(contribs_vec[1];ϵ)
-basis_vec_2 = reduced_basis(contribs_vec[2];ϵ)
+# combine = (x,y) -> θ*x+(1-θ)*y
+# A = RB.get_basis_spacetime(basis_mat_1)
+# B = RB.get_basis_spacetime(red_trial.basis)
+# C = RB.get_basis_spacetime(red_test.basis)
+# B_shift = RB.shift(B,1:num_times(red_test.basis)-1,RB.num_space_dofs(red_test.basis))
+# C_shift = RB.shift(C,2:num_times(red_test.basis),RB.num_space_dofs(red_test.basis))
+# metadata = RB.compress_combine_basis_space_time(A,B,C,B_shift,C_shift;combine)
 
-son = select_snapshots(fesnaps,1)
-ron = get_realization(son)
-θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+# these tests work!
+# basis_mat_1 = reduced_basis(contribs_mat[1][1];ϵ)
+# basis_mat_2 = reduced_basis(contribs_mat[2][1];ϵ)
 
-r = copy(ron)
-FEM.shift_time!(r,dt*(θ-1))
+# basis_vec_1 = reduced_basis(contribs_vec[1];ϵ)
+# basis_vec_2 = reduced_basis(contribs_vec[2];ϵ)
 
-rb_trial = red_trial(r)
-fe_trial = trial(r)
-red_x = zero_free_values(rb_trial)
-y = zero_free_values(fe_trial)
-z = similar(y)
-z .= 0.0
+# son = select_snapshots(fesnaps,1)
+# ron = get_realization(son)
+# θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
-op = get_algebraic_operator(feop)
-ode_cache = allocate_cache(op,r)
-ode_cache = update_cache!(ode_cache,op,r)
+# r = copy(ron)
+# FEM.shift_time!(r,dt*(θ-1))
 
-A,b = ODETools._allocate_matrix_and_vector(op,r,y,ode_cache)
-ODETools._matrix_and_vector!(A,b,op,r,dt*θ,y,ode_cache,z)
+# rb_trial = red_trial(r)
+# fe_trial = trial(r)
+# red_x = zero_free_values(rb_trial)
+# y = zero_free_values(fe_trial)
+# z = similar(y)
+# z .= 0.0
 
-B = red_trial.basis.basis_spacetime
-n_red = size(B,2)
-n_space_dofs = num_free_dofs(test)
+# op = get_algebraic_operator(feop)
+# ode_cache = allocate_cache(op,r)
+# ode_cache = update_cache!(ode_cache,op,r)
 
-# ## proj test
-# B = basis_vec_1.basis_spacetime
-# sb = Snapshots(b[1],ron)
-# x = reshape(sb,200,1)
-# norm(x - B*B'*x) / norm(x)
-# ## proj test
-# B = basis_vec_2.basis_spacetime
-# sb = Snapshots(b[2],ron)
-# x = reshape(sb,200,1)
-# norm(x - B*B'*x) / norm(x)
-# ## proj test
-# B = basis_mat_1.basis_spacetime
+# A,b = ODETools._allocate_matrix_and_vector(op,r,y,ode_cache)
+# ODETools._matrix_and_vector!(A,b,op,r,dt*θ,y,ode_cache,z)
+
+# B = red_trial.basis.basis_spacetime
+# n_red = size(B,2)
+# n_space_dofs = num_free_dofs(test)
+
+# # ## proj test
+# # B = basis_vec_1.basis_spacetime
+# # sb = Snapshots(b[1],ron)
+# # x = reshape(sb,200,1)
+# # norm(x - B*B'*x) / norm(x)
+# # ## proj test
+# # B = basis_vec_2.basis_spacetime
+# # sb = Snapshots(b[2],ron)
+# # x = reshape(sb,200,1)
+# # norm(x - B*B'*x) / norm(x)
+# # ## proj test
+# # B = basis_mat_1.basis_spacetime
+# # A1 = A[1][1]
+# # A1_red = zeros(4,4)
+# # for n = 1:num_times(r)
+# #   A1_n = A1[n]
+# #   B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
+# #   A1_red += B_n'*A1_n*B_n
+# # end
+# # ## proj test
+
 # A1 = A[1][1]
-# A1_red = zeros(4,4)
-# for n = 1:num_times(r)
+# BDA1 = RB.BDiagonal(getproperty.(A1.array,:values))
+# A1_red = θ*B'*(BDA1*B)
+# for n = 2:num_times(r)
+#   m = n-1
 #   A1_n = A1[n]
 #   B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
-#   A1_red += B_n'*A1_n*B_n
+#   B_m = B[(m-1)*n_space_dofs+1:m*n_space_dofs,:]
+#   A1_red += (1-θ)*B_n'*A1_n*B_m
 # end
-# ## proj test
 
-A1 = A[1][1]
-BDA1 = RB.BDiagonal(getproperty.(A1.array,:values))
-A1_red = θ*B'*(BDA1*B)
-for n = 2:num_times(r)
-  m = n-1
-  A1_n = A1[n]
-  B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
-  B_m = B[(m-1)*n_space_dofs+1:m*n_space_dofs,:]
-  A1_red += (1-θ)*B_n'*A1_n*B_m
-end
+# A2 = A[2][1]
+# A2_red = zeros(4,4)
+# for n = 1:num_times(r)
+#   A2_n = A2[n]
+#   B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
+#   A2_red += θ*B_n'*A2_n*B_n
+# end
+# for n = 2:num_times(r)
+#   m = n-1
+#   A2_n = A2[n]
+#   B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
+#   B_m = B[(m-1)*n_space_dofs+1:m*n_space_dofs,:]
+#   A2_red -= θ*B_n'*A2_n*B_m
+# end
 
-A2 = A[2][1]
-A2_red = zeros(4,4)
-for n = 1:num_times(r)
-  A2_n = A2[n]
-  B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
-  A2_red += θ*B_n'*A2_n*B_n
-end
-for n = 2:num_times(r)
-  m = n-1
-  A2_n = A2[n]
-  B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
-  B_m = B[(m-1)*n_space_dofs+1:m*n_space_dofs,:]
-  A2_red -= θ*B_n'*A2_n*B_m
-end
+# b1 = b[1]
+# sb1 = Snapshots(b1,ron)
+# b1_red = B'*reshape(sb1,:,1)
 
-b1 = b[1]
-sb1 = Snapshots(b1,ron)
-b1_red = B'*reshape(sb1,:,1)
+# b2 = b[2]
+# sb2 = Snapshots(b2,ron)
+# b2_red = B'*reshape(sb2,:,1)
 
-b2 = b[2]
-sb2 = Snapshots(b2,ron)
-b2_red = B'*reshape(sb2,:,1)
+# A_red = A1_red+A2_red
+# b_red = b1_red+b2_red
+# u_red = A_red \ b_red
+# u_rec = B*u_red
 
-A_red = A1_red+A2_red
-b_red = b1_red+b2_red
-u_red = A_red \ b_red
-u_rec = B*u_red
-
-U_rec = reshape(u_rec,n_space_dofs,:)
+# U_rec = reshape(u_rec,n_space_dofs,:)
 
 #############################
 

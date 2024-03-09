@@ -99,8 +99,13 @@ end
 
 function Projection(s::TTSnapshots,args...;kwargs...)
   cores = ttsvd(s,args...;kwargs...)
-  basis_spacetime = get_basis_spacetime(cores)
-  TTSVDCores(cores,basis_spacetime)
+  TTSVDCores(cores)
+end
+
+function Projection(s::NnzTTSnapshots,args...;kwargs...)
+  cores = ttsvd(s,args...;kwargs...)
+  basis = TTSVDCores(cores)
+  recast_basis(s,basis)
 end
 
 function get_basis_spacetime(cores::Vector{Array{T,3}}) where T
@@ -116,12 +121,16 @@ function get_basis_spacetime(cores::Vector{Array{T,3}}) where T
 end
 
 # for the time being, N = 3: space-time-parameter
-struct TTSVDCores{T,N} <: Projection
+struct TTSVDCores{T,N,BST} <: Projection
   cores::Vector{Array{T,3}}
-  basis_spacetime::Matrix{T}
-  function TTSVDCores(cores::Vector{Array{T,3}},basis_spacetime::Matrix{T}) where T
+  basis_spacetime::BST
+  function TTSVDCores(
+    cores::Vector{Array{T,3}},
+    basis_spacetime::BST=get_basis_spacetime(cores)
+    ) where {T,BST}
+
     N = length(cores)
-    new{T,N}(cores,basis_spacetime)
+    new{T,N,BST}(cores,basis_spacetime)
   end
 end
 
@@ -140,6 +149,30 @@ end
 Base.size(a::Core2Matrix) = (size(a.array,2),size(a.array,1)*size(a.array,3))
 Base.length(a::Core2Matrix) = prod(size(a))
 Base.getindex(a::Core2Matrix,i,j) = a.array[fast_index(j,size(a.array,1)),i,slow_index(j,size(a.array,1))]
+
+function recast_basis(s::NnzTTSnapshots,b::TTSVDCores)
+  basis_spacetime = recast(s,get_basis_spacetime(b))
+  TTSVDCores(b.cores,basis_spacetime)
+end
+
+struct CompressedTTSVDCores{M} <: Projection
+  metadata::M
+end
+
+function compress_basis(b::TTSVDCores,b_test::TTSVDCores;kwargs...)
+  metadata = compress_combine_basis_space_time(get_basis_spacetime(b),get_basis_spacetime(b_test))
+  CompressedTTSVDCores(metadata)
+end
+
+function compress_basis(b::TTSVDCores,b_trial::TTSVDCores,b_test::TTSVDCores;kwargs...)
+  A = get_basis_spacetime(b)
+  B = get_basis_spacetime(b_trial)
+  C = get_basis_spacetime(b_test)
+  B_shift = shift(B,1:num_times(b_test)-1,num_space_dofs(b_test))
+  C_shift = shift(C,2:num_times(b_test),num_space_dofs(b_test))
+  metadata = compress_combine_basis_space_time(A,B,C,B_shift,C_shift;kwargs...)
+  CompressedTTSVDCores(metadata)
+end
 
 # multi field interface
 

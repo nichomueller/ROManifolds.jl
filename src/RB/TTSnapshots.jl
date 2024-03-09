@@ -81,7 +81,7 @@ function BasicSnapshots(
     array[i] = s.values[it][ip]
   end
   basic_values = ParamArray(array)
-  BasicSnapshots(basic_values,s.realization,s.mode)
+  BasicSnapshots(basic_values,s.realization)
 end
 
 function FEM.get_values(s::TransientTTSnapshots)
@@ -189,23 +189,23 @@ const NnzTTSnapshots = Union{
 
 num_space_dofs(s::BasicNnzTTSnapshots) = nnz(first(s.values))
 
-function tensor_getindex(s::BasicNnzTTSnapshots,ispace::Integer,itime::Integer,iparam::Integer)
+function Base.getindex(s::BasicNnzTTSnapshots,ispace::Integer,itime::Integer,iparam::Integer)
   nonzeros(s.values[iparam+(itime-1)*num_params(s)])[ispace]
 end
 
-function tensor_setindex!(s::BasicNnzTTSnapshots,v,ispace::Integer,itime::Integer,iparam::Integer)
+function Base.setindex!(s::BasicNnzTTSnapshots,v,ispace::Integer,itime::Integer,iparam::Integer)
   nonzeros(s.values[iparam+(itime-1)*num_params(s)])[ispace] = v
 end
 
 num_space_dofs(s::TransientNnzTTSnapshots) = nnz(first(first(s.values)))
 
-function tensor_getindex(
+function Base.getindex(
   s::TransientNnzTTSnapshots,
   ispace::Integer,itime::Integer,iparam::Integer)
   nonzeros(s.values[itime][iparam])[ispace]
 end
 
-function tensor_setindex!(
+function Base.setindex!(
   s::TransientNnzTTSnapshots,
   v,ispace::Integer,itime::Integer,iparam::Integer)
   nonzeros(s.values[itime][iparam])[ispace] = v
@@ -217,14 +217,47 @@ function get_nonzero_indices(s::NnzTTSnapshots)
   return i .+ (j .- 1)*v.m
 end
 
-function recast(s::NnzTTSnapshots{Mode1Axis},a::AbstractMatrix)
-  s1 = first(s.values)
-  r = get_realization(s)
-  r1 = r[axes(a,2),Base.OneTo(1)]
-  i,j, = findnz(s1)
-  m,n = size(s1)
+function recast(s::NnzTTSnapshots,a::AbstractMatrix)
+  v = isa(s,BasicTTSnapshots) ? first(s.values) : first(first(s.values))
+  i,j, = findnz(v)
+  m,n = size(v)
+  nz = nnz(v)
   asparse = map(eachcol(a)) do v
-    sparse(i,j,v,m,n)
+    blocks = map(1:num_times(s)) do it
+      sparse(i,j,v[(it-1)*nz+1:it*nz],m,n)
+    end
+    BDiagonal(blocks)
   end
-  return Snapshots(ParamArray(asparse),r1,s.mode)
+  return VecOfBDiagonalSparseMat2Mat(asparse)
+end
+
+struct VecOfBDiagonalSparseMat2Mat{Tv,Ti,V} <: AbstractSparseMatrix{Tv,Ti}
+  values::V
+  function VecOfBDiagonalSparseMat2Mat(values::V
+    ) where {Tv,Ti,V<:AbstractVector{<:BDiagonal{Tv,<:AbstractSparseMatrix{Tv,Ti}}}}
+
+    new{Tv,Ti,V}(values)
+  end
+end
+
+FEM.get_values(s::VecOfBDiagonalSparseMat2Mat) = s.values
+
+num_space_dofs(s::VecOfBDiagonalSparseMat2Mat) = nnz(first(first(s.values).values))
+FEM.num_times(s::VecOfBDiagonalSparseMat2Mat) = length(first(s.values).values)
+Base.size(s::VecOfBDiagonalSparseMat2Mat) = (num_space_dofs(s)*num_times(s),length(s.values))
+
+function Base.getindex(s::VecOfBDiagonalSparseMat2Mat,i::Integer,j::Integer)
+  itime = slow_index(i,num_space_dofs(s))
+  ispace = fast_index(i,num_space_dofs(s))
+  nonzeros(s.values[j].values[itime])[ispace]
+end
+
+function Base.getindex(s::VecOfBDiagonalSparseMat2Mat,i,j)
+  view(s,i,j)
+end
+
+function get_nonzero_indices(s::VecOfBDiagonalSparseMat2Mat)
+  v = first(first(s.values).values)
+  i,j, = findnz(v)
+  return i .+ (j .- 1)*v.m
 end

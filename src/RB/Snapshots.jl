@@ -805,22 +805,38 @@ function tensor_setindex!(
   tensor_setindex!(snaps,v,is,it,ip)
 end
 
-function get_nonzero_indices(s::NnzSnapshots)
+function recast(s::NnzSnapshots{Mode1Axis},a::AbstractMatrix)
   v = isa(s,BasicSnapshots) ? first(s.values) : first(first(s.values))
   i,j, = findnz(v)
-  return i .+ (j .- 1)*v.m
-end
-
-function recast(s::NnzSnapshots{Mode1Axis},a::AbstractMatrix)
-  s1 = first(s.values)
-  r = get_realization(s)
-  r1 = r[axes(a,2),Base.OneTo(1)]
-  i,j, = findnz(s1)
-  m,n = size(s1)
+  m,n = size(v)
   asparse = map(eachcol(a)) do v
     sparse(i,j,v,m,n)
   end
-  return Snapshots(ParamArray(asparse),r1,s.mode)
+  return VecOfSparseMat2Mat(asparse)
+end
+
+struct VecOfSparseMat2Mat{Tv,Ti,V} <: AbstractSparseMatrix{Tv,Ti}
+  values::V
+  function VecOfSparseMat2Mat(values::V) where {Tv,Ti,V<:AbstractVector{<:AbstractSparseMatrix{Tv,Ti}}}
+    new{Tv,Ti,V}(values)
+  end
+end
+
+FEM.get_values(s::VecOfSparseMat2Mat) = s.values
+Base.size(s::VecOfSparseMat2Mat) = (nnz(first(s.values)),length(s.values))
+
+function Base.getindex(s::VecOfSparseMat2Mat,i,j::Integer)
+  nonzeros(s.values[j])[i]
+end
+
+function Base.getindex(s::VecOfSparseMat2Mat,i,j)
+  view(s,i,j)
+end
+
+function get_nonzero_indices(s::VecOfSparseMat2Mat)
+  v = first(s.values)
+  i,j, = findnz(v)
+  return i .+ (j .- 1)*v.m
 end
 
 struct BlockSnapshots{S,N} <: AbstractParamContainer{S,N}

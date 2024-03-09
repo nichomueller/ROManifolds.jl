@@ -145,6 +145,11 @@ function SparseArrays.resize!(a::TTArray,args...)
   return a
 end
 
+function SparseArrays.sparse(
+  I::AbstractVector,J::AbstractVector,V::TTVector{D},m::Integer,n::Integer) where D
+  TTArray(sparse(I,J,V.values,m,n),Val(D))
+end
+
 SparseArrays.nnz(a::TTSparseMatrix) = nnz(a.values)
 SparseArrays.findnz(a::TTSparseMatrix) = findnz(a.values)
 SparseArrays.nzrange(a::TTSparseMatrix,col::Int) = nzrange(a.values,col)
