@@ -37,7 +37,9 @@ function compute_bases_time_space(s::AbstractSnapshots,norm_matrix=nothing;kwarg
   PODBasis(basis_space,basis_time)
 end
 
-struct PODBasis{A<:AbstractMatrix,B<:AbstractMatrix} <: Projection
+abstract type PODProjection <: Projection end
+
+struct PODBasis{A<:AbstractMatrix,B<:AbstractMatrix} <: PODProjection
   basis_space::A
   basis_time::B
 end
@@ -65,7 +67,7 @@ function recast(x::Vector,b::PODBasis)
   (basis_space*X)*basis_time'
 end
 
-struct CompressedPODBasis{A,B,C} <: Projection
+struct CompressedPODBasis{A,B,C} <: PODProjection
   basis_space::A
   basis_time::B
   metadata::C
@@ -117,8 +119,10 @@ function get_basis_spacetime(cores::Vector{Array{T,3}}) where T
   basis
 end
 
+abstract type TTProjection <: Projection end
+
 # for the time being, N = 3: space-time-parameter
-struct TTSVDCores{T,N,BST} <: Projection
+struct TTSVDCores{T,N,BST} <: TTProjection
   cores::Vector{Array{T,3}}
   basis_spacetime::BST
   function TTSVDCores(
@@ -152,7 +156,7 @@ function recast_basis(s::NnzTTSnapshots,b::TTSVDCores)
   TTSVDCores(b.cores,basis_spacetime)
 end
 
-struct CompressedTTSVDCores{M} <: Projection
+struct CompressedTTSVDCores{M} <: TTProjection
   metadata::M
 end
 

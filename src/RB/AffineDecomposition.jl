@@ -106,7 +106,14 @@ function allocate_coeff_matrix(
   allocate_matrix(Vector{Float64},nspace*ntime,nparams)
 end
 
-function allocate_param_coeff_matrix(solver::RBSolver,b::Projection)
+function allocate_coeff_matrix(solver::TTPODMDEIMSolver,b::TTSVDCores)
+  nspace = num_reduced_space_dofs(b)
+  ntime = num_reduced_times(b)
+  nparams = num_online_params(solver)
+  allocate_matrix(Vector{Float64},nspace*ntime,nparams)
+end
+
+function allocate_coeff_param_array(solver::PODMDEIMSolver,b::PODBasis)
   nspace = num_reduced_space_dofs(b)
   ntime = num_times(b)
   nparams = num_online_params(solver)
@@ -114,9 +121,16 @@ function allocate_param_coeff_matrix(solver::RBSolver,b::Projection)
   allocate_param_array(mat,nparams)
 end
 
+function allocate_coeff_param_array(solver::TTPODMDEIMSolver,b::TTSVDCores)
+  nvectors = num_reduced_dofs(b)
+  nparams = num_online_params(solver)
+  vec = allocate_vector(Vector{Float64},nvectors)
+  allocate_param_array(vec,nparams)
+end
+
 function allocate_mdeim_coeff(solver::RBSolver,b::Projection)
   cache_solve = allocate_coeff_matrix(solver,b)
-  cache_recast = allocate_param_coeff_matrix(solver,b)
+  cache_recast = allocate_coeff_param_array(solver,b)
   return cache_solve,cache_recast
 end
 
@@ -157,6 +171,9 @@ struct AffineDecomposition{M,A,B,C,D} <: Projection
   integration_domain::C
   cache::D
 end
+
+const TTAffineDecomposition = AffineDecomposition{SpaceTimeMDEIM,A,B,C,D} where {
+  A<:TTProjection,B,C,D}
 
 get_integration_domain(a::AffineDecomposition) = a.integration_domain
 get_interp_matrix(a::AffineDecomposition) = a.mdeim_interpolation
@@ -354,6 +371,16 @@ function mdeim_coeff(a::AffineDecomposition{SpaceTimeMDEIM},b::AbstractMatrix)
   return coeff_recast
 end
 
+function mdeim_coeff(a::TTAffineDecomposition,b::AbstractMatrix)
+  coeff,coeff_recast = get_coeff_cache(a)
+  mdeim_interpolation = a.mdeim_interpolation
+  ldiv!(coeff,mdeim_interpolation,b)
+  @inbounds for i = eachindex(coeff_recast)
+    coeff_recast[i] = coeff[:,i]
+  end
+  return coeff_recast
+end
+
 function mdeim_coeff(a::AffineContribution,b::ArrayContribution)
   @assert length(a) == length(b)
   map(mdeim_coeff,a.values,b.values)
@@ -398,6 +425,26 @@ function jacobian_mdeim_lincomb(a::AffineDecomposition,coeff::ParamMatrix)
     end
   end
 
+  return lincomb_cache
+end
+
+function residual_mdeim_lincomb(a::TTAffineDecomposition,coeff::ParamMatrix)
+  _,lincomb_cache = get_lincomb_cache(a)
+  fill!(lincomb_cache,zero(eltype(lincomb_cache)))
+  basis_spacetime = a.basis.metadata
+  @inbounds for i = eachindex(lincomb_cache)
+    lincomb_cache[i] = basis_spacetime*coeff[i]
+  end
+  return lincomb_cache
+end
+
+function jacobian_mdeim_lincomb(a::TTAffineDecomposition,coeff::ParamMatrix)
+  _,lincomb_cache = get_lincomb_cache(a)
+  fill!(lincomb_cache,zero(eltype(lincomb_cache)))
+  basis_spacetime = a.basis.metadata
+  @inbounds for i = eachindex(lincomb_cache)
+    lincomb_cache[i] = basis_spacetime*coeff[i]
+  end
   return lincomb_cache
 end
 
@@ -655,10 +702,16 @@ function compress(solver,fes::Tuple{Vararg{ArrayContribution}},trial,test)
   sum(cmp)
 end
 
+# function interpolation_error(a::AffineDecomposition,fes::AbstractSnapshots,rbs::AbstractSnapshots)
+#   ids_space,ids_time = get_indices_space(a),get_indices_time(a)
+#   fes_ids = reverse_snapshots_at_indices(fes,ids_space)[:,ids_time]
+#   rbs_ids = reverse_snapshots_at_indices(rbs,ids_space)[:,ids_time]
+#   norm(fes_ids - rbs_ids)
+# end
 function interpolation_error(a::AffineDecomposition,fes::AbstractSnapshots,rbs::AbstractSnapshots)
   ids_space,ids_time = get_indices_space(a),get_indices_time(a)
-  fes_ids = reverse_snapshots_at_indices(fes,ids_space)[:,ids_time]
-  rbs_ids = reverse_snapshots_at_indices(rbs,ids_space)[:,ids_time]
+  fes_ids = reverse(select_snapshots(fes,ids_space,ids_time,:))
+  rbs_ids = reverse(select_snapshots(rbs,ids_space,ids_time,:))
   norm(fes_ids - rbs_ids)
 end
 

@@ -52,17 +52,18 @@ struct TTPODMDEIMSolver{S,M} <: RBSolver{S}
   nsnaps_test::Int
   function TTPODMDEIMSolver(
     fesolver::S,
-    ϵ::Float64,
-    mdeim_style::M;
+    ϵ::Float64;
     nsnaps_state=50,
     nsnaps_mdeim=20,
-    nsnaps_test=10) where {S,M}
+    nsnaps_test=10) where S
+    mdeim_style = SpaceTimeMDEIM()
+    M = typeof(mdeim_style)
     new{S,M}(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_mdeim,nsnaps_test)
   end
 end
 
-function TTRBSolver(fesolver,ϵ=1e-4,st_mdeim=SpaceTimeMDEIM();kwargs...)
-  TTPODMDEIMSolver(fesolver,ϵ,st_mdeim;kwargs...)
+function TTRBSolver(fesolver,ϵ=1e-4;kwargs...)
+  TTPODMDEIMSolver(fesolver,ϵ;kwargs...)
 end
 
 function get_test_directory(solver::TTPODMDEIMSolver;dir=datadir())

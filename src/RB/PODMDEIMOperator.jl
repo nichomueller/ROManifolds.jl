@@ -159,12 +159,19 @@ function _select_fe_quantities_at_time_locations(a,r,xhF,ode_cache)
   return red_r,red_times,red_xhF,red_ode_cache
 end
 
+# function _select_snapshots_at_space_time_locations(s,a,red_times)
+#   ids_space = get_indices_space(a)
+#   ids_time = filter(!isnothing,indexin(get_indices_time(a),red_times))
+#   ids_param = Base.OneTo(num_params(s))
+#   snew = reverse_snapshots_at_indices(s,ids_space)
+#   select_snapshots(snew,ids_time,ids_param)
+# end
 function _select_snapshots_at_space_time_locations(s,a,red_times)
   ids_space = get_indices_space(a)
   ids_time = filter(!isnothing,indexin(get_indices_time(a),red_times))
   ids_param = Base.OneTo(num_params(s))
-  snew = reverse_snapshots_at_indices(s,ids_space)
-  select_snapshots(snew,ids_time,ids_param)
+  srev = reverse_snapshots(s)
+  select_snapshots(srev,ids_space,ids_time,ids_param)
 end
 
 function _select_snapshots_at_space_time_locations(
@@ -355,7 +362,7 @@ end
 
 function Algebra.solve(
   solver::ThetaMethodRBSolver,
-  op::PODMDEIMOperator,
+  op::RBOperator{Affine},
   _r::TransientParamRealization)
 
   fesolver = get_fe_solver(solver)
@@ -410,7 +417,7 @@ end
 
 function Algebra.solve(
   solver::ThetaMethodRBSolver,
-  op::LinearNonlinearPODMDEIMOperator,
+  op::RBOperator{LinearNonlinear},
   _r::TransientParamRealization)
 
   fesolver = get_fe_solver(solver)
