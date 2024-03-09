@@ -77,9 +77,8 @@ function Base.materialize(c::ContributionBroadcast)
 end
 
 function Base.materialize!(a::ArrayContribution,c::ContributionBroadcast)
-  a.trians .= c.trians
-  map(Base.materialize!,a.values,c.contrib.values)
-  a.values = Contribution(map(Base.materialize,c.contrib),c.trians)
+  @check a.trians === c.trians
+  map(Base.materialize!,a.values,c.contrib)
   a
 end
 

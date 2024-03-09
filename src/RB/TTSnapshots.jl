@@ -1,5 +1,9 @@
 abstract type TTSnapshots{T,N} <: AbstractSnapshots{T,N} end
 
+Base.size(s::TTSnapshots) = (num_space_dofs(s),num_times(s),num_params(s))
+Base.length(s::TTSnapshots) = prod(size(s))
+Base.axes(s::TTSnapshots) = Base.OneTo.(size(s))
+
 #= representation of a standard tensor-train snapshot
    [ [u(x1,t1,μ1) ⋯ u(x1,t1,μP)] [u(x1,t2,μ1) ⋯ u(x1,t2,μP)] [u(x1,t3,μ1) ⋯] [⋯] [u(x1,tT,μ1) ⋯ u(x1,tT,μP)] ]
          ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
@@ -9,10 +13,10 @@ abstract type TTSnapshots{T,N} <: AbstractSnapshots{T,N} end
 struct BasicTTSnapshots{T,N,P,R} <: TTSnapshots{T,N}
   values::P
   realization::R
-  function BasicTTSnapshots(values::P,realization::R) where {D,P<:ParamTTArray{D},R}
+  function BasicTTSnapshots(values::P,realization::R) where {P<:ParamTTArray,R}
     T = eltype(P)
-    N = D+2
-    new{T,N,P,R}(mode,values,realization)
+    N = FEM.get_dim(P)+2
+    new{T,N,P,R}(values,realization)
   end
 end
 
@@ -40,12 +44,12 @@ struct TransientTTSnapshots{T,N,P,R,V} <: TTSnapshots{T,N}
   function TransientTTSnapshots(
     values::AbstractVector{P},
     realization::R
-    ) where {D,P<:ParamTTArray{D},R<:TransientParamRealization}
+    ) where {P<:ParamTTArray,R<:TransientParamRealization}
 
     V = typeof(values)
     T = eltype(P)
-    N = D+2
-    new{T,N,P,R,V}(mode,values,realization)
+    N = FEM.get_dim(P)+2
+    new{T,N,P,R,V}(values,realization)
   end
 end
 
@@ -56,11 +60,11 @@ end
 
 num_space_dofs(s::TransientTTSnapshots) = length(first(first(s.values)))
 
-function tensor_getindex(s::TransientTTSnapshots,ispace::Integer,itime::Integer,iparam::Integer)
+function Base.getindex(s::TransientTTSnapshots,ispace::Integer,itime::Integer,iparam::Integer)
   s.values[itime][iparam][ispace]
 end
 
-function tensor_setindex!(s::TransientTTSnapshots,v,ispace::Integer,itime::Integer,iparam::Integer)
+function Base.setindex!(s::TransientTTSnapshots,v,ispace::Integer,itime::Integer,iparam::Integer)
   s.values[itime][iparam][ispace] = v
 end
 
@@ -116,3 +120,111 @@ param_indices(s::SelectedTTSnapshotsAtIndices) = s.selected_indices[3]
 num_space_dofs(s::SelectedTTSnapshotsAtIndices) = length(space_indices(s))
 FEM.num_times(s::SelectedTTSnapshotsAtIndices) = length(time_indices(s))
 FEM.num_params(s::SelectedTTSnapshotsAtIndices) = length(param_indices(s))
+
+function Base.getindex(
+  s::SelectedTTSnapshotsAtIndices,
+  ispace::Integer,itime::Integer,iparam::Integer)
+  is = space_indices(s)[ispace]
+  it = time_indices(s)[itime]
+  ip = param_indices(s)[iparam]
+  getindex(s.snaps,is,it,ip)
+end
+
+function Base.setindex!(
+  s::SelectedTTSnapshotsAtIndices,
+  v,ispace::Integer,itime::Integer,iparam::Integer)
+  is = space_indices(s)[ispace]
+  it = time_indices(s)[itime]
+  ip = param_indices(s)[iparam]
+  setindex!(s.snaps,v,is,it,ip)
+end
+
+function FEM.get_values(s::SelectedTTSnapshotsAtIndices{T,N,<:BasicTTSnapshots}) where {T,N}
+  @check space_indices(s) == Base.OneTo(num_space_dofs(s))
+  v = get_values(s.snaps)
+  array = Vector{typeof(first(v))}(undef,num_cols(s))
+  @inbounds for (i,it) in enumerate(time_indices(s))
+    for (j,jp) in enumerate(param_indices(s))
+      array[(i-1)*num_params(s)+j] = v[(it-1)*num_params(s)+jp]
+    end
+  end
+  ParamArray(array)
+end
+
+function FEM.get_values(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapshots}) where {T,N}
+  get_values(BasicSnapshots(s))
+end
+
+function get_realization(s::SelectedTTSnapshotsAtIndices)
+  r = get_realization(s.snaps)
+  r[param_indices(s),time_indices(s)]
+end
+
+function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:BasicTTSnapshots}) where {T,N}
+  values = get_values(s)
+  r = get_realization(s)
+  BasicTTSnapshots(values,r)
+end
+
+function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapshots}) where {T,N}
+  @check space_indices(s) == Base.OneTo(num_space_dofs(s))
+  v = s.snaps.values
+  basic_values = Vector{typeof(first(first(v)))}(undef,num_times(s)*num_params(s))
+  @inbounds for (i,it) in enumerate(time_indices(s))
+    for (j,jp) in enumerate(param_indices(s))
+      basic_values[(i-1)*num_params(s)+j] = v[it][jp]
+    end
+  end
+  r = get_realization(s)
+  BasicTTSnapshots(ParamArray(basic_values),r)
+end
+
+const BasicNnzTTSnapshots = BasicTTSnapshots{T,N,P,R} where {T,N,P<:ParamTTSparseMatrix,R}
+const TransientNnzTTSnapshots = TransientTTSnapshots{T,N,P,R} where {T,N,P<:ParamTTSparseMatrix,R}
+const SelectedNnzTTSnapshotsAtIndices = SelectedTTSnapshotsAtIndices{T,N,S,I} where {T,N,S<:Union{BasicNnzTTSnapshots,TransientNnzTTSnapshots},I}
+const NnzTTSnapshots = Union{
+  BasicNnzTTSnapshots{T,N},
+  TransientNnzTTSnapshots{T,N},
+  SelectedNnzTTSnapshotsAtIndices{T,N}} where {T,N}
+
+num_space_dofs(s::BasicNnzTTSnapshots) = nnz(first(s.values))
+
+function tensor_getindex(s::BasicNnzTTSnapshots,ispace::Integer,itime::Integer,iparam::Integer)
+  nonzeros(s.values[iparam+(itime-1)*num_params(s)])[ispace]
+end
+
+function tensor_setindex!(s::BasicNnzTTSnapshots,v,ispace::Integer,itime::Integer,iparam::Integer)
+  nonzeros(s.values[iparam+(itime-1)*num_params(s)])[ispace] = v
+end
+
+num_space_dofs(s::TransientNnzTTSnapshots) = nnz(first(first(s.values)))
+
+function tensor_getindex(
+  s::TransientNnzTTSnapshots,
+  ispace::Integer,itime::Integer,iparam::Integer)
+  nonzeros(s.values[itime][iparam])[ispace]
+end
+
+function tensor_setindex!(
+  s::TransientNnzTTSnapshots,
+  v,ispace::Integer,itime::Integer,iparam::Integer)
+  nonzeros(s.values[itime][iparam])[ispace] = v
+end
+
+function get_nonzero_indices(s::NnzTTSnapshots)
+  v = isa(s,BasicTTSnapshots) ? first(s.values) : first(first(s.values))
+  i,j, = findnz(v)
+  return i .+ (j .- 1)*v.m
+end
+
+function recast(s::NnzTTSnapshots{Mode1Axis},a::AbstractMatrix)
+  s1 = first(s.values)
+  r = get_realization(s)
+  r1 = r[axes(a,2),Base.OneTo(1)]
+  i,j, = findnz(s1)
+  m,n = size(s1)
+  asparse = map(eachcol(a)) do v
+    sparse(i,j,v,m,n)
+  end
+  return Snapshots(ParamArray(asparse),r1,s.mode)
+end

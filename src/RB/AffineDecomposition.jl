@@ -413,7 +413,8 @@ function mdeim_lincomb!(
     ci = coeff[i]
     for j = axes(coeff,2)
       time_prod_cache .= basis_time'*ci[:,j]
-      lci .+= kronecker(basis_space[j],time_prod_cache)
+      # lci .+= kronecker(basis_space[j],time_prod_cache)
+      lci .+= kronecker(time_prod_cache,basis_space[j])
     end
   end
 end
@@ -436,7 +437,8 @@ function mdeim_lincomb!(
           time_prod_cache[row,col] = sum(basis_time[:,row,col].*ci[:,j])
         end
       end
-      lci .+= kronecker(basis_space[j],time_prod_cache)
+      # lci .+= kronecker(basis_space[j],time_prod_cache)
+      lci .+= kronecker(time_prod_cache,basis_space[j])
     end
   end
 end

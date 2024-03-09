@@ -49,11 +49,6 @@ FEM.num_times(b::PODBasis) = size(get_basis_time(b),1)
 num_reduced_space_dofs(b::PODBasis) = size(get_basis_space(b),2)
 num_reduced_times(b::PODBasis) = size(get_basis_time(b),2)
 
-function Projection(s::TTSnapshots,args...;kwargs...)
-  basis_spacetime = ttsvd(s,args...;kwargs...)
-  TTSVDBasis(basis_spacetime)
-end
-
 function recast_basis(s::NnzSnapshots,b::PODBasis)
   basis_space = recast(s,get_basis_space(b))
   basis_time = get_basis_time(b)
@@ -66,8 +61,10 @@ function recast(x::Vector,b::PODBasis)
   ns = num_reduced_space_dofs(b)
   nt = num_reduced_times(b)
 
-  X = reshape(x,nt,ns)
-  basis_space*(basis_time*X)'
+  # X = reshape(x,nt,ns)
+  # basis_space*(basis_time*X)'
+  X = reshape(x,ns,nt)
+  (basis_space*X)*basis_time'
 end
 
 struct CompressedPODBasis{A,B,C} <: Projection
@@ -102,13 +99,36 @@ end
 
 # TT interface
 
-# for the time being, N = 3: space-time-parameter
-struct TTSVDCores{N,T} <: Projection
-  cores::NTuple{N,Array{T,3}}
+function Projection(s::TTSnapshots,args...;kwargs...)
+  cores = ttsvd(s,args...;kwargs...)
+  basis_spacetime = get_basis_spacetime(cores)
+  TTSVDCores(cores,basis_spacetime)
 end
 
-get_basis_space(b::TTSVDCores) = Core2Matrix(b[1])
-get_basis_time(b::TTSVDCores) = Core2Matrix(b[2])
+# for the time being, N = 3: space-time-parameter
+struct TTSVDCores{T,N} <: Projection
+  cores::Vector{Array{T,3}}
+  basis_spacetime::Matrix{T}
+  function TTSVDCores(cores::Vector{Array{T,3}},basis_spacetime::Matrix{T}) where T
+    N = length(cores)
+    new{T,N}(cores,basis_spacetime)
+  end
+end
+
+function get_basis_spacetime(cores::Vector{Array{T,3}}) where T
+  nrows = size(cores[1],2)*size(cores[2],2)
+  ncols = size(cores[2],3)
+  basis = zeros(T,nrows,ncols)
+  for j = 1:ncols
+    for α = axes(cores[1],3)
+      basis[:,j] += kronecker(cores[2][α,:,j],cores[1][1,:,α])
+    end
+  end
+  basis
+end
+
+get_basis_space(b::TTSVDCores) = Core2Matrix(b.cores[1])
+get_basis_time(b::TTSVDCores) = Core2Matrix(b.cores[2])
 num_space_dofs(b::TTSVDCores) = size(b.cores[1],2)
 FEM.num_times(b::TTSVDCores) = size(b.cores[2],2)
 num_reduced_space_dofs(b::TTSVDCores) = size(b.cores[1],3)

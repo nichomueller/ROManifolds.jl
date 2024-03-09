@@ -145,12 +145,15 @@ function SparseArrays.resize!(a::TTArray,args...)
   return a
 end
 
-SparseArrays.nnz(a::TTSparseMatrix) = nnz(first(a))
-SparseArrays.nzrange(a::TTSparseMatrix,col::Int) = nzrange(first(a),col)
-SparseArrays.rowvals(a::TTSparseMatrix) = rowvals(first(a))
-SparseArrays.nonzeros(a::TTSparseMatrix{D}) where D = TTArray(map(nonzeros,a),Val(D))
-SparseMatricesCSR.colvals(a::TTSparseMatrix) = colvals(first(a))
-SparseMatricesCSR.getoffset(a::TTSparseMatrix) = getoffset(first(a))
+SparseArrays.nnz(a::TTSparseMatrix) = nnz(a.values)
+SparseArrays.findnz(a::TTSparseMatrix) = findnz(a.values)
+SparseArrays.nzrange(a::TTSparseMatrix,col::Int) = nzrange(a.values,col)
+SparseArrays.rowvals(a::TTSparseMatrix) = rowvals(a.values)
+SparseArrays.nonzeros(a::TTSparseMatrix{D}) where D = TTArray(a.values,Val(D))
+SparseMatricesCSR.colvals(a::TTSparseMatrix) = colvals(a.values)
+SparseMatricesCSR.getoffset(a::TTSparseMatrix) = getoffset(a.values)
+
+LinearAlgebra.cholesky(a::TTSparseMatrix) = cholesky(a.values)
 
 function Arrays.CachedArray(a::TTArray)
   TTArray(CachedArray(a.values))

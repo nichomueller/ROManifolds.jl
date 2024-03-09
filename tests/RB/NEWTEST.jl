@@ -1,114 +1,169 @@
-using Gridap
-using Test
-using DrWatson
-using Gridap.MultiField
-using Mabla.FEM
-using Mabla.RB
+struct Opt
+  rank::Vector{Int64}
+  epsilon::Vector{Float64}
+end
 
-θ = 0.5
-dt = 0.01
-t0 = 0.0
-tf = 0.1
+struct TensorTrain
+  opt::Opt
+  norms::Vector
+  cores::Vector
+  ranks::Vector{Int64}
+  singular::Vector{Float64}
+end
 
-pranges = fill([1,10],3)
-tdomain = t0:dt:tf
-ptspace = TransientParamSpace(pranges,tdomain)
-# model_dir = datadir(joinpath("meshes","perforated_plate.json"))
-# model = DiscreteModelFromFile(model_dir)
+function TensorTrain(X; opt::Opt = Opt(30, 0.0), norms = fill(I, ndims(X)))
+(cores, ranks, singular) = ttsvd(X, norms, opt)
+return TensorTrain(opt, norms, cores, ranks, singular)
+end
 
-n = 20
-domain = (0,1,0,1)
-partition = (n,n)
-model = CartesianDiscreteModel(domain, partition)
+function Base.length(tt::TensorTrain)
+  Base.length(tt.cores)
+end
 
-labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
+function Base.display(tt::TensorTrain)
+  println("A tensor train of length of $(length(tt))")
+  println("the ranks are $(tt.ranks)")
+end
 
-order = 2
-degree = 2*order
-Ω = Triangulation(model)
-dΩ = Measure(Ω,degree)
+function Base.size(tt::TensorTrain)
+  s = [Base.size(tt.cores[k], 2) for k = 1:length(tt)]
+end
 
-a(x,μ,t) = 1+exp(-sin(2π*t/tf)^2*(1-x[2])/sum(μ))
-a(μ,t) = x->a(x,μ,t)
-aμt(μ,t) = TransientParamFunction(a,μ,t)
+function proj(A, core::Array{Float64, 3}, X)
+  if size(core)[1:2] != size(A)[1:2] error("The dimension of subspace does not match the array") end
+  U = reshape(core, :, size(core, 3))
+  if X == I
+      Xu = I
+  else
+      Xu = kronecker(X, I(size(core, 1)))
+  end
+  n_3 = size(A)[3:end]
+  n_new = (size(U, 2), n_3...)
+  return reshape(U'*Xu*reshape(A, size(A, 1)*size(A, 2), :), n_new)
+end
 
-inflow(μ,t) = 1-cos(2π*t/tf)+sin(μ[2]*2π*t/tf)/μ[1]
-g_in(x,μ,t) = VectorValue(-x[2]*(1-x[2])*inflow(μ,t),0.0)
-g_in(μ,t) = x->g_in(x,μ,t)
-gμt_in(μ,t) = TransientParamFunction(g_in,μ,t)
-g_w(x,μ,t) = VectorValue(0.0,0.0)
-g_w(μ,t) = x->g_w(x,μ,t)
-gμt_w(μ,t) = TransientParamFunction(g_w,μ,t)
-g_c(x,μ,t) = VectorValue(0.0,0.0)
-g_c(μ,t) = x->g_c(x,μ,t)
-gμt_c(μ,t) = TransientParamFunction(g_c,μ,t)
+function proj(A, tt::TensorTrain, k::Integer)
+  # check the diemension
+  if ndims(A) != length(tt) error("The input array and tensor train should have same length") end
+  if !all(size(A) .== size(tt)) error("The input array and tensor train should have same size") end
+  if !(1 <= k <= length(tt)) error("The input index k is not in the range") end
 
-u0(x,μ) = VectorValue(0.0,0.0)
-u0(μ) = x->u0(x,μ)
-u0μ(μ) = ParamFunction(u0,μ)
-p0(x,μ) = 0.0
-p0(μ) = x->p0(x,μ)
-p0μ(μ) = ParamFunction(p0,μ)
+  A = reshape(A, (1, size(A)...))
+  for n = 1:k
+      A = proj(A, tt.cores[n], tt.norms[n])
+  end
+  return A
+end
 
-res(μ,t,(u,p),(v,q),dΩ) = ∫(v⋅∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
-jac(μ,t,u,(du,dp),(v,q),dΩ) = ∫(aμt(μ,t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ + ∫(q*(∇⋅(du)))dΩ
-jac_t(μ,t,u,(dut,dpt),(v,q),dΩ) = ∫(v⋅dut)dΩ
+function eval(tt::TensorTrain, ind::Vector{<:Integer})
+  # check if ind is of correct length
+  if length(ind) != length(tt)
+      error("The index length does not match the tensor train")
+  end
+  if !all(0 .< ind .<= size(tt))
+      error("The requested index exceeds the tensor train size")
+  end
+  output = 1
+  for k = 1:length(tt)
+      C = tt.cores[k]
+      output = output * C[:, ind[k], :]
+  end
+  return output[1]
+end
 
-trian_res = (Ω,)
-trian_jac = (Ω,)
-trian_jac_t = (Ω,)
+function basis(tt::TensorTrain, k::Integer)
+  # extract the basis vectors for the k-th core
+  if ! (0 < k <= length(tt)) error("Index exceeds the tensor train length") end
+  A = tt.cores[k]
+  A = [A[i1, :, i2] for i1 in 1:size(tt.cores[k], 1), i2 in 1:size(tt.cores[k], 3)]
+end
 
-coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
-induced_norm((du,dp),(v,q)) = ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
-reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-# test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","walls","cylinder"])
-# trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_w,gμt_c])
-test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial_u = TransientTrialParamFESpace(test_u,gμt_in)
-reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:C0)
-trial_p = TrialFESpace(test_p)
-test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
-trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-_feop = AffineTransientParamFEOperator(res,jac,jac_t,induced_norm,ptspace,trial,test,coupling)
-feop = FEOperatorWithTrian(_feop,trian_res,trian_jac,trian_jac_t)
+function basis(tt::TensorTrain, k1::Integer, k2::Integer)
+  # extract the product basis vectors from the k1-the core to the k2-th core
+  if ! (0 < k1 < k2 <= length(tt)) error("Indexes exceed the tensor train length or are not in ascending order") end
+  A = basis(tt, k1)
+  for k = k1:k2-1
+      A = A*basis(tt, k+1)
+  end
+  return A
+end
 
-xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
-fesolver = ThetaMethod(LUSolver(),dt,θ)
+function base2mat(A::Matrix)
+  # arrange the basis in a matrix of size n × r.
+  reduce(hcat, reshape(A, 1,:))
+end
 
-ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-# test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated_plate")))
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
+function Base.:*(x::Vector{Float64}, y::Vector{Float64})
+  z = kronecker(y, x)
+  return z[:]
+end
 
-fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(feop,rbsolver,fesnaps,rbsnaps,festats,rbstats)
-err = RB.space_time_error(results)
+function ttsvd(X, norms, opt)
+  # check opt matches the dimension of X
+  if length(opt.rank) == 1
+      optrank = fill(opt.rank[1], ndims(X) - 1)
+  elseif length(opt.rank) < ndims(X) - 1
+      error("The input ranks do not match tensor dimension")
+  else
+      optrank = opt.rank
+  end
+  if length(opt.epsilon) == 1
+      optepsilon = fill(opt.epsilon[1], ndims(X) - 1)
+  elseif length(opt.epsilon) < ndims(X) - 1
+      error("The input epsilon do not match tensor dimension")
+  else
+      optepsilon = opt.epsilon
+  end
 
-println(err)
-save(test_dir,fesnaps)
-save(test_dir,rbop)
-save(test_dir,results)
+  d = ndims(X)
+  n = size(X)
+  delta = opt.epsilon/sqrt(ndims(X)-1) * norm(X)
 
-# POD-MDEIM error
-pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
+  # initialization
+  singular = zeros(d)
+  ranks = fill(1,d)
+  cores = Vector(undef, ndims(X))
+  T = X
 
-ϵ = 1e-4
-rbsolver_space = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
+  for k = 1:d-1
+      M = norms[k]
+      if M != I; M = cholesky(M, check = true).U end
+      if k == 1
+          X_k = reshape(nprod(T, M, 1), n[k], :)
+      else
+          X_k = reshape(nprod(T, M, 2), ranks[k-1] * n[k], :)
+      end
 
-# we can load & solve directly, if the offline structures have been previously saved to file
-# load_solve(rbsolver_space,dir=test_dir_space)
+      U,S,V = svd(X_k)
+      n2 = sqrt(sum(S.^2))
+      r = min(optrank[k], findlast(S .> n2*optepsilon[k]))
+      U = U[:, 1:r]
+      S = S[1:r]
+      V = V[:, 1:r]
 
-rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
-rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
-results_space = rb_results(feop,rbsolver_space,fesnaps,rbsnaps_space,festats,rbstats_space)
-err_space = RB.space_time_error(results_space)
+      singular[k] =  r < length(S) ? sum(S[r+1:end])/n2 : 0
+      ranks[k] = r
+      T = reshape(S.*V', ranks[k], n[k+1], :)
+      if k == 1
+          cores[k] = nprod(reshape(U, 1, n[k], ranks[k]), inv(M), 2)
+      else
+          cores[k] = nprod(reshape(U, ranks[k-1], n[k], ranks[k]), inv(M), 2)
+      end
+  end
+  cores[d] = reshape(T, ranks[d-1], n[d], 1)
+  return cores, ranks, singular
+end
 
-println(err_space)
-save(test_dir,rbop_space)
-save(test_dir,results_space)
+function nprod(A, M, k)
+  if M == I
+      return A
+  end
+  d = ndims(A)
+  perm = circshift(1:d, -(k-1))
+  A = permutedims(A, perm)
+  n = size(A)
+  n = (size(M, 1), n[2:d]...)
+  A = reshape(M*reshape(A, size(A, 1), :), n)
+  permutedims(A, invperm(perm))
+end
