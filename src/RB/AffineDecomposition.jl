@@ -18,16 +18,6 @@ function get_mdeim_indices(A::AbstractMatrix{T}) where T
   return I
 end
 
-function recast_indices(A::AbstractMatrix,indices::AbstractVector)
-  return indices
-end
-
-function recast_indices(A::AbstractSparseMatrix,indices::AbstractVector)
-  nonzero_indices = get_nonzero_indices(A)
-  entire_indices = nonzero_indices[indices]
-  return entire_indices
-end
-
 struct ReducedIntegrationDomain{S<:AbstractVector,T<:AbstractVector}
   indices_space::S
   indices_time::T

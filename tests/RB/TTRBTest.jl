@@ -116,13 +116,21 @@ contribs_mat,contribs_vec = RB.jacobian_and_residual(rbsolver,pop,smdeim)
 red_mat = RB.reduced_matrix_form(rbsolver,pop,contribs_mat)
 red_vec = RB.reduced_vector_form(rbsolver,pop,contribs_vec)
 rbop = RB.PODMDEIMOperator(pop,red_mat,red_vec)
-rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+# rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 
 ii = red_mat[1].values[1].integration_domain
 ids_space,ids_time = ii.indices_space,ii.indices_time
 s = contribs_mat[1][1]
 srev = reverse_snapshots(s)
 ssrev = select_snapshots(srev,ids_space,ids_time,1:10)
+ssvec = reshape(ssrev,:,10)
+
+ii = red_vec.values[1].integration_domain
+ids_space,ids_time = ii.indices_space,ii.indices_time
+s = contribs_vec[1]
+srev = reverse_snapshots(s)
+ssrev = select_snapshots(srev,ids_space,ids_time,1:10)
+ssvec = reshape(ssrev,:,10)
 ciao
 # Affine Decomposition part
 # basis_mat_1 = reduced_basis(contribs_mat[1][1];ϵ)

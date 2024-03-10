@@ -1,3 +1,28 @@
+function recast_indices(A::AbstractMatrix,indices::AbstractVector)
+  return indices
+end
+
+function sparsify_indices(A::AbstractMatrix,indices::AbstractVector)
+  return indices
+end
+
+function recast_indices(A::AbstractSparseMatrix,indices::AbstractVector)
+  nonzero_indices = get_nonzero_indices(A)
+  entire_indices = nonzero_indices[indices]
+  return entire_indices
+end
+
+function sparsify_indices(A::AbstractSparseMatrix,indices::AbstractVector)
+  nonzero_indices = get_nonzero_indices(A)
+  sparse_indices = map(y->findfirst(x->x==y,nonzero_indices),indices)
+  return sparse_indices
+end
+
+function get_nonzero_indices(v::AbstractSparseMatrix)
+  i,j, = findnz(v)
+  return i .+ (j .- 1)*v.m
+end
+
 function compress_basis_space(A::AbstractMatrix,B::AbstractMatrix)
   map(eachcol(A)) do a
     B'*a

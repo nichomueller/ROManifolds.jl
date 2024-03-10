@@ -4,6 +4,8 @@ Base.size(s::TTSnapshots) = (num_space_dofs(s),num_times(s),num_params(s))
 Base.length(s::TTSnapshots) = prod(size(s))
 Base.axes(s::TTSnapshots) = Base.OneTo.(size(s))
 
+reverse_snapshots(s::TTSnapshots) = s
+
 #= representation of a standard tensor-train snapshot
    [ [u(x1,t1,μ1) ⋯ u(x1,t1,μP)] [u(x1,t2,μ1) ⋯ u(x1,t2,μP)] [u(x1,t3,μ1) ⋯] [⋯] [u(x1,tT,μ1) ⋯ u(x1,tT,μP)] ]
          ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮

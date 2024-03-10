@@ -43,8 +43,6 @@ export TransientSnapshots
 export TransientSnapshotsWithDirichletValues
 export CompressedTransientSnapshots
 export SelectedSnapshotsAtIndices
-export InnerTimeOuterParamTransientSnapshots
-export SelectedInnerTimeOuterParamTransientSnapshots
 export NnzSnapshots
 export GenericNnzSnapshots
 export NnzSnapshotsSwappedColumns
@@ -135,4 +133,6 @@ export rb_results
 export load_solve
 export generate_plots
 include("PostProcess.jl")
+
+include("OldCodeTest.jl")
 end # module

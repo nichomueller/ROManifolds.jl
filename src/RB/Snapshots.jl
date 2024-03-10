@@ -446,8 +446,7 @@ function change_mode(s::SelectedSnapshotsAtIndices)
 end
 
 function tensor_getindex(
-  s::SelectedSnapshotsAtIndices,
-  ispace::Integer,itime::Integer,iparam::Integer)
+  s::SelectedSnapshotsAtIndices,ispace,itime,iparam)
   is = space_indices(s)[ispace]
   it = time_indices(s)[itime]
   ip = param_indices(s)[iparam]
@@ -455,8 +454,7 @@ function tensor_getindex(
 end
 
 function tensor_setindex!(
-  s::SelectedSnapshotsAtIndices,
-  v,ispace::Integer,itime::Integer,iparam::Integer)
+  s::SelectedSnapshotsAtIndices,v,ispace,itime,iparam)
   is = space_indices(s)[ispace]
   it = time_indices(s)[itime]
   ip = param_indices(s)[iparam]
@@ -507,74 +505,76 @@ function BasicSnapshots(s::SelectedSnapshotsAtIndices{M,T,<:TransientSnapshots})
   BasicSnapshots(ParamArray(basic_values),r,mode)
 end
 
-#= mode-1 representation of a snapshot of type TransientSnapshotsSwappedColumns
+#= mode-1 representation of a snapshot of type SnapshotsSwappedColumns
    [ [u(x1,t1,μ1) ⋯ u(x1,tT,μ1)] [u(x1,t1,μ2) ⋯ u(x1,tT,μ2)] [u(x1,t1,μ3) ⋯] [⋯] [u(x1,t1,μP) ⋯ u(x1,tT,μP)] ]
          ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
    [ [u(xN,t1,μ1) ⋯ u(xN,tT,μ1)] [u(xN,t1,μ2) ⋯ u(xN,tT,μ2)] [u(xN,t1,μ3) ⋯] [⋯] [u(xN,t1,μP) ⋯ u(xN,tT,μP)] ]
 =#
-#= mode-2 representation of a snapshot of type TransientSnapshotsSwappedColumns
+#= mode-2 representation of a snapshot of type SnapshotsSwappedColumns
    [ [u(x1,t1,μ1) ⋯ u(xN,t1,μ1)] [u(x1,t1,μ2) ⋯ u(xN,t1,μ2)] [u(x1,t1,μ3) ⋯] [⋯] [u(x1,t1,μP) ⋯ u(xN,t1,μP)] ]
          ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
    [ [u(x1,tT,μ1) ⋯ u(xN,tT,μ1)] [u(x1,tT,μ2) ⋯ u(xN,tT,μ2)] [u(x1,tT,μ3) ⋯] [⋯] [u(x1,tT,μP) ⋯ u(xN,tT,μP)] ]
 =#
 
-abstract type TransientSnapshotsSwappedColumns{T} <: StandardSnapshots{Mode1Axis,T} end
+abstract type SnapshotsSwappedColumns{T} <: StandardSnapshots{Mode1Axis,T} end
 
-num_space_dofs(s::TransientSnapshotsSwappedColumns) = length(first(first(s.values)))
+num_space_dofs(s::SnapshotsSwappedColumns) = num_space_dofs(s.snaps)
 
-function col_index(s::TransientSnapshotsSwappedColumns,time_index::Integer,param_index::Integer)
+get_realization(s::SnapshotsSwappedColumns) = get_realization(s.snaps)
+
+function col_index(s::SnapshotsSwappedColumns,time_index::Integer,param_index::Integer)
   (param_index-1)*num_times(s)+time_index
 end
 
-function change_mode(s::TransientSnapshotsSwappedColumns)
+function change_mode(s::SnapshotsSwappedColumns)
   @notimplemented
 end
 
-function Base.getindex(s::TransientSnapshotsSwappedColumns,ispace,j)
+function Base.getindex(s::SnapshotsSwappedColumns,ispace,j)
   nt = num_times(s)
   iparam = slow_index(j,nt)
   itime = fast_index(j,nt)
   tensor_getindex(s,ispace,itime,iparam)
 end
 
-function Base.setindex!(s::TransientSnapshotsSwappedColumns,v,ispace,j)
+function Base.setindex!(s::SnapshotsSwappedColumns,v,ispace,j)
   nt = num_times(s)
   iparam = slow_index(j,nt)
   itime = fast_index(j,nt)
   tensor_setindex!(s,v,ispace,itime,iparam)
 end
 
-struct InnerTimeOuterParamTransientSnapshots{T,S} <: TransientSnapshotsSwappedColumns{T}
-  snaps::S
-  function InnerTimeOuterParamTransientSnapshots(snaps::S) where S<:StandardSnapshots
-    T = eltype(snaps)
-    new{T,S}(snaps)
-  end
+function tensor_getindex(s::SnapshotsSwappedColumns,ispace,itime,iparam)
+  tensor_getindex(s.snaps,ispace,itime,iparam)
+end
+
+function tensor_setindex!(s::SnapshotsSwappedColumns,v,ispace,itime,iparam)
+  tensor_setindex!(s.snaps,v,ispace,itime,iparam)
 end
 
 function reverse_snapshots(s::AbstractSnapshots)
   @abstractmethod
 end
 
-function reverse_snapshots(s::BasicSnapshots)
-  InnerTimeOuterParamTransientSnapshots(s)
-end
-
-function reverse_snapshots(s::TransientSnapshots)
-  InnerTimeOuterParamTransientSnapshots(s)
-end
-
-function reverse_snapshots(s::InnerTimeOuterParamTransientSnapshots)
+function reverse_snapshots(s::SnapshotsSwappedColumns)
   s
 end
 
+function reverse_snapshots(s::BasicSnapshots)
+  BasicSnapshotsSwappedColumns(s)
+end
+
+function reverse_snapshots(s::TransientSnapshots)
+  TransientSnapshotsSwappedColumns(s)
+end
+
 function reverse_snapshots(s::SelectedSnapshotsAtIndices)
-  SelectedInnerTimeOuterParamTransientSnapshots(s)
+  SelectedSnapshotsSwappedColumns(s)
 end
 
 function reverse_snapshots(values,r::TransientParamRealization)
   snaps = Snapshots(values,r)
-  InnerTimeOuterParamTransientSnapshots(snaps)
+  reverse_snapshots(snaps)
 end
 
 function reverse_snapshots(a::ArrayContribution,args...)
@@ -583,131 +583,80 @@ function reverse_snapshots(a::ArrayContribution,args...)
   end
 end
 
-# function reverse_snapshots(
-#   s::BasicSnapshots{M,T,<:ParamArray{T,N,A}}) where {M,T,N,A}
-
-#   nt = num_times(s)
-#   np = num_params(s)
-#   P = ParamArray{T,N,A,nt}
-#   array = Vector{P}(undef,np)
-#   @inbounds for ip = 1:np
-#     it = ip:np:nt*np
-#     array[ip] = ParamArray(map(i->s.values[i],it))
-#   end
-#   InnerTimeOuterParamTransientSnapshots(array,s.realization)
-# end
-
-# function reverse_snapshots(
-#   s::TransientSnapshots{M,T,<:ParamArray{T,N,A}}) where {M,T,N,A}
-
-#   nt = num_times(s)
-#   np = num_params(s)
-#   P = ParamArray{T,N,A,nt}
-#   array = Vector{P}(undef,np)
-#   @inbounds for ip = 1:np
-#     array[ip] = ParamArray(map(i->s.values[i][ip],1:nt))
-#   end
-#   InnerTimeOuterParamTransientSnapshots(array,s.realization)
-# end
-
-# function reverse_snapshots_at_indices(
-#   s::BasicSnapshots{M,T,<:ParamArray{T}},
-#   indices_space::AbstractVector) where {M,T}
-
-#   nt = num_times(s)
-#   np = num_params(s)
-#   P = ParamVector{T,Vector{Vector{T}},nt}
-#   array = Vector{P}(undef,np)
-#   @inbounds for ip = 1:np
-#     it = ip:np:nt*np
-#     array[ip] = ParamArray(map(i->collect(s.values[i][indices_space]),it))
-#   end
-#   InnerTimeOuterParamTransientSnapshots(array,s.realization)
-# end
-
-# function reverse_snapshots_at_indices(
-#   s::TransientSnapshots{M,T,<:ParamArray{T}},
-#   indices_space::AbstractVector) where {M,T}
-
-#   nt = num_times(s)
-#   np = num_params(s)
-#   P = ParamVector{T,Vector{Vector{T}},nt}
-#   array = Vector{P}(undef,np)
-#   @inbounds for ip = 1:np
-#     array[ip] = ParamArray(map(i->collect(s.values[i][ip][indices_space]),1:nt))
-#   end
-#   InnerTimeOuterParamTransientSnapshots(array,s.realization)
-# end
-
-function tensor_getindex(
-  s::InnerTimeOuterParamTransientSnapshots{T,<:BasicSnapshots},
-  ispace::Integer,itime::Integer,iparam::Integer) where T
-  s.snaps.values[(iparam-1)*num_times(s)+itime][ispace]
-end
-
-function tensor_setindex!(
-  s::InnerTimeOuterParamTransientSnapshots{T,<:BasicSnapshots},
-  v,ispace::Integer,itime::Integer,iparam::Integer) where T
-  s.snaps.values[(iparam-1)*num_times(s)+itime][ispace] = v
-end
-
-function tensor_getindex(
-  s::InnerTimeOuterParamTransientSnapshots{T,<:TransientSnapshots},
-  ispace::Integer,itime::Integer,iparam::Integer) where T
-  s.snaps.values[iparam][itime][ispace]
-end
-
-function tensor_setindex!(
-  s::InnerTimeOuterParamTransientSnapshots{T,<:TransientSnapshots},
-  v,ispace::Integer,itime::Integer,iparam::Integer) where T
-  s.snaps.values[iparam][itime][ispace] = v
-end
-
 function SelectedSnapshotsAtIndices(
-  s::InnerTimeOuterParamTransientSnapshots,selected_indices::Tuple)
-  SelectedInnerTimeOuterParamTransientSnapshots(s,selected_indices)
+  s::SnapshotsSwappedColumns,selected_indices::Tuple)
+  SelectedSnapshotsSwappedColumns(s,selected_indices)
 end
 
-function FEM.get_values(s::InnerTimeOuterParamTransientSnapshots)
+struct BasicSnapshotsSwappedColumns{T,S} <: SnapshotsSwappedColumns{T}
+  snaps::S
+  function BasicSnapshotsSwappedColumns(snaps::S) where S<:BasicSnapshots
+    T = eltype(snaps)
+    new{T,S}(snaps)
+  end
+end
+
+function FEM.get_values(s::BasicSnapshotsSwappedColumns)
   nt = num_times(s)
   np = num_params(s)
-  array = Vector{typeof(first(first(s.values)))}(undef,nt*np)
+  T = typeof(first(s.snaps.values))
+  array = Vector{T}(undef,nt*np)
   @inbounds for i = 1:nt*np
     it = fast_index(i,nt)
     ip = slow_index(i,nt)
-    array[i] = s.values[ip][it]
+    array[i] = s.snaps.values[(it-1)*np+ip]
   end
   return ParamArray(copy(array))
 end
 
-struct SelectedInnerTimeOuterParamTransientSnapshots{T,S,I} <: TransientSnapshotsSwappedColumns{T}
+struct TransientSnapshotsSwappedColumns{T,S} <: SnapshotsSwappedColumns{T}
   snaps::S
-  selected_indices::I
-  function SelectedInnerTimeOuterParamTransientSnapshots(
-    snaps::TransientSnapshotsSwappedColumns{T},
-    selected_indices::I
-    ) where {T,I}
-
-    S = typeof(snaps)
-    new{T,S,I}(snaps,selected_indices)
+  function TransientSnapshotsSwappedColumns(snaps::S) where S<:TransientSnapshots
+    T = eltype(snaps)
+    new{T,S}(snaps)
   end
 end
 
-function SelectedInnerTimeOuterParamTransientSnapshots(s::SelectedSnapshotsAtIndices)
-  sswap = reverse_snapshots(s.snaps)
-  SelectedInnerTimeOuterParamTransientSnapshots(sswap,s.selected_indices)
+function FEM.get_values(s::TransientSnapshotsSwappedColumns)
+  nt = num_times(s)
+  np = num_params(s)
+  T = typeof(first(first(s.snaps.values)))
+  array = Vector{T}(undef,nt*np)
+  @inbounds for i = 1:nt*np
+    it = fast_index(i,nt)
+    ip = slow_index(i,nt)
+    array[i] = s.values[it][ip]
+  end
+  return ParamArray(copy(array))
 end
 
-space_indices(s::SelectedInnerTimeOuterParamTransientSnapshots) = s.selected_indices[1]
-time_indices(s::SelectedInnerTimeOuterParamTransientSnapshots) = s.selected_indices[2]
-param_indices(s::SelectedInnerTimeOuterParamTransientSnapshots) = s.selected_indices[3]
-num_space_dofs(s::SelectedInnerTimeOuterParamTransientSnapshots) = length(space_indices(s))
-FEM.num_times(s::SelectedInnerTimeOuterParamTransientSnapshots) = length(time_indices(s))
-FEM.num_params(s::SelectedInnerTimeOuterParamTransientSnapshots) = length(param_indices(s))
+struct SelectedSnapshotsSwappedColumns{T,S,I} <: SnapshotsSwappedColumns{T}
+  snaps::S
+  selected_indices::I
+  function SelectedSnapshotsSwappedColumns(
+    s::SnapshotsSwappedColumns{T},
+    selected_indices::I
+    ) where {T,I}
+
+    S = typeof(s.snaps)
+    new{T,S,I}(s.snaps,selected_indices)
+  end
+end
+
+function SelectedSnapshotsSwappedColumns(s::SelectedSnapshotsAtIndices)
+  sswap = reverse_snapshots(s.snaps)
+  SelectedSnapshotsSwappedColumns(sswap,s.selected_indices)
+end
+
+space_indices(s::SelectedSnapshotsSwappedColumns) = s.selected_indices[1]
+time_indices(s::SelectedSnapshotsSwappedColumns) = s.selected_indices[2]
+param_indices(s::SelectedSnapshotsSwappedColumns) = s.selected_indices[3]
+num_space_dofs(s::SelectedSnapshotsSwappedColumns) = length(space_indices(s))
+FEM.num_times(s::SelectedSnapshotsSwappedColumns) = length(time_indices(s))
+FEM.num_params(s::SelectedSnapshotsSwappedColumns) = length(param_indices(s))
 
 function tensor_getindex(
-  s::SelectedInnerTimeOuterParamTransientSnapshots,
-  ispace::Integer,itime::Integer,iparam::Integer)
+  s::SelectedSnapshotsSwappedColumns,ispace,itime,iparam)
   is = space_indices(s)[ispace]
   it = time_indices(s)[itime]
   ip = param_indices(s)[iparam]
@@ -715,15 +664,14 @@ function tensor_getindex(
 end
 
 function tensor_setindex!(
-  s::SelectedInnerTimeOuterParamTransientSnapshots,
-  v,ispace::Integer,itime::Integer,iparam::Integer)
+  s::SelectedSnapshotsSwappedColumns,v,ispace,itime,iparam)
   is = space_indices(s)[ispace]
   it = time_indices(s)[itime]
   ip = param_indices(s)[iparam]
   tensor_setindex!(s.snaps,v,is,it,ip)
 end
 
-function FEM.get_values(s::SelectedInnerTimeOuterParamTransientSnapshots)
+function FEM.get_values(s::SelectedSnapshotsSwappedColumns)
   @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = get_values(s.snaps)
   values = Vector{typeof(first(v))}(undef,num_cols(s))
@@ -735,12 +683,10 @@ function FEM.get_values(s::SelectedInnerTimeOuterParamTransientSnapshots)
   ParamArray(copy(values))
 end
 
-function get_realization(s::SelectedInnerTimeOuterParamTransientSnapshots)
+function get_realization(s::SelectedSnapshotsSwappedColumns)
   r = get_realization(s.snaps)
   r[param_indices(s),time_indices(s)]
 end
-
-get_mode(s::SelectedInnerTimeOuterParamTransientSnapshots) = get_mode(s.snaps)
 
 const BasicNnzSnapshots = BasicSnapshots{M,T,P,R} where {M,T,P<:ParamSparseMatrix,R}
 const TransientNnzSnapshots = TransientSnapshots{M,T,P,R} where {M,T,P<:ParamSparseMatrix,R}
@@ -750,11 +696,13 @@ const GenericNnzSnapshots = Union{
   TransientNnzSnapshots{M,T},
   SelectedNnzSnapshotsAtIndices{M,T}} where {M,T}
 
-const InnerTimeOuterParamTransientNnzSnapshots = InnerTimeOuterParamTransientSnapshots{T,S} where {T,S<:GenericNnzSnapshots}
-const SelectedInnerTimeOuterParamTransientNnzSnapshots = SelectedInnerTimeOuterParamTransientSnapshots{T,S} where {T,S<:InnerTimeOuterParamTransientNnzSnapshots}
+const BasicNnzSnapshotsSwappedColumns = BasicSnapshotsSwappedColumns{T,S} where {T,S<:BasicNnzSnapshots}
+const TransientNnzSnapshotsSwappedColumns = TransientSnapshotsSwappedColumns{T,S} where {T,S<:TransientNnzSnapshots}
+const SelectedNnzSnapshotsSwappedColumns = SelectedSnapshotsSwappedColumns{T,S} where {T,S<:Union{BasicNnzSnapshots,TransientNnzSnapshots}}
 const NnzSnapshotsSwappedColumns = Union{
-  InnerTimeOuterParamTransientNnzSnapshots{T},
-  SelectedInnerTimeOuterParamTransientNnzSnapshots{T}
+  BasicNnzSnapshotsSwappedColumns{T},
+  TransientNnzSnapshotsSwappedColumns{T},
+  SelectedNnzSnapshotsSwappedColumns{T}
 } where T
 
 const NnzSnapshots = Union{
@@ -762,16 +710,14 @@ const NnzSnapshots = Union{
   NnzSnapshotsSwappedColumns{T}} where {M,T}
 
 num_space_dofs(s::BasicNnzSnapshots) = nnz(first(s.values))
+num_full_space_dofs(s::BasicNnzSnapshots) = length(first(s.values))
 
 function tensor_getindex(s::BasicNnzSnapshots,ispace::Integer,itime::Integer,iparam::Integer)
   nonzeros(s.values[iparam+(itime-1)*num_params(s)])[ispace]
 end
 
-function tensor_setindex!(s::BasicNnzSnapshots,v,ispace::Integer,itime::Integer,iparam::Integer)
-  nonzeros(s.values[iparam+(itime-1)*num_params(s)])[ispace] = v
-end
-
 num_space_dofs(s::TransientNnzSnapshots) = nnz(first(first(s.values)))
+num_full_space_dofs(s::TransientNnzSnapshots) = length(first(first(s.values)))
 
 function tensor_getindex(
   s::TransientNnzSnapshots,
@@ -779,59 +725,54 @@ function tensor_getindex(
   nonzeros(s.values[itime][iparam])[ispace]
 end
 
-function tensor_setindex!(
-  s::TransientNnzSnapshots,
-  v,ispace::Integer,itime::Integer,iparam::Integer)
-  nonzeros(s.values[itime][iparam])[ispace] = v
-end
-
 function tensor_getindex(
-  s::InnerTimeOuterParamTransientNnzSnapshots{T,<:BasicSnapshots},
-  ispace::Integer,itime::Integer,iparam::Integer) where T
-  nonzeros(s.snaps.values[(iparam-1)*num_times(s)+itime])[ispace]
-end
-
-function tensor_setindex!(
-  s::InnerTimeOuterParamTransientNnzSnapshots{T,<:BasicSnapshots},
-  v,ispace::Integer,itime::Integer,iparam::Integer) where T
-  nonzeros(s.snaps.values[(iparam-1)*num_times(s)+itime])[ispace] = v
-end
-
-function tensor_getindex(
-  s::InnerTimeOuterParamTransientNnzSnapshots{T,<:TransientSnapshots},
-  ispace::Integer,itime::Integer,iparam::Integer) where T
-  nonzeros(s.snaps.values[iparam][itime])[ispace]
-end
-
-function tensor_setindex!(
-  s::InnerTimeOuterParamTransientNnzSnapshots{T,<:TransientSnapshots},
-  v,ispace::Integer,itime::Integer,iparam::Integer) where T
-  nonzeros(s.snaps.values[iparam][itime])[ispace] = v
-end
-
-function tensor_getindex(
-  s::SelectedInnerTimeOuterParamTransientNnzSnapshots,
+  s::BasicNnzSnapshotsSwappedColumns,
   ispace::Integer,itime::Integer,iparam::Integer)
-  snaps = s.snaps
-  is = space_indices(s)[ispace]
-  it = time_indices(s)[itime]
-  ip = param_indices(s)[iparam]
-  try
-    v = nonzeros(snaps.snaps.values[ip][it])[is]
-  catch
-    v = nonzeros(snaps.snaps.values[(ip-1)*num_times(s)+it])[is]
-  end
-  return v
+  nonzeros(s.snaps.values[(itime-1)*num_params(s)+iparam])[ispace]
 end
 
-function tensor_setindex!(
-  s::SelectedInnerTimeOuterParamTransientNnzSnapshots,
-  v,ispace::Integer,itime::Integer,iparam::Integer)
+function tensor_getindex(
+  s::TransientNnzSnapshotsSwappedColumns,
+  ispace::Integer,itime::Integer,iparam::Integer)
+  nonzeros(s.snaps.values[itime][iparam])[ispace]
+end
+
+function tensor_getindex(
+  s::SelectedNnzSnapshotsSwappedColumns{T,<:BasicNnzSnapshots},
+  ispace::Integer,itime::Integer,iparam::Integer) where T
   snaps = s.snaps
   is = space_indices(s)[ispace]
   it = time_indices(s)[itime]
   ip = param_indices(s)[iparam]
-  tensor_setindex!(snaps,v,is,it,ip)
+  nonzeros(snaps.values[(it-1)*num_params(s)+ip])[is]
+end
+
+function tensor_getindex(
+  s::SelectedNnzSnapshotsSwappedColumns{T,<:TransientNnzSnapshots},
+  ispace::Integer,itime::Integer,iparam::Integer) where T
+  snaps = s.snaps
+  is = space_indices(s)[ispace]
+  it = time_indices(s)[itime]
+  ip = param_indices(s)[iparam]
+  nonzeros(snaps.values[ip][it])[is]
+end
+
+sparsify_indices(s::BasicNnzSnapshots,srange::AbstractVector) = sparsify_indices(first(s.values),srange)
+sparsify_indices(s::TransientNnzSnapshots,srange::AbstractVector) = sparsify_indices(first(first(s.values)),srange)
+sparsify_indices(s::NnzSnapshotsSwappedColumns,srange::AbstractVector) = sparsify_indices(s.snaps,srange)
+
+function select_snapshots(s::NnzSnapshots,spacerange,timerange,paramrange)
+  srange = isa(spacerange,Colon) ? Base.OneTo(num_space_dofs(s)) : spacerange
+  srange = isa(srange,Integer) ? [srange] : srange
+  if maximum(srange) > num_space_dofs(s)
+    srange = sparsify_indices(s,srange)
+  end
+  trange = isa(timerange,Colon) ? Base.OneTo(num_times(s)) : timerange
+  trange = isa(trange,Integer) ? [trange] : trange
+  prange = isa(paramrange,Colon) ? Base.OneTo(num_params(s)) : paramrange
+  prange = isa(prange,Integer) ? [prange] : prange
+  selected_indices = (srange,trange,prange)
+  SelectedSnapshotsAtIndices(s,selected_indices)
 end
 
 function recast(s::NnzSnapshots{Mode1Axis},a::AbstractMatrix)
@@ -863,9 +804,7 @@ function Base.getindex(s::VecOfSparseMat2Mat,i,j)
 end
 
 function get_nonzero_indices(s::VecOfSparseMat2Mat)
-  v = first(s.values)
-  i,j, = findnz(v)
-  return i .+ (j .- 1)*v.m
+  get_nonzero_indices(first(s.values))
 end
 
 struct BlockSnapshots{S,N} <: AbstractParamContainer{S,N}
@@ -1007,16 +946,6 @@ function reverse_snapshots(
   active_block_snaps = Any[reverse_snapshots(map(x->x[i],vec_block_values),r) for i in active_block_ids]
   BlockSnapshots(block_map,active_block_snaps...)
 end
-
-# function reverse_snapshots_at_indices(
-#   s::BlockSnapshots{<:Any,N},
-#   indices_space::ArrayBlock{<:Any,N}) where N
-
-#   active_block_ids = get_touched_blocks(s)
-#   block_map = BlockMap(size(s),active_block_ids)
-#   active_block_snaps = Any[reverse_snapshots_at_indices(s[i],indices_space[i]) for i in active_block_ids]
-#   BlockSnapshots(block_map,active_block_snaps...)
-# end
 
 struct TensorTrainSnapshots{S,R}
   snaps::S
