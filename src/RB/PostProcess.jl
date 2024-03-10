@@ -95,7 +95,7 @@ function speedup(r::RBResults)
   speedup(r.fem_stats,r.rb_stats)
 end
 
-function space_time_error(sol,sol_approx,norm_matrix=nothing)
+function space_time_error(sol::AbstractSnapshots,sol_approx::AbstractSnapshots,norm_matrix=nothing)
   err_norm = []
   sol_norm = []
   space_time_norm = []
@@ -107,6 +107,21 @@ function space_time_error(sol,sol_approx,norm_matrix=nothing)
       err_norm = []
       sol_norm = []
     end
+  end
+  avg_error = sum(space_time_norm) / length(space_time_norm)
+  return avg_error
+end
+
+function space_time_error(sol::TTSnapshots,sol_approx::TTSnapshots,norm_matrix=nothing)
+  space_time_norm = []
+  for j = axes(sol,3)
+    err_norm = []
+    sol_norm = []
+    for i = axes(sol,2)
+      push!(err_norm,_norm(sol[:,i,j]-sol_approx[:,i,j],norm_matrix))
+      push!(sol_norm,_norm(sol[:,i,j],norm_matrix))
+    end
+    push!(space_time_norm,norm(err_norm)/norm(sol_norm))
   end
   avg_error = sum(space_time_norm) / length(space_time_norm)
   return avg_error

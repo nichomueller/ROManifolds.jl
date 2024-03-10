@@ -5,9 +5,8 @@ get_basis_time(a::Projection) = @abstractmethod
 get_basis_spacetime(a::Projection) = @abstractmethod
 num_reduced_space_dofs(a::Projection) = @abstractmethod
 num_reduced_times(a::Projection) = @abstractmethod
-
-num_fe_dofs(a::Projection) = num_space_dofs(a)*num_times(a)
-num_reduced_dofs(a::Projection) = num_reduced_space_dofs(a)*num_reduced_times(a)
+num_fe_dofs(a::Projection) = @abstractmethod
+num_reduced_dofs(a::Projection) = @abstractmethod
 
 function Projection(s::AbstractSnapshots,args...;kwargs...)
   if num_space_dofs(s) < num_times(s)
@@ -50,6 +49,8 @@ num_space_dofs(b::PODBasis) = size(get_basis_space(b),1)
 FEM.num_times(b::PODBasis) = size(get_basis_time(b),1)
 num_reduced_space_dofs(b::PODBasis) = size(get_basis_space(b),2)
 num_reduced_times(b::PODBasis) = size(get_basis_time(b),2)
+num_fe_dofs(a::PODBasis) = num_space_dofs(a)*num_times(a)
+num_reduced_dofs(a::PODBasis) = num_reduced_space_dofs(a)*num_reduced_times(a)
 
 function recast_basis(s::NnzSnapshots,b::PODBasis)
   basis_space = recast(s,get_basis_space(b))
@@ -142,6 +143,8 @@ num_space_dofs(b::TTSVDCores) = size(b.cores[1],2)
 FEM.num_times(b::TTSVDCores) = size(b.cores[2],2)
 num_reduced_space_dofs(b::TTSVDCores) = size(b.cores[1],3)
 num_reduced_times(b::TTSVDCores) = size(b.cores[2],3)
+num_fe_dofs(b::TTSVDCores) = size(b.basis_spacetime,1)
+num_reduced_dofs(b::TTSVDCores) = size(b.basis_spacetime,2)
 
 struct Core2Matrix{T} <: AbstractMatrix{T}
   array::Array{T,3}
@@ -154,6 +157,15 @@ Base.getindex(a::Core2Matrix,i,j) = a.array[fast_index(j,size(a.array,1)),i,slow
 function recast_basis(s::NnzTTSnapshots,b::TTSVDCores)
   basis_spacetime = recast(s,get_basis_spacetime(b))
   TTSVDCores(b.cores,basis_spacetime)
+end
+
+function recast(x::TTVector,b::TTSVDCores)
+  basis_spacetime = b.basis_spacetime
+  Ns = num_space_dofs(b)
+  Nt = num_times(b)
+
+  xrec = basis_spacetime*x
+  reshape(xrec,Ns,Nt)
 end
 
 struct CompressedTTSVDCores{M} <: TTProjection
@@ -275,6 +287,26 @@ function num_reduced_times(b::BlockProjection)
     end
   end
   return dofs
+end
+
+function num_fe_dofs(b::BlockProjection)
+  ndofs = 0
+  for i in eachindex(b)
+    if b.touched[i]
+      ndofs += num_fe_dofs(b[i])
+    end
+  end
+  return ndofs
+end
+
+function num_reduced_dofs(b::BlockProjection)
+  ndofs = 0
+  for i in eachindex(b)
+    if b.touched[i]
+      ndofs += num_reduced_dofs(b[i])
+    end
+  end
+  return ndofs
 end
 
 function Projection(s::BlockSnapshots;kwargs...)

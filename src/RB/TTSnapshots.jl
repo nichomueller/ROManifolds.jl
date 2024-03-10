@@ -181,6 +181,20 @@ function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapsho
   BasicTTSnapshots(ParamArray(basic_values),r)
 end
 
+function select_snapshots_entries(s::TTSnapshots{T},ispace,itime) where T
+  @assert length(ispace) == length(itime)
+  nval = length(ispace)
+  np = num_params(s)
+  values = allocate_param_array(zeros(T,nval),np)
+  for ip = 1:np
+    vip = values[ip]
+    for (istp,(is,it)) in enumerate(zip(ispace,itime))
+      vip[istp] = s[is,it,ip]
+    end
+  end
+  return values
+end
+
 const BasicNnzTTSnapshots = BasicTTSnapshots{T,N,P,R} where {T,N,P<:ParamTTSparseMatrix,R}
 const TransientNnzTTSnapshots = TransientTTSnapshots{T,N,P,R} where {T,N,P<:ParamTTSparseMatrix,R}
 const SelectedNnzTTSnapshotsAtIndices = SelectedTTSnapshotsAtIndices{T,N,S,I} where {T,N,S<:Union{BasicNnzTTSnapshots,TransientNnzTTSnapshots},I}

@@ -66,9 +66,9 @@ get_basis_time(r::RBSpace) = get_basis_time(r.basis)
 FEM.num_times(r::RBSpace) = size(get_basis_time(r),1)
 num_reduced_times(r::RBSpace) = size(get_basis_time(r),2)
 
-num_fe_free_dofs(r::RBSpace) = dot(num_space_dofs(r),num_times(r))
+num_fe_free_dofs(r::RBSpace) = num_fe_dofs(r.basis)
 
-FESpaces.num_free_dofs(r::RBSpace) = dot(num_reduced_space_dofs(r),num_reduced_times(r))
+FESpaces.num_free_dofs(r::RBSpace) = num_reduced_dofs(r.basis)
 
 FESpaces.get_free_dof_ids(r::RBSpace) = Base.OneTo(num_free_dofs(r))
 
@@ -110,15 +110,11 @@ end
 
 function Arrays.evaluate!(cache,k::RecastMap,x::ParamVector,r::RBSpace)
   for ip in eachindex(x)
-    Xip = recast(x[ip],r)
+    Xip = recast(x[ip],r.basis)
     for it in 1:num_times(r)
       cache[(ip-1)*num_times(r)+it] = Xip[:,it]
     end
   end
-end
-
-function recast(x::Vector,r::RBSpace)
-  recast(x,r.basis)
 end
 
 function recast(x::AbstractVector,r::RBSpace)

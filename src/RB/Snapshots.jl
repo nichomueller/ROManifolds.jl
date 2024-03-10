@@ -323,32 +323,6 @@ function tensor_setindex!(
   s.values[itime,icolumn] = v
 end
 
-# # convert to vector of ParamArrays
-# function as_param_arrays(s::CompressedTransientSnapshots,values::AbstractMatrix{T}) where T
-#   np = num_params(s)
-#   nt = num_times(s)
-#   map(1:nt) do it
-#     param_idx = (it-1)*np+1:it*np
-#     array = Vector{Vector{T}}(undef,np)
-#     for (i,itp) = enumerate(param_idx)
-#       array[i] = values[:,itp]
-#     end
-#     ParamArray(array)
-#   end
-# end
-
-# function recast(s::CompressedTransientSnapshots{Mode1Axis},a::AbstractMatrix)
-#   @fastmath recast_values = a*s
-#   param_array_values = as_param_arrays(s,recast_values)
-#   Snapshots(param_array_values,s.realization,Mode1Axis())
-# end
-
-# function recast_compress(s::StandardSnapshots{Mode1Axis},a::AbstractMatrix)
-#   s_compress = compress(s,a)
-#   s_recast_compress = recast(s_compress,a)
-#   s_recast_compress
-# end
-
 struct TransientSnapshotsWithDirichletValues{M,T,P,S} <: StandardSnapshots{M,T}
   snaps::S
   dirichlet_values::P
@@ -431,6 +405,10 @@ end
 function select_snapshots(s::AbstractSnapshots;kwargs...)
   paramrange = isa(s,SelectedSnapshotsAtIndices) ? last(s.selected_indices) : Colon()
   select_snapshots(s,paramrange;kwargs...)
+end
+
+function select_snapshots_entries(s::StandardSnapshots,spacerange,timerange)
+  select_snapshots(s,spacerange,timerange,Base.OneTo(get_params(s)))
 end
 
 space_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[1]

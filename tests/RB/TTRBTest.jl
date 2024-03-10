@@ -11,7 +11,7 @@ using Mabla.RB
 using LinearAlgebra
 using SparseArrays
 
-θ = 0.5
+θ = 1
 dt = 0.01
 t0 = 0.0
 tf = 0.1
@@ -78,60 +78,22 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = TTRBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_test")))
 
-# we can load & solve directly, if the offline structures have been previously saved to file
-# load_solve(rbsolver,dir=test_dir)
-
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+results = rb_results(feop,rbsolver,fesnaps,rbsnaps,festats,rbstats)
+println(RB.space_time_error(results))
 
+####### tests
 soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
-# norm_matrix = assemble_norm_matrix(feop)
-# cores = RB.ttsvd(soff)
-
-# epsilon = [ϵ,ϵ,ϵ]
-# opt = Opt([30,30,30],epsilon)
-# tt = TensorTrain(soff;opt)
-
-# norm(tt.cores[1]-cores[1])
-# norm(tt.cores[2]-cores[2])
-# norm(tt.cores[3]-cores[3])
-
-# basis_st = RB.get_basis_spacetime(cores)
-# b12 = basis(tt,1,2) |> base2mat
-# norm(basis_st-b12)
-
-# testing general algorithm
-
 red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-
-# ## proj test --> works
-# cores = RB.ttsvd(soff)
-# B = RB.get_basis_spacetime(cores)
-# x = reshape(son,200,1)
-# norm(x - B*B'*x) / norm(x)
-# ##
-
 pop = RB.PODOperator(get_algebraic_operator(feop),red_trial,red_test)
 smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
 contribs_mat,contribs_vec = RB.jacobian_and_residual(rbsolver,pop,smdeim)
 red_mat = RB.reduced_matrix_form(rbsolver,pop,contribs_mat)
 red_vec = RB.reduced_vector_form(rbsolver,pop,contribs_vec)
 rbop = RB.PODMDEIMOperator(pop,red_mat,red_vec)
-# rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 
-ii = red_mat[1].values[1].integration_domain
-ids_space,ids_time = ii.indices_space,ii.indices_time
-s = contribs_mat[1][1]
-srev = reverse_snapshots(s)
-ssrev = select_snapshots(srev,ids_space,ids_time,1:10)
-ssvec = reshape(ssrev,:,10)
-
-ii = red_vec.values[1].integration_domain
-ids_space,ids_time = ii.indices_space,ii.indices_time
-s = contribs_vec[1]
-srev = reverse_snapshots(s)
-ssrev = select_snapshots(srev,ids_space,ids_time,1:10)
-ssvec = reshape(ssrev,:,10)
-ciao
 # Affine Decomposition part
 # basis_mat_1 = reduced_basis(contribs_mat[1][1];ϵ)
 # # lu_interp,integration_domain = RB.mdeim(rbsolver,basis_mat_1)
@@ -152,99 +114,118 @@ ciao
 # metadata = RB.compress_combine_basis_space_time(A,B,C,B_shift,C_shift;combine)
 
 # these tests work!
-# basis_mat_1 = reduced_basis(contribs_mat[1][1];ϵ)
-# basis_mat_2 = reduced_basis(contribs_mat[2][1];ϵ)
+son = select_snapshots(fesnaps,51)
+ron = get_realization(son)
+θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
-# basis_vec_1 = reduced_basis(contribs_vec[1];ϵ)
-# basis_vec_2 = reduced_basis(contribs_vec[2];ϵ)
+r = copy(ron)
+FEM.shift_time!(r,dt*(θ-1))
 
-# son = select_snapshots(fesnaps,1)
-# ron = get_realization(son)
-# θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+rb_trial = red_trial(r)
+fe_trial = trial(r)
+red_x = zero_free_values(rb_trial)
+y = zero_free_values(fe_trial)
+z = similar(y)
+z .= 0.0
 
-# r = copy(ron)
-# FEM.shift_time!(r,dt*(θ-1))
+op = get_algebraic_operator(feop)
+ode_cache = allocate_cache(op,r)
+ode_cache = update_cache!(ode_cache,op,r)
 
-# rb_trial = red_trial(r)
-# fe_trial = trial(r)
-# red_x = zero_free_values(rb_trial)
-# y = zero_free_values(fe_trial)
-# z = similar(y)
-# z .= 0.0
+A,b = ODETools._allocate_matrix_and_vector(op,r,y,ode_cache)
+ODETools._matrix_and_vector!(A,b,op,r,dt*θ,y,ode_cache,z)
 
-# op = get_algebraic_operator(feop)
-# ode_cache = allocate_cache(op,r)
-# ode_cache = update_cache!(ode_cache,op,r)
+B = red_trial.basis.basis_spacetime
+n_red = size(B,2)
+n_space_dofs = num_free_dofs(test)
 
-# A,b = ODETools._allocate_matrix_and_vector(op,r,y,ode_cache)
-# ODETools._matrix_and_vector!(A,b,op,r,dt*θ,y,ode_cache,z)
-
-# B = red_trial.basis.basis_spacetime
-# n_red = size(B,2)
-# n_space_dofs = num_free_dofs(test)
-
-# # ## proj test
-# # B = basis_vec_1.basis_spacetime
-# # sb = Snapshots(b[1],ron)
-# # x = reshape(sb,200,1)
-# # norm(x - B*B'*x) / norm(x)
-# # ## proj test
-# # B = basis_vec_2.basis_spacetime
-# # sb = Snapshots(b[2],ron)
-# # x = reshape(sb,200,1)
-# # norm(x - B*B'*x) / norm(x)
-# # ## proj test
-# # B = basis_mat_1.basis_spacetime
-# # A1 = A[1][1]
-# # A1_red = zeros(4,4)
-# # for n = 1:num_times(r)
-# #   A1_n = A1[n]
-# #   B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
-# #   A1_red += B_n'*A1_n*B_n
-# # end
-# # ## proj test
-
+# ## proj test
+# B = basis_vec_1.basis_spacetime
+# sb = Snapshots(b[1],ron)
+# x = reshape(sb,200,1)
+# norm(x - B*B'*x) / norm(x)
+# ## proj test
+# B = basis_vec_2.basis_spacetime
+# sb = Snapshots(b[2],ron)
+# x = reshape(sb,200,1)
+# norm(x - B*B'*x) / norm(x)
+# ## proj test
+# B = basis_mat_1.basis_spacetime
 # A1 = A[1][1]
-# BDA1 = RB.BDiagonal(getproperty.(A1.array,:values))
-# A1_red = θ*B'*(BDA1*B)
-# for n = 2:num_times(r)
-#   m = n-1
+# A1_red = zeros(4,4)
+# for n = 1:num_times(r)
 #   A1_n = A1[n]
 #   B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
-#   B_m = B[(m-1)*n_space_dofs+1:m*n_space_dofs,:]
-#   A1_red += (1-θ)*B_n'*A1_n*B_m
+#   A1_red += B_n'*A1_n*B_n
 # end
+# ## proj test
 
-# A2 = A[2][1]
-# A2_red = zeros(4,4)
-# for n = 1:num_times(r)
-#   A2_n = A2[n]
-#   B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
-#   A2_red += θ*B_n'*A2_n*B_n
-# end
-# for n = 2:num_times(r)
-#   m = n-1
-#   A2_n = A2[n]
-#   B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
-#   B_m = B[(m-1)*n_space_dofs+1:m*n_space_dofs,:]
-#   A2_red -= θ*B_n'*A2_n*B_m
-# end
+A1 = A[1][1]
+BDA1 = RB.BDiagonal(getproperty.(A1.array,:values))
+A1_red = θ*B'*(BDA1*B)
+for n = 2:num_times(r)
+  m = n-1
+  A1_n = A1[n]
+  B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
+  B_m = B[(m-1)*n_space_dofs+1:m*n_space_dofs,:]
+  A1_red += (1-θ)*B_n'*A1_n*B_m
+end
 
-# b1 = b[1]
-# sb1 = Snapshots(b1,ron)
-# b1_red = B'*reshape(sb1,:,1)
+A2 = A[2][1]
+A2_red = zeros(4,4)
+for n = 1:num_times(r)
+  A2_n = A2[n]
+  B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
+  A2_red += θ*B_n'*A2_n*B_n
+end
+for n = 2:num_times(r)
+  m = n-1
+  A2_n = A2[n]
+  B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
+  B_m = B[(m-1)*n_space_dofs+1:m*n_space_dofs,:]
+  A2_red -= θ*B_n'*A2_n*B_m
+end
 
-# b2 = b[2]
-# sb2 = Snapshots(b2,ron)
-# b2_red = B'*reshape(sb2,:,1)
+b1 = b[1]
+sb1 = Snapshots(b1,ron)
+b1_red = B'*reshape(sb1,:,1)
 
-# A_red = A1_red+A2_red
-# b_red = b1_red+b2_red
-# u_red = A_red \ b_red
-# u_rec = B*u_red
+b2 = b[2]
+sb2 = Snapshots(b2,ron)
+b2_red = B'*reshape(sb2,:,1)
 
-# U_rec = reshape(u_rec,n_space_dofs,:)
+A_red = A1_red+A2_red
+b_red = b1_red+b2_red
+u_red = A_red \ b_red
+u_rec = B*u_red
 
+U_rec = reshape(u_rec,n_space_dofs,:)
+
+norm(U_rec - son)
+
+#############################
+son = select_snapshots(fesnaps,RB.online_params(rbsolver))
+ron = RB.get_realization(son)
+θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+
+r = copy(ron)
+FEM.shift_time!(r,dt*(θ-1))
+
+rb_trial = red_trial(r)
+fe_trial = trial(r)
+red_x = zero_free_values(rb_trial)
+y = zero_free_values(fe_trial)
+z = similar(y)
+z .= 0.0
+
+op = get_algebraic_operator(feop)
+ode_cache = allocate_cache(op,r)
+mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(op,r,y,ode_cache)
+
+ode_cache = update_cache!(ode_cache,rbop,ron)
+A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,rbop,ron,dtθ,y,ode_cache,z)
+
+A[1] - A_red
 #############################
 
 reffe = ReferenceFE(lagrangian,Float64,order)
