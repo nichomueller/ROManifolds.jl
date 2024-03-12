@@ -75,7 +75,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = TTRBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+rbsolver = TTRBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=5,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_test")))
 
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
@@ -109,8 +109,8 @@ rbop = RB.PODMDEIMOperator(pop,red_mat,red_vec)
 # A = RB.get_basis_spacetime(basis_mat_1)
 # B = RB.get_basis_spacetime(red_trial.basis)
 # C = RB.get_basis_spacetime(red_test.basis)
-# B_shift = RB.shift(B,1:num_times(red_test.basis)-1,RB.num_space_dofs(red_test.basis))
-# C_shift = RB.shift(C,2:num_times(red_test.basis),RB.num_space_dofs(red_test.basis))
+# B_shift = RB._shift(B,1:num_times(red_test.basis)-1,RB.num_space_dofs(red_test.basis))
+# C_shift = RB._shift(C,2:num_times(red_test.basis),RB.num_space_dofs(red_test.basis))
 # metadata = RB.compress_combine_basis_space_time(A,B,C,B_shift,C_shift;combine)
 
 # these tests work!

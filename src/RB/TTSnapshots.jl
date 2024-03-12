@@ -181,7 +181,11 @@ function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapsho
   BasicTTSnapshots(ParamArray(basic_values),r)
 end
 
-function select_snapshots_entries(s::TTSnapshots{T},ispace,itime) where T
+function select_snapshots_entries(s::TTSnapshots,ispace,itime)
+  _select_snapshots_entries(s,ispace,itime)
+end
+
+function _select_snapshots_entries(s::TTSnapshots{T},ispace,itime) where T
   @assert length(ispace) == length(itime)
   nval = length(ispace)
   np = num_params(s)
@@ -225,6 +229,13 @@ function Base.setindex!(
   s::TransientNnzTTSnapshots,
   v,ispace::Integer,itime::Integer,iparam::Integer)
   nonzeros(s.values[itime][iparam])[ispace] = v
+end
+
+sparsify_indices(s::BasicNnzTTSnapshots,srange::AbstractVector) = sparsify_indices(first(s.values),srange)
+sparsify_indices(s::TransientNnzTTSnapshots,srange::AbstractVector) = sparsify_indices(first(first(s.values)),srange)
+
+function select_snapshots_entries(s::NnzTTSnapshots,ispace,itime)
+  _select_snapshots_entries(s,sparsify_indices(s,ispace),itime)
 end
 
 function get_nonzero_indices(s::NnzTTSnapshots)

@@ -181,8 +181,8 @@ function compress_basis(b::TTSVDCores,b_trial::TTSVDCores,b_test::TTSVDCores;kwa
   A = get_basis_spacetime(b)
   B = get_basis_spacetime(b_trial)
   C = get_basis_spacetime(b_test)
-  B_shift = shift(B,1:num_times(b_test)-1,num_space_dofs(b_test))
-  C_shift = shift(C,2:num_times(b_test),num_space_dofs(b_test))
+  B_shift = _shift(B,num_space_dofs(b_test),:backwards)
+  C_shift = _shift(C,num_space_dofs(b_test),:forwards)
   metadata = compress_combine_basis_space_time(A,B,C,B_shift,C_shift;kwargs...)
   CompressedTTSVDCores(metadata)
 end

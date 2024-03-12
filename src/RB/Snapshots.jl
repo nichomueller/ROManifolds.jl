@@ -323,44 +323,6 @@ function tensor_setindex!(
   s.values[itime,icolumn] = v
 end
 
-struct TransientSnapshotsWithDirichletValues{M,T,P,S} <: StandardSnapshots{M,T}
-  snaps::S
-  dirichlet_values::P
-  function TransientSnapshotsWithDirichletValues(
-    snaps::StandardSnapshots{M,T},
-    dirichlet_values::P
-    ) where {M,T,P<:AbstractParamContainer}
-
-    S = typeof(snaps)
-    new{M,T,P,S}(snaps,dirichlet_values)
-  end
-end
-
-num_space_dofs(s::TransientSnapshotsWithDirichletValues) = num_space_free_dofs(s.snaps) + num_space_dirichlet_dofs(s)
-num_space_free_dofs(s::TransientSnapshotsWithDirichletValues) = num_space_dofs(s.snaps)
-num_space_dirichlet_dofs(s::TransientSnapshotsWithDirichletValues) = length(first(s.dirichlet_values))
-
-function change_mode(s::TransientSnapshotsWithDirichletValues)
-  TransientSnapshotsWithDirichletValues(change_mode(s.snaps),s.dirichlet_values)
-end
-
-function tensor_getindex(s::TransientSnapshotsWithDirichletValues,ispace::Integer,itime,iparam)
-  if ispace > num_space_free_dofs(s)
-    ispace_dir = ispace-num_space_free_dofs(s)
-    s.dirichlet_values[itime][iparam][ispace_dir]
-  else
-    tensor_getindex(s.snaps,ispace,itime,iparam)
-  end
-end
-
-function tensor_setindex!(s::TransientSnapshotsWithDirichletValues,v,ispace,itime,iparam)
-  if ispace > num_space_free_dofs(s)
-    s.dirichlet_values[itime][iparam][ispace-num_space_free_dofs(s)] = v
-  else
-    tensor_setindex!(s.snaps,v,ispace,itime,iparam)
-  end
-end
-
 struct SelectedSnapshotsAtIndices{M,T,S,I} <: StandardSnapshots{M,T}
   snaps::S
   selected_indices::I
@@ -740,11 +702,9 @@ sparsify_indices(s::TransientNnzSnapshots,srange::AbstractVector) = sparsify_ind
 sparsify_indices(s::NnzSnapshotsSwappedColumns,srange::AbstractVector) = sparsify_indices(s.snaps,srange)
 
 function select_snapshots(s::NnzSnapshots,spacerange,timerange,paramrange)
-  srange = isa(spacerange,Colon) ? Base.OneTo(num_space_dofs(s)) : spacerange
-  srange = isa(srange,Integer) ? [srange] : srange
-  if maximum(srange) > num_space_dofs(s)
-    srange = sparsify_indices(s,srange)
-  end
+  _srange = isa(spacerange,Colon) ? Base.OneTo(num_space_dofs(s)) : spacerange
+  _srange = isa(_srange,Integer) ? [_srange] : _srange
+  srange = sparsify_indices(s,srange)
   trange = isa(timerange,Colon) ? Base.OneTo(num_times(s)) : timerange
   trange = isa(trange,Integer) ? [trange] : trange
   prange = isa(paramrange,Colon) ? Base.OneTo(num_params(s)) : paramrange

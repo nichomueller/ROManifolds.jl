@@ -40,7 +40,6 @@ include("RBOperations.jl")
 export AbstractSnapshots
 export BasicSnapshots
 export TransientSnapshots
-export TransientSnapshotsWithDirichletValues
 export CompressedTransientSnapshots
 export SelectedSnapshotsAtIndices
 export NnzSnapshots

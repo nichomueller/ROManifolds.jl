@@ -18,9 +18,21 @@ function sparsify_indices(A::AbstractSparseMatrix,indices::AbstractVector)
   return sparse_indices
 end
 
-function get_nonzero_indices(v::AbstractSparseMatrix)
-  i,j, = findnz(v)
-  return i .+ (j .- 1)*v.m
+function recast_indices(A::TTSparseMatrix,indices::AbstractVector)
+  recast_indices(A.values,indices)
+end
+
+function sparsify_indices(A::TTSparseMatrix,indices::AbstractVector)
+  sparsify_indices(A.values,indices)
+end
+
+function get_nonzero_indices(A::AbstractSparseMatrix)
+  i,j, = findnz(A)
+  return i .+ (j .- 1)*A.m
+end
+
+function get_nonzero_indices(A::TTSparseMatrix)
+  get_nonzero_indices(A.values)
 end
 
 function compress_basis_space(A::AbstractMatrix,B::AbstractMatrix)
@@ -55,10 +67,13 @@ function combine_basis_time(A::AbstractMatrix,B::AbstractMatrix;combine=(x,y)->x
   combine(bt_proj,bt_proj_shift)
 end
 
-function shift(A::AbstractMatrix,indices::AbstractVector,ns::Integer)
+function _shift(A::AbstractMatrix,ns::Integer,style=:forwards)
   A_shift = zeros(eltype(A),size(A))
-  for i in indices
-    A_shift[(i-1)*ns+1:i*ns,:] = A[(i-1)*ns+1:i*ns,:]
+  for i in 2:floor(Int,size(A,1)/ns)
+    ids_forwards = (i-1)*ns+1:i*ns
+    ids_backwards = (i-2)*ns+1:(i-1)*ns
+    Ai = style == :forwards ? A[ids_forwards,:] : A[ids_backwards,:]
+    A_shift[ids_forwards,:] = Ai
   end
   return A_shift
 end

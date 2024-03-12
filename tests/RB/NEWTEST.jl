@@ -130,61 +130,102 @@ for n = 2:num_times(r)
   B_m = B[(m-1)*n_space_dofs+1:m*n_space_dofs,:]
   A1_red += (1-θ)*B_n'*A1_n*B_m
 end
+
+M = A[2][1]
+BDM = RB.BDiagonal(getproperty.(M.array,:values))
+M_red = θ*B'*(BDM*B)
+for n = 2:num_times(r)
+  m = n-1
+  M_n = M[n]
+  B_n = B[(n-1)*n_space_dofs+1:n*n_space_dofs,:]
+  B_m = B[(m-1)*n_space_dofs+1:m*n_space_dofs,:]
+  M_red -= θ*B_n'*M_n*B_m
+end
+
 # alternative:
 # RB.compress_combine_basis_space_time(
 #   RB.VecOfBDiagonalSparseMat2Mat([BDA1]),BB,CC,B_shift,C_shift;combine)[1]
 
 ss = select_snapshots(fesnaps,51)
+pop = RB.PODOperator(get_algebraic_operator(feop),red_trial,red_test)
 contribs_mat,contribs_vec = RB.jacobian_and_residual(rbsolver,pop,ss)
-sA = contribs_mat[1][1]
-basis = reduced_basis(sA)
-
-norm(sA[:] - basis.basis_spacetime*basis.basis_spacetime'*sA[:]) / norm(sA[:])
-
-combine = (x,y) -> fesolver.θ*x+(1-fesolver.θ)*y
-proj_basis = RB.compress_basis(basis,red_trial,red_test;combine)
 
 # this means that compress_combine_basis_space_time works
 # AA = RB.get_basis_spacetime(basis)
 # BB = RB.get_basis_spacetime(red_trial.basis)
 # CC = RB.get_basis_spacetime(red_test.basis)
-# B_shift = RB.shift(BB,1:num_times(red_test.basis)-1,RB.num_space_dofs(red_test.basis))
-# C_shift = RB.shift(CC,2:num_times(red_test.basis),RB.num_space_dofs(red_test.basis))
+# B_shift = RB._shift(BB,1:num_times(red_test.basis)-1,RB.num_space_dofs(red_test.basis))
+# C_shift = RB._shift(CC,2:num_times(red_test.basis),RB.num_space_dofs(red_test.basis))
 # metadata = RB.compress_combine_basis_space_time(AA,BB,CC,B_shift,C_shift;combine)
 
 # @assert A1_red ≈ RB.compress_combine_basis_space_time(
 #   RB.VecOfBDiagonalSparseMat2Mat([BDA1]),BB,CC,B_shift,C_shift;combine)[1]
 
+# stiffness
+sA = contribs_mat[1][1]
+basis = reduced_basis(sA)
+combine = (x,y) -> fesolver.θ*x+(1-fesolver.θ)*y
+proj_basis = RB.compress_basis(basis,red_trial,red_test;combine)
+
 # prelim check
+norm(sA[:] - basis.basis_spacetime*basis.basis_spacetime'*sA[:]) / norm(sA[:])
 norm(Snapshots(A1,ron) - sA)
 
-# this does not work
+# check mdeim
+A1_mdeim = basis.basis_spacetime*coeffA[1]
+A1_mdeim + RB.VecOfBDiagonalSparseMat2Mat([BDA1]) # here too, there is a wrong - sign
+
+# check mdeim reduced structure
 ii = rbop.lhs[1][1].integration_domain
 ids_space,ids_time = ii.indices_space,ii.indices_time
 A_rev = reverse_snapshots(contribs_mat[1][1])
 A_at_ids = RB.select_snapshots_entries(A_rev,ids_space,ids_time)
 coeffA = ldiv!(zeros(1),rbop.lhs[1][1].mdeim_interpolation,A_at_ids[1])
 A1_mdeim_red = proj_basis.metadata[1]*coeffA[1]
-proj_basis.metadata[1] - A1_red
+A1_mdeim_red + A1_red # why not - ???
 
-# does normal mdeim work?
-A1_mdeim = basis.basis_spacetime*coeffA[1]
-A1_mdeim - RB.VecOfBDiagonalSparseMat2Mat([BDA1])
+# # wrong, this means that coeffA is wrong
+# # red trian is wrong
+# smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
+# pop = RB.PODOperator(get_algebraic_operator(feop),red_trial,red_test)
+# contribs_mat,contribs_vec = RB.jacobian_and_residual(rbsolver,pop,smdeim)
+# S = contribs_mat[1][1]
+# b = reduced_basis(S;ϵ=RB.get_tol(rbsolver))
+# indices_spacetime = get_mdeim_indices(b.basis_spacetime)
+# indices_space = RB.fast_index(indices_spacetime,RB.num_space_dofs(b))
+# indices_time = RB.slow_index(indices_spacetime,RB.num_space_dofs(b))
+# lu_interp = lu(view(b.basis_spacetime,indices_spacetime,:))
+# recast_indices_space = RB.recast_indices(b.basis_spacetime,indices_space)
+# integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
+# red_trian = reduce_triangulation(Ω,integration_domain,red_trial,red_test)
+# red_meas = Measure(red_trian,2)
+# A = [assemble_matrix((u,v)->∫(a(μ,t)*∇(v)⋅∇(u))dΩ,trial(nothing),test) for (μ,t) in ron]
+# red_A = [assemble_matrix((u,v)->∫(a(μ,t)*∇(v)⋅∇(u))red_meas,trial(nothing),test) for (μ,t) in ron]
 
-# wrong, this means that coeffA is wrong
-# red trian is wrong
-smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
-pop = RB.PODOperator(get_algebraic_operator(feop),red_trial,red_test)
-contribs_mat,contribs_vec = RB.jacobian_and_residual(rbsolver,pop,smdeim)
-S = contribs_mat[1][1]
-b = reduced_basis(S;ϵ=RB.get_tol(rbsolver))
-indices_spacetime = get_mdeim_indices(b.basis_spacetime)
-indices_space = RB.fast_index(indices_spacetime,RB.num_space_dofs(b))
-indices_time = RB.slow_index(indices_spacetime,RB.num_space_dofs(b))
-lu_interp = lu(view(b.basis_spacetime,indices_spacetime,:))
-recast_indices_space = RB.recast_indices(b.basis_spacetime,indices_space)
-integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
-red_trian = reduce_triangulation(Ω,integration_domain,red_trial,red_test)
-red_meas = Measure(red_trian,2)
-A = [assemble_matrix((u,v)->∫(a(μ,t)*∇(v)⋅∇(u))dΩ,trial(nothing),test) for (μ,t) in ron]
-red_A = [assemble_matrix((u,v)->∫(a(μ,t)*∇(v)⋅∇(u))red_meas,trial(nothing),test) for (μ,t) in ron]
+# mass
+sM = contribs_mat[2][1]
+basis = reduced_basis(sM)
+combine = (x,y) -> fesolver.θ*(x-y)
+
+# check space-time reduction
+AA = RB.VecOfBDiagonalSparseMat2Mat([BDM])
+BB = RB.get_basis_spacetime(red_trial.basis)
+CC = RB.get_basis_spacetime(red_test.basis)
+B_shift = RB._shift(BB,RB.num_space_dofs(red_test.basis),:backwards)
+C_shift = RB._shift(CC,RB.num_space_dofs(red_test.basis),:forwards)
+@assert M_red ≈ RB.compress_combine_basis_space_time(AA,BB,CC,B_shift,C_shift;combine)[1]
+
+# check mdeim
+M_mdeim = basis.basis_spacetime*coeffM[1]
+BDM = RB.BDiagonal(getproperty.(A[2][1].array,:values))
+M_mdeim + RB.VecOfBDiagonalSparseMat2Mat([BDM])
+
+# check mdeim reduced structure
+proj_basis = RB.compress_basis(basis,red_trial,red_test;combine)
+ii = rbop.lhs[2][1].integration_domain
+ids_space,ids_time = ii.indices_space,ii.indices_time
+M_rev = reverse_snapshots(contribs_mat[2][1])
+M_at_ids = RB.select_snapshots_entries(M_rev,ids_space,ids_time)
+coeffM = ldiv!(zeros(1),rbop.lhs[2][1].mdeim_interpolation,M_at_ids[1])
+M_mdeim_red = proj_basis.metadata[1]*coeffM[1]
+M_mdeim_red - M_red # why not - ???
