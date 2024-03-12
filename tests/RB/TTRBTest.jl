@@ -228,21 +228,9 @@ A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,rbop,ron,dtθ,y,ode_cache
 A[1] - A_red
 #############################
 
-reffe = ReferenceFE(lagrangian,Float64,order)
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial = TransientTrialParamFESpace(test,gμt)
-_feop = AffineTransientParamFEOperator(res,jac,jac_t,induced_norm,ptspace,trial,test)
-feop = FEOperatorWithTrian(_feop,trian_res,trian_jac,trian_jac_t)
-uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
-fesolver = ThetaMethod(LUSolver(),dt,θ)
-
-ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_test")))
-
-fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(feop,rbsolver,fesnaps,rbsnaps,festats,rbstats)
-
-println(RB.space_time_error(results))
+ad_jac = rbop.lhs[1]
+basisA = reduced_basis(contribs_mat[1][1])
+A51 = select_snapshots(contribs_mat[1][1],51)
+A51 = collect(A51)[:,:,]
+ABST = basisA.basis_spacetime
+ABST_proj = ad_jac[1].basis.metadata

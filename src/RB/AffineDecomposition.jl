@@ -716,16 +716,10 @@ function compress(solver,fes::Tuple{Vararg{ArrayContribution}},trial,test)
   sum(cmp)
 end
 
-# function interpolation_error(a::AffineDecomposition,fes::AbstractSnapshots,rbs::AbstractSnapshots)
-#   ids_space,ids_time = get_indices_space(a),get_indices_time(a)
-#   fes_ids = reverse_snapshots_at_indices(fes,ids_space)[:,ids_time]
-#   rbs_ids = reverse_snapshots_at_indices(rbs,ids_space)[:,ids_time]
-#   norm(fes_ids - rbs_ids)
-# end
 function interpolation_error(a::AffineDecomposition,fes::AbstractSnapshots,rbs::AbstractSnapshots)
   ids_space,ids_time = get_indices_space(a),get_indices_time(a)
-  fes_ids = reverse(select_snapshots(fes,ids_space,ids_time,:))
-  rbs_ids = reverse(select_snapshots(rbs,ids_space,ids_time,:))
+  fes_ids = select_snapshots_entries(reverse_snapshots(fes),ids_space,ids_time)
+  rbs_ids = select_snapshots_entries(reverse_snapshots(rbs),ids_space,ids_time)
   norm(fes_ids - rbs_ids)
 end
 

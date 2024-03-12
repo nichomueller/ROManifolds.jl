@@ -154,7 +154,7 @@ SparseArrays.nnz(a::TTSparseMatrix) = nnz(a.values)
 SparseArrays.findnz(a::TTSparseMatrix) = findnz(a.values)
 SparseArrays.nzrange(a::TTSparseMatrix,col::Int) = nzrange(a.values,col)
 SparseArrays.rowvals(a::TTSparseMatrix) = rowvals(a.values)
-SparseArrays.nonzeros(a::TTSparseMatrix{D}) where D = TTArray(a.values,Val(D))
+SparseArrays.nonzeros(a::TTSparseMatrix{D}) where D = TTArray(nonzeros(a.values),Val(D))
 SparseMatricesCSR.colvals(a::TTSparseMatrix) = colvals(a.values)
 SparseMatricesCSR.getoffset(a::TTSparseMatrix) = getoffset(a.values)
 
