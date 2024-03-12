@@ -370,7 +370,7 @@ function select_snapshots(s::AbstractSnapshots;kwargs...)
 end
 
 function select_snapshots_entries(s::StandardSnapshots,spacerange,timerange)
-  select_snapshots(s,spacerange,timerange,Base.OneTo(get_params(s)))
+  select_snapshots(s,spacerange,timerange,Base.OneTo(num_params(s)))
 end
 
 space_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[1]
@@ -704,7 +704,7 @@ sparsify_indices(s::NnzSnapshotsSwappedColumns,srange::AbstractVector) = sparsif
 function select_snapshots(s::NnzSnapshots,spacerange,timerange,paramrange)
   _srange = isa(spacerange,Colon) ? Base.OneTo(num_space_dofs(s)) : spacerange
   _srange = isa(_srange,Integer) ? [_srange] : _srange
-  srange = sparsify_indices(s,srange)
+  srange = sparsify_indices(s,_srange)
   trange = isa(timerange,Colon) ? Base.OneTo(num_times(s)) : timerange
   trange = isa(trange,Integer) ? [trange] : trange
   prange = isa(paramrange,Colon) ? Base.OneTo(num_params(s)) : paramrange

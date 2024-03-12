@@ -68,7 +68,7 @@ function rb_results(
   name="vel")
 
   X = assemble_norm_matrix(feop)
-  son = select_snapshots(s,online_params(solver)) |> reverse_snapshots
+  son = select_snapshots(s,online_params(solver))
   RBResults(name,son,son_approx,fem_stats,rb_stats,X)
 end
 
@@ -95,7 +95,9 @@ function speedup(r::RBResults)
   speedup(r.fem_stats,r.rb_stats)
 end
 
-function space_time_error(sol::AbstractSnapshots,sol_approx::AbstractSnapshots,norm_matrix=nothing)
+function space_time_error(_sol::AbstractSnapshots,_sol_approx::AbstractSnapshots,norm_matrix=nothing)
+  sol = reverse_snapshots(_sol)
+  sol_approx = reverse_snapshots(_sol_approx)
   err_norm = []
   sol_norm = []
   space_time_norm = []

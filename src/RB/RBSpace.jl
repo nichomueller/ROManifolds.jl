@@ -112,7 +112,7 @@ function Arrays.evaluate!(cache,k::RecastMap,x::ParamVector,r::RBSpace)
   for ip in eachindex(x)
     Xip = recast(x[ip],r.basis)
     for it in 1:num_times(r)
-      cache[(ip-1)*num_times(r)+it] = Xip[:,it]
+      cache[(it-1)*length(x)+ip] = Xip[:,it]
     end
   end
 end
