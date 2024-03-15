@@ -40,6 +40,10 @@ function Base.setindex!(s::BasicTTSnapshots,v,ispace::Integer,itime::Integer,ipa
   s.values[iparam+(itime-1)*num_params(s)][ispace] = v
 end
 
+function to_standard_snapshots(s::BasicTTSnapshots)
+  Snapshots(get_values(s.values),s.realization)
+end
+
 struct TransientTTSnapshots{T,N,P,R,V} <: TTSnapshots{T,N}
   values::V
   realization::R
@@ -88,6 +92,10 @@ end
 
 function FEM.get_values(s::TransientTTSnapshots)
   get_values(BasicSnapshots(s))
+end
+
+function to_standard_snapshots(s::TransientTTSnapshots)
+  Snapshots(map(get_values,s.values),s.realization)
 end
 
 struct SelectedTTSnapshotsAtIndices{T,N,S,I} <: TTSnapshots{T,N}

@@ -16,7 +16,7 @@ ptspace = TransientParamSpace(pranges,tdomain)
 # model_dir = datadir(joinpath("meshes","perforated_plate.json"))
 # model = DiscreteModelFromFile(model_dir)
 
-n = 20
+n = 5
 domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain, partition)
@@ -79,17 +79,17 @@ xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
 # test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated_plate")))
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
 
 fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(feop,rbsolver,fesnaps,rbsnaps,festats,rbstats)
-err = RB.space_time_error(results)
+results = rb_results(rbsolver,feop,fesnaps,rbsnaps,festats,rbstats)
+h1_l2_err = RB.space_time_error(results)
 
-println(err)
+println(h1_l2_err)
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)
@@ -106,61 +106,37 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h
 
 rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
 rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
-results_space = rb_results(feop,rbsolver_space,fesnaps,rbsnaps_space,festats,rbstats_space)
+results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbstats_space)
 err_space = RB.space_time_error(results_space)
 
 println(err_space)
 save(test_dir,rbop_space)
 save(test_dir,results_space)
 
+using Gridap.FESpaces
+using Gridap.ODEs.TransientFETools
+using Gridap.ODEs.ODETools
+using LinearAlgebra
+
 θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 son = select_snapshots(fesnaps,RB.online_params(rbsolver))
 r = copy(get_realization(son))
 FEM.shift_time!(r,dt*(θ-1))
 rtrial = get_trial(rbop)(r)
-fe_trial = get_fe_trial(rbop)(r)
+fe_trial = RB.get_fe_trial(rbop)(r)
 red_x = zero_free_values(rtrial)
 y = zero_free_values(fe_trial)
 z = similar(y)
 z .= 0.0
 ode_cache = allocate_cache(rbop,r)
 mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(rbop,r,y,ode_cache)
-stats = @timed begin
-  ode_cache = update_cache!(ode_cache,rbop,r)
-  A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,rbop,r,dtθ,y,ode_cache,z)
-  afop = AffineOperator(A,b)
-  solve!(red_x,fesolver.nls,afop)
-end
+ode_cache = update_cache!(ode_cache,rbop,r)
+# A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,rbop,r,dtθ,y,ode_cache,z)
+# afop = AffineOperator(A,b)
+# solve!(red_x,fesolver.nls,afop)
 
-x = recast(red_x,rtrial)
-s = Snapshots(x,r) |> reverse_snapshots
-
-function _recast(red_x::ParamBlockVector,r::RB.BlockRBSpace)
-  map(eachindex(red_x)) do i
-    red_xi = red_x[i]
-    block_xi = map(1:blocklength(red_xi)) do j
-      _recast(red_xi[Block(j)],r[j])
-    end
-    mortar(block_xi)
-  end
-end
-function _recast(red_x::AbstractVector,r::RBSpace)
-  basis_space = get_basis_space(r)
-  basis_time = get_basis_time(r)
-  ns = num_reduced_space_dofs(r)
-  nt = num_reduced_times(r)
-
-  red_xmat = reshape(red_x,nt,ns)
-  xmat = basis_space*(basis_time*red_xmat)'
-  x = eachcol(xmat) |> collect
-  ParamArray(x)
-end
-function _recast(red_x::ParamVector,r::RBSpace)
-  map(red_x) do red_x
-    _recast(red_x,r)
-  end
-end
-
-_x = _recast(red_x,rtrial)
-
-_s = reverse_snapshots(_x,r)
+A = mat_cache
+LinearAlgebra.fillstored!(A,zero(eltype(A)))
+fe_sA = fe_jacobians!(A,rbop,r,(y,z),(1,1/dtθ),ode_cache)
+coeff = RB.mdeim_coeff(rbop.lhs[1][1],fe_sA[1][1])
+amdeim = RB.jacobian_mdeim_lincomb(rbop.lhs[1][1],coeff)

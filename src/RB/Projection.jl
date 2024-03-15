@@ -123,16 +123,16 @@ end
 abstract type TTProjection <: Projection end
 
 # for the time being, N = 3: space-time-parameter
-struct TTSVDCores{T,N,BST} <: TTProjection
-  cores::Vector{Array{T,3}}
-  basis_spacetime::BST
+struct TTSVDCores{N,A,B} <: TTProjection
+  cores::A
+  basis_spacetime::B
   function TTSVDCores(
-    cores::Vector{Array{T,3}},
-    basis_spacetime::BST=get_basis_spacetime(cores)
-    ) where {T,BST}
+    cores::A,
+    basis_spacetime::B=get_basis_spacetime(cores)
+    ) where {A,B}
 
     N = length(cores)
-    new{T,N,BST}(cores,basis_spacetime)
+    new{N,A,B}(cores,basis_spacetime)
   end
 end
 
@@ -146,8 +146,8 @@ num_reduced_times(b::TTSVDCores) = size(b.cores[2],3)
 num_fe_dofs(b::TTSVDCores) = size(b.basis_spacetime,1)
 num_reduced_dofs(b::TTSVDCores) = size(b.basis_spacetime,2)
 
-struct Core2Matrix{T} <: AbstractMatrix{T}
-  array::Array{T,3}
+struct Core2Matrix{T,A<:AbstractArray{T,3}} <: AbstractMatrix{T}
+  array::A
 end
 
 Base.size(a::Core2Matrix) = (size(a.array,2),size(a.array,1)*size(a.array,3))

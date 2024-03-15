@@ -45,6 +45,10 @@ function Base.setindex!(a::ParamBlockArray,v::BlockArray,i...)
   a
 end
 
+function Base.setindex!(a::ParamBlockArray,v::ParamArray,i::Block)
+  a.blockarrays[i.n...] = v
+end
+
 function Base.show(io::IO,::MIME"text/plain",a::ParamBlockArray{T,N,A,L}) where {T,N,A,L}
   s = size(blocks(a))
   _nice_size(s::Tuple{Int}) = "$(s[1]) - "

@@ -100,7 +100,7 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","toy
 fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(feop,rbsolver,fesnaps,rbsnaps,festats,rbstats)
+results = rb_results(rbsolver,feop,fesnaps,rbsnaps,festats,rbstats)
 
 # fesnaps = Serialization.deserialize(RB.get_snapshots_filename(test_dir))
 
@@ -121,7 +121,7 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","toy
 
 rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
 rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
-results_space = rb_results(feop,rbsolver_space,fesnaps,rbsnaps_space,festats,rbstats_space)
+results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbstats_space)
 
 println(RB.space_time_error(results_space))
 save(test_dir,rbop_space)

@@ -387,11 +387,6 @@ function mdeim_coeff(a::TTAffineDecomposition,b::ParamVector)
   return coeff
 end
 
-function mdeim_coeff(a::AffineContribution,b::ArrayContribution)
-  @assert length(a) == length(b)
-  map(mdeim_coeff,a.values,b.values)
-end
-
 function residual_mdeim_lincomb(a::AffineDecomposition,coeff::ParamMatrix)
   time_prod_cache,lincomb_cache = get_lincomb_cache(a)
   fill!(lincomb_cache,zero(eltype(lincomb_cache)))
@@ -464,14 +459,20 @@ end
 
 function mdeim_residual(a::AffineContribution,b::ArrayContribution)
   @assert length(a) == length(b)
-  coeff = mdeim_coeff(a,b)
-  sum(map(residual_mdeim_lincomb,a.values,coeff))
+  ress = map(a.values,b.values) do a,b
+    coeff = mdeim_coeff(a,b)
+    residual_mdeim_lincomb(a,coeff)
+  end
+  sum(ress)
 end
 
 function mdeim_jacobian(a::AffineContribution,b::ArrayContribution)
   @assert length(a) == length(b)
-  coeff = mdeim_coeff(a,b)
-  sum(map(jacobian_mdeim_lincomb,a.values,coeff))
+  jacs = map(a.values,b.values) do a,b
+    coeff = mdeim_coeff(a,b)
+    jacobian_mdeim_lincomb(a,coeff)
+  end
+  sum(jacs)
 end
 
 function mdeim_jacobian(a::Tuple,b::Tuple)
@@ -480,27 +481,55 @@ end
 
 # multi field interface
 
-struct BlockAffineDecomposition{A,N}
+function allocate_block_mdeim_lincomb(solver::RBSolver,test::RBSpace)
+  active_block_ids = get_touched_blocks(test)
+  block_lincomb = Any[allocate_mdeim_lincomb(solver,test[i]) for i in active_block_ids]
+  _,block_lc = tuple_of_arrays(block_lincomb)
+  return mortar(block_lc)
+end
+
+function allocate_block_mdeim_lincomb(solver::TTPODMDEIMSolver,test::RBSpace)
+  active_block_ids = get_touched_blocks(test)
+  block_lincomb = Any[allocate_mdeim_lincomb(solver,test[i]) for i in active_block_ids]
+  return mortar(block_lincomb)
+end
+
+function allocate_block_mdeim_lincomb(solver::RBSolver,trial::RBSpace,test::RBSpace)
+  active_block_ids = Iterators.product(get_touched_blocks(test),get_touched_blocks(trial))
+  block_lincomb = Any[allocate_mdeim_lincomb(solver,trial[j],test[i]) for (i,j) in active_block_ids]
+  _,block_lc = tuple_of_arrays(block_lincomb)
+  return mortar(block_lc)
+end
+
+function allocate_block_mdeim_lincomb(solver::TTPODMDEIMSolver,trial::RBSpace,test::RBSpace)
+  active_block_ids = Iterators.product(get_touched_blocks(test),get_touched_blocks(trial))
+  block_lincomb = Any[allocate_mdeim_lincomb(solver,trial[j],test[i]) for (i,j) in active_block_ids]
+  return mortar(block_lincomb)
+end
+
+struct BlockAffineDecomposition{A,N,C}
   array::Array{A,N}
   touched::Array{Bool,N}
+  cache::C
   function BlockAffineDecomposition(
     array::Array{A,N},
-    touched::Array{Bool,N}
-    ) where {A<:AffineDecomposition,N}
+    touched::Array{Bool,N},
+    cache::C
+    ) where {A<:AffineDecomposition,N,C}
 
     @check size(array) == size(touched)
-    new{A,N}(array,touched)
+    new{A,N,C}(array,touched,cache)
   end
 end
 
-function BlockAffineDecomposition(k::BlockMap{N},a::A...) where {A<:AffineDecomposition,N}
+function BlockAffineDecomposition(k::BlockMap{N},cache,a::A...) where {A<:AffineDecomposition,N}
   array = Array{A,N}(undef,k.size)
   touched = fill(false,k.size)
   for (t,i) in enumerate(k.indices)
     array[i] = a[t]
     touched[i] = true
   end
-  BlockAffineDecomposition(array,touched)
+  BlockAffineDecomposition(array,touched,cache)
 end
 
 Base.size(a::BlockAffineDecomposition,i...) = size(a.array,i...)
@@ -593,7 +622,8 @@ function reduced_vector_form(
     reduced_form(solver,s[i],trian,test[i]) for i in active_block_ids
     ] |> tuple_of_arrays
   red_trian = FEM.merge_triangulations(red_trians)
-  ad = BlockAffineDecomposition(block_map,ads...)
+  cache = allocate_block_mdeim_lincomb(solver,test)
+  ad = BlockAffineDecomposition(block_map,cache,ads...)
   return ad,red_trian
 end
 
@@ -612,30 +642,33 @@ function reduced_matrix_form(
     reduced_form(solver,s[i,j],trian,trial[j],test[i];kwargs...) for (i,j) in Tuple.(active_block_ids)
     ] |> tuple_of_arrays
   red_trian = FEM.merge_triangulations(red_trians)
-  ad = BlockAffineDecomposition(block_map,ads...)
+  cache = allocate_block_mdeim_lincomb(solver,trial,test)
+  ad = BlockAffineDecomposition(block_map,cache,ads...)
   return ad,red_trian
 end
 
 function mdeim_coeff(a::BlockAffineDecomposition,b::BlockSnapshots)
   @check get_touched_blocks(a) == get_touched_blocks(b)
   active_block_ids = get_touched_blocks(a)
-  for i in active_block_ids
-    mdeim_coeff(a[i],b[i])
-  end
+  block_map = BlockMap(size(a),active_block_ids)
+  coeff = Any[mdeim_coeff(a[i],b[i]) for i in active_block_ids]
+  return_cache(block_map,coeff...)
 end
 
 function residual_mdeim_lincomb(a::BlockAffineDecomposition,coeff::ArrayBlock)
   active_block_ids = get_touched_blocks(a)
-  map(active_block_ids) do i
-    residual_mdeim_lincomb(a[i],coeff[i])
-  end |> mortar
+  for i in active_block_ids
+    a.cache[Block(i)] = residual_mdeim_lincomb(a[i],coeff[i])
+  end
+  return a.cache
 end
 
 function jacobian_mdeim_lincomb(a::BlockAffineDecomposition,coeff::ArrayBlock)
   active_block_ids = get_touched_blocks(a)
-  map(active_block_ids) do i
-    residual_mdeim_lincomb(a[i],coeff[i])
-  end |> mortar
+  for i in active_block_ids
+    a.cache[Block(i.I)] = jacobian_mdeim_lincomb(a[i],coeff[i])
+  end
+  return a.cache
 end
 
 # for testing/visualization purposes
@@ -657,7 +690,7 @@ function compress(A::AbstractMatrix{T},trial::RBSpace,test::RBSpace;combine=(x,y
   ns_test,ns_trial = size(basis_space_test,2),size(basis_space_trial,2)
   nt_test,nt_trial = size(basis_time_test,2),size(basis_time_trial,2)
 
-  red_xvec = compress_basis_space(A,trial,test)
+  red_xvec = compress_basis_space(A,get_basis_space(trial),get_basis_space(test))
   a = stack(vec.(red_xvec))'  # Nt x ns_test*ns_trial
   st_proj = zeros(T,nt_test,nt_trial,ns_test*ns_trial)
   st_proj_shift = zeros(T,nt_test,nt_trial,ns_test*ns_trial)

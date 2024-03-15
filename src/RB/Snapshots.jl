@@ -863,6 +863,17 @@ function select_snapshots(s::BlockSnapshots{<:Any,N},args...;kwargs...) where N
   BlockSnapshots(block_map,active_block_snaps...)
 end
 
+function select_snapshots_entries(
+  s::BlockSnapshots{<:Any,N},
+  spacerange::ArrayBlock{<:Any,N},
+  timerange) where N
+
+  active_block_ids = get_touched_blocks(s)
+  block_map = BlockMap(size(s),active_block_ids)
+  active_block_snaps = Any[select_snapshots_entries(s[i],spacerange[i],timerange) for i in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps...)
+end
+
 function reverse_snapshots(s::BlockSnapshots{<:Any,N}) where N
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)

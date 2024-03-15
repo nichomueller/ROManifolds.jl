@@ -1,9 +1,10 @@
 function load_solve(solver;dir=pwd(),kwargs...)
   snaps = deserialize(get_snapshots_filename(dir))
-  fem_stats = deserialize(get_stats_filename(dir))
   rbop = deserialize(get_op_filename(dir))
   rb_sol,rb_stats = solve(solver,rbop,snaps)
-  results = rb_results(solver,rbop,snaps,rb_sol,fem_stats,rb_stats;kwargs...)
+  old_results = deserialize(get_results_filename(dir))
+  old_fem_stats = old_results.fem_stats
+  results = rb_results(solver,rbop,snaps,rb_sol,old_fem_stats,rb_stats;kwargs...)
   return results
 end
 
@@ -41,14 +42,6 @@ end
 get_avg_time(c::ComputationalStats) = c.avg_time
 get_avg_nallocs(c::ComputationalStats) = c.avg_nallocs
 
-function get_stats_filename(dir)
-  dir * "/stats.jld"
-end
-
-function DrWatson.save(dir,c::ComputationalStats)
-  serialize(get_stats_filename(dir),c)
-end
-
 struct RBResults{A,B,BA,C,D}
   name::A
   sol::B
@@ -59,8 +52,8 @@ struct RBResults{A,B,BA,C,D}
 end
 
 function rb_results(
-  feop::TransientParamFEOperator,
   solver::RBSolver,
+  feop::TransientParamFEOperator,
   s,
   son_approx,
   fem_stats,

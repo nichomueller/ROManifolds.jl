@@ -40,26 +40,29 @@ const ParamTTMatrix = ParamArray{T,2,A,L} where {T,A<:AbstractVector{<:TTMatrix}
 const ParamTTSparseMatrix = ParamArray{T,2,A,L} where {T,A<:AbstractVector{<:TTSparseMatrix},L}
 const ParamTTSparseMatrixCSC = ParamArray{T,2,A,L} where {T,A<:AbstractVector{<:TTSparseMatrixCSC},L}
 
+get_values(a::TTArray) = a.values
+get_values(a::ParamTTArray) = ParamArray(map(get_values,get_array(a)))
+
 Base.eltype(a::TTArray{D,T,N,V}) where {D,T,N,V} = T
 Base.eltype(::Type{TTArray{D,T,N,V}}) where {D,T,N,V} = T
 Base.ndims(a::TTArray{D,T,N,V}) where {D,T,N,V} = N
 Base.ndims(::Type{TTArray{D,T,N,V}}) where {D,T,N,V} = N
-Base.length(a::TTArray) = length(a.values)
-Base.size(a::TTArray,i...) = size(a.values,i...)
-Base.axes(a::TTArray,i...) = axes(a.values,i...)
-Base.eachindex(a::TTArray) = eachindex(a.values)
+Base.length(a::TTArray) = length(get_values(a))
+Base.size(a::TTArray,i...) = size(get_values(a),i...)
+Base.axes(a::TTArray,i...) = axes(get_values(a),i...)
+Base.eachindex(a::TTArray) = eachindex(get_values(a))
 
-Base.getindex(a::TTArray,i...) = getindex(a.values,i...)
-Base.setindex!(a::TTArray,v,i...) = setindex!(a.values,v,i...)
+Base.getindex(a::TTArray,i...) = getindex(get_values(a),i...)
+Base.setindex!(a::TTArray,v,i...) = setindex!(get_values(a),v,i...)
 
-Base.copy(a::TTArray{D}) where D = TTArray(copy(a.values),Val(D))
-Base.copyto!(a::TTArray,b::TTArray) = copyto!(a.values,b.values)
+Base.copy(a::TTArray{D}) where D = TTArray(copy(get_values(a)),Val(D))
+Base.copyto!(a::TTArray,b::TTArray) = copyto!(get_values(a),get_values(b))
 
 function Base.similar(
   a::TTArray{D,T,N},
   element_type::Type{S}=T,
   dims::Tuple{Int,Vararg{Int}}=size(a)) where {D,T,S,N}
-  TTArray(similar(a.values,element_type,dims),Val(D))
+  TTArray(similar(get_values(a),element_type,dims),Val(D))
 end
 
 get_dim(a::TTArray{D}) where D = D
@@ -73,13 +76,13 @@ function Base.similar(::Type{TTArray{D,T,N,V}},n::Integer...) where {D,T,N,V}
 end
 
 function Base.sum(a::TTArray)
-  sum(a.values)
+  sum(get_values(a))
 end
 
 for op in (:+,:-)
   @eval begin
     function ($op)(a::TTArray{D},b::TTArray{D}) where D
-      TTArray(($op)(a.values,b.values),Val(D))
+      TTArray(($op)(get_values(a),get_values(b)),Val(D))
     end
   end
 end
@@ -87,7 +90,7 @@ end
 (Base.:-)(a::TTArray) = a .* -1
 
 function Base.:*(a::TTArray{D},b::Number) where D
-  TTArray(a.values*b)
+  TTArray(get_values(a)*b)
 end
 
 function Base.:*(a::Number,b::TTArray)
@@ -99,69 +102,69 @@ function Base.:/(a::TTArray,b::Number)
 end
 
 function Base.:*(a::TTMatrix{D},b::TTVector{D}) where D
-  TTArray(a.values*b.values,Val(D))
+  TTArray(get_values(a)*get_values(b),Val(D))
 end
 
 function Base.:\(a::TTMatrix{D},b::TTVector{D}) where D
-  TTArray(a.values\b.values,Val(D))
+  TTArray(get_values(a)\get_values(b),Val(D))
 end
 
 function Base.transpose(a::TTArray{D}) where D
-  TTArray(transpose(a.values),Val(D))
+  TTArray(transpose(get_values(a)),Val(D))
 end
 
 function Base.fill!(a::TTArray,v)
-  fill!(a.values,v)
+  fill!(get_values(a),v)
   return a
 end
 
 function LinearAlgebra.fillstored!(a::TTSparseMatrix,v)
-  LinearAlgebra.fillstored!(a.values,v)
+  LinearAlgebra.fillstored!(get_values(a),v)
   return a
 end
 
 function LinearAlgebra.mul!(c::TTArray,a::TTArray,b::TTArray,α::Number,β::Number)
-  mul!(c.values,a.values,b.values,α,β)
+  mul!(get_values(c),get_values(a),get_values(b),α,β)
   return c
 end
 
 function LinearAlgebra.ldiv!(a::TTArray,m::LU,b::TTArray)
-  ldiv!(a.values,m,b.values)
+  ldiv!(get_values(a),m,get_values(b))
   return a
 end
 
 function LinearAlgebra.rmul!(a::TTArray,b::Number)
-  rmul!(a.values,b)
+  rmul!(get_values(a),b)
   return a
 end
 
 function LinearAlgebra.lu!(a::TTArray,b::TTArray)
-  lu!(a.array,b.array)
+  lu!(get_values(a),get_values(b))
   return a
 end
 
 function SparseArrays.resize!(a::TTArray,args...)
-  resize!(a.array,args...)
+  resize!(get_values(a),args...)
   return a
 end
 
 function SparseArrays.sparse(
   I::AbstractVector,J::AbstractVector,V::TTVector{D},m::Integer,n::Integer) where D
-  TTArray(sparse(I,J,V.values,m,n),Val(D))
+  TTArray(sparse(I,J,get_values(V),m,n),Val(D))
 end
 
-SparseArrays.nnz(a::TTSparseMatrix) = nnz(a.values)
-SparseArrays.findnz(a::TTSparseMatrix) = findnz(a.values)
-SparseArrays.nzrange(a::TTSparseMatrix,col::Int) = nzrange(a.values,col)
-SparseArrays.rowvals(a::TTSparseMatrix) = rowvals(a.values)
-SparseArrays.nonzeros(a::TTSparseMatrix{D}) where D = TTArray(nonzeros(a.values),Val(D))
-SparseMatricesCSR.colvals(a::TTSparseMatrix) = colvals(a.values)
-SparseMatricesCSR.getoffset(a::TTSparseMatrix) = getoffset(a.values)
+SparseArrays.nnz(a::TTSparseMatrix) = nnz(get_values(a))
+SparseArrays.findnz(a::TTSparseMatrix) = findnz(get_values(a))
+SparseArrays.nzrange(a::TTSparseMatrix,col::Int) = nzrange(get_values(a),col)
+SparseArrays.rowvals(a::TTSparseMatrix) = rowvals(get_values(a))
+SparseArrays.nonzeros(a::TTSparseMatrix{D}) where D = TTArray(nonzeros(get_values(a)),Val(D))
+SparseMatricesCSR.colvals(a::TTSparseMatrix) = colvals(get_values(a))
+SparseMatricesCSR.getoffset(a::TTSparseMatrix) = getoffset(get_values(a))
 
-LinearAlgebra.cholesky(a::TTSparseMatrix) = cholesky(a.values)
+LinearAlgebra.cholesky(a::TTSparseMatrix) = cholesky(get_values(a))
 
 function Arrays.CachedArray(a::TTArray)
-  TTArray(CachedArray(a.values))
+  TTArray(CachedArray(get_values(a)))
 end
 
 function Arrays.setsize!(
@@ -175,7 +178,7 @@ function Arrays.setsize!(
 end
 
 function Arrays.SubVector(a::TTArray,pini::Int,pend::Int)
-  TTArray(SubVector(a.values,pini,pend))
+  TTArray(SubVector(get_values(a),pini,pend))
 end
 
 struct TTBroadcast{D,V}
@@ -183,19 +186,18 @@ struct TTBroadcast{D,V}
   TTBroadcast{D}(values::V) where {D,V} = new{D,V}(values)
 end
 
-_get_values(a::TTArray) = a.values
-_get_values(a::TTBroadcast) = a.values
+get_values(a::TTBroadcast) = a.values
 
 function Base.broadcasted(f,a::Union{TTArray{D},TTBroadcast{D}}...) where D
-  TTBroadcast{D}(Base.broadcasted(f,map(_get_values,a)...))
+  TTBroadcast{D}(Base.broadcasted(f,map(get_values,a)...))
 end
 
 function Base.broadcasted(f,a::Union{TTArray{D},TTBroadcast{D}},b::Number) where D
-  TTBroadcast{D}(Base.broadcasted(f,_get_values(a),b))
+  TTBroadcast{D}(Base.broadcasted(f,get_values(a),b))
 end
 
 function Base.broadcasted(f,a::Number,b::Union{TTArray,TTBroadcast{D}}) where D
-  TTBroadcast{D}(Base.broadcasted(f,a,_get_values(b)))
+  TTBroadcast{D}(Base.broadcasted(f,a,get_values(b)))
 end
 
 function Base.broadcasted(f,
@@ -212,26 +214,26 @@ function Base.broadcasted(
 end
 
 function Base.materialize(b::TTBroadcast{D}) where D
-  a = Base.materialize(_get_values(b))
+  a = Base.materialize(get_values(b))
   TTArray(a,Val(D))
 end
 
 function Base.materialize!(a::TTArray,b::Broadcast.Broadcasted)
-  Base.materialize!(_get_values(a),b)
+  Base.materialize!(get_values(a),b)
   a
 end
 
 function Base.materialize!(a::TTArray,b::TTBroadcast)
-  Base.materialize!(_get_values(a),_get_values(b))
+  Base.materialize!(get_values(a),get_values(b))
   a
 end
 
-Base.similar(a::TTBroadcast{D},args...) where D = TTBroadcast{D}(similar(a.values,args...))
-Base.axes(a::TTBroadcast,i...) = axes(a.values,i...)
-Base.eachindex(a::TTBroadcast) = eachindex(a.values)
-Base.IndexStyle(a::TTBroadcast) = IndexStyle(a.values)
-Base.ndims(a::TTBroadcast) = ndims(a.values)
+Base.similar(a::TTBroadcast{D},args...) where D = TTBroadcast{D}(similar(get_values(a),args...))
+Base.axes(a::TTBroadcast,i...) = axes(get_values(a),i...)
+Base.eachindex(a::TTBroadcast) = eachindex(get_values(a))
+Base.IndexStyle(a::TTBroadcast) = IndexStyle(get_values(a))
+Base.ndims(a::TTBroadcast) = ndims(get_values(a))
 Base.ndims(::Type{TTBroadcast{D,V}}) where {D,V} = ndims(V)
-Base.size(a::TTBroadcast) = size(a.values)
-Base.length(a::TTBroadcast) = length(a.values)
-Base.iterate(a::TTBroadcast,i...) = iterate(a.values,i...)
+Base.size(a::TTBroadcast) = size(get_values(a))
+Base.length(a::TTBroadcast) = length(get_values(a))
+Base.iterate(a::TTBroadcast,i...) = iterate(get_values(a),i...)
