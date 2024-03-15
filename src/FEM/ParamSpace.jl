@@ -1,3 +1,8 @@
+slow_index(i,N::Int) = Int.(floor.((i .- 1) ./ N) .+ 1)
+slow_index(i::Colon,::Int) = i
+fast_index(i,N::Int) = mod.(i .- 1,N) .+ 1
+fast_index(i::Colon,::Int) = i
+
 struct ParamRealization{P<:AbstractVector}
   params::P
 end
@@ -9,7 +14,6 @@ _get_params(r::ParamRealization) = r.params # this function should stay local
 _get_params(r::TrivialParamRealization) = [r.params] # this function should stay local
 num_params(r::ParamRealization) = length(_get_params(r))
 Base.length(r::ParamRealization) = num_params(r)
-Base.size(r::ParamRealization) = (length(r),)
 Base.getindex(r::ParamRealization,i) = ParamRealization(getindex(_get_params(r),i))
 Base.copy(r::ParamRealization) = ParamRealization(copy(_get_params(r)))
 Arrays.testitem(r::ParamRealization) = testitem(_get_params(r))
@@ -28,7 +32,6 @@ end
 abstract type TransientParamRealization{P<:ParamRealization,T<:Real} end
 
 Base.length(r::TransientParamRealization) = num_params(r)*num_times(r)
-Base.size(r::TransientParamRealization) = (length(r),)
 get_params(r::TransientParamRealization) = get_params(r.params)
 _get_params(r::TransientParamRealization) = _get_params(r.params)
 num_params(r::TransientParamRealization) = num_params(r.params)
@@ -192,8 +195,8 @@ end
 
 abstract type AbstractParamFunction{P<:ParamRealization} <: Function end
 
-struct ParamFunction{P} <: AbstractParamFunction{P}
-  fun::Function
+struct ParamFunction{F,P} <: AbstractParamFunction{P}
+  fun::F
   params::P
 end
 
@@ -211,8 +214,8 @@ get_params(f::ParamFunction) = get_params(f.params)
 _get_params(f::ParamFunction) = _get_params(f.params)
 num_params(f::ParamFunction) = length(_get_params(f))
 Base.length(f::ParamFunction) = num_params(f)
-Base.size(f::ParamFunction) = (length(f),)
 Arrays.testitem(f::ParamFunction) = f.fun(testitem(f.params))
+Base.getindex(f::ParamFunction,i::Integer) = f.fun(_get_params(f)[i])
 
 function Fields.gradient(f::ParamFunction)
   function _gradient(x,μ)
@@ -255,17 +258,19 @@ function Fields.laplacian(f::ParamFunction)
 end
 
 # when iterating over a ParamFunction{P}, we return return f(eltype(P)) ∀ index i
-function Base.iterate(f::ParamFunction,state...)
-  riter = iterate(get_params(f),state...)
-  if isnothing(riter)
-    return nothing
+function pteval(f::ParamFunction,x)
+  T = return_type(f,x)
+  v = Vector{T}(undef,length(f))
+  @inbounds for (i,μ) in enumerate(get_params(f))
+    v[i] = f.fun(x,μ)
   end
-  rstate,statenext = riter
-  return f.fun(rstate),statenext
+  return v
 end
 
-struct TransientParamFunction{P,T} <: AbstractParamFunction{P}
-  fun::Function
+Arrays.return_value(f::ParamFunction,x) = f.fun(x,testitem(FEM._get_params(f)))
+
+struct TransientParamFunction{F,P,T} <: AbstractParamFunction{P}
+  fun::F
   params::P
   times::T
 end
@@ -290,8 +295,13 @@ num_params(f::TransientParamFunction) = length(_get_params(f))
 get_times(f::TransientParamFunction) = f.times
 num_times(f::TransientParamFunction) = length(get_times(f))
 Base.length(f::TransientParamFunction) = num_params(f)*num_times(f)
-Base.size(f::TransientParamFunction) = (length(f),)
 Arrays.testitem(f::TransientParamFunction) = f.fun(testitem(f.params),testitem(f.times))
+function Base.getindex(f::TransientParamFunction,i::Integer)
+  np = num_params(f)
+  p = _get_params(f)[fast_index(i,np)]
+  t = get_times(f)[slow_index(i,np)]
+  f.fun(p,t)
+end
 
 function Fields.gradient(f::TransientParamFunction)
   function _gradient(x,μ,t)
@@ -333,29 +343,20 @@ function Fields.laplacian(f::TransientParamFunction)
   TransientParamFunction(_laplacian,f.params,f.times)
 end
 
-function Base.iterate(f::TransientParamFunction)
-  iterator = Iterators.product(_get_params(f),get_times(f))
-  (pstate,tstate),state = iterate(iterator)
-  iterstatenext = iterator,state
-  f.fun(pstate,tstate),iterstatenext
-end
-
-function Base.iterate(f::TransientParamFunction,iterstate)
-  iterator,state = iterstate
-  statenext = iterate(iterator,state)
-  if isnothing(statenext)
-    return nothing
+function pteval(f::TransientParamFunction,x)
+  iterator = Iterators.product(FEM._get_params(f),get_times(f))
+  T = return_type(f,x)
+  v = Vector{T}(undef,length(f))
+  @inbounds for (i,(μ,t)) in enumerate(iterator)
+    v[i] = f.fun(x,μ,t)
   end
-  (pstate,tstate),state = statenext
-  iterstatenext = iterator,state
-  f.fun(pstate,tstate),iterstatenext
+  return v
 end
 
-function Arrays.evaluate!(cache,f::AbstractParamFunction,x...)
-  map(g->g(x...),f)
-end
+Arrays.return_value(f::AbstractParamFunction,x) = f.fun(x,testitem(FEM._get_params(f)),testitem(get_times(f)))
+Arrays.evaluate!(cache,f::AbstractParamFunction,x) = pteval(f,x)
 
-(f::AbstractParamFunction)(x...) = evaluate(f,x...)
+(f::AbstractParamFunction)(x) = evaluate(f,x)
 
 function test_parametric_space()
   α = ParamRealization(rand(10))
@@ -399,13 +400,13 @@ function test_parametric_space()
   b(μ) = x -> b(x,μ)
   bμ = 𝑓ₚ(b,get_params(μ))
   bμx = bμ(x)
-  for (i,bμi) in enumerate(bμ)
-    @test bμi(x) == bμx[i]
+  for (i,μ) in enumerate(μ)
+    @test b(x,μ) == bμx[i]
   end
-  for (i,aμti) in enumerate(aμt)
-    @test aμti(x) == aμtx[i]
+  for (i,(μ,t)) in enumerate(μt)
+    @test aμ(x,μ,t) == aμtx[i]
   end
-  for (i,daμti) in enumerate(daμt)
-    @test daμti(x) == daμtx[i]
+  for (i,(μ,t)) in enumerate(μt)
+    @test da(x,μ,t) == daμtx[i]
   end
 end

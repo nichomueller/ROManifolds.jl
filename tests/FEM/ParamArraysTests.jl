@@ -53,6 +53,7 @@ u0μ(μ) = ParamFunction(u0,μ)
 res(μ,t,u,v) = ∫(v*∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
 jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
 jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
+induced_norm(du,v) = ∫(∇(v)⋅∇(du))dΩ
 
 order = 1
 degree = 2*order
@@ -65,21 +66,12 @@ T = Float64
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
 trial = TransientTrialParamFESpace(test,gμt)
-feop = AffineTransientParamFEOperator(res,jac,jac_t,ptspace,trial,test)
+feop = AffineTransientParamFEOperator(res,jac,jac_t,induced_norm,ptspace,trial,test)
 
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 sol = solve(fesolver,feop,uh0μ,r)
-
-dir = datadir("poisson_transient_solution")
-createpvd(r,dir) do pvd
-  for (uh,rt) in sol
-    files = ParamString(dir,rt)
-    vtk = createvtk(Ω,files,cellfields=["u"=>uh])
-    pvd[rt] = vtk
-  end
-end
 
 # gridap
 
@@ -133,6 +125,7 @@ p0μ(μ) = ParamFunction(p0,μ)
 res(μ,t,(u,p),(v,q)) = ∫(v⋅∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
 jac(μ,t,u,(du,dp),(v,q)) = ∫(aμt(μ,t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ + ∫(q*(∇⋅(du)))dΩ
 jac_t(μ,t,u,(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
+induced_norm((du,dp),(v,q)) = ∫(∇(v)⋅∇(du))dΩ + ∫(q*p)dΩ
 
 order = 2
 degree = 2*order
@@ -149,7 +142,7 @@ test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = AffineTransientParamFEOperator(res,jac,jac_t,ptspace,trial,test)
+feop = AffineTransientParamFEOperator(res,jac,jac_t,induced_norm,ptspace,trial,test)
 
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
@@ -222,6 +215,7 @@ form(μ,t,(u,p),(v,q)) = ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))
 res(μ,t,(u,p),(v,q)) = ∫(v⋅∂t(u))dΩ + form(μ,t,(u,p),(v,q)) + c(u,v)
 jac(μ,t,(u,p),(du,dp),(v,q)) = form(μ,t,(du,dp),(v,q)) + dc(u,du,v)
 jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
+induced_norm((du,dp),(v,q)) = ∫(∇(v)⋅∇(du))dΩ + ∫(q*p)dΩ
 
 order = 2
 degree = 2*order
@@ -238,7 +232,7 @@ test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = TransientParamFEOperator(res,jac,jac_t,ptspace,trial,test)
+feop = TransientParamFEOperator(res,jac,jac_t,induced_norm,ptspace,trial,test)
 
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 nls = Gridap.Algebra.NewtonRaphsonSolver(LUSolver(),1e-10,20)

@@ -37,11 +37,6 @@ Base.axes(s::StandardSnapshots) = Base.OneTo.(size(s))
 
 Base.IndexStyle(::Type{<:StandardSnapshots}) = IndexLinear()
 
-slow_index(i,N::Int) = Int.(floor.((i .- 1) ./ N) .+ 1)
-slow_index(i::Colon,::Int) = i
-fast_index(i,N::Int) = mod.(i .- 1,N) .+ 1
-fast_index(i::Colon,::Int) = i
-
 function col_index(s::StandardSnapshots,mode2_index,param_index)
   (mode2_index .- 1)*num_params(s) .+ param_index
 end

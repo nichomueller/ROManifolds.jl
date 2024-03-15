@@ -48,6 +48,8 @@ export get_params
 export get_times
 export num_params
 export num_times
+export slow_index
+export fast_index
 include("ParamSpace.jl")
 
 include("DiffOperators.jl")
@@ -158,13 +160,6 @@ include("ODEParamSolution.jl")
 
 export TransientParamFESolution
 include("TransientParamFESolution.jl")
-
-export ParamString
-export ParamVisualizationData
-export create_dir
-export get_parent_dir
-export correct_path
-include("ParamVisualization.jl")
 
 export get_parent
 include("TriangulationParents.jl")

@@ -1,3 +1,13 @@
+"""Recursive creation of a directory"""
+function create_dir(dir::String)
+  if !isdir(dir)
+    parent_dir, = splitdir(dir)
+    create_dir(parent_dir)
+    mkdir(dir)
+  end
+  return
+end
+
 abstract type RBSolver{S} end
 const ThetaMethodRBSolver = RBSolver{ThetaMethod}
 
@@ -39,7 +49,7 @@ end
 function get_test_directory(solver::PODMDEIMSolver;dir=datadir())
   keyword = solver.mdeim_style == SpaceOnlyMDEIM() ? "space_only_mdeim" : "space_time_mdeim"
   test_dir = joinpath(dir,keyword * "_$(solver.ϵ)")
-  FEM.create_dir(test_dir)
+  create_dir(test_dir)
   test_dir
 end
 
@@ -69,7 +79,7 @@ end
 function get_test_directory(solver::TTPODMDEIMSolver;dir=datadir())
   keyword = solver.mdeim_style == SpaceOnlyMDEIM() ? "TT_space_only_mdeim" : "TT_space_time_mdeim"
   test_dir = joinpath(dir,keyword * "_$(solver.ϵ)")
-  FEM.create_dir(test_dir)
+  create_dir(test_dir)
   test_dir
 end
 

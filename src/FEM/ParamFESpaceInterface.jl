@@ -44,30 +44,23 @@ FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldParamFESpace,fv,dv) = s
 
 get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(f.space)
 
-function FESpaces.compute_dirichlet_values_for_tags!(
-  dirichlet_values,
-  dirichlet_values_scratch,
-  f::SingleFieldParamFESpace,
-  tag_to_object)
+# function FESpaces.compute_dirichlet_values_for_tags!(
+#   dirichlet_values,
+#   dirichlet_values_scratch,
+#   f::SingleFieldParamFESpace,
+#   tag_to_object)
 
-  dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
-  _tag_to_object = FESpaces._convert_to_collectable(tag_to_object,num_dirichlet_tags(f))
-  for (tag,object) in enumerate(_tag_to_object)
-    fill!(dirichlet_values_scratch,zero(eltype(dirichlet_values_scratch)))
-    map(dirichlet_values,dirichlet_values_scratch,object) do dv,dvs,o
-      cell_vals = FESpaces._cell_vals(f,o)
-      gather_dirichlet_values!(dvs,f.space,cell_vals)
-      FESpaces._fill_dirichlet_values_for_tag!(dv,dvs,tag,dirichlet_dof_to_tag)
-    end
-  end
-  ParamArray(dirichlet_values)
-end
-
-# function FESpaces._convert_to_collectable(object::AbstractParamFunction,ntags)
-#   objects = map(object) do o
-#     FESpaces._convert_to_collectable(Fill(o,ntags),ntags)
+#   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
+#   _tag_to_object = FESpaces._convert_to_collectable(tag_to_object,num_dirichlet_tags(f))
+#   for (tag,object) in enumerate(_tag_to_object)
+#     fill!(dirichlet_values_scratch,zero(eltype(dirichlet_values_scratch)))
+#     map(dirichlet_values,dirichlet_values_scratch,object) do dv,dvs,o
+#       cell_vals = FESpaces._cell_vals(f,o)
+#       gather_dirichlet_values!(dvs,f.space,cell_vals)
+#       FESpaces._fill_dirichlet_values_for_tag!(dv,dvs,tag,dirichlet_dof_to_tag)
+#     end
 #   end
-#   ParamArray(objects)
+#   ParamArray(dirichlet_values)
 # end
 
 function FESpaces.gather_free_and_dirichlet_values!(
@@ -114,6 +107,18 @@ function FESpaces.gather_dirichlet_values!(
     cells)
 
   dirichlet_vals
+end
+
+function FESpaces._fill_dirichlet_values_for_tag!(
+  dirichlet_values::ParamArray,
+  dv::ParamArray,
+  tag,
+  dirichlet_dof_to_tag)
+
+  @assert length(dirichlet_values) == length(dv)
+  for i = eachindex(dirichlet_values)
+    FESpaces._fill_dirichlet_values_for_tag!(dirichlet_values[i],dv[i],tag,dirichlet_dof_to_tag)
+  end
 end
 
 function FESpaces._free_and_dirichlet_values_fill!(

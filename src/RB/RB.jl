@@ -46,8 +46,6 @@ export NnzSnapshots
 export GenericNnzSnapshots
 export NnzSnapshotsSwappedColumns
 export Snapshots
-export slow_index
-export fast_index
 export tensor_getindex
 export tensor_setindex!
 export select_snapshots

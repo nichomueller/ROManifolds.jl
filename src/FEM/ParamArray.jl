@@ -46,7 +46,6 @@ Base.eachindex(::ParamArray{T,N,A,L}) where {T,N,A,L} = Base.OneTo(L)
 Base.lastindex(::ParamArray{T,N,A,L}) where {T,N,A,L} = L
 Base.getindex(a::ParamArray,i...) = ParamArray(getindex(get_array(a),i...))
 Base.setindex!(a::ParamArray,v,i...) = setindex!(get_array(a),v,i...)
-Base.iterate(a::ParamArray,i...) = iterate(get_array(a),i...)
 
 function Base.show(io::IO,::MIME"text/plain",a::ParamArray{T,N,A,L}) where {T,N,A,L}
   println(io, "Parametric vector of types $(eltype(A)) and length $L, with entries:")

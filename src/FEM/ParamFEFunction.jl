@@ -39,20 +39,6 @@ function FESpaces.test_fe_function(f::SingleFieldParamFEFunction)
   end
 end
 
-function Base.iterate(f::SingleFieldParamFEFunction)
-  state = 1
-  fstate = _getindex(f,state)
-  return fstate,state+1
-end
-
-function Base.iterate(f::SingleFieldParamFEFunction,state)
-  if state > _length(f)
-    return nothing
-  end
-  fstate = _getindex(f,state)
-  return fstate,state+1
-end
-
 function _getindex(f::GenericCellField,index)
   data = get_data(f)
   trian = get_triangulation(f)

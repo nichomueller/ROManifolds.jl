@@ -19,7 +19,6 @@ Base.size(c::ParamContainer) = (length(c),)
 Base.eachindex(c::ParamContainer) = Base.OneTo(length(c))
 Base.getindex(c::ParamContainer,i...) = getindex(get_array(c),i...)
 Base.setindex!(c::ParamContainer,v,i...) = setindex!(get_array(c),v,i...)
-Base.iterate(c::ParamContainer,i...) = iterate(get_array(c),i...)
 
 function Base.:+(a::T,b::T) where T<:ParamContainer
   c = similar(a.array)
