@@ -71,6 +71,7 @@ function Algebra.solve!(
   cache)
 
   fex = similar(op.u0)
+  fex .= 0.0
   (cache_jac_lin,cache_res_lin),(cache_jac_nlin,cache_res_nlin) = cache
 
   # linear res/jac, now they are treated as cache

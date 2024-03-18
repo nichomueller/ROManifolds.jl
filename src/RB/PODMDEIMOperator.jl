@@ -295,8 +295,9 @@ function Algebra.residual!(
 
   b_lin,cache_nl = cache
   b_nlin = residual!(cache_nl,op.op_nonlinear,r,xhF,ode_cache)
-  @. b_nlin = b_nlin - b_lin
-  return b_nlin
+  # @. b_nlin = b_nlin - b_lin
+  # return b_nlin
+  return b_nlin - b_lin
 end
 
 function Algebra.jacobian!(
@@ -310,8 +311,9 @@ function Algebra.jacobian!(
 
   A_lin,cache_nl = cache
   A_nlin = jacobian!(cache_nl,op.op_nonlinear,r,xhF,i,γᵢ,ode_cache)
-  @. A_nlin = A_nlin + A_lin
-  return A_nlin
+  # @. A_nlin = A_nlin + A_lin
+  # return A_nlin
+  return A_nlin + A_lin
 end
 
 function ODETools.jacobians!(
@@ -324,8 +326,9 @@ function ODETools.jacobians!(
 
   A_lin,cache_nl = cache
   A_nlin = jacobians!(cache_nl,op.op_nonlinear,r,xhF,γ,ode_cache)
-  @. A_nlin = A_nlin + A_lin
-  return A_nlin
+  # @. A_nlin = A_nlin + A_lin
+  # return A_nlin
+  return A_nlin + A_lin
 end
 
 # Solve a POD-MDEIM problem

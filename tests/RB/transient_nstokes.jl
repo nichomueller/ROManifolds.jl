@@ -112,24 +112,6 @@ save(test_dir,results)
 # POD-MDEIM error
 pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
 
-ϵ = 1e-4
-rbsolver_space = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","toy_mesh")))
-
-# we can load & solve directly, if the offline structures have been previously saved to file
-# load_solve(rbsolver_space,dir=test_dir_space)
-
-rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
-rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop_space,fesnaps)
-results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbstats_space)
-
-println(RB.space_time_error(results_space))
-save(test_dir,rbop_space)
-save(test_dir,results_space)
-
-# POD-MDEIM error
-pod_err_space,mdeim_error_space = RB.pod_mdeim_error(rbsolver_space,feop,rbop_space,fesnaps)
-
 son = select_snapshots(fesnaps,51)
 ron = get_realization(son)
 θ == 0.0 ? dtθ = dt : dtθ = dt*θ
@@ -153,61 +135,66 @@ ode_cache = update_cache!(ode_cache,rbop,r)
 nlop = RBThetaMethodParamOperator(rbop,r,dtθ,y,ode_cache,z)
 # solve!(red_x,fesolver.nls,nlop,cache)
 
-fex = similar(nlop.u0)
-# fex .= 0.0
-(cache_jac_lin,cache_res_lin),(cache_jac_nlin,cache_res_nlin) = cache
+# # fex = copy(nlop.u0)
+# fex = copy(get_values(son))
+# (cache_jac_lin,cache_res_lin),(cache_jac_nlin,cache_res_nlin) = cache
 
-# linear res/jac, now they are treated as cache
-lop = nlop.odeop.op_linear
-A_lin,b_lin = ODETools._matrix_and_vector!(cache_jac_lin,cache_res_lin,lop,r,dtθ,y,ode_cache,z)
-cache_jac = A_lin,cache_jac_nlin
-cache_res = b_lin,cache_res_nlin
-cache = cache_jac,cache_res
+# # linear res/jac, now they are treated as cache
+# lop = nlop.odeop.op_linear
+# A_lin,b_lin = ODETools._matrix_and_vector!(cache_jac_lin,cache_res_lin,lop,r,dtθ,y,ode_cache,z)
+# cache_jac = A_lin,cache_jac_nlin
+# cache_res = b_lin,cache_res_nlin
+# cache = cache_jac,cache_res
 
-# initial nonlinear res/jac
-b = residual!(cache_res,nlop,fex)
-b1 = copy(b)
-A = jacobian!(cache_jac,nlop,fex)
-A1 = copy(A)
-dx = similar(b)
-ss = symbolic_setup(LUSolver(),A)
-ns = numerical_setup(ss,A)
+# # initial nonlinear res/jac
+# b = residual!(cache_res,nlop,fex)
+# b1 = copy(b)
+# A = jacobian!(cache_jac,nlop,fex)
+# A1 = copy(A)
+# dx = similar(b)
+# ss = symbolic_setup(LUSolver(),A)
+# ns = numerical_setup(ss,A)
 
-trial = get_trial(nlop.odeop)(nlop.r)
-isconv, conv0 = Algebra._check_convergence(nls,b)
+# trial = get_trial(nlop.odeop)(nlop.r)
+# isconv, conv0 = Algebra._check_convergence(nls,b)
 
-rmul!(b,-1)
-solve!(dx,ns,b)
-red_x .+= dx
+# rmul!(b,-1)
+# solve!(dx,ns,b)
+# red_x .+= dx
 
-xr = recast(red_x,trial)
-fex = xr
-# fex .= recast(red_x,trial)
+# xr = recast(red_x,trial)
+# fex = xr
+# # fex .= recast(red_x,trial)
 
-b = residual!(cache_res,nlop,fex)
-isconv = Algebra._check_convergence(nls,b,conv0)
-println(maximum(abs,b))
+# b = residual!(cache_res,nlop,fex)
+# isconv = Algebra._check_convergence(nls,b,conv0)
+# println(maximum(abs,b))
 
-A = jacobian!(cache_jac,nlop,fex)
-numerical_setup!(ns,A)
+# A = jacobian!(cache_jac,nlop,fex)
+# numerical_setup!(ns,A)
 
-# mdeim
-# mdeim_error(rbsolver,feop,rbop,fesnaps)
-s = select_snapshots(fesnaps,1)
-# errA_lin,errb_lin = _linear_combination_error(rbsolver,feop.op_linear,rbop.op_linear,s)
-feA,feb = RB._jacobian_and_residual(fesolver,feop,s)
-feA_comp = RB.compress(rbsolver,feA,get_trial(rbop),get_test(rbop))
-feb_comp = RB.compress(rbsolver,feb,get_test(rbop))
-rbA,rbb = RB._jacobian_and_residual(rbsolver,rbop,s)
-errA = RB._rel_norm(feA_comp,rbA)
-errb = RB._rel_norm(feb_comp,rbb)
+# reduced c, x = 0.0
+x = similar(get_values(son))
+x .= 0.0
+A_nlin,b_nlin = ODETools._allocate_matrix_and_vector(rbop.op_nonlinear,r,y,ode_cache)
+b_nlin = residual!(b_nlin,rbop.op_nonlinear,r,(x,y),ode_cache)
+b_nlin_snap = Snapshots(recast(b_nlin,trial),r)
 
-# errA_nlin,errb_nlin = _linear_combination_error(rbsolver,feop.op_nonlinear,rbop.op_nonlinear,s)
-feop_nlin = feop.op_nonlinear
-rbop_nlin = rbop.op_nonlinear
-feA,feb = RB._jacobian_and_residual(fesolver,feop_nlin,s)
-feA_comp = RB.compress(rbsolver,feA,get_trial(rbop_nlin),get_test(rbop_nlin))
-feb_comp = RB.compress(rbsolver,feb,get_test(rbop_nlin))
-rbA,rbb = RB._jacobian_and_residual(rbsolver,rbop_nlin,s)
-errA = RB._rel_norm(feA_comp,rbA)
-errb = RB._rel_norm(feb_comp,rbb)
+# full order c, x = 0.0
+Us,Uts,fecache = ode_cache
+xh = EvaluationFunction(Us[1],x)
+bok = allocate_residual(feop.op_nonlinear,r,xh,fecache)
+
+Xh, = ode_cache
+dxh = ()
+xh = TransientCellField(EvaluationFunction(Xh[1],x),dxh)
+residual!(bok,feop.op_nonlinear,r,xh,ode_cache)
+bok_snap = Snapshots(bok[1],r)
+
+bnok = cache_res_nlin
+fill!(bnok,zero(eltype(bnok)))
+fe_sb = RB.fe_residual!(bnok,rbop.op_nonlinear,r,(xx,y),ode_cache)
+# RB.mdeim_residual(rbop.op_nonlinear.rhs,fe_sb)
+coeff = RB.mdeim_coeff(rbop.op_nonlinear.rhs[1],fe_sb[1])
+# yea = RB.residual_mdeim_lincomb(rbop.op_nonlinear.rhs[1],coeff)
+active_block_ids = RB.get_touched_blocks(rbop.op_nonlinear.rhs[1])

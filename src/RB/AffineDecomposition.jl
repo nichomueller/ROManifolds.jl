@@ -703,7 +703,7 @@ function compress(A::AbstractMatrix,r::RBSpace)
   basis_time = get_basis_time(r)
 
   a = (basis_space'*A)*basis_time
-  v = vec(a')
+  v = vec(a)
   return v
 end
 
@@ -726,7 +726,7 @@ function compress(A::AbstractMatrix{T},trial::RBSpace,test::RBSpace;combine=(x,y
   st_proj = combine(st_proj,st_proj_shift)
   st_proj_a = zeros(T,ns_test*nt_test,ns_trial*nt_trial)
   @inbounds for i = 1:ns_trial, j = 1:ns_test
-    st_proj_a[1+(j-1)*nt_test:j*nt_test,1+(i-1)*nt_trial:i*nt_trial] = st_proj[:,:,(i-1)*ns_test+j]
+    st_proj_a[j:ns_test:ns_test*nt_test,i:ns_trial:ns_trial*nt_trial] = st_proj[:,:,(i-1)*ns_test+j]
   end
   return st_proj_a
 end
