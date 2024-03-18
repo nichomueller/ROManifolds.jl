@@ -119,3 +119,49 @@ for ((xh,rt),(_xh,_t)) in zip(sol,_sol)
   @check get_free_dof_values(ph1) ≈ get_free_dof_values(_ph) "failed at time $t"
   @check uh1.dirichlet_values ≈ _uh.dirichlet_values
 end
+
+
+########################## NAVIER-STOKES ############################
+
+const Re = 100.0
+conv(u,∇u) = Re*(∇u')⋅u
+dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
+c(u,v,dΩ) = ∫( v⊙(conv∘(u,∇(u))) )dΩ
+dc(u,du,v,dΩ) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )dΩ
+
+res_nlin(μ,t,(u,p),(v,q),dΩ) = c(u,v,dΩ)
+jac_nlin(μ,t,(u,p),(du,dp),(v,q),dΩ) = dc(u,du,v,dΩ)
+
+_feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,induced_norm,ptspace,trial,test)
+feop_nlin = FEOperatorWithTrian(_feop_nlin,trian_res,trian_jac)
+feop_lin_nlin = TransientParamLinearNonlinearFEOperator(feop,feop_nlin)
+
+sol = solve(fesolver,feop_lin_nlin,xh0μ,r)
+iterate(sol)
+
+# gridap
+
+_form(t,(u,p),(v,q)) = ∫(_a(t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ
+_res(t,(u,p),(v,q)) = ∫(v⋅∂t(u))dΩ + _form(t,(u,p),(v,q)) + c(u,v,dΩ)
+_jac(t,(u,p),(du,dp),(v,q)) = _form(t,(du,dp),(v,q)) + dc(u,du,v,dΩ)
+_jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
+
+_trial_u = TransientTrialFESpace(test_u,_g)
+_trial = TransientMultiFieldFESpace([_trial_u,trial_p];style=BlockMultiFieldStyle())
+_feop = TransientFEOperator(_res,_jac,_jac_t,_trial,test)
+_x0 = interpolate_everywhere([u0(μ),p0(μ)],_trial(0.0))
+
+_sol = solve(fesolver,_feop,_x0,t0,tf)
+iterate(_sol)
+
+for ((xh,rt),(_xh,_t)) in zip(sol,_sol)
+  uh,ph = xh
+  uh1 = FEM._getindex(uh,3)
+  ph1 = FEM._getindex(ph,3)
+  _uh,_ph = _xh
+  t = get_times(rt)
+  @check t ≈ _t "$t != $_t"
+  @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "failed at time $t"
+  @check get_free_dof_values(ph1) ≈ get_free_dof_values(_ph) "failed at time $t"
+  @check uh1.dirichlet_values ≈ _uh.dirichlet_values
+end

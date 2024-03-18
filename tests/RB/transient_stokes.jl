@@ -16,7 +16,7 @@ ptspace = TransientParamSpace(pranges,tdomain)
 # model_dir = datadir(joinpath("meshes","perforated_plate.json"))
 # model = DiscreteModelFromFile(model_dir)
 
-n = 5
+n = 10
 domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain, partition)
@@ -69,6 +69,7 @@ test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial_u = TransientTrialParamFESpace(test_u,gμt_in)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+# test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -79,7 +80,7 @@ xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 # test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated_plate")))
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
 
@@ -117,26 +118,12 @@ using Gridap.FESpaces
 using Gridap.ODEs.TransientFETools
 using Gridap.ODEs.ODETools
 using LinearAlgebra
+using BlockArrays
 
-θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-son = select_snapshots(fesnaps,RB.online_params(rbsolver))
-r = copy(get_realization(son))
-FEM.shift_time!(r,dt*(θ-1))
-rtrial = get_trial(rbop)(r)
-fe_trial = RB.get_fe_trial(rbop)(r)
-red_x = zero_free_values(rtrial)
-y = zero_free_values(fe_trial)
-z = similar(y)
-z .= 0.0
-ode_cache = allocate_cache(rbop,r)
-mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(rbop,r,y,ode_cache)
-ode_cache = update_cache!(ode_cache,rbop,r)
-# A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,rbop,r,dtθ,y,ode_cache,z)
-# afop = AffineOperator(A,b)
-# solve!(red_x,fesolver.nls,afop)
-
-A = mat_cache
-LinearAlgebra.fillstored!(A,zero(eltype(A)))
-fe_sA = fe_jacobians!(A,rbop,r,(y,z),(1,1/dtθ),ode_cache)
-coeff = RB.mdeim_coeff(rbop.lhs[1][1],fe_sA[1][1])
-amdeim = RB.jacobian_mdeim_lincomb(rbop.lhs[1][1],coeff)
+s = select_snapshots(fesnaps,1)
+feA,feb = RB._jacobian_and_residual(fesolver,feop,s)
+feA_comp = RB.compress(rbsolver,feA,get_trial(rbop),get_test(rbop))
+feb_comp = RB.compress(rbsolver,feb,get_test(rbop))
+rbA,rbb = RB._jacobian_and_residual(rbsolver,rbop,s)
+errA = RB._rel_norm(feA_comp,rbA)
+errb = RB._rel_norm(feb_comp,rbb)

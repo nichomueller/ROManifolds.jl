@@ -26,7 +26,7 @@ pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
-n = 5
+n = 10
 domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain, partition)
@@ -79,7 +79,7 @@ reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial_u = TransientTrialParamFESpace(test_u,gμt)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -94,7 +94,7 @@ nls = NewtonRaphsonSolver(LUSolver(),1e-10,20)
 fesolver = ThetaMethod(nls,dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","toy_mesh")))
 
 fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
@@ -113,21 +113,24 @@ save(test_dir,results)
 pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+rbsolver_space = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","toy_mesh")))
 
 # we can load & solve directly, if the offline structures have been previously saved to file
 # load_solve(rbsolver_space,dir=test_dir_space)
 
 rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
-rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
+rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop_space,fesnaps)
 results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbstats_space)
 
 println(RB.space_time_error(results_space))
 save(test_dir,rbop_space)
 save(test_dir,results_space)
 
-son = select_snapshots(fesnaps,1)
+# POD-MDEIM error
+pod_err_space,mdeim_error_space = RB.pod_mdeim_error(rbsolver_space,feop,rbop_space,fesnaps)
+
+son = select_snapshots(fesnaps,51)
 ron = get_realization(son)
 θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
@@ -187,3 +190,24 @@ println(maximum(abs,b))
 
 A = jacobian!(cache_jac,nlop,fex)
 numerical_setup!(ns,A)
+
+# mdeim
+# mdeim_error(rbsolver,feop,rbop,fesnaps)
+s = select_snapshots(fesnaps,1)
+# errA_lin,errb_lin = _linear_combination_error(rbsolver,feop.op_linear,rbop.op_linear,s)
+feA,feb = RB._jacobian_and_residual(fesolver,feop,s)
+feA_comp = RB.compress(rbsolver,feA,get_trial(rbop),get_test(rbop))
+feb_comp = RB.compress(rbsolver,feb,get_test(rbop))
+rbA,rbb = RB._jacobian_and_residual(rbsolver,rbop,s)
+errA = RB._rel_norm(feA_comp,rbA)
+errb = RB._rel_norm(feb_comp,rbb)
+
+# errA_nlin,errb_nlin = _linear_combination_error(rbsolver,feop.op_nonlinear,rbop.op_nonlinear,s)
+feop_nlin = feop.op_nonlinear
+rbop_nlin = rbop.op_nonlinear
+feA,feb = RB._jacobian_and_residual(fesolver,feop_nlin,s)
+feA_comp = RB.compress(rbsolver,feA,get_trial(rbop_nlin),get_test(rbop_nlin))
+feb_comp = RB.compress(rbsolver,feb,get_test(rbop_nlin))
+rbA,rbb = RB._jacobian_and_residual(rbsolver,rbop_nlin,s)
+errA = RB._rel_norm(feA_comp,rbA)
+errb = RB._rel_norm(feb_comp,rbb)

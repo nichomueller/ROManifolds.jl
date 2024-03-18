@@ -59,12 +59,12 @@ ODETools.∂t(U::RBSpace) = RBSpace(∂t(U),U.basis)
 ODETools.∂tt(U::RBSpace) = RBSpace(∂tt(U),U.basis)
 
 get_basis_space(r::RBSpace) = get_basis_space(r.basis)
-num_space_dofs(r::RBSpace) = size(get_basis_space(r),1)
-num_reduced_space_dofs(r::RBSpace) = size(get_basis_space(r),2)
+num_space_dofs(r::RBSpace) = num_space_dofs(r.basis)
+num_reduced_space_dofs(r::RBSpace) = num_reduced_space_dofs(r.basis)
 
 get_basis_time(r::RBSpace) = get_basis_time(r.basis)
-FEM.num_times(r::RBSpace) = size(get_basis_time(r),1)
-num_reduced_times(r::RBSpace) = size(get_basis_time(r),2)
+FEM.num_times(r::RBSpace) = num_times(r.basis)
+num_reduced_times(r::RBSpace) = num_reduced_times(r.basis)
 
 num_fe_free_dofs(r::RBSpace) = num_fe_dofs(r.basis)
 

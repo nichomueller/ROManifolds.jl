@@ -672,6 +672,31 @@ function jacobian_mdeim_lincomb(a::BlockAffineDecomposition,coeff::ArrayBlock)
 end
 
 # for testing/visualization purposes
+struct InterpolationError{A,B}
+  name::String
+  err_matrix::A
+  err_vector::B
+  function InterpolationError(err_matrix::A,err_vector::B;name="linear") where {A,B}
+    new{A,B}(name,err_matrix,err_vector)
+  end
+end
+
+function Base.show(io::IO,k::MIME"text/plain",err::InterpolationError)
+  print(io,"Interpolation error $(err.name) (matrix,vector): ($(err.err_matrix),$(err.err_vector))")
+end
+
+struct LincombError{A,B}
+  name::String
+  err_matrix::A
+  err_vector::B
+  function LincombError(err_matrix::A,err_vector::B;name="linear") where {A,B}
+    new{A,B}(name,err_matrix,err_vector)
+  end
+end
+
+function Base.show(io::IO,k::MIME"text/plain",err::LincombError)
+  print(io,"Projection error $(err.name) (matrix,vector): ($(err.err_matrix),$(err.err_vector))")
+end
 
 function compress(A::AbstractMatrix,r::RBSpace)
   basis_space = get_basis_space(r)
@@ -786,16 +811,14 @@ end
 
 function interpolation_error(solver,feop,rbop,s)
   errA,errb = _interpolation_error(solver,feop,rbop,s)
-  return Dict("interpolation error matrix" => errA),Dict("interpolation error vector" => errb)
+  return InterpolationError(errA,errb)
 end
 
 function interpolation_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
   errA_lin,errb_lin = _interpolation_error(solver,feop.op_linear,rbop.op_linear,s)
   errA_nlin,errb_nlin = _interpolation_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s)
-  err_lin = (Dict("interpolation error linear matrix" => errA_lin),
-    Dict("interpolation error linear vector" => errb_lin))
-  err_nlin = (Dict("interpolation error nonlinear matrix" => errA_nlin),
-    Dict("interpolation error nonlinear vector" => errb_nlin))
+  err_lin = InterpolationError(errA_lin,errb_lin,name="linear")
+  err_nlin = InterpolationError(errA_nlin,errb_nlin,name="non linear")
   return err_lin,err_nlin
 end
 
@@ -811,16 +834,14 @@ end
 
 function linear_combination_error(solver,feop,rbop,s)
   errA,errb = _linear_combination_error(solver,feop,rbop,s)
-  Dict("projection error matrix" => errA),Dict("projection error vector" => errb)
+  return LincombError(errA,errb)
 end
 
 function linear_combination_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
   errA_lin,errb_lin = _linear_combination_error(solver,feop.op_linear,rbop.op_linear,s)
   errA_nlin,errb_nlin = _linear_combination_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s)
-  err_lin = (Dict("projection error linear matrix" => errA_lin),
-    Dict("projection error linear vector" => errb_lin))
-  err_nlin = (Dict("projection error nonlinear matrix" => errA_nlin),
-    Dict("projection error nonlinear vector" => errb_nlin))
+  err_lin = LincombError(errA_lin,errb_lin,name="linear")
+  err_nlin = LincombError(errA_nlin,errb_nlin,name="non linear")
   return err_lin,err_nlin
 end
 

@@ -258,7 +258,7 @@ function get_basis_time(b::BlockProjection{A,N}) where {A,N}
 end
 
 function num_space_dofs(b::BlockProjection)
-  dofs = zeros(length(b))
+  dofs = zeros(Int,length(b))
   for i in eachindex(b)
     if b.touched[i]
       dofs[i] = num_space_dofs(b[i])
@@ -268,7 +268,7 @@ function num_space_dofs(b::BlockProjection)
 end
 
 function num_reduced_space_dofs(b::BlockProjection)
-  dofs = zeros(length(b))
+  dofs = zeros(Int,length(b))
   for i in eachindex(b)
     if b.touched[i]
       dofs[i] = num_reduced_space_dofs(b[i])
@@ -280,7 +280,7 @@ end
 FEM.num_times(b::BlockProjection) = num_times(b[findfirst(b.touched)])
 
 function num_reduced_times(b::BlockProjection)
-  dofs = zeros(length(b))
+  dofs = zeros(Int,length(b))
   for i in eachindex(b)
     if b.touched[i]
       dofs[i] = num_reduced_times(b[i])
