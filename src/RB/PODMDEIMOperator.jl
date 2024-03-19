@@ -12,7 +12,7 @@ end
 
 function reduced_operator(
   solver::RBSolver,
-  op::PODOperator{LinearNonlinear},
+  op::PODOperator{LinearNonlinearParamODE},
   s::S) where S
 
   red_op_lin = reduced_operator(solver,get_linear_operator(op),s)
@@ -26,7 +26,7 @@ struct PODMDEIMOperator{T,L,R} <: RBOperator{T}
   rhs::R
 end
 
-ReferenceFEs.get_order(op::PODMDEIMOperator) = get_order(op.op)
+Polynomials.get_order(op::PODMDEIMOperator) = get_order(op.op)
 FESpaces.get_trial(op::PODMDEIMOperator) = get_trial(op.op)
 FESpaces.get_test(op::PODMDEIMOperator) = get_test(op.op)
 FEM.realization(op::PODMDEIMOperator;kwargs...) = realization(op.op;kwargs...)
@@ -201,12 +201,11 @@ function fe_residual!(
   return bi
 end
 
-struct LinearNonlinearPODMDEIMOperator{A,B} <: RBOperator{LinearNonlinear}
+struct LinearNonlinearPODMDEIMOperator{A,B} <: RBOperator{LinearNonlinearParamODE}
   op_linear::A
   op_nonlinear::B
   function LinearNonlinearPODMDEIMOperator(op_linear::A,op_nonlinear::B) where {A,B}
-    @check isa(op_linear,PODMDEIMOperator{Affine})
-    @check isa(op_nonlinear,PODMDEIMOperator{Nonlinear})
+    @check isa(op_linear,PODMDEIMOperator{LinearODE})
     new{A,B}(op_linear,op_nonlinear)
   end
 end
@@ -224,7 +223,7 @@ function FESpaces.get_trial(op::LinearNonlinearPODMDEIMOperator)
   get_trial(op.op_linear)
 end
 
-function FESpaces.get_order(op::LinearNonlinearPODMDEIMOperator)
+function Polynomials.get_order(op::LinearNonlinearPODMDEIMOperator)
   @check get_order(op.op_linear) === get_order(op.op_nonlinear)
   get_order(op.op_linear)
 end
@@ -345,7 +344,7 @@ end
 
 function Algebra.solve(
   solver::RBSolver,
-  op::RBOperator{Nonlinear},
+  op::RBOperator{NonlinearODE},
   s::S) where S
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
@@ -357,7 +356,7 @@ end
 
 function Algebra.solve(
   solver::ThetaMethodRBSolver,
-  op::RBOperator{Affine},
+  op::RBOperator{LinearODE},
   _r::TransientParamRealization)
 
   fesolver = get_fe_solver(solver)
@@ -412,7 +411,7 @@ end
 
 function Algebra.solve(
   solver::ThetaMethodRBSolver,
-  op::RBOperator{LinearNonlinear},
+  op::RBOperator{LinearNonlinearParamODE},
   _r::TransientParamRealization)
 
   fesolver = get_fe_solver(solver)

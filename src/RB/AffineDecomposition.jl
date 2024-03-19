@@ -857,7 +857,7 @@ function _rel_norm(fea::ArrayBlock,rba::ParamBlockArray)
   return_cache(block_map,norms...)
 end
 
-function _jacobian_and_residual(solver::ThetaMethodRBSolver,op::RBOperator{C},s) where C
+function _jacobian_and_residual(solver::ThetaMethodRBSolver,op::RBOperator{T},s) where T
   fesolver = get_fe_solver(solver)
   dt = fesolver.dt
   θ = fesolver.θ
@@ -866,7 +866,7 @@ function _jacobian_and_residual(solver::ThetaMethodRBSolver,op::RBOperator{C},s)
   FEM.shift_time!(r,dt*(θ-1))
   ode_cache = allocate_cache(op,r)
   u0 = get_values(s)
-  if C == Affine
+  if C == LinearODE
     u0 .= 0.0
   end
   vθ = similar(u0)
@@ -880,7 +880,7 @@ function _jacobian_and_residual(solver::ThetaMethodRBSolver,op::RBOperator{C},s)
   sA,sb
 end
 
-function _jacobian_and_residual(solver::ThetaMethod,op::ODEParamOperator{C},s) where C
+function _jacobian_and_residual(solver::ThetaMethod,op::ODEParamOperator{T},s) where T
   dt = solver.dt
   θ = solver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
@@ -888,7 +888,7 @@ function _jacobian_and_residual(solver::ThetaMethod,op::ODEParamOperator{C},s) w
   FEM.shift_time!(r,dt*(θ-1))
   ode_cache = allocate_cache(op,r)
   u0 = get_values(s)
-  if C == Affine
+  if C == LinearODE
     u0 .= 0.0
   end
   vθ = similar(u0)

@@ -61,14 +61,14 @@ export ParamInserterCSC
 export ParamCSSR
 
 export TransientParamFEOperator
-export TransientParamFEOperatorFromWeakForm
-export AffineTransientParamFEOperator
+export TransientParamFEOpFromWeakForm
+export LinearTransientParamFEOperator
 export NonlinearTransientParamFEOperator
 export residual_for_trian!
 export jacobian_for_trian!
 
 export ODEParamOperator
-export ODEParamOpFromFEOp
+export ODEParamOpFromTFEOp
 
 export ThetaMethodParamOperator
 

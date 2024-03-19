@@ -240,6 +240,58 @@ function FEM.get_values(s::TransientSnapshots)
   get_values(BasicSnapshots(s))
 end
 
+struct FreeAndDirichletSnapshots{M,T,S} <: StandardSnapshots{M,T}
+  free_snaps::S
+  diri_snaps::S
+  function FreeAndDirichletSnapshots(
+    free_snaps::S,
+    diri_snaps::S) where {M,T,S<:StandardSnapshots{M,T}}
+
+    new{M,T,S}(free_snaps,diri_snaps)
+  end
+end
+
+function Snapshots(
+  free_vals::V,
+  diri_vals::V,
+  args...
+  ) where V<:Union{AbstractParamContainer,AbstractVector{<:AbstractParamContainer}}
+
+  free_snaps = Snapshots(free_vals,args...)
+  diri_snaps = Snapshots(diri_vals,args...)
+  FreeAndDirichletSnapshots(free_snaps,diri_snaps)
+end
+
+num_space_dofs(s::FreeAndDirichletSnapshots) = num_space_dofs(s.free_snaps) + num_space_dofs(s.diri_snaps)
+
+function change_mode(s::FreeAndDirichletSnapshots)
+  FreeAndDirichletSnapshots(change_mode(s.free_snaps),change_mode(s.diri_snaps))
+end
+
+function tensor_getindex(s::FreeAndDirichletSnapshots,ispace::Integer,itime::Integer,iparam::Integer)
+  if ispace > num_space_dofs(s.free_snaps)
+    tensor_getindex(s.diri_snaps,ispace-num_space_dofs(s.free_snaps),itime,iparam)
+  else
+    tensor_getindex(s.free_snaps,ispace,itime,iparam)
+  end
+end
+
+function tensor_setindex!(s::FreeAndDirichletSnapshots,v,ispace::Integer,itime::Integer,iparam::Integer)
+  if ispace > num_space_dofs(s.free_snaps)
+    tensor_setindex!(s.diri_snaps,v,ispace-num_space_dofs(s.free_snaps),itime,iparam)
+  else
+    tensor_setindex!(s.free_snaps,v,ispace,itime,iparam)
+  end
+end
+
+function BasicSnapshots(s::FreeAndDirichletSnapshots)
+  FreeAndDirichletSnapshots(BasicSnapshots(s.free_snaps),BasicSnapshots(s.diri_snaps))
+end
+
+function FEM.get_values(s::FreeAndDirichletSnapshots)
+  get_values(s.free_snaps)
+end
+
 struct CompressedTransientSnapshots{M,N,T,R,V} <: StandardSnapshots{M,T}
   current_mode::M
   initial_mode::N
@@ -349,6 +401,13 @@ function select_snapshots(s::AbstractSnapshots,spacerange,timerange,paramrange)
   prange = isa(prange,Integer) ? [prange] : prange
   selected_indices = (srange,trange,prange)
   SelectedSnapshotsAtIndices(s,selected_indices)
+end
+
+function select_snapshots(s::FreeAndDirichletSnapshots,spacerange,timerange,paramrange)
+  @assert spacerange == Colon()
+  FreeAndDirichletSnapshots(
+    select_snapshots(s.free_snaps,:,timerange,paramrange),
+    select_snapshots(s.diri_snaps,:,timerange,paramrange))
 end
 
 function select_snapshots(s::AbstractSnapshots,timerange,paramrange;spacerange=:)
@@ -501,6 +560,10 @@ end
 
 function reverse_snapshots(s::TransientSnapshots)
   TransientSnapshotsSwappedColumns(s)
+end
+
+function reverse_snapshots(s::FreeAndDirichletSnapshots)
+  FreeAndDirichletSnapshots(reverse_snapshots(s.free_snaps),reverse_snapshots(s.diri_snaps))
 end
 
 function reverse_snapshots(s::SelectedSnapshotsAtIndices)

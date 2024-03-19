@@ -148,7 +148,7 @@ function compute_jac_gridap(
   trian=Ω,
   i=1)
 
-  _trial0 = feop.trials[1](nothing)
+  _trial0 = feop.trial[1](nothing)
   dv = get_fe_basis(test)
   du = get_trial_fe_basis(_trial0)
   xh = compute_xh_gridap(feop,t,u)

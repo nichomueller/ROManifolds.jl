@@ -69,7 +69,7 @@ for np in 1:nparams
     x_t = similar(u_t)
     xh_t = compute_xh_gridap(feop_t,times[nt],(u_t,u_t))
     int_mat_t = feop_t.jacs[1](times[nt],xh_t,du,dv)
-    matdata_t = collect_cell_matrix(feop_t.trials[1](nothing),test,int_mat_t)
+    matdata_t = collect_cell_matrix(feop_t.trial[1](nothing),test,int_mat_t)
     A_t = allocate_jacobian(feop_t,times[nt],xh_t.cellfield,nothing)
     assemble_matrix_add!(A_t,feop_t.assem_t,matdata_t)
     luA_t = lu(A_t)

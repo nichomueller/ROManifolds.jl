@@ -21,7 +21,7 @@ function reduced_basis(
 end
 
 function reduced_basis(
-  feop::TransientParamSaddlePointFEOperator,s::S,norm_matrix;kwargs...) where S
+  feop::TransientParamSaddlePointFEOp,s::S,norm_matrix;kwargs...) where S
   bases = reduced_basis(feop.op,s,norm_matrix;kwargs...)
   enrich_basis(feop,bases,norm_matrix)
 end

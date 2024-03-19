@@ -16,7 +16,7 @@ end
 
 function ODETools.jacobians!(
   A::AbstractMatrix,
-  op::TransientParamFEOperatorFromWeakForm,
+  op::TransientParamFEOpFromWeakForm,
   r::TransientParamRealization,
   xh::TransientDistributedCellField,
   γ::Tuple{Vararg{Real}},

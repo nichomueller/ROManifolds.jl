@@ -52,7 +52,7 @@ export slow_index
 export fast_index
 include("ParamSpace.jl")
 
-include("DiffOperators.jl")
+include("TimeDerivatives.jl")
 
 export AbstractParamContainer
 export ParamContainer
@@ -124,23 +124,23 @@ include("ParamAssemblers.jl")
 include("ParamBlockAssemblers.jl")
 
 export TransientParamFEOperator
-export TransientParamFEOperatorFromWeakForm
-export AffineTransientParamFEOperator
+export TransientParamFEOpFromWeakForm
+export LinearTransientParamFEOperator
 export NonlinearTransientParamFEOperator
 export assemble_norm_matrix
 include("TransientParamFEOperator.jl")
 
-export TransientParamSaddlePointFEOperator
+export TransientParamSaddlePointFEOp
 export assemble_coupling_matrix
 include("TransientParamSaddlePointFEOperator.jl")
 
-export FEOperatorWithTrian
+export TransientFEOperatorWithTrian
 export TransientParamFEOperatorWithTrian
 export set_triangulation
 export change_triangulation
 include("TransientParamFEOperatorWithTrian.jl")
 
-export LinearNonlinear
+export LinearNonlinearParamODE
 export TransientParamLinearNonlinearFEOperator
 export get_linear_operator
 export get_nonlinear_operator
@@ -148,8 +148,8 @@ export join_operators
 include("TransientParamLinearNonlinearFEOperator.jl")
 
 export ODEParamOperator
-export ODEParamOpFromFEOp
-include("ODEParamOperatorInterface.jl")
+export ODEParamOpFromTFEOp
+include("ODEParamOperator.jl")
 
 export ThetaMethodParamOperator
 include("ThetaMethod.jl")

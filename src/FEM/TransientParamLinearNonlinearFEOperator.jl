@@ -1,14 +1,9 @@
 # interface to accommodate the separation of terms depending on the linearity/nonlinearity
-struct LinearNonlinear <: OperatorType end
+struct LinearNonlinearParamODE <: ODEParamOperatorType end
 
-struct TransientParamLinearNonlinearFEOperator{A,B} <: TransientParamFEOperator{LinearNonlinear}
-  op_linear::A
-  op_nonlinear::B
-  function TransientParamLinearNonlinearFEOperator(op_linear::A,op_nonlinear::B) where {A,B}
-    @check isa(op_linear,TransientParamFEOperator{Affine})
-    @check isa(op_nonlinear,TransientParamFEOperator{Nonlinear})
-    new{A,B}(op_linear,op_nonlinear)
-  end
+struct TransientParamLinearNonlinearFEOperator <: TransientParamFEOperator{LinearNonlinearParamODE}
+  op_linear::TransientParamFEOperator{LinearParamODE}
+  op_nonlinear::TransientParamFEOperator{NonlinearParamODE}
 end
 
 get_linear_operator(op) = @abstractmethod
@@ -26,7 +21,7 @@ function FESpaces.get_trial(op::TransientParamLinearNonlinearFEOperator)
   get_trial(op.op_linear)
 end
 
-function FESpaces.get_order(op::TransientParamLinearNonlinearFEOperator)
+function Polynomials.get_order(op::TransientParamLinearNonlinearFEOperator)
   return max(get_order(op.op_linear),get_order(op.op_nonlinear))
 end
 
@@ -48,8 +43,8 @@ end
 
 function join_operators(
   op::TransientParamLinearNonlinearFEOperator,
-  op_lin::TransientParamFEOperatorFromWeakForm,
-  op_nlin::TransientParamFEOperatorFromWeakForm)
+  op_lin::TransientParamFEOperator{LinearParamODE},
+  op_nlin::TransientParamFEOperator{NonlinearParamODE})
 
   trial = get_trial(op)
   test = get_test(op)
@@ -79,11 +74,11 @@ end
 
 function join_operators(
   op::TransientParamLinearNonlinearFEOperator,
-  op_lin::TransientParamSaddlePointFEOperator,
-  op_nlin::TransientParamFEOperator)
+  op_lin::TransientParamSaddlePointFEOp{LinearParamODE},
+  op_nlin::TransientParamFEOperator{NonlinearParamODE})
 
   jop = join_operators(op,op_lin.op,op_nlin)
-  TransientParamSaddlePointFEOperator(jop,op_lin.coupling)
+  TransientParamSaddlePointFEOp(jop,op_lin.coupling)
 end
 
 function join_operators(

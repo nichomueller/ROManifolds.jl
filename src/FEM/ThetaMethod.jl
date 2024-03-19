@@ -36,8 +36,8 @@ function ODETools.solve_step!(
   return (uf,r,cache)
 end
 
-struct ThetaMethodParamOperator{C} <: NonlinearOperator
-  odeop::ODEParamOperator{C}
+struct ThetaMethodParamOperator{T} <: NonlinearOperator
+  odeop::ODEParamOperator{T}
   r::TransientParamRealization
   dtθ::Float64
   u0::AbstractVector
@@ -110,7 +110,7 @@ end
 function ODETools.solve_step!(
   uf::AbstractVector,
   solver::ThetaMethod,
-  op::AffineODEParamOperator,
+  op::LinearODEParamOperator,
   r::TransientParamRealization,
   u0::AbstractVector,
   cache)
@@ -152,7 +152,7 @@ for T in (:AbstractVector,:Contribution)
   @eval begin
     function Algebra.residual!(
       b::$T,
-      op::ThetaMethodParamOperator{<:Affine},
+      op::ThetaMethodParamOperator{<:LinearODE},
       x::AbstractVector)
 
       uF = op.u0
@@ -166,7 +166,7 @@ for T in (:AbstractMatrix,:(Tuple{Vararg{Contribution}}))
   @eval begin
     function Algebra.jacobian!(
       A::$T,
-      op::ThetaMethodParamOperator{<:Affine},
+      op::ThetaMethodParamOperator{<:LinearODE},
       x::AbstractVector)
 
       vθ = op.vθ
@@ -177,7 +177,7 @@ for T in (:AbstractMatrix,:(Tuple{Vararg{Contribution}}))
 
     function Algebra.jacobian!(
       A::$T,
-      op::ThetaMethodParamOperator{<:Affine},
+      op::ThetaMethodParamOperator{<:LinearODE},
       x::AbstractVector,
       i::Int)
 

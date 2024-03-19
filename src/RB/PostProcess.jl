@@ -172,9 +172,9 @@ end
 function _plot(trial::TransientMultiFieldTrialParamFESpace,s::BlockSnapshots;varname=("vel","press"),kwargs...)
   free_values = get_values(s)
   r = get_realization(s)
-  trials = trial(r)
-  sh = FEFunction(trials,free_values)
-  nfields = length(trials.spaces)
+  trial = trial(r)
+  sh = FEFunction(trial,free_values)
+  nfields = length(trial.spaces)
   for n in 1:nfields
     _plot(sh[n],r,varname=varname[n];kwargs...)
   end

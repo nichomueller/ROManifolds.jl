@@ -1,4 +1,4 @@
-function nl_jacobian_and_residual(solver::RB.ThetaMethodRBSolver,op::RBOperator{C},s) where C
+function nl_jacobian_and_residual(solver::RB.ThetaMethodRBSolver,op::RBOperator{T},s) where T
   fesolver = RB.get_fe_solver(solver)
   dt = fesolver.dt
   θ = fesolver.θ
@@ -18,7 +18,7 @@ function nl_jacobian_and_residual(solver::RB.ThetaMethodRBSolver,op::RBOperator{
   sA,sb
 end
 
-function nl_jacobian_and_residual(solver::ThetaMethod,op::ODEParamOperator{C},s) where C
+function nl_jacobian_and_residual(solver::ThetaMethod,op::ODEParamOperator{T},s) where T
   dt = solver.dt
   θ = solver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
@@ -103,6 +103,8 @@ feA,feb = nl_jacobian_and_residual(fesolver,get_algebraic_operator(feop.op_nonli
 feA_comp = compress(rbsolver,feA,get_trial(rbop),get_test(rbop))
 feb_comp = compress(rbsolver,feb,get_test(rbop))
 rbA,rbb = nl_jacobian_and_residual(rbsolver,rbop.op_nonlinear,Snapshots(fex,r))
+errA = RB._rel_norm(feA_comp,rbA)
+errb = RB._rel_norm(feb_comp,rbb)
 
 b_nlin = residual!(cache_res_nlin,nnlop.odeop,r,(fex,),ode_cache)
 b = -b_lin + b_nlin

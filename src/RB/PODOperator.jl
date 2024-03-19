@@ -19,8 +19,8 @@ function reduced_operator(
   reduced_operator(solver,pop,s)
 end
 
-abstract type RBOperator{T<:OperatorType} <: ODEOperator{T} end
-const AffineRBOperator = RBOperator{Affine}
+abstract type RBOperator{T<:ODEParamOperatorType} <: ODEOperator{T} end
+const LinearRBOperator = RBOperator{LinearODE}
 
 struct PODOperator{T,A,B} <: RBOperator{T}
   feop::ODEParamOperator{T}
@@ -28,13 +28,13 @@ struct PODOperator{T,A,B} <: RBOperator{T}
   test::B
 end
 
-ReferenceFEs.get_order(op::PODOperator) = get_order(op.feop)
+Polynomials.get_order(op::PODOperator) = get_order(op.feop)
 FESpaces.get_trial(op::PODOperator) = op.trial
 FESpaces.get_test(op::PODOperator) = op.test
 FEM.realization(op::PODOperator;kwargs...) = realization(op.feop;kwargs...)
 FEM.get_fe_operator(op::PODOperator) = FEM.get_fe_operator(op.feop)
-FEM.get_linear_operator(op::PODOperator{LinearNonlinear}) = PODOperator(get_linear_operator(op.feop),op.trial,op.test)
-FEM.get_nonlinear_operator(op::PODOperator{LinearNonlinear}) = PODOperator(get_nonlinear_operator(op.feop),op.trial,op.test)
+FEM.get_linear_operator(op::PODOperator{LinearNonlinearParamODE}) = PODOperator(get_linear_operator(op.feop),op.trial,op.test)
+FEM.get_nonlinear_operator(op::PODOperator{LinearNonlinearParamODE}) = PODOperator(get_nonlinear_operator(op.feop),op.trial,op.test)
 get_fe_trial(op::PODOperator) = get_trial(op.feop)
 get_fe_test(op::PODOperator) = get_test(op.feop)
 
@@ -152,7 +152,46 @@ function jacobian_and_residual(
   jacobian_and_residual!(A,b,op,r,dtθ,x,ode_cache,y)
 end
 
-function ODETools.jacobians!(A,op::AffineRBOperator,r,dtθ,u0,ode_cache,vθ)
+# function jacobian_and_residual(
+#   solver::ThetaMethodRBSolver,
+#   op::RBOperator{Nonlinear},
+#   s::S) where S
+
+#   function insert_basis!(x,Φ,i)
+#     x .= Φ[:,mod(i-1,size(Φ,2))+1]
+#   end
+#   function insert_basis!(x,Φ::ArrayBlock,i)
+#     for n = eachindex(Φ)
+#       insert_basis!(x[Block(n)],Φ[n],i)
+#     end
+#   end
+
+#   fesolver = get_fe_solver(solver)
+#   dt = fesolver.dt
+#   θ = fesolver.θ
+#   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+
+#   x = get_values(s)
+#   r = get_realization(s)
+#   FEM.shift_time!(r,dt*(θ-1))
+
+#   red_trial = get_trial(op)
+#   basis_space = get_basis_space(red_trial)
+
+#   @inbounds for i = eachindex(x)
+#     insert_basis!(x,basis_space,i)
+#   end
+
+#   y = similar(x)
+#   y .= 0.0
+#   ode_cache = allocate_cache(op,r)
+#   A,b = allocate_jacobian_and_residual(op,r,x,ode_cache)
+
+#   ode_cache = update_cache!(ode_cache,op,r)
+#   jacobian_and_residual!(A,b,op,r,dtθ,x,ode_cache,y)
+# end
+
+function ODETools.jacobians!(A,op::LinearRBOperator,r,dtθ,u0,ode_cache,vθ)
   jacobians!(A,op,r,(vθ,vθ),(1.0,1/dtθ),ode_cache)
 end
 
@@ -160,7 +199,7 @@ function ODETools.jacobians!(A,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
   jacobians!(A,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
 end
 
-function Algebra.residual!(b,op::AffineRBOperator,r,dtθ,u0,ode_cache,vθ)
+function Algebra.residual!(b,op::LinearRBOperator,r,dtθ,u0,ode_cache,vθ)
   residual!(b,op,r,(vθ,vθ),ode_cache)
 end
 

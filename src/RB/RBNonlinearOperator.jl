@@ -67,7 +67,7 @@ end
 function Algebra.solve!(
   x::AbstractVector,
   nls::NewtonRaphsonSolver,
-  op::RBNonlinearOperator{LinearNonlinear},
+  op::RBNonlinearOperator{LinearNonlinearParamODE},
   cache)
 
   fex = similar(op.u0)
