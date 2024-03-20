@@ -12,7 +12,7 @@ end
 function ODEs.ode_finish!(
   uF::AbstractVector,
   solver::ODESolver,
-  op::ODEOperator,
+  odeop::ODEOperator,
   r0::TransientParamRealization,
   rf::TransientParamRealization,
   statef::Tuple{Vararg{AbstractVector}},
@@ -26,22 +26,22 @@ abstract type ODEParamSolution <: ODESolution end
 
 struct GenericODEParamSolution <: ODEParamSolution
   solver::ODESolver
-  op::ODEParamOperator
+  odeop::ODEParamOperator
   r::TransientParamRealization
-  us0::AbstractVector
+  us0::Tuple{Vararg{AbstractVector}}
 end
 
 function Base.iterate(sol::ODEParamSolution)
   r0 = get_at_time(sol.r,:initial)
-  cache = allocate_odecache(sol.solver,sol.op,r0,sol.us0)
+  cache = allocate_odecache(sol.solver,sol.odeop,r0,sol.us0)
 
-  state0,cache = ode_start(sol.solver,sol.op,r0,sol.us0,cache)
+  state0,cache = ode_start(sol.solver,sol.odeop,r0,sol.us0,cache)
 
   statef = copy.(state0)
-  rf,statef,cache = ode_march!(statef,sol.solver,sol.op,r0,state0,cache)
+  rf,statef,cache = ode_march!(statef,sol.solver,sol.odeop,r0,state0,cache)
 
   uf = copy(first(sol.us0))
-  uf,cache = ode_finish!(uf,sol.solver,sol.op,r0,rf,statef,cache)
+  uf,cache = ode_finish!(uf,sol.solver,sol.odeop,r0,rf,statef,cache)
 
   state = (rf,statef,state0,cache)
   return (rf,uf),state
@@ -54,9 +54,9 @@ function Base.iterate(sol::ODEParamSolution,state)
     return nothing
   end
 
-  rf,statef,cache = ode_march!(statef,sol.solver,sol.op,r0,state0,cache)
+  rf,statef,cache = ode_march!(statef,sol.solver,sol.odeop,r0,state0,cache)
 
-  uf,cache = ode_finish!(uf,sol.solver,sol.op,r0,rf,statef,cache)
+  uf,cache = ode_finish!(uf,sol.solver,sol.odeop,r0,rf,statef,cache)
 
   state = (rf,statef,state0,cache)
   return (rf,uf),state
@@ -76,11 +76,21 @@ end
 
 function Algebra.solve(
   solver::ODESolver,
-  op::ODEParamOperator,
+  odeop::ODEParamOperator,
   r::TransientParamRealization,
   u0::T) where T
 
-  GenericODEParamSolution(solver,op,r,u0)
+  GenericODEParamSolution(solver,odeop,r,u0)
+end
+
+function residual_and_jacobian(
+  solver::ODESolver,
+  odeop::ODEParamOperator,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}})
+
+  cache = allocate_odecache(solver,odeop,r,us)
+  residual_and_jacobian(solver,odeop,r,us,cache)
 end
 
 # for testing purposes

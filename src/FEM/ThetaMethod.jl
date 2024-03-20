@@ -61,17 +61,19 @@ function residual_and_jacobian(
   solver::ThetaMethod,
   odeop::ODEOperator,
   r::TransientParamRealization,
-  state::NTuple{1,AbstractVector},
+  state0::NTuple{1,AbstractVector},
   odecache)
 
+  u0 = state0[1]
   odeslvrcache,odeopcache = odecache
   uθ, = odeslvrcache
 
   dt,θ = solver.dt,solver.θ
 
-  x = (shift(state,1)-shift(state,-1))/dt
+  x = copy(u0)
   dtθ = θ*dt
-  shift_time!(r,dtθ)
+  shift_state!(x,1/dt)
+  shift_time!(r,dt*(θ-1))
   function usx(x)
     copy!(uθ,u0)
     axpy!(dtθ,x,uθ)
@@ -82,8 +84,8 @@ function residual_and_jacobian(
   update_odeopcache!(odeopcache,odeop,r)
 
   stageop = NonlinearParamStageOperator(odeop,odeopcache,r,usx,ws)
-  b = residual(stageop,uθ)
-  A = jacobian(stageop,uθ)
+  b = residual(stageop,x)
+  A = jacobian(stageop,x)
 
   return b,A
 end
@@ -153,10 +155,10 @@ function residual_and_jacobian(
   solver::ThetaMethod,
   odeop::ODEOperator{LinearParamODE},
   r::TransientParamRealization,
-  state::NTuple{1,AbstractVector},
+  state0::NTuple{1,AbstractVector},
   odecache)
 
-  u0 = state[1]
+  u0 = state0[1]
   odeslvrcache,odeopcache = odecache
   reuse,A,b,sysslvrcache = odeslvrcache
 
@@ -165,7 +167,7 @@ function residual_and_jacobian(
   x = copy(u0)
   fill!(x,zero(eltype(x)))
   dtθ = θ*dt
-  shift_time!(r,dtθ)
+  shift_time!(r,dt*(θ-1))
   us = (u0,x)
   ws = (1,1/dtθ)
 

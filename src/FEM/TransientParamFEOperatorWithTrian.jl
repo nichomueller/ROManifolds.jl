@@ -84,6 +84,7 @@ FESpaces.get_trial(op::TransientParamFEOpFromWeakFormWithTrian) = get_trial(op)
 Polynomials.get_order(op::TransientParamFEOpFromWeakFormWithTrian) = get_order(op)
 ODEs.get_res(op::TransientParamFEOpFromWeakFormWithTrian) = get_res(op)
 ODEs.get_jacs(op::TransientParamFEOpFromWeakFormWithTrian) = get_jacs(op)
+ODEs.get_forms(op::TransientParamFEOpFromWeakFormWithTrian) = get_forms(op)
 ODEs.get_assembler(op::TransientParamFEOpFromWeakFormWithTrian) = get_assembler(op)
 realization(op::TransientParamFEOpFromWeakFormWithTrian;kwargs...) = realization(op;kwargs...)
 get_induced_norm(op::TransientParamFEOpFromWeakFormWithTrian) = get_induced_norm(op)
@@ -149,6 +150,7 @@ FESpaces.get_trial(op::TransientParamSaddlePointFEOpWithTrian) = get_trial(op)
 Polynomials.get_order(op::TransientParamSaddlePointFEOpWithTrian) = get_order(op)
 ODEs.get_res(op::TransientParamSaddlePointFEOpWithTrian) = get_res(op)
 ODEs.get_jacs(op::TransientParamSaddlePointFEOpWithTrian) = get_jacs(op)
+ODEs.get_forms(op::TransientParamSaddlePointFEOpWithTrian) = get_forms(op)
 ODEs.get_assembler(op::TransientParamSaddlePointFEOpWithTrian) = get_assembler(op)
 realization(op::TransientParamSaddlePointFEOpWithTrian;kwargs...) = realization(op;kwargs...)
 get_induced_norm(op::TransientParamSaddlePointFEOpWithTrian) = get_induced_norm(op)
@@ -189,6 +191,13 @@ function set_triangulation(op::TransientParamFEOpFromWeakForm,trian_res,trian_ja
   newres,newjacs... = set_triangulation(op.res,op.jacs,trian_res,trian_jacs,polyn_order)
   TransientParamFEOperator(
     newres,newjacs,op.induced_norm,op.tpspace,op.trial,op.test)
+end
+
+function set_triangulation(op::TransientParamSemilinearFEOpFromWeakForm,trian_res,trian_jacs)
+  polyn_order = get_polynomial_order(op.test)
+  newres,newforms... = set_triangulation(op.res,op.forms,trian_res,trian_jacs,polyn_order)
+  TransientParamSemilinearFEOperator(
+    newforms,newres,op.induced_norm,op.tpspace,op.trial,op.test;constant_forms=op.constant_forms)
 end
 
 function set_triangulation(op::TransientParamLinearFEOpFromWeakForm,trian_res,trian_jacs)

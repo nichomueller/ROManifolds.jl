@@ -95,12 +95,7 @@ function Algebra.solve(
   TransientParamFESolution(solver,join_operators(op),args...)
 end
 
-function Algebra.solve(
-  solver::ODESolver,
-  op::TransientParamFEOperator,
-  uh0::Function;
-  kwargs...)
-
+function Algebra.solve(solver::ODESolver,op::TransientParamFEOperator,uh0;kwargs...)
   r = realization(op;kwargs...)
   solve(solver,op,r,uh0)
 end
