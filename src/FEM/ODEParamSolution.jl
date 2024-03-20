@@ -1,39 +1,65 @@
+function ode_start(
+  solver::ODESolver,
+  odeop::ODEOperator,
+  r0::TransientParamRealization,
+  us0::Tuple{Vararg{AbstractVector}},
+  odecache)
+
+  state0 = copy.(us0)
+  (state0,odecache)
+end
+
+function ODEs.ode_finish!(
+  uF::AbstractVector,
+  solver::ODESolver,
+  op::ODEOperator,
+  r0::TransientParamRealization,
+  rf::TransientParamRealization,
+  statef::Tuple{Vararg{AbstractVector}},
+  odecache)
+
+  copy!(uF,first(statef))
+  (uF,odecache)
+end
+
 abstract type ODEParamSolution <: ODESolution end
 
 struct GenericODEParamSolution <: ODEParamSolution
   solver::ODESolver
   op::ODEParamOperator
-  u0::AbstractVector
   r::TransientParamRealization
+  us0::AbstractVector
 end
 
 function Base.iterate(sol::ODEParamSolution)
-  uf = copy(sol.u0)
-  u0 = copy(sol.u0)
   r0 = get_at_time(sol.r,:initial)
-  cache = nothing
+  cache = allocate_odecache(sol.solver,sol.op,r0,sol.us0)
 
-  uf,rf,cache = solve_step!(uf,sol.solver,sol.op,r0,u0,cache)
+  state0,cache = ode_start(sol.solver,sol.op,r0,sol.us0,cache)
 
-  u0 .= uf
-  state = (uf,u0,rf,cache)
+  statef = copy.(state0)
+  rf,statef,cache = ode_march!(statef,sol.solver,sol.op,r0,state0,cache)
 
-  return (uf,rf),state
+  uf = copy(first(sol.us0))
+  uf,cache = ode_finish!(uf,sol.solver,sol.op,r0,rf,statef,cache)
+
+  state = (rf,statef,state0,cache)
+  return (rf,uf),state
 end
 
 function Base.iterate(sol::ODEParamSolution,state)
-  uf,u0,r0,cache = state
+  r0,state0,statef,cache = state
 
-  if get_times(r0) >= get_final_time(sol.r) - 100*eps()
+  if get_times(r0) >= get_final_time(sol.r) - ε
     return nothing
   end
 
-  uf,rf,cache = solve_step!(uf,sol.solver,sol.op,r0,u0,cache)
+  rf,statef,cache = ode_march!(statef,sol.solver,sol.op,r0,state0,cache)
 
-  u0 .= uf
-  state = (uf,u0,rf,cache)
+  uf,cache = ode_finish!(uf,sol.solver,sol.op,r0,rf,statef,cache)
 
-  return (uf,rf),state
+  state = (rf,statef,state0,cache)
+  return (rf,uf),state
 end
 
 function Base.collect(sol::ODEParamSolution)
@@ -42,7 +68,7 @@ function Base.collect(sol::ODEParamSolution)
   initial_values = sol.u0
   V = typeof(initial_values)
   free_values = Vector{V}(undef,ntimes)
-  for (k,(ut,rt)) in enumerate(sol)
+  for (k,(rt,ut)) in enumerate(sol)
     free_values[k] = copy(ut)
   end
   return free_values
@@ -51,36 +77,18 @@ end
 function Algebra.solve(
   solver::ODESolver,
   op::ODEParamOperator,
-  u0::T,
-  r::TransientParamRealization) where T
+  r::TransientParamRealization,
+  u0::T) where T
 
-  GenericODEParamSolution(solver,op,u0,r)
+  GenericODEParamSolution(solver,op,r,u0)
 end
 
 # for testing purposes
 
-function ODETools.test_ode_solution(sol::ODEParamSolution)
-  for (u_n,r_n) in sol
+function ODEs.test_ode_solution(sol::ODEParamSolution)
+  for (r_n,u_n) in sol
     @test isa(r_n,TransientParamRealization)
     @test isa(u_n,ParamVector)
   end
   true
-end
-
-function get_residual_jacobian(sol::ODEParamSolution)
-  uf = copy(sol.u0)
-  u0 = copy(sol.u0)
-  r = get_at_time(sol.r,:initial)
-  cache = nothing
-
-  A = []
-  b = []
-  while get_times(r) < get_final_time(sol.r) - 100*eps()
-    uf,r,cache = solve_step!(uf,sol.solver,sol.op,r,u0,cache)
-    u0 .= uf
-    ode_cache,vθ,Ar,br,l_cache = cache
-    push!(A,Ar)
-    push!(b,br)
-  end
-  return A,b
 end

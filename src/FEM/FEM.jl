@@ -28,8 +28,7 @@ import UnPack: @unpack
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.Fields: OperationField,BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
-import Gridap.ODEs.ODETools: jacobians!
-import Gridap.ODEs.TransientFETools: TransientCellField,allocate_trial_space,fill_jacobians,_matdata_jacobian
+import Gridap.ODEs: TransientCellField,allocate_trial_space,jacobians!
 import Gridap.ReferenceFEs: get_order
 import Gridap.TensorValues: inner,outer,double_contraction,symmetric_part
 import PartitionedArrays: tuple_of_arrays

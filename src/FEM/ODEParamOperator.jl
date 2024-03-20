@@ -1,21 +1,13 @@
 abstract type ODEParamOperatorType <: ODEOperatorType end
-
 struct NonlinearParamODE <: ODEParamOperatorType end
-
+struct QuasilinearParamODE <: ODEParamOperatorType end
+struct SemilinearParamODE <: ODEParamOperatorType end
 struct LinearParamODE <: ODEParamOperatorType end
 
 abstract type ODEParamOperator{T<:ODEParamOperatorType} <: ODEOperator{T} end
 
-Polynomials.get_order(op::ODEParamOpFromTFEOp) = get_order(op.feop)
-FESpaces.get_test(op::ODEParamOpFromTFEOp) = get_test(op.feop)
-FESpaces.get_trial(op::ODEParamOpFromTFEOp) = get_trial(op.feop)
-realization(op::ODEParamOpFromTFEOp;kwargs...) = realization(op.feop;kwargs...)
-get_fe_operator(op::ODEParamOpFromTFEOp) = op.feop
-get_linear_operator(op::ODEParamOpFromTFEOp) = ODEParamOpFromTFEOp(get_linear_operator(op.feop))
-get_nonlinear_operator(op::ODEParamOpFromTFEOp) = ODEParamOpFromTFEOp(get_nonlinear_operator(op.feop))
-
 function ODEs.allocate_odeopcache(
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
   args...)
@@ -25,7 +17,7 @@ end
 
 function ODEs.update_odeopcache!(
   odeopcache,
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r::TransientParamRealization,
   args...)
 
@@ -33,7 +25,7 @@ function ODEs.update_odeopcache!(
 end
 
 function Algebra.allocate_residual(
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
@@ -43,7 +35,7 @@ end
 
 function Algebra.residual!(
   b::AbstractVector,
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache;
@@ -53,7 +45,7 @@ function Algebra.residual!(
 end
 
 function Algebra.residual(
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
@@ -64,7 +56,7 @@ function Algebra.residual(
 end
 
 function Algebra.allocate_jacobian(
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r::AbstractTransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
@@ -74,7 +66,7 @@ end
 
 function ODEs.jacobian_add!(
   A::AbstractMatrix,
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
@@ -85,7 +77,7 @@ end
 
 function Algebra.jacobian!(
   A::AbstractMatrix,
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
@@ -97,7 +89,7 @@ function Algebra.jacobian!(
 end
 
 function Algebra.jacobian(
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
@@ -116,32 +108,33 @@ mutable struct ParamODEOpFromTFEOpCache <: GridapType
 end
 
 struct ODEParamOpFromTFEOp{T} <: ODEParamOperator{T}
-  tfeop::TransientParamFEOperator{T}
+  op::TransientParamFEOperator{T}
 end
 
-function Polynomials.get_order(odeop::ODEParamOpFromTFEOp)
-  get_order(odeop.tfeop)
+Polynomials.get_order(odeop::ODEParamOpFromTFEOp) = get_order(odeop.op)
+FESpaces.get_test(odeop::ODEParamOpFromTFEOp) = get_test(odeop.op)
+FESpaces.get_trial(odeop::ODEParamOpFromTFEOp) = get_trial(odeop.op)
+realization(odeop::ODEParamOpFromTFEOp;kwargs...) = realization(odeop.op;kwargs...)
+get_fe_operator(odeop::ODEParamOpFromTFEOp) = odeop.op
+ODEs.get_num_forms(odeop::ODEParamOpFromTFEOp) = get_num_forms(odeop.op)
+ODEs.get_forms(odeop::ODEParamOpFromTFEOp) = get_forms(odeop.op)
+ODEs.is_form_constant(odeop::ODEParamOpFromTFEOp,k::Integer) = is_form_constant(odeop.op,k)
+
+function get_linear_operator(odeop::ODEParamOpFromTFEOp)
+  ODEParamOpFromTFEOp(get_linear_operator(odeop.op))
 end
 
-function ODEs.get_num_forms(odeop::ODEParamOpFromTFEOp)
-  get_num_forms(odeop.tfeop)
+function get_nonlinear_operator(odeop::ODEParamOpFromTFEOp)
+  ODEParamOpFromTFEOp(get_nonlinear_operator(odeop.op))
 end
 
-function ODEs.get_forms(odeop::ODEParamOpFromTFEOp)
-  get_forms(odeop.tfeop)
-end
-
-function ODEs.is_form_constant(odeop::ODEParamOpFromTFEOp,k::Integer)
-  is_form_constant(odeop.tfeop,k)
-end
-
-function allocate_odeopcache(
+function ODEs.allocate_odeopcache(
   odeop::ODEParamOpFromTFEOp,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}})
 
   order = get_order(odeop)
-  Ut = get_trial(odeop.tfeop)
+  Ut = get_trial(odeop.op)
   U = allocate_space(Ut)
   Uts = (Ut,)
   Us = (U,)
@@ -150,18 +143,18 @@ function allocate_odeopcache(
     Us = (Us...,allocate_space(Uts[k+1]))
   end
 
-  tfeopcache = allocate_tfeopcache(odeop.tfeop,r,us)
+  tfeopcache = allocate_tfeopcache(odeop.op,r,us)
 
   uh = ODEs._make_uh_from_us(odeop,us,Us)
-  V = get_test(odeop.tfeop)
+  V = get_test(odeop.op)
   v = get_fe_basis(V)
-  Ut = evaluate(get_trial(odeop.tfeop),nothing)
+  Ut = evaluate(get_trial(odeop.op),nothing)
   du = get_trial_fe_basis(Ut)
-  assem = get_assembler(odeop.tfeop,r)
+  assem = get_assembler(odeop.op,r)
 
   const_forms = ()
-  num_forms = get_num_forms(odeop.tfeop)
-  jacs = get_jacs(odeop.tfeop)
+  num_forms = get_num_forms(odeop.op)
+  jacs = get_jacs(odeop.op)
 
   μ,t = get_params(r),get_times(r)
 
@@ -196,8 +189,8 @@ function ODEs.update_odeopcache!(odeopcache,odeop::ODEParamOpFromTFEOp,r::Transi
   end
   odeopcache.Us = Us
 
-  tfeopcache,tfeop = odeopcache.tfeopcache,odeop.tfeop
-  odeopcache.tfeopcache = update_tfeopcache!(tfeopcache,tfeop,r)
+  tfeopcache,op = odeopcache.tfeopcache,odeop.op
+  odeopcache.tfeopcache = update_tfeopcache!(tfeopcache,op,r)
 
   odeopcache
 end
@@ -209,13 +202,13 @@ function Algebra.allocate_residual(
   odeopcache)
 
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
-  V = get_test(odeop.tfeop)
+  V = get_test(odeop.op)
   v = get_fe_basis(V)
-  assem = get_assembler(odeop.tfeop,r)
+  assem = get_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
-  res = get_res(odeop.tfeop)
+  res = get_res(odeop.op)
   vecdata = collect_cell_vector(V,res(μ,t,uh,v))
   allocate_vector(assem,vecdata)
 end
@@ -229,15 +222,15 @@ function Algebra.residual!(
   add::Bool=false)
 
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
-  V = get_test(odeop.tfeop)
+  V = get_test(odeop.op)
   v = get_fe_basis(V)
-  assem = get_assembler(odeop.tfeop,r)
+  assem = get_assembler(odeop.op,r)
 
   !add && fill!(b,zero(eltype(b)))
 
   μ,t = get_params(r),get_times(r)
 
-  res = get_res(odeop.tfeop)
+  res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
   vecdata = collect_cell_vector(V,dc)
   assemble_vector_add!(b,assem,vecdata)
@@ -247,13 +240,13 @@ end
 
 function Algebra.residual!(
   b::AbstractVector,
-  odeop::ODEParamOpFromTFEOp{<:AbstractLinearODE},
+  odeop::ODEParamOpFromTFEOp{SemilinearParamODE},
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache;
   add::Bool=false)
 
-  uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
+  uh = RB._make_uh_from_us(odeop,us,odeopcache.Us)
   V = get_test(odeop.tfeop)
   v = get_fe_basis(V)
   assem = get_assembler(odeop.tfeop,r)
@@ -262,13 +255,44 @@ function Algebra.residual!(
 
   μ,t = get_params(r),get_times(r)
 
-  # Residual
   res = get_res(odeop.tfeop)
+  dc = res(μ,t,uh,v)
+
+  order = get_order(odeop)
+  mass = get_forms(odeop.tfeop)[1]
+  ∂tNuh = ∂t(uh,Val(order))
+  dc = dc + mass(μ,t,∂tNuh,v)
+
+  vecdata = collect_cell_vector(V,dc)
+  assemble_vector_add!(b,assem,vecdata)
+
+  r
+end
+
+function Algebra.residual!(
+  b::AbstractVector,
+  odeop::ODEParamOpFromTFEOp{LinearParamODE},
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  odeopcache;
+  add::Bool=false)
+
+  uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
+  V = get_test(odeop.op)
+  v = get_fe_basis(V)
+  assem = get_assembler(odeop.op,r)
+
+  !add && fill!(b,zero(eltype(b)))
+
+  μ,t = get_params(r),get_times(r)
+
+  # Residual
+  res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
   # Forms
   order = get_order(odeop)
-  forms = get_forms(odeop.tfeop)
+  forms = get_forms(odeop.op)
   ∂tkuh = uh
   for k in 0:order
     form = forms[k+1]
@@ -291,17 +315,17 @@ function Algebra.allocate_jacobian(
   odeopcache)
 
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
-  Ut = evaluate(get_trial(odeop.tfeop),nothing)
+  Ut = evaluate(get_trial(odeop.op),nothing)
   du = get_trial_fe_basis(Ut)
-  V = get_test(odeop.tfeop)
+  V = get_test(odeop.op)
   v = get_fe_basis(V)
-  assem = get_assembler(odeop.tfeop,r)
+  assem = get_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
-  jacs = get_jacs(odeop.tfeop)
+  jacs = get_jacs(odeop.op)
   dc = DomainContribution()
-  for k in 0:get_order(odeop.tfeop)
+  for k in 0:get_order(odeop.op)
     jac = jacs[k+1]
     dc = dc + jac(μ,t,uh,du,v)
   end
@@ -318,15 +342,15 @@ function ODEs.jacobian_add!(
   odeopcache)
 
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
-  Ut = evaluate(get_trial(odeop.tfeop),nothing)
+  Ut = evaluate(get_trial(odeop.op),nothing)
   du = get_trial_fe_basis(Ut)
-  V = get_test(odeop.tfeop)
+  V = get_test(odeop.op)
   v = get_fe_basis(V)
-  assem = get_assembler(odeop.tfeop,r)
+  assem = get_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
-  jacs = get_jacs(odeop.tfeop)
+  jacs = get_jacs(odeop.op)
   dc = DomainContribution()
   for k in 0:get_order(odeop)
     w = ws[k+1]
@@ -345,22 +369,22 @@ end
 
 function ODEs.jacobian_add!(
   A::AbstractMatrix,
-  odeop::ODEParamOpFromTFEOp{<:AbstractLinearODE},
+  odeop::ODEParamOpFromTFEOp{LinearParamODE},
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)
 
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
-  Ut = evaluate(get_trial(odeop.tfeop),nothing)
+  Ut = evaluate(get_trial(odeop.op),nothing)
   du = get_trial_fe_basis(Ut)
-  V = get_test(odeop.tfeop)
+  V = get_test(odeop.op)
   v = get_fe_basis(V)
-  assem = get_assembler(odeop.tfeop,r)
+  assem = get_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
-  jacs = get_jacs(odeop.tfeop)
+  jacs = get_jacs(odeop.op)
   dc = DomainContribution()
   for k in 0:get_order(odeop)
     w = ws[k+1]

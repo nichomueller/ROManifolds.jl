@@ -70,7 +70,7 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,feop,fesnaps,rbsnaps,festats,rbstats)
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 println(RB.space_time_error(results))
 save(test_dir,fesnaps)

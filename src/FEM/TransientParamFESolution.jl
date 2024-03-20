@@ -1,4 +1,4 @@
-struct TransientParamFESolution
+struct TransientParamFESolution <: TransientFESolution
   odesol::ODEParamSolution
   trial
 end
@@ -6,46 +6,54 @@ end
 function TransientParamFESolution(
   solver::ODESolver,
   op::TransientParamFEOperator,
-  uh0::Function,
-  r::TransientParamRealization)
+  r::TransientParamRealization,
+  uh0::Tuple{Vararg{Function}})
 
   params = get_params(r)
-  ode_op = get_algebraic_operator(op)
-  u0 = get_free_dof_values(uh0(params))
-  ode_sol = solve(solver,ode_op,u0,r)
+  odeop = get_algebraic_operator(op)
+  u0 = get_free_dof_values.(uh0.(params))
+  odesol = solve(solver,odeop,u0,r)
   trial = get_trial(op)
+  TransientParamFESolution(odesol,trial)
+end
 
-  TransientParamFESolution(ode_sol,trial)
+function TransientParamFESolution(
+  solver::ODESolver,
+  op::TransientParamFEOperator,
+  r::TransientParamRealization,
+  uh0::Function)
+
+  TransientParamFESolution(solver,op,r,(uh0,))
 end
 
 function Base.iterate(sol::TransientParamFESolution)
-  odesolnext = iterate(sol.odesol)
-  if odesolnext === nothing
+  ode_it = iterate(sol.odesol)
+  if isnothing(ode_it)
     return nothing
   end
-  (uf,rf),odesolstate = odesolnext
+  (rf,uf),ode_it_state = ode_it
 
   Uh = allocate_trial_space(sol.trial,rf)
   Uh = evaluate!(Uh,sol.trial,rf)
-  uh = FEFunction(Uh,uf)
+  uhf = FEFunction(Uh,uf)
 
-  state = Uh,odesolstate
-  (uh,rf),state
+  state = Uh,ode_it_state
+  (rf,uhf),state
 end
 
 function Base.iterate(sol::TransientParamFESolution,state)
-  Uh,odesolstate = state
-  odesolnext = iterate(sol.odesol,odesolstate)
-  if odesolnext === nothing
+  Uh,ode_it_state = state
+  ode_it = iterate(sol.odesol,ode_it_state)
+  if isnothing(ode_it)
     return nothing
   end
-  (uf,rf),odesolstate = odesolnext
+  (rf,uf),ode_it_state = ode_it
 
   Uh = evaluate!(Uh,sol.trial,rf)
-  uh = FEFunction(Uh,uf)
+  uhf = FEFunction(Uh,uf)
 
-  state = Uh,odesolstate
-  (uh,rf),state
+  state = Uh,ode_it_state
+  (rf,uhf),state
 end
 
 function Base.collect(sol::TransientParamFESolution)
@@ -55,7 +63,7 @@ function Base.collect(sol::TransientParamFESolution)
   initial_values = odesol.u0
   V = typeof(initial_values)
   free_values = Vector{V}(undef,ntimes)
-  for (k,(uht,rt)) in enumerate(sol)
+  for (k,(rt,uht)) in enumerate(sol)
     ut = get_free_dof_values(uht)
     free_values[k] = copy(ut)
   end
@@ -66,28 +74,25 @@ end
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperator,
-  uh0::Function,
-  r::TransientParamRealization)
+  args...)
 
-  TransientParamFESolution(solver,op,uh0,r)
+  TransientParamFESolution(solver,op,args...)
 end
 
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperatorWithTrian,
-  uh0::Function,
-  r::TransientParamRealization)
+  args...)
 
-  TransientParamFESolution(solver,op.op,uh0,r)
+  TransientParamFESolution(solver,op.op,args...)
 end
 
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamLinearNonlinearFEOperator,
-  uh0::Function,
-  r::TransientParamRealization)
+  args...)
 
-  TransientParamFESolution(solver,join_operators(op),uh0,r)
+  TransientParamFESolution(solver,join_operators(op),args...)
 end
 
 function Algebra.solve(
@@ -97,17 +102,14 @@ function Algebra.solve(
   kwargs...)
 
   r = realization(op;kwargs...)
-  solve(solver,op,uh0,r)
+  solve(solver,op,r,uh0)
 end
 
-function TransientFETools.test_transient_fe_solver(
-  solver::ODESolver,
-  op::TransientParamFEOperator,
-  u0,
-  r)
+function ODEs.test_transient_fe_solver(
+  solver::ODESolver,op::TransientParamFEOperator,r,u0)
 
-  solution = solve(solver,op,u0,r)
-  for (uhn,rn) in solution
+  solution = solve(solver,op,r,u0)
+  for (rn,uhn) in solution
     @test isa(uhn,FEFunction)
     @test isa(rn,TransientParamRealization)
   end

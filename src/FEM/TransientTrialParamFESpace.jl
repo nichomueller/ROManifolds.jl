@@ -20,12 +20,12 @@ end
 Allocate the space to be used as first argument in evaluate!
 """
 
-function TransientFETools.allocate_trial_space(
+function ODEs.allocate_trial_space(
   U::TransientTrialParamFESpace,params,times)
   HomogeneousTrialParamFESpace(U.space,Val(length(params)*length(times)))
 end
 
-function TransientFETools.allocate_trial_space(
+function ODEs.allocate_trial_space(
   U::TransientTrialParamFESpace,r::TransientParamRealization)
   allocate_trial_space(U,get_params(r),get_times(r))
 end
@@ -74,18 +74,10 @@ Functor-like evaluation. It allocates Dirichlet vals in general.
 """
 Time derivative of the Dirichlet functions
 """
-function ODETools.∂t(U::TransientTrialParamFESpace)
-  ∂tdir(f) = (μ,t) -> ∂t(f(μ,t))
+function ODEs.time_derivative(U::TransientTrialParamFESpace)
+  ∂tdir(f) = (μ,t) -> time_derivative(f(μ,t))
   ∂tdir(f::Vector) = ∂tdir.(f)
   TransientTrialParamFESpace(U.space,∂tdir(U.dirichlet_pt))
-end
-
-"""
-Time 2nd derivative of the Dirichlet functions
-"""
-function ODETools.∂tt(U::TransientTrialParamFESpace)
-  ∂ttdir(μ,t) = ∂tt.(U.dirichlet_pt(μ,t))
-  TransientTrialParamFESpace(U.space,∂ttdir)
 end
 
 # careful: this will be a BlockVector, not a ParamBlockVector
@@ -100,8 +92,8 @@ Arrays.evaluate!(Upt::FESpace,U::FESpace,params,times) = U
 Arrays.evaluate!(Upt::FESpace,U::FESpace,r) = U
 Arrays.evaluate(U::FESpace,params,times) = U
 Arrays.evaluate(U::FESpace,r) = U
-TransientFETools.allocate_trial_space(U::FESpace,params,times) = U
-TransientFETools.allocate_trial_space(U::FESpace,r) = U
+ODEs.allocate_trial_space(U::FESpace,params,times) = U
+ODEs.allocate_trial_space(U::FESpace,r) = U
 
 # Define the interface for MultiField
 
@@ -160,7 +152,7 @@ Base.iterate(m::TransientMultiFieldTrialParamFESpace,state) = iterate(m.spaces,s
 Base.getindex(m::TransientMultiFieldTrialParamFESpace,field_id::Integer) = m.spaces[field_id]
 Base.length(m::TransientMultiFieldTrialParamFESpace) = length(m.spaces)
 
-function TransientFETools.allocate_trial_space(
+function ODEs.allocate_trial_space(
   U::TransientMultiFieldTrialParamFESpace,args...)
   spaces = map(fe->allocate_trial_space(fe,args...),U.spaces)
   return MultiFieldParamFESpace(spaces;style=MultiFieldStyle(U))
@@ -191,12 +183,10 @@ end
 (U::TransientMultiFieldTrialParamFESpace)(p,t) = evaluate(U,p,t)
 (U::TransientMultiFieldTrialParamFESpace)(r) = evaluate(U,r)
 
-function ODETools.∂t(U::TransientMultiFieldTrialParamFESpace)
-  spaces = ∂t.(U.spaces)
+function ODEs.time_derivative(U::TransientMultiFieldTrialParamFESpace)
+  spaces = time_derivative.(U.spaces)
   TransientMultiFieldParamFESpace(spaces;style=MultiFieldStyle(U))
 end
-
-ODETools.∂tt(U::TransientMultiFieldTrialParamFESpace) = ∂t(∂t(U))
 
 # careful: this will be a BlockVector, not a ParamBlockVector
 function FESpaces.zero_free_values(
@@ -216,7 +206,7 @@ FESpaces.ConstraintStyle(::TransientMultiFieldTrialParamFESpace) = ConstraintSty
 MultiField.MultiFieldStyle(::Type{TransientMultiFieldTrialParamFESpace{S,B,V}}) where {S,B,V} = S()
 MultiField.MultiFieldStyle(f::TransientMultiFieldTrialParamFESpace) = MultiFieldStyle(typeof(f))
 
-function TransientFETools.test_transient_trial_fe_space(Uh,μ)
+function ODEs.test_transient_trial_fe_space(Uh,μ)
   UhX = evaluate(Uh,nothing)
   @test isa(UhX,FESpace)
   Uh0 = allocate_trial_space(Uh,μ,0.0)

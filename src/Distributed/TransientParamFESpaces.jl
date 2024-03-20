@@ -14,7 +14,7 @@ function Algebra.allocate_jacobian(
   allocate_matrix(assem,matdata)
 end
 
-function ODETools.jacobians!(
+function ODEs.jacobians!(
   A::AbstractMatrix,
   op::TransientParamFEOpFromWeakForm,
   r::TransientParamRealization,

@@ -1,191 +1,178 @@
 # general nonlinear case
-function ODETools.solve_step!(
-  uf::AbstractVector,
+
+function ODEs.allocate_odecache(
+  ::ThetaMethod,
+  odeop::ODEOperator,
+  r0::TransientParamRealization,
+  us0::NTuple{1,AbstractVector})
+
+  u0 = us0[1]
+  us0N = (u0,u0)
+  odeopcache = allocate_odeopcache(odeop,r0,us0N)
+
+  uθ = copy(u0)
+
+  sysslvrcache = nothing
+  odeslvrcache = (uθ,sysslvrcache)
+
+  (odeslvrcache,odeopcache)
+end
+
+function ODEs.ode_march!(
+  statef::NTuple{1,AbstractVector},
   solver::ThetaMethod,
-  op::ODEParamOperator,
+  odeop::ODEOperator,
   r::TransientParamRealization,
-  u0::AbstractVector,
-  cache)
+  state0::NTuple{1,AbstractVector},
+  odecache)
 
-  dt = solver.dt
-  θ = solver.θ
-  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+  u0 = state0[1]
+  odeslvrcache,odeopcache = odecache
+  uθ,sysslvrcache = odeslvrcache
+
+  sysslvr = solver.sysslvr
+  dt,θ = solver.dt,solver.θ
+
+  x = statef[1]
+  dtθ = θ*dt
   shift_time!(r,dtθ)
-
-  if isnothing(cache)
-    ode_cache = allocate_cache(op,r)
-    vθ = similar(u0)
-    vθ .= 0.0
-    nl_cache = nothing
-  else
-    ode_cache,vθ,nl_cache = cache
+  function usx(x)
+    copy!(uθ,u0)
+    axpy!(dtθ,x,uθ)
+    (uθ,x)
   end
+  ws = (dtθ,1)
 
-  ode_cache = update_cache!(ode_cache,op,r)
+  update_odeopcache!(odeopcache,odeop,r)
 
-  nlop = ThetaMethodParamOperator(op,r,dtθ,u0,ode_cache,vθ)
+  stageop = NonlinearParamStageOperator(odeop,odeopcache,r,usx,ws)
 
-  nl_cache = solve!(uf,solver.nls,nlop,nl_cache)
+  sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
 
-  if 0.0 < θ < 1.0
-    @. uf = uf*(1.0/θ)-u0*((1-θ)/θ)
-  end
-
-  cache = (ode_cache,vθ,nl_cache)
   shift_time!(r,dt*(1-θ))
-  return (uf,r,cache)
+  statef = ODEs._udate_theta!(statef,state0,dt,x)
+
+  odeslvrcache = (uθ,sysslvrcache)
+  odecache = (odeslvrcache,odeopcache)
+  (r,statef,odecache)
 end
 
-struct ThetaMethodParamOperator{T} <: NonlinearOperator
-  odeop::ODEParamOperator{T}
-  r::TransientParamRealization
-  dtθ::Float64
-  u0::AbstractVector
-  ode_cache
-  vθ::AbstractVector
-end
-
-function Algebra.allocate_residual(op::ThetaMethodParamOperator,x::AbstractVector)
-  allocate_residual(op.odeop,op.r,x,op.ode_cache)
-end
-
-function Algebra.allocate_jacobian(op::ThetaMethodParamOperator,x::AbstractVector)
-  allocate_jacobian(op.odeop,op.r,x,op.ode_cache)
-end
-
-function Algebra.zero_initial_guess(op::ThetaMethodParamOperator)
-  x0 = similar(op.u0)
-  fill!(x0,zero(eltype(x0)))
-  x0
-end
-
-for T in (:AbstractVector,:Contribution)
-  @eval begin
-    function Algebra.residual!(
-      b::$T,
-      op::ThetaMethodParamOperator,
-      x::AbstractVector)
-
-      uF = x
-      vθ = op.vθ
-      @. vθ = (x-op.u0)/op.dtθ
-      residual!(b,op.odeop,op.r,(uF,vθ),op.ode_cache)
-    end
-  end
-end
-
-for T in (:AbstractMatrix,:(Tuple{Vararg{Contribution}}))
-  @eval begin
-    function Algebra.jacobian!(
-      A::$T,
-      op::ThetaMethodParamOperator,
-      x::AbstractVector)
-
-      uF = x
-      vθ = op.vθ
-      @. vθ = (x-op.u0)/op.dtθ
-      z = zero(eltype(A))
-      fillstored!(A,z)
-      jacobians!(A,op.odeop,op.r,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
-    end
-
-    function Algebra.jacobian!(
-      A::$T,
-      op::ThetaMethodParamOperator,
-      x::AbstractVector,
-      i::Int)
-
-      uF = x
-      vθ = op.vθ
-      @. vθ = (x-op.u0)/op.dtθ
-      z = zero(eltype(A))
-      fillstored!(A,z)
-      γ = (1.0,1/op.dtθ)
-      jacobian!(A,op.odeop,op.r,(uF,vθ),i,γ[i],op.ode_cache)
-    end
-  end
-end
-
-# specializations for affine case
-function ODETools.solve_step!(
-  uf::AbstractVector,
+function residual_and_jacobian(
   solver::ThetaMethod,
-  op::LinearODEParamOperator,
+  odeop::ODEOperator,
   r::TransientParamRealization,
-  u0::AbstractVector,
-  cache)
+  state::NTuple{1,AbstractVector},
+  odecache)
 
-  dt = solver.dt
-  θ = solver.θ
-  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+  odeslvrcache,odeopcache = odecache
+  uθ, = odeslvrcache
+
+  dt,θ = solver.dt,solver.θ
+
+  x = (shift(state,1)-shift(state,-1))/dt
+  dtθ = θ*dt
   shift_time!(r,dtθ)
-
-  if isnothing(cache)
-    ode_cache = allocate_cache(op,r)
-    vθ = similar(u0)
-    vθ .= 0.0
-    l_cache = nothing
-    A,b = ODETools._allocate_matrix_and_vector(op,r,u0,ode_cache)
-  else
-    ode_cache,vθ,A,b,l_cache = cache
+  function usx(x)
+    copy!(uθ,u0)
+    axpy!(dtθ,x,uθ)
+    (uθ,x)
   end
+  ws = (1,1/dtθ)
 
-  ode_cache = update_cache!(ode_cache,op,r)
+  update_odeopcache!(odeopcache,odeop,r)
 
-  ODETools._matrix_and_vector!(A,b,op,r,dtθ,u0,ode_cache,vθ)
-  afop = AffineOperator(A,b)
+  stageop = NonlinearParamStageOperator(odeop,odeopcache,r,usx,ws)
+  b = residual(stageop,uθ)
+  A = jacobian(stageop,uθ)
 
-  newmatrix = true
-  l_cache = solve!(uf,solver.nls,afop,l_cache,newmatrix)
+  return b,A
+end
 
-  uf = uf + u0
-  if 0.0 < θ < 1.0
-    @. uf = uf*(1.0/θ)-u0*((1-θ)/θ)
-  end
+# linear case
 
-  cache = (ode_cache,vθ,A,b,l_cache)
+function ODEs.allocate_odecache(
+  ::ThetaMethod,
+  odeop::ODEOperator{LinearParamODE},
+  r0::TransientParamRealization,
+  us0::NTuple{1,AbstractVector})
+
+  u0 = us0[1]
+  us0N = (u0,u0)
+  odeopcache = allocate_odeopcache(odeop,r0,us0N)
+
+  constant_stiffness = is_form_constant(odeop,0)
+  constant_mass = is_form_constant(odeop,1)
+  reuse = (constant_stiffness && constant_mass)
+
+  A = allocate_jacobian(odeop,r0,us0N,odeopcache)
+  b = allocate_residual(odeop,r0,us0N,odeopcache)
+
+  sysslvrcache = nothing
+  odeslvrcache = (reuse,A,b,sysslvrcache)
+
+  (odeslvrcache,odeopcache)
+end
+
+function ODEs.ode_march!(
+  statef::NTuple{1,AbstractVector},
+  solver::ThetaMethod,
+  odeop::ODEOperator{LinearParamODE},
+  r::TransientParamRealization,
+  state0::NTuple{1,AbstractVector},
+  odecache)
+
+  u0 = state0[1]
+  odeslvrcache,odeopcache = odecache
+  reuse,A,b,sysslvrcache = odeslvrcache
+
+  sysslvr = solver.sysslvr
+  dt,θ = solver.dt,solver.θ
+
+  x = statef[1]
+  fill!(x,zero(eltype(x)))
+  dtθ = θ*dt
+  shift_time!(r,dtθ)
+  usx = (u0,x)
+  ws = (dtθ,1)
+
+  update_odeopcache!(odeopcache,odeop,r)
+
+  stageop = LinearParamStageOperator(odeop,odeopcache,r,usx,ws,A,b,reuse,sysslvrcache)
+
+  sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
+
   shift_time!(r,dt*(1-θ))
-  return (uf,r,cache)
+  statef = ODEs._udate_theta!(statef,state0,dt,x)
+
+  odeslvrcache = (uθ,sysslvrcache)
+  odecache = (odeslvrcache,odeopcache)
+  (r,statef,odecache)
 end
 
-for T in (:AbstractVector,:Contribution)
-  @eval begin
-    function Algebra.residual!(
-      b::$T,
-      op::ThetaMethodParamOperator{<:LinearODE},
-      x::AbstractVector)
+function residual_and_jacobian(
+  solver::ThetaMethod,
+  odeop::ODEOperator{LinearParamODE},
+  r::TransientParamRealization,
+  state::NTuple{1,AbstractVector},
+  odecache)
 
-      uF = op.u0
-      vθ = op.vθ
-      residual!(b,op.odeop,op.r,(uF,vθ),op.ode_cache)
-    end
-  end
-end
+  u0 = state[1]
+  odeslvrcache,odeopcache = odecache
+  reuse,A,b,sysslvrcache = odeslvrcache
 
-for T in (:AbstractMatrix,:(Tuple{Vararg{Contribution}}))
-  @eval begin
-    function Algebra.jacobian!(
-      A::$T,
-      op::ThetaMethodParamOperator{<:LinearODE},
-      x::AbstractVector)
+  dt,θ = solver.dt,solver.θ
 
-      vθ = op.vθ
-      z = zero(eltype(A))
-      fillstored!(A,z)
-      jacobians!(A,op.odeop,op.r,(vθ,vθ),(1.0,1/op.dtθ),op.ode_cache)
-    end
+  x = copy(u0)
+  fill!(x,zero(eltype(x)))
+  dtθ = θ*dt
+  shift_time!(r,dtθ)
+  us = (u0,x)
+  ws = (1,1/dtθ)
 
-    function Algebra.jacobian!(
-      A::$T,
-      op::ThetaMethodParamOperator{<:LinearODE},
-      x::AbstractVector,
-      i::Int)
+  stageop = LinearParamStageOperator(odeop,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
 
-      vθ = op.vθ
-      z = zero(eltype(A))
-      fillstored!(A,z)
-      γ = (1.0,1/op.dtθ)
-      jacobian!(A,op.odeop,op.r,(vθ,vθ),i,γ[i],op.ode_cache)
-    end
-  end
+  b = residual(stageop,x)
+  A = jacobian(stageop,x)
+
+  return b,A
 end

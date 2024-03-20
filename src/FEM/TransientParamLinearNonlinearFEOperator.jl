@@ -3,7 +3,7 @@ struct LinearNonlinearParamODE <: ODEParamOperatorType end
 
 struct TransientParamLinearNonlinearFEOperator <: TransientParamFEOperator{LinearNonlinearParamODE}
   op_linear::TransientParamFEOperator{LinearParamODE}
-  op_nonlinear::TransientParamFEOperator{NonlinearParamODE}
+  op_nonlinear::TransientParamFEOperator
 end
 
 get_linear_operator(op) = @abstractmethod
@@ -44,7 +44,7 @@ end
 function join_operators(
   op::TransientParamLinearNonlinearFEOperator,
   op_lin::TransientParamFEOperator{LinearParamODE},
-  op_nlin::TransientParamFEOperator{NonlinearParamODE})
+  op_nlin::TransientParamFEOperator)
 
   trial = get_trial(op)
   test = get_test(op)
@@ -75,7 +75,7 @@ end
 function join_operators(
   op::TransientParamLinearNonlinearFEOperator,
   op_lin::TransientParamSaddlePointFEOp{LinearParamODE},
-  op_nlin::TransientParamFEOperator{NonlinearParamODE})
+  op_nlin::TransientParamFEOperator)
 
   jop = join_operators(op,op_lin.op,op_nlin)
   TransientParamSaddlePointFEOp(jop,op_lin.coupling)

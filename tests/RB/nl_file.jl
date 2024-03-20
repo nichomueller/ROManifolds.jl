@@ -82,7 +82,7 @@ A_lin,b_lin = ODETools._matrix_and_vector!(cache_jac_lin,cache_res_lin,lop,r,dt�
 # initial nonlinear res/jac
 nnlop = nlop.odeop.op_nonlinear
 b_nlin = residual!(cache_res_nlin,nnlop,r,(fex,z),ode_cache)
-A_nlin = ODETools.jacobians!(cache_jac_nlin,nnlop,r,(fex,z),(1,1/dtθ),ode_cache)
+A_nlin = ODEs.jacobians!(cache_jac_nlin,nnlop,r,(fex,z),(1,1/dtθ),ode_cache)
 A = A_nlin + A_lin
 b = b_nlin - b_lin
 dx = similar(b)

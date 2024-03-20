@@ -100,7 +100,7 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","toy
 fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,feop,fesnaps,rbsnaps,festats,rbstats)
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 # fesnaps = Serialization.deserialize(RB.get_snapshots_filename(test_dir))
 

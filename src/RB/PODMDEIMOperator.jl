@@ -20,13 +20,12 @@ function reduced_operator(
   LinearNonlinearPODMDEIMOperator(red_op_lin,red_op_nlin)
 end
 
-struct PODMDEIMOperator{T,L,R} <: RBOperator{T}
+struct PODMDEIMOperator{T} <: RBOperator{T}
   op::PODOperator{T}
-  lhs::L
-  rhs::R
+  lhs
+  rhs
 end
 
-Polynomials.get_order(op::PODMDEIMOperator) = get_order(op.op)
 FESpaces.get_trial(op::PODMDEIMOperator) = get_trial(op.op)
 FESpaces.get_test(op::PODMDEIMOperator) = get_test(op.op)
 FEM.realization(op::PODMDEIMOperator;kwargs...) = realization(op.op;kwargs...)
@@ -34,19 +33,20 @@ FEM.get_fe_operator(op::PODMDEIMOperator) = FEM.get_fe_operator(op.op)
 get_fe_trial(op::PODMDEIMOperator) = get_fe_trial(op.op)
 get_fe_test(op::PODMDEIMOperator) = get_fe_test(op.op)
 
-function TransientFETools.allocate_cache(
+function ODEs.allocate_odeopcache(
   op::PODMDEIMOperator,
-  r::TransientParamRealization)
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}})
 
-  allocate_cache(op.op,r)
+  allocate_odeopcache(op.op,r,us)
 end
 
-function TransientFETools.update_cache!(
+function ODEs.update_odeopcache!(
   ode_cache,
   op::PODMDEIMOperator,
   r::TransientParamRealization)
 
-  update_cache!(ode_cache,op.op,r)
+  update_odeopcache!(ode_cache,op.op,r)
 end
 
 function Algebra.allocate_residual(
@@ -93,7 +93,7 @@ function Algebra.jacobian!(
   mdeim_jacobian(op.lhs[i],fe_sA)
 end
 
-function ODETools.jacobians!(
+function ODEs.jacobians!(
   A,
   op::PODMDEIMOperator,
   r::TransientParamRealization,
@@ -223,11 +223,6 @@ function FESpaces.get_trial(op::LinearNonlinearPODMDEIMOperator)
   get_trial(op.op_linear)
 end
 
-function Polynomials.get_order(op::LinearNonlinearPODMDEIMOperator)
-  @check get_order(op.op_linear) === get_order(op.op_nonlinear)
-  get_order(op.op_linear)
-end
-
 function FEM.realization(op::LinearNonlinearPODMDEIMOperator;kwargs...)
   realization(op.op_linear;kwargs...)
 end
@@ -246,19 +241,20 @@ function get_fe_test(op::LinearNonlinearPODMDEIMOperator)
   get_fe_test(op.op_linear)
 end
 
-function TransientFETools.allocate_cache(
+function ODEs.allocate_odeopcache(
   op::LinearNonlinearPODMDEIMOperator,
-  r::TransientParamRealization)
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}})
 
-  allocate_cache(op.op_linear,r)
+  allocate_odeopcache(op.op_linear,r,us)
 end
 
-function TransientFETools.update_cache!(
+function ODEs.update_odeopcache!(
   ode_cache,
   op::LinearNonlinearPODMDEIMOperator,
   r::TransientParamRealization)
 
-  update_cache!(ode_cache,op.op_linear,r)
+  update_odeopcache!(ode_cache,op.op_linear,r)
 end
 
 function Algebra.allocate_residual(
@@ -315,7 +311,7 @@ function Algebra.jacobian!(
   return A_nlin + A_lin
 end
 
-function ODETools.jacobians!(
+function ODEs.jacobians!(
   cache,
   op::LinearNonlinearPODMDEIMOperator,
   r::TransientParamRealization,
@@ -397,7 +393,7 @@ function ODETools._matrix_and_vector!(cache_mat,cache_vec,op::PODMDEIMOperator,r
 end
 
 function ODETools._matrix!(cache,op::PODMDEIMOperator,r,dtθ,u0,ode_cache,vθ)
-  A = ODETools.jacobians!(cache,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
+  A = ODEs.jacobians!(cache,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
   return A
 end
 

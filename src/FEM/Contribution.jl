@@ -96,14 +96,14 @@ function LinearAlgebra.fillstored!(a::ArrayContribution,v)
   a
 end
 
-# quite hacky
+# # quite hacky
 
-Base.eltype(::Tuple{Vararg{ArrayContribution{T}}}) where T = T
-Base.eltype(::Type{<:Tuple{Vararg{ArrayContribution{T}}}}) where T = T
+# Base.eltype(::Tuple{Vararg{ArrayContribution{T}}}) where T = T
+# Base.eltype(::Type{<:Tuple{Vararg{ArrayContribution{T}}}}) where T = T
 
-function LinearAlgebra.fillstored!(a::Tuple{Vararg{A}},v) where {A<:ArrayContribution}
-  for ai in a
-    LinearAlgebra.fillstored!(ai,v)
-  end
-  a
-end
+# function LinearAlgebra.fillstored!(a::Tuple{Vararg{A}},v) where {A<:ArrayContribution}
+#   for ai in a
+#     LinearAlgebra.fillstored!(ai,v)
+#   end
+#   a
+# end

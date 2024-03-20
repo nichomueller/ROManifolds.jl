@@ -1,30 +1,137 @@
-struct ODEParamOpFromTFEOpWithTrian{T} <: ODEParamOperator{T}
-  tfeop::TransientParamFEOperatorWithTrian{T}
+abstract type ODEParamOperatorWithTrian{T<:ODEParamOperatorType} <: ODEOperator{T} end
+
+function ODEs.allocate_odeopcache(
+  odeop::ODEParamOperatorWithTrian,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  args...)
+
+  nothing
 end
 
-function Polynomials.get_order(odeop::ODEParamOpFromTFEOpWithTrian)
-  get_order(odeop.tfeop)
+function ODEs.update_odeopcache!(
+  odeopcache,
+  odeop::ODEParamOperatorWithTrian,
+  r::TransientParamRealization,
+  args...)
+
+  odeopcache
 end
 
-function ODEs.get_num_forms(odeop::ODEParamOpFromTFEOpWithTrian)
-  get_num_forms(odeop.tfeop)
+function Algebra.allocate_residual(
+  odeop::ODEParamOperatorWithTrian,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  odeopcache)
+
+  @abstractmethod
 end
 
-function ODEs.get_forms(odeop::ODEParamOpFromTFEOpWithTrian)
-  get_forms(odeop.tfeop)
+function Algebra.residual!(
+  b::Contribution,
+  odeop::ODEParamOperatorWithTrian,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  odeopcache;
+  add::Bool=false)
+
+  @abstractmethod
 end
 
-function ODEs.is_form_constant(odeop::ODEParamOpFromTFEOpWithTrian,k::Integer)
-  is_form_constant(odeop.tfeop,k)
+function Algebra.residual(
+  odeop::ODEParamOperatorWithTrian,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  odeopcache)
+
+  b = allocate_residual(odeop,r,us,odeopcache)
+  residual!(b,odeop,r,us,odeopcache)
+  b
 end
 
-function allocate_odeopcache(
+function Algebra.allocate_jacobian(
+  odeop::ODEParamOperatorWithTrian,
+  r::AbstractTransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  odeopcache)
+
+  @abstractmethod
+end
+
+function ODEs.jacobian_add!(
+  A::Tuple{Vararg{Contribution}},
+  odeop::ODEParamOperatorWithTrian,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}},
+  odeopcache)
+
+  @abstractmethod
+end
+
+function Algebra.jacobian!(
+  A::Tuple{Vararg{Contribution}},
+  odeop::ODEParamOperatorWithTrian,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}},
+  odeopcache)
+
+  for Ak in A
+    fillstored!(Ak,zero(eltype(Ak)))
+  end
+  jacobian_add!(A,odeop,r,us,ws,odeopcache)
+  A
+end
+
+function Algebra.jacobian(
+  odeop::ODEParamOperatorWithTrian,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}},
+  odeopcache)
+
+  A = allocate_jacobian(odeop,r,us,odeopcache)
+  jacobian!(A,odeop,r,us,ws,odeopcache)
+  A
+end
+
+struct ODEParamOpFromTFEOpWithTrian{T} <: ODEParamOperatorWithTrian{T}
+  op::TransientParamFEOperatorWithTrian{T}
+end
+
+Polynomials.get_order(odeop::ODEParamOpFromTFEOpWithTrian) = get_order(odeop.op)
+FESpaces.get_test(odeop::ODEParamOpFromTFEOpWithTrian) = get_test(odeop.op)
+FESpaces.get_trial(odeop::ODEParamOpFromTFEOpWithTrian) = get_trial(odeop.op)
+realization(odeop::ODEParamOpFromTFEOpWithTrian;kwargs...) = realization(odeop.op;kwargs...)
+get_fe_operator(odeop::ODEParamOpFromTFEOpWithTrian) = odeop.op
+ODEs.get_num_forms(odeop::ODEParamOpFromTFEOpWithTrian) = get_num_forms(odeop.op)
+ODEs.get_forms(odeop::ODEParamOpFromTFEOpWithTrian) = get_forms(odeop.op)
+ODEs.is_form_constant(odeop::ODEParamOpFromTFEOpWithTrian,k::Integer) = is_form_constant(odeop.op,k)
+
+function get_linear_operator(odeop::ODEParamOpFromTFEOpWithTrian)
+  ODEParamOpFromTFEOpWithTrian(get_linear_operator(odeop.op))
+end
+
+function get_nonlinear_operator(odeop::ODEParamOpFromTFEOpWithTrian)
+  ODEParamOpFromTFEOpWithTrian(get_nonlinear_operator(odeop.op))
+end
+
+function set_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
+  ODEParamOpFromTFEOpWithTrian(set_triangulation(odeop.op,trians_rhs,trians_lhs))
+end
+
+function change_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
+  ODEParamOpFromTFEOpWithTrian(change_triangulation(odeop.op,trians_rhs,trians_lhs))
+end
+
+function ODEs.allocate_odeopcache(
   odeop::ODEParamOpFromTFEOpWithTrian,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}})
 
   order = get_order(odeop)
-  Ut = get_trial(odeop.tfeop)
+  Ut = get_trial(odeop.op)
   U = allocate_space(Ut)
   Uts = (Ut,)
   Us = (U,)
@@ -33,18 +140,18 @@ function allocate_odeopcache(
     Us = (Us...,allocate_space(Uts[k+1]))
   end
 
-  tfeopcache = allocate_tfeopcache(odeop.tfeop,r,us)
+  tfeopcache = allocate_tfeopcache(odeop.op,r,us)
 
   uh = ODEs._make_uh_from_us(odeop,us,Us)
-  V = get_test(odeop.tfeop)
+  V = get_test(odeop.op)
   v = get_fe_basis(V)
-  Ut = evaluate(get_trial(odeop.tfeop),nothing)
+  Ut = evaluate(get_trial(odeop.op),nothing)
   du = get_trial_fe_basis(Ut)
-  assem = get_assembler(odeop.tfeop,r)
+  assem = get_assembler(odeop.op,r)
 
   const_forms = ()
-  num_forms = get_num_forms(odeop.tfeop)
-  jacs = get_jacs(odeop.tfeop)
+  num_forms = get_num_forms(odeop.op)
+  jacs = get_jacs(odeop.op)
 
   μ,t = get_params(r),get_times(r)
 
@@ -72,15 +179,19 @@ function allocate_odeopcache(
   ODEOpFromTFEOpCache(Us,Uts,tfeopcache,const_forms)
 end
 
-function ODEs.update_odeopcache!(odeopcache,odeop::ODEParamOpFromTFEOpWithTrian,r::TransientParamRealization)
+function ODEs.update_odeopcache!(
+  odeopcache,
+  odeop::ODEParamOpFromTFEOpWithTrian,
+  r::TransientParamRealization)
+
   Us = ()
   for k in 0:get_order(odeop)
     Us = (Us...,evaluate!(odeopcache.Us[k+1],odeopcache.Uts[k+1],r))
   end
   odeopcache.Us = Us
 
-  tfeopcache,tfeop = odeopcache.tfeopcache,odeop.tfeop
-  odeopcache.tfeopcache = update_tfeopcache!(tfeopcache,tfeop,r)
+  tfeopcache,op = odeopcache.tfeopcache,odeop.op
+  odeopcache.tfeopcache = update_tfeopcache!(tfeopcache,op,r)
 
   odeopcache
 end
@@ -92,12 +203,12 @@ function Algebra.allocate_residual(
   odeopcache)
 
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
-  V = get_test(odeop.tfeop)
+  V = get_test(odeop.op)
   v = get_fe_basis(V)
-  assem = get_assembler(odeop.tfeop,r)
+  assem = get_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
-  res = get_res(odeop.tfeop)
+  res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
   b = contribution(op.trian_res) do trian
@@ -116,15 +227,15 @@ function Algebra.residual!(
   add::Bool=false)
 
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
-  V = get_test(odeop.tfeop)
+  V = get_test(odeop.op)
   v = get_fe_basis(V)
-  assem = get_assembler(odeop.tfeop,r)
+  assem = get_assembler(odeop.op,r)
 
   !add && fill!(b,zero(eltype(b)))
 
   μ,t = get_params(r),get_times(r)
 
-  res = get_res(odeop.tfeop)
+  res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
   map(b.values,op.trian_res) do values,trian
@@ -136,13 +247,13 @@ end
 
 function Algebra.residual!(
   b::Contribution,
-  odeop::ODEParamOpFromTFEOpWithTrian{<:AbstractLinearODE},
+  odeop::ODEParamOpFromTFEOp{SemilinearParamODE},
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache;
   add::Bool=false)
 
-  uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
+  uh = RB._make_uh_from_us(odeop,us,odeopcache.Us)
   V = get_test(odeop.tfeop)
   v = get_fe_basis(V)
   assem = get_assembler(odeop.tfeop,r)
@@ -151,13 +262,45 @@ function Algebra.residual!(
 
   μ,t = get_params(r),get_times(r)
 
-  # Residual
   res = get_res(odeop.tfeop)
+  dc = res(μ,t,uh,v)
+
+  order = get_order(odeop)
+  mass = get_forms(odeop.tfeop)[1]
+  ∂tNuh = ∂t(uh,Val(order))
+  dc = dc + mass(μ,t,∂tNuh,v)
+
+  map(b.values,op.trian_res) do values,trian
+    vecdata = collect_cell_vector_for_trian(V,dc,trian)
+    assemble_vector_add!(values,assem,vecdata)
+  end
+  b
+end
+
+function Algebra.residual!(
+  b::Contribution,
+  odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  odeopcache;
+  add::Bool=false)
+
+  uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
+  V = get_test(odeop.op)
+  v = get_fe_basis(V)
+  assem = get_assembler(odeop.op,r)
+
+  !add && fill!(b,zero(eltype(b)))
+
+  μ,t = get_params(r),get_times(r)
+
+  # Residual
+  res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
   # Forms
   order = get_order(odeop)
-  forms = get_forms(odeop.tfeop)
+  forms = get_forms(odeop.op)
   ∂tkuh = uh
   for k in 0:order
     form = forms[k+1]
@@ -181,17 +324,17 @@ function Algebra.allocate_jacobian(
   odeopcache)
 
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
-  Ut = evaluate(get_trial(odeop.tfeop),nothing)
+  Ut = evaluate(get_trial(odeop.op),nothing)
   du = get_trial_fe_basis(Ut)
-  V = get_test(odeop.tfeop)
+  V = get_test(odeop.op)
   v = get_fe_basis(V)
-  assem = get_assembler(odeop.tfeop,r)
+  assem = get_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
-  jacs = get_jacs(odeop.tfeop)
+  jacs = get_jacs(odeop.op)
   As = ()
-  for k in 0:get_order(odeop.tfeop)
+  for k in 0:get_order(odeop.op)
     jac = jacs[k+1]
     trian_jac = op.trian_jacs[k+1]
     dc = jac(μ,t,uh,du,v)
@@ -213,15 +356,15 @@ function ODEs.jacobian_add!(
   odeopcache)
 
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
-  Ut = evaluate(get_trial(odeop.tfeop),nothing)
+  Ut = evaluate(get_trial(odeop.op),nothing)
   du = get_trial_fe_basis(Ut)
-  V = get_test(odeop.tfeop)
+  V = get_test(odeop.op)
   v = get_fe_basis(V)
-  assem = get_assembler(odeop.tfeop,r)
+  assem = get_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
-  jacs = get_jacs(odeop.tfeop)
+  jacs = get_jacs(odeop.op)
   for k in 0:get_order(odeop)
     A = As[k+1]
     w = ws[k+1]
@@ -237,27 +380,27 @@ function ODEs.jacobian_add!(
     end
   end
 
-  A
+  As
 end
 
 function ODEs.jacobian_add!(
-  A::Tuple{Vararg{Contribution}},
-  odeop::ODEParamOpFromTFEOpWithTrian{<:AbstractLinearODE},
+  As::Tuple{Vararg{Contribution}},
+  odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)
 
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
-  Ut = evaluate(get_trial(odeop.tfeop),nothing)
+  Ut = evaluate(get_trial(odeop.op),nothing)
   du = get_trial_fe_basis(Ut)
-  V = get_test(odeop.tfeop)
+  V = get_test(odeop.op)
   v = get_fe_basis(V)
-  assem = get_assembler(odeop.tfeop,r)
+  assem = get_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
-  jacs = get_jacs(odeop.tfeop)
+  jacs = get_jacs(odeop.op)
   for k in 0:get_order(odeop)
     A = As[k+1]
     w = ws[k+1]
@@ -276,4 +419,6 @@ function ODEs.jacobian_add!(
       end
     end
   end
+
+  As
 end

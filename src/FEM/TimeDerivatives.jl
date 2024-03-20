@@ -7,6 +7,7 @@ function ODEs.time_derivative(f::TransientParamFunction)
   _dfdt(x,μ,t) = dfdt(x,μ,t)
   _dfdt(x::VectorValue) = (μ,t) -> dfdt(x,μ,t)
   _dfdt(μ,t) = x -> dfdt(x,μ,t)
+  _dfdt(x,r::TransientParamRealization) = dfdt(x,get_params(r),get_times(r))
   _dfdt(r::TransientParamRealization) = x -> dfdt(x,get_params(r),get_times(r))
   return TransientParamFunction(_dfdt,params,times)
 end

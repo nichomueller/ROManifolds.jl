@@ -100,9 +100,9 @@ end
 FESpaces.get_test(op::TransientParamFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamFEOpFromWeakForm) = op.trial
 Polynomials.get_order(op::TransientParamFEOpFromWeakForm) = op.order
-ODEs.get_res(tfeop::TransientParamFEOpFromWeakForm) = tfeop.res
-ODEs.get_jacs(tfeop::TransientParamFEOpFromWeakForm) = tfeop.jacs
-ODEs.get_assembler(tfeop::TransientParamFEOpFromWeakForm) = tfeop.assem
+ODEs.get_res(op::TransientParamFEOpFromWeakForm) = op.res
+ODEs.get_jacs(op::TransientParamFEOpFromWeakForm) = op.jacs
+ODEs.get_assembler(op::TransientParamFEOpFromWeakForm) = op.assem
 realization(op::TransientParamFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 get_induced_norm(op::TransientParamFEOpFromWeakForm) = op.induced_norm
 
@@ -165,9 +165,9 @@ end
 FESpaces.get_test(op::TransientParamLinearFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamLinearFEOpFromWeakForm) = op.trial
 Polynomials.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
-ODEs.get_res(tfeop::TransientParamLinearFEOpFromWeakForm) = tfeop.res
-ODEs.get_jacs(tfeop::TransientParamLinearFEOpFromWeakForm) = tfeop.jacs
-ODEs.get_assembler(tfeop::TransientParamLinearFEOpFromWeakForm) = tfeop.assem
+ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
+ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
+ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
 realization(op::TransientParamLinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 get_induced_norm(op::TransientParamLinearFEOpFromWeakForm) = op.induced_norm
 
@@ -182,7 +182,7 @@ function ODEs.get_assembler(feop::TransientParamLinearFEOpFromWeakForm,r::Transi
   get_param_assembler(get_assembler(feop),r)
 end
 
-function TransientFETools.test_transient_fe_operator(op::TransientParamFEOperator,uh,μt)
+function ODEs.test_transient_fe_operator(op::TransientParamFEOperator,uh,μt)
   odeop = get_algebraic_operator(op)
   @test isa(odeop,ODEParamOperator)
   cache = allocate_cache(op)

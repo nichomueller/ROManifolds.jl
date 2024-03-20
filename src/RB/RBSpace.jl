@@ -36,6 +36,11 @@ function reduced_basis(
   reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
 end
 
+function enrich_basis(feop::TransientParamFEOperator,bases,norm_matrix)
+  supr_op = assemble_coupling_matrix(feop)
+  enrich_basis(bases,norm_matrix,supr_op)
+end
+
 function fe_subspace(space,basis)
   RBSpace(space,basis)
 end
@@ -55,8 +60,7 @@ end
 (U::RBSpace)(r) = evaluate(U,r)
 (U::RBSpace)(μ,t) = evaluate(U,μ,t)
 
-ODETools.∂t(U::RBSpace) = RBSpace(∂t(U),U.basis)
-ODETools.∂tt(U::RBSpace) = RBSpace(∂tt(U),U.basis)
+ODEs.time_derivative(U::RBSpace) = RBSpace(time_derivative(U),U.basis)
 
 get_basis_space(r::RBSpace) = get_basis_space(r.basis)
 num_space_dofs(r::RBSpace) = num_space_dofs(r.basis)
@@ -102,6 +106,12 @@ function compress_basis(b::Projection,trial::RBSpace,test::RBSpace;kwargs...)
   compress_basis(b,trial.basis,test.basis;kwargs...)
 end
 
+function recast(x::AbstractVector,r::RBSpace)
+  cache = return_cache(RecastMap(),x,r)
+  evaluate!(cache,RecastMap(),x,r)
+  return cache
+end
+
 struct RecastMap <: Map end
 
 function Arrays.return_cache(k::RecastMap,x::ParamVector,r::RBSpace)
@@ -115,12 +125,6 @@ function Arrays.evaluate!(cache,k::RecastMap,x::ParamVector,r::RBSpace)
       cache[(it-1)*length(x)+ip] = Xip[:,it]
     end
   end
-end
-
-function recast(x::AbstractVector,r::RBSpace)
-  cache = return_cache(RecastMap(),x,r)
-  evaluate!(cache,RecastMap(),x,r)
-  return cache
 end
 
 # multi field interface
@@ -187,11 +191,6 @@ function get_touched_blocks(r::BlockRBSpace)
 end
 
 num_fields(r::BlockRBSpace) = length(get_touched_blocks(r))
-
-function enrich_basis(feop::TransientParamFEOperator,bases,norm_matrix)
-  supr_op = assemble_coupling_matrix(feop)
-  enrich_basis(bases,norm_matrix,supr_op)
-end
 
 function Arrays.return_cache(k::RecastMap,x::ParamBlockVector,r::BlockRBSpace)
   block_cache = map(1:blocklength(x)) do i
