@@ -146,7 +146,7 @@ function ODEs.ode_march!(
   shift_time!(r,dt*(1-θ))
   statef = ODEs._udate_theta!(statef,state0,dt,x)
 
-  odeslvrcache = (uθ,sysslvrcache)
+  odeslvrcache = (reuse,A,b,sysslvrcache)
   odecache = (odeslvrcache,odeopcache)
   (r,statef,odecache)
 end

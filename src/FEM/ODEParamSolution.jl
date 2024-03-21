@@ -43,14 +43,14 @@ function Base.iterate(sol::ODEParamSolution)
   uf = copy(first(sol.us0))
   uf,cache = ode_finish!(uf,sol.solver,sol.odeop,r0,rf,statef,cache)
 
-  state = (rf,statef,state0,cache)
+  state = (rf,statef,state0,uf,cache)
   return (rf,uf),state
 end
 
 function Base.iterate(sol::ODEParamSolution,state)
-  r0,state0,statef,cache = state
+  r0,state0,statef,uf,cache = state
 
-  if get_times(r0) >= get_final_time(sol.r) - ε
+  if get_times(r0) >= get_final_time(sol.r) - ODEs.ε
     return nothing
   end
 
@@ -58,7 +58,7 @@ function Base.iterate(sol::ODEParamSolution,state)
 
   uf,cache = ode_finish!(uf,sol.solver,sol.odeop,r0,rf,statef,cache)
 
-  state = (rf,statef,state0,cache)
+  state = (rf,statef,state0,uf,cache)
   return (rf,uf),state
 end
 

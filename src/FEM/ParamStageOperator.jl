@@ -8,7 +8,7 @@ struct NonlinearParamStageOperator <: ParamStageOperator
   ws::Tuple{Vararg{Real}}
 end
 
-function Algebra.allocate_residual(nlop::NonlinearStageOperator,x::AbstractVector)
+function Algebra.allocate_residual(nlop::NonlinearParamStageOperator,x::AbstractVector)
   odeop,odeopcache = nlop.odeop,nlop.odeopcache
   rx = nlop.rx
   usx = nlop.usx(x)
@@ -17,7 +17,7 @@ end
 
 function Algebra.residual!(
   b::AbstractVector,
-  nlop::NonlinearStageOperator,
+  nlop::NonlinearParamStageOperator,
   x::AbstractVector)
 
   odeop,odeopcache = nlop.odeop,nlop.odeopcache
@@ -26,7 +26,7 @@ function Algebra.residual!(
   residual!(b,odeop,rx,usx,odeopcache)
 end
 
-function Algebra.allocate_jacobian(nlop::NonlinearStageOperator,x::AbstractVector)
+function Algebra.allocate_jacobian(nlop::NonlinearParamStageOperator,x::AbstractVector)
   odeop,odeopcache = nlop.odeop,nlop.odeopcache
   rx = nlop.rx
   usx = nlop.usx(x)
@@ -35,7 +35,7 @@ end
 
 function Algebra.jacobian!(
   A::AbstractMatrix,
-  nlop::NonlinearStageOperator,
+  nlop::NonlinearParamStageOperator,
   x::AbstractVector)
 
   odeop,odeopcache = nlop.odeop,nlop.odeopcache

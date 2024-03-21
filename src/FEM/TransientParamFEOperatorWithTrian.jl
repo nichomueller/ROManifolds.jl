@@ -1,82 +1,82 @@
 # interface to accommodate the separation of terms depending on the triangulation
 
-function TransientParamFEOperator(
-  res::Function,jacs::Tuple{Vararg{Function}},induced_norm::Function,tpspace,trial,test,
-  trian_res,trian_jacs,args...)
-
-  op = TransientParamFEOperator(res,jacs,induced_norm,tpspace,trial,test,args...)
-  TransientFEOperatorWithTrian(op,trian_res,trian_jacs)
-end
-
-function TransientParamFEOperator(
-  res::Function,jac::Function,induced_norm::Function,tpspace,trial,test,trian_res,trian_jacs,args...)
-
-  op = TransientParamFEOperator(res,jac,induced_norm,tpspace,trial,test,args...)
-  TransientFEOperatorWithTrian(op,trian_res,trian_jacs)
-end
-
-function TransientParamFEOperator(
-  res::Function,jac::Function,jac_t::Function,induced_norm::Function,tpspace,trial,test,
-  trian_res,trian_jacs,args...)
-
-  op = TransientParamFEOperator(res,jac,jac_t,induced_norm,tpspace,trial,test,args...)
-  TransientFEOperatorWithTrian(op,trian_res,trian_jacs)
-end
-
-function TransientParamFEOperator(
-  res::Function,induced_norm::Function,tpspace,trial,test,trian_res,trian_jacs,args...;kwargs...)
-
-  @notimplemented "When building a TransientFEOperatorWithTrian, the jacobians
-  must explicitly be defined"
-end
-
-function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},res::Function,jacs::Tuple{Vararg{Function}},
-  induced_norm::Function,tpspace,trial,test,trian_res,trian_jacs,args...;kwargs...)
-
-  op = TransientParamLinearFEOperator(forms,res,jacs,induced_norm,tpspace,trial,test,args...;kwargs...)
-  TransientFEOperatorWithTrian(op,trian_res,trian_jacs)
-end
-
-function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},res::Function,jac::Function,induced_norm::Function,
-  tpspace,trial,test,trian_res,trian_jacs,args...;kwargs...)
-
-  op = TransientParamLinearFEOperator(forms,res,jac,induced_norm,tpspace,trial,test,args...;kwargs...)
-  TransientFEOperatorWithTrian(op,trian_res,trian_jacs)
-end
-
-function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},res::Function,jac::Function,jac_t::Function,
-  induced_norm::Function,tpspace,trial,test,trian_res,trian_jacs,args...;kwargs...)
-
-  op = TransientParamLinearFEOperator(forms,res,jac,jac_t,induced_norm,tpspace,trial,test,args...;kwargs...)
-  TransientFEOperatorWithTrian(op,trian_res,trian_jacs)
-end
-
-function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},res::Function,induced_norm::Function,
-  tpspace,trial,test,trian_res,trian_jacs,args...;kwargs...)
-
-  @notimplemented "When building a TransientFEOperatorWithTrian, the jacobians
-  must explicitly be defined"
-end
-
 abstract type TransientParamFEOperatorWithTrian{T<:ODEParamOperatorType} <: TransientParamFEOperator{T} end
 
 function FESpaces.get_algebraic_operator(feop::TransientParamFEOperatorWithTrian)
   ODEParamOpFromTFEOpWithTrian(feop)
 end
 
-struct TransientParamFEOpFromWeakFormWithTrian{T} <: TransientParamFEOperatorWithTrian{T}
-  op::TransientParamFEOpFromWeakForm{T}
+struct TransientParamFEOpFromWeakFormWithTrian{T,N} <: TransientParamFEOperatorWithTrian{T}
+  op::TransientParamFEOperator{T}
   trian_res::Tuple{Vararg{Triangulation}}
-  trian_jacs::NTuple{2,Tuple{Vararg{Triangulation}}}
+  trian_jacs::NTuple{N,Tuple{Vararg{Triangulation}}}
+
+  function TransientParamFEOpFromWeakFormWithTrian(
+    op::TransientParamFEOperator{T},
+    trian_res::Tuple{Vararg{Triangulation}},
+    trian_jacs::NTuple{N,Tuple{Vararg{Triangulation}}}) where {T,N}
+
+    newop = set_triangulation(op,trian_res,trian_jacs)
+    new{T,N}(newop,trian_res,trian_jacs)
+  end
 end
 
-function TransientFEOperatorWithTrian(op::TransientParamFEOpFromWeakForm,trian_res,trian_jacs...)
-  newop = set_triangulation(op,trian_res,trian_jacs)
-  TransientParamFEOperatorWithTrian(newop,trian_res,trian_jacs)
+function TransientParamFEOpFromWeakForm(
+  res::Function,
+  jacs::Tuple{Vararg{Function}},
+  induced_norm::Function,
+  assem::Assembler,
+  tpspace::TransientParamSpace,
+  trial::FESpace,
+  test::FESpace,
+  order::Integer,
+  trian_res,
+  trian_jacs...)
+
+  op = TransientParamFEOpFromWeakForm(res,jacs,induced_norm,assem,tpspace,
+    trial,test,order)
+  op_trian = TransientParamFEOpFromWeakFormWithTrian(op,trian_res,trian_jacs)
+  return op_trian
+end
+
+function TransientParamSemilinearFEOpFromWeakForm(
+  mass::Function,
+  res::Function,
+  jacs::Tuple{Vararg{Function}},
+  constant_mass::Bool,
+  induced_norm::Function,
+  assem::Assembler,
+  tpspace::TransientParamSpace,
+  trial::FESpace,
+  test::FESpace,
+  order::Integer,
+  trian_res,
+  trian_jacs...)
+
+  op = TransientParamSemilinearFEOpFromWeakForm(mass,res,jacs,constant_mass,
+    induced_norm,assem,tpspace,trial,test,order)
+  op_trian = TransientParamFEOpFromWeakFormWithTrian(op,trian_res,trian_jacs)
+  return op_trian
+end
+
+function TransientParamLinearFEOpFromWeakForm(
+  forms::Tuple{Vararg{Function}},
+  res::Function,
+  jacs::Tuple{Vararg{Function}},
+  constant_forms::Tuple{Vararg{Bool}},
+  induced_norm::Function,
+  assem::Assembler,
+  tpspace::TransientParamSpace,
+  trial::FESpace,
+  test::FESpace,
+  order::Integer,
+  trian_res,
+  trian_jacs...)
+
+  op = TransientParamLinearFEOpFromWeakForm(forms,res,jacs,constant_forms,
+    induced_norm,assem,tpspace,trial,test,order)
+  op_trian = TransientParamFEOpFromWeakFormWithTrian(op,trian_res,trian_jacs)
+  return op_trian
 end
 
 FESpaces.get_test(op::TransientParamFEOpFromWeakFormWithTrian) = get_test(op)
@@ -97,52 +97,80 @@ function ODEs.get_assembler(op::TransientParamFEOpFromWeakFormWithTrian,r::Trans
   get_assembler(op.op,r)
 end
 
-function set_triangulation(res,jacs::NTuple{1,Function},trian_res,trian_jacs,order)
-  jac, = jacs
-  trian_jac, = trian_jacs
-  degree = 2*order
-
-  meas_res = Measure.(trian_res,degree)
-  meas_jac = Measure.(trian_jac,degree)
-
-  newres(μ,t,u,v,args...) = res(μ,t,u,v,args...)
-  newjac(μ,t,u,du,v,args...) = jac(μ,t,u,du,v,args...)
-
-  newres(μ,t,u,v) = newres(μ,t,u,v,meas_res...)
-  newjac(μ,t,u,du,v) = newjac(μ,t,u,du,v,meas_jac...)
-
-  return newres,newjac
-end
-
-function set_triangulation(res,jacs::NTuple{2,Function},trian_res,trian_jacs,order)
-  jac,jac_t = jacs
-  trian_jac,trian_jac_t = trian_jacs
-  degree = 2*order
-
-  meas_res = Measure.(trian_res,degree)
-  meas_jac = Measure.(trian_jac,degree)
-  meas_jac_t = Measure.(trian_jac_t,degree)
-
-  newres(μ,t,u,v,args...) = res(μ,t,u,v,args...)
-  newjac(μ,t,u,du,v,args...) = jac(μ,t,u,du,v,args...)
-  newjac_t(μ,t,u,dut,v,args...) = jac_t(μ,t,u,dut,v,args...)
-
-  newres(μ,t,u,v) = newres(μ,t,u,v,meas_res...)
-  newjac(μ,t,u,du,v) = newjac(μ,t,u,du,v,meas_jac...)
-  newjac_t(μ,t,u,dut,v) = newjac_t(μ,t,u,dut,v,meas_jac_t...)
-
-  return newres,newjac,newjac_t
-end
-
-struct TransientParamSaddlePointFEOpWithTrian{T} <: TransientParamFEOperatorWithTrian{T}
+struct TransientParamSaddlePointFEOpWithTrian{T,N} <: TransientParamFEOperatorWithTrian{T}
   op::TransientParamSaddlePointFEOp{T}
   trian_res::Tuple{Vararg{Triangulation}}
-  trian_jacs::NTuple{2,Tuple{Vararg{Triangulation}}}
+  trian_jacs::NTuple{N,Tuple{Vararg{Triangulation}}}
+
+  function TransientParamSaddlePointFEOpWithTrian(
+    op::TransientParamSaddlePointFEOp{T},
+    trian_res::Tuple{Vararg{Triangulation}},
+    trian_jacs::NTuple{N,Tuple{Vararg{Triangulation}}}) where {T,N}
+
+    newop = set_triangulation(op,trian_res,trian_jacs)
+    new{T,N}(newop,trian_res,trian_jacs)
+  end
 end
 
-function TransientFEOperatorWithTrian(op::TransientParamSaddlePointFEOp,trian_res,trian_jacs...)
-  newop = set_triangulation(op,trian_res,trian_jacs)
-  TransientParamSaddlePointFEOpWithTrian(newop,trian_res,trian_jacs)
+function TransientParamFEOpFromWeakForm(
+  res::Function,
+  jacs::Tuple{Vararg{Function}},
+  induced_norm::Function,
+  assem::Assembler,
+  tpspace::TransientParamSpace,
+  trial::FESpace,
+  test::FESpace,
+  order::Integer,
+  coupling::Function,
+  trian_res,
+  trian_jacs...)
+
+  saddlep_op = TransientParamFEOpFromWeakForm(res,jacs,induced_norm,assem,tpspace,
+    trial,test,order,coupling)
+  saddlep_op_trian = TransientParamSaddlePointFEOpWithTrian(saddlep_op,trian_res,trian_jacs)
+  return saddlep_op_trian
+end
+
+function TransientParamSemilinearFEOpFromWeakForm(
+  mass::Function,
+  res::Function,
+  jacs::Tuple{Vararg{Function}},
+  constant_mass::Bool,
+  induced_norm::Function,
+  assem::Assembler,
+  tpspace::TransientParamSpace,
+  trial::FESpace,
+  test::FESpace,
+  order::Integer,
+  coupling::Function,
+  trian_res,
+  trian_jacs...)
+
+  saddlep_op = TransientParamSemilinearFEOpFromWeakForm(mass,res,jacs,constant_mass,
+    induced_norm,assem,tpspace,trial,test,order,coupling)
+  saddlep_op_trian = TransientParamSaddlePointFEOpWithTrian(saddlep_op,trian_res,trian_jacs)
+  return saddlep_op_trian
+end
+
+function TransientParamLinearFEOpFromWeakForm(
+  forms::Tuple{Vararg{Function}},
+  res::Function,
+  jacs::Tuple{Vararg{Function}},
+  constant_forms::Tuple{Vararg{Bool}},
+  induced_norm::Function,
+  assem::Assembler,
+  tpspace::TransientParamSpace,
+  trial::FESpace,
+  test::FESpace,
+  order::Integer,
+  coupling::Function,
+  trian_res,
+  trian_jacs...)
+
+  saddlep_op = TransientParamLinearFEOpFromWeakForm(forms,res,jacs,constant_forms,
+    induced_norm,assem,tpspace,trial,test,order,coupling)
+  saddlep_op_trian = TransientParamSaddlePointFEOpWithTrian(saddlep_op,trian_res,trian_jacs)
+  return saddlep_op_trian
 end
 
 FESpaces.get_test(op::TransientParamSaddlePointFEOpWithTrian) = get_test(op)
@@ -168,7 +196,44 @@ function ODEs.get_assembler(op::TransientParamSaddlePointFEOpWithTrian,r::Transi
   get_assembler(op.op,r)
 end
 
-# needed to retrieve measures
+# utils
+
+function _set_triangulation_jac(
+  jac::Function,
+  trian_jac::Tuple{Vararg{Triangulation}},
+  order)
+
+  degree = 2*order
+  meas = Measure.(trian_jac,degree)
+  newjac(μ,t,u,du,v,args...) = jac(μ,t,u,du,v,args...)
+  newjac(μ,t,u,du,v) = newjac(μ,t,u,du,v,meas...)
+  return newjacs
+end
+
+function _set_triangulation_jacs(
+  jacs::NTuple{N,Function},
+  trian_jacs::NTuple{N,Tuple{Vararg{Triangulation}}},
+  order) where N
+
+  newjacs = ()
+  for (jac,trians) in zip(jacs,trian_jacs)
+    newjacs = (newjacs...,_set_triangulation_jac(jac,trians,order))
+  end
+  return newjacs
+end
+
+function _set_triangulation_res(
+  res::Function,
+  trian_res::Tuple{Vararg{Triangulation}},
+  order)
+
+  degree = 2*order
+  meas = Measure.(trian_res,degree)
+  newres(μ,t,u,v,args...) = res(μ,t,u,v,args...)
+  newres(μ,t,u,v) = newres(μ,t,u,v,meas...)
+  return newres
+end
+
 function get_polynomial_order(basis,::DiscreteModel)
   cell_basis = get_data(basis)
   shapefuns = first(cell_basis.values).fields
@@ -188,23 +253,30 @@ get_polynomial_order(fs::MultiFieldFESpace) = maximum(map(get_polynomial_order,f
 
 function set_triangulation(op::TransientParamFEOpFromWeakForm,trian_res,trian_jacs)
   polyn_order = get_polynomial_order(op.test)
-  newres,newjacs... = set_triangulation(op.res,op.jacs,trian_res,trian_jacs,polyn_order)
-  TransientParamFEOperator(
-    newres,newjacs,op.induced_norm,op.tpspace,op.trial,op.test)
+  newres = _set_triangulation_res(op.res,trian_res,polyn_order)
+  newjacs = _set_triangulation_jacs(op.jacs,trian_jacs,polyn_order)
+  TransientParamFEOpFromWeakForm(
+    newres,newjacs,op.induced_norm,op.tpspace,op.assem,op.trial,op.test,op.order)
 end
 
 function set_triangulation(op::TransientParamSemilinearFEOpFromWeakForm,trian_res,trian_jacs)
   polyn_order = get_polynomial_order(op.test)
-  newres,newforms... = set_triangulation(op.res,op.forms,trian_res,trian_jacs,polyn_order)
-  TransientParamSemilinearFEOperator(
-    newforms,newres,op.induced_norm,op.tpspace,op.trial,op.test;constant_forms=op.constant_forms)
+  newres = _set_triangulation_res(op.res,trian_res,polyn_order)
+  newmass = _set_triangulation_jac(op.mass,trian_jacs[end],polyn_order)
+  newjacs = _set_triangulation_jacs(op.jacs,trian_jacs,polyn_order)
+  TransientParamSemilinearFEOpFromWeakForm(
+    newmass,newres,newjacs,op.constant_mass,op.induced_norm,op.tpspace,op.assem,
+    op.trial,op.test,op.order)
 end
 
 function set_triangulation(op::TransientParamLinearFEOpFromWeakForm,trian_res,trian_jacs)
   polyn_order = get_polynomial_order(op.test)
-  newres,newforms... = set_triangulation(op.res,op.forms,trian_res,trian_jacs,polyn_order)
-  TransientParamLinearFEOperator(
-    newforms,newres,op.induced_norm,op.tpspace,op.trial,op.test;constant_forms=op.constant_forms)
+  newres = _set_triangulation_res(op.res,trian_res,polyn_order)
+  newforms = _set_triangulation_jacs(op.forms,trian_jacs,polyn_order)
+  newjacs = _set_triangulation_jacs(op.jacs,trian_jacs,polyn_order)
+  TransientParamLinearFEOpFromWeakForm(
+    newforms,newres,newjacs,op.constant_forms,op.induced_norm,op.tpspace,
+    op.assem,op.trial,op.test,op.order)
 end
 
 function set_triangulation(op::TransientParamSaddlePointFEOp,trian_res,trian_jacs)

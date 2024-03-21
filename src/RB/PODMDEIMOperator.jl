@@ -159,7 +159,7 @@ function _select_snapshots_at_space_time_locations(
   end
 end
 
-function fe_jacobians!(
+function fe_jacobian!(
   cache,
   op::PODMDEIMOperator,
   r::TransientParamRealization,
@@ -168,7 +168,7 @@ function fe_jacobians!(
   odeopcache)
 
   red_r,red_times,red_us,red_odeopcache = _select_fe_quantities_at_time_locations(op.lhs,r,us,odeopcache)
-  A = jacobians!(cache,op.op,red_r,red_us,ws,red_odeopcache)
+  A = jacobian!(cache,op.op,red_r,red_us,ws,red_odeopcache)
   Ai = map(A,op.lhs) do A,lhs
     _select_snapshots_at_space_time_locations(A,lhs,red_times)
   end
@@ -327,7 +327,7 @@ end
 
 function Algebra.solve(
   solver::RBSolver,
-  op::RBOperator{NonlinearODE},
+  op::RBOperator{NonlinearParamODE},
   s::S) where S
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
@@ -339,7 +339,7 @@ end
 
 function Algebra.solve(
   solver::ThetaMethodRBSolver,
-  op::RBOperator{LinearODE},
+  op::RBOperator{LinearParamODE},
   r::TransientParamRealization)
 
   fesolver = get_fe_solver(solver)

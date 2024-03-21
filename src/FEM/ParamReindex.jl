@@ -22,7 +22,7 @@ end
 Arrays.testitem(k::PosNegParamReindex) = PosNegReindex(testitem(k.values_pos),testitem(k.values_neg))
 Arrays.testargs(k::PosNegParamReindex,i::Integer) = testargs(testitem(k),i)
 
-function Base.iterate(k::PosNegParamReindex,i::Integer)
+function Base.getindex(k::PosNegParamReindex,i::Integer)
   PosNegReindex(k.values_pos[i],k.values_neg[i])
 end
 

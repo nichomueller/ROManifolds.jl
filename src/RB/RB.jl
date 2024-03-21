@@ -15,8 +15,7 @@ using Gridap.Geometry
 using Gridap.Fields
 using Gridap.CellData
 using Gridap.MultiField
-using Gridap.ODEs.ODETools
-using Gridap.ODEs.TransientFETools
+using Gridap.ODEs
 
 import Base: +,-,*,\
 import StaticArrays: SVector
@@ -24,7 +23,6 @@ import UnPack: @unpack
 import Gridap.Helpers: @abstractmethod,@check,@notimplemented,@unreachable
 import Gridap.Arrays: evaluate!
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
-import Gridap.ODEs.ODETools: jacobians!
 import PartitionedArrays: tuple_of_arrays
 
 export tpod
@@ -97,7 +95,7 @@ export fe_residual
 export fe_residual!
 export fe_jacobian
 export fe_jacobian!
-export fe_jacobians!
+export fe_jacobian!
 export fe_jacobian_and_residual!
 export fe_jacobian_and_residual
 include("PODOperator.jl")

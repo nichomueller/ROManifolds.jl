@@ -1,63 +1,58 @@
 # interface to deal with the inf-sup stability condition of saddle point problems
 
-function TransientParamFEOperator(
-  res::Function,jacs::Tuple{Vararg{Function}},induced_norm::Function,tpspace,trial,test,coupling::Function)
+function TransientParamFEOpFromWeakForm(
+  res::Function,
+  jacs::Tuple{Vararg{Function}},
+  induced_norm::Function,
+  assem::Assembler,
+  tpspace::TransientParamSpace,
+  trial::FESpace,
+  test::FESpace,
+  order::Integer,
+  coupling::Function)
 
-  op = TransientParamFEOperator(res,jacs,induced_norm,tpspace,trial,test)
-  TransientParamSaddlePointFEOp(op,coupling)
+  op = TransientParamFEOpFromWeakForm(res,jacs,induced_norm,assem,tpspace,
+    trial,test,order)
+  saddlep_op = TransientParamSaddlePointFEOp(op,coupling)
+  return saddlep_op
 end
 
-function TransientParamFEOperator(
-  res::Function,jac::Function,induced_norm::Function,tpspace,trial,test,coupling::Function)
+function TransientParamSemilinearFEOpFromWeakForm(
+  mass::Function,
+  res::Function,
+  jacs::Tuple{Vararg{Function}},
+  constant_mass::Bool,
+  induced_norm::Function,
+  assem::Assembler,
+  tpspace::TransientParamSpace,
+  trial::FESpace,
+  test::FESpace,
+  order::Integer,
+  coupling::Function)
 
-  op = TransientParamFEOperator(res,jac,induced_norm,tpspace,trial,test)
-  TransientParamSaddlePointFEOp(op,coupling)
+  op = TransientParamSemilinearFEOpFromWeakForm(mass,res,jacs,constant_mass,
+    induced_norm,assem,tpspace,trial,test,order)
+  saddlep_op = TransientParamSaddlePointFEOp(op,coupling)
+  return saddlep_op
 end
 
-function TransientParamFEOperator(
-  res::Function,jac::Function,jac_t::Function,induced_norm::Function,tpspace,trial,test,coupling::Function)
+function TransientParamLinearFEOpFromWeakForm(
+  forms::Tuple{Vararg{Function}},
+  res::Function,
+  jacs::Tuple{Vararg{Function}},
+  constant_forms::Tuple{Vararg{Bool}},
+  induced_norm::Function,
+  assem::Assembler,
+  tpspace::TransientParamSpace,
+  trial::FESpace,
+  test::FESpace,
+  order::Integer,
+  coupling::Function)
 
-  op = TransientParamFEOperator(res,jac,jac_t,induced_norm,tpspace,trial,test)
-  TransientParamSaddlePointFEOp(op,coupling)
-end
-
-function TransientParamFEOperator(
-  res::Function,induced_norm::Function,tpspace,trial,test,coupling::Function;order::Integer=1)
-
-  op = TransientParamFEOperator(res,induced_norm,tpspace,trial,test;order)
-  TransientParamSaddlePointFEOp(op,coupling)
-end
-
-function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},res::Function,jacs::Tuple{Vararg{Function}},
-  induced_norm::Function,tpspace,trial,test,coupling::Function;kwargs...)
-
-  op = TransientParamLinearFEOperator(forms,res,jacs,induced_norm,tpspace,trial,test;kwargs...)
-  TransientParamSaddlePointFEOp(op,coupling)
-end
-
-function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},res::Function,jac::Function,induced_norm::Function,
-  tpspace,trial,test,coupling::Function;kwargs...)
-
-  op = TransientParamLinearFEOperator(forms,res,jac,induced_norm,tpspace,trial,test;kwargs...)
-  TransientParamSaddlePointFEOp(op,coupling)
-end
-
-function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},res::Function,jac::Function,jac_t::Function,
-  induced_norm::Function,tpspace,trial,test,coupling::Function;kwargs...)
-
-  op = TransientParamLinearFEOperator(forms,res,jac,jac_t,induced_norm,tpspace,trial,test;kwargs...)
-  TransientParamSaddlePointFEOp(op,coupling)
-end
-
-function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},res::Function,induced_norm::Function,
-  tpspace,trial,test,coupling::Function;order::Integer=1,kwargs...)
-
-  op = TransientParamLinearFEOperator(forms,res,induced_norm,tpspace,trial,test;order,kwargs...)
-  TransientParamSaddlePointFEOp(op,coupling)
+  op = TransientParamLinearFEOpFromWeakForm(forms,res,jacs,constant_forms,
+    induced_norm,assem,tpspace,trial,test,order)
+  saddlep_op = TransientParamSaddlePointFEOp(op,coupling)
+  return saddlep_op
 end
 
 struct TransientParamSaddlePointFEOp{T<:ODEParamOperatorType} <: TransientParamFEOperator{T}
@@ -65,16 +60,17 @@ struct TransientParamSaddlePointFEOp{T<:ODEParamOperatorType} <: TransientParamF
   coupling::Function
 end
 
-FESpaces.get_test(op::TransientParamSaddlePointFEOp) = get_test(op)
-FESpaces.get_trial(op::TransientParamSaddlePointFEOp) = get_trial(op)
-Polynomials.get_order(op::TransientParamSaddlePointFEOp) = get_order(op)
-ODEs.get_res(op::TransientParamSaddlePointFEOp) = get_res(op)
-ODEs.get_jacs(op::TransientParamSaddlePointFEOp) = get_jacs(op)
-ODEs.get_forms(op::TransientParamSaddlePointFEOp) = get_forms(op)
-ODEs.get_assembler(op::TransientParamSaddlePointFEOp) = get_assembler(op)
-realization(op::TransientParamSaddlePointFEOp;kwargs...) = realization(op;kwargs...)
-get_induced_norm(op::TransientParamSaddlePointFEOp) = get_induced_norm(op)
+FESpaces.get_test(op::TransientParamSaddlePointFEOp) = get_test(op.op)
+FESpaces.get_trial(op::TransientParamSaddlePointFEOp) = get_trial(op.op)
+Polynomials.get_order(op::TransientParamSaddlePointFEOp) = get_order(op.op)
+ODEs.get_res(op::TransientParamSaddlePointFEOp) = get_res(op.op)
+ODEs.get_jacs(op::TransientParamSaddlePointFEOp) = get_jacs(op.op)
+ODEs.get_forms(op::TransientParamSaddlePointFEOp) = get_forms(op.op)
+ODEs.get_assembler(op::TransientParamSaddlePointFEOp) = get_assembler(op.op)
+realization(op::TransientParamSaddlePointFEOp;kwargs...) = realization(op.op;kwargs...)
+get_induced_norm(op::TransientParamSaddlePointFEOp) = get_induced_norm(op.op)
 get_coupling(op::TransientParamSaddlePointFEOp) = op.coupling
+ODEs.is_form_constant(op::TransientParamSaddlePointFEOp,k) = is_form_constant(op.op,k)
 
 function assemble_norm_matrix(op::TransientParamSaddlePointFEOp)
   assemble_norm_matrix(op.op)

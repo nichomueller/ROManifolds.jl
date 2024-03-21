@@ -841,6 +841,46 @@ for op in (:+,:-,:*)
     function Arrays.evaluate!(cache,f::Broadcasting{typeof($op)},a::ParamArray,b::ParamArray)
       evaluate!(cache,Fields.BroadcastingFieldOpMap($op),a,b)
     end
+
+    function Arrays.return_value(f::Broadcasting{typeof($op)},a::ParamArray,b::AbstractArray{<:Number})
+      vi = return_value(f,testitem(a),b)
+      array = Vector{typeof(vi)}(undef,length(a))
+      @inbounds for i = eachindex(a)
+        array[i] = return_value(f,a[i],b)
+      end
+      ParamArray(array)
+    end
+
+    function Arrays.return_cache(f::Broadcasting{typeof($op)},a::ParamArray,b::AbstractArray{<:Number})
+      ci = return_cache(f,testitem(a),b)
+      bi = evaluate!(ci,f,testitem(a),b)
+      cache = Vector{typeof(ci)}(undef,length(a))
+      array = Vector{typeof(bi)}(undef,length(a))
+      @inbounds for i = eachindex(a)
+        cache[i] = return_cache(f,a[i],b)
+      end
+      cache,ParamArray(array)
+    end
+
+    function Arrays.evaluate!(cache,f::Broadcasting{typeof($op)},a::ParamArray,b::AbstractArray{<:Number})
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        array[i] = evaluate!(cx[i],f,a[i],b)
+      end
+      array
+    end
+
+    function Arrays.return_value(k::Broadcasting{typeof($op)},a::AbstractArray{<:Number},b::ParamArray)
+      return_value(k,b,a)
+    end
+
+    function Arrays.return_cache(k::Broadcasting{typeof($op)},a::AbstractArray{<:Number},b::ParamArray)
+      return_cache(k,b,a)
+    end
+
+    function Arrays.evaluate!(cache,k::Broadcasting{typeof($op)},a::AbstractArray{<:Number},b::ParamArray)
+      evaluate!(cache,k,b,a)
+    end
   end
 end
 
@@ -1114,4 +1154,114 @@ function Arrays.evaluate!(cache,k::MulAddMap,a::ParamArray,b::ParamArray,c::Para
   copyto!(d,c)
   mul!(d,a,b,k.α,k.β)
   d
+end
+
+function Arrays.return_cache(k::ConfigMap{typeof(ForwardDiff.gradient)},x::ParamArray)
+  return_cache(k,testitem(x))
+end
+
+function Arrays.return_cache(k::ConfigMap{typeof(ForwardDiff.jacobian)},x::ParamArray)
+  return_cache(k,testitem(x))
+end
+
+function Arrays.return_value(k::DualizeMap,a::ParamArray)
+  vi = return_value(k,testitem(a))
+  array = Vector{typeof(vi)}(undef,length(a))
+  @inbounds for i = eachindex(a)
+    array[i] = copy(vi)
+  end
+  ParamArray(array)
+end
+
+function Arrays.return_cache(k::DualizeMap,a::ParamArray)
+  ci = return_cache(k,testitem(a))
+  ki = evaluate!(ci,k,testitem(a))
+  cache = Vector{typeof(ci)}(undef,length(a))
+  array = Vector{typeof(ki)}(undef,length(a))
+  @inbounds for i = eachindex(a)
+    cache[i] = copy(ci)
+  end
+  cache,ParamArray(array)
+end
+
+function Arrays.evaluate!(cache,k::DualizeMap,a::ParamArray)
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],k,a[i])
+  end
+  array
+end
+
+function Arrays.return_value(
+  k::AutoDiffMap,
+  ydual::AbstractVector,
+  x::ParamArray,
+  cfg::ForwardDiff.GradientConfig)
+
+  @check length(ydual) == length(x)
+  vi = return_cache(k,testitem(ydual),testitem(x),cfg)
+  array = allocate_param_array(vi,length(ydual))
+  return array
+end
+
+function Arrays.return_cache(
+  k::AutoDiffMap,
+  ydual::AbstractVector,
+  x::ParamArray,
+  cfg::ForwardDiff.GradientConfig)
+
+  @check length(ydual) == length(x)
+  ci = return_cache(k,testitem(ydual),testitem(x),cfg)
+  result = allocate_param_array(ci,length(ydual))
+  return result
+end
+
+function Arrays.evaluate!(
+  result::ParamArray,
+  k::AutoDiffMap,
+  ydual::AbstractVector,
+  x::ParamArray,
+  cfg::ForwardDiff.GradientConfig)
+
+  @inbounds for i = eachindex(result)
+    evaluate!(result[i],k,ydual[i],x[i],cfg)
+  end
+  result
+end
+
+function Arrays.return_value(
+  k::AutoDiffMap,
+  ydual::AbstractVector,
+  x::ParamArray,
+  cfg::ForwardDiff.JacobianConfig)
+
+  @check length(ydual) == length(x)
+  vi = return_cache(k,testitem(ydual),testitem(x),cfg)
+  array = allocate_param_array(vi,length(ydual))
+  return array
+end
+
+function Arrays.return_cache(
+  k::AutoDiffMap,
+  ydual::AbstractVector,
+  x::ParamArray,
+  cfg::ForwardDiff.JacobianConfig)
+
+  @check length(ydual) == length(x)
+  ci = return_cache(k,testitem(ydual),testitem(x),cfg)
+  result = allocate_param_array(ci,length(ydual))
+  return result
+end
+
+function Arrays.evaluate!(
+  result::ParamArray,
+  k::AutoDiffMap,
+  ydual::AbstractVector,
+  x::ParamArray,
+  cfg::ForwardDiff.JacobianConfig)
+
+  @inbounds for i = eachindex(result)
+    evaluate!(result[i],k,ydual[i],x[i],cfg)
+  end
+  result
 end

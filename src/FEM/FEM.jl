@@ -3,32 +3,32 @@ using LinearAlgebra
 using BlockArrays
 using SparseArrays
 using SparseMatricesCSR
+using ForwardDiff
 using WriteVTK
 using Gridap
 using Gridap.Algebra
-using Gridap.FESpaces
-using Gridap.ReferenceFEs
 using Gridap.Arrays
-using Gridap.Geometry
-using Gridap.Fields
 using Gridap.CellData
+using Gridap.FESpaces
+using Gridap.Fields
+using Gridap.Geometry
 using Gridap.MultiField
-using Gridap.ODEs.ODETools
-using Gridap.ODEs.TransientFETools
+using Gridap.ODEs
+using Gridap.Polynomials
+using Gridap.ReferenceFEs
 using Gridap.Visualization
 using Gridap.Helpers
 
 import Base: inv,abs,abs2,*,+,-,/,adjoint,transpose,real,imag,conj
 import LinearAlgebra: det,tr,cross,dot,fillstored!
 import FillArrays: Fill,fill
-import ForwardDiff: derivative
 import Distributions: Uniform,Normal
 import Test: @test
 import UnPack: @unpack
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.Fields: OperationField,BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
-import Gridap.ODEs: TransientCellField,allocate_trial_space,jacobians!
+import Gridap.ODEs: TransientCellField
 import Gridap.ReferenceFEs: get_order
 import Gridap.TensorValues: inner,outer,double_contraction,symmetric_part
 import PartitionedArrays: tuple_of_arrays
@@ -110,7 +110,6 @@ include("ParamFEFunction.jl")
 
 export TransientTrialParamFESpace
 export TransientMultiFieldParamFESpace
-export TransientMultiFieldTrialParamFESpace
 include("TransientTrialParamFESpace.jl")
 
 export ParamCounter
@@ -122,8 +121,27 @@ include("ParamAssemblers.jl")
 
 include("ParamBlockAssemblers.jl")
 
+export ODEParamOperatorType
+export NonlinearParamODE
+export QuasilinearParamODE
+export SemilinearParamODE
+export LinearParamODE
+export ODEParamOperator
+export ODEParamOperatorWithTrian
+export ParamODEOpFromTFEOpCache
+include("ODEParamOperator.jl")
+
+export ParamStageOperator
+export NonlinearParamStageOperator
+export LinearParamStageOperator
+include("ParamStageOperator.jl")
+
 export TransientParamFEOperator
 export TransientParamFEOpFromWeakForm
+export TransientParamSemilinearFEOperator
+export TransientParamSemilinearFEOpFromWeakForm
+export TransientParamLinearFEOperator
+export TransientParamLinearFEOpFromWeakForm
 export LinearTransientParamFEOperator
 export NonlinearTransientParamFEOperator
 export assemble_norm_matrix
@@ -133,8 +151,9 @@ export TransientParamSaddlePointFEOp
 export assemble_coupling_matrix
 include("TransientParamSaddlePointFEOperator.jl")
 
-export TransientFEOperatorWithTrian
 export TransientParamFEOperatorWithTrian
+export TransientParamFEOpFromWeakFormWithTrian
+export TransientParamSaddlePointFEOpWithTrian
 export set_triangulation
 export change_triangulation
 include("TransientParamFEOperatorWithTrian.jl")
@@ -146,11 +165,11 @@ export get_nonlinear_operator
 export join_operators
 include("TransientParamLinearNonlinearFEOperator.jl")
 
-export ODEParamOperator
 export ODEParamOpFromTFEOp
-include("ODEParamOperator.jl")
+export ODEParamOpFromTFEOpWithTrian
+include("ODEParamOpFromTFEOp.jl")
 
-export ThetaMethodParamOperator
+export residual_and_jacobian
 include("ThetaMethod.jl")
 
 export ODEParamSolution

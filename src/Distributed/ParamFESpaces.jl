@@ -69,7 +69,7 @@ end
 
 function _to_distributed_fe_space(trial::TransientTrialParamFESpace{<:DistributedSingleFieldFESpace})
   map(local_views(trial.space)) do space
-    TransientTrialParamFESpace(space,trial.dirichlet_pt)
+    TransientTrialParamFESpace(space,trial.dirichlet)
   end
 end
 

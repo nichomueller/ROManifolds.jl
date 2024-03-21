@@ -306,7 +306,7 @@ it_M = get_values(red_op.lhs[2])[1].integration_domain.indices_time
 # it_R2 = get_values(red_op.rhs)[2].integration_domain.indices_time
 
 fe_A, = allocate_jacobian(red_op,r_on,y,ode_cache)
-fe_sA = fe_jacobians!(fe_A,red_op,r_on,(y,z),(1,1/dtθ),ode_cache)
+fe_sA = fe_jacobian!(fe_A,red_op,r_on,(y,z),(1,1/dtθ),ode_cache)
 @check get_values(fe_sA[1])[1] ≈ stack(map(i->RB.get_values(snapsA)[i][is_A],it_A))
 @check get_values(fe_sA[2])[1] ≈ stack(map(i->RB.get_values(snapsM)[i][is_M],it_M))
 

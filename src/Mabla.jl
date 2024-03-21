@@ -54,7 +54,6 @@ export MultiFieldParamFEFunction
 
 export TransientTrialParamFESpace
 export TransientMultiFieldParamFESpace
-export TransientMultiFieldTrialParamFESpace
 
 export ParamCounter
 export ParamInserterCSC
@@ -69,8 +68,6 @@ export jacobian_for_trian!
 
 export ODEParamOperator
 export ODEParamOpFromTFEOp
-
-export ThetaMethodParamOperator
 
 export ODEParamSolution
 export GenericODEParamSolution

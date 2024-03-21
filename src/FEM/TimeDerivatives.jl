@@ -2,7 +2,7 @@ function ODEs.time_derivative(f::TransientParamFunction)
   @unpack fun,params,times = f
   function dfdt(x,μ,t)
     z = zero(return_type(fun,x,μ,t))
-    _time_derivative(fun,x,μ,t,z)
+    ODEs._time_derivative(fun,x,μ,t,z)
   end
   _dfdt(x,μ,t) = dfdt(x,μ,t)
   _dfdt(x::VectorValue) = (μ,t) -> dfdt(x,μ,t)
@@ -13,7 +13,7 @@ function ODEs.time_derivative(f::TransientParamFunction)
 end
 
 function ODEs._time_derivative(f,x,μ,t,::Any)
-  derivative(t->f(x,μ,t),t)
+  ForwardDiff.derivative(t->f(x,μ,t),t)
 end
 
 function ODEs._time_derivative(f,x,μ,t,::VectorValue)

@@ -11,8 +11,8 @@ function TransientParamFESolution(
 
   params = get_params(r)
   odeop = get_algebraic_operator(op)
-  u0 = get_free_dof_values.(uh0.(params))
-  odesol = solve(solver,odeop,u0,r)
+  u0 = get_free_dof_values.(map(uh0->uh0(params),uh0))
+  odesol = solve(solver,odeop,r,u0)
   trial = get_trial(op)
   TransientParamFESolution(odesol,trial)
 end
@@ -33,7 +33,7 @@ function Base.iterate(sol::TransientParamFESolution)
   end
   (rf,uf),ode_it_state = ode_it
 
-  Uh = allocate_trial_space(sol.trial,rf)
+  Uh = allocate_space(sol.trial,rf)
   Uh = evaluate!(Uh,sol.trial,rf)
   uhf = FEFunction(Uh,uf)
 
@@ -100,7 +100,7 @@ function Algebra.solve(solver::ODESolver,op::TransientParamFEOperator,uh0;kwargs
   solve(solver,op,r,uh0)
 end
 
-function ODEs.test_transient_fe_solver(
+function test_transient_fe_solver(
   solver::ODESolver,op::TransientParamFEOperator,r,u0)
 
   solution = solve(solver,op,r,u0)

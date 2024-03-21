@@ -20,6 +20,18 @@ function ODEs.TransientCellField(f::SingleFieldParamFEFunction,derivatives::Tupl
   ODEs.TransientSingleFieldCellField(f,derivatives)
 end
 
+# audodiff
+
+function FESpaces._change_argument(op,f,trian,uh::SingleFieldParamFEFunction)
+  U = get_fe_space(uh)
+  function g(cell_u)
+    cf = CellField(U,cell_u)
+    cell_grad = f(cf)
+    CellData.get_contribution(cell_grad,trian)
+  end
+  g
+end
+
 # for visualization/testing purposes
 
 function FESpaces.test_fe_function(f::SingleFieldParamFEFunction)

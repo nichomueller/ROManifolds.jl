@@ -857,52 +857,52 @@ function _rel_norm(fea::ArrayBlock,rba::ParamBlockArray)
   return_cache(block_map,norms...)
 end
 
-function _jacobian_and_residual(solver::ThetaMethodRBSolver,op::RBOperator{T},s) where T
-  fesolver = get_fe_solver(solver)
-  dt = fesolver.dt
-  θ = fesolver.θ
-  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-  r = get_realization(s)
-  FEM.shift_time!(r,dt*(θ-1))
-  ode_cache = allocate_cache(op,r)
-  u0 = get_values(s)
-  if C == LinearODE
-    u0 .= 0.0
-  end
-  vθ = similar(u0)
-  vθ .= 0.0
-  ode_cache = update_cache!(ode_cache,op,r)
-  nlop = RBThetaMethodParamOperator(op,r,dtθ,u0,ode_cache,vθ)
-  A = allocate_jacobian(nlop,u0)
-  b = allocate_residual(nlop,u0)
-  sA = jacobian!(A,nlop,u0)
-  sb = residual!(b,nlop,u0)
-  sA,sb
-end
+# function _jacobian_and_residual(solver::ThetaMethodRBSolver,op::RBOperator{T},s) where T
+#   fesolver = get_fe_solver(solver)
+#   dt = fesolver.dt
+#   θ = fesolver.θ
+#   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+#   r = get_realization(s)
+#   FEM.shift_time!(r,dt*(θ-1))
+#   ode_cache = allocate_cache(op,r)
+#   u0 = get_values(s)
+#   if C == LinearODE
+#     u0 .= 0.0
+#   end
+#   vθ = similar(u0)
+#   vθ .= 0.0
+#   ode_cache = update_cache!(ode_cache,op,r)
+#   nlop = RBThetaMethodParamOperator(op,r,dtθ,u0,ode_cache,vθ)
+#   A = allocate_jacobian(nlop,u0)
+#   b = allocate_residual(nlop,u0)
+#   sA = jacobian!(A,nlop,u0)
+#   sb = residual!(b,nlop,u0)
+#   sA,sb
+# end
 
-function _jacobian_and_residual(solver::ThetaMethod,op::ODEParamOperator{T},s) where T
-  dt = solver.dt
-  θ = solver.θ
-  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-  r = get_realization(s)
-  FEM.shift_time!(r,dt*(θ-1))
-  ode_cache = allocate_cache(op,r)
-  u0 = get_values(s)
-  if C == LinearODE
-    u0 .= 0.0
-  end
-  vθ = similar(u0)
-  vθ .= 0.0
-  ode_cache = update_cache!(ode_cache,op,r)
-  nlop = ThetaMethodParamOperator(op,r,dtθ,u0,ode_cache,vθ)
-  A = allocate_jacobian(nlop,u0)
-  b = allocate_residual(nlop,u0)
-  jacobian!(A,nlop,u0)
-  residual!(b,nlop,u0)
-  sA = map(A->Snapshots(A,r),A)
-  sb = Snapshots(b,r)
-  sA,sb
-end
+# function _jacobian_and_residual(solver::ThetaMethod,op::ODEParamOperator{T},s) where T
+#   dt = solver.dt
+#   θ = solver.θ
+#   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+#   r = get_realization(s)
+#   FEM.shift_time!(r,dt*(θ-1))
+#   ode_cache = allocate_cache(op,r)
+#   u0 = get_values(s)
+#   if C == LinearODE
+#     u0 .= 0.0
+#   end
+#   vθ = similar(u0)
+#   vθ .= 0.0
+#   ode_cache = update_cache!(ode_cache,op,r)
+#   nlop = ThetaMethodParamOperator(op,r,dtθ,u0,ode_cache,vθ)
+#   A = allocate_jacobian(nlop,u0)
+#   b = allocate_residual(nlop,u0)
+#   jacobian!(A,nlop,u0)
+#   residual!(b,nlop,u0)
+#   sA = map(A->Snapshots(A,r),A)
+#   sb = Snapshots(b,r)
+#   sA,sb
+# end
 
 function _jacobian_and_residual(
   solver::ThetaMethod,

@@ -169,7 +169,7 @@ function _plot(trial,s;kwargs...)
   _plot(sh,r;kwargs...)
 end
 
-function _plot(trial::TransientMultiFieldTrialParamFESpace,s::BlockSnapshots;varname=("vel","press"),kwargs...)
+function _plot(trial::TransientMultiFieldParamFESpace,s::BlockSnapshots;varname=("vel","press"),kwargs...)
   free_values = get_values(s)
   r = get_realization(s)
   trial = trial(r)

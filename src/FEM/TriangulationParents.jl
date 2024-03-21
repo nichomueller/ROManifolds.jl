@@ -55,7 +55,7 @@ end
 
 function merge_triangulations(trians)
   parent = get_parent(trians)
-  uindices = FEM.get_union_indices(trians)
+  uindices = get_union_indices(trians)
   view(parent,uindices)
 end
 

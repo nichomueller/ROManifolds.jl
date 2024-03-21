@@ -15,9 +15,7 @@ function TrialParamFESpace(dirichlet_values::AbstractVector,space::SingleFieldFE
 end
 
 function TrialParamFESpace(space::SingleFieldFESpace,objects)
-  dirichlet_values = map(objects) do object
-    compute_dirichlet_values_for_tags(space,object)
-  end
+  dirichlet_values = [compute_dirichlet_values_for_tags(space,objects[i]) for i = 1:length(objects)]
   TrialParamFESpace(ParamArray(dirichlet_values),space)
 end
 

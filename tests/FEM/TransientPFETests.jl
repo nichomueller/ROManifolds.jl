@@ -64,7 +64,7 @@ _ud1 = get_dirichlet_dof_values(U1)
 @test all(ud0 ≈ 0.5ud1)
 
 Ut = ∂t(U)
-Ut.dirichlet_pt
+Ut.dirichlet
 Ut0 = Ut(μ,0.0)
 Ut0.dirichlet_values
 
