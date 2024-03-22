@@ -63,6 +63,8 @@ Base.ndims(::ArrayContribution{T,N}) where {T,N} = N
 Base.ndims(::Type{<:ArrayContribution{T,N}}) where {T,N} = N
 Base.copy(a::ArrayContribution) = Contribution(copy(a.values),a.trians)
 
+Base.sum(a::ArrayContribution) = sum(a.values)
+
 function Base.fill!(a::ArrayContribution,v)
   for vals in a.values
     fill!(vals,v)

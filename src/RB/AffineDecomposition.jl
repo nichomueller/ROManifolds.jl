@@ -801,16 +801,17 @@ function interpolation_error(a::Tuple,fes::Tuple,rbs::Tuple)
   err
 end
 
-function _interpolation_error(solver,feop,rbop,s)
-  feA,feb = _jacobian_and_residual(get_fe_solver(solver),feop,s)
-  rbA,rbb = _jacobian_and_residual(solver,rbop.op,s)
+function _interpolation_error(solver,odeop,rbop,s)
+  feA,feb = jacobian_and_residual(get_fe_solver(solver),odeop,get_realization(s),(get_values(s),))
+  rbA,rbb = jacobian_and_residual(solver,rbop.op,s)
   errA = interpolation_error(rbop.lhs,feA,rbA)
   errb = interpolation_error(rbop.rhs,feb,rbb)
   return errA,errb
 end
 
 function interpolation_error(solver,feop,rbop,s)
-  errA,errb = _interpolation_error(solver,feop,rbop,s)
+  odeop = get_algebraic_operator(feop)
+  errA,errb = _interpolation_error(solver,odeop,rbop,s)
   return InterpolationError(errA,errb)
 end
 
@@ -822,18 +823,19 @@ function interpolation_error(solver,feop::TransientParamLinearNonlinearFEOperato
   return err_lin,err_nlin
 end
 
-function _linear_combination_error(solver,feop,rbop,s)
-  feA,feb = _jacobian_and_residual(get_fe_solver(solver),feop,s)
+function _linear_combination_error(solver,odeop,rbop,s)
+  feA,feb = jacobian_and_residual(get_fe_solver(solver),odeop,get_realization(s),(get_values(s),))
   feA_comp = compress(solver,feA,get_trial(rbop),get_test(rbop))
   feb_comp = compress(solver,feb,get_test(rbop))
-  rbA,rbb = _jacobian_and_residual(solver,rbop,s)
-  errA = _rel_norm(feA_comp,rbA)
-  errb = _rel_norm(feb_comp,rbb)
+  rbA,rbb = jacobian_and_residual(solver,rbop,s)
+  errA = _rel_norm(feA_comp,sum(map(sum,rbA)))
+  errb = _rel_norm(feb_comp,sum(rbb))
   return errA,errb
 end
 
 function linear_combination_error(solver,feop,rbop,s)
-  errA,errb = _linear_combination_error(solver,feop,rbop,s)
+  odeop = get_algebraic_operator(feop)
+  errA,errb = _linear_combination_error(solver,odeop,rbop,s)
   return LincombError(errA,errb)
 end
 
@@ -845,8 +847,8 @@ function linear_combination_error(solver,feop::TransientParamLinearNonlinearFEOp
   return err_lin,err_nlin
 end
 
-function _rel_norm(fea,rba)
-  norm(fea - rba) / norm(fea)
+function _rel_norm(fe,rb)
+  norm(fe - rb) / norm(fe)
 end
 
 function _rel_norm(fea::ArrayBlock,rba::ParamBlockArray)
@@ -855,62 +857,6 @@ function _rel_norm(fea::ArrayBlock,rba::ParamBlockArray)
   rb_array = get_array(rba)
   norms = [_rel_norm(fea[i],rb_array[i]) for i in active_block_ids]
   return_cache(block_map,norms...)
-end
-
-# function _jacobian_and_residual(solver::ThetaMethodRBSolver,op::RBOperator{T},s) where T
-#   fesolver = get_fe_solver(solver)
-#   dt = fesolver.dt
-#   θ = fesolver.θ
-#   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-#   r = get_realization(s)
-#   FEM.shift_time!(r,dt*(θ-1))
-#   ode_cache = allocate_cache(op,r)
-#   u0 = get_values(s)
-#   if C == LinearODE
-#     u0 .= 0.0
-#   end
-#   vθ = similar(u0)
-#   vθ .= 0.0
-#   ode_cache = update_cache!(ode_cache,op,r)
-#   nlop = RBThetaMethodParamOperator(op,r,dtθ,u0,ode_cache,vθ)
-#   A = allocate_jacobian(nlop,u0)
-#   b = allocate_residual(nlop,u0)
-#   sA = jacobian!(A,nlop,u0)
-#   sb = residual!(b,nlop,u0)
-#   sA,sb
-# end
-
-# function _jacobian_and_residual(solver::ThetaMethod,op::ODEParamOperator{T},s) where T
-#   dt = solver.dt
-#   θ = solver.θ
-#   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-#   r = get_realization(s)
-#   FEM.shift_time!(r,dt*(θ-1))
-#   ode_cache = allocate_cache(op,r)
-#   u0 = get_values(s)
-#   if C == LinearODE
-#     u0 .= 0.0
-#   end
-#   vθ = similar(u0)
-#   vθ .= 0.0
-#   ode_cache = update_cache!(ode_cache,op,r)
-#   nlop = ThetaMethodParamOperator(op,r,dtθ,u0,ode_cache,vθ)
-#   A = allocate_jacobian(nlop,u0)
-#   b = allocate_residual(nlop,u0)
-#   jacobian!(A,nlop,u0)
-#   residual!(b,nlop,u0)
-#   sA = map(A->Snapshots(A,r),A)
-#   sb = Snapshots(b,r)
-#   sA,sb
-# end
-
-function _jacobian_and_residual(
-  solver::ThetaMethod,
-  _feop::TransientParamFEOperator,
-  args...)
-
-  op = get_algebraic_operator(_feop)
-  _jacobian_and_residual(solver,op,args...)
 end
 
 function mdeim_error(solver,feop,rbop,s)

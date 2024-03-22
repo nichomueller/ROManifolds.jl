@@ -68,11 +68,11 @@ function ODEs.allocate_odeopcache(
 end
 
 function ODEs.update_odeopcache!(
-  ode_cache,
+  odeopcache,
   op::PODOperator,
   r::TransientParamRealization)
 
-  update_odeopcache!(ode_cache,op.odeop,r)
+  update_odeopcache!(odeopcache,op.odeop,r)
 end
 
 function Algebra.allocate_residual(
@@ -101,7 +101,7 @@ function Algebra.residual!(
   odeopcache;
   kwargs...)
 
-  residual!(b,op.odeop,r,us,ode_cache;kwargs...)
+  residual!(b,op.odeop,r,us,odeopcache;kwargs...)
   return Snapshots(b,r)
 end
 
@@ -114,17 +114,12 @@ function Algebra.jacobian!(
   odeopcache)
 
   jacobian!(A,op.odeop,r,us,ws,odeopcache)
-  return Snapshots.(A,r)
+  return Snapshots(A,r)
 end
 
-function FEM.jacobian_and_residual(
-  solver::RBSolver,
-  op::RBOperator,
-  s::S) where S
-
-  fesolver = get_fe_solver(solver)
+function FEM.jacobian_and_residual(solver::RBSolver,op::RBOperator,s::S) where S
   x = get_values(s)
   r = get_realization(s)
-  A,b = jacobian_and_residual(fesolver,op.odeop,r,(x,))
+  A,b = jacobian_and_residual(get_fe_solver(solver),op.odeop,x)
   return Snapshots(A,r),Snapshots(b,r)
 end

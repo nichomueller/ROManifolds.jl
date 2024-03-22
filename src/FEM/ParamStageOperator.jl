@@ -57,11 +57,11 @@ function LinearParamStageOperator(
   rx::TransientParamRealization,
   usx::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
-  A,b,reuse::Bool,sysslvrcache)
+  matcache,veccache,reuse::Bool,sysslvrcache)
 
-  residual!(b,odeop,rx,usx,odeopcache)
+  b = residual!(veccache,odeop,rx,usx,odeopcache)
   if isnothing(sysslvrcache) || !reuse
-    jacobian!(A,odeop,rx,usx,ws,odeopcache)
+    A = jacobian!(matcache,odeop,rx,usx,ws,odeopcache)
   end
   LinearParamStageOperator(A,b,reuse)
 end

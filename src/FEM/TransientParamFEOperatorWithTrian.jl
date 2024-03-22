@@ -304,9 +304,16 @@ function set_triangulation(
   set_triangulation(op.op,trian_res,trian_jacs)
 end
 
-function change_triangulation(op::TransientParamFEOperatorWithTrian,trian_res,trian_jacs)
+function change_triangulation(op::TransientParamFEOpFromWeakFormWithTrian,trian_res,trian_jacs)
   newtrian_res = order_triangulations(op.trian_res,trian_res)
   newtrian_jacs = order_triangulations.(op.trian_jacs,trian_jacs)
   newop = set_triangulation(op,newtrian_res,newtrian_jacs)
-  TransientParamFEOperatorWithTrian(newop,newtrian_res,newtrian_jacs)
+  TransientParamFEOpFromWeakFormWithTrian(newop,newtrian_res,newtrian_jacs)
+end
+
+function change_triangulation(op::TransientParamSaddlePointFEOpWithTrian,trian_res,trian_jacs)
+  newtrian_res = order_triangulations(op.trian_res,trian_res)
+  newtrian_jacs = order_triangulations.(op.trian_jacs,trian_jacs)
+  newop = set_triangulation(op,newtrian_res,newtrian_jacs)
+  TransientParamSaddlePointFEOpWithTrian(newop,newtrian_res,newtrian_jacs)
 end

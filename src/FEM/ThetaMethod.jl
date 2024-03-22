@@ -171,6 +171,8 @@ function jacobian_and_residual(
   us = (x,x)
   ws = (1,1/dtθ)
 
+  update_odeopcache!(odeopcache,odeop,r)
+
   stageop = LinearParamStageOperator(odeop,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
 
   return stageop.A,stageop.b

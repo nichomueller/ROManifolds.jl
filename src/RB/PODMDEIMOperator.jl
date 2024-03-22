@@ -92,6 +92,16 @@ function Algebra.jacobian!(
   return Â
 end
 
+# function FEM.jacobian_and_residual(solver::RBSolver,op::PODMDEIMOperator,s::S) where S
+#   x = get_values(s)
+#   r = get_realization(s)
+#   odeopcache = allocate_odeopcache(op,r,(x,))
+#   b = allocate_residual(op,r,(x,),odeopcache)
+#   A = allocate_jacobian(op,r,(x,),odeopcache)
+#   odeopcache = update_odeopcache!(odeopcache,op,r)
+#   return residual!()
+# end
+
 function _select_fe_space_at_time_locations(fs::FESpace,indices)
   @notimplemented
 end
@@ -105,20 +115,20 @@ function _select_fe_space_at_time_locations(fs::SingleFieldParamFESpace,indices)
   TrialParamFESpace(dvi,fs.space)
 end
 
-function _select_cache_at_time_locations(xhF::Tuple{Vararg{ParamVector}},ode_cache,indices)
-  Us,Uts,fecache = ode_cache
+function _select_cache_at_time_locations(us::Tuple{Vararg{ParamVector}},odeopcache,indices)
+  @unpack Us,Uts,tfeopcache,const_forms = odeopcache
   new_xhF = ()
   new_Us = ()
-  for i = eachindex(xhF)
+  for i = eachindex(us)
     new_Us = (new_Us...,_select_fe_space_at_time_locations(Us[i],indices))
-    new_xhF = (new_xhF...,xhF[i][indices])
+    new_xhF = (new_xhF...,us[i][indices])
   end
-  new_ode_cache = new_Us,Uts,fecache
-  return new_xhF,new_ode_cache
+  new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)
+  return new_xhF,new_odeopcache
 end
 
-function _select_cache_at_time_locations(xhF::Tuple{Vararg{ParamBlockVector}},ode_cache,indices)
-  Us,Uts,fecache = ode_cache
+function _select_cache_at_time_locations(us::Tuple{Vararg{ParamBlockVector}},odeopcache,indices)
+  @unpack Us,Uts,tfeopcache,const_forms = odeopcache
   new_xhF = ()
   new_Us = ()
   for i = eachindex(Us)
@@ -127,22 +137,22 @@ function _select_cache_at_time_locations(xhF::Tuple{Vararg{ParamBlockVector}},od
     style = spacei.multi_field_style
     spacesi = [_select_fe_space_at_time_locations(spaceij,indices) for spaceij in spacei]
     new_Us = (new_Us...,MultiFieldParamFESpace(VT,spacesi,style))
-    new_xhF = (new_xhF...,ParamArray(xhF[i][indices]))
+    new_xhF = (new_xhF...,ParamArray(us[i][indices]))
   end
-  new_ode_cache = new_Us,Uts,fecache
-  return new_xhF,new_ode_cache
+  new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)
+  return new_xhF,new_odeopcache
 end
 
 function _select_indices_at_time_locations(red_times;nparams=1)
   vec(transpose((red_times.-1)*nparams .+ collect(1:nparams)'))
 end
 
-function _select_fe_quantities_at_time_locations(a,r,xhF,ode_cache)
+function _select_fe_quantities_at_time_locations(a,r,us,odeopcache)
   red_times = union_reduced_times(a)
   red_r = r[:,red_times]
   indices = _select_indices_at_time_locations(red_times;nparams=num_params(r))
-  red_xhF,red_ode_cache = _select_cache_at_time_locations(xhF,ode_cache,indices)
-  return red_r,red_times,red_xhF,red_ode_cache
+  red_xhF,red_odeopcache = _select_cache_at_time_locations(us,odeopcache,indices)
+  return red_r,red_times,red_xhF,red_odeopcache
 end
 
 function _select_snapshots_at_space_time_locations(s,a,red_times)
@@ -272,11 +282,11 @@ end
 #   cache,
 #   op::LinearNonlinearPODMDEIMOperator,
 #   r::TransientParamRealization,
-#   xhF::Tuple{Vararg{AbstractVector}},
+#   us::Tuple{Vararg{AbstractVector}},
 #   ode_cache)
 
 #   b_lin,cache_nl = cache
-#   b_nlin = residual!(cache_nl,op.op_nonlinear,r,xhF,ode_cache)
+#   b_nlin = residual!(cache_nl,op.op_nonlinear,r,us,ode_cache)
 #   # @. b_nlin = b_nlin - b_lin
 #   # return b_nlin
 #   return b_nlin - b_lin
@@ -286,13 +296,13 @@ end
 #   cache,
 #   op::LinearNonlinearPODMDEIMOperator,
 #   r::TransientParamRealization,
-#   xhF::Tuple{Vararg{AbstractVector}},
+#   us::Tuple{Vararg{AbstractVector}},
 #   i::Integer,
 #   γᵢ::Real,
 #   ode_cache)
 
 #   A_lin,cache_nl = cache
-#   A_nlin = jacobian!(cache_nl,op.op_nonlinear,r,xhF,i,γᵢ,ode_cache)
+#   A_nlin = jacobian!(cache_nl,op.op_nonlinear,r,us,i,γᵢ,ode_cache)
 #   # @. A_nlin = A_nlin + A_lin
 #   # return A_nlin
 #   return A_nlin + A_lin
@@ -302,12 +312,12 @@ end
 #   cache,
 #   op::LinearNonlinearPODMDEIMOperator,
 #   r::TransientParamRealization,
-#   xhF::Tuple{Vararg{AbstractVector}},
+#   us::Tuple{Vararg{AbstractVector}},
 #   γ::Tuple{Vararg{Real}},
 #   ode_cache)
 
 #   A_lin,cache_nl = cache
-#   A_nlin = jacobians!(cache_nl,op.op_nonlinear,r,xhF,γ,ode_cache)
+#   A_nlin = jacobians!(cache_nl,op.op_nonlinear,r,us,γ,ode_cache)
 #   # @. A_nlin = A_nlin + A_lin
 #   # return A_nlin
 #   return A_nlin + A_lin
@@ -350,24 +360,25 @@ function Algebra.solve(
 
   trial = get_trial(op)(r)
   fe_trial = get_fe_trial(op)(r)
-  x = zero_free_values(trial)
+  x̂ = zero_free_values(trial)
   y = zero_free_values(fe_trial)
   z = copy(y)
   us = (y,z)
   ws = (1,1)
 
+  sysslvr = fesolver.sysslvr
   odecache = allocate_odecache(fesolver,op,r,(y,))
   odeslvrcache,odeopcache = odecache
   reuse,A,b,sysslvrcache = odeslvrcache
 
   stats = @timed begin
-    update_odeopcache!(odeopcache,odeop,r)
-    stageop = LinearParamStageOperator(odeop,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
-    sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
+    update_odeopcache!(odeopcache,op,r)
+    stageop = LinearParamStageOperator(op,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
+    sysslvrcache = solve!(x̂,sysslvr,stageop,sysslvrcache)
   end
 
   FEM.shift_time!(r,dt*(1-θ))
-  x = recast(red_x,trial)
+  x = recast(x̂,trial)
   s = Snapshots(x,r)
   cs = ComputationalStats(stats,num_params(r))
   return s,cs
