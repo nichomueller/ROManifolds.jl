@@ -243,6 +243,14 @@ function LinearAlgebra.mul!(
   return c
 end
 
+function LinearAlgebra.axpy!(α::Number,a::ParamArray,b::ParamArray)
+  @check length(a) == length(b)
+  for i in eachindex(a)
+    axpy!(α,a[i],b[i])
+  end
+  b
+end
+
 function LinearAlgebra.ldiv!(a::ParamArray,m::LU,b::ParamArray)
   for i in eachindex(a)
     ldiv!(a[i],m,b[i])

@@ -71,6 +71,7 @@ include("ParamBlockArray.jl")
 
 export Contribution
 export ArrayContribution
+export TupOfArrayContribution
 export contribution
 export get_values
 include("Contribution.jl")
@@ -169,7 +170,7 @@ export ODEParamOpFromTFEOp
 export ODEParamOpFromTFEOpWithTrian
 include("ODEParamOpFromTFEOp.jl")
 
-export residual_and_jacobian
+export jacobian_and_residual
 include("ThetaMethod.jl")
 
 export ODEParamSolution

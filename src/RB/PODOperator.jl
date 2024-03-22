@@ -93,12 +93,6 @@ function Algebra.allocate_jacobian(
   allocate_jacobian(op.odeop,r,us,odeopcache)
 end
 
-function allocate_jacobian_and_residual(op::PODOperator,r,us,odeopcache)
-  A = allocate_jacobian(op,r,us,odeopcache)
-  b = allocate_residual(op,r,us,odeopcache)
-  return A,b
-end
-
 function Algebra.residual!(
   b::Contribution,
   op::PODOperator,
@@ -112,7 +106,7 @@ function Algebra.residual!(
 end
 
 function Algebra.jacobian!(
-  A::Tuple{Vararg{Contribution}},
+  A::TupOfArrayContribution,
   op::PODOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
@@ -123,7 +117,7 @@ function Algebra.jacobian!(
   return Snapshots.(A,r)
 end
 
-function FEM.residual_and_jacobian(
+function FEM.jacobian_and_residual(
   solver::RBSolver,
   op::RBOperator,
   s::S) where S
@@ -131,5 +125,6 @@ function FEM.residual_and_jacobian(
   fesolver = get_fe_solver(solver)
   x = get_values(s)
   r = get_realization(s)
-  FEM.residual_and_jacobian(fesolver,op.odeop,r,x)
+  A,b = jacobian_and_residual(fesolver,op.odeop,r,(x,))
+  return Snapshots(A,r),Snapshots(b,r)
 end

@@ -80,7 +80,7 @@ function Algebra.residual!(
 end
 
 function Algebra.jacobian!(
-  A::Tuple{Vararg{Contribution}},
+  A::TupOfArrayContribution,
   op::PODMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
@@ -188,12 +188,12 @@ function fe_residual!(
   return bi
 end
 
-struct LinearNonlinearPODMDEIMOperator{A,B} <: RBOperator{LinearNonlinearParamODE}
-  op_linear::A
-  op_nonlinear::B
-  function LinearNonlinearPODMDEIMOperator(op_linear::A,op_nonlinear::B) where {A,B}
+struct LinearNonlinearPODMDEIMOperator <: RBOperator{LinearNonlinearParamODE}
+  op_linear::PODMDEIMOperator
+  op_nonlinear::PODMDEIMOperator
+  function LinearNonlinearPODMDEIMOperator(op_linear,op_nonlinear)
     @check isa(op_linear,PODMDEIMOperator{LinearODE})
-    new{A,B}(op_linear,op_nonlinear)
+    new(op_linear,op_nonlinear)
   end
 end
 

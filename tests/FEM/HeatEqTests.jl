@@ -79,16 +79,16 @@ _u0 = interpolate_everywhere(x->0.0,_trial(0.0))
 
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
-mass(μ,t,dut,v) = ∫(v*dut)dΩ
-stiffness(μ,t,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
+stiffness(μ,t,u,v) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
+mass(μ,t,uₜ,v) = ∫(v*uₜ)dΩ
 rhs(μ,t,v) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
 
 feop = TransientParamLinearFEOperator((stiffness,mass),rhs,induced_norm,ptspace,trial,test)
 sol = solve(fesolver,feop,r,uh0μ)
 Base.iterate(sol)
 
-_stiffness(t,du,v) = ∫(_a(t)*∇(v)⋅∇(du))dΩ
-_mass(t,dut,v) = ∫(v*dut)dΩ
+_stiffness(t,u,v) = ∫(_a(t)*∇(v)⋅∇(u))dΩ
+_mass(t,uₜ,v) = ∫(v*uₜ)dΩ
 _rhs(t,v) = (-1)*(∫(_f(t)*v)dΩ + ∫(_h(t)*v)dΓn)
 
 _feop = TransientLinearFEOperator((_stiffness,_mass),_rhs,_trial,test)
@@ -107,14 +107,78 @@ end
 
 fesolver = ThetaMethod(NewtonRaphsonSolver(LUSolver(),1e-10,20),dt,θ)
 
-mass(μ,t,dut,v) = ∫(v*dut)dΩ
+mass(μ,t,uₜ,v) = ∫(v*uₜ)dΩ
 res(μ,t,u,v) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
 
 feop = TransientParamSemilinearFEOperator(mass,res,induced_norm,ptspace,trial,test)
 sol = solve(fesolver,feop,r,uh0μ)
 Base.iterate(sol)
 
-_mass(t,dut,v) = ∫(v*dut)dΩ
+_mass(t,uₜ,v) = ∫(v*uₜ)dΩ
+_res(t,u,v) = ∫(_a(t)*∇(v)⋅∇(u))dΩ - ∫(_f(t)*v)dΩ - ∫(_h(t)*v)dΓn
+
+_feop = TransientSemilinearFEOperator(_mass,_res,_trial,test)
+_sol = solve(fesolver,_feop,t0,tf,_u0)
+Base.iterate(_sol)
+
+for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
+  uh1 = FEM._getindex(uh,3)
+  t = get_times(rt)
+  @check t ≈ _t "$t != $_t"
+  @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
+  @check uh1.dirichlet_values ≈ _uh.dirichlet_values
+end
+
+########################## LINEAR-TRIAN ############################
+
+fesolver = ThetaMethod(LUSolver(),dt,θ)
+
+stiffness(μ,t,u,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
+mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
+rhs(μ,t,v,dΩ,dΓn) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
+
+trian_rhs = (Ω,Γn)
+trian_stiffness = (Ω,)
+trian_mass = (Ω,)
+
+feop = TransientParamLinearFEOperator((stiffness,mass),rhs,induced_norm,ptspace,
+  trial,test,trian_rhs,trian_stiffness,trian_mass)
+sol = solve(fesolver,feop,r,uh0μ)
+Base.iterate(sol)
+
+_stiffness(t,u,v) = ∫(_a(t)*∇(v)⋅∇(u))dΩ
+_mass(t,uₜ,v) = ∫(v*uₜ)dΩ
+_rhs(t,v) = (-1)*(∫(_f(t)*v)dΩ + ∫(_h(t)*v)dΓn)
+
+_feop = TransientLinearFEOperator((_stiffness,_mass),_rhs,_trial,test)
+_sol = solve(fesolver,_feop,t0,tf,_u0)
+Base.iterate(_sol)
+
+for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
+  uh1 = FEM._getindex(uh,3)
+  t = get_times(rt)
+  @check t ≈ _t "$t != $_t"
+  @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
+  @check uh1.dirichlet_values ≈ _uh.dirichlet_values
+end
+
+########################## SEMILINEAR-TRIAN ############################
+
+fesolver = ThetaMethod(NewtonRaphsonSolver(LUSolver(),1e-10,20),dt,θ)
+
+mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
+res(μ,t,u,v,dΩ,dΓn) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+
+trian_res = (Ω,Γn)
+trian_jac = (Ω,Γn)
+trian_mass = (Ω,)
+
+feop = TransientParamSemilinearFEOperator(mass,res,induced_norm,ptspace,trial,test,
+  trian_res,trian_jac,trian_mass)
+sol = solve(fesolver,feop,r,uh0μ)
+Base.iterate(sol)
+
+_mass(t,uₜ,v) = ∫(v*uₜ)dΩ
 _res(t,u,v) = ∫(_a(t)*∇(v)⋅∇(u))dΩ - ∫(_f(t)*v)dΩ - ∫(_h(t)*v)dΓn
 
 _feop = TransientSemilinearFEOperator(_mass,_res,_trial,test)

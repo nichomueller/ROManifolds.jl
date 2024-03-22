@@ -63,6 +63,61 @@ Base.ndims(::ArrayContribution{T,N}) where {T,N} = N
 Base.ndims(::Type{<:ArrayContribution{T,N}}) where {T,N} = N
 Base.copy(a::ArrayContribution) = Contribution(copy(a.values),a.trians)
 
+function Base.fill!(a::ArrayContribution,v)
+  for vals in a.values
+    fill!(vals,v)
+  end
+  a
+end
+
+function LinearAlgebra.fillstored!(a::ArrayContribution,v)
+  for vals in a.values
+    LinearAlgebra.fillstored!(vals,v)
+  end
+  a
+end
+
+function LinearAlgebra.mul!(
+  c::VectorContribution,
+  a::MatrixContribution,
+  b::AbstractVector,
+  α::Number,β::Number)
+
+  for c in c.values, a in a.values
+    mul!(c,a,b,α,β)
+  end
+  a
+end
+
+function LinearAlgebra.mul!(
+  c::VectorContribution,
+  a::MatrixContribution,
+  b::VectorContribution,
+  α::Number,β::Number)
+
+  @check length(c) == length(b)
+  for (c,b) in zip(c.values,b.values), a in a.values
+    mul!(c,a,b,α,β)
+  end
+  a
+end
+
+function LinearAlgebra.axpy!(α::Number,a::ArrayContribution,b::ArrayContribution)
+  @check length(a) == length(b)
+  for (a,b) in (a.values,b.values)
+    axpy!(α,a,b)
+  end
+  b
+end
+
+function Algebra.copy_entries!(a::ArrayContribution,b::ArrayContribution)
+  @check length(a) == length(b)
+  for (a,b) in zip(a.values,b.values)
+    copy_entries!(a,b)
+  end
+  a
+end
+
 struct ContributionBroadcast{D,T}
   contrib::D
   trians::T
@@ -82,28 +137,24 @@ function Base.materialize!(a::ArrayContribution,c::ContributionBroadcast)
   a
 end
 
-function Base.fill!(a::ArrayContribution,v)
-  for vals in a.values
-    fill!(vals,v)
+# quite hacky
+
+const TupOfArrayContribution = Tuple{Vararg{ArrayContribution{T}}} where T
+
+Base.eltype(::TupOfArrayContribution{T}) where T = T
+Base.eltype(::Type{<:TupOfArrayContribution{T}}) where T = T
+
+function LinearAlgebra.fillstored!(a::TupOfArrayContribution,v)
+  for ai in a
+    LinearAlgebra.fillstored!(ai,v)
   end
   a
 end
 
-function LinearAlgebra.fillstored!(a::ArrayContribution,v)
-  for vals in a.values
-    LinearAlgebra.fillstored!(vals,v)
+function Algebra.copy_entries!(a::TupOfArrayContribution,b::TupOfArrayContribution)
+  @check length(a) == length(b)
+  for (a,b) in zip(a,b)
+    copy_entries!(a,b)
   end
   a
 end
-
-# # quite hacky
-
-# Base.eltype(::Tuple{Vararg{ArrayContribution{T}}}) where T = T
-# Base.eltype(::Type{<:Tuple{Vararg{ArrayContribution{T}}}}) where T = T
-
-# function LinearAlgebra.fillstored!(a::Tuple{Vararg{A}},v) where {A<:ArrayContribution}
-#   for ai in a
-#     LinearAlgebra.fillstored!(ai,v)
-#   end
-#   a
-# end

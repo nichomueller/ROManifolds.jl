@@ -132,7 +132,7 @@ function Algebra.residual(
 end
 
 function ODEs.jacobian_add!(
-  A::Tuple{Vararg{Contribution}},
+  A::TupOfArrayContribution,
   odeop::ODEParamOperatorWithTrian,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
@@ -143,16 +143,14 @@ function ODEs.jacobian_add!(
 end
 
 function Algebra.jacobian!(
-  A::Tuple{Vararg{Contribution}},
+  A::TupOfArrayContribution,
   odeop::ODEParamOperatorWithTrian,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)
 
-  for Ak in A
-    fillstored!(Ak,zero(eltype(Ak)))
-  end
+  fillstored!(A,zero(eltype(A)))
   jacobian_add!(A,odeop,r,us,ws,odeopcache)
   A
 end

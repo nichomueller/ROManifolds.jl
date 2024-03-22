@@ -85,6 +85,7 @@ export recast
 include("RBSpace.jl")
 
 export RBOperator
+export PODOperator
 export reduced_operator
 export get_fe_trial
 export get_fe_test

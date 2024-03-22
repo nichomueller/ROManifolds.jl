@@ -57,7 +57,7 @@ function ODEs.ode_march!(
   (r,statef,odecache)
 end
 
-function residual_and_jacobian(
+function jacobian_and_residual(
   solver::ThetaMethod,
   odeop::ODEOperator,
   r::TransientParamRealization,
@@ -84,10 +84,10 @@ function residual_and_jacobian(
   update_odeopcache!(odeopcache,odeop,r)
 
   stageop = NonlinearParamStageOperator(odeop,odeopcache,r,usx,ws)
-  b = residual(stageop,x)
   A = jacobian(stageop,x)
+  b = residual(stageop,x)
 
-  return b,A
+  return A,b
 end
 
 # linear case
@@ -151,7 +151,7 @@ function ODEs.ode_march!(
   (r,statef,odecache)
 end
 
-function residual_and_jacobian(
+function jacobian_and_residual(
   solver::ThetaMethod,
   odeop::ODEOperator{LinearParamODE},
   r::TransientParamRealization,
@@ -168,13 +168,10 @@ function residual_and_jacobian(
   fill!(x,zero(eltype(x)))
   dtθ = θ*dt
   shift_time!(r,dt*(θ-1))
-  us = (u0,x)
+  us = (x,x)
   ws = (1,1/dtθ)
 
   stageop = LinearParamStageOperator(odeop,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
 
-  b = residual(stageop,x)
-  A = jacobian(stageop,x)
-
-  return b,A
+  return stageop.A,stageop.b
 end

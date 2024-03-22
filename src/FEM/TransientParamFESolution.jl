@@ -1,5 +1,5 @@
-struct TransientParamFESolution <: TransientFESolution
-  odesol::ODEParamSolution
+struct TransientParamFESolution{V} <: TransientFESolution
+  odesol::ODEParamSolution{V}
   trial
 end
 
@@ -56,12 +56,10 @@ function Base.iterate(sol::TransientParamFESolution,state)
   (rf,uhf),state
 end
 
-function Base.collect(sol::TransientParamFESolution)
+function Base.collect(sol::TransientParamFESolution{V}) where V
   odesol = sol.odesol
   ntimes = num_times(odesol.r)
 
-  initial_values = odesol.u0
-  V = typeof(initial_values)
   free_values = Vector{V}(undef,ntimes)
   for (k,(rt,uht)) in enumerate(sol)
     ut = get_free_dof_values(uht)

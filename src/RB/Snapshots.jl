@@ -141,6 +141,10 @@ function Snapshots(a::ArrayContribution,args...)
   end
 end
 
+function Snapshots(a::TupOfArrayContribution,args...)
+  map(a->Snapshots(a,args...),a)
+end
+
 struct BasicSnapshots{M,T,P,R} <: StandardSnapshots{M,T}
   mode::M
   values::P

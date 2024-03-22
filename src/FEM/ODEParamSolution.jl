@@ -22,13 +22,13 @@ function ODEs.ode_finish!(
   (uF,odecache)
 end
 
-abstract type ODEParamSolution <: ODESolution end
+abstract type ODEParamSolution{V} <: ODESolution end
 
-struct GenericODEParamSolution <: ODEParamSolution
+struct GenericODEParamSolution{V} <: ODEParamSolution{V}
   solver::ODESolver
   odeop::ODEParamOperator
   r::TransientParamRealization
-  us0::Tuple{Vararg{AbstractVector}}
+  us0::Tuple{Vararg{V}}
 end
 
 function Base.iterate(sol::ODEParamSolution)
@@ -62,11 +62,9 @@ function Base.iterate(sol::ODEParamSolution,state)
   return (rf,uf),state
 end
 
-function Base.collect(sol::ODEParamSolution)
+function Base.collect(sol::ODEParamSolution{V}) where V
   ntimes = num_times(sol.r)
 
-  initial_values = sol.u0
-  V = typeof(initial_values)
   free_values = Vector{V}(undef,ntimes)
   for (k,(rt,ut)) in enumerate(sol)
     free_values[k] = copy(ut)
@@ -83,14 +81,14 @@ function Algebra.solve(
   GenericODEParamSolution(solver,odeop,r,u0)
 end
 
-function residual_and_jacobian(
+function jacobian_and_residual(
   solver::ODESolver,
   odeop::ODEParamOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}})
 
   cache = allocate_odecache(solver,odeop,r,us)
-  residual_and_jacobian(solver,odeop,r,us,cache)
+  jacobian_and_residual(solver,odeop,r,us,cache)
 end
 
 # for testing purposes

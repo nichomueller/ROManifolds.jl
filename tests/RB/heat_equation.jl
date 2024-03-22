@@ -42,21 +42,21 @@ u0(x,μ) = 0
 u0(μ) = x->u0(x,μ)
 u0μ(μ) = ParamFunction(u0,μ)
 
-res(μ,t,u,v,dΩ,dΓn) = ∫(v*∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
-jac(μ,t,u,du,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
-jac_t(μ,t,u,dut,v,dΩ) = ∫(v*dut)dΩ
+stiffness(μ,t,u,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
+mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
+rhs(μ,t,v,dΩ,dΓn) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
 
-trian_res = (Ω,Γn)
-trian_jac = (Ω,)
-trian_jac_t = (Ω,)
+trian_rhs = (Ω,Γn)
+trian_stiffness = (Ω,)
+trian_mass = (Ω,)
 
 induced_norm(du,v) = ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
-_feop = AffineTransientParamFEOperator(res,jac,jac_t,induced_norm,ptspace,trial,test)
-feop = TransientFEOperatorWithTrian(_feop,trian_res,trian_jac,trian_jac_t)
+feop = TransientParamLinearFEOperator((stiffness,mass),rhs,induced_norm,ptspace,
+  trial,test,trian_rhs,trian_stiffness,trian_mass)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
@@ -94,3 +94,49 @@ results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbs
 println(RB.space_time_error(results_space))
 save(test_dir,rbop_space)
 save(test_dir,results_space)
+
+using Gridap.FESpaces
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+odeop = get_algebraic_operator(feop)
+pop = PODOperator(odeop,red_trial,red_test)
+smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
+contribs_mat,contribs_vec = jacobian_and_residual(rbsolver,pop,smdeim)
+
+using Gridap.ODEs
+using Gridap.Algebra
+w0 = get_values(smdeim)
+r = get_realization(smdeim)
+odecache = ODEs.allocate_odecache(fesolver,odeop,r,(w0,))
+odeslvrcache,odeopcache = odecache
+reuse,A,b,sysslvrcache = odeslvrcache
+x = copy(w0)
+fill!(x,zero(eltype(x)))
+dtθ = θ*dt
+FEM.shift_time!(r,dt*(θ-1))
+us = (x,x)
+ws = (1,1/dtθ)
+# stageop = LinearParamStageOperator(odeop,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
+# residual!(b,odeop,r,us,odeopcache)
+uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
+v = get_fe_basis(test)
+assem = get_assembler(odeop.op,r)
+
+!add && fill!(b,zero(eltype(b)))
+
+μ,t = get_params(r),get_times(r)
+
+# Residual
+res = get_res(odeop.op)
+dc = res(μ,t,uh,v)
+
+# Forms
+order = get_order(odeop)
+forms = get_forms(odeop.op)
+∂tkuh = uh
+for k in 0:order
+  form = forms[k+1]
+  dc = dc + form(μ,t,∂tkuh,v)
+  if k < order
+    ∂tkuh = ∂t(∂tkuh)
+  end
+end

@@ -57,7 +57,7 @@ function TransientParamFEOperator(
   order = length(jacs) - 1
   assem = SparseMatrixAssembler(trial,test)
   TransientParamFEOpFromWeakForm(
-    res,jacs,induced_norm,assem,tpspace,trial,test,order,args...)
+    res,jacs,induced_norm,tpspace,assem,trial,test,order,args...)
 end
 
 function TransientParamFEOperator(
@@ -138,7 +138,7 @@ function TransientParamSemilinearFEOperator(
   args...;constant_mass::Bool=false)
 
   order = length(jacs)
-  jac_N(μ,t,u,du,v) = mass(μ,t,du,v)
+  jac_N(μ,t,u,du,v,args...) = mass(μ,t,du,v,args...)
   jacs = (jacs...,jac_N)
   if order == 0
     @warn ODEs.default_linear_msg
@@ -245,8 +245,8 @@ function TransientParamLinearFEOperator(
   args...;constant_forms::Tuple{Vararg{Bool}}=ntuple(_ -> false,length(forms)))
 
   order = length(forms)-1
-  res(μ,t,u,v) = (-1)*b(μ,t,v)
-  jacs = ntuple(k -> ((μ,t,u,duk,v) -> forms[k](μ,t,duk,v)),length(forms))
+  res(μ,t,u,v,args...) = (-1)*b(μ,t,v,args...)
+  jacs = ntuple(k -> ((μ,t,u,duk,v,args...) -> forms[k](μ,t,duk,v,args...)),length(forms))
   assem = SparseMatrixAssembler(trial,test)
   TransientParamLinearFEOpFromWeakForm(
     forms,res,jacs,constant_forms,induced_norm,tpspace,assem,trial,test,order,args...)
