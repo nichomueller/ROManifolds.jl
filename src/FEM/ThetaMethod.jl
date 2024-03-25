@@ -103,8 +103,8 @@ function ODEs.allocate_odecache(
   us0N = (u0,u0)
   odeopcache = allocate_odeopcache(odeop,r0,us0N)
 
-  constant_stiffness = is_form_constant(odeop,0)
-  constant_mass = is_form_constant(odeop,1)
+  constant_stiffness = is_form_constant(odeop,1)
+  constant_mass = is_form_constant(odeop,2)
   reuse = (constant_stiffness && constant_mass)
 
   A = allocate_jacobian(odeop,r0,us0N,odeopcache)

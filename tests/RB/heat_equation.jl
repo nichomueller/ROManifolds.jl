@@ -62,7 +62,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
 # we can load & solve directly, if the offline structures have been previously saved to file
@@ -95,110 +95,3 @@ results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbs
 println(RB.space_time_error(results_space))
 save(test_dir,rbop_space)
 save(test_dir,results_space)
-
-using Gridap.Algebra
-using Gridap.FESpaces
-using Gridap.ODEs
-son = select_snapshots(fesnaps,RB.online_params(rbsolver))
-r = get_realization(son)
-
-FEM.shift_time!(r,dt*(θ-1))
-
-red_trial = get_trial(rbop)(r)
-fe_trial = get_fe_trial(rbop)(r)
-x = zero_free_values(red_trial)
-y = zero_free_values(fe_trial)
-z = copy(y)
-us = (y,z)
-ws = (1,1)
-
-odecache = allocate_odecache(fesolver,rbop,r,(y,))
-odeslvrcache,odeopcache = odecache
-reuse,A,b,sysslvrcache = odeslvrcache
-
-update_odeopcache!(odeopcache,rbop,r)
-stageop = LinearParamStageOperator(rbop,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
-ye=residual!(b,rbop,r,us,odeopcache)
-sysslvrcache = solve!(x,fesolver.sysslvr,stageop,sysslvrcache)
-
-s1 = select_snapshots(fesnaps,1)
-intp_err = RB.interpolation_error(rbsolver,feop,rbop,s1)
-# proj_err = linear_combination_error(solver,feop,rbop,s1)
-odeop = get_algebraic_operator(feop)
-feA,feb = jacobian_and_residual(fesolver,odeop,s1)
-feA_comp = compress(rbsolver,feA,get_trial(rbop),get_test(rbop))
-feb_comp = compress(rbsolver,feb,get_test(rbop))
-rbA,rbb = jacobian_and_residual(rbsolver,rbop,s1)
-
-feA,feb = FEM.jacobian_and_residual(fesolver,odeop,s1)
-rbA,rbb = FEM.jacobian_and_residual(rbsolver,rbop.op,s1)
-
-_odeop = rbop.op.odeop
-r = get_realization(s1)
-us = (get_values(s1),)
-cache = allocate_odecache(fesolver,_odeop,r,us)
-w0 = us[1]
-odeslvrcache,odeopcache = cache
-reuse,A,b,sysslvrcache = odeslvrcache
-x = copy(w0)
-fill!(x,zero(eltype(x)))
-dtθ = θ*dt
-FEM.shift_time!(r,dt*(θ-1))
-us = (x,x)
-ws = (1,1/dtθ)
-update_odeopcache!(odeopcache,_odeop,r)
-stageop = LinearParamStageOperator(_odeop,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
-FEM.shift_time!(r,dt*(1-θ))
-sA = Snapshots(stageop.A,r)
-sb = Snapshots(stageop.b,r)
-
-# bb = residual!(b,_odeop,r,us,odeopcache)
-uh = ODEs._make_uh_from_us(_odeop,us,odeopcache.Us)
-v = get_fe_basis(test)
-assem = get_assembler(_odeop.op,r)
-fill!(b,zero(eltype(b)))
-μ,t = get_params(r),get_times(r)
-# Residual
-res = get_res(_odeop.op)
-dc = res(μ,t,uh,v)
-# Forms
-order = get_order(_odeop)
-forms = get_forms(_odeop.op)
-∂tkuh = uh
-for k in 0:order
-  form = forms[k+1]
-  dc = dc + form(μ,t,∂tkuh,v)
-  if k < order
-    ∂tkuh = ∂t(∂tkuh)
-  end
-end
-trian = _odeop.op.trian_res[1]
-dc[trian]
-fun(x) = sum(sum(x))
-norm(lazy_map(fun,dc[trian][1]))
-
-vecdata = FEM.collect_cell_vector_for_trian(test,dc,trian)
-assemble_vector_add!(b.values[1],assem,vecdata)
-
-# ad = rbop.rhs[1]
-# ids_space,ids_time = RB.get_indices_space(ad),RB.get_indices_time(ad)
-# fes_ids = RB.select_snapshots_entries(reverse_snapshots(feb[1]),ids_space,ids_time)
-# rbs_ids = RB.select_snapshots_entries(reverse_snapshots(rbb[1]),ids_space,ids_time)
-
-dtrian = Measure(trian,2)
-c1 = -1*∫(fμt(μ,t)*v)dtrian
-c2 = stiffness(μ,t,uh,v,dtrian)
-c3 = mass(μ,t,∂t(uh),v,dtrian)
-
-norm(fun(c1[trian]))
-norm(fun(c2[trian]))
-norm(fun(c3[trian]))
-
-norm(fun(c1+c2+c3))
-ye = c1+c2+c3
-
-# this is ok
-yecdata = FEM.collect_cell_vector_for_trian(test,ye,trian)
-
-dc2 = forms[1](μ,t,uh,v)
-dc3 = forms[2](μ,t,∂t(uh),v)

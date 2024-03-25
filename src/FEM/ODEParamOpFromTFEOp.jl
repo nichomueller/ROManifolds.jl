@@ -8,7 +8,6 @@ FESpaces.get_trial(odeop::ODEParamOpFromTFEOp) = get_trial(odeop.op)
 realization(odeop::ODEParamOpFromTFEOp;kwargs...) = realization(odeop.op;kwargs...)
 get_fe_operator(odeop::ODEParamOpFromTFEOp) = odeop.op
 ODEs.get_num_forms(odeop::ODEParamOpFromTFEOp) = get_num_forms(odeop.op)
-ODEs.get_forms(odeop::ODEParamOpFromTFEOp) = get_forms(odeop.op)
 ODEs.is_form_constant(odeop::ODEParamOpFromTFEOp,k::Integer) = is_form_constant(odeop.op,k)
 
 function get_linear_operator(odeop::ODEParamOpFromTFEOp)
@@ -59,7 +58,7 @@ function ODEs.allocate_odeopcache(
 
   for k in 1:num_forms
     const_form = nothing
-    if is_form_constant(odeop,k-1)
+    if is_form_constant(odeop,k)
       jac = jacs[k]
       dc = jac(μ,t,uh,du,v)
       matdata = collect_cell_matrix(trial,test,dc)
@@ -289,7 +288,6 @@ FESpaces.get_trial(odeop::ODEParamOpFromTFEOpWithTrian) = get_trial(odeop.op)
 realization(odeop::ODEParamOpFromTFEOpWithTrian;kwargs...) = realization(odeop.op;kwargs...)
 get_fe_operator(odeop::ODEParamOpFromTFEOpWithTrian) = odeop.op
 ODEs.get_num_forms(odeop::ODEParamOpFromTFEOpWithTrian) = get_num_forms(odeop.op)
-ODEs.get_forms(odeop::ODEParamOpFromTFEOpWithTrian) = get_forms(odeop.op)
 ODEs.is_form_constant(odeop::ODEParamOpFromTFEOpWithTrian,k::Integer) = is_form_constant(odeop.op,k)
 
 function get_linear_operator(odeop::ODEParamOpFromTFEOpWithTrian)
@@ -348,7 +346,7 @@ function ODEs.allocate_odeopcache(
 
   for k in 1:num_forms
     const_form = nothing
-    if is_form_constant(odeop,k-1)
+    if is_form_constant(odeop,k)
       jac = jacs[k]
       dc = jac(μ,t,uh,du,v)
       matdata = collect_cell_matrix(trial,test,dc)

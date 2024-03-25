@@ -207,13 +207,12 @@ FESpaces.get_trial(op::TransientParamSemilinearFEOpFromWeakForm) = op.trial
 Polynomials.get_order(op::TransientParamSemilinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamSemilinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamSemilinearFEOpFromWeakForm) = op.jacs
-ODEs.get_forms(op::TransientParamSemilinearFEOpFromWeakForm) = (op.mass,)
 ODEs.get_assembler(op::TransientParamSemilinearFEOpFromWeakForm) = op.assem
 realization(op::TransientParamSemilinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 get_induced_norm(op::TransientParamSemilinearFEOpFromWeakForm) = op.induced_norm
 
 function ODEs.is_form_constant(op::TransientParamSemilinearFEOpFromWeakForm,k::Integer)
-  (k == get_order(op)) && op.constant_mass
+  (k == get_order(op)+1) && op.constant_mass
 end
 
 function assemble_norm_matrix(op::TransientParamSemilinearFEOpFromWeakForm)
@@ -279,13 +278,12 @@ FESpaces.get_trial(op::TransientParamLinearFEOpFromWeakForm) = op.trial
 Polynomials.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
-ODEs.get_forms(op::TransientParamLinearFEOpFromWeakForm) = op.forms
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
 realization(op::TransientParamLinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 get_induced_norm(op::TransientParamLinearFEOpFromWeakForm) = op.induced_norm
 
 function ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer)
-  op.constant_forms[k+1]
+  op.constant_forms[k]
 end
 
 function assemble_norm_matrix(op::TransientParamLinearFEOpFromWeakForm)

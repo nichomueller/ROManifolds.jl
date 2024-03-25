@@ -72,7 +72,8 @@ function Algebra.residual!(
   op::PODMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}},
-  odeopcache)
+  odeopcache;
+  kwargs...)
 
   fe_sb = fe_residual!(b,op,r,us,odeopcache)
   b̂ = mdeim_residual(op.rhs,fe_sb)
@@ -95,8 +96,7 @@ end
 function FEM.jacobian_and_residual(solver::RBSolver,op::PODMDEIMOperator,s::S) where S
   x = get_values(s)
   r = get_realization(s)
-  A,b = jacobian_and_residual(get_fe_solver(solver),op,r,(x,))
-  return Snapshots(A,r),Snapshots(b,r)
+  jacobian_and_residual(get_fe_solver(solver),op,r,(x,))
 end
 
 function _select_fe_space_at_time_locations(fs::FESpace,indices)
@@ -352,6 +352,7 @@ function Algebra.solve(
   fesolver = get_fe_solver(solver)
   dt = fesolver.dt
   θ = fesolver.θ
+  dtθ = dt*θ
 
   FEM.shift_time!(r,dt*(θ-1))
 
@@ -361,7 +362,7 @@ function Algebra.solve(
   y = zero_free_values(fe_trial)
   z = copy(y)
   us = (y,z)
-  ws = (1,1)
+  ws = (1,1/dtθ)
 
   sysslvr = fesolver.sysslvr
   odecache = allocate_odecache(fesolver,op,r,(y,))

@@ -82,8 +82,9 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 stiffness(μ,t,u,v) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
 mass(μ,t,uₜ,v) = ∫(v*uₜ)dΩ
 rhs(μ,t,v) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
+res(μ,t,u,v) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rhs(μ,t,v,dΩ,dΓn)
 
-feop = TransientParamLinearFEOperator((stiffness,mass),rhs,induced_norm,ptspace,trial,test)
+feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,trial,test)
 sol = solve(fesolver,feop,r,uh0μ)
 Base.iterate(sol)
 
@@ -136,13 +137,14 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 stiffness(μ,t,u,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
 mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
 rhs(μ,t,v,dΩ,dΓn) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
+res(μ,t,u,v,dΩ,dΓn) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rhs(μ,t,v,dΩ,dΓn)
 
-trian_rhs = (Ω,Γn)
+trian_res = (Ω,Γn)
 trian_stiffness = (Ω,)
 trian_mass = (Ω,)
 
-feop = TransientParamLinearFEOperator((stiffness,mass),rhs,induced_norm,ptspace,
-  trial,test,trian_rhs,trian_stiffness,trian_mass)
+feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
+  trial,test,trian_res,trian_stiffness,trian_mass)
 sol = solve(fesolver,feop,r,uh0μ)
 Base.iterate(sol)
 
@@ -166,8 +168,10 @@ end
 
 fesolver = ThetaMethod(NewtonRaphsonSolver(LUSolver(),1e-10,20),dt,θ)
 
+stiffness(μ,t,u,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
 mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
-res(μ,t,u,v,dΩ,dΓn) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+rhs(μ,t,v,dΩ,dΓn) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
+res(μ,t,u,v,dΩ,dΓn) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rhs(μ,t,v,dΩ,dΓn)
 
 trian_res = (Ω,Γn)
 trian_jac = (Ω,Γn)

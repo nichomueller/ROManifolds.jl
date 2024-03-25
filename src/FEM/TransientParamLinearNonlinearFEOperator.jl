@@ -41,40 +41,6 @@ function assemble_coupling_matrix(op::TransientParamLinearNonlinearFEOperator)
   assemble_coupling_matrix(op.op_linear)
 end
 
-function _get_res(op::TransientParamFEOperator)
-  return op.res
-end
-
-function _get_res(op::TransientParamFEOperator{SemilinearParamODE})
-  mass = get_forms(op)[1]
-  function res_semilin(μ,t,u,v)
-    ∂tu = ∂t(u,Val(op.order))
-    res = op.res(μ,t,u,v) + mass(μ,t,∂tu,v)
-    return res
-  end
-  return res_semilin
-end
-
-function _get_res(op::TransientParamFEOperator{LinearParamODE})
-  forms = get_forms(op)
-  function res_lin(μ,t,u,v)
-    ∂tu = u
-    res = op.res(μ,t,u,v)
-    for k = 1:op.order+1
-      res += forms(μ,t,∂tu,v)
-      if k <= op.order
-        ∂tu = ∂t(∂tu)
-      end
-    end
-    return res
-  end
-  return res_lin
-end
-
-function _join_res(op_lin,op_nlin)
-  (μ,t,u,v) -> _get_res(op_lin)(μ,t,u,v) + _get_res(op_nlin)(μ,t,u,v)
-end
-
 function join_operators(
   op::TransientParamLinearNonlinearFEOperator,
   op_lin::TransientParamFEOperator{LinearParamODE},
@@ -84,7 +50,7 @@ function join_operators(
   test = get_test(op)
   @check op_lin.tpspace === op_nlin.tpspace
 
-  res = _join_res(op_lin,op_nlin)
+  res(μ,t,u,v) = op_lin.res(μ,t,u,v) + op_nlin.res(μ,t,u,v)
 
   order_lin = get_order(op_lin)
   order_nlin = get_order(op_nlin)

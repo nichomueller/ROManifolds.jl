@@ -828,8 +828,8 @@ function linear_combination_error(solver,odeop,rbop,s)
   feA_comp = compress(solver,feA,get_trial(rbop),get_test(rbop))
   feb_comp = compress(solver,feb,get_test(rbop))
   rbA,rbb = jacobian_and_residual(solver,rbop,s)
-  errA = rel_norm(feA_comp,sum(map(sum,rbA)))
-  errb = rel_norm(feb_comp,sum(rbb))
+  errA = rel_norm(feA_comp,rbA)
+  errb = rel_norm(feb_comp,rbb)
   return errA,errb
 end
 
