@@ -41,18 +41,36 @@ function FESpaces.SparseMatrixAssembler(
   strategy::AssemblyStrategy=DefaultAssemblyStrategy()
   ) where MS <: BlockMultiFieldStyle
 
-  N = length_free_values(trial)
-  pmat = typeof(ParamMatrix{mat}(undef,N))
-  pvec = typeof(ParamVector{vec}(undef,N))
   mfs = MultiFieldStyle(test)
-  MultiField.BlockSparseMatrixAssembler(
+  return MultiField.BlockSparseMatrixAssembler(
     mfs,
     trial,
     test,
-    SparseMatrixBuilder(pmat),
-    ArrayBuilder(pvec),
+    SparseMatrixBuilder(mat),
+    ArrayBuilder(vec),
     strategy)
 end
+
+# function FESpaces.SparseMatrixAssembler(
+#   mat,
+#   vec,
+#   trial::MultiFieldParamFESpace{MS},
+#   test::MultiFieldFESpace{MS},
+#   strategy::AssemblyStrategy=DefaultAssemblyStrategy()
+#   ) where MS <: BlockMultiFieldStyle
+
+#   N = length_free_values(trial)
+#   pmat = typeof(ParamMatrix{mat}(undef,N))
+#   pvec = typeof(ParamVector{vec}(undef,N))
+#   mfs = MultiFieldStyle(test)
+#   MultiField.BlockSparseMatrixAssembler(
+#     mfs,
+#     trial,
+#     test,
+#     SparseMatrixBuilder(pmat),
+#     ArrayBuilder(pvec),
+#     strategy)
+# end
 
 function FESpaces.assemble_vector_add!(
   b::ParamBlockVector,

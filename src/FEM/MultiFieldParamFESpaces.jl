@@ -35,6 +35,21 @@ function MultiFieldParamFESpace(
   MultiFieldParamFESpace(VT,spaces,style)
 end
 
+function _MultiFieldParamFESpace(
+  spaces::Vector{<:SingleFieldFESpace};
+  style = ConsecutiveMultiFieldStyle())
+
+  T = get_vector_type(first(spaces))
+  @check all(map(get_vector_type,spaces) .== T)
+  if isa(style,BlockMultiFieldStyle)
+    style = BlockMultiFieldStyle(style,spaces)
+    VT = typeof(mortar(map(zero_free_values,spaces)))
+  else
+    VT = T
+  end
+  MultiFieldParamFESpace(VT,spaces,style)
+end
+
 function _find_length(spaces)
   pspaces = filter(x->isa(x,SingleFieldParamFESpace),spaces)
   L = length_free_values.(pspaces)
@@ -49,6 +64,8 @@ function MultiFieldParamFESpace(
   if any(isa.(spaces,SingleFieldParamFESpace))
     L = _find_length(spaces)
     MultiFieldParamFESpace(FESpaceToParamFESpace.(spaces,L),style=style)
+  elseif any(isa.(spaces,TransientTrialParamFESpace))
+    _MultiFieldParamFESpace(spaces,style=style)
   else
     MultiFieldFESpace(spaces,style=style)
   end

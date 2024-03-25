@@ -69,7 +69,7 @@ ODEs.get_assembler(op::TransientParamSaddlePointFEOp) = get_assembler(op.op)
 realization(op::TransientParamSaddlePointFEOp;kwargs...) = realization(op.op;kwargs...)
 get_induced_norm(op::TransientParamSaddlePointFEOp) = get_induced_norm(op.op)
 get_coupling(op::TransientParamSaddlePointFEOp) = op.coupling
-ODEs.is_form_constant(op::TransientParamSaddlePointFEOp,k) = is_form_constant(op.op,k)
+ODEs.is_form_constant(op::TransientParamSaddlePointFEOp,k::Integer) = is_form_constant(op.op,k)
 
 function assemble_norm_matrix(op::TransientParamSaddlePointFEOp)
   assemble_norm_matrix(op.op)

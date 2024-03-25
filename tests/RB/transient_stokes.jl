@@ -5,7 +5,7 @@ using Gridap.MultiField
 using Mabla.FEM
 using Mabla.RB
 
-θ = 1
+θ = 0.5
 dt = 0.01
 t0 = 0.0
 tf = 0.1
@@ -51,13 +51,13 @@ p0(x,μ) = 0.0
 p0(μ) = x->p0(x,μ)
 p0μ(μ) = ParamFunction(p0,μ)
 
-res(μ,t,(u,p),(v,q),dΩ) = ∫(v⋅∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
-jac(μ,t,u,(du,dp),(v,q),dΩ) = ∫(aμt(μ,t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ + ∫(q*(∇⋅(du)))dΩ
-jac_t(μ,t,u,(dut,dpt),(v,q),dΩ) = ∫(v⋅dut)dΩ
+stiffness(μ,t,(u,p),(v,q),dΩ) = ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
+mass(μ,t,(uₜ,pₜ),(v,q),dΩ) = ∫(v⋅uₜ)dΩ
+res(μ,t,(u,p),(v,q),dΩ) = ∫(v⋅∂t(u))dΩ + stiffness(μ,t,(u,p),(v,q),dΩ)
 
 trian_res = (Ω,)
-trian_jac = (Ω,)
-trian_jac_t = (Ω,)
+trian_stiffness = (Ω,)
+trian_mass = (Ω,)
 
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 induced_norm((du,dp),(v,q)) = ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
@@ -73,8 +73,8 @@ test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-_feop = AffineTransientParamFEOperator(res,jac,jac_t,induced_norm,ptspace,trial,test,coupling)
-feop = TransientFEOperatorWithTrian(_feop,trian_res,trian_jac,trian_jac_t)
+feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
+  trial,test,coupling,trian_res,trian_stiffness,trian_mass)
 
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
@@ -114,16 +114,52 @@ println(err_space)
 save(test_dir,rbop_space)
 save(test_dir,results_space)
 
-using Gridap.FESpaces
-using Gridap.ODEs.TransientFETools
-using Gridap.ODEs.ODETools
-using LinearAlgebra
-using BlockArrays
+order = 1
+j1(μ,t,u,duk,v,dΩ) = stiffness(μ,t,duk,v,dΩ)
+j2(μ,t,u,duk,v,dΩ) = mass(μ,t,duk,v,dΩ)
+jacs = (j1,j2)
+assem = SparseMatrixAssembler(trial,test)
+TransientParamLinearFEOpFromWeakForm(
+  (stiffness,mass),res,jacs,(false,false),induced_norm,ptspace,assem,trial,test,1,
+  coupling,trian_res,trian_stiffness,trian_mass)
 
-s = select_snapshots(fesnaps,1)
-feA,feb = RB._jacobian_and_residual(fesolver,feop,s)
-feA_comp = RB.compress(rbsolver,feA,get_trial(rbop),get_test(rbop))
-feb_comp = RB.compress(rbsolver,feb,get_test(rbop))
-rbA,rbb = RB._jacobian_and_residual(rbsolver,rbop,s)
-errA = RB._rel_norm(feA_comp,rbA)
-errb = RB._rel_norm(feb_comp,rbb)
+using Gridap.ODEs
+sol = solve(fesolver,feop,xh0μ;r=realization(feop;nparams=1))
+odesol = sol.odesol
+r = odesol.r
+r0 = FEM.get_at_time(r,:initial)
+odeop = odesol.odeop
+cache = allocate_odecache(fesolver,odeop,r0,odesol.us0)
+state0 = copy.(odesol.us0)
+statef = copy.(state0)
+w0 = state0[1]
+odecache = cache
+odeslvrcache,odeopcache = odecache
+reuse,A,b,sysslvrcache = odeslvrcache
+sysslvr = fesolver.sysslvr
+x = statef[1]
+fill!(x,zero(eltype(x)))
+dtθ = θ*dt
+FEM.shift_time!(r0,dtθ)
+usx = (w0,x)
+ws = (dtθ,1)
+update_odeopcache!(odeopcache,odeop,r0)
+stageop = LinearParamStageOperator(odeop,odeopcache,r0,usx,ws,A,b,reuse,sysslvrcache)
+sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
+
+using Serialization
+using Gridap.ODEs
+p = deserialize("/home/nicholasmueller/git_repos/Mabla.jl/params.txt")
+μ = ParamRealization(p)
+t = deserialize("/home/nicholasmueller/git_repos/Mabla.jl/times.txt")
+r = FEM.GenericTransientParamRealization(μ,t,0.0)
+
+dv = get_fe_basis(test)
+du = get_trial_fe_basis(trial(nothing))
+uh = TransientCellField(zero(trial(r)),(zero(trial(r)),))
+
+dc = feop.op.op.jacs[1](μ,t,uh,du,dv,dΩ)
+D = dc[Ω]
+S1 = Snapshots(D[1][1,1],r)
+S2 = Snapshots(D[1][2,1],r)
+S3 = Snapshots(D[1][1,2],r)

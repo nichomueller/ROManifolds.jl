@@ -42,25 +42,25 @@ function get_param_assembler(
   GenericSparseMatrixAssembler(matrix_builder,vector_builder,rows,cols,strategy)
 end
 
-function FESpaces.SparseMatrixAssembler(
-  mat,
-  vec,
-  trial::ParamFESpace,
-  test::FESpace,
-  strategy::AssemblyStrategy=DefaultAssemblyStrategy())
+# function FESpaces.SparseMatrixAssembler(
+#   mat,
+#   vec,
+#   trial::ParamFESpace,
+#   test::FESpace,
+#   strategy::AssemblyStrategy=DefaultAssemblyStrategy())
 
-  N = length_free_values(trial)
-  pmat = typeof(ParamMatrix{mat}(undef,N))
-  pvec = typeof(ParamVector{vec}(undef,N))
-  rows = get_free_dof_ids(test)
-  cols = get_free_dof_ids(trial)
-  GenericSparseMatrixAssembler(
-    SparseMatrixBuilder(pmat),
-    ArrayBuilder(pvec),
-    rows,
-    cols,
-    strategy)
-end
+#   N = length_free_values(trial)
+#   pmat = typeof(ParamMatrix{mat}(undef,N))
+#   pvec = typeof(ParamVector{vec}(undef,N))
+#   rows = get_free_dof_ids(test)
+#   cols = get_free_dof_ids(trial)
+#   GenericSparseMatrixAssembler(
+#     SparseMatrixBuilder(pmat),
+#     ArrayBuilder(pvec),
+#     rows,
+#     cols,
+#     strategy)
+# end
 
 function collect_cell_matrix_for_trian(
   trial::FESpace,

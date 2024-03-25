@@ -8,7 +8,7 @@ function get_dirichlet_cells end
 get_dirichlet_cells(f::FESpace) = @abstractmethod
 get_dirichlet_cells(f::UnconstrainedFESpace) = f.dirichlet_cells
 
-abstract type SingleFieldParamFESpace{S} <: SingleFieldFESpace end
+abstract type SingleFieldParamFESpace <: SingleFieldFESpace end
 
 FESpaces.get_free_dof_ids(f::SingleFieldParamFESpace) = get_free_dof_ids(f.space)
 
@@ -23,8 +23,6 @@ FESpaces.get_fe_basis(f::SingleFieldParamFESpace) = get_fe_basis(f.space)
 FESpaces.get_trial_fe_basis(f::SingleFieldParamFESpace) = get_trial_fe_basis(f.space)
 
 FESpaces.get_fe_dof_basis(f::SingleFieldParamFESpace) = get_fe_dof_basis(f.space)
-
-FESpaces.ConstraintStyle(::Type{<:SingleFieldParamFESpace{S}}) where S = ConstraintStyle(S)
 
 FESpaces.get_cell_isconstrained(f::SingleFieldParamFESpace) = get_cell_isconstrained(f.space)
 
@@ -43,25 +41,6 @@ FESpaces.get_dirichlet_dof_tag(f::SingleFieldParamFESpace) = get_dirichlet_dof_t
 FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldParamFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
 get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(f.space)
-
-# function FESpaces.compute_dirichlet_values_for_tags!(
-#   dirichlet_values,
-#   dirichlet_values_scratch,
-#   f::SingleFieldParamFESpace,
-#   tag_to_object)
-
-#   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
-#   _tag_to_object = FESpaces._convert_to_collectable(tag_to_object,num_dirichlet_tags(f))
-#   for (tag,object) in enumerate(_tag_to_object)
-#     fill!(dirichlet_values_scratch,zero(eltype(dirichlet_values_scratch)))
-#     map(dirichlet_values,dirichlet_values_scratch,object) do dv,dvs,o
-#       cell_vals = FESpaces._cell_vals(f,o)
-#       gather_dirichlet_values!(dvs,f.space,cell_vals)
-#       FESpaces._fill_dirichlet_values_for_tag!(dv,dvs,tag,dirichlet_dof_to_tag)
-#     end
-#   end
-#   ParamArray(dirichlet_values)
-# end
 
 function FESpaces.gather_free_and_dirichlet_values!(
   free_vals,
@@ -167,13 +146,15 @@ end
 # This artifact aims to make a FESpace behave like a ParamFESpace with free and
 # dirichlet values being ParamArrays of length L
 
-struct FESpaceToParamFESpace{S,L} <: SingleFieldParamFESpace{S}
+struct FESpaceToParamFESpace{S,L} <: SingleFieldParamFESpace
   space::S
   FESpaceToParamFESpace(space::S,::Val{L}) where {S,L} = new{S,L}(space)
 end
 
 FESpaceToParamFESpace(f::SingleFieldFESpace,L::Integer) = FESpaceToParamFESpace(f,Val(L))
 FESpaceToParamFESpace(f::SingleFieldParamFESpace,L::Integer) = f
+
+FESpaces.ConstraintStyle(::Type{<:FESpaceToParamFESpace{S}}) where S = ConstraintStyle(S)
 
 length_dirichlet_values(f::FESpaceToParamFESpace{S,L}) where {S,L} = L
 

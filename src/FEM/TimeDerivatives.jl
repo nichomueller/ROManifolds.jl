@@ -17,9 +17,9 @@ function ODEs._time_derivative(f,x,μ,t,::Any)
 end
 
 function ODEs._time_derivative(f,x,μ,t,::VectorValue)
-  VectorValue(derivative(t->get_array(f(x,μ,t)),t))
+  VectorValue(ForwardDiff.derivative(t->get_array(f(x,μ,t)),t))
 end
 
 function ODEs._time_derivative(f,x,μ,t,::TensorValue)
-  TensorValue(derivative(t->get_array(f(x,μ,t)),t))
+  TensorValue(ForwardDiff.derivative(t->get_array(f(x,μ,t)),t))
 end

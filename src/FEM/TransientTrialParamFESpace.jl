@@ -71,7 +71,7 @@ Geometry.get_triangulation(f::TransientTrialParamFESpace) = get_triangulation(f.
 FESpaces.get_cell_dof_ids(f::TransientTrialParamFESpace) = get_cell_dof_ids(f.space)
 FESpaces.get_fe_basis(f::TransientTrialParamFESpace) = get_fe_basis(f.space)
 FESpaces.get_fe_dof_basis(f::TransientTrialParamFESpace) = get_fe_dof_basis(f.space)
-FESpaces.ConstraintStyle(::Type{<:TransientTrialParamFESpace{U}}) where {U} = ConstraintStyle(U)
+FESpaces.ConstraintStyle(::Type{<:TransientTrialParamFESpace{U}}) where U = ConstraintStyle(U)
 function FESpaces.get_cell_constraints(f::TransientTrialParamFESpace,c::Constrained)
   get_cell_constraints(f.space,c)
 end
@@ -100,26 +100,27 @@ end
 
 # Define the TransientTrialFESpace interface for stationary spaces
 
+ODEs.allocate_space(U::FESpace,params,times) = U
+ODEs.allocate_space(U::FESpace,r) = U
 Arrays.evaluate!(Upt::FESpace,U::FESpace,params,times) = U
 Arrays.evaluate!(Upt::FESpace,U::FESpace,r) = U
 Arrays.evaluate(U::FESpace,params,times) = U
 Arrays.evaluate(U::FESpace,r) = U
-ODEs.allocate_space(U::FESpace,params,times) = U
-ODEs.allocate_space(U::FESpace,r) = U
+(space::FESpace)(params,times) = evaluate(space,params,times)
 
 # Define the interface for MultiField
 
 const TransientMultiFieldParamFESpace = MultiFieldParamFESpace
 
 function ODEs.has_transient(U::MultiFieldParamFESpace)
-  any(space -> space isa TransientMultiFieldParamFESpace,U.spaces)
+  any(space -> space isa TransientTrialParamFESpace,U.spaces)
 end
 
 function ODEs.allocate_space(U::MultiFieldParamFESpace,args...)
   if !ODEs.has_transient(U)
     return U
   end
-  spaces = map(U->allocate_space(U,args...))
+  spaces = map(U->allocate_space(U,args...),U.spaces)
   style = MultiFieldStyle(U)
   MultiFieldParamFESpace(spaces;style)
 end

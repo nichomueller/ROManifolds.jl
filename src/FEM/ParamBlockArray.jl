@@ -41,7 +41,7 @@ Base.getindex(a::ParamBlockArray{T},nb::Block{N}) where {T,N} = get_array(a)[nb.
 
 function Base.setindex!(a::ParamBlockArray,v::BlockArray,i...)
   blocksi = getindex(a,i...)
-  setindex!(blocksi,v,i)
+  setindex!(blocksi,v,i...)
   a
 end
 
@@ -61,16 +61,18 @@ function Base.copy(a::ParamBlockArray)
   ParamBlockArray(copy.(get_array(a)),a.axes)
 end
 
-# function Base.similar(
-#   a::ParamBlockArray{T},
-#   element_type::Type{S}=eltype.(blocks(a)),
-#   dims::Tuple{Int,Vararg{Int}}=size.(blocks(a))) where {T,S}
-
-#   ParamBlockArray(map(similar,get_array(a),element_type,dims),a.axes)
-# end
-
 function Base.similar(a::ParamBlockArray{T}) where T
   ParamBlockArray(map(similar,get_array(a)),a.axes)
+end
+
+function Base.copy!(a::ParamBlockArray,b::ParamBlockArray)
+  @assert length(a) == length(b)
+  copyto!(a,b)
+end
+
+function Base.copyto!(a::ParamBlockArray,b::ParamBlockArray)
+  map(copy!,get_array(a),get_array(b))
+  a
 end
 
 function Base.fill!(a::ParamBlockArray,v)
@@ -165,6 +167,14 @@ function LinearAlgebra.rmul!(a::ParamBlockArray,b::Number)
   map(get_array(a)) do a
     rmul!(a,b)
   end
+end
+
+function LinearAlgebra.axpy!(α::Number,a::ParamBlockArray,b::ParamBlockArray)
+  @check length(a) == length(b)
+  for i in eachindex(a)
+    axpy!(α,a[i],b[i])
+  end
+  b
 end
 
 function LinearAlgebra.lu(a::ParamBlockArray)

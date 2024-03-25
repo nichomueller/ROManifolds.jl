@@ -172,15 +172,15 @@ function TransientParamLinearFEOpFromWeakForm(
   return saddlep_op_trian
 end
 
-FESpaces.get_test(op::TransientParamSaddlePointFEOpWithTrian) = get_test(op)
-FESpaces.get_trial(op::TransientParamSaddlePointFEOpWithTrian) = get_trial(op)
-Polynomials.get_order(op::TransientParamSaddlePointFEOpWithTrian) = get_order(op)
-ODEs.get_res(op::TransientParamSaddlePointFEOpWithTrian) = get_res(op)
-ODEs.get_jacs(op::TransientParamSaddlePointFEOpWithTrian) = get_jacs(op)
-ODEs.get_assembler(op::TransientParamSaddlePointFEOpWithTrian) = get_assembler(op)
-realization(op::TransientParamSaddlePointFEOpWithTrian;kwargs...) = realization(op;kwargs...)
-get_induced_norm(op::TransientParamSaddlePointFEOpWithTrian) = get_induced_norm(op)
-get_coupling(op::TransientParamSaddlePointFEOpWithTrian) = get_coupling(op)
+FESpaces.get_test(op::TransientParamSaddlePointFEOpWithTrian) = get_test(op.op)
+FESpaces.get_trial(op::TransientParamSaddlePointFEOpWithTrian) = get_trial(op.op)
+Polynomials.get_order(op::TransientParamSaddlePointFEOpWithTrian) = get_order(op.op)
+ODEs.get_res(op::TransientParamSaddlePointFEOpWithTrian) = get_res(op.op)
+ODEs.get_jacs(op::TransientParamSaddlePointFEOpWithTrian) = get_jacs(op.op)
+ODEs.get_assembler(op::TransientParamSaddlePointFEOpWithTrian) = get_assembler(op.op)
+realization(op::TransientParamSaddlePointFEOpWithTrian;kwargs...) = realization(op.op;kwargs...)
+get_induced_norm(op::TransientParamSaddlePointFEOpWithTrian) = get_induced_norm(op.op)
+get_coupling(op::TransientParamSaddlePointFEOpWithTrian) = get_coupling(op.op)
 
 function assemble_norm_matrix(op::TransientParamSaddlePointFEOpWithTrian)
   assemble_norm_matrix(op.op)

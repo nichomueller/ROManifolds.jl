@@ -1,4 +1,4 @@
-struct TrialParamFESpace{S} <: SingleFieldParamFESpace{S}
+struct TrialParamFESpace{S} <: SingleFieldParamFESpace
   dirichlet_values::ParamArray
   space::S
   function TrialParamFESpace(dirichlet_values::ParamArray,space::SingleFieldFESpace)
@@ -60,6 +60,8 @@ end
 # Delegated functions
 
 FESpaces.get_dirichlet_dof_values(f::TrialParamFESpace) = f.dirichlet_values
+
+FESpaces.ConstraintStyle(::Type{<:TrialParamFESpace{U}}) where U = ConstraintStyle(U)
 
 length_dirichlet_values(f::TrialParamFESpace) = length(f.dirichlet_values)
 
