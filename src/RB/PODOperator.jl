@@ -122,8 +122,9 @@ function FEM.jacobian_and_residual(solver::RBSolver,op::RBOperator,s::S) where S
 end
 
 function FEM.jacobian_and_residual(fesolver::ODESolver,odeop::ODEParamOperator,s::S) where S
-  x = get_values(s)
+  us = (get_values(s),)
   r = get_realization(s)
-  A,b = jacobian_and_residual(fesolver,odeop,r,(x,))
+  odecache = allocate_odecache(fesolver,odeop,r,us)
+  A,b = jacobian_and_residual(fesolver,odeop,r,us,odecache)
   return Snapshots(A,r),Snapshots(b,r)
 end

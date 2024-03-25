@@ -335,7 +335,7 @@ end
 function Algebra.solve(
   solver::RBSolver,
   op::RBOperator{NonlinearParamODE},
-  s::S) where S
+  r::TransientParamRealization)
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
 end
@@ -349,33 +349,17 @@ function Algebra.solve(
   op::RBOperator{LinearParamODE},
   r::TransientParamRealization)
 
-  fesolver = get_fe_solver(solver)
-  dt = fesolver.dt
-  θ = fesolver.θ
-  dtθ = dt*θ
-
-  FEM.shift_time!(r,dt*(θ-1))
-
-  trial = get_trial(op)(r)
-  fe_trial = get_fe_trial(op)(r)
-  x̂ = zero_free_values(trial)
-  y = zero_free_values(fe_trial)
-  z = copy(y)
-  us = (y,z)
-  ws = (1,1/dtθ)
-
-  sysslvr = fesolver.sysslvr
-  odecache = allocate_odecache(fesolver,op,r,(y,))
-  odeslvrcache,odeopcache = odecache
-  reuse,A,b,sysslvrcache = odeslvrcache
-
   stats = @timed begin
-    update_odeopcache!(odeopcache,op,r)
-    stageop = LinearParamStageOperator(op,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
-    sysslvrcache = solve!(x̂,sysslvr,stageop,sysslvrcache)
+    fesolver = get_fe_solver(solver)
+    trial = get_trial(op)(r)
+    fe_trial = get_fe_trial(op)(r)
+    x̂ = zero_free_values(trial)
+    y = zero_free_values(fe_trial)
+
+    odecache = allocate_odecache(fesolver,op,r,(y,))
+    solve!((x̂,),fesolver,op,r,(y,),odecache)
   end
 
-  FEM.shift_time!(r,dt*(1-θ))
   x = recast(x̂,trial)
   s = Snapshots(x,r)
   cs = ComputationalStats(stats,num_params(r))

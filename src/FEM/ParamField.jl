@@ -144,18 +144,6 @@ Base.getindex(f::FieldToParamField,i::Integer) = f.field
 Base.size(f::ParamField) = (length(f),)
 Base.eltype(f::ParamField) = typeof(testitem(f))
 
-# function Base.map(f::ParamField,x::AbstractArray{<:Point})
-#   fi = testitem(f)
-#   vi = map(fi,x)
-#   array = Vector{typeof(vi)}(undef,length(f))
-#   for (i,fi) in enumerate(f)
-#     array[i] = map(fi,x)
-#   end
-#   ParamArray(array)
-# end
-
-# Base.broadcasted(f::ParamField,x::AbstractArray{<:Point}) = map(f,x)
-
 Arrays.return_value(b::Broadcasting{<:Function},f::ParamField,x...) = evaluate(b.f,f,x...)
 
 for T in (:Point,:(AbstractArray{<:Point}))

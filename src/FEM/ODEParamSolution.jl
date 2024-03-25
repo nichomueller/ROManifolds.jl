@@ -81,16 +81,6 @@ function Algebra.solve(
   GenericODEParamSolution(solver,odeop,r,u0)
 end
 
-function jacobian_and_residual(
-  solver::ODESolver,
-  odeop::ODEParamOperator,
-  r::TransientParamRealization,
-  us::Tuple{Vararg{AbstractVector}})
-
-  cache = allocate_odecache(solver,odeop,r,us)
-  jacobian_and_residual(solver,odeop,r,us,cache)
-end
-
 # for testing purposes
 
 function ODEs.test_ode_solution(sol::ODEParamSolution)

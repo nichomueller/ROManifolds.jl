@@ -2,7 +2,7 @@
 
 function ODEs.allocate_odecache(
   ::ThetaMethod,
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r0::TransientParamRealization,
   us0::NTuple{1,AbstractVector})
 
@@ -21,7 +21,7 @@ end
 function ODEs.ode_march!(
   statef::NTuple{1,AbstractVector},
   solver::ThetaMethod,
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r::TransientParamRealization,
   state0::NTuple{1,AbstractVector},
   odecache)
@@ -57,9 +57,9 @@ function ODEs.ode_march!(
   (r,statef,odecache)
 end
 
-function jacobian_and_residual(
+function get_stage_operator(
   solver::ThetaMethod,
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r::TransientParamRealization,
   state0::NTuple{1,AbstractVector},
   odecache)
@@ -70,11 +70,11 @@ function jacobian_and_residual(
 
   dt,θ = solver.dt,solver.θ
 
-  x = copy(u0)
+  x = u0
   dtθ = θ*dt
   shift_state!(x,1/dt)
   shift_time!(r,dt*(θ-1))
-  function usx(x)
+  function us(x)
     copy!(uθ,u0)
     axpy!(dtθ,x,uθ)
     (uθ,x)
@@ -82,12 +82,41 @@ function jacobian_and_residual(
   ws = (1,1/dtθ)
 
   update_odeopcache!(odeopcache,odeop,r)
-
   stageop = NonlinearParamStageOperator(odeop,odeopcache,r,usx,ws)
-  A = jacobian(stageop,x)
-  b = residual(stageop,x)
   shift_time!(r,dt*(1-θ))
 
+  return stageop
+end
+
+function Algebra.solve!(
+  statef::NTuple{1,AbstractVector},
+  solver::ThetaMethod,
+  odeop::ODEParamOperator,
+  r::TransientParamRealization,
+  state0::NTuple{1,AbstractVector},
+  odecache)
+
+  x = statef[1]
+  sysslvr = solver.sysslvr
+  uθ,sysslvrcache = odeslvrcache
+
+  stageop = get_stage_operator(solver,odeop,r,state0,odecache)
+  solve!(x,sysslvr,stageop,sysslvrcache)
+  return x
+end
+
+function jacobian_and_residual(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator,
+  r::TransientParamRealization,
+  state0::NTuple{1,AbstractVector},
+  odecache)
+
+  x = state0[1]
+
+  stageop = get_stage_operator(solver,odeop,r,state0,odecache)
+  A = jacobian(stageop,x)
+  b = residual(stageop,x)
   return A,b
 end
 
@@ -95,7 +124,7 @@ end
 
 function ODEs.allocate_odecache(
   ::ThetaMethod,
-  odeop::ODEOperator{LinearParamODE},
+  odeop::ODEParamOperator{LinearParamODE},
   r0::TransientParamRealization,
   us0::NTuple{1,AbstractVector})
 
@@ -119,7 +148,7 @@ end
 function ODEs.ode_march!(
   statef::NTuple{1,AbstractVector},
   solver::ThetaMethod,
-  odeop::ODEOperator{LinearParamODE},
+  odeop::ODEParamOperator{LinearParamODE},
   r::TransientParamRealization,
   state0::NTuple{1,AbstractVector},
   odecache)
@@ -152,9 +181,9 @@ function ODEs.ode_march!(
   (r,statef,odecache)
 end
 
-function jacobian_and_residual(
+function get_stage_operator(
   solver::ThetaMethod,
-  odeop::ODEOperator{LinearParamODE},
+  odeop::ODEParamOperator{LinearParamODE},
   r::TransientParamRealization,
   state0::NTuple{1,AbstractVector},
   odecache)
@@ -173,9 +202,37 @@ function jacobian_and_residual(
   ws = (1,1/dtθ)
 
   update_odeopcache!(odeopcache,odeop,r)
-
   stageop = LinearParamStageOperator(odeop,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
   shift_time!(r,dt*(1-θ))
 
+  return stageop
+end
+
+function Algebra.solve!(
+  statef::NTuple{1,AbstractVector},
+  solver::ThetaMethod,
+  odeop::ODEParamOperator{LinearParamODE},
+  r::TransientParamRealization,
+  state0::NTuple{1,AbstractVector},
+  odecache)
+
+  x = statef[1]
+  sysslvr = solver.sysslvr
+  odeslvrcache,odeopcache = odecache
+  reuse,A,b,sysslvrcache = odeslvrcache
+
+  stageop = get_stage_operator(solver,odeop,r,state0,odecache)
+  solve!(x,sysslvr,stageop,sysslvrcache)
+  return x
+end
+
+function jacobian_and_residual(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator{LinearParamODE},
+  r::TransientParamRealization,
+  state0::NTuple{1,AbstractVector},
+  odecache)
+
+  stageop = get_stage_operator(solver,odeop,r,state0,odecache)
   return stageop.A,stageop.b
 end
