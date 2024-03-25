@@ -200,11 +200,11 @@ end
 
 function _set_triangulation_jac(
   jac::Function,
-  trian_jac::Tuple{Vararg{Triangulation}},
+  trian::Tuple{Vararg{Triangulation}},
   order)
 
   degree = 2*order
-  meas = Measure.(trian_jac,degree)
+  meas = Measure.(trian,degree)
   newjac(μ,t,u,du,v,args...) = jac(μ,t,u,du,v,args...)
   newjac(μ,t,u,du,v) = newjac(μ,t,u,du,v,meas...)
   return newjac
@@ -212,23 +212,23 @@ end
 
 function _set_triangulation_jacs(
   jacs::NTuple{N,Function},
-  trian_jacs::NTuple{N,Tuple{Vararg{Triangulation}}},
+  trians::NTuple{N,Tuple{Vararg{Triangulation}}},
   order) where N
 
   newjacs = ()
-  for (jac,trians) in zip(jacs,trian_jacs)
-    newjacs = (newjacs...,_set_triangulation_jac(jac,trians,order))
+  for (jac,trian) in zip(jacs,trians)
+    newjacs = (newjacs...,_set_triangulation_jac(jac,trian,order))
   end
   return newjacs
 end
 
 function _set_triangulation_form(
   res::Function,
-  trian_res::Tuple{Vararg{Triangulation}},
+  trian::Tuple{Vararg{Triangulation}},
   order)
 
   degree = 2*order
-  meas = Measure.(trian_res,degree)
+  meas = Measure.(trian,degree)
   newres(μ,t,u,v,args...) = res(μ,t,u,v,args...)
   newres(μ,t,u,v) = newres(μ,t,u,v,meas...)
   return newres
@@ -236,12 +236,12 @@ end
 
 function _set_triangulation_forms(
   forms::NTuple{N,Function},
-  trian_forms::NTuple{N,Tuple{Vararg{Triangulation}}},
+  trians::NTuple{N,Tuple{Vararg{Triangulation}}},
   order) where N
 
   newforms = ()
-  for (form,trians) in zip(forms,trian_forms)
-    newforms = (newforms...,_set_triangulation_form(form,trians,order))
+  for (form,trian) in zip(forms,trians)
+    newforms = (newforms...,_set_triangulation_form(form,trian,order))
   end
   return newforms
 end

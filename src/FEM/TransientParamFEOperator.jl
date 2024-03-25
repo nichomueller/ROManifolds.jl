@@ -241,11 +241,10 @@ struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearPa
 end
 
 function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},b::Function,induced_norm::Function,tpspace,trial,test,
+  forms::Tuple{Vararg{Function}},res::Function,induced_norm::Function,tpspace,trial,test,
   args...;constant_forms::Tuple{Vararg{Bool}}=ntuple(_ -> false,length(forms)))
 
   order = length(forms)-1
-  res(μ,t,u,v,args...) = (-1)*b(μ,t,v,args...)
   jacs = ntuple(k -> ((μ,t,u,duk,v,args...) -> forms[k](μ,t,duk,v,args...)),length(forms))
   assem = SparseMatrixAssembler(trial,test)
   TransientParamLinearFEOpFromWeakForm(
@@ -253,25 +252,25 @@ function TransientParamLinearFEOperator(
 end
 
 function TransientParamLinearFEOperator(
-  mass::Function,b::Function,induced_norm::Function,tpspace,trial,test,
+  mass::Function,res::Function,induced_norm::Function,tpspace,trial,test,
   args...;kwargs...)
 
-  TransientParamLinearFEOperator((mass,),b,induced_norm,tpspace,trial,test;kwargs)
+  TransientParamLinearFEOperator((mass,),res,induced_norm,tpspace,trial,test;kwargs)
 end
 
 function TransientParamLinearFEOperator(
-  stiffness::Function,mass::Function,b::Function,induced_norm::Function,tpspace,trial,test,
+  stiffness::Function,mass::Function,res::Function,induced_norm::Function,tpspace,trial,test,
   args...;kwargs...)
 
-  TransientParamLinearFEOperator((stiffness,mass),b,induced_norm,tpspace,
+  TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,tpspace,
     trial,test,args...;kwargs...)
 end
 
 function TransientParamLinearFEOperator(
-  stiffness::Function,damping::Function,mass::Function,b::Function,
+  stiffness::Function,damping::Function,mass::Function,res::Function,
   induced_norm::Function,tpspace,trial,test,args...;kwargs...)
 
-  TransientParamLinearFEOperator((stiffness,damping,mass),b,induced_norm,tpspace,
+  TransientParamLinearFEOperator((stiffness,damping,mass),res,induced_norm,tpspace,
     trial,test,args...;kwargs...)
 end
 

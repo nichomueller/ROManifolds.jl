@@ -86,6 +86,7 @@ function jacobian_and_residual(
   stageop = NonlinearParamStageOperator(odeop,odeopcache,r,usx,ws)
   A = jacobian(stageop,x)
   b = residual(stageop,x)
+  shift_time!(r,dt*(1-θ))
 
   return A,b
 end
@@ -174,6 +175,7 @@ function jacobian_and_residual(
   update_odeopcache!(odeopcache,odeop,r)
 
   stageop = LinearParamStageOperator(odeop,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
+  shift_time!(r,dt*(1-θ))
 
   return stageop.A,stageop.b
 end

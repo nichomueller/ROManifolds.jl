@@ -118,8 +118,12 @@ function Algebra.jacobian!(
 end
 
 function FEM.jacobian_and_residual(solver::RBSolver,op::RBOperator,s::S) where S
+  jacobian_and_residual(get_fe_solver(solver),op.odeop,s)
+end
+
+function FEM.jacobian_and_residual(fesolver::ODESolver,odeop::ODEParamOperator,s::S) where S
   x = get_values(s)
   r = get_realization(s)
-  A,b = jacobian_and_residual(get_fe_solver(solver),op.odeop,x)
+  A,b = jacobian_and_residual(fesolver,odeop,r,(x,))
   return Snapshots(A,r),Snapshots(b,r)
 end

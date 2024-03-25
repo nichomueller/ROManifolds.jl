@@ -801,61 +801,61 @@ function interpolation_error(a::Tuple,fes::Tuple,rbs::Tuple)
   err
 end
 
-function _interpolation_error(solver,odeop,rbop,s)
-  feA,feb = jacobian_and_residual(get_fe_solver(solver),odeop,get_realization(s),(get_values(s),))
+function interpolation_error(solver,odeop,rbop,s)
+  feA,feb = jacobian_and_residual(get_fe_solver(solver),odeop,s)
   rbA,rbb = jacobian_and_residual(solver,rbop.op,s)
   errA = interpolation_error(rbop.lhs,feA,rbA)
   errb = interpolation_error(rbop.rhs,feb,rbb)
   return errA,errb
 end
 
-function interpolation_error(solver,feop,rbop,s)
+function interpolation_error(solver,feop::TransientParamFEOperator,rbop,s)
   odeop = get_algebraic_operator(feop)
-  errA,errb = _interpolation_error(solver,odeop,rbop,s)
+  errA,errb = interpolation_error(solver,odeop,rbop,s)
   return InterpolationError(errA,errb)
 end
 
 function interpolation_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
-  errA_lin,errb_lin = _interpolation_error(solver,feop.op_linear,rbop.op_linear,s)
-  errA_nlin,errb_nlin = _interpolation_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s)
+  errA_lin,errb_lin = interpolation_error(solver,feop.op_linear,rbop.op_linear,s)
+  errA_nlin,errb_nlin = interpolation_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s)
   err_lin = InterpolationError(errA_lin,errb_lin,name="linear")
   err_nlin = InterpolationError(errA_nlin,errb_nlin,name="non linear")
   return err_lin,err_nlin
 end
 
-function _linear_combination_error(solver,odeop,rbop,s)
-  feA,feb = jacobian_and_residual(get_fe_solver(solver),odeop,get_realization(s),(get_values(s),))
+function linear_combination_error(solver,odeop,rbop,s)
+  feA,feb = jacobian_and_residual(get_fe_solver(solver),odeop,s)
   feA_comp = compress(solver,feA,get_trial(rbop),get_test(rbop))
   feb_comp = compress(solver,feb,get_test(rbop))
   rbA,rbb = jacobian_and_residual(solver,rbop,s)
-  errA = _rel_norm(feA_comp,sum(map(sum,rbA)))
-  errb = _rel_norm(feb_comp,sum(rbb))
+  errA = rel_norm(feA_comp,sum(map(sum,rbA)))
+  errb = rel_norm(feb_comp,sum(rbb))
   return errA,errb
 end
 
-function linear_combination_error(solver,feop,rbop,s)
+function linear_combination_error(solver,feop::TransientParamFEOperator,rbop,s)
   odeop = get_algebraic_operator(feop)
-  errA,errb = _linear_combination_error(solver,odeop,rbop,s)
+  errA,errb = linear_combination_error(solver,odeop,rbop,s)
   return LincombError(errA,errb)
 end
 
 function linear_combination_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
-  errA_lin,errb_lin = _linear_combination_error(solver,feop.op_linear,rbop.op_linear,s)
-  errA_nlin,errb_nlin = _linear_combination_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s)
+  errA_lin,errb_lin = linear_combination_error(solver,feop.op_linear,rbop.op_linear,s)
+  errA_nlin,errb_nlin = linear_combination_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s)
   err_lin = LincombError(errA_lin,errb_lin,name="linear")
   err_nlin = LincombError(errA_nlin,errb_nlin,name="non linear")
   return err_lin,err_nlin
 end
 
-function _rel_norm(fe,rb)
+function rel_norm(fe,rb)
   norm(fe - rb) / norm(fe)
 end
 
-function _rel_norm(fea::ArrayBlock,rba::ParamBlockArray)
+function rel_norm(fea::ArrayBlock,rba::ParamBlockArray)
   active_block_ids = get_touched_blocks(fea)
   block_map = BlockMap(size(fea),active_block_ids)
   rb_array = get_array(rba)
-  norms = [_rel_norm(fea[i],rb_array[i]) for i in active_block_ids]
+  norms = [rel_norm(fea[i],rb_array[i]) for i in active_block_ids]
   return_cache(block_map,norms...)
 end
 

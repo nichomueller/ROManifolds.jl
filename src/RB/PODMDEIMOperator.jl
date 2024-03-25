@@ -92,15 +92,12 @@ function Algebra.jacobian!(
   return Â
 end
 
-# function FEM.jacobian_and_residual(solver::RBSolver,op::PODMDEIMOperator,s::S) where S
-#   x = get_values(s)
-#   r = get_realization(s)
-#   odeopcache = allocate_odeopcache(op,r,(x,))
-#   b = allocate_residual(op,r,(x,),odeopcache)
-#   A = allocate_jacobian(op,r,(x,),odeopcache)
-#   odeopcache = update_odeopcache!(odeopcache,op,r)
-#   return residual!()
-# end
+function FEM.jacobian_and_residual(solver::RBSolver,op::PODMDEIMOperator,s::S) where S
+  x = get_values(s)
+  r = get_realization(s)
+  A,b = jacobian_and_residual(get_fe_solver(solver),op,r,(x,))
+  return Snapshots(A,r),Snapshots(b,r)
+end
 
 function _select_fe_space_at_time_locations(fs::FESpace,indices)
   @notimplemented

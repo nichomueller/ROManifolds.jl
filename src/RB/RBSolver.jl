@@ -91,7 +91,7 @@ function fe_solutions(
 
   fesolver = get_fe_solver(solver)
   nparams = num_params(solver)
-  sol = solve(fesolver,op,uh0;nparams)
+  sol = solve(fesolver,op,uh0;kwargs...)
   odesol = sol.odesol
   realization = odesol.r
 
@@ -111,7 +111,7 @@ function ode_solutions(
 
   fesolver = get_fe_solver(solver)
   nparams = num_params(solver)
-  sol = solve(fesolver,op,uh0;nparams)
+  sol = solve(fesolver,op,uh0;kwargs...)
   odesol = sol.odesol
   realization = odesol.r
 
