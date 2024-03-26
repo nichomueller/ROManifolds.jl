@@ -122,7 +122,7 @@ nl_cache = nothing
 ode_solver = ThetaMethod(ls,dt,θ)
 ode_solver.θ == 0.0 ? dtθ = dt : dtθ = dt*ode_solver.θ
 rθ = get_at_time(r,:initial)
-shift_time!(rθ,dtθ)
+shift!(rθ,dtθ)
 ode_cache = update_cache!(ode_cache,odeop,rθ)
 
 using Gridap.ODEs.ODETools: ThetaMethodNonlinearOperator
@@ -135,7 +135,7 @@ h = nl_cache.b
 
 # Steady version of the problem to extract the Laplacian and mass matrices
 # tf = 0.1
-shift_time!(rθ,dt*(1-θ))
+shift!(rθ,dt*(1-θ))
 Utf = U(rθ)
 # fst(x) = -Δ(u(tf))(x)
 fθ(x) = f(get_params(rθ),get_times(rθ))(x)

@@ -93,10 +93,11 @@ function Algebra.jacobian!(
   return Â
 end
 
-function FEM.jacobian_and_residual(solver::RBSolver,op::PODMDEIMOperator,s::S) where S
+function jacobian_and_residual(solver::RBSolver,op::PODMDEIMOperator,s::S) where S
   x = get_values(s)
   r = get_realization(s)
-  jacobian_and_residual(get_fe_solver(solver),op,r,(x,))
+  odecache = allocate_odecache(fesolver,odeop,r,us)
+  jacobian_and_residual(get_fe_solver(solver),op,r,(x,),odecache)
 end
 
 function _select_fe_space_at_time_locations(fs::FESpace,indices)
@@ -251,74 +252,57 @@ function ODEs.update_odeopcache!(
   update_odeopcache!(ode_cache,op.op_linear,r)
 end
 
-# function Algebra.allocate_residual(
-#   op::LinearNonlinearPODMDEIMOperator,
-#   r::TransientParamRealization,
-#   x::AbstractVector,
-#   ode_cache)
+function Algebra.allocate_residual(
+  op::LinearNonlinearPODMDEIMOperator,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  odeopcache)
 
-#   cache_lin = allocate_residual(op.op_linear,r,x,ode_cache)
-#   cache_nlin = allocate_residual(op.op_nonlinear,r,x,ode_cache)
-#   return cache_lin,cache_nlin
-# end
+  b_lin = allocate_residual(op.op_linear,r,us,odeopcache)
+  b_nlin = copy(b_lin)
+  return b_lin,b_nlin
+end
 
-# function Algebra.allocate_jacobian(
-#   op::LinearNonlinearPODMDEIMOperator,
-#   r::TransientParamRealization,
-#   x::AbstractVector,
-#   ode_cache)
+function Algebra.allocate_jacobian(
+  op::LinearNonlinearPODMDEIMOperator,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  odeopcache)
 
-#   cache_lin = allocate_jacobian(op.op_linear,r,x,ode_cache)
-#   cache_nlin = allocate_jacobian(op.op_nonlinear,r,x,ode_cache)
-#   return cache_lin,cache_nlin
-# end
+  A_lin = allocate_jacobian(op.op_linear,r,us,odeopcache)
+  A_nlin = copy(A_lin)
+  return A_lin,A_nlin
+end
 
-# # we assume that the linear components have already been computed during the
-# # first call to residual() and jacobian() (first iteration of the Newton solver)
-# function Algebra.residual!(
-#   cache,
-#   op::LinearNonlinearPODMDEIMOperator,
-#   r::TransientParamRealization,
-#   us::Tuple{Vararg{AbstractVector}},
-#   ode_cache)
+function Algebra.residual!(
+  b::NTuple{2,Contribution},
+  op::LinearNonlinearPODMDEIMOperator,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  odeopcache;
+  kwargs...)
 
-#   b_lin,cache_nl = cache
-#   b_nlin = residual!(cache_nl,op.op_nonlinear,r,us,ode_cache)
-#   # @. b_nlin = b_nlin - b_lin
-#   # return b_nlin
-#   return b_nlin - b_lin
-# end
+  b̂_lin,b_nlin = b
+  fe_sb_nlin = fe_residual!(b_nlin,op.op_nonlinear,r,us,odeopcache)
+  b̂_nlin = mdeim_residual(op.op_nonlinear.rhs,fe_sb_nlin)
+  @. b̂_nlin = b̂_nlin + b̂_lin
+  return b̂_nlin
+end
 
-# function Algebra.jacobian!(
-#   cache,
-#   op::LinearNonlinearPODMDEIMOperator,
-#   r::TransientParamRealization,
-#   us::Tuple{Vararg{AbstractVector}},
-#   i::Integer,
-#   γᵢ::Real,
-#   ode_cache)
+function Algebra.jacobian!(
+  A::NTuple{2,TupOfArrayContribution},
+  op::LinearNonlinearPODMDEIMOperator,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}},
+  odeopcache)
 
-#   A_lin,cache_nl = cache
-#   A_nlin = jacobian!(cache_nl,op.op_nonlinear,r,us,i,γᵢ,ode_cache)
-#   # @. A_nlin = A_nlin + A_lin
-#   # return A_nlin
-#   return A_nlin + A_lin
-# end
-
-# function ODEs.jacobians!(
-#   cache,
-#   op::LinearNonlinearPODMDEIMOperator,
-#   r::TransientParamRealization,
-#   us::Tuple{Vararg{AbstractVector}},
-#   γ::Tuple{Vararg{Real}},
-#   ode_cache)
-
-#   A_lin,cache_nl = cache
-#   A_nlin = jacobians!(cache_nl,op.op_nonlinear,r,us,γ,ode_cache)
-#   # @. A_nlin = A_nlin + A_lin
-#   # return A_nlin
-#   return A_nlin + A_lin
-# end
+  Â_lin,A_nlin = A
+  fe_sA_nlin = fe_jacobian!(A_nlin,op.op_nonlinear,r,us,ws,odeopcache)
+  Â_nlin = mdeim_jacobian(op.op_nonlinear.lhs,fe_sA_nlin)
+  @. Â_nlin = Â_nlin + Â_lin
+  return Â_nlin
+end
 
 # Solve a POD-MDEIM problem
 
@@ -346,7 +330,7 @@ end
 
 function Algebra.solve(
   solver::ThetaMethodRBSolver,
-  op::RBOperator{LinearParamODE},
+  op::RBOperator,
   r::TransientParamRealization)
 
   stats = @timed begin
@@ -365,45 +349,6 @@ function Algebra.solve(
   cs = ComputationalStats(stats,num_params(r))
   return s,cs
 end
-
-# # Nonlinear case
-
-# function Algebra.solve(
-#   solver::ThetaMethodRBSolver,
-#   op::RBOperator{LinearNonlinearParamODE},
-#   _r::TransientParamRealization)
-
-#   fesolver = get_fe_solver(solver)
-#   dt = fesolver.dt
-#   θ = fesolver.θ
-#   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-
-#   r = copy(_r)
-#   FEM.shift_time!(r,dt*(θ-1))
-
-#   trial = get_trial(op)(r)
-#   fe_trial = get_fe_trial(op)(r)
-#   red_x = zero_free_values(trial)
-#   y = zero_free_values(fe_trial)
-#   z = similar(y)
-#   z .= 0.0
-
-#   ode_cache = allocate_cache(op,r)
-#   cache_lin = ODETools._allocate_matrix_and_vector(op.op_linear,r,y,ode_cache)
-#   cache_nlin = ODETools._allocate_matrix_and_vector(op.op_nonlinear,r,y,ode_cache)
-#   cache = cache_lin,cache_nlin
-
-#   stats = @timed begin
-#     ode_cache = update_cache!(ode_cache,op,r)
-#     nlop = RBThetaMethodParamOperator(op,r,dtθ,y,ode_cache,z)
-#     solve!(red_x,fesolver.nls,nlop,cache)
-#   end
-
-#   x = recast(red_x,trial)
-#   s = Snapshots(x,r)
-#   cs = ComputationalStats(stats,num_params(r))
-#   return s,cs
-# end
 
 # for testing/visualization purposes
 

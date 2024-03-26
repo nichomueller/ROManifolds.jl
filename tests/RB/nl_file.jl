@@ -4,7 +4,7 @@ function nl_jacobian_and_residual(solver::RB.ThetaMethodRBSolver,op::RBOperator{
   θ = fesolver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
   r = get_realization(s)
-  FEM.shift_time!(r,dt*(θ-1))
+  FEM.shift!(r,dt*(θ-1))
   ode_cache = allocate_cache(op,r)
   u0 = copy(get_values(s))
   vθ = similar(u0)
@@ -23,7 +23,7 @@ function nl_jacobian_and_residual(solver::ThetaMethod,op::ODEParamOperator{T},s)
   θ = solver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
   r = get_realization(s)
-  FEM.shift_time!(r,dt*(θ-1))
+  FEM.shift!(r,dt*(θ-1))
   ode_cache = allocate_cache(op,r)
   u0 = copy(get_values(s))
   vθ = similar(u0)
@@ -54,7 +54,7 @@ ron = get_realization(son)
 θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
 r = copy(ron)
-FEM.shift_time!(r,dt*(θ-1))
+FEM.shift!(r,dt*(θ-1))
 
 rb_trial = get_trial(rbop)(r)
 fe_trial = get_fe_trial(rbop)(r)

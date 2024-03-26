@@ -1,14 +1,11 @@
 using Gridap
 using Gridap.FESpaces
-using GridapGmsh
 using ForwardDiff
 using BlockArrays
 using LinearAlgebra
 using Test
 using Gridap.Algebra
 using Gridap.ODEs
-using Gridap.ODEs.TransientFETools
-using Gridap.ODEs.ODETools
 using Gridap.Helpers
 using Gridap.Fields
 using Gridap.MultiField
@@ -61,9 +58,9 @@ dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 c(u,v,dΩ) = ∫( v⊙(conv∘(u,∇(u))) )dΩ
 dc(u,du,v,dΩ) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )dΩ
 
-res_lin(μ,t,(u,p),(v,q),dΩ) = ∫(v⋅∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
-jac_lin(μ,t,(u,p),(du,dp),(v,q),dΩ) = ∫(aμt(μ,t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ + ∫(q*(∇⋅(du)))dΩ
-jac_t_lin(μ,t,(u,p),(dut,dpt),(v,q),dΩ) = ∫(v⋅dut)dΩ
+stiffness(μ,t,(u,p),(v,q),dΩ) = ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
+mass(μ,t,(uₜ,pₜ),(v,q),dΩ) = ∫(v⋅uₜ)dΩ
+res(μ,t,(u,p),(v,q),dΩ) = ∫(v⋅∂t(u))dΩ + stiffness(μ,t,(u,p),(v,q),dΩ)
 
 res_nlin(μ,t,(u,p),(v,q),dΩ) = c(u,v,dΩ)
 jac_nlin(μ,t,(u,p),(du,dp),(v,q),dΩ) = dc(u,du,v,dΩ)
@@ -83,10 +80,10 @@ test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-_feop_lin = AffineTransientParamFEOperator(res_lin,jac_lin,jac_t_lin,induced_norm,ptspace,trial,test,coupling)
-feop_lin = TransientFEOperatorWithTrian(_feop_lin,trian_res,trian_jac,trian_jac_t)
-_feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,induced_norm,ptspace,trial,test)
-feop_nlin = TransientFEOperatorWithTrian(_feop_nlin,trian_res,trian_jac)
+feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
+  trial,test,coupling,trian_res,trian_jac,trian_jac_t)
+feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,induced_norm,ptspace,
+  trial,test,trian_res,trian_jac)
 feop = TransientParamLinearNonlinearFEOperator(feop_lin,feop_nlin)
 
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
@@ -117,7 +114,7 @@ ron = get_realization(son)
 θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
 r = copy(ron)
-FEM.shift_time!(r,dt*(θ-1))
+FEM.shift!(r,dt*(θ-1))
 
 rb_trial = get_trial(rbop)(r)
 fe_trial = get_fe_trial(rbop)(r)

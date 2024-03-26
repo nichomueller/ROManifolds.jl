@@ -16,7 +16,7 @@ ptspace = TransientParamSpace(pranges,tdomain)
 # model_dir = datadir(joinpath("meshes","perforated_plate.json"))
 # model = DiscreteModelFromFile(model_dir)
 
-n = 10
+n = 20
 domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain, partition)
@@ -33,7 +33,8 @@ a(x,μ,t) = 1+exp(-sin(2π*t/tf)^2*(1-x[2])/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
-inflow(μ,t) = 1-cos(2π*t/tf)+sin(μ[2]*2π*t/tf)/μ[1]
+# inflow(μ,t) = 1-cos(2π*t/tf)+sin(μ[2]*2π*t/tf)/μ[1]
+inflow(μ,t) = 1-cos(2π*t/(μ[1]*tf))
 g_in(x,μ,t) = VectorValue(-x[2]*(1-x[2])*inflow(μ,t),0.0)
 g_in(μ,t) = x->g_in(x,μ,t)
 gμt_in(μ,t) = TransientParamFunction(g_in,μ,t)

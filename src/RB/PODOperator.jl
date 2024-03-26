@@ -117,11 +117,11 @@ function Algebra.jacobian!(
   return Snapshots(A,r)
 end
 
-function FEM.jacobian_and_residual(solver::RBSolver,op::RBOperator,s::S) where S
+function jacobian_and_residual(solver::RBSolver,op::RBOperator,s::S) where S
   jacobian_and_residual(get_fe_solver(solver),op.odeop,s)
 end
 
-function FEM.jacobian_and_residual(fesolver::ODESolver,odeop::ODEParamOperator,s::S) where S
+function jacobian_and_residual(fesolver::ODESolver,odeop::ODEParamOperator,s::S) where S
   us = (get_values(s),)
   r = get_realization(s)
   odecache = allocate_odecache(fesolver,odeop,r,us)

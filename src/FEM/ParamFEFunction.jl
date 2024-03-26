@@ -143,8 +143,9 @@ end
 _length(f::MultiFieldParamFEFunction) = _length(first(f.single_fe_functions))
 
 function _getindex(f::MultiFieldParamFEFunction,index)
-  mfs = map(_getindex,f.single_fe_functions)
-  sff = map(_getindex,f.fe_space)
+  style = f.fe_space.multi_field_style
+  sff = map(f->_getindex(f,index),f.single_fe_functions)
+  mfs = MultiFieldFESpace(map(f->_getindex(f,index),f.fe_space);style)
   fv = f.free_values[index]
-  MultiFieldParamFEFunction(fv,mfs,sff)
+  MultiFieldFEFunction(fv,mfs,sff)
 end

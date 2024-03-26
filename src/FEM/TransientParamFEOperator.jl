@@ -44,8 +44,8 @@ struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParam
   res::Function
   jacs::Tuple{Vararg{Function}}
   induced_norm::Function
-  assem::Assembler
   tpspace::TransientParamSpace
+  assem::Assembler
   trial::FESpace
   test::FESpace
   order::Integer

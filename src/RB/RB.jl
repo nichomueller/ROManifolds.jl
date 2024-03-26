@@ -60,6 +60,10 @@ export BasicTTSnapshots
 export TransientTTSnapshots
 include("TTSnapshots.jl")
 
+export get_stage_operator
+export jacobian_and_residual
+include("ThetaMethod.jl")
+
 export RBInfo
 export RBSolver
 export TTRBSolver

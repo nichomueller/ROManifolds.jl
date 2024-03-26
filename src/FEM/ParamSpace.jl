@@ -81,7 +81,7 @@ function change_time!(r::GenericTransientParamRealization{P,T} where P,time::T) 
   r.times .= time
 end
 
-function shift_time!(r::GenericTransientParamRealization,δ::Real)
+function shift!(r::GenericTransientParamRealization,δ::Real)
   r.times .+= δ
 end
 
@@ -123,7 +123,7 @@ function change_time!(r::TransientParamRealizationAt{P,T} where P,time::T) where
   r.t[] = time
 end
 
-function shift_time!(r::TransientParamRealizationAt,δ::Real)
+function shift!(r::TransientParamRealizationAt,δ::Real)
   r.t[] += δ
 end
 
@@ -189,7 +189,7 @@ function realization(
   TransientParamRealization(params,times)
 end
 
-function shift_temporal_domain!(p::TransientParamSpace,δ::Real)
+function shift!(p::TransientParamSpace,δ::Real)
   p.temporal_domain .+= δ
 end
 

@@ -232,7 +232,7 @@ ns = num_free_dofs(test)
 function get_fe_snaps(_r)
   # full order matrix
   r = copy(_r)
-  FEM.shift_time!(r,dt*(θ-1))
+  FEM.shift!(r,dt*(θ-1))
   trial0 = trial(nothing)
   pA = ParamArray([assemble_matrix((u,v)->∫(a(μ,t)*∇(v)⋅∇(u))dΩ,trial0,test) for (μ,t) in r])
   pM = ParamArray([assemble_matrix((u,v)->∫(v*u)dΩ,trial0,test)/(θ*dt) for (μ,t) in r])

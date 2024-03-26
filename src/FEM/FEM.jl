@@ -170,7 +170,6 @@ export ODEParamOpFromTFEOp
 export ODEParamOpFromTFEOpWithTrian
 include("ODEParamOpFromTFEOp.jl")
 
-export jacobian_and_residual
 include("ThetaMethod.jl")
 
 export ODEParamSolution
