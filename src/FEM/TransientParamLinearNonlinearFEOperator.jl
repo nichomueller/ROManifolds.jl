@@ -64,13 +64,16 @@ function assemble_coupling_matrix(op::TransientParamLinearNonlinearFEOperator)
 end
 
 function join_operators(
-  op::TransientParamLinearNonlinearFEOperator,
   op_lin::TransientParamFEOperator{LinearParamODE},
   op_nlin::TransientParamFEOperator)
 
-  trial = get_trial(op)
-  test = get_test(op)
+  @check get_trial(op_lin) == get_trial(op_nlin)
+  @check get_test(op_lin) == get_test(op_nlin)
   @check op_lin.tpspace === op_nlin.tpspace
+
+  trial = get_trial(op_lin)
+  test = get_test(op_lin)
+  order = max(get_order(op_lin),get_order(op_nlin))
 
   res(μ,t,u,v) = op_lin.res(μ,t,u,v) + op_nlin.res(μ,t,u,v)
 
@@ -78,7 +81,7 @@ function join_operators(
   order_nlin = get_order(op_nlin)
 
   jacs = ()
-  for i = 1:get_order(op)+1
+  for i = 1:order+1
     function jac_i(μ,t,u,du,v)
       if i <= order_lin+1 && i <= order_nlin+1
         op_lin.jacs[i](μ,t,u,du,v) + op_nlin.jacs[i](μ,t,u,du,v)
@@ -95,26 +98,24 @@ function join_operators(
 end
 
 function join_operators(
-  op::TransientParamLinearNonlinearFEOperator,
   op_lin::TransientParamSaddlePointFEOp{LinearParamODE},
   op_nlin::TransientParamFEOperator)
 
-  jop = join_operators(op,op_lin.op,op_nlin)
+  jop = join_operators(op_lin.op,op_nlin)
   TransientParamSaddlePointFEOp(jop,op_lin.coupling)
 end
 
 function join_operators(
-  op::TransientParamLinearNonlinearFEOperator,
   op_lin::TransientParamFEOperatorWithTrian,
   op_nlin::TransientParamFEOperatorWithTrian)
 
   set_op_lin = set_triangulation(op_lin)
   set_op_nlin = set_triangulation(op_nlin)
-  join_operators(op,set_op_lin,set_op_nlin)
+  join_operators(set_op_lin,set_op_nlin)
 end
 
 function join_operators(op::TransientParamLinearNonlinearFEOperator)
   op_lin = get_linear_operator(op)
   op_nlin = get_nonlinear_operator(op)
-  join_operators(op,op_lin,op_nlin)
+  join_operators(op_lin,op_nlin)
 end

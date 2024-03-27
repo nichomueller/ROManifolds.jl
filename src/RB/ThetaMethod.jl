@@ -185,16 +185,17 @@ function _solve_rb_nr!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,stageop,trial)
     x .= recast(x̂,trial)
 
     b = residual!(b_cache,stageop,x)
+
+    A = jacobian!(A_cache,stageop,x)
+    numerical_setup!(ns,A)
+
+    b .+= A_lin*x̂
     isconv = Algebra._check_convergence(nls,b,conv0)
-    # println(maximum(abs,b))
+    println(maximum(abs,b))
     if isconv; return; end
 
     if nliter == nls.max_nliters
       @unreachable
     end
-
-    A = jacobian!(A_cache,stageop,x)
-    numerical_setup!(ns,A)
-    b .+= A_lin*x̂
   end
 end

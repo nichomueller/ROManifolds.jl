@@ -91,7 +91,7 @@ nls = NewtonRaphsonSolver(LUSolver(),1e-10,20)
 fesolver = ThetaMethod(nls,dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","toy_mesh")))
 
 fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
@@ -108,82 +108,3 @@ save(test_dir,results)
 
 # POD-MDEIM error
 pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
-
-son = select_snapshots(fesnaps,RB.online_params(rbsolver))
-r = get_realization(son)
-trial = get_trial(rbop)(r)
-fe_trial = get_fe_trial(rbop)(r)
-x̂ = zero_free_values(trial)
-y = zero_free_values(fe_trial)
-
-odecache = allocate_odecache(fesolver,rbop,r,(y,))
-# solve!((x̂,),fesolver,rbop,r,(y,),odecache)
-
-odecache_lin,odecache_nlin = odecache
-odeslvrcache_nlin,odeopcache_nlin = odecache_nlin
-A_lin,b_lin = jacobian_and_residual(fesolver,get_linear_operator(rbop),r,(y,),odecache_lin)
-A_nlin = allocate_jacobian(get_nonlinear_operator(rbop),r,(y,),odeopcache_nlin)
-b_nlin = allocate_residual(get_nonlinear_operator(rbop),r,(y,),odeopcache_nlin)
-sysslvrcache = ((A_lin,A_nlin),(b_lin,b_nlin))
-sysslvr = fesolver.sysslvr
-stageop = get_stage_operator(fesolver,rbop,r,(y,),odecache_nlin)
-solve!(x̂,y,sysslvr,stageop,sysslvrcache)
-
-odeop = stageop.odeop
-red_trial = get_trial(odeop)(stageop.rx)
-A_cache,b_cache = sysslvrcache
-B = residual!(b_cache,stageop,y)
-A = jacobian!(A_cache,stageop,y)
-B .+= A*x̂
-
-dx̂ = similar(B)
-ss = symbolic_setup(nls.ls,A)
-ns = numerical_setup(ss,A)
-
-# v = get_fe_basis(test_u)
-# du = get_trial_fe_basis(test_u)
-# u = rand(num_free_dofs(test_u))
-# _trial_u = TrialFESpace(test_u,x->x)
-# uh = FEFunction(_trial_u,u)
-# β = assemble_vector(v->c(uh,v,dΩ),test_u)
-
-# test_c(u,du,v) = ∫(v⊙(∇(du)'⋅u))dΩ
-
-# γ = assemble_vector(v->test_c(uh,zero(_trial_u),v),test_u)
-# ε = assemble_matrix((u,v)->test_c(uh,u,v),_trial_u,test_u)*u
-
-# β ≈ γ+ε
-
-s1 = select_snapshots(fesnaps,1)
-intp_err = RB.interpolation_error(rbsolver,feop,rbop,s1)
-# proj_err = RB.linear_combination_error(rbsolver,feop,rbop,s1)
-err_lin = RB.linear_combination_error(rbsolver,feop.op_linear,rbop.op_linear,s1;name="linear")
-# err_nlin = RB.linear_combination_error(rbsolver,feop.op_nonlinear,rbop.op_nonlinear,s1;name="non linear")
-odeop = get_algebraic_operator(feop.op_nonlinear)
-# errA,errb = linear_combination_error(rbsolver,odeop,rbop.op_nonlinear,s1)
-feA,feb = jacobian_and_residual(fesolver,odeop,s1)
-feA_comp = RB.compress(fesolver,feA,get_trial(rbop.op_nonlinear),get_test(rbop.op_nonlinear))
-feb_comp = RB.compress(fesolver,feb,get_test(rbop.op_nonlinear))
-# rbA,rbb = jacobian_and_residual(rbsolver,rbop.op_nonlinear,s1)
-
-x = get_values(s1)
-r = get_realization(s1)
-
-odecache = allocate_odecache(fesolver,rbop.op_nonlinear,r,(x,))
-# jacobian_and_residual(fesolver,rbop.op_nonlinear,r,(x,),odecache)
-stageop = get_stage_operator(fesolver,rbop.op_nonlinear,r,(x,),odecache)
-A = jacobian(stageop,x)
-
-# lin
-_odecache = allocate_odecache(fesolver,rbop.op_linear,r,(x,))
-# jacobian_and_residual(fesolver,rbop.op_linear,r,(x,),odecache)
-_stageop = get_stage_operator(fesolver,rbop.op_linear,r,(x,),_odecache)
-_A = jacobian(_stageop,x)
-
-# AA = allocate_jacobian(stageop,x)
-# jacobian!(AA,stageop,x)
-# A
-odeop,odeopcache = stageop.odeop,stageop.odeopcache
-rx = stageop.rx
-usx = stageop.usx(x)
-allocate_jacobian(odeop,rx,usx,odeopcache)

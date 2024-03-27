@@ -656,6 +656,7 @@ function mdeim_coeff(a::BlockAffineDecomposition,b::BlockSnapshots)
 end
 
 function residual_mdeim_lincomb(a::BlockAffineDecomposition,coeff::ArrayBlock)
+  fill!(a.cache,zero(eltype(a.cache)))
   active_block_ids = get_touched_blocks(a)
   for i in active_block_ids
     a.cache[Block(i)] = residual_mdeim_lincomb(a[i],coeff[i])
@@ -664,6 +665,7 @@ function residual_mdeim_lincomb(a::BlockAffineDecomposition,coeff::ArrayBlock)
 end
 
 function jacobian_mdeim_lincomb(a::BlockAffineDecomposition,coeff::ArrayBlock)
+  fill!(a.cache,zero(eltype(a.cache)))
   active_block_ids = get_touched_blocks(a)
   for i in active_block_ids
     a.cache[Block(i.I)] = jacobian_mdeim_lincomb(a[i],coeff[i])

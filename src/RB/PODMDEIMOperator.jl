@@ -224,7 +224,7 @@ function FEM.realization(op::LinearNonlinearPODMDEIMOperator;kwargs...)
 end
 
 function FEM.get_fe_operator(op::LinearNonlinearPODMDEIMOperator)
-  FEM.get_fe_operator(op.op_linear),FEM.get_fe_operator(op.op_nonlinear)
+  join_operators(FEM.get_fe_operator(op.op_linear),FEM.get_fe_operator(op.op_nonlinear))
 end
 
 function get_fe_trial(op::LinearNonlinearPODMDEIMOperator)
