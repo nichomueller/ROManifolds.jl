@@ -90,7 +90,7 @@ end
 (Base.:-)(a::TTArray) = a .* -1
 
 function Base.:*(a::TTArray{D},b::Number) where D
-  TTArray(get_values(a)*b)
+  TTArray(get_values(a)*b,Val(D))
 end
 
 function Base.:*(a::Number,b::TTArray)

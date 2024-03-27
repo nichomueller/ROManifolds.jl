@@ -273,7 +273,7 @@ function reduced_form(
   return ad,red_trian
 end
 
-function reduced_vector_form(
+function reduced_residual(
   solver::RBSolver,
   op::RBOperator,
   s::S,
@@ -283,7 +283,7 @@ function reduced_vector_form(
   reduced_form(solver,s,trian,test)
 end
 
-function reduced_matrix_form(
+function reduced_jacobian(
   solver::RBSolver,
   op::RBOperator,
   s::S,
@@ -295,30 +295,30 @@ function reduced_matrix_form(
   reduced_form(solver,s,trian,trial,test;kwargs...)
 end
 
-function reduced_vector_form(
+function reduced_residual(
   solver::RBSolver,
   op::RBOperator,
   c::ArrayContribution)
 
   a,trians = map(get_domains(c),get_values(c)) do trian,values
-    reduced_vector_form(solver,op,values,trian)
+    reduced_residual(solver,op,values,trian)
   end |> tuple_of_arrays
   return Contribution(a,trians)
 end
 
-function reduced_matrix_form(
+function reduced_jacobian(
   solver::RBSolver,
   op::RBOperator,
   c::ArrayContribution;
   kwargs...)
 
   a,trians = map(get_domains(c),get_values(c)) do trian,values
-    reduced_matrix_form(solver,op,values,trian;kwargs...)
+    reduced_jacobian(solver,op,values,trian;kwargs...)
   end |> tuple_of_arrays
   return Contribution(a,trians)
 end
 
-function reduced_matrix_form(
+function reduced_jacobian(
   solver::ThetaMethodRBSolver,
   op::RBOperator,
   contribs::Tuple{Vararg{Any}})
@@ -328,21 +328,21 @@ function reduced_matrix_form(
   a = ()
   for (i,c) in enumerate(contribs)
     combine = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*(x-y)
-    a = (a...,reduced_matrix_form(solver,op,c;combine))
+    a = (a...,reduced_jacobian(solver,op,c;combine))
   end
   return a
 end
 
-function reduced_matrix_vector_form(
+function reduced_jacobian_residual(
   solver::RBSolver,
   op::RBOperator,
   s::S) where S
 
   smdeim = select_snapshots(s,mdeim_params(solver))
-  contribs_mat,contribs_vec = jacobian_and_residual(solver,op,smdeim)
-  red_mat = reduced_matrix_form(solver,op,contribs_mat)
-  red_vec = reduced_vector_form(solver,op,contribs_vec)
-  return red_mat,red_vec
+  jac,res = jacobian_and_residual(solver,op,smdeim)
+  red_jac = reduced_jacobian(solver,op,jac)
+  red_res = reduced_residual(solver,op,res)
+  return red_jac,red_res
 end
 
 # ONLINE PHASE
@@ -609,7 +609,7 @@ function num_reduced_times(a::BlockAffineDecomposition)
   length(get_indices_time(a))
 end
 
-function reduced_vector_form(
+function reduced_residual(
   solver::RBSolver,
   op::RBOperator,
   s::BlockSnapshots,
@@ -627,7 +627,7 @@ function reduced_vector_form(
   return ad,red_trian
 end
 
-function reduced_matrix_form(
+function reduced_jacobian(
   solver::RBSolver,
   op::RBOperator,
   s::BlockSnapshots,

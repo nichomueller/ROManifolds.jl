@@ -99,8 +99,8 @@ _,coeff_mat = coeff_cache
 RB.mdeim_lincomb!(lincomb_cache,A,coeff_mat)
 _,_,mat_red = lincomb_cache
 
-red_mat_snaps = RB.compress(snaps_biform_online,red_trial,red_test)
-err = red_mat_snaps - mat_red[1]
+red_jac_snaps = RB.compress(snaps_biform_online,red_trial,red_test)
+err = red_jac_snaps - mat_red[1]
 
 @check norm(err)/sqrt(length(err)) ≤ 1e-12
 
@@ -143,8 +143,8 @@ _,coeff_vec = coeff_cache
 RB.mdeim_lincomb!(lincomb_cache,b,coeff_vec)
 _,_,vec_red = lincomb_cache
 
-red_vec_snaps = RB.compress(snaps_liform_online,red_test)
-err = red_vec_snaps - vec_red[1]
+red_res_snaps = RB.compress(snaps_liform_online,red_test)
+err = red_res_snaps - vec_red[1]
 
 @check norm(err)/sqrt(length(err)) ≤ 1e-12
 
@@ -269,7 +269,7 @@ snapsA,snapsM,snapsR = get_fe_snaps(r_mdeim)
 @check contribs_mat[2][Ω] ≈ snapsM
 @check contribs_vec[Ω] + contribs_vec[Γn] ≈ -snapsR
 
-red_lhs,red_rhs = RB.reduced_matrix_vector_form(rbsolver,op,snaps)
+red_lhs,red_rhs = RB.reduced_jacobian_residual(rbsolver,op,snaps)
 red_op = reduced_operator(op,red_lhs,red_rhs)
 
 snaps_on = RB.select_snapshots(snaps,1)

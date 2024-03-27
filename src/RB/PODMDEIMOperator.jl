@@ -3,7 +3,7 @@ function reduced_operator(
   op::PODOperator,
   s::S) where S
 
-  red_lhs,red_rhs = reduced_matrix_vector_form(solver,op,s)
+  red_lhs,red_rhs = reduced_jacobian_residual(solver,op,s)
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
   new_op = change_triangulation(op,trians_rhs,trians_lhs)
@@ -324,10 +324,6 @@ function Algebra.solve(
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
 end
-
-# θ-Method specialization
-
-# Solve a POD-MDEIM problem, linear case
 
 function Algebra.solve(
   solver::ThetaMethodRBSolver,

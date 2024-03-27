@@ -6,21 +6,21 @@ end
 
 function FESpaces.SparseMatrixAssembler(
   trial::SingleFieldFESpace,
-  test::UnconstrainedFESpace{<:TTVector{D}}) where D
+  test::UnconstrainedFESpace{TTVector})
 
   T = get_dof_value_type(trial)
-  matrix_type = TTSparseMatrixCSC{D,T}
-  vector_type = TTVector{D,T}
+  matrix_type = TTSparseMatrixCSC{1,T}
+  vector_type = TTVector{1,T}
   SparseMatrixAssembler(matrix_type,vector_type,trial,test)
 end
 
 function Algebra.allocate_in_range(matrix::TTMatrix{D,T}) where {D,T}
-  V = TTVector{D,T}
+  V = TTVector{1,T}
   allocate_in_range(V,matrix)
 end
 
 function Algebra.allocate_in_domain(matrix::TTMatrix{D,T}) where {D,T}
-  V = TTVector{D,T}
+  V = TTVector{1,T}
   allocate_in_domain(V,matrix)
 end
 

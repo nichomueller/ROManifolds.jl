@@ -175,10 +175,9 @@ end
 
 function _solve_rb_nr!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,stageop,trial)
   A_lin, = A_cache
-  isconv,conv0 = Algebra._check_convergence(nls,b)
-  if isconv; return; end
+  max0 = maximum(abs,b)
 
-  for nliter in 1:nls.max_nliters
+  for k in 1:nls.max_nliters
     rmul!(b,-1)
     solve!(dx̂,ns,b)
     x̂ .+= dx̂
@@ -190,11 +189,12 @@ function _solve_rb_nr!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,stageop,trial)
     numerical_setup!(ns,A)
 
     b .+= A_lin*x̂
-    isconv = Algebra._check_convergence(nls,b,conv0)
-    println(maximum(abs,b))
-    if isconv; return; end
+    maxk = maximum(abs,b)
+    println(maxk)
 
-    if nliter == nls.max_nliters
+    maxk < 1e-5*max0 && return
+
+    if k == nls.max_nliters
       @unreachable
     end
   end

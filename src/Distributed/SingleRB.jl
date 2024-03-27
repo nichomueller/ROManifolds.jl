@@ -159,7 +159,7 @@ function RB.mdeim(
   return lu_interp,d_red_trian,integration_domain
 end
 
-# function RB.reduced_vector_form(
+# function RB.reduced_residual(
 #   solver::RBSolver,
 #   op::RBOperator,
 #   c::Contribution{DistributedTriangulation})
@@ -167,12 +167,12 @@ end
 #   info = RB.get_info(solver)
 #   a = distributed_array_contribution()
 #   for (trian,values) in c.dict
-#     RB.reduced_vector_form!(a,info,op,values,trian)
+#     RB.reduced_residual!(a,info,op,values,trian)
 #   end
 #   return a
 # end
 
-# function RB.reduced_matrix_form(
+# function RB.reduced_jacobian(
 #   solver::RBSolver,
 #   op::RBOperator,
 #   c::Contribution{DistributedTriangulation};
@@ -181,7 +181,7 @@ end
 #   info = RB.get_info(solver)
 #   a = distributed_array_contribution()
 #   for (trian,values) in c.dict
-#     RB.reduced_matrix_form!(a,info,op,values,trian;kwargs...)
+#     RB.reduced_jacobian!(a,info,op,values,trian;kwargs...)
 #   end
 #   return a
 # end

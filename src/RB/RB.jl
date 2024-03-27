@@ -80,6 +80,9 @@ export get_basis_space
 export num_reduced_space_dofs
 export get_basis_time
 export num_reduced_times
+export get_basis_spacetime
+export num_reduced_dofs
+export cores2matrix
 include("Projection.jl")
 
 export RBSpace
@@ -112,7 +115,7 @@ export BlockAffineDecomposition
 export mdeim
 export get_mdeim_indices
 export reduce_triangulation
-export reduced_matrix_vector_form
+export reduced_jacobian_residual
 export allocate_mdeim_coeff
 export mdeim_coeff!
 export allocate_mdeim_lincomb

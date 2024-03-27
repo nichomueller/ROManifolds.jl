@@ -20,7 +20,6 @@ function reduced_operator(
 end
 
 abstract type RBOperator{T<:ODEParamOperatorType} <: ODEParamOperatorWithTrian{T} end
-const LinearRBOperator = RBOperator{LinearParamODE}
 
 struct PODOperator{T} <: RBOperator{T}
   odeop::ODEParamOperatorWithTrian{T}

@@ -14,7 +14,7 @@ using DrWatson
 using Mabla.FEM
 using Mabla.RB
 
-θ = 1
+θ = 0.5
 dt = 0.01
 t0 = 0.0
 tf = 0.1

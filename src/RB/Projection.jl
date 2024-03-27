@@ -108,51 +108,58 @@ function Projection(s::NnzTTSnapshots,args...;kwargs...)
   recast_basis(s,basis)
 end
 
-function get_basis_spacetime(cores::Vector{Array{T,3}}) where T
-  nrows = size(cores[1],2)*size(cores[2],2)
-  ncols = size(cores[2],3)
-  basis = zeros(T,nrows,ncols)
-  for j = 1:ncols
-    for α = axes(cores[1],3)
-      basis[:,j] += kronecker(cores[2][α,:,j],cores[1][1,:,α])
-    end
-  end
-  basis
-end
-
 abstract type TTProjection <: Projection end
 
-# for the time being, N = 3: space-time-parameter
-struct TTSVDCores{N,A,B} <: TTProjection
+# D ∈ {2,3,4}: space (x,y,z) + time
+struct TTSVDCores{D,A,B} <: TTProjection
   cores::A
   basis_spacetime::B
   function TTSVDCores(
     cores::A,
-    basis_spacetime::B=get_basis_spacetime(cores)
+    basis_spacetime::B=cores2matrix(cores)
     ) where {A,B}
 
-    N = length(cores)
-    new{N,A,B}(cores,basis_spacetime)
+    D = length(cores)
+    new{D,A,B}(cores,basis_spacetime)
   end
 end
 
-get_basis_space(b::TTSVDCores) = Core2Matrix(b.cores[1])
-get_basis_time(b::TTSVDCores) = Core2Matrix(b.cores[2])
+get_basis_space(b::TTSVDCores) = cores2matrix(b.cores[1:end-1])
+get_basis_time(b::TTSVDCores) = cores2matrix(b.cores[end])
 get_basis_spacetime(b::TTSVDCores) = b.basis_spacetime
-num_space_dofs(b::TTSVDCores) = size(b.cores[1],2)
-FEM.num_times(b::TTSVDCores) = size(b.cores[2],2)
-num_reduced_space_dofs(b::TTSVDCores) = size(b.cores[1],3)
-num_reduced_times(b::TTSVDCores) = size(b.cores[2],3)
-num_fe_dofs(b::TTSVDCores) = size(b.basis_spacetime,1)
-num_reduced_dofs(b::TTSVDCores) = size(b.basis_spacetime,2)
+num_space_dofs(b::TTSVDCores) = prod(size.(b.cores[1:end-1],2))
+num_space_dofs(b::TTSVDCores,k::Integer) = size(b.cores[k],2)
+FEM.num_times(b::TTSVDCores) = size(b.cores[end],2)
+num_reduced_space_dofs(b::TTSVDCores) = prod(size.(b.cores[1:end-1],3))
+num_reduced_space_dofs(b::TTSVDCores,k::Integer) = size(b.cores[k],3)
+num_reduced_times(b::TTSVDCores) = size(b.cores[end],3)
+num_fe_dofs(b::TTSVDCores) = num_space_dofs(b)*num_times(b)
+num_reduced_dofs(b::TTSVDCores) = num_reduced_times(b)
 
-struct Core2Matrix{T,A<:AbstractArray{T,3}} <: AbstractMatrix{T}
-  array::A
+function _cores2matrix(a::AbstractArray{T,3},b::AbstractArray{T,3}) where T
+  nrows = size(a,2)*size(b,2)
+  ncols = size(b,3)
+  c = zeros(T,nrows,ncols)
+  for j = 1:ncols
+    for α = axes(a,3)
+      @inbounds @views c[:,j] += kronecker(b[α,:,j],a[1,:,α])
+    end
+  end
+  return c
 end
 
-Base.size(a::Core2Matrix) = (size(a.array,2),size(a.array,1)*size(a.array,3))
-Base.length(a::Core2Matrix) = prod(size(a))
-Base.getindex(a::Core2Matrix,i,j) = a.array[fast_index(j,size(a.array,1)),i,slow_index(j,size(a.array,1))]
+function _cores2matrix(a::AbstractArray{T,3},b::AbstractArray{T,3}...) where T
+  _cores2matrix(_cores2matrix(a,b[1]),b[2:end]...)
+end
+
+function cores2matrix(cores::Vector{<:AbstractArray{T,3}})
+  _cores2matrix(cores[1],cores[2:end]...)
+end
+
+function cores2matrix(core::AbstractArray{T,3}) where T
+  pcore = permutedims(core,(2,1,3))
+  return reshape(pcore,size(pcore,1),:)
+end
 
 function recast_basis(s::NnzTTSnapshots,b::TTSVDCores)
   basis_spacetime = recast(s,get_basis_spacetime(b))
