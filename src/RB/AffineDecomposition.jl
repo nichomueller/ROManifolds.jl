@@ -731,11 +731,11 @@ function compress(A::AbstractMatrix{T},trial::RBSpace,test::RBSpace;combine=(x,y
   return st_proj_a
 end
 
-function compress(solver,fes::ArrayContribution,args::RBSpace...;kwargs...)
+function compress(fesolver,fes::ArrayContribution,args::RBSpace...;kwargs...)
   sum(map(i->compress(fes[i],args...;kwargs...),eachindex(fes)))
 end
 
-function compress(solver,fes::ArrayContribution,test::BlockRBSpace;kwargs...)
+function compress(fesolver,fes::ArrayContribution,test::BlockRBSpace;kwargs...)
   active_block_ids = get_touched_blocks(fes[1])
   block_map = BlockMap(size(fes[1]),active_block_ids)
   rb_blocks = map(active_block_ids) do i
@@ -744,12 +744,12 @@ function compress(solver,fes::ArrayContribution,test::BlockRBSpace;kwargs...)
       val[i]
     end
     testi = test[i]
-    compress(solver,fesi,testi;kwargs...)
+    compress(fesolver,fesi,testi;kwargs...)
   end
   return_cache(block_map,rb_blocks...)
 end
 
-function compress(solver,fes::ArrayContribution,trial::BlockRBSpace,test::BlockRBSpace;kwargs...)
+function compress(fesolver,fes::ArrayContribution,trial::BlockRBSpace,test::BlockRBSpace;kwargs...)
   active_block_ids = get_touched_blocks(fes[1])
   block_map = BlockMap(size(fes[1]),active_block_ids)
   rb_blocks = map(Tuple.(active_block_ids)) do (i,j)
@@ -759,17 +759,16 @@ function compress(solver,fes::ArrayContribution,trial::BlockRBSpace,test::BlockR
     end
     trialj = trial[j]
     testi = test[i]
-    compress(solver,fesij,trialj,testi;kwargs...)
+    compress(fesolver,fesij,trialj,testi;kwargs...)
   end
   return_cache(block_map,rb_blocks...)
 end
 
-function compress(solver,fes::Tuple{Vararg{ArrayContribution}},trial,test)
-  fesolver = get_fe_solver(solver)
+function compress(fesolver,fes::Tuple{Vararg{ArrayContribution}},trial,test)
   cmp = ()
   for i = eachindex(fes)
     combine = (x,y) -> i == 1 ? fesolver.θ*x+(1-fesolver.θ)*y : fesolver.θ*(x-y)
-    cmp = (cmp...,compress(solver,fes[i],trial,test;combine))
+    cmp = (cmp...,compress(fesolver,fes[i],trial,test;combine))
   end
   sum(cmp)
 end
@@ -809,41 +808,38 @@ function interpolation_error(solver,odeop,rbop,s)
   return errA,errb
 end
 
-function interpolation_error(solver,feop::TransientParamFEOperator,rbop,s)
+function interpolation_error(solver,feop::TransientParamFEOperator,rbop,s;kwargs...)
   odeop = get_algebraic_operator(feop)
   errA,errb = interpolation_error(solver,odeop,rbop,s)
-  return InterpolationError(errA,errb)
+  return InterpolationError(errA,errb;kwargs...)
 end
 
 function interpolation_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
-  errA_lin,errb_lin = interpolation_error(solver,feop.op_linear,rbop.op_linear,s)
-  errA_nlin,errb_nlin = interpolation_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s)
-  err_lin = InterpolationError(errA_lin,errb_lin,name="linear")
-  err_nlin = InterpolationError(errA_nlin,errb_nlin,name="non linear")
+  err_lin = interpolation_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
+  err_nlin = interpolation_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
   return err_lin,err_nlin
 end
 
 function linear_combination_error(solver,odeop,rbop,s)
-  feA,feb = jacobian_and_residual(get_fe_solver(solver),odeop,s)
-  feA_comp = compress(solver,feA,get_trial(rbop),get_test(rbop))
-  feb_comp = compress(solver,feb,get_test(rbop))
+  fesolver = get_fe_solver(solver)
+  feA,feb = jacobian_and_residual(fesolver,odeop,s)
+  feA_comp = compress(fesolver,feA,get_trial(rbop),get_test(rbop))
+  feb_comp = compress(fesolver,feb,get_test(rbop))
   rbA,rbb = jacobian_and_residual(solver,rbop,s)
   errA = rel_norm(feA_comp,rbA)
   errb = rel_norm(feb_comp,rbb)
   return errA,errb
 end
 
-function linear_combination_error(solver,feop::TransientParamFEOperator,rbop,s)
+function linear_combination_error(solver,feop::TransientParamFEOperator,rbop,s;kwargs...)
   odeop = get_algebraic_operator(feop)
   errA,errb = linear_combination_error(solver,odeop,rbop,s)
-  return LincombError(errA,errb)
+  return LincombError(errA,errb;kwargs...)
 end
 
 function linear_combination_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
-  errA_lin,errb_lin = linear_combination_error(solver,feop.op_linear,rbop.op_linear,s)
-  errA_nlin,errb_nlin = linear_combination_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s)
-  err_lin = LincombError(errA_lin,errb_lin,name="linear")
-  err_nlin = LincombError(errA_nlin,errb_nlin,name="non linear")
+  err_lin = linear_combination_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
+  err_nlin = linear_combination_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
   return err_lin,err_nlin
 end
 

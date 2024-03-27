@@ -123,10 +123,6 @@ export PODMDEIMOperator
 export LinearNonlinearPODMDEIMOperator
 include("PODMDEIMOperator.jl")
 
-export RBNonlinearOperator
-export RBThetaMethodParamOperator
-include("RBNonlinearOperator.jl")
-
 export ComputationalStats
 export RBResults
 export rb_results

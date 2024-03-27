@@ -126,6 +126,15 @@ function Base.:*(a::ParamBlockArray,b::Number)
   ParamBlockArray(c,a.axes)
 end
 
+function Base.:*(a::ParamBlockMatrix,b::ParamBlockVector)
+  @assert length(a) == length(b)
+  c = similar(b)
+  @inbounds for i = eachindex(a)
+    mul!(c[i],a[i],b[i])
+  end
+  c
+end
+
 function Base.:*(a::Number,b::ParamBlockArray)
   b*a
 end

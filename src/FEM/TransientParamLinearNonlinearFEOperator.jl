@@ -1,10 +1,32 @@
 # interface to accommodate the separation of terms depending on the linearity/nonlinearity
 struct LinearNonlinearParamODE <: ODEParamOperatorType end
 
-struct TransientParamLinearNonlinearFEOperator <: TransientParamFEOperator{LinearNonlinearParamODE}
+struct GenericTransientParamLinearNonlinearFEOperator <: TransientParamFEOperator{LinearNonlinearParamODE}
   op_linear::TransientParamFEOperator{LinearParamODE}
   op_nonlinear::TransientParamFEOperator
 end
+
+struct TransientParamLinearNonlinearFEOperatorWithTrian <: TransientParamFEOperatorWithTrian{LinearNonlinearParamODE}
+  op_linear::TransientParamFEOperatorWithTrian{LinearParamODE}
+  op_nonlinear::TransientParamFEOperatorWithTrian
+end
+
+function TransientParamLinNonlinFEOperator(
+  op_linear::TransientParamFEOperator{LinearParamODE},
+  op_nonlinear::TransientParamFEOperator)
+  GenericTransientParamLinearNonlinearFEOperator(op_linear,op_nonlinear)
+end
+
+function TransientParamLinNonlinFEOperator(
+  op_linear::TransientParamFEOperatorWithTrian{LinearParamODE},
+  op_nonlinear::TransientParamFEOperatorWithTrian)
+  TransientParamLinearNonlinearFEOperatorWithTrian(op_linear,op_nonlinear)
+end
+
+const TransientParamLinearNonlinearFEOperator = Union{
+  GenericTransientParamLinearNonlinearFEOperator,
+  TransientParamLinearNonlinearFEOperatorWithTrian
+}
 
 get_linear_operator(op) = @abstractmethod
 get_linear_operator(op::TransientParamLinearNonlinearFEOperator) = op.op_linear

@@ -134,7 +134,7 @@ jac_nlin(μ,t,(u,p),(du,dp),(v,q),dΩ) = dc(u,du,v,dΩ)
 
 _feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,induced_norm,ptspace,trial,test)
 feop_nlin = TransientFEOperatorWithTrian(_feop_nlin,trian_res,trian_jac)
-feop_lin_nlin = TransientParamLinearNonlinearFEOperator(feop,feop_nlin)
+feop_lin_nlin = TransientParamLinNonlinFEOperator(feop,feop_nlin)
 
 sol = solve(fesolver,feop_lin_nlin,xh0μ,r)
 iterate(sol)

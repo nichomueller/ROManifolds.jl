@@ -17,7 +17,7 @@ using Mabla.RB
 θ = 1
 dt = 0.01
 t0 = 0.0
-tf = 0.05
+tf = 0.1
 
 pranges = fill([1,10],3)
 tdomain = t0:dt:tf
@@ -84,7 +84,7 @@ feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptsp
   trial,test,coupling,trian_res,trian_jac,trian_jac_t)
 feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,induced_norm,ptspace,
   trial,test,trian_res,trian_jac)
-feop = TransientParamLinearNonlinearFEOperator(feop_lin,feop_nlin)
+feop = TransientParamLinNonlinFEOperator(feop_lin,feop_nlin)
 
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 nls = NewtonRaphsonSolver(LUSolver(),1e-10,20)
@@ -109,88 +109,81 @@ save(test_dir,results)
 # POD-MDEIM error
 pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
 
-son = select_snapshots(fesnaps,51)
-ron = get_realization(son)
-θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-
-r = copy(ron)
-FEM.shift!(r,dt*(θ-1))
-
-rb_trial = get_trial(rbop)(r)
+son = select_snapshots(fesnaps,RB.online_params(rbsolver))
+r = get_realization(son)
+trial = get_trial(rbop)(r)
 fe_trial = get_fe_trial(rbop)(r)
-red_x = zero_free_values(rb_trial)
+x̂ = zero_free_values(trial)
 y = zero_free_values(fe_trial)
-z = similar(y)
-z .= 0.0
 
-ode_cache = allocate_cache(rbop,r)
-cache_lin = ODETools._allocate_matrix_and_vector(rbop.op_linear,r,y,ode_cache)
-cache_nlin = ODETools._allocate_matrix_and_vector(rbop.op_nonlinear,r,y,ode_cache)
-cache = cache_lin,cache_nlin
+odecache = allocate_odecache(fesolver,rbop,r,(y,))
+# solve!((x̂,),fesolver,rbop,r,(y,),odecache)
 
-ode_cache = update_cache!(ode_cache,rbop,r)
-nlop = RBThetaMethodParamOperator(rbop,r,dtθ,y,ode_cache,z)
-# solve!(red_x,fesolver.nls,nlop,cache)
+odecache_lin,odecache_nlin = odecache
+odeslvrcache_nlin,odeopcache_nlin = odecache_nlin
+A_lin,b_lin = jacobian_and_residual(fesolver,get_linear_operator(rbop),r,(y,),odecache_lin)
+A_nlin = allocate_jacobian(get_nonlinear_operator(rbop),r,(y,),odeopcache_nlin)
+b_nlin = allocate_residual(get_nonlinear_operator(rbop),r,(y,),odeopcache_nlin)
+sysslvrcache = ((A_lin,A_nlin),(b_lin,b_nlin))
+sysslvr = fesolver.sysslvr
+stageop = get_stage_operator(fesolver,rbop,r,(y,),odecache_nlin)
+solve!(x̂,y,sysslvr,stageop,sysslvrcache)
 
-# # fex = copy(nlop.u0)
-# fex = copy(get_values(son))
-# (cache_jac_lin,cache_res_lin),(cache_jac_nlin,cache_res_nlin) = cache
+odeop = stageop.odeop
+red_trial = get_trial(odeop)(stageop.rx)
+A_cache,b_cache = sysslvrcache
+B = residual!(b_cache,stageop,y)
+A = jacobian!(A_cache,stageop,y)
+B .+= A*x̂
 
-# # linear res/jac, now they are treated as cache
-# lop = nlop.odeop.op_linear
-# A_lin,b_lin = ODETools._matrix_and_vector!(cache_jac_lin,cache_res_lin,lop,r,dtθ,y,ode_cache,z)
-# cache_jac = A_lin,cache_jac_nlin
-# cache_res = b_lin,cache_res_nlin
-# cache = cache_jac,cache_res
+dx̂ = similar(B)
+ss = symbolic_setup(nls.ls,A)
+ns = numerical_setup(ss,A)
 
-# # initial nonlinear res/jac
-# b = residual!(cache_res,nlop,fex)
-# b1 = copy(b)
-# A = jacobian!(cache_jac,nlop,fex)
-# A1 = copy(A)
-# dx = similar(b)
-# ss = symbolic_setup(LUSolver(),A)
-# ns = numerical_setup(ss,A)
+# v = get_fe_basis(test_u)
+# du = get_trial_fe_basis(test_u)
+# u = rand(num_free_dofs(test_u))
+# _trial_u = TrialFESpace(test_u,x->x)
+# uh = FEFunction(_trial_u,u)
+# β = assemble_vector(v->c(uh,v,dΩ),test_u)
 
-# trial = get_trial(nlop.odeop)(nlop.r)
-# isconv, conv0 = Algebra._check_convergence(nls,b)
+# test_c(u,du,v) = ∫(v⊙(∇(du)'⋅u))dΩ
 
-# rmul!(b,-1)
-# solve!(dx,ns,b)
-# red_x .+= dx
+# γ = assemble_vector(v->test_c(uh,zero(_trial_u),v),test_u)
+# ε = assemble_matrix((u,v)->test_c(uh,u,v),_trial_u,test_u)*u
 
-# xr = recast(red_x,trial)
-# fex = xr
-# # fex .= recast(red_x,trial)
+# β ≈ γ+ε
 
-# b = residual!(cache_res,nlop,fex)
-# isconv = Algebra._check_convergence(nls,b,conv0)
-# println(maximum(abs,b))
+s1 = select_snapshots(fesnaps,1)
+intp_err = RB.interpolation_error(rbsolver,feop,rbop,s1)
+# proj_err = RB.linear_combination_error(rbsolver,feop,rbop,s1)
+err_lin = RB.linear_combination_error(rbsolver,feop.op_linear,rbop.op_linear,s1;name="linear")
+# err_nlin = RB.linear_combination_error(rbsolver,feop.op_nonlinear,rbop.op_nonlinear,s1;name="non linear")
+odeop = get_algebraic_operator(feop.op_nonlinear)
+# errA,errb = linear_combination_error(rbsolver,odeop,rbop.op_nonlinear,s1)
+feA,feb = jacobian_and_residual(fesolver,odeop,s1)
+feA_comp = RB.compress(fesolver,feA,get_trial(rbop.op_nonlinear),get_test(rbop.op_nonlinear))
+feb_comp = RB.compress(fesolver,feb,get_test(rbop.op_nonlinear))
+# rbA,rbb = jacobian_and_residual(rbsolver,rbop.op_nonlinear,s1)
 
-# A = jacobian!(cache_jac,nlop,fex)
-# numerical_setup!(ns,A)
+x = get_values(s1)
+r = get_realization(s1)
 
-# reduced c, x = 0.0
-x = similar(get_values(son))
-x .= 0.0
-A_nlin,b_nlin = ODETools._allocate_matrix_and_vector(rbop.op_nonlinear,r,y,ode_cache)
-b_nlin = residual!(b_nlin,rbop.op_nonlinear,r,(x,y),ode_cache)
-b_nlin_snap = Snapshots(recast(b_nlin,trial),r)
+odecache = allocate_odecache(fesolver,rbop.op_nonlinear,r,(x,))
+# jacobian_and_residual(fesolver,rbop.op_nonlinear,r,(x,),odecache)
+stageop = get_stage_operator(fesolver,rbop.op_nonlinear,r,(x,),odecache)
+A = jacobian(stageop,x)
 
-# full order c, x = 0.0
-Us,Uts,fecache = ode_cache
-xh = EvaluationFunction(Us[1],x)
-bok = allocate_residual(feop.op_nonlinear,r,xh,fecache)
+# lin
+_odecache = allocate_odecache(fesolver,rbop.op_linear,r,(x,))
+# jacobian_and_residual(fesolver,rbop.op_linear,r,(x,),odecache)
+_stageop = get_stage_operator(fesolver,rbop.op_linear,r,(x,),_odecache)
+_A = jacobian(_stageop,x)
 
-Xh, = ode_cache
-dxh = ()
-xh = TransientCellField(EvaluationFunction(Xh[1],x),dxh)
-residual!(bok,feop.op_nonlinear,r,xh,ode_cache)
-bok_snap = Snapshots(bok[1],r)
-
-feA,feb = RB._jacobian_and_residual(fesolver,feop.op_nonlinear,son)
-feA_comp = RB.compress(rbsolver,feA,get_trial(rbop),get_test(rbop))
-feb_comp = RB.compress(rbsolver,feb,get_test(rbop))
-rbA,rbb = RB._jacobian_and_residual(rbsolver,rbop.op_nonlinear,son)
-errA = RB._rel_norm(feA_comp,rbA)
-errb = RB._rel_norm(feb_comp,rbb)
+# AA = allocate_jacobian(stageop,x)
+# jacobian!(AA,stageop,x)
+# A
+odeop,odeopcache = stageop.odeop,stageop.odeopcache
+rx = stageop.rx
+usx = stageop.usx(x)
+allocate_jacobian(odeop,rx,usx,odeopcache)

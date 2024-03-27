@@ -117,3 +117,16 @@ function ODEs.ode_march!(
   odecache = (odeslvrcache,odeopcache)
   (r,statef,odecache)
 end
+
+# linear-nonlinear case
+
+function ODEs.allocate_odecache(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator{LinearNonlinearParamODE},
+  r0::TransientParamRealization,
+  us0::NTuple{1,AbstractVector})
+
+  odecache_lin = allocate_odecache(solver,get_linear_operator(odeop),r0,us0)
+  odecache_nlin = allocate_odecache(solver,get_nonlinear_operator(odeop),r0,us0)
+  return odecache_lin,odecache_nlin
+end

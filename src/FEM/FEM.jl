@@ -49,6 +49,7 @@ export num_params
 export num_times
 export slow_index
 export fast_index
+export shift!
 include("ParamSpace.jl")
 
 include("TimeDerivatives.jl")
@@ -160,6 +161,7 @@ export change_triangulation
 include("TransientParamFEOperatorWithTrian.jl")
 
 export LinearNonlinearParamODE
+export TransientParamLinNonlinFEOperator
 export TransientParamLinearNonlinearFEOperator
 export get_linear_operator
 export get_nonlinear_operator

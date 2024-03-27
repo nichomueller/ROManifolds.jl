@@ -89,3 +89,16 @@ function compress_combine_basis_space_time(A,B,C,B_shift,C_shift;combine=(x,y)->
     combine(C'*A*B,C_shift'*A*B_shift)
   end
 end
+
+function FEM.shift!(a::AbstractParamContainer,r::TransientParamRealization,α::Number,β::Number)
+  b = copy(a)
+  nt = num_times(r)
+  np = num_params(r)
+  @assert length(a) == nt*np
+  for i = eachindex(a)
+    it = slow_index(i,np)
+    if it > 1
+      a[i] .= α*a[i] + β*b[i-np]
+    end
+  end
+end
