@@ -8,7 +8,28 @@ function create_dir(dir::String)
   return
 end
 
-abstract type RBSolver{S} end
+abstract type MDEIMStyle end
+struct SpaceOnlyMDEIM <: MDEIMStyle end
+struct SpaceTimeMDEIM <: MDEIMStyle end
+
+struct RBSolver{S,M}
+  fesolver::S
+  ϵ::Float64
+  mdeim_style::M
+  nsnaps_state::Int
+  nsnaps_mdeim::Int
+  nsnaps_test::Int
+  function RBSolver(
+    fesolver::S,
+    ϵ::Float64,
+    mdeim_style::M=SpaceTimeMDEIM();
+    nsnaps_state=50,
+    nsnaps_mdeim=20,
+    nsnaps_test=10) where {S,M}
+    new{S,M}(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_mdeim,nsnaps_test)
+  end
+end
+
 const ThetaMethodRBSolver = RBSolver{ThetaMethod}
 
 get_fe_solver(s::RBSolver) = s.fesolver
@@ -21,63 +42,8 @@ num_mdeim_params(solver::RBSolver) = solver.nsnaps_mdeim
 mdeim_params(solver::RBSolver) = 1:num_mdeim_params(solver)
 get_tol(solver::RBSolver) = solver.ϵ
 
-struct SpaceOnlyMDEIM end
-struct SpaceTimeMDEIM end
-
-struct PODMDEIMSolver{S,M} <: RBSolver{S}
-  fesolver::S
-  ϵ::Float64
-  mdeim_style::M
-  nsnaps_state::Int
-  nsnaps_mdeim::Int
-  nsnaps_test::Int
-  function PODMDEIMSolver(
-    fesolver::S,
-    ϵ::Float64,
-    mdeim_style::M;
-    nsnaps_state=50,
-    nsnaps_mdeim=20,
-    nsnaps_test=10) where {S,M}
-    new{S,M}(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_mdeim,nsnaps_test)
-  end
-end
-
-function RBSolver(fesolver,ϵ=1e-4,st_mdeim=SpaceTimeMDEIM();kwargs...)
-  PODMDEIMSolver(fesolver,ϵ,st_mdeim;kwargs...)
-end
-
-function get_test_directory(solver::PODMDEIMSolver;dir=datadir())
+function get_test_directory(solver::RBSolver;dir=datadir())
   keyword = solver.mdeim_style == SpaceOnlyMDEIM() ? "space_only_mdeim" : "space_time_mdeim"
-  test_dir = joinpath(dir,keyword * "_$(solver.ϵ)")
-  create_dir(test_dir)
-  test_dir
-end
-
-struct TTPODMDEIMSolver{S,M} <: RBSolver{S}
-  fesolver::S
-  ϵ::Float64
-  mdeim_style::M
-  nsnaps_state::Int
-  nsnaps_mdeim::Int
-  nsnaps_test::Int
-  function TTPODMDEIMSolver(
-    fesolver::S,
-    ϵ::Float64;
-    nsnaps_state=50,
-    nsnaps_mdeim=20,
-    nsnaps_test=10) where S
-    mdeim_style = SpaceTimeMDEIM()
-    M = typeof(mdeim_style)
-    new{S,M}(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_mdeim,nsnaps_test)
-  end
-end
-
-function TTRBSolver(fesolver,ϵ=1e-4;kwargs...)
-  TTPODMDEIMSolver(fesolver,ϵ;kwargs...)
-end
-
-function get_test_directory(solver::TTPODMDEIMSolver;dir=datadir())
-  keyword = solver.mdeim_style == SpaceOnlyMDEIM() ? "TT_space_only_mdeim" : "TT_space_time_mdeim"
   test_dir = joinpath(dir,keyword * "_$(solver.ϵ)")
   create_dir(test_dir)
   test_dir
@@ -129,9 +95,9 @@ function Algebra.solve(
   uh0::Function;
   kwargs...)
 
-  snaps,fem_stats = fe_solutions(solver,feop,uh0)
-  rbop = reduced_operator(solver,feop,snaps)
-  rb_sol,rb_stats = solve(solver,rbop,snaps)
-  results = rb_results(solver,rbop,snaps,rb_sol,fem_stats,rb_stats;kwargs...)
+  fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
+  rbop = reduced_operator(rbsolver,feop,fesnaps)
+  rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+  results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
   return results
 end

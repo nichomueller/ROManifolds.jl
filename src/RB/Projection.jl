@@ -36,11 +36,15 @@ function compute_bases_time_space(s::AbstractSnapshots,norm_matrix=nothing;kwarg
   PODBasis(basis_space,basis_time)
 end
 
-abstract type PODProjection <: Projection end
-
-struct PODBasis{A<:AbstractMatrix,B<:AbstractMatrix} <: PODProjection
+struct PODBasis{A,B,C} <: Projection
   basis_space::A
   basis_time::B
+  metadata::C
+end
+
+function PODBasis(basis_space,basis_time)
+  metadata = nothing
+  PODBasis(basis_space,basis_time,metadata)
 end
 
 get_basis_space(b::PODBasis) = b.basis_space
@@ -68,33 +72,6 @@ function recast(x::Vector,b::PODBasis)
   (basis_space*X)*basis_time'
 end
 
-struct CompressedPODBasis{A,B,C} <: PODProjection
-  basis_space::A
-  basis_time::B
-  metadata::C
-end
-
-get_basis_space(b::CompressedPODBasis) = b.basis_space
-get_basis_time(b::CompressedPODBasis) = b.basis_time
-num_space_dofs(b::CompressedPODBasis) = @notimplemented
-FEM.num_times(b::CompressedPODBasis) = size(get_basis_time(b),1)
-num_reduced_space_dofs(b::CompressedPODBasis) = @notimplemented
-num_reduced_times(b::CompressedPODBasis) = @notimplemented
-
-function compress_basis(b::PODBasis,b_test::PODBasis;kwargs...)
-  proj_basis_space = compress_basis_space(get_basis_space(b),get_basis_space(b_test))
-  proj_basis_time = get_basis_time(b)
-  metadata = combine_basis_time(get_basis_time(b_test);kwargs...)
-  CompressedPODBasis(proj_basis_space,proj_basis_time,metadata)
-end
-
-function compress_basis(b::PODBasis,b_trial::PODBasis,b_test::PODBasis;kwargs...)
-  proj_basis_space = compress_basis_space(get_basis_space(b),get_basis_space(b_trial),get_basis_space(b_test))
-  proj_basis_time = get_basis_time(b)
-  metadata = combine_basis_time(get_basis_time(b_trial),get_basis_time(b_test);kwargs...)
-  CompressedPODBasis(proj_basis_space,proj_basis_time,metadata)
-end
-
 # TT interface
 
 function Projection(s::TTSnapshots,args...;kwargs...)
@@ -108,10 +85,8 @@ function Projection(s::NnzTTSnapshots,args...;kwargs...)
   recast_basis(s,basis)
 end
 
-abstract type TTProjection <: Projection end
-
 # D ∈ {2,3,4}: space (x,y,z) + time
-struct TTSVDCores{D,A,B} <: TTProjection
+struct TTSVDCores{D,A,B} <: Projection
   cores::A
   basis_spacetime::B
   function TTSVDCores(
@@ -152,7 +127,7 @@ function _cores2matrix(a::AbstractArray{T,3},b::AbstractArray{T,3}...) where T
   _cores2matrix(_cores2matrix(a,b[1]),b[2:end]...)
 end
 
-function cores2matrix(cores::Vector{<:AbstractArray{T,3}})
+function cores2matrix(cores::Vector{<:AbstractArray{T,3}}) where T
   _cores2matrix(cores[1],cores[2:end]...)
 end
 
@@ -173,25 +148,6 @@ function recast(x::TTVector,b::TTSVDCores)
 
   xrec = basis_spacetime*x
   reshape(xrec,Ns,Nt)
-end
-
-struct CompressedTTSVDCores{M} <: TTProjection
-  metadata::M
-end
-
-function compress_basis(b::TTSVDCores,b_test::TTSVDCores;kwargs...)
-  metadata = compress_combine_basis_space_time(get_basis_spacetime(b),get_basis_spacetime(b_test))
-  CompressedTTSVDCores(metadata)
-end
-
-function compress_basis(b::TTSVDCores,b_trial::TTSVDCores,b_test::TTSVDCores;kwargs...)
-  A = get_basis_spacetime(b)
-  B = get_basis_spacetime(b_trial)
-  C = get_basis_spacetime(b_test)
-  B_shift = _shift(B,num_space_dofs(b_test),:backwards)
-  C_shift = _shift(C,num_space_dofs(b_test),:forwards)
-  metadata = compress_combine_basis_space_time(A,B,C,B_shift,C_shift;kwargs...)
-  CompressedTTSVDCores(metadata)
 end
 
 # multi field interface

@@ -71,116 +71,63 @@ function reduce_triangulation(
   return red_trian
 end
 
-function Algebra.allocate_matrix(::Type{V},m::Integer,n::Integer) where V
-  T = eltype(V)
+function Algebra.allocate_matrix(::Type{M},m::Integer,n::Integer) where M
+  T = eltype(M)
   zeros(T,m,n)
 end
 
-function allocate_coeff_matrix(
-  solver::PODMDEIMSolver{S,SpaceOnlyMDEIM} where S,
-  b::PODBasis)
+function allocate_coefficient(
+  solver::RBSolver{S,SpaceOnlyMDEIM} where S,
+  b::Projection)
 
   nspace = num_reduced_space_dofs(b)
   ntime = num_times(b)
   nparams = num_online_params(solver)
-  allocate_matrix(Vector{Float64},nspace,ntime*nparams)
+  coeffmat = allocate_matrix(Vector{Float64},nspace,ntime)
+  coeff = allocate_param_array(coeffmat,nparams)
+  return coeff
 end
 
-function allocate_coeff_matrix(
-  solver::PODMDEIMSolver{S,SpaceTimeMDEIM} where S,
-  b::PODBasis)
+function allocate_coefficient(
+  solver::RBSolver{S,SpaceTimeMDEIM} where S,
+  b::Projection)
 
   nspace = num_reduced_space_dofs(b)
   ntime = num_reduced_times(b)
   nparams = num_online_params(solver)
-  allocate_matrix(Vector{Float64},nspace*ntime,nparams)
+  coeffvec = allocate_vector(Vector{Float64},nspace*ntime)
+  coeff = allocate_param_array(coeffvec,nparams)
+  return coeff
 end
 
-function allocate_coeff_param_array(solver::PODMDEIMSolver,b::PODBasis)
-  nspace = num_reduced_space_dofs(b)
-  ntime = num_times(b)
-  nparams = num_online_params(solver)
-  mat = allocate_matrix(Vector{Float64},ntime,nspace)
-  allocate_param_array(mat,nparams)
-end
-
-function allocate_coeff_param_array(solver::TTPODMDEIMSolver,b::TTSVDCores)
-  nvectors = num_reduced_dofs(b)
-  nparams = num_online_params(solver)
-  vec = allocate_vector(Vector{Float64},nvectors)
-  allocate_param_array(vec,nparams)
-end
-
-function allocate_mdeim_coeff(solver::PODMDEIMSolver,b::PODBasis)
-  cache_solve = allocate_coeff_matrix(solver,b)
-  cache_recast = allocate_coeff_param_array(solver,b)
-  return cache_solve,cache_recast
-end
-
-function allocate_mdeim_coeff(solver::TTPODMDEIMSolver,b::TTSVDCores)
-  cache_recast = allocate_coeff_param_array(solver,b)
-  return cache_recast
-end
-
-function allocate_mdeim_lincomb(solver::PODMDEIMSolver,test::RBSpace)
+function allocate_result(solver::RBSolver,test::RBSpace)
   V = get_vector_type(test)
   ns_test = num_reduced_space_dofs(test)
   nt_test = num_reduced_times(test)
   nparams = num_online_params(solver)
-  time_prod_cache = allocate_vector(V,nt_test)
-  kron_prod = allocate_vector(V,ns_test*nt_test)
-  lincomb_cache = allocate_param_array(kron_prod,nparams)
-  return time_prod_cache,lincomb_cache
+  kronprod = allocate_vector(V,ns_test*nt_test)
+  result = allocate_param_array(kronprod,nparams)
+  return result
 end
 
-function allocate_mdeim_lincomb(solver::TTPODMDEIMSolver,test::RBSpace)
+function allocate_result(solver::RBSolver,trial::RBSpace,test::RBSpace)
   V = get_vector_type(test)
-  nfree_test = num_free_dofs(test)
-  nparams = num_online_params(solver)
-  kron_prod = allocate_vector(V,nfree_test)
-  lincomb_cache = allocate_param_array(kron_prod,nparams)
-  return lincomb_cache
-end
-
-function allocate_mdeim_lincomb(solver::RBSolver,trial::RBSpace,test::RBSpace)
-  V = get_vector_type(test)
-  nt_trial = num_reduced_times(trial)
-  nt_test = num_reduced_times(test)
+  M = Matrix{eltype(V)}
   nfree_trial = num_free_dofs(trial)
   nfree_test = num_free_dofs(test)
   nparams = num_online_params(solver)
-  time_prod_cache = allocate_matrix(V,nt_test,nt_trial)
-  kron_prod = allocate_matrix(V,nfree_test,nfree_trial)
-  lincomb_cache = allocate_param_array(kron_prod,nparams)
-  return time_prod_cache,lincomb_cache
+  kronprod = allocate_matrix(M,nfree_test,nfree_trial)
+  result = allocate_param_array(kronprod,nparams)
+  return result
 end
 
-function allocate_mdeim_lincomb(solver::TTPODMDEIMSolver,trial::RBSpace,test::RBSpace)
-  V = get_vector_type(test)
-  nfree_trial = num_free_dofs(trial)
-  nfree_test = num_free_dofs(test)
-  nparams = num_online_params(solver)
-  kron_prod = allocate_matrix(V,nfree_test,nfree_trial)
-  lincomb_cache = allocate_param_array(kron_prod,nparams)
-  return lincomb_cache
-end
-
-function allocate_mdeim_cache(solver::RBSolver,b::Projection,args...)
-  coeff_cache = allocate_mdeim_coeff(solver,b)
-  lincomb_cache = allocate_mdeim_lincomb(solver,args...)
-  return coeff_cache,lincomb_cache
-end
-
-struct AffineDecomposition{M,A,B,C,D} <: Projection
-  mdeim_style::M
+struct AffineDecomposition{A,B,C,D,E}
   basis::A
   mdeim_interpolation::B
   integration_domain::C
-  cache::D
+  coefficient::D
+  result::E
 end
-
-const TTAffineDecomposition = AffineDecomposition{SpaceTimeMDEIM,A,B,C,D} where {
-  A<:TTProjection,B,C,D}
 
 get_integration_domain(a::AffineDecomposition) = a.integration_domain
 get_interp_matrix(a::AffineDecomposition) = a.mdeim_interpolation
@@ -190,9 +137,6 @@ num_space_dofs(a::AffineDecomposition) = @notimplemented
 FEM.num_times(a::AffineDecomposition) = num_times(a.basis)
 num_reduced_space_dofs(a::AffineDecomposition) = length(get_indices_space(a))
 num_reduced_times(a::AffineDecomposition) = length(get_indices_time(a))
-get_mdeim_cache(a::AffineDecomposition) = a.cache
-get_coeff_cache(a::AffineDecomposition) = first(get_mdeim_cache(a))
-get_lincomb_cache(a::AffineDecomposition) = last(get_mdeim_cache(a))
 
 function _time_indices_and_interp_matrix(::SpaceTimeMDEIM,interp_basis_space,basis_time)
   indices_time = get_mdeim_indices(basis_time)
@@ -208,21 +152,14 @@ function _time_indices_and_interp_matrix(::SpaceOnlyMDEIM,interp_basis_space,bas
   return indices_time,lu_interp
 end
 
-function mdeim(solver::RBSolver,b::PODBasis)
-  indices_space = get_mdeim_indices(b.basis_space)
-  interp_basis_space = view(b.basis_space,indices_space,:)
-  indices_time,lu_interp = _time_indices_and_interp_matrix(solver.mdeim_style,interp_basis_space,b.basis_time)
-  recast_indices_space = recast_indices(b.basis_space,indices_space)
-  integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
-  return lu_interp,integration_domain
-end
+function mdeim(mdeim_style::MDEIMStyle,b::PODBasis)
+  basis_space = get_basis_space(b)
+  basis_time = get_basis_time(b)
 
-function mdeim(solver::RBSolver,b::TTSVDCores)
-  indices_spacetime = get_mdeim_indices(b.basis_spacetime)
-  indices_space = fast_index(indices_spacetime,num_space_dofs(b))
-  indices_time = slow_index(indices_spacetime,num_space_dofs(b))
-  lu_interp = lu(view(b.basis_spacetime,indices_spacetime,:))
-  recast_indices_space = recast_indices(b.basis_spacetime,indices_space)
+  indices_space = get_mdeim_indices(basis_space)
+  recast_indices_space = recast_indices(basis_space,indices_space)
+  interp_basis_space = view(basis_space,indices_space,:)
+  indices_time,lu_interp = _time_indices_and_interp_matrix(mdeim_style,interp_basis_space,basis_time)
   integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
   return lu_interp,integration_domain
 end
@@ -264,12 +201,14 @@ function reduced_form(
   args...;
   kwargs...) where {S,T}
 
+  mdeim_style = solver.mdeim_style
   basis = reduced_basis(s;ϵ=get_tol(solver))
-  lu_interp,integration_domain = mdeim(solver,basis)
-  proj_basis = compress_basis(basis,args...;kwargs...)
+  lu_interp,integration_domain = mdeim(mdeim_style,basis)
+  proj_basis = reduce_operator(mdeim_style,basis,args...;kwargs...)
   red_trian = reduce_triangulation(trian,integration_domain,args...)
-  cache = allocate_mdeim_cache(solver,basis,args...)
-  ad = AffineDecomposition(solver.mdeim_style,proj_basis,lu_interp,integration_domain,cache)
+  coefficient = allocate_coefficient(solver,basis)
+  result = allocate_result(solver,args...)
+  ad = AffineDecomposition(proj_basis,lu_interp,integration_domain,coefficient,result)
   return ad,red_trian
 end
 
@@ -347,121 +286,48 @@ end
 
 # ONLINE PHASE
 
-function mdeim_coeff(a::AffineDecomposition{SpaceOnlyMDEIM},b::AbstractMatrix)
-  coeff,coeff_recast = get_coeff_cache(a)
+function coefficient!(a::AffineDecomposition,b::ParamArray)
+  coefficient = a.coefficient
   mdeim_interpolation = a.mdeim_interpolation
-  ldiv!(coeff,mdeim_interpolation,b)
-  nt = num_times(a)
-  @inbounds for i = eachindex(coeff_recast)
-    coeff_recast[i] = transpose(coeff[:,(i-1)*nt+1:i*nt])
-  end
-  return coeff_recast
+  ldiv!(coefficient,mdeim_interpolation,b)
 end
 
-function mdeim_coeff(a::AffineDecomposition{SpaceTimeMDEIM},b::AbstractMatrix)
-  coeff,coeff_recast = get_coeff_cache(a)
-  mdeim_interpolation = a.mdeim_interpolation
-  basis_time = a.basis.basis_time
+function mdeim_residual(a::AffineDecomposition,b::ParamArray)
+  coefficient!(a,b)
 
-  ns = num_reduced_space_dofs(a)
-  nt = num_reduced_times(a)
-  np = length(coeff_recast)
+  basis = a.basis
+  coefficient = a.coefficient
+  result = a.result
 
-  bvec = reshape(b,:,np)
-  ldiv!(coeff,mdeim_interpolation,bvec)
-  @inbounds for i = eachindex(coeff_recast)
-    for j in 1:ns
-      coeff_recast[i][:,j] = basis_time*coeff[j:ns:ns*nt,i]
-    end
+  fill!(result,zero(eltype(result)))
+
+  @inbounds for i = eachindex(result)
+    result[i] = basis*coefficient[i]
   end
 
-  return coeff_recast
+  return result
 end
 
-function mdeim_coeff(a::TTAffineDecomposition,b::ParamVector)
-  coeff = get_coeff_cache(a)
-  mdeim_interpolation = a.mdeim_interpolation
-  @inbounds for i = eachindex(coeff)
-    ldiv!(coeff[i],mdeim_interpolation,b[i])
-  end
-  return coeff
-end
+function mdeim_jacobian(a::AffineDecomposition,b::ParamArray)
+  coefficient!(a,b)
 
-function residual_mdeim_lincomb(a::AffineDecomposition,coeff::ParamMatrix)
-  time_prod_cache,lincomb_cache = get_lincomb_cache(a)
-  fill!(lincomb_cache,zero(eltype(lincomb_cache)))
+  basis = a.basis
+  coefficient = a.coefficient
+  result = a.result
 
-  basis_time = a.basis.metadata
-  basis_space = a.basis.basis_space
+  fill!(result,zero(eltype(result)))
 
-  @inbounds for i = eachindex(lincomb_cache)
-    lci = lincomb_cache[i]
-    ci = coeff[i]
-    for j = axes(coeff,2)
-      time_prod_cache .= basis_time'*ci[:,j]
-      lci .+= kronecker(time_prod_cache,basis_space[j])
-    end
+  @inbounds for i = eachindex(result)
+    result[i] = basis*coefficient[i]
   end
 
-  return lincomb_cache
-end
-
-function jacobian_mdeim_lincomb(a::AffineDecomposition,coeff::ParamMatrix)
-  time_prod_cache,lincomb_cache = get_lincomb_cache(a)
-  fill!(lincomb_cache,zero(eltype(lincomb_cache)))
-
-  basis_time = a.basis.metadata
-  basis_space = a.basis.basis_space
-
-  @inbounds for i = eachindex(lincomb_cache)
-    lci = lincomb_cache[i]
-    ci = coeff[i]
-    for j = axes(coeff,2)
-      for col in axes(basis_time,3)
-        for row in axes(basis_time,2)
-          time_prod_cache[row,col] = sum(basis_time[:,row,col].*ci[:,j])
-        end
-      end
-      lci .+= kronecker(time_prod_cache,basis_space[j])
-    end
-  end
-
-  return lincomb_cache
-end
-
-function residual_mdeim_lincomb(a::TTAffineDecomposition,coeff::ParamVector)
-  lincomb_cache = get_lincomb_cache(a)
-  fill!(lincomb_cache,zero(eltype(lincomb_cache)))
-  basis_spacetime = a.basis.metadata
-  for i = eachindex(lincomb_cache)
-    lci = lincomb_cache[i]
-    ci = coeff[i]
-    for j in eachindex(ci)
-      @inbounds lci .+= basis_spacetime[j]*ci[j]
-    end
-  end
-  return lincomb_cache
-end
-
-function jacobian_mdeim_lincomb(a::TTAffineDecomposition,coeff::ParamVector)
-  lincomb_cache = get_lincomb_cache(a)
-  fill!(lincomb_cache,zero(eltype(lincomb_cache)))
-  basis_spacetime = a.basis.metadata
-  for i = eachindex(lincomb_cache)
-    lci = lincomb_cache[i]
-    ci = coeff[i]
-    for j in eachindex(ci)
-      @inbounds lci .+= basis_spacetime[j]*ci[j]
-    end
-  end
-  return lincomb_cache
+  return result
 end
 
 function mdeim_residual(a::AffineContribution,b::ArrayContribution)
   @assert length(a) == length(b)
   ress = map(a.values,b.values) do a,b
-    coeff = mdeim_coeff(a,b)
-    residual_mdeim_lincomb(a,coeff)
+    mdeim_residual(a,b)
   end
   sum(ress)
 end
@@ -469,8 +335,7 @@ end
 function mdeim_jacobian(a::AffineContribution,b::ArrayContribution)
   @assert length(a) == length(b)
   jacs = map(a.values,b.values) do a,b
-    coeff = mdeim_coeff(a,b)
-    jacobian_mdeim_lincomb(a,coeff)
+    mdeim_jacobian(a,b)
   end
   sum(jacs)
 end
@@ -483,28 +348,16 @@ end
 
 function allocate_block_mdeim_lincomb(solver::RBSolver,test::RBSpace)
   active_block_ids = get_touched_blocks(test)
-  block_lincomb = Any[allocate_mdeim_lincomb(solver,test[i]) for i in active_block_ids]
-  _,block_lc = tuple_of_arrays(block_lincomb)
+  block_lincomb = Any[allocate_result(solver,test[i]) for i in active_block_ids]
+  block_lc = tuple_of_arrays(block_lincomb)
   return mortar(block_lc)
-end
-
-function allocate_block_mdeim_lincomb(solver::TTPODMDEIMSolver,test::RBSpace)
-  active_block_ids = get_touched_blocks(test)
-  block_lincomb = Any[allocate_mdeim_lincomb(solver,test[i]) for i in active_block_ids]
-  return mortar(block_lincomb)
 end
 
 function allocate_block_mdeim_lincomb(solver::RBSolver,trial::RBSpace,test::RBSpace)
   active_block_ids = Iterators.product(get_touched_blocks(test),get_touched_blocks(trial))
-  block_lincomb = Any[allocate_mdeim_lincomb(solver,trial[j],test[i]) for (i,j) in active_block_ids]
-  _,block_lc = tuple_of_arrays(block_lincomb)
+  block_lincomb = Any[allocate_result(solver,trial[j],test[i]) for (i,j) in active_block_ids]
+  block_lc = tuple_of_arrays(block_lincomb)
   return mortar(block_lc)
-end
-
-function allocate_block_mdeim_lincomb(solver::TTPODMDEIMSolver,trial::RBSpace,test::RBSpace)
-  active_block_ids = Iterators.product(get_touched_blocks(test),get_touched_blocks(trial))
-  block_lincomb = Any[allocate_mdeim_lincomb(solver,trial[j],test[i]) for (i,j) in active_block_ids]
-  return mortar(block_lincomb)
 end
 
 struct BlockAffineDecomposition{A,N,C}

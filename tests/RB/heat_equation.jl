@@ -95,3 +95,64 @@ results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbs
 println(RB.space_time_error(results_space))
 save(test_dir,rbop_space)
 save(test_dir,results_space)
+
+#################
+using Gridap.FESpaces
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+odeop = get_algebraic_operator(feop)
+pop = PODOperator(odeop,red_trial,red_test)
+smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
+jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
+
+# residual
+sres = rres[1]
+mdeim_style = rbsolver.mdeim_style
+basis = reduced_basis(sres;ϵ=RB.get_tol(rbsolver))
+lu_interp,integration_domain = mdeim(mdeim_style,basis)
+proj_basis = reduce_operator(mdeim_style,basis,get_test(pop))
+
+# jacobian
+sjac = jjac[1][1]
+mdeim_style = rbsolver.mdeim_style
+basis = reduced_basis(sjac;ϵ=RB.get_tol(rbsolver))
+lu_interp,integration_domain = mdeim(mdeim_style,basis)
+# proj_basis = reduce_operator(mdeim_style,basis,get_trial(pop),get_test(pop))
+
+bs = get_basis_space(basis)
+bt = get_basis_time(basis)
+b_trial = RB.get_basis(get_trial(pop))
+b_test = RB.get_basis(get_test(pop))
+bs_trial = get_basis_space(b_trial)
+bt_trial = get_basis_time(b_trial)
+bs_test = get_basis_space(b_test)
+bt_test = get_basis_time(b_test)
+
+M = Matrix{eltype(bs)}
+b̂st = Vector{M}(undef,num_reduced_dofs(basis))
+combine = (x,y) -> θ*x+(1-θ)*y
+
+b̂t = combine_basis_time(bt,bt_trial,bt_test;combine)
+
+@inbounds for is = 1:num_reduced_space_dofs(basis)
+  b̂si = bs_test'*get_values(bs)[is]*bs_trial
+  for it = 1:num_reduced_times(basis)
+    ist = (it-1)*num_reduced_space_dofs(basis)+is
+    b̂ti = b̂t[it]
+    b̂st[ist] = kronecker(b̂ti,b̂si)
+  end
+end
+
+# online stuff
+using Gridap.Algebra
+using Gridap.ODEs
+son = select_snapshots(fesnaps,RB.online_params(rbsolver))
+ron = get_realization(son)
+fesolver = RB.get_fe_solver(rbsolver)
+fe_trial = get_fe_trial(pop)(ron)
+x̂ = zero_free_values(red_trial)
+y = zero_free_values(fe_trial)
+odecache = allocate_odecache(fesolver,pop,ron,(y,))
+_,odeopcache = odecache
+bcache = allocate_residual(pop,ron,(y,y),odeopcache)
+fe_sb = fe_residual!(bcache,rbop,ron,(y,y),odeopcache)
+b̂ = RB.mdeim_residual(rbop.rhs,fe_sb)

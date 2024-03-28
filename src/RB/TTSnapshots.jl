@@ -150,12 +150,11 @@ function Base.setindex!(
 end
 
 function FEM.get_values(s::SelectedTTSnapshotsAtIndices{T,N,<:BasicTTSnapshots}) where {T,N}
-  @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = get_values(s.snaps)
   array = Vector{typeof(first(v))}(undef,num_cols(s))
   @inbounds for (i,it) in enumerate(time_indices(s))
     for (j,jp) in enumerate(param_indices(s))
-      array[(i-1)*num_params(s)+j] = v[(it-1)*num_params(s)+jp]
+      array[(i-1)*num_params(s)+j] = v[(it-1)*num_params(s)+jp][space_indices(s)]
     end
   end
   ParamArray(array)
@@ -177,12 +176,11 @@ function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:BasicTTSnapshots})
 end
 
 function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapshots}) where {T,N}
-  @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = s.snaps.values
   basic_values = Vector{typeof(first(first(v)))}(undef,num_times(s)*num_params(s))
   @inbounds for (i,it) in enumerate(time_indices(s))
     for (j,jp) in enumerate(param_indices(s))
-      basic_values[(i-1)*num_params(s)+j] = v[it][jp]
+      basic_values[(i-1)*num_params(s)+j] = v[it][jp][space_indices(s)]
     end
   end
   r = get_realization(s)

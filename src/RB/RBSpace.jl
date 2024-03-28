@@ -62,6 +62,8 @@ end
 
 ODEs.time_derivative(U::RBSpace) = RBSpace(time_derivative(U),U.basis)
 
+get_basis(r::RBSpace) = r.basis
+
 get_basis_space(r::RBSpace) = get_basis_space(r.basis)
 num_space_dofs(r::RBSpace) = num_space_dofs(r.basis)
 num_reduced_space_dofs(r::RBSpace) = num_reduced_space_dofs(r.basis)
@@ -96,14 +98,6 @@ end
 function Algebra.allocate_in_domain(r::RBSpace)
   V = get_vector_type(r.space)
   allocate_vector(V,num_fe_free_dofs(r))
-end
-
-function compress_basis(b::Projection,test::RBSpace;kwargs...)
-  compress_basis(b,test.basis;kwargs...)
-end
-
-function compress_basis(b::Projection,trial::RBSpace,test::RBSpace;kwargs...)
-  compress_basis(b,trial.basis,test.basis;kwargs...)
 end
 
 function recast(x::AbstractVector,r::RBSpace)

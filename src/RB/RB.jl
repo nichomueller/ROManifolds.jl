@@ -108,6 +108,12 @@ export fe_jacobian_and_residual!
 export fe_jacobian_and_residual
 include("PODOperator.jl")
 
+export ReducedAlgebraicOperator
+export ReducedVectorOperator
+export ReducedMatrixOperator
+export reduce_operator
+include("ReducedAlgebraicOperator.jl")
+
 export ReducedIntegrationDomain
 export AffineDecomposition
 export AffineContribution

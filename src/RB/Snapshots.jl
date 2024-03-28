@@ -244,58 +244,6 @@ function FEM.get_values(s::TransientSnapshots)
   get_values(BasicSnapshots(s))
 end
 
-struct FreeAndDirichletSnapshots{M,T,S} <: StandardSnapshots{M,T}
-  free_snaps::S
-  diri_snaps::S
-  function FreeAndDirichletSnapshots(
-    free_snaps::S,
-    diri_snaps::S) where {M,T,S<:StandardSnapshots{M,T}}
-
-    new{M,T,S}(free_snaps,diri_snaps)
-  end
-end
-
-function Snapshots(
-  free_vals::V,
-  diri_vals::V,
-  args...
-  ) where V<:Union{AbstractParamContainer,AbstractVector{<:AbstractParamContainer}}
-
-  free_snaps = Snapshots(free_vals,args...)
-  diri_snaps = Snapshots(diri_vals,args...)
-  FreeAndDirichletSnapshots(free_snaps,diri_snaps)
-end
-
-num_space_dofs(s::FreeAndDirichletSnapshots) = num_space_dofs(s.free_snaps) + num_space_dofs(s.diri_snaps)
-
-function change_mode(s::FreeAndDirichletSnapshots)
-  FreeAndDirichletSnapshots(change_mode(s.free_snaps),change_mode(s.diri_snaps))
-end
-
-function tensor_getindex(s::FreeAndDirichletSnapshots,ispace::Integer,itime::Integer,iparam::Integer)
-  if ispace > num_space_dofs(s.free_snaps)
-    tensor_getindex(s.diri_snaps,ispace-num_space_dofs(s.free_snaps),itime,iparam)
-  else
-    tensor_getindex(s.free_snaps,ispace,itime,iparam)
-  end
-end
-
-function tensor_setindex!(s::FreeAndDirichletSnapshots,v,ispace::Integer,itime::Integer,iparam::Integer)
-  if ispace > num_space_dofs(s.free_snaps)
-    tensor_setindex!(s.diri_snaps,v,ispace-num_space_dofs(s.free_snaps),itime,iparam)
-  else
-    tensor_setindex!(s.free_snaps,v,ispace,itime,iparam)
-  end
-end
-
-function BasicSnapshots(s::FreeAndDirichletSnapshots)
-  FreeAndDirichletSnapshots(BasicSnapshots(s.free_snaps),BasicSnapshots(s.diri_snaps))
-end
-
-function FEM.get_values(s::FreeAndDirichletSnapshots)
-  get_values(s.free_snaps)
-end
-
 struct CompressedTransientSnapshots{M,N,T,R,V} <: StandardSnapshots{M,T}
   current_mode::M
   initial_mode::N
@@ -428,7 +376,8 @@ function select_snapshots(s::AbstractSnapshots;kwargs...)
 end
 
 function select_snapshots_entries(s::StandardSnapshots,spacerange,timerange)
-  select_snapshots(s,spacerange,timerange,Base.OneTo(num_params(s)))
+  ss = select_snapshots(s,spacerange,timerange,Base.OneTo(num_params(s)))
+  get_values(ss)
 end
 
 space_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[1]
@@ -460,12 +409,11 @@ function tensor_setindex!(
 end
 
 function FEM.get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapshots}) where T
-  @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = get_values(s.snaps)
   array = Vector{typeof(first(v))}(undef,num_cols(s))
   @inbounds for (i,it) in enumerate(time_indices(s))
     for (j,jp) in enumerate(param_indices(s))
-      array[(i-1)*num_params(s)+j] = v[(it-1)*num_params(s)+jp]
+      array[(i-1)*num_params(s)+j] = v[(it-1)*num_params(s)+jp][space_indices(s)]
     end
   end
   ParamArray(array)
@@ -490,12 +438,11 @@ function BasicSnapshots(s::SelectedSnapshotsAtIndices{M,T,<:BasicSnapshots}) whe
 end
 
 function BasicSnapshots(s::SelectedSnapshotsAtIndices{M,T,<:TransientSnapshots}) where {M,T}
-  @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = s.snaps.values
   basic_values = Vector{typeof(first(first(v)))}(undef,num_cols(s))
   @inbounds for (i,it) in enumerate(time_indices(s))
     for (j,jp) in enumerate(param_indices(s))
-      basic_values[(i-1)*num_params(s)+j] = v[it][jp]
+      basic_values[(i-1)*num_params(s)+j] = v[it][jp][space_indices(s)]
     end
   end
   r = get_realization(s)
@@ -674,12 +621,11 @@ function tensor_setindex!(
 end
 
 function FEM.get_values(s::SelectedSnapshotsSwappedColumns)
-  @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = get_values(s.snaps)
   values = Vector{typeof(first(v))}(undef,num_cols(s))
   for (i,ip) in enumerate(param_indices(s))
     for (j,jt) in enumerate(time_indices(s))
-      @inbounds values[(i-1)*num_times(s)+j] = v[(ip-1)*num_times(s)+jt]
+      @inbounds values[(i-1)*num_times(s)+j] = v[(ip-1)*num_times(s)+jt][space_indices(s)]
     end
   end
   ParamArray(copy(values))
