@@ -355,13 +355,6 @@ function select_snapshots(s::AbstractSnapshots,spacerange,timerange,paramrange)
   SelectedSnapshotsAtIndices(s,selected_indices)
 end
 
-function select_snapshots(s::FreeAndDirichletSnapshots,spacerange,timerange,paramrange)
-  @assert spacerange == Colon()
-  FreeAndDirichletSnapshots(
-    select_snapshots(s.free_snaps,:,timerange,paramrange),
-    select_snapshots(s.diri_snaps,:,timerange,paramrange))
-end
-
 function select_snapshots(s::AbstractSnapshots,timerange,paramrange;spacerange=:)
   select_snapshots(s,spacerange,timerange,paramrange)
 end
@@ -375,9 +368,17 @@ function select_snapshots(s::AbstractSnapshots;kwargs...)
   select_snapshots(s,paramrange;kwargs...)
 end
 
-function select_snapshots_entries(s::StandardSnapshots,spacerange,timerange)
-  ss = select_snapshots(s,spacerange,timerange,Base.OneTo(num_params(s)))
-  get_values(ss)
+function select_snapshots_entries(s::StandardSnapshots{M,T},spacerange,timerange) where {M,T}
+  ss = select_snapshots(s,spacerange,timerange,Base.OneTo(num_params(s))) |> copy
+  nval = length(spacerange),length(timerange)
+  nt = length(timerange)
+  np = num_params(s)
+  values = allocate_param_array(zeros(T,nval),np)
+  @inbounds for ip = 1:np
+    cols = (ip-1)*nt+1:ip*nt
+    values[ip] = ss[:,cols]
+  end
+  return values
 end
 
 space_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[1]
@@ -511,10 +512,6 @@ end
 
 function reverse_snapshots(s::TransientSnapshots)
   TransientSnapshotsSwappedColumns(s)
-end
-
-function reverse_snapshots(s::FreeAndDirichletSnapshots)
-  FreeAndDirichletSnapshots(reverse_snapshots(s.free_snaps),reverse_snapshots(s.diri_snaps))
 end
 
 function reverse_snapshots(s::SelectedSnapshotsAtIndices)

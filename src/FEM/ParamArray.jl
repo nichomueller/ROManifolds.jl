@@ -199,8 +199,13 @@ function Base.:(==)(a::ParamArray,b::ParamArray)
 end
 
 function Base.transpose(a::ParamArray)
-  at = map(transpose,a)
+  at = map(transpose,get_array(a))
   ParamArray(at)
+end
+
+function Base.vec(a::ParamMatrix)
+  av = map(vec,get_array(a))
+  ParamArray(av)
 end
 
 function Base.maximum(f,a::ParamArray)

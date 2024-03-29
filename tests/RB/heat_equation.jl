@@ -62,7 +62,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
 # we can load & solve directly, if the offline structures have been previously saved to file
@@ -82,7 +82,7 @@ save(test_dir,results)
 pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
 
 ϵ = 1e-4
-rbsolver_space = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+rbsolver_space = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
 test_dir_space = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
 # we can load & solve directly, if the offline structures have been previously saved to file
@@ -96,53 +96,47 @@ println(RB.space_time_error(results_space))
 save(test_dir,rbop_space)
 save(test_dir,results_space)
 
-#################
-using Gridap.FESpaces
-red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-odeop = get_algebraic_operator(feop)
-pop = PODOperator(odeop,red_trial,red_test)
-smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
-jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
+# #################
+# using Gridap.FESpaces
+# red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+# odeop = get_algebraic_operator(feop)
+# pop = PODOperator(odeop,red_trial,red_test)
+# smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
+# jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
 
-# residual
-sres = rres[1]
-mdeim_style = rbsolver.mdeim_style
-basis = reduced_basis(sres;ϵ=RB.get_tol(rbsolver))
-lu_interp,integration_domain = mdeim(mdeim_style,basis)
-proj_basis = reduce_operator(mdeim_style,basis,get_test(pop))
+# # jacobian
+# sjac = jjac[1][1]
+# mdeim_style = rbsolver.mdeim_style
+# basis = reduced_basis(sjac;ϵ=RB.get_tol(rbsolver))
+# lu_interp,integration_domain = mdeim(mdeim_style,basis)
+# # proj_basis = reduce_operator(mdeim_style,basis,get_trial(pop),get_test(pop))
 
-# jacobian
-sjac = jjac[1][1]
-mdeim_style = rbsolver.mdeim_style
-basis = reduced_basis(sjac;ϵ=RB.get_tol(rbsolver))
-lu_interp,integration_domain = mdeim(mdeim_style,basis)
-# proj_basis = reduce_operator(mdeim_style,basis,get_trial(pop),get_test(pop))
+# bs = get_basis_space(basis)
+# bt = get_basis_time(basis)
+# b_trial = RB.get_basis(get_trial(pop))
+# b_test = RB.get_basis(get_test(pop))
+# bs_trial = get_basis_space(b_trial)
+# bt_trial = get_basis_time(b_trial)
+# bs_test = get_basis_space(b_test)
+# bt_test = get_basis_time(b_test)
 
-bs = get_basis_space(basis)
-bt = get_basis_time(basis)
-b_trial = RB.get_basis(get_trial(pop))
-b_test = RB.get_basis(get_test(pop))
-bs_trial = get_basis_space(b_trial)
-bt_trial = get_basis_time(b_trial)
-bs_test = get_basis_space(b_test)
-bt_test = get_basis_time(b_test)
+# M = Matrix{eltype(bs)}
+# b̂st = Vector{M}(undef,num_reduced_dofs(basis))
+# combine = (x,y) -> θ*x+(1-θ)*y
 
-M = Matrix{eltype(bs)}
-b̂st = Vector{M}(undef,num_reduced_dofs(basis))
-combine = (x,y) -> θ*x+(1-θ)*y
+# b̂t = combine_basis_time(bt,bt_trial,bt_test;combine)
 
-b̂t = combine_basis_time(bt,bt_trial,bt_test;combine)
-
-@inbounds for is = 1:num_reduced_space_dofs(basis)
-  b̂si = bs_test'*get_values(bs)[is]*bs_trial
-  for it = 1:num_reduced_times(basis)
-    ist = (it-1)*num_reduced_space_dofs(basis)+is
-    b̂ti = b̂t[it]
-    b̂st[ist] = kronecker(b̂ti,b̂si)
-  end
-end
+# @inbounds for is = 1:num_reduced_space_dofs(basis)
+#   b̂si = bs_test'*get_values(bs)[is]*bs_trial
+#   for it = 1:num_reduced_times(basis)
+#     ist = (it-1)*num_reduced_space_dofs(basis)+is
+#     b̂ti = b̂t[it]
+#     b̂st[ist] = kronecker(b̂ti,b̂si)
+#   end
+# end
 
 # online stuff
+using Gridap.FESpaces
 using Gridap.Algebra
 using Gridap.ODEs
 son = select_snapshots(fesnaps,RB.online_params(rbsolver))
@@ -153,6 +147,22 @@ x̂ = zero_free_values(red_trial)
 y = zero_free_values(fe_trial)
 odecache = allocate_odecache(fesolver,pop,ron,(y,))
 _,odeopcache = odecache
-bcache = allocate_residual(pop,ron,(y,y),odeopcache)
-fe_sb = fe_residual!(bcache,rbop,ron,(y,y),odeopcache)
-b̂ = RB.mdeim_residual(rbop.rhs,fe_sb)
+FEM.shift!(ron,dt*(θ-1))
+
+dtθ = dt*θ
+ws = (1,1/dtθ)
+Acache = allocate_jacobian(pop,ron,(y,y),odeopcache)
+fe_sA = fe_jacobian!(Acache,rbop,ron,(y,y),ws,odeopcache)
+# Â = RB.mdeim_jacobian(rbop.lhs,fe_sA)
+
+ad = rbop.lhs[1][1]
+RB.coefficient!(ad,fe_sA[1][1])
+basis = ad.basis
+coefficient = ad.coefficient
+result = ad.result
+fill!(result,zero(eltype(result)))
+
+i = 1
+# basis*coefficient[i]
+contrib1 = basis.basis[1]*coefficient[i][1]
+contrib2 = basis.basis[3]*coefficient[i][2]

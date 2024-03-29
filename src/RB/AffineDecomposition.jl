@@ -286,10 +286,22 @@ end
 
 # ONLINE PHASE
 
-function coefficient!(a::AffineDecomposition,b::ParamArray)
+function coefficient!(
+  a::AffineDecomposition{<:ReducedAlgebraicOperator{T}},
+  b::ParamArray) where T<:SpaceOnlyMDEIM
+
   coefficient = a.coefficient
   mdeim_interpolation = a.mdeim_interpolation
   ldiv!(coefficient,mdeim_interpolation,b)
+end
+
+function coefficient!(
+  a::AffineDecomposition{<:ReducedAlgebraicOperator{T}},
+  b::ParamArray) where T<:SpaceTimeMDEIM
+
+  coefficient = a.coefficient
+  mdeim_interpolation = a.mdeim_interpolation
+  ldiv!(coefficient,mdeim_interpolation,vec(b))
 end
 
 function mdeim_residual(a::AffineDecomposition,b::ParamArray)
@@ -563,6 +575,11 @@ function compress(A::AbstractMatrix,r::RBSpace)
 end
 
 function compress(A::AbstractMatrix{T},trial::RBSpace,test::RBSpace;combine=(x,y)->x) where T
+  function compress_basis_space(A::AbstractMatrix,B::AbstractMatrix,C::AbstractMatrix)
+    map(get_values(A)) do A
+      C'*A*B
+    end
+  end
   basis_space_test = get_basis_space(test)
   basis_time_test = get_basis_time(test)
   basis_space_trial = get_basis_space(trial)
