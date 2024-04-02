@@ -92,20 +92,18 @@ function allocate_coefficient(
   solver::RBSolver{S,SpaceTimeMDEIM} where S,
   b::Projection)
 
-  nspace = num_reduced_space_dofs(b)
-  ntime = num_reduced_times(b)
+  n = num_reduced_dofs(b)
   nparams = num_online_params(solver)
-  coeffvec = allocate_vector(Vector{Float64},nspace*ntime)
+  coeffvec = allocate_vector(Vector{Float64},n)
   coeff = allocate_param_array(coeffvec,nparams)
   return coeff
 end
 
 function allocate_result(solver::RBSolver,test::RBSpace)
   V = get_vector_type(test)
-  ns_test = num_reduced_space_dofs(test)
-  nt_test = num_reduced_times(test)
+  nfree_test = num_free_dofs(test)
   nparams = num_online_params(solver)
-  kronprod = allocate_vector(V,ns_test*nt_test)
+  kronprod = allocate_vector(V,nfree_test)
   result = allocate_param_array(kronprod,nparams)
   return result
 end
@@ -155,11 +153,22 @@ end
 function mdeim(mdeim_style::MDEIMStyle,b::PODBasis)
   basis_space = get_basis_space(b)
   basis_time = get_basis_time(b)
-
   indices_space = get_mdeim_indices(basis_space)
   recast_indices_space = recast_indices(basis_space,indices_space)
   interp_basis_space = view(basis_space,indices_space,:)
   indices_time,lu_interp = _time_indices_and_interp_matrix(mdeim_style,interp_basis_space,basis_time)
+  integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
+  return lu_interp,integration_domain
+end
+
+function mdeim(mdeim_style::MDEIMStyle,b::TTSVDCores)
+  basis_space = first(b.cores)
+  basis_spacetime = get_basis_spacetime(b)
+  indices_spacetime = get_mdeim_indices(basis_spacetime)
+  indices_space = fast_index(indices_spacetime,num_space_dofs(b))
+  indices_time = slow_index(indices_spacetime,num_space_dofs(b))
+  lu_interp = lu(view(basis_spacetime,indices_spacetime,:))
+  recast_indices_space = recast_indices(basis_space,indices_space)
   integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
   return lu_interp,integration_domain
 end
@@ -314,7 +323,7 @@ function mdeim_result(a::AffineDecomposition,b::ParamArray)
   fill!(result,zero(eltype(result)))
 
   @inbounds for i = eachindex(result)
-    result[i] = basis*coefficient[i]
+    result[i] .= basis*coefficient[i]
   end
 
   return result
@@ -322,10 +331,10 @@ end
 
 function mdeim_result(a::AffineContribution,b::ArrayContribution)
   @assert length(a) == length(b)
-  jacs = map(a.values,b.values) do a,b
+  result = map(a.values,b.values) do a,b
     mdeim_result(a,b)
   end
-  sum(jacs)
+  sum(result)
 end
 
 function mdeim_result(a::Tuple,b::Tuple)

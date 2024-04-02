@@ -142,10 +142,10 @@ function reduce_operator(
     for i_test = 1:num_reduced_dofs(b_test)
       ids_i = (i_test-1)*ns_test+1:i_test*ns_test
       bt_test_i = view(bt_test,:,ids_i)
-      b̂ti = bti'*bt_test_i
+      b̂ti = bt_test_i'*bti
       cache_t[i_test] = sum(b̂s .* b̂ti)
     end
-    b̂st[i] = cache_st
+    b̂st[i] = copy(cache_t)
   end
 
   return ReducedVectorOperator(mdeim_style,b̂st)
@@ -158,17 +158,24 @@ function reduce_operator(
   b_test::TTSVDCores;
   kwargs...)
 
-  bs = get_basis_space(b)
+  bs = first(b.cores)
   bt = get_basis_time(b)
   bs_trial = get_basis_space(b_trial)
   bt_trial = get_basis_time(b_trial)
   bs_test = get_basis_space(b_test)
   bt_test = get_basis_time(b_test)
 
-  M = Matrix{eltype(bs)}
+  ns_test = num_reduced_space_dofs(b_test)
+  ns_trial = num_reduced_space_dofs(b_trial)
+
+  T = eltype(first(bs))
+  M = Matrix{T}
   b̂st = Vector{M}(undef,num_reduced_dofs(b))
 
   cache_t = zeros(T,num_reduced_dofs(b_test),num_reduced_dofs(b_trial))
+  @inbounds for i = 1:num_reduced_dofs(b)
+    b̂st[i] = copy(cache_t)
+  end
 
   @inbounds for is = 1:num_reduced_space_dofs(b)
     b̂si = bs_test'*get_values(bs)[is]*bs_trial
@@ -182,7 +189,7 @@ function reduce_operator(
         b̂ti = combine_basis_time(bti,bti_trial,bti_test;kwargs...)
         cache_t[i_test,i_trial] = sum(b̂si .* b̂ti)
       end
-      b̂st[i] += cache_st
+      b̂st[i] .+= copy(cache_t)
     end
   end
 

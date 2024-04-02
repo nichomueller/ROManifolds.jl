@@ -1,15 +1,8 @@
 using Gridap
-using Gridap.Algebra
-using Gridap.Arrays
-using Gridap.FESpaces
-using Gridap.ODEs.ODETools
-using Gridap.ODEs.TransientFETools
 using Test
 using DrWatson
 using Mabla.FEM
 using Mabla.RB
-using LinearAlgebra
-using SparseArrays
 
 θ = 0.5
 dt = 0.01
@@ -20,8 +13,9 @@ pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
-partition = (20,20)
-model = CartesianDiscreteModel(domain, partition)
+domain = (0,1,0,1)
+partition = (10,10)
+model = CartesianDiscreteModel(domain,partition)
 
 labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
@@ -78,16 +72,43 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = TTRBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=5,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=5,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1")))
 
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,feop,fesnaps,rbsnaps,festats,rbstats)
+println(RB.space_time_error(results))
+
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)
 # results = load_solve(rbsolver,dir=test_dir)
 println(RB.space_time_error(results))
 println(RB.speedup(results))
+
+using Gridap.Algebra
+using Gridap.FESpaces
+using Gridap.ODEs
+
+s = select_snapshots(fesnaps,RB.online_params(rbsolver))
+r = get_realization(s)
+fesolver = RB.get_fe_solver(rbsolver)
+red_trial = get_trial(rbop)(r)
+fe_trial = get_fe_trial(rbop)(r)
+x̂ = zero_free_values(red_trial)
+y = zero_free_values(fe_trial)
+
+odecache = allocate_odecache(fesolver,rbop,r,(y,))
+# solve!((x̂,),fesolver,rbop,r,(y,),odecache)
+x = y
+sysslvr = fesolver.sysslvr
+odeslvrcache,odeopcache = odecache
+reuse,A,b,sysslvrcache = odeslvrcache
+
+fe_sb = fe_residual!(b,rbop,r,(y,y),odeopcache)
+b̂ = RB.mdeim_result(rbop.rhs,fe_sb)
+
+fe_sA = fe_jacobian!(A,rbop,r,(y,y),(1,1/200),odeopcache)
+b̂ = RB.mdeim_result(rbop.rhs,fe_sb)

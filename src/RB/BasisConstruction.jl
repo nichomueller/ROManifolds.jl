@@ -13,9 +13,11 @@ function tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
   (L'\U[:,1:rank])[invperm(C.p),:]
 end
 
+# we are not interested in the last dimension (corresponds to the parameter)
+
 function ttsvd(mat::AbstractArray{T,N},args...;kwargs...) where {T,N}
-  cores = Vector{Array{T,3}}(undef,N)
-  ranks = fill(1,N+1)
+  cores = Vector{Array{T,3}}(undef,N-1)
+  ranks = fill(1,N)
   sizes = size(mat)
   mat_k = copy(mat)
   for k = 1:N-1
@@ -26,13 +28,12 @@ function ttsvd(mat::AbstractArray{T,N},args...;kwargs...) where {T,N}
     mat_k = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
     cores[k] = reshape(U[:,1:rank],ranks[k],sizes[k],rank)
   end
-  cores[N] = reshape(mat_k,ranks[N],sizes[N],1)
   return cores
 end
 
 function ttsvd(mat::AbstractArray{T,N},X::AbstractMatrix;kwargs...) where {T,N}
-  cores = Vector{Array{T,3}}(undef,N)
-  ranks = fill(1,N+1)
+  cores = Vector{Array{T,3}}(undef,N-1)
+  ranks = fill(1,N)
   sizes = size(mat)
   mat_k = copy(mat)
   C = cholesky(X)
@@ -54,7 +55,6 @@ function ttsvd(mat::AbstractArray{T,N},X::AbstractMatrix;kwargs...) where {T,N}
       cores[k] = reshape(U[:,1:rank],ranks[k],sizes[k],rank)
     end
   end
-  cores[N] = reshape(mat_k,ranks[N],sizes[N],1)
   return cores
 end
 

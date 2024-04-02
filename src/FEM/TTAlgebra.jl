@@ -6,7 +6,7 @@ end
 
 function FESpaces.SparseMatrixAssembler(
   trial::SingleFieldFESpace,
-  test::UnconstrainedFESpace{TTVector})
+  test::UnconstrainedFESpace{<:TTVector})
 
   T = get_dof_value_type(trial)
   matrix_type = TTSparseMatrixCSC{1,T}

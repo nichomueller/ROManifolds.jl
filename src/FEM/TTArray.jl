@@ -52,7 +52,8 @@ Base.size(a::TTArray,i...) = size(get_values(a),i...)
 Base.axes(a::TTArray,i...) = axes(get_values(a),i...)
 Base.eachindex(a::TTArray) = eachindex(get_values(a))
 
-Base.getindex(a::TTArray,i...) = getindex(get_values(a),i...)
+Base.getindex(a::TTArray,i::Integer...) = getindex(get_values(a),i...)
+Base.getindex(a::TTArray{D},i...) where D = TTArray(getindex(get_values(a),i...),Val(D))
 Base.setindex!(a::TTArray,v,i...) = setindex!(get_values(a),v,i...)
 
 Base.copy(a::TTArray{D}) where D = TTArray(copy(get_values(a)),Val(D))
@@ -154,12 +155,16 @@ function SparseArrays.sparse(
 end
 
 SparseArrays.nnz(a::TTSparseMatrix) = nnz(get_values(a))
-SparseArrays.findnz(a::TTSparseMatrix) = findnz(get_values(a))
 SparseArrays.nzrange(a::TTSparseMatrix,col::Int) = nzrange(get_values(a),col)
 SparseArrays.rowvals(a::TTSparseMatrix) = rowvals(get_values(a))
 SparseArrays.nonzeros(a::TTSparseMatrix{D}) where D = TTArray(nonzeros(get_values(a)),Val(D))
 SparseMatricesCSR.colvals(a::TTSparseMatrix) = colvals(get_values(a))
 SparseMatricesCSR.getoffset(a::TTSparseMatrix) = getoffset(get_values(a))
+
+function SparseArrays.findnz(a::TTSparseMatrix{D}) where D
+  i,j,v = findnz(get_values(a))
+  return i,j,TTArray(v,Val(D))
+end
 
 LinearAlgebra.cholesky(a::TTSparseMatrix) = cholesky(get_values(a))
 

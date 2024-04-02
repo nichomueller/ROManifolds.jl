@@ -250,12 +250,37 @@ function get_nonzero_indices(s::NnzTTSnapshots)
   return i .+ (j .- 1)*v.m
 end
 
-function recast(s::NnzTTSnapshots,a::AbstractMatrix)
+function recast(s::NnzTTSnapshots,a::AbstractArray{T,3}) where T
+  @check size(a,1) == 1
   v = isa(s,BasicTTSnapshots) ? first(s.values) : first(first(s.values))
   i,j, = findnz(v)
   m,n = size(v)
-  asparse = map(eachcol(a)) do v
+  asparse = map(eachcol(dropdims(a;dims=1))) do v
     sparse(i,j,v,m,n)
   end
-  return VecOfSparseMat2Mat(asparse)
+  return VecOfSparseMat2Arr3(asparse)
+end
+
+struct VecOfSparseMat2Arr3{Tv,Ti,V} <: AbstractArray{Tv,3}
+  values::V
+  function VecOfSparseMat2Arr3(values::V) where {Tv,Ti,V<:AbstractVector{<:AbstractSparseMatrix{Tv,Ti}}}
+    new{Tv,Ti,V}(values)
+  end
+end
+
+FEM.get_values(s::VecOfSparseMat2Arr3) = s.values
+Base.size(s::VecOfSparseMat2Arr3) = (1,nnz(first(s.values)),length(s.values))
+
+function Base.getindex(s::VecOfSparseMat2Arr3,i::Integer,j,k::Integer)
+  @check i == 1
+  nonzeros(s.values[k])[j]
+end
+
+function Base.getindex(s::VecOfSparseMat2Arr3,i::Integer,j,k)
+  @check i == 1
+  view(s,i,j,k)
+end
+
+function get_nonzero_indices(s::VecOfSparseMat2Arr3)
+  get_nonzero_indices(first(s.values))
 end

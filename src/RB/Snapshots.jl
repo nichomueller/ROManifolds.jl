@@ -728,7 +728,7 @@ function recast(s::NnzSnapshots{Mode1Axis},a::AbstractMatrix)
   return VecOfSparseMat2Mat(asparse)
 end
 
-struct VecOfSparseMat2Mat{Tv,Ti,V} <: AbstractSparseMatrix{Tv,Ti}
+struct VecOfSparseMat2Mat{Tv,Ti,V} <: AbstractMatrix{Tv}
   values::V
   function VecOfSparseMat2Mat(values::V) where {Tv,Ti,V<:AbstractVector{<:AbstractSparseMatrix{Tv,Ti}}}
     new{Tv,Ti,V}(values)

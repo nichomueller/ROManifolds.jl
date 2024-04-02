@@ -36,12 +36,12 @@ function compute_bases_time_space(s::AbstractSnapshots,norm_matrix=nothing;kwarg
   PODBasis(basis_space,basis_time)
 end
 
-struct PODBasis{A,B,C} <: Projection
+struct PODBasis{A,B} <: Projection
   basis_space::A
   basis_time::B
 end
 
-get_basis_space(b::PODBasis) = b.basis_space
+get_basis_space(b::PODBasis) = _get_basis_space(b.basis_space)
 get_basis_time(b::PODBasis) = b.basis_time
 num_space_dofs(b::PODBasis) = size(get_basis_space(b),1)
 FEM.num_times(b::PODBasis) = size(get_basis_time(b),1)
@@ -85,7 +85,7 @@ struct TTSVDCores{D,A,B} <: Projection
   basis_spacetime::B
   function TTSVDCores(
     cores::A,
-    basis_spacetime::B=cores2matrix(cores)
+    basis_spacetime::B=cores2matrix(cores...)
     ) where {A,B}
 
     D = length(cores)
@@ -93,7 +93,7 @@ struct TTSVDCores{D,A,B} <: Projection
   end
 end
 
-get_basis_space(b::TTSVDCores) = cores2matrix(b.cores[1:end-1])
+get_basis_space(b::TTSVDCores) = cores2matrix(b.cores[1:end-1]...)
 get_basis_time(b::TTSVDCores) = cores2matrix(b.cores[end])
 get_basis_spacetime(b::TTSVDCores) = b.basis_spacetime
 num_space_dofs(b::TTSVDCores) = prod(size.(b.cores[1:end-1],2))
@@ -117,12 +117,8 @@ function cores2matrix(a::AbstractArray{T,3},b::AbstractArray{T,3}) where T
   return c
 end
 
-function cores2matrix(a::AbstractArray{T,3},b::AbstractArray{T,3}...) where T
-  cores2matrix(cores2matrix(a,b[1]),b[2:end]...)
-end
-
-function cores2matrix(cores::Vector{<:AbstractArray{T,3}}) where T
-  cores2matrix(cores[1],cores[2:end]...)
+function cores2matrix(a::AbstractArray{T,3}...) where T
+  @notimplemented
 end
 
 function cores2matrix(core::AbstractArray{T,3}) where T
@@ -130,9 +126,11 @@ function cores2matrix(core::AbstractArray{T,3}) where T
   return reshape(pcore,size(pcore,1),:)
 end
 
-function recast_basis(s::NnzTTSnapshots,b::TTSVDCores)
-  basis_spacetime = recast(s,get_basis_spacetime(b))
-  TTSVDCores(b.cores,basis_spacetime)
+function recast_basis(s::NnzTTSnapshots,b::TTSVDCores{D}) where D
+  @assert D == 2 "Spatial splitting deactivated for residuals/jacobians"
+  _space_core,time_core = b.cores
+  space_core = recast(s,_space_core)
+  TTSVDCores([space_core,time_core],b.basis_spacetime)
 end
 
 function recast(x::TTVector,b::TTSVDCores)
