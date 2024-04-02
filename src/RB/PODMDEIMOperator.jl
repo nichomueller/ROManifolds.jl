@@ -76,7 +76,7 @@ function Algebra.residual!(
   kwargs...)
 
   fe_sb = fe_residual!(b,op,r,us,odeopcache)
-  b̂ = mdeim_residual(op.rhs,fe_sb)
+  b̂ = mdeim_result(op.rhs,fe_sb)
   return b̂
 end
 
@@ -89,7 +89,7 @@ function Algebra.jacobian!(
   odeopcache)
 
   fe_sA = fe_jacobian!(A,op,r,us,ws,odeopcache)
-  Â = mdeim_jacobian(op.lhs,fe_sA)
+  Â = mdeim_result(op.lhs,fe_sA)
   return Â
 end
 
@@ -285,7 +285,7 @@ function Algebra.residual!(
 
   b̂_lin,b_nlin = b
   fe_sb_nlin = fe_residual!(b_nlin,op.op_nonlinear,r,us,odeopcache)
-  b̂_nlin = mdeim_residual(op.op_nonlinear.rhs,fe_sb_nlin)
+  b̂_nlin = mdeim_result(op.op_nonlinear.rhs,fe_sb_nlin)
   @. b̂_nlin = b̂_nlin + b̂_lin
   return b̂_nlin
 end
@@ -300,7 +300,7 @@ function Algebra.jacobian!(
 
   Â_lin,A_nlin = A
   fe_sA_nlin = fe_jacobian!(A_nlin,op.op_nonlinear,r,us,ws,odeopcache)
-  Â_nlin = mdeim_jacobian(op.op_nonlinear.lhs,fe_sA_nlin)
+  Â_nlin = mdeim_result(op.op_nonlinear.lhs,fe_sA_nlin)
   @. Â_nlin = Â_nlin + Â_lin
   return Â_nlin
 end

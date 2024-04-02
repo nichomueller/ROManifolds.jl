@@ -304,7 +304,7 @@ function coefficient!(
   ldiv!(coefficient,mdeim_interpolation,vec(b))
 end
 
-function mdeim_residual(a::AffineDecomposition,b::ParamArray)
+function mdeim_result(a::AffineDecomposition,b::ParamArray)
   coefficient!(a,b)
 
   basis = a.basis
@@ -320,40 +320,16 @@ function mdeim_residual(a::AffineDecomposition,b::ParamArray)
   return result
 end
 
-function mdeim_jacobian(a::AffineDecomposition,b::ParamArray)
-  coefficient!(a,b)
-
-  basis = a.basis
-  coefficient = a.coefficient
-  result = a.result
-
-  fill!(result,zero(eltype(result)))
-
-  @inbounds for i = eachindex(result)
-    result[i] = basis*coefficient[i]
-  end
-
-  return result
-end
-
-function mdeim_residual(a::AffineContribution,b::ArrayContribution)
-  @assert length(a) == length(b)
-  ress = map(a.values,b.values) do a,b
-    mdeim_residual(a,b)
-  end
-  sum(ress)
-end
-
-function mdeim_jacobian(a::AffineContribution,b::ArrayContribution)
+function mdeim_result(a::AffineContribution,b::ArrayContribution)
   @assert length(a) == length(b)
   jacs = map(a.values,b.values) do a,b
-    mdeim_jacobian(a,b)
+    mdeim_result(a,b)
   end
   sum(jacs)
 end
 
-function mdeim_jacobian(a::Tuple,b::Tuple)
-  sum(map(mdeim_jacobian,a,b))
+function mdeim_result(a::Tuple,b::Tuple)
+  sum(map(mdeim_result,a,b))
 end
 
 # multi field interface

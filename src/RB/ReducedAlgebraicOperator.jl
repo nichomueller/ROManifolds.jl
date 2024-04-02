@@ -16,8 +16,8 @@ end
 
 function reduce_operator(
   mdeim_style::SpaceOnlyMDEIM,
-  b::Projection,
-  b_test::Projection;
+  b::PODBasis,
+  b_test::PODBasis;
   kwargs...)
 
   bs = get_basis_space(b)
@@ -38,9 +38,9 @@ end
 
 function reduce_operator(
   mdeim_style::SpaceOnlyMDEIM,
-  b::Projection,
-  b_trial::Projection,
-  b_test::Projection;
+  b::PODBasis,
+  b_trial::PODBasis,
+  b_test::PODBasis;
   kwargs...)
 
   bs = get_basis_space(b)
@@ -64,8 +64,8 @@ end
 
 function reduce_operator(
   mdeim_style::SpaceTimeMDEIM,
-  b::Projection,
-  b_test::Projection;
+  b::PODBasis,
+  b_test::PODBasis;
   kwargs...)
 
   bs = get_basis_space(b)
@@ -85,9 +85,9 @@ end
 
 function reduce_operator(
   mdeim_style::SpaceTimeMDEIM,
-  b::Projection,
-  b_trial::Projection,
-  b_test::Projection;
+  b::PODBasis,
+  b_trial::PODBasis,
+  b_test::PODBasis;
   kwargs...)
 
   bs = get_basis_space(b)
@@ -108,6 +108,81 @@ function reduce_operator(
       ist = (it-1)*num_reduced_space_dofs(b)+is
       b̂ti = b̂t[it]
       b̂st[ist] = kronecker(b̂ti,b̂si)
+    end
+  end
+
+  return ReducedMatrixOperator(mdeim_style,b̂st)
+end
+
+# TT interface
+
+function reduce_operator(
+  mdeim_style::SpaceTimeMDEIM,
+  b::TTSVDCores,
+  b_test::TTSVDCores;
+  kwargs...)
+
+  bs = get_basis_space(b)
+  bt = get_basis_time(b)
+  bs_test = get_basis_space(b_test)
+  bt_test = get_basis_time(b_test)
+
+  ns = num_reduced_space_dofs(b)
+  ns_test = num_reduced_space_dofs(b_test)
+
+  T = eltype(first(bs))
+  V = Vector{T}
+  b̂st = Vector{V}(undef,num_reduced_dofs(b))
+
+  b̂s = bs_test'*bs
+  cache_t = zeros(T,num_reduced_dofs(b_test))
+
+  @inbounds for i = 1:num_reduced_dofs(b)
+    bti = view(bt,:,(i-1)*ns+1:i*ns)
+    for i_test = 1:num_reduced_dofs(b_test)
+      ids_i = (i_test-1)*ns_test+1:i_test*ns_test
+      bt_test_i = view(bt_test,:,ids_i)
+      b̂ti = bti'*bt_test_i
+      cache_t[i_test] = sum(b̂s .* b̂ti)
+    end
+    b̂st[i] = cache_st
+  end
+
+  return ReducedVectorOperator(mdeim_style,b̂st)
+end
+
+function reduce_operator(
+  mdeim_style::SpaceTimeMDEIM,
+  b::TTSVDCores,
+  b_trial::TTSVDCores,
+  b_test::TTSVDCores;
+  kwargs...)
+
+  bs = get_basis_space(b)
+  bt = get_basis_time(b)
+  bs_trial = get_basis_space(b_trial)
+  bt_trial = get_basis_time(b_trial)
+  bs_test = get_basis_space(b_test)
+  bt_test = get_basis_time(b_test)
+
+  M = Matrix{eltype(bs)}
+  b̂st = Vector{M}(undef,num_reduced_dofs(b))
+
+  cache_t = zeros(T,num_reduced_dofs(b_test),num_reduced_dofs(b_trial))
+
+  @inbounds for is = 1:num_reduced_space_dofs(b)
+    b̂si = bs_test'*get_values(bs)[is]*bs_trial
+    for i = 1:num_reduced_dofs(b)
+      bti = view(bt,:,is)
+      for i_test = 1:num_reduced_dofs(b_test), i_trial = 1:num_reduced_dofs(b_trial)
+        ids_i_test = (i_test-1)*ns_test+1:i_test*ns_test
+        ids_i_trial = (i_trial-1)*ns_trial+1:i_trial*ns_trial
+        bti_test = view(bt_test,:,ids_i_test)
+        bti_trial = view(bt_trial,:,ids_i_trial)
+        b̂ti = combine_basis_time(bti,bti_trial,bti_test;kwargs...)
+        cache_t[i_test,i_trial] = sum(b̂si .* b̂ti)
+      end
+      b̂st[i] += cache_st
     end
   end
 

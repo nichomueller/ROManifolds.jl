@@ -39,12 +39,6 @@ end
 struct PODBasis{A,B,C} <: Projection
   basis_space::A
   basis_time::B
-  metadata::C
-end
-
-function PODBasis(basis_space,basis_time)
-  metadata = nothing
-  PODBasis(basis_space,basis_time,metadata)
 end
 
 get_basis_space(b::PODBasis) = b.basis_space
@@ -111,7 +105,7 @@ num_reduced_times(b::TTSVDCores) = size(b.cores[end],3)
 num_fe_dofs(b::TTSVDCores) = num_space_dofs(b)*num_times(b)
 num_reduced_dofs(b::TTSVDCores) = num_reduced_times(b)
 
-function _cores2matrix(a::AbstractArray{T,3},b::AbstractArray{T,3}) where T
+function cores2matrix(a::AbstractArray{T,3},b::AbstractArray{T,3}) where T
   nrows = size(a,2)*size(b,2)
   ncols = size(b,3)
   c = zeros(T,nrows,ncols)
@@ -123,12 +117,12 @@ function _cores2matrix(a::AbstractArray{T,3},b::AbstractArray{T,3}) where T
   return c
 end
 
-function _cores2matrix(a::AbstractArray{T,3},b::AbstractArray{T,3}...) where T
-  _cores2matrix(_cores2matrix(a,b[1]),b[2:end]...)
+function cores2matrix(a::AbstractArray{T,3},b::AbstractArray{T,3}...) where T
+  cores2matrix(cores2matrix(a,b[1]),b[2:end]...)
 end
 
 function cores2matrix(cores::Vector{<:AbstractArray{T,3}}) where T
-  _cores2matrix(cores[1],cores[2:end]...)
+  cores2matrix(cores[1],cores[2:end]...)
 end
 
 function cores2matrix(core::AbstractArray{T,3}) where T

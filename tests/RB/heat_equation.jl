@@ -62,7 +62,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
 # we can load & solve directly, if the offline structures have been previously saved to file
@@ -82,7 +82,7 @@ save(test_dir,results)
 pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
 
 ϵ = 1e-4
-rbsolver_space = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
+rbsolver_space = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir_space = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
 # we can load & solve directly, if the offline structures have been previously saved to file
@@ -96,73 +96,40 @@ println(RB.space_time_error(results_space))
 save(test_dir,rbop_space)
 save(test_dir,results_space)
 
-# #################
-# using Gridap.FESpaces
-# red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-# odeop = get_algebraic_operator(feop)
-# pop = PODOperator(odeop,red_trial,red_test)
-# smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
-# jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
+# using Kronecker
 
-# # jacobian
-# sjac = jjac[1][1]
-# mdeim_style = rbsolver.mdeim_style
-# basis = reduced_basis(sjac;ϵ=RB.get_tol(rbsolver))
-# lu_interp,integration_domain = mdeim(mdeim_style,basis)
-# # proj_basis = reduce_operator(mdeim_style,basis,get_trial(pop),get_test(pop))
+# Ns = 10
+# Nt = 9
+# ns = 5
+# nt = 3
+# Qs = 4
+# Qt = 2
 
-# bs = get_basis_space(basis)
-# bt = get_basis_time(basis)
-# b_trial = RB.get_basis(get_trial(pop))
-# b_test = RB.get_basis(get_test(pop))
-# bs_trial = get_basis_space(b_trial)
-# bt_trial = get_basis_time(b_trial)
-# bs_test = get_basis_space(b_test)
-# bt_test = get_basis_time(b_test)
+# ϕ_s = rand(Ns,ns)
+# ϕ_t = rand(ns,Nt,nt)
+# f_s = rand(Ns,Qs)
+# f_t = rand(Qs,Nt,Qt)
 
-# M = Matrix{eltype(bs)}
-# b̂st = Vector{M}(undef,num_reduced_dofs(basis))
-# combine = (x,y) -> θ*x+(1-θ)*y
+# i = rand(1:nt)
+# q = rand(1:Qt)
 
-# b̂t = combine_basis_time(bt,bt_trial,bt_test;combine)
+# res1 = sum([kronecker(ϕ_s[:,α],ϕ_t[α,:,i]) for α = 1:ns])
+# res2 = sum([kronecker(f_s[:,α],f_t[α,:,q]) for α = 1:Qs])
+# res_ok = res1'*res2
 
-# @inbounds for is = 1:num_reduced_space_dofs(basis)
-#   b̂si = bs_test'*get_values(bs)[is]*bs_trial
-#   for it = 1:num_reduced_times(basis)
-#     ist = (it-1)*num_reduced_space_dofs(basis)+is
-#     b̂ti = b̂t[it]
-#     b̂st[ist] = kronecker(b̂ti,b̂si)
-#   end
+# _ϕ_t = reshape(permutedims(ϕ_t,(2,1,3)),Nt,:)
+# _f_t = reshape(permutedims(f_t,(2,1,3)),Nt,:)
+
+# ϕfs = ϕ_s'*f_s
+# ϕft = _ϕ_t[:,(i-1)*ns+1:i*ns]'*_f_t[:,(q-1)*Qs+1:q*Qs]
+# res_nok = sum(ϕfs .* ϕft)
+
+# res_ok[1] ≈ res_nok
+
+# # kronecker
+
+# res_ok = zeros(nt)
+# for i = 1:nt
+#   res1 = sum([kronecker(ϕ_s[:,α],ϕ_t[α,:,i]) for α = 1:ns])
+#   res_ok[i] = res1'*res2
 # end
-
-# online stuff
-using Gridap.FESpaces
-using Gridap.Algebra
-using Gridap.ODEs
-son = select_snapshots(fesnaps,RB.online_params(rbsolver))
-ron = get_realization(son)
-fesolver = RB.get_fe_solver(rbsolver)
-fe_trial = get_fe_trial(pop)(ron)
-x̂ = zero_free_values(red_trial)
-y = zero_free_values(fe_trial)
-odecache = allocate_odecache(fesolver,pop,ron,(y,))
-_,odeopcache = odecache
-FEM.shift!(ron,dt*(θ-1))
-
-dtθ = dt*θ
-ws = (1,1/dtθ)
-Acache = allocate_jacobian(pop,ron,(y,y),odeopcache)
-fe_sA = fe_jacobian!(Acache,rbop,ron,(y,y),ws,odeopcache)
-# Â = RB.mdeim_jacobian(rbop.lhs,fe_sA)
-
-ad = rbop.lhs[1][1]
-RB.coefficient!(ad,fe_sA[1][1])
-basis = ad.basis
-coefficient = ad.coefficient
-result = ad.result
-fill!(result,zero(eltype(result)))
-
-i = 1
-# basis*coefficient[i]
-contrib1 = basis.basis[1]*coefficient[i][1]
-contrib2 = basis.basis[3]*coefficient[i][2]

@@ -254,43 +254,8 @@ function recast(s::NnzTTSnapshots,a::AbstractMatrix)
   v = isa(s,BasicTTSnapshots) ? first(s.values) : first(first(s.values))
   i,j, = findnz(v)
   m,n = size(v)
-  nz = nnz(v)
   asparse = map(eachcol(a)) do v
-    blocks = map(1:num_times(s)) do it
-      sparse(i,j,v[(it-1)*nz+1:it*nz],m,n)
-    end
-    BDiagonal(blocks)
+    sparse(i,j,v,m,n)
   end
-  return VecOfBDiagonalSparseMat2Mat(asparse)
-end
-
-struct VecOfBDiagonalSparseMat2Mat{Tv,Ti,V} <: AbstractSparseMatrix{Tv,Ti}
-  values::V
-  function VecOfBDiagonalSparseMat2Mat(values::V
-    ) where {Tv,Ti,V<:AbstractVector{<:BDiagonal{Tv,<:AbstractSparseMatrix{Tv,Ti}}}}
-
-    new{Tv,Ti,V}(values)
-  end
-end
-
-FEM.get_values(s::VecOfBDiagonalSparseMat2Mat) = s.values
-
-num_space_dofs(s::VecOfBDiagonalSparseMat2Mat) = nnz(first(first(s.values).values))
-FEM.num_times(s::VecOfBDiagonalSparseMat2Mat) = length(first(s.values).values)
-Base.size(s::VecOfBDiagonalSparseMat2Mat) = (num_space_dofs(s)*num_times(s),length(s.values))
-
-function Base.getindex(s::VecOfBDiagonalSparseMat2Mat,i::Integer,j::Integer)
-  itime = slow_index(i,num_space_dofs(s))
-  ispace = fast_index(i,num_space_dofs(s))
-  nonzeros(s.values[j].values[itime])[ispace]
-end
-
-function Base.getindex(s::VecOfBDiagonalSparseMat2Mat,i,j)
-  view(s,i,j)
-end
-
-function get_nonzero_indices(s::VecOfBDiagonalSparseMat2Mat)
-  v = first(first(s.values).values)
-  i,j, = findnz(v)
-  return i .+ (j .- 1)*v.m
+  return VecOfSparseMat2Mat(asparse)
 end
