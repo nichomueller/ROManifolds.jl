@@ -1,3 +1,45 @@
+function get_dof_permutation(
+  model::CartesianDiscreteModel{Dc},
+  space::UnconstrainedFESpace,
+  order::Integer) where Dc
+
+  function get_terms(p::Polytope,orders)
+    _nodes, = Gridap.ReferenceFEs._compute_nodes(p,orders)
+    terms = Gridap.ReferenceFEs._coords_to_terms(_nodes,orders)
+    return terms
+  end
+
+  desc = get_cartesian_descriptor(model)
+
+  periodic = desc.isperiodic
+  ncells = desc.partition
+  ndofs = order .* ncells .+ 1 .- periodic
+
+  new_dof_ids = LinearIndices(ndofs)
+  n2o_dof_map = fill(-1,num_free_dofs(space))
+
+  terms = get_terms(first(get_polytopes(model)),fill(order,Dc))
+  cell_dof_ids = get_cell_dof_ids(space)
+  cache_cell_dof_ids = array_cache(cell_dof_ids)
+  for (iC,cell) in enumerate(CartesianIndices(ncells))
+    first_new_dof  = order .* (Tuple(cell) .- 1) .+ 1
+    new_dofs_range = map(i -> i:i+order,first_new_dof)
+    new_dofs = view(new_dof_ids,new_dofs_range...)
+
+    cell_dofs = getindex!(cache_cell_dof_ids,cell_dof_ids,iC)
+    for (iDof,dof) in enumerate(cell_dofs)
+      t = terms[iDof]
+      n2o_dof_map[new_dofs[t]] = dof
+    end
+  end
+
+  return n2o_dof_map
+end
+
+function get_dof_permutation(model::CartesianDiscreteModel,space::FESpace)
+  get_dof_permutation(model,space,get_polynomial_order(space))
+end
+
 struct TTIndexMap{D}
   # decide what to put here
 end
