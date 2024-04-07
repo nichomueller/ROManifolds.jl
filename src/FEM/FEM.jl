@@ -183,17 +183,4 @@ include("TransientParamFESolution.jl")
 
 export get_parent
 include("TriangulationParents.jl")
-
-export TTArray
-export TTVector
-export TTMatrix
-export TTSparseMatrix
-export ParamTTArray
-export ParamTTVector
-export ParamTTMatrix
-export ParamTTSparseMatrix
-export ParamTTSparseMatrixCSC
-include("TTArray.jl")
-
-include("TTAlgebra.jl")
 end # module

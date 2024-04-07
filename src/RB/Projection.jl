@@ -56,7 +56,7 @@ function recast_basis(s::NnzSnapshots,b::PODBasis)
   PODBasis(basis_space,basis_time)
 end
 
-function recast(x::Vector,b::PODBasis)
+function recast(x::AbstractVector,b::PODBasis)
   basis_space = get_basis_space(b)
   basis_time = get_basis_time(b)
   ns = num_reduced_space_dofs(b)
@@ -133,7 +133,7 @@ function recast_basis(s::NnzTTSnapshots,b::TTSVDCores{D}) where D
   TTSVDCores([space_core,time_core],b.basis_spacetime)
 end
 
-function recast(x::TTVector,b::TTSVDCores)
+function recast(x::AbstractVector,b::TTSVDCores)
   basis_spacetime = b.basis_spacetime
   Ns = num_space_dofs(b)
   Nt = num_times(b)

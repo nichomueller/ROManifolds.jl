@@ -53,6 +53,7 @@ function fe_solutions(
   solver::RBSolver,
   op::TransientParamFEOperator,
   uh0::Function;
+  tt_format=false,
   kwargs...)
 
   fesolver = get_fe_solver(solver)
@@ -64,7 +65,14 @@ function fe_solutions(
   stats = @timed begin
     values = collect(sol)
   end
-  snaps = Snapshots(values,realization)
+
+  if tt_format
+    perm = get_dof_permutation(op)
+    snaps = Snapshots(values,realization,perm)
+  else
+    snaps = Snapshots(values,realization)
+  end
+
   cs = ComputationalStats(stats,nparams)
   return snaps,cs
 end
@@ -73,6 +81,7 @@ function ode_solutions(
   solver::RBSolver,
   op::TransientParamFEOperator,
   uh0::Function;
+  tt_format=false,
   kwargs...)
 
   fesolver = get_fe_solver(solver)
@@ -84,7 +93,14 @@ function ode_solutions(
   stats = @timed begin
     values = collect(odesol)
   end
-  snaps = Snapshots(values,realization)
+
+  if tt_format
+    perm = get_dof_permutation(op)
+    snaps = Snapshots(values,realization,perm)
+  else
+    snaps = Snapshots(values,realization)
+  end
+
   cs = ComputationalStats(stats,nparams)
   return snaps,cs
 end

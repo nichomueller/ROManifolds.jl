@@ -4,6 +4,7 @@ authors = ["nichomueller <nicholas.mueller@monash.edu>"]
 version = "0.1.0"
 
 [deps]
+Arpack = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
 ArrayLayouts = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"

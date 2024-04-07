@@ -64,7 +64,7 @@ trian_jac = (Ω,)
 trian_jac_t = (Ω,)
 
 reffe = ReferenceFE(lagrangian,Float64,order)
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"],vector_type=TTVector{1,Float64})
+test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
 feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
   trial,test,trian_res,trian_stiffness,trian_mass)
@@ -75,7 +75,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=5,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1")))
 
-fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
+fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ;tt_format=true)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,feop,fesnaps,rbsnaps,festats,rbstats)
@@ -86,3 +86,34 @@ println(RB.speedup(results))
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)
+
+using Gridap.Algebra
+using Gridap.Arrays
+using Gridap.CellData
+using Gridap.FESpaces
+using Gridap.Fields
+using Gridap.Geometry
+using Gridap.MultiField
+using Gridap.ODEs
+using Gridap.Polynomials
+using Gridap.ReferenceFEs
+
+domain = (0,1,0,1)
+partition = (2,2)
+model = CartesianDiscreteModel(domain,partition)
+labels = get_face_labeling(model)
+add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
+add_tag_from_tags!(labels,"neumann",[7])
+
+order = 2
+reffe = ReferenceFE(lagrangian,Float64,order)
+test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+
+perm1 = RB.get_dof_permutation(model,test,order)
+X = assemble_norm_matrix(feop)
+Xx = X[1:10,1:10]
+Xy = diagm(0 => ones(9), -1 => -1/10*ones(8), 1 => -1/10*ones(8))
+Y = kronecker(Xy,Xx)
+
+lly,vvy = eigs(Y)
+llx,vvx = eigs(X)

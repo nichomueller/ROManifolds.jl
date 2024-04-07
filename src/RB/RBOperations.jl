@@ -23,10 +23,6 @@ function get_nonzero_indices(A::AbstractSparseMatrix)
   return i .+ (j .- 1)*A.m
 end
 
-function get_nonzero_indices(A::TTMatrix)
-  return get_nonzero_indices(A.values)
-end
-
 function get_nonzero_indices(A::AbstractArray{T,3} where T)
   return axes(A,2)
 end
