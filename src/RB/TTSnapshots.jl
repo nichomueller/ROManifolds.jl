@@ -171,8 +171,6 @@ function BasicSnapshots(s::BasicTTSnapshots)
   s
 end
 
-# num_space_dofs_1D(s::BasicTTSnapshots{T,N}) where {T,N} = length(first(s.values))
-
 function tensor_getindex(s::BasicTTSnapshots,ispace,itime,iparam)
   perm_ispace = s.permutation[ispace]
   s.values[iparam+(itime-1)*num_params(s)][perm_ispace]
@@ -207,8 +205,6 @@ function TransientSnapshots(
   ) where P<:ParamArray
   TransientTTSnapshots(values,realization,perm)
 end
-
-# num_space_dofs_1D(s::TransientTTSnapshots) = length(first(first(s.values)))
 
 function tensor_getindex(s::TransientTTSnapshots,ispace,itime,iparam)
   perm_ispace = s.permutation[ispace]
@@ -369,8 +365,6 @@ const NnzTTSnapshots = Union{
   TransientNnzTTSnapshots{T,N},
   SelectedNnzTTSnapshotsAtIndices{T,N}} where {T,N}
 
-# num_space_dofs_1D(s::BasicNnzTTSnapshots) = nnz(first(s.values))
-
 function tensor_getindex(s::BasicNnzTTSnapshots,ispace,itime,iparam)
   perm_ispace = s.permutation[ispace]
   nonzeros(s.values[iparam+(itime-1)*num_params(s)])[perm_ispace]
@@ -380,8 +374,6 @@ function tensor_setindex!(s::BasicNnzTTSnapshots,v,ispace,itime,iparam)
   perm_ispace = s.permutation[ispace]
   nonzeros(s.values[iparam+(itime-1)*num_params(s)])[perm_ispace] = v
 end
-
-# num_space_dofs_1D(s::TransientNnzTTSnapshots) = nnz(first(first(s.values)))
 
 function tensor_getindex(s::TransientNnzTTSnapshots,ispace,itime,iparam)
   nonzeros(s.values[itime][iparam])[ispace]

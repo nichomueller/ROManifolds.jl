@@ -50,7 +50,7 @@ struct OperationParamField{O,F} <: ParamField
   fields::F
 end
 
-function _find_length(op,fields)
+function param_length(op,fields)
   pfields = filter(x->isa(x,ParamField),fields)
   if isempty(pfields)
     @check isa(op,ParamField)
@@ -68,7 +68,7 @@ end
 
 function Fields.OperationField(op,fields::Tuple{Vararg{Field}})
   if any(isa.(fields,ParamField)) || isa(op,ParamField)
-    L = _find_length(op,fields)
+    L = param_length(op,fields)
     OperationParamField(FieldToParamField(op,L),FieldToParamField.(fields,L))
   else
     OperationField{typeof(op),typeof(fields)}(op,fields)

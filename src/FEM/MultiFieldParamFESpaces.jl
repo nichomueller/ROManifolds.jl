@@ -50,7 +50,7 @@ function _MultiFieldParamFESpace(
   MultiFieldParamFESpace(VT,spaces,style)
 end
 
-function _find_length(spaces)
+function param_length(spaces)
   pspaces = filter(x->isa(x,SingleFieldParamFESpace),spaces)
   L = length_free_values.(pspaces)
   @check all(L .== first(L))
@@ -62,7 +62,7 @@ function MultiFieldParamFESpace(
   style = ConsecutiveMultiFieldStyle())
 
   if any(isa.(spaces,SingleFieldParamFESpace))
-    L = _find_length(spaces)
+    L = param_length(spaces)
     MultiFieldParamFESpace(FESpaceToParamFESpace.(spaces,L),style=style)
   elseif any(isa.(spaces,TransientTrialParamFESpace))
     _MultiFieldParamFESpace(spaces,style=style)
@@ -181,7 +181,7 @@ function MultiField._restrict_to_field(
   offsets = compute_field_offsets(f,mfs)
   pini = offsets[field] + 1
   pend = offsets[field] + num_free_dofs(U[field])
-  return SubVector(block_free_values,pini,pend)
+  return view(block_free_values,pini:pend)
 end
 
 function MultiField.compute_field_offsets(f::MultiFieldParamFESpace)

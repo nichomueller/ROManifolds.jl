@@ -52,6 +52,10 @@ function Base.show(io::IO,::MIME"text/plain",a::ParamArray{T,N,A,L}) where {T,N,
   show(io,a.array)
 end
 
+function Base.view(a::ParamArray,i...)
+  ParamArray(map(x->view(x,i...),get_array(a)))
+end
+
 function Base.copy(a::ParamArray)
   ai = testitem(a)
   b = Vector{typeof(ai)}(undef,length(a))
@@ -256,7 +260,18 @@ function LinearAlgebra.axpy!(α::Number,a::ParamArray,b::ParamArray)
   b
 end
 
-function LinearAlgebra.ldiv!(a::ParamArray,m::LU,b::ParamArray)
+for factorization in (:LU,:Cholesky)
+  @eval begin
+    function LinearAlgebra.ldiv!(m::$factorization,b::ParamArray)
+      for i in eachindex(b)
+        ldiv!(m,b[i])
+      end
+      return b
+    end
+  end
+end
+
+function LinearAlgebra.ldiv!(a::ParamArray,m::Factorization,b::ParamArray)
   for i in eachindex(a)
     ldiv!(a[i],m,b[i])
   end
@@ -321,13 +336,6 @@ function Arrays.setsize!(
     setsize!(ai,s)
   end
   return a
-end
-
-function Arrays.SubVector(a::ParamArray,pini::Int,pend::Int)
-  svector = map(a) do vector
-    SubVector(vector,pini,pend)
-  end
-  ParamArray(svector)
 end
 
 struct ParamBroadcast{D} <: AbstractParamBroadcast

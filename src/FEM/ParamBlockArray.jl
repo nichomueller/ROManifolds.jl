@@ -156,7 +156,18 @@ function LinearAlgebra.mul!(
   c
 end
 
-function LinearAlgebra.ldiv!(a::ParamBlockArray,m::LU,b::ParamBlockArray)
+for factorization in (:LU,:Cholesky)
+  @eval begin
+    function LinearAlgebra.ldiv!(m::$factorization,b::ParamBlockArray)
+      for i in eachindex(b)
+        ldiv!(m,b[i])
+      end
+      return b
+    end
+  end
+end
+
+function LinearAlgebra.ldiv!(a::ParamBlockArray,m::Factorization,b::ParamBlockArray)
   @assert length(a) == length(b)
   @inbounds for i = eachindex(a)
     ldiv!(a[i],m,b[i])

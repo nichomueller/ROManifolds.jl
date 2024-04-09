@@ -59,7 +59,7 @@ function _getindex(f::GenericCellField,index)
   GenericCellField(di,trian,DS)
 end
 
-function _length(f::SingleFieldParamFEFunction)
+function param_length(f::SingleFieldParamFEFunction)
   @assert length_dirichlet_values(f.fe_space) == length(f.dirichlet_values)
   length(f.dirichlet_values)
 end
@@ -140,7 +140,7 @@ function FESpaces.test_fe_function(f::MultiFieldParamFEFunction)
   map(test_fe_function,f.single_fe_functions)
 end
 
-_length(f::MultiFieldParamFEFunction) = _length(first(f.single_fe_functions))
+param_length(f::MultiFieldParamFEFunction) = param_length(first(f.single_fe_functions))
 
 function _getindex(f::MultiFieldParamFEFunction,index)
   style = f.fe_space.multi_field_style
