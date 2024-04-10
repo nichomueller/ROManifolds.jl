@@ -3,36 +3,37 @@ function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamCon
   allocate_param_array(vector,length(V))
 end
 
-function Algebra.allocate_in_range(matrix::ParamMatrix{T,A,L}) where {T,A,L}
-  V = ParamVector{T,Vector{eltype(A)},L}
+function Algebra.allocate_in_range(matrix::ParamMatrix{T,L,A}) where {T,L,A}
+  V = ParamVector{T,L,Vector{Vector{T}}}
   allocate_in_range(V,matrix)
 end
 
-function Algebra.allocate_in_domain(matrix::ParamMatrix{T,A,L}) where {T,A,L}
-  V = ParamVector{T,Vector{eltype(A)},L}
+function Algebra.allocate_in_domain(matrix::ParamMatrix{T,L,A}) where {T,L,A}
+  V = ParamVector{T,L,Vector{Vector{T}}}
   allocate_in_domain(V,matrix)
 end
 
 function Algebra.allocate_vector(
-  ::Type{<:ParamBlockVector{T,V}},
-  indices::BlockedUnitRange) where {T,V}
+  ::Type{<:ParamBlockVector{T,L,BlockVector{T,VV}}},
+  indices::BlockedUnitRange) where {T,L,VV}
 
+  V = eltype(VV)
   mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
 end
 
-function Algebra.allocate_in_range(matrix::ParamBlockMatrix{T,A,L}) where {T,A,L}
-  BV = BlockVector{T,Vector{ParamVector{T,Vector{eltype(A)},L}}}
-  V = ParamBlockVector{T,Vector{eltype(A)},L,BV}
+function Algebra.allocate_in_range(matrix::ParamBlockMatrix{T,L,A,B}) where {T,L,A,B}
+  BV = BlockVector{T,Vector{ParamVector{T,L,Vector{Vector{T}}}}}
+  V = ParamBlockVector{T,L,BV,B}
   allocate_in_range(V,matrix)
 end
 
-function Algebra.allocate_in_domain(matrix::ParamBlockMatrix{T,A,L}) where {T,A,L}
-  BV = BlockVector{T,Vector{ParamVector{T,Vector{eltype(A)},L}}}
-  V = ParamBlockVector{T,Vector{eltype(A)},L,BV}
+function Algebra.allocate_in_domain(matrix::ParamBlockMatrix{T,L,A,B}) where {T,L,A,B}
+  BV = BlockVector{T,Vector{ParamVector{T,L,Vector{Vector{T}}}}}
+  V = ParamBlockVector{T,L,BV,B}
   allocate_in_domain(V,matrix)
 end
 
-function Algebra.nz_allocation(a::Algebra.ArrayCounter{<:ParamVector{T,A,L}}) where {T,A,L}
+function Algebra.nz_allocation(a::Algebra.ArrayCounter{<:ParamVector{T,L,A}}) where {T,L,A}
   elA = eltype(A)
   v = fill!(similar(elA,map(length,a.axes)),zero(T))
   allocate_param_array(v,L)
@@ -46,7 +47,7 @@ end
   A
 end
 
-function Algebra.is_entry_stored(::Type{<:ParamMatrix{T,A,L}},i,j) where {T,A,L}
+function Algebra.is_entry_stored(::Type{<:ParamMatrix{T,L,A}},i,j) where {T,L,A}
   is_entry_stored(eltype(A),i,j)
 end
 
@@ -81,9 +82,7 @@ end
   nothing
 end
 
-function Algebra.copy_entries!(
-  a::ParamMatrix{Ta,Vector{<:AbstractSparseMatrix}} where Ta,
-  b::ParamMatrix{Tb,Vector{<:AbstractSparseMatrix}} where Tb)
+function Algebra.copy_entries!(a::ParamMatrix,b::ParamMatrix)
   na = nonzeros(a)
   nb = nonzeros(b)
   if na !== nb
@@ -92,7 +91,7 @@ function Algebra.copy_entries!(
 end
 
 function Algebra.allocate_coo_vectors(
-  ::Type{<:ParamMatrix{Tv,<:Vector{<:AbstractSparseMatrix{Tv,Ti}},L}},
+  ::Type{<:ParamMatrix{Tv,L,<:Vector{<:AbstractSparseMatrix{Tv,Ti}}}},
   n::Integer) where {Tv,Ti,L}
   I = zeros(Ti,n)
   J = zeros(Ti,n)
@@ -101,7 +100,7 @@ function Algebra.allocate_coo_vectors(
   I,J,PV
 end
 
-function Algebra.sparse_from_coo(::Type{ParamMatrix{T,A,L}},I,J,V::ParamArray,m,n) where {T,A,L}
+function Algebra.sparse_from_coo(::Type{ParamMatrix{T,L,A}},I,J,V::ParamArray,m,n) where {T,L,A}
   elA = eltype(A)
   psparse = map(1:L) do k
     Algebra.sparse_from_coo(elA,I,J,V[k],m,n)
@@ -109,7 +108,7 @@ function Algebra.sparse_from_coo(::Type{ParamMatrix{T,A,L}},I,J,V::ParamArray,m,
   ParamArray(psparse)
 end
 
-function Algebra.finalize_coo!(::Type{ParamMatrix{T,A,L}},I,J,V::ParamArray,m,n) where {T,A,L}
+function Algebra.finalize_coo!(::Type{ParamMatrix{T,L,A}},I,J,V::ParamArray,m,n) where {T,L,A}
   elA = eltype(A)
   map(1:L) do k
     Algebra.finalize_coo!(elA,I,J,V[k],m,n)
@@ -120,7 +119,7 @@ function Algebra.nz_index(a::ParamMatrix,i0,i1)
   nz_index(first(a),i0,i1)
 end
 
-function Algebra.push_coo!(::Type{ParamMatrix{T,A,L}},I,J,V::ParamArray,i,j,v) where {T,A,L}
+function Algebra.push_coo!(::Type{ParamMatrix{T,L,A}},I,J,V::ParamArray,i,j,v) where {T,L,A}
   elA = eltype(A)
   map(1:L) do k
     Algebra.push_coo!(elA,I,J,V[k],i,j,v)
@@ -145,8 +144,8 @@ Algebra.LoopStyle(::Type{ParamCounter{C,L}}) where {C,L} = LoopStyle(C)
 end
 
 function Algebra.nz_counter(
-  builder::SparseMatrixBuilder{<:ParamMatrix{T,A,L}},
-  axes) where {T,A,L}
+  builder::SparseMatrixBuilder{<:ParamMatrix{T,L,A}},
+  axes) where {T,L,A}
 
   elA = eltype(A)
   elb = SparseMatrixBuilder(elA)

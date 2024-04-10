@@ -45,7 +45,7 @@ X = MultiFieldParamFESpace([U,P],style=multi_field_style)
 @test num_free_dofs(X) == num_free_dofs(U) + num_free_dofs(P)
 @test num_free_dofs(X) == num_free_dofs(Y)
 @test length(X) == 2
-@test typeof(zero_free_values(X)) <: ParamArray{Vector{Float64},1,Vector{Vector{Float64}},3}
+@test typeof(zero_free_values(X)) <: ParamArray{Vector{Float64},1,3,Vector{Vector{Float64}}}
 
 dy = get_fe_basis(Y)
 dv, dq = dy

@@ -88,8 +88,8 @@ FESpaces.get_dirichlet_dof_tag(r::RBSpace) = get_dirichlet_dof_tag(r.space)
 
 function FESpaces.get_vector_type(r::RBSpace)
   change_length(x) = x
-  change_length(::Type{ParamVector{T,A,L}}) where {T,A,L} = ParamVector{T,A,Int(L/num_times(r))}
-  change_length(::Type{<:ParamBlockVector{T,A,L}}) where {T,A,L} = ParamBlockVector{T,A,Int(L/num_times(r))}
+  change_length(::Type{ParamVector{T,L,A}}) where {T,L,A} = ParamVector{T,Int(L/num_times(r)),A}
+  change_length(::Type{<:ParamBlockVector{T,L,A}}) where {T,L,A} = ParamBlockVector{T,Int(L/num_times(r)),A}
   V = get_vector_type(r.space)
   newV = change_length(V)
   return newV

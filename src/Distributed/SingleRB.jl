@@ -72,7 +72,7 @@ end
 
 function FESpaces.get_vector_type(r::DistributedRBSpace)
   change_length(x) = x
-  function change_length(::Type{<:PVector{<:ParamVector{T,A,L},B,C,D}}) where {T,A,L,B,C,D}
+  function change_length(::Type{<:PVector{<:ParamVector{T,L,A},B,C,D}}) where {T,A,L,B,C,D}
     PVector{ParamVector{T,A,Int(L/num_times(r))},B,C,D,T}
   end
   V = get_vector_type(r.space)

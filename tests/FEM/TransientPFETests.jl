@@ -107,7 +107,7 @@ jacobian!(J,op,μt0,xh,1,1.0,cache)
 jacobian!(J,op,μt0,xh,2,10.0,cache)
 
 _U0,_uh = map(1:length(μ)) do i
-  FEM._getindex(U0,i),FEM._getindex(uh,i)
+  FEM.param_getindex(U0,i),FEM.param_getindex(uh,i)
 end |> tuple_of_arrays
 map(μ,_U0,_uh,r,J) do μ,_U0,_uh,r,J
   _res(u,v) = a(u,v) + 10.0*∫(u*v)dΩ - b(v,μ,0.0)

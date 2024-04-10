@@ -18,6 +18,10 @@ using Gridap.Polynomials
 using Gridap.ReferenceFEs
 using Gridap.Visualization
 using Gridap.Helpers
+using GridapSolvers
+using GridapSolvers.LinearSolvers
+using GridapSolvers.BlockSolvers
+using GridapSolvers.MultilevelTools
 
 import Base: inv,abs,abs2,*,+,-,/,adjoint,transpose,real,imag,conj
 import LinearAlgebra: det,tr,cross,dot,fillstored!
@@ -54,6 +58,14 @@ include("ParamSpace.jl")
 
 include("TimeDerivatives.jl")
 
+export ParamField
+export ParamFieldGradient
+export GenericParamField
+export ZeroParamField
+export ConstantParamField
+export OperationParamField
+include("ParamField.jl")
+
 export AbstractParamContainer
 export ParamContainer
 include("ParamContainer.jl")
@@ -80,14 +92,6 @@ include("Contribution.jl")
 export ParamReindex
 export PosNegParamReindex
 include("ParamReindex.jl")
-
-export ParamField
-export ParamFieldGradient
-export GenericParamField
-export ZeroParamField
-export ConstantParamField
-export OperationParamField
-include("ParamField.jl")
 
 include("LagrangianDofBases.jl")
 
@@ -122,6 +126,8 @@ include("ParamAlgebra.jl")
 include("ParamAssemblers.jl")
 
 include("ParamBlockAssemblers.jl")
+
+include("ParamSolvers.jl")
 
 export ODEParamOperatorType
 export NonlinearParamODE

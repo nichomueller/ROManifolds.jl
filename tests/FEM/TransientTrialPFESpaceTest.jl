@@ -40,7 +40,7 @@ dirichlet_values = get_dirichlet_dof_values(U)
 @test length_dirichlet_values(U) == length(μt) == length(gμt(μ,t)) == 9
 
 for i in 1:length_dirichlet_values(U)
-  Ũi = FEM._getindex(U,i)
+  Ũi = FEM.param_getindex(U,i)
   Ui = TrialFESpace(V,g(params[slow_idx(i,3)],t[fast_idx(i,3)]))
   @test dirichlet_values[i] == get_dirichlet_dof_values(Ui)
   @test dirichlet_values[i] == get_dirichlet_dof_values(Ũi)

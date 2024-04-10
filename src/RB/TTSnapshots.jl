@@ -217,8 +217,8 @@ function tensor_setindex!(s::TransientTTSnapshots,v,ispace,itime,iparam)
 end
 
 function BasicSnapshots(
-  s::TransientTTSnapshots{T,<:ParamArray{T,N,A}}
-  ) where {T,N,A}
+  s::TransientTTSnapshots{T,<:ParamArray{T,N,L,A}}
+  ) where {T,N,L,A}
 
   nt = num_times(s)
   np = num_params(s)

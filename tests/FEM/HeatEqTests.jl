@@ -97,7 +97,7 @@ _sol = solve(fesolver,_feop,t0,tf,_u0)
 Base.iterate(_sol)
 
 for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
-  uh1 = FEM._getindex(uh,3)
+  uh1 = FEM.param_getindex(uh,3)
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
@@ -123,7 +123,7 @@ _sol = solve(fesolver,_feop,t0,tf,_u0)
 Base.iterate(_sol)
 
 for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
-  uh1 = FEM._getindex(uh,3)
+  uh1 = FEM.param_getindex(uh,3)
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
@@ -157,7 +157,7 @@ _sol = solve(fesolver,_feop,t0,tf,_u0)
 Base.iterate(_sol)
 
 for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
-  uh1 = FEM._getindex(uh,3)
+  uh1 = FEM.param_getindex(uh,3)
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
@@ -190,7 +190,7 @@ _sol = solve(fesolver,_feop,t0,tf,_u0)
 Base.iterate(_sol)
 
 for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
-  uh1 = FEM._getindex(uh,3)
+  uh1 = FEM.param_getindex(uh,3)
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"

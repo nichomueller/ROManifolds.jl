@@ -1,7 +1,7 @@
 function PartitionedArrays.allocate_gather_impl(
-  snd::AbstractVector{ParamArray{T,A,L}},
+  snd::AbstractVector{ParamArray{T,L,A}},
   destination,
-  ::Type{T}) where {T,A,L}
+  ::Type{T}) where {T,L,A}
 
   l = map(snd) do snd
     length(first(snd))
@@ -52,9 +52,9 @@ function PartitionedArrays.gather_impl!(
 end
 
 function PartitionedArrays.allocate_scatter_impl(
-  snd::AbstractVector{ParamArray{T,A,L}},
+  snd::AbstractVector{ParamArray{T,L,A}},
   source,
-  ::Type{T}) where {T,A,L}
+  ::Type{T}) where {T,L,A}
 
   counts = map(snd) do snd
     map(length,first(snd))
@@ -81,9 +81,9 @@ function PartitionedArrays.scatter_impl!(
 end
 
 function PartitionedArrays.allocate_emit_impl(
-  snd::AbstractVector{ParamArray{T,A,L}},
+  snd::AbstractVector{ParamArray{T,L,A}},
   source,
-  ::Type) where {T,A,L}
+  ::Type) where {T,L,A}
 
   @assert source !== :all "Scatter all not implemented"
   n = map(snd) do snd

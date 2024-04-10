@@ -1,17 +1,17 @@
-struct ParamBlockArray{T,N,A,L,B,BS} <: AbstractParamContainer{T,N}
-  blockarrays::B
-  axes::BS
+struct ParamBlockArray{T,N,L,A,B} <: AbstractParamContainer{T,N}
+  blockarrays::A
+  axes::B
   function ParamBlockArray(
-    blockarrays::AbstractArray{ParamArray{T,N,A,L}},
-    axes::BS
-    ) where {T,N,A,L,BS}
-    B = typeof(blockarrays)
-    new{T,N,A,L,B,BS}(blockarrays,axes)
+    blockarrays::AbstractArray{<:ParamArray{T,N,L}},
+    axes::B
+    ) where {T,N,L,B}
+    A = typeof(blockarrays)
+    new{T,N,L,A,B}(blockarrays,axes)
   end
 end
 
-const ParamBlockVector{T,A,L,B} = ParamBlockArray{T,1,A,L,B}
-const ParamBlockMatrix{T,A,L,B} = ParamBlockArray{T,2,A,L,B}
+const ParamBlockVector = ParamBlockArray{T,1,L,A,B} where {T,L,A,B}
+const ParamBlockMatrix = ParamBlockArray{T,2,L,A,B} where {T,L,A,B}
 
 function BlockArrays.mortar(blocks::AbstractArray{<:AbstractParamContainer})
   block_sizes = BlockArrays.sizes_from_blocks(first.(blocks))
@@ -24,14 +24,14 @@ BlockArrays.blocks(a::ParamBlockArray) = get_array(a)
 BlockArrays.blocksize(a::ParamBlockArray,i...) = size(get_array(a),i...)
 BlockArrays.blocklength(a::ParamBlockArray) = length(get_array(a))
 BlockArrays.eachblock(a::ParamBlockArray) = Base.OneTo(blocklength(a))
-Base.length(a::ParamBlockArray{T,N,A,L}) where {T,N,A,L} = L
+Base.length(a::ParamBlockArray{T,N,L}) where {T,N,L} = L
 Base.size(a::ParamBlockArray) = map(length,axes(a))
 Base.axes(a::ParamBlockArray) = a.axes
 Base.eltype(::ParamBlockArray{T}) where T = T
 Base.eltype(::Type{<:ParamBlockArray{T}}) where T = T
 Base.ndims(::ParamBlockArray{T,N} where T) where N = N
 Base.ndims(::Type{<:ParamBlockArray{T,N}} where T) where N = N
-Base.eachindex(::ParamBlockArray{T,N,A,L}) where {T,N,A,L} = Base.OneTo(L)
+Base.eachindex(::ParamBlockArray{T,N,L}) where {T,N,L} = Base.OneTo(L)
 
 Arrays.testitem(a::ParamBlockArray) = first(a)
 Base.first(a::ParamBlockArray) = getindex(a,1)
@@ -49,11 +49,12 @@ function Base.setindex!(a::ParamBlockArray,v::ParamArray,i::Block)
   a.blockarrays[i.n...] = v
 end
 
-function Base.show(io::IO,::MIME"text/plain",a::ParamBlockArray{T,N,A,L}) where {T,N,A,L}
+function Base.show(io::IO,::MIME"text/plain",a::ParamBlockArray{T,N,L,A}) where {T,N,L,A}
+  elt = eltype(eltype(A))
   s = size(blocks(a))
   _nice_size(s::Tuple{Int}) = "$(s[1]) - "
   _nice_size(s::Tuple{Int,Int}) = "$(s[1]) × $(s[2]) - "
-  println(io, _nice_size(s) *"parametric block array of types $(eltype(A)) and length $L, with entries:")
+  println(io, _nice_size(s) *"parametric block array of types $elt and length $L, with entries:")
   show(io,a.blockarrays)
 end
 

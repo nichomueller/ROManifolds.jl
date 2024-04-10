@@ -1,17 +1,17 @@
-struct ParamArray{T,N,A<:AbstractVector{<:AbstractArray{T,N}},L} <: AbstractParamContainer{T,N}
+struct ParamArray{T,N,L,A} <: AbstractParamContainer{T,N}
   array::A
-  function ParamArray(array::A,::Val{L}) where {T,N,A<:AbstractVector{<:AbstractArray{T,N}},L}
-    new{T,N,A,L}(array)
+  function ParamArray(array::A,::Val{L}) where {T,N,L,A<:AbstractVector{<:AbstractArray{T,N}}}
+    new{T,N,L,A}(array)
   end
 end
 
-const ParamVector{T,A,L} = ParamArray{T,1,A,L}
-const ParamMatrix{T,A,L} = ParamArray{T,2,A,L}
-const ParamSparseMatrix = ParamArray{T,2,A,L} where {T,A<:AbstractVector{<:AbstractSparseMatrix},L}
+const ParamVector{T,L,A} = ParamArray{T,1,L,A}
+const ParamMatrix{T,L,A} = ParamArray{T,2,L,A}
+const ParamSparseMatrix = ParamArray{T,2,L,A} where {T,L,A<:AbstractVector{<:AbstractSparseMatrix}}
 
-const AffineParamArray{T,N,A} = ParamArray{T,N,A,1}
-const AffineParamVector{T,A} = ParamVector{T,A,1}
-const AffineParamMatrix{T,A} = ParamMatrix{T,A,1}
+const AffineParamArray{T,N,A} = ParamArray{T,N,1,A}
+const AffineParamVector{T,A} = ParamVector{T,1,A}
+const AffineParamMatrix{T,A} = ParamMatrix{T,1,A}
 
 function ParamArray(array)
   ParamArray(array,Val(length(array)))
@@ -33,21 +33,21 @@ end
 
 Arrays.get_array(a::ParamArray) = a.array
 Arrays.testitem(a::ParamArray) = testitem(get_array(a))
-Base.length(::ParamArray{T,N,A,L}) where {T,N,A,L} = L
-Base.length(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L} = L
+Base.length(::ParamArray{T,N,L}) where {T,N,L} = L
+Base.length(::Type{<:ParamArray{T,N,L}}) where {T,N,L} = L
 Base.size(a::ParamArray,i...) = size(testitem(a),i...)
 Base.axes(a::ParamArray,i...) = axes(testitem(a),i...)
-Base.eltype(::ParamArray{T,N,A,L}) where {T,N,A,L} = T
-Base.eltype(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L} = T
-Base.ndims(::ParamArray{T,N,A,L}) where {T,N,A,L} = N
-Base.ndims(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L} = N
+Base.eltype(::ParamArray{T}) where T = T
+Base.eltype(::Type{<:ParamArray{T}}) where T = T
+Base.ndims(::ParamArray{T,N}) where {T,N} = N
+Base.ndims(::Type{<:ParamArray{T,N}}) where {T,N} = N
 Base.first(a::ParamArray) = testitem(a)
-Base.eachindex(::ParamArray{T,N,A,L}) where {T,N,A,L} = Base.OneTo(L)
-Base.lastindex(::ParamArray{T,N,A,L}) where {T,N,A,L} = L
+Base.eachindex(::ParamArray{T,N,L}) where {T,N,L} = Base.OneTo(L)
+Base.lastindex(::ParamArray{T,N,L}) where {T,N,L} = L
 Base.getindex(a::ParamArray,i...) = ParamArray(getindex(get_array(a),i...))
 Base.setindex!(a::ParamArray,v,i...) = setindex!(get_array(a),v,i...)
 
-function Base.show(io::IO,::MIME"text/plain",a::ParamArray{T,N,A,L}) where {T,N,A,L}
+function Base.show(io::IO,::MIME"text/plain",a::ParamArray{T,N,L,A}) where {T,N,L,A}
   println(io, "Parametric vector of types $(eltype(A)) and length $L, with entries:")
   show(io,a.array)
 end
@@ -88,7 +88,7 @@ function Base.similar(
   ParamArray(b)
 end
 
-function Base.similar(::Type{ParamArray{T,N,A,L}},n::Integer...) where {T,N,A,L}
+function Base.similar(::Type{ParamArray{T,N,L,A}},n::Integer...) where {T,N,L,A}
   array = Vector{eltype(A)}(undef,L)
   @inbounds for i = eachindex(array)
     array[i] = similar(eltype(A),n...)
@@ -107,7 +107,7 @@ function Base.zeros(a::ParamArray)
   get_array(zero(a))
 end
 
-function Arrays.testvalue(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L}
+function Arrays.testvalue(::Type{ParamArray{T,N,L,A}}) where {T,N,L,A}
   tv = testvalue(eltype(A))
   array = Vector{typeof(tv)}(undef,L)
   @inbounds for k = eachindex(array)
@@ -314,12 +314,16 @@ function SparseArrays.resize!(a::ParamArray,args...)
   return a
 end
 
-SparseArrays.nnz(a::ParamMatrix) = nnz(first(a))
-SparseArrays.nzrange(a::ParamMatrix,col::Int) = nzrange(first(a),col)
-SparseArrays.rowvals(a::ParamMatrix) = rowvals(first(a))
-SparseArrays.nonzeros(a::ParamMatrix) = ParamArray(map(nonzeros,a))
-SparseMatricesCSR.colvals(a::ParamMatrix) = colvals(first(a))
-SparseMatricesCSR.getoffset(a::ParamMatrix) = getoffset(first(a))
+function LinearAlgebra.diag(a::ParamMatrix)
+  ParamArray(map(diag,get_array(a)))
+end
+
+SparseArrays.nnz(a::ParamSparseMatrix) = nnz(first(a))
+SparseArrays.nzrange(a::ParamSparseMatrix,col::Int) = nzrange(first(a),col)
+SparseArrays.rowvals(a::ParamSparseMatrix) = rowvals(first(a))
+SparseArrays.nonzeros(a::ParamSparseMatrix) = ParamArray(map(nonzeros,a))
+SparseMatricesCSR.colvals(a::ParamSparseMatrix) = colvals(first(a))
+SparseMatricesCSR.getoffset(a::ParamSparseMatrix) = getoffset(first(a))
 
 function Arrays.CachedArray(a::ParamArray)
   cache = map(a) do a
@@ -329,8 +333,8 @@ function Arrays.CachedArray(a::ParamArray)
 end
 
 function Arrays.setsize!(
-  a::ParamArray{T,N,AbstractVector{CachedArray{T,N}}},
-  s::NTuple{N,Int}) where {T,N}
+  a::ParamArray{T,N,L,AbstractVector{CachedArray{T,N}}},
+  s::NTuple{N,Int}) where {T,N,L}
 
   for ai in a
     setsize!(ai,s)
@@ -723,8 +727,8 @@ end
 
 function Arrays.return_value(
   ::typeof(*),
-  a::ParamMatrix{T,A,L},
-  b::ParamVector{S,B,L}
+  a::ParamMatrix{T,L,A},
+  b::ParamVector{S,L,B}
   ) where {T,A,S,B,L}
   array = Vector{eltype(B)}(undef,L)
   @inbounds for i = 1:L

@@ -122,8 +122,8 @@ end
 
 for ((rt,xh),(_t,_xh)) in zip(sol,_sol)
   uh,ph = xh
-  uh1 = FEM._getindex(uh,3)
-  ph1 = FEM._getindex(ph,3)
+  uh1 = FEM.param_getindex(uh,3)
+  ph1 = FEM.param_getindex(ph,3)
   _uh,_ph = _xh
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"
@@ -143,7 +143,7 @@ xh = TransientCellField(ff,(ff,))
 du = get_trial_fe_basis(test)
 dv = get_fe_basis(test)
 
-_ff = FEM._getindex(ff,1)
+_ff = FEM.param_getindex(ff,1)
 _xh = TransientCellField(_ff,(_ff,))
 
 function _check_equality(a::DomainContribution,b::DomainContribution)

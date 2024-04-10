@@ -9,9 +9,9 @@ function PartitionedArrays.ghost_values(values::ParamArray,indices)
 end
 
 function PartitionedArrays.assembly_buffers(
-  values::ParamArray{T,N,A,L},
+  values::ParamArray{T,N,L,A},
   local_indices_snd,
-  local_indices_rcv) where {T,N,A,L}
+  local_indices_rcv) where {T,N,L,A}
 
   ptrs = local_indices_snd.ptrs
   data = zeros(T,ptrs[end]-1)

@@ -110,8 +110,8 @@ iterate(_sol)
 
 for ((xh,rt),(_xh,_t)) in zip(sol,_sol)
   uh,ph = xh
-  uh1 = FEM._getindex(uh,3)
-  ph1 = FEM._getindex(ph,3)
+  uh1 = FEM.param_getindex(uh,3)
+  ph1 = FEM.param_getindex(ph,3)
   _uh,_ph = _xh
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"
@@ -156,8 +156,8 @@ iterate(_sol)
 
 for ((xh,rt),(_xh,_t)) in zip(sol,_sol)
   uh,ph = xh
-  uh1 = FEM._getindex(uh,3)
-  ph1 = FEM._getindex(ph,3)
+  uh1 = FEM.param_getindex(uh,3)
+  ph1 = FEM.param_getindex(ph,3)
   _uh,_ph = _xh
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"

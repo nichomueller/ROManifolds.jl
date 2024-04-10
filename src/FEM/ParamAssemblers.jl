@@ -11,7 +11,7 @@ end
 function _get_param_matrix_type(::Type{M},r) where M
   L = length(r)
   elM = eltype(M)
-  ParamMatrix{elM,Vector{M},L}
+  ParamMatrix{elM,L,Vector{M}}
 end
 
 function get_param_vector_builder(
@@ -27,7 +27,7 @@ end
 function _get_param_vector_type(::Type{V},r) where V
   L = length(r)
   elV = eltype(V)
-  ParamVector{elV,Vector{V},L}
+  ParamVector{elV,L,Vector{V}}
 end
 
 function get_param_assembler(

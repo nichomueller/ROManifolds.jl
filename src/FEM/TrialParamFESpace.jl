@@ -65,7 +65,7 @@ FESpaces.ConstraintStyle(::Type{<:TrialParamFESpace{U}}) where U = ConstraintSty
 
 length_dirichlet_values(f::TrialParamFESpace) = length(f.dirichlet_values)
 
-function _getindex(f::TrialParamFESpace,index)
+function param_getindex(f::TrialParamFESpace,index)
   dv = f.dirichlet_values[index]
   TrialFESpace(dv,f.space)
 end

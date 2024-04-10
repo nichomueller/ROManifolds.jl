@@ -1,11 +1,11 @@
 # struct ParamJaggedArray{T,Ti,A,L} <: AbstractParamContainer{JaggedArray{T,Ti},1}
-#   data::ParamVector{T,A,L}
+#   data::ParamVector{T,L,A}
 #   ptrs::Vector{Ti}
 
-#   function ParamJaggedArray(data::ParamVector{T,A,L},ptrs::Vector{Ti}) where {T,Ti,A,L}
+#   function ParamJaggedArray(data::ParamVector{T,L,A},ptrs::Vector{Ti}) where {T,Ti,A,L}
 #     new{T,Ti,A,L}(data,ptrs)
 #   end
-#   function ParamJaggedArray{T,Ti}(data::ParamVector{T,A,L},ptrs::Vector) where {T,Ti,A,L}
+#   function ParamJaggedArray{T,Ti}(data::ParamVector{T,L,A},ptrs::Vector) where {T,Ti,A,L}
 #     new{T,Ti,A,L}(data,convert(Vector{Ti},ptrs))
 #   end
 # end

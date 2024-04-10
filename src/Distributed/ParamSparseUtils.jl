@@ -19,11 +19,11 @@ function PartitionedArrays.nzindex(a::RB.BasicNnzSnapshots,args...)
 end
 
 function PartitionedArrays.compresscoo(
-  ::Type{ParamMatrix{T,A,L}},
+  ::Type{ParamMatrix{T,L,A}},
   I::AbstractVector,
   J::AbstractVector,
   V::ParamArray,
-  args...) where {T,A,L}
+  args...) where {T,L,A}
 
   elA = eltype(A)
   v = map(V) do V
@@ -359,7 +359,7 @@ end
 function Base.:*(a::PSparseMatrix,b::PVector{ParamVector{Tb,A,L}}) where {Tb,A,L}
   Ta = eltype(a)
   T = typeof(zero(Ta)*zero(Tb)+zero(Ta)*zero(Tb))
-  c = PVector{ParamVector{T,A,L}}(undef,partition(axes(a,1)))
+  c = PVector{ParamVector{T,L,A}}(undef,partition(axes(a,1)))
   mul!(c,a,b)
   c
 end
@@ -515,7 +515,7 @@ Base.:*(x::AdjointPVector,A::PSparseMatrix) = (A'*x.parent)'
 
 function Base.:*(a::AdjointPSparseMatrix{Ta},b::PVector{ParamVector{Tb,A,L}}) where {Ta,Tb,A,L}
   T = typeof(zero(Ta)*zero(Tb)+zero(Ta)*zero(Tb))
-  c = PVector{ParamVector{T,A,L}}(undef,partition(axes(a,1)))
+  c = PVector{ParamVector{T,L,A}}(undef,partition(axes(a,1)))
   mul!(c,a,b)
   c
 end

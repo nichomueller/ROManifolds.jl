@@ -157,7 +157,7 @@ function _plot(solh::SingleFieldParamFEFunction,r::TransientParamRealization;dir
   create_dir(dir)
   createpvd(dir) do pvd
     for (i,t) in enumerate(get_times(r))
-      solh_t = FEM._getindex(solh,i)
+      solh_t = FEM.param_getindex(solh,i)
       vtk = createvtk(trian,dir,cellfields=[varname=>solh_t])
       pvd[t] = vtk
     end

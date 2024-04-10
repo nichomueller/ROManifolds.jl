@@ -251,6 +251,6 @@ function FESpaces.test_single_field_fe_space(f::SingleFieldParamFESpace,pred=(==
   @test isa(cell_dof_basis,CellDof)
 end
 
-function _getindex(f::FESpaceToParamFESpace,index)
+function param_getindex(f::FESpaceToParamFESpace,index)
   f.space
 end
