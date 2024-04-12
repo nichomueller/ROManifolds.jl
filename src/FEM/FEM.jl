@@ -127,7 +127,7 @@ include("ParamAssemblers.jl")
 
 include("ParamBlockAssemblers.jl")
 
-include("ParamSolvers.jl")
+include("ParamIterativeSolvers.jl")
 
 export ODEParamOperatorType
 export NonlinearParamODE
@@ -189,4 +189,14 @@ include("TransientParamFESolution.jl")
 
 export get_parent
 include("TriangulationParents.jl")
+
+export UnivariateDescriptor
+export UnivariateCoordinates
+export UnivariateCellNodes
+export UnivariateGrid
+export UnivariateMap
+export UnivariateDiscreteModel
+include("UnivariateProductGeometry.jl")
+
+include("TensorProductRefFEs.jl")
 end # module

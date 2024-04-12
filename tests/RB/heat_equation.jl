@@ -51,7 +51,7 @@ trian_res = (Ω,Γn)
 trian_stiffness = (Ω,)
 trian_mass = (Ω,)
 
-induced_norm(du,v) = ∫(∇(v)⋅∇(du))dΩ
+induced_norm(du,v) = ∫(v*u)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])

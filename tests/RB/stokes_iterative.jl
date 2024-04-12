@@ -82,8 +82,6 @@ trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldS
 feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
   trial,test,coupling,trian_res,trian_stiffness,trian_mass)
 
-# Solve
-
 solver_u = LUSolver()
 solver_p = CGSolver(RichardsonSmoother(JacobiLinearSolver(),10,0.2);maxiter=20,atol=1e-14,rtol=1.e-6,verbose=false)
 
