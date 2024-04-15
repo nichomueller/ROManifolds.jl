@@ -116,109 +116,41 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 
-reffe1 = ReferenceFE(QUAD,lagrangian,Float64,order)
-reffe2 = ReferenceFE(QUAD,lagrangian,VectorValue{2,Float64},order)
+# reffe1 = ReferenceFE(QUAD,lagrangian,Float64,order)
+# reffe2 = ReferenceFE(QUAD,lagrangian,VectorValue{2,Float64},order)
 
-_reffe1 = ReferenceFE((SEGMENT,SEGMENT),FEM.tplagrangian,Float64,order)
+# _reffe1 = ReferenceFE(QUAD,FEM.tplagrangian,Float64,order)
 
-FEM.get_type(_reffe1)
-get_order(_reffe1) == get_order(reffe1)
-get_orders(_reffe1) == get_orders(reffe1)
-num_dofs(_reffe1) == num_dofs(reffe1)
-get_polytope(_reffe1) == get_polytope(reffe1)
-pb = get_prebasis(reffe1)
-_pb = get_prebasis(_reffe1)
+# basis,reffe_args,reffe_kwargs = reffe
+# cell_reffe = ReferenceFE(model,basis,reffe_args...;reffe_kwargs...)
 
-pb.terms == pb.terms && pb.orders == pb.orders
+# _reffe = ReferenceFE(FEM.tplagrangian,Float64,order)
+# _basis,_reffe_args,_reffe_kwargs = _reffe
+# _cell_reffe = ReferenceFE(model,_basis,_reffe_args...;_reffe_kwargs...)
+# conf = Conformity(testitem(_cell_reffe),:H1)
 
-dofs = get_dof_basis(reffe1)
-_dofs = get_dof_basis(_reffe1)
+# cell_fe = CellFE(model,_cell_reffe,conf)
+Ω = Triangulation(model)
+dΩ = Measure(Ω,2)
 
-CIAO
-# struct MyTensorProdStruct{T,D} <: AbstractVector{T}
-#   array::Vector{T}
-#   MyTensorProdStruct(array::Vector{T}) where T = new{T,length(array)}(array)
-# end
+stiff(du,v) = ∫(∇(du)⋅∇(v))dΩ
+U = TrialFESpace(test,x->sum(x))
+V = test
+assemble_matrix(stiff,U,V)
 
-# Base.length(v::MyTensorProdStruct) = length(v.array)
-# Base.size(v::MyTensorProdStruct) = size(v.array)
-# Base.getindex(v::MyTensorProdStruct,i::Int) = getindex(v.array,i)
 
-# abstract type TensorProductRefFE{D} <: ReferenceFE{D} end
+a = SparseMatrixAssembler(U,V)
+v = get_fe_basis(V)
+u = get_trial_fe_basis(U)
 
-# struct LagrangianTensorProdRefFE{C,D} <: TensorProductRefFE{D}
-#   reffes::MyTensorProdStruct{GenericLagrangianRefFE{C,1},D}
-#   tpreffe::GenericLagrangianRefFE{C,D}
-# end
+∇(u)⋅∇(v)
 
-# function TensorProductRefFE(
-#   reffes::MyTensorProdStruct{<:GenericLagrangianRefFE},
-#   tpreffe::GenericLagrangianRefFE)
-
-#   LagrangianTensorProdRefFE(reffes,tpreffe)
-# end
-
-# struct MyTensorProdLagrangian <: ReferenceFEName end
-
-# const tplagrangian = MyTensorProdLagrangian()
-
-# function ReferenceFEs.ReferenceFE(
-#   polytope::MyTensorProdStruct{<:Polytope,D},
-#   ::MyTensorProdLagrangian,
-#   ::Type{T},
-#   orders::Union{Integer,Tuple{Vararg{Integer}}};
-#   kwargs...) where {T,D}
-
-#   reffes = map(1:D) do i
-#     ReferenceFE(polytope[i],lagrangian,T,orders;kwargs...)
-#   end |> MyTensorProdStruct
-#   tpp = Polytope(ntuple(i->HEX_AXIS,D)...)
-#   tproduct_reffe = ReferenceFE(tpp,lagrangian,T,orders;kwargs...)
-#   TensorProductRefFE(reffes,tproduct_reffe)
-# end
-
-# _basis = tplagrangian
-# _ctype_to_polytope = MyTensorProdStruct([SEGMENT,SEGMENT])
-# r1 = ReferenceFE(_ctype_to_polytope,_basis,reffe_args...;reffe_kwargs...)
-
-# test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-
-# perm1 = RB.get_dof_permutation(model,test,order)
-
-# v = get_fe_basis(test)
-
-# Ω = Triangulation(model)
-# dΩ = Measure(Ω,2*order)
-
-# # CartesianDiscreteModel(domain,partition)
-# desc = CartesianDescriptor(domain,partition)
-# _desc = UnivariateDescriptor(domain,partition)
-# _model = UnivariateDiscreteModel(_desc)
-
-T = VectorValue{2,Float64}
-p = QUAD
-orders = (2,2)
-
-rebasis = compute_monomial_basis(T,p,orders)
-nodes, face_own_nodes = compute_nodes(p,orders)
-dofs = LagrangianDofBasis(T,nodes)
-reffaces = compute_lagrangian_reffaces(T,p,orders)
-
-nnodes = length(dofs.nodes)
-ndofs = length(dofs.dof_to_node)
-metadata = reffaces
-_reffaces = vcat(reffaces...)
-face_nodes = ReferenceFEs._generate_face_nodes(nnodes,face_own_nodes,p,_reffaces)
-face_own_dofs = ReferenceFEs._generate_face_own_dofs(face_own_nodes, dofs.node_and_comp_to_dof)
-face_dofs = ReferenceFEs._generate_face_dofs(ndofs,face_own_dofs,p,_reffaces)
-
-# face_to_num_fnodes = map(num_nodes,_reffaces)
-# push!(face_to_num_fnodes,nnodes)
-
-# face_to_lface_to_own_fnodes = map(get_face_own_nodes,_reffaces)
-# push!(face_to_lface_to_own_fnodes,face_own_nodes)
-
-# face_to_lface_to_face = get_faces(p)
-
-# result = ReferenceFEs._generate_face_nodes_aux(nnodes,face_own_nodes,face_to_num_fnodes,
-#   face_to_lface_to_own_fnodes,face_to_lface_to_face)
+function Arrays.return_cache(b::LagrangianDofBasis,field)
+  error("stop here")
+  cf = return_cache(field,b.nodes)
+  vals = evaluate!(cf,field,b.nodes)
+  ndofs = length(b.dof_to_node)
+  r = _lagr_dof_cache(vals,ndofs)
+  c = CachedArray(r)
+  (c, cf)
+end

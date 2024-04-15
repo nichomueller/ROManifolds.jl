@@ -27,6 +27,7 @@ import Base: inv,abs,abs2,*,+,-,/,adjoint,transpose,real,imag,conj
 import LinearAlgebra: det,tr,cross,dot,fillstored!
 import FillArrays: Fill,fill
 import Distributions: Uniform,Normal
+import Kronecker: kronecker
 import Test: @test
 import UnPack: @unpack
 import Gridap.Algebra: residual!,jacobian!
@@ -34,7 +35,7 @@ import Gridap.Fields: OperationField,BroadcastOpFieldArray,BroadcastingFieldOpMa
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ODEs: TransientCellField
 import Gridap.ReferenceFEs: get_order
-import Gridap.TensorValues: inner,outer,double_contraction,symmetric_part
+import Gridap.TensorValues: Mutable,inner,outer,double_contraction,symmetric_part
 import PartitionedArrays: tuple_of_arrays
 
 export AbstractParamRealization
