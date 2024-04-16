@@ -199,5 +199,5 @@ export UnivariateMap
 export UnivariateDiscreteModel
 include("UnivariateProductGeometry.jl")
 
-include("TensorProductRefFEs.jl")
+include("TProduct/TProduct.jl")
 end # module
