@@ -49,9 +49,9 @@ end
 
 function nodes_indexing_map!(v,D,K)
   if K == 0
-    push!(v,CartesianIndices(ntuple(i->1:D-1,D)))
+    push!(v,CartesianIndices(tfill(1:D-1,Val(D))))
   elseif K == D
-    push!(v,CartesianIndices(ntuple(i->D:D,D)))
+    push!(v,CartesianIndices(tfill(D:D,Val(D))))
   else
     for i = 1:D-K+1
       vi = fill(1:D-1,(D,))

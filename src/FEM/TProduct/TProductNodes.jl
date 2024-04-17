@@ -14,7 +14,7 @@ function push_entries!(vids,I::CartesianIndices{D},perm=1:D) where D
   end
 end
 
-function indices_map(p::Polytope{D},orders::NTuple{D,Int}) where D
+function compute_indices_map(p::Polytope{D},orders) where D
   vids = CartesianIndex{D}[]
   for d = 0:D
     I = collect(subsets(1:D,Val(d)))
@@ -29,13 +29,33 @@ end
 struct TensorProductNodes{D,T,A} <: AbstractVector{Point{D,T}}
   nodes::A
   nodes_map::Vector{CartesianIndex{D}}
-  function TensorProductNodes(
-    nodes::Tuple{Vararg{AbstractVector{Point{1,T}},D}},
-    nodes_map::Vector{CartesianIndex{D}}) where {D,T}
-
-    A = typeof(nodes)
+  function TensorProductNodes{T}(nodes::A,nodes_map::Vector{CartesianIndex{D}}) where {D,T,A}
     new{D,T,A}(nodes,nodes_map)
   end
+end
+
+function TensorProductNodes(nodes::NTuple{D,AbstractVector{Point{1,T}}},args...) where {D,T}
+  TensorProductNodes{T}(nodes,args...)
+end
+
+function TensorProductNodes(nodes::AbstractVector{<:AbstractVector{Point{1,T}}},args...) where T
+  TensorProductNodes{T}(nodes,args...)
+end
+
+function TensorProductNodes(p::Polytope{D},orders) where D
+  function _compute_1d_nodes(order)
+    nodes,_ = compute_nodes(SEGMENT,(order,))
+    return nodes
+  end
+  o1 = first(orders)
+  isotropy = all(orders .== o1)
+  nodes = isotropy ? Fill(_compute_1d_nodes(o1),D) : map(_compute_1d_nodes,orders)
+  indices_map = compute_indices_map(p,orders)
+  TensorProductNodes(nodes,indices_map)
+end
+
+function TensorProductNodes(p::Polytope{D},order::Integer=1) where D
+  TensorProductNodes(p,tfill(order,Val(D)))
 end
 
 Base.length(a::TensorProductNodes) = length(a.nodes_map)

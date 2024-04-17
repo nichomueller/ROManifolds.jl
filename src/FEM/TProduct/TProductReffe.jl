@@ -31,12 +31,12 @@ function ReferenceFEs.ReferenceFE(p::Polytope,name::TensorProductRefFEName,::Typ
 end
 
 function TensorProductRefFE(p::Polytope{D},name::TensorProductRefFEName,::Type{T},order::Int) where {D,T}
-  TensorProductRefFE(p,name,T,ntuple(i->order,D))
+  TensorProductRefFE(p,name,T,tfill(order,Val(D)))
 end
 
 function TensorProductRefFE(p::Polytope{D},name::TensorProductRefFEName,::Type{T},orders) where {D,T}
   @check length(orders) == D
-  nodes_map = indices_map(p,orders)
+  nodes_map = compute_indices_map(p,orders)
 
   reffes = ntuple(i->ReferenceFE(SEGMENT,ureffe(name),T,orders[i]),D)
   prebasis = TensorProductMonomialBasis(get_prebasis.(reffes))
@@ -48,7 +48,7 @@ function TensorProductRefFE(p::Polytope{D},name::TensorProductRefFEName,::Type{T
 end
 
 ReferenceFEs.num_dofs(reffe::TensorProductRefFE)      = prod(num_dofs.(reffe.reffe))
-ReferenceFEs.get_polytope(reffe::TensorProductRefFE)  = Polytope(ntuple(i->HEX_AXIS,D)...)
+ReferenceFEs.get_polytope(reffe::TensorProductRefFE)  = Polytope(tfill(HEX_AXIS,Val(D))...)
 ReferenceFEs.get_prebasis(reffe::TensorProductRefFE)  = reffe.prebasis
 ReferenceFEs.get_dof_basis(reffe::TensorProductRefFE) = reffe.dof_basis
 ReferenceFEs.Conformity(reffe::TensorProductRefFE)    = Conformity(first(reffe.reffe))

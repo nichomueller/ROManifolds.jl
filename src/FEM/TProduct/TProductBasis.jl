@@ -1,112 +1,110 @@
-Base.promote_rule(::Type{VectorValue{1,T}},::Val{D}) where {D,T} = VectorValue{D,T}
-
-struct TensorProductDofBases{D,T,A,B} <: AbstractVector{T}
-  dof_bases::NTuple{D,A}
-  nodes::B
-
-  function TensorProductDofBases(
-    dof_bases::NTuple{D,A},
-    nodes::TensorProductNodes{D}) where {D,T1<:Dof,A<:AbstractVector{T1}}
-
-    T = promote_rule(T1,Val(D))
-    B = typeof(nodes)
-    new{D,T,A,B}(dof_bases,nodes)
-  end
-end
-
-Base.length(a::TensorProductDofBases) = length(a.nodes)
-Base.size(a::TensorProductDofBases) = (length(a),)
-Base.axes(a::TensorProductDofBases) = (Base.OneTo(length(a)),)
-Base.IndexStyle(::TensorProductDofBases) = IndexLinear()
-Base.getindex(a::TensorProductDofBases,i::Integer) = PointValue(a.nodes[i])
-
-ReferenceFEs.get_nodes(a::TensorProductDofBases) = a.nodes
-
-TensorValues.num_components(::TensorProductDofBases{D,T,LagrangianDofBasis{T1,V}}) where {D,T,T1,V} = num_components(V)
-
-function ReferenceFEs.get_dof_to_node(a::TensorProductDofBases{D,T,<:LagrangianDofBasis}) where {D,T}
-  nnodes = length(a.nodes)
-  ncomps = num_components(a)
+function _get_dof_to_node(::Type{T},nodes) where T
+  nnodes = length(nodes)
+  ncomps = num_components(T)
   ids = ntuple(i->collect(Base.OneTo(nnodes)),ncomps)
   collect1d(ids)
 end
 
-function ReferenceFEs.get_dof_to_comp(a::TensorProductDofBases{D,T,<:LagrangianDofBasis}) where {D,T}
-  nnodes = length(a.nodes)
-  ncomps = num_components(a)
+function _get_dof_to_comp(::Type{T},nodes) where T
+  nnodes = length(nodes)
+  ncomps = num_components(T)
   ids = ntuple(i->fill(i,nnodes),ncomps)
   collect1d(ids)
 end
 
-function ReferenceFEs.get_node_and_comp_to_dof(a::TensorProductDofBases{D,T,<:LagrangianDofBasis}) where {D,T}
-  nnodes = length(a.nodes)
-  ncomps = num_components(a)
-  dof_to_node = get_dof_to_node(a)
-  dof_to_comp = get_dof_to_comp(a)
+function _get_node_and_comp_to_dof(::Type{T},nodes) where T<:MultiValue
+  nnodes = length(nodes)
+  ncomps = num_components(T)
+  dof_to_node = _get_dof_to_node(T,nodes)
+  dof_to_comp = _get_dof_to_comp(T,nodes)
   ids = (dof_to_comp .- 1)*ncomps .+ dof_to_node
   rids = reshape(ids,nnodes,ncomps)
   [VectorValue[rids[i,:]] for i = axes(rids,1)]
 end
 
-function Arrays.return_cache(a::TensorProductDofBases{D,T,<:LagrangianDofBasis},field) where {D,T}
-  dof_to_node = get_dof_to_node(a)
-  node_and_comp_to_dof = get_node_and_comp_to_dof(a)
-  cf = return_cache(field,a.nodes)
-  vals = evaluate!(cf,field,a.nodes)
-  ndofs = length(dof_to_node)
-  r = ReferenceFEs._lagr_dof_cache(vals,ndofs)
-  c = CachedArray(r)
-  (c,cf,dof_to_node,node_and_comp_to_dof)
+function _get_node_and_comp_to_dof(::Type{T},nodes) where T
+  _get_dof_to_node(T,nodes)
 end
 
-function Arrays.evaluate!(cache,a::TensorProductDofBases{D,T,<:LagrangianDofBasis},field) where {D,T}
-  c,cf,dof_to_node,node_and_comp_to_dof = cache
-  vals = evaluate!(cf,field,a.nodes)
-  ndofs = length(dof_to_node)
-  S = eltype(vals)
-  ncomps = num_components(S)
-  @check ncomps == num_components(eltype(node_and_comp_to_dof)) """\n
-  Unable to evaluate LagrangianDofBasis. The number of components of the
-  given Field does not match with the LagrangianDofBasis.
+function _dof_basis_from_factors(::Type{T},nodes) where T
+  dof_to_node = _get_dof_to_node(T,nodes)
+  dof_to_comp = _get_dof_to_comp(T,nodes)
+  node_and_comp_to_dof = _get_node_and_comp_to_dof(T,nodes)
+  return LagrangianDofBasis(collect(nodes),dof_to_node,dof_to_comp,node_and_comp_to_dof)
+end
 
-  If you are trying to interpolate a function on a FESpace make sure that
-  both objects have the same value type.
+struct TensorProductDofBases{D,T,A,B,C} <: AbstractVector{T}
+  factors::A
+  basis::B
+  nodes::C
 
-  For instance, trying to interpolate a vector-valued function on a scalar-valued FE space
-  would raise this error.
-  """
-  ReferenceFEs._evaluate_lagr_dof!(c,vals,node_and_comp_to_dof,ndofs,ncomps)
+  function TensorProductDofBases(
+    factors::A,
+    basis::B,
+    nodes::C) where {D,T,A,B<:AbstractVector{T},C<:TensorProductNodes{D}}
+
+    new{D,T,A,B,C}(factors,basis,nodes)
+  end
+end
+
+function TensorProductDofBases(::Type{T},p::Polytope{D},orders;lagrangian=true) where {T,D}
+  function _compute_1d_dbasis(order)
+    @check lagrangian
+    LagrangianDofBasis(eltype(T),SEGMENT,(order,))
+  end
+  o1 = first(orders)
+  isotropy = all(orders .== o1)
+  factors = isotropy ? Fill(_compute_1d_dbasis(o1),D) : map(_compute_1d_dbasis,orders)
+  nodes = TensorProductNodes(p,orders)
+  basis = _dof_basis_from_factors(T,nodes)
+  TensorProductDofBases(factors,basis,nodes)
+end
+
+function TensorProductDofBases(::Type{T},p::Polytope{D},order::Integer=1;kwargs...) where {T,D}
+  orders = tfill(order,Val(D))
+  TensorProductDofBases(T,p,orders;kwargs...)
+end
+
+Base.size(a::TensorProductDofBases) = size(a.basis)
+Base.axes(a::TensorProductDofBases) = axes(a.basis)
+Base.IndexStyle(::TensorProductDofBases) = IndexLinear()
+Base.getindex(a::TensorProductDofBases,i::Integer) = ReferenceFEs.PointValue(a.nodes[i])
+
+get_factors(b::TensorProductDofBases) = b.factors
+
+ReferenceFEs.get_nodes(a::TensorProductDofBases) = a.nodes
+
+function Arrays.return_cache(a::TensorProductDofBases,field)
+  return_cache(a.basis,field)
+end
+
+function Arrays.evaluate!(cache,a::TensorProductDofBases,field)
+  evaluate!(cache,a.basis,field)
 end
 
 function Arrays.return_cache(
   a::TensorProductDofBases{D,T,<:LagrangianDofBasis},
-  field::TensorProductField) where {D,T}
+  field::Union{TensorProductField,TensorProductMonomialBasis}
+  ) where {D,T}
 
-  b = first(a.dof_bases)
-  f = first(field.field)
-  (c,cf,dof_to_node,node_and_comp_to_dof) = return_cache(b,f)
+  b = first(get_factors(a))
+  f = first(get_factors(field))
+  c,cf = return_cache(b,f)
   vc = Vector{typeof(get_array(c))}(undef,D)
-  C = _tp_lagr_dof_cache(c,length(get_dof_to_node(a)))
-  (C,vc,c,cf,dof_to_node,node_and_comp_to_dof)
+  (vc,c,cf)
 end
 
 function Arrays.evaluate!(
   cache,
   a::TensorProductDofBases{D,T,<:LagrangianDofBasis},
-  field::TensorProductField) where {D,T}
+  field::Union{TensorProductField,TensorProductMonomialBasis}
+  ) where {D,T}
 
-  C,vc,_cache... = cache
+  b = get_factors(a)
+  f = get_factors(field)
+  vc,_cache... = cache
   @inbounds for d = 1:D
-    vc[d] = evaluate!(_cache,a.dof_bases[d],field.field[d])
+    vc[d] = evaluate!(_cache,b[d],f[d])
   end
-  copyto!(C,kronecker(vc...))
-  return C
-end
-
-function Arrays.return_cache(a::TensorProductDofBases{D,T,<:MomentBasedDofBasis},field) where {D,T}
-  @notimplemented
-end
-
-function Arrays.evaluate!(cache,a::TensorProductDofBases{D,T,<:MomentBasedDofBasis},field) where {D,T}
-  @notimplemented
+  return vc
 end

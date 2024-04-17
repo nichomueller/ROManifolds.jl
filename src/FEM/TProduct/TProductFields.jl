@@ -76,8 +76,20 @@ end
 abstract type TensorProductField <: Field end
 
 struct GenericTensorProductField{D,F} <: Field
-  fields::NTuple{D,F}
+  factors::F
+  GenericTensorProductField{D}(factors::F) where {D,F} = new{D,F}(factors)
 end
+
+function GenericTensorProductField(factors::NTuple{D,<:Field}) where D
+  GenericTensorProductField{D}(factors)
+end
+
+function GenericTensorProductField(factors::AbstractVector{<:Field})
+  D = length(factors)
+  GenericTensorProductField{D}(factors)
+end
+
+get_factors(f::GenericTensorProductField) = f.factors
 
 function Arrays.return_value(f::GenericTensorProductField,x::Point)
   return_value(TensorProductMap(f.fields),x)

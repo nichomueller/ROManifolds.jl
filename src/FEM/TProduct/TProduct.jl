@@ -23,7 +23,7 @@ import Gridap.ReferenceFEs: get_order
 import Gridap.TensorValues: Mutable,inner,outer,double_contraction,symmetric_part
 import PartitionedArrays: tuple_of_arrays
 
-export indices_map
+export compute_indices_map
 export TensorProductNodes
 include("TProductNodes.jl")
 
