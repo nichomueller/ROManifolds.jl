@@ -34,9 +34,9 @@ function TensorProductRefFE(p::Polytope{D},name::TensorProductRefFEName,::Type{T
   TensorProductRefFE(p,name,T,tfill(order,Val(D)))
 end
 
-function TensorProductRefFE(p::Polytope{D},name::TensorProductRefFEName,::Type{T},orders) where {D,T}
+function TensorProductRefFE(polytope::Polytope{D},name::TensorProductRefFEName,::Type{T},orders) where {D,T}
   @check length(orders) == D
-  nodes_map = compute_indices_map(p,orders)
+  nodes_map = compute_nodes_map(;p,orders)
 
   reffes = ntuple(i->ReferenceFE(SEGMENT,ureffe(name),T,orders[i]),D)
   prebasis = TensorProductMonomialBasis(get_prebasis.(reffes))

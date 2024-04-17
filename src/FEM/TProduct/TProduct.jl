@@ -11,6 +11,7 @@ using Gridap.Helpers
 using Gridap.Polynomials
 using Gridap.ReferenceFEs
 using Gridap.TensorValues
+using Mabla.FEM
 
 import FillArrays: Fill,fill
 import IterTools: subsets
@@ -23,13 +24,17 @@ import Gridap.ReferenceFEs: get_order
 import Gridap.TensorValues: Mutable,inner,outer,double_contraction,symmetric_part
 import PartitionedArrays: tuple_of_arrays
 
-export compute_indices_map
+include("Utils.jl")
+
+export IndexMap
+export NodesMap
+export NodesAndComps2DofsMap
+export compute_nodes_map
+export compute_nodes_and_comps_2_dof_map
+include("IndexMaps.jl")
+
 export TensorProductNodes
 include("TProductNodes.jl")
-
-export TensorProductArray
-export get_factors
-include("TProductArray.jl")
 
 export TensorProductMap
 export TensorProductField
@@ -42,6 +47,10 @@ include("TProductMonomial.jl")
 
 export TensorProductDofBases
 include("TProductBasis.jl")
+
+export TensorProductArray
+export get_factors
+include("TProductArray.jl")
 
 export TensorProductRefFE
 include("TProductReffe.jl")

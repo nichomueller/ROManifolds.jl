@@ -1,31 +1,3 @@
-function _get_dof_to_node(::Type{T},nodes) where T
-  nnodes = length(nodes)
-  ncomps = num_components(T)
-  ids = ntuple(i->collect(Base.OneTo(nnodes)),ncomps)
-  collect1d(ids)
-end
-
-function _get_dof_to_comp(::Type{T},nodes) where T
-  nnodes = length(nodes)
-  ncomps = num_components(T)
-  ids = ntuple(i->fill(i,nnodes),ncomps)
-  collect1d(ids)
-end
-
-function _get_node_and_comp_to_dof(::Type{T},nodes) where T<:MultiValue
-  nnodes = length(nodes)
-  ncomps = num_components(T)
-  dof_to_node = _get_dof_to_node(T,nodes)
-  dof_to_comp = _get_dof_to_comp(T,nodes)
-  ids = (dof_to_comp .- 1)*ncomps .+ dof_to_node
-  rids = reshape(ids,nnodes,ncomps)
-  [VectorValue[rids[i,:]] for i = axes(rids,1)]
-end
-
-function _get_node_and_comp_to_dof(::Type{T},nodes) where T
-  _get_dof_to_node(T,nodes)
-end
-
 function _dof_basis_from_factors(::Type{T},nodes) where T
   dof_to_node = _get_dof_to_node(T,nodes)
   dof_to_comp = _get_dof_to_comp(T,nodes)
@@ -83,28 +55,59 @@ function Arrays.evaluate!(cache,a::TensorProductDofBases,field)
 end
 
 function Arrays.return_cache(
-  a::TensorProductDofBases{D,T,<:LagrangianDofBasis},
+  a::TensorProductDofBases{D},
   field::Union{TensorProductField,TensorProductMonomialBasis}
-  ) where {D,T}
+  ) where D
 
+  nodes_map = a.nodes.nodes_map
+  orders = field.basis.orders
+  ndofs = num_dofs(a.basis)
+  index_map = compute_nodes_and_comps_2_dof_map(nodes_map;orders,ndofs)
   b = first(get_factors(a))
   f = first(get_factors(field))
-  c,cf = return_cache(b,f)
-  vc = Vector{typeof(get_array(c))}(undef,D)
-  (vc,c,cf)
+  cache = return_cache(b,f)
+  r = Vector{typeof(get_array(c))}(undef,D)
+  (index_map,r,cache)
 end
 
 function Arrays.evaluate!(
-  cache,
-  a::TensorProductDofBases{D,T,<:LagrangianDofBasis},
+  _cache,
+  a::TensorProductDofBases{D},
   field::Union{TensorProductField,TensorProductMonomialBasis}
-  ) where {D,T}
+  ) where D
 
+  index_map,r,cache = _cache
   b = get_factors(a)
   f = get_factors(field)
-  vc,_cache... = cache
   @inbounds for d = 1:D
-    vc[d] = evaluate!(_cache,b[d],f[d])
+    r[d] = evaluate!(cache,b[d],f[d])
   end
-  return vc
+  tpr = BasisFactors(r,index_map)
+  return tpr
+end
+
+# Fill shortcut
+
+function Arrays.return_cache(
+  a::TensorProductDofBases{D,S,<:Fill},
+  field::TensorProductMonomialBasis{D,T,<:Fill}) where {D,S,T}
+
+  nodes_map = a.nodes.nodes_map
+  orders = field.basis.orders
+  ndofs = num_dofs(a.basis)
+  index_map = compute_nodes_and_comps_2_dof_map(nodes_map;orders,ndofs)
+  cache = return_cache(a.factors[1],field.factors[1])
+  return index_map,cache
+end
+
+function Arrays.evaluate!(
+  _cache,
+  a::TensorProductDofBases{D,S,<:Fill},
+  field::TensorProductMonomialBasis{D,T,<:Fill}
+  ) where {D,S,T}
+
+  index_map,cache = _cache
+  r = evaluate!(cache,a.factors[1],field.factors[1])
+  tpr = BasisFactors(Fill(r,D),index_map)
+  return tpr
 end

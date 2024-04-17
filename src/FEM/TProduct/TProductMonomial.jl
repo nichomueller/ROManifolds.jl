@@ -1,9 +1,6 @@
 function _basis_from_factors(::Type{T},::Val{D},factors) where {D,T}
-  get_inner_terms(b::MonomialBasis) = b.terms
   orders = Tuple(map(get_order,factors))
-  _terms = map(get_inner_terms,factors)
-  nterms = Tuple(map(length,_terms))
-  terms = collect1d(CartesianIndices(nterms))
+  terms = _get_terms(factors)
   return MonomialBasis{D}(T,orders,terms)
 end
 
