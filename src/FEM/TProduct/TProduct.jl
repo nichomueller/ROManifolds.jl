@@ -33,7 +33,13 @@ export compute_nodes_map
 export compute_nodes_and_comps_2_dof_map
 include("IndexMaps.jl")
 
+export Isotropy
+export Isotropic
+export Anisotropic
 export TensorProductNodes
+export get_factors
+export get_index_map
+export get_isotropy
 include("TProductNodes.jl")
 
 export TensorProductMap
@@ -48,10 +54,17 @@ include("TProductMonomial.jl")
 export TensorProductDofBases
 include("TProductBasis.jl")
 
+export TensorProductShapefuns
+include("TProductShapefuns.jl")
+
 export TensorProductArray
-export get_factors
 include("TProductArray.jl")
 
 export TensorProductRefFE
+export tplagrangian
 include("TProductReffe.jl")
+
+export TensorProductQuadrature
+export tpquadrature
+include("TProductQuadrature.jl")
 end # module

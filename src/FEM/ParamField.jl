@@ -33,7 +33,7 @@ Arrays.testvalue(::Type{ZeroParamField{F}}) where F = ZeroParamField(testvalue(F
 Fields.gradient(f::ZeroParamField) = ZeroParamField(gradient(f.field))
 
 struct ConstantParamField{T<:Number,V} <: ParamField
-  value::AbstractVector{T}
+  value::V
   function ConstantParamField(value::AbstractVector{T}) where T
     V = typeof(value)
     new{T,V}(value)

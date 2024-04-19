@@ -21,102 +21,44 @@ partition = (2,2)
 model = CartesianDiscreteModel(domain,partition)
 labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
-add_tag_from_tags!(labels,"neumann",[7])
 
 D = 2
-T = VectorValue{2,Float64} #Float64#
+T = VectorValue{2,Float64}
 order = 2
 
-reffe = ReferenceFE(SEGMENT,lagrangian,T,order)
-prebasis = get_prebasis(reffe)
+reffe = ReferenceFE(QUAD,TProduct.tplagrangian,T,order)
+shapes = get_shapefuns(reffe)
 dof_basis = get_dof_basis(reffe)
-change = inv(evaluate(dof_basis,prebasis))
+prebasis = get_prebasis(reffe)
+space = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+v = get_fe_basis(space)
 
 tpreffe = ReferenceFE(QUAD,lagrangian,T,order)
 tpshapes = get_shapefuns(tpreffe)
 tpdof_basis = get_dof_basis(tpreffe)
 tpprebasis = get_prebasis(tpreffe)
+tpspace = TestFESpace(model,tpreffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+tpv = get_fe_basis(tpspace)
 
-################### TPNodes ##########
-nodes_map = compute_nodes_map(;polytope=QUAD,orders=(2,2))
-nodes = get_nodes(dof_basis)
-_nodes = TensorProductNodes(QUAD,2)
+@assert evaluate(dof_basis,prebasis) ≈ evaluate(tpdof_basis,tpprebasis)
 
-ξ = evaluate(prebasis,dof_basis.nodes)
-ϕξ = evaluate(dof_basis,prebasis)
+trian = Triangulation(model)
 
-_prebasis = TensorProductMonomialBasis(T,QUAD,2)
-_dof_basis = TensorProductDofBases(T,QUAD,2)
-_ξ = evaluate(_prebasis,_nodes)
-_ϕξ = evaluate(_dof_basis,_prebasis)
+degree = TProduct.order_2_degree(order)
+tpquad = Quadrature(QUAD,degree)
+quad = Quadrature(QUAD,tpquadrature,degree)
 
-tpξ = evaluate(tpprebasis,tpdof_basis.nodes)
-tpϕξ = evaluate(tpdof_basis,tpprebasis)
+cell_quad = CellQuadrature(trian,degree)
+_cell_quad = CellQuadrature(trian,_quad)
 
-M = tpϕξ[1:9,1:2:18]
-m = _ϕξ[1][1:3,1:2:6]
+x = get_cell_points(cell_quad)
+@assert all(v(x) .≈ tpv(x))
 
-struct Dof2NodeAndComp{A,B}
-  node_map::A
-  dofs_map::B
-end
+tpn = TensorProductNodes(map(get_coordinates,quad.factors),quad.quad_map,TProduct.Isotropic())
+x = CellPoint(Fill(tpn,4),trian,ReferenceDomain())
 
-num_nodes(a::Dof2NodeAndComp) = length(a.node_map)
+_vx = evaluate!(cache,get_data(v),get_data(_x))
 
-struct Temp{T,A,B} <: AbstractMatrix{T}
-  a::Vector{Matrix{T}}
-  i::Dof2NodeAndComp{A,B}
-  size::NTuple{2,Int}
-end
-
-Base.size(a::Temp) = a.size
-Base.IndexStyle(::Temp) = IndexCartesian()
-
-function Base.getindex(a::Temp,i::Integer,j::Integer)
-  nnodes = num_nodes(a.i)
-  ncomps = 2
-  compi = slow_index(i,nnodes)
-  compj = fast_index(j,ncomps)
-  if compi != compj
-    return zero(eltype(a))
-  end
-  nodei = fast_index(i,nnodes)
-  nodej = slow_index(j,ncomps)
-  rowi = a.i.node_map[nodei]
-  colj = a.i.dofs_map[nodej]
-  return prod(map(d->a.a[d][rowi[d],colj[d]],1:D))
-end
-
-node_map = _nodes.nodes_map
-dofs_map = collect1d(CartesianIndices((1:3,1:3)))
-mymap = Dof2NodeAndComp(node_map,dofs_map)
-temp = Temp(collect(_ϕξ),mymap,(18,18))
-
-###########################
-a = temp
-i,j = 10,2
-nnodes = num_nodes(a.i)
-ncomps = 2
-compi = slow_index(i,nnodes)
-compj = fast_index(j,ncomps)
-if compi != compj
-  return zero(eltype(a))
-end
-nodei = fast_index(i,nnodes)
-nodej = slow_index(j,nnodes)
-rowi = a.i.node_map[nodei]
-colj = a.i.dofs_map[nodej]
-###########################
-
-B = zeros(size(A))
-for i = axes(B,1)
-  entry = node_map[i]
-  B[i,:] = kronecker(_ξ[2][entry[2],:],_ξ[1][entry[1],:])
-end
-
-BB = zeros(size(A))
-for irow = axes(BB,1)
-  entryrow = node_map[irow]
-  factors = map(d->_ξ[D-d+1][entryrow[D-d+1],:],1:D)
-  BB[irow,:] = kronecker(factors...)
-end
+_ξ = get_data(_x)[1]
+_c = return_cache(ϕ,_ξ)
+evaluate!(_c,ϕ,_ξ)

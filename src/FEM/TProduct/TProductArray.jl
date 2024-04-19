@@ -1,12 +1,35 @@
 abstract type TensorProductFactors{T,N} <: AbstractArray{T,N} end
 
-struct BasisFactors{T,A,I} <: TensorProductFactors{T,2}
+struct FieldFactors{I,T,A,B} <: TensorProductFactors{T,1}
   factors::A
-  index_map::I
+  index_map::B
+  isotropy::I
+  function FieldFactors(
+    factors::A,index_map::B,isotropy::I
+    ) where {T,A<:AbstractVector{<:AbstractVector{T}},B<:NodesMap,I}
+    new{I,T,A,B}(factors,index_map,isotropy)
+  end
+end
+
+Base.size(a::FieldFactors) = (num_nodes(a.index_map),)
+Base.axes(a::FieldFactors) = (Base.OneTo(num_nodes(a.index_map)),)
+
+get_factors(a::FieldFactors) = a.factors
+
+function Base.getindex(a::FieldFactors,i::Integer)
+  factors = a.factors
+  entry = a.nodes_map.indices[i]
+  return prod(map(d->factors[d][entry[d]],eachindex(factors)))
+end
+
+struct BasisFactors{I,T,A,B} <: TensorProductFactors{T,2}
+  factors::A
+  index_map::B
+  isotropy::I
   function BasisFactors(
-    factors::A,index_map::I,
-    ) where {T,A<:AbstractVector{<:AbstractMatrix{T}},I<:NodesAndComps2DofsMap}
-    new{T,A,I}(factors,index_map)
+    factors::A,index_map::B,isotropy::I
+    ) where {T,A<:AbstractVector{<:AbstractMatrix{T}},B<:NodesAndComps2DofsMap,I}
+    new{I,T,A,B}(factors,index_map,isotropy)
   end
 end
 

@@ -191,13 +191,5 @@ include("TransientParamFESolution.jl")
 export get_parent
 include("TriangulationParents.jl")
 
-export UnivariateDescriptor
-export UnivariateCoordinates
-export UnivariateCellNodes
-export UnivariateGrid
-export UnivariateMap
-export UnivariateDiscreteModel
-include("UnivariateProductGeometry.jl")
-
 include("TProduct/TProduct.jl")
 end # module

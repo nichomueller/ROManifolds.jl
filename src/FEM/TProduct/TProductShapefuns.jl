@@ -1,0 +1,78 @@
+# shapes
+
+struct TensorProductShapefuns{D,I,A,B} <: AbstractVector{TensorProductField{D,I}}
+  factors::A
+  shapefuns::B
+  function TensorProductShapefuns{D,I}(factors::A,shapefuns::B) where {D,I,A,B}
+    new{D,I,A,B}(factors,shapefuns)
+  end
+end
+
+function ReferenceFEs.compute_shapefuns(
+  dofs::TensorProductDofBases{D,I},
+  prebasis::TensorProductMonomialBasis{D,I}) where {D,I}
+
+  factors = map(compute_shapefuns,dofs.factors,prebasis.factors)
+  shapefuns = compute_shapefuns(dofs.basis,prebasis.basis)
+  TensorProductShapefuns{D,I}(factors,shapefuns)
+end
+
+get_factors(a::TensorProductShapefuns) = a.factors
+get_field(a::TensorProductShapefuns) = a.shapefuns
+
+Base.size(a::TensorProductShapefuns) = size(a.shapefuns)
+Base.getindex(a::TensorProductShapefuns,i::Integer) = getindex(a.shapefuns,i)
+
+function Arrays.return_cache(a::TensorProductShapefuns,x::TensorProductNodes)
+  field = get_field(a)
+  factors = get_factors(a)
+  points = get_factors(x)
+  orders = get_orders(field.fields)
+  ndofs = size(field,1)
+  nodes_map = get_index_map(x)
+  index_map = compute_nodes_and_comps_2_dof_map(nodes_map;orders,ndofs)
+  s,c = return_cache(factors[1],points[1])
+  r = Vector{typeof(get_array(s))}(undef,D)
+  return index_map,r,(s,c)
+end
+
+function Arrays.evaluate!(cache,a::TensorProductShapefuns,x::TensorProductNodes{D}) where D
+  index_map,r,c = cache
+  factors = get_factors(a)
+  points = get_factors(x)
+  @inbounds for d = 1:D
+    r[d] = evaluate!(c,factors[d],points[d])
+  end
+  tpr = BasisFactors(r,index_map,Anisotropic())
+  return tpr
+end
+
+function Arrays.return_cache(
+  a::TensorProductShapefuns{D,Isotropic},
+  x::TensorProductNodes{D,Isotropic}
+  ) where D
+
+  field = get_field(a)
+  factors = get_factors(a)
+  points = get_factors(x)
+  orders = get_orders(field.fields)
+  ndofs = size(field,1)
+  nodes_map = get_index_map(x)
+  index_map = compute_nodes_and_comps_2_dof_map(nodes_map;orders,ndofs)
+  cache = return_cache(factors[1],points[1])
+  return index_map,cache
+end
+
+function Arrays.evaluate!(
+  cache,
+  a::TensorProductShapefuns{D,Isotropic},
+  x::TensorProductNodes{D,Isotropic}
+  ) where D
+
+  index_map,c = _cache
+  factors = get_factors(a)
+  points = get_factors(x)
+  r = evaluate!(c,factors[1],points[1])
+  tpr = BasisFactors(Fill(r,D),index_map,Isotropic())
+  return tpr
+end

@@ -38,6 +38,13 @@ function compute_nodes_map(;
   return NodesMap(vids)
 end
 
+function trivial_nodes_map(;
+  polytope::Polytope{D}=QUAD,
+  orders=tfill(1,Val(D))) where D
+
+  NodesMap(_get_terms(orders))
+end
+
 struct NodesAndComps2DofsMap{A,B} <: IndexMap
   nodes_map::A
   dofs_map::B
@@ -51,7 +58,7 @@ ReferenceFEs.num_dofs(a::NodesAndComps2DofsMap) = a.ndofs
 function compute_nodes_and_comps_2_dof_map(
   nodes_map::NodesMap{D};
   orders=tfill(1,Val(D)),
-  dofs_map=_get_terms(orders.+1),
+  dofs_map=_get_terms(orders),
   ndofs=num_nodes(nodes_map)) where D
 
   NodesAndComps2DofsMap(nodes_map,dofs_map,ndofs)

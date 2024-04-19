@@ -1,119 +1,114 @@
-struct TensorProductMap{D,T} <: Map
-  values::NTuple{D,T}
-end
+abstract type TensorProductField{D,I} <: Field end
 
-function Arrays.return_value(
-  ::TensorProductMap{D},
-  a::NTuple{D,T}
-  ) where {D,T<:AbstractArray{<:Number}}
+get_factors(::TensorProductField) = @abstractmethod
+get_field(::TensorProductField) = @abstractmethod
+get_isotropy(::TensorProductField{D,I} where D) where I = I
 
-  ka = kronecker(a...) |> collect
-  return ka
-end
+Fields.gradient(a::TensorProductField) = GenericTensorProductField(map(gradient,get_factors(a)))
 
-function Arrays.return_cache(
-  ::TensorProductMap{D},
-  a::NTuple{D,T}
-  ) where {D,T<:AbstractArray{<:Number}}
+function Arrays.evaluate!(
+  cache,
+  k::Broadcasting{typeof(∇)},
+  a::AbstractArray{<:TensorProductField{D,I}}) where {D,I}
 
-  ka = kronecker(a...) |> collect
-  return ka
+  TensorProductField(map(evaluate!,Fill(cache,D),Fill(k,D),get_factors.(a)))
 end
 
 function Arrays.evaluate!(
   cache,
-  ::TensorProductMap{D},
-  a::NTuple{D,T}
-  ) where {D,T<:AbstractArray{<:Number}}
+  k::Broadcasting{typeof(∇∇)},
+  a::AbstractArray{<:TensorProductField{D,I}}) where {D,I}
 
-  ka = kronecker(a...)
-  copyto!(cache,ka)
-  return ka
+  TensorProductField(map(evaluate!,Fill(cache,D),Fill(k,D),get_factors.(a)))
 end
 
-function Arrays.return_value(
-  ::TensorProductMap{D},
-  a::NTuple{D,T},
-  x::Point
-  ) where {D,T<:Union{Field,AbstractArray{Field}}}
-
-  factors = ntuple(d->return_value(a[d],x),D)
-  lazy_kron = kronecker(factors...)
-  collect(lazy_kron)
-end
-
-_get_product_cache(t::NTuple{N,<:AbstractArray} where N) = collect(kronecker(t...))
-_get_product_cache(t::NTuple{N,<:Tuple} where N) = _get_product_cache(first.(t))
-
-function Arrays.return_cache(
-  m::TensorProductMap{D},
-  a::NTuple{D,T},
-  x::Point
-  ) where {D,T<:Union{Field,AbstractArray{Field}}}
-
-  factors = ntuple(d->return_cache(a[d],x),D)
-  V = return_type(m,a,x)
-  array_factors = Vector{V}(undef,D)
-  product = _get_product_cache(factors)
-  return factors,array_factors,product
-end
-
-function Arrays.evaluate!(
-  cache,
-  ::TensorProductMap{D},
-  a::NTuple{D,T},
-  x::Point
-  ) where {D,T<:Union{Field,AbstractArray{Field}}}
-
-  factors,array_factors,product = cache
-  @inbounds for d = 1:D
-    array_factors[d] = evaluate!(factors[d],a[d],x)
-  end
-  copyto!(product,kronecker(array_factors...))
-  return product
-end
-
-abstract type TensorProductField <: Field end
-
-struct GenericTensorProductField{D,F} <: Field
-  factors::F
-  GenericTensorProductField{D}(factors::F) where {D,F} = new{D,F}(factors)
-end
-
-function GenericTensorProductField(factors::NTuple{D,<:Field}) where D
-  GenericTensorProductField{D}(factors)
-end
-
-function GenericTensorProductField(factors::AbstractVector{<:Field})
-  D = length(factors)
-  GenericTensorProductField{D}(factors)
-end
-
-get_factors(f::GenericTensorProductField) = f.factors
-
-function Arrays.return_value(f::GenericTensorProductField,x::Point)
-  return_value(TensorProductMap(f.fields),x)
-end
-
-for T in (:(Point),:(AbstractVector{<:Point}))
+for F in (:(TensorProductField),:(AbstractArray{<:TensorProductField}))
   @eval begin
-    function Arrays.return_cache(f::GenericTensorProductField,x::$T)
-      return_cache(TensorProductMap(f.fields),x)
+    function Arrays.return_value(a::$F,x::Point)
+      return_value(get_field(a),x)
     end
-    function Arrays.evaluate!(cache,f::GenericTensorProductField,x::$T)
-      evaluate!(cache,TensorProductMap(f.fields),x)
+  end
+  for T in (:(Point),:(AbstractArray{<:Point}))
+    @eval begin
+      function Arrays.return_cache(a::$F,x::$T)
+        return_cache(get_field(a),x)
+      end
+      function Arrays.evaluate!(cache,a::$F,x::$T)
+        evaluate!(cache,get_field(a),x)
+      end
     end
   end
 end
 
-function Arrays.return_value(f::GenericTensorProductField,x::TensorProductNodes)
-  TensorProductArray(ntuple(d->return_value(f[d],x.nodes[d]),D))
+struct GenericTensorProductField{D,I,A} <: TensorProductField{D,I}
+  factors::A
+  isotropy::I
+  function GenericTensorProductField(factors::A,isotropy::I) where {A,I}
+    D = length(factors)
+    new{D,I,A}(isotropy,factors)
+  end
 end
 
-function Arrays.return_cache(f::GenericTensorProductField,x::TensorProductNodes)
-  TensorProductArray(ntuple(d->return_cache(f[d],x.nodes[d]),D))
+function GenericTensorProductField(factors::A) where A
+  isotropy = Isotropy(all(factors .== factors[1]))
+  GenericTensorProductField(factors,isotropy)
 end
 
-function Arrays.evaluate!(cache,f::GenericTensorProductField,x::TensorProductNodes)
-  TensorProductArray(ntuple(d->evaluate!(cache[d],f[d],x.nodes[d]),D))
+get_factors(a::GenericTensorProductField) = a.factors
+get_field(a::GenericTensorProductField) = GenericField(x->sum(map(f->evaluate.(f,x),a.factors)))
+
+function Arrays.return_cache(a::GenericTensorProductField,x::AbstractTensorProductPoints)
+  factors = get_factors(a)
+  points = get_factors(x)
+  c = return_cache(factors[1],points[1])
+  r = Vector{typeof(get_array(c))}(undef,D)
+  return r,c
+end
+
+function Arrays.evaluate!(cache,a::GenericTensorProductField,x::AbstractTensorProductPoints{D}) where D
+  r,c = cache
+  factors = get_factors(a)
+  points = get_factors(x)
+  index_map = get_index_map(x)
+  @inbounds for d = 1:D
+    r[d] = evaluate!(c,factors[d],points[d])
+  end
+  tpr = FieldFactors(r,index_map,Anisotropic())
+  return tpr
+end
+
+function Arrays.return_cache(
+  a::GenericTensorProductField{Isotropic},
+  x::TensorProductNodes{D,Isotropic}
+  ) where D
+
+  factors = get_factors(a)
+  points = get_factors(x)
+  return_cache(factors[1],points[1])
+end
+
+function Arrays.evaluate!(
+  cache,
+  a::GenericTensorProductField{Isotropic},
+  x::TensorProductNodes{D,Isotropic}
+  ) where D
+
+  factors = get_factors(a)
+  points = get_factors(x)
+  index_map = get_index_map(x)
+  r = evaluate!(cache,factors[1],points[1])
+  tpr = FieldFactors(Fill(r,D),index_map,Isotropic())
+  return tpr
+end
+
+# gradients
+
+function Arrays.evaluate!(
+  cache,
+  k::Broadcasting{typeof(∇)},
+  a::GenericTensorProductField{D,I,FieldGradientArray{N}}
+  ) where {D,I,N}
+
+  ∇a = map(evaluate!,Fill(cache,D),Fill(k,D),map(get_factors,a))
+  GenericTensorProductField(∇a)
 end
