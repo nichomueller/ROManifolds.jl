@@ -50,7 +50,7 @@ struct GenericTensorProductField{D,I,A} <: TensorProductField{D,I}
 end
 
 function GenericTensorProductField(factors::A) where A
-  isotropy = Isotropy(all(factors .== factors[1]))
+  isotropy = Isotropy(factors)
   GenericTensorProductField(factors,isotropy)
 end
 
@@ -69,11 +69,11 @@ function Arrays.evaluate!(cache,a::GenericTensorProductField,x::AbstractTensorPr
   r,c = cache
   factors = get_factors(a)
   points = get_factors(x)
-  index_map = get_index_map(x)
+  indices_map = get_indices_map(x)
   @inbounds for d = 1:D
     r[d] = evaluate!(c,factors[d],points[d])
   end
-  tpr = FieldFactors(r,index_map,Anisotropic())
+  tpr = FieldFactors(r,indices_map,Anisotropic())
   return tpr
 end
 
@@ -95,10 +95,58 @@ function Arrays.evaluate!(
 
   factors = get_factors(a)
   points = get_factors(x)
-  index_map = get_index_map(x)
+  indices_map = get_indices_map(x)
   r = evaluate!(cache,factors[1],points[1])
-  tpr = FieldFactors(Fill(r,D),index_map,Isotropic())
+  tpr = FieldFactors(Fill(r,D),indices_map,Isotropic())
   return tpr
+end
+
+struct TensorProductAffineMap{D,T,L} <: AbstractVector{AffineMap{1,1,T,1}}
+  map::AffineMap{D,D,T,L}
+end
+
+Base.size(a::TensorProductAffineMap{D}) where D = (D,)
+
+function Base.getindex(a::TensorProductAffineMap{D},d::Integer) where D
+  origin = Point(a.map.origin[d])
+  gradient = diagonal_tensor(VectorValue(a.map.gradient[(d-1)*D+d]))
+  AffineMap(gradient,origin)
+end
+
+get_factors(a::AffineMap) = TensorProductAffineMap(a)
+
+function Arrays.return_cache(a::AffineMap,x::AbstractTensorProductPoints{D}) where D
+  factors = get_factors(a)
+  points = get_factors(x)
+  c = return_cache(factors[1],points[1])
+  r = Vector{typeof(get_array(c))}(undef,D)
+  return r,c
+end
+
+function Arrays.evaluate!(cache,a::AffineMap,x::AbstractTensorProductPoints{D}) where D
+  r,c = cache
+  factors = get_factors(a)
+  points = get_factors(x)
+  indices_map = get_indices_map(x)
+  @inbounds for d = 1:D
+    r[d] = evaluate!(c,factors[d],points[d])
+  end
+  tensor_product_points(typeof(x),r,indices_map)
+end
+
+function Arrays.return_cache(a::AffineMap,x::AbstractTensorProductPoints{D,Isotropic}) where D
+  factors = get_factors(a)
+  points = get_factors(x)
+  indices_map = get_indices_map(x)
+  cache = return_cache(factors[1],points[1])
+  return factors,indices_map,cache
+end
+
+function Arrays.evaluate!(_cache,a::AffineMap,x::AbstractTensorProductPoints{D,Isotropic}) where D
+  factors,indices_map,cache = _cache
+  points = get_factors(x)
+  r = evaluate!(cache,factors[1],points[1])
+  tensor_product_points(typeof(x),r,indices_map)
 end
 
 # gradients

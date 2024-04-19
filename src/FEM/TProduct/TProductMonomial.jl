@@ -13,12 +13,11 @@ struct TensorProductMonomialBasis{D,I,T,A} <: AbstractVector{TensorProductMonomi
 end
 
 function TensorProductMonomialBasis(::Type{T},p::Polytope{D},orders) where {T,D}
-  function _compute_1d_mbasis(order)
+  function _compute_1d_mbasis(order=first(orders))
     compute_monomial_basis(eltype(T),SEGMENT,(order,))
   end
-  o1 = first(orders)
-  isotropy = Isotropy(all(orders .== o1))
-  factors = isotropy==Isotropic() ? Fill(_compute_1d_mbasis(o1),D) : map(_compute_1d_mbasis,orders)
+  isotropy = Isotropy(orders)
+  factors = isotropy==Isotropic() ? Fill(_compute_1d_mbasis(),D) : map(_compute_1d_mbasis,orders)
   basis = _basis_from_factors(T,Val(D),factors)
   TensorProductMonomialBasis(factors,basis,isotropy)
 end

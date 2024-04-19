@@ -31,12 +31,11 @@ struct TensorProductQuadrature{D,I,T,A,B,C} <: Quadrature{D,T}
 end
 
 function TensorProductQuadrature(polytope::Polytope{D},degrees;T::Type{<:AbstractFloat}=Float64) where D
-  function _compute_1d_quad(degree)
+  function _compute_1d_quad(degree=first(degrees))
     Quadrature(SEGMENT,(degree,);T)
   end
-  d1 = first(degrees)
-  isotropy = Isotropy(all(degrees .== d1))
-  factors = isotropy==Isotropic() ? Fill(_compute_1d_quad(d1),D) : map(_compute_1d_quad,degrees)
+  isotropy = Isotropy(degrees)
+  factors = isotropy==Isotropic() ? Fill(_compute_1d_quad(),D) : map(_compute_1d_quad,degrees)
   quad = Quadrature(polytope,tensor_product,degrees;T)
   orders = map(degree_2_order,degrees)
   indices_map = trivial_nodes_map(;polytope,orders)

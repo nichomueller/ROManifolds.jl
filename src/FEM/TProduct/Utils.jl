@@ -29,3 +29,13 @@ function _get_node_and_comp_to_dof(::Type{T},nodes) where T
 end
 
 ReferenceFEs.num_dofs(a::LagrangianDofBasis{P,V}) where {P,V} = length(a.nodes)*num_components(V)
+
+function _split_cartesian_descriptor(origin::Point{D},sizes,partition,cmap,isperiodic) where D
+  function _compute_1d_desc(
+    o=first(origin.data),s=first(sizes),p=first(partition),m=cmap,i=first(isperiodic))
+    CartesianDescriptor(Point(o),(s,),(p,);map=m,isperiodic=(i,))
+  end
+  isotropy = Isotropy(map(Isotropy,(sizes,partition,cmap,isperiodic))...)
+  factors = isotropy==Isotropic() ? Fill(_compute_1d_desc(),D) : map(_compute_1d_desc,origin.data,sizes,partition,Fill(map,D),isperiodic)
+  return factors,isotropy
+end

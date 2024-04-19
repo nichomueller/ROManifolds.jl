@@ -38,7 +38,7 @@ export Isotropic
 export Anisotropic
 export TensorProductNodes
 export get_factors
-export get_index_map
+export get_indices_map
 export get_isotropy
 include("TProductNodes.jl")
 
@@ -67,4 +67,9 @@ include("TProductReffe.jl")
 export TensorProductQuadrature
 export tpquadrature
 include("TProductQuadrature.jl")
+
+export TensorProductDescriptor
+export KroneckerCoordinates
+export TensorProductGrid
+include("TProductGeometry.jl")
 end # module
