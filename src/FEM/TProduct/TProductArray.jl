@@ -20,7 +20,7 @@ struct FieldFactors{I,T,N,A,B} <: TensorProductFactors{T,N}
   indices_map::B
   isotropy::I
   function FieldFactors(
-    factors::A,indices_map::B,isotropy::I
+    factors::A,indices_map::B,isotropy::I=Isotropy(factors)
     ) where {T,N,A<:AbstractVector{<:AbstractArray{T,N}},B<:IndexMap,I}
     new{I,T,N,A,B}(factors,indices_map,isotropy)
   end
@@ -50,8 +50,8 @@ function Base.getindex(a::MFieldFactors,nodei::Integer,j::Integer)
   ncomps = num_components(indices_map)
   compj = FEM.fast_index(j,ncomps)
   nodej = FEM.slow_index(j,ncomps)
-  rowi = indices_map.nodes_map[nodei]
-  colj = indices_map.dofs_map[nodej]
+  rowi = indices_map.nodes_map[nodei,1]
+  colj = indices_map.dofs_map[nodej,compj]
   return myprod(ntuple(d->factors[d][rowi[d],colj[d]],length(factors)))
 end
 
@@ -63,8 +63,8 @@ struct BasisFactors{I,T,A,B} <: TensorProductFactors{T,2}
   indices_map::B
   isotropy::I
   function BasisFactors(
-    factors::A,indices_map::B,isotropy::I
-    ) where {T,A<:AbstractVector{<:AbstractMatrix{T}},B<:NodesAndComps2DofsMap,I}
+    factors::A,indices_map::B,isotropy::I=Isotropy(factors)
+    ) where {T,A<:AbstractVector{<:AbstractMatrix{T}},B<:IndexMap,I}
     E = eltype(T)
     new{I,E,A,B}(factors,indices_map,isotropy)
   end
@@ -88,7 +88,7 @@ function Base.getindex(a::BasisFactors,i::Integer,j::Integer)
   end
   nodei = FEM.fast_index(i,nnodes)
   nodej = FEM.slow_index(j,ncomps)
-  rowi = indices_map.nodes_map[nodei]
-  colj = indices_map.dofs_map[nodej]
+  rowi = indices_map.nodes_map[nodei,compi]
+  colj = indices_map.dofs_map[nodej,compj]
   return mydot(ntuple(d->factors[d][rowi[d],colj[d]],length(factors)))
 end

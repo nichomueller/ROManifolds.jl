@@ -27,10 +27,8 @@ function Arrays.return_cache(a::TensorProductShapefuns,x::TensorProductNodes)
   field = get_field(a)
   factors = get_factors(a)
   points = get_factors(x)
-  orders = get_orders(field.fields)
-  ndofs = size(field,1)
-  indices_map = get_indices_map(x)
-  indices_map = compute_nodes_and_comps_2_dof_map(indices_map;orders,ndofs)
+  nodes_map = get_indices_map(x)
+  indices_map = compute_nodes_and_comps_2_dof_map(field.fields,nodes_map)
   s,c = return_cache(factors[1],points[1])
   r = Vector{typeof(get_array(s))}(undef,D)
   return indices_map,r,(s,c)
@@ -43,7 +41,7 @@ function Arrays.evaluate!(cache,a::TensorProductShapefuns,x::TensorProductNodes{
   @inbounds for d = 1:D
     r[d] = evaluate!(c,factors[d],points[d])
   end
-  tpr = BasisFactors(r,indices_map,Anisotropic())
+  tpr = FieldFactors(r,indices_map,Anisotropic())
   return tpr
 end
 
@@ -55,10 +53,8 @@ function Arrays.return_cache(
   field = get_field(a)
   factors = get_factors(a)
   points = get_factors(x)
-  orders = get_orders(field.fields)
-  ndofs = size(field,1)
-  indices_map = get_indices_map(x)
-  indices_map = compute_nodes_and_comps_2_dof_map(indices_map;orders,ndofs)
+  nodes_map = get_indices_map(x)
+  indices_map = compute_nodes_and_comps_2_dof_map(field.fields,nodes_map)
   cache = return_cache(factors[1],points[1])
   return indices_map,cache
 end
@@ -73,6 +69,6 @@ function Arrays.evaluate!(
   factors = get_factors(a)
   points = get_factors(x)
   r = evaluate!(c,factors[1],points[1])
-  tpr = BasisFactors(Fill(r,D),indices_map,Isotropic())
+  tpr = FieldFactors(Fill(r,D),indices_map,Isotropic())
   return tpr
 end

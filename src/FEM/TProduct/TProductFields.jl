@@ -43,15 +43,10 @@ end
 struct GenericTensorProductField{D,I,A} <: TensorProductField{D,I}
   factors::A
   isotropy::I
-  function GenericTensorProductField(factors::A,isotropy::I) where {A,I}
+  function GenericTensorProductField(factors::A,isotropy::I=Isotropy(factors)) where {A,I}
     D = length(factors)
     new{D,I,A}(isotropy,factors)
   end
-end
-
-function GenericTensorProductField(factors::A) where A
-  isotropy = Isotropy(factors)
-  GenericTensorProductField(factors,isotropy)
 end
 
 get_factors(a::GenericTensorProductField) = a.factors

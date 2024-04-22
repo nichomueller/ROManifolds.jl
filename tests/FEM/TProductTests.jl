@@ -23,40 +23,17 @@ labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
 
 D = 2
-T = VectorValue{2,Float64}
+T = Float64#VectorValue{2,Float64}
 order = 2
+
+# # dim 1
+# reffe1 = ReferenceFE(SEGMENT,lagrangian,T,order)
+# v1 = FESpaces.get_cell_dof_basis(model,Fill(reffe1,4),GradConformity())
 
 orders = (2,2)
 prebasis = TensorProductMonomialBasis(T,QUAD,orders)
 dof_basis = TensorProductDofBases(T,QUAD,lagrangian,orders)
 pd = evaluate(dof_basis,prebasis)
-
-tpϕx = evaluate(tpprebasis,tpdof_basis.nodes)
-
-###################
-nodes_map = compute_nodes_map(;polytope=QUAD,orders)
-ndofs = 18
-indices_map = compute_nodes_and_comps_2_dof_map(nodes_map;orders,ndofs)
-ϕx = evaluate(prebasis,dof_basis.nodes)
-bf = TProduct.FieldFactors(ϕx,indices_map,Isotropic())
-
-nodei,j = 2,3
-factors = get_factors(bf)
-indices_map = get_indices_map(bf)
-ncomps = num_components(indices_map)
-compj = FEM.fast_index(j,ncomps)
-nodej = FEM.slow_index(j,ncomps)
-rowi = indices_map.nodes_map[nodei]
-colj = indices_map.dofs_map[nodej]
-kk = ntuple(d->factors[d][rowi[d],colj[d]],length(factors))
-
-Base.:*(a::VectorValue,b::VectorValue) = Point(map(*,a.data,b.data))
-B = zeros(VectorValue{2,Float64},9,18)
-for i = axes(B,1)
-  entry = indices_map.nodes_map[i]
-  B[i,:] = kronecker(factors[2][entry[2],:],factors[1][entry[1],:])
-end
-###################
 
 reffe = ReferenceFE(QUAD,TProduct.tplagrangian,T,order)
 shapes = get_shapefuns(reffe)
@@ -72,7 +49,13 @@ tpprebasis = get_prebasis(tpreffe)
 tpspace = TestFESpace(model,tpreffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 tpv = get_fe_basis(tpspace)
 
-@assert evaluate(dof_basis,prebasis) ≈ evaluate(tpdof_basis,tpprebasis)
+tpϕx = evaluate(tpprebasis,tpdof_basis.nodes)
+ϕx = evaluate(prebasis,dof_basis.nodes)
+@assert tpϕx ≈ ϕx
+
+bx = evaluate(dof_basis,prebasis)
+tpbx = evaluate(tpdof_basis,tpprebasis)
+@assert bx ≈ tpbx
 
 trian = Triangulation(model)
 
@@ -85,13 +68,49 @@ cell_quad = CellQuadrature(trian,degree)
 
 tpx = get_cell_points(cell_quad)
 @assert all(v(tpx) .≈ tpv(tpx))
-
-tpgrid = CartesianGrid(domain,partition)
-affmap = get_cell_map(tpgrid)[1]
+@assert all(tpv(x) .≈ tpv(tpx))
+@assert all(v(x) .≈ tpv(tpx))
 
 tpn = TensorProductNodes(map(get_coordinates,quad.factors),quad.quad_map,TProduct.Isotropic())
 x = CellPoint(Fill(tpn,4),trian,ReferenceDomain())
 v(x)
+
+tpvx = tpv(tpx)
+vx = v(x)
+
+xdat = get_data(x)[1]
+result = evaluate(tpshapes,xdat)
+_result = evaluate(shapes,xdat)
+
+index_map = compute_nodes_and_comps_2_dof_map(;T,polytope=QUAD,orders)
+__result = TProduct.BasisFactors(Fill(shapes.factors[1].values,2),index_map)
+
+result = tpv(tpx)[1]
+
+@which return_cache(get_data(tpv)[1],get_data(x)[1])
+
+tpcache = return_cache(get_data(tpv)[1],get_data(tpx)[1])
+cache = return_cache(get_data(v)[1],get_data(x)[1])
+
+i = 1
+tpev = evaluate!(tpcache,get_data(tpv)[i],get_data(tpx)[i])
+ev = evaluate!(cache,get_data(v)[i],get_data(x)[i])
+
+i=2
+tpev = evaluate!(tpcache,tpshapes,get_data(tpx)[i])
+ev = evaluate!(cache,shapes,get_data(x)[i])
+
+factors = ev.factors
+f1 = factors[1]
+index_map = compute_nodes_and_comps_2_dof_map(;T,polytope=QUAD,orders)
+Φ = TProduct.BasisFactors(Fill(shapes.factors[1].values,2),index_map)
+
+
+
+
+
+
+
 
 f(x) = x
 

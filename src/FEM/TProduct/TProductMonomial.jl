@@ -14,7 +14,7 @@ end
 
 function TensorProductMonomialBasis(::Type{T},p::Polytope{D},orders) where {T,D}
   function _compute_1d_mbasis(order=first(orders))
-    compute_monomial_basis(T,SEGMENT,(order,)) # eltype(T)
+    compute_monomial_basis(T,SEGMENT,(order,))
   end
   isotropy = Isotropy(orders)
   factors = isotropy==Isotropic() ? Fill(_compute_1d_mbasis(),D) : map(_compute_1d_mbasis,orders)
@@ -40,6 +40,15 @@ get_factors(b::TensorProductMonomialBasis) = b.factors
 
 Arrays.get_array(a::CachedArray) = a.array
 
+function compute_nodes_and_comps_2_dof_map(a::MonomialBasis{D,T},nodes_map::NodesMap) where {D,T}
+  orders = get_orders(a)
+  compute_nodes_and_comps_2_dof_map(nodes_map;T,orders)
+end
+
+function compute_nodes_and_comps_2_dof_map(a::TensorProductMonomialBasis,nodes_map::NodesMap)
+  compute_nodes_and_comps_2_dof_map(get_field(a),nodes_map)
+end
+
 function Arrays.return_cache(
   f::TensorProductMonomialBasis{D},
   x::AbstractTensorProductPoints{D}
@@ -47,9 +56,11 @@ function Arrays.return_cache(
 
   factors = get_factors(f)
   points = get_factors(x)
+  nodes_map = get_indices_map(x)
+  indices_map = compute_nodes_and_comps_2_dof_map(f,nodes_map)
   r,v,c = return_cache(factors[1],points[1])
   vr = Vector{typeof(get_array(r))}(undef,D)
-  return vr,(r,v,c)
+  return indices_map,vr,(r,v,c)
 end
 
 function Arrays.evaluate!(
@@ -58,34 +69,37 @@ function Arrays.evaluate!(
   x::AbstractTensorProductPoints{D}
   ) where D
 
-  vr,c = cache
+  indices_map,vr,c = cache
   factors = get_factors(f)
   points = get_factors(x)
   @inbounds for d = 1:D
     vr[d] = evaluate!(c,factors[d],points[d])
   end
-  return vr
+  return FieldFactors(vr,indices_map,Anisotropic())
 end
 
 # Isotropic shortcuts
 
 function Arrays.return_cache(
-  f::TensorProductMonomialBasis,
+  f::TensorProductMonomialBasis{D,Isotropic},
   x::TensorProductNodes{D,Isotropic}) where D
 
   factors = get_factors(f)
   points = get_factors(x)
-  return return_cache(factors[1],points[1])
+  nodes_map = get_indices_map(x)
+  indices_map = compute_nodes_and_comps_2_dof_map(f,nodes_map)
+  return indices_map,return_cache(factors[1],points[1])
 end
 
 function Arrays.evaluate!(
-  cache,
-  f::TensorProductMonomialBasis{D},
+  _cache,
+  f::TensorProductMonomialBasis{D,Isotropic},
   x::TensorProductNodes{D,Isotropic}
   ) where D
 
+  indices_map,cache = _cache
   factors = get_factors(f)
   points = get_factors(x)
   r = evaluate!(cache,factors[1],points[1])
-  return Fill(r,D)
+  return FieldFactors(Fill(r,D),indices_map,Isotropic())
 end

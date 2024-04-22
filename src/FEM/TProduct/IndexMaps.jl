@@ -49,21 +49,32 @@ end
 struct NodesAndComps2DofsMap{A,B} <: IndexMap
   nodes_map::A
   dofs_map::B
-  ndofs::Int
 end
 
-ReferenceFEs.num_nodes(a::NodesAndComps2DofsMap) = num_nodes(a.nodes_map)
-ReferenceFEs.num_components(a::NodesAndComps2DofsMap) = Int(num_dofs(a)/num_nodes(a))
-ReferenceFEs.num_dofs(a::NodesAndComps2DofsMap) = a.ndofs
-Base.getindex(a::NodesAndComps2DofsMap,i::Integer) = a.indices[i]
+ReferenceFEs.num_nodes(a::NodesAndComps2DofsMap) = size(a.nodes_map,1)
+ReferenceFEs.num_components(a::NodesAndComps2DofsMap) = size(a.nodes_map,2)
+ReferenceFEs.num_dofs(a::NodesAndComps2DofsMap) = length(a.dofs_map)
 
 function compute_nodes_and_comps_2_dof_map(
   nodes_map::NodesMap{D};
+  T=Float64,
   orders=tfill(1,Val(D)),
-  dofs_map=_get_terms(orders),
-  ndofs=num_nodes(nodes_map)) where D
+  dofs_map=_get_terms(orders)) where D
 
-  NodesAndComps2DofsMap(nodes_map,dofs_map,ndofs)
+  ncomps = num_components(T)
+  local_nnodes = orders.+1
+  global_nnodes = num_nodes(nodes_map)
+  _nodes_map = nodes_map.indices
+
+  nodes_map_comp = zeros(CartesianIndex{D},global_nnodes,ncomps)
+  dofs_map_comp = zeros(CartesianIndex{D},global_nnodes,ncomps)
+  @inbounds for comp in 1:ncomps
+    for node in 1:global_nnodes
+      nodes_map_comp[node,comp] = CartesianIndex((comp-1).*local_nnodes.+Tuple(_nodes_map[node]))
+      dofs_map_comp[node,comp] = CartesianIndex((Tuple(dofs_map[node]).-1).*ncomps.+comp)
+    end
+  end
+  NodesAndComps2DofsMap(nodes_map_comp,dofs_map_comp)
 end
 
 function compute_nodes_and_comps_2_dof_map(;

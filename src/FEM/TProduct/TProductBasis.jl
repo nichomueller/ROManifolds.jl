@@ -15,7 +15,7 @@ struct TensorProductDofBases{D,I,T,A,B,C} <: AbstractVector{T}
     factors::A,
     basis::B,
     nodes::C,
-    isotropy::I
+    isotropy::I=Isotropy(factors)
     ) where {D,I,T,A,B<:AbstractVector{T},C<:TensorProductNodes{D}}
 
     new{D,I,T,A,B,C}(factors,basis,nodes,isotropy)
@@ -24,7 +24,7 @@ end
 
 function TensorProductDofBases(::Type{T},p::Polytope{D},::Lagrangian,orders) where {T,D}
   function _compute_1d_dbasis(order=first(orders))
-    LagrangianDofBasis(eltype(T),SEGMENT,(order,))
+    LagrangianDofBasis(T,SEGMENT,(order,)) #eltype(T)
   end
   isotropy = Isotropy(orders)
   factors = isotropy==Isotropic() ? Fill(_compute_1d_dbasis(),D) : map(_compute_1d_dbasis,orders)
@@ -117,9 +117,7 @@ function Arrays.return_cache(
   ) where D
 
   nodes_map = get_indices_map(a)
-  orders = get_orders(field)
-  ndofs = size(field,1)
-  indices_map = compute_nodes_and_comps_2_dof_map(nodes_map;orders,ndofs)
+  indices_map = compute_nodes_and_comps_2_dof_map(field,nodes_map)
   bfactors = get_factors(a)
   ffactors = get_factors(field)
   s,v,c = return_cache(bfactors[1],ffactors[1])
@@ -150,10 +148,8 @@ function Arrays.return_cache(
   field::TensorProductMonomialBasis{D,Isotropic}
   ) where D
 
-  indices_map = get_indices_map(a)
-  orders = get_orders(field)
-  ndofs = size(field,1)
-  indices_map = compute_nodes_and_comps_2_dof_map(indices_map;orders,ndofs)
+  nodes_map = get_indices_map(a)
+  indices_map = compute_nodes_and_comps_2_dof_map(field,nodes_map)
   bfactors = get_factors(a)
   ffactors = get_factors(field)
   cache = return_cache(bfactors[1],ffactors[1])
