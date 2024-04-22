@@ -26,6 +26,38 @@ D = 2
 T = VectorValue{2,Float64}
 order = 2
 
+orders = (2,2)
+prebasis = TensorProductMonomialBasis(T,QUAD,orders)
+dof_basis = TensorProductDofBases(T,QUAD,lagrangian,orders)
+pd = evaluate(dof_basis,prebasis)
+
+tpϕx = evaluate(tpprebasis,tpdof_basis.nodes)
+
+###################
+nodes_map = compute_nodes_map(;polytope=QUAD,orders)
+ndofs = 18
+indices_map = compute_nodes_and_comps_2_dof_map(nodes_map;orders,ndofs)
+ϕx = evaluate(prebasis,dof_basis.nodes)
+bf = TProduct.FieldFactors(ϕx,indices_map,Isotropic())
+
+nodei,j = 2,3
+factors = get_factors(bf)
+indices_map = get_indices_map(bf)
+ncomps = num_components(indices_map)
+compj = FEM.fast_index(j,ncomps)
+nodej = FEM.slow_index(j,ncomps)
+rowi = indices_map.nodes_map[nodei]
+colj = indices_map.dofs_map[nodej]
+kk = ntuple(d->factors[d][rowi[d],colj[d]],length(factors))
+
+Base.:*(a::VectorValue,b::VectorValue) = Point(map(*,a.data,b.data))
+B = zeros(VectorValue{2,Float64},9,18)
+for i = axes(B,1)
+  entry = indices_map.nodes_map[i]
+  B[i,:] = kronecker(factors[2][entry[2],:],factors[1][entry[1],:])
+end
+###################
+
 reffe = ReferenceFE(QUAD,TProduct.tplagrangian,T,order)
 shapes = get_shapefuns(reffe)
 dof_basis = get_dof_basis(reffe)
@@ -51,27 +83,65 @@ quad = Quadrature(QUAD,tpquadrature,degree)
 cell_quad = CellQuadrature(trian,degree)
 # _cell_quad = CellQuadrature(trian,quad)
 
-x = get_cell_points(cell_quad)
-@assert all(v(x) .≈ tpv(x))
+tpx = get_cell_points(cell_quad)
+@assert all(v(tpx) .≈ tpv(tpx))
 
 tpgrid = CartesianGrid(domain,partition)
 affmap = get_cell_map(tpgrid)[1]
 
 tpn = TensorProductNodes(map(get_coordinates,quad.factors),quad.quad_map,TProduct.Isotropic())
 x = CellPoint(Fill(tpn,4),trian,ReferenceDomain())
+v(x)
 
-_cache = return_cache(affmap,tpn)
-# evaluate!(_cache,affmap,tpn)
-factors,indices_map,cache = _cache
-points = get_factors(tpn)
-r = evaluate!(cache,factors[1],points[1])
-tpr = TProduct.FieldFactors(Fill(r,D),indices_map,Isotropic())
+f(x) = x
 
-_vx = evaluate!(cache,get_data(v),get_data(_x))
+tpvfx = (tpv⋅f)(tpx)
+vfx = (v⋅f)(x)
 
-_ξ = get_data(_x)[1]
-_c = return_cache(ϕ,_ξ)
-evaluate!(_c,ϕ,_ξ)
+op1 = tpv⋅f
+ax = map(i->i(x),op1.args)
+# lazy_map(Fields.BroadcastingFieldOpMap(op1.op.op),ax...)
+item = ax[1][1],ax[2][1]
+k = Fields.BroadcastingFieldOpMap(op1.op.op)
+cache = return_cache(k,item...)
+eval1 = evaluate!(cache,k,item...)
+
+# function return_cache(f::Broadcasting,x::Union{Number,AbstractArray{<:Number}}...)
+#   s = map(_size,x)
+#   bs = Base.Broadcast.broadcast_shape(s...)
+#   T = return_type(f.f,map(testitem,x)...)
+#   r = fill(testvalue(T),bs)
+#   cache = CachedArray(r)
+#   _prepare_cache!(cache,x...)
+#   cache
+# end
+
+# function evaluate!(
+#   cache,
+#   f::BroadcastingFieldOpMap,
+#   b::AbstractMatrix,
+#   a::AbstractVector)
+
+#   @check size(a,1) == size(b,1)
+#   np, ni = size(b)
+#   setsize!(cache,(np,ni))
+#   r = cache.array
+#   for p in 1:np
+#     ap = a[p]
+#     for i in 1:ni
+#       r[p,i] = f.op(b[p,i],ap)
+#     end
+#   end
+#   r
+# end
+
+op2 = v⋅f
+ax = map(i->i(x),op2.args)
+# lazy_map(Fields.BroadcastingFieldOpMap(op2.op.op),ax...)
+item = ax[1][1],ax[2][1]
+k = Fields.BroadcastingFieldOpMap(op2.op.op)
+cache = return_cache(k,item...)
+evaluate!(cache,k,item...)
 
 grid = TensorProductGrid(domain,partition)
 tpgrid = CartesianGrid(domain,partition)

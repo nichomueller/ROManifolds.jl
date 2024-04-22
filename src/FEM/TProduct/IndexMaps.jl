@@ -5,6 +5,7 @@ struct NodesMap{D} <: IndexMap
 end
 
 ReferenceFEs.num_nodes(a::NodesMap) = length(a.indices)
+ReferenceFEs.num_dofs(a::NodesMap) = @notimplemented
 Base.getindex(a::NodesMap,i::Integer) = a.indices[i]
 
 function _index_inclusion(orders,α,β)
@@ -54,6 +55,7 @@ end
 ReferenceFEs.num_nodes(a::NodesAndComps2DofsMap) = num_nodes(a.nodes_map)
 ReferenceFEs.num_components(a::NodesAndComps2DofsMap) = Int(num_dofs(a)/num_nodes(a))
 ReferenceFEs.num_dofs(a::NodesAndComps2DofsMap) = a.ndofs
+Base.getindex(a::NodesAndComps2DofsMap,i::Integer) = a.indices[i]
 
 function compute_nodes_and_comps_2_dof_map(
   nodes_map::NodesMap{D};

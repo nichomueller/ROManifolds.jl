@@ -1,27 +1,62 @@
+mydot(a::NTuple{N,Number}) where N = mydot(a...)
+mydot(a::Number...) = mydot(a[1],mydot(a[2:end]...))
+mydot(a::Number,b::Number) = dot(a,b)
+mydot(a::Number) = a
+mydot(a::VectorValue,b::Number) = sum(a)*b
+mydot(a::Number,b::VectorValue) = sum(b)*a
+mydot(a::VectorValue,b::VectorValue) = dot(a,b)
+mydot(a::VectorValue) = sum(a)
+
+myprod(a::NTuple{N,Number}) where N = myprod(a...)
+myprod(a::Number...) = myprod(a[1],myprod(a[2:end]...))
+myprod(a::Number,b::Number) = *(a,b)
+myprod(a::Number) = a
+myprod(a::VectorValue,b::VectorValue) = Point(map(*,a.data,b.data))
+
 abstract type TensorProductFactors{T,N} <: AbstractArray{T,N} end
 
-struct FieldFactors{I,T,A,B} <: TensorProductFactors{T,1}
+struct FieldFactors{I,T,N,A,B} <: TensorProductFactors{T,N}
   factors::A
   indices_map::B
   isotropy::I
   function FieldFactors(
     factors::A,indices_map::B,isotropy::I
-    ) where {T,A<:AbstractVector{<:AbstractVector{T}},B<:NodesMap,I}
-    new{I,T,A,B}(factors,indices_map,isotropy)
+    ) where {T,N,A<:AbstractVector{<:AbstractArray{T,N}},B<:IndexMap,I}
+    new{I,T,N,A,B}(factors,indices_map,isotropy)
   end
 end
-
-Base.size(a::FieldFactors) = (num_nodes(a.indices_map),)
-Base.axes(a::FieldFactors) = (Base.OneTo(num_nodes(a.indices_map)),)
 
 get_factors(a::FieldFactors) = a.factors
 get_indices_map(a::FieldFactors) = a.indices_map
 
-function Base.getindex(a::FieldFactors,i::Integer)
+const VFieldFactors = FieldFactors{I,T,1,A,B} where {I,T,A,B}
+const MFieldFactors = FieldFactors{I,T,2,A,B} where {I,T,A,B}
+
+Base.size(a::VFieldFactors) = (num_nodes(a.indices_map),)
+Base.axes(a::VFieldFactors) = (Base.OneTo(num_nodes(a.indices_map)),)
+
+function Base.getindex(a::VFieldFactors,i::Integer)
   factors = get_factors(a)
   entry = get_indices_map(a)[i]
-  return prod(map(d->factors[d][entry[d]],eachindex(factors)))
+  return myprod(map(d->factors[d][entry[d]],eachindex(factors)))
 end
+
+Base.size(a::MFieldFactors) = (num_nodes(a.indices_map),num_dofs(a.indices_map))
+Base.axes(a::MFieldFactors) = (Base.OneTo(num_nodes(a.indices_map)),Base.OneTo(num_dofs(a.indices_map)))
+
+function Base.getindex(a::MFieldFactors,nodei::Integer,j::Integer)
+  factors = get_factors(a)
+  indices_map = get_indices_map(a)
+  ncomps = num_components(indices_map)
+  compj = FEM.fast_index(j,ncomps)
+  nodej = FEM.slow_index(j,ncomps)
+  rowi = indices_map.nodes_map[nodei]
+  colj = indices_map.dofs_map[nodej]
+  return myprod(ntuple(d->factors[d][rowi[d],colj[d]],length(factors)))
+end
+
+# Vector-valued bases are flattened out. For e.g., a 1x2 matrix of eltype
+# VectorValue{2,T} becomes a 2x2 matrix of eltype T
 
 struct BasisFactors{I,T,A,B} <: TensorProductFactors{T,2}
   factors::A
@@ -30,12 +65,13 @@ struct BasisFactors{I,T,A,B} <: TensorProductFactors{T,2}
   function BasisFactors(
     factors::A,indices_map::B,isotropy::I
     ) where {T,A<:AbstractVector{<:AbstractMatrix{T}},B<:NodesAndComps2DofsMap,I}
-    new{I,T,A,B}(factors,indices_map,isotropy)
+    E = eltype(T)
+    new{I,E,A,B}(factors,indices_map,isotropy)
   end
 end
 
-Base.size(a::BasisFactors) = (a.indices_map.ndofs,a.indices_map.ndofs)
-Base.axes(a::BasisFactors) = (Base.OneTo(a.indices_map.ndofs),Base.OneTo(a.indices_map.ndofs))
+Base.size(a::BasisFactors) = (num_dofs(a.indices_map),num_dofs(a.indices_map))
+Base.axes(a::BasisFactors) = (Base.OneTo(num_dofs(a.indices_map)),Base.OneTo(num_dofs(a.indices_map)))
 
 get_factors(a::BasisFactors) = a.factors
 get_indices_map(a::BasisFactors) = a.indices_map
@@ -54,5 +90,5 @@ function Base.getindex(a::BasisFactors,i::Integer,j::Integer)
   nodej = FEM.slow_index(j,ncomps)
   rowi = indices_map.nodes_map[nodei]
   colj = indices_map.dofs_map[nodej]
-  return prod(map(d->factors[d][rowi[d],colj[d]],eachindex(factors)))
+  return mydot(ntuple(d->factors[d][rowi[d],colj[d]],length(factors)))
 end

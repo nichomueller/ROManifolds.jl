@@ -14,7 +14,7 @@ end
 
 function TensorProductMonomialBasis(::Type{T},p::Polytope{D},orders) where {T,D}
   function _compute_1d_mbasis(order=first(orders))
-    compute_monomial_basis(eltype(T),SEGMENT,(order,))
+    compute_monomial_basis(T,SEGMENT,(order,)) # eltype(T)
   end
   isotropy = Isotropy(orders)
   factors = isotropy==Isotropic() ? Fill(_compute_1d_mbasis(),D) : map(_compute_1d_mbasis,orders)

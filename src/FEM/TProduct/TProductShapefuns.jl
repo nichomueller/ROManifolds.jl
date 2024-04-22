@@ -69,7 +69,7 @@ function Arrays.evaluate!(
   x::TensorProductNodes{D,Isotropic}
   ) where D
 
-  indices_map,c = _cache
+  indices_map,c = cache
   factors = get_factors(a)
   points = get_factors(x)
   r = evaluate!(c,factors[1],points[1])

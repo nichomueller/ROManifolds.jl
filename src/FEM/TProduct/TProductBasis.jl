@@ -116,10 +116,10 @@ function Arrays.return_cache(
   field::TensorProductMonomialBasis{D}
   ) where D
 
-  indices_map = get_indices_map(a)
+  nodes_map = get_indices_map(a)
   orders = get_orders(field)
   ndofs = size(field,1)
-  indices_map = compute_nodes_and_comps_2_dof_map(indices_map;orders,ndofs)
+  indices_map = compute_nodes_and_comps_2_dof_map(nodes_map;orders,ndofs)
   bfactors = get_factors(a)
   ffactors = get_factors(field)
   s,v,c = return_cache(bfactors[1],ffactors[1])

@@ -146,7 +146,7 @@ function Arrays.evaluate!(_cache,a::AffineMap,x::AbstractTensorProductPoints{D,I
   factors,indices_map,cache = _cache
   points = get_factors(x)
   r = evaluate!(cache,factors[1],points[1])
-  tensor_product_points(typeof(x),r,indices_map)
+  tensor_product_points(typeof(x),Fill(r,D),indices_map)
 end
 
 # gradients
