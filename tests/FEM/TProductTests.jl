@@ -71,6 +71,11 @@ tpx = get_cell_points(cell_quad)
 @assert all(tpv(x) .≈ tpv(tpx))
 @assert all(v(x) .≈ tpv(tpx))
 
+_get_values(a::Fields.LinearCombinationFieldVector) = a.values
+ϕ = _get_values(tpshapes)
+ψ = TProduct.FieldFactors(map(_get_values,factors),indices_map,Isotropic())
+@assert ψ[shapes.shapes_indices_map] == ϕ
+
 tpn = TensorProductNodes(map(get_coordinates,quad.factors),quad.quad_map,TProduct.Isotropic())
 x = CellPoint(Fill(tpn,4),trian,ReferenceDomain())
 v(x)
@@ -78,91 +83,10 @@ v(x)
 tpvx = tpv(tpx)
 vx = v(x)
 
-xdat = get_data(x)[1]
-result = evaluate(tpshapes,xdat)
-_result = evaluate(shapes,xdat)
+v1 = get_data(v)[1]
+x1 = get_data(x)[1]
+v1x1 = evaluate(v1,x1)
 
-index_map = compute_nodes_and_comps_2_dof_map(;T,polytope=QUAD,orders)
-__result = TProduct.BasisFactors(Fill(shapes.factors[1].values,2),index_map)
-
-result = tpv(tpx)[1]
-
-@which return_cache(get_data(tpv)[1],get_data(x)[1])
-
-tpcache = return_cache(get_data(tpv)[1],get_data(tpx)[1])
-cache = return_cache(get_data(v)[1],get_data(x)[1])
-
-i = 1
-tpev = evaluate!(tpcache,get_data(tpv)[i],get_data(tpx)[i])
-ev = evaluate!(cache,get_data(v)[i],get_data(x)[i])
-
-i=2
-tpev = evaluate!(tpcache,tpshapes,get_data(tpx)[i])
-ev = evaluate!(cache,shapes,get_data(x)[i])
-
-factors = ev.factors
-f1 = factors[1]
-index_map = compute_nodes_and_comps_2_dof_map(;T,polytope=QUAD,orders)
-Φ = TProduct.BasisFactors(Fill(shapes.factors[1].values,2),index_map)
-
-
-
-
-
-
-
-
-f(x) = x
-
-tpvfx = (tpv⋅f)(tpx)
-vfx = (v⋅f)(x)
-
-op1 = tpv⋅f
-ax = map(i->i(x),op1.args)
-# lazy_map(Fields.BroadcastingFieldOpMap(op1.op.op),ax...)
-item = ax[1][1],ax[2][1]
-k = Fields.BroadcastingFieldOpMap(op1.op.op)
-cache = return_cache(k,item...)
-eval1 = evaluate!(cache,k,item...)
-
-# function return_cache(f::Broadcasting,x::Union{Number,AbstractArray{<:Number}}...)
-#   s = map(_size,x)
-#   bs = Base.Broadcast.broadcast_shape(s...)
-#   T = return_type(f.f,map(testitem,x)...)
-#   r = fill(testvalue(T),bs)
-#   cache = CachedArray(r)
-#   _prepare_cache!(cache,x...)
-#   cache
-# end
-
-# function evaluate!(
-#   cache,
-#   f::BroadcastingFieldOpMap,
-#   b::AbstractMatrix,
-#   a::AbstractVector)
-
-#   @check size(a,1) == size(b,1)
-#   np, ni = size(b)
-#   setsize!(cache,(np,ni))
-#   r = cache.array
-#   for p in 1:np
-#     ap = a[p]
-#     for i in 1:ni
-#       r[p,i] = f.op(b[p,i],ap)
-#     end
-#   end
-#   r
-# end
-
-op2 = v⋅f
-ax = map(i->i(x),op2.args)
-# lazy_map(Fields.BroadcastingFieldOpMap(op2.op.op),ax...)
-item = ax[1][1],ax[2][1]
-k = Fields.BroadcastingFieldOpMap(op2.op.op)
-cache = return_cache(k,item...)
-evaluate!(cache,k,item...)
-
-grid = TensorProductGrid(domain,partition)
-tpgrid = CartesianGrid(domain,partition)
-
-@assert all(get_node_coordinates(grid) .== get_node_coordinates(tpgrid))
+tpv1 = get_data(tpv)[1]
+tpx1 = get_data(tpx)[1]
+tpv1x1 = evaluate(tpv1,tpx1)

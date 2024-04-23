@@ -92,3 +92,32 @@ function Base.getindex(a::BasisFactors,i::Integer,j::Integer)
   colj = indices_map.dofs_map[nodej,compj]
   return mydot(ntuple(d->factors[d][rowi[d],colj[d]],length(factors)))
 end
+
+function compose(factors::TensorProductFactors,indices_map)
+  CompositeTensorProductFactors(factors,indices_map)
+end
+
+struct CompositeTensorProductFactors{T,N,A,B} <: TensorProductFactors{T,N}
+  factors::A
+  indices_map::B
+  function CompositeTensorProductFactors(
+    factors::A,
+    indices_map::B
+    ) where {T,N,A<:TensorProductFactors{T,N},B}
+    new{T,N,A,B}(factors,indices_map)
+  end
+end
+
+get_factors(a::CompositeTensorProductFactors) = a.factors
+get_indices_map(a::CompositeTensorProductFactors) = a.indices_map
+
+Base.size(a::CompositeTensorProductFactors) = size(a.factors)
+Base.axes(a::CompositeTensorProductFactors) = axes(a.factors)
+
+# Base.IndexStyle(::CompositeTensorProductFactors) = IndexLinear()
+
+function Base.getindex(a::CompositeTensorProductFactors,i::Integer...)
+  factors = get_factors(a)
+  mappedi = get_indices_map(a)[i...]
+  getindex(factors,mappedi)
+end
