@@ -26,10 +26,6 @@ D = 2
 T = Float64#VectorValue{2,Float64}
 order = 2
 
-# # dim 1
-# reffe1 = ReferenceFE(SEGMENT,lagrangian,T,order)
-# v1 = FESpaces.get_cell_dof_basis(model,Fill(reffe1,4),GradConformity())
-
 orders = (2,2)
 prebasis = TensorProductMonomialBasis(T,QUAD,orders)
 dof_basis = TensorProductDofBases(T,QUAD,lagrangian,orders)
@@ -90,3 +86,58 @@ v1x1 = evaluate(v1,x1)
 tpv1 = get_data(tpv)[1]
 tpx1 = get_data(tpx)[1]
 tpv1x1 = evaluate(tpv1,tpx1)
+
+#evaluate shapefun at x
+trian = Triangulation(model)
+degree = TProduct.order_2_degree(order)
+quad = Quadrature(QUAD,tensor_product,degree)
+cell_quad = CellQuadrature(trian,degree)
+x = get_cell_points(cell_quad)
+reffe = ReferenceFE(QUAD,lagrangian,VectorValue{2,Float64},order)
+shapes = get_shapefuns(reffe)
+
+x1 = get_data(x)[1]
+ϕ1 = shapes
+cache = return_cache(ϕ1,x1)
+# evaluate!(cache,ϕ1,x1)
+cf,ck = cache
+fx = evaluate!(cf,ϕ1.fields,x1) # monomial basis at x1
+v = ϕ1.values
+k = Fields.LinearCombinationMap(:)
+# evaluate!(ck,k,v,fx)
+setsize!(ck,(size(fx,1),size(v,2)))
+r = ck.array
+# @inbounds for p in axes(fx,1)
+#   for j in axes(r,2)
+#     rj = zero(eltype(r))
+#     for i in axes(fx,2)
+#       rj += outer(fx[p,i],v[i,j])
+#     end
+#     r[p,j] = rj
+#   end
+# end
+p,j = 1,1
+rj = zero(eltype(r))
+for i in axes(fx,2)
+  rj += outer(fx[p,i],v[i,j])
+end
+
+C = evaluate(reffe.reffe.dofs,reffe.reffe.prebasis)
+px = evaluate(reffe.reffe.prebasis,reffe.reffe.dofs.nodes)
+
+_reffe = ReferenceFE(QUAD,TProduct.tplagrangian,T,order)
+_C = evaluate(_reffe.dof_basis,_reffe.prebasis)
+
+using OneHotArrays
+using Kronecker
+K = OneHotMatrix([1,2,5,3,4,6,7,8,9],9)
+C ≈ K*kronecker(get_factors(_C)...)
+
+_x = _reffe.dof_basis.nodes
+_px = get_factors(evaluate(_reffe.prebasis,_x))
+
+px ≈ K*kronecker(_px...)
+
+shapex = evaluate(reffe.reffe.shapefuns,reffe.reffe.dofs.nodes)
+_shapex = kronecker(map(inv,get_factors(_C))...)*kronecker(_px...)
+shapex ≈  _shapex

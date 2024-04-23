@@ -1,5 +1,16 @@
 using Gridap
-using Test
+using Gridap.Algebra
+using Gridap.Arrays
+using Gridap.CellData
+using Gridap.FESpaces
+using Gridap.Fields
+using Gridap.Geometry
+using Gridap.MultiField
+using Gridap.ODEs
+using Gridap.Polynomials
+using Gridap.ReferenceFEs
+using Gridap.Helpers
+using BlockArrays
 using DrWatson
 using Mabla.FEM
 using Mabla.RB
@@ -7,14 +18,14 @@ using Mabla.RB
 θ = 0.5
 dt = 0.01
 t0 = 0.0
-tf = 0.1
+tf = 0.05
 
 pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
 domain = (0,1,0,1)
-partition = (10,10)
+partition = (2,2)
 model = CartesianDiscreteModel(domain,partition)
 
 labels = get_face_labeling(model)
@@ -57,7 +68,7 @@ trian_res = (Ω,Γn)
 trian_stiffness = (Ω,)
 trian_mass = (Ω,)
 
-induced_norm(du,v) = ∫(v*u)dΩ + ∫(∇(v)⋅∇(du))dΩ
+induced_norm(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 trian_res = (Ω,Γn)
 trian_jac = (Ω,)
@@ -66,13 +77,13 @@ trian_jac_t = (Ω,)
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
-feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
+feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
   trial,test,trian_res,trian_stiffness,trian_mass)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=5,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=5,nsnaps_test=5,nsnaps_mdeim=2)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1")))
 
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ;tt_format=true)
@@ -87,70 +98,8 @@ save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)
 
-using Gridap
-using Gridap.Algebra
-using Gridap.Arrays
-using Gridap.CellData
-using Gridap.FESpaces
-using Gridap.Fields
-using Gridap.Geometry
-using Gridap.MultiField
-using Gridap.ODEs
-using Gridap.Polynomials
-using Gridap.ReferenceFEs
-using Gridap.Helpers
-using BlockArrays
-
-using Mabla.FEM
-using Mabla.RB
-
-domain = (0,1,0,1)
-partition = (2,2)
-model = CartesianDiscreteModel(domain,partition)
-labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
-add_tag_from_tags!(labels,"neumann",[7])
-
-order = 2
-reffe = ReferenceFE(lagrangian,Float64,order)
-
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-
-# reffe1 = ReferenceFE(QUAD,lagrangian,Float64,order)
-# reffe2 = ReferenceFE(QUAD,lagrangian,VectorValue{2,Float64},order)
-
-# _reffe1 = ReferenceFE(QUAD,FEM.tplagrangian,Float64,order)
-
-# basis,reffe_args,reffe_kwargs = reffe
-# cell_reffe = ReferenceFE(model,basis,reffe_args...;reffe_kwargs...)
-
-# _reffe = ReferenceFE(FEM.tplagrangian,Float64,order)
-# _basis,_reffe_args,_reffe_kwargs = _reffe
-# _cell_reffe = ReferenceFE(model,_basis,_reffe_args...;_reffe_kwargs...)
-# conf = Conformity(testitem(_cell_reffe),:H1)
-
-# cell_fe = CellFE(model,_cell_reffe,conf)
-Ω = Triangulation(model)
-dΩ = Measure(Ω,2)
-
-stiff(du,v) = ∫(∇(du)⋅∇(v))dΩ
-U = TrialFESpace(test,x->sum(x))
-V = test
-assemble_matrix(stiff,U,V)
-
-
-a = SparseMatrixAssembler(U,V)
-v = get_fe_basis(V)
-u = get_trial_fe_basis(U)
-
-∇(u)⋅∇(v)
-
-function Arrays.return_cache(b::LagrangianDofBasis,field)
-  error("stop here")
-  cf = return_cache(field,b.nodes)
-  vals = evaluate!(cf,field,b.nodes)
-  ndofs = length(b.dof_to_node)
-  r = _lagr_dof_cache(vals,ndofs)
-  c = CachedArray(r)
-  (c, cf)
-end
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+odeop = get_algebraic_operator(feop)
+pop = PODOperator(odeop,trial,test)
+smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
+A,b = jacobian_and_residual(rbsolver,pop,smdeim)
