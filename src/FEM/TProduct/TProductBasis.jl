@@ -80,7 +80,7 @@ function Arrays.evaluate!(
   @inbounds for d = 1:D
     r[d] = evaluate!(cache,bfactors[d],ffactors[d])
   end
-  tpr = BasisFactors(r,indices_map,Anisotropic())
+  tpr = FieldFactors(r,indices_map,Anisotropic())
   return tpr
 end
 
@@ -106,6 +106,6 @@ function Arrays.evaluate!(
   ffactors = get_factors(field)
   indices_map = get_indices_map(field)
   r = evaluate!(cache,bfactors[1],ffactors[1])
-  tpr = BasisFactors(Fill(r,D),indices_map,Isotropic())
+  tpr = FieldFactors(Fill(r,D),indices_map,Isotropic())
   return tpr
 end

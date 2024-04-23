@@ -16,6 +16,7 @@ using Mabla.FEM
 import FillArrays: Fill,fill
 import IterTools: subsets
 import Kronecker: kronecker
+import OneHotArrays: OneHotMatrix
 import Test: @test
 import UnPack: @unpack
 import Gridap.Fields: OperationField,BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
@@ -28,9 +29,7 @@ include("Utils.jl")
 
 export IndexMap
 export NodesMap
-export NodesAndComps2DofsMap
 export compute_nodes_map
-export compute_nodes_and_comps_2_dof_map
 include("IndexMaps.jl")
 
 export Isotropy

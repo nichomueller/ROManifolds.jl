@@ -18,7 +18,7 @@ function TensorProductMonomialBasis(::Type{T},p::Polytope{D},orders) where {T,D}
     compute_monomial_basis(T,SEGMENT,(order,))
   end
   isotropy = Isotropy(orders)
-  indices_map = compute_nodes_and_comps_2_dof_map(;T,polytope=p,orders)
+  indices_map = compute_nodes_map(;polytope=p,orders)
   factors = isotropy==Isotropic() ? Fill(_compute_1d_mbasis(),D) : map(_compute_1d_mbasis,orders)
   basis = _basis_from_factors(T,Val(D),factors)
   TensorProductMonomialBasis(factors,basis,indices_map,isotropy)

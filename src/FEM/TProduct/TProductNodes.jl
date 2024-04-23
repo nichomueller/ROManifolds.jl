@@ -19,25 +19,26 @@ ReferenceFEs.num_dims(::AbstractTensorProductPoints{D}) where D = D
 get_isotropy(::AbstractTensorProductPoints{D,I} where D) where I = I
 tensor_product_points(::Type{<:AbstractTensorProductPoints},nodes,::NodesMap) = @abstractmethod
 
-struct TensorProductNodes{D,I,T,A} <: AbstractTensorProductPoints{D,I,T,1}
+struct TensorProductNodes{D,I,T,A,B} <: AbstractTensorProductPoints{D,I,T,1}
   nodes::A
-  indices_map::NodesMap{D}
+  indices_map::B
   isotropy::I
-  function TensorProductNodes{T}(
+  function TensorProductNodes(
+    ::Type{T},
     nodes::A,
-    indices_map::NodesMap{D},
+    indices_map::B,
     isotropy::I=Isotropy(nodes)
-    ) where {D,I,T,A}
-    new{D,I,T,A}(nodes,indices_map,isotropy)
+    ) where {D,I,T,A,B<:NodesMap{D}}
+    new{D,I,T,A,B}(nodes,indices_map,isotropy)
   end
 end
 
 function TensorProductNodes(nodes::NTuple{D,AbstractVector{Point{1,T}}},args...) where {D,T}
-  TensorProductNodes{T}(nodes,args...)
+  TensorProductNodes(T,nodes,args...)
 end
 
 function TensorProductNodes(nodes::AbstractVector{<:AbstractVector{Point{1,T}}},args...) where T
-  TensorProductNodes{T}(nodes,args...)
+  TensorProductNodes(T,nodes,args...)
 end
 
 function TensorProductNodes(polytope::Polytope{D},orders) where D

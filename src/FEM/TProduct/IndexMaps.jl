@@ -1,11 +1,11 @@
 abstract type IndexMap <: Map end
 
-struct NodesMap{D} <: IndexMap
+struct NodesMap{D,A} <: IndexMap
   indices::Vector{CartesianIndex{D}}
+  rmatrix::A
 end
 
 ReferenceFEs.num_nodes(a::NodesMap) = length(a.indices)
-ReferenceFEs.num_dofs(a::NodesMap) = @notimplemented
 Base.getindex(a::NodesMap,i::Integer) = a.indices[i]
 
 function _index_inclusion(orders,α,β)
@@ -24,7 +24,7 @@ function push_entries!(vids,I::CartesianIndices{D},perm=1:D) where D
   end
 end
 
-function compute_nodes_map(;
+function standard_nodes_map(;
   polytope::Polytope{D}=QUAD,
   orders=tfill(1,Val(D))) where D
 
@@ -36,52 +36,28 @@ function compute_nodes_map(;
       push_entries!(vids,ij)
     end
   end
-  return NodesMap(vids)
+  return vids
 end
 
 function trivial_nodes_map(;
   polytope::Polytope{D}=QUAD,
   orders=tfill(1,Val(D))) where D
 
-  NodesMap(_get_terms(orders))
+  return _get_terms(orders)
 end
 
-struct NodesAndComps2DofsMap{A,B} <: IndexMap
-  nodes_map::A
-  dofs_map::B
-end
-
-ReferenceFEs.num_nodes(a::NodesAndComps2DofsMap) = size(a.nodes_map,1)
-ReferenceFEs.num_components(a::NodesAndComps2DofsMap) = size(a.nodes_map,2)
-ReferenceFEs.num_dofs(a::NodesAndComps2DofsMap) = length(a.dofs_map)
-
-function compute_nodes_and_comps_2_dof_map(
-  nodes_map::NodesMap{D};
-  T=Float64,
-  orders=tfill(1,Val(D)),
-  dofs_map=_get_terms(orders)) where D
-
-  ncomps = num_components(T)
-  local_nnodes = orders.+1
-  global_nnodes = num_nodes(nodes_map)
-  _nodes_map = nodes_map.indices
-
-  nodes_map_comp = zeros(CartesianIndex{D},global_nnodes,ncomps)
-  dofs_map_comp = zeros(CartesianIndex{D},global_nnodes,ncomps)
-  @inbounds for comp in 1:ncomps
-    for node in 1:global_nnodes
-      nodes_map_comp[node,comp] = CartesianIndex((comp-1).*local_nnodes.+Tuple(_nodes_map[node]))
-      dofs_map_comp[node,comp] = CartesianIndex((Tuple(dofs_map[node]).-1).*ncomps.+comp)
-    end
-  end
-  NodesAndComps2DofsMap(nodes_map_comp,dofs_map_comp)
-end
-
-function compute_nodes_and_comps_2_dof_map(;
+function compute_nodes_map(;
   polytope::Polytope{D}=QUAD,
-  orders=tfill(1,Val(D)),
-  kwargs...) where D
+  orders=tfill(1,Val(D))
+  ) where D
 
-  nodes_map = compute_nodes_map(;polytope,orders)
-  compute_nodes_and_comps_2_dof_map(nodes_map;orders,kwargs...)
+  indices = standard_nodes_map(;polytope,orders)
+  ordered_indices = trivial_nodes_map(;polytope,orders)
+  ordered2indices = zeros(Int,length(indices))
+  tup = Tuple.(indices)
+  for (i,id) in enumerate(ordered_indices)
+    @inbounds ordered2indices[i] = findfirst([Tuple(id)] .== tup)
+  end
+  rmatrix = OneHotMatrix(ordered2indices,length(indices)) |> Matrix
+  return NodesMap(indices,rmatrix)
 end

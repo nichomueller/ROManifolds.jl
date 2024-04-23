@@ -48,10 +48,6 @@ function get_indices_map(a::KroneckerCoordinates{D}) where D
   trivial_nodes_map(;polytope,orders)
 end
 
-function tensor_product_points(::Type{<:KroneckerCoordinates},coords,::NodesMap)
-  KroneckerCoordinates(coords)
-end
-
 Base.size(a::KroneckerCoordinates,d::Integer) = size(a.coords[d],1)
 Base.size(a::KroneckerCoordinates{D}) where D = ntuple(d->size(a,d),Val(D))
 Base.IndexStyle(::Type{<:KroneckerCoordinates}) = IndexCartesian()

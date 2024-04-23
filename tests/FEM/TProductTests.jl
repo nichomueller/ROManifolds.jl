@@ -23,7 +23,7 @@ labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
 
 D = 2
-T = Float64#VectorValue{2,Float64}
+T = Float64
 order = 2
 
 orders = (2,2)
