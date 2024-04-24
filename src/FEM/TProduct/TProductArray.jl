@@ -1,21 +1,28 @@
 abstract type TensorProductFactors{T} <: AbstractArray{T,2} end
 
-struct FieldFactors{I,T,A,B} <: TensorProductFactors{T}
+struct FieldFactors{I,T,A,B,C} <: TensorProductFactors{T}
   factors::A
-  indices_map::B
+  product::B
+  row_map::C
+  col_map::C
   isotropy::I
   function FieldFactors(
-    factors::A,indices_map::B,isotropy::I=Isotropy(factors)
-    ) where {T,A<:AbstractVector{<:AbstractMatrix{T}},B<:IndexMap,I}
-    new{I,T,A,B}(factors,indices_map,isotropy)
+    factors::A,row_map::C,col_map::C=trivial(row_map),isotropy::I=Isotropy(factors)
+    ) where {T,A<:AbstractVector{<:AbstractMatrix{T}},C<:IndexMap,I}
+
+    product = kronecker(factors...)
+    B = typeof(product)
+    new{I,T,A,B,C}(factors,product,row_map,col_map,isotropy)
   end
 end
 
 get_factors(a::FieldFactors) = a.factors
-get_indices_map(a::FieldFactors) = a.indices_map
+get_indices_map(a::FieldFactors) = (a.row_map,a.col_map)
 
-Base.size(a::FieldFactors) = size(a.indices_map.rmatrix)
+Base.size(a::FieldFactors) = size(a.product)
 
 function Base.getindex(a::FieldFactors,i::Integer,j::Integer)
-  dot(a.indices_map.rmatrix[i,:],kronecker(a.factors...)[:,j])
+  rowi = a.row_map.rmatrix[i,:]
+  colj = a.col_map.rmatrix[:,j]
+  rowi'*a.product*colj
 end

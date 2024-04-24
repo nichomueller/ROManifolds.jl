@@ -17,14 +17,13 @@ function _index_inclusion(orders,α,β)
   end
 end
 
-function push_entries!(vids,I::CartesianIndices{D},perm=1:D) where D
-  ids = permutedims(collect(I),perm)
-  for idi in ids
-    push!(vids,idi)
+function push_entries!(vids,I::CartesianIndices{D}) where D
+  for id in I
+    push!(vids,id)
   end
 end
 
-function standard_nodes_map(;
+function standard_indices(;
   polytope::Polytope{D}=QUAD,
   orders=tfill(1,Val(D))) where D
 
@@ -39,7 +38,7 @@ function standard_nodes_map(;
   return vids
 end
 
-function trivial_nodes_map(;
+function trivial_indices(;
   polytope::Polytope{D}=QUAD,
   orders=tfill(1,Val(D))) where D
 
@@ -48,11 +47,12 @@ end
 
 function compute_nodes_map(;
   polytope::Polytope{D}=QUAD,
-  orders=tfill(1,Val(D))
+  orders=tfill(1,Val(D)),
+  ordered=false
   ) where D
 
-  indices = standard_nodes_map(;polytope,orders)
-  ordered_indices = trivial_nodes_map(;polytope,orders)
+  indices = ordered ? trivial_indices(;polytope,orders) : standard_indices(;polytope,orders)
+  ordered_indices = trivial_indices(;polytope,orders)
   ordered2indices = zeros(Int,length(indices))
   tup = Tuple.(indices)
   for (i,id) in enumerate(ordered_indices)
@@ -60,4 +60,12 @@ function compute_nodes_map(;
   end
   rmatrix = OneHotMatrix(ordered2indices,length(indices)) |> Matrix
   return NodesMap(indices,rmatrix)
+end
+
+function Base.inv(i::NodesMap)
+
+end
+
+function trivial(i::NodesMap)
+
 end

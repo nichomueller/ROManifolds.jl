@@ -38,7 +38,7 @@ function TensorProductQuadrature(polytope::Polytope{D},degrees;T::Type{<:Abstrac
   factors = isotropy==Isotropic() ? Fill(_compute_1d_quad(),D) : map(_compute_1d_quad,degrees)
   quad = Quadrature(polytope,tensor_product,degrees;T)
   orders = map(degree_2_order,degrees)
-  indices_map = trivial_nodes_map(;polytope,orders)
+  indices_map = compute_nodes_map(;polytope,orders,ordered=true)
   TensorProductQuadrature(factors,quad,indices_map,isotropy)
 end
 

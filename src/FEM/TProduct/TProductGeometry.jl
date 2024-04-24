@@ -97,7 +97,7 @@ Geometry.get_cell_node_ids(a::TensorProductGrid) = get_cell_node_ids(a.grid)
 Geometry.get_cell_map(a::TensorProductGrid) = get_cell_map(a.grid)
 
 function Geometry.get_reffes(a::TensorProductGrid{D}) where D
-  p = Polytope(tfill(HEX_AXIS,Val{D}()))
+  p = Polytope(tfill(HEX_AXIS,Val(D)))
   reffe = TensorProductRefFE(p,lagrangian,Float64,1)
   [reffe,]
 end

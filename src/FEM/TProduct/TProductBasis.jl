@@ -44,39 +44,41 @@ Base.IndexStyle(::TensorProductDofBases) = IndexLinear()
 Base.getindex(a::TensorProductDofBases,i::Integer) = ReferenceFEs.PointValue(a.nodes[i])
 
 get_factors(a::TensorProductDofBases) = a.factors
+get_field(a::TensorProductDofBases) = a.basis
+get_indices_map(a::TensorProductDofBases) = get_indices_map(a.nodes)
 
 ReferenceFEs.get_nodes(a::TensorProductDofBases) = a.nodes
 
 function Arrays.return_cache(a::TensorProductDofBases,field)
-  return_cache(a.basis,field)
+  return_cache(get_field(a),field)
 end
 
 function Arrays.evaluate!(cache,a::TensorProductDofBases,field)
-  evaluate!(cache,a.basis,field)
+  evaluate!(cache,get_field(a),field)
 end
 
 function Arrays.return_cache(
   a::TensorProductDofBases{D},
-  field::TensorProductMonomialBasis{D}
+  field::TensorProductField{D}
   ) where D
 
   bfactors = get_factors(a)
   ffactors = get_factors(field)
-  s,v,c = return_cache(bfactors[1],ffactors[1])
-  r = Vector{typeof(get_array(s))}(undef,D)
-  return r,(s,v,c)
+  indices_map = get_indices_map(a)
+  c,cf = return_cache(bfactors[1],ffactors[1])
+  r = Vector{typeof(get_array(c))}(undef,D)
+  return indices_map,r,(c,cf)
 end
 
 function Arrays.evaluate!(
   _cache,
   a::TensorProductDofBases{D},
-  field::TensorProductMonomialBasis{D}
+  field::TensorProductField{D}
   ) where D
 
-  r,cache = _cache
+  indices_map,r,cache = _cache
   bfactors = get_factors(a)
   ffactors = get_factors(field)
-  indices_map = get_indices_map(field)
   @inbounds for d = 1:D
     r[d] = evaluate!(cache,bfactors[d],ffactors[d])
   end
@@ -88,23 +90,82 @@ end
 
 function Arrays.return_cache(
   a::TensorProductDofBases{D,Isotropic},
-  field::TensorProductMonomialBasis{D,Isotropic}
+  field::TensorProductField{D,Isotropic}
   ) where D
 
   bfactors = get_factors(a)
   ffactors = get_factors(field)
-  return return_cache(bfactors[1],ffactors[1])
+  indices_map = get_indices_map(a)
+  cache = return_cache(bfactors[1],ffactors[1])
+  return indices_map,cache
 end
 
 function Arrays.evaluate!(
-  cache,
+  _cache,
   a::TensorProductDofBases{D,Isotropic},
-  field::TensorProductMonomialBasis{D,Isotropic}
+  field::TensorProductField{D,Isotropic}
+  ) where D
+
+  indices_map,cache = _cache
+  bfactors = get_factors(a)
+  ffactors = get_factors(field)
+  r = evaluate!(cache,bfactors[1],ffactors[1])
+  tpr = FieldFactors(Fill(r,D),indices_map,Isotropic())
+  return tpr
+end
+
+function Arrays.return_cache(
+  a::TensorProductDofBases{D},
+  field::AbstractVector{<:TensorProductField{D}}
   ) where D
 
   bfactors = get_factors(a)
   ffactors = get_factors(field)
-  indices_map = get_indices_map(field)
+  indices_map = get_indices_map(a)
+  c,cf = return_cache(bfactors[1],ffactors[1])
+  r = Vector{typeof(get_array(c))}(undef,D)
+  return indices_map,r,(c,cf)
+end
+
+function Arrays.evaluate!(
+  _cache,
+  a::TensorProductDofBases{D},
+  field::AbstractVector{<:TensorProductField{D}}
+  ) where D
+
+  indices_map,r,cache = _cache
+  bfactors = get_factors(a)
+  ffactors = get_factors(field)
+  @inbounds for d = 1:D
+    r[d] = evaluate!(cache,bfactors[d],ffactors[d])
+  end
+  tpr = FieldFactors(r,indices_map,Anisotropic())
+  return tpr
+end
+
+# Isotropy shortcuts
+
+function Arrays.return_cache(
+  a::TensorProductDofBases{D,Isotropic},
+  field::AbstractVector{<:TensorProductField{D,Isotropic}}
+  ) where D
+
+  bfactors = get_factors(a)
+  ffactors = get_factors(field)
+  indices_map = get_indices_map(a)
+  cache = return_cache(bfactors[1],ffactors[1])
+  return indices_map,cache
+end
+
+function Arrays.evaluate!(
+  _cache,
+  a::TensorProductDofBases{D,Isotropic},
+  field::AbstractVector{<:TensorProductField{D,Isotropic}}
+  ) where D
+
+  indices_map,cache = _cache
+  bfactors = get_factors(a)
+  ffactors = get_factors(field)
   r = evaluate!(cache,bfactors[1],ffactors[1])
   tpr = FieldFactors(Fill(r,D),indices_map,Isotropic())
   return tpr
