@@ -71,6 +71,13 @@ tpx = get_cell_points(cell_quad)
 @assert all(tpv(x) .≈ tpv(tpx))
 @assert all(v(x) .≈ tpv(tpx))
 
+############ Geometry
+grid = TensorProductGrid(domain,partition)
+nodes = get_node_coordinates(grid)
+desc = get_cartesian_descriptor(grid)
+amap = get_cell_map(grid)
+############ Cell fields
+
 f(x) = exp(x[1])
 
 cf = f*v
@@ -84,10 +91,22 @@ cell_field = get_data(_f)
 cell_point = get_data(_x)
 X = lazy_map(evaluate,cell_field,cell_point)
 
-a = get_data(_f.args[2])
-lazy_map(Broadcasting(_f.op),a...)
-cache = return_cache(Broadcasting(_f.op),a[1][1],a[2][1])
-ciao = evaluate!(cache,Broadcasting(_f.op),a[1][1],a[2][1])
+# v = return_value(cell_field[1],cell_point[1])
+evaluate(cell_field[1],testargs(cell_field[1],cell_point[1])...)
+c = return_cache(cell_field[1],testargs(cell_field[1],cell_point[1])...)
+
+ff = cell_field[1]
+xx = cell_point[1]
+cfs = map(fi -> return_cache(fi,xx),ff.args)
+rs = map(fi -> return_value(fi,xx),ff.args)
+bm = Fields.BroadcastingFieldOpMap(ff.op)
+r = return_cache(bm,rs...)
+
+
+
+
+
+
 BOH
 # cf = v*v
 # tpcf = tpv*tpv

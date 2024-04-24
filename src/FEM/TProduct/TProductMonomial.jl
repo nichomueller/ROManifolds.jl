@@ -4,6 +4,8 @@ function _basis_from_factors(::Type{T},::Val{D},factors) where {D,T}
   return MonomialBasis{D}(T,orders,terms)
 end
 
+struct TPMonomial{D} <: TPField end
+
 struct TensorProductMonomialBasis{D,T,A} <: TensorProductField{D,Isotropic}
   factors::A
   basis::MonomialBasis{D,T}
@@ -24,7 +26,7 @@ function TensorProductMonomialBasis(::Type{T},p::Polytope{D},order::Integer=1) w
 end
 
 Base.size(a::TensorProductMonomialBasis{D,T}) where {D,T} = size(a.basis)
-Base.getindex(a::TensorProductMonomialBasis{D},i::Integer) where D = Monomial{D}()
+Base.getindex(a::TensorProductMonomialBasis{D},i::Integer) where D = TPMonomial{D}()
 Base.IndexStyle(::TensorProductMonomialBasis) = IndexLinear()
 
 ReferenceFEs.get_order(a::TensorProductMonomialBasis) = get_order(a.basis)

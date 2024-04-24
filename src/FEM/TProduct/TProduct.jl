@@ -16,7 +16,7 @@ using Mabla.FEM
 import FillArrays: Fill,fill
 import IterTools: subsets
 import Kronecker: kronecker
-import OneHotArrays: OneHotMatrix
+import OneHotArrays: OneHotMatrix,OneHotVector
 import Test: @test
 import UnPack: @unpack
 import Gridap.Fields: OperationField,BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap

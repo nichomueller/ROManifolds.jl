@@ -8,7 +8,7 @@ struct FieldFactors{D,I,T,N,A,B,C,E} <: TensorProductFactors{D,T,N}
   isotropy::I
   function FieldFactors(
     factors::A,row_map::C,col_map::E=trivial(row_map),isotropy::I=Isotropy(factors)
-    ) where {T,A<:AbstractVector{<:AbstractArray{T,N}},C<:IndexMap,E<:IndexMap,I}
+    ) where {T,N,A<:AbstractVector{<:AbstractArray{T,N}},C<:IndexMap,E<:IndexMap,I}
 
     product = kronecker(factors...)
     D = length(factors)

@@ -16,7 +16,7 @@ abstract type AbstractTensorProductPoints{D,I,T,N} <: AbstractArray{Point{D,T},N
 get_factors(::AbstractTensorProductPoints) = @abstractmethod
 get_indices_map(::AbstractTensorProductPoints) = @abstractmethod
 ReferenceFEs.num_dims(::AbstractTensorProductPoints{D}) where D = D
-get_isotropy(::AbstractTensorProductPoints{D,I} where D) where I = I
+get_isotropy(::AbstractTensorProductPoints{D,I} where D) where I = I()
 tensor_product_points(::Type{<:AbstractTensorProductPoints},nodes,::NodesMap) = @abstractmethod
 
 struct TensorProductNodes{D,I,T,A,B} <: AbstractTensorProductPoints{D,I,T,1}

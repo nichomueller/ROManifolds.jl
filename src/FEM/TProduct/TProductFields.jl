@@ -1,8 +1,57 @@
-abstract type TensorProductField{D,I} <: AbstractVector{Field} end
+# struct KroneckerMap <: Map end
+
+# Arrays.return_cache(k::KroneckerMap,cache::Tuple{Vararg{Any}}) = return_cache(k,first.(cache))
+# Arrays.return_cache(k::KroneckerMap,cache::Tuple{Vararg{CachedArray}}) = return_cache(k,get_array.(cache))
+# Arrays.return_cache(::KroneckerMap,cache::Tuple{Vararg{AbstractArray}}) = kron(cache...)
+
+abstract type TPField <: Field end
+
+struct GenericTPField{D,I,A} <: TPField
+  factors::A
+  isotropy::I
+  function GenericTPField(factors::A,isotropy::I=Isotropy(factors)) where {I,A<:AbstractVector{<:Field}}
+    D = length(factors)
+    new{D,I,A}(factors,isotropy)
+  end
+end
+
+function GenericTPField(factors::AbstractVector{<:AbstractVector{<:Field}},index::Int,args...)
+  kindices = get_kindices(factors,index)
+  ifactors = map(getindex,factors,kindices)
+  GenericTPField(ifactors,args...)
+end
+
+get_factors(a::GenericTPField) = a.factors
+
+function Arrays.return_cache(a::GenericTPField,x::AbstractTensorProductPoints)
+  factors = get_factors(a)
+  points = get_factors(x)
+  cache = map(return_cache,factors,points)
+  return cache
+end
+
+function Arrays.evaluate!(cache,a::GenericTPField,x::AbstractTensorProductPoints)
+  factors = get_factors(a)
+  points = get_factors(x)
+  ax = map(evaluate!,cache,factors,points)
+  return kronecker(ax...)
+end
+
+for op in (:(Fields.∇),:(Fields.∇∇))
+  @eval begin
+    function $op(a::GenericTPField)
+      factors = Broadcasting($op)(get_factors(a))
+      isotropy = get_isotropy(a)
+      GenericTPField(factors,isotropy)
+    end
+  end
+end
+
+abstract type TensorProductField{D,I} <: AbstractVector{TPField} end
 
 get_factors(::TensorProductField) = @abstractmethod
 get_field(::TensorProductField) = @abstractmethod
-get_isotropy(::TensorProductField{D,I} where D) where I = I
+get_isotropy(::TensorProductField{D,I} where D) where I = I()
 
 for F in (:(TensorProductField),:(AbstractArray{<:TensorProductField}))
   @eval begin
@@ -22,18 +71,18 @@ for F in (:(TensorProductField),:(AbstractArray{<:TensorProductField}))
   end
 end
 
-struct GenericTensorProductField{D,I,A,B} <: TensorProductField{D,I}
+struct GenericTensorProductField{D,I,A} <: TensorProductField{D,I}
   factors::A
-  field::B
   isotropy::I
-  function GenericTensorProductField(factors::A,field::B,isotropy::I=Isotropy(factors)) where {A,B,I}
+  function GenericTensorProductField(factors::A,isotropy::I=Isotropy(factors)) where {A,I}
     D = length(factors)
-    new{D,I,A,B}(factors,field,isotropy)
+    new{D,I,A}(factors,field,isotropy)
   end
 end
 
-Base.size(a::GenericTensorProductField) = size(a.field)
-Base.getindex(a::GenericTensorProductField,i::Integer...) = getindex(a.field,i...)
+Base.length(a::GenericTensorProductField) = prod(length.(a.factors))
+Base.size(a::GenericTensorProductField) = (length(a),)
+Base.getindex(a::GenericTensorProductField,i::Integer...) = GenericTPField(a.field,i...)
 
 get_factors(a::GenericTensorProductField) = a.factors
 get_field(a::GenericTensorProductField) = a.field
@@ -99,8 +148,13 @@ function Arrays.evaluate!(
   return tpr
 end
 
-struct TensorProductAffineMap{D,T,L} <: AbstractVector{AffineMap{1,1,T,1}}
+struct TensorProductAffineMap{D,I,T,L} <: TensorProductField{D,I}
   map::AffineMap{D,D,T,L}
+  function TensorProductAffineMap(map::AffineMap{D,D,T,L}) where {D,T,L}
+    isotropy = Isotropy(map)
+    I = typeof(isotropy)
+    new{D,I,T,L}(map)
+  end
 end
 
 Base.size(a::TensorProductAffineMap{D}) where D = (D,)
@@ -112,6 +166,12 @@ function Base.getindex(a::TensorProductAffineMap{D},d::Integer) where D
 end
 
 get_factors(a::AffineMap) = TensorProductAffineMap(a)
+
+function Isotropy(a::AffineMap{D,D}) where D
+  o1 = a.origin[1]
+  g1 = a.gradient[1]
+  Isotropy(all(a.origin.data .== o1) && all([a.gradient[(d-1)*D+d] .== g1 for d=1:D]))
+end
 
 function Arrays.return_cache(a::AffineMap,x::AbstractTensorProductPoints{D}) where D
   factors = get_factors(a)
@@ -149,7 +209,7 @@ end
 
 # gradients
 
-Fields.gradient(a::TensorProductField) = GenericTensorProductField(get_factors(a),get_field(a))
+Fields.gradient(a::TensorProductField) = GenericTensorProductField(get_factors(a))
 
 function Arrays.evaluate!(
   cache,

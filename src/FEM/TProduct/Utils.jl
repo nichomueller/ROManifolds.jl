@@ -48,3 +48,19 @@ function Base.:*(a::VectorValue{1,T}...) where T
   end
   return Point(p)
 end
+
+function get_kindices(a::AbstractVector{<:AbstractVector},i::Int)
+  function _recursive_kindices(a::AbstractVector...)
+    a1,aend... = a
+    lend = prod(length.(aend))
+    i1 = FEM.slow_index(i,lend)
+    return i1,_recursive_kindices(aend...)...
+  end
+
+  function _recursive_kindices(a::AbstractVector,b::AbstractVector)
+    lend = length(b)
+    return FEM.slow_index(i,lend),FEM.fast_index(i,lend)
+  end
+
+  return _recursive_kindices(a...)
+end

@@ -83,7 +83,8 @@ Geometry.OrientationStyle(::Type{<:TensorProductGrid}) = Oriented()
 function Geometry.get_cartesian_descriptor(a::TensorProductGrid)
   factors = map(get_cartesian_descriptor,a.factors)
   desc = get_cartesian_descriptor(a.grid)
-  TensorProductDescriptor(factors,desc)
+  isotropy = Isotropic()
+  TensorProductDescriptor(factors,desc,isotropy)
 end
 
 function Geometry.get_node_coordinates(a::TensorProductGrid)
@@ -94,7 +95,9 @@ Geometry.get_cell_type(a::TensorProductGrid) = get_cell_type(a.grid)
 
 Geometry.get_cell_node_ids(a::TensorProductGrid) = get_cell_node_ids(a.grid)
 
-Geometry.get_cell_map(a::TensorProductGrid) = get_cell_map(a.grid)
+function Geometry.get_cell_map(a::TensorProductGrid)
+  map(get_cell_map,a.factors)
+end
 
 function Geometry.get_reffes(a::TensorProductGrid{D}) where D
   p = Polytope(tfill(HEX_AXIS,Val(D)))

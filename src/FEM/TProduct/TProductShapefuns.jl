@@ -21,8 +21,15 @@ get_factors(a::TensorProductShapefuns) = a.factors
 get_indices_map(a::TensorProductShapefuns) = a.indices_map
 get_field(a::TensorProductShapefuns{D,I}) where {D,I} = a.shapefuns
 
-Base.size(a::TensorProductShapefuns{D}) where D = ntuple(d->prod(size.(a.factors,d)),D)
-Base.getindex(a::TensorProductShapefuns,i::Integer...) = getindex(get_field(a),i...)
+Base.length(a::TensorProductShapefuns) = prod(length.(a.factors))
+Base.size(a::TensorProductShapefuns) = (length(a),)
+
+function Base.getindex(a::TensorProductShapefuns,i::Integer)
+  iH = OneHotVector(i,length(a))
+  ids = get_indices_map(a)
+  ri = findfirst(ids.rmatrix*iH .== 1)
+  GenericTPField(a.factors,ri)
+end
 
 function Arrays.return_cache(a::TensorProductShapefuns{D},x::TensorProductNodes{D}) where D
   factors = get_factors(a)
