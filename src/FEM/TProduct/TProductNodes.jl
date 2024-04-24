@@ -79,3 +79,7 @@ function Base.getindex(a::TensorProductNodes{D,I,T},i::Integer) where {D,I,T}
   end
   Point(p)
 end
+
+function Base.copy(a::TensorProductNodes{D,I,T}) where {D,I,T}
+  TensorProductNodes(T,copy.(a.nodes),a.indices_map,a.isotropy)
+end

@@ -71,72 +71,41 @@ tpx = get_cell_points(cell_quad)
 @assert all(tpv(x) .≈ tpv(tpx))
 @assert all(v(x) .≈ tpv(tpx))
 
-_get_values(a::Fields.LinearCombinationFieldVector) = a.values
-ϕ = _get_values(tpshapes)
-ψ = TProduct.FieldFactors(map(_get_values,factors),indices_map,Isotropic())
-@assert ψ[shapes.shapes_indices_map] == ϕ
+f(x) = exp(x[1])
 
-tpvx = tpv(tpx)
-vx = v(x)
+cf = f*v
+tpcf = f*tpv
+tpcfx = tpcf(x)
+cfx = cf(x)
+@check all(cfx .≈ tpcfx)
 
-v1 = get_data(v)[1]
-x1 = get_data(x)[1]
-v1x1 = evaluate(v1,x1)
+_f,_x = CellData._to_common_domain(cf,x)
+cell_field = get_data(_f)
+cell_point = get_data(_x)
+X = lazy_map(evaluate,cell_field,cell_point)
 
-tpv1 = get_data(tpv)[1]
-tpx1 = get_data(tpx)[1]
-tpv1x1 = evaluate(tpv1,tpx1)
+a = get_data(_f.args[2])
+lazy_map(Broadcasting(_f.op),a...)
+cache = return_cache(Broadcasting(_f.op),a[1][1],a[2][1])
+ciao = evaluate!(cache,Broadcasting(_f.op),a[1][1],a[2][1])
+BOH
+# cf = v*v
+# tpcf = tpv*tpv
+# tpcfx = tpcf(x)
+# cfx = cf(x)
+# @check all(cfx .≈ tpcfx)
 
-#evaluate shapefun at x
-trian = Triangulation(model)
-degree = TProduct.order_2_degree(order)
-quad = Quadrature(QUAD,tensor_product,degree)
-cell_quad = CellQuadrature(trian,degree)
-x = get_cell_points(cell_quad)
-reffe = ReferenceFE(QUAD,lagrangian,Float64,order)
-shapes = get_shapefuns(reffe)
+# cf = ∇(v)⋅∇(v)
+# tpcf = ∇(tpv)⋅∇(tpv)
+# tpcfx = tpcf(x)
+# cfx = cf(x)
+# @check all(cfx .≈ tpcfx)
+ff,xx = cell_field[1],cell_point[1]
+cfs = map(fi -> return_cache(fi,xx),ff.args)
+rs = map(fi -> return_value(fi,xx),ff.args)
+bm = Fields.BroadcastingFieldOpMap(ff.op)
+r = return_cache(bm,rs...)
+r, cfs
 
-C = evaluate(reffe.reffe.dofs,reffe.reffe.prebasis)
-px = evaluate(reffe.reffe.prebasis,reffe.reffe.dofs.nodes)
-
-_reffe = ReferenceFE(QUAD,TProduct.tplagrangian,T,order)
-_C = evaluate(_reffe.dof_basis,_reffe.prebasis)
-
-using OneHotArrays
-using Kronecker
-K = OneHotMatrix([1,2,5,3,4,6,7,8,9],9)
-C ≈ Matrix(K)*kronecker(get_factors(_C)...)
-
-_x = _reffe.dof_basis.nodes
-_px = get_factors(evaluate(_reffe.prebasis,_x))
-
-px ≈ K*kronecker(_px...)
-
-shapex = evaluate(reffe.reffe.shapefuns,reffe.reffe.dofs.nodes)
-_shapex = kronecker(map(inv,get_factors(_C))...)*kronecker(_px...)
-shapex ≈  _shapex
-
-# v(x) vs tpv(tpx)
-result = tpv(tpx)[1]
-shapes2d = tpv.cell_basis[1]
-nodes2d = tpx.cell_ref_point[1]
-invchange2d = shapes2d.values
-change2d = inv(invchange2d)
-bx2d = evaluate(shapes2d.fields,nodes2d)
-@check result ≈ bx2d*invchange2d
-
-shapes = get_data(v)[1]
-nodes = get_data(x)[1]
-bx = evaluate(prebasis,nodes)
-change = evaluate(dof_basis,prebasis)
-@check bx ≈ bx2d
-@check kronecker(bx.factors...) ≈ bx2d
-@check change ≈ change2d
-@check change.indices_map.rmatrix*kronecker(change.factors...) ≈ change2d
-@check inv(kronecker(change.factors...))*inv(change.indices_map.rmatrix) ≈ invchange2d
-@check result ≈ bx*inv(kronecker(change.factors...))*inv(change.indices_map.rmatrix)
-# v1x1 = evaluate(v1,x1)
-
-newpreb = TensorProductMonomialBasis(prebasis.factors,prebasis.basis,nodes.indices_map,prebasis.isotropy)
-newbx = evaluate(newpreb,nodes)
-@check newbx ≈ bx2d
+return_value(ff.args[2],xx)
+testargs(ff.args[2],xx)

@@ -39,3 +39,12 @@ function _split_cartesian_descriptor(origin::Point{D},sizes,partition,cmap,isper
   factors = isotropy==Isotropic() ? Fill(_compute_1d_desc(),D) : map(_compute_1d_desc,origin.data,sizes,partition,Fill(map,D),isperiodic)
   return factors,isotropy
 end
+
+function Base.:*(a::VectorValue{1,T}...) where T
+  D = length(a)
+  p = zero(Mutable(Point{D,T}))
+  @inbounds for d in 1:D
+    p[d] = a[d][1]
+  end
+  return Point(p)
+end

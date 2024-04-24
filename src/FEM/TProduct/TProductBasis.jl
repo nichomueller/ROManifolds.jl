@@ -65,9 +65,9 @@ function Arrays.return_cache(
   bfactors = get_factors(a)
   ffactors = get_factors(field)
   indices_map = get_indices_map(a)
-  c,cf = return_cache(bfactors[1],ffactors[1])
-  r = Vector{typeof(get_array(c))}(undef,D)
-  return indices_map,r,(c,cf)
+  cache = return_cache(bfactors[1],ffactors[1])
+  r = _return_vec_cache(cache,D)
+  return indices_map,r,cache
 end
 
 function Arrays.evaluate!(
@@ -82,7 +82,7 @@ function Arrays.evaluate!(
   @inbounds for d = 1:D
     r[d] = evaluate!(cache,bfactors[d],ffactors[d])
   end
-  tpr = FieldFactors(r,indices_map,Anisotropic())
+  tpr = FieldFactors(r,indices_map)
   return tpr
 end
 
@@ -110,7 +110,7 @@ function Arrays.evaluate!(
   bfactors = get_factors(a)
   ffactors = get_factors(field)
   r = evaluate!(cache,bfactors[1],ffactors[1])
-  tpr = FieldFactors(Fill(r,D),indices_map,Isotropic())
+  tpr = FieldFactors(Fill(r,D),indices_map)
   return tpr
 end
 
@@ -122,9 +122,9 @@ function Arrays.return_cache(
   bfactors = get_factors(a)
   ffactors = get_factors(field)
   indices_map = get_indices_map(a)
-  c,cf = return_cache(bfactors[1],ffactors[1])
-  r = Vector{typeof(get_array(c))}(undef,D)
-  return indices_map,r,(c,cf)
+  cache = return_cache(bfactors[1],ffactors[1])
+  r = _return_vec_cache(cache,D)
+  return indices_map,r,cache
 end
 
 function Arrays.evaluate!(
@@ -139,7 +139,7 @@ function Arrays.evaluate!(
   @inbounds for d = 1:D
     r[d] = evaluate!(cache,bfactors[d],ffactors[d])
   end
-  tpr = FieldFactors(r,indices_map,Anisotropic())
+  tpr = FieldFactors(r,indices_map)
   return tpr
 end
 
@@ -167,6 +167,6 @@ function Arrays.evaluate!(
   bfactors = get_factors(a)
   ffactors = get_factors(field)
   r = evaluate!(cache,bfactors[1],ffactors[1])
-  tpr = FieldFactors(Fill(r,D),indices_map,Isotropic())
+  tpr = FieldFactors(Fill(r,D),indices_map)
   return tpr
 end

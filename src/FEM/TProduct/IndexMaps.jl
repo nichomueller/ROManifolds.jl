@@ -63,9 +63,11 @@ function compute_nodes_map(;
 end
 
 function Base.inv(i::NodesMap)
-
+  NodesMap(i.indices,inv(i.rmatrix))
 end
 
 function trivial(i::NodesMap)
-
+  indices = collect1d(CartesianIndices(last(i.indices)))
+  rmatrix = I(length(indices))
+  NodesMap(indices,rmatrix)
 end

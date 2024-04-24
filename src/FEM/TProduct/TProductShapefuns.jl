@@ -1,4 +1,4 @@
-struct TensorProductShapefuns{D,I,A,B,C} <: AbstractVector{TensorProductField{D,I}}
+struct TensorProductShapefuns{D,I,A,B,C} <: TensorProductField{D,I}
   factors::A
   shapefuns::B
   indices_map::C
@@ -9,7 +9,7 @@ end
 
 function ReferenceFEs.compute_shapefuns(
   dofs::TensorProductDofBases{D,I},
-  prebasis::TensorProductMonomialBasis{D,I}) where {D,I}
+  prebasis::TensorProductMonomialBasis{D}) where {D,I}
 
   factors = map(compute_shapefuns,get_factors(dofs),get_factors(prebasis))
   shapefuns = compute_shapefuns(get_field(dofs),get_field(prebasis))
@@ -22,26 +22,26 @@ get_indices_map(a::TensorProductShapefuns) = a.indices_map
 get_field(a::TensorProductShapefuns{D,I}) where {D,I} = a.shapefuns
 
 Base.size(a::TensorProductShapefuns{D}) where D = ntuple(d->prod(size.(a.factors,d)),D)
-Base.getindex(a::TensorProductShapefuns,i::Integer...) = getindex(a.shapefuns,i...)
+Base.getindex(a::TensorProductShapefuns,i::Integer...) = getindex(get_field(a),i...)
 
-function Arrays.return_cache(a::TensorProductShapefuns,x::TensorProductNodes)
+function Arrays.return_cache(a::TensorProductShapefuns{D},x::TensorProductNodes{D}) where D
   factors = get_factors(a)
   points = get_factors(x)
   row_map = get_indices_map(x)
   col_map = get_indices_map(a)
-  s,c = return_cache(factors[1],points[1])
-  r = Vector{typeof(get_array(s))}(undef,D)
-  return row_map,col_map,r,(s,c)
+  cache = return_cache(factors[1],points[1])
+  r = _return_vec_cache(cache,D)
+  return row_map,col_map,r,cache
 end
 
-function Arrays.evaluate!(cache,a::TensorProductShapefuns,x::TensorProductNodes{D}) where D
-  row_map,col_map,r,c = cache
+function Arrays.evaluate!(_cache,a::TensorProductShapefuns,x::TensorProductNodes{D}) where D
+  row_map,col_map,r,cache = _cache
   factors = get_factors(a)
   points = get_factors(x)
   @inbounds for d = 1:D
-    r[d] = evaluate!(c,factors[d],points[d])
+    r[d] = evaluate!(cache,factors[d],points[d])
   end
-  return FieldFactors(r,row_map,col_map,Anisotropic())
+  return FieldFactors(r,row_map,col_map)
 end
 
 function Arrays.return_cache(
@@ -67,5 +67,5 @@ function Arrays.evaluate!(
   factors = get_factors(a)
   points = get_factors(x)
   r = evaluate!(cache,factors[1],points[1])
-  return FieldFactors(Fill(r,D),row_map,col_map,Isotropic())
+  return FieldFactors(Fill(r,D),row_map,col_map)
 end
