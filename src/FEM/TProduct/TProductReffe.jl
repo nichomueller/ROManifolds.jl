@@ -59,3 +59,8 @@ ReferenceFEs.get_order(r::TensorProductRefFE)     = get_order(r.reffe)
 
 ReferenceFEs.Conformity(r::TensorProductRefFE,sym::Symbol) = Conformity(r.reffe,sym)
 ReferenceFEs.get_face_own_dofs(r::TensorProductRefFE,conf::Conformity) = get_face_own_dofs(r.reffe,conf)
+
+function ReferenceFEs.get_node_coordinates(reffe::TensorProductRefFE)
+  dofs = get_dof_basis(reffe)
+  dofs.nodes
+end
