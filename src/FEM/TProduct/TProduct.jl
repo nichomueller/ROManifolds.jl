@@ -71,4 +71,9 @@ export TensorProductDescriptor
 export KroneckerCoordinates
 export TensorProductGrid
 include("TProductGeometry.jl")
+
+export TProductFESpace
+export get_dof_permutation
+export comp_to_free_dofs
+include("TProductFESpaces.jl")
 end # module
