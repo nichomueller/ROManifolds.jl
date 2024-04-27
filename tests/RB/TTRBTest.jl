@@ -114,13 +114,14 @@ vvreffe = ReferenceFE(lagrangian,VectorValue{2,Float64},1)
 vvtest = TestFESpace(model,vvreffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 tptest = TProductFESpace(model,vvreffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 
+import Mabla.FEM.TProduct
 domain = (0,1,0,1)
 partition = (2,2)
 model = CartesianDiscreteModel(domain,partition)
 reffe = ReferenceFE(lagrangian,Float64,2)
 test = TestFESpace(model,reffe;conformity=:H1)
 trial = TrialFESpace(test,x->0)
-perm = get_dof_permutation(Float64,model,test,2)
+perm = TProduct.get_dof_permutation(Float64,model,test,2)
 
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2)
