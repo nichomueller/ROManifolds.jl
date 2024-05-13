@@ -133,178 +133,73 @@ trial1d = TrialFESpace(test1d,x->0)
 Ω1d = Triangulation(model1d)
 dΩ1d = Measure(Ω1d,2)
 
+_model = TProduct.TProductModel(domain,partition)
+_test = TProduct.TProductFESpace(_model,reffe;conformity=:H1)
+_perm = _test.dof_permutation
+
 # test 1
 F = assemble_vector(v->∫(v)dΩ,test)
 F1d = assemble_vector(v->∫(v)dΩ1d,test1d)
 TPF = kronecker(F1d,F1d)
 TPF ≈ F
-TPF[perm[:]] ≈ F
+TPF[_perm[:]] ≈ F[perm[:]]
 
 # test 2
 f1d(x) = x[1]
 f(x) = x[1]*x[2]
 F = assemble_vector(v->∫(f*v)dΩ,test)
 F1d = assemble_vector(v->∫(f1d*v)dΩ1d,test1d)
-kronecker(F1d,F1d) ≈ F
+TPF = kronecker(F1d,F1d)
+TPF ≈ F
+TPF[_perm[:]] ≈ F[perm[:]]
 
 # test 3
 M = assemble_matrix((u,v)->∫(v*u)dΩ,trial,test)
 M1d = assemble_matrix((u,v)->∫(v*u)dΩ1d,trial1d,test1d)
-kronecker(M1d,M1d) ≈ M
+TPM = kronecker(M1d,M1d)
+TPM ≈ M
+TPM[_perm[:],_perm[:]] ≈ M[perm[:],perm[:]]
 
 # test 4
 M = assemble_matrix((u,v)->∫(f*v*u)dΩ,trial,test)
 M1d = assemble_matrix((u,v)->∫(f1d*v*u)dΩ1d,trial1d,test1d)
-kronecker(M1d,M1d) ≈ M
+TPM = kronecker(M1d,M1d)
+TPM ≈ M
+TPM[_perm[:],_perm[:]] ≈ M[perm[:],perm[:]]
 
-_model = TProduct.TProductModel(domain,partition)
-_test = TProduct.TProductFESpace(_model,reffe;conformity=:H1)
+# test 5
+A = assemble_matrix((u,v)->∫(∇(v)⋅∇(u))dΩ,trial,test)
+M1d = assemble_matrix((u,v)->∫(v*u)dΩ1d,trial1d,test1d)
+A1d = assemble_matrix((u,v)->∫(∇(v)⋅∇(u))dΩ1d,trial1d,test1d)
+TPA = kronecker(A1d,M1d) + kronecker(M1d,A1d)
+TPA ≈ A
+TPA[_perm[:],_perm[:]] ≈ A[perm[:],perm[:]]
 
-_perm = _test.dof_permutation
+x = get_cell_points(get_triangulation(test))
+v = get_fe_basis(test)
+v(x)
 
-CIAO
-# # 1d connectivity
-# cell_dof_ids = get_cell_dof_ids(test)
-# c1 = get_cell_dof_ids(test1d)
-# _cell_dof_ids_1d = copy(c1),copy(c1)
-# # _cell_dof_ids_1d = TProduct._setup_1d_connectivities([test1d,test1d])
+_x = get_cell_points(get_triangulation(_test))
+_v = get_fe_basis(_test)
+_v(_x)
 
-# v = [1,5,2,6,3,7,4]
-# tpv = Vector{typeof(v)}(undef,3)
+_vv = _v*_v
+_vv(_x)
 
-# function my_recursive_fun(cell_ids,spaces,order,D)
-#   function _my_recursive_fun(cell_ids,::Val{1},::Val{d′}) where d′
-#     @assert d′ == D
-#     return _my_recursive_fun(cell_ids,Val(2),Val(d′-1))
-#   end
-#   function _my_recursive_fun(cell_ids_prev,::Val{d},::Val{d′}) where {d,d′}
-#     space_d = spaces[d]
-#     cell_ids_d = get_cell_dof_ids(space_d)
-#     ncells_prev = length(cell_ids_prev)
-#     ncells_d = ncells_prev*length(cell_ids_d)
-#     vec_cell_ids = Vector{eltype(cell_ids_d)}(undef,ncells_d)
+vv = v*v
+vv(x)
+dvv = ∇(v)⋅∇(v)
+dvv(x)
 
-#     orders = tfill(order,Val(d))
-#     cache = zeros(eltype(eltype(cell_ids_d)),orders.+1)
+_dv = ∇(_v)
+_dv(_x)
+_dvv = ∇(_v)⋅∇(_v)
 
-#     for iprev = 1:ncells_prev
-#       cell_prev = cell_ids_prev[iprev]
-#       for id = eachindex(cell_ids_d)
-#         for idof in CartesianIndices(orders.+1)
-#           tidof = Tuple(idof)
-#           cache[idof] = cell_prev[tidof[d-1]] + (tidof[d]-1)*ncells_prev
-#         end
-#         i = (id-1)*ncells_prev+iprev
-#         vec_cell_ids[i] = vec(copy(cache))
-#       end
-#     end
-#     _my_recursive_fun(vec_cell_ids,Val(d+1),Val(d′-1))
-#   end
-#   function _my_recursive_fun(cell_ids,::Val{d},::Val{0}) where d
-#     @assert d == D+1
-#     return cell_ids
-#   end
-#   return _my_recursive_fun(cell_ids,Val(1),Val(D))
-# end
-
-# cellids = get_cell_dof_ids(test1d)
-# spaces = (test1d,test1d)
-# order = 2
-# D = 2
-# diocan = my_recursive_fun(cellids,spaces,order,D)
-
-
-# d = 2
-# cell_ids_prev = get_cell_dof_ids(test1d)
-# order = 2
-
-# ncells_prev = length(cell_ids_prev)
-# space_d = test1d
-# ndofs_prev = num_free_dofs(space_d) + num_dirichlet_dofs(space_d)
-# cell_ids_d = get_cell_dof_ids(space_d)
-# ncells_d = ncells_prev*length(cell_ids_d)
-# vec_cell_ids_d = Vector{eltype(cell_ids_d)}(undef,ncells_d)
-
-# orders = tfill(order,Val(d))
-# cache = zeros(eltype(eltype(cell_ids_d)),orders.+1)
-
-# for iprev = 1:ncells_prev
-#   cell_prev = cell_ids_prev[iprev]
-#   for id = eachindex(cell_ids_d)
-#     for idof in CartesianIndices(orders.+1)
-#       tidof = Tuple(idof)
-#       cache[idof] = cell_prev[tidof[d-1]] + (tidof[d]-1)*ndofs_prev
-#     end
-#     i = (id-1)*ncells_prev+iprev
-#     vec_cell_ids_d[i] = vec(copy(cache))
-#   end
-# end
-
-# new attempt
-d = 2
-cell_ids_prev = get_cell_dof_ids(test1d)
-order = 2
-
-space_d = test1d
-cell_ids_prev = get_cell_dof_ids(space_d)
-cell_ids_d = get_cell_dof_ids(space_d)
-
-ndofs_d = num_free_dofs(space_d)
-ndofs_prev = num_free_dofs(space_d)
-ncells_prev = length(cell_ids_prev)
-
-# inner reorder
-dof_permutations_1d = TProduct._get_dof_permutation(model1d,cell_ids_prev,order)
-
-# add a (reordered) dimension
-add_dim = ndofs_prev .* collect(0:ndofs_d)
-add_dim_reorder = add_dim[dof_permutations_1d]
-temp = dof_permutations_1d .+ add_dim_reorder'
-
-# NEW RECURSION
-
-function my_recursive_fun(models,spaces,ord,D)
-  function _tensor_product(aprev::AbstractArray{Tp,M},a::AbstractVector{Td}) where {Tp,Td,M}
-    T = promote_type(Tp,Td)
-    N = M+1
-    s = (size(aprev)...,length(a))
-    atp = zeros(T,s)
-    slicesN = eachslice(atp,dims=N)
-    @inbounds for (iN,sliceN) in enumerate(slicesN)
-      sliceN .= aprev .+ a[iN]
-    end
-    return atp
-  end
-  function _my_recursive_fun(::Val{1},::Val{d′}) where d′
-    @assert d′ == D
-    model_d = models[1]
-    space_d = spaces[1]
-    ndofs_d = num_free_dofs(space_d) + num_dirichlet_dofs(space_d)
-    ndofs = ndofs_d
-    cell_ids_d = get_cell_dof_ids(space_d)
-    dof_permutations_1d = TProduct._get_dof_permutation(model_d,cell_ids_d,ord)
-    return _my_recursive_fun(dof_permutations_1d,ndofs,Val(2),Val(d′-1))
-  end
-  function _my_recursive_fun(node2dof_prev,ndofs_prev,::Val{d},::Val{d′}) where {d,d′}
-    model_d = models[d]
-    space_d = spaces[d]
-    ndofs_d = num_free_dofs(space_d) + num_dirichlet_dofs(space_d)
-    ndofs = ndofs_prev*ndofs_d
-    cell_ids_d = get_cell_dof_ids(space_d)
-
-    dof_permutations_1d = TProduct._get_dof_permutation(model_d,cell_ids_d,ord)
-
-    add_dim = ndofs_prev .* collect(0:ndofs_d)
-    add_dim_reorder = add_dim[dof_permutations_1d]
-    node2dof_d = _tensor_product(node2dof_prev,add_dim_reorder)
-
-    _my_recursive_fun(node2dof_d,ndofs,Val(d+1),Val(d′-1))
-  end
-  function _my_recursive_fun(node2dof,ndofs,::Val{d},::Val{0}) where d
-    @assert d == D+1
-    return node2dof
-  end
-  return _my_recursive_fun(Val(1),Val(D))
-end
-
-my_recursive_fun((model1d,model1d,model1d),(test1d,test1d,test1d),2,3)
+k = Operation(⋅)
+a = ∇(_v),∇(_v)
+_get_field(a::Tuple,i::Int,d::Int) = i==d ? TProduct.get_gradient_data(a[i]) : get_data(a[i])
+_get_fields(a::Tuple,d::Int) = map(i->_get_field(a,i,d)[i],eachindex(a))
+D = length(get_data(first(a)))
+d = 1
+fd = _get_fields(a,d)
+evaluate!(nothing,k,fd...)

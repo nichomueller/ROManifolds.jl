@@ -1152,7 +1152,7 @@ function Fields._setsize_mul!(c,a::ParamArray,b::ParamArray)
   end
 end
 
-function  Fields._setsize_mul!(c,args::Union{ParamArray,AbstractArray}...)
+function Fields._setsize_mul!(c,args::Union{ParamArray,AbstractArray}...)
   inds = findall(ai->isa(ai,ParamArray),args)
   @notimplementedif length(inds) == 0
   ai = args[first(inds)]
