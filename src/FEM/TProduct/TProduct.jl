@@ -1,5 +1,6 @@
 module TProduct
 using LinearAlgebra
+using SparseArrays
 using Gridap
 using Gridap.Algebra
 using Gridap.Arrays
@@ -8,6 +9,7 @@ using Gridap.FESpaces
 using Gridap.Fields
 using Gridap.Geometry
 using Gridap.Helpers
+using Gridap.MultiField
 using Gridap.Polynomials
 using Gridap.ReferenceFEs
 using Gridap.TensorValues
@@ -25,6 +27,7 @@ import Gridap.ReferenceFEs: get_order
 import Gridap.TensorValues: Mutable,inner,outer,double_contraction,symmetric_part
 import LinearAlgebra: det,tr,cross,dot,⋅,rmul!
 import Base: inv,abs,abs2,*,+,-,/,adjoint,transpose,real,imag,conj
+import SparseArrays: AbstractSparseMatrixCSC
 import PartitionedArrays: tuple_of_arrays
 
 include("Utils.jl")
@@ -74,8 +77,14 @@ export KroneckerCoordinates
 export TensorProductGrid
 include("TProductGeometry.jl")
 
-export TProductFESpace
+# export TProductFESpace
 export get_dof_permutation
 export comp_to_free_dofs
 include("TProductFESpaces.jl")
+
+export TProductCellFields
+export TProductFESpace
+export TProductFEBasisComponent
+export TProductGradient
+include("TProductCellFields.jl")
 end # module

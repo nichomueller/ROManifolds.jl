@@ -194,12 +194,72 @@ dvv(x)
 _dv = ∇(_v)
 _dv(_x)
 _dvv = ∇(_v)⋅∇(_v)
+_dvv(_x)
 
-k = Operation(⋅)
-a = ∇(_v),∇(_v)
-_get_field(a::Tuple,i::Int,d::Int) = i==d ? TProduct.get_gradient_data(a[i]) : get_data(a[i])
-_get_fields(a::Tuple,d::Int) = map(i->_get_field(a,i,d)[i],eachindex(a))
-D = length(get_data(first(a)))
-d = 1
-fd = _get_fields(a,d)
-evaluate!(nothing,k,fd...)
+_Ω = Triangulation(_model)
+_dΩ = Measure(_Ω,2)
+
+u = get_trial_fe_basis(test)
+Mc = ∫(∇(v)⋅∇(u))dΩ
+M = assemble_matrix(Mc,trial,test)
+
+_u = get_trial_fe_basis(_test)
+_dvu = ∇(_v)⋅∇(_u)
+_dvu(_x)
+
+# _Mc = ∫(∇(_v)⋅∇(_u))_dΩ
+# _M = assemble_matrix(_Mc,_test,_test)
+_Mc = ∫(_v*_u)_dΩ
+_M = assemble_matrix(_Mc,_test,_test)
+
+assem = SparseMatrixAssembler(_test,_test)
+
+
+# build index map between sparse structures
+
+function get_rowval(A::SparseMatrixCSC,B::SparseMatrixCSC)
+  rA = A.rowval
+  rB = B.rowval
+  Ti = promote_type(eltype(rA),eltype(rB))
+  nAB = length(rA)*length(rB)
+  r = zeros(Ti,nAB)
+  iB = collect(eachindex(rB))
+  count = 0
+  for iA in CartesianIndices(size(A))
+    !iszero(A[iA]) && continue
+    ir = count*length(rB) .+ iB
+    @inbounds r[ir] = rB .+ size(B,1)*iA.I[1]
+    count += 1
+  end
+  return r
+end
+
+_A = [1 0 0
+      0 1 0
+      1 1 1]
+A = sparse(_A)
+AA = kron(_A,_A)
+
+ir = get_rowval(A,A)
+
+B = A
+rA = A.rowval
+rB = B.rowval
+Ti = promote_type(eltype(rA),eltype(rB))
+nAB = length(rA)*length(rB)
+r = zeros(Ti,nAB)
+iB = collect(eachindex(rB))
+count = 0
+iA = collect(CartesianIndices(size(A)))[1]
+iszero(A[iA])
+ir = count*length(rB) .+ iB
+@inbounds r[ir] = rB .+ size(B,1)*(iA.I[1]-1)
+count += 1
+
+for iA in CartesianIndices(size(A))
+  !iszero(A[iA]) && continue
+  ir = count*length(rB) .+ iB
+  @inbounds r[ir] = rB .+ size(B,1)*iA.I[1]
+  count += 1
+end
+return r
