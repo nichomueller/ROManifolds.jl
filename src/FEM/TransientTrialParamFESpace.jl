@@ -7,7 +7,7 @@ struct TransientTrialParamFESpace{A,B} <: SingleFieldFESpace
     space::A,
     dirichlet::Union{Function,AbstractVector{<:Function}}) where A
 
-    space0 = allocate_space(space)
+    space0 = HomogeneousTrialFESpace(space)
     B = typeof(space0)
     new{A,B}(space,space0,dirichlet)
   end

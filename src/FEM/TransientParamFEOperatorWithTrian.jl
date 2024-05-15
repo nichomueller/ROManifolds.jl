@@ -246,7 +246,7 @@ end
 
 function get_polynomial_order(basis,::DiscreteModel)
   cell_basis = get_data(basis)
-  shapefuns = first(cell_basis.values).fields
+  shapefuns = first(cell_basis.value).fields
   orders = get_order(shapefuns)
   first(orders)
 end

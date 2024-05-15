@@ -1,6 +1,7 @@
 module TProduct
 using LinearAlgebra
 using SparseArrays
+using SparseMatricesCSR
 using Gridap
 using Gridap.Algebra
 using Gridap.Arrays
@@ -27,64 +28,43 @@ import Gridap.ReferenceFEs: get_order
 import Gridap.TensorValues: Mutable,inner,outer,double_contraction,symmetric_part
 import LinearAlgebra: det,tr,cross,dot,⋅,rmul!
 import Base: inv,abs,abs2,*,+,-,/,adjoint,transpose,real,imag,conj
-import SparseArrays: AbstractSparseMatrixCSC,getcolptr
+import SparseArrays: AbstractSparseMatrixCSC
 import PartitionedArrays: tuple_of_arrays
+import Mabla.FEM: get_dirichlet_cells
 
-include("Utils.jl")
+export TTArray
+export TTVector
+export TTMatrix
+export ParamTTArray
+export ParamTTVector
+export ParamTTMatrix
+export get_values
+export get_index_map
+include("TTArray.jl")
 
-export IndexMap
-export NodesMap
-export compute_nodes_map
-include("IndexMaps.jl")
-
-export Isotropy
-export Isotropic
-export Anisotropic
-export TensorProductNodes
-export get_factors
-export get_indices_map
-export get_isotropy
-include("TProductNodes.jl")
-
-export TensorProductMap
-export TensorProductField
-export GenericTensorProductField
-include("TProductFields.jl")
-
-export TensorProductMonomialBasis
-export ParamContainer
-include("TProductMonomial.jl")
-
-export TensorProductDofBases
-include("TProductBasis.jl")
-
-export TensorProductShapefuns
-include("TProductShapefuns.jl")
-
-export TensorProductArray
-include("TProductArray.jl")
-
-export TensorProductRefFE
-export tplagrangian
-include("TProductReffe.jl")
-
-export TensorProductQuadrature
-export tpquadrature
-include("TProductQuadrature.jl")
-
-export TensorProductDescriptor
-export KroneckerCoordinates
-export TensorProductGrid
+export TProductModel
+export TProductTriangulation
+export TProductMeasure
 include("TProductGeometry.jl")
 
-# export TProductFESpace
+export TProductFESpace
+export TProductFEBasis
 export get_dof_permutation
-export comp_to_free_dofs
+export get_tp_dof_permutation
+export get_tp_fe_basis
+export get_tp_trial_fe_basis
 include("TProductFESpaces.jl")
 
+export TProductCellPoint
 export TProductCellFields
-export TProductFESpace
-export TProductFEBasisComponent
-export TProductGradient
+export TProductGradientCellField
+export TProductGradientEval
+export TProductSparseMatrixAssembler
+export TProductArray
+export TProductGradientArray
+export symbolic_kron
+export symbolic_kron!
+export numerical_kron!
+export kronecker_gradients
 include("TProductCellFields.jl")
 end # module

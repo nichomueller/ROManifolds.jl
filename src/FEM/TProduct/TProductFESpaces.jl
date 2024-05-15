@@ -244,314 +244,121 @@ function get_tp_dof_permutation(
   @notimplemented
 end
 
-struct TProductModel{D,A,B} <: DiscreteModel{D,D}
-  model::A
-  models_1d::B
-  function TProductModel(
-    model::A,
-    models_1d::B
-    ) where {D,A<:CartesianDiscreteModel{D},B<:AbstractVector{<:CartesianDiscreteModel}}
-    new{D,A,B}(model,models_1d)
-  end
+function _get_tt_vector(f,perm)
+  V = get_vector_type(f)
+  T = eltype(V)
+  D = ndims(perm)
+  vec = allocate_vector(TTVector{D,T},perm)
+  return vec
 end
 
-Geometry.get_grid(model::TProductModel) = get_grid(model.model)
-Geometry.get_grid_topology(model::TProductModel) = get_grid_topology(model.model)
-Geometry.get_face_labeling(model::TProductModel) = get_face_labeling(model.model)
-
-get_model(model::TProductModel) = model.model
-get_1d_models(model::TProductModel) = model.models_1d
-
-function _split_cartesian_descriptor(desc::CartesianDescriptor{D}) where D
-  origin,sizes,partition,cmap,isperiodic = desc.origin,desc.sizes,desc.partition,desc.map,desc.isperiodic
-  function _compute_1d_desc(
-    o=first(origin.data),s=first(sizes),p=first(partition),m=cmap,i=first(isperiodic))
-    CartesianDescriptor(Point(o),(s,),(p,);map=m,isperiodic=(i,))
-  end
-  isotropy = all([sizes[d] == sizes[1] && partition[d] == partition[1] for d = 1:D])
-  factors = isotropy ? Fill(_compute_1d_desc(),D) : map(_compute_1d_desc,origin.data,sizes,partition,Fill(cmap,D),Fill(isperiodic,D))
-  return factors
+function _get_tt_vector_type(f,perm)
+  typeof(_get_tt_vector(f,perm))
 end
 
-function TProductModel(args...;kwargs...)
-  desc = CartesianDescriptor(args...;kwargs...)
-  descs_1d = _split_cartesian_descriptor(desc)
-  model = CartesianDiscreteModel(desc)
-  models_1d = CartesianDiscreteModel.(descs_1d)
-  TProductModel(model,models_1d)
+struct TProductFESpace{D,V} <: SingleFieldFESpace
+  space::SingleFieldFESpace
+  spaces_1d::Vector{<:SingleFieldFESpace}
+  dof_permutation::Array{Int,D}
+  vector_type::Type{V}
 end
 
-struct TProductTriangulation{Dt,Dp,A,B,C} <: Triangulation{Dt,Dp}
-  model::A
-  trian::B
-  trians_1d::C
-  function TProductTriangulation(
-    model::A,
-    trian::B,
-    trians_1d::C
-    ) where {Dt,Dp,A<:TProductModel,B<:BodyFittedTriangulation{Dt,Dp},C<:AbstractVector{<:Triangulation}}
-    new{Dt,Dp,A,B,C}(model,trian,trians_1d)
-  end
+function TProductFESpace(
+  space::SingleFieldFESpace,
+  spaces_1d::Vector{<:SingleFieldFESpace},
+  dof_permutation::Array)
+
+  vector_type = _get_tt_vector_type(space,dof_permutation)
+  TProductFESpace(space,spaces_1d,dof_permutation,vector_type)
 end
 
-Geometry.get_background_model(trian::TProductTriangulation) = trian.model
-Geometry.get_grid(trian::TProductTriangulation) = get_grid(trian.trian)
-Geometry.get_glue(trian::TProductTriangulation{Dt},::Val{Dt}) where Dt = get_glue(trian.trian,Dt)
+function FESpaces.FESpace(
+  model::TProductModel,
+  reffe::Tuple{<:ReferenceFEName,Any,Any};
+  kwargs...)
 
-function Geometry.Triangulation(model::TProductModel;kwargs...)
-  trian = Triangulation(model.model;kwargs...)
-  trians_1d = map(Triangulation,model.models_1d)
-  TProductTriangulation(model,trian,trians_1d)
+  basis,reffe_args,reffe_kwargs = reffe
+  T,order = reffe_args
+  cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
+  cell_reffes_1d = map(model->ReferenceFE(model,basis,T,order;reffe_kwargs...),model.models_1d)
+  space = FESpace(model,cell_reffe;kwargs...)
+  spaces_1d = map(FESpace,model.models_1d,cell_reffes_1d) # is it ok to eliminate the kwargs?
+  # perm = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order) # this one will be used later on
+  perm = get_dof_permutation(T,model.model,space,order)
+  TProductFESpace(space,spaces_1d,perm)
 end
 
-function CellData.get_cell_points(trian::TProductTriangulation)
-  single_points = map(get_cell_points,trian.trians_1d)
-  TProductCellPoint(single_points)
+get_dof_permutation(f::TProductFESpace) = f.dof_permutation
+
+FESpaces.get_triangulation(f::TProductFESpace) = get_triangulation(f.space)
+
+FESpaces.get_free_dof_ids(f::TProductFESpace) = get_free_dof_ids(f.space)
+
+function FESpaces.zero_dirichlet_values(f::TProductFESpace)
+  vec = _get_tt_vector(f.space,f.dof_permutation)
+  fill!(vec,zero(eltype(vec)))
 end
 
-struct TProductMeasure{A,B} <: Measure
-  measure::A
-  measures_1d::B
+FESpaces.get_vector_type(f::TProductFESpace) = f.vector_type
+
+FESpaces.get_dof_value_type(f::TProductFESpace) = get_dof_value_type(f.space)
+
+FESpaces.get_cell_dof_ids(f::TProductFESpace) = get_cell_dof_ids(f.space)
+
+FESpaces.ConstraintStyle(f::TProductFESpace) = ConstraintStyle(f.space)
+
+FESpaces.get_fe_basis(f::TProductFESpace) = get_fe_basis(f.space)
+
+FESpaces.get_fe_dof_basis(f::TProductFESpace) = get_fe_dof_basis(f.space)
+
+FESpaces.num_dirichlet_dofs(f::TProductFESpace) = num_dirichlet_dofs(f.space)
+
+FESpaces.get_cell_isconstrained(f::TProductFESpace) = get_cell_isconstrained(f.space)
+
+FESpaces.get_cell_constraints(f::TProductFESpace) = get_cell_constraints(f.space)
+
+FESpaces.get_dirichlet_dof_ids(f::TProductFESpace) = get_dirichlet_dof_ids(f.space)
+
+FESpaces.get_cell_is_dirichlet(f::TProductFESpace) = get_cell_is_dirichlet(f.space)
+
+FESpaces.num_dirichlet_tags(f::TProductFESpace) = num_dirichlet_tags(f.space)
+
+FESpaces.get_dirichlet_dof_tag(f::TProductFESpace) = get_dirichlet_dof_tag(f.space)
+
+FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
+
+FEM.get_dirichlet_cells(f::TProductFESpace) = get_dirichlet_cells(f.space)
+
+struct TProductFEBasis{DS,BS} <: FEBasis
+  basis::Vector
+  trian::Triangulation
+  domain_style::DS
+  basis_style::BS
 end
 
-function CellData.Measure(a::TProductTriangulation,args...;kwargs...)
-  measure = Measure(a.trian,args...;kwargs...)
-  measures_1d = map(Ω -> Measure(Ω,args...;kwargs...),a.trians_1d)
-  TProductMeasure(measure,measures_1d)
+function TProductFEBasis(basis::Vector,trian::TProductTriangulation)
+  b1 = testitem(basis)
+  DS = DomainStyle(b1)
+  BS = BasisStyle(b1)
+  @check all(map(i -> DS===DomainStyle(i) && BS===BasisStyle(i),basis))
+  TProductFEBasis(basis,trian,DS,BS)
 end
 
-CellData.get_cell_quadrature(a::TProductMeasure) = get_cell_quadrature(a.measure)
+CellData.get_data(f::TProductFEBasis) = f.basis
+CellData.get_triangulation(f::TProductFEBasis) = f.trian
+FESpaces.BasisStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = BS
+CellData.DomainStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = DS
+MultiField.num_fields(a::TProductFEBasis) = length(get_data(a))
+Base.length(a::TProductFEBasis) = num_fields(a)
 
-# struct TProductFESpace{A,B,C} <: SingleFieldFESpace
-#   space::A
-#   spaces_1d::B
-#   dof_permutation::C
-# end
+function get_tp_fe_basis(f::TProductFESpace)
+  basis = map(get_fe_basis,f.spaces_1d)
+  trian = get_triangulation(f)
+  TProductFEBasis(basis,trian)
+end
 
-# function TProductFESpace(
-#   model::TProductModel,
-#   reffe::Tuple{<:ReferenceFEName,Any,Any};
-#   kwargs...)
-
-#   basis,reffe_args,reffe_kwargs = reffe
-#   T,order = reffe_args
-#   cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
-#   cell_reffes_1d = map(model->ReferenceFE(model,basis,T,order;reffe_kwargs...),model.models_1d)
-#   space = FESpace(model,cell_reffe;kwargs...)
-#   spaces_1d = map(FESpace,model.models_1d,cell_reffes_1d) # is it ok to eliminate the kwargs?
-#   perm = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order)
-#   TProductFESpace(space,spaces_1d,perm)
-# end
-
-# FESpaces.get_triangulation(f::TProductFESpace) = get_triangulation(f.space)
-
-# FESpaces.ConstraintStyle(::Type{<:TProductFESpace{A}}) where A = ConstraintStyle(A)
-
-# FESpaces.get_dirichlet_dof_values(f::TProductFESpace) = get_dirichlet_dof_values(f.space)
-
-# FESpaces.get_free_dof_ids(f::TProductFESpace) = get_free_dof_ids(f.space)
-
-# FESpaces.get_cell_dof_ids(f::TProductFESpace) = get_cell_dof_ids(f.space)
-
-# FESpaces.get_dirichlet_dof_ids(f::TProductFESpace) = get_dirichlet_dof_ids(f.space)
-
-# FESpaces.num_dirichlet_tags(f::TProductFESpace) = num_dirichlet_tags(f.space)
-
-# FESpaces.get_dirichlet_dof_tag(f::TProductFESpace) = get_dirichlet_dof_tag(f.space)
-
-# function FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv)
-#   scatter_free_and_dirichlet_values(f.space,fv,dv)
-# end
-
-# function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::TProductFESpace,cv)
-#   gather_free_and_dirichlet_values!(fv,dv,f.space,cv)
-# end
-
-# function FESpaces.get_fe_dof_basis(f::TProductFESpace)
-#   data = map(get_fe_dof_basis,f.spaces_1d)
-#   trian = get_triangulation(f)
-#   DS = ReferenceDomain()
-#   TProductCellDof(data,trian,DS)
-# end
-
-# function FESpaces.get_fe_basis(f::TProductFESpace)
-#   data = map(get_fe_basis,f.spaces_1d)
-#   trian = get_triangulation(f)
-#   DS = ReferenceDomain()
-#   TProductCellField(data,trian,DS)
-# end
-
-# function FESpaces.get_trial_fe_basis(f::TProductFESpace)
-#   data = map(get_trial_fe_basis,f.spaces_1d)
-#   trian = get_triangulation(f)
-#   DS = ReferenceDomain()
-#   TProductCellField(data,trian,DS)
-# end
-
-# function FESpaces.get_vector_type(f::TProductFESpace)
-#   D = length(f.spaces_1d)
-#   V = get_vector_type(f.space)
-#   T = eltype(V)
-#   return TTArray{T,D}
-# end
-
-# # tensor product cell data
-
-# struct TProductCellPoint <: CellDatum
-#   data::AbstractVector
-#   trian::TProductTriangulation
-#   DS::DomainStyle
-# end
-
-# function Base.:(==)(a::TProductCellPoint,b::TProductCellPoint)
-#   all(a.data .== b.data)
-# end
-
-# struct TProductCellField <: CellField
-#   data::AbstractVector
-#   trian::TProductTriangulation
-#   DS::DomainStyle
-# end
-
-# CellData.get_data(a::TProductCellField) = a.data
-# CellData.DomainStyle(a::TProductCellField) = a.DS
-# CellData.get_triangulation(a::TProductCellField) = a.trian
-
-# function CellData.change_domain(
-#   a::TProductCellField,
-#   input_domain::DomainStyle,
-#   target_domain::DomainStyle)
-
-#   b = map(data->change_domain(data,input_domain,target_domain),get_data(a))
-#   trian = get_triangulation(a)
-#   DS = DomainStyle(a)
-#   TProductCellField(b,trian,DS)
-# end
-
-# function Arrays.evaluate!(cache,f::TProductCellField,x::TProductCellPoint)
-#   @assert length(f.data) == length(x.data)
-#   fx = map(evaluate!,Fill(cache,length(f.data)),f.data,x.data)
-#   TProductCellArray(fx)
-# end
-
-# function CellData.integrate(f::TProductCellField,a::TProductMeasure)
-#   data = map(integrate,get_data(f),a.measures_1d)
-#   TProductCellArray(data)
-# end
-
-# struct TProductCellDof <: CellDatum
-#   data::AbstractVector
-#   trian::TProductTriangulation
-#   DS::DomainStyle
-# end
-
-# CellData.get_data(a::TProductCellDof) = a.data
-# CellData.DomainStyle(a::TProductCellDof) = a.DS
-# CellData.get_triangulation(a::TProductCellDof) = a.trian
-
-# (a::TProductCellDof)(f) = evaluate(a,f)
-
-# function Arrays.evaluate!(cache,s::TProductCellDof,f::TProductCellField)
-#   @assert length(s.data) == length(f.data)
-#   sf = map(evaluate!,Fill(cache,length(s.data)),s.data,f.data)
-#   TProductCellArray(sf)
-# end
-
-# function FESpaces.get_dof_value_type(f::TProductCellField,s::TProductCellDof)
-#   fitem = first(get_data(f))
-#   sitem = first(get_data(s))
-#   get_dof_value_type(fitem,sitem)
-# end
-
-# struct TProductCellArray{T,N,A} <: AbstractVector{AbstractArray{T,N}}
-#   data::A
-#   function TProductCellArray(data::AbstractVector{<:AbstractArray{T,N}}) where {T,N}
-#     A = typeof(data)
-#     new{T,N,A}(data)
-#   end
-# end
-
-# Base.length(a::TProductCellArray) = length(a.data)
-# Base.size(a::TProductCellArray) = (length(a),)
-# Base.axes(a::TProductCellArray) = (Base.OneTo(length(a)),)
-# Base.getindex(a::TProductCellArray,i::Integer) = a.data[i]
-# Arrays.testitem(a::TProductCellArray) = a[1]
-
-# function Arrays.evaluate!(cache,k::Operation,a::TProductCellField...)
-#   item = first(a)
-#   trian = get_triangulation(item)
-#   DS = DomainStyle(item)
-#   @check all([get_triangulation(ai) == trian for ai in a])
-#   @check all([DomainStyle(ai) == DS for ai in a])
-
-#   D = length(get_data(item))
-#   kD = Fill(k,D)
-
-#   olddata = map(get_data,a)
-#   data = map(CellData._operate_cellfields,kD,olddata...)
-
-#   TProductCellField(data,trian,DS)
-# end
-
-# for op in (:+,:-)
-#   @eval begin
-#     function ($op)(a::TProductCellField,b::TProductCellField)
-#       @check get_triangulation(a) == get_triangulation(b)
-#       @check DomainStyle(a) == DomainStyle(b)
-#       data = map($op,get_data(a),get_data(b))
-#       TProductCellField(data,get_triangulation(a),DomainStyle(a))
-#     end
-#   end
-# end
-
-# struct GradientTProductCellField <: CellField
-#   data::AbstractVector
-#   gradient_data::AbstractVector
-#   trian::TProductTriangulation
-#   DS::DomainStyle
-# end
-
-# CellData.get_data(a::GradientTProductCellField) = a.data
-# CellData.DomainStyle(a::GradientTProductCellField) = a.DS
-# CellData.get_triangulation(a::GradientTProductCellField) = a.trian
-
-# get_gradient_data(a::GradientTProductCellField) = a.gradient_data
-
-# function CellData.gradient(a::TProductCellField)
-#   data = get_data(a)
-#   gradient_data = map(gradient,data)
-#   trian = get_triangulation(a)
-#   DS = DomainStyle(a)
-#   GradientTProductCellField(data,gradient_data,trian,DS)
-# end
-
-# function Arrays.evaluate!(cache,f::GradientTProductCellField,x::TProductCellPoint)
-#   @assert length(f.gradient_data) == length(x.data)
-#   fx = map(evaluate!,Fill(cache,length(f.data)),f.data,x.data)
-#   dfx = map(evaluate!,Fill(cache,length(f.gradient_data)),f.gradient_data,x.data)
-#   GradientTProductCellArray(fx,dfx)
-# end
-
-# function CellData.evaluate!(cache,k::Operation,a::GradientTProductCellField,b::GradientTProductCellField)
-#   @check get_triangulation(a) == get_triangulation(b)
-#   @check DomainStyle(a) == DomainStyle(b)
-#   D = length(get_data(a))
-#   _cache = Fill(cache,D)
-#   _k = Fill(k,D)
-#   data = map(evaluate!,_cache,_k,get_data(a),get_data(b))
-#   gradient_data = map(evaluate!,_cache,_k,get_gradient_data(a),get_gradient_data(b))
-#   trian = get_triangulation(a)
-#   DS = DomainStyle(a)
-#   GradientTProductCellField(data,gradient_data,trian,DS)
-# end
-
-# function CellData.integrate(f::GradientTProductCellField,a::TProductMeasure)
-#   data = map(integrate,get_data(f),a.measures_1d)
-#   gradient_data = map(integrate,get_gradient_data(f),a.measures_1d)
-#   GradientTProductCellArray(data,gradient_data)
-# end
-
-# struct GradientTProductCellArray{A,B}
-#   data::A
-#   gradient_data::B
-# end
+function get_tp_trial_fe_basis(f::TProductFESpace)
+  basis = map(get_trial_fe_basis,f.spaces_1d)
+  trian = get_triangulation(f)
+  TProductFEBasis(basis,trian)
+end

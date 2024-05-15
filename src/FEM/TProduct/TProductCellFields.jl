@@ -15,9 +15,6 @@ end
 
 CellData.get_data(f::TProductCellPoint) = f.single_points
 MultiField.num_fields(a::TProductCellPoint) = length(a.single_points)
-Base.getindex(a::TProductCellPoint,i::Integer) = a.single_points[i]
-Base.iterate(a::TProductCellPoint)  = iterate(a.single_points)
-Base.iterate(a::TProductCellPoint,state) = iterate(a.single_points,state)
 Base.length(a::TProductCellPoint) = num_fields(a)
 
 function CellData.get_triangulation(f::TProductCellPoint)
@@ -55,9 +52,6 @@ end
 
 CellData.DomainStyle(::Type{TProductCellField{DS}}) where DS = DS()
 MultiField.num_fields(a::TProductCellField) = length(a.single_fields)
-Base.getindex(a::TProductCellField,i::Integer) = a.single_fields[i]
-Base.iterate(a::TProductCellField)  = iterate(a.single_fields)
-Base.iterate(a::TProductCellField,state) = iterate(a.single_fields,state)
 Base.length(a::TProductCellField) = num_fields(a)
 
 function LinearAlgebra.dot(a::TProductCellField,b::TProductCellField)
@@ -65,119 +59,45 @@ function LinearAlgebra.dot(a::TProductCellField,b::TProductCellField)
   return sum(map(dot,a.single_fields,b.single_fields))
 end
 
-struct TProductFESpace{D} <: SingleFieldFESpace
-  space::SingleFieldFESpace
-  spaces_1d::Vector{<:SingleFieldFESpace}
-  dof_permutation::Array{Int,D}
-end
-
-function TProductFESpace(
-  model::TProductModel,
-  reffe::Tuple{<:ReferenceFEName,Any,Any};
-  kwargs...)
-
-  basis,reffe_args,reffe_kwargs = reffe
-  T,order = reffe_args
-  cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
-  cell_reffes_1d = map(model->ReferenceFE(model,basis,T,order;reffe_kwargs...),model.models_1d)
-  space = FESpace(model,cell_reffe;kwargs...)
-  spaces_1d = map(FESpace,model.models_1d,cell_reffes_1d) # is it ok to eliminate the kwargs?
-  perm = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order)
-  TProductFESpace(space,spaces_1d,perm)
-end
-
-FESpaces.get_triangulation(f::TProductFESpace) = get_triangulation(f.space)
-
-FESpaces.get_free_dof_ids(f::TProductFESpace) = get_free_dof_ids(f.space)
-
-function FESpaces.get_vector_type(f::TProductFESpace{D}) where D
-  T = eltype(get_vector_type(f.space))
-  Array{T,D}
-end
-
-FESpaces.get_dof_value_type(f::TProductFESpace) = get_dof_value_type(f.space)
-
-FESpaces.ConstraintStyle(f::TProductFESpace) = ConstraintStyle(f.space)
-
-struct TProductFEBasis{DS,BS} <: FEBasis
-  basis::ArrayBlock
-  trian::Triangulation
-  domain_style::DS
-  basis_style::BS
-end
-
-function TProductFEBasis(basis::ArrayBlock,trian::TProductTriangulation)
-  b1 = testitem(basis)
-  DS = DomainStyle(b1)
-  BS = BasisStyle(b1)
-  @check all(map(i -> DS===DomainStyle(i) && BS===BasisStyle(i),basis.array))
-  TProductFEBasis(basis,trian,DS,BS)
-end
-
-CellData.get_data(f::TProductFEBasis) = f.basis.array
-CellData.get_triangulation(f::TProductFEBasis) = f.trian
-FESpaces.BasisStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = BS
-CellData.DomainStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = DS
-MultiField.num_fields(a::TProductFEBasis) = length(get_data(a))
-Base.length(a::TProductFEBasis) = num_fields(a)
-
-function FESpaces.get_fe_basis(f::TProductFESpace)
-  nfields = length(f.spaces_1d)
-  touched = fill(true,nfields)
-  basis = map(get_fe_basis,f.spaces_1d)
-  bbasis = ArrayBlock(basis,touched)
-  trian = get_triangulation(f)
-  TProductFEBasis(bbasis,trian)
-end
-
-function FESpaces.get_trial_fe_basis(f::TProductFESpace)
-  nfields = length(f.spaces_1d)
-  touched = fill(true,nfields)
-  basis = map(get_trial_fe_basis,f.spaces_1d)
-  bbasis = ArrayBlock(basis,touched)
-  trian = get_triangulation(f)
-  TProductFEBasis(bbasis,trian)
-end
-
 # gradients
 
-struct TProductGradient <: CellField
+struct TProductGradientCellField <: CellField
   cell_data::CellField
   gradient_cell_data::CellField
 end
 
-CellData.get_data(a::TProductGradient) = a.cell_data
-CellData.DomainStyle(a::TProductGradient) = DomainStyle(get_data(a))
-CellData.get_triangulation(a::TProductGradient) = get_triangulation(get_data(a))
-get_gradient_data(a::TProductGradient) = a.gradient_cell_data
+CellData.get_data(a::TProductGradientCellField) = a.cell_data
+CellData.DomainStyle(a::TProductGradientCellField) = DomainStyle(get_data(a))
+CellData.get_triangulation(a::TProductGradientCellField) = get_triangulation(get_data(a))
+get_gradient_data(a::TProductGradientCellField) = a.gradient_cell_data
 
-(g::TProductGradient)(x) = evaluate(g,x)
+(g::TProductGradientCellField)(x) = evaluate(g,x)
 
 function Fields.gradient(f::TProductCellField)
   g = TProductCellField(gradient.(f.single_fields))
-  return TProductGradient(f,g)
+  return TProductGradientCellField(f,g)
 end
 
 function Fields.gradient(f::TProductFEBasis)
-  dbasis = ArrayBlock(map(gradient,f.basis.array),f.basis.touched)
+  dbasis = map(gradient,f.basis)
   trian = get_triangulation(f)
   g = TProductFEBasis(dbasis,trian)
-  return TProductGradient(f,g)
+  return TProductGradientCellField(f,g)
 end
 
-struct TProductGradientArrayBlock{A}
-  f::VectorBlock
-  g::VectorBlock
-  op::A
+struct TProductGradientEval
+  f::Vector
+  g::Vector
+  op
 end
 
-function TProductGradientArrayBlock(f::VectorBlock,g::VectorBlock)
+function TProductGradientEval(f::Vector,g::Vector)
   op = nothing
-  TProductGradientArrayBlock(f,g,op)
+  TProductGradientEval(f,g,op)
 end
 
-CellData.get_data(a::TProductGradientArrayBlock) = a.f
-get_gradient_data(a::TProductGradientArrayBlock) = a.g
+CellData.get_data(a::TProductGradientEval) = a.f
+get_gradient_data(a::TProductGradientEval) = a.g
 
 # evaluations
 
@@ -191,15 +111,13 @@ function Arrays.return_cache(f::TProductCellDatum,x::TProductCellPoint)
   fx1 = evaluate(fitem,xitem)
   cache = Vector{typeof(c1)}(undef,length(f))
   array = Vector{typeof(fx1)}(undef,length(f))
-  touched = fill(true,length(f))
-  b = ArrayBlock(array,touched)
-  return cache,b
+  return cache,array
 end
 
 function Arrays.evaluate!(_cache,f::TProductCellDatum,x::TProductCellPoint)
   cache,b = _cache
   @inbounds for i = 1:length(f)
-    b.array[i] = evaluate!(cache[i],get_data(f)[i],get_data(x)[i])
+    b[i] = evaluate!(cache[i],get_data(f)[i],get_data(x)[i])
   end
   return b
 end
@@ -218,44 +136,42 @@ function Arrays.evaluate!(_cache,k::Operation,α::TProductCellDatum,β::TProduct
   TProductCellField(αβ)
 end
 
-function Arrays.return_cache(f::TProductGradient,x::TProductCellPoint)
+function Arrays.return_cache(f::TProductGradientCellField,x::TProductCellPoint)
   cache = return_cache(get_data(f),x)
   gradient_cache = return_cache(get_gradient_data(f),x)
   return cache,gradient_cache
 end
 
-function Arrays.evaluate!(_cache,f::TProductGradient,x::TProductCellPoint)
+function Arrays.evaluate!(_cache,f::TProductGradientCellField,x::TProductCellPoint)
   cache,gradient_cache = _cache
   fx = evaluate!(cache,get_data(f),x)
   dfx = evaluate!(gradient_cache,get_gradient_data(f),x)
-  return TProductGradientArrayBlock(fx,dfx)
+  return TProductGradientEval(fx,dfx)
 end
 
-function Arrays.return_cache(k::Operation,f::TProductGradient...)
+function Arrays.return_cache(k::Operation,f::TProductGradientCellField...)
   cache = return_cache(k,map(get_data,f)...)
   gradient_cache = return_cache(k,map(get_gradient_data,f)...)
   return cache,gradient_cache
 end
 
-function Arrays.evaluate!(_cache,k::Operation,α::TProductGradient,β::TProductGradient)
+function Arrays.evaluate!(_cache,k::Operation,α::TProductGradientCellField,β::TProductGradientCellField)
   cache,gradient_cache = _cache
   αβ = evaluate!(cache,k,get_data(α),get_data(β))
   dαβ = evaluate!(gradient_cache,k,get_gradient_data(α),get_gradient_data(β))
-  return TProductGradient(αβ,dαβ)
+  return TProductGradientCellField(αβ,dαβ)
 end
 
 # integration
 
 function CellData.integrate(f::TProductCellDatum,a::TProductMeasure)
-  array = map(integrate,get_data(f),a.measures_1d)
-  touched = fill(true,length(f))
-  ArrayBlock(array,touched)
+  map(integrate,get_data(f),a.measures_1d)
 end
 
-function CellData.integrate(f::TProductGradient,a::TProductMeasure)
+function CellData.integrate(f::TProductGradientCellField,a::TProductMeasure)
   fi = integrate(get_data(f),a)
   dfi = integrate(get_gradient_data(f),a)
-  TProductGradientArrayBlock(fi,dfi)
+  TProductGradientEval(fi,dfi)
 end
 
 # assembly
@@ -278,81 +194,77 @@ end
 function FESpaces.collect_cell_matrix(
   trial::TProductFESpace,
   test::TProductFESpace,
-  a::VectorBlock{<:DomainContribution})
+  a::Vector{<:DomainContribution})
 
-  array = map(collect_cell_matrix,trial.spaces_1d,test.spaces_1d,a.array)
-  touched = a.touched
-  ArrayBlock(array,touched)
+  map(collect_cell_matrix,trial.spaces_1d,test.spaces_1d,a)
 end
 
 function FESpaces.collect_cell_vector(
   test::TProductFESpace,
-  a::VectorBlock{<:DomainContribution})
+  a::Vector{<:DomainContribution})
 
-  array = map(collect_cell_vector,test.spaces_1d,a.array)
-  touched = a.touched
-  ArrayBlock(array,touched)
+  map(collect_cell_vector,test.spaces_1d,a)
 end
 
 function FESpaces.collect_cell_matrix(
   trial::TProductFESpace,
   test::TProductFESpace,
-  a::TProductGradientArrayBlock)
+  a::TProductGradientEval)
 
   f = collect_cell_matrix(trial,test,get_data(a))
   g = collect_cell_matrix(trial,test,get_gradient_data(a))
-  TProductGradientArrayBlock(f,g,a.op)
+  TProductGradientEval(f,g,a.op)
 end
 
 function FESpaces.collect_cell_vector(
   test::TProductFESpace,
-  a::TProductGradientArrayBlock)
+  a::TProductGradientEval)
 
   f = collect_cell_vector(test,get_data(a))
   g = collect_cell_vector(test,get_gradient_data(a))
-  TProductGradientArrayBlock(f,g,a.op)
+  TProductGradientEval(f,g,a.op)
 end
 
-function FESpaces.allocate_vector(a::TProductSparseMatrixAssembler,vecdata::ArrayBlock)
-  vecs_1d = map(allocate_vector,a.assems_1d,vecdata.array)
+function FESpaces.allocate_vector(a::TProductSparseMatrixAssembler,vecdata::Vector)
+  vecs_1d = map(allocate_vector,a.assems_1d,vecdata)
   vec = symbolic_kron(vecs_1d...)
   return TProductArray(vec,vecs_1d)
 end
 
-function FESpaces.assemble_vector!(b,a::TProductSparseMatrixAssembler,vecdata::ArrayBlock)
-  map(b.arrays_1d,assemble_vector!,a.assems_1d,vecdata.array)
-  numeric_kron!(b.array,b.arrays_1d...)
+function FESpaces.assemble_vector!(b,a::TProductSparseMatrixAssembler,vecdata::Vector)
+  map(b.arrays_1d,assemble_vector!,a.assems_1d,vecdata)
+  numerical_kron!(b.array,b.arrays_1d...)
 end
 
-function FESpaces.assemble_vector_add!(b,a::TProductSparseMatrixAssembler,vecdata::ArrayBlock)
-  map(b.arrays_1d,assemble_vector_add!,a.assems_1d,vecdata.array)
-  numeric_kron!(b.array,b.arrays_1d...)
+function FESpaces.assemble_vector_add!(b,a::TProductSparseMatrixAssembler,vecdata::Vector)
+  map(b.arrays_1d,assemble_vector_add!,a.assems_1d,vecdata)
+  numerical_kron!(b.array,b.arrays_1d...)
 end
 
-function FESpaces.assemble_vector(a::TProductSparseMatrixAssembler,vecdata::ArrayBlock)
-  vecs_1d = map(assemble_vector,a.assems_1d,vecdata.array)
+function FESpaces.assemble_vector(a::TProductSparseMatrixAssembler,vecdata::Vector)
+  vecs_1d = map(assemble_vector,a.assems_1d,vecdata)
   vec = kron(vecs_1d...)
   return TProductArray(vec,vecs_1d)
 end
 
-function FESpaces.allocate_matrix(a::TProductSparseMatrixAssembler,matdata::ArrayBlock)
-  mats_1d = map(allocate_matrix,a.assems_1d,matdata.array)
+function FESpaces.allocate_matrix(a::TProductSparseMatrixAssembler,matdata::Vector)
+  mats_1d = map(allocate_matrix,a.assems_1d,matdata)
   mat = symbolic_kron(mats_1d...)
   return TProductArray(mat,mats_1d)
 end
 
-function FESpaces.assemble_matrix!(A,a::TProductSparseMatrixAssembler,matdata::ArrayBlock)
-  map(assemble_matrix!,A.arrays_1d,a.assems_1d,matdata.array)
-  numeric_kron!(A.array,A.arrays_1d...)
+function FESpaces.assemble_matrix!(A,a::TProductSparseMatrixAssembler,matdata::Vector)
+  map(assemble_matrix!,A.arrays_1d,a.assems_1d,matdata)
+  numerical_kron!(A.array,A.arrays_1d...)
 end
 
-function FESpaces.assemble_matrix_add!(A,a::TProductSparseMatrixAssembler,matdata::ArrayBlock)
-  map(assemble_matrix_add!,A.arrays_1d,a.assems_1d,matdata.array)
-  numeric_kron!(A.array,A.arrays_1d...)
+function FESpaces.assemble_matrix_add!(A,a::TProductSparseMatrixAssembler,matdata::Vector)
+  map(assemble_matrix_add!,A.arrays_1d,a.assems_1d,matdata)
+  numerical_kron!(A.array,A.arrays_1d...)
 end
 
-function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::ArrayBlock)
-  mats_1d = map(assemble_matrix,a.assems_1d,matdata.array)
+function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::Vector)
+  mats_1d = map(assemble_matrix,a.assems_1d,matdata)
   mat = kron(mats_1d...)
   return TProductArray(mat,mats_1d)
 end
@@ -429,7 +341,7 @@ function symbolic_kron(a::AbstractVector{T},b::AbstractVector{S}) where {T<:Numb
   return c
 end
 
-@inline function numeric_kron!(c::Vector,a::AbstractVector{T},b::AbstractVector{S}) where {T<:Number,S<:Number}
+@inline function numerical_kron!(c::Vector,a::AbstractVector{T},b::AbstractVector{S}) where {T<:Number,S<:Number}
   kron!(c,a,b)
 end
 
@@ -485,7 +397,7 @@ end
   return C
 end
 
-@inline function numeric_kron!(C::SparseMatrixCSC,A::AbstractSparseMatrixCSC,B::AbstractSparseMatrixCSC)
+@inline function numerical_kron!(C::SparseMatrixCSC,A::AbstractSparseMatrixCSC,B::AbstractSparseMatrixCSC)
   nA = size(A,2)
   nB = size(B,2)
 
@@ -519,7 +431,7 @@ function symbolic_kron(A::AbstractArray)
   A
 end
 
-function numeric_kron!(A::AbstractArray,B::AbstractArray)
+function numerical_kron!(A::AbstractArray,B::AbstractArray)
   copyto!(A,B)
   A
 end
@@ -528,8 +440,8 @@ function symbolic_kron(A::AbstractArray,B::AbstractArray,C::AbstractArray...)
   symbolic_kron(A,symbolic_kron(B,C...))
 end
 
-function numeric_kron!(A::AbstractArray,B::AbstractArray,C::AbstractArray...)
-  numeric_kron!(A,numeric_kron!(B,C...))
+function numerical_kron!(A::AbstractArray,B::AbstractArray,C::AbstractArray...)
+  numerical_kron!(A,numerical_kron!(B,C...))
 end
 
 # for gradients
@@ -559,7 +471,7 @@ _symbolic_kron(f,g,::Val{1}) = symbolic_kron(g[1])
 _symbolic_kron(f,g,::Val{2}) = symbolic_kron(g[1],f[2])
 _symbolic_kron(f,g,::Val{3}) = symbolic_kron(g[1],f[2],f[3])
 
-@inline function numeric_kron!(
+@inline function numerical_kron!(
   C::SparseMatrixCSC,
   vA::Vector{<:AbstractSparseMatrixCSC},
   vB::Vector{<:AbstractSparseMatrixCSC},
@@ -614,54 +526,54 @@ _symbolic_kron(f,g,::Val{3}) = symbolic_kron(g[1],f[2],f[3])
   return C
 end
 
-function FESpaces.allocate_vector(a::TProductSparseMatrixAssembler,vecdata::TProductGradientArrayBlock)
-  vecs_1d = map(allocate_vector,a.assems_1d,vecdata.f.array)
-  gradvecs_1d = map(allocate_vector,a.assems_1d,vecdata.g.array)
+function FESpaces.allocate_vector(a::TProductSparseMatrixAssembler,vecdata::TProductGradientEval)
+  vecs_1d = map(allocate_vector,a.assems_1d,vecdata.f)
+  gradvecs_1d = map(allocate_vector,a.assems_1d,vecdata.g)
   vec = symbolic_kron(vecs_1d,gradvecs_1d)
   return TProductGradientArray(vec,vecs_1d,gradvecs_1d)
 end
 
-function FESpaces.assemble_vector!(b,a::TProductSparseMatrixAssembler,vecdata::TProductGradientArrayBlock)
-  map(assemble_vector!,b.arrays_1d,a.assems_1d,vecdata.f.array)
-  map(assemble_vector!,b.gradients_1d,a.assems_1d,vecdata.g.array)
-  numeric_kron!(b.array,b.arrays_1d,b.gradients_1d,vecdata.op)
+function FESpaces.assemble_vector!(b,a::TProductSparseMatrixAssembler,vecdata::TProductGradientEval)
+  map(assemble_vector!,b.arrays_1d,a.assems_1d,vecdata.f)
+  map(assemble_vector!,b.gradients_1d,a.assems_1d,vecdata.g)
+  numerical_kron!(b.array,b.arrays_1d,b.gradients_1d,vecdata.op)
 end
 
-function FESpaces.assemble_vector_add!(b,a::TProductSparseMatrixAssembler,vecdata::TProductGradientArrayBlock)
-  map(assemble_vector_add!,b.arrays_1d,a.assems_1d,vecdata.f.array)
-  map(assemble_vector_add!,b.gradients_1d,a.assems_1d,vecdata.g.array)
-  numeric_kron!(b.array,b.arrays_1d,b.gradients_1d,vecdata.op)
+function FESpaces.assemble_vector_add!(b,a::TProductSparseMatrixAssembler,vecdata::TProductGradientEval)
+  map(assemble_vector_add!,b.arrays_1d,a.assems_1d,vecdata.f)
+  map(assemble_vector_add!,b.gradients_1d,a.assems_1d,vecdata.g)
+  numerical_kron!(b.array,b.arrays_1d,b.gradients_1d,vecdata.op)
 end
 
-function FESpaces.assemble_vector(a::TProductSparseMatrixAssembler,vecdata::TProductGradientArrayBlock)
-  vecs_1d = map(assemble_vector,a.assems_1d,vecdata.f.array)
-  gradvecs_1d = map(assemble_vector,a.assems_1d,vecdata.g.array)
+function FESpaces.assemble_vector(a::TProductSparseMatrixAssembler,vecdata::TProductGradientEval)
+  vecs_1d = map(assemble_vector,a.assems_1d,vecdata.f)
+  gradvecs_1d = map(assemble_vector,a.assems_1d,vecdata.g)
   vec = kronecker_gradients(vecs_1d,gradvecs_1d,vecdata.op)
   return TProductGradientArray(vec,vecs_1d,gradvecs_1d)
 end
 
-function FESpaces.allocate_matrix(a::TProductSparseMatrixAssembler,matdata::TProductGradientArrayBlock)
-  mats_1d = map(allocate_matrix,a.assems_1d,matdata.f.array)
-  gradmats_1d = map(allocate_matrix,a.assems_1d,matdata.g.array)
+function FESpaces.allocate_matrix(a::TProductSparseMatrixAssembler,matdata::TProductGradientEval)
+  mats_1d = map(allocate_matrix,a.assems_1d,matdata.f)
+  gradmats_1d = map(allocate_matrix,a.assems_1d,matdata.g)
   mat = symbolic_kron(mats_1d,gradmats_1d)
   return TProductGradientArray(mat,mats_1d,gradmats_1d)
 end
 
-function FESpaces.assemble_matrix!(A,a::TProductSparseMatrixAssembler,matdata::TProductGradientArrayBlock)
-  map(assemble_matrix!,A.arrays_1d,a.assems_1d,matdata.f.array)
-  map(assemble_matrix!,A.gradients_1d,a.assems_1d,matdata.g.array)
-  numeric_kron!(A.array,A.arrays_1d,A.gradients_1d,matdata.op)
+function FESpaces.assemble_matrix!(A,a::TProductSparseMatrixAssembler,matdata::TProductGradientEval)
+  map(assemble_matrix!,A.arrays_1d,a.assems_1d,matdata.f)
+  map(assemble_matrix!,A.gradients_1d,a.assems_1d,matdata.g)
+  numerical_kron!(A.array,A.arrays_1d,A.gradients_1d,matdata.op)
 end
 
-function FESpaces.assemble_matrix_add!(A,a::TProductSparseMatrixAssembler,matdata::TProductGradientArrayBlock)
-  map(assemble_matrix_add!,A.arrays_1d,a.assems_1d,matdata.f.array)
-  map(assemble_matrix_add!,A.gradients_1d,a.assems_1d,matdata.g.array)
-  numeric_kron!(A.array,A.arrays_1d,A.gradients_1d,matdata.op)
+function FESpaces.assemble_matrix_add!(A,a::TProductSparseMatrixAssembler,matdata::TProductGradientEval)
+  map(assemble_matrix_add!,A.arrays_1d,a.assems_1d,matdata.f)
+  map(assemble_matrix_add!,A.gradients_1d,a.assems_1d,matdata.g)
+  numerical_kron!(A.array,A.arrays_1d,A.gradients_1d,matdata.op)
 end
 
-function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::TProductGradientArrayBlock)
-  mats_1d = map(assemble_matrix,a.assems_1d,matdata.f.array)
-  gradmats_1d = map(assemble_matrix,a.assems_1d,matdata.g.array)
+function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::TProductGradientEval)
+  mats_1d = map(assemble_matrix,a.assems_1d,matdata.f)
+  gradmats_1d = map(assemble_matrix,a.assems_1d,matdata.g)
   mat = kronecker_gradients(mats_1d,gradmats_1d,matdata.op)
   return TProductGradientArray(mat,mats_1d,gradmats_1d)
 end
@@ -737,6 +649,6 @@ SparseArrays.nonzeros(a::TProductGradientSparseMatrix) = a.array
 
 # deal with cell field + gradient cell field
 for op in (:+,:-)
-  @eval ($op)(a::ArrayBlock,b::TProductGradientArrayBlock) = TProductGradientArrayBlock(b.f,b.g,$op)
-  @eval ($op)(a::TProductGradientArrayBlock,b::ArrayBlock) = TProductGradientArrayBlock(a.f,a.g,$op)
+  @eval ($op)(a::Vector,b::TProductGradientEval) = TProductGradientEval(b.f,b.g,$op)
+  @eval ($op)(a::TProductGradientEval,b::Vector) = TProductGradientEval(a.f,a.g,$op)
 end
