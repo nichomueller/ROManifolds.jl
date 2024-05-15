@@ -32,16 +32,6 @@ import SparseArrays: AbstractSparseMatrixCSC
 import PartitionedArrays: tuple_of_arrays
 import Mabla.FEM: get_dirichlet_cells
 
-export TTArray
-export TTVector
-export TTMatrix
-export ParamTTArray
-export ParamTTVector
-export ParamTTMatrix
-export get_values
-export get_index_map
-include("TTArray.jl")
-
 export TProductModel
 export TProductTriangulation
 export TProductMeasure
@@ -67,4 +57,14 @@ export symbolic_kron!
 export numerical_kron!
 export kronecker_gradients
 include("TProductCellFields.jl")
+
+export TTArray
+export TTVector
+export TTMatrix
+export ParamTTArray
+export ParamTTVector
+export ParamTTMatrix
+export get_values
+export get_index_map
+include("TTArray.jl")
 end # module

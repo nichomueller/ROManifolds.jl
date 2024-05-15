@@ -59,8 +59,9 @@ function Geometry.Triangulation(model::TProductModel;kwargs...)
 end
 
 function CellData.get_cell_points(trian::TProductTriangulation)
+  point = get_cell_points(trian.trian)
   single_points = map(get_cell_points,trian.trians_1d)
-  TProductCellPoint(single_points)
+  TProductCellPoint(point,single_points)
 end
 
 struct TProductMeasure{A,B} <: Measure
@@ -74,4 +75,8 @@ function CellData.Measure(a::TProductTriangulation,args...;kwargs...)
   TProductMeasure(measure,measures_1d)
 end
 
-CellData.get_cell_quadrature(a::TProductMeasure) = get_cell_quadrature(a.measure)
+function CellData.get_cell_points(a::TProductMeasure)
+  point = get_cell_points(a.measure)
+  single_points = map(get_cell_points,a.measures_1d)
+  TProductCellPoint(point,single_points)
+end

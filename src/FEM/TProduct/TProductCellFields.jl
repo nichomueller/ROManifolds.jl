@@ -1,21 +1,10 @@
 struct TProductCellPoint{DS<:DomainStyle} <: CellDatum
+  point::CellPoint{DS}
   single_points::Vector{<:CellPoint}
-  domain_style::DS
-
-  function TProductCellPoint(single_points::Vector{<:CellPoint})
-    @assert length(single_points) > 0
-    if any( map(i->DomainStyle(i)==ReferenceDomain(),single_points) )
-      domain_style = ReferenceDomain()
-    else
-      domain_style = PhysicalDomain()
-    end
-    new{typeof(domain_style)}(single_points,domain_style)
-  end
 end
 
-CellData.get_data(f::TProductCellPoint) = f.single_points
-MultiField.num_fields(a::TProductCellPoint) = length(a.single_points)
-Base.length(a::TProductCellPoint) = num_fields(a)
+CellData.get_data(f::TProductCellPoint) = f.point
+Base.length(a::TProductCellPoint) = length(a.single_points)
 
 function CellData.get_triangulation(f::TProductCellPoint)
   s1 = first(f.single_points)
@@ -25,6 +14,12 @@ function CellData.get_triangulation(f::TProductCellPoint)
 end
 
 CellData.DomainStyle(::Type{TProductCellPoint{DS}}) where DS = DS()
+
+# default behavior
+
+function Arrays.evaluate!(cache,f::CellField,x::TProductCellPoint)
+  evaluate!(cache,f,x.point)
+end
 
 struct TProductCellField{DS<:DomainStyle} <: CellField
   single_fields::Vector{<:CellField}
@@ -51,11 +46,10 @@ function CellData.get_triangulation(f::TProductCellField)
 end
 
 CellData.DomainStyle(::Type{TProductCellField{DS}}) where DS = DS()
-MultiField.num_fields(a::TProductCellField) = length(a.single_fields)
-Base.length(a::TProductCellField) = num_fields(a)
+Base.length(a::TProductCellField) = length(a.single_fields)
 
 function LinearAlgebra.dot(a::TProductCellField,b::TProductCellField)
-  @check num_fields(a) == num_fields(b)
+  @check length(a) == length(b)
   return sum(map(dot,a.single_fields,b.single_fields))
 end
 

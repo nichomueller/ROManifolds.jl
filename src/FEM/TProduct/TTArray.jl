@@ -1,8 +1,8 @@
-struct TTArray{D,T,N,V} <: AbstractArray{T,N}
+struct TTArray{D,T,N,V,I} <: AbstractArray{T,N}
   values::V
-  index_map::Array{Int,D}
-  function TTArray(values::V,index_map::Array{Int,D}) where {T,N,V<:AbstractArray{T,N},D}
-    new{D,T,N,V}(values,index_map)
+  index_map::I
+  function TTArray(values::V,index_map::I) where {T,N,D,V<:AbstractArray{T,N},I<:AbstractIndexMap{D}}
+    new{D,T,N,V,I}(values,index_map)
   end
 end
 
@@ -14,14 +14,24 @@ const TTSparseMatrixCSC{D,T,V<:SparseMatrixCSC} = TTArray{D,T,2,V}
 get_values(a::TTArray) = a.values
 get_index_map(a::TTArray) = a.index_map
 
-function TTVector{T}(::UndefInitializer,s,index_map) where T
+function TTVector{D,T,V,I}(::UndefInitializer,s,index_map) where {D,T,V,I}
   values = zeros(T,s)
   TTArray(values,index_map)
 end
 
-function TTMatrix{T}(::UndefInitializer,s,index_map) where T
+function TTMatrix{D,T,V,I}(::UndefInitializer,s,index_map) where {D,T,V,I}
   values = zeros(T,s)
   TTArray(values,index_map)
+end
+
+# without index map, we default to normal arrays
+
+function TTVector{D,T,V,I}(::UndefInitializer,s) where {D,T,V,I}
+  Vector{T}(undef,s)
+end
+
+function TTMatrix{D,T,V,I}(::UndefInitializer,s) where {D,T,V,I}
+  Matrix{T}(undef,s)
 end
 
 const ParamTTArray = ParamArray{T,N,A,L} where {T,N,A<:AbstractVector{<:TTArray},L}
@@ -235,7 +245,7 @@ Base.length(a::TTBroadcast) = length(get_values(a))
 
 # algebra
 
-function Algebra.allocate_vector(::Type{V},index_map) where V<:TTArray
+function Algebra.allocate_vector(::Type{V},index_map::AbstractIndexMap) where V<:TTArray
   values = Vector{eltype(V)}(undef,length(index_map))
   TTArray(values,index_map)
 end

@@ -34,6 +34,34 @@ function _shape_per_dir(i::AbstractVector{<:Integer})
   (max1 - min1 + 1,)
 end
 
+abstract type AbstractIndexMap{D} <: AbstractArray{Int,D} end
+
+struct IndexMap{D} <: AbstractIndexMap{D}
+  indices::Array{Int,D}
+end
+
+Base.size(i::IndexMap) = size(i.indices)
+Base.getindex(i::IndexMap,j...) = getindex(i.indices,j...)
+
+function free_dofs_map(i::IndexMap)
+  free_dofs_locations = findall(i.indices.>0)
+  IndexMapView(i.indices,free_dofs_locations)
+end
+
+function dirichlet_dofs_map(i::IndexMap)
+  dir_dofs_locations = findall(i.indices.<0)
+  i.indices[dir_dofs_locations]
+end
+
+struct IndexMapView{D,L} <: AbstractIndexMap{D}
+  indices::Array{Int,D}
+  locations::L
+end
+
+Base.size(i::IndexMapView) = _shape_per_dir(i.locations)
+Base.IndexStyle(::Type{<:IndexMapView}) = IndexLinear()
+Base.getindex(i::IndexMapView,j::Int) = i.indices[i.locations[j]]
+
 function comp_to_free_dofs(::Type{T},space::FESpace,args...;kwargs...) where T
   @abstractmethod
 end
@@ -103,33 +131,11 @@ function _get_dof_permutation(
   ncells = desc.partition
   ndofs = order .* ncells .+ 1 .- periodic
 
-  new_dof_ids = copy(LinearIndices(ndofs))
-
   terms = _get_terms(first(get_polytopes(model)),fill(order,Dc))
   cache_cell_dof_ids = array_cache(cell_dof_ids)
 
-  for (icell,cell) in enumerate(CartesianIndices(ncells))
-    first_new_dof  = order .* (Tuple(cell) .- 1) .+ 1
-    new_dofs_range = map(i -> i:i+order,first_new_dof)
-    new_dofs = view(new_dof_ids,new_dofs_range...)
-
-    cell_dofs = getindex!(cache_cell_dof_ids,cell_dof_ids,icell)
-    for (idof,dof) in enumerate(cell_dofs)
-      t = terms[idof]
-      new_dofs[t] < 0 && continue
-      if dof < 0
-        new_dofs[t] *= -1
-      end
-    end
-  end
-
-  pos_ids = findall(new_dof_ids.>0)
-  neg_ids = findall(new_dof_ids.<0)
-  new_dof_ids[pos_ids] .= LinearIndices(pos_ids)
-  new_dof_ids[neg_ids] .= -1 .* LinearIndices(neg_ids)
-
-  free_vals_shape = _shape_per_dir(pos_ids)
-  n2o_dof_map = fill(-1,free_vals_shape)
+  new_dof_ids = LinearIndices(ndofs)
+  n2o_dof_map = fill(-1,ndofs)
 
   for (icell,cell) in enumerate(CartesianIndices(ncells))
     first_new_dof  = order .* (Tuple(cell) .- 1) .+ 1
@@ -155,7 +161,8 @@ function get_dof_permutation(
   kwargs...) where T
 
   cell_dof_ids = get_cell_dof_ids(space)
-  _get_dof_permutation(model,cell_dof_ids,order)
+  dof_perm = _get_dof_permutation(model,cell_dof_ids,order)
+  return IndexMap(dof_perm)
 end
 
 function get_dof_permutation(
@@ -175,7 +182,7 @@ function get_dof_permutation(
     push!(dof_perms,dof_perm_comp)
   end
   dof_perm = _dof_perm_from_dof_perms(dof_perms)
-  return dof_perm
+  return IndexMap(dof_perm)
 end
 
 function _get_tp_dof_permutation(models::AbstractVector,spaces::AbstractVector,order::Integer)
@@ -244,10 +251,9 @@ function get_tp_dof_permutation(
   @notimplemented
 end
 
-function _get_tt_vector(f,perm)
+function _get_tt_vector(f,perm::AbstractIndexMap{D}) where D
   V = get_vector_type(f)
   T = eltype(V)
-  D = ndims(perm)
   vec = allocate_vector(TTVector{D,T},perm)
   return vec
 end
@@ -259,14 +265,14 @@ end
 struct TProductFESpace{D,V} <: SingleFieldFESpace
   space::SingleFieldFESpace
   spaces_1d::Vector{<:SingleFieldFESpace}
-  dof_permutation::Array{Int,D}
+  dof_permutation::IndexMap{D}
   vector_type::Type{V}
 end
 
 function TProductFESpace(
   space::SingleFieldFESpace,
   spaces_1d::Vector{<:SingleFieldFESpace},
-  dof_permutation::Array)
+  dof_permutation::AbstractIndexMap)
 
   vector_type = _get_tt_vector_type(space,dof_permutation)
   TProductFESpace(space,spaces_1d,dof_permutation,vector_type)
@@ -290,12 +296,14 @@ end
 
 get_dof_permutation(f::TProductFESpace) = f.dof_permutation
 
+get_free_dof_permutation(f::TProductFESpace) = free_dofs_map(f.dof_permutation)
+
 FESpaces.get_triangulation(f::TProductFESpace) = get_triangulation(f.space)
 
 FESpaces.get_free_dof_ids(f::TProductFESpace) = get_free_dof_ids(f.space)
 
-function FESpaces.zero_dirichlet_values(f::TProductFESpace)
-  vec = _get_tt_vector(f.space,f.dof_permutation)
+function FESpaces.zero_free_values(f::TProductFESpace)
+  vec = _get_tt_vector(f.space,get_free_dof_permutation(f))
   fill!(vec,zero(eltype(vec)))
 end
 
@@ -307,7 +315,10 @@ FESpaces.get_cell_dof_ids(f::TProductFESpace) = get_cell_dof_ids(f.space)
 
 FESpaces.ConstraintStyle(f::TProductFESpace) = ConstraintStyle(f.space)
 
-FESpaces.get_fe_basis(f::TProductFESpace) = get_fe_basis(f.space)
+function FESpaces.get_fe_basis(f::TProductFESpace)
+  basis = get_fe_basis(f.space)
+  FESpaces.SingleFieldFEBasis(get_data(basis),basis.trian.trian,BasisStyle(basis),DomainStyle(basis))
+end
 
 FESpaces.get_fe_dof_basis(f::TProductFESpace) = get_fe_dof_basis(f.space)
 
@@ -328,6 +339,24 @@ FESpaces.get_dirichlet_dof_tag(f::TProductFESpace) = get_dirichlet_dof_tag(f.spa
 FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
 FEM.get_dirichlet_cells(f::TProductFESpace) = get_dirichlet_cells(f.space)
+
+# need to correct free dof values for trial spaces defined for TT problems
+
+for F in (:TrialFESpace,:TransientTrialFESpace)
+  @eval begin
+    FESpaces.zero_free_values(f::$F{<:TProductFESpace}) = zero_free_values(f.space)
+  end
+end
+
+for F in (:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
+  @eval begin
+    function FESpaces.zero_free_values(f::$F{<:TProductFESpace})
+      V = get_vector_type(f)
+      vector = zero_free_values(f.space)
+      allocate_param_array(vector,length(V))
+    end
+  end
+end
 
 struct TProductFEBasis{DS,BS} <: FEBasis
   basis::Vector

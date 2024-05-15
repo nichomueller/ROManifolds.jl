@@ -89,7 +89,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=5,nsnaps_test=5,nsnaps_mdeim=2)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1")))
 
-fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ;tt_format=true)
+fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,feop,fesnaps,rbsnaps,festats,rbstats)
@@ -310,7 +310,4 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=5,nsnaps_test=5,nsnaps_mdeim=2)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1")))
 
-fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ;tt_format=true)
-
-V = get_vector_type(test)
-free_values = allocate_vector(V,get_free_dof_ids(f))
+fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
