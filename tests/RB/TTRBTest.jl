@@ -200,66 +200,43 @@ _Ω = Triangulation(_model)
 _dΩ = Measure(_Ω,2)
 
 u = get_trial_fe_basis(test)
-Mc = ∫(∇(v)⋅∇(u))dΩ
+Mc = ∫(v⋅u)dΩ
 M = assemble_matrix(Mc,trial,test)
+Ac = ∫(∇(v)⋅∇(u))dΩ
+A = assemble_matrix(Mc,test,test)
 
 _u = get_trial_fe_basis(_test)
 _dvu = ∇(_v)⋅∇(_u)
 _dvu(_x)
 
-# _Mc = ∫(∇(_v)⋅∇(_u))_dΩ
-# _M = assemble_matrix(_Mc,_test,_test)
 _Mc = ∫(_v*_u)_dΩ
 _M = assemble_matrix(_Mc,_test,_test)
+_Ac = ∫(∇(_v)⋅∇(_u))_dΩ
+_A = assemble_matrix(_Ac,_test,_test)
 
-assem = SparseMatrixAssembler(_test,_test)
+# test on larger meshes
+domain = (0,1,0,1)
+partition = (20,20)
+model = CartesianDiscreteModel(domain,partition)
+reffe = ReferenceFE(lagrangian,Float64,2)
+test = TestFESpace(model,reffe;conformity=:H1)
+Ω = Triangulation(model)
+dΩ = Measure(Ω,2)
 
+_model = TProduct.TProductModel(domain,partition)
+_test = TProduct.TProductFESpace(_model,reffe;conformity=:H1)
+_Ω = Triangulation(_model)
+_dΩ = Measure(_Ω,2)
 
-# build index map between sparse structures
+M = assemble_matrix((u,v)->∫(v*u)dΩ,test,test)
+_M = assemble_matrix((u,v)->∫(v*u)_dΩ,_test,_test)
 
-function get_rowval(A::SparseMatrixCSC,B::SparseMatrixCSC)
-  rA = A.rowval
-  rB = B.rowval
-  Ti = promote_type(eltype(rA),eltype(rB))
-  nAB = length(rA)*length(rB)
-  r = zeros(Ti,nAB)
-  iB = collect(eachindex(rB))
-  count = 0
-  for iA in CartesianIndices(size(A))
-    !iszero(A[iA]) && continue
-    ir = count*length(rB) .+ iB
-    @inbounds r[ir] = rB .+ size(B,1)*iA.I[1]
-    count += 1
-  end
-  return r
-end
+A = assemble_matrix((u,v)->∫(∇(v)⋅∇(u))dΩ,test,test)
+_A = assemble_matrix((u,v)->∫(∇(v)⋅∇(u))_dΩ,_test,_test)
 
-_A = [1 0 0
-      0 1 0
-      1 1 1]
-A = sparse(_A)
-AA = kron(_A,_A)
+AM = assemble_matrix((u,v)->∫(v*u)dΩ + ∫(∇(v)⋅∇(u))dΩ,test,test)
+_AM = assemble_matrix((u,v)->∫(v*u)_dΩ + ∫(∇(v)⋅∇(u))_dΩ,_test,_test)
 
-ir = get_rowval(A,A)
-
-B = A
-rA = A.rowval
-rB = B.rowval
-Ti = promote_type(eltype(rA),eltype(rB))
-nAB = length(rA)*length(rB)
-r = zeros(Ti,nAB)
-iB = collect(eachindex(rB))
-count = 0
-iA = collect(CartesianIndices(size(A)))[1]
-iszero(A[iA])
-ir = count*length(rB) .+ iB
-@inbounds r[ir] = rB .+ size(B,1)*(iA.I[1]-1)
-count += 1
-
-for iA in CartesianIndices(size(A))
-  !iszero(A[iA]) && continue
-  ir = count*length(rB) .+ iB
-  @inbounds r[ir] = rB .+ size(B,1)*iA.I[1]
-  count += 1
-end
-return r
+a = SparseMatrixAssembler(_test,_test)
+_AMc = ∫(_v*_u)_dΩ + ∫(∇(_v)⋅∇(_u))_dΩ
+matdata = collect_cell_matrix(_test,_test,_AMc)

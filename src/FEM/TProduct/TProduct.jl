@@ -27,7 +27,7 @@ import Gridap.ReferenceFEs: get_order
 import Gridap.TensorValues: Mutable,inner,outer,double_contraction,symmetric_part
 import LinearAlgebra: det,tr,cross,dot,⋅,rmul!
 import Base: inv,abs,abs2,*,+,-,/,adjoint,transpose,real,imag,conj
-import SparseArrays: AbstractSparseMatrixCSC
+import SparseArrays: AbstractSparseMatrixCSC,getcolptr
 import PartitionedArrays: tuple_of_arrays
 
 include("Utils.jl")
