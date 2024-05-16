@@ -202,7 +202,7 @@ struct TransientSnapshots{M,T,P,R,V} <: StandardSnapshots{M,T}
   end
 end
 
-function Snapshots(values::AbstractVector{P},args...) where P
+function Snapshots(values::AbstractVector{P},args...) where P<:AbstractParamContainer
   TransientSnapshots(values,args...)
 end
 
@@ -260,7 +260,7 @@ struct CompressedTransientSnapshots{M,N,T,R,V} <: StandardSnapshots{M,T}
   end
 end
 
-function Snapshots(values::AbstractMatrix{T},args...) where T
+function Snapshots(values::AbstractMatrix{T},args...) where T<:Number
   CompressedTransientSnapshots(values,args...)
 end
 

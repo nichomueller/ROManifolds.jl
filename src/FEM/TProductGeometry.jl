@@ -58,6 +58,10 @@ function Geometry.Triangulation(model::TProductModel;kwargs...)
   TProductTriangulation(model,trian,trians_1d)
 end
 
+function Geometry.BoundaryTriangulation(model::TProductModel,args...;kwargs...)
+  BoundaryTriangulation(model.model,args...;kwargs...)
+end
+
 function CellData.get_cell_points(trian::TProductTriangulation)
   point = get_cell_points(trian.trian)
   single_points = map(get_cell_points,trian.trians_1d)
@@ -79,4 +83,10 @@ function CellData.get_cell_points(a::TProductMeasure)
   point = get_cell_points(a.measure)
   single_points = map(get_cell_points,a.measures_1d)
   TProductCellPoint(point,single_points)
+end
+
+# default behavior
+
+function CellData.integrate(f::CellField,b::TProductMeasure)
+  integrate(f,b.measure)
 end

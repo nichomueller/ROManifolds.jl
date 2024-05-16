@@ -262,9 +262,9 @@ function _get_tt_vector_type(f,perm)
   typeof(_get_tt_vector(f,perm))
 end
 
-struct TProductFESpace{D,V} <: SingleFieldFESpace
-  space::SingleFieldFESpace
-  spaces_1d::Vector{<:SingleFieldFESpace}
+struct TProductFESpace{D,A<:SingleFieldFESpace,B<:AbstractVector{<:SingleFieldFESpace},V} <: SingleFieldFESpace
+  space::A
+  spaces_1d::B
   dof_permutation::IndexMap{D}
   vector_type::Type{V}
 end
@@ -287,7 +287,7 @@ function FESpaces.FESpace(
   T,order = reffe_args
   cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
   cell_reffes_1d = map(model->ReferenceFE(model,basis,T,order;reffe_kwargs...),model.models_1d)
-  space = FESpace(model,cell_reffe;kwargs...)
+  space = FESpace(model.model,cell_reffe;kwargs...)
   spaces_1d = map(FESpace,model.models_1d,cell_reffes_1d) # is it ok to eliminate the kwargs?
   # perm = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order) # this one will be used later on
   perm = get_dof_permutation(T,model.model,space,order)
@@ -313,12 +313,9 @@ FESpaces.get_dof_value_type(f::TProductFESpace) = get_dof_value_type(f.space)
 
 FESpaces.get_cell_dof_ids(f::TProductFESpace) = get_cell_dof_ids(f.space)
 
-FESpaces.ConstraintStyle(f::TProductFESpace) = ConstraintStyle(f.space)
+FESpaces.ConstraintStyle(::Type{<:TProductFESpace{D,A}}) where {D,A} = ConstraintStyle(A)
 
-function FESpaces.get_fe_basis(f::TProductFESpace)
-  basis = get_fe_basis(f.space)
-  FESpaces.SingleFieldFEBasis(get_data(basis),basis.trian.trian,BasisStyle(basis),DomainStyle(basis))
-end
+FESpaces.get_fe_basis(f::TProductFESpace) = get_fe_basis(f.space)
 
 FESpaces.get_fe_dof_basis(f::TProductFESpace) = get_fe_dof_basis(f.space)
 
@@ -338,7 +335,7 @@ FESpaces.get_dirichlet_dof_tag(f::TProductFESpace) = get_dirichlet_dof_tag(f.spa
 
 FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-FEM.get_dirichlet_cells(f::TProductFESpace) = get_dirichlet_cells(f.space)
+get_dirichlet_cells(f::TProductFESpace) = get_dirichlet_cells(f.space)
 
 # need to correct free dof values for trial spaces defined for TT problems
 
@@ -358,9 +355,9 @@ for F in (:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
   end
 end
 
-struct TProductFEBasis{DS,BS} <: FEBasis
-  basis::Vector
-  trian::Triangulation
+struct TProductFEBasis{DS,BS,A,B} <: FEBasis
+  basis::A
+  trian::B
   domain_style::DS
   basis_style::BS
 end

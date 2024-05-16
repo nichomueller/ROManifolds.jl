@@ -311,3 +311,10 @@ rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=5,nsnaps_test=5,nsnaps_mdeim=2)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1")))
 
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
+
+r = realization(feop)
+v = get_fe_basis(test)
+u = get_trial_fe_basis(trial(r))
+μ,t = get_params(r),get_times(r)
+# ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
+∫(hμt(μ,t)*v)dΓn # ∫(fμt(μ,t)*v)dΩ #

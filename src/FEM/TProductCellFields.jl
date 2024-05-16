@@ -1,6 +1,11 @@
-struct TProductCellPoint{DS<:DomainStyle} <: CellDatum
-  point::CellPoint{DS}
-  single_points::Vector{<:CellPoint}
+struct TProductCellPoint{DS<:DomainStyle,A,B} <: CellDatum
+  point::A
+  single_points::B
+  function TProductCellPoint(
+    point::A,single_points::B
+    ) where {DS,A<:CellPoint{DS},B<:AbstractVector{<:CellPoint{DS}}}
+    new{DS,A,B}(point,single_points)
+  end
 end
 
 CellData.get_data(f::TProductCellPoint) = f.point
@@ -13,7 +18,7 @@ function CellData.get_triangulation(f::TProductCellPoint)
   trian
 end
 
-CellData.DomainStyle(::Type{TProductCellPoint{DS}}) where DS = DS()
+CellData.DomainStyle(::Type{<:TProductCellPoint{DS}}) where DS = DS()
 
 # default behavior
 
@@ -21,18 +26,19 @@ function Arrays.evaluate!(cache,f::CellField,x::TProductCellPoint)
   evaluate!(cache,f,x.point)
 end
 
-struct TProductCellField{DS<:DomainStyle} <: CellField
-  single_fields::Vector{<:CellField}
+struct TProductCellField{DS<:DomainStyle,A} <: CellField
+  single_fields::A
   domain_style::DS
 
-  function TProductCellField(single_fields::Vector{<:CellField})
+  function TProductCellField(single_fields::A) where {A<:Vector{<:CellField}}
     @assert length(single_fields) > 0
     if any( map(i->DomainStyle(i)==ReferenceDomain(),single_fields) )
       domain_style = ReferenceDomain()
     else
       domain_style = PhysicalDomain()
     end
-    new{typeof(domain_style)}(single_fields,domain_style)
+    DS = typeof(domain_style)
+    new{DS,A}(single_fields,domain_style)
   end
 end
 
@@ -55,9 +61,9 @@ end
 
 # gradients
 
-struct TProductGradientCellField <: CellField
-  cell_data::CellField
-  gradient_cell_data::CellField
+struct TProductGradientCellField{A,B} <: CellField
+  cell_data::A
+  gradient_cell_data::B
 end
 
 CellData.get_data(a::TProductGradientCellField) = a.cell_data
@@ -79,13 +85,13 @@ function Fields.gradient(f::TProductFEBasis)
   return TProductGradientCellField(f,g)
 end
 
-struct TProductGradientEval
-  f::Vector
-  g::Vector
-  op
+struct TProductGradientEval{A,B,C}
+  f::A
+  g::B
+  op::C
 end
 
-function TProductGradientEval(f::Vector,g::Vector)
+function TProductGradientEval(f::AbstractVector,g::AbstractVector)
   op = nothing
   TProductGradientEval(f,g,op)
 end

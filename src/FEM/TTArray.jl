@@ -131,7 +131,12 @@ function LinearAlgebra.mul!(c::TTArray,a::TTArray,b::TTArray,α::Number,β::Numb
   return c
 end
 
-function LinearAlgebra.ldiv!(a::TTArray,m::LU,b::TTArray)
+function LinearAlgebra.ldiv!(m::Factorization,b::TTArray)
+  ldiv!(m,get_values(b))
+  return b
+end
+
+function LinearAlgebra.ldiv!(a::TTArray,m::Factorization,b::TTArray)
   ldiv!(get_values(a),m,get_values(b))
   return a
 end

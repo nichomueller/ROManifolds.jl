@@ -191,5 +191,39 @@ include("TransientParamFESolution.jl")
 export get_parent
 include("TriangulationParents.jl")
 
-include("TProduct/TProduct.jl")
+export TProductModel
+export TProductTriangulation
+export TProductMeasure
+include("TProductGeometry.jl")
+
+export TProductFESpace
+export TProductFEBasis
+export get_dof_permutation
+export get_tp_dof_permutation
+export get_tp_fe_basis
+export get_tp_trial_fe_basis
+include("TProductFESpaces.jl")
+
+export TProductCellPoint
+export TProductCellFields
+export TProductGradientCellField
+export TProductGradientEval
+export TProductSparseMatrixAssembler
+export TProductArray
+export TProductGradientArray
+export symbolic_kron
+export symbolic_kron!
+export numerical_kron!
+export kronecker_gradients
+include("TProductCellFields.jl")
+
+export TTArray
+export TTVector
+export TTMatrix
+export ParamTTArray
+export ParamTTVector
+export ParamTTMatrix
+export get_values
+export get_index_map
+include("TTArray.jl")
 end # module
