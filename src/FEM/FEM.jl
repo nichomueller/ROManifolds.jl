@@ -16,6 +16,7 @@ using Gridap.MultiField
 using Gridap.ODEs
 using Gridap.Polynomials
 using Gridap.ReferenceFEs
+using Gridap.TensorValues
 using Gridap.Visualization
 using Gridap.Helpers
 using GridapSolvers
@@ -37,6 +38,7 @@ import Gridap.ODEs: TransientCellField
 import Gridap.ReferenceFEs: get_order
 import Gridap.TensorValues: Mutable,inner,outer,double_contraction,symmetric_part
 import PartitionedArrays: tuple_of_arrays
+import SparseArrays: AbstractSparseMatrixCSC
 
 export AbstractParamRealization
 export ParamRealization

@@ -55,8 +55,8 @@ struct BasicTTSnapshots{T,N,P,R} <: TTSnapshots{T,N}
   end
 end
 
-function BasicSnapshots(values::ParamTTArray,args...)
-  BasicTTSnapshots(values,args...)
+function BasicSnapshots(values::ParamTTArray,realization::TransientParamRealization)
+  BasicTTSnapshots(values,realization)
 end
 
 function BasicSnapshots(s::BasicTTSnapshots)
@@ -91,8 +91,12 @@ struct TransientTTSnapshots{T,N,P,R,V} <: TTSnapshots{T,N}
   end
 end
 
-function TransientSnapshots(values::AbstractVector{P},args...) where P<:ParamTTArray
-  TransientTTSnapshots(values,args...)
+function TransientSnapshots(
+  values::AbstractVector{P},
+  realization::TransientParamRealization
+  ) where P<:ParamTTArray
+
+  TransientTTSnapshots(values,realization)
 end
 
 FEM.get_index_map(s::TransientTTSnapshots) = get_index_map(first(s.values))
@@ -108,8 +112,8 @@ function tensor_setindex!(s::TransientTTSnapshots,v,ispace,itime,iparam)
 end
 
 function BasicSnapshots(
-  s::TransientTTSnapshots{T,<:ParamArray{T,N,L,A}}
-  ) where {T,N,L,A}
+  s::TransientTTSnapshots{T,N,<:ParamArray{T,M,L,A}}
+  ) where {T,N,M,L,A}
 
   nt = num_times(s)
   np = num_params(s)

@@ -34,13 +34,14 @@ function TTMatrix{D,T,V,I}(::UndefInitializer,s) where {D,T,V,I}
   Matrix{T}(undef,s)
 end
 
-const ParamTTArray = ParamArray{T,N,A,L} where {T,N,A<:AbstractVector{<:TTArray},L}
-const ParamTTVector = ParamArray{T,1,A,L} where {T,A<:AbstractVector{<:TTVector},L}
-const ParamTTMatrix = ParamArray{T,2,A,L} where {T,A<:AbstractVector{<:TTMatrix},L}
-const ParamTTSparseMatrix = ParamArray{T,2,A,L} where {T,A<:AbstractVector{<:TTSparseMatrix},L}
-const ParamTTSparseMatrixCSC = ParamArray{T,2,A,L} where {T,A<:AbstractVector{<:TTSparseMatrixCSC},L}
+const ParamTTArray = ParamArray{T,N,L,A} where {T,N,L,A<:AbstractVector{<:TTArray}}
+const ParamTTVector = ParamArray{T,1,L,A} where {T,L,A<:AbstractVector{<:TTVector}}
+const ParamTTMatrix = ParamArray{T,2,L,A} where {T,L,A<:AbstractVector{<:TTMatrix}}
+const ParamTTSparseMatrix = ParamArray{T,2,L,A} where {T,L,A<:AbstractVector{<:TTSparseMatrix}}
+const ParamTTSparseMatrixCSC = ParamArray{T,2,L,A} where {T,L,A<:AbstractVector{<:TTSparseMatrixCSC}}
 
 get_values(a::ParamTTArray) = ParamArray(map(get_values,get_array(a)))
+get_index_map(a::ParamTTArray) = get_index_map(first(a))
 
 Base.eltype(a::TTArray{D,T}) where {D,T} = T
 Base.eltype(::Type{<:TTArray{D,T}}) where {D,T} = T

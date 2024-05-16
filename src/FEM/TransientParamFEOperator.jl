@@ -112,7 +112,7 @@ function assemble_norm_matrix(op::TransientParamFEOpFromWeakForm)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
   inorm = get_induced_norm(op)
-  assemble_matrix(inorm,trial,test)
+  assemble_norm_matrix(inorm,trial,test)
 end
 
 function ODEs.get_assembler(feop::TransientParamFEOpFromWeakForm,r::TransientParamRealization)
@@ -219,7 +219,7 @@ function assemble_norm_matrix(op::TransientParamSemilinearFEOpFromWeakForm)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
   inorm = get_induced_norm(op)
-  assemble_matrix(inorm,trial,test)
+  assemble_norm_matrix(inorm,trial,test)
 end
 
 function ODEs.get_assembler(feop::TransientParamSemilinearFEOpFromWeakForm,r::TransientParamRealization)
@@ -290,7 +290,7 @@ function assemble_norm_matrix(op::TransientParamLinearFEOpFromWeakForm)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
   inorm = get_induced_norm(op)
-  assemble_matrix(inorm,trial,test)
+  assemble_norm_matrix(inorm,trial,test)
 end
 
 function ODEs.get_assembler(feop::TransientParamLinearFEOpFromWeakForm,r::TransientParamRealization)

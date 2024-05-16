@@ -26,6 +26,7 @@ import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
 
 export tpod
+export ttsvd
 export gram_schmidt!
 export orth_complement!
 export orth_projection

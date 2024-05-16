@@ -377,14 +377,37 @@ CellData.DomainStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = DS
 MultiField.num_fields(a::TProductFEBasis) = length(get_data(a))
 Base.length(a::TProductFEBasis) = num_fields(a)
 
+function get_tp_triangulation(f::TProductFESpace)
+  trian = get_triangulation(f.space)
+  trians_1d = map(get_triangulation,f.spaces_1d)
+  TProductTriangulation(trian,trians_1d)
+end
+
 function get_tp_fe_basis(f::TProductFESpace)
   basis = map(get_fe_basis,f.spaces_1d)
-  trian = get_triangulation(f)
+  trian = get_tp_triangulation(f)
   TProductFEBasis(basis,trian)
 end
 
 function get_tp_trial_fe_basis(f::TProductFESpace)
   basis = map(get_trial_fe_basis,f.spaces_1d)
-  trian = get_triangulation(f)
+  trian = get_tp_triangulation(f)
   TProductFEBasis(basis,trian)
+end
+
+get_tp_trial_fe_basis(f::TrialFESpace{<:TProductFESpace}) = get_tp_trial_fe_basis(f.space)
+
+function assemble_norm_matrix(f,U::FESpace,V::FESpace)
+  assemble_matrix(f,U,V)
+end
+
+function assemble_norm_matrix(f,U::TProductFESpace,V::TProductFESpace)
+  a = SparseMatrixAssembler(U,V)
+  v = get_tp_fe_basis(V)
+  u = get_tp_trial_fe_basis(U)
+  assemble_matrix(a,collect_cell_matrix(U,V,f(u,v)))
+end
+
+function assemble_norm_matrix(f,U::TrialFESpace{<:TProductFESpace},V::TProductFESpace)
+  assemble_norm_matrix(f,U.space,V)
 end

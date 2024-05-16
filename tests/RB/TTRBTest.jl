@@ -16,229 +16,7 @@ using DrWatson
 using Kronecker
 using Mabla.FEM
 using Mabla.RB
-using Mabla.FEM.TProduct
 
-θ = 0.5
-dt = 0.01
-t0 = 0.0
-tf = 0.05
-
-pranges = fill([1,10],3)
-tdomain = t0:dt:tf
-ptspace = TransientParamSpace(pranges,tdomain)
-
-domain = (0,1,0,1)
-partition = (10,10)
-model = CartesianDiscreteModel(domain,partition)
-
-labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
-add_tag_from_tags!(labels,"neumann",[7])
-
-order = 1
-degree = 2*order
-Ω = Triangulation(model)
-dΩ = Measure(Ω,degree)
-Γn = BoundaryTriangulation(model,tags=["neumann"])
-dΓn = Measure(Γn,degree)
-
-a(x,μ,t) = 1+exp(-sin(t)^2*x[1]/sum(μ))
-a(μ,t) = x->a(x,μ,t)
-aμt(μ,t) = TransientParamFunction(a,μ,t)
-
-f(x,μ,t) = 1.
-f(μ,t) = x->f(x,μ,t)
-fμt(μ,t) = TransientParamFunction(f,μ,t)
-
-h(x,μ,t) = abs(cos(t/μ[3]))
-h(μ,t) = x->h(x,μ,t)
-hμt(μ,t) = TransientParamFunction(h,μ,t)
-
-g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
-g(μ,t) = x->g(x,μ,t)
-gμt(μ,t) = TransientParamFunction(g,μ,t)
-
-u0(x,μ) = 0
-u0(μ) = x->u0(x,μ)
-u0μ(μ) = ParamFunction(u0,μ)
-
-stiffness(μ,t,u,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
-mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
-rhs(μ,t,v,dΩ,dΓn) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
-res(μ,t,u,v,dΩ,dΓn) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rhs(μ,t,v,dΩ,dΓn)
-
-trian_res = (Ω,Γn)
-trian_stiffness = (Ω,)
-trian_mass = (Ω,)
-
-induced_norm(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
-
-trian_res = (Ω,Γn)
-trian_jac = (Ω,)
-trian_jac_t = (Ω,)
-
-reffe = ReferenceFE(lagrangian,Float64,order)
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial = TransientTrialParamFESpace(test,gμt)
-feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
-  trial,test,trian_res,trian_stiffness,trian_mass)
-uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
-fesolver = ThetaMethod(LUSolver(),dt,θ)
-
-ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=5,nsnaps_test=5,nsnaps_mdeim=2)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1")))
-
-fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,feop,fesnaps,rbsnaps,festats,rbstats)
-
-println(RB.space_time_error(results))
-println(RB.speedup(results))
-
-save(test_dir,fesnaps)
-save(test_dir,rbop)
-save(test_dir,results)
-
-red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-odeop = get_algebraic_operator(feop)
-pop = PODOperator(odeop,trial,test)
-smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
-A,b = jacobian_and_residual(rbsolver,pop,smdeim)
-
-perm = get_dof_permutation(Float64,model,test,order)
-
-vvreffe = ReferenceFE(lagrangian,VectorValue{2,Float64},1)
-vvtest = TestFESpace(model,vvreffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-tptest = TProductFESpace(model,vvreffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-
-domain = (0,1,0,1)
-partition = (2,2)
-model = CartesianDiscreteModel(domain,partition)
-reffe = ReferenceFE(lagrangian,Float64,2)
-test = TestFESpace(model,reffe;conformity=:H1)
-trial = TrialFESpace(test,x->0)
-perm = TProduct.get_dof_permutation(Float64,model,test,2)
-
-Ω = Triangulation(model)
-dΩ = Measure(Ω,2)
-
-domain1d = (0,1)
-partition1d = (2,)
-model1d = CartesianDiscreteModel(domain1d,partition1d)
-reffe1d = ReferenceFE(lagrangian,Float64,2)
-test1d = TestFESpace(model1d,reffe1d;conformity=:H1)
-trial1d = TrialFESpace(test1d,x->0)
-Ω1d = Triangulation(model1d)
-dΩ1d = Measure(Ω1d,2)
-
-_model = TProduct.TProductModel(domain,partition)
-_test = TProduct.TProductFESpace(_model,reffe;conformity=:H1)
-_perm = _test.dof_permutation
-
-# test 1
-F = assemble_vector(v->∫(v)dΩ,test)
-F1d = assemble_vector(v->∫(v)dΩ1d,test1d)
-TPF = kronecker(F1d,F1d)
-TPF ≈ F
-TPF[_perm[:]] ≈ F[perm[:]]
-
-# test 2
-f1d(x) = x[1]
-f(x) = x[1]*x[2]
-F = assemble_vector(v->∫(f*v)dΩ,test)
-F1d = assemble_vector(v->∫(f1d*v)dΩ1d,test1d)
-TPF = kronecker(F1d,F1d)
-TPF ≈ F
-TPF[_perm[:]] ≈ F[perm[:]]
-
-# test 3
-M = assemble_matrix((u,v)->∫(v*u)dΩ,trial,test)
-M1d = assemble_matrix((u,v)->∫(v*u)dΩ1d,trial1d,test1d)
-TPM = kronecker(M1d,M1d)
-TPM ≈ M
-TPM[_perm[:],_perm[:]] ≈ M[perm[:],perm[:]]
-
-# test 4
-M = assemble_matrix((u,v)->∫(f*v*u)dΩ,trial,test)
-M1d = assemble_matrix((u,v)->∫(f1d*v*u)dΩ1d,trial1d,test1d)
-TPM = kronecker(M1d,M1d)
-TPM ≈ M
-TPM[_perm[:],_perm[:]] ≈ M[perm[:],perm[:]]
-
-# test 5
-A = assemble_matrix((u,v)->∫(∇(v)⋅∇(u))dΩ,trial,test)
-M1d = assemble_matrix((u,v)->∫(v*u)dΩ1d,trial1d,test1d)
-A1d = assemble_matrix((u,v)->∫(∇(v)⋅∇(u))dΩ1d,trial1d,test1d)
-TPA = kronecker(A1d,M1d) + kronecker(M1d,A1d)
-TPA ≈ A
-TPA[_perm[:],_perm[:]] ≈ A[perm[:],perm[:]]
-
-x = get_cell_points(get_triangulation(test))
-v = get_fe_basis(test)
-v(x)
-
-_x = get_cell_points(get_triangulation(_test))
-_v = get_fe_basis(_test)
-_v(_x)
-
-_vv = _v*_v
-_vv(_x)
-
-vv = v*v
-vv(x)
-dvv = ∇(v)⋅∇(v)
-dvv(x)
-
-_dv = ∇(_v)
-_dv(_x)
-_dvv = ∇(_v)⋅∇(_v)
-_dvv(_x)
-
-_Ω = Triangulation(_model)
-_dΩ = Measure(_Ω,2)
-
-u = get_trial_fe_basis(test)
-Mc = ∫(v⋅u)dΩ
-M = assemble_matrix(Mc,trial,test)
-Ac = ∫(∇(v)⋅∇(u))dΩ
-A = assemble_matrix(Mc,test,test)
-
-_u = get_trial_fe_basis(_test)
-_dvu = ∇(_v)⋅∇(_u)
-_dvu(_x)
-
-_Mc = ∫(_v*_u)_dΩ
-_M = assemble_matrix(_Mc,_test,_test)
-_Ac = ∫(∇(_v)⋅∇(_u))_dΩ
-_A = assemble_matrix(_Ac,_test,_test)
-
-# test on larger meshes
-domain = (0,1,0,1)
-partition = (20,20)
-model = CartesianDiscreteModel(domain,partition)
-reffe = ReferenceFE(lagrangian,Float64,2)
-test = TestFESpace(model,reffe;conformity=:H1)
-Ω = Triangulation(model)
-dΩ = Measure(Ω,2)
-
-_model = TProduct.TProductModel(domain,partition)
-_test = TProduct.TProductFESpace(_model,reffe;conformity=:H1)
-_Ω = Triangulation(_model)
-_dΩ = Measure(_Ω,2)
-
-M = assemble_matrix((u,v)->∫(v*u)dΩ,test,test)
-_M = assemble_matrix((u,v)->∫(v*u)_dΩ,_test,_test)
-
-A = assemble_matrix((u,v)->∫(∇(v)⋅∇(u))dΩ,test,test)
-_A = assemble_matrix((u,v)->∫(∇(v)⋅∇(u))_dΩ,_test,_test)
-
-AM = assemble_matrix((u,v)->∫(v*u)dΩ + ∫(∇(v)⋅∇(u))dΩ,test,test)
-_AM = assemble_matrix((u,v)->∫(v*u)_dΩ + ∫(∇(v)⋅∇(u))_dΩ,_test,_test)
-
-
-#################################
 θ = 0.5
 dt = 0.01
 t0 = 0.0
@@ -312,9 +90,51 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1"
 
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
 
-r = realization(feop)
-v = get_fe_basis(test)
-u = get_trial_fe_basis(trial(r))
-μ,t = get_params(r),get_times(r)
-# ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
-∫(hμt(μ,t)*v)dΓn # ∫(fμt(μ,t)*v)dΩ #
+boh = BasicSnapshots(fesnaps)
+bohI = select_snapshots(fesnaps,1:5;spacerange=(1:2,1:3))
+
+# red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+# odeop = get_algebraic_operator(feop)
+# pop = PODOperator(odeop,trial,test)
+# smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
+# A,b = jacobian_and_residual(rbsolver,pop,smdeim)
+soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
+norm_matrix = assemble_norm_matrix(feop)
+# YE = ttsvd(soff,norm_matrix)
+mat,X = soff,norm_matrix
+
+N = length(size(mat))
+T = Float64
+N_space = N-2
+cores = Vector{Array{T,3}}(undef,N-1)
+weights = Vector{Array{T,3}}(undef,N_space-1)
+ranks = fill(1,N)
+sizes = size(mat)
+cache = cores,weights,ranks
+M = copy(mat)
+# routine on the indexes from 1 to N_space - 1
+RB.ttsvd_and_weights!(cache,M,X;ids_range=1:FEM.get_dim(X)-1)
+
+X1 = RB._get_norm_matrices(X,Val(1))
+K = length(X1)
+core = cores[1]
+rank = size(core,3)
+W = zeros(rank,K,rank)
+@inbounds for k = 1:K
+  X1k = X1[k]
+  for i = 1:rank, i′ = 1:rank
+    W[i,k,i′] = core[1,:,i]'*X1k*core[1,:,i′]
+  end
+end
+
+# fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
+# rbop = reduced_operator(rbsolver,feop,fesnaps)
+# rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+# results = rb_results(rbsolver,feop,fesnaps,rbsnaps,festats,rbstats)
+
+# println(RB.space_time_error(results))
+# println(RB.speedup(results))
+
+# save(test_dir,fesnaps)
+# save(test_dir,rbop)
+# save(test_dir,results)

@@ -48,6 +48,13 @@ struct TProductTriangulation{Dt,Dp,A,B,C} <: Triangulation{Dt,Dp}
   end
 end
 
+function TProductTriangulation(trian::Triangulation,trians_1d::AbstractVector{<:Triangulation})
+  model = get_background_model(trian)
+  models_1d = map(get_background_model,trians_1d)
+  tpmodel = TProductModel(model,models_1d)
+  TProductTriangulation(tpmodel,trian,trians_1d)
+end
+
 Geometry.get_background_model(trian::TProductTriangulation) = trian.model
 Geometry.get_grid(trian::TProductTriangulation) = get_grid(trian.trian)
 Geometry.get_glue(trian::TProductTriangulation{Dt},::Val{Dt}) where Dt = get_glue(trian.trian,Dt)

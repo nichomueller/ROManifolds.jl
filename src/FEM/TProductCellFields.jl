@@ -269,7 +269,9 @@ function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::Vect
   return TProductArray(mat,mats_1d)
 end
 
-struct TProductArray{T,N,A} <: AbstractArray{T,N}
+abstract type AbstractTProductArray{T,N} <: AbstractArray{T,N} end
+
+struct TProductArray{T,N,A} <: AbstractTProductArray{T,N}
   array::A
   arrays_1d::Vector{A}
   function TProductArray(array::A,arrays_1d::Vector{A}) where {T,N,A<:AbstractArray{T,N}}
@@ -281,6 +283,8 @@ function TProductArray(arrays_1d::Vector{A}) where A
   array::A = kron(arrays_1d...)
   TProductArray(array,arrays_1d)
 end
+
+get_dim(a::TProductArray) = length(a.arrays_1d)
 
 Base.size(a::TProductArray) = size(a.array)
 Base.getindex(a::TProductArray,i...) = a.array[i...]
@@ -578,7 +582,7 @@ function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::TPro
   return TProductGradientArray(mat,mats_1d,gradmats_1d)
 end
 
-struct TProductGradientArray{T,N,A} <: AbstractArray{T,N}
+struct TProductGradientArray{T,N,A} <: AbstractTProductArray{T,N}
   array::A
   arrays_1d::Vector{A}
   gradients_1d::Vector{A}
@@ -592,6 +596,8 @@ function TProductGradientArray(arrays_1d::Vector{A},gradients_1d::Vector{A}) whe
   array::A = kronecker_gradients(arrays_1d,gradients_1d)
   TProductGradientArray(array,arrays_1d)
 end
+
+get_dim(a::TProductGradientArray) = length(a.arrays_1d)
 
 Base.size(a::TProductGradientArray) = size(a.array)
 Base.getindex(a::TProductGradientArray,i...) = a.array[i...]
