@@ -22,9 +22,8 @@ function _split_cartesian_descriptor(desc::CartesianDescriptor{D}) where D
     o=first(origin.data),s=first(sizes),p=first(partition),m=cmap,i=first(isperiodic))
     CartesianDescriptor(Point(o),(s,),(p,);map=m,isperiodic=(i,))
   end
-  isotropy = all([sizes[d] == sizes[1] && partition[d] == partition[1] for d = 1:D])
-  factors = isotropy ? Fill(_compute_1d_desc(),D) : map(_compute_1d_desc,origin.data,sizes,partition,Fill(cmap,D),Fill(isperiodic,D))
-  return factors
+  descs = map(_compute_1d_desc,origin.data,sizes,partition,Fill(cmap,D),isperiodic)
+  return descs
 end
 
 function TProductModel(args...;kwargs...)
@@ -33,6 +32,57 @@ function TProductModel(args...;kwargs...)
   model = CartesianDiscreteModel(desc)
   models_1d = CartesianDiscreteModel.(descs_1d)
   TProductModel(model,models_1d)
+end
+
+function _axes_to_lower_dim_entities(coords::AbstractArray{VectorValue{D,T},D}) where {D,T}
+  function _lower_dim_entities_at_axis!(entities,coords::AbstractArray,ax::Int)
+    range = axes(coords,ax)
+    bottom = selectdim(coords,ax,first(range))
+    top = selectdim(coords,ax,last(range))
+    push!(entities,[bottom,top])
+    return
+  end
+  entities = Vector{Array{VectorValue{D,T},D-1}}[]
+  for ax = 1:D
+    _lower_dim_entities_at_axis!(entities,coords,ax)
+  end
+  return entities
+end
+
+function entities_1d_in_tag(coords::AbstractArray{VectorValue{D,T},D},nodes_in_tag)  where {D,T}
+  ax_to_entities = _axes_to_lower_dim_entities(coords)
+  vec_of_tags = Int[]
+  vec_of_axes = Int[]
+  for (axis,entities) in enumerate(ax_to_entities)
+    for (loc,entity) in enumerate(entities)
+      Iset = intersect(nodes_in_tag,entity)
+      # check_tp_condition(Iset) here i should check that the tags are set correctly
+      Iset != entity && continue
+      push!(vec_of_tags,loc)
+      push!(vec_of_axes,axis)
+    end
+  end
+  return vec_of_tags,vec_of_axes
+end
+
+function add_1d_tags!(model::TProductModel,name)
+  isempty(name) && return
+  nodes = get_node_coordinates(model)
+  labeling = get_face_labeling(model)
+  face_to_tag = get_face_tag_index(labeling,name,0)
+
+  nodes_in_tag = nodes[findall(face_to_tag.==one(Int8))]
+  tags_1d,axs = entities_1d_in_tag(nodes,nodes_in_tag)
+  for ax in unique(axs)
+    label1d = get_face_labeling(model.models_1d[ax])
+    name in label1d.tag_to_name && continue
+    tags_at_ax = tags_1d[findall(axs.==ax)]
+    add_tag_from_tags!(label1d,name,tags_at_ax)
+  end
+end
+
+function add_1d_tags!(model::TProductModel,names::AbstractVector)
+  map(name->add_1d_tags!(model,name),names)
 end
 
 struct TProductTriangulation{Dt,Dp,A,B,C} <: Triangulation{Dt,Dp}

@@ -216,7 +216,7 @@ function _get_tp_dof_permutation(models::AbstractVector,spaces::AbstractVector,o
     ndofs = ndofs_prev*ndofs_d
     cell_ids_d = get_cell_dof_ids(space_d)
 
-    dof_permutations_1d = TProduct._get_dof_permutation(model_d,cell_ids_d,order)
+    dof_permutations_1d = _get_dof_permutation(model_d,cell_ids_d,order)
 
     add_dim = ndofs_prev .* collect(0:ndofs_d)
     add_dim_reorder = add_dim[dof_permutations_1d]
@@ -251,6 +251,13 @@ function get_tp_dof_permutation(
   @notimplemented
 end
 
+function get_inv_tp_dof_permutation(args...;kwargs...)
+  tp_dof_permutation = get_tp_dof_permutation(args...;kwargs...)
+  invp = invperm(vec(tp_dof_permutation))
+  inv_tp_dof_permutation = reshape(invp,size(tp_dof_permutation))
+  IndexMap(inv_tp_dof_permutation)
+end
+
 function _get_tt_vector(f,perm::AbstractIndexMap{D}) where D
   V = get_vector_type(f)
   T = eltype(V)
@@ -266,16 +273,18 @@ struct TProductFESpace{D,A<:SingleFieldFESpace,B<:AbstractVector{<:SingleFieldFE
   space::A
   spaces_1d::B
   dof_permutation::IndexMap{D}
+  inv_tp_dof_permutation::IndexMap{D}
   vector_type::Type{V}
 end
 
 function TProductFESpace(
   space::SingleFieldFESpace,
   spaces_1d::Vector{<:SingleFieldFESpace},
-  dof_permutation::AbstractIndexMap)
+  dof_permutation::AbstractIndexMap,
+  inv_tp_dof_permutation::AbstractIndexMap)
 
   vector_type = _get_tt_vector_type(space,dof_permutation)
-  TProductFESpace(space,spaces_1d,dof_permutation,vector_type)
+  TProductFESpace(space,spaces_1d,dof_permutation,inv_tp_dof_permutation,vector_type)
 end
 
 function FESpaces.FESpace(
@@ -288,10 +297,16 @@ function FESpaces.FESpace(
   cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
   cell_reffes_1d = map(model->ReferenceFE(model,basis,T,order;reffe_kwargs...),model.models_1d)
   space = FESpace(model.model,cell_reffe;kwargs...)
-  spaces_1d = map(FESpace,model.models_1d,cell_reffes_1d) # is it ok to eliminate the kwargs?
-  # perm = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order) # this one will be used later on
-  perm = get_dof_permutation(T,model.model,space,order)
-  TProductFESpace(space,spaces_1d,perm)
+  spaces_1d = univariate_spaces(model,cell_reffes_1d;kwargs...)
+  dof_permutation = get_dof_permutation(T,model.model,space,order)
+  inv_tp_dof_permutation = get_inv_tp_dof_permutation(T,model.models_1d,spaces_1d,order)
+  TProductFESpace(space,spaces_1d,dof_permutation,inv_tp_dof_permutation)
+end
+
+function univariate_spaces(model::TProductModel,cell_reffes;dirichlet_tags=Int[],kwargs...)
+  add_1d_tags!(model,dirichlet_tags)
+  map((model,cell_reffe) -> FESpace(model,cell_reffe;dirichlet_tags,kwargs...),
+    model.models_1d,cell_reffes)
 end
 
 get_dof_permutation(f::TProductFESpace) = f.dof_permutation
