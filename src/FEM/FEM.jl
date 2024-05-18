@@ -228,4 +228,10 @@ export ParamTTMatrix
 export get_values
 export get_index_map
 include("TTArray.jl")
+
+export TTBuilder
+export TTCounter
+export TTInserter
+export ParamTTInserterCSC
+include("TTAlgebra.jl")
 end # module

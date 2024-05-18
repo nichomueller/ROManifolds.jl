@@ -90,38 +90,14 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1"
 
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
 
-boh = BasicSnapshots(fesnaps)
-bohI = select_snapshots(fesnaps,1:5;spacerange=(1:2,1:3))
-
-# red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
 # odeop = get_algebraic_operator(feop)
 # pop = PODOperator(odeop,trial,test)
 # smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
 # A,b = jacobian_and_residual(rbsolver,pop,smdeim)
 soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
 norm_matrix = assemble_norm_matrix(feop)
-YE = ttsvd(soff,norm_matrix)
-
-# T,N,mat,X = Float64,4,soff,norm_matrix
-# N_space = N-2
-# cores = Vector{Array{T,3}}(undef,N-1)
-# weights = Vector{Array{T,3}}(undef,N_space-1)
-# ranks = fill(1,N)
-# sizes = size(mat)
-
-# for k in 1:FEM.get_dim(X)-1
-#   mat_k = reshape(mat,ranks[k]*sizes[k],:)
-#   U,Σ,V = svd(mat_k)
-#   rank = RB.truncation(Σ)
-#   core_k = U[:,1:rank]
-#   ranks[k+1] = rank
-#   mat = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
-#   cores[k] = reshape(core_k,ranks[k],sizes[k],rank)
-#   RB._weight_array!(weights,cores,X,Val(k))
-# end
-# XW = RB._get_norm_matrix_from_weights(X,weights)
-
-# BOH
+cores = ttsvd(soff,norm_matrix)
 
 # fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
 # rbop = reduced_operator(rbsolver,feop,fesnaps)
@@ -135,38 +111,34 @@ YE = ttsvd(soff,norm_matrix)
 # save(test_dir,rbop)
 # save(test_dir,results)
 
-# vals = map(get_values,fesnaps.values)
-# r = fesnaps.realization
-# s = Snapshots(vals,r)
-# soff1 = select_snapshots(s,RB.offline_params(rbsolver))
-# using SparseArrays
-# ye = ttsvd(soff,sparse(copy(norm_matrix)))
+form(u,v) = ∫(u*v)dΩ
+U = evaluate(get_trial(feop),nothing)
+V = test
+M = assemble_matrix(form,U,V)
+p = FEM.free_dofs_map(test.dof_permutation)
+M[p,1]
 
-# S = copy(soff)
-# norms = Vector{Vector{Matrix{Float64}}}(undef,3)
-# norms[1] = [norm_matrix.arrays_1d[1],norm_matrix.arrays_1d[2]]
-# norms[2] = [norm_matrix.gradients_1d[1],norm_matrix.arrays_1d[2]]
-# norms[2] = [norm_matrix.arrays_1d[1],norm_matrix.gradients_1d[2]]
-# resok = ttsvd_thick(S,norms,1e-4)
+# assembly
+odeop = get_algebraic_operator(feop.op)
+r = realization(feop)
+μ = get_params(r)
+w0 = zero_free_values(trial(r))
+us0N = (w0,w0)
+odeopcache = allocate_odeopcache(odeop,r,us0N)
+b = allocate_residual(odeop,r,us0N,odeopcache)
 
-cores = YE
-bx = cores[1][1,:,:]
-corey = cores[2]
-bxy = zeros(size(bx,1)*size(corey,2),size(corey,3))
-for i = axes(corey,3)
-  bxy[:,i] = sum([kronecker(bx[:,k],corey[k,:,i]) for k = axes(bx,2)])
-end
+uh = ODEs._make_uh_from_us(odeop,us0N,odeopcache.Us)
+test = get_test(odeop.op)
+v = get_fe_basis(test)
+assem = get_assembler(odeop.op,r)
+μ,t = get_params(r),get_times(r)
+rr = get_res(odeop.op)
+dc = rr(μ,t,uh,v)
+vecdata = collect_cell_vector(test,dc)
+boh = allocate_vector(assem,vecdata)
 
-bx'*bx
-bxy'*bxy
-bxy'*X*bxy
-
-coresnew = ttsvd(soff)
-bx = coresnew[1][1,:,:]
-corey = coresnew[2]
-bxy = zeros(size(bx,1)*size(corey,2),size(corey,3))
-for i = axes(corey,3)
-  bxy[:,i] = sum([kronecker(bx[:,k],corey[k,:,i]) for k = axes(bx,2)])
-end
-bx'*bx
-bxy'*bxy
+v1 = nz_counter(get_vector_builder(assem),(get_rows(assem),))
+symbolic_loop_vector!(v1,assem,vecdata)
+v2 = nz_allocation(v1)
+symbolic_loop_vector!(v2,assem,vecdata)
+v3 = create_from_nz(v2)

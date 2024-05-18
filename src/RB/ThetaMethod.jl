@@ -42,6 +42,7 @@ function Algebra.solve!(
 
   x = statef[1]
   sysslvr = solver.sysslvr
+  odeslvrcache,odeopcache = odecache
   uθ,sysslvrcache = odeslvrcache
 
   stageop = get_stage_operator(solver,odeop,r,state0,odecache)
@@ -122,7 +123,7 @@ function jacobian_and_residual(
   return stageop.A,stageop.b
 end
 
-# # linear-nonlinear
+# linear-nonlinear case
 
 function Algebra.solve!(
   staterb::NTuple{1,AbstractVector},

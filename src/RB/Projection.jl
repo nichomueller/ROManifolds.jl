@@ -105,20 +105,24 @@ num_reduced_times(b::TTSVDCores) = size(b.cores[end],3)
 num_fe_dofs(b::TTSVDCores) = num_space_dofs(b)*num_times(b)
 num_reduced_dofs(b::TTSVDCores) = num_reduced_times(b)
 
-function cores2matrix(a::AbstractArray{T,3},b::AbstractArray{T,3}) where T
-  nrows = size(a,2)*size(b,2)
-  ncols = size(b,3)
-  c = zeros(T,nrows,ncols)
-  for j = 1:ncols
-    for α = axes(a,3)
-      @inbounds @views c[:,j] += kronecker(b[α,:,j],a[1,:,α])
-    end
-  end
-  return c
+function cores2matrix(a::AbstractArray{S,3},b::AbstractArray{T,3}...) where {S,T}
+  c,d... = b
+  c2m = cores2matrix(cores2matrix(a,c),d...)
+  return dropdims(c2m;dims=1)
 end
 
-function cores2matrix(a::AbstractArray{T,3}...) where T
-  @notimplemented
+function cores2matrix(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
+  @check size(a,3) == size(b,1)
+  TS = promote_type(T,S)
+  nrows = size(a,2)*size(b,2)
+  ab = zeros(TS,size(a,1),nrows,size(b,3))
+  for i = axes(a,1), j = axes(b,3)
+    abij = ab[i,:,j]
+    for α = axes(a,3)
+      @inbounds @views abij += kronecker(b[α,:,j],a[i,:,α])
+    end
+  end
+  return ab
 end
 
 function cores2matrix(core::AbstractArray{T,3}) where T
