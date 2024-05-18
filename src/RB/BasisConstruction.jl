@@ -31,8 +31,7 @@ end
 # we are not interested in the last dimension (corresponds to the parameter)
 
 function ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...) where {T,N}
-  cores,ranks = cache
-  sizes = size(mat)
+  cores,ranks,sizes = cache
   for k in ids_range
     mat_k = reshape(mat,ranks[k]*sizes[k],:)
     U,Σ,V = svd(mat_k)
@@ -42,14 +41,13 @@ function ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...)
     mat = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
     cores[k] = reshape(core_k,ranks[k],sizes[k],rank)
   end
-  return
+  return mat
 end
 
 function ttsvd!(cache,mat::AbstractArray{T,N},X::AbstractMatrix;ids_range=1:N-1,kwargs...) where {T,N}
   L,p = _cholesky_factor_and_perm(X)
   Ip = invperm(p)
-  cores,ranks = cache
-  sizes = size(mat)
+  cores,ranks,sizes = cache
   for k in ids_range
     Xmat_k = L'*reshape(mat,ranks[k]*sizes[k],:)[p,:]
     U,Σ,V = svd(Xmat_k)
@@ -57,21 +55,14 @@ function ttsvd!(cache,mat::AbstractArray{T,N},X::AbstractMatrix;ids_range=1:N-1,
     core_k = (L'\U[:,1:rank])[Ip,:]
     ranks[k+1] = rank
     mat = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
-    println(size(core_k))
-    println((ranks[k],sizes[k],rank))
     cores[k] = reshape(core_k,ranks[k],sizes[k],rank)
   end
-  return
+  return mat
 end
 
-function ttsvd_and_weights!(
-  cache,
-  mat::AbstractArray,X::FEM.AbstractTProductArray;
-  ids_range=1:FEM.get_dim(X)-1,kwargs...)
-
-  cores,weights,ranks = cache
-  sizes = size(mat)
-  for k in ids_range
+function ttsvd_and_weights!(cache,mat::AbstractArray,X::FEM.AbstractTProductArray;kwargs...)
+  cores,weights,ranks,sizes = cache
+  for k in 1:FEM.get_dim(X)-1
     mat_k = reshape(mat,ranks[k]*sizes[k],:)
     U,Σ,V = svd(mat_k)
     rank = truncation(Σ;kwargs...)
@@ -81,15 +72,9 @@ function ttsvd_and_weights!(
     cores[k] = reshape(core_k,ranks[k],sizes[k],rank)
     _weight_array!(weights,cores,X,Val(k))
   end
-  return mat
-end
-
-function ttsvd(mat::AbstractArray{T,N},X=nothing;kwargs...) where {T,N}
-  cores = Vector{Array{T,3}}(undef,N-1)
-  ranks = fill(1,N)
-  cache = cores,ranks
-  ttsvd!(cache,copy(mat),X;kwargs...)
-  return cores
+  XW = _get_norm_matrix_from_weights(X,weights)
+  M = ttsvd!((cores,ranks,sizes),mat,XW;ids_range=FEM.get_dim(X),kwargs...)
+  return M
 end
 
 function _get_norm_matrices(X::TProductArray,::Val{d}) where d
@@ -174,16 +159,28 @@ function _get_norm_matrix_from_weights(norms,weights)
   @fastmath (XW+XW')/2 # needed to eliminate roundoff errors
 end
 
+function ttsvd(mat::AbstractArray{T,N},X=nothing;kwargs...) where {T,N}
+  cores = Vector{Array{T,3}}(undef,N-1)
+  ranks = fill(1,N)
+  sizes = size(mat)
+  cache = cores,ranks,sizes
+  # routine on the spatial indexes
+  M = ttsvd!(cache,copy(mat),X;ids_range=1:N-2,kwargs...)
+  # routine on the temporal index
+  _ = ttsvd!(cache,M;ids_range=N-1,kwargs...)
+  return cores
+end
+
 function ttsvd(mat::AbstractArray{T,N},X::FEM.AbstractTProductArray;kwargs...) where {T,N}
   N_space = N-2
   cores = Vector{Array{T,3}}(undef,N-1)
   weights = Vector{Array{T,3}}(undef,N_space-1)
   ranks = fill(1,N)
-  # routine on the indexes from 1 to N_space - 1
-  M = ttsvd_and_weights!((cores,weights,ranks),copy(mat),X;ids_range=1:N_space-1,kwargs...)
-  # routine on the indexes from N_space to N + 1
-  XW = _get_norm_matrix_from_weights(X,weights)
-  ttsvd!((cores,ranks),M,XW;ids_range=N_space:N-1,kwargs...)
+  sizes = size(mat)
+  # routine on the spatial indexes
+  M = ttsvd_and_weights!((cores,weights,ranks,sizes),copy(mat),X;kwargs...)
+  # routine on the temporal index
+  _ = ttsvd!((cores,ranks,sizes),M;ids_range=N_space+1,kwargs...)
   return cores
 end
 

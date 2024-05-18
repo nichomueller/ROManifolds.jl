@@ -185,6 +185,7 @@ function get_dof_permutation(
   return IndexMap(dof_perm)
 end
 
+# this function computes only the free dofs tensor product permutation
 function _get_tp_dof_permutation(models::AbstractVector,spaces::AbstractVector,order::Integer)
   @assert length(models) == length(spaces)
   D = length(models)
@@ -203,23 +204,25 @@ function _get_tp_dof_permutation(models::AbstractVector,spaces::AbstractVector,o
     @assert d′ == D
     model_d = models[1]
     space_d = spaces[1]
-    ndofs_d = num_free_dofs(space_d) + num_dirichlet_dofs(space_d)
+    ndofs_d = num_free_dofs(space_d)
     ndofs = ndofs_d
     cell_ids_d = get_cell_dof_ids(space_d)
     dof_permutations_1d = _get_dof_permutation(model_d,cell_ids_d,order)
-    return _d_dof_permutation(dof_permutations_1d,ndofs,Val(2),Val(d′-1))
+    free_dof_permutations_1d = dof_permutations_1d[findall(dof_permutations_1d.>0)]
+    return _d_dof_permutation(free_dof_permutations_1d,ndofs,Val(2),Val(d′-1))
   end
   function _d_dof_permutation(node2dof_prev,ndofs_prev,::Val{d},::Val{d′}) where {d,d′}
     model_d = models[d]
     space_d = spaces[d]
-    ndofs_d = num_free_dofs(space_d) + num_dirichlet_dofs(space_d)
+    ndofs_d = num_free_dofs(space_d)
     ndofs = ndofs_prev*ndofs_d
     cell_ids_d = get_cell_dof_ids(space_d)
 
     dof_permutations_1d = _get_dof_permutation(model_d,cell_ids_d,order)
+    free_dof_permutations_1d = dof_permutations_1d[findall(dof_permutations_1d.>0)]
 
     add_dim = ndofs_prev .* collect(0:ndofs_d)
-    add_dim_reorder = add_dim[dof_permutations_1d]
+    add_dim_reorder = add_dim[free_dof_permutations_1d]
     node2dof_d = _tensor_product(node2dof_prev,add_dim_reorder)
 
     _d_dof_permutation(node2dof_d,ndofs,Val(d+1),Val(d′-1))
