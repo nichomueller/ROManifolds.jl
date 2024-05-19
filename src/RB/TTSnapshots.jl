@@ -6,34 +6,28 @@ Base.axes(s::TTSnapshots) = Base.OneTo.(size(s))
 
 num_space_dofs(s::TTSnapshots) = size(get_index_map(s))
 
-function Base.getindex(s::TTSnapshots{T,3},ix,itime,iparam) where T
-  view(s,ix,itime,iparam)
-end
-function Base.getindex(s::TTSnapshots{T,4},ix,iy,itime,iparam) where T
-  view(s,ix,iy,itime,iparam)
-end
-function Base.getindex(s::TTSnapshots{T,5},ix,iy,iz,itime,iparam) where T
-  view(s,ix,iy,iz,itime,iparam)
+Base.IndexStyle(::Type{<:TTSnapshots}) = IndexCartesian()
+
+function Base.getindex(s::TTSnapshots,i...)
+  view(s,i...)
 end
 
-function Base.getindex(s::TTSnapshots{T,3},ix::Integer,itime::Integer,iparam::Integer) where T
-  tensor_getindex(s,CartesianIndex(ix),itime,iparam)
-end
-function Base.getindex(s::TTSnapshots{T,4},ix::Integer,iy::Integer,itime::Integer,iparam::Integer) where T
-  tensor_getindex(s,CartesianIndex(ix,iy),itime,iparam)
-end
-function Base.getindex(s::TTSnapshots{T,5},ix::Integer,iy::Integer,iz::Integer,itime::Integer,iparam::Integer) where T
-  tensor_getindex(s,CartesianIndex(ix,iy,iz),itime,iparam)
+function Base.getindex(s::TTSnapshots{T,N},i::Integer...) where {T,N}
+  getindex(s,CartesianIndex(i...))
 end
 
-function Base.setindex!(s::TTSnapshots{T,3},v,ix::Integer,itime::Integer,iparam::Integer) where T
-  tensor_setindex!(s,v,CartesianIndex(ix),itime,iparam)
+function Base.getindex(s::TTSnapshots{T,N},i::CartesianIndex{N}) where {T,N}
+  ispace = CartesianIndex(i.I[1:N-2])
+  itime = i.I[end-1]
+  iparam = i.I[end]
+  tensor_getindex(s,ispace,itime,iparam)
 end
-function Base.setindex!(s::TTSnapshots{T,4},v,ix::Integer,iy::Integer,itime::Integer,iparam::Integer) where T
-  tensor_setindex!(s,v,CartesianIndex(ix,iy),itime,iparam)
-end
-function Base.setindex!(s::TTSnapshots{T,5},v,ix::Integer,iy::Integer,iz::Integer,itime::Integer,iparam::Integer) where T
-  tensor_setindex!(s,v,CartesianIndex(ix,iy,iz),itime,iparam)
+
+function Base.setindex!(s::TTSnapshots{T,N},v,i::Integer...) where {T,N}
+  ispace = CartesianIndex(i[1:N-2])
+  itime = i[end-1]
+  iparam = i[end]
+  tensor_setindex!(s,v,ispace,itime,iparam)
 end
 
 reverse_snapshots(s::TTSnapshots) = s
@@ -181,14 +175,14 @@ function tensor_getindex(s::SelectedTTSnapshotsAtIndices,ispace,itime,iparam)
   is = space_indices(s)[ispace]
   it = time_indices(s)[itime]
   ip = param_indices(s)[iparam]
-  getindex(s.snaps,is,it,ip)
+  tensor_getindex(s.snaps,is,it,ip)
 end
 
-function tensor_getindex(s::SelectedTTSnapshotsAtIndices,v,ispace,itime,iparam)
+function tensor_setindex!(s::SelectedTTSnapshotsAtIndices,v,ispace,itime,iparam)
   is = space_indices(s)[ispace]
   it = time_indices(s)[itime]
   ip = param_indices(s)[iparam]
-  setindex!(s.snaps,v,is,it,ip)
+  tensor_setindex!(s.snaps,v,is,it,ip)
 end
 
 function FEM.get_values(s::SelectedTTSnapshotsAtIndices{T,N,<:BasicTTSnapshots}) where {T,N}
@@ -229,14 +223,6 @@ function _to_linear_indices(i::Tuple{Vararg{AbstractVector}},sizes)
   end
   vcat(i...)
 end
-# function _to_cartesian_indices(i::Tuple{Vararg{AbstractVector}})
-#   s = map(length,i)
-#   li = zeros(CartesianIndex{length(s)},s)
-#   for (ij,j) in enumerate(CartesianIndices(s))
-#     li[ij] = CartesianIndex(getindex.(i,Tuple(j)))
-#   end
-#   return li
-# end
 
 function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapshots}) where {T,N}
   v = s.snaps.values
@@ -277,6 +263,12 @@ const NnzTTSnapshots = Union{
   BasicNnzTTSnapshots{T,N},
   TransientNnzTTSnapshots{T,N},
   SelectedNnzTTSnapshotsAtIndices{T,N}} where {T,N}
+
+# function _mat_size(i::AbstractIndexMap{D}) where D
+#   ntuple(d->tfill(size(i,d),2)...,1:D)
+# end
+
+# num_space_dofs(s::NnzTTSnapshots) = _mat_size(get_index_map(s))
 
 function tensor_getindex(s::BasicNnzTTSnapshots,ispace,itime,iparam)
   perm_ispace = get_index_map(s)[ispace]

@@ -52,7 +52,7 @@ Base.size(a::TTArray,i...) = size(get_values(a),i...)
 Base.axes(a::TTArray,i...) = axes(get_values(a),i...)
 Base.eachindex(a::TTArray) = eachindex(get_values(a))
 
-Base.getindex(a::TTArray,i::Integer...) = getindex(get_values(a),i...)
+Base.getindex(a::TTArray,i::Union{Integer,CartesianIndex}...) = getindex(get_values(a),i...)
 Base.getindex(a::TTArray,i...) = TTArray(getindex(get_values(a),i...),get_index_map(a))
 Base.setindex!(a::TTArray,v,i...) = setindex!(get_values(a),v,i...)
 

@@ -107,31 +107,24 @@ A,b = jacobian_and_residual(rbsolver,pop,smdeim)
 # save(test_dir,rbop)
 # save(test_dir,results)
 
-s = smdeim
-odeop = pop.odeop
-us = (get_values(s),)
-r = get_realization(s)
-# odecache = allocate_odecache(fesolver,odeop,r,us)
-us0N = (us[1],us[1])
-odeopcache = allocate_odeopcache(odeop,r,us0N)
-# A = allocate_jacobian(odeop,r,us0N,odeopcache)
-uh = ODEs._make_uh_from_us(odeop,us0N,odeopcache.Us)
-trial = evaluate(get_trial(odeop.op),nothing)
-du = get_trial_fe_basis(trial)
-test = get_test(odeop.op)
-v = get_fe_basis(test)
-assem = get_assembler(odeop.op,r)
+form(u,v) = ∫(u*v)dΩ
+M = assemble_matrix(form,trial(nothing),test)
+p = FEM.get_free_dof_permutation(test)
+_Mp = M[p,p]
+Mp = permutedims(M[p,p],[1,3,2,4])
 
-μ,t = get_params(r),get_times(r)
+boh = rand(4,5,4,5)
+permutedims(boh,[1,3,2,4])
 
-jacs = get_jacs(odeop.op)
-As = ()
+using SparseArrays
+I,J,V = findnz(M)
 
-k = 1
-jac = jacs[k]
-trian_jac = odeop.op.trian_jacs[k]
-dc = jac(μ,t,uh,du,v)
-A = contribution(trian_jac) do trian
-  matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
-  allocate_matrix(assem,matdata)
-end
+using PartitionedArrays
+Ix,Iy = tuple_of_arrays(map(i->Tuple(findfirst(p .== i)),I))
+Jx,Jy = tuple_of_arrays(map(i->Tuple(findfirst(p .== i)),J))
+Ixy = map(i->findfirst(p .== i),I)
+Jxy = map(i->findfirst(p .== i),J)
+psparseI = p[Ixy]
+# ci = map(CartesianIndex,I,J)
+
+ids = CartesianIndices(size(p))
