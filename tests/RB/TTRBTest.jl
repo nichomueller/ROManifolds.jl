@@ -66,15 +66,11 @@ mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
 rhs(μ,t,v,dΩ,dΓn) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
 res(μ,t,u,v,dΩ,dΓn) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rhs(μ,t,v,dΩ,dΓn)
 
-trian_res = (Ω,Γn)
-trian_stiffness = (Ω,)
-trian_mass = (Ω,)
+trian_res = (Ω.trian,Γn)
+trian_stiffness = (Ω.trian,)
+trian_mass = (Ω.trian,)
 
 induced_norm(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
-
-trian_res = (Ω,Γn)
-trian_jac = (Ω,)
-trian_jac_t = (Ω,)
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
@@ -91,13 +87,13 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1"
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
 
 red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-# odeop = get_algebraic_operator(feop)
-# pop = PODOperator(odeop,trial,test)
-# smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
-# A,b = jacobian_and_residual(rbsolver,pop,smdeim)
-soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
-norm_matrix = assemble_norm_matrix(feop)
-cores = ttsvd(soff,norm_matrix)
+# soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
+# norm_matrix = assemble_norm_matrix(feop)
+# cores = ttsvd(soff,norm_matrix)
+odeop = get_algebraic_operator(feop)
+pop = PODOperator(odeop,red_trial,red_test)
+smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
+A,b = jacobian_and_residual(rbsolver,pop,smdeim)
 
 # fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
 # rbop = reduced_operator(rbsolver,feop,fesnaps)
@@ -111,34 +107,31 @@ cores = ttsvd(soff,norm_matrix)
 # save(test_dir,rbop)
 # save(test_dir,results)
 
-form(u,v) = ∫(u*v)dΩ
-U = evaluate(get_trial(feop),nothing)
-V = test
-M = assemble_matrix(form,U,V)
-p = FEM.free_dofs_map(test.dof_permutation)
-M[p,1]
-
-# assembly
-odeop = get_algebraic_operator(feop.op)
-r = realization(feop)
-μ = get_params(r)
-w0 = zero_free_values(trial(r))
-us0N = (w0,w0)
+s = smdeim
+odeop = pop.odeop
+us = (get_values(s),)
+r = get_realization(s)
+# odecache = allocate_odecache(fesolver,odeop,r,us)
+us0N = (us[1],us[1])
 odeopcache = allocate_odeopcache(odeop,r,us0N)
-b = allocate_residual(odeop,r,us0N,odeopcache)
-
+# A = allocate_jacobian(odeop,r,us0N,odeopcache)
 uh = ODEs._make_uh_from_us(odeop,us0N,odeopcache.Us)
+trial = evaluate(get_trial(odeop.op),nothing)
+du = get_trial_fe_basis(trial)
 test = get_test(odeop.op)
 v = get_fe_basis(test)
 assem = get_assembler(odeop.op,r)
-μ,t = get_params(r),get_times(r)
-rr = get_res(odeop.op)
-dc = rr(μ,t,uh,v)
-vecdata = collect_cell_vector(test,dc)
-boh = allocate_vector(assem,vecdata)
 
-v1 = nz_counter(get_vector_builder(assem),(get_rows(assem),))
-symbolic_loop_vector!(v1,assem,vecdata)
-v2 = nz_allocation(v1)
-symbolic_loop_vector!(v2,assem,vecdata)
-v3 = create_from_nz(v2)
+μ,t = get_params(r),get_times(r)
+
+jacs = get_jacs(odeop.op)
+As = ()
+
+k = 1
+jac = jacs[k]
+trian_jac = odeop.op.trian_jacs[k]
+dc = jac(μ,t,uh,du,v)
+A = contribution(trian_jac) do trian
+  matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
+  allocate_matrix(assem,matdata)
+end

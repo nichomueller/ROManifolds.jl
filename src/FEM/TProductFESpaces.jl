@@ -53,6 +53,11 @@ function dirichlet_dofs_map(i::IndexMap)
   i.indices[dir_dofs_locations]
 end
 
+function inv_index_map(i::AbstractIndexMap)
+  invi = reshape(invperm(vec(i)),size(i))
+  IndexMap(invi)
+end
+
 struct IndexMapView{D,L} <: AbstractIndexMap{D}
   indices::Array{Int,D}
   locations::L
@@ -241,7 +246,8 @@ function get_tp_dof_permutation(
   order::Integer;
   kwargs...) where T
 
-  _get_tp_dof_permutation(models,spaces,order)
+  dof_perm = _get_tp_dof_permutation(models,spaces,order)
+  return IndexMap(dof_perm)
 end
 
 function get_tp_dof_permutation(
@@ -252,13 +258,6 @@ function get_tp_dof_permutation(
   kwargs...) where T<:MultiValue
 
   @notimplemented
-end
-
-function get_inv_tp_dof_permutation(args...;kwargs...)
-  tp_dof_permutation = get_tp_dof_permutation(args...;kwargs...)
-  invp = invperm(vec(tp_dof_permutation))
-  inv_tp_dof_permutation = reshape(invp,size(tp_dof_permutation))
-  IndexMap(inv_tp_dof_permutation)
 end
 
 function _get_tt_vector(f,perm::AbstractIndexMap{D}) where D
@@ -302,7 +301,8 @@ function FESpaces.FESpace(
   space = FESpace(model.model,cell_reffe;kwargs...)
   spaces_1d = univariate_spaces(model,cell_reffes_1d;kwargs...)
   dof_permutation = get_dof_permutation(T,model.model,space,order)
-  inv_tp_dof_permutation = get_inv_tp_dof_permutation(T,model.models_1d,spaces_1d,order)
+  tp_dof_permutation = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order)
+  inv_tp_dof_permutation = inv_index_map(tp_dof_permutation)
   TProductFESpace(space,spaces_1d,dof_permutation,inv_tp_dof_permutation)
 end
 

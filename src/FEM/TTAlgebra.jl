@@ -215,9 +215,9 @@
 #   end
 #   ParamArray(csc)
 # end
-struct TTBuilder{A,D}
+struct TTBuilder{A,B}
   builder::A
-  index_map::IndexMap{D}
+  index_map::B
 end
 
 function Algebra.get_array_type(b::TTBuilder)
@@ -231,9 +231,9 @@ function Algebra.nz_counter(b::TTBuilder,axes)
   TTCounter(counter,b.index_map)
 end
 
-struct TTSparseMatrixAssembler{A,D} <: SparseMatrixAssembler
+struct TTSparseMatrixAssembler{A,B} <: SparseMatrixAssembler
   assem::A
-  index_map::IndexMap{D}
+  index_map::B
 end
 
 FESpaces.num_rows(a::TTSparseMatrixAssembler) = num_rows(a.assem)
@@ -248,7 +248,7 @@ function FESpaces.get_cols(a::TTSparseMatrixAssembler)
 end
 
 function FESpaces.get_assembly_strategy(a::TTSparseMatrixAssembler)
-  return get_assembly_strategy(a.assem)
+  return FESpaces.get_assembly_strategy(a.assem)
 end
 
 function FESpaces.get_matrix_builder(a::TTSparseMatrixAssembler)
@@ -267,20 +267,18 @@ function get_param_matrix_builder(
   a::TTSparseMatrixAssembler,
   r::AbstractParamRealization)
 
-  mat = get_matrix_builder(a)
-  M = get_array_type(mat)
-  pmatrix_type = _get_param_matrix_type(M,r)
-  SparseMatrixBuilder(pmatrix_type)
+  builder = get_param_matrix_builder(a.assem,r)
+  index_map = a.index_map
+  return TTBuilder(builder,index_map)
 end
 
 function get_param_vector_builder(
   a::TTSparseMatrixAssembler,
   r::AbstractParamRealization)
 
-  vec = get_vector_builder(a)
-  V = get_array_type(vec)
-  pvector_type = _get_param_vector_type(V,r)
-  ArrayBuilder(pvector_type)
+  builder = get_param_vector_builder(a.assem,r)
+  index_map = a.index_map
+  return TTBuilder(builder,index_map)
 end
 
 function TTSparseMatrixAssembler(
@@ -297,7 +295,7 @@ function TTSparseMatrixAssembler(
     get_free_dof_ids(test),
     get_free_dof_ids(trial),
     strategy)
-  index_map = test.dof_permutation
+  index_map = get_free_dof_permutation(test)
   TTSparseMatrixAssembler(assem,index_map)
 end
 
@@ -310,6 +308,11 @@ function FESpaces.SparseMatrixAssembler(
   ) where T<:FESpace # add some condition on T
 
   TTSparseMatrixAssembler(mat,vec,trial,test,strategy)
+end
+
+@inline function Algebra.add_entry!(combine::Function,A::TTArray,v::Number,i)
+  add_entry!(combine,A.values,v,i)
+  A
 end
 
 function Algebra.is_entry_stored(::Type{TTSparseMatrix{D,T,V}},i,j) where {D,T,V}
@@ -326,48 +329,44 @@ end
   A
 end
 
-# function Algebra.allocate_coo_vectors(::Type{TTSparseMatrix{D,T,V}},n::Integer) where {D,T,V}
-#   TTArray(Algebra.allocate_coo_vectors(V,n),Val(D))
-# end
-
-# function Algebra.sparse_from_coo(::Type{TTSparseMatrix{D,T,V}},i,j,v,m,n) where {D,T,V}
-#   TTArray(Algebra.sparse_from_coo(V,i,j,v,m,n),Val(D))
-# end
-
-function Algebra.finalize_coo!(::Type{TTSparseMatrix{D,T,V}},i,j,v,m,n) where {D,T,V}
-  Algebra.finalize_coo!(V,i,j,v,m,n)
+struct TTCounter{A,B}
+  counter::A
+  index_map::B
 end
 
-function Algebra.nz_index(a::TTSparseMatrix,i0,i1)
-  Algebra.nz_index(a.values,i0,i1)
-end
+Algebra.LoopStyle(::Type{TTCounter{A,B}}) where {A,B} = LoopStyle(A)
 
-function Algebra.push_coo!(::Type{TTSparseMatrix{D,T,W}},I,J,V::ParamArray,i,j,v) where {D,T,W}
-  Algebra.push_coo!(W,i,j,v,m,n)
+@inline function Algebra.add_entry!(::typeof(+),a::TTCounter,v,i)
+  add_entry!(+,a.counter,v,i)
 end
-
-struct TTCounter{C,D}
-  counter::C
-  index_map::IndexMap{D}
-end
-
-Algebra.LoopStyle(::Type{TTCounter{C,D}}) where {C,D} = LoopStyle(C)
 
 @inline function Algebra.add_entry!(::typeof(+),a::TTCounter,v,i,j)
   add_entry!(+,a.counter,v,i,j)
 end
 
-function Algebra.nz_allocation(a::TTCounter{C,D}) where {C,D}
+function Algebra.nz_allocation(a::TTCounter{<:Algebra.ArrayCounter})
+  TTArray(nz_allocation(a.counter),a.index_map)
+end
+
+function Algebra.nz_allocation(a::TTCounter)
   inserter = nz_allocation(a.counter)
   TTInserter(inserter,a.index_map)
 end
 
-struct TTInserter{I,D}
-  inserter::I
-  index_map::IndexMap{D}
+struct TTInserter{A,B}
+  inserter::A
+  index_map::B
 end
 
-Algebra.LoopStyle(::Type{<:TTInserter}) = Loop()
+Algebra.LoopStyle(::Type{TTInserter{A,B}}) where {A,B} = LoopStyle(A)
+
+@inline function Algebra.add_entry!(::typeof(+),a::TTInserter,v::Nothing,i)
+  Algebra.add_entry!(+,a.inserter,v,i)
+end
+
+@noinline function Algebra.add_entry!(::typeof(+),a::TTInserter,v,i)
+  Algebra.add_entry!(+,a.inserter,v,i)
+end
 
 @inline function Algebra.add_entry!(::typeof(+),a::TTInserter,v::Nothing,i,j)
   Algebra.add_entry!(+,a.inserter,v,i,j)
@@ -377,118 +376,68 @@ end
   Algebra.add_entry!(+,a.inserter,v,i,j)
 end
 
-function Algebra.create_from_nz(a::TTInserter{I,D}) where {I,D}
+function Algebra.create_from_nz(a::TTInserter)
   nz = create_from_nz(a.inserter)
   TTArray(nz,a.index_map)
 end
 
-# Param CSC
+# Param - TT interface
 
-function ParamInserter(inserter::TTInserter,L::Integer)
-  ParamTTInserterCSC(inserter,Val(L))
+function Algebra.nz_allocation(a::TTCounter{<:Algebra.ArrayCounter{<:ParamVector{T,L,A}}}) where {T,L,A}
+  counter = a.counter
+  index_map = a.index_map
+  elA = eltype(A)
+  v = fill!(similar(elA,map(length,counter.axes)),zero(T))
+  ttv = TTArray(v,index_map)
+  allocate_param_array(ttv,L)
 end
 
-struct ParamTTInserterCSC{Tv,Ti,P,D}
-  nrows::Int
-  ncols::Int
-  colptr::Vector{Ti}
-  colnnz::Vector{Ti}
-  rowval::Vector{Ti}
-  nzval::P
-  index_map::IndexMap{D}
-  function ParamTTInserterCSC(a::TTInserter{Algebra.InserterCSC{Tv,Ti},D},::Val{L}) where {Tv,Ti,D,L}
-    @unpack nrows,ncols,colptr,colnnz,rowval,nzval = a.inserter
-    index_map = a.index_map
-    pnzval = allocate_param_array(nzval,L)
-    P = typeof(pnzval)
-    new{Tv,Ti,P,D}(nrows,ncols,colptr,colnnz,rowval,pnzval,index_map)
-  end
+function Algebra.nz_allocation(a::TTCounter{<:ParamCounter})
+  counter = nz_allocation(a.counter)
+  index_map = a.index_map
+  ParamTTInserterCSC(counter,index_map)
 end
 
-Algebra.LoopStyle(::Type{<:ParamTTInserterCSC}) = Loop()
-
-@inline function Algebra.add_entry!(::typeof(+),a::ParamTTInserterCSC{Tv,Ti},v::Nothing,i,j)  where {Tv,Ti}
-  pini = Int(a.colptr[j])
-  pend = pini + Int(a.colnnz[j]) - 1
-  p = searchsortedfirst(a.rowval,i,pini,pend,Base.Order.Forward)
-  if (p>pend)
-    # add new entry
-    a.colnnz[j] += 1
-    a.rowval[p] = i
-  elseif a.rowval[p] != i
-    # shift one forward from p to pend
-    @check  pend+1 < Int(a.colptr[j+1])
-    for k in pend:-1:p
-      o = k + 1
-      a.rowval[o] = a.rowval[k]
-    end
-    # add new entry
-    a.colnnz[j] += 1
-    a.rowval[p] = i
-  end
-  nothing
+struct ParamTTInserterCSC{A,B}
+  inserter::A
+  index_map::B
 end
 
-@noinline function Algebra.add_entry!(
-  ::typeof(+),a::ParamTTInserterCSC{Tv,Ti,P},v::AbstractParamContainer{Tv},i,j) where {Tv,Ti,P}
-  pini = Int(a.colptr[j])
-  pend = pini + Int(a.colnnz[j]) - 1
-  p = searchsortedfirst(a.rowval,i,pini,pend,Base.Order.Forward)
-  if (p>pend)
-    # add new entry
-    a.colnnz[j] += 1
-    a.rowval[p] = i
-    @inbounds for l = 1:length(P)
-      a.nzval[l][p] = v[l]
-    end
-  elseif a.rowval[p] != i
-    # shift one forward from p to pend
-    @check  pend+1 < Int(a.colptr[j+1])
-    for k in pend:-1:p
-      o = k + 1
-      a.rowval[o] = a.rowval[k]
-      @inbounds for l = 1:length(P)
-        a.nzval[l][o] = a.nzval[l][k]
-      end
-    end
-    # add new entry
-    a.colnnz[j] += 1
-    a.rowval[p] = i
-    @inbounds for l = 1:length(P)
-      a.nzval[l][p] = v[l]
-    end
-  else
-    # update existing entry
-    @inbounds for l = 1:length(P)
-      a.nzval[l][p] += v[l]
-    end
-  end
-  nothing
+Algebra.LoopStyle(::Type{ParamTTInserterCSC{A,B}}) where {A,B} = LoopStyle(A)
+
+@inline function Algebra.add_entry!(::typeof(+),a::ParamTTInserterCSC,v::Nothing,i,j)
+  add_entry!(+,a.inserter,v,i,j)
 end
 
-function Algebra.create_from_nz(a::ParamTTInserterCSC{Tv,Ti,P,D}) where {Tv,Ti,P,D}
+@noinline function Algebra.add_entry!(::typeof(+),a::ParamTTInserterCSC,v::AbstractParamContainer,i,j)
+  add_entry!(+,a.inserter,v,i,j)
+end
+
+function Algebra.create_from_nz(a::ParamTTInserterCSC)
+  inserter = a.inserter
+  index_map = a.index_map
   k = 1
-  for j in 1:a.ncols
-    pini = Int(a.colptr[j])
-    pend = pini + Int(a.colnnz[j]) - 1
+  for j in 1:inserter.ncols
+    pini = Int(inserter.colptr[j])
+    pend = pini + Int(inserter.colnnz[j]) - 1
     for p in pini:pend
-      @inbounds for l = 1:length(P)
-        a.nzval[l][k] = a.nzval[l][p]
+      @inbounds for l = eachindex(inserter.nzval)
+        inserter.nzval[l][k] = inserter.nzval[l][p]
       end
-      a.rowval[k] = a.rowval[p]
+      inserter.rowval[k] = inserter.rowval[p]
       k += 1
     end
   end
-  @inbounds for j in 1:a.ncols
-    a.colptr[j+1] = a.colnnz[j]
+  @inbounds for j in 1:inserter.ncols
+    inserter.colptr[j+1] = inserter.colnnz[j]
   end
-  length_to_ptrs!(a.colptr)
-  nnz = a.colptr[end]-1
-  resize!(a.rowval,nnz)
-  resize!(a.nzval,nnz)
-  csc = map(1:length(P)) do l
-    v = SparseMatrixCSC(a.nrows,a.ncols,a.colptr,a.rowval,a.nzval[l])
-    TTArray(v,a.index_map)
+  length_to_ptrs!(inserter.colptr)
+  nnz = inserter.colptr[end]-1
+  resize!(inserter.rowval,nnz)
+  resize!(inserter.nzval,nnz)
+  csc = map(eachindex(inserter.nzval)) do l
+    v = SparseMatrixCSC(inserter.nrows,inserter.ncols,inserter.colptr,inserter.rowval,inserter.nzval[l])
+    TTArray(v,index_map)
   end
   ParamArray(csc)
 end

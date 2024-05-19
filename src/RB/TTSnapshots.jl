@@ -158,11 +158,11 @@ function SelectedSnapshotsAtIndices(s::SelectedTTSnapshotsAtIndices,selected_ind
 end
 
 function select_snapshots(s::TTSnapshots,spacerange,timerange,paramrange)
-  srange = isa(spacerange,Colon) ? Base.OneTo.(num_space_dofs(s)) : spacerange
-  srange = map(i->isa(i,Integer) ? [i] : i,srange)
-  trange = isa(timerange,Colon) ? Base.OneTo(num_times(s)) : timerange
+  @check isa(spacerange,Union{Colon,CartesianIndices})
+  srange = isa(spacerange,Colon) ? CartesianIndices(num_space_dofs(s)) : spacerange
+  trange = isa(timerange,Colon) ? LinearIndices((num_times(s),)) : timerange
   trange = isa(trange,Integer) ? [trange] : trange
-  prange = isa(paramrange,Colon) ? Base.OneTo(num_params(s)) : paramrange
+  prange = isa(paramrange,Colon) ? LinearIndices((num_params(s),)) : paramrange
   prange = isa(prange,Integer) ? [prange] : prange
   selected_indices = (srange,trange,prange)
   SelectedSnapshotsAtIndices(s,selected_indices)
@@ -171,21 +171,21 @@ end
 space_indices(s::SelectedTTSnapshotsAtIndices) = s.selected_indices[1]
 time_indices(s::SelectedTTSnapshotsAtIndices) = s.selected_indices[2]
 param_indices(s::SelectedTTSnapshotsAtIndices) = s.selected_indices[3]
-num_space_dofs(s::SelectedTTSnapshotsAtIndices) = length.(space_indices(s))
+num_space_dofs(s::SelectedTTSnapshotsAtIndices) = size(space_indices(s))
 FEM.num_times(s::SelectedTTSnapshotsAtIndices) = length(time_indices(s))
 FEM.num_params(s::SelectedTTSnapshotsAtIndices) = length(param_indices(s))
 
 FEM.get_index_map(s::SelectedTTSnapshotsAtIndices) = get_index_map(s.snaps)
 
 function tensor_getindex(s::SelectedTTSnapshotsAtIndices,ispace,itime,iparam)
-  is = CartesianIndex(getindex.(space_indices(s),Tuple(ispace)))
+  is = space_indices(s)[ispace]
   it = time_indices(s)[itime]
   ip = param_indices(s)[iparam]
   getindex(s.snaps,is,it,ip)
 end
 
 function tensor_getindex(s::SelectedTTSnapshotsAtIndices,v,ispace,itime,iparam)
-  is = CartesianIndex(getindex.(space_indices(s),Tuple(ispace)))
+  is = space_indices(s)[ispace]
   it = time_indices(s)[itime]
   ip = param_indices(s)[iparam]
   setindex!(s.snaps,v,is,it,ip)
@@ -193,7 +193,7 @@ end
 
 function FEM.get_values(s::SelectedTTSnapshotsAtIndices{T,N,<:BasicTTSnapshots}) where {T,N}
   v = get_values(s.snaps)
-  array = Vector{typeof(first(v))}(undef,num_cols(s))
+  array = Vector{typeof(first(v))}(undef,num_times(s)*num_params(s))
   ispace = space_indices(s)
   index_map = get_index_map(s)
   perm_ispace = map(i->index_map[CartesianIndex(i)],ispace)
@@ -220,15 +220,32 @@ function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:BasicTTSnapshots})
   BasicTTSnapshots(values,r)
 end
 
+function _to_linear_indices(i::CartesianIndices,args...)
+  vec(LinearIndices(i))
+end
+function _to_linear_indices(i::Tuple{Vararg{AbstractVector}},sizes)
+  for k = 1:length(i)-1
+    i[k+1] .+= sizes[k]
+  end
+  vcat(i...)
+end
+# function _to_cartesian_indices(i::Tuple{Vararg{AbstractVector}})
+#   s = map(length,i)
+#   li = zeros(CartesianIndex{length(s)},s)
+#   for (ij,j) in enumerate(CartesianIndices(s))
+#     li[ij] = CartesianIndex(getindex.(i,Tuple(j)))
+#   end
+#   return li
+# end
+
 function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapshots}) where {T,N}
   v = s.snaps.values
   basic_values = Vector{typeof(first(first(v)))}(undef,num_times(s)*num_params(s))
   ispace = space_indices(s)
-  index_map = get_index_map(s)
-  perm_ispace = map(i->index_map[CartesianIndex(i)],ispace)
+  lispace = _to_linear_indices(ispace,num_space_dofs(s.snaps))
   @inbounds for (i,it) in enumerate(time_indices(s))
     for (j,jp) in enumerate(param_indices(s))
-      basic_values[(i-1)*num_params(s)+j] = v[it][jp][perm_ispace]
+      basic_values[(i-1)*num_params(s)+j] = vec(v[it][jp][lispace])
     end
   end
   r = get_realization(s)

@@ -198,8 +198,13 @@ export TProductTriangulation
 export TProductMeasure
 include("TProductGeometry.jl")
 
+export AbstractIndexMap
+export IndexMap
+export IndexMapView
 export TProductFESpace
 export TProductFEBasis
+export inv_index_map
+export free_dofs_map
 export get_dof_permutation
 export get_tp_dof_permutation
 export get_tp_fe_basis

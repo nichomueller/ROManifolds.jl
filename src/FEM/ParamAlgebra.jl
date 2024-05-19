@@ -82,14 +82,6 @@ end
   nothing
 end
 
-function Algebra.copy_entries!(a::ParamMatrix,b::ParamMatrix)
-  na = nonzeros(a)
-  nb = nonzeros(b)
-  if na !== nb
-    copyto!(na,nb)
-  end
-end
-
 function Algebra.allocate_coo_vectors(
   ::Type{<:ParamMatrix{Tv,L,<:Vector{<:AbstractSparseMatrix{Tv,Ti}}}},
   n::Integer) where {Tv,Ti,L}
