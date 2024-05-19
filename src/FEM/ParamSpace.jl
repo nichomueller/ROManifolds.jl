@@ -1,4 +1,4 @@
-slow_index(i,N::Int) = Int.(floor.((i .- 1) ./ N) .+ 1)
+slow_index(i,N::Int) = cld.(i,N)#Int.(floor.((i .- 1) ./ N) .+ 1)
 slow_index(i::Colon,::Int) = i
 fast_index(i,N::Int) = mod.(i .- 1,N) .+ 1
 fast_index(i::Colon,::Int) = i

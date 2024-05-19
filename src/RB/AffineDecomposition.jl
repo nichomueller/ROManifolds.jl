@@ -162,7 +162,7 @@ function mdeim(mdeim_style::MDEIMStyle,b::PODBasis)
 end
 
 function mdeim(mdeim_style::MDEIMStyle,b::TTSVDCores)
-  basis_space = first(b.cores)
+  basis_space = get_basis_space(b)
   basis_spacetime = get_basis_spacetime(b)
   indices_spacetime = get_mdeim_indices(basis_spacetime)
   indices_space = fast_index(indices_spacetime,num_space_dofs(b))

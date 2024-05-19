@@ -95,6 +95,16 @@ pop = PODOperator(odeop,red_trial,red_test)
 smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
 A,b = jacobian_and_residual(rbsolver,pop,smdeim)
 
+b1,t1 = b.values[1],b.trians[1]
+# bred = RB.reduced_form(rbsolver,b1,t1,get_test(pop))
+mdeim_style = rbsolver.mdeim_style
+basis = reduced_basis(b1;ϵ=RB.get_tol(rbsolver))
+lu_interp,integration_domain = mdeim(mdeim_style,basis)
+proj_basis = reduce_operator(mdeim_style,basis,get_test(pop))
+
+b_test = RB.get_basis(get_test(pop))
+
+STOP
 # fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
 # rbop = reduced_operator(rbsolver,feop,fesnaps)
 # rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
@@ -128,3 +138,6 @@ psparseI = p[Ixy]
 # ci = map(CartesianIndex,I,J)
 
 ids = CartesianIndices(size(p))
+
+M = assemble_norm_matrix(form,trial(nothing),test)
+Mk = kronecker(M.arrays_1d[1],M.arrays_1d[2])

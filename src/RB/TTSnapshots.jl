@@ -256,83 +256,203 @@ function _select_snapshots_entries(s::TTSnapshots{T},ispace,itime) where T
   return values
 end
 
-const BasicNnzTTSnapshots = BasicTTSnapshots{T,N,P,R} where {T,N,P<:ParamSparseMatrix,R}
-const TransientNnzTTSnapshots = TransientTTSnapshots{T,N,P,R} where {T,N,P<:ParamSparseMatrix,R}
+# abstract type MatrixTTSnapshots{T,N} <: TTSnapshots{T,N} end
+
+# function _mat_size(i::AbstractIndexMap{D}) where D
+#   ntuple(d->tfill(size(i,d),2)...,1:D)
+# end
+
+# num_space_dofs(s::MatrixTTSnapshots) = _mat_size(get_index_map(s))
+
+# function tensor_getindex(s::MatrixTTSnapshots,ispace::CartesianIndex{D},itime,iparam) where D
+#   ispace_row = ispace.I[1:Int(D/2)]
+#   ispace_col = ispace.I[Int(D/2)+1:end]
+#   perm_ispace_row = get_index_map(s)[CartesianIndex(ispace_row)]
+#   perm_ispace_col = get_index_map(s)[CartesianIndex(ispace_col)]
+#   _tensor_getindex(s,perm_ispace_row,perm_ispace_col,itime,iparam)
+# end
+
+# function tensor_setindex!(s::MatrixTTSnapshots,v,ispace::CartesianIndex{D},itime,iparam) where D
+#   ispace_row = ispace.I[1:Int(D/2)]
+#   ispace_col = ispace.I[Int(D/2)+1:end]
+#   perm_ispace_row = get_index_map(s)[CartesianIndex(ispace_row)]
+#   perm_ispace_col = get_index_map(s)[CartesianIndex(ispace_col)]
+#   _tensor_setindex!(s,v,perm_ispace_row,perm_ispace_col,itime,iparam)
+# end
+
+# struct MatrixBasicTTSnapshots{T,N,P,R} <: MatrixTTSnapshots{T,N}
+#   values::P
+#   realization::R
+#   function MatrixBasicTTSnapshots(values::P,realization::R) where {P<:ParamTTSparseMatrix,R}
+#     T = eltype(P)
+#     D = ndims(get_index_map(values))
+#     N = 2*D+2
+#     new{T,N,P,R}(values,realization)
+#   end
+# end
+
+# function BasicSnapshots(values::ParamTTSparseMatrix,realization::TransientParamRealization)
+#   MatrixBasicTTSnapshots(values,realization)
+# end
+
+# FEM.get_index_map(s::ParamTTSparseMatrix) = get_index_map(s.values)
+
+# function _tensor_getindex(s::ParamTTSparseMatrix,ispace_row,ispace_col,itime,iparam)
+#   s.values[iparam+(itime-1)*num_params(s)][ispace_row,ispace_col]
+# end
+
+# function _tensor_setindex!(s::ParamTTSparseMatrix,v,ispace_row,ispace_col,itime,iparam)
+#   s.values[iparam+(itime-1)*num_params(s)][ispace_row,ispace_col] = v
+# end
+
+# struct MatrixTransientTTSnapshots{T,N,P,R} <: MatrixTTSnapshots{T,N}
+#   values::P
+#   realization::R
+#   function MatrixTransientTTSnapshots(
+#     values::AbstractVector{P},realization::R) where {P<:ParamTTSparseMatrix,R}
+#     T = eltype(P)
+#     D = ndims(get_index_map(values))
+#     N = 2*D+2
+#     new{T,N,P,R}(values,realization)
+#   end
+# end
+
+# function TransientSnapshots(
+#   values::AbstractVector{P},
+#   realization::TransientParamRealization
+#   ) where P<:ParamTTSparseMatrix
+
+#   MatrixTransientTTSnapshots(values,realization)
+# end
+
+# FEM.get_index_map(s::MatrixTransientTTSnapshots) = get_index_map(first(s.values))
+
+# function _tensor_getindex(s::MatrixTransientTTSnapshots,ispace_row,ispace_col,itime,iparam)
+#   s.values[itime][iparam][ispace_row,ispace_col]
+# end
+
+# function _tensor_setindex!(s::MatrixTransientTTSnapshots,v,ispace_row,ispace_col,itime,iparam)
+#   s.values[itime][iparam][ispace_row,ispace_col] = v
+# end
+
+const BasicNnzTTSnapshots = BasicTTSnapshots{T,N,P,R} where {T,N,P<:FEM.ParamTTSparseMatrix,R}
+const TransientNnzTTSnapshots = TransientTTSnapshots{T,N,P,R} where {T,N,P<:FEM.ParamTTSparseMatrix,R}
 const SelectedNnzTTSnapshotsAtIndices = SelectedTTSnapshotsAtIndices{T,N,S,I} where {T,N,S<:Union{BasicNnzTTSnapshots,TransientNnzTTSnapshots},I}
 const NnzTTSnapshots = Union{
   BasicNnzTTSnapshots{T,N},
   TransientNnzTTSnapshots{T,N},
   SelectedNnzTTSnapshotsAtIndices{T,N}} where {T,N}
 
-# function _mat_size(i::AbstractIndexMap{D}) where D
-#   ntuple(d->tfill(size(i,d),2)...,1:D)
+function _mat_size(i::AbstractIndexMap{D}) where D
+  _size_d(d) = size(i,cld(d,2))
+  ntuple(_size_d,2*D)
+end
+
+num_space_dofs(s::NnzTTSnapshots) = _mat_size(get_index_map(s))
+
+function tensor_getindex(s::NnzTTSnapshots,ispace::CartesianIndex{D},itime,iparam) where D
+  ispace_row = ispace.I[1:Int(D/2)]
+  ispace_col = ispace.I[Int(D/2)+1:end]
+  perm_ispace_row = get_index_map(s)[CartesianIndex(ispace_row)]
+  perm_ispace_col = get_index_map(s)[CartesianIndex(ispace_col)]
+  _tensor_getindex(s,perm_ispace_row,perm_ispace_col,itime,iparam)
+end
+
+function tensor_setindex!(s::NnzTTSnapshots,v,ispace::CartesianIndex{D},itime,iparam) where D
+  ispace_row = ispace.I[1:Int(D/2)]
+  ispace_col = ispace.I[Int(D/2)+1:end]
+  perm_ispace_row = get_index_map(s)[CartesianIndex(ispace_row)]
+  perm_ispace_col = get_index_map(s)[CartesianIndex(ispace_col)]
+  _tensor_setindex!(s,v,perm_ispace_row,perm_ispace_col,itime,iparam)
+end
+
+function _tensor_getindex(s::BasicNnzTTSnapshots,ispace_row,ispace_col,itime,iparam)
+  s.values[iparam+(itime-1)*num_params(s)][ispace_row,ispace_col]
+end
+
+function _tensor_setindex!(s::BasicNnzTTSnapshots,v,ispace_row,ispace_col,itime,iparam)
+  s.values[iparam+(itime-1)*num_params(s)][ispace_row,ispace_col] = v
+end
+
+function _tensor_getindex(s::TransientNnzTTSnapshots,ispace_row,ispace_col,itime,iparam)
+  s.values[itime][iparam][ispace_row,ispace_col]
+end
+
+function _tensor_setindex!(s::TransientNnzTTSnapshots,v,ispace_row,ispace_col,itime,iparam)
+  s.values[itime][iparam][ispace_row,ispace_col] = v
+end
+
+# const BasicNnzTTSnapshots = BasicTTSnapshots{T,N,P,R} where {T,N,P<:ParamSparseMatrix,R}
+# const TransientNnzTTSnapshots = TransientTTSnapshots{T,N,P,R} where {T,N,P<:ParamSparseMatrix,R}
+# const SelectedNnzTTSnapshotsAtIndices = SelectedTTSnapshotsAtIndices{T,N,S,I} where {T,N,S<:Union{BasicNnzTTSnapshots,TransientNnzTTSnapshots},I}
+# const NnzTTSnapshots = Union{
+#   BasicNnzTTSnapshots{T,N},
+#   TransientNnzTTSnapshots{T,N},
+#   SelectedNnzTTSnapshotsAtIndices{T,N}} where {T,N}
+
+# function tensor_getindex(s::BasicNnzTTSnapshots,ispace,itime,iparam)
+#   perm_ispace = get_index_map(s)[ispace]
+#   nonzeros(s.values[iparam+(itime-1)*num_params(s)])[perm_ispace]
 # end
 
-# num_space_dofs(s::NnzTTSnapshots) = _mat_size(get_index_map(s))
+# function tensor_setindex!(s::BasicNnzTTSnapshots,v,ispace,itime,iparam)
+#   perm_ispace = get_index_map(s)[ispace]
+#   nonzeros(s.values[iparam+(itime-1)*num_params(s)])[perm_ispace] = v
+# end
 
-function tensor_getindex(s::BasicNnzTTSnapshots,ispace,itime,iparam)
-  perm_ispace = get_index_map(s)[ispace]
-  nonzeros(s.values[iparam+(itime-1)*num_params(s)])[perm_ispace]
-end
+# function tensor_getindex(s::TransientNnzTTSnapshots,ispace,itime,iparam)
+#   nonzeros(s.values[itime][iparam])[ispace]
+# end
 
-function tensor_setindex!(s::BasicNnzTTSnapshots,v,ispace,itime,iparam)
-  perm_ispace = get_index_map(s)[ispace]
-  nonzeros(s.values[iparam+(itime-1)*num_params(s)])[perm_ispace] = v
-end
+# function tensor_setindex!(s::TransientNnzTTSnapshots,v,ispace,itime,iparam)
+#   perm_ispace = get_index_map(s)[ispace]
+#   nonzeros(s.values[itime][iparam])[perm_ispace] = v
+# end
 
-function tensor_getindex(s::TransientNnzTTSnapshots,ispace,itime,iparam)
-  nonzeros(s.values[itime][iparam])[ispace]
-end
+# sparsify_indices(s::BasicNnzTTSnapshots,srange::AbstractVector) = sparsify_indices(first(s.values),srange)
+# sparsify_indices(s::TransientNnzTTSnapshots,srange::AbstractVector) = sparsify_indices(first(first(s.values)),srange)
 
-function tensor_setindex!(s::TransientNnzTTSnapshots,v,ispace,itime,iparam)
-  perm_ispace = get_index_map(s)[ispace]
-  nonzeros(s.values[itime][iparam])[perm_ispace] = v
-end
+# function select_snapshots_entries(s::NnzTTSnapshots,ispace,itime)
+#   _select_snapshots_entries(s,sparsify_indices(s,ispace),itime)
+# end
 
-sparsify_indices(s::BasicNnzTTSnapshots,srange::AbstractVector) = sparsify_indices(first(s.values),srange)
-sparsify_indices(s::TransientNnzTTSnapshots,srange::AbstractVector) = sparsify_indices(first(first(s.values)),srange)
+# function get_nonzero_indices(s::NnzTTSnapshots)
+#   v = isa(s,BasicTTSnapshots) ? first(s.values) : first(first(s.values))
+#   i,j, = findnz(v)
+#   return i .+ (j .- 1)*v.m
+# end
 
-function select_snapshots_entries(s::NnzTTSnapshots,ispace,itime)
-  _select_snapshots_entries(s,sparsify_indices(s,ispace),itime)
-end
+# function recast(s::NnzTTSnapshots,a::AbstractArray{T,3}) where T
+#   @check size(a,1) == 1
+#   v = isa(s,BasicTTSnapshots) ? first(s.values) : first(first(s.values))
+#   i,j, = findnz(v)
+#   m,n = size(v)
+#   asparse = map(eachcol(dropdims(a;dims=1))) do v
+#     sparse(i,j,v,m,n)
+#   end
+#   return VecOfSparseMat2Arr3(asparse)
+# end
 
-function get_nonzero_indices(s::NnzTTSnapshots)
-  v = isa(s,BasicTTSnapshots) ? first(s.values) : first(first(s.values))
-  i,j, = findnz(v)
-  return i .+ (j .- 1)*v.m
-end
+# struct VecOfSparseMat2Arr3{Tv,Ti,V} <: AbstractArray{Tv,3}
+#   values::V
+#   function VecOfSparseMat2Arr3(values::V) where {Tv,Ti,V<:AbstractVector{<:AbstractSparseMatrix{Tv,Ti}}}
+#     new{Tv,Ti,V}(values)
+#   end
+# end
 
-function recast(s::NnzTTSnapshots,a::AbstractArray{T,3}) where T
-  @check size(a,1) == 1
-  v = isa(s,BasicTTSnapshots) ? first(s.values) : first(first(s.values))
-  i,j, = findnz(v)
-  m,n = size(v)
-  asparse = map(eachcol(dropdims(a;dims=1))) do v
-    sparse(i,j,v,m,n)
-  end
-  return VecOfSparseMat2Arr3(asparse)
-end
+# FEM.get_values(s::VecOfSparseMat2Arr3) = s.values
+# Base.size(s::VecOfSparseMat2Arr3) = (1,nnz(first(s.values)),length(s.values))
 
-struct VecOfSparseMat2Arr3{Tv,Ti,V} <: AbstractArray{Tv,3}
-  values::V
-  function VecOfSparseMat2Arr3(values::V) where {Tv,Ti,V<:AbstractVector{<:AbstractSparseMatrix{Tv,Ti}}}
-    new{Tv,Ti,V}(values)
-  end
-end
+# function Base.getindex(s::VecOfSparseMat2Arr3,i::Integer,j,k::Integer)
+#   @check i == 1
+#   nonzeros(s.values[k])[j]
+# end
 
-FEM.get_values(s::VecOfSparseMat2Arr3) = s.values
-Base.size(s::VecOfSparseMat2Arr3) = (1,nnz(first(s.values)),length(s.values))
+# function Base.getindex(s::VecOfSparseMat2Arr3,i::Integer,j,k)
+#   @check i == 1
+#   view(s,i,j,k)
+# end
 
-function Base.getindex(s::VecOfSparseMat2Arr3,i::Integer,j,k::Integer)
-  @check i == 1
-  nonzeros(s.values[k])[j]
-end
-
-function Base.getindex(s::VecOfSparseMat2Arr3,i::Integer,j,k)
-  @check i == 1
-  view(s,i,j,k)
-end
-
-function get_nonzero_indices(s::VecOfSparseMat2Arr3)
-  get_nonzero_indices(first(s.values))
-end
+# function get_nonzero_indices(s::VecOfSparseMat2Arr3)
+#   get_nonzero_indices(first(s.values))
+# end
