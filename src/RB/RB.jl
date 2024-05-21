@@ -80,7 +80,7 @@ export get_basis_time
 export num_reduced_times
 export get_basis_spacetime
 export num_reduced_dofs
-export cores2matrix
+export cores2basis
 include("Projection.jl")
 
 export RBSpace

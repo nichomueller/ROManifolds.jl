@@ -73,19 +73,13 @@ function Projection(s::TTSnapshots,args...;kwargs...)
   TTSVDCores(cores)
 end
 
-function Projection(s::NnzTTSnapshots,args...;kwargs...)
-  cores = ttsvd(s,args...;kwargs...)
-  basis = TTSVDCores(cores)
-  recast_basis(s,basis)
-end
-
 # D ∈ {2,3,4}: space (x,y,z) + time
 struct TTSVDCores{D,A,B} <: Projection
   cores::A
   basis_spacetime::B
   function TTSVDCores(
     cores::A,
-    basis_spacetime::B=cores2matrix(cores...)
+    basis_spacetime::B=cores2basis(cores...)
     ) where {A,B}
 
     D = length(cores)
@@ -93,19 +87,18 @@ struct TTSVDCores{D,A,B} <: Projection
   end
 end
 
-get_basis_space(b::TTSVDCores) = cores2matrix(b.cores[1:end-1]...)
-get_basis_time(b::TTSVDCores) = cores2matrix(b.cores[end])
+get_basis_space(b::TTSVDCores) = cores2basis(b.cores[1:end-1]...)
+get_basis_time(b::TTSVDCores) = cores2basis(b.cores[end])
 get_basis_spacetime(b::TTSVDCores) = b.basis_spacetime
 num_space_dofs(b::TTSVDCores) = prod(size.(b.cores[1:end-1],2))
 num_space_dofs(b::TTSVDCores,k::Integer) = size(b.cores[k],2)
 FEM.num_times(b::TTSVDCores) = size(b.cores[end],2)
-num_reduced_space_dofs(b::TTSVDCores) = prod(size.(b.cores[1:end-1],3))
-num_reduced_space_dofs(b::TTSVDCores,k::Integer) = size(b.cores[k],3)
+num_reduced_space_dofs(b::TTSVDCores) = size(b.cores[end-1],3)
 num_reduced_times(b::TTSVDCores) = size(b.cores[end],3)
 num_fe_dofs(b::TTSVDCores) = num_space_dofs(b)*num_times(b)
 num_reduced_dofs(b::TTSVDCores) = num_reduced_times(b)
 
-function _cores2matrix(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
+function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
   @check size(a,3) == size(b,1)
   TS = promote_type(T,S)
   nrows = size(a,2)*size(b,2)
@@ -118,26 +111,44 @@ function _cores2matrix(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
   return ab
 end
 
-function _cores2matrix(a::AbstractArray,b::AbstractArray...)
+function _cores2basis(a::AbstractArray,b::AbstractArray...)
   c,d... = b
-  return _cores2matrix(_cores2matrix(a,c),d...)
+  return _cores2basis(_cores2basis(a,c),d...)
 end
 
-function cores2matrix(cores::AbstractArray...)
-  c2m = _cores2matrix(cores...)
+function cores2basis(cores::AbstractArray...)
+  c2m = _cores2basis(cores...)
   return dropdims(c2m;dims=1)
 end
 
-function cores2matrix(core::AbstractArray{T,3}) where T
+function cores2basis(core::AbstractArray{T,3}) where T
   pcore = permutedims(core,(2,1,3))
   return reshape(pcore,size(pcore,1),:)
 end
 
-function recast_basis(s::NnzTTSnapshots,b::TTSVDCores{D}) where D
-  @assert D == 2 "Spatial splitting deactivated for residuals/jacobians"
-  _space_core,time_core = b.cores
-  space_core = recast(s,_space_core)
-  TTSVDCores([space_core,time_core],b.basis_spacetime)
+function _cores2matrices(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
+  @check size(a,3) == size(b,1)
+  TS = promote_type(T,S)
+  ab = zeros(TS,size(a,1),size(a,2),size(b,2),size(b,3))
+  for i = axes(a,1), j = axes(b,3)
+    for α = axes(a,3)
+      @inbounds @views ab[i,:,:,j] += b[α,:,j]*a[i,:,α]'
+    end
+  end
+  return ab
+end
+
+function _cores2matrices(a::AbstractArray,b::AbstractArray...)
+  c,d... = b
+  return _cores2matrices(_cores2matrices(a,c),d...)
+end
+
+function cores2matrices(cores::AbstractArray...)
+  msg = "The number of cores arising from the ttsvd of matrix snapshots should be even"
+  @check length(cores)%2 == 0 msg
+  ids = reshape(LinearIndices(length(cores)),2,:)
+  c2m = _cores2matrices(cores...)
+  return dropdims(c2m;dims=(1,2))
 end
 
 function recast(x::AbstractVector,b::TTSVDCores)
