@@ -122,6 +122,27 @@ function reduce_operator(
   b_test::TTSVDCores;
   kwargs...)
 
+  b̂st = compress_cores(b,b_test)
+  return ReducedVectorOperator(mdeim_style,b̂st)
+end
+
+function reduce_operator(
+  mdeim_style::SpaceTimeMDEIM,
+  b::TTSVDCores,
+  b_trial::TTSVDCores,
+  b_test::TTSVDCores;
+  kwargs...)
+
+  b̂st = compress_cores(b,b_trial,b_test;kwargs...)
+  return ReducedMatrixOperator(mdeim_style,b̂st)
+end
+
+function old_reduce_operator(
+  mdeim_style::SpaceTimeMDEIM,
+  b::TTSVDCores,
+  b_test::TTSVDCores;
+  kwargs...)
+
   bs = get_basis_space(b)
   bt = get_basis_time(b)
   bs_test = get_basis_space(b_test)
@@ -151,7 +172,7 @@ function reduce_operator(
   return ReducedVectorOperator(mdeim_style,b̂st)
 end
 
-function reduce_operator(
+function old_reduce_operator(
   mdeim_style::SpaceTimeMDEIM,
   b::TTSVDCores,
   b_trial::TTSVDCores,
@@ -194,6 +215,81 @@ function reduce_operator(
   end
 
   return ReducedMatrixOperator(mdeim_style,b̂st)
+end
+
+function compress_core(a::Array{T,3},btest::Array{S,3};kwargs...) where {T,S}
+  TS = promote_type(T,S)
+  ab = zeros(TS,size(a,1),size(btest,1),size(a,3),size(btest,3))
+  @inbounds for i = CartesianIndices(size(ab))
+    ia1,ib1,ia3,ib3 = Tuple(i)
+    ab[i] = btest[ib1,:,ib3]'*a[ia1,:,ia3]
+  end
+  return ab
+end
+
+function compress_core(a::Array{T,4},btrial::Array{S,3},btest::Array{S,3};kwargs...) where {T,S}
+  TS = promote_type(T,S)
+  bab = zeros(TS,size(a,1),size(btest,1),size(btrial,1),size(a,4),size(btest,3),size(btrial,3))
+  @inbounds for i = CartesianIndices(size(bab))
+    ia1,ibV1,ibU1,ia4,ibV3,ibU3 = Tuple(i)
+    bab[i] = btest[ibV1,:,ibV3]'*a[ia1,:,:,ia4]*btrial[ibU1,:,ibU3]
+  end
+  return bab
+end
+
+function compress_core(a::Array{T,3},btrial::Array{S,3},btest::Array{S,3};combine=(x,y)->x) where {T,S}
+  TS = promote_type(T,S)
+  bab = zeros(TS,size(a,1),size(btest,1),size(btrial,1),size(a,4),size(btest,3),size(btrial,3))
+  bab_shift = zeros(TS,size(a,1),size(btest,1),size(btrial,1),size(a,4),size(btest,3),size(btrial,3))
+  @inbounds for i = CartesianIndices(size(bab))
+    ia1,ibV1,ibU1,ia4,ibV3,ibU3 = Tuple(i)
+    bab[i] = sum(btest[ibV1,:,ibV3].*a[ia1,:,ia4].*btrial[ibU1,:,ibU3])
+    bab_shift[i] = sum(btest[ibV1,2:end,ibV3].*a[ia1,2:end,ia4].*btrial[ibU1,1:end-1,ibU3])
+  end
+  return combine(bab,bab_shift)
+end
+
+function multiply_cores(a::Array{T,4},b::Array{S,4}) where {T,S}
+  @check (size(a,3)==size(b,1) && size(a,4)==size(b,2))
+  TS = promote_type(T,S)
+  ab = zeros(TS,size(a,1),size(a,2),size(b,3),size(b,4))
+  @inbounds for i = CartesianIndices(size(ab))
+    ia1,ia2,ib3,ib4 = Tuple(i)
+    ab[i] = dot(a[ia1,ia2,:,:],b[:,:,ib3,ib4])
+  end
+  return ab
+end
+
+function multiply_cores(a::Array{T,6},b::Array{S,6}) where {T,S}
+  @check (size(a,4)==size(b,1) && size(a,5)==size(b,2) && size(a,6)==size(b,3))
+  TS = promote_type(T,S)
+  ab = zeros(TS,size(a,1),size(a,2),size(a,3),size(b,4),size(b,5),size(b,6))
+  @inbounds for i = CartesianIndices(size(ab))
+    ia1,ia2,ia3,ib4,ib5,ib6 = Tuple(i)
+    ab[i] = dot(a[ia1,ia2,ia3,:,:,:],b[:,:,:,ib4,ib5,ib6])
+  end
+  return ab
+end
+
+function multiply_cores(c1::Array,cores::Array...)
+  _c1,_cores... = cores
+  multiply_cores(multiply_cores(c1,_c1),_cores...)
+end
+
+function _dropdims(a::Array{T,4}) where T
+  @check size(a,1) == size(a,2) == 1
+  dropdims(a;dims=(1,2))
+end
+
+function _dropdims(a::Array{T,6}) where T
+  @check size(a,1) == size(a,2) == size(a,3) == 1
+  dropdims(a;dims=(1,2,3))
+end
+
+function compress_cores(core::TTSVDCores,bases::TTSVDCores...;kwargs...)
+  ccores = map((a,b...)->compress_core(a,b...;kwargs...),get_cores(core),get_cores.(bases)...)
+  ccore = multiply_cores(ccores...)
+  _dropdims(ccore)
 end
 
 function combine_basis_time(B::AbstractMatrix,C::AbstractMatrix;combine=(x,y)->x)

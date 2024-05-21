@@ -268,8 +268,6 @@ end
 num_space_dofs(s::MatrixTTSnapshots) = _mat_size(get_index_map(s)) #(size(get_index_map(s))...,size(get_index_map(s))...)
 
 function tensor_getindex(s::MatrixTTSnapshots,ispace::CartesianIndex{D},itime,iparam) where D
-  # ispace_row = ispace.I[1:cld(D,2)]
-  # ispace_col = ispace.I[cld(D,2)+1:end]
   ispace_row = ispace.I[1:2:D]
   ispace_col = ispace.I[2:2:D]
   perm_ispace_row = get_index_map(s)[CartesianIndex(ispace_row)]
@@ -278,8 +276,6 @@ function tensor_getindex(s::MatrixTTSnapshots,ispace::CartesianIndex{D},itime,ip
 end
 
 function tensor_setindex!(s::MatrixTTSnapshots,v,ispace::CartesianIndex{D},itime,iparam) where D
-  # ispace_row = ispace.I[1:cld(D,2)]
-  # ispace_col = ispace.I[cld(D,2)+1:end]
   ispace_row = ispace.I[1:2:2*D]
   ispace_col = ispace.I[2:2:2*D]
   perm_ispace_row = get_index_map(s)[CartesianIndex(ispace_row)]

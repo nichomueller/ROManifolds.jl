@@ -41,7 +41,7 @@ struct PODBasis{A,B} <: Projection
   basis_time::B
 end
 
-get_basis_space(b::PODBasis) = _get_basis_space(b.basis_space)
+get_basis_space(b::PODBasis) = b.basis_space
 get_basis_time(b::PODBasis) = b.basis_time
 num_space_dofs(b::PODBasis) = size(get_basis_space(b),1)
 FEM.num_times(b::PODBasis) = size(get_basis_time(b),1)
@@ -69,34 +69,46 @@ end
 # TT interface
 
 function Projection(s::TTSnapshots,args...;kwargs...)
-  cores = ttsvd(s,args...;kwargs...)
-  TTSVDCores(cores)
+  cores_space...,core_time = ttsvd(s,args...;kwargs...)
+  TTSVDCores(cores_space,core_time)
 end
 
-# D ∈ {2,3,4}: space (x,y,z) + time
-struct TTSVDCores{D,A,B} <: Projection
-  cores::A
-  basis_spacetime::B
-  function TTSVDCores(
-    cores::A,
-    basis_spacetime::B=cores2basis(cores...)
-    ) where {A,B}
+function Projection(s::MatrixTTSnapshots,args...;kwargs...)
+  cores_space,core_time = ttsvd_mat(s,args...;kwargs...)
+  TTSVDCores(cores_space,core_time)
+end
 
-    D = length(cores)
-    new{D,A,B}(cores,basis_spacetime)
+struct TTSVDCores{D,A,B} <: Projection
+  cores_space::A
+  core_time::B
+  function TTSVDCores(
+    cores_space::Vector{Array{T,D}} where T,
+    core_time::Array{S,3} where S
+    ) where D
+
+    A = typeof(cores_space)
+    B = typeof(core_time)
+    new{D,A,B}(cores_space,core_time)
   end
 end
 
-get_basis_space(b::TTSVDCores) = cores2basis(b.cores[1:end-1]...)
-get_basis_time(b::TTSVDCores) = cores2basis(b.cores[end])
-get_basis_spacetime(b::TTSVDCores) = b.basis_spacetime
-num_space_dofs(b::TTSVDCores) = prod(size.(b.cores[1:end-1],2))
-num_space_dofs(b::TTSVDCores,k::Integer) = size(b.cores[k],2)
-FEM.num_times(b::TTSVDCores) = size(b.cores[end],2)
-num_reduced_space_dofs(b::TTSVDCores) = size(b.cores[end-1],3)
-num_reduced_times(b::TTSVDCores) = size(b.cores[end],3)
+const VectorTTSVDCores{A,B} = TTSVDCores{3,A,B}
+const MatrixTTSVDCores{A,B} = TTSVDCores{4,A,B}
+
+get_cores(b::TTSVDCores) = (get_spatial_cores(b)...,get_temporal_cores(b))
+get_spatial_cores(b::TTSVDCores) = b.cores_space
+get_temporal_cores(b::TTSVDCores) = b.core_time
+get_basis_space(b::TTSVDCores) = cores2basis(get_spatial_cores(b)...)
+get_basis_time(b::TTSVDCores) = cores2basis(get_temporal_cores(b))
+get_basis_spacetime(b::TTSVDCores) = cores2basis(get_spatial_cores(b)...,get_temporal_cores(b))
+FEM.num_times(b::TTSVDCores) = size(get_temporal_cores(b),2)
+num_reduced_space_dofs(b::TTSVDCores) = prod(size.(get_spatial_cores(b),3))
+num_reduced_times(b::TTSVDCores) = size(get_temporal_cores(b),3)
 num_fe_dofs(b::TTSVDCores) = num_space_dofs(b)*num_times(b)
 num_reduced_dofs(b::TTSVDCores) = num_reduced_times(b)
+
+num_space_dofs(b::VectorTTSVDCores) = prod(size.(get_spatial_cores(b),2))
+num_space_dofs(b::MatrixTTSVDCores) = prod(size.(get_spatial_cores(b),2))*prod(size.(get_spatial_cores(b),3))
 
 function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
   @check size(a,3) == size(b,1)
@@ -109,6 +121,41 @@ function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
     end
   end
   return ab
+end
+
+# when we multiply two 4-D spatial cores, the result is a 3-D core that stacks
+# the matrices' rows and columns
+function _cores2basis(a::AbstractArray{S,4},b::AbstractArray{T,4}) where {S,T}
+  @check size(a,4) == size(b,1)
+  TS = promote_type(T,S)
+  nrows = size(a,2)*size(b,2)
+  ncols = size(a,3)*size(b,3)
+  ab = zeros(TS,size(a,1),nrows*ncols,size(b,4))
+  for i = axes(a,1), j = axes(b,4)
+    for α = axes(a,4)
+      @inbounds @views ab[i,:,j] += vec(kronecker(b[α,:,:,j],a[i,:,:,α]))
+    end
+  end
+  return ab
+end
+
+# when we multiply a 4-D spatial core with a 3-D temporal core
+function _cores2basis(a::AbstractArray{S,4},b::AbstractArray{T,3}) where {S,T}
+  @check size(a,4) == size(b,1)
+  TS = promote_type(T,S)
+  nrows = size(a,2)*size(b,2)
+  ncols = size(a,3)
+  ab = zeros(TS,size(a,1),nrows*ncols,size(b,3)) # returns a 3-D array
+  for i = axes(a,1), j = axes(b,3)
+    for α = axes(a,4)
+      @inbounds @views ab[i,:,j] += vec(kronecker(b[α,:,j],a[i,:,:,α]))
+    end
+  end
+  return ab
+end
+
+function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,4}) where {S,T}
+  @notimplemented "Usually the spatial cores are computed before the temporal ones"
 end
 
 function _cores2basis(a::AbstractArray,b::AbstractArray...)
@@ -126,33 +173,13 @@ function cores2basis(core::AbstractArray{T,3}) where T
   return reshape(pcore,size(pcore,1),:)
 end
 
-function _cores2matrices(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
-  @check size(a,3) == size(b,1)
-  TS = promote_type(T,S)
-  ab = zeros(TS,size(a,1),size(a,2),size(b,2),size(b,3))
-  for i = axes(a,1), j = axes(b,3)
-    for α = axes(a,3)
-      @inbounds @views ab[i,:,:,j] += b[α,:,j]*a[i,:,α]'
-    end
-  end
-  return ab
-end
-
-function _cores2matrices(a::AbstractArray,b::AbstractArray...)
-  c,d... = b
-  return _cores2matrices(_cores2matrices(a,c),d...)
-end
-
-function cores2matrices(cores::AbstractArray...)
-  msg = "The number of cores arising from the ttsvd of matrix snapshots should be even"
-  @check length(cores)%2 == 0 msg
-  ids = reshape(LinearIndices(length(cores)),2,:)
-  c2m = _cores2matrices(cores...)
-  return dropdims(c2m;dims=(1,2))
+function cores2basis(core::AbstractArray{T,4}) where T
+  pcore = permutedims(core,(2,3,1,4))
+  return reshape(pcore,size(pcore,1)*size(pcore,2),:)
 end
 
 function recast(x::AbstractVector,b::TTSVDCores)
-  basis_spacetime = b.basis_spacetime
+  basis_spacetime = get_basis_spacetime(b)
   Ns = num_space_dofs(b)
   Nt = num_times(b)
 
