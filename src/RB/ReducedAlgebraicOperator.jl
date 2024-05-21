@@ -137,91 +137,11 @@ function reduce_operator(
   return ReducedMatrixOperator(mdeim_style,b̂st)
 end
 
-function old_reduce_operator(
-  mdeim_style::SpaceTimeMDEIM,
-  b::TTSVDCores,
-  b_test::TTSVDCores;
-  kwargs...)
-
-  bs = get_basis_space(b)
-  bt = get_basis_time(b)
-  bs_test = get_basis_space(b_test)
-  bt_test = get_basis_time(b_test)
-
-  ns = num_reduced_space_dofs(b)
-  ns_test = num_reduced_space_dofs(b_test)
-
-  T = eltype(first(bs))
-  V = Vector{T}
-  b̂st = Vector{V}(undef,num_reduced_dofs(b))
-
-  b̂s = bs_test'*bs
-  cache_t = zeros(T,num_reduced_dofs(b_test))
-
-  @inbounds for i = 1:num_reduced_dofs(b)
-    bti = view(bt,:,(i-1)*ns+1:i*ns)
-    for i_test = 1:num_reduced_dofs(b_test)
-      ids_i = (i_test-1)*ns_test+1:i_test*ns_test
-      bt_test_i = view(bt_test,:,ids_i)
-      b̂ti = bt_test_i'*bti
-      cache_t[i_test] = sum(b̂s .* b̂ti)
-    end
-    b̂st[i] = copy(cache_t)
-  end
-
-  return ReducedVectorOperator(mdeim_style,b̂st)
-end
-
-function old_reduce_operator(
-  mdeim_style::SpaceTimeMDEIM,
-  b::TTSVDCores,
-  b_trial::TTSVDCores,
-  b_test::TTSVDCores;
-  kwargs...)
-
-  bs = first(b.cores)
-  bt = get_basis_time(b)
-  bs_trial = get_basis_space(b_trial)
-  bt_trial = get_basis_time(b_trial)
-  bs_test = get_basis_space(b_test)
-  bt_test = get_basis_time(b_test)
-
-  ns_test = num_reduced_space_dofs(b_test)
-  ns_trial = num_reduced_space_dofs(b_trial)
-
-  T = eltype(first(bs))
-  M = Matrix{T}
-  b̂st = Vector{M}(undef,num_reduced_dofs(b))
-
-  cache_t = zeros(T,num_reduced_dofs(b_test),num_reduced_dofs(b_trial))
-  @inbounds for i = 1:num_reduced_dofs(b)
-    b̂st[i] = copy(cache_t)
-  end
-
-  @inbounds for is = 1:num_reduced_space_dofs(b)
-    b̂si = bs_test'*get_values(bs)[is]*bs_trial
-    for i = 1:num_reduced_dofs(b)
-      bti = view(bt,:,is)
-      for i_test = 1:num_reduced_dofs(b_test), i_trial = 1:num_reduced_dofs(b_trial)
-        ids_i_test = (i_test-1)*ns_test+1:i_test*ns_test
-        ids_i_trial = (i_trial-1)*ns_trial+1:i_trial*ns_trial
-        bti_test = view(bt_test,:,ids_i_test)
-        bti_trial = view(bt_trial,:,ids_i_trial)
-        b̂ti = combine_basis_time(bti,bti_trial,bti_test;kwargs...)
-        cache_t[i_test,i_trial] = sum(b̂si .* b̂ti)
-      end
-      b̂st[i] .+= copy(cache_t)
-    end
-  end
-
-  return ReducedMatrixOperator(mdeim_style,b̂st)
-end
-
 function compress_core(a::Array{T,3},btest::Array{S,3};kwargs...) where {T,S}
   TS = promote_type(T,S)
-  ab = zeros(TS,size(a,1),size(btest,1),size(a,3),size(btest,3))
+  ab = zeros(TS,size(btest,1),size(a,1),size(btest,3),size(a,3))
   @inbounds for i = CartesianIndices(size(ab))
-    ia1,ib1,ia3,ib3 = Tuple(i)
+    ib1,ia1,ib3,ia3 = Tuple(i)
     ab[i] = btest[ib1,:,ib3]'*a[ia1,:,ia3]
   end
   return ab
@@ -229,9 +149,9 @@ end
 
 function compress_core(a::Array{T,4},btrial::Array{S,3},btest::Array{S,3};kwargs...) where {T,S}
   TS = promote_type(T,S)
-  bab = zeros(TS,size(a,1),size(btest,1),size(btrial,1),size(a,4),size(btest,3),size(btrial,3))
+  bab = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,4),size(btrial,3))
   @inbounds for i = CartesianIndices(size(bab))
-    ia1,ibV1,ibU1,ia4,ibV3,ibU3 = Tuple(i)
+    ibV1,ia1,ibU1,ibV3,ia4,ibU3 = Tuple(i)
     bab[i] = btest[ibV1,:,ibV3]'*a[ia1,:,:,ia4]*btrial[ibU1,:,ibU3]
   end
   return bab
@@ -239,10 +159,10 @@ end
 
 function compress_core(a::Array{T,3},btrial::Array{S,3},btest::Array{S,3};combine=(x,y)->x) where {T,S}
   TS = promote_type(T,S)
-  bab = zeros(TS,size(a,1),size(btest,1),size(btrial,1),size(a,4),size(btest,3),size(btrial,3))
-  bab_shift = zeros(TS,size(a,1),size(btest,1),size(btrial,1),size(a,4),size(btest,3),size(btrial,3))
+  bab = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,4),size(btrial,3))
+  bab_shift = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,4),size(btrial,3))
   @inbounds for i = CartesianIndices(size(bab))
-    ia1,ibV1,ibU1,ia4,ibV3,ibU3 = Tuple(i)
+    ibV1,ia1,ibU1,ibV3,ia4,ibU3 = Tuple(i)
     bab[i] = sum(btest[ibV1,:,ibV3].*a[ia1,:,ia4].*btrial[ibU1,:,ibU3])
     bab_shift[i] = sum(btest[ibV1,2:end,ibV3].*a[ia1,2:end,ia4].*btrial[ibU1,1:end-1,ibU3])
   end
