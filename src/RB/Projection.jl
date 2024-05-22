@@ -102,13 +102,23 @@ get_basis_space(b::TTSVDCores) = cores2basis(get_spatial_cores(b)...)
 get_basis_time(b::TTSVDCores) = cores2basis(get_temporal_cores(b))
 get_basis_spacetime(b::TTSVDCores) = cores2basis(get_spatial_cores(b)...,get_temporal_cores(b))
 FEM.num_times(b::TTSVDCores) = size(get_temporal_cores(b),2)
-num_reduced_space_dofs(b::TTSVDCores) = prod(size.(get_spatial_cores(b),3))
+num_reduced_space_dofs(b::TTSVDCores) = size(last(get_spatial_cores(b)),3)
 num_reduced_times(b::TTSVDCores) = size(get_temporal_cores(b),3)
 num_fe_dofs(b::TTSVDCores) = num_space_dofs(b)*num_times(b)
 num_reduced_dofs(b::TTSVDCores) = num_reduced_times(b)
+num_space_dofs(b::TTSVDCores) = prod(_num_tot_space_dofs(b))
 
-num_space_dofs(b::VectorTTSVDCores) = prod(size.(get_spatial_cores(b),2))
-num_space_dofs(b::MatrixTTSVDCores) = prod(size.(get_spatial_cores(b),2))*prod(size.(get_spatial_cores(b),3))
+_num_tot_space_dofs(b::TTSVDCores) = size.(get_spatial_cores(b),2)
+
+function _num_tot_space_dofs(b::MatrixTTSVDCores)
+  scores = get_spatial_cores(b)
+  ncores = length(scores)
+  tot_ndofs = zeros(Int,2,ncores)
+  @inbounds for i = 1:ncores
+    tot_ndofs[:,i] .= size(scores[i],2),size(scores[i],3)
+  end
+  return tot_ndofs
+end
 
 function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
   @check size(a,3) == size(b,1)

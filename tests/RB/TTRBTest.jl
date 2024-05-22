@@ -86,296 +86,112 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1"
 
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
 
-red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-# soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
-# norm_matrix = assemble_norm_matrix(feop)
-# cores = ttsvd(soff,norm_matrix)
+# red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+# odeop = get_algebraic_operator(feop)
+# pop = PODOperator(odeop,red_trial,red_test)
+# red_lhs,red_rhs = reduced_jacobian_residual(rbsolver,pop,fesnaps)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+
+son = select_snapshots(fesnaps,RB.online_params(rbsolver))
+r = get_realization(son)
+trial = get_trial(rbop)(r)
+fe_trial = get_fe_trial(rbop)(r)
+x̂ = zero_free_values(trial)
+y = zero_free_values(fe_trial)
+
+odecache = allocate_odecache(fesolver,rbop,r,(y,))
+odeslvrcache,odeopcache = odecache
+reuse,A,b,sysslvrcache = odeslvrcache
+
+x = copy(y)
+fill!(x,zero(eltype(x)))
+dtθ = θ*dt
+shift!(r,dt*(θ-1))
+us = (x,x)
+ws = (1,1/dtθ)
+
+update_odeopcache!(odeopcache,rbop,r)
+
+# stageop = LinearParamStageOperator(rbop,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
+# bnew = residual!(b,rbop,r,us,odeopcache)
+# fe_sb = fe_residual!(b,rbop,r,us,odeopcache)
+# b̂ = mdeim_result(rbop.rhs,fe_sb)
+# aa,bb = rbop.rhs[1],fe_sb[1]
+# RB.coefficient!(aa,bb)
+# basis = aa.basis
+# coefficient = aa.coefficient
+# result = aa.result
+# fill!(result,zero(eltype(result)))
+# @inbounds for i = eachindex(result)
+#   result[i] .= basis*coefficient[i]
+# end
+
+# red_r,red_times,red_us,red_odeopcache = RB._select_fe_quantities_at_time_locations(rbop.rhs,r,us,odeopcache)
+# bb = residual!(b,rbop.op,red_r,red_us,red_odeopcache)
+# # bi = RB._select_snapshots_at_space_time_locations(bb,rbop.rhs,red_times)
+# ss,aa = bb[1],rbop.rhs[1]
+# ids_space = RB.get_indices_space(aa)
+# ids_time = filter(!isnothing,indexin(RB.get_indices_time(aa),red_times))
+# srev = reverse_snapshots(ss)
+# RB.select_snapshots_entries(srev,ids_space,ids_time)
+
+# fe_sA = fe_jacobian!(A,rbop,r,us,ws,odeopcache)
+red_r,red_times,red_us,red_odeopcache = RB._select_fe_quantities_at_time_locations(rbop.lhs,r,us,odeopcache)
+AA = jacobian!(A,rbop.op,red_r,red_us,ws,red_odeopcache)
+AA11 = AA[1][1]
+# Â = mdeim_result(rbop.lhs,fe_sA)
+
+#
+soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
+red_trial,red_test = reduced_fe_space(rbsolver,feop,soff)
 odeop = get_algebraic_operator(feop)
 pop = PODOperator(odeop,red_trial,red_test)
 smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
 A,b = jacobian_and_residual(rbsolver,pop,smdeim)
-
-# b1,t1 = b.values[1],b.trians[1]
-# bred = RB.reduced_form(rbsolver,b1,t1,get_test(pop))
-# mdeim_style = rbsolver.mdeim_style
-# basis = reduced_basis(b1;ϵ=RB.get_tol(rbsolver))
-# lu_interp,integration_domain = mdeim(mdeim_style,basis)
-# proj_basis = reduce_operator(mdeim_style,basis,get_test(pop))
+mdeim_style = rbsolver.mdeim_style
 
 A1,t1 = A[1].values[1],A[1].trians[1]
-# Ared = RB.reduced_form(rbsolver,A1,t1,get_trial(pop),get_test(pop))
-combine=(x,y)->θ*x+(1-θ)*y
-mdeim_style = rbsolver.mdeim_style
+# A1,t1 = b.values[1],b.trians[1]
 basis = reduced_basis(A1;ϵ=RB.get_tol(rbsolver))
-lu_interp,integration_domain = mdeim(mdeim_style,basis)
-proj_basis = reduce_operator(mdeim_style,basis,get_trial(pop),get_test(pop);combine)
+basis_spacetime = get_basis_spacetime(basis)
+indices_spacetime = get_mdeim_indices(basis_spacetime)
+indices_space = fast_index(indices_spacetime,RB.num_space_dofs(basis))
+indices_time = slow_index(indices_spacetime,RB.num_space_dofs(basis))
+recast_indices_space = RB.recast_indices(basis,indices_space)
 
-b1 = b[1]
-basis_vec = reduced_basis(b1;ϵ=RB.get_tol(rbsolver))
-proj_basis_vec = reduce_operator(mdeim_style,basis_vec,get_test(pop))
-################### OLD INTERFACE #####################
+space_dofs = RB._num_tot_space_dofs(basis)
+tensor_indices = RB.tensorize_indices(vec(prod(space_dofs;dims=1)),indices)
+RB._split_row_col(space_dofs,tensor_indices)
+# indices = [22]
+# dofs = [25,16]#RB._num_tot_space_dofs(basis)
+# D = length(dofs)
+# cdofs = cumprod(dofs)
+# tindices = Vector{CartesianIndex{D}}(undef,length(indices))
+# ii,i = 1,22
+# ic = ()
+# @inbounds for d = 1:D-1
+#   ic = (ic...,fast_index(i,cdofs[d]))
+# end
+# ic = (ic...,slow_index(i,cdofs[D-1]))
+# tindices[ii] = CartesianIndex(ic)
 
-struct OldBasicTTSnapshots{T,P,R} <: TTSnapshots{T,3}
-  values::P
-  realization::R
-  function OldBasicTTSnapshots(values::P,realization::R) where {P<:ParamArray,R,D}
-    T = eltype(P)
-    new{T,P,R}(values,realization)
-  end
-end
+M = reshape(basis_space,20,20)
+p = free_dofs_map(test.dof_permutation)
+p̃ = test.tp_dof_permutation
 
-function RB.BasicSnapshots(
-  values::ParamArray,
-  realization::TransientParamRealization)
-  OldBasicTTSnapshots(values,realization)
-end
+Mpp = M[p̃[:],p̃[:]][invperm(p[:]),invperm(p[:])]
 
-function RB.tensor_getindex(s::OldBasicTTSnapshots,ispace,itime,iparam)
-  s.values[iparam+(itime-1)*num_params(s)][ispace]
-end
+iis = [22]
+cids = CartesianIndices(RB.num_space_dofs(A1))
+cispace = map(i->getindex(cids,i),iis)
+A1[iis]
 
-struct OldTransientTTSnapshots{T,P,R,V} <: TTSnapshots{T,3}
-  values::V
-  realization::R
-  function OldTransientTTSnapshots(
-    values::AbstractVector{P},
-    realization::R,
-    ) where {P<:ParamArray,R<:TransientParamRealization}
+aa,bb = basis.cores_space
+boh = kronecker(bb[1,:,:,1],aa[1,:,:,1])
 
-    V = typeof(values)
-    T = eltype(P)
-    new{T,P,R,V}(values,realization)
-  end
-end
-
-function RB.TransientSnapshots(
-  values::AbstractVector{P},
-  realization::TransientParamRealization
-  ) where P<:ParamArray
-  OldTransientTTSnapshots(values,realization)
-end
-
-function RB.tensor_getindex(s::OldTransientTTSnapshots,ispace,itime,iparam)
-  perm_ispace = s.permutation[ispace]
-  s.values[itime][iparam][perm_ispace]
-end
-
-const BasicNnzTTSnapshots = OldBasicTTSnapshots{T,P,R} where {T,P<:FEM.ParamTTSparseMatrix,R}
-const TransientNnzTTSnapshots = OldTransientTTSnapshots{T,P,R} where {T,P<:FEM.ParamTTSparseMatrix,R}
-const NnzTTSnapshots = Union{BasicNnzTTSnapshots{T},TransientNnzTTSnapshots{T}} where {T}
-
-RB.num_space_dofs(s::NnzTTSnapshots) = nnz(s.values[1])
-
-function RB.tensor_getindex(s::BasicNnzTTSnapshots,ispace,itime,iparam)
-  nonzeros(s.values[iparam+(itime-1)*num_params(s)])[ispace]
-end
-
-function RB.tensor_getindex(s::TransientNnzTTSnapshots,ispace,itime,iparam)
-  nonzeros(s.values[itime][iparam])[ispace]
-end
-
-RB.sparsify_indices(s::BasicNnzTTSnapshots,srange::AbstractVector) = sparsify_indices(first(s.values),srange)
-RB.sparsify_indices(s::TransientNnzTTSnapshots,srange::AbstractVector) = sparsify_indices(first(first(s.values)),srange)
-
-function RB.select_snapshots_entries(s::NnzTTSnapshots,ispace,itime)
-  RB._select_snapshots_entries(s,RB.sparsify_indices(s,ispace),itime)
-end
-
-function RB.get_nonzero_indices(s::NnzTTSnapshots)
-  v = isa(s,OldBasicTTSnapshots) ? first(s.values) : first(first(s.values))
-  i,j, = findnz(v)
-  return i .+ (j .- 1)*v.m
-end
-
-function RB.recast(s::NnzTTSnapshots,a::AbstractArray{T,3}) where T
-  @check size(a,1) == 1
-  v = isa(s,OldBasicTTSnapshots) ? first(s.values) : first(first(s.values))
-  i,j, = findnz(v)
-  m,n = size(v)
-  asparse = map(eachcol(dropdims(a;dims=1))) do v
-    sparse(i,j,v,m,n)
-  end
-  return VecOfSparseMat2Arr3(asparse)
-end
-
-using SparseArrays
-struct VecOfSparseMat2Arr3{Tv,Ti,V} <: AbstractArray{Tv,3}
-  values::V
-  function VecOfSparseMat2Arr3(values::V) where {Tv,Ti,V<:AbstractVector{<:AbstractSparseMatrix{Tv,Ti}}}
-    new{Tv,Ti,V}(values)
-  end
-end
-
-FEM.get_values(s::VecOfSparseMat2Arr3) = s.values
-Base.size(s::VecOfSparseMat2Arr3) = (1,nnz(first(s.values)),length(s.values))
-
-function Base.getindex(s::VecOfSparseMat2Arr3,i::Integer,j,k::Integer)
-  @check i == 1
-  nonzeros(s.values[k])[j]
-end
-
-function Base.getindex(s::VecOfSparseMat2Arr3,i::Integer,j,k)
-  @check i == 1
-  view(s,i,j,k)
-end
-
-function RB.get_nonzero_indices(s::VecOfSparseMat2Arr3)
-  RB.get_nonzero_indices(first(s.values))
-end
-
-function RB.ttsvd(mat::NnzTTSnapshots{T},X::AbstractMatrix;kwargs...) where T
-  N = 3
-  cores = Vector{Array{T,3}}(undef,N-1)
-  ranks = fill(1,N)
-  sizes = size(mat)
-  mat_k = copy(mat)
-  C = cholesky(X)
-  L = sparse(C.L)
-  for k = 1:N-1
-    if k == 1
-      _mat_k = reshape(mat_k,:,prod(sizes[2:end]))
-      mat_k = reshape(L'*_mat_k[C.p,:],ranks[k]*sizes[k],:)
-    else
-      mat_k = reshape(mat_k,ranks[k]*sizes[k],:)
-    end
-    U,Σ,V = svd(mat_k)
-    rank = RB.truncation(Σ;kwargs...)
-    ranks[k+1] = rank
-    mat_k = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
-    if k == 1
-      cores[k] = reshape((L'\U[:,1:rank])[invperm(C.p),:],ranks[k],sizes[k],rank)
-    else
-      cores[k] = reshape(U[:,1:rank],ranks[k],sizes[k],rank)
-    end
-  end
-  return cores
-end
-
-function RB.Projection(s::NnzTTSnapshots,args...;kwargs...)
-  cores = RB.ttsvd(s,args...;kwargs...)
-  basis = OldTTSVDCores(cores)
-  RB.recast_basis(s,basis)
-end
-
-struct OldTTSVDCores{D,A,B} <: Projection
-  cores::A
-  basis_spacetime::B
-  function OldTTSVDCores(
-    cores::A,
-    basis_spacetime::B=RB.cores2basis(cores...)
-    ) where {A,B}
-
-    D = length(cores)
-    new{D,A,B}(cores,basis_spacetime)
-  end
-end
-
-RB.get_basis_space(b::OldTTSVDCores) = RB.cores2basis(b.cores[1:end-1]...)
-RB.get_basis_time(b::OldTTSVDCores) = RB.cores2basis(b.cores[end])
-RB.get_basis_spacetime(b::OldTTSVDCores) = b.basis_spacetime
-RB.num_space_dofs(b::OldTTSVDCores) = prod(size.(b.cores[1:end-1],2))
-RB.num_space_dofs(b::OldTTSVDCores,k::Integer) = size(b.cores[k],2)
-FEM.num_times(b::OldTTSVDCores) = size(b.cores[end],2)
-RB.num_reduced_space_dofs(b::OldTTSVDCores) = size(b.cores[end-1],3)
-RB.num_reduced_space_dofs(b::OldTTSVDCores,k::Integer) = size(b.cores[k],3)
-RB.num_reduced_times(b::OldTTSVDCores) = size(b.cores[end],3)
-RB.num_fe_dofs(b::OldTTSVDCores) = RB.num_space_dofs(b)*RB.num_times(b)
-RB.num_reduced_dofs(b::OldTTSVDCores) = RB.num_reduced_times(b)
-
-function RB.recast_basis(s::NnzTTSnapshots,b::OldTTSVDCores{D}) where D
-  @assert D == 2 "Spatial splitting deactivated for residuals/jacobians"
-  _space_core,time_core = b.cores
-  space_core = recast(s,_space_core)
-  OldTTSVDCores([space_core,time_core],b.basis_spacetime)
-end
-
-function old_reduce_operator(
-  mdeim_style::RB.SpaceTimeMDEIM,
-  b::OldTTSVDCores,
-  b_test::OldTTSVDCores;
-  kwargs...)
-
-  bs = get_basis_space(b)
-  bt = get_basis_time(b)
-  bs_test = get_basis_space(b_test)
-  bt_test = get_basis_time(b_test)
-
-  ns = num_reduced_space_dofs(b)
-  ns_test = num_reduced_space_dofs(b_test)
-
-  T = eltype(first(bs))
-  V = Vector{T}
-  b̂st = Vector{V}(undef,num_reduced_dofs(b))
-
-  b̂s = bs_test'*bs
-  cache_t = zeros(T,num_reduced_dofs(b_test))
-
-  @inbounds for i = 1:num_reduced_dofs(b)
-    bti = view(bt,:,(i-1)*ns+1:i*ns)
-    for i_test = 1:num_reduced_dofs(b_test)
-      ids_i = (i_test-1)*ns_test+1:i_test*ns_test
-      bt_test_i = view(bt_test,:,ids_i)
-      b̂ti = bt_test_i'*bti
-      cache_t[i_test] = sum(b̂s .* b̂ti)
-    end
-    b̂st[i] = copy(cache_t)
-  end
-
-  return ReducedVectorOperator(mdeim_style,b̂st)
-end
-
-function old_reduce_operator(
-  mdeim_style::RB.SpaceTimeMDEIM,
-  b::OldTTSVDCores,
-  b_trial::OldTTSVDCores,
-  b_test::OldTTSVDCores;
-  combine=(x,y)->θ*x+(1-θ)*y)
-
-  bs = first(b.cores)
-  bt = get_basis_time(b)
-  bs_trial = get_basis_space(b_trial)
-  bt_trial = get_basis_time(b_trial)
-  bs_test = get_basis_space(b_test)
-  bt_test = get_basis_time(b_test)
-
-  ns_test = num_reduced_space_dofs(b_test)
-  ns_trial = num_reduced_space_dofs(b_trial)
-
-  T = eltype(first(bs))
-  M = Matrix{T}
-  b̂st = Vector{M}(undef,num_reduced_dofs(b))
-
-  cache_t = zeros(T,num_reduced_dofs(b_test),num_reduced_dofs(b_trial))
-  @inbounds for i = 1:num_reduced_dofs(b)
-    b̂st[i] = copy(cache_t)
-  end
-
-  @inbounds for is = 1:num_reduced_space_dofs(b)
-    b̂si = bs_test'*get_values(bs)[is]*bs_trial
-    for i = 1:num_reduced_dofs(b)
-      bti = view(bt,:,is)
-      for i_test = 1:num_reduced_dofs(b_test), i_trial = 1:num_reduced_dofs(b_trial)
-        ids_i_test = (i_test-1)*ns_test+1:i_test*ns_test
-        ids_i_trial = (i_trial-1)*ns_trial+1:i_trial*ns_trial
-        bti_test = view(bt_test,:,ids_i_test)
-        bti_trial = view(bt_trial,:,ids_i_trial)
-        b̂ti = combine_basis_time(bti,bti_trial,bti_test;combine)
-        cache_t[i_test,i_trial] = sum(b̂si .* b̂ti)
-      end
-      b̂st[i] .+= copy(cache_t)
-    end
-  end
-
-  return ReducedMatrixOperator(mdeim_style,b̂st)
-end
-
-A1_old = OldBasicTTSnapshots(A1.values,A1.realization)
-mdeim_style = rbsolver.mdeim_style
-old_basis = reduced_basis(A1_old;ϵ=RB.get_tol(rbsolver))
-# lu_interp,integration_domain = mdeim(mdeim_style,basis)
-b = RB.get_basis(get_trial(pop))
-old_t_basis = OldTTSVDCores([b.cores_space...,b.core_time])
-old_proj_basis = old_reduce_operator(mdeim_style,old_basis,old_t_basis,old_t_basis)
-
-old_basis_vec = OldTTSVDCores([basis_vec.cores_space...,basis_vec.core_time])
-old_proj_basis_vec = old_reduce_operator(mdeim_style,old_basis_vec,old_t_basis)
+row,col = fast_index(22,20),slow_index(22,20)
+idsx = CartesianIndex(fast_index(row,5),fast_index(col,5))
+idsy = CartesianIndex(slow_index(row,5),slow_index(col,5))
+# rows = CartesianIndex(fast_index(row,5),slow_index(row,5))
+# cols = CartesianIndex(fast_index(col,5),slow_index(col,5))

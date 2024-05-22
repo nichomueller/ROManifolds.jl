@@ -275,7 +275,7 @@ struct TProductFESpace{D,A<:SingleFieldFESpace,B<:AbstractVector{<:SingleFieldFE
   space::A
   spaces_1d::B
   dof_permutation::IndexMap{D}
-  inv_tp_dof_permutation::IndexMap{D}
+  tp_dof_permutation::IndexMap{D}
   vector_type::Type{V}
 end
 
@@ -283,10 +283,10 @@ function TProductFESpace(
   space::SingleFieldFESpace,
   spaces_1d::Vector{<:SingleFieldFESpace},
   dof_permutation::AbstractIndexMap,
-  inv_tp_dof_permutation::AbstractIndexMap)
+  tp_dof_permutation::AbstractIndexMap)
 
   vector_type = _get_tt_vector_type(space,dof_permutation)
-  TProductFESpace(space,spaces_1d,dof_permutation,inv_tp_dof_permutation,vector_type)
+  TProductFESpace(space,spaces_1d,dof_permutation,tp_dof_permutation,vector_type)
 end
 
 function FESpaces.FESpace(
@@ -302,8 +302,7 @@ function FESpaces.FESpace(
   spaces_1d = univariate_spaces(model,cell_reffes_1d;kwargs...)
   dof_permutation = get_dof_permutation(T,model.model,space,order)
   tp_dof_permutation = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order)
-  inv_tp_dof_permutation = inv_index_map(tp_dof_permutation)
-  TProductFESpace(space,spaces_1d,dof_permutation,inv_tp_dof_permutation)
+  TProductFESpace(space,spaces_1d,dof_permutation,tp_dof_permutation)
 end
 
 function univariate_spaces(model::TProductModel,cell_reffes;dirichlet_tags=Int[],kwargs...)

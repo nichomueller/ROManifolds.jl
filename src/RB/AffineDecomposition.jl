@@ -162,13 +162,12 @@ function mdeim(mdeim_style::MDEIMStyle,b::PODBasis)
 end
 
 function mdeim(mdeim_style::MDEIMStyle,b::TTSVDCores)
-  basis_space = get_basis_space(b)
   basis_spacetime = get_basis_spacetime(b)
   indices_spacetime = get_mdeim_indices(basis_spacetime)
   indices_space = fast_index(indices_spacetime,num_space_dofs(b))
   indices_time = slow_index(indices_spacetime,num_space_dofs(b))
   lu_interp = lu(view(basis_spacetime,indices_spacetime,:))
-  recast_indices_space = recast_indices(basis_space,indices_space)
+  recast_indices_space = recast_indices(b,indices_space)
   integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
   return lu_interp,integration_domain
 end

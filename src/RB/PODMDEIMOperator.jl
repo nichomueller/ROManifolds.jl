@@ -156,7 +156,7 @@ end
 
 function _select_snapshots_at_space_time_locations(s,a,red_times)
   ids_space = get_indices_space(a)
-  ids_time = filter(!isnothing,indexin(get_indices_time(a),red_times))
+  ids_time::Vector{Int} = filter(!isnothing,indexin(get_indices_time(a),red_times))
   srev = reverse_snapshots(s)
   select_snapshots_entries(srev,ids_space,ids_time)
 end

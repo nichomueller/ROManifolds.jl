@@ -258,3 +258,14 @@ end
 function Base.:*(a::ReducedAlgebraicOperator{SpaceTimeMDEIM},b::AbstractVector)
   return sum([a.basis[q]*b[q] for q = eachindex(a.basis)])
 end
+
+#TODO try to unify the two multiplications
+# this is the case where a TT strategy is employed
+
+function Base.:*(a::ReducedMatrixOperator{SpaceTimeMDEIM,Array{T,3}},b::AbstractVector) where T
+  return sum([a.basis[:,q,:]*b[q] for q = eachindex(b)])
+end
+
+function Base.:*(a::ReducedVectorOperator{SpaceTimeMDEIM,Matrix{T}},b::AbstractVector) where T
+  return sum([a.basis[:,q]*b[q] for q = eachindex(b)])
+end

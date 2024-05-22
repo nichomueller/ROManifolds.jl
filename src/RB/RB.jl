@@ -32,10 +32,6 @@ export orth_complement!
 export orth_projection
 include("BasisConstruction.jl")
 
-export compress_basis_space
-export combine_basis_time
-include("RBOperations.jl")
-
 export AbstractSnapshots
 export BasicSnapshots
 export TransientSnapshots
@@ -136,4 +132,6 @@ export rb_results
 export load_solve
 export generate_plots
 include("PostProcess.jl")
+
+include("RBOperations.jl")
 end # module

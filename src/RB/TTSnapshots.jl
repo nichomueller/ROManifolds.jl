@@ -239,7 +239,9 @@ function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapsho
 end
 
 function select_snapshots_entries(s::TTSnapshots,ispace,itime)
-  _select_snapshots_entries(s,ispace,itime)
+  cids = CartesianIndices(num_space_dofs(s))
+  cispace = map(i->getindex(cids,i),ispace)
+  _select_snapshots_entries(s,cispace,itime)
 end
 
 function _select_snapshots_entries(s::TTSnapshots{T},ispace,itime) where T
@@ -250,7 +252,7 @@ function _select_snapshots_entries(s::TTSnapshots{T},ispace,itime) where T
   for ip = 1:np
     vip = values[ip]
     for (istp,(is,it)) in enumerate(zip(ispace,itime))
-      vip[istp] = s[is,it,ip]
+      vip[istp] = tensor_getindex(s,is,it,ip)
     end
   end
   return values
