@@ -73,8 +73,9 @@ function Projection(s::TTSnapshots,args...;kwargs...)
   TTSVDCores(cores_space,core_time)
 end
 
-function Projection(s::MatrixTTSnapshots,args...;kwargs...)
-  cores_space,core_time = ttsvd_mat(s,args...;kwargs...)
+function Projection(s::MatrixTTSnapshots{N},args...;kwargs...) where N
+  s̃ = permute_snapshots(s)
+  cores_space,core_time = ttsvd_mat(s̃,args...;kwargs...)
   TTSVDCores(cores_space,core_time)
 end
 
@@ -195,6 +196,18 @@ function recast(x::AbstractVector,b::TTSVDCores)
 
   xrec = basis_spacetime*x
   reshape(xrec,Ns,Nt)
+end
+
+function recast_indices(b::TTSVDCores,indices::AbstractVector)
+  space_dofs = _num_tot_space_dofs(b)
+  tensor_indices = tensorize_indices(indices,space_dofs)
+  return tensor_indices
+end
+
+function recast_indices(b::MatrixTTSVDCores,indices::AbstractVector)
+  space_dofs = _num_tot_space_dofs(b)
+  tensor_indices = tensorize_indices(indices,vec(prod(space_dofs;dims=1)))
+  return split_row_col_indices(tensor_indices,space_dofs)
 end
 
 # multi field interface

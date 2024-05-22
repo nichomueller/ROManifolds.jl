@@ -91,32 +91,36 @@ end
 function space_time_error(_sol::AbstractSnapshots,_sol_approx::AbstractSnapshots,norm_matrix=nothing)
   sol = reverse_snapshots(_sol)
   sol_approx = reverse_snapshots(_sol_approx)
-  err_norm = []
-  sol_norm = []
-  space_time_norm = []
-  for i = axes(sol,2)
-    push!(err_norm,_norm(sol[:,i]-sol_approx[:,i],norm_matrix))
-    push!(sol_norm,_norm(sol[:,i],norm_matrix))
+  T = promote_type(eltype(sol),eltype(sol_approx))
+  err_norm = allocate_vector(Vector{T},num_times(sol))
+  sol_norm = allocate_vector(Vector{T},num_times(sol))
+  space_time_norm = allocate_vector(Vector{T},num_params(sol))
+  @inbounds for i = axes(sol,2)
+    it = fast_index(i,num_times(sol))
+    ip = slow_index(i,num_times(sol))
+    err_norm[it] = _norm(sol[:,i]-sol_approx[:,i],norm_matrix)
+    sol_norm[it] = _norm(sol[:,i],norm_matrix)
     if mod(i,num_params(sol)) == 0
-      push!(space_time_norm,norm(err_norm)/norm(sol_norm))
-      err_norm = []
-      sol_norm = []
+      space_time_norm[ip] = norm(err_norm)/norm(sol_norm)
     end
   end
   avg_error = sum(space_time_norm) / length(space_time_norm)
   return avg_error
 end
 
-function space_time_error(sol::TTSnapshots,sol_approx::TTSnapshots,norm_matrix=nothing)
-  space_time_norm = []
-  for j = axes(sol,3)
-    err_norm = []
-    sol_norm = []
-    for i = axes(sol,2)
-      push!(err_norm,_norm(sol[:,i,j]-sol_approx[:,i,j],norm_matrix))
-      push!(sol_norm,_norm(sol[:,i,j],norm_matrix))
+function space_time_error(_sol::TTSnapshots,_sol_approx::TTSnapshots,norm_matrix=nothing)
+  sol = vectorize_index_map(_sol)
+  sol_approx = vectorize_index_map(_sol_approx)
+  T = promote_type(eltype(sol),eltype(sol_approx))
+  err_norm = allocate_vector(Vector{T},num_times(sol))
+  sol_norm = allocate_vector(Vector{T},num_times(sol))
+  space_time_norm = allocate_vector(Vector{T},num_params(sol))
+  @inbounds for ip = 1:num_params(sol)
+    for it = 1:num_times(sol)
+      err_norm[it] = _norm(sol[:,it,ip]-sol_approx[:,it,ip],norm_matrix)
+      sol_norm[it] = _norm(sol[:,it,ip],norm_matrix)
     end
-    push!(space_time_norm,norm(err_norm)/norm(sol_norm))
+    space_time_norm[ip] = norm(err_norm)/norm(sol_norm)
   end
   avg_error = sum(space_time_norm) / length(space_time_norm)
   return avg_error

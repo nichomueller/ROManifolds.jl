@@ -132,9 +132,13 @@ function LinearAlgebra.mul!(c::TTArray,a::TTArray,b::TTArray,α::Number,β::Numb
   return c
 end
 
-function LinearAlgebra.ldiv!(m::Factorization,b::TTArray)
-  ldiv!(m,get_values(b))
-  return b
+for factorization in (:LU,:Cholesky)
+  @eval begin
+    function LinearAlgebra.ldiv!(m::$factorization,b::TTArray)
+      ldiv!(m,get_values(b))
+      return b
+    end
+  end
 end
 
 function LinearAlgebra.ldiv!(a::TTArray,m::Factorization,b::TTArray)

@@ -12,8 +12,16 @@ function Base.getindex(s::TTSnapshots,i...)
   view(s,i...)
 end
 
-function Base.getindex(s::TTSnapshots{T,N},i::Integer...) where {T,N}
+function Base.getindex(s::TTSnapshots,i::Integer...)
   getindex(s,CartesianIndex(i))
+end
+
+function Base.getindex(s::TTSnapshots,i::Integer)
+  nspace = prod(num_space_dofs(s))
+  ispace = tensorize_indices(i,num_space_dofs(s))
+  itime = fast_index(i,nspace*num_times(s))
+  iparam = slow_index(i,nspace*num_times(s))
+  tensor_getindex(s,ispace,itime,iparam)
 end
 
 function Base.getindex(s::TTSnapshots{T,N},i::CartesianIndex{N}) where {T,N}
@@ -258,28 +266,80 @@ function _select_snapshots_entries(s::TTSnapshots{T},ispace,itime) where T
   return values
 end
 
+function vectorize_index_map(s::TTSnapshots)
+  i = get_index_map(s)
+  vi = FEM.vectorize_index_map(i)
+  VectorizedTTSnapshots(s,vi)
+end
+
+struct VectorizedTTSnapshots{T,S,I} <: TTSnapshots{T,3}
+  snaps::S
+  index_map::I
+  function VectorizedTTSnapshots(snaps::S,index_map::I) where {T,S<:TTSnapshots{T},I}
+    new{T,S,I}(snaps,index_map)
+  end
+end
+
+FEM.get_index_map(s::VectorizedTTSnapshots) = s.index_map
+
+function get_realization(s::VectorizedTTSnapshots)
+  get_realization(s.snaps)
+end
+
+function tensor_getindex(s::VectorizedTTSnapshots{T,<:BasicTTSnapshots},ispace,itime,iparam) where T
+  perm_ispace = get_index_map(s)[ispace]
+  s.snaps.values[iparam+(itime-1)*num_params(s)][perm_ispace]
+end
+
+function tensor_getindex(s::VectorizedTTSnapshots{T,<:TransientTTSnapshots},ispace,itime,iparam) where T
+  perm_ispace = get_index_map(s)[ispace]
+  s.snaps.values[itime][iparam][perm_ispace]
+end
+
+FEM.num_times(s::VectorizedTTSnapshots{T,<:SelectedTTSnapshotsAtIndices}) where T = num_times(s.snaps)
+FEM.num_params(s::VectorizedTTSnapshots{T,<:SelectedTTSnapshotsAtIndices}) where T = num_params(s.snaps)
+
+function tensor_getindex(s::VectorizedTTSnapshots{T,<:SelectedTTSnapshotsAtIndices},ispace,itime,iparam) where T
+  is = ispace
+  it = time_indices(s.snaps)[itime]
+  ip = param_indices(s.snaps)[iparam]
+  tensor_getindex(VectorizedTTSnapshots(s.snaps.snaps,s.index_map),is,it,ip)
+end
+
 ###################################################################
 
 abstract type MatrixTTSnapshots{T,N} <: TTSnapshots{T,N} end
 
-function _mat_size(i::AbstractIndexMap{D}) where D
-  _size_d(d) = size(i,cld(d,2))
-  ntuple(_size_d,2*D)
+num_space_dofs(s::MatrixTTSnapshots) = (size(get_index_map(s))...,size(get_index_map(s))...)
+
+# Note. Given a D-dimensional array of size (s1,s2,...,sD), we can establish the
+# map f: i ⟶ CartesianIndex((i1,i2,...,iD)) and its inverse f⁻¹ that allow us to
+# access a given entry of our array at either a cartesian index or a linear one.
+# In particular, f is given by the function 'tensorize_indices', whereas we can
+# find that i = (iD-1)*(s{D-1} + ... + s2 + s1) + ... + (i2-1)*s1 + i1
+
+function Base.getindex(s::MatrixTTSnapshots,i::Integer)
+  nspace = prod(num_space_dofs(s))
+  space_dofs = reshape(collect(num_space_dofs(s)),:,2)
+  tensor_indices = tensorize_indices(i,vec(prod(space_dofs;dims=1)))
+  ispace = split_row_col_indices(tensor_indices,space_dofs)
+  itimeparam = slow_index(i,nspace)
+  itime = fast_index(itimeparam,num_times(s))
+  iparam = slow_index(itimeparam,num_times(s))
+  tensor_getindex(s,ispace,itime,iparam)
 end
 
-num_space_dofs(s::MatrixTTSnapshots) = _mat_size(get_index_map(s)) #(size(get_index_map(s))...,size(get_index_map(s))...)
-
 function tensor_getindex(s::MatrixTTSnapshots,ispace::CartesianIndex{D},itime,iparam) where D
-  ispace_row = ispace.I[1:2:D]
-  ispace_col = ispace.I[2:2:D]
+  ispace_row = ispace.I[1:cld(D,2)]
+  ispace_col = ispace.I[cld(D,2)+1:end]
   perm_ispace_row = get_index_map(s)[CartesianIndex(ispace_row)]
   perm_ispace_col = get_index_map(s)[CartesianIndex(ispace_col)]
   _tensor_getindex(s,perm_ispace_row,perm_ispace_col,itime,iparam)
 end
 
 function tensor_setindex!(s::MatrixTTSnapshots,v,ispace::CartesianIndex{D},itime,iparam) where D
-  ispace_row = ispace.I[1:2:2*D]
-  ispace_col = ispace.I[2:2:2*D]
+  ispace_row = ispace.I[1:cld(D,2)]
+  ispace_col = ispace.I[cld(D,2)+1:end]
   perm_ispace_row = get_index_map(s)[CartesianIndex(ispace_row)]
   perm_ispace_col = get_index_map(s)[CartesianIndex(ispace_col)]
   _tensor_setindex!(s,v,perm_ispace_row,perm_ispace_col,itime,iparam)
@@ -338,4 +398,44 @@ end
 
 function _tensor_setindex!(s::MatrixTransientTTSnapshots,v,ispace_row,ispace_col,itime,iparam)
   s.values[itime][iparam][ispace_row,ispace_col] = v
+end
+
+function permute_snapshots(s::MatrixTTSnapshots)
+  PermutedMatrixTTSnapshots(s)
+end
+
+struct PermutedMatrixTTSnapshots{T,N,S} <: MatrixTTSnapshots{T,N}
+  snaps::S
+  function PermutedMatrixTTSnapshots(snaps::S) where {T,N,S<:MatrixTTSnapshots{T,N}}
+    new{T,N,S}(snaps)
+  end
+end
+
+FEM.get_index_map(s::PermutedMatrixTTSnapshots) = get_index_map(s.snaps)
+
+function _mat_size(i::AbstractIndexMap{D}) where D
+  _size_d(d) = size(i,cld(d,2))
+  ntuple(_size_d,2*D)
+end
+
+num_space_dofs(s::PermutedMatrixTTSnapshots) = _mat_size(get_index_map(s))
+
+function get_realization(s::PermutedMatrixTTSnapshots)
+  get_realization(s.snaps)
+end
+
+function tensor_getindex(s::PermutedMatrixTTSnapshots,ispace::CartesianIndex{D},itime,iparam) where D
+  ispace_row = ispace.I[1:2:D]
+  ispace_col = ispace.I[2:2:D]
+  perm_ispace_row = get_index_map(s)[CartesianIndex(ispace_row)]
+  perm_ispace_col = get_index_map(s)[CartesianIndex(ispace_col)]
+  _tensor_getindex(s.snaps,perm_ispace_row,perm_ispace_col,itime,iparam)
+end
+
+function tensor_setindex!(s::PermutedMatrixTTSnapshots,v,ispace::CartesianIndex{D},itime,iparam) where D
+  ispace_row = ispace.I[1:2:2*D]
+  ispace_col = ispace.I[2:2:2*D]
+  perm_ispace_row = get_index_map(s)[CartesianIndex(ispace_row)]
+  perm_ispace_col = get_index_map(s)[CartesianIndex(ispace_col)]
+  _tensor_setindex!(s.snaps,v,perm_ispace_row,perm_ispace_col,itime,iparam)
 end

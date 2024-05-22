@@ -4,18 +4,6 @@ function recast_indices(A::AbstractArray,indices::AbstractVector)
   return entire_indices
 end
 
-function recast_indices(b::TTSVDCores,indices::AbstractVector)
-  space_dofs = _num_tot_space_dofs(b)
-  tensor_indices = tensorize_indices(space_dofs,indices)
-  return tensor_indices
-end
-
-function recast_indices(b::MatrixTTSVDCores,indices::AbstractVector)
-  space_dofs = _num_tot_space_dofs(b)
-  tensor_indices = tensorize_indices(vec(prod(space_dofs;dims=1)),indices)
-  return _split_row_col(space_dofs,tensor_indices)
-end
-
 function sparsify_indices(A::AbstractArray,indices::AbstractVector)
   nonzero_indices = get_nonzero_indices(A)
   sparse_indices = map(y->findfirst(x->x==y,nonzero_indices),indices)
@@ -39,33 +27,42 @@ function get_nonzero_indices(A::AbstractArray{T,3} where T)
   return axes(A,2)
 end
 
-function tensorize_indices(dofs::Vector{Int},indices::AbstractVector)
+function tensorize_indices(i::Int,dofs::Vector{Int})
   D = length(dofs)
   cdofs = cumprod(dofs)
+  ic = ()
+  @inbounds for d = 1:D-1
+    ic = (ic...,fast_index(i,cdofs[d]))
+  end
+  ic = (ic...,slow_index(i,cdofs[D-1]))
+  return CartesianIndex(ic)
+end
+
+function tensorize_indices(indices::AbstractVector,dofs::AbstractVector{Int})
+  D = length(dofs)
   tindices = Vector{CartesianIndex{D}}(undef,length(indices))
   @inbounds for (ii,i) in enumerate(indices)
-    ic = ()
-    @inbounds for d = 1:D-1
-      ic = (ic...,fast_index(i,cdofs[d]))
-    end
-    ic = (ic...,slow_index(i,cdofs[D-1]))
-    tindices[ii] = CartesianIndex(ic)
+    tindices[ii] = tensorize_indices(i,dofs)
   end
   return tindices
 end
 
-function _split_row_col(dofs::Matrix{Int},tindices::AbstractVector{CartesianIndex{D}}) where D
+function split_row_col_indices(i::CartesianIndex{D},dofs::AbstractMatrix{Int}) where D
   @check size(dofs) == (2,D)
-  nrows = view(dofs,1,:)
-  tids_row_col = Vector{CartesianIndex{2*D}}(undef,length(tindices))
-  @inbounds for (ii,i) = enumerate(tindices)
-    irc = ()
-    @inbounds for d = 1:D
-      irc = (irc...,fast_index(i.I[d],nrows[d]),slow_index(i.I[d],nrows[d]))
-    end
-    tids_row_col[ii] = CartesianIndex(irc)
+  nrows = view(dofs,:,1)
+  irc = ()
+  @inbounds for d = 1:D
+    irc = (irc...,fast_index(i.I[d],nrows[d]),slow_index(i.I[d],nrows[d]))
   end
-  return tids_row_col
+  return CartesianIndex(irc)
+end
+
+function split_row_col_indices(indices::AbstractVector{CartesianIndex{D}},dofs::AbstractMatrix{Int}) where D
+  rcindices = Vector{CartesianIndex{2*D}}(undef,length(indices))
+  @inbounds for (ii,i) in enumerate(indices)
+    rcindices[ii] = split_row_col_indices(i,dofs)
+  end
+  return rcindices
 end
 
 function FEM.shift!(a::AbstractParamContainer,r::TransientParamRealization,α::Number,β::Number)

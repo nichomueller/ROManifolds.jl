@@ -167,8 +167,7 @@ function mdeim(mdeim_style::MDEIMStyle,b::TTSVDCores)
   indices_space = fast_index(indices_spacetime,num_space_dofs(b))
   indices_time = slow_index(indices_spacetime,num_space_dofs(b))
   lu_interp = lu(view(basis_spacetime,indices_spacetime,:))
-  recast_indices_space = recast_indices(b,indices_space)
-  integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
+  integration_domain = ReducedIntegrationDomain(indices_space,indices_time)
   return lu_interp,integration_domain
 end
 

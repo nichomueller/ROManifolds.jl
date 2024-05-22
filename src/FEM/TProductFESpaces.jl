@@ -58,6 +58,11 @@ function inv_index_map(i::AbstractIndexMap)
   IndexMap(invi)
 end
 
+function vectorize_index_map(i::AbstractIndexMap)
+  vi = vec(collect(LinearIndices(size(i))))
+  IndexMap(vi)
+end
+
 struct IndexMapView{D,L} <: AbstractIndexMap{D}
   indices::Array{Int,D}
   locations::L

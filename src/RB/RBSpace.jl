@@ -96,8 +96,7 @@ function FESpaces.get_vector_type(r::RBSpace)
 end
 
 function Algebra.allocate_in_domain(r::RBSpace)
-  V = get_vector_type(r.space)
-  allocate_vector(V,num_fe_free_dofs(r))
+  zero_free_values(r.space)
 end
 
 function recast(x::AbstractVector,r::RBSpace)
@@ -119,6 +118,12 @@ function Arrays.evaluate!(cache,k::RecastMap,x::ParamVector,r::RBSpace)
       cache[(it-1)*length(x)+ip] = Xip[:,it]
     end
   end
+end
+
+function Arrays.evaluate!(cache::FEM.ParamTTArray,k::RecastMap,x::ParamVector,r::RBSpace)
+  c = get_values(cache)
+  evaluate!(c,k,x,r)
+  copyto!(cache,c)
 end
 
 # multi field interface
