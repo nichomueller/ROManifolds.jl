@@ -17,7 +17,7 @@ using Kronecker
 using Mabla.FEM
 using Mabla.RB
 
-θ = 0.5
+θ = 1.0
 dt = 0.01
 t0 = 0.0
 tf = 0.05
@@ -95,3 +95,50 @@ rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 println(RB.space_time_error(results))
+
+# OLD CODE
+_model = CartesianDiscreteModel(domain,partition)
+
+_labels = get_face_labeling(_model)
+add_tag_from_tags!(_labels,"dirichlet",[1,2,3,4,5,6,8])
+add_tag_from_tags!(_labels,"neumann",[7])
+
+_Ω = Triangulation(_model)
+_dΩ = Measure(_Ω,degree)
+_Γn = BoundaryTriangulation(_model,tags=["neumann"])
+_dΓn = Measure(_Γn,degree)
+
+_trian_res = (_Ω,_Γn)
+_trian_stiffness = (_Ω,)
+_trian_mass = (_Ω,)
+
+induced_norm(du,v) = ∫(v*du)_dΩ + ∫(∇(v)⋅∇(du))_dΩ
+
+_test = TestFESpace(_model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+_trial = TransientTrialParamFESpace(_test,gμt)
+_feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
+  _trial,_test,_trian_res,_trian_stiffness,_trian_mass)
+_uh0μ(μ) = interpolate_everywhere(u0μ(μ),_trial(μ,t0))
+
+_fesnaps = RB.TransientOldTTSnapshots(fesnaps.values,fesnaps.realization)
+# _rbop = reduced_operator(rbsolver,_feop,_fesnaps)
+# _red_trial,_red_test = reduced_fe_space(rbsolver,_feop,_fesnaps)
+_soff = select_snapshots(_fesnaps,RB.offline_params(rbsolver))
+_red_trial,_red_test = reduced_fe_space(rbsolver,_feop,_soff)
+
+_pop = PODOperator(get_algebraic_operator(_feop),_red_trial,_red_test)
+smdeim = select_snapshots(_fesnaps,RB.mdeim_params(rbsolver))
+_jac,_res = jacobian_and_residual(rbsolver,_pop,smdeim)
+i0 = FEM.vectorize_index_map(FEM.get_free_dof_permutation(test))
+b1 = ParamArray(map(a->TTArray(a,i0),_res.values[1].values))
+b2 = ParamArray(map(a->TTArray(a,i0),_res.values[2].values))
+vr1 = RB.OldSnapshots(b1,_res.values[1].realization)
+vr2 = RB.OldSnapshots(b2,_res.values[2].realization)
+_res = Contribution((vr1,vr2),_res.trians)
+A1 = ParamArray(map(a->TTArray(a,i0),_jac[1].values[1].values))
+A2 = ParamArray(map(a->TTArray(a,i0),_jac[2].values[1].values))
+vj1 = RB.OldSnapshots(A1,_jac[1].values[1].realization)
+vj2 = RB.OldSnapshots(A2,_jac[2].values[1].realization)
+_jac = (Contribution((vj1,),_jac[1].trians),Contribution((vj2,),_jac[2].trians))
+red_jac = RB.reduced_jacobian(rbsolver,_pop,_jac)
+red_res = RB.reduced_residual(rbsolver,_pop,_res)
