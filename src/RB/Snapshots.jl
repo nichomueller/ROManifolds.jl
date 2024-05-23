@@ -26,10 +26,10 @@ struct Mode1Axis end
 struct Mode2Axis end
 
 get_mode(s::StandardSnapshots) = s.mode
-FEM.num_rows(s::StandardSnapshots{Mode1Axis}) = num_space_dofs(s)
-FEM.num_rows(s::StandardSnapshots{Mode2Axis}) = num_times(s)
-FEM.num_cols(s::StandardSnapshots{Mode1Axis}) = num_times(s)*num_params(s)
-FEM.num_cols(s::StandardSnapshots{Mode2Axis}) = num_space_dofs(s)*num_params(s)
+num_rows(s::StandardSnapshots{Mode1Axis}) = num_space_dofs(s)
+num_rows(s::StandardSnapshots{Mode2Axis}) = num_times(s)
+num_cols(s::StandardSnapshots{Mode1Axis}) = num_times(s)*num_params(s)
+num_cols(s::StandardSnapshots{Mode2Axis}) = num_space_dofs(s)*num_params(s)
 
 Base.length(s::StandardSnapshots) = num_rows(s)*num_cols(s)
 Base.size(s::StandardSnapshots) = (num_rows(s),num_cols(s))

@@ -313,3 +313,43 @@ const NnzTTSnapshots = Union{
   BasicNnzTTSnapshots{T,N},
   TransientNnzTTSnapshots{T,N},
   SelectedNnzTTSnapshotsAtIndices{T,N}} where {T,N}
+
+function recast(s::NnzTTSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T
+  index_map = get_index_map(s)
+  ls = FEM.get_local_sparse_maps(index_map)
+  asparse = map(SparseCore,a,ls)
+  return asparse
+end
+
+abstract type SparseCore{T} <: AbstractArray{T,4} end
+
+Base.IndexStyle(::Type{<:SparseCore}) = IndexCartesian()
+
+struct SparseCoreCSC{T,Ti} <: SparseCore{T}
+  array::Array{T,3}
+  sparsity::SparsityPatternCSC{T,Ti}
+  sparse_indexes::Vector{CartesianIndex{2}}
+end
+
+function SparseCore(array::AbstractArray{T},sparsity::SparsityPatternCSC{T}) where T
+  irows,icols,_ = findnz(sparsity)
+  SparseCoreCSC(array,sparsity,CartesianIndex.(irows,icols))
+end
+
+Base.size(a::SparseCoreCSC) = (size(a.array,1),num_rows(a.sparsity),
+  num_cols(a.sparsity),size(a.array,3))
+
+function Base.getindex(a::SparseCoreCSC,i::CartesianIndex{4})
+  is_nnz = CartesianIndex(i.I[2:3]) ∈ a.sparse_indexes
+  sparse_getindex(a,i,Val(is_nnz))
+end
+
+function sparse_getindex(::Val{false},a::SparseCoreCSC{T},i::CartesianIndex{4}) where T
+  zero(T)
+end
+
+function sparse_getindex(::Val{true},a::SparseCoreCSC{T},i::CartesianIndex{4}) where T
+  i2 = findfirst(a.sparse_indexes .== [CartesianIndex(i.I[2:3])])
+  i1,i3 = i.I[1],i.I[3]
+  getindex(a.array,CartesianIndex((i1,i2,i3)))
+end

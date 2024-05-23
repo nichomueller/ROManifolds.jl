@@ -111,11 +111,11 @@ r = TransientParamRealization(ParamRealization(params),t0:dt:tf)
 
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ;r)
 
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+# rbop = reduced_operator(rbsolver,feop,fesnaps)
+# rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+# results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-println(RB.space_time_error(results))
+# println(RB.space_time_error(results))
 
 soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
 red_trial,red_test = reduced_fe_space(rbsolver,feop,soff)
@@ -168,7 +168,7 @@ ismap = FEM.get_sparse_index_map(trial(nothing),test)
 Xismap = X[ismap]
 
 _IJ = get_nonzero_indices(X.array)
-IJ = get_nonzero_indices(FEM.tp_sparsity(U,V))
+IJ = get_nonzero_indices(FEM.get_sparsity(U,V))
 norm(IJ)
 
 M = assemble_matrix((u,v)->∫(u*v)dΩ.measure,trial(nothing).space,test.space)
@@ -182,5 +182,7 @@ Mxy = kron(My,Mx)
 @check Mxy ≈ M
 
 using SparseArrays
-k = 27
-ik,vk = findnz(M[:,k])
+sparsity = FEM.get_sparsity(trial(nothing),test)
+I,J,_ = findnz(sparsity)
+IJ = get_nonzero_indices(sparsity)
+i,j,_ = FEM.univariate_findnz(sparsity)

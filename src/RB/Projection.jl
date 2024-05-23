@@ -83,11 +83,12 @@ struct TTSVDCores{D,A,B} <: Projection
   cores_space::A
   core_time::B
   function TTSVDCores(
-    cores_space::Vector{Array{T,3}} where T,
-    core_time::Array{S,3} where S
-    )
+    cores_space::Vector{<:AbstractArray{T,D}} where T,
+    core_time::AbstractArray{S,3} where S
+    ) where D
 
-    D = length(cores_space)
+    A = typeof(cores_space)
+    B = typeof(core_time)
     new{D,A,B}(cores_space,core_time)
   end
 end

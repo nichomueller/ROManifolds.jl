@@ -193,6 +193,12 @@ include("TransientParamFESolution.jl")
 export get_parent
 include("TriangulationParents.jl")
 
+export SparsityPattern
+export SparsityPatternCSC
+export TProductSparsityPattern
+export get_sparsity
+include("SparsityPatterns.jl")
+
 export AbstractIndexMap
 export IndexMap
 export IndexMapView
@@ -214,13 +220,11 @@ include("TProductGeometry.jl")
 
 export TProductFESpace
 export TProductFEBasis
-export SparsityPattern
-export SparsityPatternCSC
 export get_dof_permutation
+export get_sparse_index_map
 export get_tp_dof_permutation
 export get_tp_fe_basis
 export get_tp_trial_fe_basis
-export sparse_index_map
 include("TProductFESpaces.jl")
 
 export TProductCellPoint

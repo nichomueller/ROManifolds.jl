@@ -36,6 +36,8 @@ end
 
 abstract type AbstractIndexMap{D} <: AbstractArray{Int,D} end
 
+Base.IndexStyle(::Type{<:AbstractIndexMap}) = IndexLinear()
+
 struct IndexMap{D} <: AbstractIndexMap{D}
   indices::Array{Int,D}
 end
@@ -69,8 +71,22 @@ struct IndexMapView{D,L} <: AbstractIndexMap{D}
 end
 
 Base.size(i::IndexMapView) = _shape_per_dir(i.locations)
-Base.IndexStyle(::Type{<:IndexMapView}) = IndexLinear()
 Base.getindex(i::IndexMapView,j::Int) = i.indices[i.locations[j]]
+
+struct SparseIndexMap{D,A,B} <: AbstractIndexMap{D}
+  global_2_local::A
+  local_sparse::B
+  function SparseIndexMap(
+    global_2_local::A,
+    local_sparse::B
+    ) where {D,A<:AbstractIndexMap{D},B<:AbstractVector{<:SparsityPattern}}
+    new{D,A,B}(global_2_local,local_sparse)
+  end
+end
+
+Base.size(i::SparseIndexMap) = size(i.global_2_local)
+Base.getindex(i::SparseIndexMap,j...) = getindex(i.global_2_local,j...)
+get_local_sparse_maps(i::SparseIndexMap) = i.local_sparse
 
 # some index utils
 

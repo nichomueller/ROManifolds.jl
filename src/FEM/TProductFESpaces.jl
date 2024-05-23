@@ -373,89 +373,46 @@ function assemble_norm_matrix(f,U::TrialFESpace{<:TProductFESpace},V::TProductFE
   assemble_norm_matrix(f,U.space,V)
 end
 
-function get_sparse_index_map(U::FESpace,V::FESpace)
-  function _global2local(i::Vector{<:CartesianIndex},j::CartesianIndex)
-    findfirst(i.==[j])
-  end
-  sparsity = tp_sparsity(U,V)
-  I,J,_ = findnz(sparsity)
-  IJ = get_nonzero_indices(sparsity)
-  i,j,_ = univariate_findnz(sparsity)
-  lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
-  unrows = univariate_num_rows(sparsity)
-  uncols = univariate_num_cols(sparsity)
-  unnz = univariate_nnz(sparsity)
-  si_map = zeros(Int,unnz...)
-  @inbounds for (k,gid) = enumerate(IJ)
-    irows = Tuple(tensorize_indices(I[k],unrows))
-    icols = Tuple(tensorize_indices(J[k],uncols))
-    iaxes = CartesianIndex.(irows,icols)
-    global2local = map(_global2local,lids,iaxes)
-    si_map[global2local...] = gid
-  end
-  IndexMap(si_map)
-end
-
-abstract type SparsityPattern end
-
-struct SparsityPatternCSC{A,B} <: SparsityPattern
-  matrix::A
-  matrices_1d::B
-end
-
-num_rows(a::SparsityPatternCSC) = size(a.matrix,1)
-num_cols(a::SparsityPatternCSC) = size(a.matrix,2)
-SparseArrays.findnz(a::SparsityPatternCSC) = findnz(a.matrix)
-SparseArrays.nnz(a::SparsityPatternCSC) = nnz(a.matrix)
-get_nonzero_indices(a::SparsityPatternCSC) = get_nonzero_indices(a.matrix)
-univariate_num_rows(a::SparsityPatternCSC) = size.(a.matrices_1d,1)
-univariate_num_cols(a::SparsityPatternCSC) = size.(a.matrices_1d,2)
-univariate_findnz(a::SparsityPatternCSC) = tuple_of_arrays(findnz.(a.matrices_1d))
-univariate_nnz(a::SparsityPatternCSC) = nnz.(a.matrices_1d)
-univariate_nonzero_indices(a::SparsityPatternCSC) = get_nonzero_indices.(a.matrices_1d)
-
-function SparsityPattern(matrix::T,matrices_1d::AbstractVector{<:T}) where T<:SparseMatrixCSC
-  SparsityPatternCSC(matrix,matrices_1d)
-end
-
 for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
   @eval begin
-    function tp_sparsity(U::$F{<:TProductFESpace},V::TProductFESpace)
-      tp_sparsity(U.space,V)
+    function get_sparsity(U::$F{<:TProductFESpace},V::TProductFESpace)
+      get_sparsity(U.space,V)
     end
   end
 end
 
-function tp_sparsity(U::TProductFESpace,V::TProductFESpace)
+function get_sparsity(U::TProductFESpace,V::TProductFESpace)
   a = SparseMatrixAssembler(U,V)
-  matrix = tp_sparsity(a.assem,U.space,V.space)
-  matrices_1d = map(tp_sparsity,a.assems_1d,U.spaces_1d,V.spaces_1d)
-  return SparsityPattern(matrix,matrices_1d)
+  sparsity = get_sparsity(a.assem,U.space,V.space)
+  sparsities_1d = map(get_sparsity,a.assems_1d,U.spaces_1d,V.spaces_1d)
+  return TProductSparsityPattern(sparsity,sparsities_1d)
 end
 
-function tp_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
-  m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
-  cellidsrows = get_cell_dof_ids(V)
-  cellidscols = get_cell_dof_ids(U)
-  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
-  m2 = nz_allocation(m1)
-  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
-  m3 = create_from_nz(m2)
-  m3
+function get_sparse_index_map(U::FESpace,V::FESpace)
+  sparsity = get_sparsity(U,V)
+  I,J,_ = findnz(sparsity)
+  i,j,_ = univariate_findnz(sparsity)
+  g2l = _global_2_local_nnz(sparsity,I,J,i,j)
+  us = get_univariate_sparsity(sparsity)
+  SparseIndexMap(g2l,us)
 end
 
-function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
-  mat1 = nothing
-  rows_cache = array_cache(cellidsrows)
-  cols_cache = array_cache(cellidscols)
+function _global_2_local_nnz(sparsity,I,J,i,j)
+  IJ = get_nonzero_indices(sparsity)
+  lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
 
-  rows1 = getindex!(rows_cache,cellidsrows,1)
-  cols1 = getindex!(cols_cache,cellidscols,1)
+  unrows = univariate_num_rows(sparsity)
+  uncols = univariate_num_cols(sparsity)
+  unnz = univariate_nnz(sparsity)
+  g2l = zeros(Int,unnz...)
 
-  touch! = FESpaces.TouchEntriesMap()
-  touch_cache = return_cache(touch!,A,mat1,rows1,cols1)
-  caches = touch_cache,rows_cache,cols_cache
+  @inbounds for (k,gid) = enumerate(IJ)
+    irows = Tuple(tensorize_indices(I[k],unrows))
+    icols = Tuple(tensorize_indices(J[k],uncols))
+    iaxes = CartesianIndex.(irows,icols)
+    global2local = map((i,j) -> findfirst(i.==[j]),lids,iaxes)
+    g2l[global2local...] = gid
+  end
 
-  FESpaces._symbolic_loop_matrix!(A,caches,cellidsrows,cellidscols,mat1)
-  return A
+  return IndexMap(g2l)
 end
