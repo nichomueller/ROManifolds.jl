@@ -20,14 +20,14 @@ using Mabla.RB
 θ = 1.0
 dt = 0.01
 t0 = 0.0
-tf = 0.05
+tf = 0.1
 
 pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
 domain = (0,1,0,1)
-partition = (5,5)
+partition = (10,10)
 model = TProductModel(domain,partition)
 
 labels = get_face_labeling(model)
@@ -81,64 +81,129 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=5,nsnaps_test=5,nsnaps_mdeim=2)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=20,nsnaps_test=1,nsnaps_mdeim=10)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1")))
 
-fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
+params = [
+  [0.1,0.9,0.5],
+  [0.2,0.4,0.8],
+  [0.3,0.7,0.4],
+  [0.9,0.2,0.4],
+  [0.5,0.5,0.6],
+  [0.8,0.4,0.2],
+  [0.3,0.4,0.3],
+  [0.1,0.2,0.9],
+  [0.9,0.2,0.1],
+  [0.4,0.6,0.5],
+  [0.2,0.5,0.5],
+  [0.1,0.2,1.0],
+  [0.2,0.7,0.1],
+  [0.2,0.2,0.2],
+  [0.9,0.5,0.1],
+  [0.8,0.7,0.2],
+  [0.1,0.1,0.7],
+  [0.1,0.7,0.9],
+  [0.4,0.4,0.1],
+  [0.4,0.3,0.5],
+  [0.2,0.3,0.6]
+]
+r = TransientParamRealization(ParamRealization(params),t0:dt:tf)
 
-# red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-# odeop = get_algebraic_operator(feop)
-# pop = PODOperator(odeop,red_trial,red_test)
-# red_lhs,red_rhs = reduced_jacobian_residual(rbsolver,pop,fesnaps)
+fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ;r)
+
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 println(RB.space_time_error(results))
 
-# OLD CODE
-_model = CartesianDiscreteModel(domain,partition)
+soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
+red_trial,red_test = reduced_fe_space(rbsolver,feop,soff)
+odeop = get_algebraic_operator(feop)
+pop = PODOperator(odeop,red_trial,red_test)
+smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
+jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
 
-_labels = get_face_labeling(_model)
-add_tag_from_tags!(_labels,"dirichlet",[1,2,3,4,5,6,8])
-add_tag_from_tags!(_labels,"neumann",[7])
+mdeim_style = rbsolver.mdeim_style
+basis = reduced_basis(jjac[1][1];ϵ=RB.get_tol(rbsolver))
+lu_interp,integration_domain = mdeim(mdeim_style,basis)
+proj_basis = reduce_operator(mdeim_style,basis,red_trial,red_test;combine=(x,y)->x)
+coefficient = RB.allocate_coefficient(rbsolver,basis)
+result = RB.allocate_result(rbsolver,red_trial,red_test)
 
-_Ω = Triangulation(_model)
-_dΩ = Measure(_Ω,degree)
-_Γn = BoundaryTriangulation(_model,tags=["neumann"])
-_dΓn = Measure(_Γn,degree)
+basis_spacetime = get_basis_spacetime(basis)
+indices_spacetime = RB.get_mdeim_indices(basis_spacetime)
 
-_trian_res = (_Ω,_Γn)
-_trian_stiffness = (_Ω,)
-_trian_mass = (_Ω,)
+aad = rbop.lhs[1][1]
+bas = aad.basis
+coeff = aad.coefficient
 
-induced_norm(du,v) = ∫(v*du)_dΩ + ∫(∇(v)⋅∇(du))_dΩ
+jcores = RB.get_cores(basis)
+Vcores = RB.get_cores(RB.get_basis(red_test))
+Ucores = RB.get_cores(RB.get_basis(red_trial))
+ccores = map((a,b...)->RB.compress_core(a,b...;combine=(x,y)->x),jcores,Ucores,Vcores)
+ccore = RB.multiply_cores(ccores...)
 
-_test = TestFESpace(_model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-_trial = TransientTrialParamFESpace(_test,gμt)
-_feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
-  _trial,_test,_trian_res,_trian_stiffness,_trian_mass)
-_uh0μ(μ) = interpolate_everywhere(u0μ(μ),_trial(μ,t0))
+cspace = dropdims(RB.multiply_cores(ccores[1],ccores[2]);dims=(1,2,3))
 
-_fesnaps = RB.TransientOldTTSnapshots(fesnaps.values,fesnaps.realization)
-# _rbop = reduced_operator(rbsolver,_feop,_fesnaps)
-# _red_trial,_red_test = reduced_fe_space(rbsolver,_feop,_fesnaps)
-_soff = select_snapshots(_fesnaps,RB.offline_params(rbsolver))
-_red_trial,_red_test = reduced_fe_space(rbsolver,_feop,_soff)
+ccore1 = RB.compress_core(jcores[1],Ucores[1],Vcores[1];combine=(x,y)->x)
+ccore2 = RB.compress_core(jcores[2],Ucores[2],Vcores[2];combine=(x,y)->x)
+cspace = dropdims(RB.multiply_cores(ccore1,ccore2);dims=(1,2,3))
 
-_pop = PODOperator(get_algebraic_operator(_feop),_red_trial,_red_test)
-smdeim = select_snapshots(_fesnaps,RB.mdeim_params(rbsolver))
-_jac,_res = jacobian_and_residual(rbsolver,_pop,smdeim)
-i0 = FEM.vectorize_index_map(FEM.get_free_dof_permutation(test))
-b1 = ParamArray(map(a->TTArray(a,i0),_res.values[1].values))
-b2 = ParamArray(map(a->TTArray(a,i0),_res.values[2].values))
-vr1 = RB.OldSnapshots(b1,_res.values[1].realization)
-vr2 = RB.OldSnapshots(b2,_res.values[2].realization)
-_res = Contribution((vr1,vr2),_res.trians)
-A1 = ParamArray(map(a->TTArray(a,i0),_jac[1].values[1].values))
-A2 = ParamArray(map(a->TTArray(a,i0),_jac[2].values[1].values))
-vj1 = RB.OldSnapshots(A1,_jac[1].values[1].realization)
-vj2 = RB.OldSnapshots(A2,_jac[2].values[1].realization)
-_jac = (Contribution((vj1,),_jac[1].trians),Contribution((vj2,),_jac[2].trians))
-red_jac = RB.reduced_jacobian(rbsolver,_pop,_jac)
-red_res = RB.reduced_residual(rbsolver,_pop,_res)
+X = assemble_norm_matrix(feop)
+M1 = X.arrays_1d[1]
+M2 = X.arrays_1d[2]
+A1 = X.gradients_1d[1]
+A2 = X.gradients_1d[2]
+
+A = X.array
+
+nzi1 = RB.get_nonzero_indices(A1)
+nzi2 = RB.get_nonzero_indices(A2)
+nzi = nzi1 .+ (nzi2.-1)'.*length(nzi1)
+nzi12 = RB.get_nonzero_indices(X.array)
+
+space_dofs = reshape(collect((10,9,10,9)),:,2)
+tensor_indices = RB.tensorize_indices(nzi12,vec(prod(space_dofs;dims=1)))
+
+_,_,nzvmx = findnz(M1)
+_,_,nzvmy = findnz(M2)
+_,_,nzvax = findnz(A1)
+_,_,nzvay = findnz(A2)
+nzv = nzvmx*nzvmy' + nzvmx*nzvay' + nzvax*nzvmy'
+
+I,J,V = findnz(X.array)
+
+Nx,Ny = 10,9
+ix = fast_index(I,Nx)
+iy = slow_index(I,Nx)
+ix,iy = RB.tens
+
+sp = FEM.univariate_sparsities(trial(nothing),test)
+
+using SparseArrays
+U,V = trial(nothing),test
+sparsity = FEM.tp_sparsity(U,V)
+I,J,_ = findnz(sparsity)
+Ix,Jx,_ = findnz(sparsity.matrices_1d[1])
+Iy,Jy,_ = findnz(sparsity.matrices_1d[2])
+IJ = get_nonzero_indices(sparsity)
+
+unrows = FEM.univariate_num_rows(sparsity)
+uncols = FEM.univariate_num_cols(sparsity)
+i = 50
+irows = Tuple(tensorize_indices(I[i],unrows))
+icols = Tuple(tensorize_indices(J[i],uncols))
+
+rowx,colx = irows[1],icols[1]
+px = findfirst(Tuple.(CartesianIndex.(Ix,Jx)).== [(rowx,colx)])
+rowy,coly = irows[2],icols[2]
+
+# FEM.sparse_index_map(U,V)
+function _global2local(i::Vector{<:CartesianIndex},j::CartesianIndex)
+  findfirst(i.==[j])
+end
+i,j,_ = FEM.univariate_findnz(sparsity)
+lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
+
+findall(IJ .== 820)

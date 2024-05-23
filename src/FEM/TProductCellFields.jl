@@ -177,6 +177,7 @@ end
 # assembly
 
 struct TProductSparseMatrixAssembler <: SparseMatrixAssembler
+  assem::GenericSparseMatrixAssembler
   assems_1d::Vector{GenericSparseMatrixAssembler}
 end
 
@@ -187,8 +188,9 @@ function FESpaces.SparseMatrixAssembler(
   test::TProductFESpace{D},
   strategy::AssemblyStrategy=DefaultAssemblyStrategy()) where D
 
+  assem = SparseMatrixAssembler(mat,vec,trial.space,test.space,strategy)
   assems_1d = map((U,V)->SparseMatrixAssembler(mat,vec,U,V,strategy),trial.spaces_1d,test.spaces_1d)
-  TProductSparseMatrixAssembler(assems_1d)
+  TProductSparseMatrixAssembler(assem,assems_1d)
 end
 
 function FESpaces.collect_cell_matrix(

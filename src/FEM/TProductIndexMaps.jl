@@ -1,3 +1,79 @@
+function _minimum_dir_d(i::AbstractVector{CartesianIndex{D}},d::Integer) where D
+  mind = Inf
+  for ii in i
+    if ii.I[d] < mind
+      mind = ii.I[d]
+    end
+  end
+  return mind
+end
+
+function _maximum_dir_d(i::AbstractVector{CartesianIndex{D}},d::Integer) where D
+  maxd = 0
+  for ii in i
+    if ii.I[d] > maxd
+      maxd = ii.I[d]
+    end
+  end
+  return maxd
+end
+
+function _shape_per_dir(i::AbstractVector{CartesianIndex{D}}) where D
+  function _admissible_shape(d::Int)
+    mind = _minimum_dir_d(i,d)
+    maxd = _maximum_dir_d(i,d)
+    @assert all([ii.I[d] ≥ mind for ii in i]) && all([ii.I[d] ≤ maxd for ii in i])
+    return maxd - mind + 1
+  end
+  ntuple(d -> _admissible_shape(d),D)
+end
+
+function _shape_per_dir(i::AbstractVector{<:Integer})
+  min1 = minimum(i)
+  max1 = maximum(i)
+  (max1 - min1 + 1,)
+end
+
+abstract type AbstractIndexMap{D} <: AbstractArray{Int,D} end
+
+struct IndexMap{D} <: AbstractIndexMap{D}
+  indices::Array{Int,D}
+end
+
+Base.size(i::IndexMap) = size(i.indices)
+Base.getindex(i::IndexMap,j...) = getindex(i.indices,j...)
+
+function free_dofs_map(i::IndexMap)
+  free_dofs_locations = findall(i.indices.>0)
+  IndexMapView(i.indices,free_dofs_locations)
+end
+
+function dirichlet_dofs_map(i::IndexMap)
+  dir_dofs_locations = findall(i.indices.<0)
+  i.indices[dir_dofs_locations]
+end
+
+function inv_index_map(i::AbstractIndexMap)
+  invi = reshape(invperm(vec(i)),size(i))
+  IndexMap(invi)
+end
+
+function vectorize_index_map(i::AbstractIndexMap)
+  vi = vec(collect(LinearIndices(size(i))))
+  IndexMap(vi)
+end
+
+struct IndexMapView{D,L} <: AbstractIndexMap{D}
+  indices::Array{Int,D}
+  locations::L
+end
+
+Base.size(i::IndexMapView) = _shape_per_dir(i.locations)
+Base.IndexStyle(::Type{<:IndexMapView}) = IndexLinear()
+Base.getindex(i::IndexMapView,j::Int) = i.indices[i.locations[j]]
+
+# some index utils
+
 function recast_indices(A::AbstractArray,indices::AbstractVector)
   nonzero_indices = get_nonzero_indices(A)
   entire_indices = nonzero_indices[indices]
@@ -63,17 +139,4 @@ function split_row_col_indices(indices::AbstractVector{CartesianIndex{D}},dofs::
     rcindices[ii] = split_row_col_indices(i,dofs)
   end
   return rcindices
-end
-
-function FEM.shift!(a::AbstractParamContainer,r::TransientParamRealization,α::Number,β::Number)
-  b = copy(a)
-  nt = num_times(r)
-  np = num_params(r)
-  @assert length(a) == nt*np
-  for i = eachindex(a)
-    it = slow_index(i,np)
-    if it > 1
-      a[i] .= α*a[i] + β*b[i-np]
-    end
-  end
 end

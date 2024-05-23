@@ -198,13 +198,13 @@ function recast(x::AbstractVector,b::TTSVDCores)
   reshape(xrec,Ns,Nt)
 end
 
-function recast_indices(b::TTSVDCores,indices::AbstractVector)
+function FEM.recast_indices(b::TTSVDCores,indices::AbstractVector)
   space_dofs = _num_tot_space_dofs(b)
   tensor_indices = tensorize_indices(indices,space_dofs)
   return tensor_indices
 end
 
-function recast_indices(b::MatrixTTSVDCores,indices::AbstractVector)
+function FEM.recast_indices(b::MatrixTTSVDCores,indices::AbstractVector)
   space_dofs = _num_tot_space_dofs(b)
   tensor_indices = tensorize_indices(indices,vec(prod(space_dofs;dims=1)))
   return split_row_col_indices(tensor_indices,space_dofs)

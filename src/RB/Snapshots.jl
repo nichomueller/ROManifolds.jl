@@ -26,10 +26,10 @@ struct Mode1Axis end
 struct Mode2Axis end
 
 get_mode(s::StandardSnapshots) = s.mode
-num_rows(s::StandardSnapshots{Mode1Axis}) = num_space_dofs(s)
-num_rows(s::StandardSnapshots{Mode2Axis}) = num_times(s)
-num_cols(s::StandardSnapshots{Mode1Axis}) = num_times(s)*num_params(s)
-num_cols(s::StandardSnapshots{Mode2Axis}) = num_space_dofs(s)*num_params(s)
+FEM.num_rows(s::StandardSnapshots{Mode1Axis}) = num_space_dofs(s)
+FEM.num_rows(s::StandardSnapshots{Mode2Axis}) = num_times(s)
+FEM.num_cols(s::StandardSnapshots{Mode1Axis}) = num_times(s)*num_params(s)
+FEM.num_cols(s::StandardSnapshots{Mode2Axis}) = num_space_dofs(s)*num_params(s)
 
 Base.length(s::StandardSnapshots) = num_rows(s)*num_cols(s)
 Base.size(s::StandardSnapshots) = (num_rows(s),num_cols(s))
@@ -702,9 +702,9 @@ function tensor_getindex(
   nonzeros(snaps.values[ip][it])[is]
 end
 
-sparsify_indices(s::BasicNnzSnapshots,srange::AbstractVector) = sparsify_indices(first(s.values),srange)
-sparsify_indices(s::TransientNnzSnapshots,srange::AbstractVector) = sparsify_indices(first(first(s.values)),srange)
-sparsify_indices(s::NnzSnapshotsSwappedColumns,srange::AbstractVector) = sparsify_indices(s.snaps,srange)
+FEM.sparsify_indices(s::BasicNnzSnapshots,srange::AbstractVector) = sparsify_indices(first(s.values),srange)
+FEM.sparsify_indices(s::TransientNnzSnapshots,srange::AbstractVector) = sparsify_indices(first(first(s.values)),srange)
+FEM.sparsify_indices(s::NnzSnapshotsSwappedColumns,srange::AbstractVector) = sparsify_indices(s.snaps,srange)
 
 function select_snapshots(s::NnzSnapshots,spacerange,timerange,paramrange)
   _srange = isa(spacerange,Colon) ? Base.OneTo(num_space_dofs(s)) : spacerange
@@ -746,7 +746,7 @@ function Base.getindex(s::VecOfSparseMat2Mat,i,j)
   view(s,i,j)
 end
 
-function get_nonzero_indices(s::VecOfSparseMat2Mat)
+function FEM.get_nonzero_indices(s::VecOfSparseMat2Mat)
   get_nonzero_indices(first(s.values))
 end
 

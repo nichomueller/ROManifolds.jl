@@ -193,22 +193,34 @@ include("TransientParamFESolution.jl")
 export get_parent
 include("TriangulationParents.jl")
 
+export AbstractIndexMap
+export IndexMap
+export IndexMapView
+export SparseIndexMap
+export inv_index_map
+export free_dofs_map
+export vectorize_index_map
+export recast_indices
+export sparsify_indices
+export get_nonzero_indices
+export tensorize_indices
+export split_row_col_indices
+include("TProductIndexMaps.jl")
+
 export TProductModel
 export TProductTriangulation
 export TProductMeasure
 include("TProductGeometry.jl")
 
-export AbstractIndexMap
-export IndexMap
-export IndexMapView
 export TProductFESpace
 export TProductFEBasis
-export inv_index_map
-export free_dofs_map
+export SparsityPattern
+export SparsityPatternCSC
 export get_dof_permutation
 export get_tp_dof_permutation
 export get_tp_fe_basis
 export get_tp_trial_fe_basis
+export sparse_index_map
 include("TProductFESpaces.jl")
 
 export TProductCellPoint

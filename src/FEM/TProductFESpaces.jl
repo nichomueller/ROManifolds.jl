@@ -1,77 +1,3 @@
-function _minimum_dir_d(i::AbstractVector{CartesianIndex{D}},d::Integer) where D
-  mind = Inf
-  for ii in i
-    if ii.I[d] < mind
-      mind = ii.I[d]
-    end
-  end
-  return mind
-end
-
-function _maximum_dir_d(i::AbstractVector{CartesianIndex{D}},d::Integer) where D
-  maxd = 0
-  for ii in i
-    if ii.I[d] > maxd
-      maxd = ii.I[d]
-    end
-  end
-  return maxd
-end
-
-function _shape_per_dir(i::AbstractVector{CartesianIndex{D}}) where D
-  function _admissible_shape(d::Int)
-    mind = _minimum_dir_d(i,d)
-    maxd = _maximum_dir_d(i,d)
-    @assert all([ii.I[d] ≥ mind for ii in i]) && all([ii.I[d] ≤ maxd for ii in i])
-    return maxd - mind + 1
-  end
-  ntuple(d -> _admissible_shape(d),D)
-end
-
-function _shape_per_dir(i::AbstractVector{<:Integer})
-  min1 = minimum(i)
-  max1 = maximum(i)
-  (max1 - min1 + 1,)
-end
-
-abstract type AbstractIndexMap{D} <: AbstractArray{Int,D} end
-
-struct IndexMap{D} <: AbstractIndexMap{D}
-  indices::Array{Int,D}
-end
-
-Base.size(i::IndexMap) = size(i.indices)
-Base.getindex(i::IndexMap,j...) = getindex(i.indices,j...)
-
-function free_dofs_map(i::IndexMap)
-  free_dofs_locations = findall(i.indices.>0)
-  IndexMapView(i.indices,free_dofs_locations)
-end
-
-function dirichlet_dofs_map(i::IndexMap)
-  dir_dofs_locations = findall(i.indices.<0)
-  i.indices[dir_dofs_locations]
-end
-
-function inv_index_map(i::AbstractIndexMap)
-  invi = reshape(invperm(vec(i)),size(i))
-  IndexMap(invi)
-end
-
-function vectorize_index_map(i::AbstractIndexMap)
-  vi = vec(collect(LinearIndices(size(i))))
-  IndexMap(vi)
-end
-
-struct IndexMapView{D,L} <: AbstractIndexMap{D}
-  indices::Array{Int,D}
-  locations::L
-end
-
-Base.size(i::IndexMapView) = _shape_per_dir(i.locations)
-Base.IndexStyle(::Type{<:IndexMapView}) = IndexLinear()
-Base.getindex(i::IndexMapView,j::Int) = i.indices[i.locations[j]]
-
 function comp_to_free_dofs(::Type{T},space::FESpace,args...;kwargs...) where T
   @abstractmethod
 end
@@ -163,7 +89,7 @@ function _get_dof_permutation(
   return n2o_dof_map
 end
 
-function get_dof_permutation(
+function _get_dof_permutation(
   ::Type{T},
   model::CartesianDiscreteModel,
   space::UnconstrainedFESpace,
@@ -175,7 +101,7 @@ function get_dof_permutation(
   return IndexMap(dof_perm)
 end
 
-function get_dof_permutation(
+function _get_dof_permutation(
   ::Type{T},
   model::CartesianDiscreteModel,
   space::UnconstrainedFESpace,
@@ -193,6 +119,11 @@ function get_dof_permutation(
   end
   dof_perm = _dof_perm_from_dof_perms(dof_perms)
   return IndexMap(dof_perm)
+end
+
+function get_dof_permutation(args...;kwargs...)
+  index_map = _get_dof_permutation(args...;kwargs...)
+  free_dofs_map(index_map)
 end
 
 # this function computes only the free dofs tensor product permutation
@@ -265,6 +196,12 @@ function get_tp_dof_permutation(
   @notimplemented
 end
 
+function univariate_spaces(model::TProductModel,cell_reffes;dirichlet_tags=Int[],kwargs...)
+  add_1d_tags!(model,dirichlet_tags)
+  map((model,cell_reffe) -> FESpace(model,cell_reffe;dirichlet_tags,kwargs...),
+    model.models_1d,cell_reffes)
+end
+
 function _get_tt_vector(f,perm::AbstractIndexMap{D}) where D
   V = get_vector_type(f)
   T = eltype(V)
@@ -276,12 +213,22 @@ function _get_tt_vector_type(f,perm)
   typeof(_get_tt_vector(f,perm))
 end
 
-struct TProductFESpace{D,A<:SingleFieldFESpace,B<:AbstractVector{<:SingleFieldFESpace},V} <: SingleFieldFESpace
+struct TProductFESpace{D,A,B,I1,I2,V} <: SingleFieldFESpace
   space::A
   spaces_1d::B
-  dof_permutation::IndexMap{D}
-  tp_dof_permutation::IndexMap{D}
+  dof_permutation::I1
+  tp_dof_permutation::I2
   vector_type::Type{V}
+  function TProductFESpace(
+    space::A,
+    spaces_1d::B,
+    dof_permutation::I1,
+    tp_dof_permutation::I2,
+    vector_type::Type{V}
+    ) where {D,A,B,I1<:AbstractIndexMap{D},I2<:AbstractIndexMap{D},V}
+
+    new{D,A,B,I1,I2,V}(space,spaces_1d,dof_permutation,tp_dof_permutation,vector_type)
+  end
 end
 
 function TProductFESpace(
@@ -310,15 +257,7 @@ function FESpaces.FESpace(
   TProductFESpace(space,spaces_1d,dof_permutation,tp_dof_permutation)
 end
 
-function univariate_spaces(model::TProductModel,cell_reffes;dirichlet_tags=Int[],kwargs...)
-  add_1d_tags!(model,dirichlet_tags)
-  map((model,cell_reffe) -> FESpace(model,cell_reffe;dirichlet_tags,kwargs...),
-    model.models_1d,cell_reffes)
-end
-
 get_dof_permutation(f::TProductFESpace) = f.dof_permutation
-
-get_free_dof_permutation(f::TProductFESpace) = free_dofs_map(f.dof_permutation)
 
 FESpaces.get_triangulation(f::TProductFESpace) = get_triangulation(f.space)
 
@@ -432,4 +371,91 @@ end
 
 function assemble_norm_matrix(f,U::TrialFESpace{<:TProductFESpace},V::TProductFESpace)
   assemble_norm_matrix(f,U.space,V)
+end
+
+function sparse_index_map(U::FESpace,V::FESpace)
+  function _global2local(i::Vector{<:CartesianIndex},j::CartesianIndex)
+    findfirst(i.==[j])
+  end
+  sparsity = tp_sparsity(U,V)
+  I,J,_ = findnz(sparsity)
+  IJ = get_nonzero_indices(sparsity)
+  i,j,_ = univariate_findnz(sparsity)
+  lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
+  unrows = univariate_num_rows(sparsity)
+  uncols = univariate_num_cols(sparsity)
+  unnz = univariate_nnz(sparsity)
+  si_map = zeros(Int,unnz...)
+  @inbounds for (k,gid) = enumerate(IJ)
+    irows = Tuple(tensorize_indices(I[k],unrows))
+    icols = Tuple(tensorize_indices(J[k],uncols))
+    iaxes = CartesianIndex.(irows,icols)
+    global2local = map(_global2local,lids,iaxes)
+    si_map[global2local...] = gid
+  end
+  IndexMap(si_map)
+end
+
+abstract type SparsityPattern end
+
+struct SparsityPatternCSC{A,B} <: SparsityPattern
+  matrix::A
+  matrices_1d::B
+end
+
+num_rows(a::SparsityPatternCSC) = size(a.matrix,1)
+num_cols(a::SparsityPatternCSC) = size(a.matrix,2)
+SparseArrays.findnz(a::SparsityPatternCSC) = findnz(a.matrix)
+SparseArrays.nnz(a::SparsityPatternCSC) = nnz(a.matrix)
+get_nonzero_indices(a::SparsityPatternCSC) = get_nonzero_indices(a.matrix)
+univariate_num_rows(a::SparsityPatternCSC) = size.(a.matrices_1d,1)
+univariate_num_cols(a::SparsityPatternCSC) = size.(a.matrices_1d,2)
+univariate_findnz(a::SparsityPatternCSC) = tuple_of_arrays(findnz.(a.matrices_1d))
+univariate_nnz(a::SparsityPatternCSC) = nnz.(a.matrices_1d)
+univariate_nonzero_indices(a::SparsityPatternCSC) = get_nonzero_indices.(a.matrices_1d)
+
+function SparsityPattern(matrix::T,matrices_1d::AbstractVector{<:T}) where T<:SparseMatrixCSC
+  SparsityPatternCSC(matrix,matrices_1d)
+end
+
+for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
+  @eval begin
+    function tp_sparsity(U::$F{<:TProductFESpace},V::TProductFESpace)
+      tp_sparsity(U.space,V)
+    end
+  end
+end
+
+function tp_sparsity(U::TProductFESpace,V::TProductFESpace)
+  a = SparseMatrixAssembler(U,V)
+  matrix = tp_sparsity(a.assem,U.space,V.space)
+  matrices_1d = map(tp_sparsity,a.assems_1d,U.spaces_1d,V.spaces_1d)
+  return SparsityPattern(matrix,matrices_1d)
+end
+
+function tp_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
+  m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
+  cellidsrows = get_cell_dof_ids(V)
+  cellidscols = get_cell_dof_ids(U)
+  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
+  m2 = nz_allocation(m1)
+  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
+  m3 = create_from_nz(m2)
+  m3
+end
+
+function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
+  mat1 = nothing
+  rows_cache = array_cache(cellidsrows)
+  cols_cache = array_cache(cellidscols)
+
+  rows1 = getindex!(rows_cache,cellidsrows,1)
+  cols1 = getindex!(cols_cache,cellidscols,1)
+
+  touch! = FESpaces.TouchEntriesMap()
+  touch_cache = return_cache(touch!,A,mat1,rows1,cols1)
+  caches = touch_cache,rows_cache,cols_cache
+
+  FESpaces._symbolic_loop_matrix!(A,caches,cellidsrows,cellidscols,mat1)
+  return A
 end

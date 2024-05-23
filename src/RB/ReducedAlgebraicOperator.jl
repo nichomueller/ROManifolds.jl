@@ -159,12 +159,12 @@ end
 
 function compress_core(a::Array{T,3},btrial::Array{S,3},btest::Array{S,3};combine=(x,y)->x) where {T,S}
   TS = promote_type(T,S)
-  bab = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,4),size(btrial,3))
-  bab_shift = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,4),size(btrial,3))
+  bab = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,3),size(btrial,3))
+  bab_shift = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,3),size(btrial,3))
   @inbounds for i = CartesianIndices(size(bab))
-    ibV1,ia1,ibU1,ibV3,ia4,ibU3 = Tuple(i)
-    bab[i] = sum(btest[ibV1,:,ibV3].*a[ia1,:,ia4].*btrial[ibU1,:,ibU3])
-    bab_shift[i] = sum(btest[ibV1,2:end,ibV3].*a[ia1,2:end,ia4].*btrial[ibU1,1:end-1,ibU3])
+    ibV1,ia1,ibU1,ibV3,ia3,ibU3 = Tuple(i)
+    bab[i] = sum(btest[ibV1,:,ibV3].*a[ia1,:,ia3].*btrial[ibU1,:,ibU3])
+    bab_shift[i] = sum(btest[ibV1,2:end,ibV3].*a[ia1,2:end,ia3].*btrial[ibU1,1:end-1,ibU3])
   end
   return combine(bab,bab_shift)
 end

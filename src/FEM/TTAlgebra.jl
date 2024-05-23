@@ -78,7 +78,7 @@ function TTSparseMatrixAssembler(
     get_free_dof_ids(test),
     get_free_dof_ids(trial),
     strategy)
-  index_map = get_free_dof_permutation(test)
+  index_map = get_dof_permutation(test)
   TTSparseMatrixAssembler(assem,index_map)
 end
 
