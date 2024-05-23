@@ -73,28 +73,24 @@ function Projection(s::TTSnapshots,args...;kwargs...)
   TTSVDCores(cores_space,core_time)
 end
 
-function Projection(s::MatrixTTSnapshots{N},args...;kwargs...) where N
-  s̃ = permute_snapshots(s)
-  cores_space,core_time = ttsvd_mat(s̃,args...;kwargs...)
-  TTSVDCores(cores_space,core_time)
+function Projection(s::NnzTTSnapshots,args...;kwargs...)
+  cores_space...,core_time = ttsvd(s,args...;kwargs...)
+  basis = TTSVDCores(cores_space,core_time)
+  recast_basis(s,basis)
 end
 
 struct TTSVDCores{D,A,B} <: Projection
   cores_space::A
   core_time::B
   function TTSVDCores(
-    cores_space::Vector{Array{T,D}} where T,
+    cores_space::Vector{Array{T,3}} where T,
     core_time::Array{S,3} where S
-    ) where D
+    )
 
-    A = typeof(cores_space)
-    B = typeof(core_time)
+    D = length(cores_space)
     new{D,A,B}(cores_space,core_time)
   end
 end
-
-const VectorTTSVDCores{A,B} = TTSVDCores{3,A,B}
-const MatrixTTSVDCores{A,B} = TTSVDCores{4,A,B}
 
 get_cores(b::TTSVDCores) = (get_spatial_cores(b)...,get_temporal_cores(b))
 get_spatial_cores(b::TTSVDCores) = b.cores_space
@@ -110,16 +106,6 @@ num_reduced_dofs(b::TTSVDCores) = num_reduced_times(b)
 num_space_dofs(b::TTSVDCores) = prod(_num_tot_space_dofs(b))
 
 _num_tot_space_dofs(b::TTSVDCores) = size.(get_spatial_cores(b),2)
-
-function _num_tot_space_dofs(b::MatrixTTSVDCores)
-  scores = get_spatial_cores(b)
-  ncores = length(scores)
-  tot_ndofs = zeros(Int,2,ncores)
-  @inbounds for i = 1:ncores
-    tot_ndofs[:,i] .= size(scores[i],2),size(scores[i],3)
-  end
-  return tot_ndofs
-end
 
 function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
   @check size(a,3) == size(b,1)
@@ -189,6 +175,12 @@ function cores2basis(core::AbstractArray{T,4}) where T
   return reshape(pcore,size(pcore,1)*size(pcore,2),:)
 end
 
+function recast_basis(s::NnzTTSnapshots,b::TTSVDCores)
+  cores_space = recast(s,get_spatial_cores(b))
+  core_time = get_temporal_cores(b)
+  TTSVDCores(cores_space,core_time)
+end
+
 function recast(x::AbstractVector,b::TTSVDCores)
   basis_spacetime = get_basis_spacetime(b)
   Ns = num_space_dofs(b)
@@ -202,12 +194,6 @@ function FEM.recast_indices(b::TTSVDCores,indices::AbstractVector)
   space_dofs = _num_tot_space_dofs(b)
   tensor_indices = tensorize_indices(indices,space_dofs)
   return tensor_indices
-end
-
-function FEM.recast_indices(b::MatrixTTSVDCores,indices::AbstractVector)
-  space_dofs = _num_tot_space_dofs(b)
-  tensor_indices = tensorize_indices(indices,vec(prod(space_dofs;dims=1)))
-  return split_row_col_indices(tensor_indices,space_dofs)
 end
 
 # multi field interface

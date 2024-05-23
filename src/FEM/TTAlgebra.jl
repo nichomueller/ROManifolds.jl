@@ -14,10 +14,14 @@ function Algebra.nz_counter(b::TTBuilder,axes)
   TTCounter(counter,b.index_map)
 end
 
-struct TTSparseMatrixAssembler{A,B} <: SparseMatrixAssembler
+struct TTSparseMatrixAssembler{A,B,C} <: SparseMatrixAssembler
   assem::A
-  index_map::B
+  matrix_index_map::B
+  vector_index_map::C
 end
+
+get_matrix_index_map(a::TTSparseMatrixAssembler) = a.matrix_index_map
+get_vector_index_map(a::TTSparseMatrixAssembler) = a.vector_index_map
 
 FESpaces.num_rows(a::TTSparseMatrixAssembler) = num_rows(a.assem)
 FESpaces.num_cols(a::TTSparseMatrixAssembler) = num_cols(a.assem)
@@ -36,13 +40,13 @@ end
 
 function FESpaces.get_matrix_builder(a::TTSparseMatrixAssembler)
   builder = get_matrix_builder(a.assem)
-  index_map = a.index_map
+  index_map = get_matrix_index_map(a)
   return TTBuilder(builder,index_map)
 end
 
 function FESpaces.get_vector_builder(a::TTSparseMatrixAssembler)
   builder = get_vector_builder(a.assem)
-  index_map = a.index_map
+  index_map = get_vector_index_map(a)
   return TTBuilder(builder,index_map)
 end
 
@@ -51,7 +55,7 @@ function get_param_matrix_builder(
   r::AbstractParamRealization)
 
   builder = get_param_matrix_builder(a.assem,r)
-  index_map = a.index_map
+  index_map = get_matrix_index_map(a)
   return TTBuilder(builder,index_map)
 end
 
@@ -60,7 +64,7 @@ function get_param_vector_builder(
   r::AbstractParamRealization)
 
   builder = get_param_vector_builder(a.assem,r)
-  index_map = a.index_map
+  index_map = get_vector_index_map(a)
   return TTBuilder(builder,index_map)
 end
 
@@ -78,19 +82,24 @@ function TTSparseMatrixAssembler(
     get_free_dof_ids(test),
     get_free_dof_ids(trial),
     strategy)
-  index_map = get_dof_permutation(test)
-  TTSparseMatrixAssembler(assem,index_map)
+  matrix_index_map = get_sparse_index_map(trial,test)
+  vector_index_map = get_dof_permutation(test)
+  TTSparseMatrixAssembler(assem,matrix_index_map,vector_index_map)
 end
 
-function FESpaces.SparseMatrixAssembler(
-  mat,
-  vec,
-  trial::T,
-  test::TProductFESpace,
-  strategy::AssemblyStrategy=DefaultAssemblyStrategy()
-  ) where T<:FESpace # add some condition on T
+for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
+  @eval begin
+    function FESpaces.SparseMatrixAssembler(
+      mat,
+      vec,
+      trial::$F{<:TProductFESpace},
+      test::TProductFESpace,
+      strategy::AssemblyStrategy=DefaultAssemblyStrategy()
+      )
 
-  TTSparseMatrixAssembler(mat,vec,trial,test,strategy)
+      TTSparseMatrixAssembler(mat,vec,trial,test,strategy)
+    end
+  end
 end
 
 @inline function Algebra.add_entry!(combine::Function,A::TTArray,v::Number,i)
@@ -128,12 +137,12 @@ end
 end
 
 function Algebra.nz_allocation(a::TTCounter{<:Algebra.ArrayCounter})
-  TTArray(nz_allocation(a.counter),a.index_map)
+  TTArray(nz_allocation(a.counter),get_vector_index_map(a))
 end
 
 function Algebra.nz_allocation(a::TTCounter)
   inserter = nz_allocation(a.counter)
-  TTInserter(inserter,a.index_map)
+  TTInserter(inserter,get_matrix_index_map(a))
 end
 
 struct TTInserter{A,B}

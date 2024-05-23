@@ -124,6 +124,8 @@ pop = PODOperator(odeop,red_trial,red_test)
 smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
 jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
 
+
+
 mdeim_style = rbsolver.mdeim_style
 basis = reduced_basis(jjac[1][1];ϵ=RB.get_tol(rbsolver))
 lu_interp,integration_domain = mdeim(mdeim_style,basis)
@@ -156,54 +158,29 @@ M2 = X.arrays_1d[2]
 A1 = X.gradients_1d[1]
 A2 = X.gradients_1d[2]
 
-A = X.array
-
-nzi1 = RB.get_nonzero_indices(A1)
-nzi2 = RB.get_nonzero_indices(A2)
-nzi = nzi1 .+ (nzi2.-1)'.*length(nzi1)
-nzi12 = RB.get_nonzero_indices(X.array)
-
-space_dofs = reshape(collect((10,9,10,9)),:,2)
-tensor_indices = RB.tensorize_indices(nzi12,vec(prod(space_dofs;dims=1)))
-
 _,_,nzvmx = findnz(M1)
 _,_,nzvmy = findnz(M2)
 _,_,nzvax = findnz(A1)
 _,_,nzvay = findnz(A2)
 nzv = nzvmx*nzvmy' + nzvmx*nzvay' + nzvax*nzvmy'
 
-I,J,V = findnz(X.array)
+ismap = FEM.get_sparse_index_map(trial(nothing),test)
+Xismap = X[ismap]
 
-Nx,Ny = 10,9
-ix = fast_index(I,Nx)
-iy = slow_index(I,Nx)
-ix,iy = RB.tens
+_IJ = get_nonzero_indices(X.array)
+IJ = get_nonzero_indices(FEM.tp_sparsity(U,V))
+norm(IJ)
 
-sp = FEM.univariate_sparsities(trial(nothing),test)
+M = assemble_matrix((u,v)->∫(u*v)dΩ.measure,trial(nothing).space,test.space)
+__IJ = get_nonzero_indices(M)
+Mismap = M[ismap]
+
+Mx = assemble_matrix((u,v)->∫(u*v)dΩ.measures_1d[1],test.spaces_1d[1],test.spaces_1d[1])
+My = assemble_matrix((u,v)->∫(u*v)dΩ.measures_1d[2],test.spaces_1d[2],test.spaces_1d[2])
+Mxy = kron(My,Mx)
+
+@check Mxy ≈ M
 
 using SparseArrays
-U,V = trial(nothing),test
-sparsity = FEM.tp_sparsity(U,V)
-I,J,_ = findnz(sparsity)
-Ix,Jx,_ = findnz(sparsity.matrices_1d[1])
-Iy,Jy,_ = findnz(sparsity.matrices_1d[2])
-IJ = get_nonzero_indices(sparsity)
-
-unrows = FEM.univariate_num_rows(sparsity)
-uncols = FEM.univariate_num_cols(sparsity)
-i = 50
-irows = Tuple(tensorize_indices(I[i],unrows))
-icols = Tuple(tensorize_indices(J[i],uncols))
-
-rowx,colx = irows[1],icols[1]
-px = findfirst(Tuple.(CartesianIndex.(Ix,Jx)).== [(rowx,colx)])
-rowy,coly = irows[2],icols[2]
-
-# FEM.sparse_index_map(U,V)
-function _global2local(i::Vector{<:CartesianIndex},j::CartesianIndex)
-  findfirst(i.==[j])
-end
-i,j,_ = FEM.univariate_findnz(sparsity)
-lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
-
-findall(IJ .== 820)
+k = 27
+ik,vk = findnz(M[:,k])

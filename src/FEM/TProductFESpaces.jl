@@ -264,7 +264,7 @@ FESpaces.get_triangulation(f::TProductFESpace) = get_triangulation(f.space)
 FESpaces.get_free_dof_ids(f::TProductFESpace) = get_free_dof_ids(f.space)
 
 function FESpaces.zero_free_values(f::TProductFESpace)
-  vec = _get_tt_vector(f.space,get_free_dof_permutation(f))
+  vec = _get_tt_vector(f.space,get_dof_permutation(f))
   fill!(vec,zero(eltype(vec)))
 end
 
@@ -373,7 +373,7 @@ function assemble_norm_matrix(f,U::TrialFESpace{<:TProductFESpace},V::TProductFE
   assemble_norm_matrix(f,U.space,V)
 end
 
-function sparse_index_map(U::FESpace,V::FESpace)
+function get_sparse_index_map(U::FESpace,V::FESpace)
   function _global2local(i::Vector{<:CartesianIndex},j::CartesianIndex)
     findfirst(i.==[j])
   end

@@ -77,24 +77,6 @@ function ttsvd_and_weights!(cache,mat::AbstractArray,X::FEM.AbstractTProductArra
   return M
 end
 
-# this is used when dealing with matrices: we compute 4-D cores instead of 3-D
-
-function mat_ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:Int(N/2-1),kwargs...) where {T,N}
-  cores,ranks,sizes = cache
-  sizes_space = eachcol(reshape(collect(sizes),2,:))[1:end-1]
-  for k in ids_range
-    nrows_k,ncols_k = sizes_space[k]
-    mat_k = reshape(mat,ranks[k]*nrows_k*ncols_k,:)
-    U,Σ,V = svd(mat_k)
-    rank = RB.truncation(Σ;kwargs...)
-    core_k = U[:,1:rank]
-    ranks[k+1] = rank
-    mat = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[2*k+1]...,:)
-    cores[k] = reshape(core_k,ranks[k],nrows_k,ncols_k,rank)
-  end
-  return mat
-end
-
 function _get_norm_matrices(X::TProductArray,::Val{d}) where d
   return [X.arrays_1d[d]]
 end
@@ -200,23 +182,6 @@ function ttsvd(mat::AbstractArray{T,N},X::FEM.AbstractTProductArray;kwargs...) w
   # routine on the temporal index
   _ = ttsvd!((cores,ranks,sizes),M;ids_range=N_space+1,kwargs...)
   return cores
-end
-
-# this is used when dealing with matrices: we compute 4-D cores instead of 3-D
-
-function ttsvd_mat(mat::AbstractArray{T,N},args...;kwargs...) where {T,N}
-  Ñ = Int(N/2)
-  space_cores = Vector{Array{T,4}}(undef,Ñ-1)
-  time_core = Vector{Array{T,3}}(undef,1)
-  ranks = fill(1,Ñ+1)
-  sizes = size(mat)
-  # routine on the spatial indexes
-  M = mat_ttsvd!((space_cores,ranks,sizes),copy(mat);ids_range=1:Ñ-1,kwargs...)
-  # routine on the temporal index
-  newsizes = (size(mat,N-1),size(mat,N))
-  newranks = ranks[Ñ:end]
-  _ = RB.ttsvd!((time_core,newranks,newsizes),M;ids_range=1,kwargs...)
-  return space_cores,time_core[1]
 end
 
 function orth_projection(
