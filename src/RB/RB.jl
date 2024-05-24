@@ -131,4 +131,7 @@ export rb_results
 export load_solve
 export generate_plots
 include("PostProcess.jl")
+
+export VecOfSparseMat2Arr3
+include("Temp.jl")
 end # module

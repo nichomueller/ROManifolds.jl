@@ -113,9 +113,9 @@ fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ;r)
 
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-# results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-# println(RB.space_time_error(results))
+println(RB.space_time_error(results))
 
 soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
 red_trial,red_test = reduced_fe_space(rbsolver,feop,soff)
@@ -124,13 +124,24 @@ pop = PODOperator(odeop,red_trial,red_test)
 smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
 jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
 
+A = jjac[1][1]
+index_map = get_index_map(A)
+inv_index_map = sortperm(index_map[:])
+
 mdeim_style = rbsolver.mdeim_style
-basis = reduced_basis(jjac[1][1];ϵ=RB.get_tol(rbsolver))
-lu_interp,integration_domain = mdeim(mdeim_style,basis)
+basis = reduced_basis(A;ϵ=RB.get_tol(rbsolver))
+# lu_interp,integration_domain = mdeim(mdeim_style,basis)
+basis_spacetime = get_basis_spacetime(basis)
+indices_spacetime = get_mdeim_indices(basis_spacetime)
+indices_space = fast_index(indices_spacetime,RB.num_space_dofs(basis))
+indices_time = slow_index(indices_spacetime,RB.num_space_dofs(basis))
+lu_interp = lu(view(basis_spacetime,indices_spacetime,:))
+#
 proj_basis = reduce_operator(mdeim_style,basis,red_trial,red_test;combine=(x,y)->x)
 coefficient = RB.allocate_coefficient(rbsolver,basis)
 result = RB.allocate_result(rbsolver,red_trial,red_test)
 
+basis_space = get_basis_space(basis)
 basis_spacetime = get_basis_spacetime(basis)
 indices_spacetime = RB.get_mdeim_indices(basis_spacetime)
 indices_space = fast_index(indices_spacetime,RB.num_space_dofs(basis))
@@ -152,29 +163,83 @@ ccore1 = RB.compress_core(jcores[1],Ucores[1],Vcores[1];combine=(x,y)->x)
 ccore2 = RB.compress_core(jcores[2],Ucores[2],Vcores[2];combine=(x,y)->x)
 cspace = dropdims(RB.multiply_cores(ccore1,ccore2);dims=(1,2,3))
 
-################################################################################
-op = rbop
-solver = rbsolver
-son = select_snapshots(fesnaps,RB.online_params(solver))
-r = get_realization(son)
-red_trial = get_trial(op)(r)
-fe_trial = get_fe_trial(op)(r)
-x̂ = zero_free_values(red_trial)
-y = zero_free_values(fe_trial)
-odecache = allocate_odecache(fesolver,op,r,(y,))
-w0 = y
-odeslvrcache,odeopcache = odecache
-reuse,A,b,sysslvrcache = odeslvrcache
-x = copy(w0)
-fill!(x,zero(eltype(x)))
-dtθ = θ*dt
-shift!(r,dt*(θ-1))
-us = (x,x)
-ws = (1,1/dtθ)
-update_odeopcache!(odeopcache,op,r)
-bb = residual!(b,op,r,us,odeopcache)
-# AA = jacobian!(A,op,r,us,ws,odeopcache)
-red_r,red_times,red_us,red_odeopcache = RB._select_fe_quantities_at_time_locations(op.lhs,r,us,odeopcache)
-A = jacobian!(A,op.op,red_r,red_us,ws,red_odeopcache)
+sparsity = FEM.get_sparsity(trial(nothing),test)
+bs = RB.temp_recast(get_basis_space(b),sparsity)
+bs_trial = get_basis_space(b_trial)
+bs_test = get_basis_space(b_test)
+b̂s = [bs_test'*get_values(bs)[1]*bs_trial,bs_test'*get_values(bs)[2]*bs_trial]
 
-ad = op.lhs[1][1]
+#
+using LinearAlgebra
+A = jjac[1][1]
+mat = copy(A)
+T,N = Float64,3
+cores = Vector{Array{T,3}}(undef,N-1)
+ranks = fill(1,N)
+sizes = size(mat)
+for k = 1:2
+  mat_k = reshape(mat,ranks[k]*sizes[k],:)
+  U,Σ,V = svd(mat_k)
+  rank = RB.truncation(Σ)
+  core_k = U[:,1:rank]
+  ranks[k+1] = rank
+  mat = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
+  cores[k] = reshape(core_k,ranks[k],sizes[k],rank)
+end
+α,β = cores
+boh = stack([sum([kron(β[i,:,k],α[1,:,i]) for i = axes(α,3)]) for k = axes(β,3)])
+
+oldA = RB.OldTTNnzSnapshots(A.values,A.realization)
+MA = reshape(oldA,size(oldA,1),:)
+er = MA - boh*boh'*MA
+
+
+
+function myf(a::Vector)
+  b = copy(a)
+  N = length(a)
+  for i = 2:N
+    b[i] = a[i] - a[i-1]
+  end
+  return b
+end
+
+bb = myf(boh[:,1])
+
+# check sparse index map
+using SparseArrays
+
+domain = (0,1,0,1)
+partition = (4,4)
+model = TProductModel(domain,partition)
+
+labels = get_face_labeling(model)
+add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
+add_tag_from_tags!(labels,"neumann",[7])
+
+test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+trial = TransientTrialParamFESpace(test,gμt)
+V,U = test,trial(nothing)
+
+Ω = Triangulation(model)
+dΩ = Measure(Ω,degree)
+f1(x) = 5*sin(x[1])
+f2(x) = 3*cos(x[2])
+imap = get_sparse_index_map(U,V)
+M1 = assemble_matrix((u,v)->∫(f1*u*v)dΩ.measure,trial(nothing).space,test.space)
+M2 = assemble_matrix((u,v)->∫(f2*u*v)dΩ.measure,trial(nothing).space,test.space)
+i1,j1,v1 = findnz(M1)
+i2,j2,v2 = findnz(M2)
+M = hcat(v1,v2)
+TTM1 = TTArray(M1,imap)
+TTM2 = TTArray(M2,imap)
+re = FEM.GenericTransientParamRealization(ParamRealization([[5.],[3.]]),[0.],0.)
+snaps = BasicSnapshots(ParamArray([TTM1,TTM2]),re)
+ϕ = Projection(snaps)
+ϕs = get_basis_space(ϕ)
+ϕs1 = sparse(reshape(ϕs[:,1],12,12))
+ϕs2 = sparse(reshape(ϕs[:,2],12,12))
+ĩ1,j̃1,ṽ1 = findnz(ϕs1)
+ĩ2,j̃2,ṽ2 = findnz(ϕs2)
+M̃ = hcat(ṽ1,ṽ2)
+E = M - M̃*M̃'*M

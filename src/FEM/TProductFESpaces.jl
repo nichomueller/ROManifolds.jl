@@ -412,9 +412,7 @@ function get_sparse_index_map(U::TProductFESpace,V::TProductFESpace)
   Jperm = ipJ[J]
 
   g2l = _global_2_local_nnz(sparsity,Iperm,Jperm,i,j)
-  us = get_univariate_sparsity(sparsity)
-
-  return SparseIndexMap(g2l,us)
+  return SparseIndexMap(g2l,sparsity)
 end
 
 function _global_2_local_nnz(sparsity,I,J,i,j)

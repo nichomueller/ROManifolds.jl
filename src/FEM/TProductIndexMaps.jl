@@ -75,18 +75,25 @@ Base.getindex(i::IndexMapView,j::Int) = i.indices[i.locations[j]]
 
 struct SparseIndexMap{D,A,B} <: AbstractIndexMap{D}
   global_2_local::A
-  local_sparse::B
+  sparsity::B
   function SparseIndexMap(
     global_2_local::A,
-    local_sparse::B
-    ) where {D,A<:AbstractIndexMap{D},B<:AbstractVector{<:SparsityPattern}}
-    new{D,A,B}(global_2_local,local_sparse)
+    sparsity::B
+    ) where {D,A<:AbstractIndexMap{D},B<:TProductSparsityPattern}
+    new{D,A,B}(global_2_local,sparsity)
   end
 end
 
 Base.size(i::SparseIndexMap) = size(i.global_2_local)
 Base.getindex(i::SparseIndexMap,j...) = getindex(i.global_2_local,j...)
-get_local_sparse_maps(i::SparseIndexMap) = i.local_sparse
+get_global_2_local_map(i::SparseIndexMap) = i.global_2_local
+get_sparsity(i::SparseIndexMap) = get_sparsity(i.sparsity)
+get_univariate_sparsity(i::SparseIndexMap) = get_univariate_sparsity(i.sparsity)
+
+function inv_index_map(i::SparseIndexMap)
+  invi = sortperm(i[:])
+  SparseIndexMap(invi,i.sparsity)
+end
 
 # some index utils
 
