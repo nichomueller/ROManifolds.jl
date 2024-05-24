@@ -23,8 +23,8 @@ end
 get_matrix_index_map(a::TTSparseMatrixAssembler) = a.matrix_index_map
 get_vector_index_map(a::TTSparseMatrixAssembler) = a.vector_index_map
 
-num_rows(a::TTSparseMatrixAssembler) = num_rows(a.assem)
-num_cols(a::TTSparseMatrixAssembler) = num_cols(a.assem)
+FESpaces.get_rows(a::TTSparseMatrixAssembler) = FESpaces.get_rows(a.assem)
+FESpaces.get_cols(a::TTSparseMatrixAssembler) = FESpaces.get_cols(a.assem)
 
 function FESpaces.get_assembly_strategy(a::TTSparseMatrixAssembler)
   return FESpaces.get_assembly_strategy(a.assem)

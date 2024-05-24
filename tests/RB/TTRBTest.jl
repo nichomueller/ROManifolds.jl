@@ -111,8 +111,8 @@ r = TransientParamRealization(ParamRealization(params),t0:dt:tf)
 
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ;r)
 
-# rbop = reduced_operator(rbsolver,feop,fesnaps)
-# rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 # results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 # println(RB.space_time_error(results))
@@ -124,8 +124,6 @@ pop = PODOperator(odeop,red_trial,red_test)
 smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
 jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
 
-
-
 mdeim_style = rbsolver.mdeim_style
 basis = reduced_basis(jjac[1][1];ϵ=RB.get_tol(rbsolver))
 lu_interp,integration_domain = mdeim(mdeim_style,basis)
@@ -135,6 +133,8 @@ result = RB.allocate_result(rbsolver,red_trial,red_test)
 
 basis_spacetime = get_basis_spacetime(basis)
 indices_spacetime = RB.get_mdeim_indices(basis_spacetime)
+indices_space = fast_index(indices_spacetime,RB.num_space_dofs(basis))
+indices_time = slow_index(indices_spacetime,RB.num_space_dofs(basis))
 
 aad = rbop.lhs[1][1]
 bas = aad.basis
@@ -152,37 +152,29 @@ ccore1 = RB.compress_core(jcores[1],Ucores[1],Vcores[1];combine=(x,y)->x)
 ccore2 = RB.compress_core(jcores[2],Ucores[2],Vcores[2];combine=(x,y)->x)
 cspace = dropdims(RB.multiply_cores(ccore1,ccore2);dims=(1,2,3))
 
-X = assemble_norm_matrix(feop)
-M1 = X.arrays_1d[1]
-M2 = X.arrays_1d[2]
-A1 = X.gradients_1d[1]
-A2 = X.gradients_1d[2]
+################################################################################
+op = rbop
+solver = rbsolver
+son = select_snapshots(fesnaps,RB.online_params(solver))
+r = get_realization(son)
+red_trial = get_trial(op)(r)
+fe_trial = get_fe_trial(op)(r)
+x̂ = zero_free_values(red_trial)
+y = zero_free_values(fe_trial)
+odecache = allocate_odecache(fesolver,op,r,(y,))
+w0 = y
+odeslvrcache,odeopcache = odecache
+reuse,A,b,sysslvrcache = odeslvrcache
+x = copy(w0)
+fill!(x,zero(eltype(x)))
+dtθ = θ*dt
+shift!(r,dt*(θ-1))
+us = (x,x)
+ws = (1,1/dtθ)
+update_odeopcache!(odeopcache,op,r)
+bb = residual!(b,op,r,us,odeopcache)
+# AA = jacobian!(A,op,r,us,ws,odeopcache)
+red_r,red_times,red_us,red_odeopcache = RB._select_fe_quantities_at_time_locations(op.lhs,r,us,odeopcache)
+A = jacobian!(A,op.op,red_r,red_us,ws,red_odeopcache)
 
-_,_,nzvmx = findnz(M1)
-_,_,nzvmy = findnz(M2)
-_,_,nzvax = findnz(A1)
-_,_,nzvay = findnz(A2)
-nzv = nzvmx*nzvmy' + nzvmx*nzvay' + nzvax*nzvmy'
-
-ismap = FEM.get_sparse_index_map(trial(nothing),test)
-Xismap = X[ismap]
-
-_IJ = get_nonzero_indices(X.array)
-IJ = get_nonzero_indices(FEM.get_sparsity(U,V))
-norm(IJ)
-
-M = assemble_matrix((u,v)->∫(u*v)dΩ.measure,trial(nothing).space,test.space)
-__IJ = get_nonzero_indices(M)
-Mismap = M[ismap]
-
-Mx = assemble_matrix((u,v)->∫(u*v)dΩ.measures_1d[1],test.spaces_1d[1],test.spaces_1d[1])
-My = assemble_matrix((u,v)->∫(u*v)dΩ.measures_1d[2],test.spaces_1d[2],test.spaces_1d[2])
-Mxy = kron(My,Mx)
-
-@check Mxy ≈ M
-
-using SparseArrays
-sparsity = FEM.get_sparsity(trial(nothing),test)
-I,J,_ = findnz(sparsity)
-IJ = get_nonzero_indices(sparsity)
-i,j,_ = FEM.univariate_findnz(sparsity)
+ad = op.lhs[1][1]

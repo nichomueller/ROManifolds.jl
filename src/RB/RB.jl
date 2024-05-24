@@ -18,7 +18,6 @@ using Gridap.MultiField
 using Gridap.ODEs
 
 import Base: +,-,*,\
-import StaticArrays: SVector
 import UnPack: @unpack
 import Gridap.Helpers: @abstractmethod,@check,@notimplemented,@unreachable
 import Gridap.Arrays: evaluate!

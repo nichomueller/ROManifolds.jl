@@ -137,7 +137,7 @@ function reduce_operator(
   return ReducedMatrixOperator(mdeim_style,b̂st)
 end
 
-function compress_core(a::Array{T,3},btest::Array{S,3};kwargs...) where {T,S}
+function compress_core(a::AbstractArray{T,3},btest::AbstractArray{S,3};kwargs...) where {T,S}
   TS = promote_type(T,S)
   ab = zeros(TS,size(btest,1),size(a,1),size(btest,3),size(a,3))
   @inbounds for i = CartesianIndices(size(ab))
@@ -147,7 +147,9 @@ function compress_core(a::Array{T,3},btest::Array{S,3};kwargs...) where {T,S}
   return ab
 end
 
-function compress_core(a::Array{T,4},btrial::Array{S,3},btest::Array{S,3};kwargs...) where {T,S}
+function compress_core(a::AbstractArray{T,4},btrial::AbstractArray{S,3},btest::AbstractArray{S,3};
+  kwargs...) where {T,S}
+
   TS = promote_type(T,S)
   bab = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,4),size(btrial,3))
   @inbounds for i = CartesianIndices(size(bab))
@@ -157,7 +159,9 @@ function compress_core(a::Array{T,4},btrial::Array{S,3},btest::Array{S,3};kwargs
   return bab
 end
 
-function compress_core(a::Array{T,3},btrial::Array{S,3},btest::Array{S,3};combine=(x,y)->x) where {T,S}
+function compress_core(a::AbstractArray{T,3},btrial::AbstractArray{S,3},btest::AbstractArray{S,3};
+  combine=(x,y)->x) where {T,S}
+
   TS = promote_type(T,S)
   bab = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,3),size(btrial,3))
   bab_shift = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,3),size(btrial,3))
@@ -169,7 +173,7 @@ function compress_core(a::Array{T,3},btrial::Array{S,3},btest::Array{S,3};combin
   return combine(bab,bab_shift)
 end
 
-function multiply_cores(a::Array{T,4},b::Array{S,4}) where {T,S}
+function multiply_cores(a::AbstractArray{T,4},b::AbstractArray{S,4}) where {T,S}
   @check (size(a,3)==size(b,1) && size(a,4)==size(b,2))
   TS = promote_type(T,S)
   ab = zeros(TS,size(a,1),size(a,2),size(b,3),size(b,4))
@@ -180,7 +184,7 @@ function multiply_cores(a::Array{T,4},b::Array{S,4}) where {T,S}
   return ab
 end
 
-function multiply_cores(a::Array{T,6},b::Array{S,6}) where {T,S}
+function multiply_cores(a::AbstractArray{T,6},b::AbstractArray{S,6}) where {T,S}
   @check (size(a,4)==size(b,1) && size(a,5)==size(b,2) && size(a,6)==size(b,3))
   TS = promote_type(T,S)
   ab = zeros(TS,size(a,1),size(a,2),size(a,3),size(b,4),size(b,5),size(b,6))
@@ -191,17 +195,17 @@ function multiply_cores(a::Array{T,6},b::Array{S,6}) where {T,S}
   return ab
 end
 
-function multiply_cores(c1::Array,cores::Array...)
+function multiply_cores(c1::AbstractArray,cores::AbstractArray...)
   _c1,_cores... = cores
   multiply_cores(multiply_cores(c1,_c1),_cores...)
 end
 
-function _dropdims(a::Array{T,4}) where T
+function _dropdims(a::AbstractArray{T,4}) where T
   @check size(a,1) == size(a,2) == 1
   dropdims(a;dims=(1,2))
 end
 
-function _dropdims(a::Array{T,6}) where T
+function _dropdims(a::AbstractArray{T,6}) where T
   @check size(a,1) == size(a,2) == size(a,3) == 1
   dropdims(a;dims=(1,2,3))
 end

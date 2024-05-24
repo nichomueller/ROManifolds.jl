@@ -106,7 +106,16 @@ num_fe_dofs(b::TTSVDCores) = num_space_dofs(b)*num_times(b)
 num_reduced_dofs(b::TTSVDCores) = num_reduced_times(b)
 num_space_dofs(b::TTSVDCores) = prod(_num_tot_space_dofs(b))
 
-_num_tot_space_dofs(b::TTSVDCores) = size.(get_spatial_cores(b),2)
+_num_tot_space_dofs(b::TTSVDCores{3}) = size.(get_spatial_cores(b),2)
+
+function _num_tot_space_dofs(b::TTSVDCores{4})
+  scores = get_spatial_cores(b)
+  tot_ndofs = zeros(Int,2,length(scores))
+  @inbounds for i = eachindex(scores)
+    tot_ndofs[:,i] .= size(scores[i],2),size(scores[i],3)
+  end
+  return tot_ndofs
+end
 
 function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
   @check size(a,3) == size(b,1)

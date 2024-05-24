@@ -247,7 +247,7 @@ function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapsho
 end
 
 function select_snapshots_entries(s::TTSnapshots,ispace,itime)
-  cids = CartesianIndices(num_space_dofs(s))
+  cids = CartesianIndices(num_space_dofs(s)) # is this ok?
   cispace = map(i->getindex(cids,i),ispace)
   _select_snapshots_entries(s,cispace,itime)
 end
@@ -314,6 +314,12 @@ const NnzTTSnapshots = Union{
   TransientNnzTTSnapshots{T,N},
   SelectedNnzTTSnapshotsAtIndices{T,N}} where {T,N}
 
+function select_snapshots_entries(s::NnzTTSnapshots,ispace,itime)
+  index_map = get_index_map(s)
+  cispace = map(i->findfirst(index_map.==i),ispace)
+  _select_snapshots_entries(s,cispace,itime)
+end
+
 function recast(s::NnzTTSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T
   index_map = get_index_map(s)
   ls = FEM.get_local_sparse_maps(index_map)
@@ -336,12 +342,16 @@ function SparseCore(array::AbstractArray{T},sparsity::SparsityPatternCSC{T}) whe
   SparseCoreCSC(array,sparsity,CartesianIndex.(irows,icols))
 end
 
-Base.size(a::SparseCoreCSC) = (size(a.array,1),num_rows(a.sparsity),
-  num_cols(a.sparsity),size(a.array,3))
+Base.size(a::SparseCoreCSC) = (size(a.array,1),FEM.num_rows(a.sparsity),
+  FEM.num_cols(a.sparsity),size(a.array,3))
+
+function Base.getindex(a::SparseCoreCSC,i::Integer...)
+  getindex(a,CartesianIndex(i))
+end
 
 function Base.getindex(a::SparseCoreCSC,i::CartesianIndex{4})
   is_nnz = CartesianIndex(i.I[2:3]) ∈ a.sparse_indexes
-  sparse_getindex(a,i,Val(is_nnz))
+  sparse_getindex(Val(is_nnz),a,i)
 end
 
 function sparse_getindex(::Val{false},a::SparseCoreCSC{T},i::CartesianIndex{4}) where T
@@ -350,6 +360,6 @@ end
 
 function sparse_getindex(::Val{true},a::SparseCoreCSC{T},i::CartesianIndex{4}) where T
   i2 = findfirst(a.sparse_indexes .== [CartesianIndex(i.I[2:3])])
-  i1,i3 = i.I[1],i.I[3]
+  i1,i3 = i.I[1],i.I[4]
   getindex(a.array,CartesianIndex((i1,i2,i3)))
 end

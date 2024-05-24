@@ -259,6 +259,12 @@ end
 
 get_dof_permutation(f::TProductFESpace) = f.dof_permutation
 
+for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
+  @eval begin
+    get_dof_permutation(f::$F{<:TProductFESpace}) = get_dof_permutation(f.space)
+  end
+end
+
 FESpaces.get_triangulation(f::TProductFESpace) = get_triangulation(f.space)
 
 FESpaces.get_free_dof_ids(f::TProductFESpace) = get_free_dof_ids(f.space)
@@ -378,6 +384,10 @@ for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToPara
     function get_sparsity(U::$F{<:TProductFESpace},V::TProductFESpace)
       get_sparsity(U.space,V)
     end
+
+    function get_sparse_index_map(U::$F{<:TProductFESpace},V::TProductFESpace)
+      get_sparse_index_map(U.space,V)
+    end
   end
 end
 
@@ -388,13 +398,23 @@ function get_sparsity(U::TProductFESpace,V::TProductFESpace)
   return TProductSparsityPattern(sparsity,sparsities_1d)
 end
 
-function get_sparse_index_map(U::FESpace,V::FESpace)
+function get_sparse_index_map(U::TProductFESpace,V::TProductFESpace)
   sparsity = get_sparsity(U,V)
   I,J,_ = findnz(sparsity)
   i,j,_ = univariate_findnz(sparsity)
-  g2l = _global_2_local_nnz(sparsity,I,J,i,j)
+
+  index_map_I = get_dof_permutation(V)
+  index_map_J = get_dof_permutation(U)
+  ipI = invperm(view(index_map_I,:))
+  ipJ = invperm(view(index_map_J,:))
+
+  Iperm = ipI[I]
+  Jperm = ipJ[J]
+
+  g2l = _global_2_local_nnz(sparsity,Iperm,Jperm,i,j)
   us = get_univariate_sparsity(sparsity)
-  SparseIndexMap(g2l,us)
+
+  return SparseIndexMap(g2l,us)
 end
 
 function _global_2_local_nnz(sparsity,I,J,i,j)

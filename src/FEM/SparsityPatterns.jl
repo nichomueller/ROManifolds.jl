@@ -7,6 +7,8 @@ end
 SparsityPattern(a::SparseMatrixCSC) = SparsityPatternCSC(a)
 
 get_sparsity(a::SparsityPatternCSC) = a
+Base.size(a::SparsityPatternCSC) = size(a.matrix)
+Base.length(a::SparsityPatternCSC) = length(a.matrix)
 num_rows(a::SparsityPatternCSC) = size(a.matrix,1)
 num_cols(a::SparsityPatternCSC) = size(a.matrix,2)
 SparseArrays.findnz(a::SparsityPatternCSC) = findnz(a.matrix)
@@ -20,11 +22,15 @@ end
 
 get_sparsity(a::TProductSparsityPattern) = a.sparsity
 get_univariate_sparsity(a::TProductSparsityPattern) = a.sparsities_1d
+Base.size(a::TProductSparsityPattern) = size(a.sparsity)
+Base.length(a::TProductSparsityPattern) = length(a.sparsity)
 num_rows(a::TProductSparsityPattern) = num_rows(a.sparsity)
 num_cols(a::TProductSparsityPattern) = num_cols(a.sparsity)
 SparseArrays.findnz(a::TProductSparsityPattern) = findnz(a.sparsity)
 SparseArrays.nnz(a::TProductSparsityPattern) = nnz(a.sparsity)
 get_nonzero_indices(a::TProductSparsityPattern) = get_nonzero_indices(a.sparsity)
+univariate_size(a::TProductSparsityPattern) = size.(a.sparsities_1d)
+univariate_length(a::TProductSparsityPattern) = length.(a.sparsities_1d)
 univariate_num_rows(a::TProductSparsityPattern) = num_rows.(a.sparsities_1d)
 univariate_num_cols(a::TProductSparsityPattern) = num_cols.(a.sparsities_1d)
 univariate_findnz(a::TProductSparsityPattern) = tuple_of_arrays(findnz.(a.sparsities_1d))
