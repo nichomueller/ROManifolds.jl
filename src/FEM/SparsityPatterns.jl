@@ -15,6 +15,14 @@ SparseArrays.findnz(a::SparsityPatternCSC) = findnz(a.matrix)
 SparseArrays.nnz(a::SparsityPatternCSC) = nnz(a.matrix)
 get_nonzero_indices(a::SparsityPatternCSC) = get_nonzero_indices(a.matrix)
 
+function permute_sparsity(a::SparsityPatternCSC,i::AbstractVector,j::AbstractVector)
+  SparsityPatternCSC(a.matrix[i,j])
+end
+
+function permute_sparsity(a::SparsityPatternCSC,i::AbstractMatrix,j::AbstractMatrix)
+  permute_sparsity(a,vec(i),vec(j))
+end
+
 struct TProductSparsityPattern{A,B} <: SparsityPattern
   sparsity::A
   sparsities_1d::B
@@ -36,6 +44,14 @@ univariate_num_cols(a::TProductSparsityPattern) = num_cols.(a.sparsities_1d)
 univariate_findnz(a::TProductSparsityPattern) = tuple_of_arrays(findnz.(a.sparsities_1d))
 univariate_nnz(a::TProductSparsityPattern) = nnz.(a.sparsities_1d)
 univariate_nonzero_indices(a::TProductSparsityPattern) = get_nonzero_indices.(a.sparsities_1d)
+
+function permute_sparsity(a::TProductSparsityPattern,i,j)
+  is,is_1d = i
+  js,js_1d = j
+  psparsity = permute_sparsity(a.sparsity,is,js)
+  psparsities_1d = map(permute_sparsity,a.sparsities_1d,is_1d,js_1d)
+  TProductSparsityPattern(psparsity,psparsities_1d)
+end
 
 function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
   m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))

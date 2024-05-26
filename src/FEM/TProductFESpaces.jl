@@ -130,6 +130,7 @@ end
 function _get_tp_dof_permutation(models::AbstractVector,spaces::AbstractVector,order::Integer)
   @assert length(models) == length(spaces)
   D = length(models)
+
   function _tensor_product(aprev::AbstractArray{Tp,M},a::AbstractVector{Td}) where {Tp,Td,M}
     T = promote_type(Tp,Td)
     N = M+1
@@ -141,29 +142,31 @@ function _get_tp_dof_permutation(models::AbstractVector,spaces::AbstractVector,o
     end
     return atp
   end
+  function _local_dof_permutation(model,space)
+    cell_ids = get_cell_dof_ids(space)
+    dof_permutations_1d = _get_dof_permutation(model,cell_ids,order)
+    free_dof_permutations_1d = dof_permutations_1d[findall(dof_permutations_1d.>0)]
+    return free_dof_permutations_1d
+  end
+
+  free_dof_permutations_1d = map(_local_dof_permutation,models,spaces)
+
   function _d_dof_permutation(::Val{1},::Val{d′}) where d′
     @assert d′ == D
-    model_d = models[1]
     space_d = spaces[1]
     ndofs_d = num_free_dofs(space_d)
     ndofs = ndofs_d
-    cell_ids_d = get_cell_dof_ids(space_d)
-    dof_permutations_1d = _get_dof_permutation(model_d,cell_ids_d,order)
-    free_dof_permutations_1d = dof_permutations_1d[findall(dof_permutations_1d.>0)]
-    return _d_dof_permutation(free_dof_permutations_1d,ndofs,Val(2),Val(d′-1))
+    free_dof_permutation_1d = free_dof_permutations_1d[1]
+    return _d_dof_permutation(free_dof_permutation_1d,ndofs,Val(2),Val(d′-1))
   end
   function _d_dof_permutation(node2dof_prev,ndofs_prev,::Val{d},::Val{d′}) where {d,d′}
-    model_d = models[d]
     space_d = spaces[d]
     ndofs_d = num_free_dofs(space_d)
     ndofs = ndofs_prev*ndofs_d
-    cell_ids_d = get_cell_dof_ids(space_d)
-
-    dof_permutations_1d = _get_dof_permutation(model_d,cell_ids_d,order)
-    free_dof_permutations_1d = dof_permutations_1d[findall(dof_permutations_1d.>0)]
+    free_dof_permutation_1d = free_dof_permutations_1d[d]
 
     add_dim = ndofs_prev .* collect(0:ndofs_d)
-    add_dim_reorder = add_dim[free_dof_permutations_1d]
+    add_dim_reorder = add_dim[free_dof_permutation_1d]
     node2dof_d = _tensor_product(node2dof_prev,add_dim_reorder)
 
     _d_dof_permutation(node2dof_d,ndofs,Val(d+1),Val(d′-1))
@@ -172,7 +175,7 @@ function _get_tp_dof_permutation(models::AbstractVector,spaces::AbstractVector,o
     @assert d == D+1
     return node2dof
   end
-  return _d_dof_permutation(Val(1),Val(D))
+  return _d_dof_permutation(Val(1),Val(D)),free_dof_permutations_1d
 end
 
 function get_tp_dof_permutation(
@@ -182,8 +185,8 @@ function get_tp_dof_permutation(
   order::Integer;
   kwargs...) where T
 
-  dof_perm = _get_tp_dof_permutation(models,spaces,order)
-  return IndexMap(dof_perm)
+  dof_perm,dof_perms_1d = _get_tp_dof_permutation(models,spaces,order)
+  return TProductIndexMap(dof_perm,dof_perms_1d)
 end
 
 function get_tp_dof_permutation(
@@ -258,6 +261,8 @@ function FESpaces.FESpace(
 end
 
 get_dof_permutation(f::TProductFESpace) = f.dof_permutation
+
+get_tp_dof_permutation(f::TProductFESpace) = f.tp_dof_permutation
 
 for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
   @eval begin
@@ -398,20 +403,27 @@ function get_sparsity(U::TProductFESpace,V::TProductFESpace)
   return TProductSparsityPattern(sparsity,sparsities_1d)
 end
 
-function get_sparse_index_map(U::TProductFESpace,V::TProductFESpace)
-  sparsity = get_sparsity(U,V)
-  I,J,_ = findnz(sparsity)
-  i,j,_ = univariate_findnz(sparsity)
+function permute_sparsity(s::SparsityPattern,U::FESpace,V::FESpace)
+  psparsity = permute_sparsity(s.sparsity,U.space,V.space)
+  psparsities = map(permute_sparsity,s.sparsities_1d,U.spaces_1d,V.spaces_1d)
+  TProductSparsityPattern(psparsity,psparsities)
+end
 
+function permute_sparsity(s::TProductSparsityPattern,U::TProductFESpace,V::TProductFESpace)
   index_map_I = get_dof_permutation(V)
   index_map_J = get_dof_permutation(U)
-  ipI = invperm(view(index_map_I,:))
-  ipJ = invperm(view(index_map_J,:))
+  index_map_I_1d = get_tp_dof_permutation(V).indices_1d
+  index_map_J_1d = get_tp_dof_permutation(U).indices_1d
+  permute_sparsity(s,(index_map_I,index_map_I_1d),(index_map_J,index_map_J_1d))
+end
 
-  Iperm = ipI[I]
-  Jperm = ipJ[J]
-
-  g2l = _global_2_local_nnz(sparsity,Iperm,Jperm,i,j)
+function get_sparse_index_map(U::TProductFESpace,V::TProductFESpace)
+  sparsity = get_sparsity(U,V)
+  psparsity = permute_sparsity(sparsity,U,V)
+  I,J,_ = findnz(psparsity)
+  i,j,_ = univariate_findnz(psparsity)
+  g2l = _global_2_local_nnz(sparsity,I,J,i,j)
+  # g2l = _invperm(pg2l,U,V)
   return SparseIndexMap(g2l,sparsity)
 end
 

@@ -73,6 +73,14 @@ end
 Base.size(i::IndexMapView) = _shape_per_dir(i.locations)
 Base.getindex(i::IndexMapView,j::Int) = i.indices[i.locations[j]]
 
+struct TProductIndexMap{D} <: AbstractIndexMap{D}
+  indices::Array{Int,D}
+  indices_1d::Vector{Vector{Int}}
+end
+
+Base.size(i::TProductIndexMap) = size(i.indices)
+Base.getindex(i::TProductIndexMap,j::Int) = getindex(i.indices,j...)
+
 struct SparseIndexMap{D,A,B} <: AbstractIndexMap{D}
   global_2_local::A
   sparsity::B

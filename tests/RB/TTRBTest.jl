@@ -13,6 +13,8 @@ using Gridap.Helpers
 using Gridap.TensorValues
 using BlockArrays
 using DrWatson
+using SparseArrays
+using LinearAlgebra
 using Kronecker
 using Mabla.FEM
 using Mabla.RB
@@ -27,14 +29,14 @@ tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
 domain = (0,1,0,1)
-partition = (10,10)
+partition = (3,3)
 model = TProductModel(domain,partition)
 
 labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
 add_tag_from_tags!(labels,"neumann",[7])
 
-order = 1
+order = 2
 degree = 2*order
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
@@ -111,135 +113,212 @@ r = TransientParamRealization(ParamRealization(params),t0:dt:tf)
 
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ;r)
 
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+# rbop = reduced_operator(rbsolver,feop,fesnaps)
+# rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+# results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-println(RB.space_time_error(results))
+# println(RB.space_time_error(results))
 
+# test 1 : try old code with new basis
 soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
 red_trial,red_test = reduced_fe_space(rbsolver,feop,soff)
 odeop = get_algebraic_operator(feop)
 pop = PODOperator(odeop,red_trial,red_test)
 smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
 jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
+red_res = RB.reduced_residual(rbsolver,pop,rres)
+# U,V = trial(nothing),test
+# sparsity = get_sparsity(U,V)
+# A = jjac[1][1]
+# mdeim_style = rbsolver.mdeim_style
+# basis = reduced_basis(A;ϵ=RB.get_tol(rbsolver))
+# temp_basis = RB.temp_reduced_basis(A,sparsity;ϵ=RB.get_tol(rbsolver))
+# lu_interp,integration_domain = RB.temp_mdeim(mdeim_style,temp_basis...)
+red_jac = RB.temp_reduced_jacobian(rbsolver,pop,jjac)
+trians_rhs = get_domains(red_res)
+trians_lhs = map(get_domains,red_jac)
+new_op = change_triangulation(pop,trians_rhs,trians_lhs)
+rbop = PODMDEIMOperator(new_op,red_jac,red_res)
+rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+println(RB.space_time_error(results))
 
-A = jjac[1][1]
-index_map = get_index_map(A)
-inv_index_map = sortperm(index_map[:])
-
-mdeim_style = rbsolver.mdeim_style
-basis = reduced_basis(A;ϵ=RB.get_tol(rbsolver))
-# lu_interp,integration_domain = mdeim(mdeim_style,basis)
-basis_spacetime = get_basis_spacetime(basis)
-indices_spacetime = get_mdeim_indices(basis_spacetime)
-indices_space = fast_index(indices_spacetime,RB.num_space_dofs(basis))
-indices_time = slow_index(indices_spacetime,RB.num_space_dofs(basis))
-lu_interp = lu(view(basis_spacetime,indices_spacetime,:))
-#
-proj_basis = reduce_operator(mdeim_style,basis,red_trial,red_test;combine=(x,y)->x)
-coefficient = RB.allocate_coefficient(rbsolver,basis)
-result = RB.allocate_result(rbsolver,red_trial,red_test)
-
-basis_space = get_basis_space(basis)
-basis_spacetime = get_basis_spacetime(basis)
-indices_spacetime = RB.get_mdeim_indices(basis_spacetime)
-indices_space = fast_index(indices_spacetime,RB.num_space_dofs(basis))
-indices_time = slow_index(indices_spacetime,RB.num_space_dofs(basis))
-
-aad = rbop.lhs[1][1]
-bas = aad.basis
-coeff = aad.coefficient
-
-jcores = RB.get_cores(basis)
-Vcores = RB.get_cores(RB.get_basis(red_test))
-Ucores = RB.get_cores(RB.get_basis(red_trial))
-ccores = map((a,b...)->RB.compress_core(a,b...;combine=(x,y)->x),jcores,Ucores,Vcores)
-ccore = RB.multiply_cores(ccores...)
-
-cspace = dropdims(RB.multiply_cores(ccores[1],ccores[2]);dims=(1,2,3))
-
-ccore1 = RB.compress_core(jcores[1],Ucores[1],Vcores[1];combine=(x,y)->x)
-ccore2 = RB.compress_core(jcores[2],Ucores[2],Vcores[2];combine=(x,y)->x)
-cspace = dropdims(RB.multiply_cores(ccore1,ccore2);dims=(1,2,3))
-
-sparsity = FEM.get_sparsity(trial(nothing),test)
-bs = RB.temp_recast(get_basis_space(b),sparsity)
-bs_trial = get_basis_space(b_trial)
-bs_test = get_basis_space(b_test)
-b̂s = [bs_test'*get_values(bs)[1]*bs_trial,bs_test'*get_values(bs)[2]*bs_trial]
-
-#
-using LinearAlgebra
-A = jjac[1][1]
-mat = copy(A)
-T,N = Float64,3
-cores = Vector{Array{T,3}}(undef,N-1)
+# test 2: test goodness of fit of basis
+mat = jjac[1][1]
+T,N = Float64,4
+cores = Vector{Array{T,3}}(undef,N)
 ranks = fill(1,N)
 sizes = size(mat)
-for k = 1:2
-  mat_k = reshape(mat,ranks[k]*sizes[k],:)
-  U,Σ,V = svd(mat_k)
-  rank = RB.truncation(Σ)
-  core_k = U[:,1:rank]
-  ranks[k+1] = rank
-  mat = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
-  cores[k] = reshape(core_k,ranks[k],sizes[k],rank)
-end
-α,β = cores
-boh = stack([sum([kron(β[i,:,k],α[1,:,i]) for i = axes(α,3)]) for k = axes(β,3)])
+cache = cores,ranks,sizes
+M = RB.ttsvd!(cache,copy(mat);ids_range=1:N-1)
+cores[end] = M
 
-oldA = RB.OldTTNnzSnapshots(A.values,A.realization)
-MA = reshape(oldA,size(oldA,1),:)
-er = MA - boh*boh'*MA
+c2m = cores2basis(cores...)
+ss = reshape(c2m,size(mat))
+e = mat - ss
 
+N1 = 3
+mat1 = reshape(mat,:,10,10)
+cores1 = Vector{Array{T,3}}(undef,N1)
+ranks1 = fill(1,N1)
+sizes1 = size(mat1)
+cache1 = cores1,ranks1,sizes1
+M1 = RB.ttsvd!(cache1,copy(mat1);ids_range=1:N1-1)
+cores1[end] = M1
 
+c2m1 = cores2basis(cores1...)
+ss1 = reshape(c2m1,size(mat1))
+e1 = mat1 - ss1
 
-function myf(a::Vector)
-  b = copy(a)
-  N = length(a)
-  for i = 2:N
-    b[i] = a[i] - a[i-1]
+mat2 = jjac[1][1]
+T2,N2 = Float64,4
+cores2 = Vector{Array{T,3}}(undef,N2)
+ranks2 = fill(1,N2)
+sizes2 = size(mat2)
+cache2 = cores2,ranks2,sizes2
+tol = [1e-8,1e-4,1e-4]
+M2 = RB.temp_ttsvd!(cache2,copy(mat2),tol;ids_range=1:N2-1)
+cores2[end] = M2
+
+c2m2 = cores2basis(cores2...)
+ss2 = reshape(c2m2,size(mat2))
+e2 = mat2 - ss2
+
+function old_ttsvd(X;kwargs...)
+  d = ndims(X)
+  n = size(X)
+
+  ranks = fill(1,d)
+  cores = Vector{Array{eltype(X),3}}(undef, ndims(X))
+  T = X
+
+  for k = 1:d-1
+    if k == 1
+      X_k = reshape(T, n[k], :)
+    else
+      X_k = reshape(T, ranks[k-1] * n[k], :)
+    end
+
+    U,S,V = svd(X_k)
+    r = RB.truncation(S;kwargs...)
+    U = U[:, 1:r]
+    S = S[1:r]
+    V = V[:, 1:r]
+
+    ranks[k] = r
+    T = reshape(S.*V', ranks[k], n[k+1], :)
+    if k == 1
+      cores[k] = reshape(U, 1, n[k], ranks[k])
+    else
+      cores[k] = reshape(U, ranks[k-1], n[k], ranks[k])
+    end
   end
-  return b
+  cores[d] = reshape(T, ranks[d-1], n[d], 1)
+  return cores
 end
 
-bb = myf(boh[:,1])
+function my_eval(cores)
+  function fun(cores,i)
+    output = 1
+    for k = eachindex(cores)
+      C = cores[k]
+      output = output * C[:, i[k], :]
+    end
+    return output[1]
+  end
 
-# check sparse index map
-using SparseArrays
+  sizes = Tuple(map(x->size(x,2),cores))
+  OUT = zeros(sizes)
+  for i in CartesianIndices(sizes)
+    OUT[i] = fun(cores,Tuple(i))
+  end
+  return OUT
+end
 
-domain = (0,1,0,1)
-partition = (4,4)
-model = TProductModel(domain,partition)
+function Base.:*(x::Vector{Float64}, y::Vector{Float64})
+  z = kronecker(y, x)
+  return z[:]
+end
 
-labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
-add_tag_from_tags!(labels,"neumann",[7])
+b = old_ttsvd(mat)
+matrec = my_eval(b)
 
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial = TransientTrialParamFESpace(test,gμt)
-V,U = test,trial(nothing)
+# index map
+U,V = test,test
+sparsity = get_sparsity(U,V)
+psparsity = FEM.permute_sparsity(sparsity,U,V)
+I,J,_ = findnz(psparsity)
+i,j,_ = FEM.univariate_findnz(psparsity)
 
-Ω = Triangulation(model)
-dΩ = Measure(Ω,degree)
-f1(x) = 5*sin(x[1])
-f2(x) = 3*cos(x[2])
-imap = get_sparse_index_map(U,V)
-M1 = assemble_matrix((u,v)->∫(f1*u*v)dΩ.measure,trial(nothing).space,test.space)
-M2 = assemble_matrix((u,v)->∫(f2*u*v)dΩ.measure,trial(nothing).space,test.space)
-i1,j1,v1 = findnz(M1)
-i2,j2,v2 = findnz(M2)
-M = hcat(v1,v2)
-TTM1 = TTArray(M1,imap)
-TTM2 = TTArray(M2,imap)
-re = FEM.GenericTransientParamRealization(ParamRealization([[5.],[3.]]),[0.],0.)
-snaps = BasicSnapshots(ParamArray([TTM1,TTM2]),re)
-ϕ = Projection(snaps)
-ϕs = get_basis_space(ϕ)
-ϕs1 = sparse(reshape(ϕs[:,1],12,12))
-ϕs2 = sparse(reshape(ϕs[:,2],12,12))
-ĩ1,j̃1,ṽ1 = findnz(ϕs1)
-ĩ2,j̃2,ṽ2 = findnz(ϕs2)
-M̃ = hcat(ṽ1,ṽ2)
-E = M - M̃*M̃'*M
+IJ = get_nonzero_indices(psparsity)
+lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
+
+unrows = FEM.univariate_num_rows(sparsity)
+uncols = FEM.univariate_num_cols(sparsity)
+unnz = FEM.univariate_nnz(sparsity)
+g2l = zeros(Int,unnz...)
+
+k,gid = 2,IJ[2]
+irows = Tuple(tensorize_indices(I[k],unrows))
+icols = Tuple(tensorize_indices(J[k],uncols))
+iaxes = CartesianIndex.(irows,icols)
+global2local = map((i,j) -> findfirst(i.==[j]),lids,iaxes)
+g2l[global2local...] = gid
+
+
+
+index_map_I = get_dof_permutation(V)
+index_map_J = get_dof_permutation(U)
+index_map_I_univ1 = get_dof_permutation(Float64,model.models_1d[1],V.spaces_1d[1],order)
+index_map_I_univ2 = get_dof_permutation(Float64,model.models_1d[2],V.spaces_1d[2],order)
+
+# Iperm = map(i->findfirst(index_map_I[:].==i),I)
+# Jperm = map(j->findfirst(index_map_J[:].==j),J)
+# iperm = [
+#   map(i->findfirst(index_map_I_univ1[:].==i),i[1]),
+#   map(i->findfirst(index_map_I_univ2[:].==i),i[2])
+#   ]
+# jperm = [
+#   map(j->findfirst(index_map_I_univ1[:].==j),j[1]),
+#   map(j->findfirst(index_map_I_univ2[:].==j),j[2])
+#   ]
+Iperm = map(i->findfirst(I.==i),index_map_I[:])
+Jperm = map(j->findfirst(J.==j),index_map_J[:])
+iperm = [
+  map(i->findfirst(i[1].==i),index_map_I_univ1[:]),
+  map(i->findfirst(i[2].==i),index_map_I_univ2[:])
+  ]
+jperm = [
+  map(j->findfirst(j[1].==j),index_map_I_univ1[:]),
+  map(j->findfirst(j[2].==j),index_map_I_univ2[:])
+  ]
+
+IJ = get_nonzero_indices(sparsity)
+lids = map((ii,ji)->CartesianIndex.(ii,ji),iperm,jperm)
+
+unrows = FEM.univariate_num_rows(sparsity)
+uncols = FEM.univariate_num_cols(sparsity)
+unnz = FEM.univariate_nnz(sparsity)
+g2l = zeros(Int,unnz...)
+
+@inbounds for (k,gid) = enumerate(IJ)
+  irows = Tuple(tensorize_indices(Iperm[k],unrows))
+  icols = Tuple(tensorize_indices(Jperm[k],uncols))
+  iaxes = CartesianIndex.(irows,icols)
+  global2local = map((i,j) -> findfirst(i.==[j]),lids,iaxes)
+  g2l[global2local...] = gid
+end
+
+MS = M[index_map_I[:],index_map_I[:]]
+MSB1 = MS[1:6,1:6]
+v1 = nonzeros(MSB1)
+
+M1 = assemble_matrix((u,v)->∫(u*v)dΩ.measures_1d[1],test.spaces_1d[1],test.spaces_1d[1])
+M1p = M1[index_map_I_univ1,index_map_I_univ1]
+M2 = assemble_matrix((u,v)->∫(u*v)dΩ.measures_1d[2],test.spaces_1d[2],test.spaces_1d[2])
+M2p = M2[index_map_I_univ2,index_map_I_univ2]
+M12 = kron(M2,M1)
+M12p = kron(M2p,M1p)
+
+p = test.dof_permutation
+ip = invperm(p[:])
