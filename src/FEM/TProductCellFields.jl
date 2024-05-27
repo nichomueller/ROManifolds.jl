@@ -176,9 +176,11 @@ end
 
 # assembly
 
-struct TProductSparseMatrixAssembler <: SparseMatrixAssembler
+struct TProductSparseMatrixAssembler{D} <: SparseMatrixAssembler
   assem::GenericSparseMatrixAssembler
   assems_1d::Vector{GenericSparseMatrixAssembler}
+  row_index_map::TProductIndexMap{D}
+  col_index_map::TProductIndexMap{D}
 end
 
 function FESpaces.SparseMatrixAssembler(
@@ -190,7 +192,9 @@ function FESpaces.SparseMatrixAssembler(
 
   assem = SparseMatrixAssembler(mat,vec,trial.space,test.space,strategy)
   assems_1d = map((U,V)->SparseMatrixAssembler(mat,vec,U,V,strategy),trial.spaces_1d,test.spaces_1d)
-  TProductSparseMatrixAssembler(assem,assems_1d)
+  row_index_map = get_tp_dof_permutation(test)
+  col_index_map = get_tp_dof_permutation(trial)
+  TProductSparseMatrixAssembler(assem,assems_1d,row_index_map,col_index_map)
 end
 
 function FESpaces.collect_cell_matrix(
@@ -230,45 +234,45 @@ end
 function FESpaces.allocate_vector(a::TProductSparseMatrixAssembler,vecdata::Vector)
   vecs_1d = map(allocate_vector,a.assems_1d,vecdata)
   vec = symbolic_kron(vecs_1d...)
-  return TProductArray(vec,vecs_1d)
+  return TProductArray(vec,vecs_1d,(a.row_index_map,))
 end
 
 function FESpaces.assemble_vector!(b,a::TProductSparseMatrixAssembler,vecdata::Vector)
   map(b.arrays_1d,assemble_vector!,a.assems_1d,vecdata)
-  numerical_kron!(b.array,b.arrays_1d...)
+  _numerical_kron!(b.array,b.arrays_1d...)
 end
 
 function FESpaces.assemble_vector_add!(b,a::TProductSparseMatrixAssembler,vecdata::Vector)
   map(b.arrays_1d,assemble_vector_add!,a.assems_1d,vecdata)
-  numerical_kron!(b.array,b.arrays_1d...)
+  _numerical_kron!(b.array,b.arrays_1d...)
 end
 
 function FESpaces.assemble_vector(a::TProductSparseMatrixAssembler,vecdata::Vector)
   vecs_1d = map(assemble_vector,a.assems_1d,vecdata)
-  vec = kron(vecs_1d...)
-  return TProductArray(vec,vecs_1d)
+  vec = _kron(vecs_1d...)
+  return TProductArray(vec,vecs_1d,(a.row_index_map,))
 end
 
 function FESpaces.allocate_matrix(a::TProductSparseMatrixAssembler,matdata::Vector)
   mats_1d = map(allocate_matrix,a.assems_1d,matdata)
   mat = symbolic_kron(mats_1d...)
-  return TProductArray(mat,mats_1d)
+  return TProductArray(mat,mats_1d,(a.row_index_map,a.col_index_map))
 end
 
 function FESpaces.assemble_matrix!(A,a::TProductSparseMatrixAssembler,matdata::Vector)
   map(assemble_matrix!,A.arrays_1d,a.assems_1d,matdata)
-  numerical_kron!(A.array,A.arrays_1d...)
+  _numerical_kron!(A.array,A.arrays_1d...)
 end
 
 function FESpaces.assemble_matrix_add!(A,a::TProductSparseMatrixAssembler,matdata::Vector)
   map(assemble_matrix_add!,A.arrays_1d,a.assems_1d,matdata)
-  numerical_kron!(A.array,A.arrays_1d...)
+  _numerical_kron!(A.array,A.arrays_1d...)
 end
 
 function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::Vector)
   mats_1d = map(assemble_matrix,a.assems_1d,matdata)
-  mat = kron(mats_1d...)
-  return TProductArray(mat,mats_1d)
+  mat = _kron(mats_1d...)
+  return TProductArray(mat,mats_1d,(a.row_index_map,a.col_index_map))
 end
 
 abstract type AbstractTProductArray{T,N} <: AbstractArray{T,N} end
@@ -281,9 +285,28 @@ struct TProductArray{T,N,A} <: AbstractTProductArray{T,N}
   end
 end
 
-function TProductArray(arrays_1d::Vector{A}) where A
-  array::A = kron(arrays_1d...)
+function TProductArray(
+  _array::A,
+  _arrays_1d::Vector{A},
+  index_maps::NTuple{N,TProductIndexMap{D}}
+  ) where {N,D,A<:AbstractArray}
+
+  array = eval_tp_map(_array,map(get_tp_indices,index_maps)...)
+  arrays_1d = map(eval_tp_map,_arrays_1d,map(get_univariate_indices,index_maps)...)
   TProductArray(array,arrays_1d)
+end
+
+function TProductArray(arrays_1d::Vector{A},index_maps...) where A
+  array::A = _kron(arrays_1d...)
+  TProductArray(array,arrays_1d,index_maps...)
+end
+
+function eval_tp_map(a::AbstractVector,row_ids::AbstractArray)
+  a[vec(row_ids)]
+end
+
+function eval_tp_map(a::AbstractMatrix,row_ids::AbstractArray,col_ids::AbstractArray)
+  a[vec(row_ids),vec(col_ids)]
 end
 
 get_dim(a::TProductArray) = length(a.arrays_1d)
@@ -342,13 +365,17 @@ SparseArrays.nzrange(a::TProductSparseMatrix,col::Int) = nzrange(a.array,col)
 SparseArrays.rowvals(a::TProductSparseMatrix) = rowvals(a.array)
 SparseArrays.nonzeros(a::TProductSparseMatrix) = a.array
 
+function _kron(A::AbstractArray...)
+  kron(reverse(A)...)
+end
+
+function symbolic_kron(A::AbstractArray)
+  A
+end
+
 function symbolic_kron(a::AbstractVector{T},b::AbstractVector{S}) where {T<:Number,S<:Number}
   c = Vector{promote_op(*,T,S)}(undef,length(a)*length(b))
   return c
-end
-
-@inline function numerical_kron!(c::Vector,a::AbstractVector{T},b::AbstractVector{S}) where {T<:Number,S<:Number}
-  kron!(c,a,b)
 end
 
 function symbolic_kron(A::AbstractSparseMatrixCSC{T1,S1},B::AbstractSparseMatrixCSC{T2,S2}) where {T1,T2,S1,S2}
@@ -359,7 +386,12 @@ function symbolic_kron(A::AbstractSparseMatrixCSC{T1,S1},B::AbstractSparseMatrix
   Ti = promote_type(S1,S2)
   C = spzeros(Tv,Ti,mC,nC)
   sizehint!(C,nnz(A)*nnz(B))
-  symbolic_kron!(C,A,B)
+  symbolic_kron!(C,B,A)
+end
+
+function symbolic_kron(A::AbstractArray,B::AbstractArray...)
+  C,D... = B
+  symbolic_kron(symbolic_kron(A,C),D...)
 end
 
 @inline function symbolic_kron!(C::SparseMatrixCSC,A::AbstractSparseMatrixCSC,B::AbstractSparseMatrixCSC)
@@ -403,6 +435,26 @@ end
   return C
 end
 
+function _numerical_kron!(A::AbstractArray,B::AbstractArray)
+  copyto!(A,B)
+  A
+end
+
+@inline function _numerical_kron!(c::Vector,a::AbstractVector{T},b::AbstractVector{S}) where {T<:Number,S<:Number}
+  kron!(c,b,a)
+  c
+end
+
+@inline function _numerical_kron!(C::SparseMatrixCSC,A::AbstractSparseMatrixCSC,B::AbstractSparseMatrixCSC)
+  numerical_kron!(C,B,A)
+  C
+end
+
+function _numerical_kron!(C::AbstractArray,A::AbstractArray,B::AbstractArray...)
+  copyto!(C,_kron(A,B...))
+  C
+end
+
 @inline function numerical_kron!(C::SparseMatrixCSC,A::AbstractSparseMatrixCSC,B::AbstractSparseMatrixCSC)
   nA = size(A,2)
   nB = size(B,2)
@@ -433,23 +485,6 @@ end
   return C
 end
 
-function symbolic_kron(A::AbstractArray)
-  A
-end
-
-function numerical_kron!(A::AbstractArray,B::AbstractArray)
-  copyto!(A,B)
-  A
-end
-
-function symbolic_kron(A::AbstractArray,B::AbstractArray,C::AbstractArray...)
-  symbolic_kron(A,symbolic_kron(B,C...))
-end
-
-function numerical_kron!(A::AbstractArray,B::AbstractArray,C::AbstractArray...)
-  numerical_kron!(A,numerical_kron!(B,C...))
-end
-
 # for gradients
 
 function kronecker_gradients(f,g,op=nothing)
@@ -460,11 +495,11 @@ function kronecker_gradients(f,g,op=nothing)
 end
 
 _kronecker_gradients(f,g,::Val{1}) = g[1]
-_kronecker_gradients(f,g,::Val{2}) = kron(g[1],f[2]) + kron(f[1],g[2])
-_kronecker_gradients(f,g,::Val{3}) = kron(g[1],f[2],f[3]) + kron(f[1],g[2],f[3]) + kron(f[1],f[2],g[3])
+_kronecker_gradients(f,g,::Val{2}) = _kron(g[1],f[2]) + _kron(f[1],g[2])
+_kronecker_gradients(f,g,::Val{3}) = _kron(g[1],f[2],f[3]) + _kron(f[1],g[2],f[3]) + _kron(f[1],f[2],g[3])
 
 _kronecker_gradients(f,g,::Nothing,::Val{d}) where d = _kronecker_gradients(f,g,Val(d))
-_kronecker_gradients(f,g,op,::Val{d}) where d = op(kron(f...),_kronecker_gradients(f,g,Val(d)))
+_kronecker_gradients(f,g,op,::Val{d}) where d = op(_kron(f...),_kronecker_gradients(f,g,Val(d)))
 
 function symbolic_kron(f,g)
   Df = length(f)
@@ -476,6 +511,15 @@ end
 _symbolic_kron(f,g,::Val{1}) = symbolic_kron(g[1])
 _symbolic_kron(f,g,::Val{2}) = symbolic_kron(g[1],f[2])
 _symbolic_kron(f,g,::Val{3}) = symbolic_kron(g[1],f[2],f[3])
+
+@inline function _numerical_kron!(
+  C::SparseMatrixCSC,
+  vA::Vector{<:AbstractSparseMatrixCSC},
+  vB::Vector{<:AbstractSparseMatrixCSC},
+  args...)
+
+  numerical_kron!(C,reverse(vA),reverse(vB),args...)
+end
 
 @inline function numerical_kron!(
   C::SparseMatrixCSC,
@@ -542,13 +586,13 @@ end
 function FESpaces.assemble_vector!(b,a::TProductSparseMatrixAssembler,vecdata::TProductGradientEval)
   map(assemble_vector!,b.arrays_1d,a.assems_1d,vecdata.f)
   map(assemble_vector!,b.gradients_1d,a.assems_1d,vecdata.g)
-  numerical_kron!(b.array,b.arrays_1d,b.gradients_1d,vecdata.op)
+  _numerical_kron!(b.array,b.arrays_1d,b.gradients_1d,vecdata.op)
 end
 
 function FESpaces.assemble_vector_add!(b,a::TProductSparseMatrixAssembler,vecdata::TProductGradientEval)
   map(assemble_vector_add!,b.arrays_1d,a.assems_1d,vecdata.f)
   map(assemble_vector_add!,b.gradients_1d,a.assems_1d,vecdata.g)
-  numerical_kron!(b.array,b.arrays_1d,b.gradients_1d,vecdata.op)
+  _numerical_kron!(b.array,b.arrays_1d,b.gradients_1d,vecdata.op)
 end
 
 function FESpaces.assemble_vector(a::TProductSparseMatrixAssembler,vecdata::TProductGradientEval)
@@ -562,26 +606,26 @@ function FESpaces.allocate_matrix(a::TProductSparseMatrixAssembler,matdata::TPro
   mats_1d = map(allocate_matrix,a.assems_1d,matdata.f)
   gradmats_1d = map(allocate_matrix,a.assems_1d,matdata.g)
   mat = symbolic_kron(mats_1d,gradmats_1d)
-  return TProductGradientArray(mat,mats_1d,gradmats_1d)
+  return TProductGradientArray(mat,mats_1d,gradmats_1d,(a.row_index_map,a.col_index_map))
 end
 
 function FESpaces.assemble_matrix!(A,a::TProductSparseMatrixAssembler,matdata::TProductGradientEval)
   map(assemble_matrix!,A.arrays_1d,a.assems_1d,matdata.f)
   map(assemble_matrix!,A.gradients_1d,a.assems_1d,matdata.g)
-  numerical_kron!(A.array,A.arrays_1d,A.gradients_1d,matdata.op)
+  _numerical_kron!(A.array,A.arrays_1d,A.gradients_1d,matdata.op)
 end
 
 function FESpaces.assemble_matrix_add!(A,a::TProductSparseMatrixAssembler,matdata::TProductGradientEval)
   map(assemble_matrix_add!,A.arrays_1d,a.assems_1d,matdata.f)
   map(assemble_matrix_add!,A.gradients_1d,a.assems_1d,matdata.g)
-  numerical_kron!(A.array,A.arrays_1d,A.gradients_1d,matdata.op)
+  _numerical_kron!(A.array,A.arrays_1d,A.gradients_1d,matdata.op)
 end
 
 function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::TProductGradientEval)
   mats_1d = map(assemble_matrix,a.assems_1d,matdata.f)
   gradmats_1d = map(assemble_matrix,a.assems_1d,matdata.g)
   mat = kronecker_gradients(mats_1d,gradmats_1d,matdata.op)
-  return TProductGradientArray(mat,mats_1d,gradmats_1d)
+  return TProductGradientArray(mat,mats_1d,gradmats_1d,(a.row_index_map,a.col_index_map))
 end
 
 struct TProductGradientArray{T,N,A} <: AbstractTProductArray{T,N}
@@ -594,9 +638,22 @@ struct TProductGradientArray{T,N,A} <: AbstractTProductArray{T,N}
   end
 end
 
-function TProductGradientArray(arrays_1d::Vector{A},gradients_1d::Vector{A}) where A
+function TProductGradientArray(
+  _array::A,
+  _arrays_1d::Vector{A},
+  _gradients_1d::Vector{A},
+  index_maps::NTuple{N,TProductIndexMap{D}}
+  ) where {N,D,A<:AbstractArray}
+
+  array = eval_tp_map(_array,map(get_tp_indices,index_maps)...)
+  arrays_1d = map(eval_tp_map,_arrays_1d,map(get_univariate_indices,index_maps)...)
+  gradients_1d = map(eval_tp_map,_gradients_1d,map(get_univariate_indices,index_maps)...)
+  TProductGradientArray(array,arrays_1d,gradients_1d)
+end
+
+function TProductGradientArray(arrays_1d::Vector{A},gradients_1d::Vector{A},index_maps...) where A
   array::A = kronecker_gradients(arrays_1d,gradients_1d)
-  TProductGradientArray(array,arrays_1d)
+  TProductGradientArray(array,arrays_1d,gradients_1d,index_maps...)
 end
 
 get_dim(a::TProductGradientArray) = length(a.arrays_1d)

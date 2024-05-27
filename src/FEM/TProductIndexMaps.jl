@@ -80,6 +80,8 @@ end
 
 Base.size(i::TProductIndexMap) = size(i.indices)
 Base.getindex(i::TProductIndexMap,j::Int) = getindex(i.indices,j...)
+get_tp_indices(i::TProductIndexMap) = i.indices
+get_univariate_indices(i::TProductIndexMap) = i.indices_1d
 
 struct SparseIndexMap{D,A,B} <: AbstractIndexMap{D}
   global_2_local::A

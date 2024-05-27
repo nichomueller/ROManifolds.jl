@@ -122,123 +122,41 @@ println(RB.space_time_error(results))
 # test 1 : try old code with new basis
 soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
 red_trial,red_test = reduced_fe_space(rbsolver,feop,soff)
+
 odeop = get_algebraic_operator(feop)
 pop = PODOperator(odeop,red_trial,red_test)
 smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
 jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
 red_res = RB.reduced_residual(rbsolver,pop,rres)
-# U,V = trial(nothing),test
-# sparsity = get_sparsity(U,V)
-# A = jjac[1][1]
-# mdeim_style = rbsolver.mdeim_style
-# basis = reduced_basis(A;ϵ=RB.get_tol(rbsolver))
-# temp_basis = RB.temp_reduced_basis(A,sparsity;ϵ=RB.get_tol(rbsolver))
-# lu_interp,integration_domain = RB.temp_mdeim(mdeim_style,temp_basis...)
 red_jac = RB.temp_reduced_jacobian(rbsolver,pop,jjac)
+
 trians_rhs = get_domains(red_res)
 trians_lhs = map(get_domains,red_jac)
 new_op = change_triangulation(pop,trians_rhs,trians_lhs)
 rbop = PODMDEIMOperator(new_op,red_jac,red_res)
+
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+
 println(RB.space_time_error(results))
 
-# test 2: test goodness of fit of basis
-mat = jjac[1][1]
-T,N = Float64,4
-cores = Vector{Array{T,3}}(undef,N)
-ranks = fill(1,N)
-sizes = size(mat)
-cache = cores,ranks,sizes
-M = RB.ttsvd!(cache,copy(mat);ids_range=1:N-1)
-cores[end] = M
-
-c2m = cores2basis(cores...)
-ss = reshape(c2m,size(mat))
-e = mat - ss
-
-N1 = 3
-mat1 = reshape(mat,:,10,10)
-cores1 = Vector{Array{T,3}}(undef,N1)
-ranks1 = fill(1,N1)
-sizes1 = size(mat1)
-cache1 = cores1,ranks1,sizes1
-M1 = RB.ttsvd!(cache1,copy(mat1);ids_range=1:N1-1)
-cores1[end] = M1
-
-c2m1 = cores2basis(cores1...)
-ss1 = reshape(c2m1,size(mat1))
-e1 = mat1 - ss1
-
-mat2 = jjac[1][1]
-T2,N2 = Float64,4
-cores2 = Vector{Array{T,3}}(undef,N2)
-ranks2 = fill(1,N2)
-sizes2 = size(mat2)
-cache2 = cores2,ranks2,sizes2
-tol = [1e-8,1e-4,1e-4]
-M2 = RB.temp_ttsvd!(cache2,copy(mat2),tol;ids_range=1:N2-1)
-cores2[end] = M2
-
-c2m2 = cores2basis(cores2...)
-ss2 = reshape(c2m2,size(mat2))
-e2 = mat2 - ss2
-
-function old_ttsvd(X;kwargs...)
-  d = ndims(X)
-  n = size(X)
-
-  ranks = fill(1,d)
-  cores = Vector{Array{eltype(X),3}}(undef, ndims(X))
-  T = X
-
-  for k = 1:d-1
-    if k == 1
-      X_k = reshape(T, n[k], :)
-    else
-      X_k = reshape(T, ranks[k-1] * n[k], :)
-    end
-
-    U,S,V = svd(X_k)
-    r = RB.truncation(S;kwargs...)
-    U = U[:, 1:r]
-    S = S[1:r]
-    V = V[:, 1:r]
-
-    ranks[k] = r
-    T = reshape(S.*V', ranks[k], n[k+1], :)
-    if k == 1
-      cores[k] = reshape(U, 1, n[k], ranks[k])
-    else
-      cores[k] = reshape(U, ranks[k-1], n[k], ranks[k])
-    end
-  end
-  cores[d] = reshape(T, ranks[d-1], n[d], 1)
-  return cores
-end
-
-function my_eval(cores)
-  function fun(cores,i)
-    output = 1
-    for k = eachindex(cores)
-      C = cores[k]
-      output = output * C[:, i[k], :]
-    end
-    return output[1]
-  end
-
-  sizes = Tuple(map(x->size(x,2),cores))
-  OUT = zeros(sizes)
-  for i in CartesianIndices(sizes)
-    OUT[i] = fun(cores,Tuple(i))
-  end
-  return OUT
-end
-
-function Base.:*(x::Vector{Float64}, y::Vector{Float64})
-  z = kronecker(y, x)
-  return z[:]
-end
-
-b = old_ttsvd(mat)
-matrec = my_eval(b)
+################# running code ###############
+# RB.temp_reduced_jacobian(rbsolver,pop,jjac[1])
+combine = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*(x-y)
+op,solver = pop,rbsolver
+s = RB.OldTTNnzSnapshots(jjac[1][1].values,jjac[1][1].realization)
+red_trial = get_trial(op)
+red_test = get_test(op)
+mdeim_style = solver.mdeim_style
+# basis = temp_reduced_basis(s;ϵ=get_tol(solver))
+cores = RB.temp_ttsvd(s)
+b = RB.OldTTSVDCores(cores)
+_space_core,time_core = b.cores
+space_core = RB.temp_recast(s,_space_core)
+basis = RB.OldTTSVDCores([space_core,time_core],b.basis_spacetime)
+lu_interp,integration_domain = RB.temp_mdeim(mdeim_style,basis)
+proj_basis = RB.temp_reduce_operator(mdeim_style,basis,RB.get_basis(red_trial),RB.get_basis(red_test);combine)
+red_trian = RB.reduce_triangulation(jjac[1].trians[1],integration_domain,red_trial,red_test)
+coefficient = RB.allocate_coefficient(solver,basis)
+result = RB.allocate_result(solver,red_trial,red_test)
+ad = AffineDecomposition(proj_basis,lu_interp,integration_domain,coefficient,result)
