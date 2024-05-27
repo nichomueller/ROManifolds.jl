@@ -113,11 +113,11 @@ r = TransientParamRealization(ParamRealization(params),t0:dt:tf)
 
 fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ;r)
 
-# rbop = reduced_operator(rbsolver,feop,fesnaps)
-# rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-# results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-# println(RB.space_time_error(results))
+println(RB.space_time_error(results))
 
 # test 1 : try old code with new basis
 soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
@@ -242,83 +242,3 @@ end
 
 b = old_ttsvd(mat)
 matrec = my_eval(b)
-
-# index map
-U,V = test,test
-sparsity = get_sparsity(U,V)
-psparsity = FEM.permute_sparsity(sparsity,U,V)
-I,J,_ = findnz(psparsity)
-i,j,_ = FEM.univariate_findnz(psparsity)
-
-IJ = get_nonzero_indices(psparsity)
-lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
-
-unrows = FEM.univariate_num_rows(sparsity)
-uncols = FEM.univariate_num_cols(sparsity)
-unnz = FEM.univariate_nnz(sparsity)
-g2l = zeros(Int,unnz...)
-
-k,gid = 2,IJ[2]
-irows = Tuple(tensorize_indices(I[k],unrows))
-icols = Tuple(tensorize_indices(J[k],uncols))
-iaxes = CartesianIndex.(irows,icols)
-global2local = map((i,j) -> findfirst(i.==[j]),lids,iaxes)
-g2l[global2local...] = gid
-
-
-
-index_map_I = get_dof_permutation(V)
-index_map_J = get_dof_permutation(U)
-index_map_I_univ1 = get_dof_permutation(Float64,model.models_1d[1],V.spaces_1d[1],order)
-index_map_I_univ2 = get_dof_permutation(Float64,model.models_1d[2],V.spaces_1d[2],order)
-
-# Iperm = map(i->findfirst(index_map_I[:].==i),I)
-# Jperm = map(j->findfirst(index_map_J[:].==j),J)
-# iperm = [
-#   map(i->findfirst(index_map_I_univ1[:].==i),i[1]),
-#   map(i->findfirst(index_map_I_univ2[:].==i),i[2])
-#   ]
-# jperm = [
-#   map(j->findfirst(index_map_I_univ1[:].==j),j[1]),
-#   map(j->findfirst(index_map_I_univ2[:].==j),j[2])
-#   ]
-Iperm = map(i->findfirst(I.==i),index_map_I[:])
-Jperm = map(j->findfirst(J.==j),index_map_J[:])
-iperm = [
-  map(i->findfirst(i[1].==i),index_map_I_univ1[:]),
-  map(i->findfirst(i[2].==i),index_map_I_univ2[:])
-  ]
-jperm = [
-  map(j->findfirst(j[1].==j),index_map_I_univ1[:]),
-  map(j->findfirst(j[2].==j),index_map_I_univ2[:])
-  ]
-
-IJ = get_nonzero_indices(sparsity)
-lids = map((ii,ji)->CartesianIndex.(ii,ji),iperm,jperm)
-
-unrows = FEM.univariate_num_rows(sparsity)
-uncols = FEM.univariate_num_cols(sparsity)
-unnz = FEM.univariate_nnz(sparsity)
-g2l = zeros(Int,unnz...)
-
-@inbounds for (k,gid) = enumerate(IJ)
-  irows = Tuple(tensorize_indices(Iperm[k],unrows))
-  icols = Tuple(tensorize_indices(Jperm[k],uncols))
-  iaxes = CartesianIndex.(irows,icols)
-  global2local = map((i,j) -> findfirst(i.==[j]),lids,iaxes)
-  g2l[global2local...] = gid
-end
-
-MS = M[index_map_I[:],index_map_I[:]]
-MSB1 = MS[1:6,1:6]
-v1 = nonzeros(MSB1)
-
-M1 = assemble_matrix((u,v)->∫(u*v)dΩ.measures_1d[1],test.spaces_1d[1],test.spaces_1d[1])
-M1p = M1[index_map_I_univ1,index_map_I_univ1]
-M2 = assemble_matrix((u,v)->∫(u*v)dΩ.measures_1d[2],test.spaces_1d[2],test.spaces_1d[2])
-M2p = M2[index_map_I_univ2,index_map_I_univ2]
-M12 = kron(M2,M1)
-M12p = kron(M2p,M1p)
-
-p = test.dof_permutation
-ip = invperm(p[:])

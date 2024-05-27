@@ -417,13 +417,21 @@ function permute_sparsity(s::TProductSparsityPattern,U::TProductFESpace,V::TProd
   permute_sparsity(s,(index_map_I,index_map_I_1d),(index_map_J,index_map_J_1d))
 end
 
+function permute_ids(i::AbstractArray{Int},perm::AbstractArray{Int})
+  ip = copy(i)
+  @inbounds for (k,ik) in enumerate(ip)
+    ip[k] = perm[ik]
+  end
+  return ip
+end
+
 function get_sparse_index_map(U::TProductFESpace,V::TProductFESpace)
   sparsity = get_sparsity(U,V)
   psparsity = permute_sparsity(sparsity,U,V)
   I,J,_ = findnz(psparsity)
   i,j,_ = univariate_findnz(psparsity)
-  g2l = _global_2_local_nnz(sparsity,I,J,i,j)
-  # g2l = _invperm(pg2l,U,V)
+  pg2l = _global_2_local_nnz(psparsity,I,J,i,j)
+  g2l = _invperm(pg2l,U,V)
   return SparseIndexMap(g2l,sparsity)
 end
 
@@ -445,4 +453,16 @@ function _global_2_local_nnz(sparsity,I,J,i,j)
   end
 
   return IndexMap(g2l)
+end
+
+function _invperm(perm,U::TProductFESpace,V::TProductFESpace)
+  nrows = num_free_dofs(V)
+  index_map_I = vec(get_dof_permutation(V))
+  index_map_J = vec(get_dof_permutation(U))
+  index_map_IJ = index_map_I .+ nrows .* (index_map_J'.-1)
+  iperm = copy(perm)
+  @inbounds for (k,pk) in enumerate(perm)
+    iperm[k] = index_map_IJ[pk]
+  end
+  return IndexMap(iperm)
 end
