@@ -70,35 +70,49 @@ end
 
 function Projection(s::TTSnapshots,args...;kwargs...)
   cores_space...,core_time = ttsvd(s,args...;kwargs...)
-  TTSVDCores(cores_space,core_time)
+  index_map = get_index_map(s)
+  TTSVDCores(cores_space,core_time,index_map)
 end
 
 function Projection(s::NnzTTSnapshots,args...;kwargs...)
   cores_space...,core_time = ttsvd(s,args...;kwargs...)
-  basis = TTSVDCores(cores_space,core_time)
-  recast_basis(s,basis)
+  cores_space′ = recast(s,cores_space)
+  index_map = get_index_map(s)
+  TTSVDCores(cores_space′,core_time,index_map)
 end
 
-struct TTSVDCores{D,A,B} <: Projection
+struct TTSVDCores{D,A,B,C,I} <: Projection
   cores_space::A
   core_time::B
+  basis_spacetime::C
+  index_map::I
   function TTSVDCores(
     cores_space::Vector{<:AbstractArray{T,D}} where T,
-    core_time::AbstractArray{S,3} where S
+    core_time::AbstractArray{S,3} where S,
+    basis_spacetime::AbstractMatrix,
+    index_map::AbstractIndexMap
     ) where D
 
     A = typeof(cores_space)
     B = typeof(core_time)
-    new{D,A,B}(cores_space,core_time)
+    C = typeof(basis_spacetime)
+    I = typeof(index_map)
+    new{D,A,B,C,I}(cores_space,core_time,basis_spacetime,index_map)
   end
+end
+
+function TTSVDCores(cores_space::Vector{<:AbstractArray},core_time::AbstractArray,index_map::AbstractIndexMap)
+  basis_spacetime = get_basis_spacetime(index_map,cores_space,core_time)
+  TTSVDCores(cores_space,core_time,basis_spacetime,index_map)
 end
 
 get_cores(b::TTSVDCores) = (get_spatial_cores(b)...,get_temporal_cores(b))
 get_spatial_cores(b::TTSVDCores) = b.cores_space
 get_temporal_cores(b::TTSVDCores) = b.core_time
-get_basis_space(b::TTSVDCores) = cores2basis(get_spatial_cores(b)...)
+get_basis_space(b::TTSVDCores) = cores2basis(get_index_map(b),get_spatial_cores(b)...)
 get_basis_time(b::TTSVDCores) = cores2basis(get_temporal_cores(b))
-get_basis_spacetime(b::TTSVDCores) = cores2basis(get_spatial_cores(b)...,get_temporal_cores(b))
+get_basis_spacetime(b::TTSVDCores) = b.basis_spacetime
+FEM.get_index_map(b::TTSVDCores) = b.index_map
 FEM.num_times(b::TTSVDCores) = size(get_temporal_cores(b),2)
 num_reduced_space_dofs(b::TTSVDCores) = size(last(get_spatial_cores(b)),3)
 num_reduced_times(b::TTSVDCores) = size(get_temporal_cores(b),3)
@@ -133,17 +147,7 @@ end
 # when we multiply two 4-D spatial cores, the result is a 3-D core that stacks
 # the matrices' rows and columns
 function _cores2basis(a::AbstractArray{S,4},b::AbstractArray{T,4}) where {S,T}
-  @check size(a,4) == size(b,1)
-  TS = promote_type(T,S)
-  nrows = size(a,2)*size(b,2)
-  ncols = size(a,3)*size(b,3)
-  ab = zeros(TS,size(a,1),nrows*ncols,size(b,4))
-  for i = axes(a,1), j = axes(b,4)
-    for α = axes(a,4)
-      @inbounds @views ab[i,:,j] += vec(kronecker(b[α,:,:,j],a[i,:,:,α]))
-    end
-  end
-  return ab
+  @abstractmethod
 end
 
 # when we multiply a 4-D spatial core with a 3-D temporal core
@@ -170,6 +174,15 @@ function _cores2basis(a::AbstractArray,b::AbstractArray...)
   return _cores2basis(_cores2basis(a,c),d...)
 end
 
+function _cores2basis(i::AbstractIndexMap,a::AbstractArray{T,3}...) where T
+  basis = _cores2basis(a...)
+  return view(basis,:,vec(i),:)
+end
+
+function _cores2basis(i::AbstractIndexMap,a::AbstractArray{T,4}...) where T
+  @abstractmethod
+end
+
 function cores2basis(cores::AbstractArray...)
   c2m = _cores2basis(cores...)
   return dropdims(c2m;dims=1)
@@ -185,10 +198,12 @@ function cores2basis(core::AbstractArray{T,4}) where T
   return reshape(pcore,size(pcore,1)*size(pcore,2),:)
 end
 
-function recast_basis(s::NnzTTSnapshots,b::TTSVDCores)
-  cores_space = recast(s,get_spatial_cores(b))
-  core_time = get_temporal_cores(b)
-  TTSVDCores(cores_space,core_time)
+function get_basis_space(index_map::AbstractIndexMap,cores_space)
+  cores2basis(_cores2basis(index_map,cores_space...))
+end
+
+function get_basis_spacetime(index_map::AbstractIndexMap,cores_space,core_time)
+  cores2basis(_cores2basis(index_map,cores_space...),core_time)
 end
 
 function recast(x::AbstractVector,b::TTSVDCores)

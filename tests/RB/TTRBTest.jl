@@ -128,54 +128,20 @@ pop = PODOperator(odeop,red_trial,red_test)
 smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
 jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
 red_res = RB.reduced_residual(rbsolver,pop,rres)
-red_jac = RB.temp_reduced_jacobian(rbsolver,pop,jjac)
+red_jac = RB.reduced_jacobian(rbsolver,pop,jjac)
 
-# A = rres[1]
-# mdeim_style = rbsolver.mdeim_style
-# basis = reduced_basis(A;ϵ=RB.get_tol(rbsolver))
-# # lu_interp,integration_domain = mdeim(mdeim_style,basis)
-# basis_spacetime = get_basis_spacetime(basis)
-# indices_spacetime = RB.get_mdeim_indices(basis_spacetime)
-# indices_space = fast_index(indices_spacetime,RB.num_space_dofs(basis))
-# indices_time = slow_index(indices_spacetime,RB.num_space_dofs(basis))
-# lu_interp = lu(view(basis_spacetime,indices_spacetime,:))
+A = jjac[1][1]
+mdeim_style = rbsolver.mdeim_style
+basis = reduced_basis(A;ϵ=RB.get_tol(rbsolver))
+lu_interp,integration_domain = mdeim(mdeim_style,basis)
+proj_basis = reduce_operator(mdeim_style,basis,red_trial,red_test)
+red_trian = reduce_triangulation(Ω.trian,integration_domain,red_trial,red_test)
 
-trians_rhs = get_domains(red_res)
-trians_lhs = map(get_domains,red_jac)
-new_op = change_triangulation(pop,trians_rhs,trians_lhs)
-rbop = PODMDEIMOperator(new_op,red_jac,red_res)
+basis_spacetime = get_basis_spacetime(basis)
+indices_spacetime = get_mdeim_indices(basis_spacetime)
 
-rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+indices_space = recast_indices(RB.get_indices_space(integration_domain),trial,test)
 
-println(RB.space_time_error(results))
-
-################# running code ###############
-# RB.temp_reduced_jacobian(rbsolver,pop,jjac[1])
-combine = (x,y) -> θ*x+(1-θ)*y
-op,solver = pop,rbsolver
-s = RB.OldTTNnzSnapshots(jjac[1][1].values,jjac[1][1].realization)
-red_trial = get_trial(op)
-red_test = get_test(op)
-mdeim_style = solver.mdeim_style
-# basis = temp_reduced_basis(s;ϵ=get_tol(solver))
-i = get_dof_permutation(test)
-_old_core_space = get_basis_space(red_trial.basis)[invperm(i[:]),:]
-old_core_space = reshape(_old_core_space,1,size(_old_core_space)...)
-old_basis = RB.OldTTSVDCores([old_core_space,red_trial.basis.core_time])
-cores = RB.temp_ttsvd(s)
-b = RB.OldTTSVDCores(cores)
-_space_core,time_core = b.cores
-space_core = RB.temp_recast(s,_space_core)
-basis = RB.OldTTSVDCores([space_core,time_core])
-lu_interp,integration_domain = RB.temp_mdeim(mdeim_style,basis)
-proj_basis = RB.temp_reduce_operator(mdeim_style,basis,old_basis,old_basis;combine)
-red_trian = RB.reduce_triangulation(jjac[1].trians[1],integration_domain,red_trial,red_test)
-coefficient = RB.allocate_coefficient(solver,basis)
-result = RB.allocate_result(solver,red_trial,red_test)
-ad = AffineDecomposition(proj_basis,lu_interp,integration_domain,coefficient,result)
-
-################
 op = rbop
 son = select_snapshots(fesnaps,RB.online_params(rbsolver))
 r = get_realization(son)

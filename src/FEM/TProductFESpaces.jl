@@ -467,14 +467,14 @@ function _invperm(perm,U::TProductFESpace,V::TProductFESpace)
   return IndexMap(iperm)
 end
 
-function recast_indices(indices::AbstractVector,f::FESpace...)
-  return indices
-end
+# function recast_indices(indices::AbstractVector,f::FESpace...)
+#   return indices
+# end
 
-function recast_indices(indices::AbstractVector,V::TProductFESpace)
-  p = get_dof_permutation(V)
-  return vec(p)[indices]
-end
+# function recast_indices(indices::AbstractVector,V::TProductFESpace)
+#   p = get_dof_permutation(V)
+#   return vec(p)[indices]
+# end
 
 # function recast_indices(indices::AbstractVector,U::TProductFESpace,V::TProductFESpace)
 #   nrows = num_free_dofs(V)
@@ -491,11 +491,11 @@ end
 #     end
 #   end
 # end
-for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
-  @eval begin
-    function recast_indices(indices::AbstractVector,U::$F{<:TProductFESpace},V::TProductFESpace)
-      @warn "deactivated recast indices for jacobians during debugging"
-      return indices
-    end
-  end
-end
+# for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
+#   @eval begin
+#     function recast_indices(indices::AbstractVector,U::$F{<:TProductFESpace},V::TProductFESpace)
+#       @warn "deactivated recast indices for jacobians during debugging"
+#       return indices
+#     end
+#   end
+# end

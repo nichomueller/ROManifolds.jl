@@ -48,6 +48,12 @@ export get_realization
 export compress
 include("Snapshots.jl")
 
+export AbstractTTCore
+export TTCore
+export SparseCore
+export SparseCoreCSC
+include("TTCores.jl")
+
 export TTSnapshots
 export BasicTTSnapshots
 export TransientTTSnapshots

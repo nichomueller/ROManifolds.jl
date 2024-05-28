@@ -247,7 +247,10 @@ function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapsho
 end
 
 function select_snapshots_entries(s::TTSnapshots,ispace,itime)
-  _select_snapshots_entries(s,ispace,itime)
+  index_map = get_index_map(s)
+  index_map′ = inv_index_map(index_map)
+  ispace′ = index_map′[ispace]
+  _select_snapshots_entries(s,ispace′,itime)
 end
 
 function _select_snapshots_entries(s::TTSnapshots{T},ispace,itime) where T
@@ -312,75 +315,10 @@ const NnzTTSnapshots = Union{
   TransientNnzTTSnapshots{T,N},
   SelectedNnzTTSnapshotsAtIndices{T,N}} where {T,N}
 
-function select_snapshots_entries(s::NnzTTSnapshots,ispace,itime)
-  index_map = get_index_map(s)
-  cispace = map(i->findfirst(index_map.==i),ispace)
-  _select_snapshots_entries(s,cispace,itime)
-end
-
 function recast(s::NnzTTSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T
   index_map = get_index_map(s)
   g2l = fill(FEM.get_global_2_local_map(index_map),length(a))
   ls = FEM.get_univariate_sparsity(index_map)
   asparse = map(SparseCore,a,g2l,ls)
   return asparse
-end
-
-abstract type SparseCore{T} <: AbstractArray{T,4} end
-
-Base.IndexStyle(::Type{<:SparseCore}) = IndexCartesian()
-
-struct SparseCoreCSC{T,Ti,D} <: SparseCore{T}
-  array::Array{T,3}
-  global_2_local::IndexMap{D}
-  sparsity::SparsityPatternCSC{T,Ti}
-  sparse_indexes::Vector{CartesianIndex{2}}
-end
-
-function SparseCore(
-  array::AbstractArray{T},
-  global_2_local::AbstractIndexMap{D},
-  sparsity::SparsityPatternCSC{T}) where {T,D}
-
-  irows,icols,_ = findnz(sparsity)
-  SparseCoreCSC(array,global_2_local,sparsity,CartesianIndex.(irows,icols))
-end
-
-Base.size(a::SparseCoreCSC) = (size(a.array,1),FEM.num_rows(a.sparsity),
-  FEM.num_cols(a.sparsity),size(a.array,3))
-
-function Base.getindex(a::SparseCoreCSC,i::Integer...)
-  getindex(a,CartesianIndex(i))
-end
-
-function Base.getindex(a::SparseCoreCSC,i::CartesianIndex{4})
-  is_nnz = CartesianIndex(i.I[2:3]) ∈ a.sparse_indexes
-  sparse_getindex(Val(is_nnz),a,i)
-end
-
-function sparse_getindex(::Val{false},a::SparseCoreCSC{T},i::CartesianIndex{4}) where T
-  zero(T)
-end
-
-function sparse_getindex(::Val{true},a::SparseCoreCSC{T},i::CartesianIndex{4}) where T
-  i2 = findfirst(a.sparse_indexes .== [CartesianIndex(i.I[2:3])])
-  i1,i3 = i.I[1],i.I[4]
-  getindex(a.array,CartesianIndex((i1,i2,i3)))
-end
-
-function _cores2basis(a::SparseCoreCSC{S},b::SparseCoreCSC{T}) where {S,T}
-  @check size(a,4) == size(b,1)
-  @check a.global_2_local == b.global_2_local
-  # local_2_global = sortperm(a.global_2_local[:])
-  g2l = vec(a.global_2_local)
-  TS = promote_type(T,S)
-  nrows = size(a,2)*size(b,2)
-  ncols = size(a,3)*size(b,3)
-  ab = zeros(TS,size(a,1),nrows*ncols,size(b,4))
-  for i = axes(a,1), j = axes(b,4)
-    for α = axes(a,4)
-      @inbounds @views ab[i,g2l,j] += kronecker(b.array[α,:,j],a.array[i,:,α])
-    end
-  end
-  return ab
 end

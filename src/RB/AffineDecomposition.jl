@@ -41,7 +41,7 @@ function get_reduced_cells(
   return unique(cells)
 end
 
-function reduce_triangulation(
+function get_reduced_cells(
   trian::Triangulation,
   ids::AbstractVector,
   test::FESpace)
@@ -49,11 +49,10 @@ function reduce_triangulation(
   cell_dof_ids = get_cell_dof_ids(test,trian)
   indices_space_rows = fast_index(ids,num_free_dofs(test))
   red_integr_cells = get_reduced_cells(cell_dof_ids,indices_space_rows)
-  red_trian = view(trian,red_integr_cells)
-  return red_trian
+  return red_integr_cells
 end
 
-function reduce_triangulation(
+function get_reduced_cells(
   trian::Triangulation,
   ids::AbstractVector,
   trial::FESpace,
@@ -67,14 +66,15 @@ function reduce_triangulation(
   red_integr_cells_trial = get_reduced_cells(cell_dof_ids_trial,indices_space_cols)
   red_integr_cells_test = get_reduced_cells(cell_dof_ids_test,indices_space_rows)
   red_integr_cells = union(red_integr_cells_trial,red_integr_cells_test)
-  red_trian = view(trian,red_integr_cells)
-  return red_trian
+  return red_integr_cells
 end
 
 function reduce_triangulation(trian::Triangulation,i::ReducedIntegrationDomain,r::RBSpace...)
   f = map(get_space,r)
-  indices_space = recast_indices(get_indices_space(i),f...)
-  reduce_triangulation(trian,indices_space,f...)
+  indices_space = get_indices_space(i)
+  red_integr_cells = get_reduced_cells(trian,indices_space,f...)
+  red_trian = view(trian,red_integr_cells)
+  return red_trian
 end
 
 function Algebra.allocate_matrix(::Type{M},m::Integer,n::Integer) where M

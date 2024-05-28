@@ -123,14 +123,8 @@ end
 
 function Arrays.evaluate!(cache::FEM.ParamTTArray,k::RecastMap,x::ParamVector,r::RBSpace)
   c = get_values(cache)
-  perm = get_dof_permutation(r.space)
-  iperm = inv_index_map(perm)
-  for ip in eachindex(x)
-    Xip = recast(x[ip],r.basis)
-    for it in 1:num_times(r)
-      c[(it-1)*length(x)+ip] .= Xip[vec(iperm),it]
-    end
-  end
+  evaluate!(c,k,x,r)
+  copyto!(cache,c)
 end
 
 # multi field interface
