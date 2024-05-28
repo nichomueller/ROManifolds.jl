@@ -247,9 +247,7 @@ function BasicSnapshots(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapsho
 end
 
 function select_snapshots_entries(s::TTSnapshots,ispace,itime)
-  cids = CartesianIndices(num_space_dofs(s)) # is this ok?
-  cispace = map(i->getindex(cids,i),ispace)
-  _select_snapshots_entries(s,cispace,itime)
+  _select_snapshots_entries(s,ispace,itime)
 end
 
 function _select_snapshots_entries(s::TTSnapshots{T},ispace,itime) where T

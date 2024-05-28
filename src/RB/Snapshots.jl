@@ -702,14 +702,14 @@ function tensor_getindex(
   nonzeros(snaps.values[ip][it])[is]
 end
 
-FEM.sparsify_indices(s::BasicNnzSnapshots,srange::AbstractVector) = sparsify_indices(first(s.values),srange)
-FEM.sparsify_indices(s::TransientNnzSnapshots,srange::AbstractVector) = sparsify_indices(first(first(s.values)),srange)
-FEM.sparsify_indices(s::NnzSnapshotsSwappedColumns,srange::AbstractVector) = sparsify_indices(s.snaps,srange)
+FEM.sparsify_indices(srange::AbstractVector,s::BasicNnzSnapshots) = sparsify_indices(srange,first(s.values))
+FEM.sparsify_indices(srange::AbstractVector,s::TransientNnzSnapshots) = sparsify_indices(srange,first(first(s.values)))
+FEM.sparsify_indices(srange::AbstractVector,s::NnzSnapshotsSwappedColumns) = sparsify_indices(srange,s.snaps)
 
 function select_snapshots(s::NnzSnapshots,spacerange,timerange,paramrange)
   _srange = isa(spacerange,Colon) ? Base.OneTo(num_space_dofs(s)) : spacerange
   _srange = isa(_srange,Integer) ? [_srange] : _srange
-  srange = sparsify_indices(s,_srange)
+  srange = sparsify_indices(_srange,s)
   trange = isa(timerange,Colon) ? Base.OneTo(num_times(s)) : timerange
   trange = isa(trange,Integer) ? [trange] : trange
   prange = isa(paramrange,Colon) ? Base.OneTo(num_params(s)) : paramrange

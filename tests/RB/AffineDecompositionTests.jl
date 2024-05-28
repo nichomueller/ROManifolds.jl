@@ -75,7 +75,7 @@ if mdeim_style == RB.SpaceOnlyMDEIM()
 else
   @check length(indices_time) == 1
 end
-recast_indices_space = RB.recast_indices(basis_space,indices_space)
+recast_indices_space = RB.recast_indices(indices_space,basis_space)
 integration_domain = RB.ReducedIntegrationDomain(recast_indices_space,indices_time)
 proj_basis_space = map(basis_space.values) do a
   Φ'*a*Φ

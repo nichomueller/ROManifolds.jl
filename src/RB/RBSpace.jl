@@ -62,6 +62,7 @@ end
 
 ODEs.time_derivative(U::RBSpace) = RBSpace(time_derivative(U),U.basis)
 
+get_space(r::RBSpace) = r.space
 get_basis(r::RBSpace) = r.basis
 
 get_basis_space(r::RBSpace) = get_basis_space(r.basis)
@@ -115,15 +116,21 @@ function Arrays.evaluate!(cache,k::RecastMap,x::ParamVector,r::RBSpace)
   for ip in eachindex(x)
     Xip = recast(x[ip],r.basis)
     for it in 1:num_times(r)
-      cache[(it-1)*length(x)+ip] = Xip[:,it]
+      cache[(it-1)*length(x)+ip] .= Xip[:,it]
     end
   end
 end
 
 function Arrays.evaluate!(cache::FEM.ParamTTArray,k::RecastMap,x::ParamVector,r::RBSpace)
   c = get_values(cache)
-  evaluate!(c,k,x,r)
-  copyto!(cache,c)
+  perm = get_dof_permutation(r.space)
+  iperm = inv_index_map(perm)
+  for ip in eachindex(x)
+    Xip = recast(x[ip],r.basis)
+    for it in 1:num_times(r)
+      c[(it-1)*length(x)+ip] .= Xip[vec(iperm),it]
+    end
+  end
 end
 
 # multi field interface

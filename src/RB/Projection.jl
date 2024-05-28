@@ -200,12 +200,6 @@ function recast(x::AbstractVector,b::TTSVDCores)
   reshape(xrec,Ns,Nt)
 end
 
-function FEM.recast_indices(b::TTSVDCores,indices::AbstractVector)
-  space_dofs = _num_tot_space_dofs(b)
-  tensor_indices = tensorize_indices(indices,space_dofs)
-  return tensor_indices
-end
-
 # multi field interface
 
 struct BlockProjection{A,N}

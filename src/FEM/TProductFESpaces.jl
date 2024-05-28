@@ -432,7 +432,7 @@ function get_sparse_index_map(U::TProductFESpace,V::TProductFESpace)
   i,j,_ = univariate_findnz(psparsity)
   pg2l = _global_2_local_nnz(psparsity,I,J,i,j)
   g2l = _invperm(pg2l,U,V)
-  return SparseIndexMap(g2l,sparsity)
+  return SparseIndexMap(g2l,psparsity)
 end
 
 function _global_2_local_nnz(sparsity,I,J,i,j)
@@ -465,4 +465,37 @@ function _invperm(perm,U::TProductFESpace,V::TProductFESpace)
     iperm[k] = index_map_IJ[pk]
   end
   return IndexMap(iperm)
+end
+
+function recast_indices(indices::AbstractVector,f::FESpace...)
+  return indices
+end
+
+function recast_indices(indices::AbstractVector,V::TProductFESpace)
+  p = get_dof_permutation(V)
+  return vec(p)[indices]
+end
+
+# function recast_indices(indices::AbstractVector,U::TProductFESpace,V::TProductFESpace)
+#   nrows = num_free_dofs(V)
+#   pU = get_dof_permutation(U)
+#   pV = get_dof_permutation(V)
+#   pUV = vec(pV) .+ nrows .* (vec(pU)'.-1)
+#   return vec(pUV)[indices]
+# end
+
+# for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
+#   @eval begin
+#     function recast_indices(indices::AbstractVector,U::$F{<:TProductFESpace},V::TProductFESpace)
+#       recast_indices(indices,U.space,V)
+#     end
+#   end
+# end
+for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
+  @eval begin
+    function recast_indices(indices::AbstractVector,U::$F{<:TProductFESpace},V::TProductFESpace)
+      @warn "deactivated recast indices for jacobians during debugging"
+      return indices
+    end
+  end
 end

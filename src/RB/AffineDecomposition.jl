@@ -43,11 +43,11 @@ end
 
 function reduce_triangulation(
   trian::Triangulation,
-  i::ReducedIntegrationDomain,
-  test::RBSpace)
+  ids::AbstractVector,
+  test::FESpace)
 
-  cell_dof_ids = get_cell_dof_ids(test.space,trian)
-  indices_space_rows = fast_index(i.indices_space,num_free_dofs(test.space))
+  cell_dof_ids = get_cell_dof_ids(test,trian)
+  indices_space_rows = fast_index(ids,num_free_dofs(test))
   red_integr_cells = get_reduced_cells(cell_dof_ids,indices_space_rows)
   red_trian = view(trian,red_integr_cells)
   return red_trian
@@ -55,20 +55,26 @@ end
 
 function reduce_triangulation(
   trian::Triangulation,
-  i::ReducedIntegrationDomain,
-  trial::RBSpace,
-  test::RBSpace)
+  ids::AbstractVector,
+  trial::FESpace,
+  test::FESpace)
 
-  trial0 = trial.space(nothing)
-  cell_dof_ids_trial = get_cell_dof_ids(trial0,trian)
-  cell_dof_ids_test = get_cell_dof_ids(test.space,trian)
-  indices_space_cols = slow_index(i.indices_space,num_free_dofs(trial0))
-  indices_space_rows = fast_index(i.indices_space,num_free_dofs(test.space))
+  cell_dof_ids_trial = get_cell_dof_ids(trial,trian)
+  cell_dof_ids_test = get_cell_dof_ids(test,trian)
+  # indices_space_cols = slow_index(ids,num_free_dofs(trial))
+  indices_space_cols = slow_index(ids,num_free_dofs(test))
+  indices_space_rows = fast_index(ids,num_free_dofs(test))
   red_integr_cells_trial = get_reduced_cells(cell_dof_ids_trial,indices_space_cols)
   red_integr_cells_test = get_reduced_cells(cell_dof_ids_test,indices_space_rows)
   red_integr_cells = union(red_integr_cells_trial,red_integr_cells_test)
   red_trian = view(trian,red_integr_cells)
   return red_trian
+end
+
+function reduce_triangulation(trian::Triangulation,i::ReducedIntegrationDomain,r::RBSpace...)
+  f = map(get_space,r)
+  indices_space = recast_indices(get_indices_space(i),f...)
+  reduce_triangulation(trian,indices_space,f...)
 end
 
 function Algebra.allocate_matrix(::Type{M},m::Integer,n::Integer) where M
@@ -154,7 +160,7 @@ function mdeim(mdeim_style::MDEIMStyle,b::PODBasis)
   basis_space = get_basis_space(b)
   basis_time = get_basis_time(b)
   indices_space = get_mdeim_indices(basis_space)
-  recast_indices_space = recast_indices(basis_space,indices_space)
+  recast_indices_space = recast_indices(indices_space,basis_space)
   interp_basis_space = view(basis_space,indices_space,:)
   indices_time,lu_interp = _time_indices_and_interp_matrix(mdeim_style,interp_basis_space,basis_time)
   integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)

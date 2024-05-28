@@ -107,13 +107,13 @@ end
 
 # some index utils
 
-function recast_indices(A::AbstractArray,indices::AbstractVector)
+function recast_indices(indices::AbstractVector,A::AbstractArray)
   nonzero_indices = get_nonzero_indices(A)
   entire_indices = nonzero_indices[indices]
   return entire_indices
 end
 
-function sparsify_indices(A::AbstractArray,indices::AbstractVector)
+function sparsify_indices(indices::AbstractVector,A::AbstractArray)
   nonzero_indices = get_nonzero_indices(A)
   sparse_indices = map(y->findfirst(x->x==y,nonzero_indices),indices)
   return sparse_indices
