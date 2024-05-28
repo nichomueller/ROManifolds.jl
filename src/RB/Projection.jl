@@ -176,7 +176,8 @@ end
 
 function _cores2basis(i::AbstractIndexMap,a::AbstractArray{T,3}...) where T
   basis = _cores2basis(a...)
-  return view(basis,:,vec(i),:)
+  invi = inv_index_map(i)
+  return view(basis,:,vec(invi),:)
 end
 
 function _cores2basis(i::AbstractIndexMap,a::AbstractArray{T,4}...) where T

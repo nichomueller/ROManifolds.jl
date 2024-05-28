@@ -248,8 +248,7 @@ end
 
 function select_snapshots_entries(s::TTSnapshots,ispace,itime)
   index_map = get_index_map(s)
-  index_map′ = inv_index_map(index_map)
-  ispace′ = index_map′[ispace]
+  ispace′::Vector{Int} = map(is->findfirst(vec(index_map).==is),ispace)
   _select_snapshots_entries(s,ispace′,itime)
 end
 
@@ -317,8 +316,7 @@ const NnzTTSnapshots = Union{
 
 function recast(s::NnzTTSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T
   index_map = get_index_map(s)
-  g2l = fill(FEM.get_global_2_local_map(index_map),length(a))
   ls = FEM.get_univariate_sparsity(index_map)
-  asparse = map(SparseCore,a,g2l,ls)
+  asparse = map(SparseCore,a,ls)
   return asparse
 end

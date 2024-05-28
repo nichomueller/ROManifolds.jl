@@ -1,5 +1,8 @@
 abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
 
+Base.IndexStyle(::Type{<:AbstractTTCore}) = IndexCartesian()
+Base.getindex(a::AbstractTTCore,i::Int...) = getindex(a,CartesianIndex(i))
+
 abstract type SparseCore{T} <: AbstractTTCore{T,4} end
 
 struct SparseCoreCSC{T,Ti} <: SparseCore{T}
@@ -38,29 +41,31 @@ function _cores2basis(a::SparseCoreCSC{S},b::SparseCoreCSC{T}) where {S,T}
   @notimplemented "Need to provide a sparse index map for the construction of the global basis"
 end
 
-function _cores2basis(I::AbstractIndexMap,a::SparseCoreCSC{S},b::SparseCoreCSC{T}) where {S,T}
+function _cores2basis(I::SparseIndexMap,a::SparseCoreCSC{S},b::SparseCoreCSC{T}) where {S,T}
   @check size(a,4) == size(b,1)
+  Is = FEM.get_global_2_local_map(I)
   TS = promote_type(T,S)
   nrows = size(a,2)*size(b,2)
   ncols = size(a,3)*size(b,3)
   ab = zeros(TS,size(a,1),nrows*ncols,size(b,4))
   for i = axes(a,1), j = axes(b,4)
     for α = axes(a,4)
-      @inbounds @views ab[i,vec(I),j] += kronecker(b.array[α,:,j],a.array[i,:,α])
+      @inbounds @views ab[i,vec(Is),j] += kronecker(b.array[α,:,j],a.array[i,:,α])
     end
   end
   return ab
 end
 
-function _cores2basis(I::AbstractIndexMap,a::SparseCoreCSC{S},b::SparseCoreCSC{T},c::SparseCoreCSC{U}) where {S,T,U}
+function _cores2basis(I::SparseIndexMap,a::SparseCoreCSC{S},b::SparseCoreCSC{T},c::SparseCoreCSC{U}) where {S,T,U}
   @check size(a,4) == size(b,1) && size(b,4) == size(c,1)
+  Is = FEM.get_global_2_local_map(I)
   TSU = promote_type(T,S,U)
   nrows = size(a,2)*size(b,2)*size(c,2)
   ncols = size(a,3)*size(b,3)*size(c,3)
   abc = zeros(TSU,size(a,1),nrows*ncols,size(c,4))
   for i = axes(a,1), j = axes(c,4)
     for α = axes(a,4), β = axes(b,4)
-      @inbounds @views abc[i,vec(I),j] += kronecker(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α])
+      @inbounds @views abc[i,vec(Is),j] += kronecker(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α])
     end
   end
   return abc

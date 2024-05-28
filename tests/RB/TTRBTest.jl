@@ -118,39 +118,3 @@ rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 println(RB.space_time_error(results))
-
-# test 1 : try old code with new basis
-soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
-red_trial,red_test = reduced_fe_space(rbsolver,feop,soff)
-
-odeop = get_algebraic_operator(feop)
-pop = PODOperator(odeop,red_trial,red_test)
-smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
-jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
-red_res = RB.reduced_residual(rbsolver,pop,rres)
-red_jac = RB.reduced_jacobian(rbsolver,pop,jjac)
-
-A = jjac[1][1]
-mdeim_style = rbsolver.mdeim_style
-basis = reduced_basis(A;ϵ=RB.get_tol(rbsolver))
-lu_interp,integration_domain = mdeim(mdeim_style,basis)
-proj_basis = reduce_operator(mdeim_style,basis,red_trial,red_test)
-red_trian = reduce_triangulation(Ω.trian,integration_domain,red_trial,red_test)
-
-basis_spacetime = get_basis_spacetime(basis)
-indices_spacetime = get_mdeim_indices(basis_spacetime)
-
-indices_space = recast_indices(RB.get_indices_space(integration_domain),trial,test)
-
-op = rbop
-son = select_snapshots(fesnaps,RB.online_params(rbsolver))
-r = get_realization(son)
-red_trial = get_trial(op)(r)
-fe_trial = get_fe_trial(op)(r)
-x̂ = zero_free_values(red_trial)
-y = zero_free_values(fe_trial)
-
-odecache = allocate_odecache(fesolver,op,r,(y,))
-solve!((x̂,),fesolver,op,r,(y,),odecache)
-x = recast(x̂,red_trial)
-s = Snapshots(x,r)

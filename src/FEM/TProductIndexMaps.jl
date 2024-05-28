@@ -101,7 +101,7 @@ get_sparsity(i::SparseIndexMap) = get_sparsity(i.sparsity)
 get_univariate_sparsity(i::SparseIndexMap) = get_univariate_sparsity(i.sparsity)
 
 function inv_index_map(i::SparseIndexMap)
-  invi = sortperm(i[:])
+  invi = IndexMap(reshape(sortperm(i[:]),size(i)))
   SparseIndexMap(invi,i.sparsity)
 end
 
