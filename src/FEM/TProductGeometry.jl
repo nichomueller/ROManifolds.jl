@@ -35,7 +35,7 @@ function TProductModel(args...;kwargs...)
 end
 
 function _axes_to_lower_dim_entities(coords::AbstractArray{VectorValue{D,T},D}) where {D,T}
-  function _lower_dim_entities_at_axis!(entities,coords::AbstractArray,ax::Int)
+  function _lower_dim_entities_at_axis!(entities,coords::AbstractArray,ax::Integer)
     range = axes(coords,ax)
     bottom = selectdim(coords,ax,first(range))
     top = selectdim(coords,ax,last(range))

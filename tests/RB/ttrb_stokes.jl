@@ -72,7 +72,7 @@ trian_stiffness = (Ω,)
 trian_mass = (Ω,)
 
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
-induced_norm((du,dp),(v,q)) = ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
+induced_norm((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
@@ -100,24 +100,34 @@ using FillArrays
 basis,reffe_args,reffe_kwargs = reffe_u
 T,order = reffe_args
 cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
-cell_reffes_1d = map(model->ReferenceFE(model,basis,T,order;reffe_kwargs...),model.models_1d)
+cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
 space = FESpace(model.model,cell_reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 spaces_1d = FEM.univariate_spaces(model,cell_reffes_1d;conformity=:H1,dirichlet_tags=["dirichlet"])
-dof_permutation = get_dof_permutation(T,model.model,space,order,cell_reffe)
+comp_to_dofs = FEM.get_comp_to_free_dofs(T,space,cell_reffe)
+dof_permutation = get_dof_permutation(T,model.model,space,order,comp_to_dofs)
+tp_dof_permutation = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order)
 
-cell_dof_ids = get_cell_dof_ids(space)
-# comp2dofs = comp_to_free_dofs(T,space;kwargs...)
-
-conf = Conformity(testitem(cell_reffe),:H1)
-cell_fe = CellFE(model,cell_reffe,conf)
-
-cell_dof_ids = get_cell_dof_ids(space)
-comp2dofs = FEM.comp_to_free_dofs(T,space,cell_reffe)
-Ti = eltype(eltype(cell_dof_ids))
-dof_perms = Matrix{Ti}[]
-for dofs in comp2dofs
-  cell_dof_comp_ids = FEM._get_cell_dof_comp_ids(cell_dof_ids,dofs)
-  dof_perm_comp = FEM._get_dof_permutation(model.model,cell_dof_comp_ids,order)
-  push!(dof_perms,dof_perm_comp)
+function _to_ncomps(perm::AbstractArray{S,D}) where {S,D}
+  ncomp = num_components(T)
+  ncomp_perm = zeros(S,size(perm)...,ncomp)
+  @inbounds for comp = 1:ncomp
+    selectdim(ncomp_perm,D+1,comp) .= (perm.-1).*ncomp .+ comp
+  end
+  return ncomp_perm
 end
-dof_perm = FEM._dof_perm_from_dof_perms(dof_perms)
+
+dof_perm,dof_perms_1d = FEM._get_tp_dof_permutation(eltype(T),model.models_1d,spaces_1d,order)
+ncomp_dof_perm = _to_ncomps(dof_perm)
+ncomp_dof_perms_1d = _to_ncomps.(dof_perms_1d)
+
+simap = get_sparse_index_map(test_u,test_u)
+
+sparsity = get_sparsity(test_u,test_u)
+psparsity = FEM.permute_sparsity(sparsity,test_u,test_u)
+U,V = test_u,test_u
+index_map_I = get_dof_permutation(V)
+index_map_J = get_dof_permutation(U)
+index_map_I_1d = get_tp_dof_permutation(V).indices_1d
+index_map_J_1d = get_tp_dof_permutation(U).indices_1d
+
+psparsity = FEM.permute_sparsity(sparsity.sparsity,index_map_I,index_map_J)

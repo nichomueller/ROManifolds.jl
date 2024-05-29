@@ -32,7 +32,7 @@ end
 struct ComputationalStats
   avg_time::Float64
   avg_nallocs::Float64
-  function ComputationalStats(stats::NamedTuple,nruns::Int)
+  function ComputationalStats(stats::NamedTuple,nruns::Integer)
     avg_time = stats[:time] / nruns
     avg_nallocs = stats[:bytes] / (1e6*nruns)
     new(avg_time,avg_nallocs)

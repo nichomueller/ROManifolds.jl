@@ -78,7 +78,7 @@ end
 function Base.similar(
   a::ParamArray{T},
   element_type::Type{S}=T,
-  dims::Tuple{Int,Vararg{Int}}=size(a)) where {T,S}
+  dims::Tuple{Integer,Vararg{Integer}}=size(a)) where {T,S}
 
   elb = similar(testitem(a),element_type,dims)
   b = Vector{typeof(elb)}(undef,length(a))
@@ -319,7 +319,7 @@ function LinearAlgebra.diag(a::ParamMatrix)
 end
 
 SparseArrays.nnz(a::ParamSparseMatrix) = nnz(first(a))
-SparseArrays.nzrange(a::ParamSparseMatrix,col::Int) = nzrange(first(a),col)
+SparseArrays.nzrange(a::ParamSparseMatrix,col::Integer) = nzrange(first(a),col)
 SparseArrays.rowvals(a::ParamSparseMatrix) = rowvals(first(a))
 SparseArrays.nonzeros(a::ParamSparseMatrix) = ParamArray(map(nonzeros,a))
 SparseMatricesCSR.colvals(a::ParamSparseMatrix) = colvals(first(a))
@@ -334,7 +334,7 @@ end
 
 function Arrays.setsize!(
   a::ParamArray{T,N,L,AbstractVector{CachedArray{T,N}}},
-  s::NTuple{N,Int}) where {T,N,L}
+  s::NTuple{N,Integer}) where {T,N,L}
 
   for ai in a
     setsize!(ai,s)

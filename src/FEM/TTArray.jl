@@ -62,7 +62,7 @@ Base.copyto!(a::TTArray,b::TTArray) = copyto!(get_values(a),get_values(b))
 function Base.similar(
   a::TTArray{D,T},
   element_type::Type{S}=T,
-  dims::Tuple{Int,Vararg{Int}}=size(a)) where {D,T,S}
+  dims::Tuple{Integer,Vararg{Integer}}=size(a)) where {D,T,S}
   TTArray(similar(get_values(a),element_type,dims),get_index_map(a))
 end
 
@@ -174,7 +174,7 @@ function SparseArrays.sparse(
 end
 
 SparseArrays.nnz(a::TTSparseMatrix) = nnz(get_values(a))
-SparseArrays.nzrange(a::TTSparseMatrix,col::Int) = nzrange(get_values(a),col)
+SparseArrays.nzrange(a::TTSparseMatrix,col::Integer) = nzrange(get_values(a),col)
 SparseArrays.rowvals(a::TTSparseMatrix) = rowvals(get_values(a))
 SparseArrays.nonzeros(a::TTSparseMatrix) = TTArray(nonzeros(get_values(a)),get_index_map(a))
 SparseMatricesCSR.colvals(a::TTSparseMatrix) = colvals(get_values(a))
@@ -193,7 +193,7 @@ end
 
 function Arrays.setsize!(
   a::TTArray{T,N,AbstractVector{CachedArray{T,N}}},
-  s::NTuple{N,Int}) where {T,N}
+  s::NTuple{N,Integer}) where {T,N}
 
   for ai in a
     setsize!(ai,s)

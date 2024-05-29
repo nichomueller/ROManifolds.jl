@@ -19,7 +19,7 @@ function _maximum_dir_d(i::AbstractVector{CartesianIndex{D}},d::Integer) where D
 end
 
 function _shape_per_dir(i::AbstractVector{CartesianIndex{D}}) where D
-  function _admissible_shape(d::Int)
+  function _admissible_shape(d::Integer)
     mind = _minimum_dir_d(i,d)
     maxd = _maximum_dir_d(i,d)
     @assert all([ii.I[d] ≥ mind for ii in i]) && all([ii.I[d] ≤ maxd for ii in i])
@@ -34,24 +34,17 @@ function _shape_per_dir(i::AbstractVector{<:Integer})
   (max1 - min1 + 1,)
 end
 
-abstract type AbstractIndexMap{D} <: AbstractArray{Int,D} end
+abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D} end
 
 Base.IndexStyle(::Type{<:AbstractIndexMap}) = IndexLinear()
 
-struct IndexMap{D} <: AbstractIndexMap{D}
-  indices::Array{Int,D}
+function free_dofs_map(i::AbstractIndexMap)
+  free_dofs_locations = findall(i.>0)
+  IndexMapView(i,free_dofs_locations)
 end
 
-Base.size(i::IndexMap) = size(i.indices)
-Base.getindex(i::IndexMap,j...) = getindex(i.indices,j...)
-
-function free_dofs_map(i::IndexMap)
-  free_dofs_locations = findall(i.indices.>0)
-  IndexMapView(i.indices,free_dofs_locations)
-end
-
-function dirichlet_dofs_map(i::IndexMap)
-  dir_dofs_locations = findall(i.indices.<0)
+function dirichlet_dofs_map(i::AbstractIndexMap)
+  dir_dofs_locations = findall(i.<0)
   i.indices[dir_dofs_locations]
 end
 
@@ -65,38 +58,70 @@ function vectorize_index_map(i::AbstractIndexMap)
   IndexMap(vi)
 end
 
-struct IndexMapView{D,L} <: AbstractIndexMap{D}
-  indices::Array{Int,D}
+struct IndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
+  indices::Array{Ti,D}
+end
+
+Base.size(i::IndexMap) = size(i.indices)
+Base.getindex(i::IndexMap,j...) = getindex(i.indices,j...)
+
+struct IndexMapView{D,Ti,I,L} <: AbstractIndexMap{D,Ti}
+  indices::I
   locations::L
-end
-
-Base.size(i::IndexMapView) = _shape_per_dir(i.locations)
-Base.getindex(i::IndexMapView,j::Int) = i.indices[i.locations[j]]
-
-struct TProductIndexMap{D} <: AbstractIndexMap{D}
-  indices::Array{Int,D}
-  indices_1d::Vector{Vector{Int}}
-end
-
-Base.size(i::TProductIndexMap) = size(i.indices)
-Base.getindex(i::TProductIndexMap,j::Int) = getindex(i.indices,j...)
-get_tp_indices(i::TProductIndexMap) = i.indices
-get_univariate_indices(i::TProductIndexMap) = i.indices_1d
-
-struct SparseIndexMap{D,A,B} <: AbstractIndexMap{D}
-  global_2_local::A
-  sparsity::B
-  function SparseIndexMap(
-    global_2_local::A,
-    sparsity::B
-    ) where {D,A<:AbstractIndexMap{D},B<:TProductSparsityPattern}
-    new{D,A,B}(global_2_local,sparsity)
+  function IndexMapView(indices::I,locations::L) where {D,Ti,I<:AbstractIndexMap{D,Ti},L}
+    new{D,Ti,I,L}(indices,locations)
   end
 end
 
-Base.size(i::SparseIndexMap) = size(i.global_2_local)
-Base.getindex(i::SparseIndexMap,j...) = getindex(i.global_2_local,j...)
-get_global_2_local_map(i::SparseIndexMap) = i.global_2_local
+Base.size(i::IndexMapView) = _shape_per_dir(i.locations)
+Base.getindex(i::IndexMapView,j::Integer) = i.indices[i.locations[j]]
+
+struct MultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
+  indices::Vector{I}
+  function MultiValueIndexMap(indices::I) where {D,Ti,I<:AbstractIndexMap{D,Ti}}
+    new{D,Ti,I}(indices)
+  end
+end
+
+TensorValues.num_components(i::MultiValueIndexMap) = length(i.indices)
+Base.size(i::MultiValueIndexMap) = num_components(i).*size(i.indices)
+
+function Base.getindex(i::MultiValueIndexMap,j::Integer)
+  icomp = fast_index(j,num_components(i))
+  idof = slow_index(j,num_components(i))
+  i.indices[icomp][idof]
+end
+
+struct TProductIndexMap{D,Ti,I} <: AbstractIndexMap{D,Ti}
+  indices::I
+  indices_1d::Vector{Vector{Ti}}
+  function TProductIndexMap(
+    indices::I,
+    indices_1d::Vector{Vector{Ti}}
+    ) where {D,Ti,I<:AbstractIndexMap{D,Ti}}
+    new{D,Ti,I}(indices,indices_1d)
+  end
+end
+
+Base.size(i::TProductIndexMap) = size(i.indices)
+Base.getindex(i::TProductIndexMap,j::Integer) = getindex(i.indices,j...)
+get_tp_indices(i::TProductIndexMap) = i.indices
+get_univariate_indices(i::TProductIndexMap) = i.indices_1d
+
+struct SparseIndexMap{D,Ti,A,B} <: AbstractIndexMap{D,Ti}
+  indices::A
+  sparsity::B
+  function SparseIndexMap(
+    indices::A,
+    sparsity::B
+    ) where {D,Ti,A<:AbstractIndexMap{D,Ti},B<:TProductSparsityPattern}
+    new{D,Ti,A,B}(indices,sparsity)
+  end
+end
+
+Base.size(i::SparseIndexMap) = size(i.indices)
+Base.getindex(i::SparseIndexMap,j...) = getindex(i.indices,j...)
+get_index_map(i::SparseIndexMap) = i.indices
 get_sparsity(i::SparseIndexMap) = get_sparsity(i.sparsity)
 get_univariate_sparsity(i::SparseIndexMap) = get_univariate_sparsity(i.sparsity)
 
@@ -136,7 +161,7 @@ function get_nonzero_indices(A::AbstractArray{T,3} where T)
   return axes(A,2)
 end
 
-function tensorize_indices(i::Int,dofs::Vector{Int})
+function tensorize_indices(i::Integer,dofs::AbstractVector{<:Integer})
   D = length(dofs)
   cdofs = cumprod(dofs)
   ic = ()
@@ -147,7 +172,7 @@ function tensorize_indices(i::Int,dofs::Vector{Int})
   return CartesianIndex(ic)
 end
 
-function tensorize_indices(indices::AbstractVector,dofs::AbstractVector{Int})
+function tensorize_indices(indices::AbstractVector,dofs::AbstractVector{<:Integer})
   D = length(dofs)
   tindices = Vector{CartesianIndex{D}}(undef,length(indices))
   @inbounds for (ii,i) in enumerate(indices)
@@ -156,7 +181,7 @@ function tensorize_indices(indices::AbstractVector,dofs::AbstractVector{Int})
   return tindices
 end
 
-function split_row_col_indices(i::CartesianIndex{D},dofs::AbstractMatrix{Int}) where D
+function split_row_col_indices(i::CartesianIndex{D},dofs::AbstractMatrix{<:Integer}) where D
   @check size(dofs) == (2,D)
   nrows = view(dofs,:,1)
   irc = ()
@@ -166,7 +191,7 @@ function split_row_col_indices(i::CartesianIndex{D},dofs::AbstractMatrix{Int}) w
   return CartesianIndex(irc)
 end
 
-function split_row_col_indices(indices::AbstractVector{CartesianIndex{D}},dofs::AbstractMatrix{Int}) where D
+function split_row_col_indices(indices::AbstractVector{CartesianIndex{D}},dofs::AbstractMatrix{<:Integer}) where D
   rcindices = Vector{CartesianIndex{2*D}}(undef,length(indices))
   @inbounds for (ii,i) in enumerate(indices)
     rcindices[ii] = split_row_col_indices(i,dofs)

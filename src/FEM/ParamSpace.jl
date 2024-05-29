@@ -1,7 +1,7 @@
-slow_index(i,N::Int) = cld.(i,N)#Int.(floor.((i .- 1) ./ N) .+ 1)
-slow_index(i::Colon,::Int) = i
-fast_index(i,N::Int) = mod.(i .- 1,N) .+ 1
-fast_index(i::Colon,::Int) = i
+slow_index(i,N::Integer) = cld.(i,N)
+slow_index(i::Colon,::Integer) = i
+fast_index(i,N::Integer) = mod.(i .- 1,N) .+ 1
+fast_index(i::Colon,::Integer) = i
 
 struct ParamRealization{P<:AbstractVector}
   params::P
@@ -367,8 +367,8 @@ function test_parametric_space()
   γ = TransientParamRealization(α,1)
   δ = TransientParamRealization(α,1:10)
   ϵ = TransientParamRealization(β,1:10)
-  @test isa(δ,TransientParamRealization{<:TrivialParamRealization,UnitRange{Int}})
-  @test isa(ϵ,TransientParamRealization{ParamRealization{Vector{Vector{Float64}}},UnitRange{Int}})
+  @test isa(δ,TransientParamRealization{<:TrivialParamRealization,UnitRange{Integer}})
+  @test isa(ϵ,TransientParamRealization{ParamRealization{Vector{Vector{Float64}}},UnitRange{Integer}})
   @test length(γ) == 1 && length(δ) == 9 && length(ϵ) == 9
   change_time!(ϵ,11:20)
   @test get_times(get_at_time(ϵ,:final)) == 20

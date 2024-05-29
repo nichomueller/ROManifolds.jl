@@ -1,19 +1,19 @@
-function comp_to_free_dofs(::Type{T},space::FESpace,cell_reffe) where T
+function get_comp_to_free_dofs(::Type{T},space::FESpace,cell_reffe) where T
   @abstractmethod
 end
 
-function comp_to_free_dofs(::Type{T},space::UnconstrainedFESpace,cell_reffe) where T
+function get_comp_to_free_dofs(::Type{T},space::UnconstrainedFESpace,cell_reffe) where T
   glue = space.metadata
   ncomps = num_components(T)
   free_dof_to_comp = if isnothing(glue)
-    _free_dof_to_comp(space,cell_reffe)
+    _get_free_dof_to_comp(space,cell_reffe)
   else
     glue.free_dof_to_comp
   end
-  comp_to_free_dofs(free_dof_to_comp,ncomps)
+  get_comp_to_free_dofs(free_dof_to_comp,ncomps)
 end
 
-function _free_dof_to_comp(space,cell_reffe)
+function _get_free_dof_to_comp(space,cell_reffe)
   reffe = testitem(cell_reffe)
   ldof_to_comp = get_dof_to_comp(reffe)
   cell_dof_ids = get_cell_dof_ids(space)
@@ -29,7 +29,7 @@ function _free_dof_to_comp(space,cell_reffe)
   return dof_to_comp
 end
 
-function comp_to_free_dofs(dof2comp,ncomps)
+function get_comp_to_free_dofs(dof2comp,ncomps)
   comp2dof = Vector{typeof(dof2comp)}(undef,ncomps)
   for comp in 1:ncomps
     comp2dof[comp] = findall(dof2comp.==comp)
@@ -72,8 +72,8 @@ end
 
 function _get_dof_permutation(
   model::CartesianDiscreteModel{Dc},
-  cell_dof_ids::Table,
-  order::Integer) where Dc
+  cell_dof_ids::Table{Ti},
+  order::Integer) where {Dc,Ti}
 
   desc = get_cartesian_descriptor(model)
 
@@ -85,7 +85,7 @@ function _get_dof_permutation(
   cache_cell_dof_ids = array_cache(cell_dof_ids)
 
   new_dof_ids = LinearIndices(ndofs)
-  n2o_dof_map = fill(-1,ndofs)
+  n2o_dof_map = fill(Ti(-1),ndofs)
 
   for (icell,cell) in enumerate(CartesianIndices(ncells))
     first_new_dof  = order .* (Tuple(cell) .- 1) .+ 1
@@ -108,11 +108,12 @@ function _get_dof_permutation(
   model::CartesianDiscreteModel,
   space::UnconstrainedFESpace,
   order::Integer,
-  args...) where T
+  args...
+  ) where T
 
   cell_dof_ids = get_cell_dof_ids(space)
   dof_perm = _get_dof_permutation(model,cell_dof_ids,order)
-  return IndexMap(dof_perm)
+  return dof_perm
 end
 
 function _get_dof_permutation(
@@ -120,23 +121,23 @@ function _get_dof_permutation(
   model::CartesianDiscreteModel,
   space::UnconstrainedFESpace,
   order::Integer,
-  cell_reffe) where T<:MultiValue
+  comp_to_dofs::AbstractVector
+  ) where T<:MultiValue
 
   cell_dof_ids = get_cell_dof_ids(space)
-  comp2dofs = comp_to_free_dofs(T,space,cell_reffe)
   Ti = eltype(eltype(cell_dof_ids))
   dof_perms = Matrix{Ti}[]
-  for dofs in comp2dofs
+  for dofs in comp_to_dofs
     cell_dof_comp_ids = _get_cell_dof_comp_ids(cell_dof_ids,dofs)
     dof_perm_comp = _get_dof_permutation(model,cell_dof_comp_ids,order)
     push!(dof_perms,dof_perm_comp)
   end
   dof_perm = _dof_perm_from_dof_perms(dof_perms)
-  return IndexMap(dof_perm)
+  return dof_perm
 end
 
 function get_dof_permutation(args...)
-  index_map = _get_dof_permutation(args...)
+  index_map = IndexMap(_get_dof_permutation(args...))
   free_dofs_map(index_map)
 end
 
@@ -145,8 +146,7 @@ function _get_tp_dof_permutation(models::AbstractVector,spaces::AbstractVector,o
   @assert length(models) == length(spaces)
   D = length(models)
 
-  function _tensor_product(aprev::AbstractArray{Tp,M},a::AbstractVector{Td}) where {Tp,Td,M}
-    T = promote_type(Tp,Td)
+  function _tensor_product(aprev::AbstractArray{T,M},a::AbstractVector) where {T,M}
     N = M+1
     s = (size(aprev)...,length(a))
     atp = zeros(T,s)
@@ -192,25 +192,51 @@ function _get_tp_dof_permutation(models::AbstractVector,spaces::AbstractVector,o
   return _d_dof_permutation(Val(1),Val(D)),free_dof_permutations_1d
 end
 
-function get_tp_dof_permutation(
+function _get_tp_dof_permutation(
   ::Type{T},
   models::AbstractVector,
   spaces::AbstractVector,
-  order::Integer;
-  kwargs...) where T
+  order::Integer
+  ) where T
 
-  dof_perm,dof_perms_1d = _get_tp_dof_permutation(models,spaces,order)
-  return TProductIndexMap(dof_perm,dof_perms_1d)
+  dof_perm = _get_tp_dof_permutation(models,spaces,order)
+  return dof_perm
 end
 
-function get_tp_dof_permutation(
+function _get_tp_dof_permutation(
   ::Type{T},
   models::AbstractVector,
   spaces::AbstractVector,
-  order::Integer;
-  kwargs...) where T<:MultiValue
+  order::Integer
+  ) where T<:MultiValue
 
-  @notimplemented
+  function _to_dof_perm_comps(perm::AbstractArray{S,D}) where {S,D}
+    ncomp = num_components(T)
+    ncomp_perm = zeros(S,size(perm)...,ncomp)
+    @inbounds for comp = 1:ncomp
+      selectdim(ncomp_perm,D+1,comp) .= (perm.-1).*ncomp .+ comp
+    end
+    return ncomp_perm
+  end
+  function _to_dof_perm_vec(perm::AbstractVector{S}) where S
+    ndofs = length(perm)
+    ncomp = num_components(T)
+    ncomp_perm = zeros(S,ndofs*ncomp)
+    @inbounds for comp = 1:ncomp
+      ncomp_perm[comp:ncomp:ndofs*ncomp] .= (perm.-1).*ncomp .+ comp
+    end
+    return ncomp_perm
+  end
+
+  dof_perm,dof_perms_1d = _get_tp_dof_permutation(eltype(T),models,spaces,order)
+  ncomp_dof_perm = _to_dof_perm_comps(dof_perm)
+  ncomp_dof_perms_1d = _to_dof_perm_vec.(dof_perms_1d)
+  return ncomp_dof_perm,ncomp_dof_perms_1d
+end
+
+function get_tp_dof_permutation(args...)
+  dof_perm,dof_perms_1d = _get_tp_dof_permutation(args...)
+  return TProductIndexMap(dof_perm,dof_perms_1d)
 end
 
 function univariate_spaces(model::TProductModel,cell_reffes;dirichlet_tags=Int[],kwargs...)
@@ -266,10 +292,11 @@ function FESpaces.FESpace(
   basis,reffe_args,reffe_kwargs = reffe
   T,order = reffe_args
   cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
-  cell_reffes_1d = map(model->ReferenceFE(model,basis,T,order;reffe_kwargs...),model.models_1d)
+  cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
   space = FESpace(model.model,cell_reffe;kwargs...)
   spaces_1d = univariate_spaces(model,cell_reffes_1d;kwargs...)
-  dof_permutation = get_dof_permutation(T,model.model,space,order,cell_reffe)
+  comp_to_dofs = get_comp_to_free_dofs(T,space,cell_reffe)
+  dof_permutation = get_dof_permutation(T,model.model,space,order,comp_to_dofs)
   tp_dof_permutation = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order)
   TProductFESpace(space,spaces_1d,dof_permutation,tp_dof_permutation)
 end
@@ -431,7 +458,7 @@ function permute_sparsity(s::TProductSparsityPattern,U::TProductFESpace,V::TProd
   permute_sparsity(s,(index_map_I,index_map_I_1d),(index_map_J,index_map_J_1d))
 end
 
-function permute_ids(i::AbstractArray{Int},perm::AbstractArray{Int})
+function permute_ids(i::AbstractArray{<:Integer},perm::AbstractArray{<:Integer})
   ip = copy(i)
   @inbounds for (k,ik) in enumerate(ip)
     ip[k] = perm[ik]

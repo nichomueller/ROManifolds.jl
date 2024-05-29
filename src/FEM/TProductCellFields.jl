@@ -176,11 +176,11 @@ end
 
 # assembly
 
-struct TProductSparseMatrixAssembler{D} <: SparseMatrixAssembler
+struct TProductSparseMatrixAssembler{D,Ti} <: SparseMatrixAssembler
   assem::GenericSparseMatrixAssembler
   assems_1d::Vector{GenericSparseMatrixAssembler}
-  row_index_map::TProductIndexMap{D}
-  col_index_map::TProductIndexMap{D}
+  row_index_map::TProductIndexMap{D,Ti}
+  col_index_map::TProductIndexMap{D,Ti}
 end
 
 function FESpaces.SparseMatrixAssembler(
@@ -277,42 +277,39 @@ end
 
 abstract type AbstractTProductArray{T,N} <: AbstractArray{T,N} end
 
-struct TProductArray{T,N,A} <: AbstractTProductArray{T,N}
+struct TProductArray{T,N,A,I} <: AbstractTProductArray{T,N}
   array::A
   arrays_1d::Vector{A}
-  function TProductArray(array::A,arrays_1d::Vector{A}) where {T,N,A<:AbstractArray{T,N}}
-    new{T,N,A}(array,arrays_1d)
+  index_map::NTuple{N,I}
+  function TProductArray(
+    array::A,
+    arrays_1d::Vector{A},
+    index_map::NTuple{N,I}
+    ) where {T,N,A<:AbstractArray{T,N},I<:TProductIndexMap}
+    new{T,N,A,I}(array,arrays_1d,index_map)
   end
 end
 
-function TProductArray(
-  _array::A,
-  _arrays_1d::Vector{A},
-  index_maps::NTuple{N,TProductIndexMap{D}}
-  ) where {N,D,A<:AbstractArray}
-
-  array = eval_tp_map(_array,map(get_tp_indices,index_maps)...)
-  arrays_1d = map(eval_tp_map,_arrays_1d,map(get_univariate_indices,index_maps)...)
-  TProductArray(array,arrays_1d)
-end
-
-function TProductArray(arrays_1d::Vector{A},index_maps...) where A
+function TProductArray(arrays_1d::Vector{A},index_map::NTuple) where A
   array::A = _kron(arrays_1d...)
-  TProductArray(array,arrays_1d,index_maps...)
-end
-
-function eval_tp_map(a::AbstractVector,row_ids::AbstractArray)
-  a[vec(row_ids)]
-end
-
-function eval_tp_map(a::AbstractMatrix,row_ids::AbstractArray,col_ids::AbstractArray)
-  a[vec(row_ids),vec(col_ids)]
+  TProductArray(array,arrays_1d,index_map)
 end
 
 get_dim(a::TProductArray) = length(a.arrays_1d)
 
 Base.size(a::TProductArray) = size(a.array)
-Base.getindex(a::TProductArray,i...) = a.array[i...]
+
+function Base.getindex(a::TProductArray{T,1},irow::Integer)
+  row_ids = first(a.index_map)
+  getindex(a.array,row_ids[irow])
+end
+
+function Base.getindex(a::TProductArray{T,2},irow::Integer,jcol::Integer)
+  row_ids = first(a.index_map)
+  col_ids = last(a.index_map)
+  getindex(a.array,row_ids[irow],col_ids[jcol])
+end
+
 Base.iterate(a::TProductArray,i...) = iterate(a.array,i...)
 Base.copy(a::TProductArray) = TProductArray(copy(a.array),a.arrays_1d)
 
@@ -361,7 +358,7 @@ end
 const TProductSparseMatrix = TProductArray{T,2,A} where {T,A<:AbstractSparseMatrix}
 
 SparseArrays.nnz(a::TProductSparseMatrix) = nnz(a.array)
-SparseArrays.nzrange(a::TProductSparseMatrix,col::Int) = nzrange(a.array,col)
+SparseArrays.nzrange(a::TProductSparseMatrix,col::Integer) = nzrange(a.array,col)
 SparseArrays.rowvals(a::TProductSparseMatrix) = rowvals(a.array)
 SparseArrays.nonzeros(a::TProductSparseMatrix) = a.array
 
@@ -628,38 +625,42 @@ function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::TPro
   return TProductGradientArray(mat,mats_1d,gradmats_1d,(a.row_index_map,a.col_index_map))
 end
 
-struct TProductGradientArray{T,N,A} <: AbstractTProductArray{T,N}
+struct TProductGradientArray{T,N,A,I} <: AbstractTProductArray{T,N}
   array::A
   arrays_1d::Vector{A}
   gradients_1d::Vector{A}
+  index_map::NTuple{N,I}
   function TProductGradientArray(
-    array::A,arrays_1d::Vector{A},gradients_1d::Vector{A}) where {T,N,A<:AbstractArray{T,N}}
-    new{T,N,A}(array,arrays_1d,gradients_1d)
+    array::A,
+    arrays_1d::Vector{A},
+    gradients_1d::Vector{A},
+    index_map::NTuple{N,I}
+    ) where {T,N,A<:AbstractArray{T,N},I<:TProductIndexMap}
+
+    new{T,N,A,I}(array,arrays_1d,gradients_1d,index_map)
   end
 end
 
-function TProductGradientArray(
-  _array::A,
-  _arrays_1d::Vector{A},
-  _gradients_1d::Vector{A},
-  index_maps::NTuple{N,TProductIndexMap{D}}
-  ) where {N,D,A<:AbstractArray}
-
-  array = eval_tp_map(_array,map(get_tp_indices,index_maps)...)
-  arrays_1d = map(eval_tp_map,_arrays_1d,map(get_univariate_indices,index_maps)...)
-  gradients_1d = map(eval_tp_map,_gradients_1d,map(get_univariate_indices,index_maps)...)
-  TProductGradientArray(array,arrays_1d,gradients_1d)
-end
-
-function TProductGradientArray(arrays_1d::Vector{A},gradients_1d::Vector{A},index_maps...) where A
+function TProductGradientArray(arrays_1d::Vector{A},gradients_1d::Vector{A},index_map...) where A
   array::A = kronecker_gradients(arrays_1d,gradients_1d)
-  TProductGradientArray(array,arrays_1d,gradients_1d,index_maps...)
+  TProductGradientArray(array,arrays_1d,gradients_1d,index_map...)
 end
 
 get_dim(a::TProductGradientArray) = length(a.arrays_1d)
 
 Base.size(a::TProductGradientArray) = size(a.array)
-Base.getindex(a::TProductGradientArray,i...) = a.array[i...]
+
+function Base.getindex(a::TProductGradientArray{T,1},irow::Integer)
+  row_ids = first(a.index_map)
+  getindex(a.array,row_ids[irow])
+end
+
+function Base.getindex(a::TProductGradientArray{T,2},irow::Integer,jcol::Integer)
+  row_ids = first(a.index_map)
+  col_ids = last(a.index_map)
+  getindex(a.array,row_ids[irow],col_ids[jcol])
+end
+
 Base.iterate(a::TProductGradientArray,i...) = iterate(a.array,i...)
 Base.copy(a::TProductGradientArray) = TProductGradientArray(copy(a.array),a.arrays_1d,a.gradients_1d)
 
@@ -708,7 +709,7 @@ end
 const TProductGradientSparseMatrix = TProductGradientArray{T,2,A} where {T,A<:AbstractSparseMatrix}
 
 SparseArrays.nnz(a::TProductGradientSparseMatrix) = nnz(a.array)
-SparseArrays.nzrange(a::TProductGradientSparseMatrix,col::Int) = nzrange(a.array,col)
+SparseArrays.nzrange(a::TProductGradientSparseMatrix,col::Integer) = nzrange(a.array,col)
 SparseArrays.rowvals(a::TProductGradientSparseMatrix) = rowvals(a.array)
 SparseArrays.nonzeros(a::TProductGradientSparseMatrix) = a.array
 

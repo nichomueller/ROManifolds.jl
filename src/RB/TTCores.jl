@@ -1,7 +1,7 @@
 abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
 
 Base.IndexStyle(::Type{<:AbstractTTCore}) = IndexCartesian()
-Base.getindex(a::AbstractTTCore,i::Int...) = getindex(a,CartesianIndex(i))
+Base.getindex(a::AbstractTTCore,i::Integer...) = getindex(a,CartesianIndex(i))
 
 abstract type SparseCore{T} <: AbstractTTCore{T,4} end
 
@@ -43,7 +43,7 @@ end
 
 function _cores2basis(I::SparseIndexMap,a::SparseCoreCSC{S},b::SparseCoreCSC{T}) where {S,T}
   @check size(a,4) == size(b,1)
-  Is = FEM.get_global_2_local_map(I)
+  Is = get_index_map(I)
   TS = promote_type(T,S)
   nrows = size(a,2)*size(b,2)
   ncols = size(a,3)*size(b,3)
@@ -58,7 +58,7 @@ end
 
 function _cores2basis(I::SparseIndexMap,a::SparseCoreCSC{S},b::SparseCoreCSC{T},c::SparseCoreCSC{U}) where {S,T,U}
   @check size(a,4) == size(b,1) && size(b,4) == size(c,1)
-  Is = FEM.get_global_2_local_map(I)
+  Is = get_index_map(I)
   TSU = promote_type(T,S,U)
   nrows = size(a,2)*size(b,2)*size(c,2)
   ncols = size(a,3)*size(b,3)*size(c,3)

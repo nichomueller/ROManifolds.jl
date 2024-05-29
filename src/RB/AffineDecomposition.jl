@@ -3,7 +3,7 @@
 function get_mdeim_indices(A::AbstractMatrix{T}) where T
   m,n = size(A)
   res = zeros(T,m)
-  I = zeros(Int,n)
+  I = zeros(Int32,n)
   I[1] = argmax(abs.(A[:,1]))
   if n > 1
     @inbounds for i = 2:n
