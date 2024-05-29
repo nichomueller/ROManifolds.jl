@@ -151,6 +151,13 @@ function LinearAlgebra.rmul!(a::TTArray,b::Number)
   return a
 end
 
+for factorization in (:(LinearAlgebra.lu),:(LinearAlgebra.cholesky))
+  @eval begin
+    function $factorization(a::TTArray)
+      $factorization(get_values(a))
+    end
+  end
+end
 function LinearAlgebra.lu!(a::TTArray,b::TTArray)
   lu!(get_values(a),get_values(b))
   return a

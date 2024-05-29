@@ -1,20 +1,32 @@
-function comp_to_free_dofs(::Type{T},space::FESpace,args...;kwargs...) where T
+function comp_to_free_dofs(::Type{T},space::FESpace,cell_reffe) where T
   @abstractmethod
 end
 
-function comp_to_free_dofs(::Type{T},space::UnconstrainedFESpace;kwargs...) where T
+function comp_to_free_dofs(::Type{T},space::UnconstrainedFESpace,cell_reffe) where T
   glue = space.metadata
   ncomps = num_components(T)
   free_dof_to_comp = if isnothing(glue)
-    _free_dof_to_comp(space,ncomps;kwargs...)
+    _free_dof_to_comp(space,cell_reffe)
   else
     glue.free_dof_to_comp
   end
   comp_to_free_dofs(free_dof_to_comp,ncomps)
 end
 
-function _free_dof_to_comp(space,ncomps;kwargs...)
-  @notimplemented
+function _free_dof_to_comp(space,cell_reffe)
+  reffe = testitem(cell_reffe)
+  ldof_to_comp = get_dof_to_comp(reffe)
+  cell_dof_ids = get_cell_dof_ids(space)
+  nfree = num_free_dofs(space)
+  dof_to_comp = zeros(eltype(ldof_to_comp),nfree)
+  @inbounds for dofs_cell in cell_dof_ids
+    for (ldof,dof) in enumerate(dofs_cell)
+      if dof > 0
+        dof_to_comp[dof] = ldof_to_comp[ldof]
+      end
+    end
+  end
+  return dof_to_comp
 end
 
 function comp_to_free_dofs(dof2comp,ncomps)
@@ -38,16 +50,18 @@ function _get_cell_dof_comp_ids(cell_dof_ids,dofs)
   return Table(new_cell_ids)
 end
 
-function _dof_perm_from_dof_perms(dof_perms::Vector{Matrix{Ti}}) where Ti
-  @check all(size.(dof_perms) .== [size(first(dof_perms))])
-  s = size(first(dof_perms))
-  Dc = length(dof_perms)
-  dof_perm = zeros(VectorValue{Dc,Ti},s)
-  for ij in LinearIndices(s)
-    perms_ij = getindex.(dof_perms,ij)
-    dof_perm[ij] = Point(perms_ij)
-  end
-  return dof_perm
+# function _expand(a::Union{AbstractArray,Tuple})
+#   b = ()
+#   @inbounds for ai in a
+#     b = isa(a,Tuple) ? (b...,expand(ai)...) : (b...,ai)
+#   end
+#   return b
+# end
+
+function _dof_perm_from_dof_perms(dof_perms::AbstractVector{<:AbstractArray{Ti}}) where Ti
+  sizes = map(size,dof_perms)
+  @check all(sizes .== [first(sizes)])
+  stack(dof_perms)
 end
 
 function _get_terms(p::Polytope,orders)
@@ -93,8 +107,8 @@ function _get_dof_permutation(
   ::Type{T},
   model::CartesianDiscreteModel,
   space::UnconstrainedFESpace,
-  order::Integer;
-  kwargs...) where T
+  order::Integer,
+  args...) where T
 
   cell_dof_ids = get_cell_dof_ids(space)
   dof_perm = _get_dof_permutation(model,cell_dof_ids,order)
@@ -105,11 +119,11 @@ function _get_dof_permutation(
   ::Type{T},
   model::CartesianDiscreteModel,
   space::UnconstrainedFESpace,
-  order::Integer;
-  kwargs...) where T<:MultiValue
+  order::Integer,
+  cell_reffe) where T<:MultiValue
 
   cell_dof_ids = get_cell_dof_ids(space)
-  comp2dofs = comp_to_free_dofs(T,space;kwargs...)
+  comp2dofs = comp_to_free_dofs(T,space,cell_reffe)
   Ti = eltype(eltype(cell_dof_ids))
   dof_perms = Matrix{Ti}[]
   for dofs in comp2dofs
@@ -121,8 +135,8 @@ function _get_dof_permutation(
   return IndexMap(dof_perm)
 end
 
-function get_dof_permutation(args...;kwargs...)
-  index_map = _get_dof_permutation(args...;kwargs...)
+function get_dof_permutation(args...)
+  index_map = _get_dof_permutation(args...)
   free_dofs_map(index_map)
 end
 
@@ -255,7 +269,7 @@ function FESpaces.FESpace(
   cell_reffes_1d = map(model->ReferenceFE(model,basis,T,order;reffe_kwargs...),model.models_1d)
   space = FESpace(model.model,cell_reffe;kwargs...)
   spaces_1d = univariate_spaces(model,cell_reffes_1d;kwargs...)
-  dof_permutation = get_dof_permutation(T,model.model,space,order)
+  dof_permutation = get_dof_permutation(T,model.model,space,order,cell_reffe)
   tp_dof_permutation = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order)
   TProductFESpace(space,spaces_1d,dof_permutation,tp_dof_permutation)
 end
@@ -442,7 +456,7 @@ function _global_2_local_nnz(sparsity,I,J,i,j)
   unrows = univariate_num_rows(sparsity)
   uncols = univariate_num_cols(sparsity)
   unnz = univariate_nnz(sparsity)
-  g2l = zeros(Int,unnz...)
+  g2l = zeros(eltype(IJ),unnz...)
 
   @inbounds for (k,gid) = enumerate(IJ)
     irows = Tuple(tensorize_indices(I[k],unrows))
@@ -466,36 +480,3 @@ function _invperm(perm,U::TProductFESpace,V::TProductFESpace)
   end
   return IndexMap(iperm)
 end
-
-# function recast_indices(indices::AbstractVector,f::FESpace...)
-#   return indices
-# end
-
-# function recast_indices(indices::AbstractVector,V::TProductFESpace)
-#   p = get_dof_permutation(V)
-#   return vec(p)[indices]
-# end
-
-# function recast_indices(indices::AbstractVector,U::TProductFESpace,V::TProductFESpace)
-#   nrows = num_free_dofs(V)
-#   pU = get_dof_permutation(U)
-#   pV = get_dof_permutation(V)
-#   pUV = vec(pV) .+ nrows .* (vec(pU)'.-1)
-#   return vec(pUV)[indices]
-# end
-
-# for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
-#   @eval begin
-#     function recast_indices(indices::AbstractVector,U::$F{<:TProductFESpace},V::TProductFESpace)
-#       recast_indices(indices,U.space,V)
-#     end
-#   end
-# end
-# for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
-#   @eval begin
-#     function recast_indices(indices::AbstractVector,U::$F{<:TProductFESpace},V::TProductFESpace)
-#       @warn "deactivated recast indices for jacobians during debugging"
-#       return indices
-#     end
-#   end
-# end

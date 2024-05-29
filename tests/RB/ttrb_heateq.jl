@@ -1,25 +1,10 @@
 using Gridap
-using Gridap.Algebra
-using Gridap.Arrays
-using Gridap.CellData
-using Gridap.FESpaces
-using Gridap.Fields
-using Gridap.Geometry
-using Gridap.MultiField
-using Gridap.ODEs
-using Gridap.Polynomials
-using Gridap.ReferenceFEs
-using Gridap.Helpers
-using Gridap.TensorValues
-using BlockArrays
+using Test
 using DrWatson
-using SparseArrays
-using LinearAlgebra
-using Kronecker
 using Mabla.FEM
 using Mabla.RB
 
-θ = 1.0
+θ = 0.5
 dt = 0.01
 t0 = 0.0
 tf = 0.1
@@ -29,14 +14,14 @@ tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
 domain = (0,1,0,1)
-partition = (3,3)
+partition = (10,10)
 model = TProductModel(domain,partition)
 
 labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
 add_tag_from_tags!(labels,"neumann",[7])
 
-order = 2
+order = 1
 degree = 2*order
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
@@ -83,38 +68,37 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=20,nsnaps_test=1,nsnaps_mdeim=10)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1")))
 
-params = [
-  [0.1,0.9,0.5],
-  [0.2,0.4,0.8],
-  [0.3,0.7,0.4],
-  [0.9,0.2,0.4],
-  [0.5,0.5,0.6],
-  [0.8,0.4,0.2],
-  [0.3,0.4,0.3],
-  [0.1,0.2,0.9],
-  [0.9,0.2,0.1],
-  [0.4,0.6,0.5],
-  [0.2,0.5,0.5],
-  [0.1,0.2,1.0],
-  [0.2,0.7,0.1],
-  [0.2,0.2,0.2],
-  [0.9,0.5,0.1],
-  [0.8,0.7,0.2],
-  [0.1,0.1,0.7],
-  [0.1,0.7,0.9],
-  [0.4,0.4,0.1],
-  [0.4,0.3,0.5],
-  [0.2,0.3,0.6]
-]
-r = TransientParamRealization(ParamRealization(params),t0:dt:tf)
-
-fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ;r)
+fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
 
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 println(RB.space_time_error(results))
+
+for ϵ = (1e-2,1e-3,1e-4)
+  rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+  rbop = reduced_operator(rbsolver,feop,fesnaps)
+  rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+  results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+  println("Accuracy: $(RB.space_time_error(results))")
+  println("Speedup: $(RB.speedup(results))")
+end
+
+_test = TestFESpace(model.model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+_trial = TransientTrialParamFESpace(_test,gμt)
+_feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
+  _trial,_test,trian_res,trian_stiffness,trian_mass)
+_uh0μ(μ) = interpolate_everywhere(u0μ(μ),_trial(μ,t0))
+_fesnaps,_festats = ode_solutions(rbsolver,_feop,_uh0μ)
+for ϵ = (1e-2,1e-3,1e-4)
+  rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+  _rbop = reduced_operator(rbsolver,_feop,_fesnaps)
+  _rbsnaps,_rbstats = solve(rbsolver,_rbop,_fesnaps)
+  _results = rb_results(rbsolver,_rbop,_fesnaps,_rbsnaps,_festats,_rbstats)
+  println("Accuracy: $(RB.space_time_error(_results))")
+  println("Speedup: $(RB.speedup(_results))")
+end
