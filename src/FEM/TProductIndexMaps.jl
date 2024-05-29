@@ -39,12 +39,12 @@ abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D} end
 Base.IndexStyle(::Type{<:AbstractIndexMap}) = IndexLinear()
 
 function free_dofs_map(i::AbstractIndexMap)
-  free_dofs_locations = findall(i.>0)
-  IndexMapView(i,free_dofs_locations)
+  free_dofs_locations = findall(i.>zero(eltype(i)))
+  IndexMap(i[free_dofs_locations])
 end
 
 function dirichlet_dofs_map(i::AbstractIndexMap)
-  dir_dofs_locations = findall(i.<0)
+  dir_dofs_locations = findall(i.<zero(eltype(i)))
   i.indices[dir_dofs_locations]
 end
 
@@ -76,20 +76,42 @@ end
 Base.size(i::IndexMapView) = _shape_per_dir(i.locations)
 Base.getindex(i::IndexMapView,j::Integer) = i.indices[i.locations[j]]
 
-struct MultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
-  indices::Vector{I}
-  function MultiValueIndexMap(indices::I) where {D,Ti,I<:AbstractIndexMap{D,Ti}}
+struct MultiValueIndexMap{D,Ti,I} <: AbstractIndexMap{D,Ti}
+  indices::I
+  function MultiValueIndexMap(indices::I) where {D,Ti,I<:AbstractArray{Ti,D}}
     new{D,Ti,I}(indices)
   end
 end
 
-TensorValues.num_components(i::MultiValueIndexMap) = length(i.indices)
-Base.size(i::MultiValueIndexMap) = num_components(i).*size(i.indices)
+Base.size(i::MultiValueIndexMap) = size(i.indices)
+Base.getindex(i::MultiValueIndexMap,j...) = getindex(i.indices,j...)
 
-function Base.getindex(i::MultiValueIndexMap,j::Integer)
-  icomp = fast_index(j,num_components(i))
-  idof = slow_index(j,num_components(i))
-  i.indices[icomp][idof]
+function get_component(i::MultiValueIndexMap{D},d) where D
+  indices = collect(selectdim(i.indices,D,d))
+  IndexMap(indices)
+end
+
+function split_components(i::MultiValueIndexMap{D}) where D
+  indices = collect(eachslice(i.indices;dims=D))
+  IndexMap.(indices)
+end
+
+function get_component(i::IndexMapView{D,Ti,<:MultiValueIndexMap{D,Ti}},d) where {D,Ti}
+  id = get_component(i.indices,d)
+  free_dofs_map(id)
+end
+
+function split_components(i::IndexMapView{D,Ti,<:MultiValueIndexMap{D,Ti}}) where {D,Ti}
+  id = split_components(i.indices)
+  free_dofs_map.(id)
+end
+
+function permute_sparsity(a::SparsityPatternCSC,i::MultiValueIndexMap{D},j::MultiValueIndexMap{D}) where D
+  ncomps = D
+  i1 = get_component(i,1)
+  j1 = get_component(j,1)
+  pa = permute_sparsity(a,j1,i1)
+  MultiValuePatternCSC(pa.matrix,ncomps)
 end
 
 struct TProductIndexMap{D,Ti,I} <: AbstractIndexMap{D,Ti}

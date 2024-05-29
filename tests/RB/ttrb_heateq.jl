@@ -21,7 +21,7 @@ labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
 add_tag_from_tags!(labels,"neumann",[7])
 
-order = 1
+order = 2
 degree = 2*order
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)

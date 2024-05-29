@@ -50,14 +50,6 @@ function _get_cell_dof_comp_ids(cell_dof_ids,dofs)
   return Table(new_cell_ids)
 end
 
-# function _expand(a::Union{AbstractArray,Tuple})
-#   b = ()
-#   @inbounds for ai in a
-#     b = isa(a,Tuple) ? (b...,expand(ai)...) : (b...,ai)
-#   end
-#   return b
-# end
-
 function _dof_perm_from_dof_perms(dof_perms::AbstractVector{<:AbstractArray{Ti}}) where Ti
   sizes = map(size,dof_perms)
   @check all(sizes .== [first(sizes)])
@@ -105,39 +97,39 @@ end
 
 function _get_dof_permutation(
   ::Type{T},
-  model::CartesianDiscreteModel,
+  model::CartesianDiscreteModel{D},
   space::UnconstrainedFESpace,
   order::Integer,
   args...
-  ) where T
+  ) where {T,D}
 
   cell_dof_ids = get_cell_dof_ids(space)
   dof_perm = _get_dof_permutation(model,cell_dof_ids,order)
-  return dof_perm
+  return IndexMap(dof_perm)
 end
 
 function _get_dof_permutation(
   ::Type{T},
-  model::CartesianDiscreteModel,
+  model::CartesianDiscreteModel{D},
   space::UnconstrainedFESpace,
   order::Integer,
   comp_to_dofs::AbstractVector
-  ) where T<:MultiValue
+  ) where {T<:MultiValue,D}
 
   cell_dof_ids = get_cell_dof_ids(space)
   Ti = eltype(eltype(cell_dof_ids))
-  dof_perms = Matrix{Ti}[]
+  dof_perms = Array{Ti,D}[]
   for dofs in comp_to_dofs
     cell_dof_comp_ids = _get_cell_dof_comp_ids(cell_dof_ids,dofs)
     dof_perm_comp = _get_dof_permutation(model,cell_dof_comp_ids,order)
     push!(dof_perms,dof_perm_comp)
   end
   dof_perm = _dof_perm_from_dof_perms(dof_perms)
-  return dof_perm
+  return MultiValueIndexMap(dof_perm)
 end
 
 function get_dof_permutation(args...)
-  index_map = IndexMap(_get_dof_permutation(args...))
+  index_map = _get_dof_permutation(args...)
   free_dofs_map(index_map)
 end
 
@@ -199,8 +191,8 @@ function _get_tp_dof_permutation(
   order::Integer
   ) where T
 
-  dof_perm = _get_tp_dof_permutation(models,spaces,order)
-  return dof_perm
+  dof_perm,dof_perm_1d = _get_tp_dof_permutation(models,spaces,order)
+  return IndexMap(dof_perm),dof_perm_1d
 end
 
 function _get_tp_dof_permutation(
@@ -218,20 +210,10 @@ function _get_tp_dof_permutation(
     end
     return ncomp_perm
   end
-  function _to_dof_perm_vec(perm::AbstractVector{S}) where S
-    ndofs = length(perm)
-    ncomp = num_components(T)
-    ncomp_perm = zeros(S,ndofs*ncomp)
-    @inbounds for comp = 1:ncomp
-      ncomp_perm[comp:ncomp:ndofs*ncomp] .= (perm.-1).*ncomp .+ comp
-    end
-    return ncomp_perm
-  end
 
   dof_perm,dof_perms_1d = _get_tp_dof_permutation(eltype(T),models,spaces,order)
-  ncomp_dof_perm = _to_dof_perm_comps(dof_perm)
-  ncomp_dof_perms_1d = _to_dof_perm_vec.(dof_perms_1d)
-  return ncomp_dof_perm,ncomp_dof_perms_1d
+  ncomp_dof_perm = MultiValueIndexMap(_to_dof_perm_comps(dof_perm))
+  return ncomp_dof_perm,dof_perms_1d
 end
 
 function get_tp_dof_permutation(args...)

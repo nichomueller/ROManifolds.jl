@@ -95,39 +95,51 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h
 fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
 
 ############# maps
-using FillArrays
-
-basis,reffe_args,reffe_kwargs = reffe_u
-T,order = reffe_args
-cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
-cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
-space = FESpace(model.model,cell_reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-spaces_1d = FEM.univariate_spaces(model,cell_reffes_1d;conformity=:H1,dirichlet_tags=["dirichlet"])
-comp_to_dofs = FEM.get_comp_to_free_dofs(T,space,cell_reffe)
-dof_permutation = get_dof_permutation(T,model.model,space,order,comp_to_dofs)
-tp_dof_permutation = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order)
-
-function _to_ncomps(perm::AbstractArray{S,D}) where {S,D}
-  ncomp = num_components(T)
-  ncomp_perm = zeros(S,size(perm)...,ncomp)
-  @inbounds for comp = 1:ncomp
-    selectdim(ncomp_perm,D+1,comp) .= (perm.-1).*ncomp .+ comp
-  end
-  return ncomp_perm
-end
-
-dof_perm,dof_perms_1d = FEM._get_tp_dof_permutation(eltype(T),model.models_1d,spaces_1d,order)
-ncomp_dof_perm = _to_ncomps(dof_perm)
-ncomp_dof_perms_1d = _to_ncomps.(dof_perms_1d)
 
 simap = get_sparse_index_map(test_u,test_u)
 
-sparsity = get_sparsity(test_u,test_u)
-psparsity = FEM.permute_sparsity(sparsity,test_u,test_u)
 U,V = test_u,test_u
-index_map_I = get_dof_permutation(V)
+sparsity = get_sparsity(U,V)
+psparsity = FEM.permute_sparsity(sparsity,U,V)
+I,J,_ = findnz(psparsity)
+i,j,_ = FEM.univariate_findnz(psparsity)
+pg2l = _global_2_local_nnz(psparsity,I,J,i,j)
+
+IJ = get_nonzero_indices(sparsity)
+lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
+
+unrows = FEM.univariate_num_rows(sparsity)
+uncols = FEM.univariate_num_cols(sparsity)
+unnz = FEM.univariate_nnz(sparsity)
+g2l = zeros(eltype(IJ),unnz...)
+
+@inbounds for (k,gid) = enumerate(IJ)
+  println(k)
+  irows = Tuple(tensorize_indices(I[k],unrows))
+  icols = Tuple(tensorize_indices(J[k],uncols))
+  iaxes = CartesianIndex.(irows,icols)
+  global2local = map((i,j) -> findfirst(i.==[j]),lids,iaxes)
+  g2l[global2local...] = gid
+end
+
+onesparsity = SparsityPatternCSC(Mx)
+
+V = test_u
+index_map_I = FEM.get_component(get_dof_permutation(V),1)
 index_map_J = get_dof_permutation(U)
 index_map_I_1d = get_tp_dof_permutation(V).indices_1d
 index_map_J_1d = get_tp_dof_permutation(U).indices_1d
+permute_sparsity(s,(index_map_I,index_map_I_1d),(index_map_J,index_map_J_1d))
 
-psparsity = FEM.permute_sparsity(sparsity.sparsity,index_map_I,index_map_J)
+M = assemble_matrix((u,v)->∫(u⋅v)dΩ.measure,test_u.space,test_u.space)
+MII = M[index_map_I[:],index_map_I[:]]
+
+_reffe_u = ReferenceFE(lagrangian,Float64,order)
+_test_u = TestFESpace(model,_reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
+_M = assemble_matrix((u,v)->∫(u*v)dΩ.measure,_test_u.space,_test_u.space)
+_index_map_I = get_dof_permutation(_test_u)
+_MII = _M[_index_map_I[:],_index_map_I[:]]
+
+_Mx = assemble_matrix((u,v)->∫(u*v)dΩ.measures_1d[1],_test_u.spaces_1d[1],_test_u.spaces_1d[1])
+_My = assemble_matrix((u,v)->∫(u*v)dΩ.measures_1d[2],_test_u.spaces_1d[2],_test_u.spaces_1d[2])
+_Mxy = kron(_My,_Mx)

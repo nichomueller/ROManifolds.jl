@@ -78,7 +78,7 @@ end
 function Base.similar(
   a::ParamArray{T},
   element_type::Type{S}=T,
-  dims::Tuple{Integer,Vararg{Integer}}=size(a)) where {T,S}
+  dims::Tuple{Int,Vararg{Int}}=size(a)) where {T,S}
 
   elb = similar(testitem(a),element_type,dims)
   b = Vector{typeof(elb)}(undef,length(a))

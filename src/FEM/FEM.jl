@@ -202,6 +202,7 @@ include("SparsityPatterns.jl")
 export AbstractIndexMap
 export IndexMap
 export IndexMapView
+export MultiValueIndexMap
 export SparseIndexMap
 export inv_index_map
 export free_dofs_map

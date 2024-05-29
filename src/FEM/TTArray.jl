@@ -62,7 +62,7 @@ Base.copyto!(a::TTArray,b::TTArray) = copyto!(get_values(a),get_values(b))
 function Base.similar(
   a::TTArray{D,T},
   element_type::Type{S}=T,
-  dims::Tuple{Integer,Vararg{Integer}}=size(a)) where {D,T,S}
+  dims::Tuple{Int,Vararg{Int}}=size(a)) where {D,T,S}
   TTArray(similar(get_values(a),element_type,dims),get_index_map(a))
 end
 

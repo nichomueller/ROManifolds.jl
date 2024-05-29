@@ -299,19 +299,19 @@ get_dim(a::TProductArray) = length(a.arrays_1d)
 
 Base.size(a::TProductArray) = size(a.array)
 
-function Base.getindex(a::TProductArray{T,1},irow::Integer)
+function Base.getindex(a::TProductArray{T,1},irow::Integer) where T
   row_ids = first(a.index_map)
   getindex(a.array,row_ids[irow])
 end
 
-function Base.getindex(a::TProductArray{T,2},irow::Integer,jcol::Integer)
+function Base.getindex(a::TProductArray{T,2},irow::Integer,jcol::Integer) where T
   row_ids = first(a.index_map)
   col_ids = last(a.index_map)
   getindex(a.array,row_ids[irow],col_ids[jcol])
 end
 
 Base.iterate(a::TProductArray,i...) = iterate(a.array,i...)
-Base.copy(a::TProductArray) = TProductArray(copy(a.array),a.arrays_1d)
+Base.copy(a::TProductArray) = TProductArray(copy(a.array),a.arrays_1d,a.index_map)
 
 Base.fill!(a::TProductArray,v) = fill!(a.array,v)
 
@@ -650,19 +650,19 @@ get_dim(a::TProductGradientArray) = length(a.arrays_1d)
 
 Base.size(a::TProductGradientArray) = size(a.array)
 
-function Base.getindex(a::TProductGradientArray{T,1},irow::Integer)
+function Base.getindex(a::TProductGradientArray{T,1},irow::Integer) where T
   row_ids = first(a.index_map)
   getindex(a.array,row_ids[irow])
 end
 
-function Base.getindex(a::TProductGradientArray{T,2},irow::Integer,jcol::Integer)
+function Base.getindex(a::TProductGradientArray{T,2},irow::Integer,jcol::Integer) where T
   row_ids = first(a.index_map)
   col_ids = last(a.index_map)
   getindex(a.array,row_ids[irow],col_ids[jcol])
 end
 
 Base.iterate(a::TProductGradientArray,i...) = iterate(a.array,i...)
-Base.copy(a::TProductGradientArray) = TProductGradientArray(copy(a.array),a.arrays_1d,a.gradients_1d)
+Base.copy(a::TProductGradientArray) = TProductGradientArray(copy(a.array),a.arrays_1d,a.gradients_1d,a.index_map)
 
 Base.fill!(a::TProductGradientArray,v) = fill!(a.array,v)
 
