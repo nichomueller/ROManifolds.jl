@@ -197,7 +197,7 @@ function _get_tp_dof_permutation(
 
   ncomp = num_components(T)
   dof_perm,dof_perms_1d = _get_tp_dof_permutation(eltype(T),models,spaces,order)
-  ncomp_dof_perm = MultiValueIndexMap(dof_perm,ncomp)
+  ncomp_dof_perm = compose_indices(dof_perm,ncomp)
   return ncomp_dof_perm,dof_perms_1d
 end
 
@@ -344,13 +344,13 @@ get_dirichlet_cells(f::TProductFESpace) = get_dirichlet_cells(f.space)
 
 # need to correct free dof values for trial spaces defined for TT problems
 
-for F in (:TrialFESpace,:TransientTrialFESpace)
+for F in (:TrialFESpace,:TransientTrialFESpace,:TransientTrialParamFESpace)
   @eval begin
     FESpaces.zero_free_values(f::$F{<:TProductFESpace}) = zero_free_values(f.space)
   end
 end
 
-for F in (:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
+for F in (:TrialParamFESpace,:FESpaceToParamFESpace)
   @eval begin
     function FESpaces.zero_free_values(f::$F{<:TProductFESpace})
       V = get_vector_type(f)

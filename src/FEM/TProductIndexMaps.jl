@@ -60,6 +60,17 @@ function vectorize_index_map(i::AbstractIndexMap)
   IndexMap(vi)
 end
 
+function compose_indices(index::AbstractIndexMap{Ti,D},ncomps::Integer) where {Ti,D}
+  indices = zeros(Ti,ncomps.*size(index))
+  @inbounds for j in eachindex(indices)
+    compj = fast_index(j,ncomps)
+    dofj = slow_index(j,ncomps)
+    ij = index[dofj]
+    indices[j] = (ij.-1).*ncomps .+ compj
+  end
+  return MultiValueIndexMap(indices,ncomps)
+end
+
 function fix_dof_index_map(i::AbstractIndexMap,dof_to_fix::Int)
   FixedDofIndexMap(i,dof_to_fix)
 end
@@ -86,6 +97,10 @@ abstract type AbstractMultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti} end
 
 Base.view(i::AbstractMultiValueIndexMap,locations) = MultiValueIndexMapView(i,locations)
 
+function _to_scalar_values!(indices::AbstractArray,D::Integer,d::Integer)
+  indices .= (indices .- d) ./ D .+ 1
+end
+
 function get_component(i::AbstractMultiValueIndexMap{D},d;multivalue=true) where D
   ncomps = num_components(i)
   indices = collect(selectdim(i,D,d))
@@ -96,6 +111,20 @@ end
 function split_components(i::AbstractMultiValueIndexMap{D}) where D
   indices = collect(eachslice(i;dims=D))
   IndexMap.(indices)
+end
+
+function merge_components(i::AbstractVector{<:AbstractArray{Ti}}) where Ti
+  sizes = map(size,i)
+  @check all(sizes .== [first(sizes)])
+  ncomps = length(i)
+  indices = zeros(Ti,ncomps.*first(sizes))
+  @inbounds for j in eachindex(indices)
+    compj = fast_index(j,ncomps)
+    dofj = slow_index(j,ncomps)
+    ij = i[compj][dofj]
+    indices[j] = (ij.-1).*ncomps .+ compj
+  end
+  return indices
 end
 
 function permute_sparsity(
@@ -112,42 +141,23 @@ function permute_sparsity(
   MultiValuePatternCSC(pa.matrix,ncomps)
 end
 
-function _compose_indices(index::AbstractArray{Ti,D},ncomp::Integer) where {Ti,D}
-  indices = zeros(Ti,size(index)...,ncomp)
-  @inbounds for comp = 1:ncomp
-    selectdim(indices,D+1,comp) .= (index.-1).*ncomp .+ comp
-  end
-  return indices
-end
-
-function _stack_indices(vec_indices::AbstractVector{<:AbstractArray})
-  sizes = map(size,vec_indices)
-  @check all(sizes .== [first(sizes)])
-  stack(vec_indices)
-end
-
-function _to_scalar_values!(indices::AbstractArray,D::Integer,d::Integer)
-  indices .= (indices .- d) ./ D .+ 1
-end
-
 struct MultiValueIndexMap{D,Ti,I} <: AbstractMultiValueIndexMap{D,Ti}
   indices::I
-  function MultiValueIndexMap(indices::I) where {D,Ti,I<:AbstractArray{Ti,D}}
-    new{D,Ti,I}(indices)
+  ncomps::Int
+  function MultiValueIndexMap(indices::I,ncomps::Int) where {D,Ti,I<:AbstractArray{Ti,D}}
+    new{D,Ti,I}(indices,ncomps)
   end
-end
-
-function MultiValueIndexMap(indices::AbstractArray{<:Integer},ncomp::Integer)
-  MultiValueIndexMap(_compose_indices(indices,ncomp))
 end
 
 function MultiValueIndexMap(indices::AbstractVector{<:AbstractArray})
-  MultiValueIndexMap(_stack_indices(indices))
+  mindices = merge_components(indices)
+  ncomps = length(indices)
+  return MultiValueIndexMap(mindices,ncomps)
 end
 
 Base.size(i::MultiValueIndexMap) = size(i.indices)
 Base.getindex(i::MultiValueIndexMap,j...) = getindex(i.indices,j...)
-TensorValues.num_components(i::MultiValueIndexMap{D}) where D = size(i,D)
+TensorValues.num_components(i::MultiValueIndexMap) = i.ncomps
 
 struct MultiValueIndexMapView{D,Ti,I,L} <: AbstractMultiValueIndexMap{D,Ti}
   indices::I

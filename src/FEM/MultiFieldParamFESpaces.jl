@@ -24,12 +24,12 @@ function MultiFieldParamFESpace(
   spaces::Vector{<:SingleFieldParamFESpace};
   style = ConsecutiveMultiFieldStyle())
 
-  T = get_vector_type(first(spaces))
-  @check all(map(get_vector_type,spaces) .== T)
   if isa(style,BlockMultiFieldStyle)
     style = BlockMultiFieldStyle(style,spaces)
     VT = typeof(mortar(map(zero_free_values,spaces)))
   else
+    Ts = map(get_dof_value_type,spaces)
+    T  = typeof(*(map(zero,Ts)...))
     VT = T
   end
   MultiFieldParamFESpace(VT,spaces,style)
@@ -39,12 +39,12 @@ function _MultiFieldParamFESpace(
   spaces::Vector{<:SingleFieldFESpace};
   style = ConsecutiveMultiFieldStyle())
 
-  T = get_vector_type(first(spaces))
-  @check all(map(get_vector_type,spaces) .== T)
   if isa(style,BlockMultiFieldStyle)
     style = BlockMultiFieldStyle(style,spaces)
     VT = typeof(mortar(map(zero_free_values,spaces)))
   else
+    T = get_vector_type(first(spaces))
+    @check all(map(get_vector_type,spaces) .== T)
     VT = T
   end
   MultiFieldParamFESpace(VT,spaces,style)
