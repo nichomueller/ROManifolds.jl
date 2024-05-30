@@ -94,52 +94,14 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h
 
 fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
 
-############# maps
+# TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
+style=BlockMultiFieldStyle()
+spaces = [test_u,test_p]
+any(isa.(spaces,SingleFieldParamFESpace))
+any(isa.(spaces,TransientTrialParamFESpace))
+MultiFieldFESpace(spaces,style=style)
 
-simap = get_sparse_index_map(test_u,test_u)
-
-U,V = test_u,test_u
-sparsity = get_sparsity(U,V)
-psparsity = FEM.permute_sparsity(sparsity,U,V)
-I,J,_ = findnz(psparsity)
-i,j,_ = FEM.univariate_findnz(psparsity)
-pg2l = _global_2_local_nnz(psparsity,I,J,i,j)
-
-IJ = get_nonzero_indices(sparsity)
-lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
-
-unrows = FEM.univariate_num_rows(sparsity)
-uncols = FEM.univariate_num_cols(sparsity)
-unnz = FEM.univariate_nnz(sparsity)
-g2l = zeros(eltype(IJ),unnz...)
-
-@inbounds for (k,gid) = enumerate(IJ)
-  println(k)
-  irows = Tuple(tensorize_indices(I[k],unrows))
-  icols = Tuple(tensorize_indices(J[k],uncols))
-  iaxes = CartesianIndex.(irows,icols)
-  global2local = map((i,j) -> findfirst(i.==[j]),lids,iaxes)
-  g2l[global2local...] = gid
-end
-
-onesparsity = SparsityPatternCSC(Mx)
-
-V = test_u
-index_map_I = FEM.get_component(get_dof_permutation(V),1)
-index_map_J = get_dof_permutation(U)
-index_map_I_1d = get_tp_dof_permutation(V).indices_1d
-index_map_J_1d = get_tp_dof_permutation(U).indices_1d
-permute_sparsity(s,(index_map_I,index_map_I_1d),(index_map_J,index_map_J_1d))
-
-M = assemble_matrix((u,v)->∫(u⋅v)dΩ.measure,test_u.space,test_u.space)
-MII = M[index_map_I[:],index_map_I[:]]
-
-_reffe_u = ReferenceFE(lagrangian,Float64,order)
-_test_u = TestFESpace(model,_reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
-_M = assemble_matrix((u,v)->∫(u*v)dΩ.measure,_test_u.space,_test_u.space)
-_index_map_I = get_dof_permutation(_test_u)
-_MII = _M[_index_map_I[:],_index_map_I[:]]
-
-_Mx = assemble_matrix((u,v)->∫(u*v)dΩ.measures_1d[1],_test_u.spaces_1d[1],_test_u.spaces_1d[1])
-_My = assemble_matrix((u,v)->∫(u*v)dΩ.measures_1d[2],_test_u.spaces_1d[2],_test_u.spaces_1d[2])
-_Mxy = kron(_My,_Mx)
+Ts = map(get_dof_value_type,spaces)
+T  = typeof(*(map(zero,Ts)...))
+style = BlockMultiFieldStyle(style,spaces)
+VT = typeof(mortar(map(zero_free_values,spaces)))

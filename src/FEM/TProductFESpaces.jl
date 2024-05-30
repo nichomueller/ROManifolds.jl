@@ -50,12 +50,6 @@ function _get_cell_dof_comp_ids(cell_dof_ids,dofs)
   return Table(new_cell_ids)
 end
 
-function _dof_perm_from_dof_perms(dof_perms::AbstractVector{<:AbstractArray{Ti}}) where Ti
-  sizes = map(size,dof_perms)
-  @check all(sizes .== [first(sizes)])
-  stack(dof_perms)
-end
-
 function _get_terms(p::Polytope,orders)
   _nodes, = Gridap.ReferenceFEs._compute_nodes(p,orders)
   terms = Gridap.ReferenceFEs._coords_to_terms(_nodes,orders)
@@ -124,8 +118,7 @@ function _get_dof_permutation(
     dof_perm_comp = _get_dof_permutation(model,cell_dof_comp_ids,order)
     push!(dof_perms,dof_perm_comp)
   end
-  dof_perm = _dof_perm_from_dof_perms(dof_perms)
-  return MultiValueIndexMap(dof_perm)
+  return MultiValueIndexMap(dof_perms)
 end
 
 function get_dof_permutation(args...)
@@ -202,17 +195,9 @@ function _get_tp_dof_permutation(
   order::Integer
   ) where T<:MultiValue
 
-  function _to_dof_perm_comps(perm::AbstractArray{S,D}) where {S,D}
-    ncomp = num_components(T)
-    ncomp_perm = zeros(S,size(perm)...,ncomp)
-    @inbounds for comp = 1:ncomp
-      selectdim(ncomp_perm,D+1,comp) .= (perm.-1).*ncomp .+ comp
-    end
-    return ncomp_perm
-  end
-
+  ncomp = num_components(T)
   dof_perm,dof_perms_1d = _get_tp_dof_permutation(eltype(T),models,spaces,order)
-  ncomp_dof_perm = MultiValueIndexMap(_to_dof_perm_comps(dof_perm))
+  ncomp_dof_perm = MultiValueIndexMap(dof_perm,ncomp)
   return ncomp_dof_perm,dof_perms_1d
 end
 
@@ -221,9 +206,36 @@ function get_tp_dof_permutation(args...)
   return TProductIndexMap(dof_perm,dof_perms_1d)
 end
 
-function univariate_spaces(model::TProductModel,cell_reffes;dirichlet_tags=Int[],kwargs...)
+function _compute_dof_permutations(::Type{T},model,space::FESpace,spaces_1d,cell_reffe,order) where T
+  @abstractmethod
+end
+
+function _compute_dof_permutations(::Type{T},model,space::UnconstrainedFESpace,spaces_1d,cell_reffe,order) where T
+  comp_to_dofs = get_comp_to_free_dofs(T,space,cell_reffe)
+  dof_permutation = get_dof_permutation(T,model.model,space,order,comp_to_dofs)
+  tp_dof_permutation = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order)
+  return dof_permutation,tp_dof_permutation
+end
+
+function _compute_dof_permutations(::Type{T},model,z::ZeroMeanFESpace,spaces_1d,cell_reffe,order) where T
+  uspace = z.space.space
+  dof_to_fix = z.space.dof_to_fix
+  _dof_permutation,_tp_dof_permutation = _compute_dof_permutations(T,model,uspace,spaces_1d,cell_reffe,order)
+  dof_permutation = FixedDofIndexMap(_dof_permutation,dof_to_fix)
+  tp_dof_permutation = FixedDofIndexMap(_dof_permutation,findfirst(vec(_tp_dof_permutation).==dof_to_fix))
+  return dof_permutation,tp_dof_permutation
+end
+
+function univariate_spaces(
+  model::TProductModel,
+  cell_reffes;
+  dirichlet_tags=Int[],
+  conformity=nothing,
+  vector_type=nothing,
+  kwargs...)
+
   add_1d_tags!(model,dirichlet_tags)
-  map((model,cell_reffe) -> FESpace(model,cell_reffe;dirichlet_tags,kwargs...),
+  map((model,cell_reffe) -> FESpace(model,cell_reffe;dirichlet_tags,conformity,vector_type),
     model.models_1d,cell_reffes)
 end
 
@@ -277,9 +289,7 @@ function FESpaces.FESpace(
   cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
   space = FESpace(model.model,cell_reffe;kwargs...)
   spaces_1d = univariate_spaces(model,cell_reffes_1d;kwargs...)
-  comp_to_dofs = get_comp_to_free_dofs(T,space,cell_reffe)
-  dof_permutation = get_dof_permutation(T,model.model,space,order,comp_to_dofs)
-  tp_dof_permutation = get_tp_dof_permutation(T,model.models_1d,spaces_1d,order)
+  dof_permutation,tp_dof_permutation = _compute_dof_permutations(T,model,space,spaces_1d,cell_reffe,order)
   TProductFESpace(space,spaces_1d,dof_permutation,tp_dof_permutation)
 end
 
@@ -440,25 +450,17 @@ function permute_sparsity(s::TProductSparsityPattern,U::TProductFESpace,V::TProd
   permute_sparsity(s,(index_map_I,index_map_I_1d),(index_map_J,index_map_J_1d))
 end
 
-function permute_ids(i::AbstractArray{<:Integer},perm::AbstractArray{<:Integer})
-  ip = copy(i)
-  @inbounds for (k,ik) in enumerate(ip)
-    ip[k] = perm[ik]
-  end
-  return ip
-end
-
 function get_sparse_index_map(U::TProductFESpace,V::TProductFESpace)
   sparsity = get_sparsity(U,V)
   psparsity = permute_sparsity(sparsity,U,V)
   I,J,_ = findnz(psparsity)
   i,j,_ = univariate_findnz(psparsity)
-  pg2l = _global_2_local_nnz(psparsity,I,J,i,j)
-  g2l = _invperm(pg2l,U,V)
-  return SparseIndexMap(g2l,psparsity)
+  g2l = global_2_local_nnz(psparsity,I,J,i,j)
+  pg2l = permute_index_map(psparsity,g2l,U,V)
+  return SparseIndexMap(pg2l,psparsity)
 end
 
-function _global_2_local_nnz(sparsity,I,J,i,j)
+function global_2_local_nnz(sparsity::TProductSparsityPattern,I,J,i,j)
   IJ = get_nonzero_indices(sparsity)
   lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
 
@@ -471,21 +473,52 @@ function _global_2_local_nnz(sparsity,I,J,i,j)
     irows = Tuple(tensorize_indices(I[k],unrows))
     icols = Tuple(tensorize_indices(J[k],uncols))
     iaxes = CartesianIndex.(irows,icols)
-    global2local = map((i,j) -> findfirst(i.==[j]),lids,iaxes)
-    g2l[global2local...] = gid
+    lid = map((i,j) -> findfirst(i.==[j]),lids,iaxes)
+    g2l[lid...] = gid
   end
 
-  return IndexMap(g2l)
+  return g2l
 end
 
-function _invperm(perm,U::TProductFESpace,V::TProductFESpace)
-  nrows = num_free_dofs(V)
-  index_map_I = vec(get_dof_permutation(V))
-  index_map_J = vec(get_dof_permutation(U))
-  index_map_IJ = index_map_I .+ nrows .* (index_map_J'.-1)
+function _permute_index_map(perm,I,J)
+  nrows = length(I)
+  IJ = vec(I) .+ nrows .* (vec(J)'.-1)
   iperm = copy(perm)
   @inbounds for (k,pk) in enumerate(perm)
-    iperm[k] = index_map_IJ[pk]
+    iperm[k] = IJ[pk]
   end
   return IndexMap(iperm)
+end
+
+function permute_index_map(::TProductSparsityPattern,perm,U::TProductFESpace,V::TProductFESpace)
+  I = get_dof_permutation(V)
+  J = get_dof_permutation(U)
+  return _permute_index_map(perm,I,J)
+end
+
+function permute_index_map(
+  sparsity::TProductSparsityPattern{<:MultiValuePatternCSC},
+  perm,U::TProductFESpace,V::TProductFESpace)
+
+  function _to_component_indices(i,ncomps,icomp)
+    nrows = Int(num_free_dofs(V)/ncomps)
+    ic = copy(i)
+    @inbounds for (j,IJ) in enumerate(i)
+      I = fast_index(IJ,nrows)
+      J = slow_index(IJ,nrows)
+      I′ = (I-1)*ncomps + icomp
+      J′ = (J-1)*ncomps + icomp
+      ic[j] = (J′-1)*nrows*ncomps + I′
+    end
+    return ic
+  end
+
+  I = get_dof_permutation(V)
+  J = get_dof_permutation(U)
+  I1 = get_component(I,1;multivalue=false)
+  J1 = get_component(J,1;multivalue=false)
+  indices = _permute_index_map(perm,I1,J1)
+  ncomps = num_components(sparsity)
+  indices′ = map(icomp->_to_component_indices(indices,ncomps,icomp),1:ncomps)
+  return MultiValueIndexMap(indices′)
 end
