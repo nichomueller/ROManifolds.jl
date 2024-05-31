@@ -40,6 +40,8 @@ Base.IndexStyle(::Type{<:AbstractIndexMap}) = IndexLinear()
 
 Base.view(i::AbstractIndexMap,locations) = IndexMapView(i,locations)
 
+get_dim(i::AbstractIndexMap{D}) where D = D
+
 function free_dofs_map(i::AbstractIndexMap)
   free_dofs_locations = findall(i.>zero(eltype(i)))
   view(i,free_dofs_locations)
@@ -60,15 +62,12 @@ function vectorize_index_map(i::AbstractIndexMap)
   IndexMap(vi)
 end
 
-function compose_indices(index::AbstractIndexMap{Ti,D},ncomps::Integer) where {Ti,D}
-  indices = zeros(Ti,ncomps.*size(index))
-  @inbounds for j in eachindex(indices)
-    compj = fast_index(j,ncomps)
-    dofj = slow_index(j,ncomps)
-    ij = index[dofj]
-    indices[j] = (ij.-1).*ncomps .+ compj
+function compose_indices(index::AbstractArray{Ti,D},ncomps::Integer) where {Ti,D}
+  indices = zeros(Ti,size(index)...,ncomps)
+  @inbounds for comp = 1:ncomps
+    selectdim(indices,D+1,comp) .= (index.-1).*ncomps .+ comp
   end
-  return MultiValueIndexMap(indices,ncomps)
+  return MultiValueIndexMap(indices)
 end
 
 function fix_dof_index_map(i::AbstractIndexMap,dof_to_fix::Int)
@@ -116,14 +115,7 @@ end
 function merge_components(i::AbstractVector{<:AbstractArray{Ti}}) where Ti
   sizes = map(size,i)
   @check all(sizes .== [first(sizes)])
-  ncomps = length(i)
-  indices = zeros(Ti,ncomps.*first(sizes))
-  @inbounds for j in eachindex(indices)
-    compj = fast_index(j,ncomps)
-    dofj = slow_index(j,ncomps)
-    ij = i[compj][dofj]
-    indices[j] = (ij.-1).*ncomps .+ compj
-  end
+  indices = stack(i)
   return indices
 end
 
@@ -143,21 +135,19 @@ end
 
 struct MultiValueIndexMap{D,Ti,I} <: AbstractMultiValueIndexMap{D,Ti}
   indices::I
-  ncomps::Int
-  function MultiValueIndexMap(indices::I,ncomps::Int) where {D,Ti,I<:AbstractArray{Ti,D}}
-    new{D,Ti,I}(indices,ncomps)
+  function MultiValueIndexMap(indices::I) where {D,Ti,I<:AbstractArray{Ti,D}}
+    new{D,Ti,I}(indices)
   end
 end
 
 function MultiValueIndexMap(indices::AbstractVector{<:AbstractArray})
   mindices = merge_components(indices)
-  ncomps = length(indices)
-  return MultiValueIndexMap(mindices,ncomps)
+  return MultiValueIndexMap(mindices)
 end
 
 Base.size(i::MultiValueIndexMap) = size(i.indices)
 Base.getindex(i::MultiValueIndexMap,j...) = getindex(i.indices,j...)
-TensorValues.num_components(i::MultiValueIndexMap) = i.ncomps
+TensorValues.num_components(i::MultiValueIndexMap{D}) where D = size(i.indices,D)
 
 struct MultiValueIndexMapView{D,Ti,I,L} <: AbstractMultiValueIndexMap{D,Ti}
   indices::I

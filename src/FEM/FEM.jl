@@ -130,6 +130,8 @@ include("ParamAssemblers.jl")
 
 include("ParamBlockAssemblers.jl")
 
+include("FastLinearSolvers.jl")
+
 include("ParamIterativeSolvers.jl")
 
 export ODEParamOperatorType
@@ -258,4 +260,12 @@ export TTCounter
 export TTInserter
 export ParamTTInserterCSC
 include("TTAlgebra.jl")
+
+export TTBlockArray
+export TTBlockVector
+export TTBlockMatrix
+export ParamBlockTTArray
+export ParamBlockTTVector
+export ParamBlockTTMatrix
+include("TTBlockArray.jl")
 end # module

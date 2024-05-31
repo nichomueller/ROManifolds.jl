@@ -94,34 +94,15 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h
 
 fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
 
-# TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
+nparams = num_params(rbsolver)
+sol = solve(fesolver,feop,xh0μ;nparams)
+odesol = sol.odesol
+r = odesol.r
+vals = collect(odesol)
 
-basis,reffe_args,reffe_kwargs = reffe_u
-T,order = reffe_args
-cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
-cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
-space = FESpace(model.model,cell_reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-spaces_1d = FEM.univariate_spaces(model,cell_reffes_1d;conformity=:H1,dirichlet_tags=["dirichlet"])
-comp_to_dofs = FEM.get_comp_to_free_dofs(T,space,cell_reffe)
-
-ncomp = num_components(T)
-cell_dof_ids = get_cell_dof_ids(space)
-Ti = eltype(eltype(cell_dof_ids))
-dof_perms = Array{Ti,2}[]
-for dofs in comp_to_dofs
-  cell_dof_comp_ids = FEM._get_cell_dof_comp_ids(cell_dof_ids,dofs)
-  dof_perm_comp = FEM._get_dof_permutation(model.model,cell_dof_comp_ids,order)
-  push!(dof_perms,dof_perm_comp)
-end
-# return MultiValueIndexMap(dof_perms)
-# mindices = FEM.merge_components(dof_perms)
-i = dof_perms
-sizes = map(size,i)
-@check all(sizes .== [first(sizes)])
-ncomps = length(i)
-indices = zeros(Ti,ncomps.*first(sizes))
-j = 1
-compj = fast_index(j,ncomps)
-dofj = slow_index(j,ncomps)
-ij = i[compj][dofj]
-indices[j] = (ij.-1).*ncomps .+ compj
+NB,SB,P = 2,(1,1),(1,2)
+U = trial(r)
+block_ranges   = MultiField.get_block_ranges(NB,SB,P)
+block_num_dofs = map(range->sum(map(num_free_dofs,U.spaces[range])),block_ranges)
+block_vtypes   = map(range->get_vector_type(first(U.spaces[range])),block_ranges)
+values = mortar(map(allocate_vector,block_vtypes,block_num_dofs))

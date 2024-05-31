@@ -1,3 +1,8 @@
+function Algebra.allocate_vector(::Type{V},index_map::AbstractIndexMap) where V<:TTArray
+  values = Vector{eltype(V)}(undef,length(index_map))
+  TTArray(values,index_map)
+end
+
 struct TTBuilder{A,B}
   builder::A
   index_map::B
@@ -94,21 +99,21 @@ for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToPara
   end
 end
 
-@inline function Algebra.add_entry!(combine::Function,A::TTArray,v::Number,i)
+@inline function Algebra.add_entry!(combine::Function,A::AbstractTTArray,v::Number,i)
   add_entry!(combine,A.values,v,i)
   A
 end
 
-function Algebra.is_entry_stored(::Type{TTSparseMatrix{D,T,V}},i,j) where {D,T,V}
+function Algebra.is_entry_stored(::Type{TTSparseMatrix{T,V}},i,j) where {T,V}
   is_entry_stored(V,i,j)
 end
 
-@inline function Algebra.add_entry!(combine::Function,A::TTArray,v::Number,i,j)
+@inline function Algebra.add_entry!(combine::Function,A::AbstractTTArray,v::Number,i,j)
   add_entry!(combine,A.values,v,i,j)
   A
 end
 
-@inline function Algebra.add_entry!(combine::Function,A::TTArray,::Nothing,i,j)
+@inline function Algebra.add_entry!(combine::Function,A::AbstractTTArray,::Nothing,i,j)
   add_entry!(combine,A.values,nothing,i,j)
   A
 end

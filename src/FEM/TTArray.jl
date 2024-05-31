@@ -1,36 +1,38 @@
-struct TTArray{D,T,N,V,I} <: AbstractArray{T,N}
+abstract type AbstractTTArray{T,N} <: AbstractArray{T,N} end
+
+struct TTArray{T,N,V,I} <: AbstractTTArray{T,N}
   values::V
   index_map::I
-  function TTArray(values::V,index_map::I) where {T,N,D,V<:AbstractArray{T,N},I<:AbstractIndexMap{D}}
-    new{D,T,N,V,I}(values,index_map)
+  function TTArray(values::V,index_map::I) where {T,N,V<:AbstractArray{T,N},I<:AbstractIndexMap}
+    new{T,N,V,I}(values,index_map)
   end
 end
 
-const TTVector{D,T,V} = TTArray{D,T,1,V}
-const TTMatrix{D,T,V} = TTArray{D,T,2,V}
-const TTSparseMatrix{D,T,V<:AbstractSparseMatrix} = TTArray{D,T,2,V}
-const TTSparseMatrixCSC{D,T,V<:SparseMatrixCSC} = TTArray{D,T,2,V}
+const TTVector{T,V,I} = TTArray{T,1,V,I}
+const TTMatrix{T,V,I} = TTArray{T,2,V,I}
+const TTSparseMatrix{T,V<:AbstractSparseMatrix,I} = TTArray{T,2,V,I}
+const TTSparseMatrixCSC{T,V<:SparseMatrixCSC,I} = TTArray{T,2,V,I}
 
 get_values(a::TTArray) = a.values
 get_index_map(a::TTArray) = a.index_map
 
-function TTVector{D,T,V,I}(::UndefInitializer,s,index_map) where {D,T,V,I}
+function TTVector{T,V,I}(::UndefInitializer,s,index_map) where {T,V,I}
   values = zeros(T,s)
   TTArray(values,index_map)
 end
 
-function TTMatrix{D,T,V,I}(::UndefInitializer,s,index_map) where {D,T,V,I}
+function TTMatrix{T,V,I}(::UndefInitializer,s,index_map) where {T,V,I}
   values = zeros(T,s)
   TTArray(values,index_map)
 end
 
 # without index map, we default to normal arrays
 
-function TTVector{D,T,V,I}(::UndefInitializer,s) where {D,T,V,I}
+function TTVector{T,V,I}(::UndefInitializer,s) where {T,V,I}
   Vector{T}(undef,s)
 end
 
-function TTMatrix{D,T,V,I}(::UndefInitializer,s) where {D,T,V,I}
+function TTMatrix{T,V,I}(::UndefInitializer,s) where {T,V,I}
   Matrix{T}(undef,s)
 end
 
@@ -43,10 +45,10 @@ const ParamTTSparseMatrixCSC = ParamArray{T,2,L,A} where {T,L,A<:AbstractVector{
 get_values(a::ParamTTArray) = ParamArray(map(get_values,get_array(a)))
 get_index_map(a::ParamTTArray) = get_index_map(first(a))
 
-Base.eltype(a::TTArray{D,T}) where {D,T} = T
-Base.eltype(::Type{<:TTArray{D,T}}) where {D,T} = T
-Base.ndims(a::TTArray{D,T,N}) where {D,T,N} = N
-Base.ndims(::Type{<:TTArray{D,T,N}}) where {D,T,N} = N
+Base.eltype(a::TTArray{T}) where {T} = T
+Base.eltype(::Type{<:TTArray{T}}) where {T} = T
+Base.ndims(a::TTArray{T,N}) where {T,N} = N
+Base.ndims(::Type{<:TTArray{T,N}}) where {T,N} = N
 Base.length(a::TTArray) = length(get_values(a))
 Base.size(a::TTArray,i...) = size(get_values(a),i...)
 Base.axes(a::TTArray,i...) = axes(get_values(a),i...)
@@ -60,18 +62,18 @@ Base.copy(a::TTArray) = TTArray(copy(get_values(a)),get_index_map(a))
 Base.copyto!(a::TTArray,b::TTArray) = copyto!(get_values(a),get_values(b))
 
 function Base.similar(
-  a::TTArray{D,T},
+  a::TTArray{T},
   element_type::Type{S}=T,
-  dims::Tuple{Int,Vararg{Int}}=size(a)) where {D,T,S}
+  dims::Tuple{Int,Vararg{Int}}=size(a)) where {T,S}
   TTArray(similar(get_values(a),element_type,dims),get_index_map(a))
 end
 
-get_dim(a::TTArray{D}) where D = D
-get_dim(::Type{<:TTArray{D}}) where D = D
-get_dim(a::ParamTTArray{T,N,A}) where {T,N,A} = get_dim(eltype(A))
+get_dim(a::TTArray) = get_dim(get_index_map(a))
+get_dim(::Type{<:TTArray{T,N,V,I}}) where {T,N,V,I} = get_dim(I)
+get_dim(a::ParamTTArray) = get_dim(testitem(a))
 get_dim(::Type{<:ParamTTArray{T,N,A}}) where {T,N,A} = get_dim(eltype(A))
 
-function Base.similar(::Type{TTArray{D,T,N,V}},n::Integer...) where {D,T,N,V}
+function Base.similar(::Type{TTArray{T,N,V}},n::Integer...) where {T,N,V}
   values = similar(V,n...)
   TTArray(values,get_index_map(a))
 end
@@ -185,8 +187,6 @@ function SparseArrays.findnz(a::TTSparseMatrix)
   return i,j,TTArray(v,get_index_map(a))
 end
 
-LinearAlgebra.cholesky(a::TTSparseMatrix) = cholesky(get_values(a))
-
 function Arrays.CachedArray(a::TTArray)
   TTArray(CachedArray(get_values(a)),get_index_map(a))
 end
@@ -238,7 +238,7 @@ end
 
 function Base.materialize(b::TTBroadcast)
   a = Base.materialize(get_values(b))
-  TTArray(a,get_values(a))
+  TTArray(a,get_index_map(a))
 end
 
 function Base.materialize!(a::TTArray,b::Broadcast.Broadcasted)
@@ -259,10 +259,3 @@ Base.ndims(a::TTBroadcast) = ndims(get_values(a))
 Base.ndims(::Type{TTBroadcast{D,V}}) where {D,V} = ndims(V)
 Base.size(a::TTBroadcast) = size(get_values(a))
 Base.length(a::TTBroadcast) = length(get_values(a))
-
-# algebra
-
-function Algebra.allocate_vector(::Type{V},index_map::AbstractIndexMap) where V<:TTArray
-  values = Vector{eltype(V)}(undef,length(index_map))
-  TTArray(values,index_map)
-end

@@ -239,10 +239,10 @@ function univariate_spaces(
     model.models_1d,cell_reffes)
 end
 
-function _get_tt_vector(f,perm::AbstractIndexMap{D}) where D
+function _get_tt_vector(f,perm::AbstractIndexMap)
   V = get_vector_type(f)
   T = eltype(V)
-  vec = allocate_vector(TTVector{D,T},perm)
+  vec = allocate_vector(TTVector{T},perm)
   return vec
 end
 
@@ -293,6 +293,25 @@ function FESpaces.FESpace(
   TProductFESpace(space,spaces_1d,dof_permutation,tp_dof_permutation)
 end
 
+abstract type TProductStyle end
+struct TProduct <: TProductStyle end
+struct UnTProduct <: TProductStyle end
+
+TProductStyle(f::F) where F = TProductStyle(F)
+TProductStyle(::Type{<:FESpace}) = @abstractmethod
+TProductStyle(::Type{<:SingleFieldFESpace}) = UnTProduct()
+TProductStyle(::Type{<:TProductFESpace}) = TProduct()
+for F in (:TrialFESpace,:TransientTrialFESpace,:TrialParamFESpace,:FESpaceToParamFESpace,:TransientTrialParamFESpace)
+  @eval begin
+    TProductStyle(::Type{<:$F{<:TProductFESpace}}) = TProduct()
+  end
+end
+
+is_tensor_product(f::F) where F = (TProductStyle(F)==TProduct())
+is_tensor_product(::Type{F}) where F = (TProductStyle(F)==TProduct())
+
+get_space(f::TProductFESpace) = f.space
+
 get_dof_permutation(f::TProductFESpace) = f.dof_permutation
 
 get_tp_dof_permutation(f::TProductFESpace) = f.tp_dof_permutation
@@ -342,7 +361,7 @@ FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv) = scatter_f
 
 get_dirichlet_cells(f::TProductFESpace) = get_dirichlet_cells(f.space)
 
-# need to correct free dof values for trial spaces defined for TT problems
+# need to correct free dof values for fe spaces employing the TT strategy
 
 for F in (:TrialFESpace,:TransientTrialFESpace,:TransientTrialParamFESpace)
   @eval begin
@@ -356,6 +375,44 @@ for F in (:TrialParamFESpace,:FESpaceToParamFESpace)
       V = get_vector_type(f)
       vector = zero_free_values(f.space)
       allocate_param_array(vector,length(V))
+    end
+  end
+end
+
+function FESpaces.zero_free_values(f::MultiFieldFESpace{<:TProductFESpace})
+  V = get_vector_type(f)
+  f′ = MultiFieldFESpace(V,map(get_space,f.spaces))
+  vector = zero_free_values(f′)
+end
+
+function FESpaces.zero_free_values(f::MultiFieldParamFESpace{<:TProductFESpace})
+  V = get_vector_type(f)
+  f′ = MultiFieldParamFESpace(V,map(get_space,f.spaces))
+  vector = zero_free_values(f′)
+  allocate_param_array(vector,length(V))
+end
+
+# need to correct parametric, tproduct, zeromean constrained fespaces
+function FESpaces.FEFunction(
+  f::FESpaceToParamFESpace{<:TProductFESpace{D,<:ZeroMeanFESpace},L},
+  free_values::ParamArray,
+  dirichlet_values::ParamArray) where {D,L}
+  FEFunction(FESpaceToParamFESpace(f.space.space,Val(L)),free_values,dirichlet_values)
+end
+
+function FESpaces.EvaluationFunction(
+  f::FESpaceToParamFESpace{<:TProductFESpace{D,<:ZeroMeanFESpace},L},
+  free_values::ParamArray) where {D,L}
+  EvaluationFunction(FESpaceToParamFESpace(f.space.space,Val(L)),free_values)
+end
+
+for F in (:TrialFESpace,:ZeroMeanFESpace,:FESpaceWithConstantFixed)
+  @eval begin
+    function FESpaces.scatter_free_and_dirichlet_values(
+      f::FESpaceToParamFESpace{<:TProductFESpace{D,<:$F},L},
+      fv::ParamArray,
+      dv::ParamArray) where {D,L}
+      scatter_free_and_dirichlet_values(FESpaceToParamFESpace(f.space.space,Val(L)),fv,dv)
     end
   end
 end

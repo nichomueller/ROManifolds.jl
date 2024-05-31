@@ -28,9 +28,8 @@ function MultiFieldParamFESpace(
     style = BlockMultiFieldStyle(style,spaces)
     VT = typeof(mortar(map(zero_free_values,spaces)))
   else
-    Ts = map(get_dof_value_type,spaces)
-    T  = typeof(*(map(zero,Ts)...))
-    VT = T
+    T  = promote_type(map(get_dof_value_type,spaces)...)
+    VT = Vector{T}
   end
   MultiFieldParamFESpace(VT,spaces,style)
 end
@@ -43,9 +42,7 @@ function _MultiFieldParamFESpace(
     style = BlockMultiFieldStyle(style,spaces)
     VT = typeof(mortar(map(zero_free_values,spaces)))
   else
-    T = get_vector_type(first(spaces))
-    @check all(map(get_vector_type,spaces) .== T)
-    VT = T
+    VT = promote_type(map(get_vector_type,spaces)...)
   end
   MultiFieldParamFESpace(VT,spaces,style)
 end
@@ -112,23 +109,29 @@ function FESpaces.get_free_dof_ids(f::MultiFieldParamFESpace,::ConsecutiveMultiF
 end
 
 function FESpaces.get_free_dof_ids(f::MultiFieldParamFESpace,::BlockMultiFieldStyle{NB,SB,P}) where {NB,SB,P}
-  block_ranges   = MultiField.get_block_ranges(NB,SB,P)
+  block_ranges = MultiField.get_block_ranges(NB,SB,P)
   block_num_dofs = map(range->sum(map(num_free_dofs,f.spaces[range])),block_ranges)
   return BlockArrays.blockedrange(block_num_dofs)
 end
 
-function FESpaces.zero_free_values(f::MultiFieldParamFESpace)
+function FESpaces.zero_free_values(f::MultiFieldParamFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
+  if all(is_tensor_product.(f.spaces))
+    return _zero_free_values(f)
+  elseif any(is_tensor_product.(f.spaces))
+    @notimplemented
+  end
   V = get_vector_type(f)
-  allocate_vector(V,num_free_dofs(f))
+  free_values = allocate_vector(V,get_free_dof_ids(f))
+  fill!(free_values,zero(eltype(V)))
+  return free_values
 end
 
-function FESpaces.zero_free_values(f::MultiFieldParamFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
-  block_ranges   = MultiField.get_block_ranges(NB,SB,P)
-  block_num_dofs = map(range->sum(map(num_free_dofs,f.spaces[range])),block_ranges)
-  block_vtypes   = map(range->get_vector_type(first(f.spaces[range])),block_ranges)
-  values = mortar(map(allocate_vector,block_vtypes,block_num_dofs))
-  fill!(values,zero(eltype(values)))
-  return values
+function _zero_free_values(f::MultiFieldParamFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
+  @check NB == length(f.spaces)
+  values = map(zero_free_values,f.spaces)
+  block_values = mortar(values)
+  fill!(block_values,zero(eltype(block_values)))
+  return block_values
 end
 
 FESpaces.get_dof_value_type(::MultiFieldParamFESpace{MS,CS,V}) where {MS,CS,V} = eltype(V)
