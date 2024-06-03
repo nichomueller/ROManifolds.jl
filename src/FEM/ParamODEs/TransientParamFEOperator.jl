@@ -101,7 +101,7 @@ end
 
 FESpaces.get_test(op::TransientParamFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamFEOpFromWeakForm) = op.trial
-Polynomials.get_order(op::TransientParamFEOpFromWeakForm) = op.order
+ReferenceFEs.get_order(op::TransientParamFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamFEOpFromWeakForm) = op.assem
@@ -204,7 +204,7 @@ end
 
 FESpaces.get_test(op::TransientParamSemilinearFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamSemilinearFEOpFromWeakForm) = op.trial
-Polynomials.get_order(op::TransientParamSemilinearFEOpFromWeakForm) = op.order
+ReferenceFEs.get_order(op::TransientParamSemilinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamSemilinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamSemilinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamSemilinearFEOpFromWeakForm) = op.assem
@@ -275,7 +275,7 @@ end
 
 FESpaces.get_test(op::TransientParamLinearFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamLinearFEOpFromWeakForm) = op.trial
-Polynomials.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
+ReferenceFEs.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem

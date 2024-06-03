@@ -436,8 +436,7 @@ CellData.get_data(f::TProductFEBasis) = f.basis
 CellData.get_triangulation(f::TProductFEBasis) = f.trian
 FESpaces.BasisStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = BS
 CellData.DomainStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = DS
-MultiField.num_fields(a::TProductFEBasis) = length(get_data(a))
-Base.length(a::TProductFEBasis) = num_fields(a)
+Base.length(a::TProductFEBasis) = length(get_data(a))
 
 function get_tp_triangulation(f::TProductFESpace)
   trian = get_triangulation(f.space)

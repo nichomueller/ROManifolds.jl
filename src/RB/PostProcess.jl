@@ -66,7 +66,7 @@ function rb_results(
 end
 
 function rb_results(solver::RBSolver,op::RBOperator,args...;kwargs...)
-  feop = FEM.get_fe_operator(op)
+  feop = ParamODEs.get_fe_operator(op)
   rb_results(solver,feop,args...;kwargs...)
 end
 

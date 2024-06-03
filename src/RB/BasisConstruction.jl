@@ -60,9 +60,9 @@ function ttsvd!(cache,mat::AbstractArray{T,N},X::AbstractMatrix;ids_range=1:N-1,
   return mat
 end
 
-function ttsvd_and_weights!(cache,mat::AbstractArray,X::FEM.AbstractTProductArray;kwargs...)
+function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;kwargs...)
   cores,weights,ranks,sizes = cache
-  for k in 1:FEM.get_dim(X)-1
+  for k in 1:ParamTensorProduct.get_dim(X)-1
     mat_k = reshape(mat,ranks[k]*sizes[k],:)
     U,Σ,V = svd(mat_k)
     rank = truncation(Σ;kwargs...)
@@ -73,7 +73,7 @@ function ttsvd_and_weights!(cache,mat::AbstractArray,X::FEM.AbstractTProductArra
     _weight_array!(weights,cores,X,Val(k))
   end
   XW = _get_norm_matrix_from_weights(X,weights)
-  M = ttsvd!((cores,ranks,sizes),mat,XW;ids_range=FEM.get_dim(X),kwargs...)
+  M = ttsvd!((cores,ranks,sizes),mat,XW;ids_range=ParamTensorProduct.get_dim(X),kwargs...)
   return M
 end
 
@@ -101,7 +101,7 @@ function _get_norm_matrices(X::TProductGradientArray,::Val{3},::Val{3})
 end
 
 function _get_norm_matrices(X::TProductGradientArray,::Val{d}) where d
-  _get_norm_matrices(X,Val(d),Val(FEM.get_dim(X)))
+  _get_norm_matrices(X,Val(d),Val(ParamTensorProduct.get_dim(X)))
 end
 
 function _weight_array!(weights,cores,X,::Val{1})
@@ -171,7 +171,7 @@ function ttsvd(mat::AbstractArray{T,N},X=nothing;kwargs...) where {T,N}
   return cores
 end
 
-function ttsvd(mat::AbstractArray{T,N},X::FEM.AbstractTProductArray;kwargs...) where {T,N}
+function ttsvd(mat::AbstractArray{T,N},X::AbstractTProductArray;kwargs...) where {T,N}
   N_space = N-2
   cores = Vector{Array{T,3}}(undef,N-1)
   weights = Vector{Array{T,3}}(undef,N_space-1)

@@ -14,6 +14,7 @@ const ParamBlockVector = ParamBlockArray{T,1,L,A,B} where {T,L,A,B}
 const ParamBlockMatrix = ParamBlockArray{T,2,L,A,B} where {T,L,A,B}
 
 function BlockArrays.mortar(blocks::AbstractArray{<:AbstractParamContainer})
+  any(isa.(blocks,ParamTTArray)) && return _tt_mortar(blocks)
   block_sizes = BlockArrays.sizes_from_blocks(first.(blocks))
   block_axes = map(blockedrange,block_sizes)
   ParamBlockArray(blocks,block_axes)

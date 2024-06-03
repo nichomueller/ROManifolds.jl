@@ -65,7 +65,7 @@ function BasicSnapshots(s::BasicTTSnapshots)
   s
 end
 
-FEM.get_index_map(s::BasicTTSnapshots) = get_index_map(s.values)
+ParamTensorProduct.get_index_map(s::BasicTTSnapshots) = get_index_map(s.values)
 
 function tensor_getindex(s::BasicTTSnapshots,ispace,itime,iparam)
   perm_ispace = get_index_map(s)[ispace]
@@ -101,7 +101,7 @@ function TransientSnapshots(
   TransientTTSnapshots(values,realization)
 end
 
-FEM.get_index_map(s::TransientTTSnapshots) = get_index_map(first(s.values))
+ParamTensorProduct.get_index_map(s::TransientTTSnapshots) = get_index_map(first(s.values))
 
 function tensor_getindex(s::TransientTTSnapshots,ispace,itime,iparam)
   perm_ispace = get_index_map(s)[ispace]
@@ -129,7 +129,7 @@ function BasicSnapshots(
   BasicSnapshots(basic_values,s.realization)
 end
 
-function FEM.get_values(s::TransientTTSnapshots)
+function ParamDataStructures.get_values(s::TransientTTSnapshots)
   get_values(BasicSnapshots(s))
 end
 
@@ -174,10 +174,10 @@ space_indices(s::SelectedTTSnapshotsAtIndices) = s.selected_indices[1]
 time_indices(s::SelectedTTSnapshotsAtIndices) = s.selected_indices[2]
 param_indices(s::SelectedTTSnapshotsAtIndices) = s.selected_indices[3]
 num_space_dofs(s::SelectedTTSnapshotsAtIndices) = size(space_indices(s))
-FEM.num_times(s::SelectedTTSnapshotsAtIndices) = length(time_indices(s))
-FEM.num_params(s::SelectedTTSnapshotsAtIndices) = length(param_indices(s))
+ParamDataStructures.num_times(s::SelectedTTSnapshotsAtIndices) = length(time_indices(s))
+ParamDataStructures.num_params(s::SelectedTTSnapshotsAtIndices) = length(param_indices(s))
 
-FEM.get_index_map(s::SelectedTTSnapshotsAtIndices) = get_index_map(s.snaps)
+ParamTensorProduct.get_index_map(s::SelectedTTSnapshotsAtIndices) = get_index_map(s.snaps)
 
 function tensor_getindex(s::SelectedTTSnapshotsAtIndices,ispace,itime,iparam)
   is = space_indices(s)[ispace]
@@ -193,7 +193,7 @@ function tensor_setindex!(s::SelectedTTSnapshotsAtIndices,v,ispace,itime,iparam)
   tensor_setindex!(s.snaps,v,is,it,ip)
 end
 
-function FEM.get_values(s::SelectedTTSnapshotsAtIndices{T,N,<:BasicTTSnapshots}) where {T,N}
+function ParamDataStructures.get_values(s::SelectedTTSnapshotsAtIndices{T,N,<:BasicTTSnapshots}) where {T,N}
   v = get_values(s.snaps)
   array = Vector{typeof(first(v))}(undef,num_times(s)*num_params(s))
   ispace = space_indices(s)
@@ -207,7 +207,7 @@ function FEM.get_values(s::SelectedTTSnapshotsAtIndices{T,N,<:BasicTTSnapshots})
   ParamArray(array)
 end
 
-function FEM.get_values(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapshots}) where {T,N}
+function ParamDataStructures.get_values(s::SelectedTTSnapshotsAtIndices{T,N,<:TransientTTSnapshots}) where {T,N}
   get_values(BasicSnapshots(s))
 end
 
@@ -268,7 +268,7 @@ end
 
 function vectorize_index_map(s::TTSnapshots)
   i = get_index_map(s)
-  vi = FEM.vectorize_index_map(i)
+  vi = ParamTensorProduct.vectorize_index_map(i)
   VectorizedTTSnapshots(s,vi)
 end
 
@@ -280,7 +280,7 @@ struct VectorizedTTSnapshots{T,S,I} <: TTSnapshots{T,3}
   end
 end
 
-FEM.get_index_map(s::VectorizedTTSnapshots) = s.index_map
+ParamTensorProduct.get_index_map(s::VectorizedTTSnapshots) = s.index_map
 
 function get_realization(s::VectorizedTTSnapshots)
   get_realization(s.snaps)
@@ -296,8 +296,8 @@ function tensor_getindex(s::VectorizedTTSnapshots{T,<:TransientTTSnapshots},ispa
   s.snaps.values[itime][iparam][perm_ispace]
 end
 
-FEM.num_times(s::VectorizedTTSnapshots{T,<:SelectedTTSnapshotsAtIndices}) where T = num_times(s.snaps)
-FEM.num_params(s::VectorizedTTSnapshots{T,<:SelectedTTSnapshotsAtIndices}) where T = num_params(s.snaps)
+ParamDataStructures.num_times(s::VectorizedTTSnapshots{T,<:SelectedTTSnapshotsAtIndices}) where T = num_times(s.snaps)
+ParamDataStructures.num_params(s::VectorizedTTSnapshots{T,<:SelectedTTSnapshotsAtIndices}) where T = num_params(s.snaps)
 
 function tensor_getindex(s::VectorizedTTSnapshots{T,<:SelectedTTSnapshotsAtIndices},ispace,itime,iparam) where T
   is = ispace
@@ -306,8 +306,8 @@ function tensor_getindex(s::VectorizedTTSnapshots{T,<:SelectedTTSnapshotsAtIndic
   tensor_getindex(VectorizedTTSnapshots(s.snaps.snaps,s.index_map),is,it,ip)
 end
 
-const BasicNnzTTSnapshots = BasicTTSnapshots{T,N,P,R} where {T,N,P<:FEM.ParamTTSparseMatrix,R}
-const TransientNnzTTSnapshots = TransientTTSnapshots{T,N,P,R,V} where {T,N,P<:FEM.ParamTTSparseMatrix,R,V}
+const BasicNnzTTSnapshots = BasicTTSnapshots{T,N,P,R} where {T,N,P<:ParamTTSparseMatrix,R}
+const TransientNnzTTSnapshots = TransientTTSnapshots{T,N,P,R,V} where {T,N,P<:ParamTTSparseMatrix,R,V}
 const SelectedNnzTTSnapshotsAtIndices = SelectedTTSnapshotsAtIndices{T,N,S,I} where {T,N,S<:Union{BasicNnzTTSnapshots,TransientNnzTTSnapshots},I}
 const NnzTTSnapshots = Union{
   BasicNnzTTSnapshots{T,N},
@@ -316,7 +316,7 @@ const NnzTTSnapshots = Union{
 
 function recast(s::NnzTTSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T
   index_map = get_index_map(s)
-  ls = FEM.get_univariate_sparsity(index_map)
+  ls = ParamTensorProduct.get_univariate_sparsity(index_map)
   asparse = map(SparseCore,a,ls)
   return asparse
 end

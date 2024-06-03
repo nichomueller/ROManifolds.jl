@@ -70,7 +70,7 @@ num_space_dofs(r::RBSpace) = num_space_dofs(r.basis)
 num_reduced_space_dofs(r::RBSpace) = num_reduced_space_dofs(r.basis)
 
 get_basis_time(r::RBSpace) = get_basis_time(r.basis)
-FEM.num_times(r::RBSpace) = num_times(r.basis)
+ParamDataStructures.num_times(r::RBSpace) = num_times(r.basis)
 num_reduced_times(r::RBSpace) = num_reduced_times(r.basis)
 
 num_fe_free_dofs(r::RBSpace) = num_fe_dofs(r.basis)
@@ -121,7 +121,7 @@ function Arrays.evaluate!(cache,k::RecastMap,x::ParamVector,r::RBSpace)
   end
 end
 
-function Arrays.evaluate!(cache::FEM.ParamTTArray,k::RecastMap,x::ParamVector,r::RBSpace)
+function Arrays.evaluate!(cache::ParamTTArray,k::RecastMap,x::ParamVector,r::RBSpace)
   c = get_values(cache)
   evaluate!(c,k,x,r)
   copyto!(cache,c)

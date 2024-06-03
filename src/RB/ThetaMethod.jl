@@ -201,7 +201,7 @@ function _solve_rb_nr!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,stageop,trial)
   end
 end
 
-function FEM.shift!(a::AbstractParamContainer,r::TransientParamRealization,α::Number,β::Number)
+function ParamDataStructures.shift!(a::AbstractParamContainer,r::TransientParamRealization,α::Number,β::Number)
   b = copy(a)
   nt = num_times(r)
   np = num_params(r)

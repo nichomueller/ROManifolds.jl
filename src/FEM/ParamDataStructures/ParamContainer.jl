@@ -98,8 +98,6 @@ function Arrays.testitem(a::ParamFieldContainer)
   return_value(Operation(a.op),fs...)
 end
 
-# Base.transpose(a::ParamFieldContainer) = a
-
 for T in (:(Point),:(AbstractArray{<:Point}))
   @eval begin
     function Arrays.return_cache(f::ParamFieldContainer,x::$T)

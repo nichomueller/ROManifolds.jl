@@ -43,7 +43,7 @@ function FESpaces.get_trial(op::TransientParamLinearNonlinearFEOperator)
   get_trial(op.op_linear)
 end
 
-function Polynomials.get_order(op::TransientParamLinearNonlinearFEOperator)
+function ReferenceFEs.get_order(op::TransientParamLinearNonlinearFEOperator)
   return max(get_order(op.op_linear),get_order(op.op_nonlinear))
 end
 

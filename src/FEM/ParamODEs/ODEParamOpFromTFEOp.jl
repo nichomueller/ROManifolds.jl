@@ -2,7 +2,7 @@ struct ODEParamOpFromTFEOp{T} <: ODEParamOperator{T}
   op::TransientParamFEOperator{T}
 end
 
-Polynomials.get_order(odeop::ODEParamOpFromTFEOp) = get_order(odeop.op)
+ReferenceFEs.get_order(odeop::ODEParamOpFromTFEOp) = get_order(odeop.op)
 FESpaces.get_test(odeop::ODEParamOpFromTFEOp) = get_test(odeop.op)
 FESpaces.get_trial(odeop::ODEParamOpFromTFEOp) = get_trial(odeop.op)
 realization(odeop::ODEParamOpFromTFEOp;kwargs...) = realization(odeop.op;kwargs...)
@@ -282,7 +282,7 @@ struct ODEParamOpFromTFEOpWithTrian{T} <: ODEParamOperatorWithTrian{T}
   op::TransientParamFEOperatorWithTrian{T}
 end
 
-Polynomials.get_order(odeop::ODEParamOpFromTFEOpWithTrian) = get_order(odeop.op)
+ReferenceFEs.get_order(odeop::ODEParamOpFromTFEOpWithTrian) = get_order(odeop.op)
 FESpaces.get_test(odeop::ODEParamOpFromTFEOpWithTrian) = get_test(odeop.op)
 FESpaces.get_trial(odeop::ODEParamOpFromTFEOpWithTrian) = get_trial(odeop.op)
 realization(odeop::ODEParamOpFromTFEOpWithTrian;kwargs...) = realization(odeop.op;kwargs...)

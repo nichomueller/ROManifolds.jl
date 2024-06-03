@@ -138,7 +138,7 @@ get_interp_matrix(a::AffineDecomposition) = a.mdeim_interpolation
 get_indices_space(a::AffineDecomposition) = get_indices_space(get_integration_domain(a))
 get_indices_time(a::AffineDecomposition) = get_indices_time(get_integration_domain(a))
 num_space_dofs(a::AffineDecomposition) = @notimplemented
-FEM.num_times(a::AffineDecomposition) = num_times(a.basis)
+ParamDataStructures.num_times(a::AffineDecomposition) = num_times(a.basis)
 num_reduced_space_dofs(a::AffineDecomposition) = length(get_indices_space(a))
 num_reduced_times(a::AffineDecomposition) = length(get_indices_time(a))
 
@@ -177,7 +177,7 @@ function mdeim(mdeim_style::MDEIMStyle,b::TTSVDCores)
   return lu_interp,integration_domain
 end
 
-function FEM.Contribution(v::Tuple{Vararg{AffineDecomposition}},t::Tuple{Vararg{Triangulation}})
+function ParamDataStructures.Contribution(v::Tuple{Vararg{AffineDecomposition}},t::Tuple{Vararg{Triangulation}})
   AffineContribution(v,t)
 end
 
@@ -414,7 +414,7 @@ function Arrays.testitem(a::BlockAffineDecomposition)
   end
 end
 
-function FEM.Contribution(v::Tuple{Vararg{BlockAffineDecomposition}},t::Tuple{Vararg{Triangulation}})
+function ParamDataStructures.Contribution(v::Tuple{Vararg{BlockAffineDecomposition}},t::Tuple{Vararg{Triangulation}})
   AffineContribution(v,t)
 end
 
@@ -451,7 +451,7 @@ end
 
 num_space_dofs(a::BlockAffineDecomposition) = @notimplemented
 
-function FEM.num_times(a::BlockAffineDecomposition)
+function ParamDataStructures.num_times(a::BlockAffineDecomposition)
   num_times(testitem(a))
 end
 
@@ -475,7 +475,7 @@ function reduced_residual(
   ads,red_trians = Any[
     reduced_form(solver,s[i],trian,test[i]) for i in active_block_ids
     ] |> tuple_of_arrays
-  red_trian = FEM.merge_triangulations(red_trians)
+  red_trian = ParamUtils.merge_triangulations(red_trians)
   cache = allocate_block_mdeim_lincomb(solver,test)
   ad = BlockAffineDecomposition(block_map,cache,ads...)
   return ad,red_trian
@@ -495,7 +495,7 @@ function reduced_jacobian(
   ads,red_trians = Any[
     reduced_form(solver,s[i,j],trian,trial[j],test[i];kwargs...) for (i,j) in Tuple.(active_block_ids)
     ] |> tuple_of_arrays
-  red_trian = FEM.merge_triangulations(red_trians)
+  red_trian = ParamUtils.merge_triangulations(red_trians)
   cache = allocate_block_mdeim_lincomb(solver,trial,test)
   ad = BlockAffineDecomposition(block_map,cache,ads...)
   return ad,red_trian

@@ -28,8 +28,8 @@ end
 
 FESpaces.get_trial(op::PODMDEIMOperator) = get_trial(op.op)
 FESpaces.get_test(op::PODMDEIMOperator) = get_test(op.op)
-FEM.realization(op::PODMDEIMOperator;kwargs...) = realization(op.op;kwargs...)
-FEM.get_fe_operator(op::PODMDEIMOperator) = FEM.get_fe_operator(op.op)
+ParamDataStructures.realization(op::PODMDEIMOperator;kwargs...) = realization(op.op;kwargs...)
+ParamODEs.get_fe_operator(op::PODMDEIMOperator) = ParamODEs.get_fe_operator(op.op)
 get_fe_trial(op::PODMDEIMOperator) = get_fe_trial(op.op)
 get_fe_test(op::PODMDEIMOperator) = get_fe_test(op.op)
 
@@ -206,8 +206,8 @@ struct LinearNonlinearPODMDEIMOperator <: RBOperator{LinearNonlinearParamODE}
   end
 end
 
-FEM.get_linear_operator(op::LinearNonlinearPODMDEIMOperator) = op.op_linear
-FEM.get_nonlinear_operator(op::LinearNonlinearPODMDEIMOperator) = op.op_nonlinear
+ParamODEs.get_linear_operator(op::LinearNonlinearPODMDEIMOperator) = op.op_linear
+ParamODEs.get_nonlinear_operator(op::LinearNonlinearPODMDEIMOperator) = op.op_nonlinear
 
 function FESpaces.get_test(op::LinearNonlinearPODMDEIMOperator)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
@@ -219,12 +219,12 @@ function FESpaces.get_trial(op::LinearNonlinearPODMDEIMOperator)
   get_trial(op.op_nonlinear)
 end
 
-function FEM.realization(op::LinearNonlinearPODMDEIMOperator;kwargs...)
+function ParamDataStructures.realization(op::LinearNonlinearPODMDEIMOperator;kwargs...)
   realization(op.op_nonlinear;kwargs...)
 end
 
-function FEM.get_fe_operator(op::LinearNonlinearPODMDEIMOperator)
-  join_operators(FEM.get_fe_operator(op.op_linear),FEM.get_fe_operator(op.op_nonlinear))
+function ParamODEs.get_fe_operator(op::LinearNonlinearPODMDEIMOperator)
+  join_operators(ParamODEs.get_fe_operator(op.op_linear),ParamODEs.get_fe_operator(op.op_nonlinear))
 end
 
 function get_fe_trial(op::LinearNonlinearPODMDEIMOperator)

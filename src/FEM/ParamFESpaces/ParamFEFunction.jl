@@ -16,10 +16,6 @@ FESpaces.get_free_dof_values(f::SingleFieldParamFEFunction) = f.free_values
 FESpaces.get_cell_dof_values(f::SingleFieldParamFEFunction) = f.cell_dof_values
 FESpaces.get_fe_space(f::SingleFieldParamFEFunction) = f.fe_space
 
-function ODEs.TransientCellField(f::SingleFieldParamFEFunction,derivatives::Tuple)
-  ODEs.TransientSingleFieldCellField(f,derivatives)
-end
-
 # audodiff
 
 function FESpaces._change_argument(op,f,trian,uh::SingleFieldParamFEFunction)
@@ -128,11 +124,6 @@ MultiField.num_fields(m::MultiFieldParamFEFunction) = length(m.single_fe_functio
 Base.iterate(m::MultiFieldParamFEFunction) = iterate(m.single_fe_functions)
 Base.iterate(m::MultiFieldParamFEFunction,state) = iterate(m.single_fe_functions,state)
 Base.getindex(m::MultiFieldParamFEFunction,field_id::Integer) = m.single_fe_functions[field_id]
-
-function ODEs.TransientCellField(multi_field::MultiFieldParamFEFunction,derivatives::Tuple)
-  transient_single_fields = ODEs._to_transient_single_fields(multi_field,derivatives)
-  ODEs.TransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
-end
 
 # for visualization/testing purposes
 

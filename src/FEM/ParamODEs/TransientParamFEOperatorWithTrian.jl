@@ -81,7 +81,7 @@ end
 
 FESpaces.get_test(op::TransientParamFEOpFromWeakFormWithTrian) = get_test(op.op)
 FESpaces.get_trial(op::TransientParamFEOpFromWeakFormWithTrian) = get_trial(op.op)
-Polynomials.get_order(op::TransientParamFEOpFromWeakFormWithTrian) = get_order(op.op)
+ReferenceFEs.get_order(op::TransientParamFEOpFromWeakFormWithTrian) = get_order(op.op)
 ODEs.get_res(op::TransientParamFEOpFromWeakFormWithTrian) = get_res(op.op)
 ODEs.get_jacs(op::TransientParamFEOpFromWeakFormWithTrian) = get_jacs(op.op)
 ODEs.get_assembler(op::TransientParamFEOpFromWeakFormWithTrian) = get_assembler(op.op)
@@ -174,7 +174,7 @@ end
 
 FESpaces.get_test(op::TransientParamSaddlePointFEOpWithTrian) = get_test(op.op)
 FESpaces.get_trial(op::TransientParamSaddlePointFEOpWithTrian) = get_trial(op.op)
-Polynomials.get_order(op::TransientParamSaddlePointFEOpWithTrian) = get_order(op.op)
+ReferenceFEs.get_order(op::TransientParamSaddlePointFEOpWithTrian) = get_order(op.op)
 ODEs.get_res(op::TransientParamSaddlePointFEOpWithTrian) = get_res(op.op)
 ODEs.get_jacs(op::TransientParamSaddlePointFEOpWithTrian) = get_jacs(op.op)
 ODEs.get_assembler(op::TransientParamSaddlePointFEOpWithTrian) = get_assembler(op.op)

@@ -62,7 +62,7 @@ end
 
 FESpaces.get_test(op::TransientParamSaddlePointFEOp) = get_test(op.op)
 FESpaces.get_trial(op::TransientParamSaddlePointFEOp) = get_trial(op.op)
-Polynomials.get_order(op::TransientParamSaddlePointFEOp) = get_order(op.op)
+ReferenceFEs.get_order(op::TransientParamSaddlePointFEOp) = get_order(op.op)
 ODEs.get_res(op::TransientParamSaddlePointFEOp) = get_res(op.op)
 ODEs.get_jacs(op::TransientParamSaddlePointFEOp) = get_jacs(op.op)
 ODEs.get_assembler(op::TransientParamSaddlePointFEOp) = get_assembler(op.op)

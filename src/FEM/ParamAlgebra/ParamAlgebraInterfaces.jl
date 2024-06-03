@@ -39,6 +39,62 @@ function Algebra.nz_allocation(a::Algebra.ArrayCounter{<:ParamVector{T,L,A}}) wh
   allocate_param_array(v,L)
 end
 
+@inline function Algebra._add_entries!(
+  combine::Function,A,vs::AbstractParamContainer,is,js)
+  for (lj,j) in enumerate(js)
+    if j>0
+      for (li,i) in enumerate(is)
+        if i>0
+          vij = ParamContainer(map(x->x[li,lj],vs))
+          add_entry!(combine,A,vij,i,j)
+        end
+      end
+    end
+  end
+  A
+end
+
+@inline function Algebra._add_entries!(
+  combine::Function,A::AbstractParamContainer,vs::AbstractParamContainer,is,js)
+  for (lj,j) in enumerate(js)
+    if j>0
+      for (li,i) in enumerate(is)
+        if i>0
+          for k = eachindex(vs)
+            vij = vs[k][li,lj]
+            add_entry!(combine,A[k],vij,i,j)
+          end
+        end
+      end
+    end
+  end
+  A
+end
+
+@inline function Algebra._add_entries!(
+  combine::Function,A,vs::AbstractParamContainer,is)
+  for (li,i) in enumerate(is)
+    if i>0
+      vi = ParamContainer(map(x->x[li],vs))
+      add_entry!(combine,A,vi,i)
+    end
+  end
+  A
+end
+
+@inline function Algebra._add_entries!(
+  combine::Function,A::AbstractParamContainer,vs::AbstractParamContainer,is)
+  for (li,i) in enumerate(is)
+    if i>0
+      for k = eachindex(vs)
+        vi = vs[k][li]
+        add_entry!(combine,A[k],vi,i)
+      end
+    end
+  end
+  A
+end
+
 @inline function Algebra.add_entry!(combine::Function,A::ParamVector,v::Number,i)
   for k = eachindex(A)
     ai = A[k][i]

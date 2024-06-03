@@ -1,11 +1,12 @@
 module RB
-using Mabla.FEM
+
 using LinearAlgebra
 using BlockArrays
 using SparseArrays
 using DrWatson
 using Kronecker
 using Serialization
+
 using Gridap
 using Gridap.Algebra
 using Gridap.FESpaces
@@ -16,11 +17,18 @@ using Gridap.Fields
 using Gridap.CellData
 using Gridap.MultiField
 using Gridap.ODEs
+using Gridap.Helpers
+
+using Mabla.FEM
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamAlgebra
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamODEs
+using Mabla.FEM.ParamTensorProduct
+using Mabla.FEM.ParamUtils
 
 import Base: +,-,*,\
 import UnPack: @unpack
-import Gridap.Helpers: @abstractmethod,@check,@notimplemented,@unreachable
-import Gridap.Arrays: evaluate!
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
 
@@ -138,6 +146,4 @@ export load_solve
 export generate_plots
 include("PostProcess.jl")
 
-export VecOfSparseMat2Arr3
-include("Temp.jl")
 end # module

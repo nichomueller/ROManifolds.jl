@@ -44,7 +44,7 @@ end
 get_basis_space(b::PODBasis) = b.basis_space
 get_basis_time(b::PODBasis) = b.basis_time
 num_space_dofs(b::PODBasis) = size(get_basis_space(b),1)
-FEM.num_times(b::PODBasis) = size(get_basis_time(b),1)
+ParamDataStructures.num_times(b::PODBasis) = size(get_basis_time(b),1)
 num_reduced_space_dofs(b::PODBasis) = size(get_basis_space(b),2)
 num_reduced_times(b::PODBasis) = size(get_basis_time(b),2)
 num_fe_dofs(a::PODBasis) = num_space_dofs(a)*num_times(a)
@@ -112,8 +112,8 @@ get_temporal_cores(b::TTSVDCores) = b.core_time
 get_basis_space(b::TTSVDCores) = cores2basis(get_index_map(b),get_spatial_cores(b)...)
 get_basis_time(b::TTSVDCores) = cores2basis(get_temporal_cores(b))
 get_basis_spacetime(b::TTSVDCores) = b.basis_spacetime
-FEM.get_index_map(b::TTSVDCores) = b.index_map
-FEM.num_times(b::TTSVDCores) = size(get_temporal_cores(b),2)
+ParamTensorProduct.get_index_map(b::TTSVDCores) = b.index_map
+ParamDataStructures.num_times(b::TTSVDCores) = size(get_temporal_cores(b),2)
 num_reduced_space_dofs(b::TTSVDCores) = size(last(get_spatial_cores(b)),3)
 num_reduced_times(b::TTSVDCores) = size(get_temporal_cores(b),3)
 num_fe_dofs(b::TTSVDCores) = num_space_dofs(b)*num_times(b)
@@ -306,7 +306,7 @@ function num_reduced_space_dofs(b::BlockProjection)
   return dofs
 end
 
-FEM.num_times(b::BlockProjection) = num_times(b[findfirst(b.touched)])
+ParamDataStructures.num_times(b::BlockProjection) = num_times(b[findfirst(b.touched)])
 
 function num_reduced_times(b::BlockProjection)
   dofs = zeros(Int,length(b))

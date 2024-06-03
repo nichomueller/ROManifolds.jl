@@ -29,20 +29,20 @@ end
 
 FESpaces.get_trial(op::PODOperator) = op.trial
 FESpaces.get_test(op::PODOperator) = op.test
-FEM.realization(op::PODOperator;kwargs...) = realization(op.odeop;kwargs...)
-FEM.get_fe_operator(op::PODOperator) = FEM.get_fe_operator(op.odeop)
+ParamDataStructures.realization(op::PODOperator;kwargs...) = realization(op.odeop;kwargs...)
+ParamODEs.get_fe_operator(op::PODOperator) = ParamODEs.get_fe_operator(op.odeop)
 get_fe_trial(op::PODOperator) = get_trial(op.odeop)
 get_fe_test(op::PODOperator) = get_test(op.odeop)
 
-function FEM.get_linear_operator(op::PODOperator{LinearNonlinearParamODE})
+function ParamODEs.get_linear_operator(op::PODOperator{LinearNonlinearParamODE})
   PODOperator(get_linear_operator(op.odeop),op.trial,op.test)
 end
 
-function FEM.get_nonlinear_operator(op::PODOperator{LinearNonlinearParamODE})
+function ParamODEs.get_nonlinear_operator(op::PODOperator{LinearNonlinearParamODE})
   PODOperator(get_nonlinear_operator(op.odeop),op.trial,op.test)
 end
 
-function FEM.set_triangulation(
+function ParamODEs.set_triangulation(
   op::PODOperator,
   trians_rhs,
   trians_lhs)
@@ -50,7 +50,7 @@ function FEM.set_triangulation(
   PODOperator(set_triangulation(op.odeop,trians_rhs,trians_lhs),op.trial,op.test)
 end
 
-function FEM.change_triangulation(
+function ParamODEs.change_triangulation(
   op::PODOperator,
   trians_rhs,
   trians_lhs)

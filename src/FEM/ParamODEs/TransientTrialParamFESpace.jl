@@ -67,7 +67,7 @@ end
 
 FESpaces.get_free_dof_ids(f::TransientTrialParamFESpace) = get_free_dof_ids(f.space)
 FESpaces.get_vector_type(f::TransientTrialParamFESpace) = get_vector_type(f.space)
-Geometry.get_triangulation(f::TransientTrialParamFESpace) = get_triangulation(f.space)
+CellData.get_triangulation(f::TransientTrialParamFESpace) = get_triangulation(f.space)
 FESpaces.get_cell_dof_ids(f::TransientTrialParamFESpace) = get_cell_dof_ids(f.space)
 FESpaces.get_fe_basis(f::TransientTrialParamFESpace) = get_fe_basis(f.space)
 FESpaces.get_fe_dof_basis(f::TransientTrialParamFESpace) = get_fe_dof_basis(f.space)

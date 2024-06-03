@@ -1,9 +1,9 @@
 abstract type AbstractSnapshots{T,N} <: AbstractParamContainer{T,N} end
 
-FEM.get_values(s::AbstractSnapshots) = copy(s.values)
+ParamDataStructures.get_values(s::AbstractSnapshots) = copy(s.values)
 get_realization(s::AbstractSnapshots) = copy(s.realization)
-FEM.num_times(s::AbstractSnapshots) = num_times(get_realization(s))
-FEM.num_params(s::AbstractSnapshots) = num_params(get_realization(s))
+ParamDataStructures.num_times(s::AbstractSnapshots) = num_times(get_realization(s))
+ParamDataStructures.num_params(s::AbstractSnapshots) = num_params(get_realization(s))
 Base.eltype(::AbstractSnapshots{T}) where T = T
 Base.eltype(::Type{<:AbstractSnapshots{T}}) where T = T
 Base.ndims(::AbstractSnapshots{T,N}) where {T,N} = N
@@ -240,7 +240,7 @@ function BasicSnapshots(
   BasicSnapshots(basic_values,s.realization,s.mode)
 end
 
-function FEM.get_values(s::TransientSnapshots)
+function ParamDataStructures.get_values(s::TransientSnapshots)
   get_values(BasicSnapshots(s))
 end
 
@@ -385,8 +385,8 @@ space_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[1]
 time_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[2]
 param_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[3]
 num_space_dofs(s::SelectedSnapshotsAtIndices) = length(space_indices(s))
-FEM.num_times(s::SelectedSnapshotsAtIndices) = length(time_indices(s))
-FEM.num_params(s::SelectedSnapshotsAtIndices) = length(param_indices(s))
+ParamDataStructures.num_times(s::SelectedSnapshotsAtIndices) = length(time_indices(s))
+ParamDataStructures.num_params(s::SelectedSnapshotsAtIndices) = length(param_indices(s))
 
 function change_mode(s::SelectedSnapshotsAtIndices)
   snaps = change_mode(s.snaps)
@@ -409,7 +409,7 @@ function tensor_setindex!(
   tensor_setindex!(s.snaps,v,is,it,ip)
 end
 
-function FEM.get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapshots}) where T
+function ParamDataStructures.get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapshots}) where T
   v = get_values(s.snaps)
   array = Vector{typeof(first(v))}(undef,num_cols(s))
   @inbounds for (i,it) in enumerate(time_indices(s))
@@ -420,7 +420,7 @@ function FEM.get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapsho
   ParamArray(array)
 end
 
-function FEM.get_values(s::SelectedSnapshotsAtIndices{M,T,<:TransientSnapshots}) where {M,T}
+function ParamDataStructures.get_values(s::SelectedSnapshotsAtIndices{M,T,<:TransientSnapshots}) where {M,T}
   get_values(BasicSnapshots(s))
 end
 
@@ -542,7 +542,7 @@ struct BasicSnapshotsSwappedColumns{T,S} <: SnapshotsSwappedColumns{T}
   end
 end
 
-function FEM.get_values(s::BasicSnapshotsSwappedColumns)
+function ParamDataStructures.get_values(s::BasicSnapshotsSwappedColumns)
   nt = num_times(s)
   np = num_params(s)
   T = typeof(first(s.snaps.values))
@@ -563,7 +563,7 @@ struct TransientSnapshotsSwappedColumns{T,S} <: SnapshotsSwappedColumns{T}
   end
 end
 
-function FEM.get_values(s::TransientSnapshotsSwappedColumns)
+function ParamDataStructures.get_values(s::TransientSnapshotsSwappedColumns)
   nt = num_times(s)
   np = num_params(s)
   T = typeof(first(first(s.snaps.values)))
@@ -598,8 +598,8 @@ space_indices(s::SelectedSnapshotsSwappedColumns) = s.selected_indices[1]
 time_indices(s::SelectedSnapshotsSwappedColumns) = s.selected_indices[2]
 param_indices(s::SelectedSnapshotsSwappedColumns) = s.selected_indices[3]
 num_space_dofs(s::SelectedSnapshotsSwappedColumns) = length(space_indices(s))
-FEM.num_times(s::SelectedSnapshotsSwappedColumns) = length(time_indices(s))
-FEM.num_params(s::SelectedSnapshotsSwappedColumns) = length(param_indices(s))
+ParamDataStructures.num_times(s::SelectedSnapshotsSwappedColumns) = length(time_indices(s))
+ParamDataStructures.num_params(s::SelectedSnapshotsSwappedColumns) = length(param_indices(s))
 
 function tensor_getindex(
   s::SelectedSnapshotsSwappedColumns,ispace,itime,iparam)
@@ -617,7 +617,7 @@ function tensor_setindex!(
   tensor_setindex!(s.snaps,v,is,it,ip)
 end
 
-function FEM.get_values(s::SelectedSnapshotsSwappedColumns)
+function ParamDataStructures.get_values(s::SelectedSnapshotsSwappedColumns)
   v = get_values(s.snaps)
   values = Vector{typeof(first(v))}(undef,num_cols(s))
   for (i,ip) in enumerate(param_indices(s))
@@ -702,9 +702,9 @@ function tensor_getindex(
   nonzeros(snaps.values[ip][it])[is]
 end
 
-FEM.sparsify_indices(srange::AbstractVector,s::BasicNnzSnapshots) = sparsify_indices(srange,first(s.values))
-FEM.sparsify_indices(srange::AbstractVector,s::TransientNnzSnapshots) = sparsify_indices(srange,first(first(s.values)))
-FEM.sparsify_indices(srange::AbstractVector,s::NnzSnapshotsSwappedColumns) = sparsify_indices(srange,s.snaps)
+ParamTensorProduct.sparsify_indices(srange::AbstractVector,s::BasicNnzSnapshots) = sparsify_indices(srange,first(s.values))
+ParamTensorProduct.sparsify_indices(srange::AbstractVector,s::TransientNnzSnapshots) = sparsify_indices(srange,first(first(s.values)))
+ParamTensorProduct.sparsify_indices(srange::AbstractVector,s::NnzSnapshotsSwappedColumns) = sparsify_indices(srange,s.snaps)
 
 function select_snapshots(s::NnzSnapshots,spacerange,timerange,paramrange)
   _srange = isa(spacerange,Colon) ? Base.OneTo(num_space_dofs(s)) : spacerange
@@ -735,7 +735,7 @@ struct VecOfSparseMat2Mat{Tv,Ti,V} <: AbstractMatrix{Tv}
   end
 end
 
-FEM.get_values(s::VecOfSparseMat2Mat) = s.values
+ParamDataStructures.get_values(s::VecOfSparseMat2Mat) = s.values
 Base.size(s::VecOfSparseMat2Mat) = (nnz(first(s.values)),length(s.values))
 
 function Base.getindex(s::VecOfSparseMat2Mat,i,j::Integer)
@@ -746,7 +746,7 @@ function Base.getindex(s::VecOfSparseMat2Mat,i,j)
   view(s,i,j)
 end
 
-function FEM.get_nonzero_indices(s::VecOfSparseMat2Mat)
+function ParamTensorProduct.get_nonzero_indices(s::VecOfSparseMat2Mat)
   get_nonzero_indices(first(s.values))
 end
 
@@ -826,10 +826,10 @@ function Arrays.testitem(s::BlockSnapshots)
   end
 end
 
-FEM.num_times(s::BlockSnapshots) = num_times(testitem(s))
-FEM.num_params(s::BlockSnapshots) = num_params(testitem(s))
+ParamDataStructures.num_times(s::BlockSnapshots) = num_times(testitem(s))
+ParamDataStructures.num_params(s::BlockSnapshots) = num_params(testitem(s))
 
-function FEM.get_values(s::BlockSnapshots)
+function ParamDataStructures.get_values(s::BlockSnapshots)
   map(get_values,s.array) |> mortar
 end
 

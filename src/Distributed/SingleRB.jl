@@ -12,7 +12,7 @@ function RB.num_reduced_space_dofs(r::DistributedRBSpace)
   PartitionedArrays.getany(ns)
 end
 
-function FEM.num_times(r::DistributedRBSpace)
+function ParamDataStructures.num_times(r::DistributedRBSpace)
   Nt = map(num_times,local_views(r))
   PartitionedArrays.getany(Nt)
 end

@@ -100,9 +100,9 @@ odesol = sol.odesol
 r = odesol.r
 vals = collect(odesol)
 
+r = realization(feop)
 NB,SB,P = 2,(1,1),(1,2)
 U = trial(r)
-block_ranges   = MultiField.get_block_ranges(NB,SB,P)
-block_num_dofs = map(range->sum(map(num_free_dofs,U.spaces[range])),block_ranges)
-block_vtypes   = map(range->get_vector_type(first(U.spaces[range])),block_ranges)
-values = mortar(map(allocate_vector,block_vtypes,block_num_dofs))
+values = map(zero_free_values,U.spaces)
+block_values = mortar(values)
+fill!(block_values,zero(eltype(block_values)))
