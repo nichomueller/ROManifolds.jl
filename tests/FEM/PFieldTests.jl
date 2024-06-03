@@ -109,48 +109,6 @@ map(f,df,ddf,μ) do f,df,ddf,μ
   test_field(f,z,f.(z),grad=∇(f).(z),gradgrad=∇∇(f).(z))
 end
 
-# ZeroField
-
-f = zero(f)
-@test isa(f,ZeroParamField)
-
-map(f,df,ddf,μ) do f,df,ddf,μ
-  test_field(f,p,0*q(μ)(p))
-  test_field(f,p,0*q(μ)(p),grad=0*∇(q(μ))(p))
-  test_field(f,p,0*q(μ)(p),grad=0*∇(q(μ))(p),gradgrad=0*∇∇(q(μ))(p))
-
-  test_field(f,x,0*q(μ).(x))
-  test_field(f,x,0*q(μ).(x),grad=0*∇(q(μ)).(x))
-  test_field(f,x,0*q(μ).(x),grad=0*∇(q(μ)).(x),gradgrad=0*∇∇(q(μ)).(x))
-
-  test_field(f,z,f.(z))
-  test_field(f,z,f.(z),grad=∇(f).(z))
-  test_field(f,z,f.(z),grad=∇(f).(z),gradgrad=∇∇(f).(z))
-end
-
-# Functions with more a challenging domain (requiring testargs) are not implemented for now
-
-# ConstantField
-
-v = ParamArray([1.0*VectorValue(1.0,1.0),2.0*VectorValue(1.0,1.0)])
-f = ConstantField(v)
-@test isa(f,ConstantParamField)
-
-fp = v
-∇fp = ParamArray([zero(TensorValue{2,2,Float64}),zero(TensorValue{2,2,Float64})])
-∇∇fp = ParamArray([zero(ThirdOrderTensorValue{2,2,2,Float64,6}),zero(ThirdOrderTensorValue{2,2,2,Float64,6})])
-test_field(f,p,fp)
-test_field(f,p,fp,grad=∇fp)
-test_field(f,p,fp,grad=∇fp,gradgrad=∇∇fp)
-
-test_field(f,x,f.(x))
-test_field(f,x,f.(x),grad=∇(f).(x))
-test_field(f,x,f.(x),grad=∇(f).(x),gradgrad=∇∇(f).(x))
-
-test_field(f,z,f.(z))
-test_field(f,z,f.(z),grad=∇(f).(z))
-test_field(f,z,f.(z),grad=∇(f).(z),gradgrad=∇∇(f).(z))
-
 # Operations
 
 afun(x,μ) = sum(μ)*x[1]+2

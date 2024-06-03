@@ -1,6 +1,6 @@
 abstract type FastLinearSolver <:LinearSolver  end
 
-struct FastLUSolver <: LinearSolver
+struct FastLUSolver <: FastLinearSolver
   check::Bool
 end
 

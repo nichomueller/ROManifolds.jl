@@ -25,6 +25,9 @@ export ParamInserterCSC
 export ParamCSSR
 include("ParamAlgebraInterfaces.jl")
 
+export FastLinearSolver
+export FastLUSolver
+export CholeskySolver
 include("FastLinearSolvers.jl")
 
 include("ParamIterativeSolvers.jl")

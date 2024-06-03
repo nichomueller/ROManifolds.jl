@@ -21,30 +21,6 @@ Base.length(f::ParamFieldGradient) = length(f.object)
 Base.getindex(f::ParamFieldGradient{N},i::Integer) where N = FieldGradient{N}(f.object[i])
 Arrays.testvalue(::Type{ParamFieldGradient{N,T}}) where {N,T} = ParamFieldGradient{N}(testvalue(T))
 
-struct ZeroParamField{F} <: ParamField
-  field::F
-end
-
-Base.zero(f::ParamField) = ZeroParamField(f)
-Fields.ZeroField(f::ParamField) = ZeroParamField(f)
-Base.length(f::ZeroParamField) = length(f.field)
-Base.getindex(f::ZeroParamField,i::Integer) = ZeroField(f.field[i])
-Arrays.testvalue(::Type{ZeroParamField{F}}) where F = ZeroParamField(testvalue(F))
-Fields.gradient(f::ZeroParamField) = ZeroParamField(gradient(f.field))
-
-struct ConstantParamField{T<:Number,V} <: ParamField
-  value::V
-  function ConstantParamField(value::AbstractVector{T}) where T
-    V = typeof(value)
-    new{T,V}(value)
-  end
-end
-
-Fields.ConstantField(a::AbstractVector{T}) where T<:Number = ConstantParamField(a)
-Base.zero(::Type{<:ConstantParamField{T}}) where T = ConstantField(zero.(T))
-Base.length(f::ConstantParamField) = length(f.value)
-Base.getindex(f::ConstantParamField,i::Integer) = ConstantField(f.value[i])
-
 struct OperationParamField{O,F} <: ParamField
   op::O
   fields::F

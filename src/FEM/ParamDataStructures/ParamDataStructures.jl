@@ -40,8 +40,6 @@ include("ParamSpace.jl")
 export ParamField
 export ParamFieldGradient
 export GenericParamField
-export ZeroParamField
-export ConstantParamField
 export OperationParamField
 include("ParamField.jl")
 
@@ -56,6 +54,10 @@ export ParamSparseMatrix
 export allocate_param_array
 export zero_param_array
 include("ParamArray.jl")
+
+using ArraysOfArrays
+export MatrixOfSparseMatricesCSC
+include("ArrayOfSparseMatrices.jl")
 
 export ParamBlockArray
 export ParamBlockVector

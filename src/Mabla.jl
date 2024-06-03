@@ -33,8 +33,6 @@ export PosNegParamReindex
 export ParamField
 export ParamFieldGradient
 export GenericParamField
-export ZeroParamField
-export ConstantParamField
 export OperationParamField
 
 export SingleFieldParamFESpace
