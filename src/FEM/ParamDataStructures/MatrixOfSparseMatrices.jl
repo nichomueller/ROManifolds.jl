@@ -1,9 +1,20 @@
-struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,P<:Matrix{Tv}} <: AbstractMatrixOfMatrices{Tv,2,2}
+struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,P<:AbstractMatrix{Tv},L} <: AbstractParamArray{Tv,2,L}
   m::Int64
   n::Int64
   colptr::Vector{Ti}
   rowval::Vector{Ti}
   nzval::P
+  function MatrixOfSparseMatricesCSC(
+    m::Int64,
+    n::Int64,
+    colptr::Vector{Ti},
+    rowval::Vector{Ti},
+    nzval::P
+    ) where {Tv,Ti,P<:AbstractMatrix{Tv}}
+
+    L = size(nzval,2)
+    new{Tv,Ti,P,L}(m,n,colptr,rowval,nzval)
+  end
 end
 
 SparseArrays.getcolptr(A::MatrixOfSparseMatricesCSC) = A.colptr
@@ -14,13 +25,8 @@ _nonzeros(A::MatrixOfSparseMatricesCSC,iblock::Integer...) = @inbounds getindex(
 function MatrixOfSparseMatricesCSC(A::AbstractVector{SparseMatrixCSC{Tv,Ti}}) where {Tv,Ti}
   m,n = innersize(A)
   colptr,rowval,nzval = innerpattern(A)
-  matval = Matrix{Tv}(undef,innersize(nzval)...,length(nzval))
-  copyto!(eachcol(matval),nzval)
-  MatrixOfSparseMatricesCSC(m,n,colptr,rowval,matval)
-end
-
-function ArraysOfArrays.ArrayOfSimilarArrays(A::AbstractVector{<:SparseMatrixCSC})
-  MatrixOfSparseMatricesCSC(A)
+  B = ArrayOfSimilarArrays(nzval)
+  MatrixOfSparseMatricesCSC(m,n,colptr,rowval,B.data)
 end
 
 function innerpattern(A::AbstractVector{<:SparseMatrixCSC})
@@ -43,16 +49,19 @@ end
 
 ArraysOfArrays.flatview(A::MatrixOfSparseMatricesCSC) = A.nzval
 
-Base.size(A::MatrixOfSparseMatricesCSC) = (size(A.nzval,2),size(A.nzval,2))
+Base.size(A::MatrixOfSparseMatricesCSC) = (param_length(A),param_length(A))
 
 function Base.show(io::IO,::MIME"text/plain",A::MatrixOfSparseMatricesCSC)
   println(io, "Block diagonal matrix of sparse matrices, with sparsity pattern: ")
   show(io,MIME("text/plain"),A[1])
 end
 
-Base.@propagate_inbounds function Base.getindex(A::MatrixOfSparseMatricesCSC,iblock::Integer)
-  irow = fast_index(iblock,size(A,1))
-  icol = slow_index(iblock,size(A,1))
+param_data(A::MatrixOfMatrices) = map(i->param_getindex(A,i),param_eachindex(A))
+param_getindex(a::MatrixOfSparseMatricesCSC,i::Integer) = getindex(a,i,i)
+
+Base.@propagate_inbounds function Base.getindex(A::MatrixOfSparseMatricesCSC,i::Integer)
+  irow = fast_index(i,size(A,1))
+  icol = slow_index(i,size(A,1))
   getindex(A,irow,icol)
 end
 
@@ -79,13 +88,6 @@ end
 Base.@propagate_inbounds function Base.setindex!(A::MatrixOfSparseMatricesCSC,v,i::Integer...)
   A[i...] = v
   A
-end
-
-function Base.similar(A::MatrixOfSparseMatricesCSC)
-  colptr = similar(A.colptr)
-  rowval = similar(A.rowval)
-  nzvals = similar(A.nzval)
-  MatrixOfSparseMatricesCSC(A.m,A.n,colptr,rowval,nzvals)
 end
 
 function Base.similar(

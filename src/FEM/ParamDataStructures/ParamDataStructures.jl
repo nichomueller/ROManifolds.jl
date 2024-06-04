@@ -39,29 +39,31 @@ export fast_index
 export shift!
 include("ParamSpace.jl")
 
+export AbstractParamContainer
+export AbstractParamArray
+export AbstractParamVector
+export AbstractParamMatrix
+export ParamContainer
+export param_data
+export param_length
+export param_eachindex
+export param_getindex
+include("ParamContainersInterface.jl")
+
 export ParamField
 export ParamFieldGradient
 export GenericParamField
 export OperationParamField
 include("ParamField.jl")
 
-export ParamContainer
-include("ParamContainers.jl")
+export VectorOfVectors
+include("VectorOfVectors.jl")
 
 export MatrixOfMatrices
 include("MatrixOfMatrices.jl")
 
 export MatrixOfSparseMatricesCSC
 include("MatrixOfSparseMatrices.jl")
-
-export ParamArray
-export ParamVector
-export ParamMatrix
-export param_data
-export param_length
-export param_eachindex
-export param_getindex
-include("ParamArrays.jl")
 
 export ParamBroadcast
 include("ParamBroadcasts.jl")

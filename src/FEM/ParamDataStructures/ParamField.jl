@@ -1,10 +1,3 @@
-param_length(a) = @abstractmethod
-param_data(a) = @abstractmethod
-param_getindex(a,i::Integer...) = @abstractmethod
-param_eachindex(a) = Base.OneTo(param_length(a))
-_find_param_length(a...) = @abstractmethod
-_to_param_quantities(a...) = @abstractmethod
-
 abstract type ParamField <: Field end
 
 Arrays.testitem(f::ParamField) = param_getindex(f,1)

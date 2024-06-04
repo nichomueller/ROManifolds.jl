@@ -1,42 +1,10 @@
-function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamContainer
-  vector = zeros(eltype(V),n)
-  allocate_param_array(vector,length(V))
+function allocate_param_vector(::Type{V},indices,plength) where V
+  n = length(indices)
+  allocate_param_vector(V,n,plength)
 end
 
-function Algebra.allocate_in_range(matrix::ParamMatrix{T,L,A}) where {T,L,A}
-  V = ParamVector{T,L,Vector{Vector{T}}}
-  allocate_in_range(V,matrix)
-end
-
-function Algebra.allocate_in_domain(matrix::ParamMatrix{T,L,A}) where {T,L,A}
-  V = ParamVector{T,L,Vector{Vector{T}}}
-  allocate_in_domain(V,matrix)
-end
-
-function Algebra.allocate_vector(
-  ::Type{<:ParamBlockVector{T,L,BlockVector{T,VV}}},
-  indices::BlockedUnitRange) where {T,L,VV}
-
-  V = eltype(VV)
-  mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
-end
-
-function Algebra.allocate_in_range(matrix::ParamBlockMatrix{T,L,A,B}) where {T,L,A,B}
-  BV = BlockVector{T,Vector{ParamVector{T,L,Vector{Vector{T}}}}}
-  V = ParamBlockVector{T,L,BV,B}
-  allocate_in_range(V,matrix)
-end
-
-function Algebra.allocate_in_domain(matrix::ParamBlockMatrix{T,L,A,B}) where {T,L,A,B}
-  BV = BlockVector{T,Vector{ParamVector{T,L,Vector{Vector{T}}}}}
-  V = ParamBlockVector{T,L,BV,B}
-  allocate_in_domain(V,matrix)
-end
-
-function Algebra.nz_allocation(a::Algebra.ArrayCounter{<:ParamVector{T,L,A}}) where {T,L,A}
-  elA = eltype(A)
-  v = fill!(similar(elA,map(length,a.axes)),zero(T))
-  allocate_param_array(v,L)
+function allocate_param_vector(::Type{V},n::Integer,plength::Integer) where V<:ParamVector
+  array_of_similar_arrays(cache,param_length(mat))
 end
 
 @inline function Algebra._add_entries!(
@@ -201,12 +169,18 @@ function Algebra.nz_counter(
   ParamCounter(counter,L)
 end
 
+function Algebra.nz_allocation(a::Algebra.ArrayCounter{<:ParamVector{T,L,A}}) where {T,L,A}
+  elA = eltype(A)
+  v = fill!(similar(elA,map(length,a.axes)),zero(T))
+  allocate_param_array(v,L)
+end
+
 function Algebra.nz_allocation(a::ParamCounter{C,L}) where {C,L}
   inserter = nz_allocation(a.counter)
   ParamInserter(inserter,L)
 end
 
-# CSC
+# CSC format
 
 function ParamInserter(inserter::Algebra.InserterCSC,L::Integer)
   ParamInserterCSC(inserter,Val(L))
@@ -312,162 +286,4 @@ function Algebra.create_from_nz(a::ParamInserterCSC{Tv,Ti,P}) where {Tv,Ti,P}
     SparseMatrixCSC(a.nrows,a.ncols,a.colptr,a.rowval,a.nzval[l])
   end
   ParamArray(csc)
-end
-
-# CSSR
-
-function ParamInserter(inserter::Algebra.CSRR,L::Integer)
-  ParamCSSR(inserter,Val(L))
-end
-
-struct ParamCSSR{Tv,Ti,P}
-  nrows::Int
-  ncols::Int
-  colptr::Vector{Ti}
-  colnnz::Vector{Ti}
-  rowval::Vector{Ti}
-  nzval::ParamVector{Tv}
-  work::Vector{Ti}
-  function ParamCSSR(inserter::Algebra.CSRR{Tv,Ti},::Val{L}) where {Tv,Ti,L}
-    @unpack nrows,ncols,colptr,colnnz,rowval,nzval,work = inserter
-    pnzval = allocate_param_array(nzval,L)
-    P = typeof(pnzval)
-    new{Tv,Ti,P}(nrows,ncols,colptr,colnnz,rowval,pnzval,work)
-  end
-end
-
-Algebra.LoopStyle(::Type{<:ParamCSSR}) = Loop()
-
-@inline function Algebra.add_entry!(::typeof(+),a::ParamCSSR{Tv,Ti},v::Nothing,i,j) where {Tv,Ti}
-  p = a.rowptrs[i]
-  a.colvals[p] = j
-  a.rowptrs[i] = p+Ti(1)
-  nothing
-end
-
-@inline function Algebra.add_entry!(
-  ::typeof(+),a::ParamCSSR{Tv,Ti,P},v::AbstractParamContainer{Tv},i,j) where {Tv,Ti,P}
-  p = a.rowptrs[i]
-  a.colvals[p] = j
-  @inbounds for l = 1:length(P)
-    a.nzvals[l][p] = v[l]
-  end
-  a.rowptrs[i] = p+Ti(1)
-  nothing
-end
-
-function Algebra.create_from_nz(a::ParamCSSR{Tv,Ti,P}) where {Tv,Ti,P}
-  rewind_ptrs!(a.rowptrs)
-  colptrs = Vector{Ti}(undef,a.ncols+1)
-  cscnnz = Algebra._csrr_to_csc_count!(colptrs,a.rowptrs,a.colvals,a.nzvals,a.work)
-  rowvals = Vector{Ti}(undef,cscnnz)
-  nzvalscsc = Vector{Tv}(undef,cscnnz)
-  pnzvalscsc = allocate_param_array(nzvalscsc,length(P))
-  Algebra._csrr_to_csc_fill!(colptrs,rowvals,pnzvalscsc,a.rowptrs,a.colvals,a.nzvals)
-  cssr = map(1:length(P)) do l
-    SparseMatrixCSC(a.nrows,a.ncols,colptr,rowval,pnzvalscsc[l])
-  end
-  ParamArray(cssr)
-end
-
-function Algebra._csrr_to_csc_count!(
-  colptrs::Vector{Ti},
-  rowptrs::Vector{Tj},
-  colvals::Vector{Tj},
-  nzvalscsr::ParamVector{Tv},
-  work::Vector{Tj}) where {Ti,Tj,Tv}
-
-  nrows = length(rowptrs)-1
-  ncols = length(colptrs)-1
-  if nrows == 0 || ncols == 0
-    fill!(colptrs, Ti(1))
-    return Tj(0)
-  end
-
-  # Convert csrr to csru by identifying repeated cols with array work.
-  # At the same time, count number of unique rows in colptrs shifted by one.
-  fill!(colptrs, Ti(0))
-  fill!(work, Tj(0))
-  writek = Tj(1)
-  newcsrrowptri = Ti(1)
-  origcsrrowptri = Tj(1)
-  origcsrrowptrip1 = rowptrs[2]
-  @inbounds for i in 1:nrows
-    for readk in origcsrrowptri:(origcsrrowptrip1-Tj(1))
-      j = colvals[readk]
-      if work[j] < newcsrrowptri
-        work[j] = writek
-        if writek != readk
-          colvals[writek] = j
-          for l = eachindex(nzvalscsr)
-            nzvalscsr[l][writek] = nzvalscsr[l][readk]
-          end
-        end
-        writek += Tj(1)
-        colptrs[j+1] += Ti(1)
-      else
-        klt = work[j]
-        for l = eachindex(nzvalscsr)
-          nzvalscsr[l][klt] = +(nzvalscsr[l][klt], nzvalscsr[l][readk])
-        end
-      end
-    end
-    newcsrrowptri = writek
-    origcsrrowptri = origcsrrowptrip1
-    origcsrrowptrip1 != writek && (rowptrs[i+1] = writek)
-    i < nrows && (origcsrrowptrip1 = rowptrs[i+2])
-  end
-
-  # Convert colptrs from counts to ptrs shifted by one
-  # (ptrs will be corrected below)
-  countsum = Tj(1)
-  colptrs[1] = Ti(1)
-  @inbounds for j in 2:(ncols+1)
-    overwritten = colptrs[j]
-    colptrs[j] = countsum
-    countsum += overwritten
-    @check Base.hastypemax(Ti) && (countsum <= typemax(Ti))
-  end
-
-  cscnnz = countsum - Tj(1)
-  cscnnz
-end
-
-function Algebra._csrr_to_csc_fill!(
-  colptrs::Vector{Ti},rowvals::Vector{Ti},nzvalscsc::ParamVector{Tv},
-  rowptrs::Vector{Tj},colvals::Vector{Tj},nzvalscsr::ParamVector{Tv}) where {Ti,Tj,Tv}
-
-  nrows = length(rowptrs)-1
-  ncols = length(colptrs)-1
-  if nrows == 0 || ncols == 0
-    return nothing
-  end
-
-  # From csru to csc
-  # Tracking write positions in colptrs corrects
-  # the column pointers to the final value.
-  @inbounds for i in 1:nrows
-    for csrk in rowptrs[i]:(rowptrs[i+1]-Tj(1))
-      j = colvals[csrk]
-      csck = colptrs[j+1]
-      colptrs[j+1] = csck + Ti(1)
-      rowvals[csck] = i
-      for l = eachindex(nzvalscsc)
-        nzvalscsc[l][csck] = nzvalscsr[l][csrk]
-      end
-    end
-  end
-
-  nothing
-end
-
-# CSR
-
-function Algebra.create_from_nz(a::Algebra.NzAllocationCSR{Bi,<:ParamInserterCSC}) where Bi
-  Atcsc = create_from_nz(a.csc)
-  Acsc = transpose(Atcsc)
-  Acsr = map(1:length(Acsc)) do l
-    SparseMatrixCSR{Bi}(Acsc[l])
-  end
-  ParamArray(Acsr)
 end
