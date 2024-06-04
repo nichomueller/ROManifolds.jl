@@ -1,6 +1,7 @@
 module ParamDataStructures
 
 using LinearAlgebra
+using ArraysOfArrays
 using BlockArrays
 using ForwardDiff
 using SparseArrays
@@ -17,6 +18,7 @@ import Base:+,-,*,/
 import Distributions: Uniform,Normal
 import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
+import SparseArrays.getcolptr
 
 export AbstractParamRealization
 export ParamRealization
@@ -55,7 +57,6 @@ export allocate_param_array
 export zero_param_array
 include("ParamArray.jl")
 
-using ArraysOfArrays
 export MatrixOfSparseMatricesCSC
 include("ArrayOfSparseMatrices.jl")
 
