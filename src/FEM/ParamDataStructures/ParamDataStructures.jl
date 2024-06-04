@@ -45,28 +45,26 @@ export GenericParamField
 export OperationParamField
 include("ParamField.jl")
 
-export AbstractParamContainer
 export ParamContainer
-include("ParamContainer.jl")
+include("ParamContainers.jl")
+
+export MatrixOfMatrices
+include("MatrixOfMatrices.jl")
+
+export MatrixOfSparseMatricesCSC
+include("MatrixOfSparseMatrices.jl")
 
 export ParamArray
 export ParamVector
 export ParamMatrix
-export ParamSparseMatrix
-export allocate_param_array
-export zero_param_array
-include("ParamArray.jl")
+export param_data
+export param_length
+export param_eachindex
+export param_getindex
+include("ParamArrays.jl")
 
-export MatrixOfSparseMatricesCSC
-include("ArrayOfSparseMatrices.jl")
-
-export ParamBlockArray
-export ParamBlockVector
-export ParamBlockMatrix
-export ParamBlockArrayView
-export ParamBlockVectorView
-export ParamBlockMatrixView
-include("ParamBlockArray.jl")
+export ParamBroadcast
+include("ParamBroadcasts.jl")
 
 export Contribution
 export ArrayContribution

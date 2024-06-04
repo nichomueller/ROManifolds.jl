@@ -1,4 +1,4 @@
-struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,P<:Matrix{Tv}} <: AbstractArrayOfSimilarArrays{Tv,2,2}
+struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,P<:Matrix{Tv}} <: AbstractMatrixOfMatrices{Tv,2,2}
   m::Int64
   n::Int64
   colptr::Vector{Ti}
@@ -8,7 +8,7 @@ end
 
 SparseArrays.getcolptr(A::MatrixOfSparseMatricesCSC) = A.colptr
 SparseArrays.rowvals(A::MatrixOfSparseMatricesCSC) = A.rowval
-SparseArrays.nonzeros(A::MatrixOfSparseMatricesCSC) = eachcol(A.rowval)
+SparseArrays.nonzeros(A::MatrixOfSparseMatricesCSC) = A.nzval
 _nonzeros(A::MatrixOfSparseMatricesCSC,iblock::Integer...) = @inbounds getindex(A.nzval,:,iblock...)
 
 function MatrixOfSparseMatricesCSC(A::AbstractVector{SparseMatrixCSC{Tv,Ti}}) where {Tv,Ti}
@@ -21,10 +21,6 @@ end
 
 function ArraysOfArrays.ArrayOfSimilarArrays(A::AbstractVector{<:SparseMatrixCSC})
   MatrixOfSparseMatricesCSC(A)
-end
-
-function array_of_similar_arrays(a::AbstractArray{<:Number},l::Integer)
-  ArrayOfSimilarArrays([copy(a) for _ = 1:l])
 end
 
 function innerpattern(A::AbstractVector{<:SparseMatrixCSC})
@@ -83,40 +79,6 @@ end
 Base.@propagate_inbounds function Base.setindex!(A::MatrixOfSparseMatricesCSC,v,i::Integer...)
   A[i...] = v
   A
-end
-
-for Tb in (:MatrixOfSparseMatricesCSC,:SparseMatrixCSC)
-  for Ta in (:MatrixOfSparseMatricesCSC,:SparseMatrixCSC)
-    @eval begin
-      function _compatibility_check(A::$Ta,B::$Tb)
-        msg_shape = "Can't push, shape of source and elements of target is incompatible"
-        msg_sparsity = "Can't push, sparsity of source and elements of target is incompatible"
-        size(B) != innersize(A) && throw(DimensionMismatch(msg_shape))
-        (getcolptr(A) != getcolptr(B) || rowvals(A) != rowvals(B)) && error(msg_sparsity)
-      end
-    end
-  end
-  @eval begin
-    function Base.push!(
-      A::MatrixOfSparseMatricesCSC{Tv,Ti},
-      B::$Tb{Tv,Ti}
-      ) where {Tv,Ti}
-
-      _compatibility_check(A,B)
-      append!(eachcol(A.nzval),nonzeros(B))
-      A
-    end
-
-    function Base.pushfirst!(
-      A::MatrixOfSparseMatricesCSC{Tv,Ti},
-      B::$Tb{Tv,Ti}
-      ) where {Tv,Ti}
-
-      _compatibility_check(A,B)
-      prepend!(eachcol(A.nzval),nonzeros(B))
-      A
-    end
-  end
 end
 
 function Base.similar(A::MatrixOfSparseMatricesCSC)
