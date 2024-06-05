@@ -20,20 +20,6 @@ struct MultiFieldParamFESpace{MS<:MultiFieldStyle,CS<:ConstraintStyle,V} <: FESp
   end
 end
 
-function MultiFieldParamFESpace(
-  spaces::Vector{<:SingleFieldParamFESpace};
-  style = ConsecutiveMultiFieldStyle())
-
-  if isa(style,BlockMultiFieldStyle)
-    style = BlockMultiFieldStyle(style,spaces)
-    VT = typeof(mortar(map(zero_free_values,spaces)))
-  else
-    T  = promote_type(map(get_dof_value_type,spaces)...)
-    VT = Vector{T}
-  end
-  MultiFieldParamFESpace(VT,spaces,style)
-end
-
 function _MultiFieldParamFESpace(
   spaces::Vector{<:SingleFieldFESpace};
   style = ConsecutiveMultiFieldStyle())
@@ -47,7 +33,7 @@ function _MultiFieldParamFESpace(
   MultiFieldParamFESpace(VT,spaces,style)
 end
 
-function param_length(spaces)
+function param_length(spaces::SingleFieldFESpace...)
   pspaces = filter(x->isa(x,SingleFieldParamFESpace),spaces)
   L = length_free_values.(pspaces)
   @check all(L .== first(L))
@@ -59,8 +45,9 @@ function MultiFieldParamFESpace(
   style = ConsecutiveMultiFieldStyle())
 
   if any(isa.(spaces,SingleFieldParamFESpace))
-    L = param_length(spaces)
-    MultiFieldParamFESpace(FESpaceToParamFESpace.(spaces,L),style=style)
+    L = param_length(spaces...)
+    spaces′ = FESpaceToParamFESpace.(spaces,L)
+    _MultiFieldParamFESpace(spaces′,style=style)
   elseif any(isa.(spaces,TransientTrialParamFESpace))
     _MultiFieldParamFESpace(spaces,style=style)
   else
@@ -114,26 +101,6 @@ function FESpaces.get_free_dof_ids(f::MultiFieldParamFESpace,::BlockMultiFieldSt
   return BlockArrays.blockedrange(block_num_dofs)
 end
 
-function FESpaces.zero_free_values(f::MultiFieldParamFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
-  if all(is_tensor_product.(f.spaces))
-    return _zero_free_values(f)
-  elseif any(is_tensor_product.(f.spaces))
-    @notimplemented
-  end
-  V = get_vector_type(f)
-  free_values = allocate_vector(V,get_free_dof_ids(f))
-  fill!(free_values,zero(eltype(V)))
-  return free_values
-end
-
-function _zero_free_values(f::MultiFieldParamFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
-  @check NB == length(f.spaces)
-  values = map(zero_free_values,f.spaces)
-  block_values = mortar(values)
-  fill!(block_values,zero(eltype(block_values)))
-  return block_values
-end
-
 FESpaces.get_dof_value_type(::MultiFieldParamFESpace{MS,CS,V}) where {MS,CS,V} = eltype(V)
 
 FESpaces.get_vector_type(f::MultiFieldParamFESpace) = f.vector_type
@@ -171,7 +138,7 @@ end
 function MultiField._restrict_to_field(
   f,
   mfs::BlockMultiFieldStyle{NB,SB,P},
-  free_values::Union{<:ParamBlockVector,<:ParamBlockVectorView},
+  free_values::AbstractParamArray,
   field) where {NB,SB,P}
 
   @check blocklength(free_values) == NB
@@ -424,5 +391,5 @@ function FESpaces.test_fe_space(f::ParamFESpace)
   @test length(get_cell_dof_ids(f,trian)) == num_cells(fe_basis)
   @test length(get_cell_constraints(f,trian)) == num_cells(fe_basis)
   @test length(get_cell_isconstrained(f,trian)) == num_cells(fe_basis)
-  @test CellField(f,get_cell_dof_ids(f,trian)) != nothing
+  @test CellField(f,get_cell_dof_ids(f,trian)) ≠ nothing
 end

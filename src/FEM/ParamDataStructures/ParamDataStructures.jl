@@ -40,10 +40,8 @@ export shift!
 include("ParamSpace.jl")
 
 export AbstractParamContainer
-export AbstractParamArray
-export AbstractParamVector
-export AbstractParamMatrix
 export ParamContainer
+export VectorOfScalars
 export param_data
 export param_length
 export param_eachindex
@@ -56,6 +54,11 @@ export GenericParamField
 export OperationParamField
 include("ParamField.jl")
 
+export AbstractParamArray
+export AbstractParamVector
+export AbstractParamMatrix
+include("ParamArraysInterface.jl")
+
 export VectorOfVectors
 include("VectorOfVectors.jl")
 
@@ -64,6 +67,9 @@ include("MatrixOfMatrices.jl")
 
 export MatrixOfSparseMatricesCSC
 include("MatrixOfSparseMatrices.jl")
+
+export ArrayOfTrivialArrays
+include("ArrayOfTrivialArrays.jl")
 
 export ParamBroadcast
 include("ParamBroadcasts.jl")

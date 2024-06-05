@@ -1,12 +1,12 @@
-struct VectorOfVectors{T,P<:AbstractMatrix{T},L} <: AbstractParamArray{T,1,L}
+struct VectorOfVectors{T,L,P<:AbstractMatrix{T}} <: AbstractParamArray{T,1,L}
   data::P
   function VectorOfVectors(data::P) where {T,P<:AbstractMatrix{T}}
     L = size(data,2)
-    new{T,P,L}(data)
+    new{T,L,P}(data)
   end
 end
 
-function VectorOfVectors(A::AbstractVector{<:AbstractVector}) where T
+function VectorOfVectors(A::AbstractVector{<:AbstractVector})
   B = ArrayOfSimilarArrays(A)
   VectorOfVectors(B.data)
 end
@@ -21,24 +21,25 @@ ArraysOfArrays.flatview(A::VectorOfVectors) = A.data
 
 Base.size(A::VectorOfVectors) = (param_length(A),)
 
-function Base.show(io::IO,::MIME"text/plain",A::VectorOfVectors)
-  println(io, "Parametric collection of vectors, with the following eltypes: ")
-  show(io,MIME("text/plain"),A[1])
-end
+# function Base.show(io::IO,::MIME"text/plain",A::VectorOfVectors)
+#   println(io, "Parametric collection of vectors, with the following eltypes: ")
+#   show(io,MIME("text/plain"),A[1])
+# end
 
 param_data(A::VectorOfVectors) = eachcol(A.data)
 param_getindex(A::VectorOfVectors,i::Integer) = getindex(A,i)
 
 Base.@propagate_inbounds function Base.getindex(A::VectorOfVectors,i::Integer)
+  @boundscheck checkbounds(A,i)
   view(A.data,:,i)
 end
 
-Base.@propagate_inbounds function Base.setindex!(A::VectorOfVectors,v,i::Integer...)
-  A[i...] = v
-  A
+Base.@propagate_inbounds function Base.setindex!(A::VectorOfVectors,v,i::Integer)
+  @boundscheck checkbounds(A,i)
+  view(A.data,:,i) .= v
 end
 
-function Base.similar(A::VectorOfVectors,::Type{<:AbstractVector{T′}})
+function Base.similar(A::VectorOfVectors,::Type{<:AbstractVector{T′}}) where T′
   VectorOfVectors(similar(A.data,T′))
 end
 

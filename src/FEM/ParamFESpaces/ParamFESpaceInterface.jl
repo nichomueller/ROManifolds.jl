@@ -89,47 +89,45 @@ function FESpaces.gather_dirichlet_values!(
 end
 
 function FESpaces._fill_dirichlet_values_for_tag!(
-  dirichlet_values::ParamArray,
-  dv::ParamArray,
+  dirichlet_values::AbstractParamVector,
+  dv::AbstractParamVector,
   tag,
   dirichlet_dof_to_tag)
 
-  @assert length(dirichlet_values) == length(dv)
-  for i = eachindex(dirichlet_values)
-    FESpaces._fill_dirichlet_values_for_tag!(dirichlet_values[i],dv[i],tag,dirichlet_dof_to_tag)
+  @check param_length(dirichlet_values) == param_length(dv)
+  @inbounds for i = param_eachindex(dirichlet_values)
+    dirichlet_values_i = param_getindex(dirichlet_values,i)
+    dv_i = param_getindex(dv,i)
+    FESpaces._fill_dirichlet_values_for_tag!(dirichlet_values_i,dv_i,tag,dirichlet_dof_to_tag)
   end
 end
 
 function FESpaces._free_and_dirichlet_values_fill!(
-  free_vals::ParamArray,
-  dirichlet_vals::ParamArray,
+  free_vals::AbstractParamVector,
+  dirichlet_vals::AbstractParamVector,
   cache_vals,
   cache_dofs,
   cell_vals,
   cell_dofs,
   cells)
 
-  for cell in cells
-    vals = getindex!(cache_vals,cell_vals,cell)
-    dofs = getindex!(cache_dofs,cell_dofs,cell)
-    map(vals,free_vals,dirichlet_vals) do vals,free_vals,dirichlet_vals
-      for (i,dof) in enumerate(dofs)
-        val = vals[i]
-        if dof > 0
-          free_vals[dof] = val
-        elseif dof < 0
-          dirichlet_vals[-dof] = val
-        else
-          @unreachable "dof ids either positive or negative, not zero"
-        end
-      end
-    end
+  @check param_length(free_vals) == param_length(dirichlet_vals)
+  @inbounds for i = param_eachindex(free_vals)
+    free_vals_i = param_getindex(free_vals,i)
+    dirichlet_vals_i = param_getindex(dirichlet_vals,i)
+    FESpaces._free_and_dirichlet_values_fill!(
+      free_vals_i,
+      dirichlet_vals_i,
+      cache_vals,
+      cache_dofs,
+      cell_vals,
+      cell_dofs,
+      cells)
   end
-
 end
 
 function FESpaces.FEFunction(
-  fs::SingleFieldParamFESpace,free_values::ParamArray,dirichlet_values::ParamArray)
+  fs::SingleFieldParamFESpace,free_values::AbstractParamVector,dirichlet_values::AbstractParamVector)
   cell_vals = scatter_free_and_dirichlet_values(fs,free_values,dirichlet_values)
   cell_field = CellField(fs,cell_vals)
   SingleFieldParamFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
@@ -140,7 +138,7 @@ end
 function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   V = get_vector_type(f.space)
   N = length_free_values(f)
-  typeof(ParamVector{V}(undef,N))
+  typeof(array_of_similar_arrays(V(),N))
 end
 
 # This artifact aims to make a FESpace behave like a ParamFESpace with free and
@@ -160,64 +158,83 @@ length_dirichlet_values(f::FESpaceToParamFESpace{S,L}) where {S,L} = L
 
 # Extend some of Gridap's functions when needed
 function FESpaces.FEFunction(
-  f::FESpaceToParamFESpace{<:ZeroMeanFESpace,L},
-  free_values::ParamArray,
-  dirichlet_values::ParamArray) where L
+  f::FESpaceToParamFESpace{<:ZeroMeanFESpace},
+  free_values::AbstractParamVector,
+  dirichlet_values::AbstractParamVector)
 
-  fs = f.space
-  fv,dv = map(free_values,dirichlet_values) do _fv,_dv
+  zf = f.space
+  fv = similar(free_values)
+  dv = similar(dirichlet_values)
+  @check param_length(fv) == param_length(dv)
+  @inbounds for i = param_eachindex(fv)
+    fv_i = param_getindex(fv,i)
+    dv_i = param_getindex(dv,i)
     c = FESpaces._compute_new_fixedval(
-      _fv,_dv,fs.vol_i,fs.vol,fs.space.dof_to_fix)
-    fv = lazy_map(+,_fv,Fill(c,length(_fv)))
-    dv = _dv .+ c
-    fv,dv
-  end |> tuple_of_arrays
-  FEFunction(FESpaceToParamFESpace(fs.space,Val(L)),ParamArray(fv),ParamArray(dv))
+      fv_i,dv_i,zf.vol_i,zf.vol,zf.space.dof_to_fix)
+    fv_i .+= c
+    dv_i .+= c
+  end
+  error("check that fv and dv are well defined")
+  f′ = FESpaceToParamFESpace(zf.space,length_dirichlet_values(f))
+  FEFunction(f′,fv,dv)
 end
 
-function FESpaces.EvaluationFunction(
-  f::FESpaceToParamFESpace{<:ZeroMeanFESpace,L},
-  free_values) where L
-  FEFunction(FESpaceToParamFESpace(f.space.space,Val(L)),free_values)
-end
-
-function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceToParamFESpace{<:TrialFESpace,L},
-  fv::ParamArray,
-  dv::ParamArray) where L
-  scatter_free_and_dirichlet_values(FESpaceToParamFESpace(f.space.space,Val(L)),fv,dv)
+function FESpaces.EvaluationFunction(f::FESpaceToParamFESpace{<:ZeroMeanFESpace},free_values)
+  zf = f.space
+  f′ = FESpaceToParamFESpace(zf.space,length_dirichlet_values(f))
+  FEFunction(f′,free_values)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceToParamFESpace{<:ZeroMeanFESpace,L},
-  fv::ParamArray,
-  dv::ParamArray) where L
-  scatter_free_and_dirichlet_values(FESpaceToParamFESpace(f.space.space,Val(L)),fv,dv)
+  f::FESpaceToParamFESpace{<:TrialFESpace},
+  fv::AbstractParamVector,
+  dv::AbstractParamVector)
+
+  tf = f.space
+  f′ = FESpaceToParamFESpace(tf.space,length_dirichlet_values(f))
+  scatter_free_and_dirichlet_values(f′,fv,dv)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceToParamFESpace{<:FESpaceWithConstantFixed{<:FESpaces.FixConstant}},
-  fv::ParamArray,
-  dv::ParamArray)
+  f::FESpaceToParamFESpace{<:ZeroMeanFESpace},
+  fv::AbstractParamVector,
+  dv::AbstractParamVector)
 
-  fs = f.space
-  _dv,_fv = map(fv,dv) do fv,dv
-    @assert length(dv) == 1
-    _dv = similar(dv,eltype(dv),0)
-    _fv = FESpaces.VectorWithEntryInserted(fv,fs.dof_to_fix,dv[1])
-    _dv,_fv
-  end |> tuple_of_arrays
-  scatter_free_and_dirichlet_values(fs.space,ParamArray(_fv),ParamArray(_dv))
+  zf = f.space
+  f′ = FESpaceToParamFESpace(zf.space,length_dirichlet_values(f))
+  scatter_free_and_dirichlet_values(f′,fv,dv)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceToParamFESpace{<:FESpaceWithConstantFixed{<:FESpaces.DoNotFixConstant}},
-  fv::ParamArray,
-  dv::ParamArray)
+  f::FESpaceToParamFESpace{<:FESpaceWithConstantFixed{T}},
+  free_values::AbstractParamVector,
+  dirichlet_values::AbstractParamVector
+  ) where T<:FESpaces.FixConstant
 
-  fs = f.space
-  @assert all(length.(dv) .== 0)
-  scatter_free_and_dirichlet_values(fs.space,ParamArray(fv),ParamArray(dv))
+  ff = f.space
+  fv = similar(free_values)
+  dv = similar(dirichlet_values)
+  @check param_length(fv) == param_length(dv)
+  @inbounds for i = param_eachindex(fv)
+    fv_i = param_getindex(fv,i)
+    dv_i = param_getindex(dv,i)
+    fv_i .= FESpaces.VectorWithEntryInserted(fv_i,ff.dof_to_fix,dv_i[1])
+    dv_i .= similar(dv_i,eltype(dv_i),0)
+  end
+  error("check that fv and dv are well defined")
+  f′ = FESpaceToParamFESpace(ff.space,length_dirichlet_values(f))
+  FEFunction(f′,fv,dv)
+end
+
+function FESpaces.scatter_free_and_dirichlet_values(
+  f::FESpaceToParamFESpace{<:FESpaceWithConstantFixed{T}},
+  free_values::AbstractParamVector,
+  dirichlet_values::AbstractParamVector
+  ) where T<:FESpaces.DoNotFixConstant
+
+  ff = f.space
+  @check all(length.(dirichlet_values) .== 0)
+  scatter_free_and_dirichlet_values(ff.space,free_values,dirichlet_values)
 end
 
 # for testing purposes

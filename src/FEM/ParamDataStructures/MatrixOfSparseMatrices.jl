@@ -1,4 +1,4 @@
-struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,P<:AbstractMatrix{Tv},L} <: AbstractParamArray{Tv,2,L}
+struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,L,P<:AbstractMatrix{Tv}} <: AbstractParamArray{Tv,2,L}
   m::Int64
   n::Int64
   colptr::Vector{Ti}
@@ -13,7 +13,7 @@ struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,P<:AbstractMatrix{Tv},L} <: Abst
     ) where {Tv,Ti,P<:AbstractMatrix{Tv}}
 
     L = size(nzval,2)
-    new{Tv,Ti,P,L}(m,n,colptr,rowval,nzval)
+    new{Tv,Ti,L,P}(m,n,colptr,rowval,nzval)
   end
 end
 
@@ -47,16 +47,18 @@ end
   prod(innersize(A))
 end
 
+Base.:(==)(A::MatrixOfSparseMatricesCSC,B::MatrixOfSparseMatricesCSC) = (A.nzval == B.nzval)
+
 ArraysOfArrays.flatview(A::MatrixOfSparseMatricesCSC) = A.nzval
 
 Base.size(A::MatrixOfSparseMatricesCSC) = (param_length(A),param_length(A))
 
-function Base.show(io::IO,::MIME"text/plain",A::MatrixOfSparseMatricesCSC)
-  println(io, "Block diagonal matrix of sparse matrices, with sparsity pattern: ")
-  show(io,MIME("text/plain"),A[1])
-end
+# function Base.show(io::IO,::MIME"text/plain",A::MatrixOfSparseMatricesCSC)
+#   println(io, "Block diagonal matrix of sparse matrices, with sparsity pattern: ")
+#   show(io,MIME("text/plain"),A[1])
+# end
 
-param_data(A::MatrixOfMatrices) = map(i->param_getindex(A,i),param_eachindex(A))
+param_data(A::MatrixOfSparseMatricesCSC) = map(i->param_getindex(A,i),param_eachindex(A))
 param_getindex(a::MatrixOfSparseMatricesCSC,i::Integer) = getindex(a,i,i)
 
 Base.@propagate_inbounds function Base.getindex(A::MatrixOfSparseMatricesCSC,i::Integer)
@@ -66,6 +68,7 @@ Base.@propagate_inbounds function Base.getindex(A::MatrixOfSparseMatricesCSC,i::
 end
 
 Base.@propagate_inbounds function Base.getindex(A::MatrixOfSparseMatricesCSC,irow::Integer,icol::Integer)
+  @boundscheck checkbounds(A,irow,icol)
   diagonal_getindex(Val(irow==icol),A,irow)
 end
 
@@ -85,9 +88,23 @@ Base.@propagate_inbounds function diagonal_getindex(
   spzeros(innersize(A))
 end
 
-Base.@propagate_inbounds function Base.setindex!(A::MatrixOfSparseMatricesCSC,v,i::Integer...)
-  A[i...] = v
-  A
+Base.@propagate_inbounds function Base.setindex!(A::MatrixOfSparseMatricesCSC,v,i::Integer)
+  irow = fast_index(i,size(A,1))
+  icol = slow_index(i,size(A,1))
+  setindex!(A,v,irow,icol)
+end
+
+Base.@propagate_inbounds function Base.setindex!(A::MatrixOfSparseMatricesCSC,v,irow::Integer,icol::Integer)
+  @boundscheck checkbounds(A,irow,icol)
+  irow==icol && diagonal_setindex!(Val(true),A,v,irow)
+end
+
+Base.@propagate_inbounds function diagonal_setindex!(::Val{true},A::MatrixOfSparseMatricesCSC,v,iblock::Integer)
+  setindex!(_nonzeros(A,iblock),v)
+end
+
+Base.@propagate_inbounds function diagonal_setindex!(::Val{false},A::MatrixOfSparseMatricesCSC,v,iblock::Integer)
+  @notimplemented
 end
 
 function Base.similar(

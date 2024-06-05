@@ -1,18 +1,17 @@
 abstract type ParamField <: Field end
 
+Base.length(f::ParamField) = param_length(f)
+Base.size(f::ParamField) = (length(f),)
+Base.eltype(f::ParamField) = typeof(testitem(f))
+Base.IteratorSize(::Type{<:ParamField}) = Base.HasShape{length(f)}()
+
 Arrays.testitem(f::ParamField) = param_getindex(f,1)
+Arrays.testargs(f::ParamField,x::Point) = testargs(testitem(f),x)
+Arrays.testargs(f::ParamField,x::AbstractArray{<:Point}) = testargs(testitem(f),x)
+Arrays.return_value(b::Broadcasting{<:Function},f::ParamField,x...) = evaluate(b.f,f,x...)
 
-function _find_param_length(f::Union{ParamField,Field}...)
-  pf::Tuple{Vararg{ParamField}} = filter(g->isa(g,ParamField),f)
-  @check all(param_length(first(pf)) .== param_length.(pf))
-  return param_length(first(pf))
-end
-
-function _to_param_quantities(A::Union{ParamField,Field}...)
-  plength = _find_param_length(A...)
-  pA = map(f->TrivialParamField(f,plength),A)
-  return pA
-end
+_to_param_quantity(f::ParamField,plength::Integer) = f
+_to_param_quantity(f::Field,plength::Integer) = TrivialParamField(f,plength)
 
 # this aims to make a field of type F behave like a pfield of length plength
 struct TrivialParamField{F<:Field} <: ParamField
@@ -30,6 +29,8 @@ TrivialParamField(f,args...) = f
 param_length(f::TrivialParamField) = f.plength
 param_getindex(f::TrivialParamField,i::Integer) = f.field
 
+Arrays.evaluate(f::TrivialParamField,x::Point) = fill(evaluate(f.field,x),f.plength)
+
 struct GenericParamField{T<:AbstractParamFunction} <: ParamField
   object::T
 end
@@ -37,6 +38,10 @@ end
 Fields.GenericField(f::AbstractParamFunction) = GenericParamField(f)
 param_length(f::GenericParamField) = length(f.object)
 param_getindex(f::GenericParamField,i::Integer) = GenericField(f.object[i])
+
+Arrays.return_value(f::GenericParamField,x::Point) = return_value(f.object,x)
+Arrays.return_cache(f::GenericParamField,x::Point) = return_cache(f.object,x)
+Arrays.evaluate!(cache,f::GenericParamField,x::Point) = evaluate!(cache,f.object,x)
 
 struct ParamFieldGradient{N,F} <: ParamField
   object::F
@@ -46,8 +51,23 @@ end
 Fields.FieldGradient{N}(f::ParamField) where N = ParamFieldGradient{N}(f)
 Fields.FieldGradient{N}(f::ParamFieldGradient{N}) where N = ParamFieldGradient{N+1}(f.object)
 param_length(f::ParamFieldGradient) = param_length(f.object)
-param_getindex(f::ParamFieldGradient{N},i::Integer) where N = FieldGradient{N}(f.object[i])
+param_getindex(f::ParamFieldGradient{N,<:ParamField},i::Integer) where N = FieldGradient{N}(param_getindex(f.object,i))
+
+Arrays.return_value(f::ParamFieldGradient,x::Point) = evaluate(f,testargs(f,x)...)
+Arrays.return_cache(f::ParamFieldGradient,x::Point) = nothing
+Arrays.evaluate!(cache,f::ParamFieldGradient,x::Point) = @abstractmethod
 Arrays.testvalue(::Type{ParamFieldGradient{N,T}}) where {N,T} = ParamFieldGradient{N}(testvalue(T))
+
+function Arrays.return_cache(f::ParamFieldGradient{N,<:GenericParamField},x::Point) where N
+  return_cache(ParamFieldGradient{N}(f.object.object),x)
+end
+
+function Arrays.evaluate!(c,f::ParamFieldGradient{N,<:GenericParamField},x::Point) where N
+  evaluate!(c,ParamFieldGradient{N}(f.object.object),x)
+end
+
+Arrays.return_cache(f::ParamFieldGradient{N,<:Function},x::Point) where N = gradient(f.object,Val(N))
+Arrays.evaluate!(c,f::ParamFieldGradient{N,<:Function},x::Point) where N = c(x)
 
 struct OperationParamField{O,F} <: ParamField
   op::O
@@ -58,13 +78,25 @@ function Fields.OperationField(op,fields::Tuple{Vararg{Field}})
   try pfields = _to_param_quantities(op,fields...)
     OperationParamField(pfields...)
   catch
-    OperationField{typeof(op),typeof(fields)}(op,fields)
+    Fields.OperationField{typeof(op),typeof(fields)}(op,fields)
   end
 end
 
 param_length(f::OperationParamField) = param_length(f.fields)
 param_getindex(f::OperationParamField,i::Integer) = OperationField(f.op,param_getindex.(f.fields,i))
 param_getindex(f::OperationParamField{<:ParamField},i::Integer) = OperationField(param_getindex(f.op,i),param_getindex.(f.fields,i))
+
+function Arrays.return_value(c::OperationParamField,x::Point)
+  map(i->return_value(param_getindex(c,i),x),param_eachindex(c))
+end
+
+function Arrays.return_cache(c::OperationParamField,x::Point)
+  map(i->return_cache(param_getindex(c,i),x),param_eachindex(c))
+end
+
+function Arrays.evaluate!(cache,c::OperationParamField,x::Point)
+  map(i->evaluate!(cache[i],param_getindex(c,i),x),param_eachindex(c))
+end
 
 for op in (:+,:-)
   @eval begin
@@ -113,46 +145,12 @@ Fields.InverseField(a::ParamField) = InverseParamField(a)
 param_length(f::InverseParamField) = param_length(f.original)
 param_getindex(f::InverseParamField,i::Integer) = Fields.InverseField(param_getindex(f.original,i))
 
-# common functions among ParamFields
-Base.size(f::ParamField) = (length(f),)
-Base.eltype(f::ParamField) = typeof(testitem(f))
+function Arrays.return_cache(c::InverseParamField,x::Point)
+  map(i->return_cache(param_getindex(c,i),x),param_eachindex(c))
+end
 
-Arrays.return_value(b::Broadcasting{<:Function},f::ParamField,x...) = evaluate(b.f,f,x...)
-
-for T in (:Point,:(AbstractArray{<:Point}))
-  @eval begin
-    Arrays.testargs(f::ParamField,x::$T) = testargs(testitem(f),x)
-
-    function Arrays.return_value(f::ParamField,x::$T)
-      fi = testitem(f)
-      vi = return_value(fi,x)
-      array = Vector{typeof(vi)}(undef,param_length(f))
-      for i in param_eachindex(f)
-        array[i] = return_value(param_getindex(f,i),x)
-      end
-      ArrayOfSimilarArrays(array)
-    end
-
-    function Arrays.return_cache(f::ParamField,x::$T)
-      fi = testitem(f)
-      li = return_cache(fi,x)
-      fix = evaluate!(li,fi,x)
-      l = Vector{typeof(li)}(undef,param_length(f))
-      g = Vector{typeof(fix)}(undef,param_length(f))
-      for i in param_eachindex(f)
-        l[i] = return_cache(param_getindex(f,i),x)
-      end
-      l,ArrayOfSimilarArrays(g)
-    end
-
-    function Arrays.evaluate!(cache,f::ParamField,x::$T)
-      l,g = cache
-      for i in param_eachindex(f)
-        g[i] = evaluate!(param_getindex(l,i),param_getindex(f,i),x)
-      end
-      g
-    end
-  end
+function Arrays.evaluate!(cache,c::InverseParamField,x::Point)
+  map(i->evaluate!(cache[i],param_getindex(c,i),x),param_eachindex(c))
 end
 
 struct BroadcastOpParamFieldArray{O,T,N,A} <: AbstractVector{BroadcastOpFieldArray{O,T,N,A}}
@@ -170,27 +168,36 @@ Base.size(a::BroadcastOpParamFieldArray) = param_length(a)
 Base.getindex(a::BroadcastOpParamFieldArray,i::Integer) = param_getindex(a,i)
 Arrays.testitem(a::BroadcastOpParamFieldArray) = param_getindex(a,1)
 
-for T in (:(Point),:(AbstractArray{<:Point}))
-  @eval begin
-    function Arrays.return_cache(f::BroadcastOpParamFieldArray,x::$T)
-      ci = return_cache(testitem(f),x)
-      bi = evaluate!(ci,testitem(f),x)
-      cache = Vector{typeof(ci)}(undef,param_length(f))
-      array = Vector{typeof(bi)}(undef,param_length(f))
-      @inbounds for i = param_eachindex(f)
-        cache[i] = return_cache(param_getindex(f,i),x)
-      end
-      cache,ArrayOfSimilarArrays(array)
-    end
+# lazy maps
 
-    function Arrays.evaluate!(cache,f::BroadcastOpParamFieldArray,x::$T)
-      cx,array = cache
-      @inbounds for i = param_eachindex(array)
-        array[i] = evaluate!(param_getindex(cx,i),param_getindex(f,i),x)
-      end
-      array
-    end
+function Arrays.return_value(f::Union{ParamField,BroadcastOpParamFieldArray},x::AbstractArray{<:Point})
+  fi = testitem(f)
+  vi = return_value(fi,x)
+  array = Vector{typeof(vi)}(undef,param_length(f))
+  for i in param_eachindex(f)
+    array[i] = return_value(param_getindex(f,i),x)
   end
+  ParamArray(array)
+end
+
+function Arrays.return_cache(f::Union{ParamField,BroadcastOpParamFieldArray},x::AbstractArray{<:Point})
+  fi = testitem(f)
+  li = return_cache(fi,x)
+  fix = evaluate!(li,fi,x)
+  l = Vector{typeof(li)}(undef,param_length(f))
+  g = array_of_similar_arrays(fix,param_length(f))
+  for i in param_eachindex(f)
+    l[i] = return_cache(param_getindex(f,i),x)
+  end
+  l,g
+end
+
+function Arrays.evaluate!(cache,f::Union{ParamField,BroadcastOpParamFieldArray},x::AbstractArray{<:Point})
+  l,g = cache
+  for i in param_eachindex(f)
+    g[i] = evaluate!(l[i],param_getindex(f,i),x)
+  end
+  g
 end
 
 function Arrays.return_cache(f::Broadcasting{typeof(∇)},a::BroadcastOpParamFieldArray)
@@ -210,4 +217,21 @@ function Arrays.evaluate!(cache,f::Broadcasting{typeof(∇)},a::BroadcastOpParam
     array[i] = evaluate!(param_getindex(cx,i),f,param_getindex(a,i))
   end
   array
+end
+
+function Arrays.return_cache(f::ParamContainer{Union{Field,ParamField}},x::AbstractArray{<:Point})
+  c = return_cache(testitem(f),x)
+  cache = Vector{typeof(c)}(undef,param_length(f))
+  @inbounds for i = param_eachindex(cache)
+    cache[i] = return_cache(param_getindex(f,i),x)
+  end
+  return c,ParamContainer(cache)
+end
+
+function Arrays.evaluate!(cache,f::ParamContainer{Union{Field,ParamField}},x::AbstractArray{<:Point})
+  c,pcache = cache
+  @inbounds for i = param_eachindex(pcache)
+    pcache[i] = evaluate!(c,param_getindex(f,i),x)
+  end
+  return pcache
 end

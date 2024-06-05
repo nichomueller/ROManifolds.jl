@@ -51,32 +51,32 @@ function FESpaces.SparseMatrixAssembler(
     strategy)
 end
 
-function FESpaces.assemble_vector_add!(
-  b::ParamBlockVector,
-  a::MultiField.BlockSparseMatrixAssembler,
-  vecdata)
-  b1 = ArrayBlock(blocks(b),fill(true,blocksize(b)))
-  b2 = MultiField.expand_blocks(a,b1)
-  FESpaces.assemble_vector_add!(b2,a,vecdata)
-end
+# function FESpaces.assemble_vector_add!(
+#   b::ParamBlockVector,
+#   a::MultiField.BlockSparseMatrixAssembler,
+#   vecdata)
+#   b1 = ArrayBlock(blocks(b),fill(true,blocksize(b)))
+#   b2 = MultiField.expand_blocks(a,b1)
+#   FESpaces.assemble_vector_add!(b2,a,vecdata)
+# end
 
-function FESpaces.assemble_matrix_add!(
-  mat::ParamBlockMatrix,
-  a::MultiField.BlockSparseMatrixAssembler,
-  matdata)
-  m1 = ArrayBlock(blocks(mat),fill(true,blocksize(mat)))
-  m2 = MultiField.expand_blocks(a,m1)
-  FESpaces.assemble_matrix_add!(m2,a,matdata)
-end
+# function FESpaces.assemble_matrix_add!(
+#   mat::ParamBlockMatrix,
+#   a::MultiField.BlockSparseMatrixAssembler,
+#   matdata)
+#   m1 = ArrayBlock(blocks(mat),fill(true,blocksize(mat)))
+#   m2 = MultiField.expand_blocks(a,m1)
+#   FESpaces.assemble_matrix_add!(m2,a,matdata)
+# end
 
-function FESpaces.assemble_matrix_and_vector_add!(
-  A::ParamBlockMatrix,
-  b::ParamBlockVector,
-  a::MultiField.BlockSparseMatrixAssembler,
-  data)
-  m1 = ArrayBlock(blocks(A),fill(true,blocksize(A)))
-  m2 = MultiField.expand_blocks(a,m1)
-  b1 = ArrayBlock(blocks(b),fill(true,blocksize(b)))
-  b2 = MultiField.expand_blocks(a,b1)
-  FESpaces.assemble_matrix_and_vector_add!(m2,b2,a,data)
-end
+# function FESpaces.assemble_matrix_and_vector_add!(
+#   A::ParamBlockMatrix,
+#   b::ParamBlockVector,
+#   a::MultiField.BlockSparseMatrixAssembler,
+#   data)
+#   m1 = ArrayBlock(blocks(A),fill(true,blocksize(A)))
+#   m2 = MultiField.expand_blocks(a,m1)
+#   b1 = ArrayBlock(blocks(b),fill(true,blocksize(b)))
+#   b2 = MultiField.expand_blocks(a,b1)
+#   FESpaces.assemble_matrix_and_vector_add!(m2,b2,a,data)
+# end

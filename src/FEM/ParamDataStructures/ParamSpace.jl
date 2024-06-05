@@ -267,7 +267,7 @@ function pteval(f::ParamFunction,x)
   return v
 end
 
-Arrays.return_value(f::ParamFunction,x) = f.fun(x,testitem(FEM._get_params(f)))
+Arrays.return_value(f::ParamFunction,x) = f.fun(x,testitem(_get_params(f)))
 
 struct TransientParamFunction{F,P,T} <: AbstractParamFunction{P}
   fun::F
@@ -344,7 +344,7 @@ function Fields.laplacian(f::TransientParamFunction)
 end
 
 function pteval(f::TransientParamFunction,x)
-  iterator = Iterators.product(FEM._get_params(f),get_times(f))
+  iterator = Iterators.product(_get_params(f),get_times(f))
   T = return_type(f,x)
   v = Vector{T}(undef,length(f))
   @inbounds for (i,(μ,t)) in enumerate(iterator)
@@ -353,7 +353,8 @@ function pteval(f::TransientParamFunction,x)
   return v
 end
 
-Arrays.return_value(f::AbstractParamFunction,x) = f.fun(x,testitem(FEM._get_params(f)),testitem(get_times(f)))
+Arrays.return_value(f::TransientParamFunction,x) = f.fun(x,testitem(_get_params(f)),testitem(get_times(f)))
+
 Arrays.evaluate!(cache,f::AbstractParamFunction,x) = pteval(f,x)
 
 (f::AbstractParamFunction)(x) = evaluate(f,x)

@@ -4,14 +4,10 @@ function get_param_matrix_builder(
 
   mat = get_matrix_builder(a)
   M = get_array_type(mat)
-  pmatrix_type = _get_param_matrix_type(M,r)
-  SparseMatrixBuilder(pmatrix_type)
-end
-
-function _get_param_matrix_type(::Type{M},r) where M
+  T = eltype(M)
   L = length(r)
-  elM = eltype(M)
-  ParamMatrix{elM,L,Vector{M}}
+  pmatrix_type = MatrixOfSparseMatricesCSC{T,Int,L,Vector{M}}
+  SparseMatrixBuilder(pmatrix_type)
 end
 
 function get_param_vector_builder(
@@ -20,14 +16,10 @@ function get_param_vector_builder(
 
   vec = get_vector_builder(a)
   V = get_array_type(vec)
-  pvector_type = _get_param_vector_type(V,r)
-  ArrayBuilder(pvector_type)
-end
-
-function _get_param_vector_type(::Type{V},r) where V
+  T = eltype(V)
   L = length(r)
-  elV = eltype(V)
-  ParamVector{elV,L,Vector{V}}
+  pvector_type = VectorOfVectors{T,L,Vector{V}}
+  ArrayBuilder(pvector_type)
 end
 
 function get_param_assembler(

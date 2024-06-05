@@ -8,7 +8,6 @@ struct SingleFieldParamFEFunction{T<:CellField} <: ParamFEFunction
   fe_space::SingleFieldFESpace
 end
 
-Base.length(f::SingleFieldParamFEFunction) = length(f.free_values)
 CellData.get_data(f::SingleFieldParamFEFunction) = get_data(f.cell_field)
 FESpaces.get_triangulation(f::SingleFieldParamFEFunction) = get_triangulation(f.cell_field)
 CellData.DomainStyle(::Type{SingleFieldParamFEFunction{T}}) where T = DomainStyle(T)
@@ -31,7 +30,7 @@ end
 # for visualization/testing purposes
 
 function FESpaces.test_fe_function(f::SingleFieldParamFEFunction)
-  lazy_getter(a,i=1) = lazy_map(x->getindex(x.array,i),a)
+  lazy_getter(a,i=1) = lazy_map(x->param_getindex(x.array,i),a)
   trian = get_triangulation(f)
   free_values = get_free_dof_values(f)
   fe_space = get_fe_space(f)
@@ -41,9 +40,9 @@ function FESpaces.test_fe_function(f::SingleFieldParamFEFunction)
     fe_space_i = param_getindex(fe_space,i)
     fi = FEFunction(fe_space_i,free_values[i])
     test_fe_function(fi)
-    @test free_values[i] == get_free_dof_values(fi)
+    @test param_getindex(free_values,i) == get_free_dof_values(fi)
     @test lazy_getter(cell_values,i) == get_cell_dof_values(fi,trian)
-    @test dirichlet_values[i] == fi.dirichlet_values
+    @test param_getindex(dirichlet_values,i) == fi.dirichlet_values
   end
 end
 
@@ -51,21 +50,21 @@ function param_getindex(f::GenericCellField,index)
   data = get_data(f)
   trian = get_triangulation(f)
   DS = DomainStyle(f)
-  di = getindex.(data,index)
+  di = param_getindex.(data,index)
   GenericCellField(di,trian,DS)
 end
 
 function param_length(f::SingleFieldParamFEFunction)
-  @assert length_dirichlet_values(f.fe_space) == length(f.dirichlet_values)
-  length(f.dirichlet_values)
+  @assert param_length(f.free_values) == param_length(f.dirichlet_values)
+  param_length(f.free_values)
 end
 
 function param_getindex(f::SingleFieldParamFEFunction,index)
   cf = param_getindex(f.cell_field,index)
   fs = param_getindex(f.fe_space,index)
-  cv = lazy_map(x->getindex(x,index),f.cell_dof_values)
-  fv = f.free_values[index]
-  dv = f.dirichlet_values[index]
+  cv = lazy_map(x->param_getindex(x,index),f.cell_dof_values)
+  fv = param_getindex(f.free_values,index)
+  dv = param_getindex(f.dirichlet_values,index)
   SingleFieldFEFunction(cf,cv,fv,dv,fs)
 end
 
@@ -91,7 +90,6 @@ struct MultiFieldParamFEFunction{T<:MultiFieldCellField} <: ParamFEFunction
   end
 end
 
-Base.length(f::MultiFieldParamFEFunction) = length(f.free_values)
 CellData.get_data(f::MultiFieldParamFEFunction) = get_data(f.multi_cell_field)
 FESpaces.get_triangulation(f::MultiFieldParamFEFunction) = get_triangulation(f.multi_cell_field)
 CellData.DomainStyle(::Type{MultiFieldParamFEFunction{T}}) where T = DomainStyle(T)
@@ -137,6 +135,6 @@ function param_getindex(f::MultiFieldParamFEFunction,index)
   style = f.fe_space.multi_field_style
   sff = map(f->param_getindex(f,index),f.single_fe_functions)
   mfs = MultiFieldFESpace(map(f->param_getindex(f,index),f.fe_space);style)
-  fv = f.free_values[index]
+  fv = param_getindex(f.free_values,index)
   MultiFieldFEFunction(fv,mfs,sff)
 end

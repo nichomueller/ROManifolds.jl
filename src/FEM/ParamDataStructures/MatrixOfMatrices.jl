@@ -1,9 +1,9 @@
-struct MatrixOfMatrices{Tv,Ti<:Integer,P<:AbstractMatrix{Tv},L} <: AbstractParamArray{Tv,2,L}
+struct MatrixOfMatrices{Tv,Ti<:Integer,L,P<:AbstractMatrix{Tv}} <: AbstractParamArray{Tv,2,L}
   data::P
   colptr::Vector{Ti}
   function MatrixOfMatrices(data::P,colptr::Vector{Ti}) where {Tv,Ti,P<:AbstractMatrix{Tv}}
     L = length(colptr) - 1
-    new{Tv,Ti,P,L}(data,colptr)
+    new{Tv,Ti,L,P}(data,colptr)
   end
 end
 
@@ -23,14 +23,16 @@ end
   (size(A.data,1),A.colptr[2]-A.colptr[1])
 end
 
+Base.:(==)(A::MatrixOfMatrices,B::MatrixOfMatrices) = (A.data == B.data)
+
 ArraysOfArrays.flatview(A::MatrixOfMatrices) = A.data
 
 Base.size(A::MatrixOfMatrices) = (param_length(A),param_length(A))
 
-function Base.show(io::IO,::MIME"text/plain",A::MatrixOfMatrices)
-  println(io, "Block diagonal matrix of matrices, with the following structure: ")
-  show(io,MIME("text/plain"),A[1])
-end
+# function Base.show(io::IO,::MIME"text/plain",A::MatrixOfMatrices)
+#   println(io, "Block diagonal matrix of matrices, with the following structure: ")
+#   show(io,MIME("text/plain"),A[1])
+# end
 
 param_data(A::MatrixOfMatrices) = map(i->param_getindex(A,i),param_eachindex(A))
 param_getindex(a::MatrixOfMatrices,i::Integer) = getindex(a,i,i)
@@ -42,6 +44,7 @@ Base.@propagate_inbounds function Base.getindex(A::MatrixOfMatrices,i::Integer)
 end
 
 Base.@propagate_inbounds function Base.getindex(A::MatrixOfMatrices,irow::Integer,icol::Integer)
+  @boundscheck checkbounds(A,irow,icol)
   diagonal_getindex(Val(irow==icol),A,irow)
 end
 
@@ -61,9 +64,23 @@ Base.@propagate_inbounds function diagonal_getindex(
   zeros(T,innersize(A))
 end
 
-Base.@propagate_inbounds function Base.setindex!(A::MatrixOfMatrices,v,i::Integer...)
-  A[i...] = v
-  A
+Base.@propagate_inbounds function Base.setindex!(A::MatrixOfMatrices,v,i::Integer)
+  irow = fast_index(i,size(A,1))
+  icol = slow_index(i,size(A,1))
+  setindex!(A,v,irow,icol)
+end
+
+Base.@propagate_inbounds function Base.setindex!(A::MatrixOfMatrices,v,irow::Integer,icol::Integer)
+  @boundscheck checkbounds(A,irow,icol)
+  irow==icol && diagonal_setindex!(Val(true),A,v,irow)
+end
+
+Base.@propagate_inbounds function diagonal_setindex!(::Val{true},A::MatrixOfMatrices,v,iblock::Integer)
+  view(A.data,:,A.colptr[iblock]:A.colptr[iblock+1]-1) .= v
+end
+
+Base.@propagate_inbounds function diagonal_setindex!(::Val{false},A::MatrixOfMatrices,v,iblock::Integer)
+  @notimplemented
 end
 
 function Base.similar(A::MatrixOfMatrices{Tv},::Type{<:AbstractMatrix{Tv′}}) where {Tv,Tv′}

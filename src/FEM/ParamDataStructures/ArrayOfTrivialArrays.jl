@@ -1,8 +1,10 @@
-struct ArrayOfTrivialArrays{P,N} <: AbstractArrayOfSimilarArrays{P,N,N}
+struct ArrayOfTrivialArrays{T,N,L,P<:AbstractArray{T,N}} <: AbstractParamArray{T,N,L}
   data::P
   outersize::NTuple{N,Int}
   function ArrayOfTrivialArrays(data::P,outersize::NTuple{N,Int}) where {T<:Number,N,P<:AbstractArray{T,N}}
-    new{P,N}(data,outersize)
+    @check all(outersize.==first(outersize))
+    L = first(outersize)
+    new{T,N,L,P}(data,outersize)
   end
 end
 
@@ -10,7 +12,7 @@ function ArrayOfTrivialArrays(A::AbstractArray{<:Number,N},plength::Int=1) where
   ArrayOfTrivialArrays(A,ntuple(_ -> plength,Val(N)))
 end
 
-function ArrayOfTrivialArrays(A::AbstractArrayOfSimilarArrays,args...)
+function ArrayOfTrivialArrays(A::AbstractParamArray,args...)
   A
 end
 
@@ -20,28 +22,23 @@ end
 
 Base.size(A::ArrayOfTrivialArrays) = A.outersize
 
+param_data(A::ArrayOfTrivialArrays) = map(i->param_getindex(A,i),param_eachindex(A))
+param_getindex(a::ArrayOfTrivialArrays,i::Integer...) = getindex(a,i...)
+
 Base.@propagate_inbounds function Base.getindex(A::ArrayOfTrivialArrays,i::Integer...)
   @boundscheck checkbounds(A,i...)
   A.data
 end
 
 Base.@propagate_inbounds function Base.setindex!(A::ArrayOfTrivialArrays,v,i::Integer...)
-  A[i...] = v
-  A
+  @boundscheck checkbounds(A,i...)
+  setindex!(A.data,v,i...)
 end
 
-function Base.push!(A::ArrayOfTrivialArrays{P,N},B::AbstractArray{T,N}) where {P,T,N}
-  @check A.data == B
-  ArrayOfTrivialArrays(A.data,A.outersize .+ 1)
-end
+Base.:(==)(A::ArrayOfTrivialArrays,B::ArrayOfTrivialArrays) = (A.data == B.data)
 
-function Base.pushfirst!(A::ArrayOfTrivialArrays{P,N},B::AbstractArray{T,N}) where {P,T,N}
-  @check A.data == B
-  ArrayOfTrivialArrays(A.data,A.outersize .+ 1)
-end
-
-function Base.similar(A::ArrayOfTrivialArrays{P,N},::Type{<:AbstractArray{T,N}},dims::Dims) where {P,T,N}
-  ArrayOfTrivialArrays(similar(A.data,T,dims...),A.outersize)
+function Base.similar(A::ArrayOfTrivialArrays{T,N},::Type{<:AbstractArray{T′,N}}) where {T,T′,N}
+  ArrayOfTrivialArrays(similar(A.data,T′),A.outersize)
 end
 
 function Base.copyto!(A::ArrayOfTrivialArrays,B::ArrayOfTrivialArrays)

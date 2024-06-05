@@ -36,7 +36,7 @@ end
 
 function Base.materialize(b::ParamBroadcast)
   A = map(Base.materialize,param_data(b))
-  ArrayOfSimilarArrays(A)
+  ParamArray(A)
 end
 
 function Base.materialize!(A::AbstractParamArray,b::Broadcast.Broadcasted)

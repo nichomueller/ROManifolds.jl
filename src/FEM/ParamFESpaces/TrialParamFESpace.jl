@@ -1,7 +1,7 @@
 struct TrialParamFESpace{S} <: SingleFieldParamFESpace
-  dirichlet_values::ParamArray
+  dirichlet_values::AbstractParamVector
   space::S
-  function TrialParamFESpace(dirichlet_values::ParamArray,space::SingleFieldFESpace)
+  function TrialParamFESpace(dirichlet_values::AbstractParamVector,space::SingleFieldFESpace)
     new{typeof(space)}(dirichlet_values,space)
   end
 end
@@ -19,7 +19,7 @@ function TrialParamFESpace(space::SingleFieldFESpace,objects)
   TrialParamFESpace(ParamArray(dirichlet_values),space)
 end
 
-function TrialParamFESpace!(dir_values::ParamArray,space::SingleFieldFESpace,objects)
+function TrialParamFESpace!(dir_values::AbstractParamVector,space::SingleFieldFESpace,objects)
   dir_values_scratch = zero_dirichlet_values(space)
   dir_values = compute_dirichlet_values_for_tags!(dir_values,dir_values_scratch,space,objects)
   TrialParamFESpace!(dir_values,space)
@@ -38,7 +38,7 @@ function TrialParamFESpace(f::Function,space::SingleFieldFESpace)
   TrialParamFESpace(space,f)
 end
 
-function TrialParamFESpace!(f::Function,dir_values::ParamArray,space::SingleFieldFESpace)
+function TrialParamFESpace!(f::Function,dir_values::AbstractParamVector,space::SingleFieldFESpace)
   TrialParamFESpace!(dir_values,space,f)
 end
 
@@ -52,7 +52,7 @@ function HomogeneousTrialParamFESpace(U::SingleFieldFESpace,::Val{N}) where N
   TrialParamFESpace(dirichlet_values,U)
 end
 
-function HomogeneousTrialParamFESpace!(dirichlet_values::ParamArray,U::SingleFieldFESpace,args...)
+function HomogeneousTrialParamFESpace!(dirichlet_values::AbstractParamVector,U::SingleFieldFESpace,args...)
   fill!(dirichlet_values,zero(eltype(dirichlet_values)))
   TrialParamFESpace(dirichlet_values,U)
 end
@@ -66,6 +66,6 @@ FESpaces.ConstraintStyle(::Type{<:TrialParamFESpace{U}}) where U = ConstraintSty
 length_dirichlet_values(f::TrialParamFESpace) = length(f.dirichlet_values)
 
 function param_getindex(f::TrialParamFESpace,index)
-  dv = f.dirichlet_values[index]
+  dv = param_getindex(f.dirichlet_values,index)
   TrialFESpace(dv,f.space)
 end
