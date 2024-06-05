@@ -43,33 +43,16 @@ end
   (A.m,A.n)
 end
 
-@inline function ArraysOfArrays._innerlength(A::AbstractArray{<:SparseMatrixCSC})
-  prod(innersize(A))
-end
-
 Base.:(==)(A::MatrixOfSparseMatricesCSC,B::MatrixOfSparseMatricesCSC) = (A.nzval == B.nzval)
-
-ArraysOfArrays.flatview(A::MatrixOfSparseMatricesCSC) = A.nzval
 
 Base.size(A::MatrixOfSparseMatricesCSC) = (param_length(A),param_length(A))
 
-# function Base.show(io::IO,::MIME"text/plain",A::MatrixOfSparseMatricesCSC)
-#   println(io, "Block diagonal matrix of sparse matrices, with sparsity pattern: ")
-#   show(io,MIME("text/plain"),A[1])
-# end
+param_getindex(a::MatrixOfSparseMatricesCSC,i::Integer) = diagonal_getindex(Val(true),a,i)
 
-param_data(A::MatrixOfSparseMatricesCSC) = map(i->param_getindex(A,i),param_eachindex(A))
-param_getindex(a::MatrixOfSparseMatricesCSC,i::Integer) = getindex(a,i,i)
-
-Base.@propagate_inbounds function Base.getindex(A::MatrixOfSparseMatricesCSC,i::Integer)
-  irow = fast_index(i,size(A,1))
-  icol = slow_index(i,size(A,1))
-  getindex(A,irow,icol)
-end
-
-Base.@propagate_inbounds function Base.getindex(A::MatrixOfSparseMatricesCSC,irow::Integer,icol::Integer)
-  @boundscheck checkbounds(A,irow,icol)
-  diagonal_getindex(Val(irow==icol),A,irow)
+Base.@propagate_inbounds function Base.getindex(A::MatrixOfSparseMatricesCSC,i::Vararg{Integer,2})
+  @boundscheck checkbounds(A,i...)
+  iblock = first(i)
+  diagonal_getindex(Val(all(i.==iblock)),A,iblock)
 end
 
 Base.@propagate_inbounds function diagonal_getindex(
@@ -88,15 +71,10 @@ Base.@propagate_inbounds function diagonal_getindex(
   spzeros(innersize(A))
 end
 
-Base.@propagate_inbounds function Base.setindex!(A::MatrixOfSparseMatricesCSC,v,i::Integer)
-  irow = fast_index(i,size(A,1))
-  icol = slow_index(i,size(A,1))
-  setindex!(A,v,irow,icol)
-end
-
-Base.@propagate_inbounds function Base.setindex!(A::MatrixOfSparseMatricesCSC,v,irow::Integer,icol::Integer)
-  @boundscheck checkbounds(A,irow,icol)
-  irow==icol && diagonal_setindex!(Val(true),A,v,irow)
+Base.@propagate_inbounds function Base.setindex!(A::MatrixOfSparseMatricesCSC,v,i::Vararg{Integer,2})
+  @boundscheck checkbounds(A,i...)
+  iblock = first(i)
+  irow==icol && diagonal_setindex!(Val(true),A,v,iblock)
 end
 
 Base.@propagate_inbounds function diagonal_setindex!(::Val{true},A::MatrixOfSparseMatricesCSC,v,iblock::Integer)

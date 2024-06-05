@@ -1,218 +1,102 @@
-using Gridap.Fields
 using Gridap.TensorValues
 using Gridap.Arrays
+using Gridap.Fields
+using Gridap.ReferenceFEs
+using Gridap.Geometry
+using Gridap.CellData
+using Gridap.FESpaces
+using FillArrays
+using Random
 using Mabla.FEM
 using Mabla.FEM.ParamDataStructures
 using Test
 
-# Parametric information
 
-μ = ParamRealization([[1.0],[2.0],[3.0]])
-fun(x,μ) = sum(μ)
-fun(μ) = x -> fun(x,μ)
-funμ = 𝑓ₚ(fun,μ)
+lazy_getter(a,i=1) = lazy_map(x->getindex(x.array,i),a)
 
-# Testing the default interface at a single point
+domain = (0,1,0,1)
+cells = (2,2)
+model = simplexify(CartesianDiscreteModel(domain,cells))
 
-p = Point(1.0,2.0)
+Ω = Triangulation(model)
+Γ = BoundaryTriangulation(model)
+Λ = SkeletonTriangulation(model)
+n_Λ = get_normal_vector(Λ)
 
-f = GenericField(funμ)
-df = ∇(f)
-ddf = ∇∇(f)
-@test typeof(f) <: GenericParamField
-@test typeof(df) <: ParamFieldGradient{1}
-@test typeof(ddf) <: ParamFieldGradient{2}
-fp = f(p)
-dfp = df(p)
-ddfp = ddf(p)
+degree = 2
+dΩ = Measure(Ω,degree)
+dΓ = Measure(Γ,degree)
+dΛ = Measure(Λ,degree)
 
-# correct fields
-map(fp,dfp,ddfp,μ) do fp,dfp,ddfp,μ
-  𝑓 = GenericField(fun(μ))
-  𝑑𝑓 = ∇(𝑓)
-  𝑑𝑑𝑓 = ∇∇(𝑓)
-  @test fp == 𝑓(p)
-  @test dfp == 𝑑𝑓(p)
-  @test ddfp == 𝑑𝑑𝑓(p)
-end
+v = GenericCellField(get_cell_shapefuns(Ω),Ω,ReferenceDomain())
+u = GenericCellField(lazy_map(transpose,get_data(v)),Ω,ReferenceDomain())
 
-∇fp = zero(VectorValue{2,Float64})
-∇fpμ = [∇fp,∇fp,∇fp]
-∇∇fp = zero(TensorValue{2,2,Float64})
-∇∇fpμ = [∇∇fp,∇∇fp,∇∇fp]
-test_field(f,p,fp)
-test_field(f,p,fp,grad=∇fpμ)
-test_field(f,p,fp,grad=∇fpμ,gradgrad=∇∇fpμ)
+μ = ParamRealization([[1],[2],[3]])
+μ₀ = ParamRealization([[0],[0],[0]])
+f(x,μ) = 1+sum(μ)
+f(μ) = x -> f(x,μ)
+fμ = 𝑓ₚ(f,μ)
+fμ₀ = 𝑓ₚ(f,μ₀)
 
-z = evaluate(f,p)
-@test z == fp
+###########
+∫(fμ*u*v)*dΩ
 
-# Testing the default interface at a vector of points
+###########
 
-np = 4
-x = fill(p,np)
-z = fill(p,0)
+a = ∫(fμ*u*v)*dΩ + ∫(fμ*u*v)*dΓ + ∫(fμ*∇(u)⋅∇(v))*dΩ
+@test num_domains(a) == 2
+@test Ω in get_domains(a)
+@test Γ in get_domains(a)
+@test isa(get_contribution(a,Ω),LazyArray{<:Any,<:ParamArray})
+@test length(lazy_getter(get_contribution(a,Ω))) == num_cells(Ω)
+@test length(first(get_contribution(a,Ω))) == 3
+b = ∫(u*v)*dΩ + ∫(u*v)*dΓ + ∫(∇(u)⋅∇(v))*dΩ
+@test 2*sum(b) == sum(a)[1]
 
-test_field(f,x,f(x))
-test_field(f,x,f(x),grad=∇(f)(x))
-test_field(f,x,f(x),grad=∇(f)(x),gradgrad=∇∇(f)(x))
+a = ∫(fμ₀)*dΩ + ∫(fμ₀)*dΓ
+@test all(sum(a) .≈ 5)
+@test all(sum(2*a) .≈ 10)
+@test all(sum(a*2) .≈ 10)
 
-test_field(f,z,f(z))
-test_field(f,z,f(z),grad=∇(f)(z))
-test_field(f,z,f(z),grad=∇(f)(z),gradgrad=∇∇(f)(z))
+f1(x,μ) = 2*x[1]*(1+sum(μ))
+f1(μ) = x -> f1(x,μ)
+f1μ = 𝑓ₚ(f1,μ₀)
+f2(x,μ) = 3*x[2]*(1+sum(μ))
+f2(μ) = x -> f2(x,μ)
+f2μ = 𝑓ₚ(f2,μ₀)
+u = CellField(f1μ,Ω)
+v = CellField(f2μ,Ω)
 
-# integration
+a = ∫(jump(u))*dΛ
+@test all(sum(a) .+ 1 .≈ 1)
 
-fun(x,μ) = 3*x[1]*sum(μ)
-fun(μ) = x -> fun(x,μ)
-funμ = 𝑓ₚ(fun,μ)
-f = GenericField(funμ)
-ϕ(x) = 2*x[1]
-Φ = GenericField(ϕ)
+a = ∫( (n_Λ.⁺⋅∇(v.⁻))*jump(n_Λ⋅∇(u)) )*dΛ
+@test all(sum(a) .+ 1 .≈ 1)
 
-w = ones(size(x))
+quad = Quadrature(duffy,2)
+dΩ = Measure(Ω,quad)
+s = ∫(fμ₀)dΩ
+@test all(sum(s) .≈ 1)
 
-i = integrate(f,x,w)
-@test i == map(y->sum(y.*w),f(x))
+dΩ = Measure(Ω,degree,T=Float32)
+dΓ = Measure(Γ,degree,T=Float32)
+dΛ = Measure(Λ,degree,T=Float32)
 
-i = integrate(f,x,w,∇(Φ))
-@test i == map(y->sum(y.*w.*meas.(∇(Φ).(x))),f(x))
+a = ∫(fμ₀)*dΩ + ∫(fμ₀)*dΓ
+@test all(isapprox.(sum(a),5,atol=1e-6))
+@test all(isapprox.(sum(2*a),10,atol=1e-6))
+@test all(isapprox.(sum(a*2),10,atol=1e-6))
 
-# Test field as collection
+u = CellField(f1μ,Ω)
+v = CellField(f2μ,Ω)
 
-@test length(f) == 3
-@test size(f) == (3,)
-@test eltype(f) <: GenericField
+a = ∫(jump(u))*dΛ
+@test all(sum(a) .+ 1 .≈ 1)
 
-# GenericField (function)
+a = ∫( (n_Λ.⁺⋅∇(v.⁻))*jump(n_Λ⋅∇(u)) )*dΛ
+@test all(sum(a) .+ 1 .≈ 1)
 
-q(x,μ) = 3*x[1]*sum(μ)
-q(μ) = x -> q(x,μ)
-qμ = 𝑓ₚ(q,μ)
-
-f = GenericField(qμ)
-df = ∇(f)
-ddf = ∇∇(f)
-for (i,μ) in enumerate(μ)
-  fi = param_getindex(f,i)
-  test_field(fi,p,q(μ)(p))
-  test_field(fi,p,q(μ)(p),grad=∇(q(μ))(p))
-  test_field(fi,p,q(μ)(p),grad=∇(q(μ))(p),gradgrad=∇∇(q(μ))(p))
-
-  test_field(fi,p,q(μ).(p))
-  test_field(fi,p,q(μ).(p),grad=∇(q(μ)).(p))
-  test_field(fi,p,q(μ).(p),grad=∇(q(μ)).(p),gradgrad=∇∇(q(μ)).(p))
-
-  test_field(fi,z,fi.(z))
-  test_field(fi,z,fi.(z),grad=∇(fi).(z))
-  test_field(fi,z,fi.(z),grad=∇(fi).(z),gradgrad=∇∇(fi).(z))
-end
-
-# Operations
-
-afun(x,μ) = sum(μ)*x[1]+2
-afun(μ) = x -> afun(x,μ)
-aμ = 𝑓ₚ(afun,μ)
-bfun(x,μ) = sum(μ)*sin(x[1])*cos(x[2])
-bfun(μ) = x -> bfun(x,μ)
-bμ = 𝑓ₚ(bfun,μ)
-
-a = GenericField(aμ)
-b = GenericField(bμ)
-
-fi = testitem(df)
-li = return_cache(fi,x)
-fix = evaluate!(li,fi,x)
-
-f = Operation(*)(a,b)
-@test isa(f,OperationParamField)
-cp = aμ(p) .* bμ(p)
-∇cp = ∇(aμ)(p) .* bμ(p) .+ aμ(p) .* ∇(bμ)(p)
-test_field(f,p,cp)
-test_field(f,p,cp,grad=∇cp)
-test_field(f,x,f.(x))
-test_field(f,x,f.(x),grad=∇(f).(x))
-test_field(f,z,f.(z))
-test_field(f,z,f.(z),grad=∇(f).(z))
-
-f = Operation(/)(a,b)
-cp = aμ(p) ./ bμ(p)
-test_field(f,p,cp)
-
-afun(x,μ) = (x.+2)*sum(μ)
-afun(μ) = x -> afun(x,μ)
-aμ = 𝑓ₚ(afun,μ)
-bfun(x,μ) = 2*x*sum(μ)
-bfun(μ) = x -> bfun(x,μ)
-bμ = 𝑓ₚ(bfun,μ)
-
-a = GenericField(aμ)
-b = GenericField(bμ)
-
-f = Operation(⋅)(a,b)
-cp = aμ(p) .⋅ bμ(p)
-∇cp = ∇(aμ)(p) .⋅ bμ(p) .+ ∇(bμ)(p) .⋅ aμ(p)
-test_field(f,p,cp)
-test_field(f,p,cp,grad=∇cp)
-test_field(f,x,f.(x))
-test_field(f,x,f.(x),grad=∇(f).(x))
-test_field(f,z,f.(z))
-test_field(f,z,f.(z),grad=∇(f).(z))
-
-f = Operation(+)(a,b)
-cp = aμ(p).+bμ(p)
-∇cp = ∇(aμ)(p) .+ ∇(bμ)(p)
-test_field(f,p,cp)
-test_field(f,p,cp,grad=∇cp)
-test_field(f,x,f.(x))
-test_field(f,x,f.(x),grad=∇(f).(x))
-test_field(f,z,f.(z))
-test_field(f,z,f.(z),grad=∇(f).(z))
-
-# Composition
-
-mfun(g) = 3*g[1]
-gfun(x,μ) = 2*x*sum(μ)
-gfun(μ) = x -> gfun(x,μ)
-gμ = 𝑓ₚ(gfun,μ)
-ffun(x) = mfun(gμ(x))
-
-m = GenericField(mfun)
-g = GenericField(gμ)
-
-f = m∘g
-@test isa(f,OperationParamField)
-fp = m(g(p))
-∇fp = ∇(g)(p).⋅∇(m)(g(p))
-test_field(f,p,fp)
-test_field(f,p,fp,grad=∇fp)
-test_field(f,x,f.(x))
-test_field(f,x,f.(x),grad=∇(f).(x))
-test_field(f,z,f.(z))
-test_field(f,z,f.(z),grad=∇(f).(z))
-
-vfun(x,μ) = (2*x[1]+x[2])*sum(μ)
-vfun(μ) = x -> vfun(x,μ)
-vμ = 𝑓ₚ(vfun,μ)
-
-vfun1(x) = 2*x[1]+x[2]
-v1 = GenericField(vfun1)
-vt1 = VoidFieldMap(true)(v1)
-vf1 = VoidFieldMap(false)(v1)
-test_field(vt1,p,zero(v1(p)))
-
-v = GenericField(vμ)
-vt = VoidFieldMap(true)(v)
-vf = VoidFieldMap(false)(v)
-test_field(vt,p,zero(v(p)))
-test_field(vf,p,v(p))
-test_field(vt,p,zero(v(p)),grad=zero(∇(v)(p)))
-test_field(vf,p,v(p),grad=∇(v)(p))
-test_field(vt,p,zero(v(p)),grad=zero(∇(v)(p)),gradgrad=zero(∇∇(v)(p)))
-test_field(vf,p,v(p),grad=∇(v)(p),gradgrad=∇∇(v)(p))
-test_field(vt,x,zero(v(x)))
-test_field(vf,x,v(x))
-test_field(vt,x,zero(v(x)),grad=zero(∇(v)(x)))
-test_field(vf,x,v(x),grad=∇(v)(x))
-test_field(vt,x,zero(v(x)),grad=zero(∇(v)(x)),gradgrad=zero(∇∇(v)(x)))
-test_field(vf,x,v(x),grad=∇(v)(x),gradgrad=∇∇(v)(x))
+quad = Quadrature(duffy,2,T=Float32)
+dΩ = Measure(Ω,quad)
+s = ∫(fμ₀)dΩ
+@test all(sum(s) .≈ 1)

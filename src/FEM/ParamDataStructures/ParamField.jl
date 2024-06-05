@@ -75,16 +75,17 @@ struct OperationParamField{O,F} <: ParamField
 end
 
 function Fields.OperationField(op,fields::Tuple{Vararg{Field}})
-  try pfields = _to_param_quantities(op,fields...)
-    OperationParamField(pfields...)
+  try
+    pop,pfields... = _to_param_quantities(op,fields...)
+    OperationParamField(pop,pfields)
   catch
     Fields.OperationField{typeof(op),typeof(fields)}(op,fields)
   end
 end
 
-param_length(f::OperationParamField) = param_length(f.fields)
-param_getindex(f::OperationParamField,i::Integer) = OperationField(f.op,param_getindex.(f.fields,i))
-param_getindex(f::OperationParamField{<:ParamField},i::Integer) = OperationField(param_getindex(f.op,i),param_getindex.(f.fields,i))
+param_length(f::OperationParamField) = _find_param_length(f.op,f.fields...)
+param_getindex(f::OperationParamField,i::Integer) = Fields.OperationField(f.op,param_getindex.(f.fields,i))
+param_getindex(f::OperationParamField{<:ParamField},i::Integer) = Fields.OperationField(param_getindex(f.op,i),param_getindex.(f.fields,i))
 
 function Arrays.return_value(c::OperationParamField,x::Point)
   map(i->return_value(param_getindex(c,i),x),param_eachindex(c))

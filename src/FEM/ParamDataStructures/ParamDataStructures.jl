@@ -59,11 +59,10 @@ export AbstractParamVector
 export AbstractParamMatrix
 include("ParamArraysInterface.jl")
 
+export ArrayOfArrays
 export VectorOfVectors
-include("VectorOfVectors.jl")
-
 export MatrixOfMatrices
-include("MatrixOfMatrices.jl")
+include("ArrayOfArrays.jl")
 
 export MatrixOfSparseMatricesCSC
 include("MatrixOfSparseMatrices.jl")

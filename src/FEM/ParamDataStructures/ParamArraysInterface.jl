@@ -1,7 +1,6 @@
 abstract type AbstractParamArray{T,N,L} <: AbstractParamContainer{AbstractArray{T,N},N,L} end
 
-ParamArray(A::AbstractVector{<:AbstractVector}) = VectorOfVectors(A)
-ParamArray(A::AbstractVector{<:AbstractMatrix}) = VectorOfVectors(A)
+ParamArray(A::AbstractVector{<:AbstractArray}) = ArrayOfArrays(A)
 ParamArray(A::AbstractVector{<:SparseMatrixCSC}) = MatrixOfSparseMatricesCSC(A)
 ParamArray(A::AbstractArray{<:Number},plength=1) = ArrayOfTrivialArrays(A,plength)
 
@@ -17,12 +16,30 @@ function array_of_similar_arrays(a::Union{Number,AbstractArray{<:Number,0}},l::I
   VectorOfScalars(fill(zero(eltype(a)),l))
 end
 
-function array_of_similar_arrays(a::AbstractVecOrMat{<:Number},l::Integer)
+function array_of_similar_arrays(a::AbstractArray{<:Number},l::Integer)
   ParamArray([similar(a) for _ = 1:l])
 end
 
 _to_param_quantity(A::AbstractParamArray,plength::Integer) = A
 _to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
+
+Base.:*(A::AbstractParamArray,b::Number) = A .* b
+Base.:*(a::Number,B::AbstractParamArray) = a .* B
+Base.:/(A::AbstractParamArray,b::Number) = A ./ b
+
+for op in (:+,:-)
+  @eval begin
+    function ($op)(A::AbstractParamArray,b::AbstractArray{<:Number})
+      B = ParamArray(b,param_length(A))
+      ($op)(A,B)
+    end
+
+    function ($op)(a::AbstractArray{<:Number},B::AbstractParamArray)
+      A = ParamArray(a,param_length(B))
+      ($op)(A,B)
+    end
+  end
+end
 
 const AbstractParamVector{T,L} = AbstractParamArray{T,1,L}
 const AbstractParamMatrix{T,L} = AbstractParamArray{T,2,L}
@@ -209,16 +226,18 @@ for T in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamTensor3D)
   end
 end
 
-function Arrays.return_value(f::BroadcastingFieldOpMap,A::Union{AbstractArray{<:Number},AbstractParamArray}...)
-  param_return_value(f,A...)
+# more general cases
+
+function Arrays.return_value(f::BroadcastingFieldOpMap,A::AbstractParamArray,B::Union{AbstractArray{<:Number},AbstractParamArray}...)
+  param_return_value(f,A,B...)
 end
 
-function Arrays.return_cache(f::BroadcastingFieldOpMap,A::Union{AbstractArray{<:Number},AbstractParamArray}...)
-  param_return_cache(f,A...)
+function Arrays.return_cache(f::BroadcastingFieldOpMap,A::AbstractParamArray,B::Union{AbstractArray{<:Number},AbstractParamArray}...)
+  param_return_cache(f,A,B...)
 end
 
-function Arrays.evaluate!(C,f::BroadcastingFieldOpMap,A::Union{AbstractArray{<:Number},AbstractParamArray}...)
-  param_evaluate!(C,f,A...)
+function Arrays.evaluate!(C,f::BroadcastingFieldOpMap,A::AbstractParamArray,B::Union{AbstractArray{<:Number},AbstractParamArray}...)
+  param_evaluate!(C,f,A,B...)
 end
 
 for op in (:+,:-,:*)

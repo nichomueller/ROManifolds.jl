@@ -1,7 +1,7 @@
-slow_index(i,N::Integer) = cld.(i,N)
-slow_index(i::Colon,::Integer) = i
-fast_index(i,N::Integer) = mod.(i .- 1,N) .+ 1
-fast_index(i::Colon,::Integer) = i
+@inline slow_index(i,N::Integer) = cld.(i,N)
+@inline slow_index(i::Colon,::Integer) = i
+@inline fast_index(i,N::Integer) = mod.(i .- 1,N) .+ 1
+@inline fast_index(i::Colon,::Integer) = i
 
 struct ParamRealization{P<:AbstractVector}
   params::P
@@ -14,7 +14,7 @@ _get_params(r::ParamRealization) = r.params # this function should stay local
 _get_params(r::TrivialParamRealization) = [r.params] # this function should stay local
 num_params(r::ParamRealization) = length(_get_params(r))
 Base.length(r::ParamRealization) = num_params(r)
-Base.getindex(r::ParamRealization,i) = ParamRealization(getindex(_get_params(r),i))
+Base.getindex(r::ParamRealization,i::Integer) = ParamRealization(getindex(_get_params(r),i))
 Base.copy(r::ParamRealization) = ParamRealization(copy(_get_params(r)))
 Arrays.testitem(r::ParamRealization) = testitem(_get_params(r))
 
