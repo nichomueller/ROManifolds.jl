@@ -256,7 +256,7 @@ function _select_snapshots_entries(s::TTSnapshots{T},ispace,itime) where T
   @assert length(ispace) == length(itime)
   nval = length(ispace)
   np = num_params(s)
-  values = allocate_param_array(zeros(T,nval),np)
+  values = array_of_similar_arrays(zeros(T,nval),np)
   for ip = 1:np
     vip = values[ip]
     for (istp,(is,it)) in enumerate(zip(ispace,itime))

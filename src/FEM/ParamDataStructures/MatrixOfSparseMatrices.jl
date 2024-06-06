@@ -1,31 +1,31 @@
-struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,L,P<:AbstractMatrix{Tv}} <: AbstractParamArray{Tv,2,L}
+struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,L,P<:AbstractMatrix{Tv}} <: ParamSparseMatrixCSC{Tv,Ti,L}
   m::Int64
   n::Int64
   colptr::Vector{Ti}
   rowval::Vector{Ti}
-  nzval::P
+  data::P
   function MatrixOfSparseMatricesCSC(
     m::Int64,
     n::Int64,
     colptr::Vector{Ti},
     rowval::Vector{Ti},
-    nzval::P
+    data::P
     ) where {Tv,Ti,P<:AbstractMatrix{Tv}}
 
-    L = size(nzval,2)
-    new{Tv,Ti,L,P}(m,n,colptr,rowval,nzval)
+    L = size(data,2)
+    new{Tv,Ti,L,P}(m,n,colptr,rowval,data)
   end
 end
 
 SparseArrays.getcolptr(A::MatrixOfSparseMatricesCSC) = A.colptr
 SparseArrays.rowvals(A::MatrixOfSparseMatricesCSC) = A.rowval
-SparseArrays.nonzeros(A::MatrixOfSparseMatricesCSC) = A.nzval
-_nonzeros(A::MatrixOfSparseMatricesCSC,iblock::Integer...) = @inbounds getindex(A.nzval,:,iblock...)
+SparseArrays.nonzeros(A::MatrixOfSparseMatricesCSC) = A.data
+_nonzeros(A::MatrixOfSparseMatricesCSC,iblock::Integer...) = @inbounds getindex(A.data,:,iblock...)
 
 function MatrixOfSparseMatricesCSC(A::AbstractVector{SparseMatrixCSC{Tv,Ti}}) where {Tv,Ti}
   m,n = innersize(A)
-  colptr,rowval,nzval = innerpattern(A)
-  B = ArrayOfSimilarArrays(nzval)
+  colptr,rowval,data = innerpattern(A)
+  B = ArrayOfSimilarArrays(data)
   MatrixOfSparseMatricesCSC(m,n,colptr,rowval,B.data)
 end
 
@@ -35,17 +35,15 @@ function innerpattern(A::AbstractVector{<:SparseMatrixCSC})
   if (any(A->A.colptr != colptr, A) || any(A->A.rowval != rowval, A))
     throw(DimensionMismatch("Sparsity pattern of element csc matrices is not equal"))
   end
-  nzval = map(nonzeros,A)
-  return colptr,rowval,nzval
+  data = map(nonzeros,A)
+  return colptr,rowval,data
 end
+
+Base.size(A::MatrixOfSparseMatricesCSC) = (param_length(A),param_length(A))
 
 @inline function ArraysOfArrays.innersize(A::MatrixOfSparseMatricesCSC)
   (A.m,A.n)
 end
-
-Base.:(==)(A::MatrixOfSparseMatricesCSC,B::MatrixOfSparseMatricesCSC) = (A.nzval == B.nzval)
-
-Base.size(A::MatrixOfSparseMatricesCSC) = (param_length(A),param_length(A))
 
 param_getindex(a::MatrixOfSparseMatricesCSC,i::Integer) = diagonal_getindex(Val(true),a,i)
 
@@ -92,7 +90,7 @@ function Base.similar(
 
   colptr = similar(A.colptr,Ti′)
   rowval = similar(A.rowval,Ti′)
-  nzvals = similar(A.nzval,Tv′)
+  nzvals = similar(A.data,Tv′)
   MatrixOfSparseMatricesCSC(A.m,A.n,colptr,rowval,nzvals)
 end
 
@@ -100,6 +98,10 @@ function Base.copyto!(A::MatrixOfSparseMatricesCSC,B::MatrixOfSparseMatricesCSC)
   @check size(A) == size(B)
   copyto!(A.colptr,B.colptr)
   copyto!(A.rowval,B.rowval)
-  copyto!(A.nzval,B.nzval)
+  copyto!(A.data,B.data)
   A
+end
+
+function Base.zero(A::MatrixOfSparseMatricesCSC{Tv,Ti}) where {Tv,Ti}
+  MatrixOfSparseMatricesCSC(A.m,A.n,ones(Ti,length(A.colptr)),Ti[],Tv[])
 end

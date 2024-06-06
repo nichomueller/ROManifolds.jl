@@ -20,7 +20,7 @@ export ParamContainer
 export ParamArray
 export ParamVector
 export ParamMatrix
-export allocate_param_array
+export array_of_similar_arrays
 export zero_param_array
 export get_at_offsets
 export recenter

@@ -5,6 +5,7 @@ using BlockArrays
 using SparseArrays
 
 using Gridap
+using Gridap.Algebra
 using Gridap.CellData
 using Gridap.FESpaces
 using Gridap.MultiField

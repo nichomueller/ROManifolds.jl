@@ -374,7 +374,7 @@ for F in (:TrialParamFESpace,:FESpaceToParamFESpace)
     function FESpaces.zero_free_values(f::$F{<:TProductFESpace})
       V = get_vector_type(f)
       vector = zero_free_values(f.space)
-      allocate_param_array(vector,length(V))
+      array_of_similar_arrays(vector,length(V))
     end
   end
 end
@@ -389,7 +389,7 @@ function FESpaces.zero_free_values(f::MultiFieldParamFESpace{<:TProductFESpace})
   V = get_vector_type(f)
   f′ = MultiFieldParamFESpace(V,map(get_space,f.spaces))
   vector = zero_free_values(f′)
-  allocate_param_array(vector,length(V))
+  array_of_similar_arrays(vector,length(V))
 end
 
 # need to correct parametric, tproduct, zeromean constrained fespaces

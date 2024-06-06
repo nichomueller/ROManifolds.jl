@@ -6,7 +6,7 @@ function get_param_matrix_builder(
   M = get_array_type(mat)
   T = eltype(M)
   L = length(r)
-  pmatrix_type = MatrixOfSparseMatricesCSC{T,Int,L,Vector{M}}
+  pmatrix_type = MatrixOfSparseMatricesCSC{T,Int,L,Matrix{T}}
   SparseMatrixBuilder(pmatrix_type)
 end
 
@@ -18,7 +18,7 @@ function get_param_vector_builder(
   V = get_array_type(vec)
   T = eltype(V)
   L = length(r)
-  pvector_type = VectorOfVectors{T,L,Vector{V}}
+  pvector_type = VectorOfVectors{T,L,Matrix{T}}
   ArrayBuilder(pvector_type)
 end
 
@@ -61,6 +61,24 @@ function collect_cell_vector_for_trian(
   cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
   rows = get_cell_dof_ids(test,trian)
   [cell_vec_r],[rows]
+end
+
+eltype2(x) = (eltype∘eltype)(x)
+
+function FESpaces.assemble_vector!(b::AbstractParamVector,a::SparseMatrixAssembler,vecdata)
+  fill!(b,zero(eltype2(b)))
+  assemble_vector_add!(b,a,vecdata)
+end
+
+function FESpaces.assemble_matrix!(mat::AbstractParamMatrix,a::SparseMatrixAssembler,matdata)
+  LinearAlgebra.fillstored!(mat,zero(eltype2(mat)))
+  assemble_matrix_add!(mat,a,matdata)
+end
+
+function FESpaces.assemble_matrix_and_vector!(A::AbstractParamMatrix,b::AbstractParamVector,a::SparseMatrixAssembler,data)
+  LinearAlgebra.fillstored!(A,zero(eltype2(A)))
+  fill!(b,zero(eltype2(b)))
+  assemble_matrix_and_vector_add!(A,b,a,data)
 end
 
 function test_passembler(a::Assembler,matdata,vecdata,data)

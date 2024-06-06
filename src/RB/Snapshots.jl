@@ -373,7 +373,7 @@ function select_snapshots_entries(s::StandardSnapshots{M,T},spacerange,timerange
   nval = length(spacerange),length(timerange)
   nt = length(timerange)
   np = num_params(s)
-  values = allocate_param_array(zeros(T,nval),np)
+  values = array_of_similar_arrays(zeros(T,nval),np)
   @inbounds for ip = 1:np
     cols = (ip-1)*nt+1:ip*nt
     values[ip] = ss[:,cols]

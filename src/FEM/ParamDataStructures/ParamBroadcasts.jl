@@ -2,23 +2,30 @@ abstract type AbstractParamBroadcast end
 
 struct ParamBroadcast{D} <: AbstractParamBroadcast
   data::D
+  plength::Int
 end
 
-param_data(A::ParamBroadcast) = A.data
+Base.axes(A::ParamBroadcast) = (Base.OneTo(param_length(A)),)
+
+param_length(A::ParamBroadcast) = A.plength
+all_data(A::ParamBroadcast) = A.data
 
 function Base.broadcasted(f,A::Union{AbstractParamArray,ParamBroadcast}...)
-  bc = map((x...)->Base.broadcasted(f,x...),map(param_data,A)...)
-  ParamBroadcast(bc)
+  bc = Base.broadcasted(f,map(all_data,A)...)
+  plength = _find_param_length(A...)
+  ParamBroadcast(bc,plength)
 end
 
 function Base.broadcasted(f,A::Union{AbstractParamArray,ParamBroadcast},b::Number)
-  bc = map(a->Base.broadcasted(f,a,b),param_data(A))
-  ParamBroadcast(bc)
+  bc = Base.broadcasted(f,all_data(A),b)
+  plength = param_length(A)
+  ParamBroadcast(bc,plength)
 end
 
 function Base.broadcasted(f,a::Number,B::Union{AbstractParamArray,ParamBroadcast})
-  bc = map(b->Base.broadcasted(f,a,b),param_data(B))
-  ParamBroadcast(bc)
+  bc = Base.broadcasted(f,a,all_data(B))
+  plength = param_length(B)
+  ParamBroadcast(bc,plength)
 end
 
 function Base.broadcasted(f,
@@ -35,16 +42,23 @@ function Base.broadcasted(
 end
 
 function Base.materialize(b::ParamBroadcast)
-  A = map(Base.materialize,param_data(b))
-  ParamArray(A)
+  param_materialize(Base.materialize(all_data(b)))
 end
 
+param_materialize(A) = A
+param_materialize(A::AbstractArray{<:AbstractArray}) = error("what?")#ParamArray(A)
+param_materialize(A::AbstractArray{<:Number}) = ArrayOfArrays(A)
+param_materialize(A::SparseMatrixCSC) = MatrixOfSparseMatricesCSC(A)
+
 function Base.materialize!(A::AbstractParamArray,b::Broadcast.Broadcasted)
-  map(x->Base.materialize!(x,b),param_data(A))
+  dA = all_data(A)
+  Base.materialize!(dA,b)
   A
 end
 
 function Base.materialize!(A::AbstractParamArray,b::ParamBroadcast)
-  map(Base.materialize!,param_data(A),param_data(b))
+  dA = all_data(A)
+  db = all_data(b)
+  Base.materialize!(dA,db)
   A
 end

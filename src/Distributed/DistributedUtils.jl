@@ -15,11 +15,11 @@ function PartitionedArrays.assembly_buffers(
 
   ptrs = local_indices_snd.ptrs
   data = zeros(T,ptrs[end]-1)
-  ptdata = allocate_param_array(data,L)
+  ptdata = array_of_similar_arrays(data,L)
   buffer_snd = JaggedArray(ptdata,ptrs)
   ptrs = local_indices_rcv.ptrs
   data = zeros(T,ptrs[end]-1)
-  ptdata = allocate_param_array(data,L)
+  ptdata = array_of_similar_arrays(data,L)
   buffer_rcv = JaggedArray(ptdata,ptrs)
   buffer_snd,buffer_rcv
 end

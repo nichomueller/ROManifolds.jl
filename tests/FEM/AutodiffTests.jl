@@ -30,7 +30,7 @@ U = TrialParamFESpace(V,fμ)
 
 dv = get_fe_basis(V)
 du = get_trial_fe_basis(U)
-uh = FEFunction(U,allocate_param_array(rand(num_free_dofs(U)),length(fμ)))
+uh = FEFunction(U,array_of_similar_arrays(rand(num_free_dofs(U)),length(fμ)))
 
 ener(uh) = ∫( fμ*∇(uh)⋅∇(uh)*0.5 )*dΩ
 res(uh) = ∫(fμ*∇(uh)⋅∇(dv))*dΩ

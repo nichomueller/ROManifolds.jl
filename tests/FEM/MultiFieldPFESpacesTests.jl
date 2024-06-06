@@ -63,7 +63,7 @@ cellmatvec = pair_arrays(cellmat,cellvec)
 @test cellvec[1][1] != nothing
 @test cellvec[1][2] == nothing
 
-free_values = allocate_param_array(rand(num_free_dofs(X)),length(gμ))
+free_values = array_of_similar_arrays(rand(num_free_dofs(X)),length(gμ))
 xh = FEFunction(X,free_values)
 test_fe_function(xh)
 uh,ph = xh

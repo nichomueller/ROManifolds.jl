@@ -36,7 +36,7 @@ U = TrialParamFESpace(uμ,V0)
 
 free_values_partition = map(partition(V0.gids)) do indices
   v = ones(Float64,local_length(indices))
-  allocate_param_array(v,length(μ))
+  array_of_similar_arrays(v,length(μ))
 end
 
 free_values = PVector(free_values_partition,partition(V0.gids))

@@ -11,14 +11,14 @@ function PartitionedArrays.allocate_gather_impl(
     ptrs = length_to_ptrs!(pushfirst!(l,one(eltype(l))))
     ndata = ptrs[end]-1
     data = Vector{T}(undef,ndata)
-    ptdata = allocate_param_array(data,L)
+    ptdata = array_of_similar_arrays(data,L)
     ParamJaggedArray{T,Int32}(ptdata,ptrs)
   end
   if isa(destination,Integer)
     function g(l,snd)
       ptrs = Vector{Int32}(undef,1)
       data = Vector{T}(undef,0)
-      ptdata = allocate_param_array(data,L)
+      ptdata = array_of_similar_arrays(data,L)
       ParamJaggedArray(ptdata,ptrs)
     end
     rcv = map_main(f,l_dest,snd;otherwise=g,main=destination)
@@ -62,7 +62,7 @@ function PartitionedArrays.allocate_scatter_impl(
   counts_scat = scatter(counts;source)
   map(counts_scat) do count
     data = Vector{T}(undef,count)
-    allocate_param_array(data,L)
+    array_of_similar_arrays(data,L)
   end
 end
 
@@ -92,7 +92,7 @@ function PartitionedArrays.allocate_emit_impl(
   n_all = emit(n;source)
   map(n_all) do n
     data = Vector{T}(undef,n)
-    allocate_param_array(data,L)
+    array_of_similar_arrays(data,L)
   end
 end
 
@@ -171,7 +171,7 @@ function PartitionedArrays.allocate_exchange_impl(
     length_to_ptrs!(ptrs)
     n_data = ptrs[end]-1
     data = Vector{S}(undef,n_data)
-    ptdata = allocate_param_array(data,length(A))
+    ptdata = array_of_similar_arrays(data,length(A))
     JaggedArray(ptdata,ptrs)
   end
   rcv

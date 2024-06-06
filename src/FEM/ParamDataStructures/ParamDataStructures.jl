@@ -14,7 +14,7 @@ using Gridap.Fields
 using Gridap.CellData
 using Gridap.Helpers
 
-import Base:+,-,*,/
+import Base:+,-,*,/,\
 import Distributions: Uniform,Normal
 import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
@@ -57,6 +57,9 @@ include("ParamField.jl")
 export AbstractParamArray
 export AbstractParamVector
 export AbstractParamMatrix
+export ParamArray
+export param_array
+export array_of_similar_arrays
 include("ParamArraysInterface.jl")
 
 export ArrayOfArrays

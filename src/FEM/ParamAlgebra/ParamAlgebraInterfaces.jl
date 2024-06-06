@@ -1,6 +1,6 @@
 function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamContainer
   vector = zeros(eltype(V),n)
-  allocate_param_array(vector,param_length(V))
+  array_of_similar_arrays(vector,param_length(V))
 end
 
 function Algebra.allocate_in_range(matrix::AbstractParamMatrix)
@@ -13,25 +13,26 @@ function Algebra.allocate_in_domain(matrix::AbstractParamMatrix)
   allocate_in_domain(V,matrix)
 end
 
-# @inline function Algebra._add_entries!(
-#   combine::Function,A,vs::AbstractParamContainer,is,js)
-#   for (lj,j) in enumerate(js)
-#     if j>0
-#       for (li,i) in enumerate(is)
-#         if i>0
-#           vij = ParamContainer(map(x->x[li,lj],vs))
-#           add_entry!(combine,A,vij,i,j)
-#         end
-#       end
-#     end
-#   end
-#   A
-# end
+@inline function Algebra._add_entries!(
+  combine::Function,A,vs::AbstractParamContainer,is,js)
+
+  for (lj,j) in enumerate(js)
+    if j>0
+      for (li,i) in enumerate(is)
+        if i>0
+          vij = ParamContainer(map(x->x[li,lj],param_data(vs)))
+          add_entry!(combine,A,vij,i,j)
+        end
+      end
+    end
+  end
+  A
+end
 
 @inline function Algebra._add_entries!(
   combine::Function,A::AbstractParamContainer,vs::AbstractParamContainer,is,js)
   @check param_length(A) == param_length(vs)
-  for i = param_eachindex(A)
+  @inbounds for i = param_eachindex(A)
     Algebra._add_entries!(combine,param_getindex(A,i),param_getindex(vs,i),is,js)
   end
   A
@@ -39,26 +40,26 @@ end
 
 @inline function Algebra._add_entries!(
   combine::Function,A::AbstractParamContainer,vs::Nothing,is,js)
-  for i = param_eachindex(A)
+  @inbounds for i = param_eachindex(A)
     Algebra._add_entries!(combine,param_getindex(A,i),vs,is,js)
   end
   A
 end
 
-# @inline function Algebra._add_entries!(
-#   combine::Function,A,vs::AbstractParamContainer,is)
-#   for (li,i) in enumerate(is)
-#     if i>0
-#       vi = ParamContainer(map(x->x[li],vs))
-#       add_entry!(combine,A,vi,i)
-#     end
-#   end
-#   A
-# end
+@inline function Algebra._add_entries!(
+  combine::Function,A,vs::AbstractParamContainer,is)
+  for (li,i) in enumerate(is)
+    if i>0
+      vi = ParamContainer(map(x->x[li],param_data(vs)))
+      add_entry!(combine,A,vi,i)
+    end
+  end
+  A
+end
 
 @inline function Algebra._add_entries!(
   combine::Function,A::AbstractParamContainer,vs::Nothing,is)
-  for i = param_eachindex(A)
+  @inbounds for i = param_eachindex(A)
     Algebra._add_entries!(combine,param_getindex(A,i),vs,is)
   end
   A
@@ -67,31 +68,29 @@ end
 @inline function Algebra._add_entries!(
   combine::Function,A::AbstractParamContainer,vs::AbstractParamContainer,is)
   @check param_length(A) == param_length(vs)
-  for i = param_eachindex(A)
+  @inbounds for i = param_eachindex(A)
     Algebra._add_entries!(combine,param_getindex(A,i),param_getindex(vs,i),is)
   end
   A
 end
 
-# @inline function Algebra.add_entry!(combine::Function,A::ParamVector,v::Number,i)
-#   for k = eachindex(A)
-#     ai = A[k][i]
-#     A[k][i] = combine(ai,v)
-#   end
-#   A
-# end
+@inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::Number,is)
+  @inbounds for i = param_eachindex(A)
+    Algebra._add_entries!(combine,param_getindex(A,i),v,is)
+  end
+  A
+end
 
 function Algebra.is_entry_stored(::Type{T},i,j) where T<:AbstractParamMatrix
   is_entry_stored(eltype(T),i,j)
 end
 
-# @inline function Algebra.add_entry!(combine::Function,A::ParamMatrix,v::Number,i,j)
-#   for k = eachindex(A)
-#     aij = A[k][i,j]
-#     A[k][i,j] = combine(aij,v)
-#   end
-#   A
-# end
+@inline function Algebra.add_entry!(combine::Function,A::AbstractParamMatrix,v::Number,is,js)
+  @inbounds for i = param_eachindex(A)
+    Algebra._add_entries!(combine,param_getindex(A,i),v,is,js)
+  end
+  A
+end
 
 @inline function Algebra.add_entry!(::typeof(+),a::Algebra.AllocationCOO{T},::Nothing,i,j) where T<:AbstractParamMatrix
   if Algebra.is_entry_stored(T,i,j)
@@ -120,7 +119,7 @@ function Algebra.allocate_coo_vectors(::Type{T},n::Integer) where {Tv,Ti,T<:Matr
   I = zeros(Ti,n)
   J = zeros(Ti,n)
   V = zeros(Tv,n)
-  PV = allocate_param_array(V,param_length(T))
+  PV = array_of_similar_arrays(V,param_length(T))
   I,J,PV
 end
 
@@ -169,7 +168,7 @@ end
 function Algebra.nz_allocation(a::Algebra.ArrayCounter{T}) where T<:AbstractParamVector
   S = eltype(T)
   v = fill!(similar(S,map(length,a.axes)),zero(eltype(S)))
-  allocate_param_array(v,param_length(T))
+  array_of_similar_arrays(v,param_length(T))
 end
 
 function Algebra.nz_allocation(a::ParamCounter{C,L}) where {C,L}
@@ -192,7 +191,7 @@ struct ParamInserterCSC{Tv,Ti,P}
   nzval::P
   function ParamInserterCSC(inserter::Algebra.InserterCSC{Tv,Ti},::Val{L}) where {Tv,Ti,L}
     @unpack nrows,ncols,colptr,colnnz,rowval,nzval = inserter
-    pnzval = allocate_param_array(nzval,L)
+    pnzval = array_of_similar_arrays(nzval,L)
     P = typeof(pnzval)
     new{Tv,Ti,P}(nrows,ncols,colptr,colnnz,rowval,pnzval)
   end
@@ -223,7 +222,7 @@ Algebra.LoopStyle(::Type{<:ParamInserterCSC}) = Loop()
 end
 
 @noinline function Algebra.add_entry!(
-  ::typeof(+),a::ParamInserterCSC{Tv,Ti,P},v::AbstractParamContainer{Tv},i,j) where {Tv,Ti,P}
+  ::typeof(+),a::ParamInserterCSC{Tv,Ti,P},v::AbstractParamContainer,i,j) where {Tv,Ti,P}
   pini = Int(a.colptr[j])
   pend = pini + Int(a.colnnz[j]) - 1
   p = searchsortedfirst(a.rowval,i,pini,pend,Base.Order.Forward)
@@ -266,7 +265,7 @@ function Algebra.create_from_nz(a::ParamInserterCSC{Tv,Ti,P}) where {Tv,Ti,P}
     pend = pini + Int(a.colnnz[j]) - 1
     for p in pini:pend
       @inbounds for l = param_eachindex(P)
-        param_getindex(a.nzval,l)[k] += param_getindex(a.nzval,l)[p]
+        param_getindex(a.nzval,l)[k] = param_getindex(a.nzval,l)[p]
       end
       a.rowval[k] = a.rowval[p]
       k += 1
@@ -278,9 +277,10 @@ function Algebra.create_from_nz(a::ParamInserterCSC{Tv,Ti,P}) where {Tv,Ti,P}
   length_to_ptrs!(a.colptr)
   nnz = a.colptr[end]-1
   resize!(a.rowval,nnz)
-  resize!(a.nzval,nnz)
-  ParamArray([
-    SparseMatrixCSC(a.nrows,a.ncols,a.colptr,a.rowval,param_getindex(a.nzval,l))
-    for l = param_eachindex(P)
-      ])
+
+  param_array(param_data(a.nzval)) do v
+    cv = collect(v)
+    resize!(cv,nnz)
+    SparseMatrixCSC(a.nrows,a.ncols,a.colptr,a.rowval,cv)
+  end
 end

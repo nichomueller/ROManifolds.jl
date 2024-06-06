@@ -1,4 +1,4 @@
-struct ArrayOfArrays{T,N,L,M,P<:AbstractArray{T,M}} <: AbstractParamArray{T,N,L}
+struct ArrayOfArrays{T,N,L,M,P<:AbstractArray{T,M}} <: ParamArray{T,N,L}
   data::P
   function ArrayOfArrays(data::P) where {T,M,P<:AbstractArray{T,M}}
     N = M - 1
@@ -16,9 +16,17 @@ function ArrayOfArrays(A::AbstractVector{<:AbstractArray})
   ArrayOfArrays(B.data)
 end
 
-Base.:(==)(A::ArrayOfArrays,B::ArrayOfArrays) = (A.data == B.data)
+function ArrayOfCachedArrays(A::AbstractVector{<:AbstractArray})
+  B = ArrayOfSimilarArrays(A)
+  Bcache = CachedArray(B.data)
+  ArrayOfArrays(Bcache)
+end
 
 Base.size(A::ArrayOfArrays{T,N}) where {T,N} = ntuple(_->param_length(A),Val(N))
+
+@inline function ArraysOfArrays.innersize(A::ArrayOfArrays{T,N}) where {T,N}
+  ArraysOfArrays.front_tuple(size(A.data),Val(N))
+end
 
 param_data(A::ArrayOfArrays{T,N}) where {T,N} = eachslice(A.data,dims=N+1)
 param_getindex(A::ArrayOfArrays,i::Integer) = diagonal_getindex(Val(true),A,i)
@@ -67,8 +75,16 @@ function Base.similar(A::ArrayOfArrays{T,N},::Type{<:AbstractArray{T′}}) where
   ArrayOfArrays(similar(A.data,T′))
 end
 
+function Base.similar(A::ArrayOfArrays{T,N},::Type{<:AbstractArray{T′}},dims::Dims{1}) where {T,T′,N}
+  ArrayOfArrays(similar(A.data,T′,innersize(A)...,dims...))
+end
+
 function Base.copyto!(A::ArrayOfArrays,B::ArrayOfArrays)
   @check size(A) == size(B)
   copyto!(A.data,B.data)
   A
+end
+
+function Base.zero(A::ArrayOfArrays)
+  ArrayOfArrays(zero(A.data))
 end

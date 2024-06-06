@@ -90,7 +90,7 @@ function allocate_coefficient(
   ntime = num_times(b)
   nparams = num_online_params(solver)
   coeffmat = allocate_matrix(Vector{Float64},nspace,ntime)
-  coeff = allocate_param_array(coeffmat,nparams)
+  coeff = array_of_similar_arrays(coeffmat,nparams)
   return coeff
 end
 
@@ -101,7 +101,7 @@ function allocate_coefficient(
   n = num_reduced_dofs(b)
   nparams = num_online_params(solver)
   coeffvec = allocate_vector(Vector{Float64},n)
-  coeff = allocate_param_array(coeffvec,nparams)
+  coeff = array_of_similar_arrays(coeffvec,nparams)
   return coeff
 end
 
@@ -110,7 +110,7 @@ function allocate_result(solver::RBSolver,test::RBSpace)
   nfree_test = num_free_dofs(test)
   nparams = num_online_params(solver)
   kronprod = allocate_vector(V,nfree_test)
-  result = allocate_param_array(kronprod,nparams)
+  result = array_of_similar_arrays(kronprod,nparams)
   return result
 end
 
@@ -121,7 +121,7 @@ function allocate_result(solver::RBSolver,trial::RBSpace,test::RBSpace)
   nfree_test = num_free_dofs(test)
   nparams = num_online_params(solver)
   kronprod = allocate_matrix(M,nfree_test,nfree_trial)
-  result = allocate_param_array(kronprod,nparams)
+  result = array_of_similar_arrays(kronprod,nparams)
   return result
 end
 

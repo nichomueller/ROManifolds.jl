@@ -178,7 +178,7 @@ function Algebra.nz_allocation(a::TTCounter{<:Algebra.ArrayCounter{<:ParamVector
   elA = eltype(A)
   v = fill!(similar(elA,map(length,counter.axes)),zero(T))
   ttv = TTArray(v,index_map)
-  allocate_param_array(ttv,L)
+  array_of_similar_arrays(ttv,L)
 end
 
 function Algebra.nz_allocation(a::TTCounter{<:ParamCounter})
