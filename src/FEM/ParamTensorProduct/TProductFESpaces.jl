@@ -397,13 +397,13 @@ function FESpaces.FEFunction(
   f::FESpaceToParamFESpace{<:TProductFESpace{D,<:ZeroMeanFESpace},L},
   free_values::ParamArray,
   dirichlet_values::ParamArray) where {D,L}
-  FEFunction(FESpaceToParamFESpace(f.space.space,Val(L)),free_values,dirichlet_values)
+  FEFunction(FESpaceToParamFESpace(f.space.space,Val{L}()),free_values,dirichlet_values)
 end
 
 function FESpaces.EvaluationFunction(
   f::FESpaceToParamFESpace{<:TProductFESpace{D,<:ZeroMeanFESpace},L},
   free_values::ParamArray) where {D,L}
-  EvaluationFunction(FESpaceToParamFESpace(f.space.space,Val(L)),free_values)
+  EvaluationFunction(FESpaceToParamFESpace(f.space.space,Val{L}()),free_values)
 end
 
 for F in (:TrialFESpace,:ZeroMeanFESpace,:FESpaceWithConstantFixed)
@@ -412,7 +412,7 @@ for F in (:TrialFESpace,:ZeroMeanFESpace,:FESpaceWithConstantFixed)
       f::FESpaceToParamFESpace{<:TProductFESpace{D,<:$F},L},
       fv::ParamArray,
       dv::ParamArray) where {D,L}
-      scatter_free_and_dirichlet_values(FESpaceToParamFESpace(f.space.space,Val(L)),fv,dv)
+      scatter_free_and_dirichlet_values(FESpaceToParamFESpace(f.space.space,Val{L}()),fv,dv)
     end
   end
 end

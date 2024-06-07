@@ -22,78 +22,41 @@ function ArrayOfCachedArrays(A::AbstractVector{<:AbstractArray})
   ArrayOfArrays(Bcache)
 end
 
-Base.size(A::ArrayOfArrays{T,N}) where {T,N} = ntuple(_->param_length(A),Val(N))
+Base.size(A::ArrayOfArrays{T,N}) where {T,N} = ntuple(_->param_length(A),Val{N}())
 
 @inline function ArraysOfArrays.innersize(A::ArrayOfArrays{T,N}) where {T,N}
-  ArraysOfArrays.front_tuple(size(A.data),Val(N))
+  ArraysOfArrays.front_tuple(size(A.data),Val{N}())
 end
 
 all_data(A::ArrayOfArrays) = A.data
 param_data(A::ArrayOfArrays{T,N}) where {T,N} = eachslice(A.data,dims=N+1)
-param_getindex(A::ArrayOfArrays,i::Integer) = diagonal_getindex(Val(true),A,i)
-param_setindex!(A::ArrayOfArrays,v,i::Integer) = diagonal_setindex!(Val(true),A,v,i)
-param_view(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N} = VectorOfScalars(A.data[i...,:])
+param_getindex(A::ArrayOfArrays,i::Integer) = diagonal_getindex(A,i)
+param_setindex!(A::ArrayOfArrays,v,i::Integer) = diagonal_setindex!(A,v,i)
+param_view(A::ArrayOfArrays{T,N},i::Integer) where {T,N} = view(A.data,ArraysOfArrays._ncolons(Val{N}())...,i)
+param_entry(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N} = ParamNumber(A.data[i...,:])
 
 Base.@propagate_inbounds function Base.getindex(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
-  diagonal_getindex(Val(all(i.==iblock)),A,iblock)
+  if all(i.==iblock)
+    diagonal_getindex(A,iblock)
+  else
+    fill(zero(T),innersize(A))
+  end
 end
 
-Base.@propagate_inbounds function diagonal_getindex(
-  ::Val{true},
-  A::ArrayOfArrays{T,N},
-  iblock::Integer) where {T,N}
-
-  getindex(A.data,ArraysOfArrays._ncolons(Val(N))...,iblock)
-end
-
-Base.@propagate_inbounds function diagonal_getindex(
-  ::Val{false},
-  A::ArrayOfArrays{T,N},
-  iblock::Integer) where {T,N}
-
-  fill(zero(T),innersize(A))
+Base.@propagate_inbounds function diagonal_getindex(A::ArrayOfArrays{T,N},iblock::Integer) where {T,N}
+  getindex(A.data,ArraysOfArrays._ncolons(Val{N}())...,iblock)
 end
 
 Base.@propagate_inbounds function Base.setindex!(A::ArrayOfArrays{T,N},v,i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
-  all(i.==iblock) && diagonal_setindex!(Val(true),A,v,iblock)
+  all(i.==iblock) && diagonal_setindex!(A,v,iblock)
 end
 
-Base.@propagate_inbounds function diagonal_setindex!(
-  ::Val{true},
-  A::ArrayOfArrays{T,N},
-  v,iblock::Integer) where {T,N}
-
-  setindex!(A.data,v,ArraysOfArrays._ncolons(Val(N))...,iblock)
-end
-
-Base.@propagate_inbounds function diagonal_setindex!(::Val{false},A,v,iblock::Integer)
-  @notimplemented
-end
-
-function Arrays.array_cache(A::ArrayOfArrays{T,N}) where {T,N}
-  r = Array{T,N}(undef,innersize(A))
-  CachedArray(r)
-end
-
-function Arrays.getindex!(cache,A::ArrayOfArrays{T,N},i::Vararg{Int,N}) where {T,N}
-  iblock = first(i)
-  diagonal_getindex!(Val(all(i.==iblock)),cache,A,iblock)
-end
-
-function diagonal_getindex!(::Val{true},cache,A::ArrayOfArrays{T,N},iblock::Integer) where {T,N}
-  r = cache.array
-  r .= A.data[ArraysOfArrays._ncolons(Val(N))...,iblock]
-  r
-end
-
-function diagonal_getindex!(::Val{false},cache,A::ArrayOfArrays{T,N},iblock::Integer) where {T,N}
-  r = cache.array
-  fill!(r,zero(T))
-  r
+Base.@propagate_inbounds function diagonal_setindex!(A::ArrayOfArrays{T,N},v,iblock::Integer) where {T,N}
+  setindex!(A.data,v,ArraysOfArrays._ncolons(Val{N}())...,iblock)
 end
 
 function Base.similar(A::ArrayOfArrays{T,N},::Type{<:AbstractArray{T′}}) where {T,T′,N}

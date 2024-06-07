@@ -7,6 +7,7 @@ all_data(a) = @abstractmethod
 param_getindex(a,i::Integer...) = @abstractmethod
 param_setindex!(a,v,i::Integer...) = @abstractmethod
 param_view(a,i::Integer...) = @abstractmethod
+param_entry(a,i::Integer...) = @abstractmethod
 param_eachindex(a) = Base.OneTo(param_length(a))
 array_of_similar_arrays(a,l::Integer) = @abstractmethod
 _to_param_quantity(a,plength::Integer) = @abstractmethod
@@ -36,7 +37,7 @@ struct ParamContainer{T,L} <: AbstractParamContainer{T,1,L}
   ParamContainer(data::Vector{T}) where T = new{T,length(data)}(data)
 end
 
-ParamContainer(a::AbstractArray{<:Number}) = VectorOfScalars(a)
+ParamContainer(a::AbstractArray{<:Number}) = ParamNumber(a)
 ParamContainer(a::AbstractArray{<:AbstractArray}) = ParamArray(a)
 
 param_getindex(a::ParamContainer,i::Integer) = getindex(a,i)
@@ -46,22 +47,35 @@ Base.size(a::ParamContainer) = (param_length(a),)
 Base.getindex(a::ParamContainer,i::Integer) = getindex(a.data,i)
 Base.setindex!(a::ParamContainer,v,i::Integer) = setindex!(a.data,v,i)
 
-struct VectorOfScalars{T<:Number,L} <: AbstractParamContainer{T,1,L}
+struct ParamNumber{T<:Number,L} <: AbstractParamContainer{T,1,L}
   data::Vector{T}
-  VectorOfScalars(data::Vector{T}) where T = new{T,length(data)}(data)
+  ParamNumber(data::Vector{T}) where T<:Number = new{T,length(data)}(data)
 end
 
-all_data(a::VectorOfScalars) = a.data
-param_getindex(a::VectorOfScalars,i::Integer) = getindex(a,i)
-param_setindex!(a::VectorOfScalars,v,i::Integer) = setindex!(a,v,i)
-param_view(a::VectorOfScalars,i::Integer) = getindex(a,i)
+all_data(a::ParamNumber) = a.data
+param_getindex(a::ParamNumber,i::Integer) = getindex(a,i)
+param_setindex!(a::ParamNumber,v,i::Integer) = setindex!(a,v,i)
+param_view(a::ParamNumber,i::Integer) = getindex(a,i)
+param_entry(a::ParamNumber,i::Integer) = getindex(a,i)
 
-_to_param_quantity(a::VectorOfScalars,plength::Integer) = a
+_to_param_quantity(a::ParamNumber,plength::Integer) = a
 
-Base.size(a::VectorOfScalars) = (param_length(a),)
-Base.getindex(a::VectorOfScalars,i::Integer) = getindex(a.data,i)
-Base.setindex!(a::VectorOfScalars,v,i::Integer) = setindex!(a.data,v,i)
+Base.size(a::ParamNumber) = (param_length(a),)
+Base.getindex(a::ParamNumber,i::Integer) = getindex(a.data,i)
+Base.setindex!(a::ParamNumber,v,i::Integer) = setindex!(a.data,v,i)
 
 function array_of_similar_arrays(a::Union{Number,AbstractArray{<:Number,0}},l::Integer)
-  VectorOfScalars(fill(zero(eltype(a)),l))
+  ParamNumber(fill(zero(eltype(a)),l))
+end
+
+for op in (:+,:-)
+  @eval begin
+    function ($op)(A::ParamNumber,b::Number)
+      ParamNumber(Base.broadcast($op,A,b))
+    end
+
+    function ($op)(a::Number,B::ParamNumber)
+      ParamNumber(Base.broadcast($op,a,B))
+    end
+  end
 end

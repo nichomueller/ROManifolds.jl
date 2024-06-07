@@ -41,11 +41,14 @@ include("ParamSpace.jl")
 
 export AbstractParamContainer
 export ParamContainer
-export VectorOfScalars
+export ParamNumber
 export param_data
 export param_length
 export param_eachindex
 export param_getindex
+export param_setindex!
+export param_view
+export param_entry
 include("ParamContainersInterface.jl")
 
 export ParamField

@@ -46,44 +46,32 @@ Base.size(A::MatrixOfSparseMatricesCSC) = (param_length(A),param_length(A))
 end
 
 all_data(A::MatrixOfSparseMatricesCSC) = A.data
-param_getindex(A::MatrixOfSparseMatricesCSC,i::Integer) = diagonal_getindex(Val(true),A,i)
-param_setindex!(A::MatrixOfSparseMatricesCSC,v,i::Integer) = diagonal_setindex!(Val(true),A,v,i)
-param_view(A::MatrixOfSparseMatricesCSC,i::Integer...) = VectorOfScalars(A.data[i...,:])
+param_getindex(A::MatrixOfSparseMatricesCSC,i::Integer) = diagonal_getindex(A,i)
+param_setindex!(A::MatrixOfSparseMatricesCSC,v,i::Integer) = diagonal_setindex!(A,v,i)
+param_entry(A::MatrixOfSparseMatricesCSC,i::Integer...) = ParamNumber(A.data[i...,:])
 
 Base.@propagate_inbounds function Base.getindex(A::MatrixOfSparseMatricesCSC,i::Vararg{Integer,2})
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
-  diagonal_getindex(Val(all(i.==iblock)),A,iblock)
+  if all(i.==iblock)
+    diagonal_getindex(A,iblock)
+  else
+    spzeros(innersize(A))
+  end
 end
 
-Base.@propagate_inbounds function diagonal_getindex(
-  ::Val{true},
-  A::MatrixOfSparseMatricesCSC{T},
-  iblock::Integer) where T
-
+Base.@propagate_inbounds function diagonal_getindex(A::MatrixOfSparseMatricesCSC,iblock::Integer)
   SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,_nonzeros(A,iblock))
-end
-
-Base.@propagate_inbounds function diagonal_getindex(
-  ::Val{false},
-  A::MatrixOfSparseMatricesCSC{T},
-  iblock::Integer) where T
-
-  spzeros(innersize(A))
 end
 
 Base.@propagate_inbounds function Base.setindex!(A::MatrixOfSparseMatricesCSC,v,i::Vararg{Integer,2})
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
-  irow==icol && diagonal_setindex!(Val(true),A,v,iblock)
+  irow==icol && diagonal_setindex!(A,v,iblock)
 end
 
-Base.@propagate_inbounds function diagonal_setindex!(::Val{true},A::MatrixOfSparseMatricesCSC,v,iblock::Integer)
+Base.@propagate_inbounds function diagonal_setindex!(A::MatrixOfSparseMatricesCSC,v,iblock::Integer)
   setindex!(_nonzeros(A,iblock),v)
-end
-
-Base.@propagate_inbounds function diagonal_setindex!(::Val{false},A::MatrixOfSparseMatricesCSC,v,iblock::Integer)
-  @notimplemented
 end
 
 function Base.similar(

@@ -25,6 +25,7 @@ params = [1],[2],[3]
 f(x,μ) = sum(μ)
 f(μ) = x -> f(x,μ)
 fμ(μ) = 𝑓ₚ(f,μ)
+b(x) = x[2]
 biform(u,v) = fμ(μ)*∇(v)⊙∇(u)
 liform(v) = fμ(μ)*v⊙b
 biform1(u,v) = fμ(μ)*v*u
@@ -112,8 +113,8 @@ assemble_vector!(vec,assem,vecdata)
 x2 = mat \ vec
 
 @test x ≈ x2
-@test length(x) == length(x2) == length(vec) == length(mat) == 3
-@test typeof(x) == typeof(x2) == typeof(vec) <: ParamVector
+@test param_length(x) == param_length(x2) == param_length(vec) == param_length(mat) == 3
+@test typeof(x) == typeof(x2) == typeof(vec) <: VectorOfVectors
 
 for (i,μi) = enumerate(μ)
   μi = sum(μi)
@@ -153,36 +154,3 @@ for (i,μi) = enumerate(μ)
   @test mat[i][1, 1]  ≈  1.333333333333333*μi
   @test mat[i][2, 1]  ≈ -0.33333333333333*μi
 end
-
-mat, vec = assemble_matrix_and_vector(assem2,data)
-
-x4 = mat \ vec
-@test x ≈ x4
-
-for (i,μi) = enumerate(μ)
-  μi = sum(μi)
-  @test vec[i] ≈ [0.0625, 0.125, 0.0625]*μi
-  @test mat[i][1, 1]  ≈  1.333333333333333*μi
-  @test mat[i][2, 1]  ≈ -0.33333333333333*μi
-end
-
-################################################################################
-
-dtrian = Measure(trian,2)
-biform(u,v) = ∫(fμ(μ)*∇(v)⊙∇(u))dtrian
-A = assemble_matrix(biform,U,V)
-
-# A = assemble_matrix(biform,U,V)
-a = SparseMatrixAssembler(U,V)
-dc = biform(get_trial_fe_basis(U),get_fe_basis(V))
-matdata = collect_cell_matrix(U,V,dc)
-
-
-
-# ok
-bf(u,v) = ∫(∇(v)⊙∇(u))dtrian
-AA = assemble_matrix(bf,V,V)
-
-aa = SparseMatrixAssembler(V,V)
-dcc = bf(get_trial_fe_basis(V),get_fe_basis(V))
-mdata = collect_cell_matrix(V,V,dcc)

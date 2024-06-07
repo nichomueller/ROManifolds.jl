@@ -20,7 +20,7 @@ end
     if j>0
       for (li,i) in enumerate(is)
         if i>0
-          vij = param_view(vs,li,lj)
+          vij = param_entry(vs,li,lj)
           add_entry!(combine,A,vij,i,j)
         end
       end
@@ -30,54 +30,19 @@ end
 end
 
 @inline function Algebra._add_entries!(
-  combine::Function,A::AbstractParamContainer,vs::AbstractParamContainer,is,js)
-  @check param_length(A) == param_length(vs)
-  @inbounds for i = param_eachindex(A)
-    Algebra._add_entries!(combine,param_getindex(A,i),param_getindex(vs,i),is,js)
-  end
-  A
-end
-
-@inline function Algebra._add_entries!(
-  combine::Function,A::AbstractParamContainer,vs::Nothing,is,js)
-  @inbounds for i = param_eachindex(A)
-    Algebra._add_entries!(combine,param_getindex(A,i),vs,is,js)
-  end
-  A
-end
-
-@inline function Algebra._add_entries!(
   combine::Function,A,vs::AbstractParamContainer,is)
   for (li,i) in enumerate(is)
     if i>0
-      vi = param_view(vs,li)
+      vi = param_entry(vs,li)
       add_entry!(combine,A,vi,i)
     end
   end
   A
 end
 
-@inline function Algebra._add_entries!(
-  combine::Function,A::AbstractParamContainer,vs::Nothing,is)
-  @inbounds for i = param_eachindex(A)
-    Algebra._add_entries!(combine,param_getindex(A,i),vs,is)
-  end
-  A
-end
-
-@inline function Algebra._add_entries!(
-  combine::Function,A::AbstractParamContainer,vs::AbstractParamContainer,is)
-  @check param_length(A) == param_length(vs)
-  @inbounds for i = param_eachindex(A)
-    Algebra._add_entries!(combine,param_getindex(A,i),param_getindex(vs,i),is)
-  end
-  A
-end
-
-@inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::Number,is)
-  @inbounds for i = param_eachindex(A)
-    Algebra._add_entries!(combine,param_getindex(A,i),v,is)
-  end
+@inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::ParamNumber,i)
+  Ai = A.data[i,:]
+  @inbounds A.data[i,:] .= combine(Ai,v)
   A
 end
 
@@ -85,10 +50,16 @@ function Algebra.is_entry_stored(::Type{T},i,j) where T<:AbstractParamMatrix
   is_entry_stored(eltype(T),i,j)
 end
 
-@inline function Algebra.add_entry!(combine::Function,A::AbstractParamMatrix,v::Number,is,js)
-  @inbounds for i = param_eachindex(A)
-    Algebra._add_entries!(combine,param_getindex(A,i),v,is,js)
-  end
+@inline function Algebra.add_entry!(combine::Function,A::AbstractParamMatrix,v::ParamNumber,i,j)
+  Aij = A.data[i,j,:]
+  @inbounds A.data[i,j,:] .= combine(Aij,v)
+  A
+end
+
+function Algebra.add_entry!(combine::Function,A::MatrixOfSparseMatricesCSC,v::ParamNumber,i,j)
+  k = nz_index(A,i,j)
+  Aij = A.data[k,:]
+  @inbounds A.data[k,:] .= combine(Aij,v)
   A
 end
 
@@ -108,9 +79,7 @@ end
     k = a.counter.nnz
     a.I[k] = i
     a.J[k] = j
-    @inbounds for j = param_eachindex(T)
-      param_getindex(a.V,j)[k] = param_getindex(v,j)
-    end
+    a.V.data[k,j] .= v.data[:,j]
   end
   nothing
 end
@@ -124,12 +93,16 @@ function Algebra.allocate_coo_vectors(::Type{T},n::Integer) where {Tv,Ti,T<:Matr
 end
 
 function Algebra.sparse_from_coo(::Type{T},I,J,V::AbstractParamArray,m,n) where T<:AbstractParamMatrix
-  ParamArray([Algebra.sparse_from_coo(eltype(T),I,J,param_getindex(V,i),m,n) for i = param_eachindex(V)])
+  param_array(param_data(V)) do v
+    cv = collect(v)
+    Algebra.sparse_from_coo(eltype(T),I,J,cv,m,n)
+  end
 end
 
 function Algebra.finalize_coo!(::Type{T},I,J,V::AbstractParamArray,m,n) where T<:AbstractParamMatrix
   @inbounds for i = param_eachindex(V)
-    Algebra.finalize_coo!(eltype(T),I,J,param_getindex(V,i),m,n)
+    vi = param_view(V,i)
+    Algebra.finalize_coo!(eltype(T),I,J,vi,m,n)
   end
 end
 
@@ -139,7 +112,8 @@ end
 
 function Algebra.push_coo!(::Type{T},I,J,V::AbstractParamArray,i,j,v) where T<:AbstractParamMatrix
   @inbounds for k = param_eachindex(V)
-    Algebra.push_coo!(eltype(T),I,J,param_getindex(V,k),i,j,v)
+    vk = param_view(V,k)
+    Algebra.push_coo!(eltype(T),I,J,vk,i,j,v)
   end
 end
 
@@ -151,7 +125,7 @@ struct ParamCounter{C,L}
 end
 
 function ParamCounter(counter::C,L::Integer) where C
-  ParamCounter(counter,Val(L))
+  ParamCounter(counter,Val{L}())
 end
 
 Algebra.LoopStyle(::Type{ParamCounter{C,L}}) where {C,L} = LoopStyle(C)
@@ -179,7 +153,7 @@ end
 # CSC format
 
 function ParamInserter(inserter::Algebra.InserterCSC,L::Integer)
-  ParamInserterCSC(inserter,Val(L))
+  ParamInserterCSC(inserter,Val{L}())
 end
 
 struct ParamInserterCSC{Tv,Ti,P}
@@ -222,7 +196,7 @@ Algebra.LoopStyle(::Type{<:ParamInserterCSC}) = Loop()
 end
 
 @noinline function Algebra.add_entry!(
-  ::typeof(+),a::ParamInserterCSC{Tv,Ti,P},v::AbstractParamContainer,i,j) where {Tv,Ti,P}
+  ::typeof(+),a::ParamInserterCSC{Tv,Ti,P},v::ParamNumber,i,j) where {Tv,Ti,P}
   pini = Int(a.colptr[j])
   pend = pini + Int(a.colnnz[j]) - 1
   p = searchsortedfirst(a.rowval,i,pini,pend,Base.Order.Forward)
@@ -230,30 +204,22 @@ end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    @inbounds for l = param_eachindex(P)
-      param_getindex(a.nzval,l)[p] = param_getindex(v,l)
-    end
+    a.nzval.data[p,:] .= v
   elseif a.rowval[p] != i
     # shift one forward from p to pend
     @check  pend+1 < Int(a.colptr[j+1])
     for k in pend:-1:p
       o = k + 1
       a.rowval[o] = a.rowval[k]
-      @inbounds for l = param_eachindex(P)
-        param_getindex(a.nzval,l)[o] = param_getindex(a.nzval,l)[k]
-      end
+      a.nzval.data[o,:] .= a.nzval.data[k,:]
     end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    @inbounds for l = param_eachindex(P)
-      param_getindex(a.nzval,l)[p] = param_getindex(v,l)
-    end
+    a.nzval.data[p,:] .= v
   else
     # update existing entry
-    @inbounds for l = param_eachindex(P)
-      param_getindex(a.nzval,l)[p] += param_getindex(v,l)
-    end
+    a.nzval.data[p,:] .+= v
   end
   nothing
 end
@@ -264,9 +230,7 @@ function Algebra.create_from_nz(a::ParamInserterCSC{Tv,Ti,P}) where {Tv,Ti,P}
     pini = Int(a.colptr[j])
     pend = pini + Int(a.colnnz[j]) - 1
     for p in pini:pend
-      @inbounds for l = param_eachindex(P)
-        param_getindex(a.nzval,l)[k] = param_getindex(a.nzval,l)[p]
-      end
+      a.nzval.data[k,:] .= a.nzval.data[p,:]
       a.rowval[k] = a.rowval[p]
       k += 1
     end

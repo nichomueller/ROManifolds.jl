@@ -111,11 +111,5 @@ for T in (:ParamReindex,:PosNegParamReindex)
       end
       array
     end
-
-    # function Arrays.evaluate(k::$T,j::Integer)
-    #   cache = return_cache(k,j)
-    #   array = evaluate!(cache,k,j)
-    #   ParamArray(array)
-    # end
   end
 end

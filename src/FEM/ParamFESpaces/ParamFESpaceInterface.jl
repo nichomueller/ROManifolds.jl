@@ -149,7 +149,7 @@ struct FESpaceToParamFESpace{S,L} <: SingleFieldParamFESpace
   FESpaceToParamFESpace(space::S,::Val{L}) where {S,L} = new{S,L}(space)
 end
 
-FESpaceToParamFESpace(f::SingleFieldFESpace,L::Integer) = FESpaceToParamFESpace(f,Val(L))
+FESpaceToParamFESpace(f::SingleFieldFESpace,L::Integer) = FESpaceToParamFESpace(f,Val{L}())
 FESpaceToParamFESpace(f::SingleFieldParamFESpace,L::Integer) = f
 
 FESpaces.ConstraintStyle(::Type{<:FESpaceToParamFESpace{S}}) where S = ConstraintStyle(S)

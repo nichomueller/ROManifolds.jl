@@ -66,7 +66,7 @@ function Arrays.evaluate!(c,f::ParamFieldGradient{N,<:GenericParamField},x::Poin
   evaluate!(c,ParamFieldGradient{N}(f.object.object),x)
 end
 
-Arrays.return_cache(f::ParamFieldGradient{N,<:Function},x::Point) where N = gradient(f.object,Val(N))
+Arrays.return_cache(f::ParamFieldGradient{N,<:Function},x::Point) where N = gradient(f.object,Val{N}())
 Arrays.evaluate!(c,f::ParamFieldGradient{N,<:Function},x::Point) where N = c(x)
 
 struct OperationParamField{O,F} <: ParamField

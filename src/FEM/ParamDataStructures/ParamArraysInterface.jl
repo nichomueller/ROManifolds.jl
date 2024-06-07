@@ -71,17 +71,20 @@ function LinearAlgebra.mul!(
 
   @check param_length(C) == param_length(A) == param_length(B)
   @inbounds for i in param_eachindex(C)
-    mul!(param_getindex(C,i),param_getindex(A,i),param_getindex(B,i),α,β)
+    ci = param_view(C,i)
+    ai = param_view(A,i)
+    bi = param_view(B,i)
+    mul!(ci,ai,bi,α,β)
   end
   return C
 end
 
-function (\)(A::AbstractParamMatrix{T},B::AbstractParamVector{S}) where {T,S}
-  TS = LinearAlgebra.promote_op(LinearAlgebra.matprod,T,S)
+function (\)(A::AbstractParamMatrix,B::AbstractParamVector)
+  TS = LinearAlgebra.promote_op(LinearAlgebra.matprod,eltype(A),eltype(B))
   C = similar(B,TS,axes(A,1))
   @inbounds for i in param_eachindex(C)
-    Ci = param_getindex(C,i)
-    Ci .= param_getindex(A,i)\param_getindex(B,i)
+    ci = param_view(C,i)
+    ci .= param_getindex(A,i)\param_getindex(B,i)
   end
   return C
 end
@@ -96,7 +99,8 @@ for factorization in (:LU,:Cholesky)
   @eval begin
     function LinearAlgebra.ldiv!(a::$factorization,B::AbstractParamArray)
       @inbounds for i in param_eachindex(B)
-        ldiv!(a,param_getindex(B,i))
+        bi = param_view(B,i)
+        ldiv!(a,bi)
       end
       return B
     end
@@ -106,7 +110,9 @@ end
 function LinearAlgebra.ldiv!(A::AbstractParamArray,b::Factorization,C::AbstractParamArray)
   @check param_length(A) == param_length(C)
   @inbounds for i in param_eachindex(A)
-    ldiv!(param_getindex(A,i),b,param_getindex(C,i))
+    ai = param_view(A,i)
+    ci = param_view(C,i)
+    ldiv!(ai,b,ci)
   end
   return A
 end
@@ -114,7 +120,10 @@ end
 function LinearAlgebra.ldiv!(A::AbstractParamArray,B::ParamContainer,C::AbstractParamArray)
   @check param_length(A) == param_length(B) == length(C)
   @inbounds for i in param_eachindex(A)
-    ldiv!(param_getindex(A,i),param_getindex(B,i),param_getindex(C,i))
+    ai = param_view(A,i)
+    bi = param_view(B,i)
+    ci = param_view(C,i)
+    ldiv!(ai,bi,ci)
   end
   return A
 end
@@ -126,7 +135,9 @@ end
 function LinearAlgebra.lu!(A::AbstractParamArray,B::AbstractParamArray)
   @check param_length(A) == param_length(B)
   @inbounds for i in param_eachindex(A)
-    lu!(param_getindex(A,i),param_getindex(B,i))
+    ai = param_view(A,i)
+    bi = param_view(B,i)
+    lu!(ai,bi)
   end
   return A
 end
