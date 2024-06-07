@@ -20,7 +20,7 @@ end
     if j>0
       for (li,i) in enumerate(is)
         if i>0
-          vij = ParamContainer(map(x->x[li,lj],param_data(vs)))
+          vij = param_view(vs,li,lj)
           add_entry!(combine,A,vij,i,j)
         end
       end
@@ -50,7 +50,7 @@ end
   combine::Function,A,vs::AbstractParamContainer,is)
   for (li,i) in enumerate(is)
     if i>0
-      vi = ParamContainer(map(x->x[li],param_data(vs)))
+      vi = param_view(vs,li)
       add_entry!(combine,A,vi,i)
     end
   end

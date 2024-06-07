@@ -48,6 +48,12 @@ for f in (:(Base.maximum),:(Base.minimum))
   end
 end
 
+function Base.transpose(A::AbstractParamArray)
+  param_array(param_data(A)) do v
+    transpose(v)
+  end
+end
+
 for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
   @eval begin
     function $f(A::AbstractParamArray,z)
@@ -156,11 +162,12 @@ function param_return_cache(f::Union{Function,Map},A::Union{AbstractArray,Field}
   @inbounds for i in param_eachindex(first(pA))
     cache[i] = return_cache(f,param_getindex.(pA,i)...)
   end
-  return cache,pA,data
+  return cache,data
 end
 
-function param_evaluate!(B,f::Union{Function,Map},A::Union{AbstractArray,Field}...)
-  cache,pA,data = B
+function param_evaluate!(C,f::Union{Function,Map},A::Union{AbstractArray,Field}...)
+  cache,data = C
+  pA = _to_param_quantities(A...)
   @inbounds for i in param_eachindex(data)
     vi = evaluate!(cache[i],f,param_getindex.(pA,i)...)
     param_setindex!(data,vi,i)

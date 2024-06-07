@@ -45,7 +45,7 @@ Base.@propagate_inbounds function diagonal_getindex(
   A::ArrayOfArrays{T,N},
   iblock::Integer) where {T,N}
 
-  view(A.data,ArraysOfArrays._ncolons(Val(N))...,iblock)
+  getindex(A.data,ArraysOfArrays._ncolons(Val(N))...,iblock)
 end
 
 Base.@propagate_inbounds function diagonal_getindex(
@@ -53,7 +53,7 @@ Base.@propagate_inbounds function diagonal_getindex(
   A::ArrayOfArrays{T,N},
   iblock::Integer) where {T,N}
 
-  view(fill(zero(T),size(A.data)),ArraysOfArrays._ncolons(Val(N))...,1)
+  fill(zero(T),innersize(A))
 end
 
 Base.@propagate_inbounds function Base.setindex!(A::ArrayOfArrays{T,N},v,i::Vararg{Integer,N}) where {T,N}
