@@ -1,42 +1,70 @@
 struct ArrayOfTrivialArrays{T,N,L,P<:AbstractArray{T,N}} <: ParamArray{T,N,L}
   data::P
-  outersize::NTuple{N,Int}
-  function ArrayOfTrivialArrays(data::P,outersize::NTuple{N,Int}) where {T<:Number,N,P<:AbstractArray{T,N}}
-    @check all(outersize.==first(outersize))
-    L = first(outersize)
-    new{T,N,L,P}(data,outersize)
+  plength::Int
+  function ArrayOfTrivialArrays(data::P,plength::Int) where {T<:Number,N,P<:AbstractArray{T,N}}
+    new{T,N,plength,P}(data,plength)
   end
 end
 
-function ArrayOfTrivialArrays(A::AbstractArray{<:Number,N},plength::Int=1) where N
-  ArrayOfTrivialArrays(A,ntuple(_ -> plength,Val(N)))
+function ArrayOfTrivialArrays(A::AbstractArray{<:Number,N}) where N
+  plength = 1
+  ArrayOfTrivialArrays(A,plength)
 end
 
 function ArrayOfTrivialArrays(A::AbstractParamArray,args...)
   A
 end
 
-Base.size(A::ArrayOfTrivialArrays) = A.outersize
+Base.size(A::ArrayOfTrivialArrays{T,N}) where {T,N} = ntuple(_ -> A.plength,Val(N))
 
 @inline function ArraysOfArrays.innersize(A::ArrayOfTrivialArrays)
   size(A.data)
 end
 
+all_data(A::ArrayOfTrivialArrays) = A.data
 param_data(A::ArrayOfTrivialArrays) = fill(A.data,param_length(A))
-param_getindex(a::ArrayOfTrivialArrays,i::Integer...) = getindex(a,i...)
+param_getindex(A::ArrayOfTrivialArrays,i::Integer...) = getindex(A,i...)
+param_setindex!(A::ArrayOfTrivialArrays,v,i::Integer...) = diagonal_setindex!(Val(true),A,v,i...)
+param_view(A::ArrayOfTrivialArrays,i::Integer...) = VectorOfScalars(fill(A.data[i...],A.plength))
 
 Base.@propagate_inbounds function Base.getindex(A::ArrayOfTrivialArrays{T,N},i::Integer...) where {T,N}
   @boundscheck checkbounds(A,i...)
+  iblock = first(i)
+  diagonal_getindex(Val(all(i.==iblock)),A,iblock)
+end
+
+Base.@propagate_inbounds function diagonal_getindex(
+  ::Val{true},
+  A::ArrayOfTrivialArrays{T,N},
+  iblock::Integer) where {T,N}
+
   view(A.data,ArraysOfArrays._ncolons(Val(N))...)
+end
+
+Base.@propagate_inbounds function diagonal_getindex(
+  ::Val{false},
+  A::ArrayOfTrivialArrays{T,N},
+  iblock::Integer) where {T,N}
+
+  view(fill(zero(T),size(A.data)),ArraysOfArrays._ncolons(Val(N))...)
 end
 
 Base.@propagate_inbounds function Base.setindex!(A::ArrayOfTrivialArrays,v,i::Integer...)
   @boundscheck checkbounds(A,i...)
-  setindex!(A.data,v,i...)
+  iblock = first(i)
+  all(i.==iblock) && diagonal_setindex!(Val(true),A,v,iblock)
+end
+
+Base.@propagate_inbounds function diagonal_setindex!(
+  ::Val{true},
+  A::ArrayOfTrivialArrays{T,N},
+  v,iblock::Integer) where {T,N}
+
+  setindex!(A.data,v,ArraysOfArrays._ncolons(Val(N))...)
 end
 
 function Base.similar(A::ArrayOfTrivialArrays{T,N},::Type{<:AbstractArray{T′}}) where {T,T′,N}
-  ArrayOfTrivialArrays(similar(A.data,T′),A.outersize)
+  ArrayOfTrivialArrays(similar(A.data,T′),A.plength)
 end
 
 function Base.similar(A::ArrayOfTrivialArrays{T,N},::Type{<:AbstractArray{T′}},dims::Dims{1}) where {T,T′,N}
@@ -50,5 +78,5 @@ function Base.copyto!(A::ArrayOfTrivialArrays,B::ArrayOfTrivialArrays)
 end
 
 function Base.zero(A::ArrayOfTrivialArrays)
-  ArrayOfTrivialArrays(zero(A.data),A.outersize)
+  ArrayOfTrivialArrays(zero(A.data),A.plength)
 end

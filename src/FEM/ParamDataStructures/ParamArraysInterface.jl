@@ -20,8 +20,6 @@ end
 _to_param_quantity(A::AbstractParamArray,plength::Integer) = A
 _to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
 
-all_data(A::AbstractParamArray) = A.data
-
 Base.:(==)(A::AbstractParamArray,B::AbstractParamArray) = (all_data(A) == all_data(B))
 Base.:(≈)(A::AbstractParamArray,B::AbstractParamArray) = (all_data(A) ≈ all_data(B))
 
@@ -164,7 +162,8 @@ end
 function param_evaluate!(B,f::Union{Function,Map},A::Union{AbstractArray,Field}...)
   cache,pA,data = B
   @inbounds for i in param_eachindex(data)
-    data[i] = evaluate!(cache[i],f,param_getindex.(pA,i)...)
+    vi = evaluate!(cache[i],f,param_getindex.(pA,i)...)
+    param_setindex!(data,vi,i)
   end
   data
 end

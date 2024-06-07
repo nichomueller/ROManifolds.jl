@@ -28,8 +28,11 @@ Base.size(A::ArrayOfArrays{T,N}) where {T,N} = ntuple(_->param_length(A),Val(N))
   ArraysOfArrays.front_tuple(size(A.data),Val(N))
 end
 
+all_data(A::ArrayOfArrays) = A.data
 param_data(A::ArrayOfArrays{T,N}) where {T,N} = eachslice(A.data,dims=N+1)
 param_getindex(A::ArrayOfArrays,i::Integer) = diagonal_getindex(Val(true),A,i)
+param_setindex!(A::ArrayOfArrays,v,i::Integer) = diagonal_setindex!(Val(true),A,v,i)
+param_view(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N} = VectorOfScalars(A.data[i...,:])
 
 Base.@propagate_inbounds function Base.getindex(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
@@ -50,7 +53,7 @@ Base.@propagate_inbounds function diagonal_getindex(
   A::ArrayOfArrays{T,N},
   iblock::Integer) where {T,N}
 
-  zeros(T,innersize(A))
+  view(fill(zero(T),size(A.data)),ArraysOfArrays._ncolons(Val(N))...,1)
 end
 
 Base.@propagate_inbounds function Base.setindex!(A::ArrayOfArrays{T,N},v,i::Vararg{Integer,N}) where {T,N}
@@ -67,8 +70,30 @@ Base.@propagate_inbounds function diagonal_setindex!(
   setindex!(A.data,v,ArraysOfArrays._ncolons(Val(N))...,iblock)
 end
 
-Base.@propagate_inbounds function diagonal_setindex!(::Val{false},A::ArrayOfArrays,v,iblock::Integer)
+Base.@propagate_inbounds function diagonal_setindex!(::Val{false},A,v,iblock::Integer)
   @notimplemented
+end
+
+function Arrays.array_cache(A::ArrayOfArrays{T,N}) where {T,N}
+  r = Array{T,N}(undef,innersize(A))
+  CachedArray(r)
+end
+
+function Arrays.getindex!(cache,A::ArrayOfArrays{T,N},i::Vararg{Int,N}) where {T,N}
+  iblock = first(i)
+  diagonal_getindex!(Val(all(i.==iblock)),cache,A,iblock)
+end
+
+function diagonal_getindex!(::Val{true},cache,A::ArrayOfArrays{T,N},iblock::Integer) where {T,N}
+  r = cache.array
+  r .= A.data[ArraysOfArrays._ncolons(Val(N))...,iblock]
+  r
+end
+
+function diagonal_getindex!(::Val{false},cache,A::ArrayOfArrays{T,N},iblock::Integer) where {T,N}
+  r = cache.array
+  fill!(r,zero(T))
+  r
 end
 
 function Base.similar(A::ArrayOfArrays{T,N},::Type{<:AbstractArray{T′}}) where {T,T′,N}

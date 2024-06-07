@@ -25,7 +25,6 @@ params = [1],[2],[3]
 f(x,μ) = sum(μ)
 f(μ) = x -> f(x,μ)
 fμ(μ) = 𝑓ₚ(f,μ)
-b(x) = x[2]
 biform(u,v) = fμ(μ)*∇(v)⊙∇(u)
 liform(v) = fμ(μ)*v⊙b
 biform1(u,v) = fμ(μ)*v*u
@@ -245,6 +244,37 @@ a = ∫(fμfμ*u*v)*dΩ + ∫(fμfμ*u*v)*dΓ + ∫(fμfμ*∇(u)⋅∇(v))*dΩ
 bb = ∫(u*v)*dΩ + ∫(u*v)*dΓ + ∫(∇(u)⋅∇(v))*dΩ
 @test 2*sum(bb) == sum(a)[1]
 
+
+##################
+a = (∫(fμfμ*u*v)*dΩ + ∫(fμfμ*∇(u)⋅∇(v))*dΩ)[Ω] #+ ∫(fμfμ*u*v)*dΓ)#[Γ]
+b = (∫(f([1])*u*v)*dΩ + ∫(f([1])*∇(u)⋅∇(v))*dΩ)[Ω] #+ ∫(f([1])*u*v)*dΓ)#[Γ]
+x = get_cell_points(Ω)
+
+for (ai,bi) in zip(a,b)
+  @test param_getindex(ai,1) == bi
+end
+
+# cx = (fμfμ*u*v)(x)
+f1 = fμfμ*u
+ax1 = map(i->i(x),f1.args)
+cache1 = return_cache(Fields.BroadcastingFieldOpMap(f1.op.op),ax1)
+ax11 = first.(ax1)
+cache1 = return_cache(Fields.BroadcastingFieldOpMap(f1.op.op),ax11...)
+# res1 = evaluate!(cache1,Fields.BroadcastingFieldOpMap(f1.op.op),ax11...)
+
+f11 = Fields.BroadcastingFieldOpMap(f1.op.op)
+cache,pA,data = cache1
+@inbounds for i in param_eachindex(data)
+  data[i] = evaluate!(cache[i],f11,param_getindex.(pA,i)...)
+end
+data
+
+# dx = (u*v)(x)
+f2 = f([1])*u
+ax2 = map(i->i(x),f2.args)
+ax21 = first.(ax2)
+cache2 = return_cache(Fields.BroadcastingFieldOpMap(f2.op.op),ax21...)
+evaluate!(cache2,Fields.BroadcastingFieldOpMap(f2.op.op),ax21...)
 #################
 boh = sum(a[Ω])
 bohok = sum(bb[Ω])
@@ -331,3 +361,133 @@ quad = Quadrature(duffy,2,T=Float32)
 dΩ = Measure(Ω,quad)
 s = ∫(fμ₀)dΩ
 @test all(sum(s) .≈ 1)
+
+
+cachea = array_cache(a)
+r = zero(testitem(a))
+for i in eachindex(a)
+  ai = getindex!(cachea,a,i)
+  r += ai
+end
+
+cacheb = array_cache(b)
+_r = zero(testitem(b))
+for i in eachindex(b)
+  bi = getindex!(cacheb,b,i)
+  _r += bi
+end
+
+for i = eachindex(a)
+  @test getindex!(cachea,a,i)[1] == getindex!(cacheb,b,i)
+end
+
+i = (2,)
+_cache1, index_and_item1 = cachea
+index1 = LinearIndices(a)[i...]
+# index_and_item.index != index
+cg1, cgi1, cf1 = _cache1
+gi1 = getindex!(cg1, a.maps, i...)
+index_and_item1.item = Arrays._getindex_and_call!(cgi1,gi1,cf1,a.args,i...)
+index_and_item1.index = index1
+
+f11 = getindex!(cf1[1],a.args[1],i...)
+f21 = getindex!(cf1[2],a.args[2],i...)
+
+_cache11, index_and_item11 = cf1[2]
+index11 = LinearIndices(a.args[2])[i...]
+# index_and_item.index != index
+cg11, cgi11, cf11 = _cache11
+gi11 = getindex!(cg1, a.args[2].maps, i...)
+index_and_item11.item = Arrays._getindex_and_call!(cgi11,gi11,cf11,a.args[2].args,i...)
+
+f1 = getindex!(cf11[1],a.args[2].args[1],i...)
+f2 = getindex!(cf11[2],a.args[2].args[2],i...)
+f3 = getindex!(cf11[3],a.args[2].args[3],i...)
+evaluate!(cgi11,gi11,f1,f2,f3)
+
+
+_cache2, index_and_item2 = cacheb
+index2 = LinearIndices(b)[i...]
+# index_and_item.index != index
+cg2, cgi2, cf2 = _cache2
+gi2 = getindex!(cg2, b.maps, i...)
+index_and_item2.item = Arrays._getindex_and_call!(cgi2,gi2,cf2,b.args,i...)
+index_and_item2.index = index2
+
+g11 = getindex!(cf2[1],b.args[1],i...)
+g21 = getindex!(cf2[2],b.args[2],i...)
+
+_cache22, index_and_item22 = cf2[2]
+index22 = LinearIndices(b.args[2])[i...]
+# index_and_item.index != index
+cg22, cgi22, cf22 = _cache22
+gi22 = getindex!(cg22, b.args[2].maps, i...)
+index_and_item22.item = Arrays._getindex_and_call!(cgi22,gi22,cf22,b.args[2].args,i...)
+
+h1 = getindex!(cf22[1],b.args[2].args[1],i...)
+h2 = getindex!(cf22[2],b.args[2].args[2],i...)
+h3 = getindex!(cf22[3],b.args[2].args[3],i...)
+evaluate!(cgi22,gi22,h1,h2,h3)
+
+for (ai,bi) in zip(a.args[2],b.args[2])
+  @test ai[1] == bi
+end
+
+###########
+# f1 = getindex!(cf11[1],f1.args[2].args[1],i...)
+_cache, index_and_item = cf11[1]
+index = LinearIndices(a.args[2].args[1])[i...]
+cg, cgi, cf = _cache
+gi = getindex!(cg, a.args[2].args[1].maps, i...)
+index_and_item.item = Arrays._getindex_and_call!(cgi,gi,cf,a.args[2].args[1].args,i...)
+
+f1 = getindex!(cf[1],a.args[2].args[1].args[1],i...)
+f2 = getindex!(cf[2],a.args[2].args[1].args[2],i...)
+
+# h1 = getindex!(cf22[1],b.args[2].args[1],i...)
+_cache2, index_and_item2 = cf22[1]
+index2 = LinearIndices(b.args[2].args[1])[i...]
+cg2, cgi2, cf2 = _cache2
+gi2 = getindex!(cg2, b.args[2].args[1].maps, i...)
+index_and_item2.item = Arrays._getindex_and_call!(cgi2,gi2,cf2,b.args[2].args[1].args,i...)
+
+g1 = getindex!(cf2[1],b.args[2].args[1].args[1],i...)
+g2 = getindex!(cf2[2],b.args[2].args[1].args[2],i...)
+
+
+################################################################################
+# function Arrays.getindex!(C,A::ParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
+#   iblock = first(i)
+#   diagonal_getindex!(Val(all(i.==iblock)),C,A,iblock)
+# end
+
+# function diagonal_getindex!(
+#   ::Val{true},
+#   cache,
+#   A::ArrayOfArrays{T,N},
+#   iblock::Integer) where {T,N}
+
+#   view(A.data,ArraysOfArrays._ncolons(Val(N))...,iblock)
+# end
+
+mats = [rand(3,3),rand(3,3)]
+A = ParamArray(mats)
+B = mats[1]
+
+a = lazy_map(identity,A)
+sum(a)
+
+cache = array_cache(a)
+r = zero(testitem(a))
+for i in eachindex(a)
+  println(i)
+  ai = getindex!(cache,a,i)
+  r += ai
+end
+
+i = 2
+_cache, index_and_item = cache
+index = LinearIndices(a)[i]
+cg, cgi, cf = _cache
+gi = getindex!(cg, a.maps, i)
+index_and_item.item = Arrays._getindex_and_call!(cgi,gi,cf,a.args,i)

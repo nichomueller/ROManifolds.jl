@@ -45,7 +45,10 @@ Base.size(A::MatrixOfSparseMatricesCSC) = (param_length(A),param_length(A))
   (A.m,A.n)
 end
 
-param_getindex(a::MatrixOfSparseMatricesCSC,i::Integer) = diagonal_getindex(Val(true),a,i)
+all_data(A::MatrixOfSparseMatricesCSC) = A.data
+param_getindex(A::MatrixOfSparseMatricesCSC,i::Integer) = diagonal_getindex(Val(true),A,i)
+param_setindex!(A::MatrixOfSparseMatricesCSC,v,i::Integer) = diagonal_setindex!(Val(true),A,v,i)
+param_view(A::MatrixOfSparseMatricesCSC,i::Integer...) = VectorOfScalars(A.data[i...,:])
 
 Base.@propagate_inbounds function Base.getindex(A::MatrixOfSparseMatricesCSC,i::Vararg{Integer,2})
   @boundscheck checkbounds(A,i...)
