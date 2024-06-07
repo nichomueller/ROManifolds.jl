@@ -18,6 +18,7 @@ using GridapSolvers.MultilevelTools
 using Mabla.FEM.ParamDataStructures
 
 import UnPack: @unpack
+import ArraysOfArrays: innersize
 import PartitionedArrays: tuple_of_arrays
 
 export ParamCounter

@@ -215,7 +215,7 @@ end
 function Arrays.evaluate!(cache,f::Broadcasting{typeof(∇)},a::BroadcastOpParamFieldArray)
   cx,array = cache
   @inbounds for i = param_eachindex(array)
-    array[i] = evaluate!(param_getindex(cx,i),f,param_getindex(a,i))
+    array[i] = evaluate!(cx[i],f,param_getindex(a,i))
   end
   array
 end

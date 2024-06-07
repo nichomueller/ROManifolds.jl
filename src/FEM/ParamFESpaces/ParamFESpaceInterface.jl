@@ -42,6 +42,28 @@ FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldParamFESpace,fv,dv) = s
 
 get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(f.space)
 
+# These functions allow us to use global ParamArrays
+
+function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
+  V = get_vector_type(f.space)
+  N = length_free_values(f)
+  typeof(array_of_similar_arrays(V(),N))
+end
+
+function FESpaces.zero_free_values(f::SingleFieldParamFESpace)
+  V = get_vector_type(f)
+  free_values = allocate_vector(V,get_free_dof_ids(f))
+  fill!(free_values,zero(ParamAlgebra.eltype2(V)))
+  return free_values
+end
+
+function FESpaces.zero_dirichlet_values(f::SingleFieldParamFESpace)
+  V = get_vector_type(f)
+  dir_values = allocate_vector(V,num_dirichlet_dofs(f))
+  fill!(dir_values,zero(eltype(V)))
+  return dir_values
+end
+
 function FESpaces.gather_free_and_dirichlet_values!(
   free_vals,
   dirichlet_vals,
@@ -96,8 +118,8 @@ function FESpaces._fill_dirichlet_values_for_tag!(
 
   @check param_length(dirichlet_values) == param_length(dv)
   @inbounds for i = param_eachindex(dirichlet_values)
-    dirichlet_values_i = param_getindex(dirichlet_values,i)
-    dv_i = param_getindex(dv,i)
+    dirichlet_values_i = param_view(dirichlet_values,i)
+    dv_i = param_view(dv,i)
     FESpaces._fill_dirichlet_values_for_tag!(dirichlet_values_i,dv_i,tag,dirichlet_dof_to_tag)
   end
 end
@@ -113,8 +135,8 @@ function FESpaces._free_and_dirichlet_values_fill!(
 
   @check param_length(free_vals) == param_length(dirichlet_vals)
   @inbounds for i = param_eachindex(free_vals)
-    free_vals_i = param_getindex(free_vals,i)
-    dirichlet_vals_i = param_getindex(dirichlet_vals,i)
+    free_vals_i = param_view(free_vals,i)
+    dirichlet_vals_i = param_view(dirichlet_vals,i)
     FESpaces._free_and_dirichlet_values_fill!(
       free_vals_i,
       dirichlet_vals_i,
@@ -124,21 +146,6 @@ function FESpaces._free_and_dirichlet_values_fill!(
       cell_dofs,
       cells)
   end
-end
-
-function FESpaces.FEFunction(
-  fs::SingleFieldParamFESpace,free_values::AbstractParamVector,dirichlet_values::AbstractParamVector)
-  cell_vals = scatter_free_and_dirichlet_values(fs,free_values,dirichlet_values)
-  cell_field = CellField(fs,cell_vals)
-  SingleFieldParamFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
-end
-
-# This function allows us to use global ParamArrays
-
-function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
-  V = get_vector_type(f.space)
-  N = length_free_values(f)
-  typeof(array_of_similar_arrays(V(),N))
 end
 
 # This artifact aims to make a FESpace behave like a ParamFESpace with free and
@@ -167,8 +174,8 @@ function FESpaces.FEFunction(
   dv = similar(dirichlet_values)
   @check param_length(fv) == param_length(dv)
   @inbounds for i = param_eachindex(fv)
-    fv_i = param_getindex(fv,i)
-    dv_i = param_getindex(dv,i)
+    fv_i = param_view(fv,i)
+    dv_i = param_view(dv,i)
     c = FESpaces._compute_new_fixedval(
       fv_i,dv_i,zf.vol_i,zf.vol,zf.space.dof_to_fix)
     fv_i .+= c
@@ -216,8 +223,8 @@ function FESpaces.scatter_free_and_dirichlet_values(
   dv = similar(dirichlet_values)
   @check param_length(fv) == param_length(dv)
   @inbounds for i = param_eachindex(fv)
-    fv_i = param_getindex(fv,i)
-    dv_i = param_getindex(dv,i)
+    fv_i = param_view(fv,i)
+    dv_i = param_view(dv,i)
     fv_i .= FESpaces.VectorWithEntryInserted(fv_i,ff.dof_to_fix,dv_i[1])
     dv_i .= similar(dv_i,eltype(dv_i),0)
   end

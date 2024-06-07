@@ -72,8 +72,8 @@ function LinearAlgebra.mul!(
   @check param_length(C) == param_length(A) == param_length(B)
   @inbounds for i in param_eachindex(C)
     ci = param_view(C,i)
-    ai = param_view(A,i)
-    bi = param_view(B,i)
+    ai = param_getindex(A,i)
+    bi = param_getindex(B,i)
     mul!(ci,ai,bi,α,β)
   end
   return C
@@ -121,7 +121,7 @@ function LinearAlgebra.ldiv!(A::AbstractParamArray,B::ParamContainer,C::Abstract
   @check param_length(A) == param_length(B) == length(C)
   @inbounds for i in param_eachindex(A)
     ai = param_view(A,i)
-    bi = param_view(B,i)
+    bi = param_getindex(B,i)
     ci = param_view(C,i)
     ldiv!(ai,bi,ci)
   end
@@ -152,7 +152,7 @@ end
 
 function Arrays.setsize!(A::AbstractParamArray{T,N},s::NTuple{N,Integer}) where {T,N}
   @inbounds for i in param_eachindex(A)
-    setsize!(param_getindex(A,i),s)
+    setsize!(param_view(A,i),s)
   end
   return A
 end
@@ -423,7 +423,7 @@ end
 function Fields._setsize_as!(A::AbstractParamArray,B::AbstractParamArray)
   @check param_length(A) == param_length(B)
   @inbounds for i in param_eachindex(A)
-    Fields._setsize_as!(param_getindex(A,i),param_getindex(B,i))
+    Fields._setsize_as!(param_view(A,i),param_getindex(B,i))
   end
   A
 end
@@ -431,7 +431,7 @@ end
 function Fields._setsize_mul!(C::AbstractParamArray,A::AbstractParamArray,B::AbstractParamArray)
   @check param_length(A) == param_length(B)
   @inbounds for i = eachindex(C)
-    Fields._setsize_mul!(param_getindex(C,i),param_getindex(A,i),param_getindex(B,i))
+    Fields._setsize_mul!(param_view(C,i),param_getindex(A,i),param_getindex(B,i))
   end
 end
 

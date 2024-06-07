@@ -1,11 +1,23 @@
+eltype2(x) = eltype(eltype(x))#(eltype∘eltype)(x)
+
 function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamContainer
-  vector = zeros(eltype(V),n)
+  vector = zeros(eltype2(V),n)
   array_of_similar_arrays(vector,param_length(V))
+end
+
+function Algebra.allocate_in_range(::Type{V},matrix) where V<:AbstractParamContainer
+  rows = Base.OneTo(innersize(matrix,1))
+  allocate_vector(V,rows)
 end
 
 function Algebra.allocate_in_range(matrix::AbstractParamMatrix)
   V = VectorOfVectors{T,L}
   allocate_in_range(V,matrix)
+end
+
+function Algebra.allocate_in_domain(::Type{V},matrix) where V<:AbstractParamContainer
+  cols = Base.OneTo(innersize(matrix,2))
+  allocate_vector(V,cols)
 end
 
 function Algebra.allocate_in_domain(matrix::AbstractParamMatrix)
@@ -40,6 +52,11 @@ end
   A
 end
 
+@inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::Number,i)
+  V = ParamNumber(fill(v,param_length(A)))
+  add_entry!(combine,A,V,i)
+end
+
 @inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::ParamNumber,i)
   Ai = A.data[i,:]
   @inbounds A.data[i,:] .= combine(Ai,v)
@@ -48,6 +65,11 @@ end
 
 function Algebra.is_entry_stored(::Type{T},i,j) where T<:AbstractParamMatrix
   is_entry_stored(eltype(T),i,j)
+end
+
+@inline function Algebra.add_entry!(combine::Function,A::AbstractParamMatrix,v::Number,i,j)
+  V = ParamNumber(fill(v,param_length(A)))
+  add_entry!(combine,A,V,i,j)
 end
 
 @inline function Algebra.add_entry!(combine::Function,A::AbstractParamMatrix,v::ParamNumber,i,j)
@@ -196,7 +218,7 @@ Algebra.LoopStyle(::Type{<:ParamInserterCSC}) = Loop()
 end
 
 @noinline function Algebra.add_entry!(
-  ::typeof(+),a::ParamInserterCSC{Tv,Ti,P},v::ParamNumber,i,j) where {Tv,Ti,P}
+  ::typeof(+),a::ParamInserterCSC{Tv,Ti,P},v::Union{ParamNumber,Number},i,j) where {Tv,Ti,P}
   pini = Int(a.colptr[j])
   pend = pini + Int(a.colnnz[j]) - 1
   p = searchsortedfirst(a.rowval,i,pini,pend,Base.Order.Forward)

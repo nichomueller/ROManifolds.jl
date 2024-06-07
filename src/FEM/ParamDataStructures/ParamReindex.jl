@@ -14,8 +14,8 @@ function param_length(k::PosNegParamReindex)
   param_length(k.values_pos)
 end
 
-param_data(k::PosNegParamReindex) = PosNegParamReindex(param_data.(k.values_pos),param_data.(k.values_neg))
-param_getindex(k::PosNegParamReindex,i::Integer) = PosNegParamReindex(param_getindex(k.values_pos,i),param_getindex(k.values_neg,i))
+param_data(k::PosNegParamReindex) = PosNegReindex(param_data.(k.values_pos),param_data.(k.values_neg))
+param_getindex(k::PosNegParamReindex,i::Integer) = PosNegReindex(param_getindex(k.values_pos,i),param_getindex(k.values_neg,i))
 
 Arrays.testitem(k::PosNegParamReindex) = param_getindex(k,1)
 Arrays.testargs(k::PosNegParamReindex,i...) = testargs(testitem(k),i...)

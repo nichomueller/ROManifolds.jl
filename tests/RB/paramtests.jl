@@ -15,142 +15,97 @@ using Mabla.FEM.ParamDataStructures
 using Mabla.FEM.ParamAlgebra
 using Mabla.FEM.ParamFESpaces
 
-domain =(0,1,0,1)
-partition = (2,2)
+# using Test
+# using Gridap.Arrays
+# using Gridap.Algebra
+# using Gridap.TensorValues
+# using Gridap.ReferenceFEs
+# using Gridap.Geometry
+# using Gridap.Fields
+# using Gridap.FESpaces
+# using Gridap.CellData
+# using Mabla.FEM
+
+domain =(0,1,0,1,0,1)
+partition = (3,3,3)
 model = CartesianDiscreteModel(domain,partition)
+trian = get_triangulation(model)
+order = 2
+degree = 4
+quad = CellQuadrature(trian,degree)
 
-params = [1],[2],[3]
 μ = ParamRealization([[1],[2],[3]])
-μ₀ = ParamRealization([[0],[0],[0]])
-f(x,μ) = sum(μ)
+f(x,μ) = sum(μ)*x[1]
 f(μ) = x -> f(x,μ)
-fμ(μ) = 𝑓ₚ(f,μ)
-b(x) = x[2]
-biform(u,v) = fμ(μ)*∇(v)⊙∇(u)
-liform(v) = fμ(μ)*v⊙b
-biform1(u,v) = fμ(μ)*v*u
-liform1(v) = fμ(μ)*v*3
+fμ = 𝑓ₚ(f,μ)
 
-reffe = ReferenceFE(lagrangian,Float64,1)
-V = FESpace(model,reffe,dirichlet_tags=[1,2,3,4,6,5])
-U = TrialParamFESpace(V,fμ(μ₀))
+l(x) = x[2]
+liform(v) = v⊙l
+biform(u,v) = fμ*∇(v)⊙∇(u)
+
+reffe = ReferenceFE(lagrangian,Float64,order)
+V = FESpace(model,reffe,dirichlet_tags=[1,10])
+U = TrialParamFESpace(V,fμ)
 
 v = get_fe_basis(V)
 u = get_trial_fe_basis(U)
 
-degree = 2
-trian = get_triangulation(model)
-quad = CellQuadrature(trian,degree)
-
-btrian = BoundaryTriangulation(model)
-bquad = CellQuadrature(btrian,degree)
-
-b0trian = Triangulation(model,Int[])
-b0quad = CellQuadrature(b0trian,degree)
-
 cellmat = integrate(biform(u,v),quad)
 cellvec = integrate(liform(v),quad)
-cellmatvec = pair_arrays(cellmat,cellvec)
 rows = get_cell_dof_ids(V,trian)
 cols = get_cell_dof_ids(U,trian)
 cellmat_c = attach_constraints_cols(U,cellmat,trian)
 cellmat_rc = attach_constraints_rows(V,cellmat_c,trian)
 cellvec_r = attach_constraints_rows(V,cellvec,trian)
-cellmatvec_c = attach_constraints_cols(U,cellmatvec,trian)
-cellmatvec_rc = attach_constraints_rows(V,cellmatvec_c,trian)
 
-bcellmat = integrate(biform1(u,v),bquad)
-bcellvec = integrate(liform1(v),bquad)
-bcellmatvec = pair_arrays(bcellmat,bcellvec)
-brows = get_cell_dof_ids(V,btrian)
-bcols = get_cell_dof_ids(U,btrian)
-bcellmat_c = attach_constraints_cols(U,bcellmat,btrian)
-bcellmat_rc = attach_constraints_rows(V,bcellmat_c,btrian)
-bcellvec_r = attach_constraints_rows(V,bcellvec,btrian)
-bcellmatvec_c = attach_constraints_cols(U,bcellmatvec,btrian)
-bcellmatvec_rc = attach_constraints_rows(V,bcellmatvec_c,btrian)
+assem = ParamFESpaces.get_param_assembler(SparseMatrixAssembler(U,V),μ)
+matdata = ([cellmat_rc],[rows],[cols])
+vecdata = ([cellvec_r],[rows])
+A =  assemble_matrix(assem,matdata)
+b =  assemble_vector(assem,vecdata)
+x = A \ b
+x0 = zero(x)
 
-b0cellmat = integrate(biform1(u,v),b0quad)
-b0cellvec = integrate(liform1(v),b0quad)
-b0cellmatvec = pair_arrays(b0cellmat,b0cellvec)
-b0rows = get_cell_dof_ids(V,b0trian)
-b0cols = get_cell_dof_ids(U,b0trian)
-@test length(b0rows) == 0
-b0cellmat_c = attach_constraints_cols(U,b0cellmat,b0trian)
-b0cellmat_rc = attach_constraints_rows(V,b0cellmat_c,b0trian)
-b0cellvec_r = attach_constraints_rows(V,b0cellvec,b0trian)
-b0cellmatvec_c = attach_constraints_cols(U,b0cellmatvec,b0trian)
-b0cellmatvec_rc = attach_constraints_rows(V,b0cellmatvec_c,b0trian)
+op = AffineFEOperator(U,V,AffineOperator(A,b))
+solver = LinearFESolver()
+test_fe_solver(solver,op,x0,x)
+uh = solve(solver,op)
+@test get_free_dof_values(uh) ≈ x
+uh = solve(op)
+@test get_free_dof_values(uh) ≈ x
 
-term_to_cellmat = [cellmat_rc, bcellmat_rc, b0cellmat_rc]
-term_to_cellvec = [cellvec, bcellvec, b0cellvec]
-term_to_rows = [rows, brows, b0rows]
-term_to_cols = [cols, bcols, b0cols]
-term_to_cellmatvec = [ cellmatvec, bcellmatvec, b0cellmatvec ]
+# This is not supported for ParamArrays: have to use an algebraic solver
+# solver = NonlinearFESolver()
+# test_fe_solver(solver,op,x0,x)
+# uh = solve(solver,op)
+# @test get_free_dof_values(uh) ≈ x
 
-T = SparseMatrixCSC{Float64,Int}
+nls = NewtonRaphsonSolver(LUSolver(),1e-10,20)
+solver = NonlinearFESolver(nls)
+test_fe_solver(solver,op,x0,x)
 
-matvecdata = ( term_to_cellmatvec , term_to_rows, term_to_cols)
-matdata = (term_to_cellmat,term_to_rows,term_to_cols)
-vecdata = (term_to_cellvec,term_to_rows)
-data = (matvecdata,matdata,vecdata)
-
-assem = ParamFESpaces.get_param_assembler(SparseMatrixAssembler(T,Vector{Float64},U,V),μ)
-test_sparse_matrix_assembler(assem,matdata,vecdata,data)
-
-strategy = GenericAssemblyStrategy(row->row,col->col,row->true,col->true)
-
-matdata = ([cellmat],[rows],[cols])
-vecdata = ([cellvec],[rows])
-
-mat = assemble_matrix(assem,matdata)
-vec = assemble_vector(assem,vecdata)
-x = mat \ vec
+u0 = zero(U)
+# b = allocate_residual(op,u0)
+x = get_free_dof_values(u0)
+# allocate_residual(op.op,x)
+allocate_in_range(typeof(op.op.vector),op.op.matrix)
 
 
-assemble_matrix!(mat,assem,matdata)
-assemble_vector!(vec,assem,vecdata)
-x2 = mat \ vec
+# Now using algebraic solvers directly
+solver = LUSolver()
+uh = solve(solver,op)
+@test get_free_dof_values(uh) ≈ x
+uh = solve(op)
+@test get_free_dof_values(uh) ≈ x
+uh,cache = solve!(uh,solver,op)
+@test get_free_dof_values(uh) ≈ x
+uh, = solve!(uh,solver,op,cache)
 
-@test x ≈ x2
-@test param_length(x) == param_length(x2) == param_length(vec) == param_length(mat) == 3
-@test typeof(x) == typeof(x2) == typeof(vec) <: VectorOfVectors
-
-for (i,μi) = enumerate(μ)
-  μi = sum(μi)
-  @test vec[i] ≈ [0.0625, 0.125, 0.0625]*μi
-  @test mat[i][1, 1]  ≈  1.333333333333333*μi
-  @test mat[i][2, 1]  ≈ -0.33333333333333*μi
-  @test mat[i][1, 2]  ≈ -0.33333333333333*μi
-  @test mat[i][2, 2]  ≈ 2.666666666666666*μi
-  @test mat[i][3, 2]  ≈ -0.33333333333333*μi
-  @test mat[i][2, 3]  ≈ -0.33333333333333*μi
-  @test mat[i][3, 3]  ≈ 1.333333333333333*μi
-end
-
-data = (([cellmatvec],[rows],[cols]),([],[],[]),([],[]))
-mat, vec = allocate_matrix_and_vector(assem,data)
-assemble_matrix_and_vector!(mat,vec,assem,data)
-assemble_matrix_and_vector!(mat,vec,assem,data)
-
-for (i,μi) = enumerate(μ)
-  μi = sum(μi)
-  @test vec[i] ≈ [0.0625, 0.125, 0.0625]*μi
-  @test mat[i][1, 1]  ≈  1.333333333333333*μi
-  @test mat[i][2, 1]  ≈ -0.33333333333333*μi
-end
-
-x3 = mat \ vec
-@test x ≈ x3
-
-mat, vec = assemble_matrix_and_vector(assem,data)
-
-x4 = mat \ vec
-@test x ≈ x4
-
-for (i,μi) = enumerate(μ)
-  μi = sum(μi)
-  @test vec[i] ≈ [0.0625, 0.125, 0.0625]*μi
-  @test mat[i][1, 1]  ≈  1.333333333333333*μi
-  @test mat[i][2, 1]  ≈ -0.33333333333333*μi
-end
+solver = NewtonRaphsonSolver(LUSolver(),1e-10,20)
+uh = solve(solver,op)
+@test get_free_dof_values(uh) ≈ x
+uh = solve(op)
+@test get_free_dof_values(uh) ≈ x
+zh = zero(U)
+zh,cache = solve!(zh,solver,op)
+@test get_free_dof_values(zh) ≈ x
