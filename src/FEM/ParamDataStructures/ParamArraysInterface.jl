@@ -11,8 +11,8 @@ ParamArray(A::AbstractArray{<:Number},plength=1) = ArrayOfTrivialArrays(A,plengt
 
 ParamArray(A::CachedArray) = ArrayOfCachedArrays(A)
 
-function param_array(f,A::AbstractArray{<:AbstractArray})
-  ParamArray(map(f,A))
+function param_array(f,A::AbstractArray{<:AbstractArray}...)
+  ParamArray(map(f,A...))
 end
 
 function array_of_similar_arrays(a::AbstractArray{<:Number},l::Integer)
@@ -160,6 +160,11 @@ end
 
 Arrays.testitem(A::AbstractParamArray) = param_getindex(A,1)
 
+function Arrays.testvalue(::Type{<:AbstractParamArray{T,N,L}}) where {T,N,L}
+  tv = testvalue(Array{T,N})
+  array_of_similar_arrays(tv,L)
+end
+
 function Arrays.setsize!(A::AbstractParamArray{T,N},s::NTuple{N,Integer}) where {T,N}
   @inbounds for i in param_eachindex(A)
     setsize!(param_view(A,i),s)
@@ -251,8 +256,32 @@ function Arrays.return_cache(f::BroadcastingFieldOpMap,A::AbstractParamArray,B::
   param_return_cache(f,A,B...)
 end
 
-function Arrays.evaluate!(C,f::BroadcastingFieldOpMap,A::AbstractParamArray,B::Union{AbstractArray{<:Number},AbstractParamArray}...)
-  param_evaluate!(C,f,A,B...)
+function Arrays.evaluate!(c,f::BroadcastingFieldOpMap,A::AbstractParamArray,B::Union{AbstractArray{<:Number},AbstractParamArray}...)
+  param_evaluate!(c,f,A,B...)
+end
+
+function Arrays.return_value(f::BroadcastingFieldOpMap,A::AbstractArray{<:Number},B::AbstractParamArray,C::Union{AbstractArray{<:Number},AbstractParamArray}...)
+  param_return_value(f,A,B,C...)
+end
+
+function Arrays.return_cache(f::BroadcastingFieldOpMap,A::AbstractArray{<:Number},B::AbstractParamArray,C::Union{AbstractArray{<:Number},AbstractParamArray}...)
+  param_return_cache(f,A,B,C...)
+end
+
+function Arrays.evaluate!(c,f::BroadcastingFieldOpMap,A::AbstractArray{<:Number},B::AbstractParamArray,C::Union{AbstractArray{<:Number},AbstractParamArray}...)
+  param_evaluate!(c,f,A,B,C...)
+end
+
+function Arrays.return_value(f::BroadcastingFieldOpMap,A::AbstractArray{<:Number},B::AbstractArray{<:Number},C::AbstractParamArray,D::Union{AbstractArray{<:Number},AbstractParamArray}...)
+  param_return_value(f,A,B,C,D...)
+end
+
+function Arrays.return_cache(f::BroadcastingFieldOpMap,A::AbstractArray{<:Number},B::AbstractArray{<:Number},C::AbstractParamArray,D::Union{AbstractArray{<:Number},AbstractParamArray}...)
+  param_return_cache(f,A,B,C,D...)
+end
+
+function Arrays.evaluate!(c,f::BroadcastingFieldOpMap,A::AbstractArray{<:Number},B::AbstractArray{<:Number},C::AbstractParamArray,D::Union{AbstractArray{<:Number},AbstractParamArray}...)
+  param_evaluate!(c,f,A,B,C,D...)
 end
 
 for op in (:+,:-,:*)
@@ -389,40 +418,34 @@ function Arrays.evaluate!(C,f::IntegrationMap,A::AbstractParamArray,w::AbstractV
   param_evaluate!(C,f,A,w,jq)
 end
 
-function Arrays.return_cache(f::Fields.ZeroBlockMap,a::AbstractArray,B::AbstractParamArray)
-  # A = array_of_similar_arrays(a,param_length(B))
-  # CachedArray(similar(A,eltype(A),innersize(B)))
-  @warn "potentially something wrong"
-  param_return_cache(f,a,B)
+function param_similar(A::AbstractParamArray{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N}
+  a = testitem(A)
+  ad = similar(a,T′,dims)
+  array_of_similar_arrays(ad,param_length(A))
 end
 
-function Arrays.return_cache(f::Fields.ZeroBlockMap,A::AbstractParamArray,B::AbstractParamArray)
-  # @check param_length(A) == param_length(B)
-  # CachedArray(similar(A,eltype(A),innersize(B)))
-  @warn "potentially something wrong"
-  param_return_cache(f,A,B)
+for T in (:AbstractParamArray,:AbstractArray,:Nothing), S in (:AbstractParamArray,:AbstractArray)
+  (T∈(:AbstractArray,:Nothing) && S==:AbstractArray) && continue
+  @eval begin
+    function Arrays.return_cache(f::Fields.ZeroBlockMap,A::$T,B::$S)
+      pA,pB = _to_param_quantities(A,B)
+      CachedArray(param_similar(pA,eltype(pA),innersize(pB)))
+    end
+  end
 end
 
-function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,a,b::AbstractArray)
-  # _get_array(c::CachedArray) = c.array
-  # @inbounds for i = param_eachindex(C)
-  #   evaluate!(param_getindex(C,i),f,a,b)
-  # end
-  # param_array(param_data(C)) do data
-  #   _get_array(data)
-  # end
-  param_evaluate!(C,f,a,b)
+function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,A::AbstractArray,B::AbstractArray)
+  _,pA,pB = _to_param_quantities(C,A,B)
+  param_array(param_data(C),param_data(pA),param_data(pB)) do c,a,b
+    evaluate!(c,f,collect(a),collect(b))
+  end
 end
 
-function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,a,B::AbstractParamArray)
-  # _get_array(c::CachedArray) = c.array
-  # @inbounds for i = param_eachindex(C)
-  #   evaluate!(param_getindex(C,i),f,a,param_getindex(B,i))
-  # end
-  # param_array(param_data(C)) do data
-  #   _get_array(data)
-  # end
-  param_evaluate!(C,f,a,B)
+function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,a::Nothing,B::AbstractArray)
+  _,pB = _to_param_quantities(C,B)
+  param_array(param_data(C),param_data(pB)) do c,b
+    evaluate!(c,f,a,collect(b))
+  end
 end
 
 function Fields.unwrap_cached_array(A::AbstractParamArray)

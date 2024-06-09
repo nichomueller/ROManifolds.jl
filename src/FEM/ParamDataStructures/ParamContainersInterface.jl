@@ -1,17 +1,18 @@
 param_length(a) = @abstractmethod
-param_length(a::Union{Function,Map}) = 0
+param_length(a::Union{Nothing,Function,Map}) = 0
 param_length(a::AbstractParamFunction) = length(a)
 param_length(a::Union{Number,AbstractArray{<:Number}}) = 0
 param_data(a) = @abstractmethod
 all_data(a) = @abstractmethod
 param_getindex(a,i::Integer...) = @abstractmethod
+param_getindex(a::Union{Nothing,Function,Map},i::Integer...) = a
 param_setindex!(a,v,i::Integer...) = @abstractmethod
 param_view(a,i::Integer...) = @abstractmethod
 param_entry(a,i::Integer...) = @abstractmethod
 param_eachindex(a) = Base.OneTo(param_length(a))
 array_of_similar_arrays(a,l::Integer) = @abstractmethod
 _to_param_quantity(a,plength::Integer) = @abstractmethod
-_to_param_quantity(a::Union{Function,Map},plength::Integer) = a
+_to_param_quantity(a::Union{Nothing,Function,Map},plength::Integer) = a
 
 function _find_param_length(a...)
   plengths::Tuple{Vararg{Int}} = filter(!iszero,param_length.(a))
