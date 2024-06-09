@@ -151,7 +151,7 @@ function Algebra.residual!(
   vecdata = collect_cell_vector(test,dc)
   assemble_vector_add!(b,assem,vecdata)
 
-  r
+  b
 end
 
 function Algebra.residual!(

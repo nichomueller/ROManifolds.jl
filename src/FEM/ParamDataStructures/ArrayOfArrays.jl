@@ -16,12 +16,6 @@ function ArrayOfArrays(A::AbstractVector{<:AbstractArray})
   ArrayOfArrays(B.data)
 end
 
-function ArrayOfCachedArrays(A::AbstractVector{<:AbstractArray})
-  B = ArrayOfSimilarArrays(A)
-  Bcache = CachedArray(B.data)
-  ArrayOfArrays(Bcache)
-end
-
 Base.size(A::ArrayOfArrays{T,N}) where {T,N} = ntuple(_->param_length(A),Val{N}())
 
 @inline function ArraysOfArrays.innersize(A::ArrayOfArrays{T,N}) where {T,N}

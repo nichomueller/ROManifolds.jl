@@ -96,3 +96,100 @@ end
 function Base.zero(A::MatrixOfSparseMatricesCSC{Tv,Ti}) where {Tv,Ti}
   MatrixOfSparseMatricesCSC(A.m,A.n,ones(Ti,length(A.colptr)),Ti[],Tv[])
 end
+
+# some sparse operations
+
+fast_issymmetric(A::SparseArrays.AbstractSparseMatrixCSC) = fast_is_hermsym(A, identity)
+
+fast_ishermitian(A::SparseArrays.AbstractSparseMatrixCSC) = fast_is_hermsym(A, conj)
+
+function fast_is_hermsym(A::SparseArrays.AbstractSparseMatrixCSC,check::Function)
+  m, n = size(A)
+  if m != n; return false; end
+
+  colptr = getcolptr(A)
+  rowval = rowvals(A)
+  nzval = nonzeros(A)
+  tracker = copy(getcolptr(A))
+  for col = axes(A, 2)
+    # `tracker` is updated such that, for symmetric matrices,
+    # the loop below starts from an element at or below the
+    # diagonal element of column `col`"
+    for p = tracker[col]:colptr[col+1]-1
+      val = nzval[p]
+      row = rowval[p]
+
+      # Ignore stored zeros
+      if iszero(val)
+          continue
+      end
+
+      # If the matrix was symmetric we should have updated
+      # the tracker to start at the diagonal or below. Here
+      # we are above the diagonal so the matrix can't be symmetric.
+      if row < col
+        return false
+      end
+
+      # Diagonal element
+      if row == col
+        if val != check(val)
+          return false
+        end
+      else
+        offset = tracker[row]
+
+        # If the matrix is unsymmetric, there might not exist
+        # a rowval[offset]
+        if offset > length(rowval)
+          return false
+        end
+
+        row2 = rowval[offset]
+
+        # row2 can be less than col if the tracker didn't
+        # get updated due to stored zeros in previous elements.
+        # We therefore "catch up" here while making sure that
+        # the elements are actually zero.
+        while row2 < col
+          if SparseArrays._isnotzero(nzval[offset])
+            return false
+          end
+          offset += 1
+          row2 = rowval[offset]
+          tracker[row] += 1
+        end
+
+        # Non zero A[i,j] exists but A[j,i] does not exist
+        if row2 > col
+          return false
+        end
+
+        # A[i,j] and A[j,i] exists
+        if row2 == col
+          if !isapprox(val,check(nzval[offset]))
+            return false
+          end
+          tracker[row] += 1
+        end
+      end
+    end
+  end
+  return true
+end
+
+function fast_cholesky(A::AbstractSparseMatrix;kwargs...)
+  @abstractmethod
+end
+
+function fast_cholesky(A::SparseArrays.AbstractSparseMatrixCSC;kwargs...)
+  if !ishermitian(A) && fast_ishermitian(A)
+    @views @inbounds A .= (A + A') / 2
+    @check ishermitian(A)
+  end
+  cholesky(A;kwargs...)
+end
+
+function LinearAlgebra.cholesky(A::MatrixOfSparseMatricesCSC;kwargs...)
+  ParamContainer(fast_cholesky.(param_data(A);kwargs...))
+end

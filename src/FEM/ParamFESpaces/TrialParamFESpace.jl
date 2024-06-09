@@ -15,7 +15,7 @@ function TrialParamFESpace(dirichlet_values::AbstractVector,space::SingleFieldFE
 end
 
 function TrialParamFESpace(space::SingleFieldFESpace,objects)
-  dirichlet_values = [compute_dirichlet_values_for_tags(space,objects[i]) for i = 1:length(objects)]
+  dirichlet_values = [compute_dirichlet_values_for_tags(space,objects[i]) for i = param_eachindex(objects)]
   TrialParamFESpace(ParamArray(dirichlet_values),space)
 end
 
@@ -65,7 +65,7 @@ FESpaces.ConstraintStyle(::Type{<:TrialParamFESpace{U}}) where U = ConstraintSty
 
 length_dirichlet_values(f::TrialParamFESpace) = length(f.dirichlet_values)
 
-function param_getindex(f::TrialParamFESpace,index)
+function ParamDataStructures.param_getindex(f::TrialParamFESpace,index::Integer)
   dv = param_getindex(f.dirichlet_values,index)
   TrialFESpace(dv,f.space)
 end

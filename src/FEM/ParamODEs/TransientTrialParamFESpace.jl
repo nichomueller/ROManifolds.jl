@@ -110,50 +110,16 @@ Arrays.evaluate(U::FESpace,r) = U
 
 # Define the interface for MultiField
 
-const TransientMultiFieldParamFESpace = MultiFieldParamFESpace
-
-function ODEs.has_transient(U::MultiFieldParamFESpace)
+function has_param_transient(U::MultiFieldFESpace)
   any(space -> space isa TransientTrialParamFESpace,U.spaces)
 end
 
-function ODEs.allocate_space(U::MultiFieldParamFESpace,args...)
-  if !ODEs.has_transient(U)
+function ODEs.allocate_space(U::MultiFieldFESpace,args...)
+  if !has_param_transient(U)
+    @assert !ODEs.has_transient(U)
     return U
   end
   spaces = map(U->allocate_space(U,args...),U.spaces)
-  style = MultiFieldStyle(U)
-  MultiFieldParamFESpace(spaces;style)
-end
-
-function Arrays.evaluate!(Ut::MultiFieldParamFESpace,U::MultiFieldParamFESpace,args...)
-  if !ODEs.has_transient(U)
-    return Ut
-  end
-  for (Uti,Ui) in zip(Ut,U)
-    evaluate!(Uti,Ui,args...)
-  end
-  Ut
-end
-
-function Arrays.evaluate(U::MultiFieldParamFESpace,args...)
-  if !ODEs.has_transient(U)
-    return U
-  end
-  Ut = allocate_space(U,args...)
-  evaluate!(Ut,U,args...)
-end
-
-function Arrays.evaluate(U::MultiFieldParamFESpace,args::Nothing...)
-  if !ODEs.has_transient(U)
-    return U
-  end
-  spaces = map(space -> evaluate(space,args...),U.spaces)
-  style = MultiFieldStyle(U)
-  MultiFieldParamFESpace(spaces;style)
-end
-
-function ODEs.time_derivative(U::MultiFieldParamFESpace)
-  spaces = map(time_derivative,U.spaces)
   style = MultiFieldStyle(U)
   MultiFieldParamFESpace(spaces;style)
 end

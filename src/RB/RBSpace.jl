@@ -177,14 +177,14 @@ function FESpaces.get_free_dof_ids(r::BlockRBSpace,::BlockMultiFieldStyle{NB}) w
   return BlockArrays.blockedrange(block_num_dofs)
 end
 
-function FESpaces.zero_free_values(
-  r::BlockRBSpace{<:MultiFieldParamFESpace{<:BlockMultiFieldStyle{NB}}}) where NB
-  block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
-  block_vtypes = map(range->get_vector_type(r[range]),1:NB)
-  values = mortar(map(allocate_vector,block_vtypes,block_num_dofs))
-  fill!(values,zero(eltype(values)))
-  return values
-end
+# function FESpaces.zero_free_values(
+#   r::BlockRBSpace{<:MultiFieldParamFESpace{<:BlockMultiFieldStyle{NB}}}) where NB
+#   block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
+#   block_vtypes = map(range->get_vector_type(r[range]),1:NB)
+#   values = mortar(map(allocate_vector,block_vtypes,block_num_dofs))
+#   fill!(values,zero(eltype(values)))
+#   return values
+# end
 
 function get_touched_blocks(r::BlockRBSpace)
   get_touched_blocks(r.basis)

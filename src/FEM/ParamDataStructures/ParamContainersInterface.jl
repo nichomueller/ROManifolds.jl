@@ -58,6 +58,7 @@ param_setindex!(a::ParamNumber,v,i::Integer) = setindex!(a,v,i)
 param_view(a::ParamNumber,i::Integer) = getindex(a,i)
 param_entry(a::ParamNumber,i::Integer) = getindex(a,i)
 
+_to_param_quantity(a::Number,plength::Integer) = ParamNumber(fill(a,plength))
 _to_param_quantity(a::ParamNumber,plength::Integer) = a
 
 Base.size(a::ParamNumber) = (param_length(a),)

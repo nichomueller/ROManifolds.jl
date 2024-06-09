@@ -4,20 +4,20 @@ struct FastLUSolver <: FastLinearSolver
   check::Bool
 end
 
-FastLUSolver(;check=true) = FastLUSolver(check)
+FastLUSolver(;check=false) = FastLUSolver(check)
 
 struct FastLUSymbolicSetup <: SymbolicSetup
   check::Bool
 end
 
-FastLUSymbolicSetup(;check=true) = FastLUSymbolicSetup(check)
+FastLUSymbolicSetup(;check=false) = FastLUSymbolicSetup(check)
 
 mutable struct FastLUNumericalSetup{F} <: NumericalSetup
   factors::F
   check::Bool
 end
 
-FastLUNumericalSetup(factors;check=true) = FastLUNumericalSetup(factors,check)
+FastLUNumericalSetup(factors;check=false) = FastLUNumericalSetup(factors,check)
 
 function Algebra.symbolic_setup(solver::FastLUSolver,mat::AbstractMatrix)
   FastLUSymbolicSetup(;check=solver.check)
@@ -49,20 +49,20 @@ struct CholeskySolver <: FastLinearSolver
   check::Bool
 end
 
-CholeskySolver(;check) = CholeskySolver(check)
+CholeskySolver(;check=false) = CholeskySolver(check)
 
 struct CholeskySymbolicSetup <: SymbolicSetup
   check::Bool
 end
 
-CholeskySymbolicSetup(;check) = CholeskySymbolicSetup(check)
+CholeskySymbolicSetup(;check=false) = CholeskySymbolicSetup(check)
 
 mutable struct CholeskyNumericalSetup{F} <: NumericalSetup
   factors::F
   check::Bool
 end
 
-CholeskyNumericalSetup(factors;check) = CholeskyNumericalSetup(factors,check)
+CholeskyNumericalSetup(factors;check=false) = CholeskyNumericalSetup(factors,check)
 
 function Algebra.symbolic_setup(solver::CholeskySolver,mat::AbstractMatrix)
   CholeskySymbolicSetup(;check=solver.check)

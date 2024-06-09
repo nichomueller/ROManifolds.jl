@@ -56,7 +56,7 @@ function FESpaces.test_fe_function(f::SingleFieldParamFEFunction)
   end
 end
 
-function param_getindex(f::GenericCellField,index)
+function ParamDataStructures.param_getindex(f::GenericCellField,index::Integer)
   data = get_data(f)
   trian = get_triangulation(f)
   DS = DomainStyle(f)
@@ -64,12 +64,12 @@ function param_getindex(f::GenericCellField,index)
   GenericCellField(di,trian,DS)
 end
 
-function param_length(f::SingleFieldParamFEFunction)
+function ParamDataStructures.param_length(f::SingleFieldParamFEFunction)
   @assert param_length(f.free_values) == param_length(f.dirichlet_values)
   param_length(f.free_values)
 end
 
-function param_getindex(f::SingleFieldParamFEFunction,index)
+function ParamDataStructures.param_getindex(f::SingleFieldParamFEFunction,index::Integer)
   cf = param_getindex(f.cell_field,index)
   fs = param_getindex(f.fe_space,index)
   cv = lazy_map(x->param_getindex(x,index),f.cell_dof_values)
@@ -81,12 +81,12 @@ end
 struct MultiFieldParamFEFunction{T<:MultiFieldCellField} <: ParamFEFunction
   single_fe_functions::Vector{<:SingleFieldParamFEFunction}
   free_values::AbstractArray
-  fe_space::MultiFieldParamFESpace
+  fe_space::MultiFieldFESpace
   multi_cell_field::T
 
   function MultiFieldParamFEFunction(
     free_values::AbstractVector,
-    space::MultiFieldParamFESpace,
+    space::MultiFieldFESpace,
     single_fe_functions::Vector{<:SingleFieldParamFEFunction})
 
     multi_cell_field = MultiFieldCellField(map(i->i.cell_field,single_fe_functions))
@@ -98,6 +98,14 @@ struct MultiFieldParamFEFunction{T<:MultiFieldCellField} <: ParamFEFunction
       space,
       multi_cell_field)
   end
+end
+
+function MultiField.MultiFieldFEFunction(
+  free_values::AbstractVector,
+  space::MultiFieldFESpace,
+  single_fe_functions::Vector{<:SingleFieldParamFEFunction})
+
+  MultiFieldParamFEFunction(free_values,space,single_fe_functions)
 end
 
 CellData.get_data(f::MultiFieldParamFEFunction) = get_data(f.multi_cell_field)
@@ -139,9 +147,9 @@ function FESpaces.test_fe_function(f::MultiFieldParamFEFunction)
   map(test_fe_function,f.single_fe_functions)
 end
 
-param_length(f::MultiFieldParamFEFunction) = param_length(first(f.single_fe_functions))
+ParamDataStructures.param_length(f::MultiFieldParamFEFunction) = param_length(first(f.single_fe_functions))
 
-function param_getindex(f::MultiFieldParamFEFunction,index)
+function ParamDataStructures.param_getindex(f::MultiFieldParamFEFunction,index::Integer)
   style = f.fe_space.multi_field_style
   sff = map(f->param_getindex(f,index),f.single_fe_functions)
   mfs = MultiFieldFESpace(map(f->param_getindex(f,index),f.fe_space);style)

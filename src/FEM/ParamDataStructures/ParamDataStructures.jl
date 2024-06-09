@@ -32,6 +32,8 @@ export TransientParamFunction, 𝑓ₚₜ
 export realization
 export get_params
 export get_times
+export get_initial_time
+export get_final_time
 export num_params
 export num_times
 export slow_index
@@ -69,6 +71,11 @@ export ArrayOfArrays
 export VectorOfVectors
 export MatrixOfMatrices
 include("ArrayOfArrays.jl")
+
+export ArrayOfCachedArrays
+export VectorOfCachedVectors
+export MatrixOfCachedMatrices
+include("ArrayOfCachedArrays.jl")
 
 export MatrixOfSparseMatricesCSC
 include("MatrixOfSparseMatrices.jl")

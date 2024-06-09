@@ -50,20 +50,6 @@ function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   typeof(array_of_similar_arrays(V(),N))
 end
 
-function FESpaces.zero_free_values(f::SingleFieldParamFESpace)
-  V = get_vector_type(f)
-  free_values = allocate_vector(V,get_free_dof_ids(f))
-  fill!(free_values,zero(ParamAlgebra.eltype2(V)))
-  return free_values
-end
-
-function FESpaces.zero_dirichlet_values(f::SingleFieldParamFESpace)
-  V = get_vector_type(f)
-  dir_values = allocate_vector(V,num_dirichlet_dofs(f))
-  fill!(dir_values,zero(eltype(V)))
-  return dir_values
-end
-
 function FESpaces.gather_free_and_dirichlet_values!(
   free_vals,
   dirichlet_vals,
@@ -117,10 +103,10 @@ function FESpaces._fill_dirichlet_values_for_tag!(
   dirichlet_dof_to_tag)
 
   @check param_length(dirichlet_values) == param_length(dv)
-  @inbounds for i = param_eachindex(dirichlet_values)
-    dirichlet_values_i = param_view(dirichlet_values,i)
-    dv_i = param_view(dv,i)
-    FESpaces._fill_dirichlet_values_for_tag!(dirichlet_values_i,dv_i,tag,dirichlet_dof_to_tag)
+  for dof in 1:_innerlength(dv)
+    if dirichlet_dof_to_tag[dof] == tag
+      dirichlet_values.data[dof,:] .= dv.data[dof,:]
+    end
   end
 end
 
@@ -134,17 +120,19 @@ function FESpaces._free_and_dirichlet_values_fill!(
   cells)
 
   @check param_length(free_vals) == param_length(dirichlet_vals)
-  @inbounds for i = param_eachindex(free_vals)
-    free_vals_i = param_view(free_vals,i)
-    dirichlet_vals_i = param_view(dirichlet_vals,i)
-    FESpaces._free_and_dirichlet_values_fill!(
-      free_vals_i,
-      dirichlet_vals_i,
-      cache_vals,
-      cache_dofs,
-      cell_vals,
-      cell_dofs,
-      cells)
+  for cell in cells
+    vals = getindex!(cache_vals,cell_vals,cell)
+    dofs = getindex!(cache_dofs,cell_dofs,cell)
+    for (i,dof) in enumerate(dofs)
+      val = vals.data[i,:]
+      if dof > 0
+        free_vals.data[dof,:] .= val
+      elseif dof < 0
+        dirichlet_vals.data[-dof,:] .= val
+      else
+        @unreachable "dof ids either positive or negative, not zero"
+      end
+    end
   end
 end
 
@@ -181,7 +169,6 @@ function FESpaces.FEFunction(
     fv_i .+= c
     dv_i .+= c
   end
-  error("check that fv and dv are well defined")
   f′ = FESpaceToParamFESpace(zf.space,length_dirichlet_values(f))
   FEFunction(f′,fv,dv)
 end
@@ -228,7 +215,6 @@ function FESpaces.scatter_free_and_dirichlet_values(
     fv_i .= FESpaces.VectorWithEntryInserted(fv_i,ff.dof_to_fix,dv_i[1])
     dv_i .= similar(dv_i,eltype(dv_i),0)
   end
-  error("check that fv and dv are well defined")
   f′ = FESpaceToParamFESpace(ff.space,length_dirichlet_values(f))
   FEFunction(f′,fv,dv)
 end
@@ -275,6 +261,6 @@ function FESpaces.test_single_field_fe_space(f::SingleFieldParamFESpace,pred=(==
   @test isa(cell_dof_basis,CellDof)
 end
 
-function param_getindex(f::FESpaceToParamFESpace,index)
+function ParamDataStructures.param_getindex(f::FESpaceToParamFESpace,index::Integer)
   f.space
 end

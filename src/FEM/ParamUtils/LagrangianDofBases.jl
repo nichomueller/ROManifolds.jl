@@ -1,3 +1,5 @@
+ReferenceFEs.num_components(::Type{<:AbstractArray{T}}) where T = num_components(T)
+
 function ReferenceFEs._lagr_dof_cache(node_to_val::AbstractParamArray,ndofs)
   param_array(param_data(node_to_val)) do n2v
     ReferenceFEs._lagr_dof_cache(n2v,ndofs)
@@ -5,29 +7,46 @@ function ReferenceFEs._lagr_dof_cache(node_to_val::AbstractParamArray,ndofs)
 end
 
 function ReferenceFEs._evaluate_lagr_dof!(
-  c::AbstractParamVector,
+  c::VectorOfCachedVectors,
   node_comp_to_val::AbstractParamVector,
   node_and_comp_to_dof,
   ndofs,
   ncomps)
 
-  @inbounds for i = param_eachindex(node_to_val)
-    c_i = param_view(c,i)
-    node_comp_to_val_i = param_view(node_comp_to_val,i)
-    ReferenceFEs._evaluate_lagr_dof!(c_i,node_comp_to_val_i,node_and_comp_to_dof,ndofs,ncomps)
+  setsize!(c,(ndofs,))
+  r = c.data.array
+  for node in LinearIndices(node_and_comp_to_dof)
+    comp_to_dof = node_and_comp_to_dof[node]
+    comp_to_val = node_comp_to_val.data[node,:]
+    for comp in 1:ncomps
+      dof = comp_to_dof[comp]
+      val = map(c2v->getindex(c2v,comp),comp_to_val)
+      r[dof,:] .= val
+    end
   end
+  ArrayOfArrays(r)
 end
 
 function ReferenceFEs._evaluate_lagr_dof!(
-  c::AbstractParamMatrix,
+  c::MatrixOfCachedMatrices,
   node_pdof_comp_to_val::AbstractParamMatrix,
   node_and_comp_to_dof,
   ndofs,
   ncomps)
 
-  @inbounds for i = param_eachindex(node_to_val)
-    c_i = param_view(c,i)
-    node_pdof_comp_to_val_i = param_view(node_pdof_comp_to_val,i)
-    ReferenceFEs._evaluate_lagr_dof!(c_i,node_pdof_comp_to_val_i,node_and_comp_to_dof,ndofs,ncomps)
+  _, npdofs = innersize(node_pdof_comp_to_val)
+  setsize!(c,(ndofs,npdofs))
+  r = c.data.array
+  for node in LinearIndices(node_and_comp_to_dof)
+    comp_to_dof = node_and_comp_to_dof[node]
+    for pdof in 1:npdofs
+      comp_to_val = node_pdof_comp_to_val.data[node,pdof,:]
+      for comp in 1:ncomps
+        dof = comp_to_dof[comp]
+        val = map(c2v->getindex(c2v,comp),comp_to_val)
+        r[dof,pdof,:] = val
+      end
+    end
   end
+  ArrayOfArrays(r)
 end

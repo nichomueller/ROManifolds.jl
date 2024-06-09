@@ -1,5 +1,6 @@
 module ParamODEs
 
+using LinearAlgebra
 using ForwardDiff
 
 using Gridap

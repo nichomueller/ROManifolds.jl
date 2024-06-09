@@ -1,4 +1,4 @@
-eltype2(x) = eltype(eltype(x))#(eltype∘eltype)(x)
+eltype2(x) = eltype(eltype(x))
 
 function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamContainer
   vector = zeros(eltype2(V),n)

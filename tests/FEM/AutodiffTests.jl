@@ -1,4 +1,3 @@
-
 using Test
 using LinearAlgebra
 using Gridap.Algebra
@@ -12,6 +11,10 @@ using Gridap.ReferenceFEs
 using ForwardDiff
 using SparseArrays
 using Mabla.FEM
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamAlgebra
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamODEs
 
 domain = (0,1,0,1)
 partition = (2,2)
@@ -30,7 +33,8 @@ U = TrialParamFESpace(V,fμ)
 
 dv = get_fe_basis(V)
 du = get_trial_fe_basis(U)
-uh = FEFunction(U,array_of_similar_arrays(rand(num_free_dofs(U)),length(fμ)))
+u = rand(num_free_dofs(U))
+uh = FEFunction(U,ParamArray([copy(u) for i = 1:length(fμ)]))
 
 ener(uh) = ∫( fμ*∇(uh)⋅∇(uh)*0.5 )*dΩ
 res(uh) = ∫(fμ*∇(uh)⋅∇(dv))*dΩ

@@ -1,6 +1,7 @@
 module ParamUtils
 
 using Gridap
+using Gridap.Arrays
 using Gridap.Geometry
 using Gridap.ReferenceFEs
 using Gridap.Helpers

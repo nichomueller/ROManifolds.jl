@@ -63,22 +63,6 @@ function collect_cell_vector_for_trian(
   [cell_vec_r],[rows]
 end
 
-function FESpaces.assemble_vector!(b::AbstractParamVector,a::SparseMatrixAssembler,vecdata)
-  fill!(b,zero(ParamAlgebra.eltype2(b)))
-  assemble_vector_add!(b,a,vecdata)
-end
-
-function FESpaces.assemble_matrix!(mat::AbstractParamMatrix,a::SparseMatrixAssembler,matdata)
-  LinearAlgebra.fillstored!(mat,zero(ParamAlgebra.eltype2(mat)))
-  assemble_matrix_add!(mat,a,matdata)
-end
-
-function FESpaces.assemble_matrix_and_vector!(A::AbstractParamMatrix,b::AbstractParamVector,a::SparseMatrixAssembler,data)
-  LinearAlgebra.fillstored!(A,zero(ParamAlgebra.eltype2(A)))
-  fill!(b,zero(ParamAlgebra.eltype2(b)))
-  assemble_matrix_and_vector_add!(A,b,a,data)
-end
-
 function test_passembler(a::Assembler,matdata,vecdata,data)
   A = allocate_matrix(a,matdata)
   @test FESpaces.num_cols(a) == size(A,2)

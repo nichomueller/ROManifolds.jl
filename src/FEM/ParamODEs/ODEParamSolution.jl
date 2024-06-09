@@ -32,7 +32,7 @@ struct GenericODEParamSolution{V} <: ODEParamSolution{V}
 end
 
 function Base.iterate(sol::ODEParamSolution)
-  r0 = get_at_time(sol.r,:initial)
+  r0 = ParamDataStructures.get_at_time(sol.r,:initial)
   cache = allocate_odecache(sol.solver,sol.odeop,r0,sol.us0)
 
   state0,cache = ode_start(sol.solver,sol.odeop,r0,sol.us0,cache)
