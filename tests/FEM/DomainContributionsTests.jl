@@ -11,7 +11,7 @@ using Gridap.TensorValues
 using Gridap.Geometry
 using Mabla.FEM
 
-lazy_getter(a,i=1) = lazy_map(x->getindex(x.array,i),a)
+lazy_getter(a,i=1) = lazy_map(x->param_getindex(x,i),a)
 
 domain = (0,1,0,1)
 cells = (2,2)

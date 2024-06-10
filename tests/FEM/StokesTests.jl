@@ -21,7 +21,7 @@ pranges = fill([0,1],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 r = realization(ptspace,nparams=3)
-μ = FEM._get_params(r)[3]
+μ = ParamDataStructures._get_params(r)[3]
 
 domain = (0,1,0,1)
 partition = (2,2)
@@ -99,8 +99,8 @@ Base.iterate(_sol)
 
 for ((rt,xh),(_t,_xh)) in zip(sol,_sol)
   uh,ph = xh
-  uh1 = FEM.param_getindex(uh,3)
-  ph1 = FEM.param_getindex(ph,3)
+  uh1 = param_getindex(uh,3)
+  ph1 = param_getindex(ph,3)
   _uh,_ph = _xh
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"

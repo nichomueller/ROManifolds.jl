@@ -1,12 +1,18 @@
-struct BlockArrayOfArrays{T,N,L,A<:AbstractArray{<:ParamArray{T,N,L},N},B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N,L}
-  data::A
+struct BlockArrayOfArrays{T,N,L,A<:AbstractParamArray{T,N,L},A′<:AbstractArray{A,N},B<:NTuple{N,AbstractUnitRange{Int}}} <: AbstractParamArray{T,N,L,A}
+  data::A′
   axes::B
+  function BlockArrayOfArrays(
+    data::A′,
+    axes::B
+    ) where {T,N,L,A<:AbstractParamArray{T,N,L},A′<:AbstractArray{A,N},B<:NTuple{N,AbstractUnitRange{Int}}}
+    new{T,N,L,A,A′,B}(data,axes)
+  end
 end
 
-const BlockVectorOfVectors = BlockArrayOfArrays{T,1,L,A,B} where {T,L,A,B}
-const BlockMatrixOfMatrices = BlockArrayOfArrays{T,2,L,A,B} where {T,L,A,B}
+const BlockVectorOfVectors{T,L,A} = BlockArrayOfArrays{T,1,L,A}
+const BlockMatrixOfMatrices{T,L,A} = BlockArrayOfArrays{T,2,L,A}
 
-function BlockArrays._BlockArray(data::AbstractArray{<:ParamArray},axes::NTuple{N,AbstractUnitRange{Int}}) where N
+function BlockArrays._BlockArray(data::AbstractArray{<:AbstractParamArray,N},axes::NTuple{N,AbstractUnitRange{Int}}) where N
   BlockArrayOfArrays(data,axes)
 end
 
@@ -121,6 +127,15 @@ end
 
 function Base.zero(A::BlockArrayOfArrays)
   BlockArrayOfArrays(map(zero,A.data),A.axes)
+end
+
+for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
+  @eval begin
+    function $f(A::BlockArrayOfArrays,z::Number)
+      map(a -> $f(a,z),all_data(A))
+      return A
+    end
+  end
 end
 
 struct BlockParamView{T,N,L,A} <: AbstractBlockArray{T,N}

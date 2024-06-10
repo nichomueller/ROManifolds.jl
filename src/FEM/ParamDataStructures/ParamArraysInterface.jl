@@ -72,7 +72,7 @@ for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
     # small hack
     function $f(A::AbstractParamArray{T,N},z::AbstractArray{<:Number,N}) where {T,N}
       @check all(z.==first(z))
-      fill!(all_data(A),first(z))
+      $f(A,first(z))
       return A
     end
   end

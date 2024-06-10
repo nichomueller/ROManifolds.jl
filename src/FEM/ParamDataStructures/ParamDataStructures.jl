@@ -27,6 +27,7 @@ export UniformSampling
 export NormalSampling
 export ParamSpace
 export TransientParamSpace
+export AbstractParamFunction
 export ParamFunction, 𝑓ₚ
 export TransientParamFunction, 𝑓ₚₜ
 export realization

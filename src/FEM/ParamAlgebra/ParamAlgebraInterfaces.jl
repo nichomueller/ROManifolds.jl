@@ -5,6 +5,11 @@ function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamCon
   array_of_similar_arrays(vector,param_length(V))
 end
 
+function Algebra.allocate_vector(::Type{<:BlockVectorOfVectors{T,L}},indices::BlockedUnitRange) where {T,L}
+  V = VectorOfVectors{T,L}
+  mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
+end
+
 function Algebra.allocate_in_range(::Type{V},matrix) where V<:AbstractParamContainer
   rows = Base.OneTo(innersize(matrix,1))
   allocate_vector(V,rows)
@@ -15,6 +20,11 @@ function Algebra.allocate_in_range(matrix::AbstractParamMatrix)
   allocate_in_range(V,matrix)
 end
 
+function Algebra.allocate_in_range(matrix::BlockMatrixOfMatrices{T,L}) where {T,L}
+  V = BlockVectorOfVectors{T,L}
+  allocate_in_range(V,matrix)
+end
+
 function Algebra.allocate_in_domain(::Type{V},matrix) where V<:AbstractParamContainer
   cols = Base.OneTo(innersize(matrix,2))
   allocate_vector(V,cols)
@@ -22,6 +32,11 @@ end
 
 function Algebra.allocate_in_domain(matrix::AbstractParamMatrix)
   V = VectorOfVectors{T,L}
+  allocate_in_domain(V,matrix)
+end
+
+function Algebra.allocate_in_domain(matrix::BlockMatrixOfMatrices{T,L}) where {T,L}
+  V = BlockVectorOfVectors{T,L}
   allocate_in_domain(V,matrix)
 end
 

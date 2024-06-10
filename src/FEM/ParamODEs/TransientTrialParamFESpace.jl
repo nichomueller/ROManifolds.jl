@@ -110,6 +110,8 @@ Arrays.evaluate(U::FESpace,r) = U
 
 # Define the interface for MultiField
 
+const TransientMultiFieldParamFESpace = MultiFieldFESpace
+
 function has_param_transient(U::MultiFieldFESpace)
   any(space -> space isa TransientTrialParamFESpace,U.spaces)
 end

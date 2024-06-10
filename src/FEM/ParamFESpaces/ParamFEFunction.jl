@@ -40,7 +40,7 @@ end
 # for visualization/testing purposes
 
 function FESpaces.test_fe_function(f::SingleFieldParamFEFunction)
-  lazy_getter(a,i=1) = lazy_map(x->param_getindex(x.array,i),a)
+  lazy_getter(a,i=1) = lazy_map(x->param_getindex(x,i),a)
   trian = get_triangulation(f)
   free_values = get_free_dof_values(f)
   fe_space = get_fe_space(f)

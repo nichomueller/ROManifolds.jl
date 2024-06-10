@@ -70,3 +70,7 @@ end
 function Base.zero(A::ArrayOfArrays)
   ArrayOfArrays(zero(A.data))
 end
+
+function all_view(A::ArrayOfArrays{T,N},i::Union{Integer,AbstractVector,Colon}...) where {T,N}
+  ArrayOfArrays(view(A.data,i...,:))
+end

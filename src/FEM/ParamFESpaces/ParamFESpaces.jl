@@ -7,6 +7,8 @@ using SparseArrays
 using Gridap
 using Gridap.Algebra
 using Gridap.CellData
+using Gridap.Fields
+using Gridap.Geometry
 using Gridap.FESpaces
 using Gridap.MultiField
 using Gridap.Helpers

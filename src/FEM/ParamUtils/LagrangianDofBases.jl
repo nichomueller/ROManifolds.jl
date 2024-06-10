@@ -21,7 +21,7 @@ function ReferenceFEs._evaluate_lagr_dof!(
     for comp in 1:ncomps
       dof = comp_to_dof[comp]
       for (ip,val) in enumerate(comp_to_val)
-        r[dof,ip] = val[ip][comp]
+        r[dof,ip] = val[comp]
       end
     end
   end
@@ -45,7 +45,7 @@ function ReferenceFEs._evaluate_lagr_dof!(
       for comp in 1:ncomps
         dof = comp_to_dof[comp]
         for (ip,val) in enumerate(comp_to_val)
-          r[dof,pdof,ip] = val[ip][comp]
+          r[dof,pdof,ip] = val[comp]
         end
       end
     end
