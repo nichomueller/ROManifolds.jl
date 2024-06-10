@@ -2,7 +2,7 @@ eltype2(x) = eltype(eltype(x))
 
 function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamContainer
   vector = zeros(eltype2(V),n)
-  array_of_similar_arrays(vector,param_length(V))
+  array_of_zero_arrays(vector,param_length(V))
 end
 
 function Algebra.allocate_vector(::Type{<:BlockVectorOfVectors{T,L}},indices::BlockedUnitRange) where {T,L}
@@ -178,8 +178,8 @@ end
 
 function Algebra.nz_allocation(a::Algebra.ArrayCounter{T}) where T<:AbstractParamVector
   S = eltype(T)
-  v = fill!(similar(S,map(length,a.axes)),zero(eltype(S)))
-  array_of_similar_arrays(v,param_length(T))
+  v = similar(S,map(length,a.axes))
+  array_of_zero_arrays(v,param_length(T))
 end
 
 function Algebra.nz_allocation(a::ParamCounter{C,L}) where {C,L}

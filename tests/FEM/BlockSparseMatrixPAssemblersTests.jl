@@ -132,8 +132,8 @@ ParamFESpaces.test_passembler(assem_blocks,bmatdata,bvecdata,bdata)
 A1_blocks = assemble_matrix(assem_blocks,bmatdata)
 b1_blocks = assemble_vector(assem_blocks,bvecdata)
 for i = 1:length(solμ)
-  @test A1[i] ≈ A1_blocks[i]
-  @test b1[i] ≈ b1_blocks[i]
+  @test param_getindex(A1,i) ≈ param_getindex(A1_blocks,i)
+  @test param_getindex(b1,i) ≈ param_getindex(b1_blocks,i)
 end
 
 y1_blocks = similar(b1_blocks)
@@ -141,13 +141,13 @@ mul!(y1_blocks,A1_blocks,b1_blocks)
 y1 = similar(b1)
 mul!(y1,A1,b1)
 for i = 1:length(solμ)
-  @test y1[i] ≈ y1_blocks[i]
+  @test param_getindex(y1,i) ≈ param_getindex(y1_blocks,i)
 end
 
 A2_blocks, b2_blocks = assemble_matrix_and_vector(assem_blocks,bdata)
 for i = 1:length(solμ)
-  @test A2[i] ≈ A2_blocks[i]
-  @test b2[i] ≈ b2_blocks[i]
+  @test param_getindex(A2,i) ≈ param_getindex(A2_blocks,i)
+  @test param_getindex(b2,i) ≈ param_getindex(b2_blocks,i)
 end
 
 A3_blocks = allocate_matrix(assem_blocks,bmatdata)
@@ -155,15 +155,15 @@ b3_blocks = allocate_vector(assem_blocks,bvecdata)
 assemble_matrix!(A3_blocks,assem_blocks,bmatdata)
 assemble_vector!(b3_blocks,assem_blocks,bvecdata)
 for i = 1:length(solμ)
-  @test A1[i] ≈ A3_blocks[i]
-  @test b1_blocks[i] ≈ b3_blocks[i]
+  @test param_getindex(A1,i) ≈ param_getindex(A3_blocks,i)
+  @test param_getindex(b1,i) ≈ param_getindex(b3_blocks,i)
 end
 
 A4_blocks, b4_blocks = allocate_matrix_and_vector(assem_blocks,bdata)
 assemble_matrix_and_vector!(A4_blocks,b4_blocks,assem_blocks,bdata)
 for i = 1:length(solμ)
-  @test A4_blocks[i] ≈ A2_blocks[i]
-  @test b4_blocks[i] ≈ b2_blocks[i]
+  @test param_getindex(A2_blocks,i) ≈ param_getindex(A4_blocks,i)
+  @test param_getindex(b2_blocks,i) ≈ param_getindex(b4_blocks,i)
 end
 
 ############################################################################################
@@ -177,46 +177,3 @@ end
 # end # module
 
 ############
-
-A = allocate_matrix(assem_blocks,bmatdata)
-@test FESpaces.num_cols(assem_blocks) == size(A,2)
-@test FESpaces.num_rows(assem_blocks) == size(A,1)
-assemble_matrix!(A,assem_blocks,matdata)
-
-aa = assem_blocks
-matdata = bmatdata
-
-A = allocate_matrix(aa,matdata)
-@test FESpaces.num_cols(aa) == size(A,2)
-@test FESpaces.num_rows(aa) == size(A,1)
-assemble_matrix!(A,aa,matdata)
-assemble_matrix_add!(A,aa,matdata)
-A = assemble_matrix(aa,matdata)
-@test FESpaces.num_cols(aa) == size(A,2)
-@test FESpaces.num_rows(aa) == size(A,1)
-b = allocate_vector(aa,vecdata)
-@test length(testitem(b)) == FESpaces.num_rows(aa)
-assemble_vector!(b,aa,vecdata)
-assemble_vector_add!(b,aa,vecdata)
-b = assemble_vector(aa,vecdata)
-@test length(testitem(b)) == FESpaces.num_rows(aa)
-A, b = allocate_matrix_and_vector(aa,data)
-assemble_matrix_and_vector!(A,b,aa,data)
-assemble_matrix_and_vector_add!(A,b,aa,data)
-@test FESpaces.num_cols(aa) == size(A,2)
-@test FESpaces.num_rows(aa) == size(A,1)
-@test length(testitem(b)) == num_rows(aa)
-A, b = assemble_matrix_and_vector(aa,data)
-@test FESpaces.num_cols(aa) == size(A,2)
-@test FESpaces.num_rows(aa) == size(A,1)
-@test length(testitem(b)) == FESpaces.num_rows(aa)
-
-
-m1 = nz_counter(get_matrix_builder(aa),(get_rows(aa),get_cols(aa)))
-symbolic_loop_matrix!(m1,aa,matdata)
-m2 = nz_allocation(m1)
-symbolic_loop_matrix!(m2,aa,matdata)
-m3 = create_from_nz(m2)
-
-array = map(Algebra.create_from_nz,m2.array)
-mortar(array)

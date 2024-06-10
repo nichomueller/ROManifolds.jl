@@ -46,9 +46,9 @@ function Base.materialize(b::ParamBroadcast)
 end
 
 param_materialize(A) = A
-param_materialize(A::AbstractArray{<:AbstractArray}) = error("what?")#ParamArray(A)
 param_materialize(A::AbstractArray{<:Number}) = ArrayOfArrays(A)
 param_materialize(A::SparseMatrixCSC) = MatrixOfSparseMatricesCSC(A)
+param_materialize(A::AbstractArray{<:AbstractArray}) = mortar(A)
 
 function Base.materialize!(A::AbstractParamArray,b::Broadcast.Broadcasted)
   dA = all_data(A)

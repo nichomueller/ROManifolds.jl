@@ -20,6 +20,12 @@ function array_of_similar_arrays(a::AbstractArray{<:Number},l::Integer)
   ParamArray([similar(a) for _ = 1:l])
 end
 
+function array_of_zero_arrays(a::AbstractArray{<:Number},l::Integer)
+  A = array_of_similar_arrays(a,l)
+  A0 = fill!(A,zero(eltype(a)))
+  return A0
+end
+
 _to_param_quantity(A::AbstractParamArray,plength::Integer) = A
 _to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
 

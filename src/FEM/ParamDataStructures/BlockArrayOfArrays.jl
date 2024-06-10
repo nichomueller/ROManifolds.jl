@@ -1,12 +1,6 @@
-struct BlockArrayOfArrays{T,N,L,A<:AbstractParamArray{T,N,L},A′<:AbstractArray{A,N},B<:NTuple{N,AbstractUnitRange{Int}}} <: AbstractParamArray{T,N,L,A}
-  data::A′
+struct BlockArrayOfArrays{T,N,L,A<:AbstractArray{<:AbstractParamArray{T,N,L},N},B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N,L}
+  data::A
   axes::B
-  function BlockArrayOfArrays(
-    data::A′,
-    axes::B
-    ) where {T,N,L,A<:AbstractParamArray{T,N,L},A′<:AbstractArray{A,N},B<:NTuple{N,AbstractUnitRange{Int}}}
-    new{T,N,L,A,A′,B}(data,axes)
-  end
 end
 
 const BlockVectorOfVectors{T,L,A} = BlockArrayOfArrays{T,1,L,A}
@@ -43,8 +37,21 @@ BlockArrays.blocks(A::BlockArrayOfArrays) = A.data
 
 all_data(A::BlockArrayOfArrays) = A.data
 param_getindex(A::BlockArrayOfArrays,i::Integer) = mortar(map(a->param_getindex(a,i),A.data))
-param_view(A::BlockArrayOfArrays{T,N},i::Integer) where {T,N} = BlockParamView(A,i)
-param_entry(A::BlockArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N} = mortar(vec(map(a->param_entry(a,i...),A.data)))
+
+function param_view(A::BlockArrayOfArrays,i::Integer)
+  @check i ≤ param_length(A)
+  BlockParamView(A,i)
+end
+
+function param_entry(A::BlockArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
+  param_entry(A,findblockindex.(inneraxes(A),i)...)
+end
+
+function param_entry(A::BlockArrayOfArrays{T,N},i::BlockIndex{N}) where {T,N}
+  @boundscheck blockcheckbounds(A,Block(i.I))
+  @inbounds bl = A.data[i.I...]
+  @inbounds ParamNumber(bl.data[i.α...,:])
+end
 
 Base.@propagate_inbounds function param_setindex!(
   A::BlockArrayOfArrays{T,N},

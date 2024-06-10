@@ -66,6 +66,7 @@ export AbstractParamMatrix
 export ParamArray
 export param_array
 export array_of_similar_arrays
+export array_of_zero_arrays
 include("ParamArraysInterface.jl")
 
 export ArrayOfArrays
