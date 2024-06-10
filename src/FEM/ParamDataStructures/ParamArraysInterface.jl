@@ -10,6 +10,7 @@ ParamArray(A::AbstractVector{<:SparseMatrixCSC}) = MatrixOfSparseMatricesCSC(A)
 ParamArray(A::AbstractArray{<:Number},plength=1) = ArrayOfTrivialArrays(A,plength)
 
 ParamArray(A::CachedArray) = ArrayOfCachedArrays(A)
+ParamArray(A::AbstractArray{<:ParamArray}) = mortar(A)
 
 function param_array(f,A::AbstractArray{<:AbstractArray}...)
   ParamArray(map(f,A...))

@@ -20,8 +20,9 @@ function ReferenceFEs._evaluate_lagr_dof!(
     comp_to_val = node_comp_to_val.data[node,:]
     for comp in 1:ncomps
       dof = comp_to_dof[comp]
-      val = map(c2v->getindex(c2v,comp),comp_to_val)
-      r[dof,:] .= val
+      for (ip,val) in enumerate(comp_to_val)
+        r[dof,ip] = val[ip][comp]
+      end
     end
   end
   ArrayOfArrays(r)
@@ -43,8 +44,9 @@ function ReferenceFEs._evaluate_lagr_dof!(
       comp_to_val = node_pdof_comp_to_val.data[node,pdof,:]
       for comp in 1:ncomps
         dof = comp_to_dof[comp]
-        val = map(c2v->getindex(c2v,comp),comp_to_val)
-        r[dof,pdof,:] = val
+        for (ip,val) in enumerate(comp_to_val)
+          r[dof,pdof,ip] = val[ip][comp]
+        end
       end
     end
   end

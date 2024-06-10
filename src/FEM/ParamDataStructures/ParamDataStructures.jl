@@ -83,6 +83,12 @@ include("MatrixOfSparseMatrices.jl")
 export ArrayOfTrivialArrays
 include("ArrayOfTrivialArrays.jl")
 
+export BlockArrayOfArrays
+export BlockVectorOfVectors
+export BlockMatrixOfMatrices
+export BlockParamView
+include("BlockArrayOfArrays.jl")
+
 export ParamBroadcast
 include("ParamBroadcasts.jl")
 
