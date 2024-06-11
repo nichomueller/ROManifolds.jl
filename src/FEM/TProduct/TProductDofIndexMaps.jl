@@ -103,23 +103,3 @@ function get_tp_dof_index_map(zs::ZeroMeanFESpace,spaces_1d::AbstractVector{<:Un
   @warn "the code has changed, check if this is ok"
   return FixedDofIndexMap(index_map,findfirst(vec(index_map).==dof_to_fix))
 end
-
-# multi field
-
-function get_tp_dof_index_map(ms::MultiFieldFESpace,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
-  index_maps = TProductIndexMap[]
-  for space in ms
-    push!(index_maps,get_tp_dof_index_map(space,spaces_1d))
-  end
-  return index_maps
-end
-
-# trial
-
-for F in (:TrialFESpace,:TransientTrialFESpace)
-  @eval begin
-    function get_tp_dof_index_map(f::$F,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
-      get_tp_dof_index_map(f.space,spaces_1d)
-    end
-  end
-end

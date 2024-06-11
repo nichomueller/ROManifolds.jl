@@ -93,24 +93,6 @@ function get_dof_index_map(model::CartesianDiscreteModel,zs::ZeroMeanFESpace)
   return FixedDofIndexMap(index_map,dof_to_fix)
 end
 
-# multi field
-
-function get_dof_index_map(model::CartesianDiscreteModel,ms::MultiFieldFESpace)
-  index_maps = AbstractIndexMap[]
-  for space in ms
-    push!(index_maps,get_dof_index_map(model,space))
-  end
-  return index_maps
-end
-
-# trial
-
-for F in (:TrialFESpace,:TransientTrialFESpace)
-  @eval begin
-    get_dof_index_map(f::$F) = get_dof_index_map(f.space)
-  end
-end
-
 # utils
 
 function get_polynomial_order(basis,::DiscreteModel)

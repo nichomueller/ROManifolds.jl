@@ -48,7 +48,7 @@ struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParam
   induced_norm::Function
   tpspace::TransientParamSpace
   assem::Assembler
-  index_map::AbstractIndexMap
+  index_map::FEOperatorIndexMap
   trial::FESpace
   test::FESpace
   order::Integer
@@ -147,7 +147,7 @@ struct TransientParamSemilinearFEOpFromWeakForm <: TransientParamFEOperator{Semi
   induced_norm::Function
   tpspace::TransientParamSpace
   assem::Assembler
-  index_map::AbstractIndexMap
+  index_map::FEOperatorIndexMap
   trial::FESpace
   test::FESpace
   order::Integer
@@ -256,7 +256,7 @@ struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearPa
   induced_norm::Function
   tpspace::TransientParamSpace
   assem::Assembler
-  index_map::AbstractIndexMap
+  index_map::FEOperatorIndexMap
   trial::FESpace
   test::FESpace
   order::Integer

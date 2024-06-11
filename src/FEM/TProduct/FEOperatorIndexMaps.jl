@@ -1,4 +1,4 @@
-struct FEOperatorIndexMap{D,Ti,A<:AbstractIndexMap{D,Ti},B<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
+struct FEOperatorIndexMap{A,B}
   matrix_map::A
   vector_map::B
 end
@@ -36,6 +36,14 @@ function get_matrix_index_map(U::TProductFESpace,V::TProductFESpace)
   pg2l = permute_index_map(psparsity,g2l,U,V)
   return SparseIndexMap(pg2l,psparsity)
 end
+
+for F in (:TrialFESpace,:TransientTrialFESpace)
+  @eval begin
+    get_matrix_index_map(trial::$F,tests::SingleFieldFESpace) = get_matrix_index_map(trial.space,tests)
+  end
+end
+
+# utils
 
 function global_2_local_nnz(sparsity::TProductSparsityPattern,I,J,i,j)
   IJ = get_nonzero_indices(sparsity)

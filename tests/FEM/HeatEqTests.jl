@@ -202,17 +202,3 @@ for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
   @check uh1.dirichlet_values ≈ _uh.dirichlet_values
 end
-
-#
-get_vector_index_map(test)
-
-space = test
-
-dof = get_fe_dof_basis(space)
-T = TProduct.get_dof_type(dof)
-cell_dof_ids = get_cell_dof_ids(space)
-order = get_polynomial_order(space)
-comp_to_dofs = TProduct.get_comp_to_free_dofs(T,space,dof)
-# get_dof_index_map(T,model,cell_dof_ids,order,comp_to_dofs)
-dof_map = TProduct._get_dof_index_map(model,cell_dof_ids,order)
-IndexMap(dof_map)

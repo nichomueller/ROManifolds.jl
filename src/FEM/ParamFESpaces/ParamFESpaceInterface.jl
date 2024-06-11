@@ -2,6 +2,8 @@ function get_dirichlet_cells end
 get_dirichlet_cells(f::FESpace) = @abstractmethod
 get_dirichlet_cells(f::UnconstrainedFESpace) = f.dirichlet_cells
 
+ParamDataStructures.param_length(f::FESpace) = 0
+
 abstract type SingleFieldParamFESpace <: SingleFieldFESpace end
 
 FESpaces.get_free_dof_ids(f::SingleFieldParamFESpace) = get_free_dof_ids(f.space)
@@ -146,9 +148,12 @@ struct FESpaceToParamFESpace{S,L} <: SingleFieldParamFESpace
   FESpaceToParamFESpace(space::S,::Val{L}) where {S,L} = new{S,L}(space)
 end
 
+FESpaceToParamFESpace(space::FESpace,plength::Integer) = FESpaceToParamFESpace(space,Val{plength}())
+
 ParamDataStructures.param_length(f::FESpaceToParamFESpace{S,L}) where {S,L} = L
 ParamDataStructures.to_param_quantity(f::SingleFieldParamFESpace,plength::Integer) = f
 ParamDataStructures.to_param_quantity(f::SingleFieldFESpace,plength::Integer) = FESpaceToParamFESpace(f,Val{plength}())
+ParamDataStructures.param_getindex(f::FESpaceToParamFESpace,index::Integer) = f.space
 
 FESpaces.ConstraintStyle(::Type{<:FESpaceToParamFESpace{S}}) where S = ConstraintStyle(S)
 
