@@ -1,14 +1,5 @@
-function ParamDataStructures.param_length(spaces::SingleFieldFESpace...)
-  pspaces = filter(x->isa(x,SingleFieldParamFESpace),spaces)
-  L = length_free_values.(pspaces)
-  @check all(L .== first(L))
-  return first(L)
-end
-
-FESpaces.get_dof_value_type(f::MultiFieldFESpace{MS,CS,V}) where {MS,CS,T,V<:AbstractParamArray{T}} = T
-
-function _MultiFieldParamFESpace(
-  spaces::Vector{<:SingleFieldFESpace};
+function MultiFieldParamFESpace(
+  spaces::Vector{<:SingleFieldParamFESpace};
   style = ConsecutiveMultiFieldStyle())
 
   if isa(style,BlockMultiFieldStyle)
@@ -25,9 +16,8 @@ function MultiFieldParamFESpace(
   style = ConsecutiveMultiFieldStyle())
 
   if any(isa.(spaces,SingleFieldParamFESpace))
-    L = param_length(spaces...)
-    spaces′ = FESpaceToParamFESpace.(spaces,L)
-    _MultiFieldParamFESpace(spaces′,style=style)
+    spaces′ = to_param_quantities(spaces...)
+    MultiFieldParamFESpace(spaces′,style=style)
   else
     MultiFieldFESpace(spaces,style=style)
   end
@@ -40,6 +30,8 @@ function MultiFieldParamFESpace(
 
   MultiFieldFESpace(V,spaces;style)
 end
+
+FESpaces.get_dof_value_type(f::MultiFieldFESpace{MS,CS,V}) where {MS,CS,T,V<:AbstractParamArray{T}} = T
 
 function MultiField._restrict_to_field(
   f,

@@ -14,6 +14,7 @@ using Gridap.MultiField
 using Gridap.Helpers
 
 using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.IndexMaps
 using Mabla.FEM.ParamAlgebra
 
 import Test: @test
@@ -23,8 +24,6 @@ import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 
 export SingleFieldParamFESpace
 export FESpaceToParamFESpace
-export length_dirichlet_values
-export length_free_values
 include("ParamFESpaceInterface.jl")
 
 export MultiFieldParamFESpace

@@ -10,8 +10,8 @@ Arrays.testargs(f::ParamField,x::Point) = testargs(testitem(f),x)
 Arrays.testargs(f::ParamField,x::AbstractArray{<:Point}) = testargs(testitem(f),x)
 Arrays.return_value(b::Broadcasting{<:Function},f::ParamField,x...) = evaluate(b.f,f,x...)
 
-_to_param_quantity(f::ParamField,plength::Integer) = f
-_to_param_quantity(f::Field,plength::Integer) = TrivialParamField(f,plength)
+to_param_quantity(f::ParamField,plength::Integer) = f
+to_param_quantity(f::Field,plength::Integer) = TrivialParamField(f,plength)
 
 # this aims to make a field of type F behave like a pfield of length plength
 struct TrivialParamField{F<:Field} <: ParamField
@@ -76,14 +76,14 @@ end
 
 function Fields.OperationField(op,fields::Tuple{Vararg{Field}})
   try
-    pop,pfields... = _to_param_quantities(op,fields...)
+    pop,pfields... = to_param_quantities(op,fields...)
     OperationParamField(pop,pfields)
   catch
     Fields.OperationField{typeof(op),typeof(fields)}(op,fields)
   end
 end
 
-param_length(f::OperationParamField) = _find_param_length(f.op,f.fields...)
+param_length(f::OperationParamField) = find_param_length(f.op,f.fields...)
 param_getindex(f::OperationParamField,i::Integer) = Fields.OperationField(f.op,param_getindex.(f.fields,i))
 param_getindex(f::OperationParamField{<:ParamField},i::Integer) = Fields.OperationField(param_getindex(f.op,i),param_getindex.(f.fields,i))
 

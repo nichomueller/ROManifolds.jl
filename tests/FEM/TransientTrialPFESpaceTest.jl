@@ -41,9 +41,9 @@ U = Uμt(μt)
 dirichlet_values = get_dirichlet_dof_values(U)
 
 t′ = 1:3
-@test length_dirichlet_values(U) == length(μt) == length(gμt(μ,t′)) == 9
+@test param_length(U) == length(μt) == length(gμt(μ,t′)) == 9
 
-for i in 1:length_dirichlet_values(U)
+for i in param_eachindex(U)
   Ũi = param_getindex(U,i)
   Ui = TrialFESpace(V,g(params[fast_idx(i,3)],t′[slow_idx(i,3)]))
   @test dirichlet_values[i] == get_dirichlet_dof_values(Ui)

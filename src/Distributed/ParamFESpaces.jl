@@ -59,10 +59,6 @@ function FEM.FESpaceToParamFESpace(f::DistributedSingleFieldFESpace,args...)
   DistributedSingleFieldFESpace(spaces,f.gids,vector_types)
 end
 
-function FEM.length_dirichlet_values(f::DistributedSingleFieldFESpace)
-  length_dirichlet_values(PartitionedArrays.getany(local_views(f)))
-end
-
 function FEM.get_polynomial_order(f::DistributedFESpace)
   FEM.get_polynomial_order(PartitionedArrays.getany(local_views(f)))
 end
@@ -107,7 +103,7 @@ function FESpaces.SparseMatrixAssembler(
   Tpv = PartitionedArrays.getany(map(get_vector_type,local_views(trial)))
   T  = eltype(Tpv)
   Tm = SparseMatrixCSC{T,Int}
-  Tpm = typeof(ParamMatrix{Tm}(undef,length_free_values(trial)))
+  Tpm = typeof(ParamMatrix{Tm}(undef,param_length(trial)))
   SparseMatrixAssembler(Tpm,Tpv,trial,test,par_strategy)
 end
 

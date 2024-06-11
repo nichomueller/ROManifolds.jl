@@ -63,7 +63,7 @@ FESpaces.get_dirichlet_dof_values(f::TrialParamFESpace) = f.dirichlet_values
 
 FESpaces.ConstraintStyle(::Type{<:TrialParamFESpace{U}}) where U = ConstraintStyle(U)
 
-length_dirichlet_values(f::TrialParamFESpace) = length(f.dirichlet_values)
+ParamDataStructures.param_length(f::TrialParamFESpace) = length(f.dirichlet_values)
 
 function ParamDataStructures.param_getindex(f::TrialParamFESpace,index::Integer)
   dv = param_getindex(f.dirichlet_values,index)

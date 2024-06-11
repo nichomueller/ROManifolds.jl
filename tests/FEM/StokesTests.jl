@@ -3,6 +3,7 @@ using Gridap
 using Gridap.CellData
 using Gridap.Algebra
 using Gridap.FESpaces
+using Gridap.MultiField
 using Gridap.ODEs
 using Gridap.Helpers
 using Test
@@ -84,16 +85,15 @@ _g(x,t) = g(x,μ,t)
 _g(t) = x->_g(x,t)
 
 _form(t,(u,p),(v,q)) = ∫(_a(t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
-_res(t,(u,p),(v,q)) = _form(t,(u,p),(v,q))
-_jac(t,(u,p),(du,dp),(v,q)) = _form(t,(du,dp),(v,q))
 _mass(t,(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
-_jac_t(t,(u,p),(dut,dpt),(v,q)) = _mass(t,(dut,dpt),(v,q))
+zf(x) = VectorValue(0,0)
+_rhs(t,(v,q)) = ∫(zf⋅v)dΩ
 
 _trial_u = TransientTrialFESpace(test_u,_g)
 _trial = TransientMultiFieldFESpace([_trial_u,trial_p];style=BlockMultiFieldStyle())
 _x0 = interpolate_everywhere([u0(μ),p0(μ)],_trial(0.0))
 
-_feop = TransientSemilinearFEOperator(_mass,_res,_jac,_jac_t,_trial,test)
+_feop = TransientLinearFEOperator((_form,_mass),_rhs,_trial,test)
 _sol = solve(fesolver,_feop,t0,tf,_x0)
 Base.iterate(_sol)
 

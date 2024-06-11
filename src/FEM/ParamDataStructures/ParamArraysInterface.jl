@@ -26,8 +26,8 @@ function array_of_zero_arrays(a::AbstractArray{<:Number},l::Integer)
   return A0
 end
 
-_to_param_quantity(A::AbstractParamArray,plength::Integer) = A
-_to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
+to_param_quantity(A::AbstractParamArray,plength::Integer) = A
+to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
 
 Base.:(==)(A::AbstractParamArray,B::AbstractParamArray) = (all_data(A) == all_data(B))
 Base.:(≈)(A::AbstractParamArray,B::AbstractParamArray) = (all_data(A) ≈ all_data(B))
@@ -139,7 +139,7 @@ function LinearAlgebra.ldiv!(A::AbstractParamArray,b::Factorization,C::AbstractP
 end
 
 function LinearAlgebra.ldiv!(A::AbstractParamArray,B::ParamContainer,C::AbstractParamArray)
-  @check param_length(A) == param_length(B) == length(C)
+  @check param_length(A) == param_length(B) == param_length(C)
   @inbounds for i in param_eachindex(A)
     ai = param_view(A,i)
     bi = param_getindex(B,i)
@@ -180,14 +180,14 @@ function Arrays.setsize!(A::AbstractParamArray{T,N},s::NTuple{N,Integer}) where 
 end
 
 function param_return_value(f::Union{Function,Map},A...)
-  pA = _to_param_quantities(A...)
+  pA = to_param_quantities(A...)
   c = return_value(f,testitem.(pA)...)
   data = array_of_similar_arrays(c,param_length(first(pA)))
   return data
 end
 
 function param_return_cache(f::Union{Function,Map},A...)
-  pA = _to_param_quantities(A...)
+  pA = to_param_quantities(A...)
   c = return_cache(f,testitem.(pA)...)
   d = evaluate!(c,f,testitem.(pA)...)
   cache = Vector{typeof(c)}(undef,param_length(first(pA)))
@@ -200,7 +200,7 @@ end
 
 function param_evaluate!(C,f::Union{Function,Map},A...)
   cache,data = C
-  pA = _to_param_quantities(A...)
+  pA = to_param_quantities(A...)
   @inbounds for i in param_eachindex(data)
     vi = evaluate!(cache[i],f,param_getindex.(pA,i)...)
     param_setindex!(data,vi,i)
@@ -435,21 +435,21 @@ for T in (:AbstractParamArray,:AbstractArray,:Nothing), S in (:AbstractParamArra
   (T∈(:AbstractArray,:Nothing) && S==:AbstractArray) && continue
   @eval begin
     function Arrays.return_cache(f::Fields.ZeroBlockMap,A::$T,B::$S)
-      pA,pB = _to_param_quantities(A,B)
+      pA,pB = to_param_quantities(A,B)
       CachedArray(param_similar(pA,eltype(pA),innersize(pB)))
     end
   end
 end
 
 function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,A::AbstractArray,B::AbstractArray)
-  _,pA,pB = _to_param_quantities(C,A,B)
+  _,pA,pB = to_param_quantities(C,A,B)
   param_array(param_data(C),param_data(pA),param_data(pB)) do c,a,b
     evaluate!(c,f,collect(a),collect(b))
   end
 end
 
 function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,a::Nothing,B::AbstractArray)
-  _,pB = _to_param_quantities(C,B)
+  _,pB = to_param_quantities(C,B)
   param_array(param_data(C),param_data(pB)) do c,b
     evaluate!(c,f,a,collect(b))
   end
@@ -476,7 +476,7 @@ function Fields._setsize_mul!(C::AbstractParamArray,A::AbstractParamArray,B::Abs
 end
 
 function Fields._setsize_mul!(C,A::Union{AbstractParamArray,AbstractArray}...)
-  pA = _to_param_quantities(A...)
+  pA = to_param_quantities(A...)
   Fields._setsize_mul!(C,pA...)
 end
 

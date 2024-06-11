@@ -33,6 +33,8 @@ end
 
 get_coupling(op::TransientParamFEOperator) = @abstractmethod
 
+IndexMaps.get_index_map(op::TransientParamFEOperator) = @abstractmethod
+
 function assemble_coupling_matrix(op::TransientParamFEOperator)
   @abstractmethod
 end
@@ -46,6 +48,7 @@ struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParam
   induced_norm::Function
   tpspace::TransientParamSpace
   assem::Assembler
+  index_map::AbstractIndexMap
   trial::FESpace
   test::FESpace
   order::Integer
@@ -56,8 +59,9 @@ function TransientParamFEOperator(
 
   order = length(jacs) - 1
   assem = SparseMatrixAssembler(trial,test)
+  index_map = FEOperatorIndexMap(trial,test)
   TransientParamFEOpFromWeakForm(
-    res,jacs,induced_norm,tpspace,assem,trial,test,order,args...)
+    res,jacs,induced_norm,tpspace,assem,index_map,trial,test,order,args...)
 end
 
 function TransientParamFEOperator(
@@ -105,6 +109,7 @@ ReferenceFEs.get_order(op::TransientParamFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamFEOpFromWeakForm) = op.assem
+IndexMaps.get_index_map(op::TransientParamFEOpFromWeakForm) = op.index_map
 realization(op::TransientParamFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 get_induced_norm(op::TransientParamFEOpFromWeakForm) = op.induced_norm
 

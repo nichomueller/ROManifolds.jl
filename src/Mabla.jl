@@ -37,8 +37,6 @@ export OperationParamField
 
 export SingleFieldParamFESpace
 export FESpaceToParamFESpace
-export length_dirichlet_values
-export length_free_values
 
 export MultiFieldParamFESpace
 

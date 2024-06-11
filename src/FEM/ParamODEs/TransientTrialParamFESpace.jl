@@ -98,6 +98,21 @@ function FESpaces.get_dirichlet_dof_values(f::TransientTrialParamFESpace)
   @unreachable msg
 end
 
+for fun in (:(ParamTProduct.get_dof_index_map),:(ParamTProduct.get_tp_dof_index_map))
+  @eval begin
+    $fun(f::TransientTrialParamFESpace) = $fun(f.space)
+    $fun(f::TransientTrialParamFESpace,g::SingleFieldFESpace) = $fun(f.space,g)
+  end
+end
+
+for fun in (:(IndexMap.get_sparsity),:(ParamTProduct.get_sparse_index_map))
+  @eval begin
+    function $fun(f::TransientTrialParamFESpace,g::SingleFieldFESpace)
+      $fun(f.space,g)
+    end
+  end
+end
+
 # Define the TransientTrialFESpace interface for stationary spaces
 
 ODEs.allocate_space(U::FESpace,params,times) = U
@@ -124,6 +139,27 @@ function ODEs.allocate_space(U::MultiFieldFESpace,args...)
   spaces = map(U->allocate_space(U,args...),U.spaces)
   style = MultiFieldStyle(U)
   MultiFieldParamFESpace(spaces;style)
+end
+
+function Arrays.evaluate!(
+  Upt::MultiFieldFESpace,
+  U::MultiFieldFESpace,
+  args...)
+
+  if !has_param_transient(U)
+    @assert !ODEs.has_transient(U)
+    return Ut
+  end
+  for (Upti,Ui) in zip(Upt,U)
+    evaluate!(Upti,Ui,args...)
+  end
+  Upt
+end
+
+function Arrays.evaluate(U::MultiFieldFESpace,args...)
+  Upt = allocate_space(U,args...)
+  evaluate!(Upt,U,args...)
+  Upt
 end
 
 function test_transient_trial_fe_space(Uh,μ)

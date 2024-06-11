@@ -271,7 +271,7 @@ s = size(get_cell_map(Ω))
 array_new = lazy_map(Broadcasting(*),Fill(ws[1],s),array_old)
 
 cache = return_cache(Broadcasting(*),ws[1],array_old[1])
-pA = ParamDataStructures._to_param_quantities(ws[1],array_old[1])
+pA = ParamDataStructures.to_param_quantities(ws[1],array_old[1])
 
 #
 μ = ParamRealization([rand(3),rand(3)])

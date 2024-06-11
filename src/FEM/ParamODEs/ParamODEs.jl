@@ -14,6 +14,7 @@ using Gridap.ReferenceFEs
 using Gridap.Helpers
 
 using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.IndexMaps
 using Mabla.FEM.ParamFESpaces
 
 import Test: @test

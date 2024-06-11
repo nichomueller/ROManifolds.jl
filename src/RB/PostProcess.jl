@@ -109,8 +109,8 @@ function space_time_error(_sol::AbstractSnapshots,_sol_approx::AbstractSnapshots
 end
 
 function space_time_error(_sol::TTSnapshots,_sol_approx::TTSnapshots,norm_matrix=nothing)
-  sol = vectorize_index_map(_sol)
-  sol_approx = vectorize_index_map(_sol_approx)
+  sol = change_index_map(TrivialIndexMap,_sol)
+  sol_approx = change_index_map(TrivialIndexMap,_sol_approx)
   T = promote_type(eltype(sol),eltype(sol_approx))
   err_norm = allocate_vector(Vector{T},num_times(sol))
   sol_norm = allocate_vector(Vector{T},num_times(sol))
@@ -143,7 +143,7 @@ end
 function FESpaces.FEFunction(
   fs::SingleFieldParamFESpace,s::AbstractSnapshots{Mode1Axis})
   r = get_realization(s)
-  @assert FEM.length_free_values(fs) == length(r)
+  @assert param_length(fs) == length(r)
   free_values = _to_param_array(s.values)
   diri_values = get_dirichlet_dof_values(fs)
   FEFunction(fs,free_values,diri_values)

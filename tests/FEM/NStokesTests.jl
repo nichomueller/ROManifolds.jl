@@ -7,6 +7,10 @@ using Gridap.ODEs
 using Gridap.Helpers
 using Test
 using Mabla.FEM
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamAlgebra
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamODEs
 
 θ = 0.5
 dt = 0.01
@@ -17,7 +21,7 @@ pranges = fill([0,1],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 r = realization(ptspace,nparams=3)
-μ = FEM._get_params(r)[3]
+μ = ParamDataStructures._get_params(r)[2]
 
 domain = (0,1,0,1)
 partition = (2,2)
@@ -122,8 +126,8 @@ end
 
 for ((rt,xh),(_t,_xh)) in zip(sol,_sol)
   uh,ph = xh
-  uh1 = FEM.param_getindex(uh,3)
-  ph1 = FEM.param_getindex(ph,3)
+  uh1 = param_getindex(uh,2)
+  ph1 = param_getindex(ph,2)
   _uh,_ph = _xh
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"
@@ -131,122 +135,3 @@ for ((rt,xh),(_t,_xh)) in zip(sol,_sol)
   @check get_free_dof_values(ph1) ≈ get_free_dof_values(_ph) "failed at time $t"
   @check uh1.dirichlet_values ≈ _uh.dirichlet_values
 end
-
-jfeop = join_operators(feop)
-
-nparams = 3
-x = ParamArray([mortar([rand(num_free_dofs(test_u)),rand(num_free_dofs(test_p))]) for _ = 1:nparams])
-r0 = FEM.get_at_time(r,:initial)
-ff = FEFunction(trial(r0),x)
-xh = TransientCellField(ff,(ff,))
-
-du = get_trial_fe_basis(test)
-dv = get_fe_basis(test)
-
-_ff = FEM.param_getindex(ff,1)
-_xh = TransientCellField(_ff,(_ff,))
-
-function _check_equality(a::DomainContribution,b::DomainContribution)
-  _first(y) = lazy_map(x->getindex(x,1),y)
-  return lazy_map(x->getindex(x,1),_first(a[Ω])) ≈ _first(b[Ω])
-end
-
-DC = jfeop.op.jacs[1](get_params(r),0.0,xh,du,dv)
-_DC = _feop.jacs[1](0.0,_xh,du,dv)
-_check_equality(DC,_DC)
-
-DC = jfeop.op.jacs[2](get_params(r),0.0,xh,du,dv)
-_DC = _feop.jacs[2](0.0,_xh,du,dv)
-DC[Ω][1][1] ≈ _DC[Ω][1][1]
-
-DC = jfeop.op.res(get_params(r),0.0,xh,dv)
-_DC = _feop.res(0.0,_xh,dv)
-_check_equality(DC,_DC)
-
-snaps = Snapshots(collect(sol.odesol),r)
-
-
-# sol = sol.odesol do this once
-r0 = FEM.get_at_time(sol.r,:initial)
-cache = allocate_odecache(sol.solver,sol.odeop,r0,sol.us0)
-state0,cache = ode_start(sol.solver,sol.odeop,r0,sol.us0,cache)
-statef = copy.(state0)
-
-w0 = state0[1]
-odeslvrcache,odeopcache = cache
-uθ,sysslvrcache = odeslvrcache
-
-sysslvr = fesolver.sysslvr
-
-x = statef[1]
-dtθ = θ*dt
-shift!(r0,dtθ)
-function usx(x)
-  copy!(uθ,w0)
-  axpy!(dtθ,x,uθ)
-  (uθ,x)
-end
-ws = (dtθ,1)
-
-update_odeopcache!(odeopcache,sol.odeop,r0)
-
-stageop = NonlinearParamStageOperator(sol.odeop,odeopcache,r0,usx,ws)
-
-B = residual(stageop,x)
-A = jacobian(stageop,x)
-
-# residual
-b = allocate_residual(stageop,x)
-# residual!(b,stageop,x)
-odeop,odeopcache = stageop.odeop,stageop.odeopcache
-rx = stageop.rx
-ussx = stageop.usx(x)
-# residual!(b,odeop,rx,ussx,odeopcache)
-uh = ODEs._make_uh_from_us(odeop,ussx,odeopcache.Us)
-test = get_test(odeop.op)
-v = get_fe_basis(test)
-assem = get_assembler(odeop.op,rx)
-fill!(b,zero(eltype(b)))
-mydc = get_res(odeop.op)(get_params(rx),get_times(rx),uh,v)
-vecdata = collect_cell_vector(test,mydc)
-assemble_vector_add!(b,assem,vecdata)
-
-#######################################
-# _sol = _sol.odesltn do this once
-
-t0 = 0.005
-
-_cache = allocate_odecache(_sol.odeslvr,_sol.odeop,t0,_sol.us0)
-_state0,_cache = ode_start(_sol.odeslvr,_sol.odeop,t0,_sol.us0,_cache)
-_statef = copy.(_state0)
-
-_w0 = _state0[1]
-_odeslvrcache,_odeopcache = _cache
-_uθ,_sysslvrcache = _odeslvrcache
-
-_sysslvr = _sol.odeslvr.sysslvr
-
-_x = _statef[1]
-function _usx(x)
-  copy!(_uθ,_w0)
-  axpy!(dtθ,x,_uθ)
-  (_uθ,x)
-end
-
-update_odeopcache!(_odeopcache,_sol.odeop,t0)
-
-_stageop = NonlinearStageOperator(_sol.odeop,_odeopcache,t0,_usx,ws)
-
-_B = residual(_stageop,_x)
-_A = jacobian(_stageop,_x)
-
-_b = allocate_residual(_stageop,_x)
-_odeop,_odeopcache = _stageop.odeop,_stageop.odeopcache
-_ussx = _stageop.usx(_x)
-_uh = ODEs._make_uh_from_us(_sol.odeop,_ussx,_odeopcache.Us)
-_test = get_test(_sol.odeop.tfeop)
-_assem = get_assembler(_sol.odeop.tfeop)
-fill!(_b,zero(eltype(_b)))
-_mydc = get_res(_sol.odeop.tfeop)(t0,_uh,v)
-_vecdata = collect_cell_vector(_test,_mydc)
-assemble_vector_add!(_b,_assem,_vecdata)

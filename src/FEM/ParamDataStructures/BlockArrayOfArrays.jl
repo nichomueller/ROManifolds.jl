@@ -145,6 +145,12 @@ for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
   end
 end
 
+for f in (:(Base.maximum),:(Base.minimum))
+  @eval begin
+    $f(g,A::BlockArrayOfArrays) = $f(map(a -> $f(g,a),all_data(A)))
+  end
+end
+
 struct BlockParamView{T,N,L,A} <: AbstractBlockArray{T,N}
   data::BlockArrayOfArrays{T,N,L,A}
   index::Int

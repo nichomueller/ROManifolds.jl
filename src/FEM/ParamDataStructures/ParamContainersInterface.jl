@@ -11,18 +11,18 @@ param_view(a,i::Integer...) = @abstractmethod
 param_entry(a,i::Integer...) = @abstractmethod
 param_eachindex(a) = Base.OneTo(param_length(a))
 array_of_similar_arrays(a,l::Integer) = @abstractmethod
-_to_param_quantity(a,plength::Integer) = @abstractmethod
-_to_param_quantity(a::Union{Nothing,Function,Map},plength::Integer) = a
+to_param_quantity(a,plength::Integer) = @abstractmethod
+to_param_quantity(a::Union{Nothing,Function,Map},plength::Integer) = a
 
-function _find_param_length(a...)
+function find_param_length(a...)
   plengths::Tuple{Vararg{Int}} = filter(!iszero,param_length.(a))
   @check all(plengths .== first(plengths))
   return first(plengths)
 end
 
-function _to_param_quantities(a...)
-  plength = _find_param_length(a...)
-  pa = map(f->_to_param_quantity(f,plength),a)
+function to_param_quantities(a...)
+  plength = find_param_length(a...)
+  pa = map(f->to_param_quantity(f,plength),a)
   return pa
 end
 
@@ -59,8 +59,8 @@ param_setindex!(a::ParamNumber,v,i::Integer) = setindex!(a,v,i)
 param_view(a::ParamNumber,i::Integer) = getindex(a,i)
 param_entry(a::ParamNumber,i::Integer) = getindex(a,i)
 
-_to_param_quantity(a::Number,plength::Integer) = ParamNumber(fill(a,plength))
-_to_param_quantity(a::ParamNumber,plength::Integer) = a
+to_param_quantity(a::Number,plength::Integer) = ParamNumber(fill(a,plength))
+to_param_quantity(a::ParamNumber,plength::Integer) = a
 
 Base.size(a::ParamNumber) = (param_length(a),)
 Base.getindex(a::ParamNumber,i::Integer) = getindex(a.data,i)

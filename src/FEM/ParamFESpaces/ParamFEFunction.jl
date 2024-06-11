@@ -46,7 +46,7 @@ function FESpaces.test_fe_function(f::SingleFieldParamFEFunction)
   fe_space = get_fe_space(f)
   cell_values = get_cell_dof_values(f,trian)
   dirichlet_values = f.dirichlet_values
-  for i in 1:length_dirichlet_values(fe_space)
+  for i in param_eachindex(fe_space)
     fe_space_i = param_getindex(fe_space,i)
     fi = FEFunction(fe_space_i,free_values[i])
     test_fe_function(fi)

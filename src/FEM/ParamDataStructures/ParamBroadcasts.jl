@@ -12,7 +12,7 @@ all_data(A::ParamBroadcast) = A.data
 
 function Base.broadcasted(f,A::Union{AbstractParamArray,ParamBroadcast}...)
   bc = Base.broadcasted(f,map(all_data,A)...)
-  plength = _find_param_length(A...)
+  plength = find_param_length(A...)
   ParamBroadcast(bc,plength)
 end
 

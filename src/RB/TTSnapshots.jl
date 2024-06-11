@@ -40,6 +40,11 @@ end
 
 reverse_snapshots(s::TTSnapshots) = s
 
+function IndexMaps.change_index_map(f,s::TTSnapshots)
+  new_map = change_index_map(f,get_index_map(s))
+  TTSnapshots(s,new_map)
+end
+
 #= representation of a standard tensor-train snapshot
    [ [u(x1,t1,μ1) ⋯ u(x1,t1,μP)] [u(x1,t2,μ1) ⋯ u(x1,t2,μP)] [u(x1,t3,μ1) ⋯] [⋯] [u(x1,tT,μ1) ⋯ u(x1,tT,μP)] ]
          ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
@@ -264,46 +269,6 @@ function _select_snapshots_entries(s::TTSnapshots{T},ispace,itime) where T
     end
   end
   return values
-end
-
-function vectorize_index_map(s::TTSnapshots)
-  i = get_index_map(s)
-  vi = ParamTensorProduct.vectorize_index_map(i)
-  VectorizedTTSnapshots(s,vi)
-end
-
-struct VectorizedTTSnapshots{T,S,I} <: TTSnapshots{T,3}
-  snaps::S
-  index_map::I
-  function VectorizedTTSnapshots(snaps::S,index_map::I) where {T,S<:TTSnapshots{T},I}
-    new{T,S,I}(snaps,index_map)
-  end
-end
-
-ParamTensorProduct.get_index_map(s::VectorizedTTSnapshots) = s.index_map
-
-function get_realization(s::VectorizedTTSnapshots)
-  get_realization(s.snaps)
-end
-
-function tensor_getindex(s::VectorizedTTSnapshots{T,<:BasicTTSnapshots},ispace,itime,iparam) where T
-  perm_ispace = get_index_map(s)[ispace]
-  s.snaps.values[iparam+(itime-1)*num_params(s)][perm_ispace]
-end
-
-function tensor_getindex(s::VectorizedTTSnapshots{T,<:TransientTTSnapshots},ispace,itime,iparam) where T
-  perm_ispace = get_index_map(s)[ispace]
-  s.snaps.values[itime][iparam][perm_ispace]
-end
-
-ParamDataStructures.num_times(s::VectorizedTTSnapshots{T,<:SelectedTTSnapshotsAtIndices}) where T = num_times(s.snaps)
-ParamDataStructures.num_params(s::VectorizedTTSnapshots{T,<:SelectedTTSnapshotsAtIndices}) where T = num_params(s.snaps)
-
-function tensor_getindex(s::VectorizedTTSnapshots{T,<:SelectedTTSnapshotsAtIndices},ispace,itime,iparam) where T
-  is = ispace
-  it = time_indices(s.snaps)[itime]
-  ip = param_indices(s.snaps)[iparam]
-  tensor_getindex(VectorizedTTSnapshots(s.snaps.snaps,s.index_map),is,it,ip)
 end
 
 const BasicNnzTTSnapshots = BasicTTSnapshots{T,N,P,R} where {T,N,P<:ParamTTSparseMatrix,R}

@@ -1,9 +1,3 @@
-function length_dirichlet_values end
-length_dirichlet_values(f::FESpace) = @abstractmethod
-
-function length_free_values end
-length_free_values(f::FESpace) = length_dirichlet_values(f)
-
 function get_dirichlet_cells end
 get_dirichlet_cells(f::FESpace) = @abstractmethod
 get_dirichlet_cells(f::UnconstrainedFESpace) = f.dirichlet_cells
@@ -40,14 +34,29 @@ FESpaces.get_dirichlet_dof_tag(f::SingleFieldParamFESpace) = get_dirichlet_dof_t
 
 FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldParamFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
+for fun in (:(ParamTProduct.get_dof_index_map),:(ParamTProduct.get_tp_dof_index_map))
+  @eval begin
+    $fun(f::SingleFieldParamFESpace) = $fun(f.space)
+    $fun(f::SingleFieldParamFESpace,g::SingleFieldFESpace) = $fun(f.space,g)
+  end
+end
+
+for fun in (:(IndexMap.get_sparsity),:(ParamTProduct.get_sparse_index_map))
+  @eval begin
+    function $fun(f::SingleFieldParamFESpace,g::SingleFieldFESpace)
+      $fun(f.space,g)
+    end
+  end
+end
+
 get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(f.space)
 
 # These functions allow us to use global ParamArrays
 
 function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   V = get_vector_type(f.space)
-  N = length_free_values(f)
-  typeof(array_of_similar_arrays(V(),N))
+  L = param_length(f)
+  typeof(array_of_similar_arrays(V(),L))
 end
 
 function FESpaces.gather_free_and_dirichlet_values!(
@@ -144,12 +153,11 @@ struct FESpaceToParamFESpace{S,L} <: SingleFieldParamFESpace
   FESpaceToParamFESpace(space::S,::Val{L}) where {S,L} = new{S,L}(space)
 end
 
-FESpaceToParamFESpace(f::SingleFieldFESpace,L::Integer) = FESpaceToParamFESpace(f,Val{L}())
-FESpaceToParamFESpace(f::SingleFieldParamFESpace,L::Integer) = f
+ParamDataStructures.param_length(f::FESpaceToParamFESpace{S,L}) where {S,L} = L
+ParamDataStructures.to_param_quantity(f::SingleFieldParamFESpace,plength::Integer) = f
+ParamDataStructures.to_param_quantity(f::SingleFieldFESpace,plength::Integer) = FESpaceToParamFESpace(f,Val{plength}())
 
 FESpaces.ConstraintStyle(::Type{<:FESpaceToParamFESpace{S}}) where S = ConstraintStyle(S)
-
-length_dirichlet_values(f::FESpaceToParamFESpace{S,L}) where {S,L} = L
 
 # Extend some of Gridap's functions when needed
 function FESpaces.FEFunction(
@@ -169,13 +177,13 @@ function FESpaces.FEFunction(
     fv_i .+= c
     dv_i .+= c
   end
-  f′ = FESpaceToParamFESpace(zf.space,length_dirichlet_values(f))
+  f′ = FESpaceToParamFESpace(zf.space,param_length(f))
   FEFunction(f′,fv,dv)
 end
 
 function FESpaces.EvaluationFunction(f::FESpaceToParamFESpace{<:ZeroMeanFESpace},free_values)
   zf = f.space
-  f′ = FESpaceToParamFESpace(zf.space,length_dirichlet_values(f))
+  f′ = FESpaceToParamFESpace(zf.space,param_length(f))
   FEFunction(f′,free_values)
 end
 
@@ -185,7 +193,7 @@ function FESpaces.scatter_free_and_dirichlet_values(
   dv::AbstractParamVector)
 
   tf = f.space
-  f′ = FESpaceToParamFESpace(tf.space,length_dirichlet_values(f))
+  f′ = FESpaceToParamFESpace(tf.space,param_length(f))
   scatter_free_and_dirichlet_values(f′,fv,dv)
 end
 
@@ -195,7 +203,7 @@ function FESpaces.scatter_free_and_dirichlet_values(
   dv::AbstractParamVector)
 
   zf = f.space
-  f′ = FESpaceToParamFESpace(zf.space,length_dirichlet_values(f))
+  f′ = FESpaceToParamFESpace(zf.space,param_length(f))
   scatter_free_and_dirichlet_values(f′,fv,dv)
 end
 
@@ -215,7 +223,7 @@ function FESpaces.scatter_free_and_dirichlet_values(
     fv_i .= FESpaces.VectorWithEntryInserted(fv_i,ff.dof_to_fix,dv_i[1])
     dv_i .= similar(dv_i,eltype(dv_i),0)
   end
-  f′ = FESpaceToParamFESpace(ff.space,length_dirichlet_values(f))
+  f′ = FESpaceToParamFESpace(ff.space,param_length(f))
   FEFunction(f′,fv,dv)
 end
 

@@ -5,13 +5,14 @@ function TransientParamFEOpFromWeakForm(
   jacs::Tuple{Vararg{Function}},
   induced_norm::Function,
   tpspace::TransientParamSpace,
+  index_map::AbstractIndexMap,
   assem::Assembler,
   trial::FESpace,
   test::FESpace,
   order::Integer,
   coupling::Function)
 
-  op = TransientParamFEOpFromWeakForm(res,jacs,induced_norm,tpspace,assem,
+  op = TransientParamFEOpFromWeakForm(res,jacs,induced_norm,tpspace,assem,index_map,
     trial,test,order)
   saddlep_op = TransientParamSaddlePointFEOp(op,coupling)
   return saddlep_op
@@ -66,6 +67,7 @@ ReferenceFEs.get_order(op::TransientParamSaddlePointFEOp) = get_order(op.op)
 ODEs.get_res(op::TransientParamSaddlePointFEOp) = get_res(op.op)
 ODEs.get_jacs(op::TransientParamSaddlePointFEOp) = get_jacs(op.op)
 ODEs.get_assembler(op::TransientParamSaddlePointFEOp) = get_assembler(op.op)
+IndexMaps.get_index_map(op::TransientParamSaddlePointFEOp) = get_index_map(op.op)
 realization(op::TransientParamSaddlePointFEOp;kwargs...) = realization(op.op;kwargs...)
 get_induced_norm(op::TransientParamSaddlePointFEOp) = get_induced_norm(op.op)
 get_coupling(op::TransientParamSaddlePointFEOp) = op.coupling

@@ -26,6 +26,7 @@ function TransientParamFEOpFromWeakForm(
   jacs::Tuple{Vararg{Function}},
   induced_norm::Function,
   tpspace::TransientParamSpace,
+  index_map::AbstractIndexMap,
   assem::Assembler,
   trial::FESpace,
   test::FESpace,
@@ -33,7 +34,7 @@ function TransientParamFEOpFromWeakForm(
   trian_res,
   trian_jacs...)
 
-  op = TransientParamFEOpFromWeakForm(res,jacs,induced_norm,tpspace,assem,
+  op = TransientParamFEOpFromWeakForm(res,jacs,induced_norm,tpspace,assem,index_map,
     trial,test,order)
   op_trian = TransientParamFEOpFromWeakFormWithTrian(op,trian_res,trian_jacs)
   return op_trian
@@ -117,6 +118,7 @@ function TransientParamFEOpFromWeakForm(
   induced_norm::Function,
   tpspace::TransientParamSpace,
   assem::Assembler,
+  index_map::AbstractIndexMap,
   trial::FESpace,
   test::FESpace,
   order::Integer,
@@ -125,7 +127,7 @@ function TransientParamFEOpFromWeakForm(
   trian_jacs...)
 
   saddlep_op = TransientParamFEOpFromWeakForm(res,jacs,induced_norm,tpspace,assem,
-    trial,test,order,coupling)
+    index_map,trial,test,order,coupling)
   saddlep_op_trian = TransientParamSaddlePointFEOpWithTrian(saddlep_op,trian_res,trian_jacs)
   return saddlep_op_trian
 end
@@ -178,6 +180,7 @@ ReferenceFEs.get_order(op::TransientParamSaddlePointFEOpWithTrian) = get_order(o
 ODEs.get_res(op::TransientParamSaddlePointFEOpWithTrian) = get_res(op.op)
 ODEs.get_jacs(op::TransientParamSaddlePointFEOpWithTrian) = get_jacs(op.op)
 ODEs.get_assembler(op::TransientParamSaddlePointFEOpWithTrian) = get_assembler(op.op)
+IndexMaps.get_index_map(op::TransientParamSaddlePointFEOpWithTrian) = get_index_map(op.op)
 realization(op::TransientParamSaddlePointFEOpWithTrian;kwargs...) = realization(op.op;kwargs...)
 get_induced_norm(op::TransientParamSaddlePointFEOpWithTrian) = get_induced_norm(op.op)
 get_coupling(op::TransientParamSaddlePointFEOpWithTrian) = get_coupling(op.op)
@@ -244,29 +247,12 @@ function _set_triangulation_forms(
   return newforms
 end
 
-function get_polynomial_order(basis,::DiscreteModel)
-  cell_basis = get_data(basis)
-  shapefuns = first(cell_basis.value).fields
-  orders = get_order(shapefuns)
-  first(orders)
-end
-
-function get_polynomial_order(basis,::CartesianDiscreteModel)
-  cell_basis = get_data(basis)
-  shapefun = first(cell_basis).fields
-  get_order(shapefun)
-end
-
-get_polynomial_order(basis,trian::Triangulation) = get_polynomial_order(basis,get_background_model(trian))
-get_polynomial_order(fs::SingleFieldFESpace) = get_polynomial_order(get_fe_basis(fs),get_triangulation(fs))
-get_polynomial_order(fs::MultiFieldFESpace) = maximum(map(get_polynomial_order,fs.spaces))
-
 function set_triangulation(op::TransientParamFEOpFromWeakForm,trian_res,trian_jacs)
   polyn_order = get_polynomial_order(op.test)
   newres = _set_triangulation_form(op.res,trian_res,polyn_order)
   newjacs = _set_triangulation_jacs(op.jacs,trian_jacs,polyn_order)
   TransientParamFEOpFromWeakForm(
-    newres,newjacs,op.induced_norm,op.tpspace,op.assem,op.trial,op.test,op.order)
+    newres,newjacs,op.induced_norm,op.tpspace,op.assem,op.index_map,op.trial,op.test,op.order)
 end
 
 function set_triangulation(op::TransientParamSemilinearFEOpFromWeakForm,trian_res,trian_jacs)
