@@ -25,12 +25,11 @@ end
 function get_dof_index_map(
   ::Type{T},
   model::CartesianDiscreteModel{D},
-  space::Table{Ti},
+  cell_dof_ids::Table{Ti},
   order::Integer,
   args...
   ) where {T,Ti,D}
 
-  cell_dof_ids = get_cell_dof_ids(space)
   dof_map = _get_dof_index_map(model,cell_dof_ids,order)
   return IndexMap(dof_map)
 end

@@ -98,19 +98,12 @@ function FESpaces.get_dirichlet_dof_values(f::TransientTrialParamFESpace)
   @unreachable msg
 end
 
-for fun in (:(ParamTProduct.get_dof_index_map),:(ParamTProduct.get_tp_dof_index_map))
-  @eval begin
-    $fun(f::TransientTrialParamFESpace) = $fun(f.space)
-    $fun(f::TransientTrialParamFESpace,g::SingleFieldFESpace) = $fun(f.space,g)
-  end
+function TProduct.get_vector_index_map(f::TransientTrialParamFESpace)
+  get_vector_index_map(f.space)
 end
 
-for fun in (:(IndexMap.get_sparsity),:(ParamTProduct.get_sparse_index_map))
-  @eval begin
-    function $fun(f::TransientTrialParamFESpace,g::SingleFieldFESpace)
-      $fun(f.space,g)
-    end
-  end
+function TProduct.get_matrix_index_map(f::TransientTrialParamFESpace,g::SingleFieldFESpace)
+  get_matrix_index_map(f.space,g)
 end
 
 # Define the TransientTrialFESpace interface for stationary spaces

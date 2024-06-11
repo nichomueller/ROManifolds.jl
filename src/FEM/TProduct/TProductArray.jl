@@ -9,7 +9,7 @@ Base.@propagate_inbounds _map_getindex(args...) = @abstractmethod
 Base.@propagate_inbounds _map_getindex(imap::TProductIndexMap,i::Int) = (imap[i],)
 Base.@propagate_inbounds _map_getindex(imap::TProductIndexMap,jmap::TProductIndexMap,i::Int,j::Int) = (imap[i],jmap[j])
 
-Base.@propagate_inbounds function Base.getindex(a::AbstractTProductArray{T,N},i::Vararg{Integer,N}) where T
+Base.@propagate_inbounds function Base.getindex(a::AbstractTProductArray{T,N},i::Vararg{Integer,N}) where {T,N}
   i′ = _map_getindex(get_index_map(a)...,i...)
   getindex(a.array,i′...)
 end
@@ -346,9 +346,3 @@ SparseArrays.nnz(a::TProductGradientSparseMatrix) = nnz(a.array)
 SparseArrays.nzrange(a::TProductGradientSparseMatrix,col::Integer) = nzrange(a.array,col)
 SparseArrays.rowvals(a::TProductGradientSparseMatrix) = rowvals(a.array)
 SparseArrays.nonzeros(a::TProductGradientSparseMatrix) = a.array
-
-# deal with cell field + gradient cell field
-for op in (:+,:-)
-  @eval ($op)(a::Vector,b::TProductGradientEval) = TProductGradientEval(b.f,b.g,$op)
-  @eval ($op)(a::TProductGradientEval,b::Vector) = TProductGradientEval(a.f,a.g,$op)
-end

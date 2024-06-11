@@ -13,8 +13,9 @@ using Gridap.FESpaces
 using Gridap.MultiField
 using Gridap.Helpers
 
-using Mabla.FEM.ParamDataStructures
 using Mabla.FEM.IndexMaps
+using Mabla.FEM.TProduct
+using Mabla.FEM.ParamDataStructures
 using Mabla.FEM.ParamAlgebra
 
 import Test: @test

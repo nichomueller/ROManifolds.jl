@@ -26,13 +26,14 @@ function TransientParamSemilinearFEOpFromWeakForm(
   induced_norm::Function,
   tpspace::TransientParamSpace,
   assem::Assembler,
+  index_map::AbstractIndexMap,
   trial::FESpace,
   test::FESpace,
   order::Integer,
   coupling::Function)
 
   op = TransientParamSemilinearFEOpFromWeakForm(mass,res,jacs,constant_mass,
-    induced_norm,tpspace,assem,trial,test,order)
+    induced_norm,tpspace,assem,index_map,trial,test,order)
   saddlep_op = TransientParamSaddlePointFEOp(op,coupling)
   return saddlep_op
 end
@@ -45,13 +46,14 @@ function TransientParamLinearFEOpFromWeakForm(
   induced_norm::Function,
   tpspace::TransientParamSpace,
   assem::Assembler,
+  index_map::AbstractIndexMap,
   trial::FESpace,
   test::FESpace,
   order::Integer,
   coupling::Function)
 
   op = TransientParamLinearFEOpFromWeakForm(forms,res,jacs,constant_forms,
-    induced_norm,tpspace,assem,trial,test,order)
+    induced_norm,tpspace,assem,index_map,trial,test,order)
   saddlep_op = TransientParamSaddlePointFEOp(op,coupling)
   return saddlep_op
 end

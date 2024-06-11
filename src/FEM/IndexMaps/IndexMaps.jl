@@ -1,12 +1,16 @@
 module IndexMaps
 
-import LinearAlgebra
-import SparseArrays
+using LinearAlgebra
+using SparseArrays
 
 using Gridap
+using Gridap.Arrays
+using Gridap.Algebra
 using Gridap.FESpaces
 using Gridap.TensorValues
 using Gridap.Helpers
+
+import SparseArrays: AbstractSparseMatrix
 
 export recast_indices
 export sparsify_indices
@@ -17,12 +21,14 @@ include("IndexOperations.jl")
 
 export SparsityPattern
 export SparsityPatternCSC
+export MultiValueSparsityPatternCSC
 export TProductSparsityPattern
 export get_sparsity
 export permute_sparsity
 include("SparsityPatterns.jl")
 
 export AbstractIndexMap
+export TrivialIndexMap
 export IndexMap
 export IndexMapView
 export MultiValueIndexMap

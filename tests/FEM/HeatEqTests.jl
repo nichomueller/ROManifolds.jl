@@ -7,6 +7,12 @@ using Gridap.ODEs
 using Gridap.Helpers
 using Test
 using Mabla.FEM
+using Mabla.FEM.IndexMaps
+using Mabla.FEM.TProduct
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamAlgebra
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamODEs
 
 θ = 0.5
 dt = 0.1
@@ -17,7 +23,7 @@ pranges = fill([0,1],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 r = realization(ptspace,nparams=3)
-μ = FEM._get_params(r)[3]
+μ = ParamDataStructures._get_params(r)[3]
 
 domain = (0,1,0,1)
 partition = (2,2)
@@ -82,7 +88,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 stiffness(μ,t,u,v) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
 mass(μ,t,uₜ,v) = ∫(v*uₜ)dΩ
 rhs(μ,t,v) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
-res(μ,t,u,v) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rhs(μ,t,v,dΩ,dΓn)
+res(μ,t,u,v) = mass(μ,t,∂t(u),v) + stiffness(μ,t,u,v) - rhs(μ,t,v)
 
 feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,trial,test)
 sol = solve(fesolver,feop,r,uh0μ)
@@ -97,7 +103,7 @@ _sol = solve(fesolver,_feop,t0,tf,_u0)
 Base.iterate(_sol)
 
 for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
-  uh1 = FEM.param_getindex(uh,3)
+  uh1 = param_getindex(uh,3)
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
@@ -123,7 +129,7 @@ _sol = solve(fesolver,_feop,t0,tf,_u0)
 Base.iterate(_sol)
 
 for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
-  uh1 = FEM.param_getindex(uh,3)
+  uh1 = param_getindex(uh,3)
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
@@ -157,7 +163,7 @@ _sol = solve(fesolver,_feop,t0,tf,_u0)
 Base.iterate(_sol)
 
 for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
-  uh1 = FEM.param_getindex(uh,3)
+  uh1 = param_getindex(uh,3)
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
@@ -190,9 +196,23 @@ _sol = solve(fesolver,_feop,t0,tf,_u0)
 Base.iterate(_sol)
 
 for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
-  uh1 = FEM.param_getindex(uh,3)
+  uh1 = param_getindex(uh,3)
   t = get_times(rt)
   @check t ≈ _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
   @check uh1.dirichlet_values ≈ _uh.dirichlet_values
 end
+
+#
+get_vector_index_map(test)
+
+space = test
+
+dof = get_fe_dof_basis(space)
+T = TProduct.get_dof_type(dof)
+cell_dof_ids = get_cell_dof_ids(space)
+order = get_polynomial_order(space)
+comp_to_dofs = TProduct.get_comp_to_free_dofs(T,space,dof)
+# get_dof_index_map(T,model,cell_dof_ids,order,comp_to_dofs)
+dof_map = TProduct._get_dof_index_map(model,cell_dof_ids,order)
+IndexMap(dof_map)

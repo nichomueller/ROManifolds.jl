@@ -21,18 +21,18 @@ function permute_sparsity(a::SparsityPatternCSC,i::AbstractArray,j::AbstractArra
   permute_sparsity(a,vec(i),vec(j))
 end
 
-struct MultiValuePatternCSC{Tv,Ti} <: SparsityPattern
+struct MultiValueSparsityPatternCSC{Tv,Ti} <: SparsityPattern
   matrix::SparseMatrixCSC{Tv,Ti}
   ncomps::Int
 end
 
-get_sparsity(a::MultiValuePatternCSC) = a
-num_rows(a::MultiValuePatternCSC) = size(a.matrix,1)
-num_cols(a::MultiValuePatternCSC) = size(a.matrix,2)
-SparseArrays.findnz(a::MultiValuePatternCSC) = findnz(a.matrix)
-SparseArrays.nnz(a::MultiValuePatternCSC) = nnz(a.matrix)
-get_nonzero_indices(a::MultiValuePatternCSC) = get_nonzero_indices(a.matrix)
-TensorValues.num_components(a::MultiValuePatternCSC) = a.ncomps
+get_sparsity(a::MultiValueSparsityPatternCSC) = a
+num_rows(a::MultiValueSparsityPatternCSC) = size(a.matrix,1)
+num_cols(a::MultiValueSparsityPatternCSC) = size(a.matrix,2)
+SparseArrays.findnz(a::MultiValueSparsityPatternCSC) = findnz(a.matrix)
+SparseArrays.nnz(a::MultiValueSparsityPatternCSC) = nnz(a.matrix)
+get_nonzero_indices(a::MultiValueSparsityPatternCSC) = get_nonzero_indices(a.matrix)
+TensorValues.num_components(a::MultiValueSparsityPatternCSC) = a.ncomps
 
 struct TProductSparsityPattern{A,B} <: SparsityPattern
   sparsity::A
@@ -52,7 +52,7 @@ univariate_findnz(a::TProductSparsityPattern) = tuple_of_arrays(findnz.(a.sparsi
 univariate_nnz(a::TProductSparsityPattern) = nnz.(a.sparsities_1d)
 univariate_nonzero_indices(a::TProductSparsityPattern) = get_nonzero_indices.(a.sparsities_1d)
 
-TensorValues.num_components(a::TProductSparsityPattern{<:MultiValuePatternCSC}) = num_components(a.sparsity)
+TensorValues.num_components(a::TProductSparsityPattern{<:MultiValueSparsityPatternCSC}) = num_components(a.sparsity)
 
 function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
   m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))

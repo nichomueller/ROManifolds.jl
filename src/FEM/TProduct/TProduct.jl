@@ -1,4 +1,4 @@
-module ParamTensorProduct
+module TProduct
 
 using LinearAlgebra
 using BlockArrays
@@ -17,15 +17,12 @@ using Gridap.ReferenceFEs
 using Gridap.TensorValues
 using Gridap.Helpers
 
-using Mabla.FEM.ParamDataStructures
-using Mabla.FEM.ParamAlgebra
-using Mabla.FEM.ParamFESpaces
-using Mabla.FEM.ParamODEs
+using Mabla.FEM.IndexMaps
 
+import Base:+,-
 import FillArrays: Fill,fill
 import Kronecker: kronecker
 import Gridap.ReferenceFEs: get_order
-import Gridap.TensorValues: Mutable
 import PartitionedArrays: tuple_of_arrays
 import SparseArrays: AbstractSparseMatrixCSC
 
@@ -35,9 +32,6 @@ include("DofIndexMaps.jl")
 
 export get_tp_dof_index_map
 include("TProductDofIndexMaps.jl")
-
-export get_sparse_index_map
-include("FEOperatorIndexMaps.jl")
 
 export TProductModel
 export TProductTriangulation
@@ -67,4 +61,9 @@ include("TProductCellData.jl")
 
 export TProductSparseMatrixAssembler
 include("TProductAssembly.jl")
+
+export FEOperatorIndexMap
+export get_vector_index_map
+export get_matrix_index_map
+include("FEOperatorIndexMaps.jl")
 end # module

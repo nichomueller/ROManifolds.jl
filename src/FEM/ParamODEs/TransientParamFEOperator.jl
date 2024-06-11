@@ -120,6 +120,21 @@ function assemble_norm_matrix(op::TransientParamFEOpFromWeakForm)
   assemble_norm_matrix(inorm,trial,test)
 end
 
+function assemble_norm_matrix(f,U::FESpace,V::FESpace)
+  assemble_matrix(f,U,V)
+end
+
+function assemble_norm_matrix(f,U::TProductFESpace,V::TProductFESpace)
+  a = SparseMatrixAssembler(U,V)
+  v = get_tp_fe_basis(V)
+  u = get_tp_trial_fe_basis(U)
+  assemble_matrix(a,collect_cell_matrix(U,V,f(u,v)))
+end
+
+function assemble_norm_matrix(f,U::TrialFESpace{<:TProductFESpace},V::TProductFESpace)
+  assemble_norm_matrix(f,U.space,V)
+end
+
 function ODEs.get_assembler(feop::TransientParamFEOpFromWeakForm,r::TransientParamRealization)
   get_param_assembler(get_assembler(feop),r)
 end
@@ -132,6 +147,7 @@ struct TransientParamSemilinearFEOpFromWeakForm <: TransientParamFEOperator{Semi
   induced_norm::Function
   tpspace::TransientParamSpace
   assem::Assembler
+  index_map::AbstractIndexMap
   trial::FESpace
   test::FESpace
   order::Integer
@@ -151,8 +167,9 @@ function TransientParamSemilinearFEOperator(
       (mass,),res,jacs,induced_norm,tpspace,trial,test;constant_forms=(constant_mass,))
   end
   assem = SparseMatrixAssembler(trial,test)
+  index_map = FEOperatorIndexMap(trial,test)
   TransientParamSemilinearFEOpFromWeakForm(
-    mass,res,jacs,constant_mass,induced_norm,tpspace,assem,trial,test,order,args...)
+    mass,res,jacs,constant_mass,induced_norm,tpspace,assem,index_map,trial,test,order,args...)
 end
 
 function TransientParamSemilinearFEOperator(
@@ -239,6 +256,7 @@ struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearPa
   induced_norm::Function
   tpspace::TransientParamSpace
   assem::Assembler
+  index_map::AbstractIndexMap
   trial::FESpace
   test::FESpace
   order::Integer
@@ -251,8 +269,9 @@ function TransientParamLinearFEOperator(
   order = length(forms)-1
   jacs = ntuple(k -> ((μ,t,u,duk,v,args...) -> forms[k](μ,t,duk,v,args...)),length(forms))
   assem = SparseMatrixAssembler(trial,test)
+  index_map = FEOperatorIndexMap(trial,test)
   TransientParamLinearFEOpFromWeakForm(
-    forms,res,jacs,constant_forms,induced_norm,tpspace,assem,trial,test,order,args...)
+    forms,res,jacs,constant_forms,induced_norm,tpspace,assem,index_map,trial,test,order,args...)
 end
 
 function TransientParamLinearFEOperator(

@@ -34,19 +34,12 @@ FESpaces.get_dirichlet_dof_tag(f::SingleFieldParamFESpace) = get_dirichlet_dof_t
 
 FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldParamFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-for fun in (:(ParamTProduct.get_dof_index_map),:(ParamTProduct.get_tp_dof_index_map))
-  @eval begin
-    $fun(f::SingleFieldParamFESpace) = $fun(f.space)
-    $fun(f::SingleFieldParamFESpace,g::SingleFieldFESpace) = $fun(f.space,g)
-  end
+function TProduct.get_vector_index_map(f::SingleFieldParamFESpace)
+  get_vector_index_map(f.space)
 end
 
-for fun in (:(IndexMap.get_sparsity),:(ParamTProduct.get_sparse_index_map))
-  @eval begin
-    function $fun(f::SingleFieldParamFESpace,g::SingleFieldFESpace)
-      $fun(f.space,g)
-    end
-  end
+function TProduct.get_matrix_index_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace)
+  get_matrix_index_map(f.space,g)
 end
 
 get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(f.space)

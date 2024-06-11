@@ -70,8 +70,8 @@ function fix_dof_index_map(i::AbstractIndexMap,dof_to_fix::Int)
   FixedDofIndexMap(i,dof_to_fix)
 end
 
-struct TrivialIndexMap{Ti,D} <: AbstractIndexMap{D,Ti}
-  size::NTuple{Ti,D}
+struct TrivialIndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
+  size::NTuple{D,Ti}
 end
 
 function TrivialIndexMap(i::AbstractIndexMap)
@@ -116,7 +116,7 @@ end
 
 function split_components(i::AbstractMultiValueIndexMap{D}) where D
   indices = collect(eachslice(i;dims=D))
-  IndexMap.(indices)
+  IndexMaps.(indices)
 end
 
 function merge_components(i::AbstractVector{<:AbstractArray{Ti}}) where Ti
@@ -137,7 +137,7 @@ function permute_sparsity(
   i1 = get_component(i,1)
   j1 = get_component(j,1)
   pa = permute_sparsity(a,j1,i1)
-  MultiValuePatternCSC(pa.matrix,ncomps)
+  MultiValueSparsityPatternCSC(pa.matrix,ncomps)
 end
 
 struct MultiValueIndexMap{D,Ti,I} <: AbstractMultiValueIndexMap{D,Ti}

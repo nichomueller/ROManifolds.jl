@@ -78,13 +78,6 @@ function Fields.gradient(f::TProductCellField)
   return TProductGradientCellField(f,g)
 end
 
-function Fields.gradient(f::TProductFEBasis)
-  dbasis = map(gradient,f.basis)
-  trian = get_triangulation(f)
-  g = TProductFEBasis(dbasis,trian)
-  return TProductGradientCellField(f,g)
-end
-
 struct TProductGradientEval{A,B,C}
   f::A
   g::B
@@ -98,6 +91,36 @@ end
 
 CellData.get_data(a::TProductGradientEval) = a.f
 get_gradient_data(a::TProductGradientEval) = a.g
+
+# fe basis
+
+struct TProductFEBasis{DS,BS,A,B} <: FEBasis
+  basis::A
+  trian::B
+  domain_style::DS
+  basis_style::BS
+end
+
+function TProductFEBasis(basis::Vector,trian::TProductTriangulation)
+  b1 = testitem(basis)
+  DS = DomainStyle(b1)
+  BS = BasisStyle(b1)
+  @check all(map(i -> DS===DomainStyle(i) && BS===BasisStyle(i),basis))
+  TProductFEBasis(basis,trian,DS,BS)
+end
+
+CellData.get_data(f::TProductFEBasis) = f.basis
+CellData.get_triangulation(f::TProductFEBasis) = f.trian
+FESpaces.BasisStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = BS
+CellData.DomainStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = DS
+
+
+function Fields.gradient(f::TProductFEBasis)
+  dbasis = map(gradient,f.basis)
+  trian = get_triangulation(f)
+  g = TProductFEBasis(dbasis,trian)
+  return TProductGradientCellField(f,g)
+end
 
 # evaluations
 
@@ -174,24 +197,9 @@ function CellData.integrate(f::TProductGradientCellField,a::TProductMeasure)
   TProductGradientEval(fi,dfi)
 end
 
-# fe basis
+# deal with cell field + gradient cell field
 
-struct TProductFEBasis{DS,BS,A,B} <: FEBasis
-  basis::A
-  trian::B
-  domain_style::DS
-  basis_style::BS
+for op in (:+,:-)
+  @eval ($op)(a::Vector,b::TProductGradientEval) = TProductGradientEval(b.f,b.g,$op)
+  @eval ($op)(a::TProductGradientEval,b::Vector) = TProductGradientEval(a.f,a.g,$op)
 end
-
-function TProductFEBasis(basis::Vector,trian::TProductTriangulation)
-  b1 = testitem(basis)
-  DS = DomainStyle(b1)
-  BS = BasisStyle(b1)
-  @check all(map(i -> DS===DomainStyle(i) && BS===BasisStyle(i),basis))
-  TProductFEBasis(basis,trian,DS,BS)
-end
-
-CellData.get_data(f::TProductFEBasis) = f.basis
-CellData.get_triangulation(f::TProductFEBasis) = f.trian
-FESpaces.BasisStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = BS
-CellData.DomainStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = DS

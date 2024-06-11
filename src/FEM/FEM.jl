@@ -2,13 +2,13 @@ module FEM
 
 using DocStringExtensions
 
+include("IndexMaps/IndexMaps.jl")
+
+include("TProduct/TProduct.jl")
+
 include("ParamDataStructures/ParamDataStructures.jl")
 
 include("ParamAlgebra/ParamAlgebra.jl")
-
-include("IndexMaps/IndexMaps.jl")
-
-include("ParamTProduct/ParamTProduct.jl")
 
 include("ParamFESpaces/ParamFESpaces.jl")
 
