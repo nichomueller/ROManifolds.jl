@@ -3,6 +3,9 @@ struct FEOperatorIndexMap{A,B}
   vector_map::B
 end
 
+get_matrix_index_map(i::FEOperatorIndexMap) = i.matrix_map
+get_vector_index_map(i::FEOperatorIndexMap) = i.vector_map
+
 function FEOperatorIndexMap(trial::FESpace,test::FESpace)
   trial_model = get_background_model(get_triangulation(trial))
   test_model = get_background_model(get_triangulation(test))

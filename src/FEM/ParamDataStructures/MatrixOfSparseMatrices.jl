@@ -99,6 +99,20 @@ end
 
 # some sparse operations
 
+function recast(A::AbstractArray,a::AbstractArray)
+  @abstractmethod
+end
+
+function recast(A::SparseMatrixCSC,v::AbstractVector)
+  SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,v)
+end
+
+function recast(A::MatrixOfSparseMatricesCSC,a::AbstractMatrix)
+  @check size(a,1) == size(A.data,1)
+  B = map(v -> recast(A,v),collect(eachcol(a)))
+  return MatrixOfSparseMatricesCSC(B)
+end
+
 fast_issymmetric(A::SparseArrays.AbstractSparseMatrixCSC) = fast_is_hermsym(A, identity)
 
 fast_ishermitian(A::SparseArrays.AbstractSparseMatrixCSC) = fast_is_hermsym(A, conj)

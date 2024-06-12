@@ -3,7 +3,9 @@
 @inline fast_index(i,N::Integer) = mod.(i .- 1,N) .+ 1
 @inline fast_index(i::Colon,::Integer) = i
 
-struct ParamRealization{P<:AbstractVector}
+abstract type AbstractParamRealization end
+
+struct ParamRealization{P<:AbstractVector} <: AbstractParamRealization
   params::P
 end
 
@@ -29,7 +31,7 @@ end
 
 # Convention: we separate the initial time instant t0 from the others:
 # in unsteady FEM applications, the value of the solution at t0 is given
-abstract type TransientParamRealization{P<:ParamRealization,T<:Real} end
+abstract type TransientParamRealization{P<:ParamRealization,T<:Real} <: AbstractParamRealization end
 
 Base.length(r::TransientParamRealization) = num_params(r)*num_times(r)
 get_params(r::TransientParamRealization) = get_params(r.params)
@@ -126,8 +128,6 @@ end
 function shift!(r::TransientParamRealizationAt,δ::Real)
   r.t[] += δ
 end
-
-const AbstractParamRealization = Union{ParamRealization,TransientParamRealization}
 
 abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end

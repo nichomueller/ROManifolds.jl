@@ -24,14 +24,14 @@ Base.size(a::SparseCoreCSC) = (size(a.array,1),ParamFESpaces.num_rows(a.sparsity
 
 function Base.getindex(a::SparseCoreCSC,i::CartesianIndex{4})
   is_nnz = CartesianIndex(i.I[2:3]) ∈ a.sparse_indexes
-  sparse_getindex(Val(is_nnz),a,i)
+  if is_nnz
+    sparse_getindex(a,i)
+  else
+    zero(T)
+  end
 end
 
-function sparse_getindex(::Val{false},a::SparseCoreCSC{T},i::CartesianIndex{4}) where T
-  zero(T)
-end
-
-function sparse_getindex(::Val{true},a::SparseCoreCSC{T},i::CartesianIndex{4}) where T
+function sparse_getindex(a::SparseCoreCSC{T},i::CartesianIndex{4}) where T
   i2 = findfirst(a.sparse_indexes .== [CartesianIndex(i.I[2:3])])
   i1,i3 = i.I[1],i.I[4]
   getindex(a.array,CartesianIndex((i1,i2,i3)))
