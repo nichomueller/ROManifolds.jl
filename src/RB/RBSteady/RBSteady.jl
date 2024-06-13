@@ -58,6 +58,7 @@ export RBSolver
 export MDEIMStyle
 export SpaceMDEIM
 export get_test_directory
+export get_fe_solver
 export fe_solutions
 export nonlinear_rb_solve!
 include("RBSolver.jl")

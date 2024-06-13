@@ -79,7 +79,7 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_test"))
 # we can load & solve directly, if the offline structures have been previously saved to file
 # load_solve(rbsolver,dir=test_dir)
 
-fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
+fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
 
 r = realization(feop;nparams=10)
 sol = solve(fesolver,feop,uh0μ,r)

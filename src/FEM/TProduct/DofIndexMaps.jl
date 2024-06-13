@@ -95,21 +95,13 @@ end
 
 # utils
 
-function get_polynomial_order(basis,::DiscreteModel)
-  cell_basis = get_data(basis)
-  shapefuns = first(cell_basis.value).fields
-  orders = get_order(shapefuns)
-  first(orders)
-end
-
-function get_polynomial_order(basis,::CartesianDiscreteModel)
+function get_polynomial_order(basis)
   cell_basis = get_data(basis)
   shapefun = first(cell_basis).fields
   get_order(shapefun)
 end
 
-get_polynomial_order(basis,trian::Triangulation) = get_polynomial_order(basis,get_background_model(trian))
-get_polynomial_order(fs::SingleFieldFESpace) = get_polynomial_order(get_fe_basis(fs),get_triangulation(fs))
+get_polynomial_order(fs::SingleFieldFESpace) = get_polynomial_order(get_fe_basis(fs))
 get_polynomial_order(fs::MultiFieldFESpace) = maximum(map(get_polynomial_order,fs.spaces))
 
 get_dof_type(b) = @abstractmethod

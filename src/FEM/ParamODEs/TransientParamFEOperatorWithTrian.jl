@@ -88,6 +88,7 @@ ReferenceFEs.get_order(op::TransientParamFEOpFromWeakFormWithTrian) = get_order(
 ODEs.get_res(op::TransientParamFEOpFromWeakFormWithTrian) = get_res(op.op)
 ODEs.get_jacs(op::TransientParamFEOpFromWeakFormWithTrian) = get_jacs(op.op)
 ODEs.get_assembler(op::TransientParamFEOpFromWeakFormWithTrian) = get_assembler(op.op)
+IndexMaps.get_index_map(op::TransientParamFEOpFromWeakFormWithTrian) = get_index_map(op.op)
 ParamDataStructures.realization(op::TransientParamFEOpFromWeakFormWithTrian;kwargs...) = realization(op.op;kwargs...)
 ParamSteady.get_induced_norm(op::TransientParamFEOpFromWeakFormWithTrian) = get_induced_norm(op.op)
 

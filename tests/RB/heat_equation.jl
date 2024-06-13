@@ -1,8 +1,16 @@
 using Gridap
 using Test
 using DrWatson
+
 using Mabla.FEM
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamSteady
+using Mabla.FEM.ParamODEs
+
 using Mabla.RB
+using Mabla.RB.RBSteady
+using Mabla.RB.RBTransient
 
 θ = 0.5
 dt = 0.01
@@ -68,7 +76,7 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity
 # we can load & solve directly, if the offline structures have been previously saved to file
 # load_solve(rbsolver,dir=test_dir)
 
-fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
+fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
@@ -95,3 +103,15 @@ results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbs
 println(RB.compute_error(results_space))
 save(test_dir,rbop_space)
 save(test_dir,results_space)
+
+solver = rbsolver
+fesolver = get_fe_solver(solver)
+nparams = num_params(solver)
+sol = solve(fesolver,feop,uh0μ;nparams)
+odesol = sol.odesol
+r = odesol.r
+stats = @timed begin
+  vals = collect(odesol)
+end
+i = get_vector_index_map(op)
+snaps = Snapshots(values,i,r)

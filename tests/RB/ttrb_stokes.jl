@@ -92,7 +92,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=10,nsnaps_test=5,nsnaps_mdeim=5)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
 
-fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
+fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
 
 nparams = num_params(rbsolver)
 sol = solve(fesolver,feop,xh0μ;nparams)

@@ -74,12 +74,12 @@ end
 
 FESpaces.get_test(op::ParamFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::ParamFEOpFromWeakForm) = op.trial
-IndexMaps.get_index_map(op::ParamFEOpFromWeakForm) = op.index_map
 ParamDataStructures.realization(op::ParamFEOpFromWeakForm;kwargs...) = realization(op.pspace;kwargs...)
 get_induced_norm(op::ParamFEOpFromWeakForm) = op.induced_norm
 ODEs.get_res(op::ParamFEOpFromWeakForm) = op.res
 get_jac(op::ParamFEOpFromWeakForm) = op.jac
 ODEs.get_assembler(op::ParamFEOpFromWeakForm) = op.assem
+IndexMaps.get_index_map(op::ParamFEOpFromWeakForm) = op.index_map
 
 function assemble_norm_matrix(op::ParamFEOpFromWeakForm)
   test = get_test(op)
@@ -101,10 +101,6 @@ end
 
 function assemble_norm_matrix(f,U::TrialFESpace{<:TProductFESpace},V::TProductFESpace)
   assemble_norm_matrix(f,U.space,V)
-end
-
-function ODEs.get_assembler(op::ParamFEOpFromWeakForm,r::ParamRealization)
-  get_param_assembler(get_assembler(op),r)
 end
 
 # interface to deal with the inf-sup stability condition of saddle point problems
@@ -132,12 +128,12 @@ end
 
 FESpaces.get_test(op::ParamSaddlePointFEOp) = get_test(op)
 FESpaces.get_trial(op::ParamSaddlePointFEOp) = get_trial(op)
-IndexMaps.get_index_map(op::ParamSaddlePointFEOp) = get_index_map(op)
 ParamDataStructures.realization(op::ParamSaddlePointFEOp;kwargs...) = realization(op.op;kwargs...)
 get_induced_norm(op::ParamSaddlePointFEOp) = get_induced_norm(op)
 ODEs.get_res(op::ParamSaddlePointFEOp) = get_res(op.op)
 get_jac(op::ParamSaddlePointFEOp) = get_jac(op.op)
 ODEs.get_assembler(op::ParamSaddlePointFEOp) = get_assembler(op.op)
+IndexMaps.get_index_map(op::ParamSaddlePointFEOp) = get_index_map(op)
 
 # interface to accommodate the separation of terms depending on the triangulation
 
@@ -187,6 +183,7 @@ get_induced_norm(op::ParamFEOpFromWeakFormWithTrian) = get_induced_norm(op.op)
 ODEs.get_res(op::ParamFEOpFromWeakFormWithTrian) = get_res(op.op)
 get_jac(op::ParamFEOpFromWeakFormWithTrian) = get_jac(op.op)
 ODEs.get_assembler(op::ParamFEOpFromWeakFormWithTrian) = get_assembler(op.op)
+IndexMaps.get_index_map(op::ParamFEOpFromWeakFormWithTrian) = get_index_map(op)
 
 function assemble_norm_matrix(op::ParamFEOpFromWeakFormWithTrian)
   assemble_norm_matrix(op.op)
@@ -228,12 +225,12 @@ end
 
 FESpaces.get_test(op::ParamSaddlePointFEOpWithTrian) = get_test(op.op)
 FESpaces.get_trial(op::ParamSaddlePointFEOpWithTrian) = get_trial(op.op)
-IndexMaps.get_index_map(op::ParamSaddlePointFEOpWithTrian) = get_index_map(op.op)
 ParamDataStructures.realization(op::ParamSaddlePointFEOpWithTrian;kwargs...) = realization(op.op;kwargs...)
 get_induced_norm(op::ParamSaddlePointFEOpWithTrian) = get_induced_norm(op.op)
 ODEs.get_res(op::ParamSaddlePointFEOpWithTrian) = get_res(op.op)
 get_jac(op::ParamSaddlePointFEOpWithTrian) = get_jac(op.op)
 ODEs.get_assembler(op::ParamSaddlePointFEOpWithTrian) = get_assembler(op.op)
+IndexMaps.get_index_map(op::ParamSaddlePointFEOpWithTrian) = get_index_map(op.op)
 get_coupling(op::ParamSaddlePointFEOpWithTrian) = get_coupling(op.op)
 
 # utils

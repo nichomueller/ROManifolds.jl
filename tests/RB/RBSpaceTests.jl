@@ -144,7 +144,7 @@ info = RBInfo(dir;norm_style=[:l2,:l2],nsnaps_state=50,nsnaps_test=10,nsnaps_mde
 
 rbsolver = RBSolver(info,fesolver)
 
-snaps,comp = ode_solutions(rbsolver,feop,xh0μ)
+snaps,comp = fe_solutions(rbsolver,feop,xh0μ)
 
 norm_matrix = RB.assemble_norm_matrix(feop)
 soff = select_snapshots(snaps,RB.offline_params(info))

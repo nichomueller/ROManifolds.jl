@@ -85,7 +85,7 @@ rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=
 # test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated_plate")))
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
 
-fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
+fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)

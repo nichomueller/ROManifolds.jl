@@ -123,19 +123,3 @@ function FESpaces.interpolate_dirichlet(
   end
   MultiFieldFEFunction(free_values,fe,blocks)
 end
-
-function get_vector_index_map(tests::MultiFieldFESpace)
-  index_maps = AbstractIndexMap[]
-  for test in tests
-    push!(index_maps,get_vector_index_map(test))
-  end
-  return index_maps
-end
-
-function get_matrix_index_map(trials::MultiFieldFESpace,tests::MultiFieldFESpace)
-  index_maps = AbstractIndexMap[]
-  for (trial,test) in zip(trials,tests)
-    push!(index_maps,get_matrix_index_map(trial,test))
-  end
-  return index_maps
-end

@@ -97,4 +97,4 @@ fesolver = ThetaMethod(solver,dt,θ)
 
 ϵ = 1e-5
 rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
-fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
+fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)

@@ -71,7 +71,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","tt_toy_h1")))
 
-fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
+fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
 
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
@@ -93,7 +93,7 @@ _trial = TransientTrialParamFESpace(_test,gμt)
 _feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
   _trial,_test,trian_res,trian_stiffness,trian_mass)
 _uh0μ(μ) = interpolate_everywhere(u0μ(μ),_trial(μ,t0))
-_fesnaps,_festats = ode_solutions(rbsolver,_feop,_uh0μ)
+_fesnaps,_festats = fe_solutions(rbsolver,_feop,_uh0μ)
 for ϵ = (1e-2,1e-3,1e-4)
   rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
   _rbop = reduced_operator(rbsolver,_feop,_fesnaps)

@@ -32,7 +32,7 @@ function allocate_paramcache(
   v = get_fe_basis(test)
   trial = evaluate(get_trial(op.op),nothing)
   du = get_trial_fe_basis(trial)
-  assem = get_assembler(op.op,r)
+  assem = get_param_assembler(op.op,r)
 
   jac = get_jac(op.op)
   μ = get_params(r)
@@ -58,7 +58,7 @@ function Algebra.allocate_residual(
   uh = EvaluationFunction(opcache.Us,u)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_assembler(op.op,r)
+  assem = get_param_assembler(op.op,r)
 
   μ = get_params(r)
 
@@ -77,7 +77,7 @@ function Algebra.residual!(
   uh = EvaluationFunction(opcache.Us,u)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_assembler(op.op,r)
+  assem = get_param_assembler(op.op,r)
 
   μ = get_params(r)
   res = get_res(op.op)
@@ -99,7 +99,7 @@ function Algebra.allocate_jacobian(
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_assembler(op.op,r)
+  assem = get_param_assembler(op.op,r)
 
   μ = get_params(r)
   jac = get_jac(op.op)
@@ -121,7 +121,7 @@ function Algebra.jacobian!(
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_assembler(op.op,r)
+  assem = get_param_assembler(op.op,r)
 
   μ = get_params(r)
   jac = get_jac(op.op)
@@ -172,7 +172,7 @@ function allocate_paramcache(
   v = get_fe_basis(test)
   trial = evaluate(get_trial(op.op),nothing)
   du = get_trial_fe_basis(trial)
-  assem = get_assembler(op.op,r)
+  assem = get_param_assembler(op.op,r)
 
   jac = get_jac(op.op)
   μ = get_params(r)
@@ -203,7 +203,7 @@ function Algebra.allocate_residual(
   uh = EvaluationFunction(opcache.Us,u)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_assembler(op.op,r)
+  assem = get_param_assembler(op.op,r)
 
   μ = get_params(r)
   res = get_res(op.op)
@@ -226,7 +226,7 @@ function Algebra.residual!(
   uh = EvaluationFunction(opcache.Us,u)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_assembler(op.op,r)
+  assem = get_param_assembler(op.op,r)
 
   μ = get_params(r)
   res = get_res(op.op)
@@ -249,7 +249,7 @@ function Algebra.allocate_jacobian(
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_assembler(op.op,r)
+  assem = get_param_assembler(op.op,r)
 
   μ = get_params(r)
   jac = get_jac(op.op)
@@ -272,7 +272,7 @@ function Algebra.jacobian!(
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_assembler(op.op,r)
+  assem = get_param_assembler(op.op,r)
 
   μ = get_params(r)
   jac = get_jac(op.op)

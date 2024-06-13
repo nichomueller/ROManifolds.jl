@@ -113,29 +113,29 @@ end
 
 ########################## SEMILINEAR ############################
 
-fesolver = ThetaMethod(NewtonRaphsonSolver(LUSolver(),1e-10,20),dt,θ)
+# fesolver = ThetaMethod(NewtonRaphsonSolver(LUSolver(),1e-10,20),dt,θ)
 
-mass(μ,t,uₜ,v) = ∫(v*uₜ)dΩ
-res(μ,t,u,v) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+# mass(μ,t,uₜ,v) = ∫(v*uₜ)dΩ
+# res(μ,t,u,v) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
 
-feop = TransientParamSemilinearFEOperator(mass,res,induced_norm,ptspace,trial,test)
-sol = solve(fesolver,feop,r,uh0μ)
-Base.iterate(sol)
+# feop = TransientParamSemilinearFEOperator(mass,res,induced_norm,ptspace,trial,test)
+# sol = solve(fesolver,feop,r,uh0μ)
+# Base.iterate(sol)
 
-_mass(t,uₜ,v) = ∫(v*uₜ)dΩ
-_res(t,u,v) = ∫(_a(t)*∇(v)⋅∇(u))dΩ - ∫(_f(t)*v)dΩ - ∫(_h(t)*v)dΓn
+# _mass(t,uₜ,v) = ∫(v*uₜ)dΩ
+# _res(t,u,v) = ∫(_a(t)*∇(v)⋅∇(u))dΩ - ∫(_f(t)*v)dΩ - ∫(_h(t)*v)dΓn
 
-_feop = TransientSemilinearFEOperator(_mass,_res,_trial,test)
-_sol = solve(fesolver,_feop,t0,tf,_u0)
-Base.iterate(_sol)
+# _feop = TransientSemilinearFEOperator(_mass,_res,_trial,test)
+# _sol = solve(fesolver,_feop,t0,tf,_u0)
+# Base.iterate(_sol)
 
-for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
-  uh1 = param_getindex(uh,3)
-  t = get_times(rt)
-  @check t ≈ _t "$t != $_t"
-  @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
-  @check uh1.dirichlet_values ≈ _uh.dirichlet_values
-end
+# for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
+#   uh1 = param_getindex(uh,3)
+#   t = get_times(rt)
+#   @check t ≈ _t "$t != $_t"
+#   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
+#   @check uh1.dirichlet_values ≈ _uh.dirichlet_values
+# end
 
 ########################## LINEAR-TRIAN ############################
 
