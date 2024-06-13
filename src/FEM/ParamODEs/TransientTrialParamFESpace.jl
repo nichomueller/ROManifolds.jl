@@ -1,4 +1,4 @@
-struct TransientTrialParamFESpace{A,B} <: SingleFieldFESpace
+struct TransientTrialParamFESpace{A,B} <: ParametricSingleFieldFESpace
   space::A
   space0::B
   dirichlet::Union{Function,AbstractVector{<:Function}}
@@ -45,17 +45,10 @@ function Arrays.evaluate!(
   evaluate!(Upt,U,get_params(r),get_times(r))
 end
 
-function Arrays.evaluate(U::TransientTrialParamFESpace,args...)
-  Upt = allocate_space(U,args...)
-  evaluate!(Upt,U,args...)
-  Upt
-end
-
 Arrays.evaluate(U::TransientTrialParamFESpace,params::Nothing,times::Nothing) = U.space0
 Arrays.evaluate(U::TransientTrialParamFESpace,r::Nothing) = U.space0
 
 (U::TransientTrialParamFESpace)(params,times) = evaluate(U,params,times)
-(U::TransientTrialParamFESpace)(r) = evaluate(U,r)
 (U::TrialFESpace)(params,times) = U
 (U::ZeroMeanFESpace)(params,times) = U
 
@@ -65,55 +58,11 @@ function ODEs.time_derivative(U::TransientTrialParamFESpace)
   TransientTrialParamFESpace(U.space,∂tdir(U.dirichlet))
 end
 
-FESpaces.get_free_dof_ids(f::TransientTrialParamFESpace) = get_free_dof_ids(f.space)
-FESpaces.get_vector_type(f::TransientTrialParamFESpace) = get_vector_type(f.space)
-CellData.get_triangulation(f::TransientTrialParamFESpace) = get_triangulation(f.space)
-FESpaces.get_cell_dof_ids(f::TransientTrialParamFESpace) = get_cell_dof_ids(f.space)
-FESpaces.get_fe_basis(f::TransientTrialParamFESpace) = get_fe_basis(f.space)
-FESpaces.get_fe_dof_basis(f::TransientTrialParamFESpace) = get_fe_dof_basis(f.space)
-FESpaces.ConstraintStyle(::Type{<:TransientTrialParamFESpace{U}}) where U = ConstraintStyle(U)
-function FESpaces.get_cell_constraints(f::TransientTrialParamFESpace,c::Constrained)
-  get_cell_constraints(f.space,c)
-end
-function FESpaces.get_cell_isconstrained(f::TransientTrialParamFESpace,c::Constrained)
-  get_cell_isconstrained(f.space,c)
-end
-
-FESpaces.get_dirichlet_dof_ids(f::TransientTrialParamFESpace) = get_dirichlet_dof_ids(f.space)
-FESpaces.num_dirichlet_tags(f::TransientTrialParamFESpace) = num_dirichlet_tags(f.space)
-FESpaces.get_dirichlet_dof_tag(f::TransientTrialParamFESpace) = get_dirichlet_dof_tag(f.space)
-function FESpaces.scatter_free_and_dirichlet_values(f::TransientTrialParamFESpace,free_values,dirichlet_values)
-  scatter_free_and_dirichlet_values(f.space,free_values,dirichlet_values)
-end
-function FESpaces.gather_free_and_dirichlet_values!(free_values,dirichlet_values,f::TransientTrialParamFESpace,cell_vals)
-  gather_free_and_dirichlet_values!(free_values,dirichlet_values,f.space,cell_vals)
-end
-
-function FESpaces.get_dirichlet_dof_values(f::TransientTrialParamFESpace)
-  msg = """
-  It does not make sense to get the Dirichlet DOF values of a transient FE space. You
-  should first evaluate the transient FE space at a point in time and get the Dirichlet
-  DOF values from there.
-  """
-  @unreachable msg
-end
-
-function TProduct.get_vector_index_map(f::TransientTrialParamFESpace)
-  get_vector_index_map(f.space)
-end
-
-function TProduct.get_matrix_index_map(f::TransientTrialParamFESpace,g::SingleFieldFESpace)
-  get_matrix_index_map(f.space,g)
-end
-
-# Define the TransientTrialFESpace interface for stationary spaces
+# Define the TransientTrialParamFESpace interface for stationary spaces
 
 ODEs.allocate_space(U::FESpace,params,times) = U
-ODEs.allocate_space(U::FESpace,r) = U
 Arrays.evaluate!(Upt::FESpace,U::FESpace,params,times) = U
-Arrays.evaluate!(Upt::FESpace,U::FESpace,r) = U
 Arrays.evaluate(U::FESpace,params,times) = U
-Arrays.evaluate(U::FESpace,r) = U
 (space::FESpace)(params,times) = evaluate(space,params,times)
 
 # Define the interface for MultiField
@@ -124,12 +73,11 @@ function has_param_transient(U::MultiFieldFESpace)
   any(space -> space isa TransientTrialParamFESpace,U.spaces)
 end
 
-function ODEs.allocate_space(U::MultiFieldFESpace,args...)
+function ODEs.allocate_space(U::MultiFieldFESpace,μ,t)
   if !has_param_transient(U)
-    @assert !ODEs.has_transient(U)
     return U
   end
-  spaces = map(U->allocate_space(U,args...),U.spaces)
+  spaces = map(U->allocate_space(U,μ,t),U.spaces)
   style = MultiFieldStyle(U)
   MultiFieldParamFESpace(spaces;style)
 end
@@ -137,21 +85,14 @@ end
 function Arrays.evaluate!(
   Upt::MultiFieldFESpace,
   U::MultiFieldFESpace,
-  args...)
+  μ,t)
 
   if !has_param_transient(U)
-    @assert !ODEs.has_transient(U)
-    return Ut
+    return U
   end
   for (Upti,Ui) in zip(Upt,U)
-    evaluate!(Upti,Ui,args...)
+    evaluate!(Upti,Ui,μ,t)
   end
-  Upt
-end
-
-function Arrays.evaluate(U::MultiFieldFESpace,args...)
-  Upt = allocate_space(U,args...)
-  evaluate!(Upt,U,args...)
   Upt
 end
 

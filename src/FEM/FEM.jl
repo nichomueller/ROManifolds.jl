@@ -12,6 +12,8 @@ include("ParamAlgebra/ParamAlgebra.jl")
 
 include("ParamFESpaces/ParamFESpaces.jl")
 
+include("ParamSteady/ParamSteady.jl")
+
 include("ParamODEs/ParamODEs.jl")
 
 include("ParamUtils/ParamUtils.jl")

@@ -2,14 +2,14 @@
 A parametric version of the `Gridap` `TransientFEOperator`
 """
 
-abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: TransientFEOperator{T} end
+abstract type TransientParamFEOperator{T<:ParamOperatorType} <: TransientFEOperator{T} end
 
-function FESpaces.get_algebraic_operator(feop::TransientParamFEOperator)
-  ODEParamOpFromTFEOp(feop)
+function FESpaces.get_algebraic_operator(op::TransientParamFEOperator)
+  ODEParamOpFromTFEOp(op)
 end
 
 function ODEs.allocate_tfeopcache(
-  feop::TransientParamFEOperator,
+  op::TransientParamFEOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}})
 
@@ -18,29 +18,39 @@ end
 
 function ODEs.update_tfeopcache!(
   tfeopcache,
-  feop::TransientParamFEOperator,
+  op::TransientParamFEOperator,
   r::TransientParamRealization)
 
   tfeopcache
 end
 
-realization(op::TransientParamFEOperator;kwargs...) = @abstractmethod
-get_induced_norm(op::TransientParamFEOperator) = @abstractmethod
+ParamDataStructures.realization(op::TransientParamFEOperator;kwargs...) = @abstractmethod
 
-function assemble_norm_matrix(op::TransientParamFEOperator)
-  @abstractmethod
+function ParamFESpaces.get_param_assembler(op::TransientParamFEOperator,r::TransientParamRealization)
+  get_param_assembler(get_assembler(op),r)
 end
-
-get_coupling(op::TransientParamFEOperator) = @abstractmethod
 
 IndexMaps.get_index_map(op::TransientParamFEOperator) = @abstractmethod
+IndexMaps.get_vector_index_map(op::TransientParamFEOperator) = get_vector_index_map(get_index_map(op))
+IndexMaps.get_matrix_index_map(op::TransientParamFEOperator) = get_matrix_index_map(get_index_map(op))
 
-function assemble_coupling_matrix(op::TransientParamFEOperator)
+ParamSteady.get_induced_norm(op::TransientParamFEOperator) = @abstractmethod
+
+function ParamSteady.assemble_norm_matrix(op::TransientParamFEOperator)
+  test = get_test(op)
+  trial = evaluate(get_trial(op),nothing)
+  inorm = get_induced_norm(op)
+  assemble_norm_matrix(inorm,trial,test)
+end
+
+ParamSteady.get_coupling(op::TransientParamFEOperator) = @abstractmethod
+
+function ParamSteady.assemble_coupling_matrix(op::TransientParamFEOperator)
   @abstractmethod
 end
 
-get_linear_operator(op::TransientParamFEOperator) = @abstractmethod
-get_nonlinear_operator(op::TransientParamFEOperator) = @abstractmethod
+ParamSteady.get_linear_operator(op::TransientParamFEOperator) = @abstractmethod
+ParamSteady.get_nonlinear_operator(op::TransientParamFEOperator) = @abstractmethod
 
 struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParamODE}
   res::Function
@@ -110,34 +120,8 @@ ODEs.get_res(op::TransientParamFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::TransientParamFEOpFromWeakForm) = op.index_map
-realization(op::TransientParamFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
-get_induced_norm(op::TransientParamFEOpFromWeakForm) = op.induced_norm
-
-function assemble_norm_matrix(op::TransientParamFEOpFromWeakForm)
-  test = get_test(op)
-  trial = evaluate(get_trial(op),nothing)
-  inorm = get_induced_norm(op)
-  assemble_norm_matrix(inorm,trial,test)
-end
-
-function assemble_norm_matrix(f,U::FESpace,V::FESpace)
-  assemble_matrix(f,U,V)
-end
-
-function assemble_norm_matrix(f,U::TProductFESpace,V::TProductFESpace)
-  a = SparseMatrixAssembler(U,V)
-  v = get_tp_fe_basis(V)
-  u = get_tp_trial_fe_basis(U)
-  assemble_matrix(a,collect_cell_matrix(U,V,f(u,v)))
-end
-
-function assemble_norm_matrix(f,U::TrialFESpace{<:TProductFESpace},V::TProductFESpace)
-  assemble_norm_matrix(f,U.space,V)
-end
-
-function ODEs.get_assembler(feop::TransientParamFEOpFromWeakForm,r::TransientParamRealization)
-  get_param_assembler(get_assembler(feop),r)
-end
+ParamDataStructures.realization(op::TransientParamFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
+ParamSteady.get_induced_norm(op::TransientParamFEOpFromWeakForm) = op.induced_norm
 
 struct TransientParamSemilinearFEOpFromWeakForm <: TransientParamFEOperator{SemilinearParamODE}
   mass::Function
@@ -230,22 +214,11 @@ ReferenceFEs.get_order(op::TransientParamSemilinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamSemilinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamSemilinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamSemilinearFEOpFromWeakForm) = op.assem
-realization(op::TransientParamSemilinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
+ParamDataStructures.realization(op::TransientParamSemilinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 get_induced_norm(op::TransientParamSemilinearFEOpFromWeakForm) = op.induced_norm
 
 function ODEs.is_form_constant(op::TransientParamSemilinearFEOpFromWeakForm,k::Integer)
   (k == get_order(op)+1) && op.constant_mass
-end
-
-function assemble_norm_matrix(op::TransientParamSemilinearFEOpFromWeakForm)
-  test = get_test(op)
-  trial = evaluate(get_trial(op),nothing)
-  inorm = get_induced_norm(op)
-  assemble_norm_matrix(inorm,trial,test)
-end
-
-function ODEs.get_assembler(feop::TransientParamSemilinearFEOpFromWeakForm,r::TransientParamRealization)
-  get_param_assembler(get_assembler(feop),r)
 end
 
 struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE}
@@ -303,22 +276,11 @@ ReferenceFEs.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
-realization(op::TransientParamLinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
+ParamDataStructures.realization(op::TransientParamLinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 get_induced_norm(op::TransientParamLinearFEOpFromWeakForm) = op.induced_norm
 
 function ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer)
   op.constant_forms[k]
-end
-
-function assemble_norm_matrix(op::TransientParamLinearFEOpFromWeakForm)
-  test = get_test(op)
-  trial = evaluate(get_trial(op),nothing)
-  inorm = get_induced_norm(op)
-  assemble_norm_matrix(inorm,trial,test)
-end
-
-function ODEs.get_assembler(feop::TransientParamLinearFEOpFromWeakForm,r::TransientParamRealization)
-  get_param_assembler(get_assembler(feop),r)
 end
 
 function test_transient_fe_operator(op::TransientParamFEOperator,uh,μt)

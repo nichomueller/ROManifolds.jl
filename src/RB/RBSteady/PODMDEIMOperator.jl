@@ -12,7 +12,7 @@ end
 
 function reduced_operator(
   solver::RBSolver,
-  op::PODOperator{LinearNonlinearParamODE},
+  op::PODOperator{LinearNonlinearParamOperatorType},
   s::AbstractSnapshots)
 
   red_op_lin = reduced_operator(solver,get_linear_operator(op),s)
@@ -29,7 +29,9 @@ end
 FESpaces.get_trial(op::PODMDEIMOperator) = get_trial(op.op)
 FESpaces.get_test(op::PODMDEIMOperator) = get_test(op.op)
 ParamDataStructures.realization(op::PODMDEIMOperator;kwargs...) = realization(op.op;kwargs...)
-ParamFESpaces.get_fe_operator(op::PODMDEIMOperator) = ParamODEs.get_fe_operator(op.op)
+ParamSteady.get_fe_operator(op::PODMDEIMOperator) = ParamSteady.get_fe_operator(op.op)
+IndexMaps.get_vector_index_map(op::PODMDEIMOperator) = get_vector_index_map(op.op)
+IndexMaps.get_matrix_index_map(op::PODMDEIMOperator) = get_matrix_index_map(op.op)
 get_fe_trial(op::PODMDEIMOperator) = get_fe_trial(op.op)
 get_fe_test(op::PODMDEIMOperator) = get_fe_test(op.op)
 
@@ -41,13 +43,30 @@ function Algebra.allocate_jacobian(op::PODMDEIMOperator,r::AbstractParamRealizat
   allocate_jacobian(op.op,r,u)
 end
 
+function ParamSteady.allocate_paramcache(
+  op::PODMDEIMOperator,
+  r::ParamRealization,
+  u::AbstractParamVector)
+
+  allocate_paramcache(op.op,r,u)
+end
+
+function ParamSteady.update_paramcache!(
+  paramcache,
+  op::PODMDEIMOperator,
+  r::ParamRealization)
+
+  update_odeopcache!(paramcache,op.op,r)
+end
+
 function Algebra.residual!(
   b::Contribution,
   op::PODMDEIMOperator,
   r::AbstractParamRealization,
-  u::AbstractParamVector)
+  u::AbstractParamVector,
+  paramcache)
 
-  fe_sb = fe_residual!(b,op,r,u,odeopcache)
+  fe_sb = fe_residual!(b,op,r,u,paramcache)
   b̂ = mdeim_result(op.rhs,fe_sb)
   return b̂
 end
@@ -56,9 +75,10 @@ function Algebra.jacobian!(
   A::Contribution,
   op::PODMDEIMOperator,
   r::AbstractParamRealization,
-  u::AbstractParamVector)
+  u::AbstractParamVector,
+  paramcache)
 
-  fe_sA = fe_jacobian!(A,op,r,u,ws,odeopcache)
+  fe_sA = fe_jacobian!(A,op,r,u,paramcache)
   Â = mdeim_result(op.lhs,fe_sA)
   return Â
 end
@@ -86,9 +106,10 @@ function fe_jacobian!(
   cache,
   op::PODMDEIMOperator,
   r::AbstractParamRealization,
-  u::AbstractParamVector)
+  u::AbstractParamVector,
+  paramcache)
 
-  A = jacobian!(cache,op.op,r,u)
+  A = jacobian!(cache,op.op,r,u,paramcache)
   Ai = _select_snapshots_at_space_locations(A,op.lhs)
   return Ai
 end
@@ -97,20 +118,17 @@ function fe_residual!(
   cache,
   op::PODMDEIMOperator,
   r::AbstractParamRealization,
-  u::AbstractParamVector)
+  u::AbstractParamVector,
+  paramcache)
 
-  b = residual!(cache,op.op,r,u)
+  b = residual!(cache,op.op,r,u,paramcache)
   bi = _select_snapshots_at_space_locations(b,op.rhs)
   return bi
 end
 
-struct LinearNonlinearPODMDEIMOperator <: RBOperator{LinearNonlinearParamODE}
-  op_linear::PODMDEIMOperator
-  op_nonlinear::PODMDEIMOperator
-  function LinearNonlinearPODMDEIMOperator(op_linear,op_nonlinear)
-    @check isa(op_linear,PODMDEIMOperator{LinearParamODE})
-    new(op_linear,op_nonlinear)
-  end
+struct LinearNonlinearPODMDEIMOperator <: RBOperator{LinearNonlinearParamOperatorType}
+  op_linear::PODMDEIMOperator{LinearParamOperatorType}
+  op_nonlinear::PODMDEIMOperator{NonlinearParamOperatorType}
 end
 
 ParamFESpaces.get_linear_operator(op::LinearNonlinearPODMDEIMOperator) = op.op_linear
@@ -131,7 +149,7 @@ function ParamDataStructures.realization(op::LinearNonlinearPODMDEIMOperator;kwa
 end
 
 function ParamFESpaces.get_fe_operator(op::LinearNonlinearPODMDEIMOperator)
-  join_operators(get_fe_operator(op.op_linear),get_fe_operator(op.op_nonlinear))
+  join_operators(ParamSteady.get_fe_operator(op.op_linear),ParamSteady.get_fe_operator(op.op_nonlinear))
 end
 
 function get_fe_trial(op::LinearNonlinearPODMDEIMOperator)
@@ -200,7 +218,7 @@ end
 
 function Algebra.solve(
   solver::RBSolver,
-  op::RBOperator{NonlinearParamODE},
+  op::RBOperator{NonlinearParamOperatorType},
   r::AbstractParamRealization)
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
@@ -221,7 +239,8 @@ function Algebra.solve(
   end
 
   x = recast(x̂,trial)
-  s = Snapshots(x,r)
+  i = get_vector_index_map(op)
+  s = Snapshots(x,i,r)
   cs = ComputationalStats(stats,num_params(r))
   return s,cs
 end

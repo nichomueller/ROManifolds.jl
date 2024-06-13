@@ -63,7 +63,7 @@ function fe_solutions(solver::RBSolver,op::ParamFEOperator;nparams=50,r=realizat
   return snaps,cs
 end
 
-function Algebra.solve(solver::RBSolver,feop::ParamFEOperator,args...;kwargs...)
+function Algebra.solve(rbsolver::RBSolver,feop,args...;kwargs...)
   fesnaps,festats = fe_solutions(rbsolver,feop,args...)
   rbop = reduced_operator(rbsolver,feop,fesnaps)
   rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)

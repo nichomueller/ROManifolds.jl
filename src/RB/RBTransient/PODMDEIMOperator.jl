@@ -248,7 +248,8 @@ function Algebra.solve(
   end
 
   x = recast(x̂,trial)
-  s = Snapshots(x,r)
+  i = get_vector_index_map(op)
+  s = Snapshots(x,i,r)
   cs = ComputationalStats(stats,num_params(r))
   return s,cs
 end

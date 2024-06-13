@@ -99,4 +99,14 @@ export ParamReindex
 export PosNegParamReindex
 include("ParamReindex.jl")
 
+export Contribution
+export ArrayContribution
+export VectorContribution
+export MatrixContribution
+export TupOfArrayContribution
+export contribution
+export get_values
+export get_parent
+include("Contribution.jl")
+
 end # module

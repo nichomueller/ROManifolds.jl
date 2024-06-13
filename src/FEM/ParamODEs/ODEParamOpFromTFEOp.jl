@@ -5,16 +5,18 @@ end
 ReferenceFEs.get_order(odeop::ODEParamOpFromTFEOp) = get_order(odeop.op)
 FESpaces.get_test(odeop::ODEParamOpFromTFEOp) = get_test(odeop.op)
 FESpaces.get_trial(odeop::ODEParamOpFromTFEOp) = get_trial(odeop.op)
-realization(odeop::ODEParamOpFromTFEOp;kwargs...) = realization(odeop.op;kwargs...)
-get_fe_operator(odeop::ODEParamOpFromTFEOp) = odeop.op
+ParamDataStructures.realization(odeop::ODEParamOpFromTFEOp;kwargs...) = realization(odeop.op;kwargs...)
+ParamSteady.get_fe_operator(odeop::ODEParamOpFromTFEOp) = odeop.op
 ODEs.get_num_forms(odeop::ODEParamOpFromTFEOp) = get_num_forms(odeop.op)
 ODEs.is_form_constant(odeop::ODEParamOpFromTFEOp,k::Integer) = is_form_constant(odeop.op,k)
+IndexMaps.get_vector_index_map(odeop::ODEParamOpFromTFEOp) = get_vector_index_map(odeop.op)
+IndexMaps.get_matrix_index_map(odeop::ODEParamOpFromTFEOp) = get_matrix_index_map(odeop.op)
 
-function get_linear_operator(odeop::ODEParamOpFromTFEOp)
+function ParamSteady.get_linear_operator(odeop::ODEParamOpFromTFEOp)
   ODEParamOpFromTFEOp(get_linear_operator(odeop.op))
 end
 
-function get_nonlinear_operator(odeop::ODEParamOpFromTFEOp)
+function ParamSteady.get_nonlinear_operator(odeop::ODEParamOpFromTFEOp)
   ODEParamOpFromTFEOp(get_nonlinear_operator(odeop.op))
 end
 
@@ -40,7 +42,7 @@ function ODEs.allocate_odeopcache(
   v = get_fe_basis(test)
   trial = evaluate(get_trial(odeop.op),nothing)
   du = get_trial_fe_basis(trial)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   const_forms = ()
   num_forms = get_num_forms(odeop.op)
@@ -94,7 +96,7 @@ function Algebra.allocate_residual(
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
@@ -114,7 +116,7 @@ function Algebra.residual!(
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   !add && fill!(b,zero(eltype(b)))
 
@@ -139,7 +141,7 @@ function Algebra.residual!(
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   !add && fill!(b,zero(eltype(b)))
 
@@ -165,7 +167,7 @@ function Algebra.residual!(
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   !add && fill!(b,zero(eltype(b)))
 
@@ -192,7 +194,7 @@ function Algebra.allocate_jacobian(
   du = get_trial_fe_basis(trial)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
@@ -219,7 +221,7 @@ function ODEs.jacobian_add!(
   du = get_trial_fe_basis(trial)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
@@ -253,7 +255,7 @@ function ODEs.jacobian_add!(
   du = get_trial_fe_basis(trial)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
@@ -285,24 +287,24 @@ end
 ReferenceFEs.get_order(odeop::ODEParamOpFromTFEOpWithTrian) = get_order(odeop.op)
 FESpaces.get_test(odeop::ODEParamOpFromTFEOpWithTrian) = get_test(odeop.op)
 FESpaces.get_trial(odeop::ODEParamOpFromTFEOpWithTrian) = get_trial(odeop.op)
-realization(odeop::ODEParamOpFromTFEOpWithTrian;kwargs...) = realization(odeop.op;kwargs...)
-get_fe_operator(odeop::ODEParamOpFromTFEOpWithTrian) = odeop.op
+ParamDataStructures.realization(odeop::ODEParamOpFromTFEOpWithTrian;kwargs...) = realization(odeop.op;kwargs...)
+ParamSteady.get_fe_operator(odeop::ODEParamOpFromTFEOpWithTrian) = odeop.op
 ODEs.get_num_forms(odeop::ODEParamOpFromTFEOpWithTrian) = get_num_forms(odeop.op)
 ODEs.is_form_constant(odeop::ODEParamOpFromTFEOpWithTrian,k::Integer) = is_form_constant(odeop.op,k)
 
-function get_linear_operator(odeop::ODEParamOpFromTFEOpWithTrian)
+function ParamSteady.get_linear_operator(odeop::ODEParamOpFromTFEOpWithTrian)
   ODEParamOpFromTFEOpWithTrian(get_linear_operator(odeop.op))
 end
 
-function get_nonlinear_operator(odeop::ODEParamOpFromTFEOpWithTrian)
+function ParamSteady.get_nonlinear_operator(odeop::ODEParamOpFromTFEOpWithTrian)
   ODEParamOpFromTFEOpWithTrian(get_nonlinear_operator(odeop.op))
 end
 
-function set_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
+function ParamSteady.set_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
   ODEParamOpFromTFEOpWithTrian(set_triangulation(odeop.op,trians_rhs,trians_lhs))
 end
 
-function change_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
+function ParamSteady.change_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
   ODEParamOpFromTFEOpWithTrian(change_triangulation(odeop.op,trians_rhs,trians_lhs))
 end
 
@@ -328,7 +330,7 @@ function ODEs.allocate_odeopcache(
   v = get_fe_basis(test)
   trial = evaluate(get_trial(odeop.op),nothing)
   du = get_trial_fe_basis(trial)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   const_forms = ()
   num_forms = get_num_forms(odeop.op)
@@ -386,7 +388,7 @@ function Algebra.allocate_residual(
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
   res = get_res(odeop.op)
@@ -410,7 +412,7 @@ function Algebra.residual!(
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   !add && fill!(b,zero(eltype(b)))
 
@@ -437,7 +439,7 @@ function Algebra.residual!(
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   !add && fill!(b,zero(eltype(b)))
 
@@ -464,7 +466,7 @@ function Algebra.residual!(
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   !add && fill!(b,zero(eltype(b)))
 
@@ -492,7 +494,7 @@ function Algebra.allocate_jacobian(
   du = get_trial_fe_basis(trial)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
@@ -524,7 +526,7 @@ function ODEs.jacobian_add!(
   du = get_trial_fe_basis(trial)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 
@@ -560,7 +562,7 @@ function ODEs.jacobian_add!(
   du = get_trial_fe_basis(trial)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_assembler(odeop.op,r)
+  assem = get_param_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
 

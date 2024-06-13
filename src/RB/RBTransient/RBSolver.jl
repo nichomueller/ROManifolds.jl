@@ -33,7 +33,8 @@ function RBSteady.fe_solutions(
     values = collect(odesol)
   end
 
-  snaps = Snapshots(values,r)
+  i = get_vector_index_map(op)
+  snaps = Snapshots(values,i,r)
   cs = ComputationalStats(stats,nparams)
   return snaps,cs
 end

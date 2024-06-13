@@ -1,5 +1,4 @@
 # interface to accommodate the separation of terms depending on the linearity/nonlinearity
-struct LinearNonlinearParamODE <: ODEParamOperatorType end
 
 struct GenericTransientParamLinearNonlinearFEOperator <: TransientParamFEOperator{LinearNonlinearParamODE}
   op_linear::TransientParamFEOperator{LinearParamODE}
@@ -12,13 +11,13 @@ struct TransientParamLinearNonlinearFEOperatorWithTrian <: TransientParamFEOpera
 end
 
 function TransientParamLinNonlinFEOperator(
-  op_linear::TransientParamFEOperator{LinearParamODE},
+  op_linear::TransientParamFEOperator,
   op_nonlinear::TransientParamFEOperator)
   GenericTransientParamLinearNonlinearFEOperator(op_linear,op_nonlinear)
 end
 
 function TransientParamLinNonlinFEOperator(
-  op_linear::TransientParamFEOperatorWithTrian{LinearParamODE},
+  op_linear::TransientParamFEOperatorWithTrian,
   op_nonlinear::TransientParamFEOperatorWithTrian)
   TransientParamLinearNonlinearFEOperatorWithTrian(op_linear,op_nonlinear)
 end
@@ -28,10 +27,8 @@ const TransientParamLinearNonlinearFEOperator = Union{
   TransientParamLinearNonlinearFEOperatorWithTrian
 }
 
-get_linear_operator(op) = @abstractmethod
-get_linear_operator(op::TransientParamLinearNonlinearFEOperator) = op.op_linear
-get_nonlinear_operator(op) = @abstractmethod
-get_nonlinear_operator(op::TransientParamLinearNonlinearFEOperator) = op.op_nonlinear
+ParamSteady.get_linear_operator(op::TransientParamLinearNonlinearFEOperator) = op.op_linear
+ParamSteady.get_nonlinear_operator(op::TransientParamLinearNonlinearFEOperator) = op.op_nonlinear
 
 function FESpaces.get_test(op::TransientParamLinearNonlinearFEOperator)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
@@ -47,23 +44,23 @@ function ReferenceFEs.get_order(op::TransientParamLinearNonlinearFEOperator)
   return max(get_order(op.op_linear),get_order(op.op_nonlinear))
 end
 
-function realization(op::TransientParamLinearNonlinearFEOperator;kwargs...)
+function ParamDataStructures.realization(op::TransientParamLinearNonlinearFEOperator;kwargs...)
   realization(op.op_linear;kwargs...)
 end
 
-function assemble_norm_matrix(op::TransientParamLinearNonlinearFEOperator)
+function ParamSteady.assemble_norm_matrix(op::TransientParamLinearNonlinearFEOperator)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
   @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
   assemble_norm_matrix(op.op_linear)
 end
 
-function assemble_coupling_matrix(op::TransientParamLinearNonlinearFEOperator)
+function ParamSteady.assemble_coupling_matrix(op::TransientParamLinearNonlinearFEOperator)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
   @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
   assemble_coupling_matrix(op.op_linear)
 end
 
-function join_operators(
+function ParamSteady.join_operators(
   op_lin::TransientParamFEOperator{LinearParamODE},
   op_nlin::TransientParamFEOperator)
 
@@ -97,15 +94,15 @@ function join_operators(
   TransientParamFEOperator(res,jacs,op_lin.induced_norm,op_lin.tpspace,trial,test)
 end
 
-function join_operators(
-  op_lin::TransientParamSaddlePointFEOp{LinearParamODE},
+function ParamSteady.join_operators(
+  op_lin::TransientParamSaddlePointFEOp,
   op_nlin::TransientParamFEOperator)
 
   jop = join_operators(op_lin.op,op_nlin)
   TransientParamSaddlePointFEOp(jop,op_lin.coupling)
 end
 
-function join_operators(
+function ParamSteady.join_operators(
   op_lin::TransientParamFEOperatorWithTrian,
   op_nlin::TransientParamFEOperatorWithTrian)
 
@@ -114,7 +111,7 @@ function join_operators(
   join_operators(set_op_lin,set_op_nlin)
 end
 
-function join_operators(op::TransientParamLinearNonlinearFEOperator)
+function ParamSteady.join_operators(op::TransientParamLinearNonlinearFEOperator)
   op_lin = get_linear_operator(op)
   op_nlin = get_nonlinear_operator(op)
   join_operators(op_lin,op_nlin)

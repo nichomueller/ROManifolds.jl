@@ -1,4 +1,4 @@
-function reduced_fe_space(solver::RBSolver,feop::ParamFEOperator,s::AbstractSnapshots)
+function reduced_fe_space(solver,feop,s)
   soff = select_snapshots(s,offline_params(solver))
   norm_matrix = assemble_norm_matrix(feop)
   basis = reduced_basis(feop,soff,norm_matrix;ϵ=get_tol(solver))

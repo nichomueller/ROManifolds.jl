@@ -53,7 +53,7 @@ end
 
 function rb_results(
   solver::RBSolver,
-  feop::ParamFEOperator,
+  feop,
   s,
   son_approx,
   fem_stats,

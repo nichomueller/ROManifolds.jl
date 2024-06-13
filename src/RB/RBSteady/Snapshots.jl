@@ -1,6 +1,6 @@
 abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractParamRealization} <: AbstractParamContainer{T,N,L} end
 
-ParamUtils.get_values(s::AbstractSnapshots) = @abstractmethod
+ParamDataStructures.get_values(s::AbstractSnapshots) = @abstractmethod
 IndexMaps.get_index_map(s::AbstractSnapshots) = @abstractmethod
 get_realization(s::AbstractSnapshots) = @abstractmethod
 
@@ -41,7 +41,7 @@ function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::ParamRealization
   BasicSnapshots(s,i,r)
 end
 
-ParamUtils.get_values(s::BasicSnapshots) = s.data
+ParamDataStructures.get_values(s::BasicSnapshots) = s.data
 IndexMaps.get_index_map(s::BasicSnapshots) = s.index_map
 get_realization(s::BasicSnapshots) = s.realization
 
@@ -87,7 +87,7 @@ space_indices(s::SnapshotsAtIndices{T,N}) where {T,N} = s.selected_indices[1:N-1
 param_indices(s::SnapshotsAtIndices) = s.selected_indices[N]
 num_space_dofs(s::SnapshotsAtIndices) = length.(space_indices(s))
 
-ParamUtils.get_values(s::SnapshotsAtIndices) = get_values(s.snaps)
+ParamDataStructures.get_values(s::SnapshotsAtIndices) = get_values(s.snaps)
 IndexMaps.get_index_map(s::SnapshotsAtIndices) = get_index_map(s.snaps)
 get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)
 

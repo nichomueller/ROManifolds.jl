@@ -17,6 +17,7 @@ using Mabla.FEM.IndexMaps
 using Mabla.FEM.TProduct
 using Mabla.FEM.ParamDataStructures
 using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamSteady
 
 import Test: @test
 import UnPack: @unpack
@@ -33,7 +34,6 @@ export TransientTrialParamFESpace
 export TransientMultiFieldParamFESpace
 include("TransientTrialParamFESpace.jl")
 
-export ODEParamOperatorType
 export NonlinearParamODE
 export QuasilinearParamODE
 export SemilinearParamODE
@@ -56,7 +56,6 @@ export TransientParamLinearFEOperator
 export TransientParamLinearFEOpFromWeakForm
 export LinearTransientParamFEOperator
 export NonlinearTransientParamFEOperator
-export assemble_norm_matrix
 include("TransientParamFEOperator.jl")
 
 export TransientParamSaddlePointFEOp

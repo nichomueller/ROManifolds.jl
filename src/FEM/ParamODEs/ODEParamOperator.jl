@@ -1,10 +1,10 @@
-abstract type ODEParamOperatorType <: ODEOperatorType end
-struct NonlinearParamODE <: ODEParamOperatorType end
-struct QuasilinearParamODE <: ODEParamOperatorType end
-struct SemilinearParamODE <: ODEParamOperatorType end
-struct LinearParamODE <: ODEParamOperatorType end
+struct NonlinearParamODE <: NonlinearParamOperatorType end
+struct QuasilinearParamODE <: LinearParamOperatorType end
+struct SemilinearParamODE <: LinearParamOperatorType end
+struct LinearParamODE <: LinearParamOperatorType end
+struct LinearNonlinearParamODE <: LinearNonlinearParamOperatorType end
 
-abstract type ODEParamOperator{T<:ODEParamOperatorType} <: ODEOperator{T} end
+abstract type ODEParamOperator{T<:ParamOperatorType} <: ODEOperator{T} end
 
 function ODEs.allocate_odeopcache(
   odeop::ODEParamOperator,
@@ -107,7 +107,7 @@ mutable struct ParamODEOpFromTFEOpCache <: GridapType
   const_forms
 end
 
-abstract type ODEParamOperatorWithTrian{T<:ODEParamOperatorType} <: ODEParamOperator{T} end
+abstract type ODEParamOperatorWithTrian{T<:ParamOperatorType} <: ODEParamOperator{T} end
 
 function Algebra.residual!(
   b::Contribution,

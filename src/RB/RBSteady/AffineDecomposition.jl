@@ -1,8 +1,8 @@
 # OFFLINE PHASE
 
-function get_mdeim_indices(A::AbstractMatrix{T}) where T
+function get_mdeim_indices(A::AbstractMatrix)
   m,n = size(A)
-  res = zeros(T,m)
+  res = zeros(eltype(A),m)
   I = zeros(Int32,n)
   I[1] = argmax(abs.(A[:,1]))
   if n > 1
@@ -43,7 +43,7 @@ function get_reduced_cells(
 end
 
 function get_reduced_cells(
-  trian::Triangulation,
+  trian::Triangulationriangulation,
   ids::AbstractVector,
   test::FESpace)
 
@@ -54,7 +54,7 @@ function get_reduced_cells(
 end
 
 function get_reduced_cells(
-  trian::Triangulation,
+  trian::Triangulationriangulation,
   ids::AbstractVector,
   trial::FESpace,
   test::FESpace)
@@ -70,7 +70,7 @@ function get_reduced_cells(
   return red_integr_cells
 end
 
-function reduce_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,r::RBSpace...)
+function reduce_triangulation(trian::Triangulationriangulation,i::AbstractIntegrationDomain,r::RBSpace...)
   f = map(get_space,r)
   indices_space = get_indices_space(i)
   red_integr_cells = get_reduced_cells(trian,indices_space,f...)
@@ -153,10 +153,10 @@ end
 
 function reduced_form(
   solver::RBSolver,
-  s::S,
-  trian::T,
+  s::AbstractSnapshots,
+  trian::Triangulation,
   args...;
-  kwargs...) where {S,T}
+  kwargs...)
 
   mdeim_style = solver.mdeim_style
   basis = reduced_basis(s;ϵ=get_tol(solver))
@@ -172,8 +172,8 @@ end
 function reduced_residual(
   solver::RBSolver,
   op::RBOperator,
-  s::S,
-  trian::T) where {S,T}
+  s::AbstractSnapshots,
+  trian::Triangulation)
 
   test = get_test(op)
   reduced_form(solver,s,trian,test)
@@ -182,9 +182,9 @@ end
 function reduced_jacobian(
   solver::RBSolver,
   op::RBOperator,
-  s::S,
-  trian::T;
-  kwargs...) where {S,T}
+  s::AbstractSnapshots,
+  trian::Triangulation;
+  kwargs...)
 
   trial = get_trial(op)
   test = get_test(op)
@@ -217,7 +217,7 @@ end
 function reduced_jacobian_residual(
   solver::RBSolver,
   op::RBOperator,
-  s::S) where S
+  s::AbstractSnapshots)
 
   smdeim = select_snapshots(s,mdeim_params(solver))
   jac,res = jacobian_and_residual(solver,op,smdeim)
@@ -355,7 +355,7 @@ function reduced_residual(
   solver::RBSolver,
   op::RBOperator,
   s::BlockSnapshots,
-  trian::T) where T
+  trian::Triangulation)
 
   test = get_test(op)
   active_block_ids = get_touched_blocks(s)
@@ -373,8 +373,8 @@ function reduced_jacobian(
   solver::RBSolver,
   op::RBOperator,
   s::BlockSnapshots,
-  trian::T;
-  kwargs...) where T
+  trian::Triangulation;
+  kwargs...)
 
   trial = get_trial(op)
   test = get_test(op)
