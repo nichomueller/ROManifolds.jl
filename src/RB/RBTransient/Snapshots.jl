@@ -17,11 +17,11 @@ struct BasicTransientSnapshots{T,N,L,D,I,R,A} <: AbstractTransientSnapshots{T,N,
   end
 end
 
-function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::TransientParamRealization)
+function RBSteady.Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::TransientParamRealization)
   BasicTransientSnapshots(s,i,r)
 end
 
-ParamDataStructures.get_values(s::BasicTransientSnapshots) = s.data
+ParamUtils.get_values(s::BasicTransientSnapshots) = s.data
 IndexMaps.get_index_map(s::BasicTransientSnapshots) = s.index_map
 RBSteady.get_realization(s::BasicTransientSnapshots) = s.realization
 
@@ -68,7 +68,7 @@ function RBSteady.Snapshots(s::Vector{<:AbstractParamArray},i::AbstractIndexMap,
   TransientSnapshots(s,i,r)
 end
 
-function ParamDataStructures.get_values(s::TransientSnapshots)
+function ParamUtils.get_values(s::TransientSnapshots)
   vdata = s.data
   item = all_data(first(vdata))
   T = eltype(item)
@@ -129,7 +129,7 @@ RBSteady.space_indices(s::TransientSnapshotsAtIndices{T,N}) where {T,N} = s.sele
 RBSteady.param_indices(s::TransientSnapshotsAtIndices) = s.selected_indices[N]
 RBSteady.num_space_dofs(s::TransientSnapshotsAtIndices) = length.(space_indices(s))
 
-ParamDataStructures.get_values(s::TransientSnapshotsAtIndices) = get_values(s.snaps)
+ParamUtils.get_values(s::TransientSnapshotsAtIndices) = get_values(s.snaps)
 IndexMaps.get_index_map(s::TransientSnapshotsAtIndices) = get_index_map(s.snaps)
 RBSteady.get_realization(s::TransientSnapshotsAtIndices) = get_realization(s.snaps)
 

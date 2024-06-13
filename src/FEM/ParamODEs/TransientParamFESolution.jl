@@ -99,7 +99,7 @@ end
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperator,
-  uh0;nparams=60,r=realization(op;nparams))
+  uh0;nparams=50,r=realization(op;nparams))
 
   solve(solver,op,r,uh0)
 end

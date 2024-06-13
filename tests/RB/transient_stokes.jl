@@ -89,7 +89,7 @@ fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
-h1_l2_err = RB.space_time_error(results)
+h1_l2_err = RB.compute_error(results)
 
 println(h1_l2_err)
 save(test_dir,fesnaps)
@@ -109,7 +109,7 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h
 rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
 rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
 results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbstats_space)
-err_space = RB.space_time_error(results_space)
+err_space = RB.compute_error(results_space)
 
 println(err_space)
 save(test_dir,rbop_space)

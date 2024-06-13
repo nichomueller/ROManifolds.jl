@@ -77,15 +77,15 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-println(RB.space_time_error(results))
+println(RB.compute_error(results))
 
 for ϵ = (1e-2,1e-3,1e-4)
   rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
   rbop = reduced_operator(rbsolver,feop,fesnaps)
   rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
   results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
-  println("Accuracy: $(RB.space_time_error(results))")
-  println("Speedup: $(RB.speedup(results))")
+  println("Accuracy: $(RB.compute_error(results))")
+  println("Speedup: $(RB.compute_speedup(results))")
 end
 
 _test = TestFESpace(model.model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
@@ -99,6 +99,6 @@ for ϵ = (1e-2,1e-3,1e-4)
   _rbop = reduced_operator(rbsolver,_feop,_fesnaps)
   _rbsnaps,_rbstats = solve(rbsolver,_rbop,_fesnaps)
   _results = rb_results(rbsolver,_rbop,_fesnaps,_rbsnaps,_festats,_rbstats)
-  println("Accuracy: $(RB.space_time_error(_results))")
-  println("Speedup: $(RB.speedup(_results))")
+  println("Accuracy: $(RB.compute_error(_results))")
+  println("Speedup: $(RB.compute_speedup(_results))")
 end

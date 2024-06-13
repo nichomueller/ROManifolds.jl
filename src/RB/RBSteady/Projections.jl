@@ -35,7 +35,7 @@ function Projection(s::SparseSnapshots,args...;kwargs...)
   TTSVDCores(cores′,index_map)
 end
 
-function recast(x̂::AbstractVector,a::SteadyProjection)
+function ParamDataStructures.recast(x̂::AbstractVector,a::SteadyProjection)
   basis = get_basis_space(a)
   x = basis*x̂
   return x

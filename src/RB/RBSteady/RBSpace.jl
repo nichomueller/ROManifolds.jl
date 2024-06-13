@@ -86,7 +86,7 @@ function Algebra.allocate_in_range(r::RBSpace)
   zero_free_values(r.space)
 end
 
-function recast(x::AbstractVector,r::RBSpace)
+function ParamDataStructures.recast(x::AbstractVector,r::RBSpace)
   cache = return_cache(RecastMap(),x,r)
   evaluate!(cache,RecastMap(),x,r)
   return cache

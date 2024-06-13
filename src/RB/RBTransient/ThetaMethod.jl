@@ -50,7 +50,7 @@ function Algebra.solve!(
   return x
 end
 
-function jacobian_and_residual(
+function RBSteady.jacobian_and_residual(
   solver::ThetaMethod,
   odeop::ODEParamOperator,
   r::TransientParamRealization,
@@ -112,7 +112,7 @@ function Algebra.solve!(
   return x
 end
 
-function jacobian_and_residual(
+function RBSteady.jacobian_and_residual(
   solver::ThetaMethod,
   odeop::ODEParamOperator{LinearParamODE},
   r::TransientParamRealization,
@@ -171,34 +171,7 @@ function Algebra.solve!(
   ss = symbolic_setup(nls.ls,A)
   ns = numerical_setup(ss,A)
 
-  _solve_rb_nr!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,stageop,trial)
-end
-
-function _solve_rb_nr!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,stageop,trial)
-  A_lin, = A_cache
-  max0 = maximum(abs,b)
-
-  for k in 1:nls.max_nliters
-    rmul!(b,-1)
-    solve!(dx̂,ns,b)
-    x̂ .+= dx̂
-    x .= recast(x̂,trial)
-
-    b = residual!(b_cache,stageop,x)
-
-    A = jacobian!(A_cache,stageop,x)
-    numerical_setup!(ns,A)
-
-    b .+= A_lin*x̂
-    maxk = maximum(abs,b)
-    println(maxk)
-
-    maxk < 1e-5*max0 && return
-
-    if k == nls.max_nliters
-      @unreachable
-    end
-  end
+  nonlinear_rb_solve!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,stageop,trial)
 end
 
 function ParamDataStructures.shift!(a::AbstractParamContainer,r::TransientParamRealization,α::Number,β::Number)

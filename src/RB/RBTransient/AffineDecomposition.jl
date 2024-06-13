@@ -11,7 +11,7 @@ end
 get_indices_space(i::TransientIntegrationDomain) = i.indices_space
 get_indices_time(i::TransientIntegrationDomain) = i.indices_time
 
-function allocate_coefficient(
+function RBSteady.allocate_coefficient(
   solver::RBSolver{S,SpaceOnlyMDEIM} where S,
   b::TransientProjection)
 
@@ -41,7 +41,7 @@ function _time_indices_and_interp_matrix(::SpaceOnlyMDEIM,interp_basis_space,bas
   return indices_time,lu_interp
 end
 
-function mdeim(mdeim_style::MDEIMStyle,b::TransientPODBasis)
+function RBSteady.mdeim(mdeim_style::MDEIMStyle,b::TransientPODBasis)
   basis_space = get_basis_space(b)
   basis_time = get_basis_time(b)
   indices_space = get_mdeim_indices(basis_space)
@@ -52,7 +52,7 @@ function mdeim(mdeim_style::MDEIMStyle,b::TransientPODBasis)
   return lu_interp,integration_domain
 end
 
-function mdeim(mdeim_style::MDEIMStyle,b::TransientTTSVDCores)
+function RBSteady.mdeim(mdeim_style::MDEIMStyle,b::TransientTTSVDCores)
   basis_spacetime = get_basis_spacetime(b)
   indices_spacetime = get_mdeim_indices(basis_spacetime)
   indices_space = fast_index(indices_spacetime,num_space_dofs(b))
@@ -76,7 +76,7 @@ function union_reduced_times(a::NTuple)
   union([union_reduced_times(ai) for ai in a]...)
 end
 
-function reduced_jacobian(
+function RBSteady.reduced_jacobian(
   solver::ThetaMethodRBSolver,
   op::RBOperator,
   contribs::Tuple{Vararg{Any}})
@@ -93,7 +93,7 @@ end
 
 # ONLINE PHASE
 
-function coefficient!(
+function RBSteady.coefficient!(
   a::TransientAffineDecomposition{<:ReducedAlgebraicOperator{T}},
   b::AbstractParamArray
   ) where T<:SpaceTimeMDEIM
@@ -103,7 +103,7 @@ function coefficient!(
   ldiv!(coefficient,mdeim_interpolation,vec(all_data(b)))
 end
 
-function mdeim_result(a::TupOfArrayContribution,b::TupOfArrayContribution)
+function RBSteady.mdeim_result(a::TupOfArrayContribution,b::TupOfArrayContribution)
   sum(map(mdeim_result,a,b))
 end
 
@@ -111,12 +111,12 @@ end
 
 const BlockTransientAffineDecomposition{A<:TransientAffineDecomposition,N,C} = BlockAffineDecomposition{A,N,C}
 
-function get_integration_domain(a::BlockTransientAffineDecomposition)
+function RBSteady.get_integration_domain(a::BlockTransientAffineDecomposition)
   active_block_ids = get_touched_blocks(a)
   block_indices_space = get_indices_space(a)
   union_indices_space = union([block_indices_space[i] for i in active_block_ids]...)
   union_indices_time = get_indices_time(a)
-  ReducedIntegrationDomain(union_indices_space,union_indices_time)
+  TransientIntegrationDomain(union_indices_space,union_indices_time)
 end
 
 function get_indices_time(a::BlockTransientAffineDecomposition)

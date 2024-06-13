@@ -24,7 +24,7 @@ function contribution!(a,f,trians)
 end
 
 function Base.getindex(a::Contribution,trian::Triangulation...)
-  perm = FEM.find_permutation(trian,a.trians)
+  perm = find_permutation(trian,a.trians)
   getindex(a,perm...)
 end
 

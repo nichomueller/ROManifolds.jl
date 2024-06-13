@@ -406,198 +406,198 @@ function mdeim_result(a::BlockAffineDecomposition,coeff::ArrayBlock)
   return a.cache
 end
 
-# for testing/visualization purposes
-struct InterpolationError{A,B}
-  name::String
-  err_matrix::A
-  err_vector::B
-  function InterpolationError(err_matrix::A,err_vector::B;name="linear") where {A,B}
-    new{A,B}(name,err_matrix,err_vector)
-  end
-end
+# # for testing/visualization purposes
+# struct InterpolationError{A,B}
+#   name::String
+#   err_matrix::A
+#   err_vector::B
+#   function InterpolationError(err_matrix::A,err_vector::B;name="linear") where {A,B}
+#     new{A,B}(name,err_matrix,err_vector)
+#   end
+# end
 
-function Base.show(io::IO,k::MIME"text/plain",err::InterpolationError)
-  print(io,"Interpolation error $(err.name) (matrix,vector): ($(err.err_matrix),$(err.err_vector))")
-end
+# function Base.show(io::IO,k::MIME"text/plain",err::InterpolationError)
+#   print(io,"Interpolation error $(err.name) (matrix,vector): ($(err.err_matrix),$(err.err_vector))")
+# end
 
-struct LincombError{A,B}
-  name::String
-  err_matrix::A
-  err_vector::B
-  function LincombError(err_matrix::A,err_vector::B;name="linear") where {A,B}
-    new{A,B}(name,err_matrix,err_vector)
-  end
-end
+# struct LincombError{A,B}
+#   name::String
+#   err_matrix::A
+#   err_vector::B
+#   function LincombError(err_matrix::A,err_vector::B;name="linear") where {A,B}
+#     new{A,B}(name,err_matrix,err_vector)
+#   end
+# end
 
-function Base.show(io::IO,k::MIME"text/plain",err::LincombError)
-  print(io,"Projection error $(err.name) (matrix,vector): ($(err.err_matrix),$(err.err_vector))")
-end
+# function Base.show(io::IO,k::MIME"text/plain",err::LincombError)
+#   print(io,"Projection error $(err.name) (matrix,vector): ($(err.err_matrix),$(err.err_vector))")
+# end
 
-function compress(A::AbstractMatrix,r::RBSpace)
-  basis_space = get_basis_space(r)
-  basis_time = get_basis_time(r)
+# function compress(A::AbstractMatrix,r::RBSpace)
+#   basis_space = get_basis_space(r)
+#   basis_time = get_basis_time(r)
 
-  a = (basis_space'*A)*basis_time
-  v = vec(a)
-  return v
-end
+#   a = (basis_space'*A)*basis_time
+#   v = vec(a)
+#   return v
+# end
 
-function compress(A::AbstractMatrix{T},trial::RBSpace,test::RBSpace;combine=(x,y)->x) where T
-  function compress_basis_space(A::AbstractMatrix,B::AbstractMatrix,C::AbstractMatrix)
-    map(get_values(A)) do A
-      C'*A*B
-    end
-  end
-  basis_space_test = get_basis_space(test)
-  basis_time_test = get_basis_time(test)
-  basis_space_trial = get_basis_space(trial)
-  basis_time_trial = get_basis_time(trial)
-  ns_test,ns_trial = size(basis_space_test,2),size(basis_space_trial,2)
-  nt_test,nt_trial = size(basis_time_test,2),size(basis_time_trial,2)
+# function compress(A::AbstractMatrix{T},trial::RBSpace,test::RBSpace;combine=(x,y)->x) where T
+#   function compress_basis_space(A::AbstractMatrix,B::AbstractMatrix,C::AbstractMatrix)
+#     map(get_values(A)) do A
+#       C'*A*B
+#     end
+#   end
+#   basis_space_test = get_basis_space(test)
+#   basis_time_test = get_basis_time(test)
+#   basis_space_trial = get_basis_space(trial)
+#   basis_time_trial = get_basis_time(trial)
+#   ns_test,ns_trial = size(basis_space_test,2),size(basis_space_trial,2)
+#   nt_test,nt_trial = size(basis_time_test,2),size(basis_time_trial,2)
 
-  red_xvec = compress_basis_space(A,get_basis_space(trial),get_basis_space(test))
-  a = stack(vec.(red_xvec))'  # Nt x ns_test*ns_trial
-  st_proj = zeros(T,nt_test,nt_trial,ns_test*ns_trial)
-  st_proj_shift = zeros(T,nt_test,nt_trial,ns_test*ns_trial)
-  @inbounds for ins = 1:ns_test*ns_trial, jt = 1:nt_trial, it = 1:nt_test
-    st_proj[it,jt,ins] = sum(basis_time_test[:,it].*basis_time_trial[:,jt].*a[:,ins])
-    st_proj_shift[it,jt,ins] = sum(basis_time_test[2:end,it].*basis_time_trial[1:end-1,jt].*a[2:end,ins])
-  end
-  st_proj = combine(st_proj,st_proj_shift)
-  st_proj_a = zeros(T,ns_test*nt_test,ns_trial*nt_trial)
-  @inbounds for i = 1:ns_trial, j = 1:ns_test
-    st_proj_a[j:ns_test:ns_test*nt_test,i:ns_trial:ns_trial*nt_trial] = st_proj[:,:,(i-1)*ns_test+j]
-  end
-  return st_proj_a
-end
+#   red_xvec = compress_basis_space(A,get_basis_space(trial),get_basis_space(test))
+#   a = stack(vec.(red_xvec))'  # Nt x ns_test*ns_trial
+#   st_proj = zeros(T,nt_test,nt_trial,ns_test*ns_trial)
+#   st_proj_shift = zeros(T,nt_test,nt_trial,ns_test*ns_trial)
+#   @inbounds for ins = 1:ns_test*ns_trial, jt = 1:nt_trial, it = 1:nt_test
+#     st_proj[it,jt,ins] = sum(basis_time_test[:,it].*basis_time_trial[:,jt].*a[:,ins])
+#     st_proj_shift[it,jt,ins] = sum(basis_time_test[2:end,it].*basis_time_trial[1:end-1,jt].*a[2:end,ins])
+#   end
+#   st_proj = combine(st_proj,st_proj_shift)
+#   st_proj_a = zeros(T,ns_test*nt_test,ns_trial*nt_trial)
+#   @inbounds for i = 1:ns_trial, j = 1:ns_test
+#     st_proj_a[j:ns_test:ns_test*nt_test,i:ns_trial:ns_trial*nt_trial] = st_proj[:,:,(i-1)*ns_test+j]
+#   end
+#   return st_proj_a
+# end
 
-function compress(fesolver,fes::ArrayContribution,args::RBSpace...;kwargs...)
-  sum(map(i->compress(fes[i],args...;kwargs...),eachindex(fes)))
-end
+# function compress(fesolver,fes::ArrayContribution,args::RBSpace...;kwargs...)
+#   sum(map(i->compress(fes[i],args...;kwargs...),eachindex(fes)))
+# end
 
-function compress(fesolver,fes::ArrayContribution,test::BlockRBSpace;kwargs...)
-  active_block_ids = get_touched_blocks(fes[1])
-  block_map = BlockMap(size(fes[1]),active_block_ids)
-  rb_blocks = map(active_block_ids) do i
-    fesi = contribution(fes.trians) do trian
-      val = fes[trian]
-      val[i]
-    end
-    testi = test[i]
-    compress(fesolver,fesi,testi;kwargs...)
-  end
-  return_cache(block_map,rb_blocks...)
-end
+# function compress(fesolver,fes::ArrayContribution,test::BlockRBSpace;kwargs...)
+#   active_block_ids = get_touched_blocks(fes[1])
+#   block_map = BlockMap(size(fes[1]),active_block_ids)
+#   rb_blocks = map(active_block_ids) do i
+#     fesi = contribution(fes.trians) do trian
+#       val = fes[trian]
+#       val[i]
+#     end
+#     testi = test[i]
+#     compress(fesolver,fesi,testi;kwargs...)
+#   end
+#   return_cache(block_map,rb_blocks...)
+# end
 
-function compress(fesolver,fes::ArrayContribution,trial::BlockRBSpace,test::BlockRBSpace;kwargs...)
-  active_block_ids = get_touched_blocks(fes[1])
-  block_map = BlockMap(size(fes[1]),active_block_ids)
-  rb_blocks = map(Tuple.(active_block_ids)) do (i,j)
-    fesij = contribution(fes.trians) do trian
-      val = fes[trian]
-      val[i,j]
-    end
-    trialj = trial[j]
-    testi = test[i]
-    compress(fesolver,fesij,trialj,testi;kwargs...)
-  end
-  return_cache(block_map,rb_blocks...)
-end
+# function compress(fesolver,fes::ArrayContribution,trial::BlockRBSpace,test::BlockRBSpace;kwargs...)
+#   active_block_ids = get_touched_blocks(fes[1])
+#   block_map = BlockMap(size(fes[1]),active_block_ids)
+#   rb_blocks = map(Tuple.(active_block_ids)) do (i,j)
+#     fesij = contribution(fes.trians) do trian
+#       val = fes[trian]
+#       val[i,j]
+#     end
+#     trialj = trial[j]
+#     testi = test[i]
+#     compress(fesolver,fesij,trialj,testi;kwargs...)
+#   end
+#   return_cache(block_map,rb_blocks...)
+# end
 
-function compress(fesolver,fes::Tuple{Vararg{ArrayContribution}},trial,test)
-  cmp = ()
-  for i = eachindex(fes)
-    combine = (x,y) -> i == 1 ? fesolver.θ*x+(1-fesolver.θ)*y : fesolver.θ*(x-y)
-    cmp = (cmp...,compress(fesolver,fes[i],trial,test;combine))
-  end
-  sum(cmp)
-end
+# function compress(fesolver,fes::Tuple{Vararg{ArrayContribution}},trial,test)
+#   cmp = ()
+#   for i = eachindex(fes)
+#     combine = (x,y) -> i == 1 ? fesolver.θ*x+(1-fesolver.θ)*y : fesolver.θ*(x-y)
+#     cmp = (cmp...,compress(fesolver,fes[i],trial,test;combine))
+#   end
+#   sum(cmp)
+# end
 
-function interpolation_error(a::AffineDecomposition,fes::AbstractSnapshots,rbs::AbstractSnapshots)
-  ids_space,ids_time = get_indices_space(a),get_indices_time(a)
-  fes_ids = select_snapshots_entries(reverse_snapshots(fes),ids_space,ids_time)
-  rbs_ids = select_snapshots_entries(reverse_snapshots(rbs),ids_space,ids_time)
-  norm(fes_ids - rbs_ids)
-end
+# function interpolation_error(a::AffineDecomposition,fes::AbstractSnapshots,rbs::AbstractSnapshots)
+#   ids_space,ids_time = get_indices_space(a),get_indices_time(a)
+#   fes_ids = select_snapshots_entries(reverse_snapshots(fes),ids_space,ids_time)
+#   rbs_ids = select_snapshots_entries(reverse_snapshots(rbs),ids_space,ids_time)
+#   norm(fes_ids - rbs_ids)
+# end
 
-function interpolation_error(a::BlockAffineDecomposition,fes::BlockSnapshots,rbs::BlockSnapshots)
-  active_block_ids = get_touched_blocks(a)
-  block_map = BlockMap(size(a),active_block_ids)
-  errors = Any[interpolation_error(a[i],fes[i],rbs[i]) for i = get_touched_blocks(a)]
-  return_cache(block_map,errors...)
-end
+# function interpolation_error(a::BlockAffineDecomposition,fes::BlockSnapshots,rbs::BlockSnapshots)
+#   active_block_ids = get_touched_blocks(a)
+#   block_map = BlockMap(size(a),active_block_ids)
+#   errors = Any[interpolation_error(a[i],fes[i],rbs[i]) for i = get_touched_blocks(a)]
+#   return_cache(block_map,errors...)
+# end
 
-function interpolation_error(a::AffineContribution,fes::ArrayContribution,rbs::ArrayContribution)
-  sum([interpolation_error(a[i],fes[i],rbs[i]) for i in eachindex(a)])
-end
+# function interpolation_error(a::AffineContribution,fes::ArrayContribution,rbs::ArrayContribution)
+#   sum([interpolation_error(a[i],fes[i],rbs[i]) for i in eachindex(a)])
+# end
 
-function interpolation_error(a::Tuple,fes::Tuple,rbs::Tuple)
-  @check length(a) == length(fes) == length(rbs)
-  err = ()
-  for i = eachindex(a)
-    err = (err...,interpolation_error(a[i],fes[i],rbs[i]))
-  end
-  err
-end
+# function interpolation_error(a::Tuple,fes::Tuple,rbs::Tuple)
+#   @check length(a) == length(fes) == length(rbs)
+#   err = ()
+#   for i = eachindex(a)
+#     err = (err...,interpolation_error(a[i],fes[i],rbs[i]))
+#   end
+#   err
+# end
 
-function interpolation_error(solver,odeop,rbop,s)
-  feA,feb = jacobian_and_residual(get_fe_solver(solver),odeop,s)
-  rbA,rbb = jacobian_and_residual(solver,rbop.op,s)
-  errA = interpolation_error(rbop.lhs,feA,rbA)
-  errb = interpolation_error(rbop.rhs,feb,rbb)
-  return errA,errb
-end
+# function interpolation_error(solver,odeop,rbop,s)
+#   feA,feb = jacobian_and_residual(get_fe_solver(solver),odeop,s)
+#   rbA,rbb = jacobian_and_residual(solver,rbop.op,s)
+#   errA = interpolation_error(rbop.lhs,feA,rbA)
+#   errb = interpolation_error(rbop.rhs,feb,rbb)
+#   return errA,errb
+# end
 
-function interpolation_error(solver,feop::TransientParamFEOperator,rbop,s;kwargs...)
-  odeop = get_algebraic_operator(feop)
-  errA,errb = interpolation_error(solver,odeop,rbop,s)
-  return InterpolationError(errA,errb;kwargs...)
-end
+# function interpolation_error(solver,feop::TransientParamFEOperator,rbop,s;kwargs...)
+#   odeop = get_algebraic_operator(feop)
+#   errA,errb = interpolation_error(solver,odeop,rbop,s)
+#   return InterpolationError(errA,errb;kwargs...)
+# end
 
-function interpolation_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
-  err_lin = interpolation_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
-  err_nlin = interpolation_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
-  return err_lin,err_nlin
-end
+# function interpolation_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
+#   err_lin = interpolation_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
+#   err_nlin = interpolation_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
+#   return err_lin,err_nlin
+# end
 
-function linear_combination_error(solver,odeop,rbop,s)
-  fesolver = get_fe_solver(solver)
-  feA,feb = jacobian_and_residual(fesolver,odeop,s)
-  feA_comp = compress(fesolver,feA,get_trial(rbop),get_test(rbop))
-  feb_comp = compress(fesolver,feb,get_test(rbop))
-  rbA,rbb = jacobian_and_residual(solver,rbop,s)
-  errA = rel_norm(feA_comp,rbA)
-  errb = rel_norm(feb_comp,rbb)
-  return errA,errb
-end
+# function linear_combination_error(solver,odeop,rbop,s)
+#   fesolver = get_fe_solver(solver)
+#   feA,feb = jacobian_and_residual(fesolver,odeop,s)
+#   feA_comp = compress(fesolver,feA,get_trial(rbop),get_test(rbop))
+#   feb_comp = compress(fesolver,feb,get_test(rbop))
+#   rbA,rbb = jacobian_and_residual(solver,rbop,s)
+#   errA = rel_norm(feA_comp,rbA)
+#   errb = rel_norm(feb_comp,rbb)
+#   return errA,errb
+# end
 
-function linear_combination_error(solver,feop::TransientParamFEOperator,rbop,s;kwargs...)
-  odeop = get_algebraic_operator(feop)
-  errA,errb = linear_combination_error(solver,odeop,rbop,s)
-  return LincombError(errA,errb;kwargs...)
-end
+# function linear_combination_error(solver,feop::TransientParamFEOperator,rbop,s;kwargs...)
+#   odeop = get_algebraic_operator(feop)
+#   errA,errb = linear_combination_error(solver,odeop,rbop,s)
+#   return LincombError(errA,errb;kwargs...)
+# end
 
-function linear_combination_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
-  err_lin = linear_combination_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
-  err_nlin = linear_combination_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
-  return err_lin,err_nlin
-end
+# function linear_combination_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
+#   err_lin = linear_combination_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
+#   err_nlin = linear_combination_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
+#   return err_lin,err_nlin
+# end
 
-function rel_norm(fe,rb)
-  norm(fe - rb) / norm(fe)
-end
+# function rel_norm(fe,rb)
+#   norm(fe - rb) / norm(fe)
+# end
 
-function rel_norm(fea::ArrayBlock,rba::ParamBlockArray)
-  active_block_ids = get_touched_blocks(fea)
-  block_map = BlockMap(size(fea),active_block_ids)
-  rb_array = get_array(rba)
-  norms = [rel_norm(fea[i],rb_array[i]) for i in active_block_ids]
-  return_cache(block_map,norms...)
-end
+# function rel_norm(fea::ArrayBlock,rba::ParamBlockArray)
+#   active_block_ids = get_touched_blocks(fea)
+#   block_map = BlockMap(size(fea),active_block_ids)
+#   rb_array = get_array(rba)
+#   norms = [rel_norm(fea[i],rb_array[i]) for i in active_block_ids]
+#   return_cache(block_map,norms...)
+# end
 
-function mdeim_error(solver,feop,rbop,s)
-  s1 = select_snapshots(s,1)
-  intp_err = interpolation_error(solver,feop,rbop,s1)
-  proj_err = linear_combination_error(solver,feop,rbop,s1)
-  return intp_err,proj_err
-end
+# function mdeim_error(solver,feop,rbop,s)
+#   s1 = select_snapshots(s,1)
+#   intp_err = interpolation_error(solver,feop,rbop,s1)
+#   proj_err = linear_combination_error(solver,feop,rbop,s1)
+#   return intp_err,proj_err
+# end

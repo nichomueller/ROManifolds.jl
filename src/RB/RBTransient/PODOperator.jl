@@ -56,7 +56,7 @@ function Algebra.jacobian!(
   return Snapshots(A,r)
 end
 
-function jacobian_and_residual(fesolver::ODESolver,odeop::ODEParamOperator,s::AbstractSnapshots)
+function RBSteady.jacobian_and_residual(fesolver::ODESolver,odeop::ODEParamOperator,s::AbstractSnapshots)
   us = (get_values(s),)
   r = get_realization(s)
   odecache = allocate_odecache(fesolver,odeop,r,us)

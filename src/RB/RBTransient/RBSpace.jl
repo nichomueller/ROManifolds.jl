@@ -1,20 +1,20 @@
-function reduced_basis(
+function RBSteady.reduced_basis(
   feop::TransientParamFEOperator,s::AbstractTransientSnapshots,norm_matrix;kwargs...)
   reduced_basis(s,norm_matrix;kwargs...)
 end
 
-function reduced_basis(
+function RBSteady.reduced_basis(
   feop::TransientParamSaddlePointFEOp,s::AbstractTransientSnapshots,norm_matrix;kwargs...)
   bases = reduced_basis(feop.op,s,norm_matrix;kwargs...)
   enrich_basis(feop,bases,norm_matrix)
 end
 
-function reduced_basis(
+function RBSteady.reduced_basis(
   feop::TransientParamFEOperatorWithTrian,s::AbstractTransientSnapshots,norm_matrix;kwargs...)
   reduced_basis(feop.op,s,norm_matrix;kwargs...)
 end
 
-function reduced_basis(
+function RBSteady.reduced_basis(
   feop::TransientParamLinearNonlinearFEOperator,s::AbstractTransientSnapshots,norm_matrix;kwargs...)
   reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
 end
@@ -38,7 +38,7 @@ function FESpaces.get_vector_type(r::TransientRBBasis)
   return newV
 end
 
-function Arrays.evaluate!(cache,k::RecastMap,x::AbstractParamVector,r::TransientRBBasis)
+function Arrays.evaluate!(cache,k::RBSteady.RecastMap,x::AbstractParamVector,r::TransientRBBasis)
   @inbounds for ip in eachindex(x)
     Xip = recast(x[ip],r.basis)
     for it in 1:num_times(r)
@@ -47,7 +47,7 @@ function Arrays.evaluate!(cache,k::RecastMap,x::AbstractParamVector,r::Transient
   end
 end
 
-function pod_error(r::RBSpace,s::AbstractTransientSnapshots,norm_matrix::AbstractMatrix)
+function RBSteady.pod_error(r::RBSpace,s::AbstractTransientSnapshots,norm_matrix::AbstractMatrix)
   s2 = change_mode(s)
   basis_space = get_basis_space(r)
   basis_time = get_basis_time(r)

@@ -101,7 +101,7 @@ results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 # fesnaps = Serialization.deserialize(RB.get_snapshots_filename(test_dir))
 
-println(RB.space_time_error(results))
+println(RB.compute_error(results))
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)

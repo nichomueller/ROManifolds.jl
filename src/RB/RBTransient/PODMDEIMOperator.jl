@@ -58,7 +58,7 @@ function Algebra.jacobian!(
   return Â
 end
 
-function jacobian_and_residual(solver::RBSolver,op::PODMDEIMOperator,s::AbstractTransientSnapshots)
+function RBSteady.jacobian_and_residual(solver::RBSolver,op::PODMDEIMOperator,s::AbstractTransientSnapshots)
   x = get_values(s)
   r = get_realization(s)
   fesolver = get_fe_solver(solver)
@@ -133,7 +133,7 @@ function _select_snapshots_at_space_time_locations(
   end
 end
 
-function fe_jacobian!(
+function RBSteady.fe_jacobian!(
   cache,
   op::PODMDEIMOperator,
   r::TransientParamRealization,
@@ -149,7 +149,7 @@ function fe_jacobian!(
   return Ai
 end
 
-function fe_residual!(
+function RBSteady.fe_residual!(
   cache,
   op::PODMDEIMOperator,
   r::TransientParamRealization,
