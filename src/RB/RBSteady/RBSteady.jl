@@ -25,21 +25,13 @@ using Mabla.FEM.TProduct
 using Mabla.FEM.ParamDataStructures
 using Mabla.FEM.ParamAlgebra
 using Mabla.FEM.ParamFESpaces
-using Mabla.FEM.ParamODEs
-using Mabla.FEM.ParamTensorProduct
+using Mabla.FEM.ParamSteady
 using Mabla.FEM.ParamUtils
 
 import Base: +,-,*,\
 import UnPack: @unpack
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
-
-export tpod
-export ttsvd
-export gram_schmidt!
-export orth_complement!
-export orth_projection
-include("BasisConstruction.jl")
 
 export AbstractSnapshots
 export BasicSnapshots
@@ -70,6 +62,13 @@ export fe_solutions
 export nonlinear_rb_solve!
 include("RBSolver.jl")
 
+export tpod
+export ttsvd
+export gram_schmidt!
+export orth_complement!
+export orth_projection
+include("BasisConstruction.jl")
+
 export Projection
 export SteadyProjection
 export PODBasis
@@ -86,7 +85,7 @@ export add_space_supremizers
 include("Projections.jl")
 
 export RBSpace
-export BlockRBSpace
+export MultiFieldRBSpace
 export reduced_fe_space
 export reduced_basis
 export pod_error

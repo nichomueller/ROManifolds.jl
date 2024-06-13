@@ -11,6 +11,7 @@ using Gridap
 using Gridap.Arrays
 using Gridap.Algebra
 using Gridap.Fields
+using Gridap.Geometry
 using Gridap.CellData
 using Gridap.Helpers
 

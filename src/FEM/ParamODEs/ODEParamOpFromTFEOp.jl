@@ -9,8 +9,8 @@ ParamDataStructures.realization(odeop::ODEParamOpFromTFEOp;kwargs...) = realizat
 ParamSteady.get_fe_operator(odeop::ODEParamOpFromTFEOp) = odeop.op
 ODEs.get_num_forms(odeop::ODEParamOpFromTFEOp) = get_num_forms(odeop.op)
 ODEs.is_form_constant(odeop::ODEParamOpFromTFEOp,k::Integer) = is_form_constant(odeop.op,k)
-IndexMaps.get_vector_index_map(odeop::ODEParamOpFromTFEOp) = get_vector_index_map(odeop.op)
-IndexMaps.get_matrix_index_map(odeop::ODEParamOpFromTFEOp) = get_matrix_index_map(odeop.op)
+get_vector_index_map(odeop::ODEParamOpFromTFEOp) = get_vector_index_map(odeop.op)
+get_matrix_index_map(odeop::ODEParamOpFromTFEOp) = get_matrix_index_map(odeop.op)
 
 function ParamSteady.get_linear_operator(odeop::ODEParamOpFromTFEOp)
   ODEParamOpFromTFEOp(get_linear_operator(odeop.op))

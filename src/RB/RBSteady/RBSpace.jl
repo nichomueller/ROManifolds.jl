@@ -106,9 +106,9 @@ end
 
 # multi field interface
 
-const BlockRBSpace{A,B<:BlockProjection} = RBSpace{A,B}
+const MultiFieldRBSpace{A,B<:BlockProjection} = RBSpace{A,B}
 
-function Base.getindex(r::BlockRBSpace,i...)
+function Base.getindex(r::MultiFieldRBSpace,i...)
   if isa(r.space,MultiFieldFESpace)
     fs = r.space
   else
@@ -117,7 +117,7 @@ function Base.getindex(r::BlockRBSpace,i...)
   return RBSpace(fs.spaces[i...],r.basis[i...])
 end
 
-function Base.iterate(r::BlockRBSpace)
+function Base.iterate(r::MultiFieldRBSpace)
   if isa(r.space,MultiFieldFESpace)
     fs = r.space
   else
@@ -129,7 +129,7 @@ function Base.iterate(r::BlockRBSpace)
   return ri,state
 end
 
-function Base.iterate(r::BlockRBSpace,state)
+function Base.iterate(r::MultiFieldRBSpace,state)
   i,fs = state
   if i > length(fs.spaces)
     return nothing
@@ -139,31 +139,31 @@ function Base.iterate(r::BlockRBSpace,state)
   return ri,state
 end
 
-MultiField.MultiFieldStyle(r::BlockRBSpace) = MultiFieldStyle(r.space)
+MultiField.MultiFieldStyle(r::MultiFieldRBSpace) = MultiFieldStyle(r.space)
 
-function FESpaces.get_free_dof_ids(r::BlockRBSpace)
+function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace)
   get_free_dof_ids(r,MultiFieldStyle(r))
 end
 
-function FESpaces.get_free_dof_ids(r::BlockRBSpace,::ConsecutiveMultiFieldStyle)
+function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace,::ConsecutiveMultiFieldStyle)
   @notimplemented
 end
 
-function FESpaces.get_free_dof_ids(r::BlockRBSpace,::BlockMultiFieldStyle{NB}) where NB
+function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace,::BlockMultiFieldStyle{NB}) where NB
   block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
   return BlockArrays.blockedrange(block_num_dofs)
 end
 
-function get_touched_blocks(r::BlockRBSpace)
+function get_touched_blocks(r::MultiFieldRBSpace)
   get_touched_blocks(r.basis)
 end
 
-function Arrays.return_cache(k::RecastMap,x::BlockVectorOfVectors,r::BlockRBSpace)
+function Arrays.return_cache(k::RecastMap,x::BlockVectorOfVectors,r::MultiFieldRBSpace)
   block_cache = [return_cache(k,x[Block(i)],r[i]) for i = 1:blocklength(x)]
   mortar(block_cache)
 end
 
-function Arrays.evaluate!(cache,k::RecastMap,x::BlockVectorOfVectors,r::BlockRBSpace)
+function Arrays.evaluate!(cache,k::RecastMap,x::BlockVectorOfVectors,r::MultiFieldRBSpace)
   @inbounds for i = 1:blocklength(cache)
     evaluate!(cache[Block(i)],k,x[Block(i)],r[i])
   end
@@ -178,7 +178,7 @@ function pod_error(r::RBSpace,s::AbstractSnapshots,norm_matrix::AbstractMatrix)
   Dict("err_space"=>err_space)
 end
 
-function pod_error(r::BlockRBSpace,s::BlockSnapshots,norm_matrix::BlockMatrix)
+function pod_error(r::MultiFieldRBSpace,s::BlockSnapshots,norm_matrix::BlockMatrix)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
   errors = Any[pod_error(r[i],s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]

@@ -12,6 +12,7 @@ using Mabla.FEM.TProduct
 using Mabla.FEM.ParamDataStructures
 using Mabla.FEM.ParamAlgebra
 using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamSteady
 using Mabla.FEM.ParamODEs
 
 θ = 0.5

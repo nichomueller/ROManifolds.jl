@@ -1,4 +1,4 @@
-module ParamFESpaces
+module ParamSteady
 
 using LinearAlgebra
 using BlockArrays
@@ -6,11 +6,13 @@ using SparseArrays
 
 using Gridap
 using Gridap.Algebra
+using Gridap.Arrays
 using Gridap.CellData
 using Gridap.Fields
 using Gridap.Geometry
 using Gridap.FESpaces
 using Gridap.MultiField
+using Gridap.ODEs
 using Gridap.Helpers
 
 using Mabla.FEM.IndexMaps
@@ -25,14 +27,23 @@ import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ReferenceFEs: get_order
 
-export ParametricSingleFieldFESpace
+export FEOperatorIndexMap
+export get_vector_index_map
+export get_matrix_index_map
+include("FEOperatorIndexMaps.jl")
+
+export UnEvalParamSingleFieldFESpace
 export ParamTrialFESpace
 export ParamMultiFieldFESpace
 include("ParamTrialFESpace.jl")
 
 export ParamOperatorType
+export NonlinearParamOperatorType
+export LinearParamOperatorType
+export LinearNonlinearParamOperatorType
 export NonlinearParamEq
 export LinearParamEq
+export LinearNonlinearParamEq
 export ParamOperator
 export ParamOperatorWithTrian
 export ParamOpFromFEOpCache

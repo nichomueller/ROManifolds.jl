@@ -28,12 +28,14 @@ struct BasicSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R}
   data::A
   index_map::I
   realization::R
+
   function BasicSnapshots(
     data::A,
     index_map::I,
     realization::R
-    ) where {T,N,L,A<:AbstractParamArray{T,N,L}}
-    new{T,N+1,L,I,R,A}(data,index_map,realization)
+    ) where {T,N,L,D,R,A<:AbstractParamArray{T,N,L},I<:AbstractIndexMap{D}}
+
+    new{T,N+1,L,D,I,R,A}(data,index_map,realization)
   end
 end
 
@@ -165,10 +167,10 @@ struct BlockSnapshots{S,N,L} <: AbstractParamContainer{S,N,L}
   function BlockSnapshots(
     array::Array{S,N},
     touched::Array{Bool,N}
-    ) where {S<:AbstractSnapshots,N}
+    ) where {T′,N′,L,S<:AbstractSnapshots{T′,N′,L},N}
 
     @check size(array) == size(touched)
-    new{S,N}(array,touched)
+    new{S,N,L}(array,touched)
   end
 end
 

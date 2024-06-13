@@ -1,38 +1,37 @@
-abstract type ParametricSingleFieldFESpace <: SingleFieldFESpace end
+abstract type UnEvalParamSingleFieldFESpace <: SingleFieldFESpace end
 
-function Arrays.evaluate(U::ParametricSingleFieldFESpace,args...)
+function Arrays.evaluate(U::UnEvalParamSingleFieldFESpace,args...)
   Upt = allocate_space(U,args...)
   evaluate!(Upt,U,args...)
   Upt
 end
 
-(U::ParametricSingleFieldFESpace)(r) = evaluate(U,r)
+(U::UnEvalParamSingleFieldFESpace)(r) = evaluate(U,r)
 
-FESpaces.get_free_dof_ids(f::ParametricSingleFieldFESpace) = get_free_dof_ids(f.space)
-FESpaces.get_vector_type(f::ParametricSingleFieldFESpace) = get_vector_type(f.space)
-CellData.get_triangulation(f::ParametricSingleFieldFESpace) = get_triangulation(f.space)
-FESpaces.get_cell_dof_ids(f::ParametricSingleFieldFESpace) = get_cell_dof_ids(f.space)
-FESpaces.get_fe_basis(f::ParametricSingleFieldFESpace) = get_fe_basis(f.space)
-FESpaces.get_fe_dof_basis(f::ParametricSingleFieldFESpace) = get_fe_dof_basis(f.space)
-FESpaces.ConstraintStyle(::Type{<:ParametricSingleFieldFESpace{U}}) where U = ConstraintStyle(U)
-function FESpaces.get_cell_constraints(f::ParametricSingleFieldFESpace,c::Constrained)
+FESpaces.get_free_dof_ids(f::UnEvalParamSingleFieldFESpace) = get_free_dof_ids(f.space)
+FESpaces.get_vector_type(f::UnEvalParamSingleFieldFESpace) = get_vector_type(f.space)
+CellData.get_triangulation(f::UnEvalParamSingleFieldFESpace) = get_triangulation(f.space)
+FESpaces.get_cell_dof_ids(f::UnEvalParamSingleFieldFESpace) = get_cell_dof_ids(f.space)
+FESpaces.get_fe_basis(f::UnEvalParamSingleFieldFESpace) = get_fe_basis(f.space)
+FESpaces.get_fe_dof_basis(f::UnEvalParamSingleFieldFESpace) = get_fe_dof_basis(f.space)
+function FESpaces.get_cell_constraints(f::UnEvalParamSingleFieldFESpace,c::Constrained)
   get_cell_constraints(f.space,c)
 end
-function FESpaces.get_cell_isconstrained(f::ParametricSingleFieldFESpace,c::Constrained)
+function FESpaces.get_cell_isconstrained(f::UnEvalParamSingleFieldFESpace,c::Constrained)
   get_cell_isconstrained(f.space,c)
 end
 
-FESpaces.get_dirichlet_dof_ids(f::ParametricSingleFieldFESpace) = get_dirichlet_dof_ids(f.space)
-FESpaces.num_dirichlet_tags(f::ParametricSingleFieldFESpace) = num_dirichlet_tags(f.space)
-FESpaces.get_dirichlet_dof_tag(f::ParametricSingleFieldFESpace) = get_dirichlet_dof_tag(f.space)
-function FESpaces.scatter_free_and_dirichlet_values(f::ParametricSingleFieldFESpace,free_values,dirichlet_values)
+FESpaces.get_dirichlet_dof_ids(f::UnEvalParamSingleFieldFESpace) = get_dirichlet_dof_ids(f.space)
+FESpaces.num_dirichlet_tags(f::UnEvalParamSingleFieldFESpace) = num_dirichlet_tags(f.space)
+FESpaces.get_dirichlet_dof_tag(f::UnEvalParamSingleFieldFESpace) = get_dirichlet_dof_tag(f.space)
+function FESpaces.scatter_free_and_dirichlet_values(f::UnEvalParamSingleFieldFESpace,free_values,dirichlet_values)
   scatter_free_and_dirichlet_values(f.space,free_values,dirichlet_values)
 end
-function FESpaces.gather_free_and_dirichlet_values!(free_values,dirichlet_values,f::ParametricSingleFieldFESpace,cell_vals)
+function FESpaces.gather_free_and_dirichlet_values!(free_values,dirichlet_values,f::UnEvalParamSingleFieldFESpace,cell_vals)
   gather_free_and_dirichlet_values!(free_values,dirichlet_values,f.space,cell_vals)
 end
 
-function FESpaces.get_dirichlet_dof_values(f::ParametricSingleFieldFESpace)
+function FESpaces.get_dirichlet_dof_values(f::UnEvalParamSingleFieldFESpace)
   msg = """
   It does not make sense to get the Dirichlet DOF values of a transient FE space. You
   should first evaluate the transient FE space at a point in time and get the Dirichlet
@@ -41,15 +40,15 @@ function FESpaces.get_dirichlet_dof_values(f::ParametricSingleFieldFESpace)
   @unreachable msg
 end
 
-function TProduct.get_vector_index_map(f::ParametricSingleFieldFESpace)
+function get_vector_index_map(f::UnEvalParamSingleFieldFESpace)
   get_vector_index_map(f.space)
 end
 
-function TProduct.get_matrix_index_map(f::ParametricSingleFieldFESpace,g::SingleFieldFESpace)
+function get_matrix_index_map(f::UnEvalParamSingleFieldFESpace,g::SingleFieldFESpace)
   get_matrix_index_map(f.space,g)
 end
 
-struct ParamTrialESpace{A,B} <: ParametricSingleFieldFESpace
+struct ParamTrialESpace{A,B} <: UnEvalParamSingleFieldFESpace
   space::A
   space0::B
   dirichlet::Union{Function,AbstractVector{<:Function}}

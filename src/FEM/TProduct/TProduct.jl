@@ -62,8 +62,4 @@ include("TProductCellData.jl")
 export TProductSparseMatrixAssembler
 include("TProductAssembly.jl")
 
-export FEOperatorIndexMap
-export get_vector_index_map
-export get_matrix_index_map
-include("FEOperatorIndexMaps.jl")
 end # module

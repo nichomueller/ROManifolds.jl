@@ -19,17 +19,17 @@ function RBSteady.reduced_basis(
   reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
 end
 
-const TransientRBBasis{A,B<:TransientProjection} = RBBasis{A,B}
+const TransientRBSpace{A,B<:TransientProjection} = RBSpace{A,B}
 
-(U::TransientRBBasis)(μ,t) = evaluate(U,μ,t)
+(U::TransientRBSpace)(μ,t) = evaluate(U,μ,t)
 
-ODEs.time_derivative(U::TransientRBBasis) = RBSpace(time_derivative(U),U.basis)
+ODEs.time_derivative(U::TransientRBSpace) = RBSpace(time_derivative(U),U.basis)
 
-get_basis_time(r::TransientRBBasis) = get_basis_time(r.basis)
-ParamDataStructures.num_times(r::TransientRBBasis) = num_times(r.basis)
-num_reduced_times(r::TransientRBBasis) = num_reduced_times(r.basis)
+get_basis_time(r::TransientRBSpace) = get_basis_time(r.basis)
+ParamDataStructures.num_times(r::TransientRBSpace) = num_times(r.basis)
+num_reduced_times(r::TransientRBSpace) = num_reduced_times(r.basis)
 
-function FESpaces.get_vector_type(r::TransientRBBasis)
+function FESpaces.get_vector_type(r::TransientRBSpace)
   change_length(x) = x
   change_length(::Type{VectorOfVectors{T,L}}) where {T,L} = VectorOfVectors{T,Int(L/num_times(r))}
   change_length(::Type{<:BlockVectorOfVectors{T,L}}) where {T,L} = BlockVectorOfVectors{T,Int(L/num_times(r))}
@@ -38,7 +38,7 @@ function FESpaces.get_vector_type(r::TransientRBBasis)
   return newV
 end
 
-function Arrays.evaluate!(cache,k::RBSteady.RecastMap,x::AbstractParamVector,r::TransientRBBasis)
+function Arrays.evaluate!(cache,k::RBSteady.RecastMap,x::AbstractParamVector,r::TransientRBSpace)
   @inbounds for ip in eachindex(x)
     Xip = recast(x[ip],r.basis)
     for it in 1:num_times(r)

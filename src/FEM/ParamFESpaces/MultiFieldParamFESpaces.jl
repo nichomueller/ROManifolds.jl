@@ -124,7 +124,7 @@ function FESpaces.interpolate_dirichlet(
   MultiFieldFEFunction(free_values,fe,blocks)
 end
 
-function TProduct.get_vector_index_map(tests::MultiFieldFESpace)
+function get_vector_index_map(tests::MultiFieldFESpace)
   index_maps = AbstractIndexMap[]
   for test in tests
     push!(index_maps,get_vector_index_map(test))
@@ -132,7 +132,7 @@ function TProduct.get_vector_index_map(tests::MultiFieldFESpace)
   return index_maps
 end
 
-function TProduct.get_matrix_index_map(trials::MultiFieldFESpace,tests::MultiFieldFESpace)
+function get_matrix_index_map(trials::MultiFieldFESpace,tests::MultiFieldFESpace)
   index_maps = AbstractIndexMap[]
   for (trial,test) in zip(trials,tests)
     push!(index_maps,get_matrix_index_map(trial,test))

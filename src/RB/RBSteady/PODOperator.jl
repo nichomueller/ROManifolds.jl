@@ -30,21 +30,21 @@ end
 FESpaces.get_trial(op::PODOperator) = op.trial
 FESpaces.get_test(op::PODOperator) = op.test
 ParamDataStructures.realization(op::PODOperator;kwargs...) = realization(op.op;kwargs...)
-ParamFESpaces.get_fe_operator(op::PODOperator) = ParamSteady.get_fe_operator(op.op)
-IndexMaps.get_vector_index_map(op::PODOperator) = get_vector_index_map(op.op)
-IndexMaps.get_matrix_index_map(op::PODOperator) = get_matrix_index_map(op.op)
+ParamSteady.get_fe_operator(op::PODOperator) = ParamSteady.get_fe_operator(op.op)
+ParamSteady.get_vector_index_map(op::PODOperator) = get_vector_index_map(op.op)
+ParamSteady.get_matrix_index_map(op::PODOperator) = get_matrix_index_map(op.op)
 get_fe_trial(op::PODOperator) = get_trial(op.op)
 get_fe_test(op::PODOperator) = get_test(op.op)
 
-function ParamFESpaces.get_linear_operator(op::PODOperator)
+function ParamSteady.get_linear_operator(op::PODOperator)
   PODOperator(get_linear_operator(op.op),op.trial,op.test)
 end
 
-function ParamFESpaces.get_nonlinear_operator(op::PODOperator)
+function ParamSteady.get_nonlinear_operator(op::PODOperator)
   PODOperator(get_nonlinear_operator(op.op),op.trial,op.test)
 end
 
-function ParamFESpaces.set_triangulation(
+function ParamSteady.set_triangulation(
   op::PODOperator,
   trians_rhs,
   trians_lhs)
@@ -52,7 +52,7 @@ function ParamFESpaces.set_triangulation(
   PODOperator(set_triangulation(op.op,trians_rhs,trians_lhs),op.trial,op.test)
 end
 
-function ParamFESpaces.change_triangulation(
+function ParamSteady.change_triangulation(
   op::PODOperator,
   trians_rhs,
   trians_lhs)

@@ -4,30 +4,30 @@ ParamDataStructures.num_times(s::AbstractTransientSnapshots) = num_times(get_rea
 
 Base.size(s::AbstractTransientSnapshots) = (num_space_dofs(s)...,num_times(s),num_params(s))
 
-struct BasicTransientSnapshots{T,N,L,D,I,R,A} <: AbstractTransientSnapshots{T,N,L,D,I,R}
+struct TransientBasicSnapshots{T,N,L,D,I,R,A} <: AbstractTransientSnapshots{T,N,L,D,I,R}
   data::A
   index_map::I
   realization::R
-  function BasicTransientSnapshots(
+  function TransientBasicSnapshots(
     data::A,
     index_map::I,
     realization::R
-    ) where {T,N,L,A<:AbstractParamArray{T,N,L}}
-    new{T,N+2,L,I,R,A}(data,index_map,realization)
+    ) where {T,N,L,D,R,A<:AbstractParamArray{T,N,L},I<:AbstractIndexMap{D}}
+    new{T,N+2,L,D,I,R,A}(data,index_map,realization)
   end
 end
 
 function RBSteady.Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::TransientParamRealization)
-  BasicTransientSnapshots(s,i,r)
+  TransientBasicSnapshots(s,i,r)
 end
 
-ParamDataStructures.get_values(s::BasicTransientSnapshots) = s.data
-IndexMaps.get_index_map(s::BasicTransientSnapshots) = s.index_map
-RBSteady.get_realization(s::BasicTransientSnapshots) = s.realization
+ParamDataStructures.get_values(s::TransientBasicSnapshots) = s.data
+IndexMaps.get_index_map(s::TransientBasicSnapshots) = s.index_map
+RBSteady.get_realization(s::TransientBasicSnapshots) = s.realization
 
 # time is the outer variable, param the inner
 Base.@propagate_inbounds function Base.getindex(
-  s::BasicTransientSnapshots{T,N},
+  s::TransientBasicSnapshots{T,N},
   i::Vararg{Integer,N}
   ) where {T,N}
 
@@ -39,7 +39,7 @@ Base.@propagate_inbounds function Base.getindex(
 end
 
 Base.@propagate_inbounds function Base.setindex!(
-  s::BasicTransientSnapshots{T,N},
+  s::TransientBasicSnapshots{T,N},
   v,
   i::Vararg{Integer,N}
   ) where {T,N}
@@ -59,8 +59,8 @@ struct TransientSnapshots{T,N,L,D,I,R,A} <: AbstractTransientSnapshots{T,N,L,D,I
     data::A,
     index_map::I,
     realization::R
-    ) where {T,N,L,A<:Vector{<:AbstractParamArray{T,N,L}}}
-    new{T,N+2,L,I,R,A}(data,index_map,realization)
+    ) where {T,N,L,D,R,A<:Vector{<:AbstractParamArray{T,N,L}},I<:AbstractIndexMap{D}}
+    new{T,N+2,L,D,I,R,A}(data,index_map,realization)
   end
 end
 
@@ -99,7 +99,7 @@ Base.@propagate_inbounds function Base.getindex(
 end
 
 Base.@propagate_inbounds function Base.setindex!(
-  s::BasicTransientSnapshots{T,N},
+  s::TransientSnapshots{T,N},
   v,
   i::Vararg{Integer,N}
   ) where {T,N}
@@ -211,7 +211,7 @@ function ParamDataStructures.recast(s::TransientSparseSnapshots,a::AbstractMatri
   return recast(A,a)
 end
 
-const StandardTransientSnapshots{T,3,L,I,R} = AbstractTransientSnapshots{T,N,L,1,I,R}
+const StandardTransientSnapshots{T,L,I,R} = AbstractTransientSnapshots{T,3,L,1,I,R}
 const StandardTransientSparseSnapshots{T,L,I,R,A<:MatrixOfSparseMatricesCSC} = TransientSparseSnapshots{T,3,L,1,I,R,A}
 
 abstract type ModeAxes end
@@ -235,9 +235,9 @@ function RBSteady.flatten_snapshots(s::AbstractTransientSnapshots)
   ModeTransientSnapshots(s′)
 end
 
-change_mode(s::StandardTransientSnapshots) = ModeTransientSnapshots(s,Mode2Axes())
 change_mode(s::StandardTransientSnapshots) = ModeTransientSnapshots(s,change_mode(get_mode(s)))
 
+get_mode(s::StandardTransientSnapshots) = Mode1Axes()
 get_mode(s::ModeTransientSnapshots) = s.mode
 
 Base.@propagate_inbounds function Base.getindex(s::ModeTransientSnapshots,irow,icol)

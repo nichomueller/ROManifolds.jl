@@ -25,8 +25,8 @@ using Mabla.FEM.TProduct
 using Mabla.FEM.ParamDataStructures
 using Mabla.FEM.ParamAlgebra
 using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamSteady
 using Mabla.FEM.ParamODEs
-using Mabla.FEM.ParamTensorProduct
 using Mabla.FEM.ParamUtils
 
 using Mabla.RB
@@ -37,10 +37,8 @@ import UnPack: @unpack
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
 
-include("BasisConstruction.jl")
-
 export AbstractTransientSnapshots
-export BasicTransientSnapshots
+export TransientBasicSnapshots
 export TransientSnapshots
 export TransientSparseSnapshots
 export StandardTransientSnapshots
@@ -56,6 +54,8 @@ export SpaceTimeMDEIM
 export ThetaMethodRBSolver
 include("RBSolver.jl")
 
+include("BasisConstruction.jl")
+
 export TransientProjection
 export TransientPODBasis
 export TransientTTSVDCores
@@ -63,7 +63,7 @@ export get_basis_time
 export add_time_supremizers
 include("Projections.jl")
 
-export TransientRBBasis
+export TransientRBSpace
 include("RBSpace.jl")
 
 include("PODOperator.jl")

@@ -1,13 +1,13 @@
-struct ParamOpFromFEOp <: ParamOperator
-  op::ParamFEOperator
+struct ParamOpFromFEOp{T} <: ParamOperator{T}
+  op::ParamFEOperator{T}
 end
 
 FESpaces.get_test(op::ParamOpFromFEOp) = get_test(op.op)
 FESpaces.get_trial(op::ParamOpFromFEOp) = get_trial(op.op)
 ParamDataStructures.realization(op::ParamOpFromFEOp;kwargs...) = realization(op.op;kwargs...)
 get_fe_operator(op::ParamOpFromFEOp) = op.op
-IndexMaps.get_vector_index_map(op::ParamOpFromFEOp) = get_vector_index_map(op.op)
-IndexMaps.get_matrix_index_map(op::ParamOpFromFEOp) = get_matrix_index_map(op.op)
+get_vector_index_map(op::ParamOpFromFEOp) = get_vector_index_map(op.op)
+get_matrix_index_map(op::ParamOpFromFEOp) = get_matrix_index_map(op.op)
 
 function get_linear_operator(op::ParamOpFromFEOp)
   ParamOpFromFEOp(get_linear_operator(op.op))
@@ -17,7 +17,7 @@ function get_nonlinear_operator(op::ParamOpFromFEOp)
   ParamOpFromFEOp(get_nonlinear_operator(op.op))
 end
 
-function ODEs.allocate_opcache(
+function allocate_paramcache(
   op::ParamOpFromFEOp,
   r::ParamRealization,
   u::AbstractParamVector)
@@ -42,7 +42,7 @@ function ODEs.allocate_opcache(
   OpFromFEOpCache(trial,ptrial,pfeopcache,A)
 end
 
-function ODEs.update_opcache!(opcache,op::ParamOpFromFEOp,r::ParamRealization)
+function update_paramcache!(opcache,op::ParamOpFromFEOp,r::ParamRealization)
   opcache.Us = evaluate!(opcache.Us,opcache.Ups,r)
   pfeopcache,op = opcache.pfeopcache,op.op
   opcache.pfeopcache = update_pfeopcache!(pfeopcache,op,r)
@@ -132,8 +132,8 @@ function Algebra.jacobian!(
   A
 end
 
-struct ParamOpFromFEOpWithTrian <: ParamOperatorWithTrian
-  op::ParamFEOperatorWithTrian
+struct ParamOpFromFEOpWithTrian{T} <: ParamOperatorWithTrian{T}
+  op::ParamFEOperatorWithTrian{T}
 end
 
 FESpaces.get_test(op::ParamOpFromFEOpWithTrian) = get_test(op.op)
@@ -157,7 +157,7 @@ function change_triangulation(op::ParamOpFromFEOpWithTrian,trians_rhs,trians_lhs
   ParamOpFromFEOpWithTrian(change_triangulation(op.op,trians_rhs,trians_lhs))
 end
 
-function ODEs.allocate_opcache(
+function allocate_paramcache(
   op::ParamOpFromFEOpWithTrian,
   r::ParamRealization,
   u::AbstractParamVector)
@@ -183,7 +183,7 @@ function ODEs.allocate_opcache(
   OpFromFEOpCache(trial,ptrial,pfeopcache,A)
 end
 
-function ODEs.update_opcache!(
+function update_paramcache!(
   opcache,
   op::ParamOpFromFEOpWithTrian,
   r::ParamRealization)

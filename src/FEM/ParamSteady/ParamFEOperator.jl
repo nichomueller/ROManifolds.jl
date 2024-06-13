@@ -19,8 +19,8 @@ function ParamFESpaces.get_param_assembler(op::ParamFEOperator,r::ParamRealizati
 end
 
 IndexMaps.get_index_map(op::ParamFEOperator) = @abstractmethod
-IndexMaps.get_vector_index_map(op::ParamFEOperator) = get_vector_index_map(get_index_map(op))
-IndexMaps.get_matrix_index_map(op::ParamFEOperator) = get_matrix_index_map(get_index_map(op))
+get_vector_index_map(op::ParamFEOperator) = get_vector_index_map(get_index_map(op))
+get_matrix_index_map(op::ParamFEOperator) = get_matrix_index_map(get_index_map(op))
 
 get_induced_norm(op::ParamFEOperator) = @abstractmethod
 
@@ -139,37 +139,27 @@ ODEs.get_res(op::ParamSaddlePointFEOp) = get_res(op.op)
 get_jac(op::ParamSaddlePointFEOp) = get_jac(op.op)
 ODEs.get_assembler(op::ParamSaddlePointFEOp) = get_assembler(op.op)
 
-function assemble_norm_matrix(op::ParamSaddlePointFEOp)
-  assemble_norm_matrix(op.op)
-end
-
-function assemble_coupling_matrix(op::ParamSaddlePointFEOp)
-  test = get_test(op)
-  trial = evaluate(get_trial(op),nothing)
-  c = get_coupling(op)
-  assemble_matrix(c,trial,test)
-end
-
 # interface to accommodate the separation of terms depending on the triangulation
 
 abstract type ParamFEOperatorWithTrian{T} <: ParamFEOperator{T} end
 
-function FESpaces.get_algebraic_operator(op::ParamFEOperatorWithTrian{T})
-  ParamAlgebraicOpFromFEOpWithTrian(op)
+function FESpaces.get_algebraic_operator(op::ParamFEOperatorWithTrian)
+  ParamOpFromFEOpWithTrian(op)
 end
 
-struct ParamFEOpFromWeakFormWithTrian <: ParamFEOperatorWithTrian{T}
+struct ParamFEOpFromWeakFormWithTrian{T} <: ParamFEOperatorWithTrian{T}
   op::ParamFEOperator{T}
   trian_res::Tuple{Vararg{Triangulation}}
   trian_jac::Tuple{Vararg{Triangulation}}
 
   function ParamFEOpFromWeakFormWithTrian(
-    op::ParamFEOperator,
+    op::ParamFEOperator{T},
     trian_res::Tuple{Vararg{Triangulation}},
-    trian_jac::Tuple{Vararg{Triangulation}})
+    trian_jac::Tuple{Vararg{Triangulation}}
+    ) where T
 
     newop = set_triangulation(op,trian_res,trian_jac)
-    new(newop,trian_res,trian_jac)
+    new{T}(newop,trian_res,trian_jac)
   end
 end
 
@@ -246,18 +236,6 @@ get_jac(op::ParamSaddlePointFEOpWithTrian) = get_jac(op.op)
 ODEs.get_assembler(op::ParamSaddlePointFEOpWithTrian) = get_assembler(op.op)
 get_coupling(op::ParamSaddlePointFEOpWithTrian) = get_coupling(op.op)
 
-function assemble_norm_matrix(op::ParamSaddlePointFEOpWithTrian)
-  assemble_norm_matrix(op.op)
-end
-
-function assemble_coupling_matrix(op::ParamSaddlePointFEOpWithTrian)
-  assemble_coupling_matrix(op.op)
-end
-
-function ODEs.get_assembler(op::ParamSaddlePointFEOpWithTrian,r::ParamRealization)
-  get_assembler(op.op,r)
-end
-
 # utils
 
 function _set_triangulation_jac(
@@ -312,7 +290,7 @@ function change_triangulation(op::ParamFEOperatorWithTrian,trian_res,trian_jac)
   ParamFEOpFromWeakFormWithTrian(newop,newtrian_res,newtrian_jac)
 end
 
-function change_triangulation(op::ParamFEOperatorWithTrian,trian_res,trian_jac)
+function change_triangulation(op::ParamSaddlePointFEOpWithTrian,trian_res,trian_jac)
   newtrian_res = order_triangulations(op.trian_res,trian_res)
   newtrian_jac = order_triangulations(op.trian_jac,trian_jac)
   newop = set_triangulation(op,newtrian_res,newtrian_jac)

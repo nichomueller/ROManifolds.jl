@@ -45,9 +45,9 @@ struct PODBasis{A<:AbstractMatrix} <: SteadyProjection
   basis::A
 end
 
-get_basis_space(a::Projection) = a.basis
-num_space_dofs(a::Projection) = size(get_basis_space(a),1)
-num_reduced_space_dofs(a::Projection) = size(get_basis_space(a),2)
+get_basis_space(a::PODBasis) = a.basis
+num_space_dofs(a::PODBasis) = size(get_basis_space(a),1)
+num_reduced_space_dofs(a::PODBasis) = size(get_basis_space(a),2)
 
 # TT interface
 

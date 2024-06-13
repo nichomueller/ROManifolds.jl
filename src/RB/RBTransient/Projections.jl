@@ -15,7 +15,7 @@ function RBSteady.Projection(s::StandardTransientSnapshots,args...;kwargs...)
   TransientPODBasis(basis_space,basis_time)
 end
 
-function RBSteady.Projection(s::StandardSparseSnapshots,args...;kwargs...)
+function RBSteady.Projection(s::StandardTransientSparseSnapshots,args...;kwargs...)
   s′ = flatten_snapshots(s)
   basis_space = tpod(s′,args...;kwargs...)
   compressed_s2 = compress(s′,basis_space,args...;change_mode=true)
@@ -24,13 +24,13 @@ function RBSteady.Projection(s::StandardSparseSnapshots,args...;kwargs...)
   TransientPODBasis(sparse_basis_space,basis_time)
 end
 
-function RBSteady.Projection(s::TTSnapshots,args...;kwargs...)
+function RBSteady.Projection(s::AbstractTransientSnapshots,args...;kwargs...)
   cores_space...,core_time = ttsvd(s,args...;kwargs...)
   index_map = get_index_map(s)
   TransientTTSVDCores(cores_space,core_time,index_map)
 end
 
-function RBSteady.Projection(s::NnzTTSnapshots,args...;kwargs...)
+function RBSteady.Projection(s::TransientSparseSnapshots,args...;kwargs...)
   cores_space...,core_time = ttsvd(s,args...;kwargs...)
   cores_space′ = recast(s,cores_space)
   index_map = get_index_map(s)
@@ -119,12 +119,6 @@ end
 
 function RBSteady._cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,4}) where {S,T}
   @notimplemented "Usually the spatial cores are computed before the temporal ones"
-end
-
-function RBSteady._cores2basis(i::AbstractIndexMap,a::AbstractArray{T,3}...) where T
-  basis = RBSteady._cores2basis(a...)
-  invi = inv_index_map(i)
-  return view(basis,:,vec(invi),:)
 end
 
 function ParamDataStructures.recast(x̂::AbstractVector,a::TransientTTSVDCores)

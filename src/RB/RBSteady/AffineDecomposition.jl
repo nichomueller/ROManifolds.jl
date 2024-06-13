@@ -43,7 +43,7 @@ function get_reduced_cells(
 end
 
 function get_reduced_cells(
-  trian::Triangulationriangulation,
+  trian::Triangulation,
   ids::AbstractVector,
   test::FESpace)
 
@@ -54,7 +54,7 @@ function get_reduced_cells(
 end
 
 function get_reduced_cells(
-  trian::Triangulationriangulation,
+  trian::Triangulation,
   ids::AbstractVector,
   trial::FESpace,
   test::FESpace)
@@ -70,7 +70,7 @@ function get_reduced_cells(
   return red_integr_cells
 end
 
-function reduce_triangulation(trian::Triangulationriangulation,i::AbstractIntegrationDomain,r::RBSpace...)
+function reduce_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,r::RBSpace...)
   f = map(get_space,r)
   indices_space = get_indices_space(i)
   red_integr_cells = get_reduced_cells(trian,indices_space,f...)
@@ -475,7 +475,7 @@ end
 #   sum(map(i->compress(fes[i],args...;kwargs...),eachindex(fes)))
 # end
 
-# function compress(fesolver,fes::ArrayContribution,test::BlockRBSpace;kwargs...)
+# function compress(fesolver,fes::ArrayContribution,test::MultiFieldRBSpace;kwargs...)
 #   active_block_ids = get_touched_blocks(fes[1])
 #   block_map = BlockMap(size(fes[1]),active_block_ids)
 #   rb_blocks = map(active_block_ids) do i
@@ -489,7 +489,7 @@ end
 #   return_cache(block_map,rb_blocks...)
 # end
 
-# function compress(fesolver,fes::ArrayContribution,trial::BlockRBSpace,test::BlockRBSpace;kwargs...)
+# function compress(fesolver,fes::ArrayContribution,trial::MultiFieldRBSpace,test::MultiFieldRBSpace;kwargs...)
 #   active_block_ids = get_touched_blocks(fes[1])
 #   block_map = BlockMap(size(fes[1]),active_block_ids)
 #   rb_blocks = map(Tuple.(active_block_ids)) do (i,j)

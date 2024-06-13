@@ -51,7 +51,7 @@ end
 # TT interface
 
 function reduce_operator(
-  mdeim_style::SpaceTimeMDEIM,
+  mdeim_style,
   b::TTSVDCores,
   b_test::TTSVDCores;
   kwargs...)
@@ -61,7 +61,7 @@ function reduce_operator(
 end
 
 function reduce_operator(
-  mdeim_style::SpaceTimeMDEIM,
+  mdeim_style,
   b::TTSVDCores,
   b_trial::TTSVDCores,
   b_test::TTSVDCores;

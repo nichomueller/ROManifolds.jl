@@ -1,4 +1,4 @@
-struct TransientTrialParamFESpace{A,B} <: ParametricSingleFieldFESpace
+struct TransientTrialParamFESpace{A,B} <: UnEvalParamSingleFieldFESpace
   space::A
   space0::B
   dirichlet::Union{Function,AbstractVector{<:Function}}

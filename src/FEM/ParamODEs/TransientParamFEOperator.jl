@@ -31,8 +31,8 @@ function ParamFESpaces.get_param_assembler(op::TransientParamFEOperator,r::Trans
 end
 
 IndexMaps.get_index_map(op::TransientParamFEOperator) = @abstractmethod
-IndexMaps.get_vector_index_map(op::TransientParamFEOperator) = get_vector_index_map(get_index_map(op))
-IndexMaps.get_matrix_index_map(op::TransientParamFEOperator) = get_matrix_index_map(get_index_map(op))
+ParamSteady.get_vector_index_map(op::TransientParamFEOperator) = get_vector_index_map(get_index_map(op))
+ParamSteady.get_matrix_index_map(op::TransientParamFEOperator) = get_matrix_index_map(get_index_map(op))
 
 ParamSteady.get_induced_norm(op::TransientParamFEOperator) = @abstractmethod
 

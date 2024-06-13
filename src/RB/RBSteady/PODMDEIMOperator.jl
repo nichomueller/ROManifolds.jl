@@ -30,8 +30,8 @@ FESpaces.get_trial(op::PODMDEIMOperator) = get_trial(op.op)
 FESpaces.get_test(op::PODMDEIMOperator) = get_test(op.op)
 ParamDataStructures.realization(op::PODMDEIMOperator;kwargs...) = realization(op.op;kwargs...)
 ParamSteady.get_fe_operator(op::PODMDEIMOperator) = ParamSteady.get_fe_operator(op.op)
-IndexMaps.get_vector_index_map(op::PODMDEIMOperator) = get_vector_index_map(op.op)
-IndexMaps.get_matrix_index_map(op::PODMDEIMOperator) = get_matrix_index_map(op.op)
+ParamSteady.get_vector_index_map(op::PODMDEIMOperator) = get_vector_index_map(op.op)
+ParamSteady.get_matrix_index_map(op::PODMDEIMOperator) = get_matrix_index_map(op.op)
 get_fe_trial(op::PODMDEIMOperator) = get_fe_trial(op.op)
 get_fe_test(op::PODMDEIMOperator) = get_fe_test(op.op)
 
@@ -131,8 +131,8 @@ struct LinearNonlinearPODMDEIMOperator <: RBOperator{LinearNonlinearParamOperato
   op_nonlinear::PODMDEIMOperator{NonlinearParamOperatorType}
 end
 
-ParamFESpaces.get_linear_operator(op::LinearNonlinearPODMDEIMOperator) = op.op_linear
-ParamFESpaces.get_nonlinear_operator(op::LinearNonlinearPODMDEIMOperator) = op.op_nonlinear
+ParamSteady.get_linear_operator(op::LinearNonlinearPODMDEIMOperator) = op.op_linear
+ParamSteady.get_nonlinear_operator(op::LinearNonlinearPODMDEIMOperator) = op.op_nonlinear
 
 function FESpaces.get_test(op::LinearNonlinearPODMDEIMOperator)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
@@ -148,8 +148,8 @@ function ParamDataStructures.realization(op::LinearNonlinearPODMDEIMOperator;kwa
   realization(op.op_nonlinear;kwargs...)
 end
 
-function ParamFESpaces.get_fe_operator(op::LinearNonlinearPODMDEIMOperator)
-  join_operators(ParamSteady.get_fe_operator(op.op_linear),ParamSteady.get_fe_operator(op.op_nonlinear))
+function ParamSteady.get_fe_operator(op::LinearNonlinearPODMDEIMOperator)
+  join_operators(get_fe_operator(op.op_linear),get_fe_operator(op.op_nonlinear))
 end
 
 function get_fe_trial(op::LinearNonlinearPODMDEIMOperator)

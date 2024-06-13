@@ -36,11 +36,11 @@ FESpaces.get_dirichlet_dof_tag(f::SingleFieldParamFESpace) = get_dirichlet_dof_t
 
 FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldParamFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-function TProduct.get_vector_index_map(f::SingleFieldParamFESpace)
+function get_vector_index_map(f::SingleFieldParamFESpace)
   get_vector_index_map(f.space)
 end
 
-function TProduct.get_matrix_index_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace)
+function get_matrix_index_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace)
   get_matrix_index_map(f.space,g)
 end
 
@@ -265,8 +265,4 @@ function FESpaces.test_single_field_fe_space(f::SingleFieldParamFESpace,pred=(==
   end
   cell_dof_basis = get_fe_dof_basis(f)
   @test isa(cell_dof_basis,CellDof)
-end
-
-function ParamDataStructures.param_getindex(f::FESpaceToParamFESpace,index::Integer)
-  f.space
 end
