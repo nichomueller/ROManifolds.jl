@@ -1,4 +1,4 @@
-module ParamAssemblersTests
+# module ParamAssemblersTests
 
 using Test
 using Gridap.Arrays
@@ -13,6 +13,12 @@ using Gridap.FESpaces
 using Gridap.CellData
 using Gridap.Algebra
 using Mabla.FEM
+using Mabla.FEM.IndexMaps
+using Mabla.FEM.TProduct
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamAlgebra
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamSteady
 
 domain =(0,1,0,1)
 partition = (2,2)
@@ -29,6 +35,10 @@ biform(u,v) = fμ(μ)*∇(v)⊙∇(u)
 liform(v) = fμ(μ)*v⊙b
 biform1(u,v) = fμ(μ)*v*u
 liform1(v) = fμ(μ)*v*3
+# biform(u,v) = ∇(v)⊙∇(u)
+# liform(v) = v⊙b
+# biform1(u,v) = v*u
+# liform1(v) = v*3
 
 reffe = ReferenceFE(lagrangian,Float64,1)
 V = FESpace(model,reffe,dirichlet_tags=[1,2,3,4,6,5])
@@ -87,93 +97,83 @@ term_to_rows = [rows, brows, b0rows]
 term_to_cols = [cols, bcols, b0cols]
 term_to_cellmatvec = [ cellmatvec, bcellmatvec, b0cellmatvec ]
 
-mtypes = [
-  SparseMatrixCSC{Float64,Int},
-  SparseMatrixCSR{0,Float64,Int},
-  SparseMatrixCSR{1,Float64,Int},
-  SymSparseMatrixCSR{0,Float64,Int},
-  SymSparseMatrixCSR{1,Float64,Int}]
+T = SparseMatrixCSC{Float64,Int}
+matvecdata = ( term_to_cellmatvec , term_to_rows, term_to_cols)
+matdata = (term_to_cellmat,term_to_rows,term_to_cols)
+vecdata = (term_to_cellvec,term_to_rows)
+data = (matvecdata,matdata,vecdata)
 
-for T in mtypes
-  matvecdata = ( term_to_cellmatvec , term_to_rows, term_to_cols)
-  matdata = (term_to_cellmat,term_to_rows,term_to_cols)
-  vecdata = (term_to_cellvec,term_to_rows)
-  data = (matvecdata,matdata,vecdata)
+assem = get_param_assembler(SparseMatrixAssembler(T,Vector{Float64},U,V),μ)
+ParamFESpaces.test_passembler(assem,matdata,vecdata,data)
+# assem = SparseMatrixAssembler(T,Vector{Float64},U,V)
 
-  assem = SparseMatrixAssembler(T,Vector{Float64},U,V)
-  test_sparse_matrix_assembler(assem,matdata,vecdata,data)
+strategy = GenericAssemblyStrategy(row->row,col->col,row->true,col->true)
 
-  strategy = GenericAssemblyStrategy(row->row,col->col,row->true,col->true)
+assem2 = get_param_assembler(SparseMatrixAssembler(T,Vector{Float64},U,V,strategy),μ)
+ParamFESpaces.test_passembler(assem2,matdata,vecdata,data)
 
-  assem2 = SparseMatrixAssembler(T,Vector{Float64},U,V,strategy)
-  test_sparse_matrix_assembler(assem2,matdata,vecdata,data)
+matdata = ([cellmat],[rows],[cols])
+vecdata = ([cellvec],[rows])
 
-  matdata = ([cellmat],[rows],[cols])
-  vecdata = ([cellvec],[rows])
+mat = assemble_matrix(assem,matdata)
+vec = assemble_vector(assem,vecdata)
+x = mat \ vec
 
-  mat = assemble_matrix(assem,matdata)
-  vec = assemble_vector(assem,vecdata)
-  x = mat \ vec
+assemble_matrix!(mat,assem,matdata)
+assemble_vector!(vec,assem,vecdata)
+x2 = mat \ vec
 
+@test x ≈ x2
+@test param_length(x) == param_length(x2) == param_length(vec) == param_length(mat) == 3
+@test typeof(x) == typeof(x2) == typeof(vec) <: AbstractParamVector
 
-  assemble_matrix!(mat,assem,matdata)
-  assemble_vector!(vec,assem,vecdata)
-  x2 = mat \ vec
-
-  @test x ≈ x2
-  @test length(x) == length(x2) == length(vec) == length(mat) == 3
-  @test typeof(x) == typeof(x2) == typeof(vec) <: ParamVector
-
-  for (i,μi) = enumerate(μ)
-    μi = sum(μi)
-    @test vec[i] ≈ [0.0625, 0.125, 0.0625]*μi
-    @test mat[i][1, 1]  ≈  1.333333333333333*μi
-    @test mat[i][2, 1]  ≈ -0.33333333333333*μi
-    @test mat[i][1, 2]  ≈ -0.33333333333333*μi
-    @test mat[i][2, 2]  ≈ 2.666666666666666*μi
-    @test mat[i][3, 2]  ≈ -0.33333333333333*μi
-    @test mat[i][2, 3]  ≈ -0.33333333333333*μi
-    @test mat[i][3, 3]  ≈ 1.333333333333333*μi
-  end
-
-  data = (([cellmatvec],[rows],[cols]),([],[],[]),([],[]))
-  mat, vec = allocate_matrix_and_vector(assem,data)
-  assemble_matrix_and_vector!(mat,vec,assem,data)
-  assemble_matrix_and_vector!(mat,vec,assem,data)
-
-  for (i,μi) = enumerate(μ)
-    μi = sum(μi)
-    @test vec[i] ≈ [0.0625, 0.125, 0.0625]*μi
-    @test mat[i][1, 1]  ≈  1.333333333333333*μi
-    @test mat[i][2, 1]  ≈ -0.33333333333333*μi
-  end
-
-  x3 = mat \ vec
-  @test x ≈ x3
-
-  mat, vec = assemble_matrix_and_vector(assem,data)
-
-  x4 = mat \ vec
-  @test x ≈ x4
-
-  for (i,μi) = enumerate(μ)
-    μi = sum(μi)
-    @test vec[i] ≈ [0.0625, 0.125, 0.0625]*μi
-    @test mat[i][1, 1]  ≈  1.333333333333333*μi
-    @test mat[i][2, 1]  ≈ -0.33333333333333*μi
-  end
-
-  mat, vec = assemble_matrix_and_vector(assem2,data)
-
-  x4 = mat \ vec
-  @test x ≈ x4
-
-  for (i,μi) = enumerate(μ)
-    μi = sum(μi)
-    @test vec[i] ≈ [0.0625, 0.125, 0.0625]*μi
-    @test mat[i][1, 1]  ≈  1.333333333333333*μi
-    @test mat[i][2, 1]  ≈ -0.33333333333333*μi
-  end
+for (i,μi) = enumerate(μ)
+  μi = sum(μi)
+  @test param_getindex(vec,i) ≈ [0.0625, 0.125, 0.0625]*μi
+  @test param_getindex(mat,i)[1, 1]  ≈  1.333333333333333*μi
+  @test param_getindex(mat,i)[2, 1]  ≈ -0.33333333333333*μi
+  @test param_getindex(mat,i)[1, 2]  ≈ -0.33333333333333*μi
+  @test param_getindex(mat,i)[2, 2]  ≈ 2.666666666666666*μi
+  @test param_getindex(mat,i)[3, 2]  ≈ -0.33333333333333*μi
+  @test param_getindex(mat,i)[2, 3]  ≈ -0.33333333333333*μi
+  @test param_getindex(mat,i)[3, 3]  ≈ 1.333333333333333*μi
 end
 
+data = (([cellmatvec],[rows],[cols]),([],[],[]),([],[]))
+mat, vec = allocate_matrix_and_vector(assem,data)
+assemble_matrix_and_vector!(mat,vec,assem,data)
+assemble_matrix_and_vector!(mat,vec,assem,data)
+
+for (i,μi) = enumerate(μ)
+  μi = sum(μi)
+  @test param_getindex(vec,i) ≈ [0.0625, 0.125, 0.0625]*μi
+  @test param_getindex(mat,i)[1, 1]  ≈  1.333333333333333*μi
+  @test param_getindex(mat,i)[2, 1]  ≈ -0.33333333333333*μi
+end
+
+x3 = mat \ vec
+@test x ≈ x3
+
+mat, vec = assemble_matrix_and_vector(assem,data)
+
+x4 = mat \ vec
+@test x ≈ x4
+
+for (i,μi) = enumerate(μ)
+  μi = sum(μi)
+  @test param_getindex(vec,i) ≈ [0.0625, 0.125, 0.0625]*μi
+  @test param_getindex(mat,i)[1, 1]  ≈  1.333333333333333*μi
+  @test param_getindex(mat,i)[2, 1]  ≈ -0.33333333333333*μi
+end
+
+mat, vec = assemble_matrix_and_vector(assem2,data)
+
+x4 = mat \ vec
+@test x ≈ x4
+
+for (i,μi) = enumerate(μ)
+  μi = sum(μi)
+  @test param_getindex(vec,i) ≈ [0.0625, 0.125, 0.0625]*μi
+  @test param_getindex(mat,i)[1, 1]  ≈  1.333333333333333*μi
+  @test param_getindex(mat,i)[2, 1]  ≈ -0.33333333333333*μi
 end

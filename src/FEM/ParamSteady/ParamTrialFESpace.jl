@@ -67,6 +67,8 @@ function ParamTrialESpace(space)
   HomogeneousTrialFESpace(space)
 end
 
+FESpaces.ConstraintStyle(::Type{<:ParamTrialESpace{A}}) where A = ConstraintStyle(A)
+
 function ODEs.allocate_space(U::ParamTrialESpace,params)
   HomogeneousTrialParamFESpace(U.space,Val(length(params)))
 end

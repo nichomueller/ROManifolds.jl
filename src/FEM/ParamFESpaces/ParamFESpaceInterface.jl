@@ -130,7 +130,7 @@ function FESpaces._free_and_dirichlet_values_fill!(
     vals = getindex!(cache_vals,cell_vals,cell)
     dofs = getindex!(cache_dofs,cell_dofs,cell)
     for (i,dof) in enumerate(dofs)
-      @inbounds for k in param_eachindex(dirichlet_values)
+      @inbounds for k in param_eachindex(dirichlet_vals)
         val = vals.data[k][i]
         if dof > 0
           free_vals.data[k][dof] = val

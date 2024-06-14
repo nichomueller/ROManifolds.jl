@@ -1,19 +1,19 @@
-struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,L,P<:AbstractMatrix{Tv}} <: ParamSparseMatrixCSC{Tv,Ti,L}
+struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSC{Tv,Ti,L}
   m::Int64
   n::Int64
   colptr::Vector{Ti}
   rowval::Vector{Ti}
-  data::P
+  data::Matrix{Tv}
   function MatrixOfSparseMatricesCSC(
     m::Int64,
     n::Int64,
     colptr::Vector{Ti},
     rowval::Vector{Ti},
-    data::P
-    ) where {Tv,Ti,P<:AbstractMatrix{Tv}}
+    data::Matrix{Tv}
+    ) where {Tv,Ti}
 
     L = size(data,2)
-    new{Tv,Ti,L,P}(m,n,colptr,rowval,data)
+    new{Tv,Ti,L}(m,n,colptr,rowval,data)
   end
 end
 
@@ -93,6 +93,18 @@ function Base.copyto!(A::MatrixOfSparseMatricesCSC,B::MatrixOfSparseMatricesCSC)
 end
 
 # some sparse operations
+
+function LinearAlgebra.fillstored!(A::MatrixOfSparseMatricesCSC,z::Number)
+  fill!(A.data,z)
+  return A
+end
+
+# small hack
+function LinearAlgebra.fillstored!(A::MatrixOfSparseMatricesCSC,z::AbstractMatrix{<:Number})
+  @check all(z.==first(z))
+  LinearAlgebra.fillstored!(A,first(z))
+  return A
+end
 
 function recast(A::AbstractArray,a::AbstractArray)
   @abstractmethod

@@ -6,9 +6,9 @@ struct ArrayOfArrays{T,N,L,P<:AbstractVector{<:AbstractArray{T,N}}} <: ParamArra
   end
 end
 
-const VectorOfVectors{T,L,P} = ArrayOfArrays{T,1,L,P}
-const MatrixOfMatrices{T,L,P} = ArrayOfArrays{T,2,L,P}
-const Tensor3DOfTensors3D{T,L,P} = ArrayOfArrays{T,3,L,P}
+const VectorOfVectors{T,L} = ArrayOfArrays{T,1,L,Vector{Vector{T}}}
+const MatrixOfMatrices{T,L} = ArrayOfArrays{T,2,L,Vector{Matrix{T}}}
+const Tensor3DOfTensors3D{T,L} = ArrayOfArrays{T,3,L,Vector{Array{T,3}}}
 const ArrayOfCachedArrays{T,N,L,P<:AbstractVector{<:CachedArray{T,N}}} = ArrayOfArrays{T,N,L,P}
 
 Base.size(A::ArrayOfArrays{T,N}) where {T,N} = ntuple(_->param_length(A),Val{N}())
@@ -20,7 +20,7 @@ end
 param_data(A::ArrayOfArrays{T,N}) where {T,N} = A.data
 param_getindex(A::ArrayOfArrays,i::Integer) = diagonal_getindex(A,i)
 param_setindex!(A::ArrayOfArrays,v,i::Integer) = diagonal_setindex!(A,v,i)
-param_entry(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N} = ParamNumber(getindex.(A.data,i))
+param_entry(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N} = ParamNumber(map(a->getindex(a,i...),A.data))
 
 Base.@propagate_inbounds function Base.getindex(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
@@ -60,7 +60,7 @@ end
 
 function Base.copyto!(A::ArrayOfArrays,B::ArrayOfArrays)
   @check size(A) == size(B)
-  copyto!(A.data,B.data)
+  map(copyto!,A.data,B.data)
   A
 end
 

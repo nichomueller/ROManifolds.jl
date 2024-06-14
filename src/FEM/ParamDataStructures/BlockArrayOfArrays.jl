@@ -35,16 +35,20 @@ end
 
 BlockArrays.blocks(A::BlockArrayOfArrays) = A.data
 
-param_getindex(A::BlockArrayOfArrays,i::Integer) = BlockParamView(A,i)#mortar(map(a->param_getindex(a,i),A.data))
+param_getindex(A::BlockArrayOfArrays,i::Integer) = BlockParamView(A,i)
 
 function param_entry(A::BlockArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
   param_entry(A,findblockindex.(inneraxes(A),i)...)
 end
 
+function param_entry(A::BlockArrayOfArrays{T,N},i::Vararg{BlockIndex{1},N}) where {T,N}
+  param_entry(A,BlockIndex(i))
+end
+
 function param_entry(A::BlockArrayOfArrays{T,N},i::BlockIndex{N}) where {T,N}
   @boundscheck blockcheckbounds(A,Block(i.I))
   @inbounds bl = A.data[i.I...]
-  @inbounds ParamNumber(bl.data[i.α...,:])
+  @inbounds ParamNumber(map(a->getindex(a,i.α...),bl.data))
 end
 
 Base.@propagate_inbounds function param_setindex!(
@@ -126,14 +130,10 @@ function Base.copyto!(A::BlockArrayOfArrays,B::BlockArrayOfArrays)
   A
 end
 
-function Base.zero(A::BlockArrayOfArrays)
-  BlockArrayOfArrays(map(zero,A.data),A.axes)
-end
-
 for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
   @eval begin
     function $f(A::BlockArrayOfArrays,z::Number)
-      map(a -> $f(a,z),param_data(A))
+      map(a -> $f(a,z),A.data)
       return A
     end
   end
@@ -169,8 +169,8 @@ end
 @inline function BlockArrays._blockindex_getindex(A::BlockParamView{T,N},i::BlockIndex{N}) where {T,N}
   @boundscheck blockcheckbounds(A,Block(i.I))
   @inbounds bl = A.data.data[i.I...]
-  @boundscheck checkbounds(bl.data,i.α...,A.index)
-  @inbounds v = bl.data[i.α...,A.index]
+  @boundscheck checkbounds(bl.data[A.index],i.α...)
+  @inbounds v = bl.data[A.index][i.α...]
   return v
 end
 
@@ -193,7 +193,7 @@ end
 @inline function _blockindex_setindex!(A::BlockParamView{T,N},v,i::BlockIndex{N}) where {T,N}
   @boundscheck blockcheckbounds(A,Block(i.I))
   @inbounds bl = A.data.data[i.I...]
-  @boundscheck checkbounds(bl.data,i.α...,A.index)
-  @inbounds bl.data[i.α...,A.index] = v
+  @boundscheck checkbounds(bl.data[A.index],i.α...)
+  @inbounds bl.data[A.index][i.α...] = v
   return A
 end

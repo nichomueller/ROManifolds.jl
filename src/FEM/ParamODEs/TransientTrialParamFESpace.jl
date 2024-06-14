@@ -17,6 +17,8 @@ function TransientTrialParamFESpace(space)
   HomogeneousTrialFESpace(space)
 end
 
+FESpaces.ConstraintStyle(::Type{<:TransientTrialParamFESpace{A}}) where A = ConstraintStyle(A)
+
 function ODEs.allocate_space(U::TransientTrialParamFESpace,params,times)
   HomogeneousTrialParamFESpace(U.space,Val(length(params)*length(times)))
 end

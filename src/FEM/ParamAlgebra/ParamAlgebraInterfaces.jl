@@ -101,8 +101,9 @@ end
 
 function Algebra.add_entry!(combine::Function,A::MatrixOfSparseMatricesCSC,v::ParamNumber,i,j)
   k = nz_index(A,i,j)
-  Aij = A.data[k,:]
-  @inbounds A.data[k,:] .= combine(Aij,v)
+  nz = nonzeros(A)
+  Aij = nz[k,:]
+  @inbounds nz[k,:] = combine(Aij,v)
   A
 end
 
@@ -248,7 +249,7 @@ end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    @inbounds for l = 1:length(P)
+    @inbounds for l = param_eachindex(P)
       a.nzval.data[l][p] = v[l]
     end
   elseif a.rowval[p] != i
@@ -257,19 +258,19 @@ end
     for k in pend:-1:p
       o = k + 1
       a.rowval[o] = a.rowval[k]
-      @inbounds for l = 1:length(P)
+      @inbounds for l = param_eachindex(P)
         a.nzval[l][o] = a.nzval[l][k]
       end
     end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    @inbounds for l = 1:length(P)
+    @inbounds for l = param_eachindex(P)
       a.nzval[l][p] = v[l]
     end
   else
     # update existing entry
-    @inbounds for l = 1:length(P)
+    @inbounds for l = param_eachindex(P)
       a.nzval[l][p] += v[l]
     end
   end
@@ -282,7 +283,7 @@ function Algebra.create_from_nz(a::ParamInserterCSC{Tv,Ti,P}) where {Tv,Ti,P}
     pini = Int(a.colptr[j])
     pend = pini + Int(a.colnnz[j]) - 1
     for p in pini:pend
-      @inbounds for l = 1:length(P)
+      @inbounds for l = param_eachindex(P)
         a.nzval[l][k] = a.nzval[l][p]
       end
       a.rowval[k] = a.rowval[p]

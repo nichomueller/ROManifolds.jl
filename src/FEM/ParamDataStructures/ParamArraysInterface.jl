@@ -65,20 +65,16 @@ function Base.zero(::Type{<:AbstractArray{T,N}}) where {T<:Number,N}
   zeros(T,tfill(1,Val{N}()))
 end
 
-for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
-  @eval begin
-    function $f(A::AbstractParamArray,z::Number)
-      map(a -> $f(a,z),param_data(A))
-      return A
-    end
+function Base.fill!(A::AbstractParamArray,z::Number)
+  map(a -> fill!(a,z),param_data(A))
+  return A
+end
 
-    # small hack
-    function $f(A::AbstractParamArray{T,N},z::AbstractArray{<:Number,N}) where {T,N}
-      @check all(z.==first(z))
-      $f(A,first(z))
-      return A
-    end
-  end
+# small hack
+function Base.fill!(A::AbstractParamArray{T,N},z::AbstractArray{<:Number,N}) where {T,N}
+  @check all(z.==first(z))
+  fill!(A,first(z))
+  return A
 end
 
 function LinearAlgebra.mul!(
@@ -95,6 +91,13 @@ function LinearAlgebra.mul!(
     mul!(ci,ai,bi,α,β)
   end
   return C
+end
+
+function LinearAlgebra.rmul!(A::AbstractParamArray,b::Number)
+  @inbounds for i in param_eachindex(A)
+    rmul!(param_getindex(A,i),b)
+  end
+  return A
 end
 
 function (\)(A::AbstractParamMatrix,B::AbstractParamVector)
@@ -168,6 +171,12 @@ Arrays.testitem(A::AbstractParamArray) = param_getindex(A,1)
 function Arrays.testvalue(::Type{<:AbstractParamArray{T,N,L}}) where {T,N,L}
   tv = testvalue(Array{T,N})
   array_of_similar_arrays(tv,L)
+end
+
+function Arrays.CachedArray(A::AbstractParamArray)
+  param_array(param_data(A)) do a
+    CachedArray(a)
+  end
 end
 
 function Arrays.setsize!(A::AbstractParamArray{T,N},s::NTuple{N,Integer}) where {T,N}

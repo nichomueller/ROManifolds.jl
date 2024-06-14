@@ -203,3 +203,100 @@ for ((rt,uh),(_t,_uh)) in zip(sol,_sol)
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
   @check uh1.dirichlet_values ≈ _uh.dirichlet_values
 end
+
+function Algebra.solve!(
+  x::AbstractVector,
+  ls::LinearSolver,
+  lop::LinearParamStageOperator,
+  ns::Nothing)
+
+  # println("Param quantities")
+  # println(sum(param_getindex(lop.A,3)))
+  # println(sum(param_getindex(lop.b,3)))
+
+  A = lop.A
+  ss = symbolic_setup(ls,A)
+  ns = numerical_setup(ss,A)
+
+  b = lop.b
+  rmul!(b,-1)
+
+  # println(sum(param_getindex(lop.b,3)))
+
+  solve!(x,ns,b)
+
+  # println(sum(param_getindex(x,3)))
+
+  ns
+end
+
+function Algebra.solve!(
+  x::AbstractVector,
+  ls::LinearSolver,
+  lop::LinearStageOperator,
+  ns::Nothing)
+
+  # println("Gridap quantities")
+  # println(sum(lop.J))
+  # println(sum(lop.r))
+
+  J = lop.J
+  ss = symbolic_setup(ls, J)
+  ns = numerical_setup(ss, J)
+
+  r = lop.r
+  rmul!(r, -1)
+
+  solve!(x, ns, r)
+  # println(sum(x))
+  ns
+end
+
+function ODEs.ode_march!(
+  stateF::NTuple{1,AbstractVector},
+  odeslvr::ThetaMethod, odeop::ODEOperator{<:AbstractLinearODE},
+  t0::Real, state0::NTuple{1,AbstractVector},
+  odecache
+)
+  # Unpack inputs
+  u0 = state0[1]
+  odeslvrcache, odeopcache = odecache
+  reuse, J, r, sysslvrcache = odeslvrcache
+
+  # Unpack solver
+  sysslvr = odeslvr.sysslvr
+  dt, θ = odeslvr.dt, odeslvr.θ
+
+  # Define scheme
+  # Set x to zero to split jacobian and residual
+  x = stateF[1]
+  fill!(x, zero(eltype(x)))
+  dtθ = θ * dt
+  tx = t0 + dtθ
+  usx = (u0, x)
+  ws = (dtθ, 1)
+
+  # Update ODE operator cache
+  update_odeopcache!(odeopcache, odeop, tx)
+
+  # Solve the discrete ODE operator
+  stageop = LinearStageOperator(
+    odeop, odeopcache,
+    tx, usx, ws,
+    J, r, reuse, sysslvrcache
+  )
+
+  sysslvrcache = solve!(x, sysslvr, stageop, sysslvrcache)
+  println(sum(x))
+  println(dt)
+  println(sum(state0[1]))
+
+  # Update state
+  tF = t0 + dt
+  stateF = ODEs._udate_theta!(stateF, state0, dt, x)
+  println(sum(x))
+  # Pack outputs
+  odeslvrcache = (reuse, J, r, sysslvrcache)
+  odecache = (odeslvrcache, odeopcache)
+  (tF, stateF, odecache)
+end

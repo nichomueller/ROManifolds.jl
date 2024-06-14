@@ -16,7 +16,7 @@ V[findblockindex.(axes(V),3)...] = rand(4)
 param_getindex(V,1)
 param_entry(V,1)
 
-MM = Matrix{MatrixOfMatrices{Float64,2,Array{Float64,3}}}(undef,2,2)
+MM = Matrix{MatrixOfMatrices{Float64,2}}(undef,2,2)
 MM[1,1] = ParamArray([rand(3,3),rand(3,3)])
 MM[1,2] = ParamArray([rand(3,4),rand(3,4)])
 MM[2,1] = ParamArray([rand(4,3),rand(4,3)])
@@ -29,7 +29,7 @@ param_getindex(M,1)
 param_entry(M,1,2)
 
 M0 = zero(M)
-M′ = similar(M,typeof(m2))
+M′ = similar(M,typeof(rand(1,1)))
 copyto!(M′,M)
 @check M′ ≈ M
 
@@ -47,7 +47,11 @@ W2 = ParamArray([rand(4),rand(4)])
 W = mortar([W1,W2])
 
 VW = V + W
-@check VW.data ≈ V.data + W.data
+@check all(VW.data .≈ V.data + W.data)
+
+bc = Base.broadcasted(+,V,W)
+r = Base.materialize(bc)
+j = map(Base.materialize,param_data(bc))
 
 i = 3
 j = BlockArrays.findblockindex.(ParamDataStructures.inneraxes(V),i)[1]
