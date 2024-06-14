@@ -109,7 +109,9 @@ function FESpaces._fill_dirichlet_values_for_tag!(
   @check param_length(dirichlet_values) == param_length(dv)
   for dof in 1:_innerlength(dv)
     if dirichlet_dof_to_tag[dof] == tag
-      dirichlet_values.data[dof,:] .= dv.data[dof,:]
+      @inbounds for k in param_eachindex(dirichlet_values)
+        dirichlet_values.data[k][dof] = dv.data[k][dof]
+      end
     end
   end
 end
@@ -128,13 +130,15 @@ function FESpaces._free_and_dirichlet_values_fill!(
     vals = getindex!(cache_vals,cell_vals,cell)
     dofs = getindex!(cache_dofs,cell_dofs,cell)
     for (i,dof) in enumerate(dofs)
-      val = vals.data[i,:]
-      if dof > 0
-        free_vals.data[dof,:] .= val
-      elseif dof < 0
-        dirichlet_vals.data[-dof,:] .= val
-      else
-        @unreachable "dof ids either positive or negative, not zero"
+      @inbounds for k in param_eachindex(dirichlet_values)
+        val = vals.data[k][i]
+        if dof > 0
+          free_vals.data[k][dof] = val
+        elseif dof < 0
+          dirichlet_vals.data[k][-dof] = val
+        else
+          @unreachable "dof ids either positive or negative, not zero"
+        end
       end
     end
   end
@@ -168,8 +172,8 @@ function FESpaces.FEFunction(
   dv = similar(dirichlet_values)
   @check param_length(fv) == param_length(dv)
   @inbounds for i = param_eachindex(fv)
-    fv_i = param_view(fv,i)
-    dv_i = param_view(dv,i)
+    fv_i = param_getindex(fv,i)
+    dv_i = param_getindex(dv,i)
     c = FESpaces._compute_new_fixedval(
       fv_i,dv_i,zf.vol_i,zf.vol,zf.space.dof_to_fix)
     fv_i .+= c
@@ -216,8 +220,8 @@ function FESpaces.scatter_free_and_dirichlet_values(
   dv = similar(dirichlet_values)
   @check param_length(fv) == param_length(dv)
   @inbounds for i = param_eachindex(fv)
-    fv_i = param_view(fv,i)
-    dv_i = param_view(dv,i)
+    fv_i = param_getindex(fv,i)
+    dv_i = param_getindex(dv,i)
     fv_i .= FESpaces.VectorWithEntryInserted(fv_i,ff.dof_to_fix,dv_i[1])
     dv_i .= similar(dv_i,eltype(dv_i),0)
   end

@@ -68,13 +68,16 @@ end
 end
 
 @inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::Number,i)
-  V = ParamNumber(fill(v,param_length(A)))
-  add_entry!(combine,A,V,i)
+  @inbounds for k = param_eachindex(A)
+    A.data[k][i] = combine(A.data[k][i],v)
+  end
+  A
 end
 
 @inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::ParamNumber,i)
-  Ai = A.data[i,:]
-  @inbounds A.data[i,:] .= combine(Ai,v)
+  @inbounds for k = param_eachindex(A)
+    A.data[k][i] = combine(A.data[k][i],v.data[k])
+  end
   A
 end
 
@@ -83,13 +86,16 @@ function Algebra.is_entry_stored(::Type{T},i,j) where T<:AbstractParamMatrix
 end
 
 @inline function Algebra.add_entry!(combine::Function,A::AbstractParamMatrix,v::Number,i,j)
-  V = ParamNumber(fill(v,param_length(A)))
-  add_entry!(combine,A,V,i,j)
+  @inbounds for k = param_eachindex(A)
+    A.data[k][i,j] = combine(A.data[k][i,j],v)
+  end
+  A
 end
 
 @inline function Algebra.add_entry!(combine::Function,A::AbstractParamMatrix,v::ParamNumber,i,j)
-  Aij = A.data[i,j,:]
-  @inbounds A.data[i,j,:] .= combine(Aij,v)
+  @inbounds for k = param_eachindex(A)
+    A.data[k][i,j] = combine(A.data[k][i,j],v.data[k])
+  end
   A
 end
 
@@ -116,7 +122,9 @@ end
     k = a.counter.nnz
     a.I[k] = i
     a.J[k] = j
-    a.V.data[k,j] .= v.data[:,j]
+    @inbounds for l = param_eachindex(T)
+      a.V.data[l][k] = v.data[l]
+    end
   end
   nothing
 end
@@ -131,14 +139,13 @@ end
 
 function Algebra.sparse_from_coo(::Type{T},I,J,V::AbstractParamArray,m,n) where T<:AbstractParamMatrix
   param_array(param_data(V)) do v
-    cv = collect(v)
-    Algebra.sparse_from_coo(eltype(T),I,J,cv,m,n)
+    Algebra.sparse_from_coo(eltype(T),I,J,v,m,n)
   end
 end
 
 function Algebra.finalize_coo!(::Type{T},I,J,V::AbstractParamArray,m,n) where T<:AbstractParamMatrix
   @inbounds for i = param_eachindex(V)
-    vi = param_view(V,i)
+    vi = param_getindex(V,i)
     Algebra.finalize_coo!(eltype(T),I,J,vi,m,n)
   end
 end
@@ -149,7 +156,7 @@ end
 
 function Algebra.push_coo!(::Type{T},I,J,V::AbstractParamArray,i,j,v) where T<:AbstractParamMatrix
   @inbounds for k = param_eachindex(V)
-    vk = param_view(V,k)
+    vk = param_getindex(V,k)
     Algebra.push_coo!(eltype(T),I,J,vk,i,j,v)
   end
 end
@@ -241,22 +248,30 @@ end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    a.nzval.data[p,:] .= v
+    @inbounds for l = 1:length(P)
+      a.nzval.data[l][p] = v[l]
+    end
   elseif a.rowval[p] != i
     # shift one forward from p to pend
     @check  pend+1 < Int(a.colptr[j+1])
     for k in pend:-1:p
       o = k + 1
       a.rowval[o] = a.rowval[k]
-      a.nzval.data[o,:] .= a.nzval.data[k,:]
+      @inbounds for l = 1:length(P)
+        a.nzval[l][o] = a.nzval[l][k]
+      end
     end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    a.nzval.data[p,:] .= v
+    @inbounds for l = 1:length(P)
+      a.nzval[l][p] = v[l]
+    end
   else
     # update existing entry
-    a.nzval.data[p,:] .+= v
+    @inbounds for l = 1:length(P)
+      a.nzval[l][p] += v[l]
+    end
   end
   nothing
 end
@@ -267,7 +282,9 @@ function Algebra.create_from_nz(a::ParamInserterCSC{Tv,Ti,P}) where {Tv,Ti,P}
     pini = Int(a.colptr[j])
     pend = pini + Int(a.colnnz[j]) - 1
     for p in pini:pend
-      a.nzval.data[k,:] .= a.nzval.data[p,:]
+      @inbounds for l = 1:length(P)
+        a.nzval[l][k] = a.nzval[l][p]
+      end
       a.rowval[k] = a.rowval[p]
       k += 1
     end
@@ -280,8 +297,7 @@ function Algebra.create_from_nz(a::ParamInserterCSC{Tv,Ti,P}) where {Tv,Ti,P}
   resize!(a.rowval,nnz)
 
   param_array(param_data(a.nzval)) do v
-    cv = collect(v)
-    resize!(cv,nnz)
-    SparseMatrixCSC(a.nrows,a.ncols,a.colptr,a.rowval,cv)
+    resize!(v,nnz)
+    SparseMatrixCSC(a.nrows,a.ncols,a.colptr,a.rowval,v)
   end
 end

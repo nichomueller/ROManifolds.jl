@@ -47,7 +47,7 @@ Base.@propagate_inbounds function Base.setindex!(
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
   ispace′ = s.index_map[ispace...]
-  sparam = param_view(s.data,iparam+(itime-1)*num_params(s))
+  sparam = param_getindex(s.data,iparam+(itime-1)*num_params(s))
   setindex!(sparam,v,ispace′)
 end
 
@@ -68,20 +68,20 @@ function RBSteady.Snapshots(s::Vector{<:AbstractParamArray},i::AbstractIndexMap,
   TransientSnapshots(s,i,r)
 end
 
-function ParamDataStructures.get_values(s::TransientSnapshots)
-  vdata = s.data
-  item = all_data(first(vdata))
-  T = eltype(item)
-  N = ndims(item)
-  s...,send = size(item)
-  tL = length(vdata)
-  s′ = (s...,send*tL)
-  data = Array{T,N}(undef,s′)
-  @inbounds for i = eachindex(vdata)
-    @views data[s...,(i-1)*tL:i*tL] = all_data(vdata[i])
-  end
-  return ArrayOfArrays(data)
-end
+# function ParamDataStructures.get_values(s::TransientSnapshots)
+#   vdata = s.data
+#   item = all_data(first(vdata))
+#   T = eltype(item)
+#   N = ndims(item)
+#   s...,send = size(item)
+#   tL = length(vdata)
+#   s′ = (s...,send*tL)
+#   data = Array{T,N}(undef,s′)
+#   @inbounds for i = eachindex(vdata)
+#     @views data[s...,(i-1)*tL:i*tL] = all_data(vdata[i])
+#   end
+#   return ArrayOfArrays(data)
+# end
 
 IndexMaps.get_index_map(s::TransientSnapshots) = s.index_map
 RBSteady.get_realization(s::TransientSnapshots) = s.realization
@@ -107,7 +107,7 @@ Base.@propagate_inbounds function Base.setindex!(
   @boundscheck checkbounds(s,i...)
   ispace...,itime,iparam = i
   ispace′ = s.index_map[ispace...]
-  sparam = param_view(s.data[itime],iparam)
+  sparam = param_getindex(s.data[itime],iparam)
   setindex!(sparam,v,ispace′)
 end
 

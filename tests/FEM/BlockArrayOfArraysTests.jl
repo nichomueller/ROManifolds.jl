@@ -15,7 +15,6 @@ V[findblockindex.(axes(V),3)...] = rand(4)
 
 param_getindex(V,1)
 param_entry(V,1)
-v2 = param_view(V,2)
 
 MM = Matrix{MatrixOfMatrices{Float64,2,Array{Float64,3}}}(undef,2,2)
 MM[1,1] = ParamArray([rand(3,3),rand(3,3)])
@@ -28,7 +27,6 @@ M[3,3] = rand(4,4)
 
 param_getindex(M,1)
 param_entry(M,1,2)
-m2 = param_view(M,2)
 
 M0 = zero(M)
 M′ = similar(M,typeof(m2))

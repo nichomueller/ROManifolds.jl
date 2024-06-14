@@ -3,11 +3,9 @@ param_length(a::Union{Nothing,Function,Map}) = 0
 param_length(a::AbstractParamFunction) = length(a)
 param_length(a::Union{Number,AbstractArray{<:Number}}) = 0
 param_data(a) = @abstractmethod
-all_data(a) = @abstractmethod
 param_getindex(a,i::Integer...) = @abstractmethod
 param_getindex(a::Union{Nothing,Function,Map},i::Integer...) = a
 param_setindex!(a,v,i::Integer...) = @abstractmethod
-param_view(a,i::Integer...) = @abstractmethod
 param_entry(a,i::Integer...) = @abstractmethod
 param_eachindex(a) = Base.OneTo(param_length(a))
 array_of_similar_arrays(a,l::Integer) = @abstractmethod
@@ -52,10 +50,8 @@ struct ParamNumber{T<:Number,L} <: AbstractParamContainer{T,1,L}
   ParamNumber(data::Vector{T}) where T<:Number = new{T,length(data)}(data)
 end
 
-all_data(a::ParamNumber) = a.data
 param_getindex(a::ParamNumber,i::Integer) = getindex(a,i)
 param_setindex!(a::ParamNumber,v,i::Integer) = setindex!(a,v,i)
-param_view(a::ParamNumber,i::Integer) = getindex(a,i)
 param_entry(a::ParamNumber,i::Integer) = getindex(a,i)
 
 to_param_quantity(a::Number,plength::Integer) = ParamNumber(fill(a,plength))

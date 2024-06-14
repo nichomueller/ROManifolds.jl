@@ -68,7 +68,7 @@ Base.@propagate_inbounds function Base.setindex!(
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
   ispace′ = s.index_map[ispace...]
-  sparam = param_view(s.data,iparam)
+  sparam = param_getindex(s.data,iparam)
   setindex!(sparam,v,ispace′)
 end
 

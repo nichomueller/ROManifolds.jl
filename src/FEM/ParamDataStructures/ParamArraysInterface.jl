@@ -5,11 +5,8 @@ abstract type ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}} <: Abstr
 abstract type ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSC{Tv,Ti}} end
 
 ParamArray(A::AbstractVector{<:AbstractArray}) = ArrayOfArrays(A)
-ParamArray(A::AbstractVector{<:CachedArray}) = ArrayOfCachedArrays(A)
 ParamArray(A::AbstractVector{<:SparseMatrixCSC}) = MatrixOfSparseMatricesCSC(A)
 ParamArray(A::AbstractArray{<:Number},plength=1) = ArrayOfTrivialArrays(A,plength)
-
-ParamArray(A::CachedArray) = ArrayOfCachedArrays(A)
 ParamArray(A::AbstractArray{<:ParamArray}) = mortar(A)
 
 function param_array(f,A::AbstractArray{<:AbstractArray}...)
@@ -22,15 +19,15 @@ end
 
 function array_of_zero_arrays(a::AbstractArray{<:Number},l::Integer)
   A = array_of_similar_arrays(a,l)
-  A0 = fill!(A,zero(eltype(a)))
-  return A0
+  fill!(A,zero(eltype(a)))
+  return A
 end
 
 to_param_quantity(A::AbstractParamArray,plength::Integer) = A
 to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
 
-Base.:(==)(A::AbstractParamArray,B::AbstractParamArray) = (all_data(A) == all_data(B))
-Base.:(≈)(A::AbstractParamArray,B::AbstractParamArray) = (all_data(A) ≈ all_data(B))
+Base.:(==)(A::AbstractParamArray,B::AbstractParamArray) = all(param_data(A) .== param_data(B))
+Base.:(≈)(A::AbstractParamArray,B::AbstractParamArray) = all(param_data(A) .≈ param_data(B))
 
 for op in (:+,:-)
   @eval begin
@@ -52,8 +49,8 @@ const AbstractParamTensor3D{T,L} = AbstractParamArray{T,3,L}
 
 for f in (:(Base.maximum),:(Base.minimum))
   @eval begin
-    $f(A::AbstractParamArray) = $f(identity,all_data(A))
-    $f(g,A::AbstractParamArray) = $f(g,all_data(A))
+    $f(A::AbstractParamArray) = $f(map($f,param_data(A)))
+    $f(g,A::AbstractParamArray) = $f(map(a -> $f(g,a),param_data(A)))
   end
 end
 
@@ -71,7 +68,7 @@ end
 for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
   @eval begin
     function $f(A::AbstractParamArray,z::Number)
-      fill!(all_data(A),z)
+      map(a -> $f(a,z),param_data(A))
       return A
     end
 
@@ -92,7 +89,7 @@ function LinearAlgebra.mul!(
 
   @check param_length(C) == param_length(A) == param_length(B)
   @inbounds for i in param_eachindex(C)
-    ci = param_view(C,i)
+    ci = param_getindex(C,i)
     ai = param_getindex(A,i)
     bi = param_getindex(B,i)
     mul!(ci,ai,bi,α,β)
@@ -104,15 +101,16 @@ function (\)(A::AbstractParamMatrix,B::AbstractParamVector)
   TS = LinearAlgebra.promote_op(LinearAlgebra.matprod,eltype(A),eltype(B))
   C = similar(B,TS,axes(A,1))
   @inbounds for i in param_eachindex(C)
-    ci = param_view(C,i)
-    ci .= param_getindex(A,i)\param_getindex(B,i)
+    param_getindex(C,i) .= param_getindex(A,i)\param_getindex(B,i)
   end
   return C
 end
 
 function LinearAlgebra.axpy!(α::Number,A::AbstractParamArray,B::AbstractParamArray)
   @check param_length(A) == param_length(B)
-  axpy!(α,all_data(A),all_data(B))
+  @inbounds for i in param_eachindex(A)
+    axpy!(α,param_getindex(A,i),param_getindex(B,i))
+  end
   return B
 end
 
@@ -120,7 +118,7 @@ for factorization in (:LU,:Cholesky)
   @eval begin
     function LinearAlgebra.ldiv!(a::$factorization,B::AbstractParamArray)
       @inbounds for i in param_eachindex(B)
-        bi = param_view(B,i)
+        bi = param_getindex(B,i)
         ldiv!(a,bi)
       end
       return B
@@ -131,8 +129,8 @@ end
 function LinearAlgebra.ldiv!(A::AbstractParamArray,b::Factorization,C::AbstractParamArray)
   @check param_length(A) == param_length(C)
   @inbounds for i in param_eachindex(A)
-    ai = param_view(A,i)
-    ci = param_view(C,i)
+    ai = param_getindex(A,i)
+    ci = param_getindex(C,i)
     ldiv!(ai,b,ci)
   end
   return A
@@ -141,9 +139,9 @@ end
 function LinearAlgebra.ldiv!(A::AbstractParamArray,B::ParamContainer,C::AbstractParamArray)
   @check param_length(A) == param_length(B) == param_length(C)
   @inbounds for i in param_eachindex(A)
-    ai = param_view(A,i)
+    ai = param_getindex(A,i)
     bi = param_getindex(B,i)
-    ci = param_view(C,i)
+    ci = param_getindex(C,i)
     ldiv!(ai,bi,ci)
   end
   return A
@@ -156,8 +154,8 @@ end
 function LinearAlgebra.lu!(A::AbstractParamArray,B::AbstractParamArray;kwargs...)
   @check param_length(A) == param_length(B)
   @inbounds for i in param_eachindex(A)
-    ai = param_view(A,i)
-    bi = param_view(B,i)
+    ai = param_getindex(A,i)
+    bi = param_getindex(B,i)
     lu!(ai,bi)
   end
   return A
@@ -174,7 +172,7 @@ end
 
 function Arrays.setsize!(A::AbstractParamArray{T,N},s::NTuple{N,Integer}) where {T,N}
   @inbounds for i in param_eachindex(A)
-    setsize!(param_view(A,i),s)
+    setsize!(param_getindex(A,i),s)
   end
   return A
 end
@@ -198,31 +196,11 @@ function param_return_cache(f::Union{Function,Map},A...)
   return cache,data
 end
 
-function param_return_cache(f::Union{Function,Map},A::AbstractParamArray,B::AbstractArray{<:Number})
-  c = return_cache(f,testitem(A),B)
-  d = evaluate!(c,f,testitem(A),B)
-  cache = Vector{typeof(c)}(undef,param_length(A))
-  data = array_of_similar_arrays(d,param_length(A))
-  @inbounds for i in param_eachindex(A)
-    cache[i] = return_cache(f,param_getindex(A,i),B)
-  end
-  return cache,data
-end
-
 function param_evaluate!(C,f::Union{Function,Map},A...)
   cache,data = C
   pA = to_param_quantities(A...;plength=param_length(data))
   @inbounds for i in param_eachindex(data)
     vi = evaluate!(cache[i],f,param_getindex.(pA,i)...)
-    param_setindex!(data,vi,i)
-  end
-  data
-end
-
-function param_evaluate!(C,f::Union{Function,Map},A::AbstractParamArray,B::AbstractArray{<:Number})
-  cache,data = C
-  @inbounds for i in param_eachindex(data)
-    vi = evaluate!(cache[i],f,param_getindex(A,i),B)
     param_setindex!(data,vi,i)
   end
   data
@@ -445,18 +423,14 @@ function Arrays.evaluate!(C,f::IntegrationMap,A::AbstractParamArray,w::AbstractV
   param_evaluate!(C,f,A,w,jq)
 end
 
-function param_similar(A::AbstractParamArray{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N}
-  a = testitem(A)
-  ad = similar(a,T′,dims)
-  array_of_similar_arrays(ad,param_length(A))
-end
-
 for T in (:AbstractParamArray,:AbstractArray,:Nothing), S in (:AbstractParamArray,:AbstractArray)
   (T∈(:AbstractArray,:Nothing) && S==:AbstractArray) && continue
   @eval begin
     function Arrays.return_cache(f::Fields.ZeroBlockMap,A::$T,B::$S)
       pA,pB = to_param_quantities(A,B)
-      CachedArray(param_similar(pA,eltype(pA),innersize(pB)))
+      param_array(param_data(pA),param_data(pB)) do a,b
+        CachedArray(similar(a,eltype(a),size(b)))
+      end
     end
   end
 end
@@ -483,7 +457,7 @@ end
 function Fields._setsize_as!(A::AbstractParamArray,B::AbstractParamArray)
   @check param_length(A) == param_length(B)
   @inbounds for i in param_eachindex(A)
-    Fields._setsize_as!(param_view(A,i),param_getindex(B,i))
+    Fields._setsize_as!(param_getindex(A,i),param_getindex(B,i))
   end
   A
 end
@@ -491,7 +465,7 @@ end
 function Fields._setsize_mul!(C::AbstractParamArray,A::AbstractParamArray,B::AbstractParamArray)
   @check param_length(A) == param_length(B)
   @inbounds for i = eachindex(C)
-    Fields._setsize_mul!(param_view(C,i),param_getindex(A,i),param_getindex(B,i))
+    Fields._setsize_mul!(param_getindex(C,i),param_getindex(A,i),param_getindex(B,i))
   end
 end
 
@@ -575,7 +549,7 @@ for T in (:(ForwardDiff.GradientConfig),:(ForwardDiff.JacobianConfig))
       cfg::$T)
 
       @inbounds for i = param_eachindex(cache)
-        ci = param_view(cache,i)
+        ci = param_getindex(cache,i)
         evaluate!(ci,f,ydual[i],param_getindex(x,i),cfg)
       end
       cache

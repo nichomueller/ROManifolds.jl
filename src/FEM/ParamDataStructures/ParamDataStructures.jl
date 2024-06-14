@@ -51,7 +51,6 @@ export param_length
 export param_eachindex
 export param_getindex
 export param_setindex!
-export param_view
 export param_entry
 include("ParamContainersInterface.jl")
 
@@ -74,11 +73,6 @@ export ArrayOfArrays
 export VectorOfVectors
 export MatrixOfMatrices
 include("ArrayOfArrays.jl")
-
-export ArrayOfCachedArrays
-export VectorOfCachedVectors
-export MatrixOfCachedMatrices
-include("ArrayOfCachedArrays.jl")
 
 export MatrixOfSparseMatricesCSC
 export recast

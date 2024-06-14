@@ -7,48 +7,25 @@ function ReferenceFEs._lagr_dof_cache(node_to_val::AbstractParamArray,ndofs)
 end
 
 function ReferenceFEs._evaluate_lagr_dof!(
-  c::VectorOfCachedVectors,
+  c::AbstractParamVector,
   node_comp_to_val::AbstractParamVector,
   node_and_comp_to_dof,
   ndofs,
   ncomps)
 
-  setsize!(c,(ndofs,))
-  r = c.data.array
-  for node in LinearIndices(node_and_comp_to_dof)
-    comp_to_dof = node_and_comp_to_dof[node]
-    comp_to_val = node_comp_to_val.data[node,:]
-    for comp in 1:ncomps
-      dof = comp_to_dof[comp]
-      for (ip,val) in enumerate(comp_to_val)
-        r[dof,ip] = val[comp]
-      end
-    end
+  param_array(param_data(c),param_data(node_comp_to_val)) do c,node_comp_to_val
+    ReferenceFEs._evaluate_lagr_dof!(c,node_comp_to_val,node_and_comp_to_dof,ndofs,ncomps)
   end
-  ArrayOfArrays(r)
 end
 
 function ReferenceFEs._evaluate_lagr_dof!(
-  c::MatrixOfCachedMatrices,
+  c::AbstractParamMatrix,
   node_pdof_comp_to_val::AbstractParamMatrix,
   node_and_comp_to_dof,
   ndofs,
   ncomps)
 
-  _, npdofs = innersize(node_pdof_comp_to_val)
-  setsize!(c,(ndofs,npdofs))
-  r = c.data.array
-  for node in LinearIndices(node_and_comp_to_dof)
-    comp_to_dof = node_and_comp_to_dof[node]
-    for pdof in 1:npdofs
-      comp_to_val = node_pdof_comp_to_val.data[node,pdof,:]
-      for comp in 1:ncomps
-        dof = comp_to_dof[comp]
-        for (ip,val) in enumerate(comp_to_val)
-          r[dof,pdof,ip] = val[comp]
-        end
-      end
-    end
+  param_array(param_data(c),param_data(node_pdof_comp_to_val)) do c,node_pdof_comp_to_val
+    ReferenceFEs._evaluate_lagr_dof!(c,node_pdof_comp_to_val,node_and_comp_to_dof,ndofs,ncomps)
   end
-  ArrayOfArrays(r)
 end

@@ -35,13 +35,7 @@ end
 
 BlockArrays.blocks(A::BlockArrayOfArrays) = A.data
 
-all_data(A::BlockArrayOfArrays) = A.data
-param_getindex(A::BlockArrayOfArrays,i::Integer) = mortar(map(a->param_getindex(a,i),A.data))
-
-function param_view(A::BlockArrayOfArrays,i::Integer)
-  @check i ≤ param_length(A)
-  BlockParamView(A,i)
-end
+param_getindex(A::BlockArrayOfArrays,i::Integer) = BlockParamView(A,i)#mortar(map(a->param_getindex(a,i),A.data))
 
 function param_entry(A::BlockArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
   param_entry(A,findblockindex.(inneraxes(A),i)...)
@@ -139,7 +133,7 @@ end
 for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
   @eval begin
     function $f(A::BlockArrayOfArrays,z::Number)
-      map(a -> $f(a,z),all_data(A))
+      map(a -> $f(a,z),param_data(A))
       return A
     end
   end
@@ -147,7 +141,7 @@ end
 
 for f in (:(Base.maximum),:(Base.minimum))
   @eval begin
-    $f(g,A::BlockArrayOfArrays) = $f(map(a -> $f(g,a),all_data(A)))
+    $f(g,A::BlockArrayOfArrays) = $f(map(a -> $f(g,a),A.data))
   end
 end
 

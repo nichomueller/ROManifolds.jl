@@ -7,23 +7,23 @@ end
 
 Base.axes(A::ParamBroadcast) = (Base.OneTo(param_length(A)),)
 
+param_data(A::ParamBroadcast) = A.data
 param_length(A::ParamBroadcast) = A.plength
-all_data(A::ParamBroadcast) = A.data
 
 function Base.broadcasted(f,A::Union{AbstractParamArray,ParamBroadcast}...)
-  bc = Base.broadcasted(f,map(all_data,A)...)
+  bc = map((x...)->Base.broadcasted(f,x...),map(param_data,A)...)
   plength = find_param_length(A...)
   ParamBroadcast(bc,plength)
 end
 
 function Base.broadcasted(f,A::Union{AbstractParamArray,ParamBroadcast},b::Number)
-  bc = Base.broadcasted(f,all_data(A),b)
+  bc = map(a->Base.broadcasted(f,a,b),param_data(A))
   plength = param_length(A)
   ParamBroadcast(bc,plength)
 end
 
 function Base.broadcasted(f,a::Number,B::Union{AbstractParamArray,ParamBroadcast})
-  bc = Base.broadcasted(f,a,all_data(B))
+  bc = map(b->Base.broadcasted(f,a,b),param_data(B))
   plength = param_length(B)
   ParamBroadcast(bc,plength)
 end
@@ -41,24 +41,21 @@ function Base.broadcasted(
   Base.broadcasted(f,Base.materialize(a),B)
 end
 
-function Base.materialize(b::ParamBroadcast)
-  param_materialize(Base.materialize(all_data(b)))
+function Base.materialize(B::ParamBroadcast)
+  param_materialize(map(Base.materialize,param_data(B)))
 end
 
 param_materialize(A) = A
-param_materialize(A::AbstractArray{<:Number}) = ArrayOfArrays(A)
-param_materialize(A::SparseMatrixCSC) = MatrixOfSparseMatricesCSC(A)
-param_materialize(A::AbstractArray{<:AbstractArray}) = mortar(A)
+param_materialize(A::AbstractArray{<:AbstractArray{<:Number}}) = ArrayOfArrays(A)
+param_materialize(A::AbstractArray{<:SparseMatrixCSC}) = MatrixOfSparseMatricesCSC(A)
+param_materialize(A::AbstractArray{<:AbstractArray{<:AbstractArray}}) = mortar(A)
 
 function Base.materialize!(A::AbstractParamArray,b::Broadcast.Broadcasted)
-  dA = all_data(A)
-  Base.materialize!(dA,b)
+  map(a -> Base.materialize!(a,b),param_data(A))
   A
 end
 
-function Base.materialize!(A::AbstractParamArray,b::ParamBroadcast)
-  dA = all_data(A)
-  db = all_data(b)
-  Base.materialize!(dA,db)
+function Base.materialize!(A::AbstractParamArray,B::ParamBroadcast)
+  map(Base.materialize!,param_data(A),param_data(B))
   A
 end

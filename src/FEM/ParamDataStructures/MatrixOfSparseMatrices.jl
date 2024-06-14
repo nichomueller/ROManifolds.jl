@@ -45,7 +45,6 @@ Base.size(A::MatrixOfSparseMatricesCSC) = (param_length(A),param_length(A))
   (A.m,A.n)
 end
 
-all_data(A::MatrixOfSparseMatricesCSC) = A.data
 param_getindex(A::MatrixOfSparseMatricesCSC,i::Integer) = diagonal_getindex(A,i)
 param_setindex!(A::MatrixOfSparseMatricesCSC,v,i::Integer) = diagonal_setindex!(A,v,i)
 param_entry(A::MatrixOfSparseMatricesCSC,i::Integer...) = ParamNumber(A.data[i...,:])
@@ -91,10 +90,6 @@ function Base.copyto!(A::MatrixOfSparseMatricesCSC,B::MatrixOfSparseMatricesCSC)
   copyto!(A.rowval,B.rowval)
   copyto!(A.data,B.data)
   A
-end
-
-function Base.zero(A::MatrixOfSparseMatricesCSC{Tv,Ti}) where {Tv,Ti}
-  MatrixOfSparseMatricesCSC(A.m,A.n,ones(Ti,length(A.colptr)),Ti[],Tv[])
 end
 
 # some sparse operations

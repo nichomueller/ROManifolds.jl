@@ -100,7 +100,7 @@ function RBSteady.coefficient!(
 
   coefficient = a.coefficient
   mdeim_interpolation = a.mdeim_interpolation
-  ldiv!(coefficient,mdeim_interpolation,vec(all_data(b)))
+  ldiv!(coefficient,mdeim_interpolation,vec(b))
 end
 
 function RBSteady.mdeim_result(a::TupOfArrayContribution,b::TupOfArrayContribution)

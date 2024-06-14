@@ -21,11 +21,9 @@ Base.size(A::ArrayOfTrivialArrays{T,N}) where {T,N} = ntuple(_ -> A.plength,Val{
   size(A.data)
 end
 
-all_data(A::ArrayOfTrivialArrays) = A.data
 param_data(A::ArrayOfTrivialArrays) = fill(A.data,param_length(A))
 param_getindex(A::ArrayOfTrivialArrays,i::Integer...) = diagonal_getindex(A,i...)
 param_setindex!(A::ArrayOfTrivialArrays,v,i::Integer...) = diagonal_setindex!(A,v,i...)
-param_view(A::ArrayOfTrivialArrays{T,N},i::Integer...) where {T,N} = view(A.data,ArraysOfArrays._ncolons(Val{N}())...)
 param_entry(A::ArrayOfTrivialArrays,i::Integer...) = ParamNumber(fill(A.data[i...],A.plength))
 
 Base.@propagate_inbounds function Base.getindex(A::ArrayOfTrivialArrays{T,N},i::Vararg{Integer,N}) where {T,N}
@@ -49,7 +47,7 @@ Base.@propagate_inbounds function Base.setindex!(A::ArrayOfTrivialArrays,v,i::In
 end
 
 Base.@propagate_inbounds function diagonal_setindex!(A::ArrayOfTrivialArrays{T,N},v,iblock::Integer) where {T,N}
-  setindex!(A.data,v,ArraysOfArrays._ncolons(Val{N}())...)
+  copyto(A.data,v)
 end
 
 function Base.similar(A::ArrayOfTrivialArrays{T,N},::Type{<:AbstractArray{T′}}) where {T,T′,N}
@@ -66,6 +64,8 @@ function Base.copyto!(A::ArrayOfTrivialArrays,B::ArrayOfTrivialArrays)
   A
 end
 
-function Base.zero(A::ArrayOfTrivialArrays)
-  ArrayOfTrivialArrays(zero(A.data),A.plength)
+function Arrays.setsize!(A::ArrayOfCachedArrays{T,N},s::NTuple{N,Int}) where {T,N}
+  @inbounds for i in param_eachindex(A)
+    setsize!(param_getindex(A,i),s)
+  end
 end
