@@ -13,7 +13,7 @@ struct TransientBasicSnapshots{T,N,L,D,I,R,A} <: AbstractTransientSnapshots{T,N,
     index_map::I,
     realization::R
     ) where {T,N,L,D,R,A<:AbstractParamArray{T,N,L},I<:AbstractIndexMap{D}}
-    new{T,N+2,L,D,I,R,A}(data,index_map,realization)
+    new{T,D+2,L,D,I,R,A}(data,index_map,realization)
   end
 end
 
@@ -56,11 +56,11 @@ struct TransientSnapshots{T,N,L,D,I,R,A} <: AbstractTransientSnapshots{T,N,L,D,I
   index_map::I
   realization::R
   function TransientSnapshots(
-    data::A,
+    data::Vector{A},
     index_map::I,
     realization::R
-    ) where {T,N,L,D,R,A<:Vector{<:AbstractParamArray{T,N,L}},I<:AbstractIndexMap{D}}
-    new{T,N+2,L,D,I,R,A}(data,index_map,realization)
+    ) where {T,N,L,D,R,A<:AbstractParamArray{T,N,L},I<:AbstractIndexMap{D}}
+    new{T,D+2,L,D,I,R,A}(data,index_map,realization)
   end
 end
 
@@ -92,7 +92,7 @@ Base.@propagate_inbounds function Base.getindex(
   ) where {T,N}
 
   @boundscheck checkbounds(s,i...)
-  ispace...,iparam = i
+  ispace...,itime,iparam = i
   ispace′ = s.index_map[ispace...]
   sparam = param_getindex(s.data[itime],iparam)
   getindex(sparam,ispace′)
@@ -105,7 +105,7 @@ Base.@propagate_inbounds function Base.setindex!(
   ) where {T,N}
 
   @boundscheck checkbounds(s,i...)
-  ispace...,iparam = i
+  ispace...,itime,iparam = i
   ispace′ = s.index_map[ispace...]
   sparam = param_view(s.data[itime],iparam)
   setindex!(sparam,v,ispace′)

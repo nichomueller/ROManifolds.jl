@@ -113,5 +113,5 @@ r = odesol.r
 stats = @timed begin
   vals = collect(odesol)
 end
-i = get_vector_index_map(op)
-snaps = Snapshots(values,i,r)
+i = get_vector_index_map(feop)
+snaps = Snapshots(vals,i,r)

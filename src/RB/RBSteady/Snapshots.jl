@@ -35,7 +35,7 @@ struct BasicSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R}
     realization::R
     ) where {T,N,L,D,R,A<:AbstractParamArray{T,N,L},I<:AbstractIndexMap{D}}
 
-    new{T,N+1,L,D,I,R,A}(data,index_map,realization)
+    new{T,D+1,L,D,I,R,A}(data,index_map,realization)
   end
 end
 

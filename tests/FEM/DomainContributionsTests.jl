@@ -1,5 +1,3 @@
-module DomainContributionsTests
-
 using Test
 using FillArrays
 using Gridap.Helpers
@@ -10,6 +8,8 @@ using Gridap.CellData
 using Gridap.TensorValues
 using Gridap.Geometry
 using Mabla.FEM
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamFESpaces
 
 lazy_getter(a,i=1) = lazy_map(x->param_getindex(x,i),a)
 
@@ -95,4 +95,44 @@ dΩ = Measure(Ω,quad)
 s = ∫(fμ₀)dΩ
 @test all(sum(s) .≈ 1)
 
-end # module
+x = get_cell_points(Ω)
+cf = fμ*u*v
+
+c = return_cache(cf,x)
+# y = evaluate!(c,cf,x)
+ax = map(i->i(x),cf.args)
+# lazy_map(Fields.BroadcastingFieldOpMap(f.op.op),ax...)
+ax1 = map(testitem,ax)
+c = return_cache(Fields.BroadcastingFieldOpMap(cf.op.op),ax1...)
+
+# evaluate!(c,Fields.BroadcastingFieldOpMap(cf.op.op),ax1...)
+ff = Fields.BroadcastingFieldOpMap(cf.op.op)
+A,B = ax1
+c = return_cache(ff,testitem(A),B)
+d = evaluate!(c,ff,testitem(A),B)
+cache = Vector{typeof(c)}(undef,param_length(A))
+data = array_of_similar_arrays(d,param_length(A))
+@inbounds for i in param_eachindex(A)
+  cache[i] = return_cache(ff,param_getindex(A,i),B)
+end
+
+function test_return_cache(f::Union{Function,Map},A::AbstractParamArray,B::AbstractArray{<:Number})
+  c = return_cache(f,testitem(A),B)
+  d = evaluate!(c,f,testitem(A),B)
+  cache = Vector{typeof(c)}(undef,param_length(A))
+  data = Vector{typeof(d)}(undef,param_length(A))
+  @inbounds for i in param_eachindex(A)
+    cache[i] = return_cache(f,param_getindex(A,i),B)
+  end
+  return cache,data
+end
+
+function test_evaluate!(C,f::Union{Function,Map},A::AbstractParamArray,B::AbstractArray{<:Number})
+  cache,data = C
+  @inbounds for i in eachindex(data)
+    data[i] = evaluate!(cache[i],f,A[i],B)
+  end
+  data
+end
+
+@btime test_return_cache(Fields.BroadcastingFieldOpMap(cf.op.op),ax1...)

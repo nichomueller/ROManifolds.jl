@@ -42,13 +42,11 @@ function get_dof_index_map(
   comp_to_dofs::AbstractVector
   ) where {T<:MultiValue,Ti,D}
 
-  dof_perms = Array{Ti,D}[]
-  for dofs in comp_to_dofs
-    cell_dof_comp_ids = _get_cell_dof_comp_ids(cell_dof_ids,dofs)
-    dof_perm_comp = _get_dof_index_map(model,cell_dof_comp_ids,order)
-    push!(dof_perms,dof_perm_comp)
-  end
-  return MultiValueIndexMap(dof_perms)
+  msg = """
+  Instead of using a single field FESpace with a dof type $T, define $(num_components(T))
+  FESpaces of dof type $(eltype(T)) and put them in a MultiFieldFESpace
+  """
+  @notimplemented msg
 end
 
 function _get_dof_index_map(

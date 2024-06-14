@@ -99,30 +99,3 @@ function permute_index_map(::TProductSparsityPattern,index_map,U::TProductFESpac
   J = get_dof_index_map(U)
   return _permute_index_map(index_map,I,J)
 end
-
-function permute_index_map(
-  sparsity::TProductSparsityPattern{<:MultiValueSparsityPatternCSC},
-  index_map,U::TProductFESpace,V::TProductFESpace)
-
-  function _to_component_indices(i,ncomps,icomp)
-    nrows = Int(num_free_dofs(V)/ncomps)
-    ic = copy(i)
-    @inbounds for (j,IJ) in enumerate(i)
-      I = fast_index(IJ,nrows)
-      J = slow_index(IJ,nrows)
-      I′ = (I-1)*ncomps + icomp
-      J′ = (J-1)*ncomps + icomp
-      ic[j] = (J′-1)*nrows*ncomps + I′
-    end
-    return ic
-  end
-
-  I = get_dof_index_map(V)
-  J = get_dof_index_map(U)
-  I1 = get_component(I,1;multivalue=false)
-  J1 = get_component(J,1;multivalue=false)
-  indices = _permute_index_map(index_map,I1,J1)
-  ncomps = num_components(sparsity)
-  indices′ = map(icomp->_to_component_indices(indices,ncomps,icomp),1:ncomps)
-  return MultiValueIndexMap(indices′)
-end

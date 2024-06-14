@@ -46,6 +46,7 @@ export select_snapshots
 export select_snapshots_entries
 export get_touched_blocks
 export get_realization
+export num_space_dofs
 include("Snapshots.jl")
 
 export AbstractTTCore

@@ -21,7 +21,6 @@ include("IndexOperations.jl")
 
 export SparsityPattern
 export SparsityPatternCSC
-export MultiValueSparsityPatternCSC
 export TProductSparsityPattern
 export get_sparsity
 export permute_sparsity
@@ -31,7 +30,6 @@ export AbstractIndexMap
 export TrivialIndexMap
 export IndexMap
 export IndexMapView
-export MultiValueIndexMap
 export FixedDofIndexMap
 export TProductIndexMap
 export SparseIndexMap

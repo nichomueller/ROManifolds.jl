@@ -37,10 +37,11 @@ function get_tp_dof_index_map(
   order::Integer
   ) where T<:MultiValue
 
-  ncomp = num_components(T)
-  dof_map,dof_maps_1d = get_tp_dof_index_map(eltype(T),models,spaces,order)
-  ncomp_dof_map = compose_indices(dof_map,ncomp)
-  return ncomp_dof_map,dof_maps_1d
+  msg = """
+  Instead of using a single field FESpace with a dof type $T, define $(num_components(T))
+  FESpaces of dof type $(eltype(T)) and put them in a MultiFieldFESpace
+  """
+  @notimplemented msg
 end
 
 # this function computes only the free dofs tensor product permutation

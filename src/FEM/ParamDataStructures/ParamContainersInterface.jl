@@ -20,8 +20,7 @@ function find_param_length(a...)
   return first(plengths)
 end
 
-function to_param_quantities(a...)
-  plength = find_param_length(a...)
+function to_param_quantities(a...;plength=find_param_length(a...))
   pa = map(f->to_param_quantity(f,plength),a)
   return pa
 end

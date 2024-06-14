@@ -198,11 +198,31 @@ function param_return_cache(f::Union{Function,Map},A...)
   return cache,data
 end
 
+function param_return_cache(f::Union{Function,Map},A::AbstractParamArray,B::AbstractArray{<:Number})
+  c = return_cache(f,testitem(A),B)
+  d = evaluate!(c,f,testitem(A),B)
+  cache = Vector{typeof(c)}(undef,param_length(A))
+  data = array_of_similar_arrays(d,param_length(A))
+  @inbounds for i in param_eachindex(A)
+    cache[i] = return_cache(f,param_getindex(A,i),B)
+  end
+  return cache,data
+end
+
 function param_evaluate!(C,f::Union{Function,Map},A...)
   cache,data = C
-  pA = to_param_quantities(A...)
+  pA = to_param_quantities(A...;plength=param_length(data))
   @inbounds for i in param_eachindex(data)
     vi = evaluate!(cache[i],f,param_getindex.(pA,i)...)
+    param_setindex!(data,vi,i)
+  end
+  data
+end
+
+function param_evaluate!(C,f::Union{Function,Map},A::AbstractParamArray,B::AbstractArray{<:Number})
+  cache,data = C
+  @inbounds for i in param_eachindex(data)
+    vi = evaluate!(cache[i],f,param_getindex(A,i),B)
     param_setindex!(data,vi,i)
   end
   data
@@ -542,8 +562,8 @@ for T in (:(ForwardDiff.GradientConfig),:(ForwardDiff.JacobianConfig))
       cfg::$T)
 
       @check length(ydual) == param_length(x)
-      vi = return_cache(f,testitem(ydual),testitem(x),cfg)
-      A = array_of_similar_arrays(vi,length(ydual))
+      ci = return_cache(f,testitem(ydual),testitem(x),cfg)
+      A = array_of_similar_arrays(ci,length(ydual))
       return A
     end
 
