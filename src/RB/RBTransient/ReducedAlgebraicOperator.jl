@@ -39,7 +39,7 @@ function RBSteady.reduce_operator(
   b̂t = combine_basis_time(bt_trial,bt_test;kwargs...)
 
   @inbounds for i = eachindex(b̂st)
-    b̂si = bs_test'*get_values(bs)[i]*bs_trial
+    b̂si = bs_test'*param_getindex(bs,i)*bs_trial
     b̂st[i] = map(k->kronecker(b̂t[k,:,:],b̂si),axes(b̂t,1))
   end
 
@@ -89,7 +89,7 @@ function RBSteady.reduce_operator(
   b̂t = combine_basis_time(bt,bt_trial,bt_test;kwargs...)
 
   @inbounds for is = 1:num_reduced_space_dofs(b)
-    b̂si = bs_test'*get_values(bs)[is]*bs_trial
+    b̂si = bs_test'*param_getindex(bs,is)*bs_trial
     for it = 1:num_reduced_times(b)
       ist = (it-1)*num_reduced_space_dofs(b)+is
       b̂ti = b̂t[:,it,:]

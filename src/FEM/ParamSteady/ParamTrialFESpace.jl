@@ -100,21 +100,21 @@ function has_param(U::MultiFieldFESpace)
   any(space -> space isa ParamTrialESpace,U.spaces)
 end
 
-function ODEs.allocate_space(U::MultiFieldFESpace,μ)
+function ODEs.allocate_space(U::MultiFieldFESpace,r::ParamRealization)
   if !has_param(U)
     return U
   end
-  spaces = map(U->allocate_space(U,μ),U.spaces)
+  spaces = map(U->allocate_space(U,r),U.spaces)
   style = MultiFieldStyle(U)
   MultiFieldParamFESpace(spaces;style)
 end
 
-function Arrays.evaluate!(Upt::MultiFieldFESpace,U::MultiFieldFESpace,μ)
+function Arrays.evaluate!(Upt::MultiFieldFESpace,U::MultiFieldFESpace,r::ParamRealization)
   if !has_param(U)
     return U
   end
   for (Upti,Ui) in zip(Upt,U)
-    evaluate!(Upti,Ui,μ)
+    evaluate!(Upti,Ui,r)
   end
   Upt
 end

@@ -7,15 +7,15 @@ num_reduced_times(a::TransientProjection) = @abstractmethod
 RBSteady.num_fe_dofs(a::TransientProjection) = num_space_dofs(a)*num_times(a)
 RBSteady.num_reduced_dofs(a::TransientProjection) = num_reduced_space_dofs(a)*num_reduced_times(a)
 
-function RBSteady.Projection(s::StandardTransientSnapshots,args...;kwargs...)
+function RBSteady.Projection(s::UnfoldingTransientSnapshots,args...;kwargs...)
   s′ = flatten_snapshots(s)
   basis_space = tpod(s′,args...;kwargs...)
-  compressed_s2 = compress(s′,basis_space,args...;change_mode=true)
+  compressed_s2 = compress(s′,basis_space,args...;swap_mode=true)
   basis_time = tpod(compressed_s2;kwargs...)
   TransientPODBasis(basis_space,basis_time)
 end
 
-function RBSteady.Projection(s::StandardTransientSparseSnapshots,args...;kwargs...)
+function RBSteady.Projection(s::UnfoldingTransientSparseSnapshots,args...;kwargs...)
   s′ = flatten_snapshots(s)
   basis_space = tpod(s′,args...;kwargs...)
   compressed_s2 = compress(s′,basis_space,args...;change_mode=true)

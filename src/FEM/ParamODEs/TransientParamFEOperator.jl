@@ -216,7 +216,7 @@ ODEs.get_jacs(op::TransientParamSemilinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamSemilinearFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::TransientParamSemilinearFEOpFromWeakForm) = op.index_map
 ParamDataStructures.realization(op::TransientParamSemilinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
-get_induced_norm(op::TransientParamSemilinearFEOpFromWeakForm) = op.induced_norm
+ParamSteady.get_induced_norm(op::TransientParamSemilinearFEOpFromWeakForm) = op.induced_norm
 
 function ODEs.is_form_constant(op::TransientParamSemilinearFEOpFromWeakForm,k::Integer)
   (k == get_order(op)+1) && op.constant_mass
@@ -279,7 +279,7 @@ ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::TransientParamLinearFEOpFromWeakForm) = op.index_map
 ParamDataStructures.realization(op::TransientParamLinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
-get_induced_norm(op::TransientParamLinearFEOpFromWeakForm) = op.induced_norm
+ParamSteady.get_induced_norm(op::TransientParamLinearFEOpFromWeakForm) = op.induced_norm
 
 function ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer)
   op.constant_forms[k]

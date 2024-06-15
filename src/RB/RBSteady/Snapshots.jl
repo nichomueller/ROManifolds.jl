@@ -13,7 +13,7 @@ end
 
 function IndexMaps.change_index_map(f,s::AbstractSnapshots)
   index_map′ = change_index_map(f,get_index_map(s))
-  Snapshots(get_values(s),get_realization(s),index_map′)
+  Snapshots(s,index_map′,get_realization(s))
 end
 
 function flatten_snapshots(s::AbstractSnapshots)
@@ -41,6 +41,10 @@ end
 
 function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::ParamRealization)
   BasicSnapshots(s,i,r)
+end
+
+function Snapshots(s::BasicSnapshots,i::AbstractIndexMap,r::ParamRealization)
+  BasicSnapshots(s.data,i,r)
 end
 
 ParamDataStructures.get_values(s::BasicSnapshots) = s.data
@@ -72,26 +76,17 @@ Base.@propagate_inbounds function Base.setindex!(
   setindex!(sparam,v,ispace′)
 end
 
-struct SnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractSteadySnapshots{T,N,L,D,I,R},B<:NTuple{N,AbstractUnitRange{Int}}} <: AbstractSteadySnapshots{T,N,L,D,I,R}
+struct SnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractSteadySnapshots{T,N,L,D,I,R},B<:AbstractUnitRange{Int}} <: AbstractSteadySnapshots{T,N,L,D,I,R}
   snaps::A
-  indices::B
+  prange::B
 end
 
-function SnapshotsAtIndices(s::SnapshotsAtIndices,indices)
-  new_srange,new_prange = indices
-  old_srange,old_prange = s.indices
-  @check intersect(old_srange,new_srange) == new_srange
-  @check intersect(old_prange,new_prange) == new_prange
-  SnapshotsAtIndices(s.snaps,indices)
-end
-
-space_indices(s::SnapshotsAtIndices{T,N}) where {T,N} = s.selected_indices[1:N-1]
-param_indices(s::SnapshotsAtIndices) = s.selected_indices[N]
-num_space_dofs(s::SnapshotsAtIndices) = length.(space_indices(s))
+param_indices(s::SnapshotsAtIndices) = s.prange
+ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
 
 ParamDataStructures.get_values(s::SnapshotsAtIndices) = get_values(s.snaps)
 IndexMaps.get_index_map(s::SnapshotsAtIndices) = get_index_map(s.snaps)
-get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)
+get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
 
 Base.@propagate_inbounds function Base.getindex(
   s::SnapshotsAtIndices{T,N},
@@ -100,9 +95,8 @@ Base.@propagate_inbounds function Base.getindex(
 
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
-  ispace′ = getindex.(space_indices(s),ispace)
   iparam′ = getindex(param_indices(s),iparam)
-  getindex(s.snaps,ispace′...,iparam′)
+  getindex(s.snaps,ispace...,iparam′)
 end
 
 Base.@propagate_inbounds function Base.setindex!(
@@ -112,41 +106,40 @@ Base.@propagate_inbounds function Base.setindex!(
   ) where {T,N}
 
   @boundscheck checkbounds(s,i...)
-  ispace′ = getindex.(space_indices(s),ispace)
+  ispace...,iparam
   iparam′ = getindex(param_indices(s),iparam)
-  setindex!(s.snaps,v,ispace′...,iparam′)
+  setindex!(s.snaps,v,ispace...,iparam′)
 end
 
+format_range(a::AbstractUnitRange,l::Int) = a
 format_range(a::Number,l::Int) = Base.OneTo(a)
 format_range(a::Colon,l::Int) = Base.OneTo(l)
 
-function select_snapshots(
-  s::AbstractSteadySnapshots,
-  spacerange::Tuple{Vararg{AbstractUnitRange}},
-  paramrange::AbstractUnitRange)
-
-  indices = (spacerange,paramrange)
-  SnapshotsAtIndices(s,indices)
+function select_snapshots(s::SnapshotsAtIndices,prange)
+  old_prange = s.indices
+  @check intersect(old_prange,prange) == prange
+  SnapshotsAtIndices(s.snaps,prange)
 end
 
-function select_snapshots(s::AbstractSteadySnapshots,spacerange,paramrange)
-  srange = Tuple.(format_range(spacerange,num_space_dofs(s)))
-  prange = format_range(paramrange,num_params(s))
-  select_snapshots(s,srange,prange)
+function select_snapshots(s::AbstractSteadySnapshots,prange)
+  prange = format_range(prange,num_params(s))
+  SnapshotsAtIndices(s,prange)
 end
 
-function select_snapshots(
-  s::AbstractSteadySnapshots,
-  paramrange;
-  spacerange=Base.OneTo.(num_space_dofs(s)))
+function select_snapshots_entries(s::AbstractSteadySnapshots,srange)
+  T = eltype(s)
+  nval = length(srange)
+  np = num_params(s)
+  entries = array_of_similar_arrays(zeros(T,nval),np)
 
-  select_snapshots(s,spacerange,paramrange)
-end
+  for ip = 1:np
+    vip = entries.data[ip]
+    for (i,is) in enumerate(srange)
+      vip[i] = s.data[ip][is]
+    end
+  end
 
-function select_snapshots_entries(s::AbstractSteadySnapshots,spacerange)
-  ss = select_snapshots(s,spacerange,Base.OneTo(num_params(s)))
-  data = collect(ss)
-  return ArrayOfArrays(data)
+  return entries
 end
 
 const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = BasicSnapshots{T,N,L,D,I,R,A}
@@ -156,9 +149,9 @@ function ParamDataStructures.recast(s::SparseSnapshots,a::AbstractMatrix)
   return recast(A,a)
 end
 
-const StandardSnapshots{T,L,I,R} = AbstractSnapshots{T,2,L,1,I,R}
-const StandardSteadySnapshots{T,L,I,R} = AbstractSteadySnapshots{T,2,L,1,I,R}
-const StandardSparseSnapshots{T,L,I,R,A} = SparseSnapshots{T,2,L,1,I,R,A}
+const UnfoldingSnapshots{T,L,I,R} = AbstractSnapshots{T,2,L,1,I,R}
+const UnfoldingSteadySnapshots{T,L,I,R} = AbstractSteadySnapshots{T,2,L,1,I,R}
+const UnfoldingSparseSnapshots{T,L,I,R,A} = SparseSnapshots{T,2,L,1,I,R,A}
 
 struct BlockSnapshots{S,N,L} <: AbstractParamContainer{S,N,L}
   array::Array{S,N}

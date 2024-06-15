@@ -35,17 +35,17 @@ end
 
 BlockArrays.blocks(A::BlockArrayOfArrays) = A.data
 
-param_getindex(A::BlockArrayOfArrays,i::Integer) = BlockParamView(A,i)
+param_getindex(A::BlockArrayOfArrays,i::Integer) = mortar(map(a->param_getindex(a,i),A.data))#BlockParamView(A,i)
 
 function param_entry(A::BlockArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
   param_entry(A,findblockindex.(inneraxes(A),i)...)
 end
 
 function param_entry(A::BlockArrayOfArrays{T,N},i::Vararg{BlockIndex{1},N}) where {T,N}
-  param_entry(A,BlockIndex(i))
+  _param_entry(A,BlockIndex(i))
 end
 
-function param_entry(A::BlockArrayOfArrays{T,N},i::BlockIndex{N}) where {T,N}
+function _param_entry(A::BlockArrayOfArrays{T,N},i::BlockIndex{N}) where {T,N}
   @boundscheck blockcheckbounds(A,Block(i.I))
   @inbounds bl = A.data[i.I...]
   @inbounds ParamNumber(map(a->getindex(a,i.α...),bl.data))

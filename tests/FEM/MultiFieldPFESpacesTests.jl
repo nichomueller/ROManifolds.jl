@@ -87,12 +87,12 @@ X = MultiFieldParamFESpace([U,P],style=multi_field_style)
 @test isa(Y,MultiFieldFESpace)
 @test isa(X,MultiFieldParamFESpace)
 @test isa(X.spaces,Vector{<:SingleFieldParamFESpace})
-@test get_vector_type(X) <: ParamArray
+@test get_vector_type(X) <: AbstractParamArray
 
 @test num_free_dofs(X) == num_free_dofs(U) + num_free_dofs(P)
 @test num_free_dofs(X) == num_free_dofs(Y)
 @test length(X) == 2
-@test typeof(zero_free_values(X)) <: ParamArray{Vector{Float64},1,3,Vector{Vector{Float64}}}
+@test typeof(zero_free_values(X)) <: AbstractParamArray
 
 dy = get_fe_basis(Y)
 dv, dq = dy
@@ -103,10 +103,10 @@ du, dp = dx
 cellmat = integrate(gμ*dv*du,quad)
 cellvec = integrate(gμ*dv*2,quad)
 cellmatvec = pair_arrays(cellmat,cellvec)
-@test isa(cellmat[end],ArrayBlock{<:ParamArray})
+@test isa(cellmat[end],ArrayBlock{<:AbstractParamArray})
 @test cellmat[1][1,1] != nothing
 @test cellmat[1][1,2] == nothing
-@test isa(cellvec[end], ArrayBlock{<:ParamArray})
+@test isa(cellvec[end], ArrayBlock{<:AbstractParamArray})
 @test cellvec[1][1] != nothing
 @test cellvec[1][2] == nothing
 
@@ -131,9 +131,6 @@ cf = CellField(X,get_cell_dof_ids(X,trian))
 @test isa(cf,MultiFieldCellField)
 
 my_test_fe_space(X,cellmatvec,cellmat,cellvec,trian)
-
-#using Gridap.Visualization
-#writevtk(trian,"trian";nsubcells=30,cellfields=["uh" => uh, "ph"=> ph])
 
 fh = interpolate([gμ,gμ],X)
 fh = interpolate_everywhere([gμ,gμ],X)

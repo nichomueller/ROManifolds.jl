@@ -49,12 +49,15 @@ W = mortar([W1,W2])
 VW = V + W
 @check all(VW.data .≈ V.data + W.data)
 
-bc = Base.broadcasted(+,V,W)
-r = Base.materialize(bc)
-j = map(Base.materialize,param_data(bc))
+using SparseArrays
+item = sprand(Float64,10,10,0.5)
+MM = Matrix{typeof(ParamArray([item,item]))}(undef,2,2)
+MM[1,1] = ParamArray([item,item])
+MM[1,2] = ParamArray([item,item])
+MM[2,1] = ParamArray([item,item])
+MM[2,2] = ParamArray([item,item])
+M = mortar(MM)
 
-i = 3
-j = BlockArrays.findblockindex.(ParamDataStructures.inneraxes(V),i)[1]
-@boundscheck blockcheckbounds(V,Block(j.I))
-@inbounds bl = V.data[j.I...]
-@inbounds ParamNumber(bl.data[j.α...,:])
+luM = lu(M)
+
+PD = param_data(M)

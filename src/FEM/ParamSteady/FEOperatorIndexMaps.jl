@@ -17,7 +17,7 @@ function FEOperatorIndexMap(trial::FESpace,test::FESpace)
 end
 
 function get_vector_index_map(test::FESpace)
-  TrivialIndexMap((Int32(num_free_dofs(test)),))
+  TrivialIndexMap(LinearIndices((num_free_dofs(test),)))
 end
 
 function get_vector_index_map(test::TProductFESpace)
@@ -34,8 +34,7 @@ end
 
 function get_matrix_index_map(trial::FESpace,test::FESpace)
   sparsity = get_sparsity(trial,test)
-  i = Int32.(get_nonzero_indices(sparsity))
-  return IndexMap(i)
+  return TrivialIndexMap(get_nonzero_indices(sparsity))
 end
 
 function get_matrix_index_map(U::TProductFESpace,V::TProductFESpace)

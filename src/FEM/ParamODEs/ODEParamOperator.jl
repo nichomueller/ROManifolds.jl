@@ -5,6 +5,7 @@ struct LinearParamODE <: LinearParamOperatorType end
 struct LinearNonlinearParamODE <: LinearNonlinearParamOperatorType end
 
 abstract type ODEParamOperator{T<:ParamOperatorType} <: ODEOperator{T} end
+const AbstractParamOperator{T} = Union{ParamOperator{T},ODEParamOperator{T}}
 
 function ODEs.allocate_odeopcache(
   odeop::ODEParamOperator,
@@ -108,6 +109,7 @@ mutable struct ParamODEOpFromTFEOpCache <: GridapType
 end
 
 abstract type ODEParamOperatorWithTrian{T<:ParamOperatorType} <: ODEParamOperator{T} end
+const AbstractParamOperatorWithTrian{T} = Union{ParamOperatorWithTrian{T},ODEParamOperatorWithTrian{T}}
 
 function Algebra.residual!(
   b::Contribution,

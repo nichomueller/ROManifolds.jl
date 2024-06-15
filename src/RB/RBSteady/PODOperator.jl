@@ -1,7 +1,7 @@
 function reduced_operator(
   solver::RBSolver,
-  feop::ParamFEOperator,
-  s::AbstractSnapshots)
+  feop::T,
+  s::AbstractSnapshots) where T
 
   red_trial,red_test = reduced_fe_space(solver,feop,s)
   op = get_algebraic_operator(feop)
@@ -10,10 +10,10 @@ end
 
 function reduced_operator(
   solver::RBSolver,
-  op::ParamOperator,
+  op::T,
   trial::RBSpace,
   test::RBSpace,
-  s::AbstractSnapshots)
+  s::AbstractSnapshots) where T
 
   pop = PODOperator(op,trial,test)
   reduced_operator(solver,pop,s)
@@ -22,7 +22,7 @@ end
 abstract type RBOperator{T<:ParamOperatorType} <: NonlinearOperator end
 
 struct PODOperator{T} <: RBOperator{T}
-  op::ParamOperatorWithTrian{T}
+  op::AbstractParamOperatorWithTrian{T}
   trial::RBSpace
   test::RBSpace
 end

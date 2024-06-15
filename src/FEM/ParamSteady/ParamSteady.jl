@@ -57,7 +57,9 @@ export ParamSaddlePointFEOp
 export ParamFEOperatorWithTrian
 export ParamFEOpFromWeakFormWithTrian
 export ParamSaddlePointFEOpWithTrian
+export get_induced_norm
 export assemble_norm_matrix
+export get_coupling
 export assemble_coupling_matrix
 export set_triangulation
 export change_triangulation

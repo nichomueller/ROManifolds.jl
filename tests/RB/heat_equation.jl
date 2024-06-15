@@ -20,8 +20,14 @@ tf = 0.1
 pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
-model_dir = datadir(joinpath("models","elasticity_3cyl2D.json"))
-model = DiscreteModelFromFile(model_dir)
+# model_dir = datadir(joinpath("models","elasticity_3cyl2D.json"))
+# model = DiscreteModelFromFile(model_dir)
+domain = (0,1,0,1)
+partition = (5,5)
+model = CartesianDiscreteModel(domain,partition)
+labels = get_face_labeling(model)
+add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
+add_tag_from_tags!(labels,"neumann",[7])
 
 order = 1
 degree = 2*order
@@ -59,7 +65,7 @@ trian_res = (Ω,Γn)
 trian_stiffness = (Ω,)
 trian_mass = (Ω,)
 
-induced_norm(du,v) = ∫(v*u)dΩ + ∫(∇(v)⋅∇(du))dΩ
+induced_norm(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
@@ -115,3 +121,11 @@ stats = @timed begin
 end
 i = get_vector_index_map(feop)
 snaps = Snapshots(vals,i,r)
+
+using Gridap.Algebra
+using Gridap.FESpaces
+using Gridap.ODEs
+
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+op = get_algebraic_operator(feop)
+reduced_operator(rbsolver,op,red_trial,red_test,fesnaps)

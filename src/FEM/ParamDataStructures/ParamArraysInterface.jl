@@ -60,6 +60,12 @@ function Base.transpose(A::AbstractParamArray)
   end
 end
 
+function Base.vec(A::AbstractParamArray)
+  param_array(param_data(A)) do v
+    vec(v)
+  end
+end
+
 # small hack
 function Base.zero(::Type{<:AbstractArray{T,N}}) where {T<:Number,N}
   zeros(T,tfill(1,Val{N}()))
@@ -71,10 +77,14 @@ function Base.fill!(A::AbstractParamArray,z::Number)
 end
 
 # small hack
-function Base.fill!(A::AbstractParamArray{T,N},z::AbstractArray{<:Number,N}) where {T,N}
-  @check all(z.==first(z))
-  fill!(A,first(z))
-  return A
+for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
+  @eval begin
+    function $f(A::AbstractParamArray{T,N},z::AbstractArray{<:Number,N}) where {T,N}
+      @check all(z.==first(z))
+      $f(A,first(z))
+      return A
+    end
+  end
 end
 
 function LinearAlgebra.mul!(

@@ -34,44 +34,83 @@ function _shape_per_dir(i::AbstractVector{<:Integer})
   (max1 - min1 + 1,)
 end
 
+"""
+    abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D}
+
+Index mapping operator that serves to view a finite element function according to
+a nonstandard indexing strategy. Just like the connectivity matrix, the entries of
+the index maps are positive when the corresponding dof is free, and negative when
+the corresponding dof is Dirichlet.
+"""
+
 abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D} end
 
 Base.view(i::AbstractIndexMap,locations) = IndexMapView(i,locations)
+
+"""
+    free_dofs_map(i::AbstractIndexMap) -> AbstractIndexMap
+
+Removes the negative indices from the index map, which correspond to Dirichlet
+boundary conditions.
+"""
 
 function free_dofs_map(i::AbstractIndexMap)
   free_dofs_locations = findall(i.>zero(eltype(i)))
   view(i,free_dofs_locations)
 end
 
+"""
+    dirichlet_dofs_map(i::AbstractIndexMap) -> AbstractVector
+
+Removes the positive indices from the index map, which correspond to Dirichlet
+boundary conditions.
+"""
+
 function dirichlet_dofs_map(i::AbstractIndexMap)
   dir_dofs_locations = findall(i.<zero(eltype(i)))
   i.indices[dir_dofs_locations]
 end
+
+"""
+    inv_index_map(i::AbstractIndexMap) -> AbstractIndexMap
+
+Returns the inverse index map.
+"""
 
 function inv_index_map(i::AbstractIndexMap)
   invi = reshape(invperm(vec(i)),size(i))
   IndexMap(invi)
 end
 
+"""
+    change_index_map(f,i::AbstractIndexMap) -> AbstractIndexMap
+
+Returns an index map given by f∘i, where f is a function encoding an index map.
+"""
+
 function change_index_map(f,i::AbstractIndexMap)
-  i′ = f(i)
-  IndexMap(i′)
+  i′::AbstractIndexMap = f(collect(i))
+  i′
 end
 
-function fix_dof_index_map(i::AbstractIndexMap,dof_to_fix::Int)
+"""
+    fix_dof_index_map(i::AbstractIndexMap,dof_to_fix::Integer) -> FixedDofIndexMap
+"""
+
+function fix_dof_index_map(i::AbstractIndexMap,dof_to_fix::Integer)
   FixedDofIndexMap(i,dof_to_fix)
 end
 
-struct TrivialIndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
-  size::NTuple{D,Ti}
+struct TrivialIndexMap{Ti,I<:AbstractVector{Ti}} <: AbstractIndexMap{1,Ti}
+  indices::I
 end
 
 function TrivialIndexMap(i::AbstractIndexMap)
-  TrivialIndexMap(size(i))
+  TrivialIndexMap(LinearIndices((length(i),)))
 end
 
-Base.size(i::TrivialIndexMap) = i.size
-Base.getindex(i::TrivialIndexMap,j::Integer) = LinearIndices(i.size)[j]
+Base.size(i::TrivialIndexMap) = (length(i.indices),)
+Base.getindex(i::TrivialIndexMap,j::Integer) = getindex(i.indices,j)
 
 struct IndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
   indices::Array{Ti,D}

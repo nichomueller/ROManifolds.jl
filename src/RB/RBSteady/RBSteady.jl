@@ -26,7 +26,7 @@ using Mabla.FEM.ParamDataStructures
 using Mabla.FEM.ParamAlgebra
 using Mabla.FEM.ParamFESpaces
 using Mabla.FEM.ParamSteady
-using Mabla.FEM.ParamUtils
+using Mabla.FEM.ParamODEs
 
 import Base: +,-,*,\
 import UnPack: @unpack
@@ -37,8 +37,8 @@ export AbstractSnapshots
 export BasicSnapshots
 export SnapshotsAtIndices
 export SparseSnapshots
-export StandardSnapshots
-export StandardSteadySnapshots
+export UnfoldingSnapshots
+export UnfoldingSteadySnapshots
 export BlockSnapshots
 export Snapshots
 export flatten_snapshots

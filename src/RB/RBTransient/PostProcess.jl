@@ -1,4 +1,4 @@
-function RBSteady.compute_error(sol::StandardTransientSnapshots,sol_approx::StandardTransientSnapshots,norm_matrix=nothing)
+function RBSteady.compute_error(sol::UnfoldingTransientSnapshots,sol_approx::UnfoldingTransientSnapshots,norm_matrix=nothing)
   err_norm = zeros(num_times(sol))
   sol_norm = zeros(num_times(sol))
   space_time_norm = zeros(num_params(sol))

@@ -6,7 +6,7 @@ function get_dof_index_map(space::FESpace)
 end
 
 function get_dof_index_map(model::DiscreteModel,space::FESpace)
-  TrivialIndexMap((Int32(num_free_dofs(space)),))
+  TrivialIndexMap(LinearIndices((num_free_dofs(space),)))
 end
 
 function get_dof_index_map(model::CartesianDiscreteModel,space::FESpace)

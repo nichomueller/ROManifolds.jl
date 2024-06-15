@@ -11,12 +11,12 @@ abstract type SteadyProjection <: Projection end
 num_fe_dofs(a::SteadyProjection) = num_space_dofs(a)
 num_reduced_dofs(a::SteadyProjection) = num_reduced_space_dofs(a)
 
-function Projection(s::StandardSteadySnapshots,args...;kwargs...)
+function Projection(s::UnfoldingSteadySnapshots,args...;kwargs...)
   basis = tpod(s,args...;kwargs...)
   PODBasis(basis)
 end
 
-function Projection(s::StandardSparseSnapshots,args...;kwargs...)
+function Projection(s::UnfoldingSparseSnapshots,args...;kwargs...)
   basis = tpod(s,args...;kwargs...)
   sparse_basis = recast(s,basis)
   PODBasis(sparse_basis)

@@ -27,7 +27,6 @@ using Mabla.FEM.ParamAlgebra
 using Mabla.FEM.ParamFESpaces
 using Mabla.FEM.ParamSteady
 using Mabla.FEM.ParamODEs
-using Mabla.FEM.ParamUtils
 
 using Mabla.RB
 using Mabla.RB.RBSteady
@@ -41,7 +40,7 @@ export AbstractTransientSnapshots
 export TransientBasicSnapshots
 export TransientSnapshots
 export TransientSparseSnapshots
-export StandardTransientSnapshots
+export UnfoldingTransientSnapshots
 export ModeTransientSnapshots
 export compress
 include("Snapshots.jl")

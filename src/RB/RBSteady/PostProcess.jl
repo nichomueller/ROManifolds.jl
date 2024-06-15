@@ -98,7 +98,7 @@ function compute_error(_sol::AbstractSteadySnapshots,_sol_approx::AbstractSteady
   compute_error(sol,sol_approx,args...)
 end
 
-function compute_error(sol::StandardSnapshots,sol_approx::StandardSnapshots,norm_matrix=nothing)
+function compute_error(sol::UnfoldingSnapshots,sol_approx::UnfoldingSnapshots,norm_matrix=nothing)
   @check size(sol) == size(sol_approx)
   space_norm = zeros(num_params(sol))
   @inbounds for i = axes(sol,2)

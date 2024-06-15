@@ -84,6 +84,10 @@ function ODEs.allocate_space(U::MultiFieldFESpace,μ,t)
   MultiFieldParamFESpace(spaces;style)
 end
 
+function ODEs.allocate_space(U::MultiFieldFESpace,r::TransientParamRealization)
+  allocate_space(U,get_params(r),get_times(r))
+end
+
 function Arrays.evaluate!(
   Upt::MultiFieldFESpace,
   U::MultiFieldFESpace,
@@ -96,6 +100,10 @@ function Arrays.evaluate!(
     evaluate!(Upti,Ui,μ,t)
   end
   Upt
+end
+
+function ODEs.evaluate!(Upt::MultiFieldFESpace,U::MultiFieldFESpace,r::TransientParamRealization)
+  evaluate!(Upt,U,get_params(r),get_times(r))
 end
 
 function test_transient_trial_fe_space(Uh,μ)

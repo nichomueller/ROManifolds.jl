@@ -32,7 +32,7 @@ function reduced_basis(
   reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
 end
 
-function enrich_basis(feop::ParamFEOperator,bases,norm_matrix)
+function enrich_basis(feop,bases,norm_matrix)
   supr_op = assemble_coupling_matrix(feop)
   enrich_basis(bases,norm_matrix,supr_op)
 end

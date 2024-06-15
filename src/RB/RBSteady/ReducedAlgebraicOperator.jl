@@ -42,7 +42,7 @@ function reduce_operator(
   b̂s = Array{T,3}(undef,s)
 
   @inbounds for i = 1:num_reduced_space_dofs(b)
-    b̂s[:,i,:] = bs_test'*get_values(bs)[i]*bs_trial
+    b̂s[:,i,:] = bs_test'*param_getindex(bs,i)*bs_trial
   end
 
   return ReducedMatrixOperator(mdeim_style,b̂s)

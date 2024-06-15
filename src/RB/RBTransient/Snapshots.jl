@@ -21,6 +21,10 @@ function RBSteady.Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::Transie
   TransientBasicSnapshots(s,i,r)
 end
 
+function RBSteady.Snapshots(s::TransientBasicSnapshots,i::AbstractIndexMap,r::TransientParamRealization)
+  TransientBasicSnapshots(s.data,i,r)
+end
+
 ParamDataStructures.get_values(s::TransientBasicSnapshots) = s.data
 IndexMaps.get_index_map(s::TransientBasicSnapshots) = s.index_map
 RBSteady.get_realization(s::TransientBasicSnapshots) = s.realization
@@ -45,7 +49,7 @@ Base.@propagate_inbounds function Base.setindex!(
   ) where {T,N}
 
   @boundscheck checkbounds(s,i...)
-  ispace...,iparam = i
+  ispace...,itime,iparam = i
   ispace′ = s.index_map[ispace...]
   sparam = param_getindex(s.data,iparam+(itime-1)*num_params(s))
   setindex!(sparam,v,ispace′)
@@ -68,20 +72,19 @@ function RBSteady.Snapshots(s::Vector{<:AbstractParamArray},i::AbstractIndexMap,
   TransientSnapshots(s,i,r)
 end
 
-# function ParamDataStructures.get_values(s::TransientSnapshots)
-#   vdata = s.data
-#   item = all_data(first(vdata))
-#   T = eltype(item)
-#   N = ndims(item)
-#   s...,send = size(item)
-#   tL = length(vdata)
-#   s′ = (s...,send*tL)
-#   data = Array{T,N}(undef,s′)
-#   @inbounds for i = eachindex(vdata)
-#     @views data[s...,(i-1)*tL:i*tL] = all_data(vdata[i])
-#   end
-#   return ArrayOfArrays(data)
-# end
+function RBSteady.Snapshots(s::TransientSnapshots,i::AbstractIndexMap,r::TransientParamRealization)
+  TransientSnapshots(s.data,i,r)
+end
+
+function ParamDataStructures.get_values(s::TransientSnapshots)
+  item = testitem(first(s.data).data)
+  data = array_of_similar_arrays(item,num_params(s)*num_times(s))
+  @inbounds for (ipt,index) in enumerate(CartesianIndices((num_params(s),num_times(s))))
+    ip,it = index.I
+    @views data[ipt] = s.data[it][ip]
+  end
+  return ArrayOfArrays(data)
+end
 
 IndexMaps.get_index_map(s::TransientSnapshots) = s.index_map
 RBSteady.get_realization(s::TransientSnapshots) = s.realization
@@ -111,27 +114,54 @@ Base.@propagate_inbounds function Base.setindex!(
   setindex!(sparam,v,ispace′)
 end
 
-struct TransientSnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractTransientSnapshots{T,N,L,D,I,R},B<:NTuple{N,AbstractUnitRange{Int}}} <: AbstractTransientSnapshots{T,N,L,D,I,R}
+struct TransientSnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractTransientSnapshots{T,N,L,D,I,R},B,C} <: AbstractTransientSnapshots{T,N,L,D,I,R}
   snaps::A
-  indices::B
+  trange::B
+  prange::C
 end
 
-function RBSteady.SnapshotsAtIndices(s::TransientSnapshotsAtIndices,indices)
-  new_srange,new_trange,new_prange = indices
-  old_srange,old_trange,old_prange = s.indices
-  @check intersect(old_srange,new_srange) == new_srange
-  @check intersect(old_trange,new_trange) == new_trange
-  @check intersect(old_prange,new_prange) == new_prange
-  TransientSnapshotsAtIndices(s.snaps,indices)
+function RBSteady.Snapshots(s::TransientSnapshotsAtIndices,i::AbstractIndexMap,r::TransientParamRealization)
+  snaps = Snapshots(s.snaps,i,r)
+  TransientSnapshotsAtIndices(snaps,s.trange,s.prange)
 end
 
-RBSteady.space_indices(s::TransientSnapshotsAtIndices{T,N}) where {T,N} = s.selected_indices[1:N-1]
-RBSteady.param_indices(s::TransientSnapshotsAtIndices) = s.selected_indices[N]
-RBSteady.num_space_dofs(s::TransientSnapshotsAtIndices) = length.(space_indices(s))
+time_indices(s::TransientSnapshotsAtIndices) = s.trange
+ParamDataStructures.num_times(s::TransientSnapshotsAtIndices) = length(time_indices(s))
+RBSteady.param_indices(s::TransientSnapshotsAtIndices) = s.prange
+ParamDataStructures.num_params(s::TransientSnapshotsAtIndices) = length(RBSteady.param_indices(s))
 
-ParamDataStructures.get_values(s::TransientSnapshotsAtIndices) = get_values(s.snaps)
 IndexMaps.get_index_map(s::TransientSnapshotsAtIndices) = get_index_map(s.snaps)
-RBSteady.get_realization(s::TransientSnapshotsAtIndices) = get_realization(s.snaps)
+RBSteady.get_realization(s::TransientSnapshotsAtIndices) = get_realization(s.snaps)[s.prange,s.trange]
+
+function ParamDataStructures.get_values(
+  s::TransientSnapshotsAtIndices{T,N,L,D,I,R,<:TransientBasicSnapshots}
+  ) where {T,N,L,D,I,R}
+
+  snaps = s.snaps
+  item = testitem(snaps.data)
+  data = array_of_similar_arrays(item,num_params(s)*num_times(s))
+  indices = CartesianIndices((RBSteady.param_indices(s),time_indices(s)))
+  @inbounds for (ipt,index) in enumerate(indices)
+    ip,it = index.I
+    @views data[ipt] = snaps.data[ip+(it-1)*num_params(s)]
+  end
+  return ArrayOfArrays(data)
+end
+
+function ParamDataStructures.get_values(
+  s::TransientSnapshotsAtIndices{T,N,L,D,I,R,<:TransientSnapshots}
+  ) where {T,N,L,D,I,R}
+
+  snaps = s.snaps
+  item = testitem(first(snaps.data).data)
+  data = array_of_similar_arrays(item,num_params(s)*num_times(s))
+  indices = CartesianIndices((RBSteady.param_indices(s),time_indices(s)))
+  @inbounds for (ipt,index) in enumerate(indices)
+    ip,it = index.I
+    data[ipt] = snaps.data[it][ip]
+  end
+  return ArrayOfArrays(data)
+end
 
 Base.@propagate_inbounds function Base.getindex(
   s::TransientSnapshotsAtIndices{T,N},
@@ -140,10 +170,9 @@ Base.@propagate_inbounds function Base.getindex(
 
   @boundscheck checkbounds(s,i...)
   ispace...,itime,iparam = i
-  ispace′ = getindex.(space_indices(s),ispace)
   itime′ = getindex(time_indices(s),itime)
-  iparam′ = getindex(param_indices(s),iparam)
-  getindex(s.snaps,ispace′...,itime′,iparam′)
+  iparam′ = getindex(RBSteady.param_indices(s),iparam)
+  getindex(s.snaps,ispace...,itime′,iparam′)
 end
 
 Base.@propagate_inbounds function Base.setindex!(
@@ -154,51 +183,47 @@ Base.@propagate_inbounds function Base.setindex!(
 
   @boundscheck checkbounds(s,i...)
   ispace...,itime,iparam = i
-  ispace′ = getindex.(space_indices(s),ispace)
   itime′ = getindex(time_indices(s),itime)
-  iparam′ = getindex(param_indices(s),iparam)
-  setindex!(s.snaps,v,ispace′,itime′,iparam′)
+  iparam′ = getindex(RBSteady.param_indices(s),iparam)
+  setindex!(s.snaps,v,ispace,itime′,iparam′)
 end
 
-function RBSteady.select_snapshots(
-  s::AbstractTransientSnapshots,
-  spacerange::Tuple{Vararg{AbstractUnitRange}},
-  timerange::AbstractUnitRange,
-  paramrange::AbstractUnitRange)
-
-  indices = (spacerange,timerange,paramrange)
-  TransientSnapshotsAtIndices(s,indices)
+function RBSteady.select_snapshots(s::TransientSnapshotsAtIndices,trange,prange)
+  old_trange,old_prange = s.indices
+  @check intersect(old_trange,trange) == trange
+  @check intersect(old_prange,prange) == prange
+  TransientSnapshotsAtIndices(s.snaps,trange,prange)
 end
 
-function RBSteady.select_snapshots(s::AbstractTransientSnapshots,spacerange,timerange,paramrange)
-  srange = Tuple.(format_range(spacerange,num_space_dofs(s)))
-  trange = format_range(timerange,num_params(s))
-  prange = format_range(paramrange,num_params(s))
-  select_snapshots(s,srange,trange,prange)
+function RBSteady.select_snapshots(s::AbstractTransientSnapshots,trange,prange)
+  trange = RBSteady.format_range(trange,num_times(s))
+  prange = RBSteady.format_range(prange,num_params(s))
+  TransientSnapshotsAtIndices(s,trange,prange)
 end
 
-function RBSteady.select_snapshots(
-  s::AbstractTransientSnapshots,
-  timerange,
-  paramrange;
-  spacerange=Base.OneTo.(num_space_dofs(s)))
-
-  select_snapshots(s,spacerange,timerange,paramrange)
+function RBSteady.select_snapshots(s::AbstractTransientSnapshots,prange;trange=Base.OneTo(num_times(s)))
+  select_snapshots(s,trange,prange)
 end
 
-function RBSteady.select_snapshots(
-  s::AbstractTransientSnapshots,
-  paramrange;
-  spacerange=Base.OneTo.(num_space_dofs(s)),
-  timerange=Base.OneTo(num_times(s)))
+function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange)
+  _getindex(s::TransientBasicSnapshots,is,it,ip) = s.data[ip+(it-1)*num_params(s)][is]
+  _getindex(s::TransientSnapshots,is,it,ip) = s.data[it][ip][is]
 
-  select_snapshots(s,spacerange,timerange,paramrange)
-end
+  @assert length(srange) == length(trange)
 
-function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,spacerange,timerange)
-  ss = select_snapshots(s,spacerange,timerange,Base.OneTo(num_params(s)))
-  data = collect(ss)
-  return ArrayOfArrays(data)
+  T = eltype(s)
+  nval = length(srange)
+  np = num_params(s)
+  entries = array_of_similar_arrays(zeros(T,nval),np)
+
+  @inbounds for ip = 1:np
+    vip = entries.data[ip]
+    for (i,(is,it)) in enumerate(zip(srange,trange))
+      vip[i] = _getindex(s,is,it,ip)
+    end
+  end
+
+  return entries
 end
 
 const TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
@@ -211,8 +236,8 @@ function ParamDataStructures.recast(s::TransientSparseSnapshots,a::AbstractMatri
   return recast(A,a)
 end
 
-const StandardTransientSnapshots{T,L,I,R} = AbstractTransientSnapshots{T,3,L,1,I,R}
-const StandardTransientSparseSnapshots{T,L,I,R,A<:MatrixOfSparseMatricesCSC} = TransientSparseSnapshots{T,3,L,1,I,R,A}
+const UnfoldingTransientSnapshots{T,L,I<:TrivialIndexMap,R} = AbstractTransientSnapshots{T,3,L,1,I,R}
+const UnfoldingTransientSparseSnapshots{T,L,I<:TrivialIndexMap,R,A} = TransientSparseSnapshots{T,3,L,1,I,R,A}
 
 abstract type ModeAxes end
 struct Mode1Axes <: ModeAxes end
@@ -221,7 +246,7 @@ struct Mode2Axes <: ModeAxes end
 change_mode(::Mode1Axes) = Mode2Axes()
 change_mode(::Mode2Axes) = Mode1Axes()
 
-struct ModeTransientSnapshots{M<:ModeAxes,T,L,I,R,A<:StandardTransientSnapshots{T,L,I,R}} <: StandardTransientSnapshots{T,L,I,R}
+struct ModeTransientSnapshots{M<:ModeAxes,T,L,I,R,A<:UnfoldingTransientSnapshots{T,L,I,R}} <: AbstractTransientSnapshots{T,2,L,1,I,R}
   snaps::A
   mode::M
 end
@@ -235,23 +260,43 @@ function RBSteady.flatten_snapshots(s::AbstractTransientSnapshots)
   ModeTransientSnapshots(s′)
 end
 
-change_mode(s::StandardTransientSnapshots) = ModeTransientSnapshots(s,change_mode(get_mode(s)))
+RBSteady.num_space_dofs(s::ModeTransientSnapshots) = prod(num_space_dofs(s.snaps))
+ParamDataStructures.get_values(s::ModeTransientSnapshots) = get_values(s.snaps)
+RBSteady.get_realization(s::ModeTransientSnapshots) = get_realization(s.snaps)
 
-get_mode(s::StandardTransientSnapshots) = Mode1Axes()
+change_mode(s::UnfoldingTransientSnapshots) = ModeTransientSnapshots(s,change_mode(get_mode(s)))
+
+get_mode(s::UnfoldingTransientSnapshots) = Mode1Axes()
 get_mode(s::ModeTransientSnapshots) = s.mode
 
-Base.@propagate_inbounds function Base.getindex(s::ModeTransientSnapshots,irow,icol)
+Base.@propagate_inbounds function Base.getindex(s::ModeTransientSnapshots,irow::Integer,icol::Integer)
   @boundscheck checkbounds(s,irow,icol)
   islow = slow_index(icol,num_params(s))
   ifast = fast_index(icol,num_params(s))
   getindex(s.snaps,irow,islow,ifast)
 end
 
-Base.@propagate_inbounds function Base.setindex!(s::ModeTransientSnapshots,v,irow,icol)
+Base.@propagate_inbounds function Base.setindex!(s::ModeTransientSnapshots,v,irow::Integer,icol::Integer)
   @boundscheck checkbounds(s,irow,icol)
   islow = slow_index(icol,num_params(s))
   ifast = fast_index(icol,num_params(s))
   setindex!(s.snaps,v,irow,islow,ifast)
+end
+
+function RBSteady.select_snapshots_entries(s::UnfoldingTransientSnapshots,srange,trange)
+  _getindex(s::TransientBasicSnapshots,is,it,ip) = s.data[ip+(it-1)*num_params(s)][is]
+  _getindex(s::TransientSnapshots,is,it,ip) = s.data[it][ip][is]
+
+  T = eltype(s)
+  nval = length(srange),length(trange)
+  np = num_params(s)
+  entries = array_of_similar_arrays(zeros(T,nval),np)
+
+  @inbounds for ip = 1:np, (i,it) = enumerate(trange)
+    entries.data[ip][:,i] = _getindex(s,srange,it,ip)
+  end
+
+  return entries
 end
 
 const Mode1TransientSnapshots{T,L,I,R,A} = ModeTransientSnapshots{Mode1Axes,T,L,I,R,A}
@@ -265,9 +310,9 @@ Base.size(s::Mode2TransientSnapshots) = (num_times(s),num_space_dofs(s)*num_para
 _compress(s,a,X::AbstractMatrix) = a'*X*s
 _compress(s,a,args...) = a'*s
 
-function compress(s::Mode1TransientSnapshots,a::AbstractMatrix,args...;change_mode=true)
-  s′ = _compress(s,a,args...)
-  if change_mode
+function compress(s::Mode1TransientSnapshots,a::AbstractMatrix,args...;swap_mode=true)
+  s′ = _compress(collect(s),a,args...)
+  if swap_mode
     s′ = change_mode(s′,num_params(s))
   end
   return s′
