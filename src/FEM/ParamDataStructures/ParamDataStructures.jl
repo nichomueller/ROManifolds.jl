@@ -21,6 +21,8 @@ import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
 import SparseArrays.getcolptr
 
+import Mabla.FEM.IndexMaps: fast_index,slow_index
+
 export AbstractParamRealization
 export ParamRealization
 export TransientParamRealization
@@ -102,6 +104,7 @@ export TupOfArrayContribution
 export contribution
 export get_values
 export get_parent
+export order_triangulations
 include("Contribution.jl")
 
 # include("LazyMaps.jl")

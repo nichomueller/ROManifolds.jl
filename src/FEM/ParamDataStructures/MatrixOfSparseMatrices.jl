@@ -116,7 +116,8 @@ end
 
 function recast(A::MatrixOfSparseMatricesCSC,a::AbstractMatrix)
   @check size(a,1) == size(A.data,1)
-  B = map(v -> recast(A,v),collect(eachcol(a)))
+  item = param_getindex(A,1)
+  B = map(v -> recast(item,v),collect.(eachcol(a)))
   return MatrixOfSparseMatricesCSC(B)
 end
 

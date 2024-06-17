@@ -129,3 +129,28 @@ using Gridap.ODEs
 red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
 op = get_algebraic_operator(feop)
 reduced_operator(rbsolver,op,red_trial,red_test,fesnaps)
+
+pop = PODOperator(op,red_trial,red_test)
+
+smdeim = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
+jacs,ress = jacobian_and_residual(rbsolver,pop,smdeim)
+combine = (x,y) -> θ*x+(1-θ)*y
+# red_jac = reduced_jacobian(rbsolver,pop,jacs)
+basis = reduced_basis(jacs[1][1])
+lu_interp,integration_domain = mdeim(rbsolver.mdeim_style,basis)
+
+# proj_basis = reduce_operator(rbsolver.mdeim_style,basis,get_basis(red_trial),get_basis(red_test);combine)
+b,b_trial,b_test = basis,RBSteady.get_basis(red_trial),RBSteady.get_basis(red_test)
+
+T = Float64
+bs = get_basis_space(b)
+bt = get_basis_time(b)
+bs_trial = get_basis_space(b_trial)
+bt_trial = get_basis_time(b_trial)
+bs_test = get_basis_space(b_test)
+bt_test = get_basis_time(b_test)
+
+T = Float64
+s = num_reduced_dofs(b_test),num_reduced_dofs(b),num_reduced_dofs(b_trial)
+b̂st = Array{T,3}(undef,s)
+b̂t = RBTransient.combine_basis_time(bt,bt_trial,bt_test;combine)

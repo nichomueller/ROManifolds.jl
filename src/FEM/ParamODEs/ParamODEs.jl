@@ -34,13 +34,12 @@ export TransientTrialParamFESpace
 export TransientMultiFieldParamFESpace
 include("TransientTrialParamFESpace.jl")
 
+export ODEParamOperatorType
 export NonlinearParamODE
 export QuasilinearParamODE
 export SemilinearParamODE
 export LinearParamODE
-export AbstractParamOperator
 export ODEParamOperator
-export AbstractParamOperatorWithTrian
 export ODEParamOperatorWithTrian
 export ParamODEOpFromTFEOpCache
 include("ODEParamOperator.jl")

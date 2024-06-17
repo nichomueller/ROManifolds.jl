@@ -291,6 +291,8 @@ ParamDataStructures.realization(odeop::ODEParamOpFromTFEOpWithTrian;kwargs...) =
 ParamSteady.get_fe_operator(odeop::ODEParamOpFromTFEOpWithTrian) = odeop.op
 ODEs.get_num_forms(odeop::ODEParamOpFromTFEOpWithTrian) = get_num_forms(odeop.op)
 ODEs.is_form_constant(odeop::ODEParamOpFromTFEOpWithTrian,k::Integer) = is_form_constant(odeop.op,k)
+ParamSteady.get_vector_index_map(odeop::ODEParamOpFromTFEOpWithTrian) = get_vector_index_map(odeop.op)
+ParamSteady.get_matrix_index_map(odeop::ODEParamOpFromTFEOpWithTrian) = get_matrix_index_map(odeop.op)
 
 function ParamSteady.get_linear_operator(odeop::ODEParamOpFromTFEOpWithTrian)
   ODEParamOpFromTFEOpWithTrian(get_linear_operator(odeop.op))

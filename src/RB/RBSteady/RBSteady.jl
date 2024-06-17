@@ -115,7 +115,7 @@ export AffineDecomposition
 export AffineContribution
 export BlockAffineDecomposition
 export mdeim
-export get_mdeim_indices
+export empirical_interpolation
 export get_integration_domain
 export reduce_triangulation
 export reduced_jacobian

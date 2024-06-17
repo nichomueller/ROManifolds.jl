@@ -51,10 +51,12 @@ num_reduced_space_dofs(a::PODBasis) = size(get_basis_space(a),2)
 
 # TT interface
 
-struct TTSVDCores{D,A<:AbstractVector{<:AbstractArray{D}},I} <: SteadyProjection
+struct TTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I} <: SteadyProjection
   cores::A
   index_map::I
 end
+
+IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
 
 get_cores(a::TTSVDCores) = a.cores
 get_spatial_cores(a::TTSVDCores) = a.cores
@@ -91,6 +93,19 @@ end
 function cores2basis(core::AbstractArray{T,4}) where T
   pcore = permutedims(core,(2,3,1,4))
   return reshape(pcore,size(pcore,1)*size(pcore,2),:)
+end
+
+function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
+  @check size(a,3) == size(b,1)
+  TS = promote_type(T,S)
+  nrows = size(a,2)*size(b,2)
+  ab = zeros(TS,size(a,1),nrows,size(b,3))
+  for i = axes(a,1), j = axes(b,3)
+    for α = axes(a,3)
+      @inbounds @views ab[i,:,j] += kronecker(b[α,:,j],a[i,:,α])
+    end
+  end
+  return ab
 end
 
 # when we multiply two 4-D spatial cores, the result is a 3-D core that stacks

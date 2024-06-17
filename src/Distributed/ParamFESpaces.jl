@@ -51,9 +51,9 @@ function FEM.HomogeneousTrialParamFESpace(f::DistributedSingleFieldFESpace,args.
   DistributedSingleFieldFESpace(spaces,f.gids,vector_types)
 end
 
-function FEM.FESpaceToParamFESpace(f::DistributedSingleFieldFESpace,args...)
+function FEM.TrivialParamFESpace(f::DistributedSingleFieldFESpace,args...)
   spaces = map(f.spaces) do s
-    FESpaceToParamFESpace(s,args...)
+    TrivialParamFESpace(s,args...)
   end
   vector_types = GridapDistributed._find_vector_type(spaces,f.gids)
   DistributedSingleFieldFESpace(spaces,f.gids,vector_types)

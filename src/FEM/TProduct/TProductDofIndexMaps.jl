@@ -61,7 +61,7 @@ function _get_tp_dof_index_map(models::AbstractVector,spaces::AbstractVector,ord
   end
   function _local_dof_map(model,space)
     cell_ids = get_cell_dof_ids(space)
-    dof_maps_1d = _get_dof_map(model,cell_ids,order)
+    dof_maps_1d = _get_dof_index_map(model,cell_ids,order)
     free_dof_maps_1d = dof_maps_1d[findall(dof_maps_1d.>0)]
     return free_dof_maps_1d
   end

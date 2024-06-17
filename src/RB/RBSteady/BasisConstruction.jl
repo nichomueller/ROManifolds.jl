@@ -62,7 +62,7 @@ end
 
 function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;kwargs...)
   cores,weights,ranks,sizes = cache
-  for k in 1:1:length(X.arrays_1d)-1
+  for k in 1:length(X.arrays_1d)-1
     mat_k = reshape(mat,ranks[k]*sizes[k],:)
     U,Σ,V = svd(mat_k)
     rank = truncation(Σ;kwargs...)
@@ -70,10 +70,10 @@ function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;kw
     ranks[k+1] = rank
     mat = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
     cores[k] = reshape(core_k,ranks[k],sizes[k],rank)
-    _weight_array!(weights,cores,X,Val(k))
+    _weight_array!(weights,cores,X,Val{k}())
   end
   XW = _get_norm_matrix_from_weights(X,weights)
-  M = ttsvd!((cores,ranks,sizes),mat,XW;ids_range=1:length(X.arrays_1d),kwargs...)
+  M = ttsvd!((cores,ranks,sizes),mat,XW;ids_range=length(X.arrays_1d),kwargs...)
   return M
 end
 
@@ -145,7 +145,7 @@ end
 
 function _get_norm_matrix_from_weights(norms,weights)
   N_space = length(weights)+1
-  X = _get_norm_matrices(norms,Val(N_space))
+  X = _get_norm_matrices(norms,Val{N_space}())
   W = weights[end]
   @check length(X) == size(W,2)
   iX = first(X)
@@ -156,7 +156,8 @@ function _get_norm_matrix_from_weights(norms,weights)
   @inbounds for k = eachindex(X)
     XW += kron(X[k],W[:,k,:])
   end
-  @fastmath (XW+XW')/2 # needed to eliminate roundoff errors
+  @. XW = (XW+XW')/2 # needed to eliminate roundoff errors
+  return XW
 end
 
 function ttsvd(mat::AbstractArray{T,N},X=nothing;kwargs...) where {T,N}

@@ -9,7 +9,6 @@ struct TProductCellPoint{DS<:DomainStyle,A,B} <: CellDatum
 end
 
 CellData.get_data(f::TProductCellPoint) = f.point
-Base.length(a::TProductCellPoint) = length(a.single_points)
 
 function CellData.get_triangulation(f::TProductCellPoint)
   s1 = first(f.single_points)
@@ -52,10 +51,9 @@ function CellData.get_triangulation(f::TProductCellField)
 end
 
 CellData.DomainStyle(::Type{TProductCellField{DS}}) where DS = DS()
-Base.length(a::TProductCellField) = length(a.single_fields)
 
 function LinearAlgebra.dot(a::TProductCellField,b::TProductCellField)
-  @check length(a) == length(b)
+  @check length(a.single_fields) == length(b.single_fields)
   return sum(map(dot,a.single_fields,b.single_fields))
 end
 
@@ -114,7 +112,6 @@ CellData.get_triangulation(f::TProductFEBasis) = f.trian
 FESpaces.BasisStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = BS
 CellData.DomainStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = DS
 
-
 function Fields.gradient(f::TProductFEBasis)
   dbasis = map(gradient,f.basis)
   trian = get_triangulation(f)
@@ -127,27 +124,27 @@ end
 const TProductCellDatum = Union{TProductFEBasis,TProductCellField}
 
 function Arrays.return_cache(f::TProductCellDatum,x::TProductCellPoint)
-  @assert length(f) == length(x)
+  @assert length(get_data(f)) == length(x.single_points)
   fitem = testitem(get_data(f))
   xitem = testitem(get_data(x))
   c1 = return_cache(fitem,xitem)
   fx1 = evaluate(fitem,xitem)
-  cache = Vector{typeof(c1)}(undef,length(f))
-  array = Vector{typeof(fx1)}(undef,length(f))
+  cache = Vector{typeof(c1)}(undef,length(get_data(f)))
+  array = Vector{typeof(fx1)}(undef,length(get_data(f)))
   return cache,array
 end
 
 function Arrays.evaluate!(_cache,f::TProductCellDatum,x::TProductCellPoint)
   cache,b = _cache
-  @inbounds for i = 1:length(f)
+  @inbounds for i = 1:length(get_data(f))
     b[i] = evaluate!(cache[i],get_data(f)[i],get_data(x)[i])
   end
   return b
 end
 
 function Arrays.return_cache(k::Operation,f::TProductCellDatum...)
-  D = length(first(f))
-  @assert all(map(i -> length(get_data(i)) == D,f))
+  D = length(get_data(first(f)))
+  @assert all(map(fi -> length(get_data(fi)) == D,f))
   fitem = map(testitem,get_data.(f))
   c1 = return_cache(k,fitem...)
   Fill(c1,D),Fill(k,D)

@@ -24,7 +24,7 @@ import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 
 export SingleFieldParamFESpace
-export FESpaceToParamFESpace
+export TrivialParamFESpace
 include("ParamFESpaceInterface.jl")
 
 export MultiFieldParamFESpace
@@ -41,6 +41,8 @@ export MultiFieldParamFEFunction
 include("ParamFEFunction.jl")
 
 export get_param_assembler
+export collect_cell_matrix_for_trian
+export collect_cell_vector_for_trian
 include("ParamAssemblers.jl")
 
 include("ParamBlockAssemblers.jl")

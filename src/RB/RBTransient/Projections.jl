@@ -5,7 +5,7 @@ ParamDataStructures.num_times(a::TransientProjection) = @abstractmethod
 num_reduced_times(a::TransientProjection) = @abstractmethod
 
 RBSteady.num_fe_dofs(a::TransientProjection) = num_space_dofs(a)*num_times(a)
-RBSteady.num_reduced_dofs(a::TransientProjection) = num_reduced_space_dofs(a)*num_reduced_times(a)
+RBSteady.num_reduced_dofs(a::TransientProjection) = RBSteady.num_reduced_space_dofs(a)*num_reduced_times(a)
 
 function RBSteady.Projection(s::UnfoldingTransientSnapshots,args...;kwargs...)
   s′ = flatten_snapshots(s)
@@ -18,7 +18,7 @@ end
 function RBSteady.Projection(s::UnfoldingTransientSparseSnapshots,args...;kwargs...)
   s′ = flatten_snapshots(s)
   basis_space = tpod(s′,args...;kwargs...)
-  compressed_s2 = compress(s′,basis_space,args...;change_mode=true)
+  compressed_s2 = compress(s′,basis_space,args...;swap_mode=true)
   basis_time = tpod(compressed_s2;kwargs...)
   sparse_basis_space = recast(s,basis_space)
   TransientPODBasis(sparse_basis_space,basis_time)
@@ -63,7 +63,7 @@ end
 
 # TT interface
 
-struct TransientTTSVDCores{D,A<:AbstractVector{<:AbstractArray{D}},B<:AbstractArray{3},C<:AbstractMatrix,I} <: TransientProjection
+struct TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},C<:AbstractMatrix,I} <: TransientProjection
   cores_space::A
   core_time::B
   basis_spacetime::C
@@ -79,7 +79,9 @@ function TransientTTSVDCores(
   TransientTTSVDCores(cores_space,core_time,basis_spacetime,index_map)
 end
 
-RBSteady.get_cores(a::TransientTTSVDCores) = (get_get_spatial_cores(a)...,get_temporal_core(a))
+IndexMaps.get_index_map(a::TransientTTSVDCores) = a.index_map
+
+RBSteady.get_cores(a::TransientTTSVDCores) = (get_spatial_cores(a)...,get_temporal_core(a))
 RBSteady.get_spatial_cores(a::TransientTTSVDCores) = a.cores_space
 get_temporal_core(a::TransientTTSVDCores) = a.core_time
 
@@ -87,9 +89,11 @@ RBSteady.get_basis_space(a::TransientTTSVDCores) = cores2basis(get_index_map(a),
 RBSteady.num_space_dofs(a::TransientTTSVDCores) = prod(_num_tot_space_dofs(a))
 RBSteady.num_reduced_space_dofs(a::TransientTTSVDCores) = size(last(get_spatial_cores(a)),3)
 
-get_basis_time(a::TransientTTSVDCores) = cores2basis(get_temporal_cores(a))
-ParamDataStructures.num_times(a::TransientTTSVDCores) = size(get_temporal_cores(a),2)
-num_reduced_times(a::TransientTTSVDCores) = size(get_temporal_cores(a),3)
+get_basis_time(a::TransientTTSVDCores) = cores2basis(get_temporal_core(a))
+ParamDataStructures.num_times(a::TransientTTSVDCores) = size(get_temporal_core(a),2)
+num_reduced_times(a::TransientTTSVDCores) = size(get_temporal_core(a),3)
+
+get_basis_spacetime(a::TransientTTSVDCores) = a.basis_spacetime
 
 _num_tot_space_dofs(a::TransientTTSVDCores{3}) = size.(get_spatial_cores(a),2)
 
@@ -119,6 +123,10 @@ end
 
 function RBSteady._cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,4}) where {S,T}
   @notimplemented "Usually the spatial cores are computed before the temporal ones"
+end
+
+function get_basis_spacetime(index_map::AbstractIndexMap,cores_space,core_time)
+  cores2basis(RBSteady._cores2basis(index_map,cores_space...),core_time)
 end
 
 function ParamDataStructures.recast(x̂::AbstractVector,a::TransientTTSVDCores)

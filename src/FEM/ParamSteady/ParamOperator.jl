@@ -1,12 +1,8 @@
-abstract type ParamOperatorType <: ODEOperatorType end
+abstract type ParamOperatorType end
 
-abstract type NonlinearParamOperatorType <: ParamOperatorType end
-abstract type LinearParamOperatorType <: ParamOperatorType end
-abstract type LinearNonlinearParamOperatorType <: ParamOperatorType end
-
-struct NonlinearParamEq <: NonlinearParamOperatorType end
-struct LinearParamEq <: LinearParamOperatorType end
-struct LinearNonlinearParamEq <: LinearNonlinearParamOperatorType end
+struct NonlinearParamEq <: ParamOperatorType end
+struct LinearParamEq <: ParamOperatorType end
+struct LinearNonlinearParamEq <: ParamOperatorType end
 
 abstract type ParamOperator{T<:ParamOperatorType} <: NonlinearOperator end
 

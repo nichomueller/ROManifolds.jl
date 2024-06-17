@@ -12,7 +12,7 @@ end
 
 function reduced_operator(
   solver::RBSolver,
-  op::PODOperator{LinearNonlinearParamOperatorType},
+  op::PODOperator{LinearNonlinearParamEq},
   s::AbstractSnapshots)
 
   red_op_lin = reduced_operator(solver,get_linear_operator(op),s)
@@ -22,8 +22,8 @@ end
 
 struct PODMDEIMOperator{T} <: RBOperator{T}
   op::PODOperator{T}
-  lhs
-  rhs
+  lhs::ArrayContribution
+  rhs::ArrayContribution
 end
 
 FESpaces.get_trial(op::PODMDEIMOperator) = get_trial(op.op)
@@ -126,9 +126,9 @@ function fe_residual!(
   return bi
 end
 
-struct LinearNonlinearPODMDEIMOperator <: RBOperator{LinearNonlinearParamOperatorType}
-  op_linear::PODMDEIMOperator{LinearParamOperatorType}
-  op_nonlinear::PODMDEIMOperator{NonlinearParamOperatorType}
+struct LinearNonlinearPODMDEIMOperator <: RBOperator{LinearNonlinearParamEq}
+  op_linear::PODMDEIMOperator{LinearParamEq}
+  op_nonlinear::PODMDEIMOperator{NonlinearParamEq}
 end
 
 ParamSteady.get_linear_operator(op::LinearNonlinearPODMDEIMOperator) = op.op_linear
@@ -218,7 +218,7 @@ end
 
 function Algebra.solve(
   solver::RBSolver,
-  op::RBOperator{NonlinearParamOperatorType},
+  op::RBOperator{NonlinearParamEq},
   r::AbstractParamRealization)
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"

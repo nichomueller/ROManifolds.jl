@@ -11,6 +11,7 @@ using Gridap.TensorValues
 using Gridap.Helpers
 
 import SparseArrays: AbstractSparseMatrix
+import PartitionedArrays: tuple_of_arrays
 
 export recast_indices
 export sparsify_indices

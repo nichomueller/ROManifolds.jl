@@ -78,6 +78,8 @@ FESpaces.get_dirichlet_dof_tag(r::RBSpace) = get_dirichlet_dof_tag(r.space)
 
 FESpaces.get_vector_type(r::RBSpace) = get_vector_type(r.space)
 
+FESpaces.get_dof_value_type(r::RBSpace) = get_dof_value_type(r.space)
+
 function Algebra.allocate_in_domain(r::RBSpace)
   zero_free_values(r)
 end

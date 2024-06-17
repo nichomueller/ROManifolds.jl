@@ -1,3 +1,5 @@
+# general nonlinear case
+
 function get_stage_operator(
   solver::ThetaMethod,
   odeop::ODEParamOperator,

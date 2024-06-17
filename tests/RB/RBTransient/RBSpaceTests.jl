@@ -1,10 +1,25 @@
 using LinearAlgebra
+using BlockArrays
+using SparseArrays
 using Plots
 using Test
+using DrWatson
+
 using Gridap
+using Gridap.FESpaces
 using Gridap.Helpers
+
 using Mabla.FEM
+using Mabla.FEM.IndexMaps
+using Mabla.FEM.TProduct
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamSteady
+using Mabla.FEM.ParamODEs
+
 using Mabla.RB
+using Mabla.RB.RBSteady
+using Mabla.RB.RBTransient
 
 ns = 100
 nt = 10
@@ -13,77 +28,122 @@ pranges = fill([0,1],3)
 tdomain = 0:1:10
 ptspace = TransientParamSpace(pranges,tdomain)
 r = realization(ptspace,nparams=np)
+v = [ParamArray([rand(ns) for _ = 1:np]) for _ = 1:nt]
 
-v = [rand(ns) for i = 1:np*nt]
-a = ParamArray(v)
-s = Snapshots(a,r)
-Us,Ss,Vs = svd(s)
-s2 = RB.change_mode(s)
-Us2,Ss2,Vs2 = svd(s2)
+X̃ = sprand(Float64,ns,ns,0.5)
+X′ = (X̃ + X̃') / 2
+X = X′'*X′ / norm(X′)^2
 
-w = [v[(i-1)*np+1:i*np] for i = 1:nt]
-b = ParamArray.(w)
-t = Snapshots(b,r)
-Ut,St,Vt = svd(t)
-t2 = RB.change_mode(t)
-Ut2,St2,Vt2 = svd(t2)
+# case 1
+i = TrivialIndexMap(LinearIndices((ns,)))
+s = Snapshots(v,i,r)
+basis = Projection(s,X)
 
-A = stack(v)
-UA,SA,VA = svd(A)
-x = map(1:np) do ip
-  hcat(v[ip:np:nt*np]...)'
-end
-B = hcat(x...)
-UB,SB,VB = svd(B)
+bs = get_basis_space(basis)
+bt = get_basis_time(basis)
+s1 = flatten_snapshots(s)
+s2 = RBTransient.change_mode(s1)
 
-@check Ut ≈ Us ≈ UA
-@check St ≈ Ss ≈ SA
-@check Ut2 ≈ Us2 ≈ UB
-@check St2 ≈ Ss2 ≈ SB
+@check norm(bs*bs'*X*s1 - s1)/sqrt(ns) ≤ 1e-12
+@check norm(bt*bt'*s2 - s2)/sqrt(nt) ≤ 1e-12
+@check norm(bs'*X*bs - I) ≤ 1e-12
+@check norm(bt'*bt - I) ≤ 1e-12
 
-v1 = A[:,rand(axes(A,2))]
-w1 = B[:,rand(axes(B,2))]
+# case 2
+nsx,nxy = 10,10
+i = IndexMap(collect(LinearIndices((nsx,nxy))))
+s = Snapshots(v,i,r)
+basis = Projection(s)
 
-@check norm(UA*UA'*v1 - v1)/sqrt(ns) ≤ 1e-12
-@check norm(UB*UB'*w1 - w1)/sqrt(nt) ≤ 1e-12
+bs = get_basis_space(basis)
+bt = get_basis_time(basis)
+s1 = flatten_snapshots(s)
+s2 = RBTransient.change_mode(s1)
+bst = RBTransient.get_basis_spacetime(basis)
 
-nparts = 2
-nrowsA = floor(Int,ns/nparts)
-A_parts = [A[(i-1)*nrows+1:i*nrows,:] for i = 1:nparts]
-v1_parts = [v1[(i-1)*nrows+1:i*nrows] for i = 1:nparts]
+s12 = map(eachslice(s;dims=4)) do s
+  vec(collect(s))
+end |> stack
 
-UA_parts = map(A_parts) do A
-  U,V,S = svd(A)
-  U
-end
+@check norm(bst'*bst - I) ≤ 1e-12
+@check norm(bst*bst'*s12 - s12)/sqrt(ns) ≤ 1e-12
 
-solA = hcat(UA[:,1],vcat(map(x->x[:,1],UA_parts)...))
-plot(solA)
+# FEM problem
 
-v1_rec_parts = map(UA_parts,v1_parts) do U,v1
-  U*U'*v1
-end
+θ = 0.5
+dt = 0.01
+t0 = 0.0
+tf = 0.05
 
-@check norm(vcat(v1_rec_parts...) - v1)/sqrt(ns) ≤ 1e-12
+pranges = fill([1,10],3)
+tdomain = t0:dt:tf
+ptspace = TransientParamSpace(pranges,tdomain)
+
+domain = (0,1,0,1)
+partition = (5,5)
+model = TProductModel(domain,partition)
+
+order = 1
+degree = 2*order
+Ω = Triangulation(model)
+dΩ = Measure(Ω,degree)
+
+a(x,μ,t) = 1+exp(-sin(t)^2*x[1]/sum(μ))
+a(μ,t) = x->a(x,μ,t)
+aμt(μ,t) = TransientParamFunction(a,μ,t)
+
+f(x,μ,t) = 1.
+f(μ,t) = x->f(x,μ,t)
+fμt(μ,t) = TransientParamFunction(f,μ,t)
+
+g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
+g(μ,t) = x->g(x,μ,t)
+gμt(μ,t) = TransientParamFunction(g,μ,t)
+
+u0(x,μ) = 0
+u0(μ) = x->u0(x,μ)
+u0μ(μ) = ParamFunction(u0,μ)
+
+stiffness(μ,t,u,v) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
+mass(μ,t,uₜ,v) = ∫(v*uₜ)dΩ
+rhs(μ,t,v) = ∫(fμt(μ,t)*v)dΩ
+res(μ,t,u,v) = mass(μ,t,∂t(u),v) + stiffness(μ,t,u,v) - rhs(μ,t,v)
+
+induced_norm(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
+
+reffe = ReferenceFE(lagrangian,Float64,order)
+test = TestFESpace(model,reffe;conformity=:H1)
+trial = TransientTrialParamFESpace(test,gμt)
+feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,trial,test)
+uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
+fesolver = ThetaMethod(LUSolver(),dt,θ)
+
+ϵ = 1e-4
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
+
+fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
+X = assemble_norm_matrix(feop)
+
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+basis = RBSteady.get_basis(red_test)
+bs = RBTransient.get_basis_space(basis)
+
+@check bs ≈ cores2basis(RBSteady.get_spatial_cores(basis)...)
+@check norm(bs'*X*bs - I) ≤ 1e-12
+
+u = get_values(fesnaps)
+r = get_realization(fesnaps)
+op = get_algebraic_operator(feop)
+cache = allocate_odecache(fesolver,op,r,(u,))
+A,_ = jacobian_and_residual(fesolver,op,r,(u,),cache)
+iA = get_matrix_index_map(feop)
+sA = Snapshots(A,iA,r)
+basis = reduced_basis(sA)
+
+lu_interp,integration_domain = mdeim(SpaceTimeMDEIM(),basis)
 
 # supremizer check
-using Gridap
-using Gridap.FESpaces
-using ForwardDiff
-using BlockArrays
-using LinearAlgebra
-using Test
-using Gridap.Algebra
-using Gridap.ODEs
-using Gridap.ODEs.TransientFETools
-using Gridap.ODEs.ODETools
-using Gridap.Helpers
-using Gridap.Fields
-using Gridap.MultiField
-using BlockArrays
-using DrWatson
-using Mabla.FEM
-using Mabla.RB
 
 θ = 1
 dt = 0.01

@@ -37,7 +37,7 @@ function reduce_operator(
   bs_trial = get_basis_space(b_trial)
   bs_test = get_basis_space(b_test)
 
-  T = promote_type(eltype(bs),eltype(bs_test))
+  T = promote_type(eltype(bs_trial),eltype(bs_test))
   s = num_reduced_space_dofs(b_test),num_reduced_space_dofs(b),num_reduced_space_dofs(b_trial)
   b̂s = Array{T,3}(undef,s)
 

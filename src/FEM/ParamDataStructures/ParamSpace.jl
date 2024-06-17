@@ -1,8 +1,3 @@
-@inline slow_index(i,N::Integer) = cld.(i,N)
-@inline slow_index(i::Colon,::Integer) = i
-@inline fast_index(i,N::Integer) = mod.(i .- 1,N) .+ 1
-@inline fast_index(i::Colon,::Integer) = i
-
 abstract type AbstractParamRealization end
 
 struct ParamRealization{P<:AbstractVector} <: AbstractParamRealization

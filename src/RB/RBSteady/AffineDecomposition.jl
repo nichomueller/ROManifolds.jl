@@ -1,6 +1,6 @@
 # OFFLINE PHASE
 
-function get_mdeim_indices(A::AbstractMatrix)
+function empirical_interpolation(A::AbstractMatrix)
   m,n = size(A)
   res = zeros(eltype(A),m)
   I = zeros(Int32,n)
@@ -14,8 +14,14 @@ function get_mdeim_indices(A::AbstractMatrix)
       I[i] = argmax(abs.(res))
     end
   end
+  Ai = view(A,I,:)
+  return I,Ai
+end
 
-  return I
+function empirical_interpolation(A::MatrixOfSparseMatricesCSC)
+  I,Ai = empirical_interpolation(A.data)
+  I′ = recast_indices(I,param_getindex(A,1))
+  return I′,Ai
 end
 
 abstract type AbstractIntegrationDomain end
@@ -101,12 +107,11 @@ function allocate_result(solver::RBSolver,test::RBSpace)
 end
 
 function allocate_result(solver::RBSolver,trial::RBSpace,test::RBSpace)
-  V = get_vector_type(test)
-  M = Matrix{eltype(V)}
+  T = get_dof_value_type(test)
   nfree_trial = num_free_dofs(trial)
   nfree_test = num_free_dofs(test)
   nparams = num_online_params(solver)
-  kronprod = allocate_matrix(M,nfree_test,nfree_trial)
+  kronprod = allocate_matrix(Matrix{T},nfree_test,nfree_trial)
   result = array_of_similar_arrays(kronprod,nparams)
   return result
 end
@@ -125,11 +130,9 @@ get_indices_space(a::AffineDecomposition) = get_indices_space(get_integration_do
 
 function mdeim(mdeim_style::MDEIMStyle,b::SteadyProjection)
   basis_space = get_basis_space(b)
-  indices_space = get_mdeim_indices(basis_space)
-  recast_indices_space = recast_indices(indices_space,basis_space)
-  interp_basis_space = view(basis_space,indices_space,:)
+  indices_space,interp_basis_space = empirical_interpolation(basis_space)
   lu_interp = lu(interp_basis_space)
-  integration_domain = IntegrationDomain(recast_indices_space)
+  integration_domain = IntegrationDomain(indices_space)
   return lu_interp,integration_domain
 end
 

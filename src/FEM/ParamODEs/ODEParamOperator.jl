@@ -1,11 +1,12 @@
-struct NonlinearParamODE <: NonlinearParamOperatorType end
-struct QuasilinearParamODE <: LinearParamOperatorType end
-struct SemilinearParamODE <: LinearParamOperatorType end
-struct LinearParamODE <: LinearParamOperatorType end
-struct LinearNonlinearParamODE <: LinearNonlinearParamOperatorType end
+abstract type ODEParamOperatorType <: ODEOperatorType end
+struct NonlinearParamODE <: ODEParamOperatorType end
+abstract type AbstractLinearParamODE <: ODEParamOperatorType end
+struct QuasilinearParamODE <: AbstractLinearParamODE end
+struct SemilinearParamODE <: AbstractLinearParamODE end
+struct LinearParamODE <: AbstractLinearParamODE end
+struct LinearNonlinearParamODE <: ODEParamOperatorType end
 
-abstract type ODEParamOperator{T<:ParamOperatorType} <: ODEOperator{T} end
-const AbstractParamOperator{T} = Union{ParamOperator{T},ODEParamOperator{T}}
+abstract type ODEParamOperator{T<:ODEParamOperatorType} <: ODEOperator{T} end
 
 function ODEs.allocate_odeopcache(
   odeop::ODEParamOperator,
@@ -108,8 +109,7 @@ mutable struct ParamODEOpFromTFEOpCache <: GridapType
   const_forms
 end
 
-abstract type ODEParamOperatorWithTrian{T<:ParamOperatorType} <: ODEParamOperator{T} end
-const AbstractParamOperatorWithTrian{T} = Union{ParamOperatorWithTrian{T},ODEParamOperatorWithTrian{T}}
+abstract type ODEParamOperatorWithTrian{T<:ODEParamOperatorType} <: ODEParamOperator{T} end
 
 function Algebra.residual!(
   b::Contribution,
@@ -152,7 +152,7 @@ function Algebra.jacobian!(
   ws::Tuple{Vararg{Real}},
   odeopcache)
 
-  fillstored!(A,zero(eltype(A)))
+  LinearAlgebra.fillstored!(A,zero(eltype(A)))
   jacobian_add!(A,odeop,r,us,ws,odeopcache)
   A
 end

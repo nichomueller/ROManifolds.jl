@@ -8,8 +8,8 @@ function RBSteady.reduce_operator(
   bs_test = get_basis_space(b_test)
   bt_test = get_basis_time(b_test)
 
-  T = promote_type(eltype(bs),eltype(bs_test))
-  b̂st = Vector{Vector{Vector{T}}}(undef,num_reduced_space_dofs(b))
+  T = eltype(bs_test)
+  b̂st = Vector{Vector{Vector{T}}}(undef,RBSteady.num_reduced_space_dofs(b))
 
   b̂s = bs_test'*bs
   @inbounds for i = eachindex(b̂st)
@@ -33,8 +33,8 @@ function RBSteady.reduce_operator(
   bs_test = get_basis_space(b_test)
   bt_test = get_basis_time(b_test)
 
-  T = promote_type(eltype(bs),eltype(bs_test))
-  b̂st = Vector{Vector{Matrix{T}}}(undef,num_reduced_space_dofs(b))
+  T = promote_type(eltype(bs_trial),eltype(bs_test))
+  b̂st = Vector{Vector{Matrix{T}}}(undef,RBSteady.num_reduced_space_dofs(b))
 
   b̂t = combine_basis_time(bt_trial,bt_test;kwargs...)
 
@@ -57,7 +57,7 @@ function RBSteady.reduce_operator(
   bs_test = get_basis_space(b_test)
   bt_test = get_basis_time(b_test)
 
-  T = promote_type(eltype(bs),eltype(bs_test))
+  T = eltype(bs_test)
   s = num_reduced_dofs(b_test),num_reduced_dofs(b)
   b̂st = Matrix{T}(undef,s)
 
@@ -82,16 +82,16 @@ function RBSteady.reduce_operator(
   bs_test = get_basis_space(b_test)
   bt_test = get_basis_time(b_test)
 
-  T = promote_type(eltype(bs),eltype(bs_test))
+  T = promote_type(eltype(bs_trial),eltype(bs_test))
   s = num_reduced_dofs(b_test),num_reduced_dofs(b),num_reduced_dofs(b_trial)
   b̂st = Array{T,3}(undef,s)
 
   b̂t = combine_basis_time(bt,bt_trial,bt_test;kwargs...)
 
-  @inbounds for is = 1:num_reduced_space_dofs(b)
+  @inbounds for is = 1:RBSteady.num_reduced_space_dofs(b)
     b̂si = bs_test'*param_getindex(bs,is)*bs_trial
     for it = 1:num_reduced_times(b)
-      ist = (it-1)*num_reduced_space_dofs(b)+is
+      ist = (it-1)*RBSteady.num_reduced_space_dofs(b)+is
       b̂ti = b̂t[:,it,:]
       b̂st[:,ist,:] .= kronecker(b̂ti,b̂si)
     end
@@ -148,7 +148,7 @@ function combine_basis_time(B::AbstractMatrix,C::AbstractMatrix;combine=(x,y)->x
   nt_row = size(C,2)
   nt_col = size(B,2)
 
-  T = eltype(B)
+  T = eltype(C)
   bt_proj = zeros(T,time_ndofs,nt_row,nt_col)
   bt_proj_shift = copy(bt_proj)
   @inbounds for jt = 1:nt_col, it = 1:nt_row
@@ -164,8 +164,8 @@ function combine_basis_time(A::AbstractMatrix,B::AbstractMatrix,C::AbstractMatri
   nt_row = size(C,2)
   nt_col = size(B,2)
 
-  T = eltype(A)
-  bt_proj = zeros(T,nt_row,nt_col)
+  T = promote_type(eltype(B),eltype(C))
+  bt_proj = zeros(T,nt_row,nt,nt_col)
   bt_proj_shift = copy(bt_proj)
   @inbounds for q = 1:nt, jt = 1:nt_col, it = 1:nt_row
     bt_proj[it,q,jt] = sum(C[:,it].*A[:,q].*B[:,jt])

@@ -1,7 +1,7 @@
 function reduced_operator(
   solver::RBSolver,
-  feop::T,
-  s::AbstractSnapshots) where T
+  feop::ParamFEOperator,
+  s::AbstractSnapshots)
 
   red_trial,red_test = reduced_fe_space(solver,feop,s)
   op = get_algebraic_operator(feop)
@@ -10,19 +10,19 @@ end
 
 function reduced_operator(
   solver::RBSolver,
-  op::T,
+  op::ParamFEOperator,
   trial::RBSpace,
   test::RBSpace,
-  s::AbstractSnapshots) where T
+  s::AbstractSnapshots)
 
   pop = PODOperator(op,trial,test)
   reduced_operator(solver,pop,s)
 end
 
-abstract type RBOperator{T<:ParamOperatorType} <: NonlinearOperator end
+abstract type RBOperator{T<:ParamOperatorType} <: ParamOperatorWithTrian{T} end
 
 struct PODOperator{T} <: RBOperator{T}
-  op::AbstractParamOperatorWithTrian{T}
+  op::ParamOperatorWithTrian{T}
   trial::RBSpace
   test::RBSpace
 end
@@ -108,13 +108,8 @@ function Algebra.jacobian!(
   return Snapshots(A,i,r)
 end
 
-function jacobian_and_residual(
-  solver::RBSolver,
-  op::RBOperator,
-  r::AbstractParamRealization,
-  s::AbstractSnapshots)
-
-  jacobian_and_residual(get_fe_solver(solver),op.op,r,s)
+function jacobian_and_residual(solver::RBSolver,op::RBOperator,s::AbstractSnapshots)
+  jacobian_and_residual(get_fe_solver(solver),op.op,s)
 end
 
 function jacobian_and_residual(fesolver::FESolver,op::ParamOperator,s::AbstractSnapshots)
@@ -127,7 +122,7 @@ function jacobian_and_residual(fesolver::FESolver,op::ParamOperator,s::AbstractS
 end
 
 function jacobian_and_residual(::FESolver,op::ParamOperator,r::ParamRealization,u::AbstractVector)
-  pcache = allocate_odecache(fesolver,op,r,u)
+  pcache = allocate_paramcache(fesolver,op,r,u)
   A = jacobian(op,r,u,pcache)
   b = residual(op,r,u,pcache)
   return A,b

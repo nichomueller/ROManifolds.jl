@@ -8,7 +8,7 @@ struct TransientIntegrationDomain{S<:AbstractVector,T<:AbstractVector} <: Abstra
   indices_time::T
 end
 
-get_indices_space(i::TransientIntegrationDomain) = i.indices_space
+RBSteady.get_indices_space(i::TransientIntegrationDomain) = i.indices_space
 get_indices_time(i::TransientIntegrationDomain) = i.indices_time
 
 function RBSteady.allocate_coefficient(
@@ -28,8 +28,7 @@ const TransientAffineDecomposition{A,B,C<:TransientIntegrationDomain,D,E} = Affi
 get_indices_time(a::TransientAffineDecomposition) = get_indices_time(get_integration_domain(a))
 
 function _time_indices_and_interp_matrix(::SpaceTimeMDEIM,interp_basis_space,basis_time)
-  indices_time = get_mdeim_indices(basis_time)
-  interp_basis_time = view(basis_time,indices_time,:)
+  indices_time,interp_basis_time = empirical_interpolation(basis_time)
   interp_basis_space_time = kronecker(interp_basis_time,interp_basis_space)
   lu_interp = lu(interp_basis_space_time)
   return indices_time,lu_interp
@@ -44,20 +43,18 @@ end
 function RBSteady.mdeim(mdeim_style::MDEIMStyle,b::TransientPODBasis)
   basis_space = get_basis_space(b)
   basis_time = get_basis_time(b)
-  indices_space = get_mdeim_indices(basis_space)
-  recast_indices_space = recast_indices(indices_space,basis_space)
-  interp_basis_space = view(basis_space,indices_space,:)
+  indices_space,interp_basis_space = empirical_interpolation(basis_space)
   indices_time,lu_interp = _time_indices_and_interp_matrix(mdeim_style,interp_basis_space,basis_time)
-  integration_domain = TransientIntegrationDomain(recast_indices_space,indices_time)
+  integration_domain = TransientIntegrationDomain(indices_space,indices_time)
   return lu_interp,integration_domain
 end
 
 function RBSteady.mdeim(mdeim_style::MDEIMStyle,b::TransientTTSVDCores)
   basis_spacetime = get_basis_spacetime(b)
-  indices_spacetime = get_mdeim_indices(basis_spacetime)
+  indices_spacetime,interp_basis_spacetime = empirical_interpolation(basis_spacetime)
   indices_space = fast_index(indices_spacetime,num_space_dofs(b))
   indices_time = slow_index(indices_spacetime,num_space_dofs(b))
-  lu_interp = lu(view(basis_spacetime,indices_spacetime,:))
+  lu_interp = lu(interp_basis_spacetime)
   integration_domain = TransientIntegrationDomain(indices_space,indices_time)
   return lu_interp,integration_domain
 end

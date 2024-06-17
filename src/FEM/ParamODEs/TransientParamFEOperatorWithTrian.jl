@@ -1,6 +1,6 @@
 # interface to accommodate the separation of terms depending on the triangulation
 
-abstract type TransientParamFEOperatorWithTrian{T<:ParamOperatorType} <: TransientParamFEOperator{T} end
+abstract type TransientParamFEOperatorWithTrian{T<:ODEParamOperatorType} <: TransientParamFEOperator{T} end
 
 function FESpaces.get_algebraic_operator(feop::TransientParamFEOperatorWithTrian)
   ODEParamOpFromTFEOpWithTrian(feop)

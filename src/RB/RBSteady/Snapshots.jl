@@ -11,6 +11,16 @@ function Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractParamRealizat
   @abstractmethod
 end
 
+function Snapshots(a::ArrayContribution,i::AbstractIndexMap,r::AbstractParamRealization)
+  contribution(a.trians) do trian
+    Snapshots(a[trian],i,r)
+  end
+end
+
+function RBSteady.Snapshots(a::TupOfArrayContribution,i::AbstractIndexMap,r::AbstractParamRealization)
+  map(a->Snapshots(a,i,r),a)
+end
+
 function IndexMaps.change_index_map(f,s::AbstractSnapshots)
   index_map′ = change_index_map(f,get_index_map(s))
   Snapshots(s,index_map′,get_realization(s))
@@ -145,8 +155,7 @@ end
 const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = BasicSnapshots{T,N,L,D,I,R,A}
 
 function ParamDataStructures.recast(s::SparseSnapshots,a::AbstractMatrix)
-  A = param_getindex(s.data,1)
-  return recast(A,a)
+  return recast(s.data,a)
 end
 
 const UnfoldingSnapshots{T,L,I,R} = AbstractSnapshots{T,2,L,1,I,R}

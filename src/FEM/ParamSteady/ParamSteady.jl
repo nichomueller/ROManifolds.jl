@@ -38,9 +38,6 @@ export ParamMultiFieldFESpace
 include("ParamTrialFESpace.jl")
 
 export ParamOperatorType
-export NonlinearParamOperatorType
-export LinearParamOperatorType
-export LinearNonlinearParamOperatorType
 export NonlinearParamEq
 export LinearParamEq
 export LinearNonlinearParamEq

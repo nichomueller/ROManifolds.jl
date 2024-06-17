@@ -99,6 +99,10 @@ end
   A
 end
 
+function Algebra.add_entry!(combine::Function,A::MatrixOfSparseMatricesCSC,v::Number,i,j)
+  add_entry!(combine,A,ParamNumber(fill(v,param_length(A))),i,j)
+end
+
 function Algebra.add_entry!(combine::Function,A::MatrixOfSparseMatricesCSC,v::ParamNumber,i,j)
   k = nz_index(A,i,j)
   nz = nonzeros(A)

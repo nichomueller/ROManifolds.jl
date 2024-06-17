@@ -6,9 +6,9 @@ function RBSteady.ttsvd(mat::AbstractTransientSnapshots{T,N},X=nothing;kwargs...
   sizes = size(mat)
   cache = cores,ranks,sizes
   # routine on the spatial indexes
-  M = ttsvd!(cache,mat,X;ids_range=1:N-2,kwargs...)
+  M = RBSteady.ttsvd!(cache,mat,X;ids_range=1:N-2,kwargs...)
   # routine on the temporal index
-  _ = ttsvd!(cache,M;ids_range=N-1,kwargs...)
+  _ = RBSteady.ttsvd!(cache,M;ids_range=N-1,kwargs...)
   return cores
 end
 
@@ -19,8 +19,8 @@ function RBSteady.ttsvd(mat::AbstractTransientSnapshots{T,N},X::AbstractTProduct
   ranks = fill(1,N)
   sizes = size(mat)
   # routine on the spatial indexes
-  M = ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;kwargs...)
+  M = RBSteady.ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;kwargs...)
   # routine on the temporal index
-  _ = ttsvd!((cores,ranks,sizes),M;ids_range=N_space+1,kwargs...)
+  _ = RBSteady.ttsvd!((cores,ranks,sizes),M;ids_range=N_space+1,kwargs...)
   return cores
 end

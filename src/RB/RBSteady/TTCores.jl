@@ -19,15 +19,15 @@ function SparseCore(
   SparseCoreCSC(array,sparsity,CartesianIndex.(irows,icols))
 end
 
-Base.size(a::SparseCoreCSC) = (size(a.array,1),ParamFESpaces.num_rows(a.sparsity),
-  ParamFESpaces.num_cols(a.sparsity),size(a.array,3))
+Base.size(a::SparseCoreCSC) = (size(a.array,1),IndexMaps.num_rows(a.sparsity),
+  IndexMaps.num_cols(a.sparsity),size(a.array,3))
 
 function Base.getindex(a::SparseCoreCSC,i::CartesianIndex{4})
   is_nnz = CartesianIndex(i.I[2:3]) ∈ a.sparse_indexes
   if is_nnz
     sparse_getindex(a,i)
   else
-    zero(T)
+    zero(eltype(a))
   end
 end
 

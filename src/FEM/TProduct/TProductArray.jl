@@ -10,8 +10,15 @@ Base.@propagate_inbounds _map_getindex(imap::TProductIndexMap,i::Int) = (imap[i]
 Base.@propagate_inbounds _map_getindex(imap::TProductIndexMap,jmap::TProductIndexMap,i::Int,j::Int) = (imap[i],jmap[j])
 
 Base.@propagate_inbounds function Base.getindex(a::AbstractTProductArray{T,N},i::Vararg{Integer,N}) where {T,N}
+  @boundscheck checkbounds(a,i...)
   i′ = _map_getindex(get_index_map(a)...,i...)
   getindex(a.array,i′...)
+end
+
+Base.@propagate_inbounds function Base.setindex!(a::AbstractTProductArray{T,N},v,i::Vararg{Integer,N}) where {T,N}
+  @boundscheck checkbounds(a,i...)
+  i′ = _map_getindex(get_index_map(a)...,i...)
+  setindex!(a.array,v,i′...)
 end
 
 Base.fill!(a::AbstractTProductArray,v) = fill!(get_array(a),v)
@@ -70,6 +77,7 @@ struct TProductArray{T,N,A,I} <: AbstractTProductArray{T,N}
 end
 
 Arrays.get_array(a::TProductArray) = a.array
+get_index_map(a::TProductArray) = a.index_map
 
 function TProductArray(arrays_1d::Vector{A},index_map::NTuple) where A
   array::A = _kron(arrays_1d...)
@@ -321,6 +329,9 @@ struct TProductGradientArray{T,N,A,I} <: AbstractTProductArray{T,N}
     new{T,N,A,I}(array,arrays_1d,gradients_1d,index_map)
   end
 end
+
+Arrays.get_array(a::TProductGradientArray) = a.array
+get_index_map(a::TProductGradientArray) = a.index_map
 
 function TProductGradientArray(arrays_1d::Vector{A},gradients_1d::Vector{A},index_map...) where A
   array::A = kronecker_gradients(arrays_1d,gradients_1d)

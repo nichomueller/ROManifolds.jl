@@ -24,7 +24,7 @@ function contribution!(a,f,trians)
 end
 
 function Base.getindex(a::Contribution,trian::Triangulation...)
-  perm = find_permutation(trian,a.trians)
+  perm = find_trian_permutation(trian,a.trians)
   getindex(a,perm...)
 end
 
@@ -224,13 +224,13 @@ function merge_triangulations(trians)
   view(parent,uindices)
 end
 
-function find_permutation(a,b)
+function find_trian_permutation(a,b)
   compare(a,b) = a == b || is_parent(a,b)
   map(a -> findfirst(b -> compare(a,b),b),a)
 end
 
 function order_triangulations(tparents,tchildren)
   @check length(tparents) == length(tchildren)
-  iperm = find_permutation(tparents,tchildren)
+  iperm = find_trian_permutation(tparents,tchildren)
   map(iperm->tchildren[iperm],iperm)
 end

@@ -36,7 +36,7 @@ FESpaces.get_triangulation(f::TProductFESpace) = get_triangulation(f.space)
 
 FESpaces.get_free_dof_ids(f::TProductFESpace) = get_free_dof_ids(f.space)
 
-FESpaces.get_vector_type(f::TProductFESpace) = f.vector_type
+FESpaces.get_vector_type(f::TProductFESpace) = get_vector_type(f.space)
 
 FESpaces.get_dof_value_type(f::TProductFESpace) = get_dof_value_type(f.space)
 

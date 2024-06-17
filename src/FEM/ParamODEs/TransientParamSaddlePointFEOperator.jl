@@ -58,7 +58,7 @@ function TransientParamLinearFEOpFromWeakForm(
   return saddlep_op
 end
 
-struct TransientParamSaddlePointFEOp{T<:ParamOperatorType} <: TransientParamFEOperator{T}
+struct TransientParamSaddlePointFEOp{T<:ODEParamOperatorType} <: TransientParamFEOperator{T}
   op::TransientParamFEOperator{T}
   coupling::Function
 end

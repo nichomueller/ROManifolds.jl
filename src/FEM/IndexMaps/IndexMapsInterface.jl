@@ -56,14 +56,15 @@ boundary conditions.
 
 function free_dofs_map(i::AbstractIndexMap)
   free_dofs_locations = findall(i.>zero(eltype(i)))
-  view(i,free_dofs_locations)
+  s = _shape_per_dir(free_dofs_locations)
+  free_dofs_locations′ = reshape(free_dofs_locations,s)
+  view(i,free_dofs_locations′)
 end
 
 """
     dirichlet_dofs_map(i::AbstractIndexMap) -> AbstractVector
 
-Removes the positive indices from the index map, which correspond to Dirichlet
-boundary conditions.
+Removes the positive indices from the index map, which correspond to free dofs.
 """
 
 function dirichlet_dofs_map(i::AbstractIndexMap)
@@ -89,7 +90,7 @@ Returns an index map given by f∘i, where f is a function encoding an index map
 """
 
 function change_index_map(f,i::AbstractIndexMap)
-  i′::AbstractIndexMap = f(collect(i))
+  i′::AbstractIndexMap = f(vec(collect(i)))
   i′
 end
 
@@ -100,6 +101,14 @@ end
 function fix_dof_index_map(i::AbstractIndexMap,dof_to_fix::Integer)
   FixedDofIndexMap(i,dof_to_fix)
 end
+
+"""
+    TrivialIndexMap{Ti,I<:AbstractVector{Ti}} <: AbstractIndexMap{1,Ti}
+
+Represents an index map that does not change the indexing strategy of the FEM function.
+In other words, this is simply a wrapper for a LinearIndices list. In the case of sparse
+matrices, the indices in a TrivialIndexMap are those of the nonzero elements.
+"""
 
 struct TrivialIndexMap{Ti,I<:AbstractVector{Ti}} <: AbstractIndexMap{1,Ti}
   indices::I
@@ -117,43 +126,47 @@ struct IndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
 end
 
 Base.size(i::IndexMap) = size(i.indices)
-Base.getindex(i::IndexMap,j...) = getindex(i.indices,j...)
+Base.getindex(i::IndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 
-struct IndexMapView{D,Ti,I,L} <: AbstractIndexMap{D,Ti}
+struct IndexMapView{D,Ti,I<:AbstractIndexMap{D,Ti},L} <: AbstractIndexMap{D,Ti}
   indices::I
   locations::L
-  function IndexMapView(indices::I,locations::L) where {D,Ti,I<:AbstractIndexMap{D,Ti},L}
+  function IndexMapView(indices::I,locations::L) where {I,L}
+    msg = "The index map and the view locations must have the same dimension"
+    @check ndims(indices) == ndims(locations) msg
+    D = ndims(indices)
+    Ti = eltype(indices)
     new{D,Ti,I,L}(indices,locations)
   end
 end
 
-Base.size(i::IndexMapView) = _shape_per_dir(i.locations)
-Base.getindex(i::IndexMapView,j::Integer) = i.indices[i.locations[j]]
+Base.size(i::IndexMapView) = size(i.locations)
+Base.getindex(i::IndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.locations[j...]]
 
-struct FixedDofIndexMap{D,Ti,I} <: AbstractIndexMap{D,Ti}
+struct FixedDofIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
   indices::I
-  dof_to_fix::Int
-  function FixedDofIndexMap(indices::I,dof_to_fix::Int) where {D,Ti,I<:AbstractIndexMap{D,Ti}}
-    new{D,Ti,I}(indices,dof_to_fix)
-  end
+  dof_to_fix::CartesianIndex{D}
+end
+
+function FixedDofIndexMap(indices::AbstractIndexMap,dof_to_fix::Integer)
+  FixedDofIndexMap(indices,CartesianIndices(size(indices))[dof_to_fix])
 end
 
 Base.size(i::FixedDofIndexMap) = size(i.indices)
-Base.getindex(i::FixedDofIndexMap,j::Integer) = fixed_getindex(Val(j==i.dof_to_fix),i.indices,j)
-fixed_getindex(::Val{false},i::AbstractArray,j::Int) = getindex(i,j)
-fixed_getindex(::Val{true},i::AbstractArray,j::Int) = -one(eltype(i))
+
+function Base.getindex(i::FixedDofIndexMap{D},j::Vararg{Integer,D}) where D
+  if CartesianIndex(j) == i.dof_to_fix
+    getindex(i.indices,j...)
+  else
+    -one(eltype(i))
+  end
+end
 
 Base.view(i::FixedDofIndexMap,locations) = FixedDofIndexMap(IndexMapView(i.indices,locations),i.dof_to_fix)
 
-struct TProductIndexMap{D,Ti,I} <: AbstractIndexMap{D,Ti}
+struct TProductIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
   indices::I
   indices_1d::Vector{Vector{Ti}}
-  function TProductIndexMap(
-    indices::I,
-    indices_1d::Vector{Vector{Ti}}
-    ) where {D,Ti,I<:AbstractIndexMap{D,Ti}}
-    new{D,Ti,I}(indices,indices_1d)
-  end
 end
 
 function TProductIndexMap(indices::AbstractArray,indices_1d::AbstractVector{<:AbstractVector})
@@ -161,7 +174,7 @@ function TProductIndexMap(indices::AbstractArray,indices_1d::AbstractVector{<:Ab
 end
 
 Base.size(i::TProductIndexMap) = size(i.indices)
-Base.getindex(i::TProductIndexMap,j::Integer) = getindex(i.indices,j...)
+Base.getindex(i::TProductIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 get_tp_indices(i::TProductIndexMap) = i.indices
 get_univariate_indices(i::TProductIndexMap) = i.indices_1d
 
@@ -177,7 +190,7 @@ struct SparseIndexMap{D,Ti,A,B} <: AbstractIndexMap{D,Ti}
 end
 
 Base.size(i::SparseIndexMap) = size(i.indices)
-Base.getindex(i::SparseIndexMap,j...) = getindex(i.indices,j...)
+Base.getindex(i::SparseIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 get_index_map(i::SparseIndexMap) = i.indices
 get_sparsity(i::SparseIndexMap) = get_sparsity(i.sparsity)
 get_univariate_sparsity(i::SparseIndexMap) = get_univariate_sparsity(i.sparsity)

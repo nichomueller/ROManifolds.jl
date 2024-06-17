@@ -147,23 +147,23 @@ end
 # This artifact aims to make a FESpace behave like a ParamFESpace with free and
 # dirichlet values being ParamArrays of length L
 
-struct FESpaceToParamFESpace{S,L} <: SingleFieldParamFESpace
+struct TrivialParamFESpace{S,L} <: SingleFieldParamFESpace
   space::S
-  FESpaceToParamFESpace(space::S,::Val{L}) where {S,L} = new{S,L}(space)
+  TrivialParamFESpace(space::S,::Val{L}) where {S,L} = new{S,L}(space)
 end
 
-FESpaceToParamFESpace(space::FESpace,plength::Integer) = FESpaceToParamFESpace(space,Val{plength}())
+TrivialParamFESpace(space::FESpace,plength::Integer) = TrivialParamFESpace(space,Val{plength}())
 
-ParamDataStructures.param_length(f::FESpaceToParamFESpace{S,L}) where {S,L} = L
+ParamDataStructures.param_length(f::TrivialParamFESpace{S,L}) where {S,L} = L
 ParamDataStructures.to_param_quantity(f::SingleFieldParamFESpace,plength::Integer) = f
-ParamDataStructures.to_param_quantity(f::SingleFieldFESpace,plength::Integer) = FESpaceToParamFESpace(f,Val{plength}())
-ParamDataStructures.param_getindex(f::FESpaceToParamFESpace,index::Integer) = f.space
+ParamDataStructures.to_param_quantity(f::SingleFieldFESpace,plength::Integer) = TrivialParamFESpace(f,Val{plength}())
+ParamDataStructures.param_getindex(f::TrivialParamFESpace,index::Integer) = f.space
 
-FESpaces.ConstraintStyle(::Type{<:FESpaceToParamFESpace{S}}) where S = ConstraintStyle(S)
+FESpaces.ConstraintStyle(::Type{<:TrivialParamFESpace{S}}) where S = ConstraintStyle(S)
 
 # Extend some of Gridap's functions when needed
 function FESpaces.FEFunction(
-  f::FESpaceToParamFESpace{<:ZeroMeanFESpace},
+  f::TrivialParamFESpace{<:ZeroMeanFESpace},
   free_values::AbstractParamVector,
   dirichlet_values::AbstractParamVector)
 
@@ -179,38 +179,38 @@ function FESpaces.FEFunction(
     fv_i .+= c
     dv_i .+= c
   end
-  f′ = FESpaceToParamFESpace(zf.space,param_length(f))
+  f′ = TrivialParamFESpace(zf.space,param_length(f))
   FEFunction(f′,fv,dv)
 end
 
-function FESpaces.EvaluationFunction(f::FESpaceToParamFESpace{<:ZeroMeanFESpace},free_values)
+function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:ZeroMeanFESpace},free_values)
   zf = f.space
-  f′ = FESpaceToParamFESpace(zf.space,param_length(f))
+  f′ = TrivialParamFESpace(zf.space,param_length(f))
   FEFunction(f′,free_values)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceToParamFESpace{<:TrialFESpace},
+  f::TrivialParamFESpace{<:TrialFESpace},
   fv::AbstractParamVector,
   dv::AbstractParamVector)
 
   tf = f.space
-  f′ = FESpaceToParamFESpace(tf.space,param_length(f))
+  f′ = TrivialParamFESpace(tf.space,param_length(f))
   scatter_free_and_dirichlet_values(f′,fv,dv)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceToParamFESpace{<:ZeroMeanFESpace},
+  f::TrivialParamFESpace{<:ZeroMeanFESpace},
   fv::AbstractParamVector,
   dv::AbstractParamVector)
 
   zf = f.space
-  f′ = FESpaceToParamFESpace(zf.space,param_length(f))
+  f′ = TrivialParamFESpace(zf.space,param_length(f))
   scatter_free_and_dirichlet_values(f′,fv,dv)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceToParamFESpace{<:FESpaceWithConstantFixed{T}},
+  f::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
   free_values::AbstractParamVector,
   dirichlet_values::AbstractParamVector
   ) where T<:FESpaces.FixConstant
@@ -225,12 +225,12 @@ function FESpaces.scatter_free_and_dirichlet_values(
     fv_i .= FESpaces.VectorWithEntryInserted(fv_i,ff.dof_to_fix,dv_i[1])
     dv_i .= similar(dv_i,eltype(dv_i),0)
   end
-  f′ = FESpaceToParamFESpace(ff.space,param_length(f))
+  f′ = TrivialParamFESpace(ff.space,param_length(f))
   FEFunction(f′,fv,dv)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceToParamFESpace{<:FESpaceWithConstantFixed{T}},
+  f::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
   free_values::AbstractParamVector,
   dirichlet_values::AbstractParamVector
   ) where T<:FESpaces.DoNotFixConstant

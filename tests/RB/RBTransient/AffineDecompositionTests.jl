@@ -65,7 +65,7 @@ mdeim_style = RB.SpaceTimeMDEIM()#RB.SpaceOnlyMDEIM()
 basis_space,basis_time = RB.reduced_basis(snaps_biform)
 @check size(basis_space,2) == 1 && size(basis_time,2) == 1
 
-indices_space = RB.get_mdeim_indices(basis_space)
+indices_space = RB.empirical_interpolation(basis_space)
 interp_basis_space = view(basis_space,indices_space,:)
 @check length(indices_space) == 1 && indices_space[1] == argmax(abs.(_A.nzval))
 
@@ -110,7 +110,7 @@ mdeim_style = RB.SpaceTimeMDEIM() # RB.SpaceOnlyMDEIM() #
 basis_space,basis_time = RB.reduced_basis(snaps_liform)
 @check size(basis_space,2) == 1 && size(basis_time,2) == 1
 
-indices_space = RB.get_mdeim_indices(basis_space)
+indices_space = RB.empirical_interpolation(basis_space)
 interp_basis_space = view(basis_space,indices_space,:)
 @check length(indices_space) == 1 && indices_space[1] == argmax(abs.(_b))
 

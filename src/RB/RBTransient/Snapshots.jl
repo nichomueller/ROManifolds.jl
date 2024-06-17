@@ -231,13 +231,19 @@ const TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union
   TransientSnapshots{T,N,L,D,I,R,A},
 }
 
-function ParamDataStructures.recast(s::TransientSparseSnapshots,a::AbstractMatrix)
-  A = param_getindex(s.data,1)
-  return recast(A,a)
+function ParamDataStructures.recast(s::TransientSparseSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T
+  index_map = get_index_map(s)
+  ls = IndexMaps.get_univariate_sparsity(index_map)
+  asparse = map(SparseCore,a,ls)
+  return asparse
 end
 
 const UnfoldingTransientSnapshots{T,L,I<:TrivialIndexMap,R} = AbstractTransientSnapshots{T,3,L,1,I,R}
-const UnfoldingTransientSparseSnapshots{T,L,I<:TrivialIndexMap,R,A} = TransientSparseSnapshots{T,3,L,1,I,R,A}
+const UnfoldingTransientSparseSnapshots{T,L,I<:TrivialIndexMap,R,A<:MatrixOfSparseMatricesCSC} = TransientSparseSnapshots{T,3,L,1,I,R,A}
+
+function ParamDataStructures.recast(s::UnfoldingTransientSparseSnapshots,a::AbstractMatrix)
+  return recast(s.data,a)
+end
 
 abstract type ModeAxes end
 struct Mode1Axes <: ModeAxes end
@@ -252,7 +258,7 @@ struct ModeTransientSnapshots{M<:ModeAxes,T,L,I,R,A<:UnfoldingTransientSnapshots
 end
 
 function ModeTransientSnapshots(s::AbstractTransientSnapshots)
-  ModeTransientSnapshots(s,Mode1Axes())
+  ModeTransientSnapshots(s,get_mode(s))
 end
 
 function RBSteady.flatten_snapshots(s::AbstractTransientSnapshots)
@@ -265,23 +271,10 @@ ParamDataStructures.get_values(s::ModeTransientSnapshots) = get_values(s.snaps)
 RBSteady.get_realization(s::ModeTransientSnapshots) = get_realization(s.snaps)
 
 change_mode(s::UnfoldingTransientSnapshots) = ModeTransientSnapshots(s,change_mode(get_mode(s)))
+change_mode(s::ModeTransientSnapshots) = ModeTransientSnapshots(s.snaps,change_mode(get_mode(s)))
 
 get_mode(s::UnfoldingTransientSnapshots) = Mode1Axes()
 get_mode(s::ModeTransientSnapshots) = s.mode
-
-Base.@propagate_inbounds function Base.getindex(s::ModeTransientSnapshots,irow::Integer,icol::Integer)
-  @boundscheck checkbounds(s,irow,icol)
-  islow = slow_index(icol,num_params(s))
-  ifast = fast_index(icol,num_params(s))
-  getindex(s.snaps,irow,islow,ifast)
-end
-
-Base.@propagate_inbounds function Base.setindex!(s::ModeTransientSnapshots,v,irow::Integer,icol::Integer)
-  @boundscheck checkbounds(s,irow,icol)
-  islow = slow_index(icol,num_params(s))
-  ifast = fast_index(icol,num_params(s))
-  setindex!(s.snaps,v,irow,islow,ifast)
-end
 
 function RBSteady.select_snapshots_entries(s::UnfoldingTransientSnapshots,srange,trange)
   _getindex(s::TransientBasicSnapshots,is,it,ip) = s.data[ip+(it-1)*num_params(s)][is]
@@ -304,6 +297,34 @@ const Mode2TransientSnapshots{T,L,I,R,A} = ModeTransientSnapshots{Mode2Axes,T,L,
 
 Base.size(s::Mode1TransientSnapshots) = (num_space_dofs(s),num_times(s)*num_params(s))
 Base.size(s::Mode2TransientSnapshots) = (num_times(s),num_space_dofs(s)*num_params(s))
+
+Base.@propagate_inbounds function Base.getindex(s::Mode1TransientSnapshots,ispace::Integer,icol::Integer)
+  @boundscheck checkbounds(s,ispace,icol)
+  itime = slow_index(icol,num_params(s))
+  iparam = fast_index(icol,num_params(s))
+  getindex(s.snaps,ispace,itime,iparam)
+end
+
+Base.@propagate_inbounds function Base.setindex!(s::Mode1TransientSnapshots,v,ispace::Integer,icol::Integer)
+  @boundscheck checkbounds(s,ispace,icol)
+  itime = slow_index(icol,num_params(s))
+  iparam = fast_index(icol,num_params(s))
+  setindex!(s.snaps,v,ispace,itime,iparam)
+end
+
+Base.@propagate_inbounds function Base.getindex(s::Mode2TransientSnapshots,itime::Integer,icol::Integer)
+  @boundscheck checkbounds(s,itime,icol)
+  ispace = slow_index(icol,num_params(s))
+  iparam = fast_index(icol,num_params(s))
+  getindex(s.snaps,ispace,itime,iparam)
+end
+
+Base.@propagate_inbounds function Base.setindex!(s::Mode2TransientSnapshots,v,itime::Integer,icol::Integer)
+  @boundscheck checkbounds(s,itime,icol)
+  ispace = slow_index(icol,num_params(s))
+  iparam = fast_index(icol,num_params(s))
+  setindex!(s.snaps,v,ispace,itime,iparam)
+end
 
 # compression operation
 

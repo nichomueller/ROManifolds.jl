@@ -2,7 +2,7 @@
 A parametric version of the `Gridap` `TransientFEOperator`
 """
 
-abstract type TransientParamFEOperator{T<:ParamOperatorType} <: TransientFEOperator{T} end
+abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: TransientFEOperator{T} end
 
 function FESpaces.get_algebraic_operator(op::TransientParamFEOperator)
   ODEParamOpFromTFEOp(op)
