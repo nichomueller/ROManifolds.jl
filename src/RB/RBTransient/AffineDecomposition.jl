@@ -75,7 +75,7 @@ end
 
 function RBSteady.reduced_jacobian(
   solver::ThetaMethodRBSolver,
-  op::RBOperator,
+  op::TransientRBOperator,
   contribs::Tuple{Vararg{Any}})
 
   fesolver = get_fe_solver(solver)
@@ -90,6 +90,8 @@ end
 
 # ONLINE PHASE
 
+const TupOfAffineContribution = Tuple{Vararg{AffineContribution{T}}} where T
+
 function RBSteady.coefficient!(
   a::TransientAffineDecomposition{<:ReducedAlgebraicOperator{T}},
   b::AbstractParamArray
@@ -100,7 +102,7 @@ function RBSteady.coefficient!(
   ldiv!(coefficient,mdeim_interpolation,vec(b))
 end
 
-function RBSteady.mdeim_result(a::TupOfArrayContribution,b::TupOfArrayContribution)
+function RBSteady.mdeim_result(a::TupOfAffineContribution,b::TupOfArrayContribution)
   sum(map(mdeim_result,a,b))
 end
 

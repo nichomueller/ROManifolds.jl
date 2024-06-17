@@ -172,56 +172,32 @@ function reduced_form(
   return ad,red_trian
 end
 
-function reduced_residual(
-  solver::RBSolver,
-  op::RBOperator,
-  s::AbstractSnapshots,
-  trian::Triangulation)
-
+function reduced_residual(solver::RBSolver,op,s::AbstractSnapshots,trian::Triangulation)
   test = get_test(op)
   reduced_form(solver,s,trian,test)
 end
 
-function reduced_jacobian(
-  solver::RBSolver,
-  op::RBOperator,
-  s::AbstractSnapshots,
-  trian::Triangulation;
-  kwargs...)
-
+function reduced_jacobian(solver::RBSolver,op,s::AbstractSnapshots,trian::Triangulation;kwargs...)
   trial = get_trial(op)
   test = get_test(op)
   reduced_form(solver,s,trian,trial,test;kwargs...)
 end
 
-function reduced_residual(
-  solver::RBSolver,
-  op::RBOperator,
-  c::ArrayContribution)
-
+function reduced_residual(solver::RBSolver,op,c::ArrayContribution)
   a,trians = map(get_domains(c),get_values(c)) do trian,values
     reduced_residual(solver,op,values,trian)
   end |> tuple_of_arrays
   return Contribution(a,trians)
 end
 
-function reduced_jacobian(
-  solver::RBSolver,
-  op::RBOperator,
-  c::ArrayContribution;
-  kwargs...)
-
+function reduced_jacobian(solver::RBSolver,op,c::ArrayContribution;kwargs...)
   a,trians = map(get_domains(c),get_values(c)) do trian,values
     reduced_jacobian(solver,op,values,trian;kwargs...)
   end |> tuple_of_arrays
   return Contribution(a,trians)
 end
 
-function reduced_jacobian_residual(
-  solver::RBSolver,
-  op::RBOperator,
-  s::AbstractSnapshots)
-
+function reduced_jacobian_residual(solver::RBSolver,op,s::AbstractSnapshots)
   smdeim = select_snapshots(s,mdeim_params(solver))
   jac,res = jacobian_and_residual(solver,op,smdeim)
   red_jac = reduced_jacobian(solver,op,jac)

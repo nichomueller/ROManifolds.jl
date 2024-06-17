@@ -136,6 +136,10 @@ function compress_cores(core::TTSVDCores,bases::TTSVDCores...;kwargs...)
   _dropdims(ccore)
 end
 
+function Base.:*(a::ReducedVectorOperator,b::AbstractVector)
+  return sum([a.basis[:,q]*b[q] for q = eachindex(b)])
+end
+
 function Base.:*(a::ReducedMatrixOperator,b::AbstractVector)
   return sum([a.basis[:,q,:]*b[q] for q = eachindex(b)])
 end

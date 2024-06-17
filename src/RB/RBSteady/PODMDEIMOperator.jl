@@ -22,8 +22,8 @@ end
 
 struct PODMDEIMOperator{T} <: RBOperator{T}
   op::PODOperator{T}
-  lhs::ArrayContribution
-  rhs::ArrayContribution
+  lhs
+  rhs
 end
 
 FESpaces.get_trial(op::PODMDEIMOperator) = get_trial(op.op)

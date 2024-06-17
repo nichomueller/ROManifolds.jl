@@ -10,7 +10,7 @@ end
 
 function reduced_operator(
   solver::RBSolver,
-  op::ParamFEOperator,
+  op::ParamOperator,
   trial::RBSpace,
   test::RBSpace,
   s::AbstractSnapshots)

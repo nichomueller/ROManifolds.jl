@@ -22,8 +22,8 @@ end
 
 struct TransientPODMDEIMOperator{T} <: TransientRBOperator{T}
   op::TransientPODOperator{T}
-  lhs::TupOfArrayContribution
-  rhs::ArrayContribution
+  lhs
+  rhs
 end
 
 FESpaces.get_trial(op::TransientPODMDEIMOperator) = get_trial(op.op)
@@ -112,23 +112,23 @@ function _select_fe_space_at_time_locations(fs::TrivialParamFESpace,indices)
 end
 
 function _select_fe_space_at_time_locations(fs::SingleFieldParamFESpace,indices)
-  dvi = ParamArray(fs.dirichlet_values[indices])
+  dvi = ParamArray(fs.dirichlet_values.data[indices])
   TrialParamFESpace(dvi,fs.space)
 end
 
-function _select_cache_at_time_locations(us::Tuple{Vararg{AbstractParamVector}},odeopcache,indices)
+function _select_odecache_at_time_locations(us::Tuple{Vararg{AbstractParamVector}},odeopcache,indices)
   @unpack Us,Uts,tfeopcache,const_forms = odeopcache
   new_xhF = ()
   new_Us = ()
   for i = eachindex(us)
     new_Us = (new_Us...,_select_fe_space_at_time_locations(Us[i],indices))
-    new_xhF = (new_xhF...,us[i][indices])
+    new_xhF = (new_xhF...,ParamArray(us[i].data[indices]))
   end
   new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_odeopcache
 end
 
-function _select_cache_at_time_locations(us::Tuple{Vararg{BlockVectorOfVectors}},odeopcache,indices)
+function _select_odecache_at_time_locations(us::Tuple{Vararg{BlockVectorOfVectors}},odeopcache,indices)
   @unpack Us,Uts,tfeopcache,const_forms = odeopcache
   new_xhF = ()
   new_Us = ()
@@ -138,29 +138,51 @@ function _select_cache_at_time_locations(us::Tuple{Vararg{BlockVectorOfVectors}}
     style = spacei.multi_field_style
     spacesi = [_select_fe_space_at_time_locations(spaceij,indices) for spaceij in spacei]
     new_Us = (new_Us...,MultiFieldParamFESpace(VT,spacesi,style))
-    new_xhF = (new_xhF...,ParamArray(us[i][indices]))
+    new_xhF = (new_xhF...,ParamArray(us[i].data[indices]))
   end
   new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_odeopcache
+end
+
+function _select_cache_at_time_locations(b::ArrayOfArrays,indices)
+  ArrayOfArrays(b.data[indices])
+end
+
+function _select_cache_at_time_locations(A::MatrixOfSparseMatricesCSC,indices)
+  MatrixOfSparseMatricesCSC(A.m,A.n,A.colptr,A.rowval,A.data[:,indices])
+end
+
+function _select_cache_at_time_locations(cache::ArrayContribution,indices)
+  contribution(cache.trians) do trian
+    _select_cache_at_time_locations(cache[trian],indices)
+  end
+end
+
+function _select_cache_at_time_locations(cache::TupOfArrayContribution,indices)
+  red_cache = ()
+  for c in cache
+    red_cache = (red_cache...,_select_cache_at_time_locations(c,indices))
+  end
+  return red_cache
 end
 
 function _select_indices_at_time_locations(red_times;nparams=1)
   vec(transpose((red_times.-1)*nparams .+ collect(1:nparams)'))
 end
 
-function _select_fe_quantities_at_time_locations(a,r,us,odeopcache)
+function _select_fe_quantities_at_time_locations(cache,a,r,us,odeopcache)
   red_times = union_reduced_times(a)
   red_r = r[:,red_times]
   indices = _select_indices_at_time_locations(red_times;nparams=num_params(r))
-  red_xhF,red_odeopcache = _select_cache_at_time_locations(us,odeopcache,indices)
-  return red_r,red_times,red_xhF,red_odeopcache
+  red_cache = _select_cache_at_time_locations(cache,indices)
+  red_xhF,red_odeopcache = _select_odecache_at_time_locations(us,odeopcache,indices)
+  return red_cache,red_r,red_times,red_xhF,red_odeopcache
 end
 
 function _select_snapshots_at_space_time_locations(s,a,red_times)
-  ids_space = get_indices_space(a)
+  ids_space = RBSteady.get_indices_space(a)
   ids_time::Vector{Int} = filter(!isnothing,indexin(get_indices_time(a),red_times))
-  srev = reverse_snapshots(s)
-  select_snapshots_entries(srev,ids_space,ids_time)
+  select_snapshots_entries(s,ids_space,ids_time)
 end
 
 function _select_snapshots_at_space_time_locations(
@@ -178,8 +200,9 @@ function RBSteady.fe_jacobian!(
   ws::Tuple{Vararg{Real}},
   odeopcache)
 
-  red_r,red_times,red_us,red_odeopcache = _select_fe_quantities_at_time_locations(op.lhs,r,us,odeopcache)
-  A = jacobian!(cache,op.op,red_r,red_us,ws,red_odeopcache)
+  red_cache,red_r,red_times,red_us,red_odeopcache = _select_fe_quantities_at_time_locations(
+    cache,op.lhs,r,us,odeopcache)
+  A = jacobian!(red_cache,op.op,red_r,red_us,ws,red_odeopcache)
   Ai = map(A,op.lhs) do A,lhs
     _select_snapshots_at_space_time_locations(A,lhs,red_times)
   end
@@ -193,8 +216,9 @@ function RBSteady.fe_residual!(
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache)
 
-  red_r,red_times,red_us,red_odeopcache = _select_fe_quantities_at_time_locations(op.rhs,r,us,odeopcache)
-  b = residual!(cache,op.op,red_r,red_us,red_odeopcache)
+  red_cache,red_r,red_times,red_us,red_odeopcache = _select_fe_quantities_at_time_locations(
+    cache,op.rhs,r,us,odeopcache)
+  b = residual!(red_cache,op.op,red_r,red_us,red_odeopcache)
   bi = _select_snapshots_at_space_time_locations(b,op.rhs,red_times)
   return bi
 end
@@ -306,7 +330,7 @@ end
 # Solve a POD-MDEIM problem
 
 function Algebra.solve(solver::RBSolver,op::TransientRBOperator,s::AbstractTransientSnapshots)
-  son = select_snapshots(s,online_params(solver))
+  son = select_snapshots(s,RBSteady.online_params(solver))
   ron = get_realization(son)
   solve(solver,op,ron)
 end

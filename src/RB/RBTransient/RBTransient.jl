@@ -65,6 +65,8 @@ include("Projections.jl")
 export TransientRBSpace
 include("RBSpace.jl")
 
+export TransientRBOperator
+export TransientPODOperator
 include("PODOperator.jl")
 
 export combine_basis_time
@@ -74,6 +76,8 @@ export TransientIntegrationDomain
 export TransientAffineDecomposition
 include("AffineDecomposition.jl")
 
+export TransientPODMDEIMOperator
+export LinearNonlinearTransientPODMDEIMOperator
 include("PODMDEIMOperator.jl")
 
 include("PostProcess.jl")

@@ -154,3 +154,40 @@ T = Float64
 s = num_reduced_dofs(b_test),num_reduced_dofs(b),num_reduced_dofs(b_trial)
 b̂st = Array{T,3}(undef,s)
 b̂t = RBTransient.combine_basis_time(bt,bt_trial,bt_test;combine)
+
+using Gridap.Algebra
+using Gridap.FESpaces
+using Gridap.ODEs
+
+op = rbop
+son = select_snapshots(fesnaps,RBSteady.online_params(rbsolver))
+r = get_realization(son)
+red_trial = get_trial(op)(r)
+fe_trial = get_fe_trial(op)(r)
+x̂ = zero_free_values(red_trial)
+y = zero_free_values(fe_trial)
+odecache = allocate_odecache(fesolver,op,r,(y,))
+
+sysslvr = fesolver.sysslvr
+odeslvrcache,odeopcache = odecache
+reuse,A,b,sysslvrcache = odeslvrcache
+
+us = (y,y)
+ws = (1,1/(dt*θ))
+# stageop = get_stage_operator(fesolver,rbop,r,(y,),odecache)
+bb = residual!(b,rbop,r,us,odeopcache)
+AA = jacobian!(A,rbop,r,us,ws,odeopcache)
+
+# fe_sb = fe_residual!(b,rbop,r,us,odeopcache)
+red_cache,red_r,red_times,red_us,red_odeopcache = RBTransient._select_fe_quantities_at_time_locations(
+  b,rbop.rhs,r,us,odeopcache)
+
+b = residual!(red_cache,rbop.op,red_r,red_us,red_odeopcache)
+
+
+
+
+
+# fe_sA = fe_jacobian!(A,rbop,r,us,ws,odeopcache)
+red_r,red_times,red_us,red_odeopcache = RBTransient._select_fe_quantities_at_time_locations(rbop.lhs,r,us,odeopcache)
+AA = jacobian!(A,op.op,red_r,red_us,ws,red_odeopcache)

@@ -121,12 +121,24 @@ end
 Base.size(i::TrivialIndexMap) = (length(i.indices),)
 Base.getindex(i::TrivialIndexMap,j::Integer) = getindex(i.indices,j)
 
+"""
+    IndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
+
+Most standard implementation of an index map.
+"""
+
 struct IndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
   indices::Array{Ti,D}
 end
 
 Base.size(i::IndexMap) = size(i.indices)
 Base.getindex(i::IndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
+
+"""
+    IndexMapView{D,Ti,I<:AbstractIndexMap{D,Ti},L} <: AbstractIndexMap{D,Ti}
+
+Most standard implementation of an index map.
+"""
 
 struct IndexMapView{D,Ti,I<:AbstractIndexMap{D,Ti},L} <: AbstractIndexMap{D,Ti}
   indices::I

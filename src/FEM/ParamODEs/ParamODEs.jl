@@ -36,6 +36,7 @@ include("TransientTrialParamFESpace.jl")
 
 export ODEParamOperatorType
 export NonlinearParamODE
+export AbstractLinearParamODE
 export QuasilinearParamODE
 export SemilinearParamODE
 export LinearParamODE

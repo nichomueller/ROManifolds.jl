@@ -10,7 +10,7 @@ end
 
 function RBSteady.reduced_operator(
   solver::RBSolver,
-  op::TransientParamFEOperator,
+  op::ODEParamOperator,
   trial::RBSpace,
   test::RBSpace,
   s::AbstractTransientSnapshots)
@@ -22,7 +22,7 @@ end
 abstract type TransientRBOperator{T<:ODEParamOperatorType} <: ODEParamOperatorWithTrian{T} end
 
 struct TransientPODOperator{T} <: TransientRBOperator{T}
-  op::ParamOperatorWithTrian{T}
+  op::ODEParamOperatorWithTrian{T}
   trial::RBSpace
   test::RBSpace
 end

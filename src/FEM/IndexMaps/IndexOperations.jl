@@ -10,7 +10,7 @@ function sparsify_indices(indices::AbstractVector,A::AbstractArray)
   return sparse_indices
 end
 
-function get_nonzero_indices(A::AbstractVector)
+function get_nonzero_indices(A::AbstractArray)
   @notimplemented
 end
 
