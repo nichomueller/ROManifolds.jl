@@ -1,3 +1,12 @@
+function DrWatson.save(dir,op::TransientRBOperator)
+  serialize(dir * "/operator.jld",op)
+end
+
+function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...;kwargs...)
+  feop = ParamSteady.get_fe_operator(op)
+  rb_results(solver,feop,args...;kwargs...)
+end
+
 function RBSteady.compute_error(sol::UnfoldingTransientSnapshots,sol_approx::UnfoldingTransientSnapshots,norm_matrix=nothing)
   err_norm = zeros(num_times(sol))
   sol_norm = zeros(num_times(sol))
@@ -5,8 +14,8 @@ function RBSteady.compute_error(sol::UnfoldingTransientSnapshots,sol_approx::Unf
   @inbounds for i = axes(sol,2)
     it = fast_index(i,num_times(sol))
     ip = slow_index(i,num_times(sol))
-    err_norm[it] = _norm(sol[:,i]-sol_approx[:,i],norm_matrix)
-    sol_norm[it] = _norm(sol[:,i],norm_matrix)
+    err_norm[it] = RBSteady._norm(sol[:,i]-sol_approx[:,i],norm_matrix)
+    sol_norm[it] = RBSteady._norm(sol[:,i],norm_matrix)
     if mod(i,num_params(sol)) == 0
       space_time_norm[ip] = norm(err_norm) / norm(sol_norm)
     end

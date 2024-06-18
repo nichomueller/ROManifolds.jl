@@ -145,7 +145,7 @@ function select_snapshots_entries(s::AbstractSteadySnapshots,srange)
   for ip = 1:np
     vip = entries.data[ip]
     for (i,is) in enumerate(srange)
-      vip[i] = s.data[ip][is]
+      vip[i] = param_getindex(s.data,ip)[is]
     end
   end
 

@@ -88,11 +88,7 @@ function compute_speedup(r::RBResults)
   compute_speedup(r.fem_stats,r.rb_stats)
 end
 
-function compute_error(sol::AbstractSnapshots,sol_approx::AbstractSnapshots,args...)
-  @abstractmethod
-end
-
-function compute_error(_sol::AbstractSteadySnapshots,_sol_approx::AbstractSteadySnapshots,args...)
+function compute_error(_sol::AbstractSnapshots,_sol_approx::AbstractSnapshots,args...)
   sol = flatten_snapshots(_sol)
   sol_approx = flatten_snapshots(_sol_approx)
   compute_error(sol,sol_approx,args...)

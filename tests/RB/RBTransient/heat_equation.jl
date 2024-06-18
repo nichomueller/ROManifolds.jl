@@ -20,14 +20,14 @@ tf = 0.1
 pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
-# model_dir = datadir(joinpath("models","elasticity_3cyl2D.json"))
-# model = DiscreteModelFromFile(model_dir)
-domain = (0,1,0,1)
-partition = (5,5)
-model = CartesianDiscreteModel(domain,partition)
-labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
-add_tag_from_tags!(labels,"neumann",[7])
+model_dir = datadir(joinpath("models","elasticity_3cyl2D.json"))
+model = DiscreteModelFromFile(model_dir)
+# domain = (0,1,0,1)
+# partition = (5,5)
+# model = CartesianDiscreteModel(domain,partition)
+# labels = get_face_labeling(model)
+# add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
+# add_tag_from_tags!(labels,"neumann",[7])
 
 order = 1
 degree = 2*order
@@ -87,7 +87,7 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-println(RB.compute_error(results))
+println(compute_error(results))
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)
@@ -96,7 +96,7 @@ save(test_dir,results)
 pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
 
 ϵ = 1e-4
-rbsolver_space = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+rbsolver_space = RBSolver(fesolver,ϵ;mdeim_style=SpaceOnlyMDEIM(),nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir_space = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
 # we can load & solve directly, if the offline structures have been previously saved to file
@@ -106,21 +106,9 @@ rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
 rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
 results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbstats_space)
 
-println(RB.compute_error(results_space))
+println(compute_error(results_space))
 save(test_dir,rbop_space)
 save(test_dir,results_space)
-
-solver = rbsolver
-fesolver = get_fe_solver(solver)
-nparams = num_params(solver)
-sol = solve(fesolver,feop,uh0μ;nparams)
-odesol = sol.odesol
-r = odesol.r
-stats = @timed begin
-  vals = collect(odesol)
-end
-i = get_vector_index_map(feop)
-snaps = Snapshots(vals,i,r)
 
 using Gridap.Algebra
 using Gridap.FESpaces
@@ -130,30 +118,30 @@ red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
 op = get_algebraic_operator(feop)
 reduced_operator(rbsolver,op,red_trial,red_test,fesnaps)
 
-pop = PODOperator(op,red_trial,red_test)
+# pop = PODOperator(op,red_trial,red_test)
 
-smdeim = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
-jacs,ress = jacobian_and_residual(rbsolver,pop,smdeim)
-combine = (x,y) -> θ*x+(1-θ)*y
-# red_jac = reduced_jacobian(rbsolver,pop,jacs)
-basis = reduced_basis(jacs[1][1])
-lu_interp,integration_domain = mdeim(rbsolver.mdeim_style,basis)
+# smdeim = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
+# jacs,ress = jacobian_and_residual(rbsolver,pop,smdeim)
+# combine = (x,y) -> θ*x+(1-θ)*y
+# # red_jac = reduced_jacobian(rbsolver,pop,jacs)
+# basis = reduced_basis(jacs[1][1])
+# lu_interp,integration_domain = mdeim(rbsolver.mdeim_style,basis)
 
-# proj_basis = reduce_operator(rbsolver.mdeim_style,basis,get_basis(red_trial),get_basis(red_test);combine)
-b,b_trial,b_test = basis,RBSteady.get_basis(red_trial),RBSteady.get_basis(red_test)
+# # proj_basis = reduce_operator(rbsolver.mdeim_style,basis,get_basis(red_trial),get_basis(red_test);combine)
+# b,b_trial,b_test = basis,RBSteady.get_basis(red_trial),RBSteady.get_basis(red_test)
 
-T = Float64
-bs = get_basis_space(b)
-bt = get_basis_time(b)
-bs_trial = get_basis_space(b_trial)
-bt_trial = get_basis_time(b_trial)
-bs_test = get_basis_space(b_test)
-bt_test = get_basis_time(b_test)
+# T = Float64
+# bs = get_basis_space(b)
+# bt = get_basis_time(b)
+# bs_trial = get_basis_space(b_trial)
+# bt_trial = get_basis_time(b_trial)
+# bs_test = get_basis_space(b_test)
+# bt_test = get_basis_time(b_test)
 
-T = Float64
-s = num_reduced_dofs(b_test),num_reduced_dofs(b),num_reduced_dofs(b_trial)
-b̂st = Array{T,3}(undef,s)
-b̂t = RBTransient.combine_basis_time(bt,bt_trial,bt_test;combine)
+# T = Float64
+# s = num_reduced_dofs(b_test),num_reduced_dofs(b),num_reduced_dofs(b_trial)
+# b̂st = Array{T,3}(undef,s)
+# b̂t = RBTransient.combine_basis_time(bt,bt_trial,bt_test;combine)
 
 using Gridap.Algebra
 using Gridap.FESpaces
@@ -182,12 +170,33 @@ AA = jacobian!(A,rbop,r,us,ws,odeopcache)
 red_cache,red_r,red_times,red_us,red_odeopcache = RBTransient._select_fe_quantities_at_time_locations(
   b,rbop.rhs,r,us,odeopcache)
 
-b = residual!(red_cache,rbop.op,red_r,red_us,red_odeopcache)
+b′ = residual!(red_cache,rbop.op,red_r,red_us,red_odeopcache)
+b1,rhs1 = b′[1],rbop.rhs[1]
+ids_space = RBSteady.get_indices_space(rhs1)
+ids_time::Vector{Int} = filter(!isnothing,indexin(RBTransient.get_indices_time(rhs1),red_times))
+b1′ = select_snapshots_entries(b1,ids_space,ids_time)
 
+_getindex(s::TransientBasicSnapshots,is,it,ip) = s.data[ip+(it-1)*num_params(s)][is]
+_getindex(s::TransientSnapshots,is,it,ip) = s.data[it][ip][is]
 
+srange,trange = ids_space,ids_time
+T = eltype(b1)
+nval = length(srange),length(trange)
+np = num_params(b1)
+entries = array_of_similar_arrays(zeros(T,nval),np)
 
-
+@inbounds for ip = 1:np, (i,it) = enumerate(trange)
+  entries.data[ip][:,i] = _getindex(b1,srange,it,ip)
+end
 
 # fe_sA = fe_jacobian!(A,rbop,r,us,ws,odeopcache)
-red_r,red_times,red_us,red_odeopcache = RBTransient._select_fe_quantities_at_time_locations(rbop.lhs,r,us,odeopcache)
-AA = jacobian!(A,op.op,red_r,red_us,ws,red_odeopcache)
+red_A,red_r,red_times,red_us,red_odeopcache = RBTransient._select_fe_quantities_at_time_locations(
+  A,rbop.lhs,r,us,odeopcache)
+AA = jacobian!(red_A,op.op,red_r,red_us,ws,red_odeopcache)
+
+s = AA[2][1]
+ad = rbop.lhs[2][1]
+
+ids_space = RBSteady.get_indices_space(ad)
+ids_time::Vector{Int} = filter(!isnothing,indexin(RBTransient.get_indices_time(ad),red_times))
+ssrev = select_snapshots_entries(s,ids_space,ids_time)

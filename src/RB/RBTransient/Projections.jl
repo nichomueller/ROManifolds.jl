@@ -53,7 +53,7 @@ num_reduced_times(a::TransientPODBasis) = size(get_basis_time(a),2)
 function ParamDataStructures.recast(x̂::AbstractVector,a::TransientPODBasis)
   basis_space = get_basis_space(a)
   basis_time = get_basis_time(a)
-  ns = num_reduced_space_dofs(a)
+  ns = RBSteady.num_reduced_space_dofs(a)
   nt = num_reduced_times(a)
 
   X̂ = reshape(x̂,ns,nt)

@@ -70,6 +70,7 @@ Base.@propagate_inbounds function Base.setindex!(A::MatrixOfSparseMatricesCSC,v,
 end
 
 Base.@propagate_inbounds function diagonal_setindex!(A::MatrixOfSparseMatricesCSC,v,iblock::Integer)
+  @boundscheck iblock ≤ param_length(A)
   setindex!(_nonzeros(A,iblock),v)
 end
 

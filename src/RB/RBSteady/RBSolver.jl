@@ -25,11 +25,11 @@ end
 function RBSolver(
   fesolver::FESolver,
   ϵ::Float64;
+  mdeim_style=SpaceMDEIM(),
   nsnaps_state=50,
   nsnaps_mdeim=20,
   nsnaps_test=10)
 
-  mdeim_style = SpaceMDEIM()
   RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_mdeim,nsnaps_test)
 end
 

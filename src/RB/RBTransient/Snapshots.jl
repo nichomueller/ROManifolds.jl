@@ -206,8 +206,8 @@ function RBSteady.select_snapshots(s::AbstractTransientSnapshots,prange;trange=B
 end
 
 function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange)
-  _getindex(s::TransientBasicSnapshots,is,it,ip) = s.data[ip+(it-1)*num_params(s)][is]
-  _getindex(s::TransientSnapshots,is,it,ip) = s.data[it][ip][is]
+  _getindex(s::TransientBasicSnapshots,is,it,ip) = s.data.data[ip+(it-1)*num_params(s)][is]
+  _getindex(s::TransientSnapshots,is,it,ip) = s.data[it].data[ip][is]
 
   @assert length(srange) == length(trange)
 
@@ -277,8 +277,8 @@ get_mode(s::UnfoldingTransientSnapshots) = Mode1Axes()
 get_mode(s::ModeTransientSnapshots) = s.mode
 
 function RBSteady.select_snapshots_entries(s::UnfoldingTransientSnapshots,srange,trange)
-  _getindex(s::TransientBasicSnapshots,is,it,ip) = s.data[ip+(it-1)*num_params(s)][is]
-  _getindex(s::TransientSnapshots,is,it,ip) = s.data[it][ip][is]
+  _getindex(s::TransientBasicSnapshots,is,it,ip) = param_getindex(s.data,ip+(it-1)*num_params(s))[is]
+  _getindex(s::TransientSnapshots,is,it,ip) = param_getindex(s.data[it],ip)[is]
 
   T = eltype(s)
   nval = length(srange),length(trange)
@@ -344,7 +344,7 @@ function change_mode(a::AbstractMatrix,np::Integer)
   n2 = Int(size(a,2)/np)
   a′ = zeros(eltype(a),n2,n1*np)
   @inbounds for i = 1:np
-    @views a′[:,(i-1)*n1+1:i*n1] = a[:,(i-1)*n2+1:i*n2]'
+    @views a′[:,(i-1)*n1+1:i*n1] = a[:,i:np:np*n2]'
   end
   return a′
 end

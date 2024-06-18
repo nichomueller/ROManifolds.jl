@@ -15,9 +15,9 @@ function RBSteady.allocate_coefficient(
   solver::RBSolver{S,SpaceOnlyMDEIM} where S,
   b::TransientProjection)
 
-  nspace = num_reduced_space_dofs(b)
+  nspace = RBSteady.num_reduced_space_dofs(b)
   ntime = num_times(b)
-  nparams = num_online_params(solver)
+  nparams = RBSteady.num_online_params(solver)
   coeffmat = allocate_matrix(Vector{Float64},nspace,ntime)
   coeff = array_of_similar_arrays(coeffmat,nparams)
   return coeff

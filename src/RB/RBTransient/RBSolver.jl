@@ -7,11 +7,11 @@ RBSteady.get_mdeim_style_filename(::SpaceTimeMDEIM) = "space_time_mdeim"
 function RBSteady.RBSolver(
   fesolver::ODESolver,
   ϵ::Float64;
+  mdeim_style=SpaceTimeMDEIM(),
   nsnaps_state=50,
   nsnaps_mdeim=20,
   nsnaps_test=10)
 
-  mdeim_style = SpaceTimeMDEIM()
   RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_mdeim,nsnaps_test)
 end
 
