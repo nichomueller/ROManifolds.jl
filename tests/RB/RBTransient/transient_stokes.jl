@@ -1,9 +1,18 @@
 using Gridap
+using Gridap.MultiField
 using Test
 using DrWatson
-using Gridap.MultiField
+
 using Mabla.FEM
+using Mabla.FEM.TProduct
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamSteady
+using Mabla.FEM.ParamODEs
+
 using Mabla.RB
+using Mabla.RB.RBSteady
+using Mabla.RB.RBTransient
 
 θ = 0.5
 dt = 0.01
@@ -16,7 +25,7 @@ ptspace = TransientParamSpace(pranges,tdomain)
 # model_dir = datadir(joinpath("meshes","perforated_plate.json"))
 # model = DiscreteModelFromFile(model_dir)
 
-n = 20
+n = 5
 domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain, partition)
@@ -61,7 +70,7 @@ trian_stiffness = (Ω,)
 trian_mass = (Ω,)
 
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
-induced_norm((du,dp),(v,q)) = ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
+induced_norm((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 # test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","walls","cylinder"])
@@ -81,7 +90,7 @@ xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
 # test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated_plate")))
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
 
@@ -114,3 +123,19 @@ err_space = RB.compute_error(results_space)
 println(err_space)
 save(test_dir,rbop_space)
 save(test_dir,results_space)
+
+using BlockArrays
+using Gridap.Fields
+
+nparams = num_params(rbsolver)
+sol = solve(fesolver,feop,xh0μ;nparams)
+odesol = sol.odesol
+r = odesol.r
+
+stats = @timed begin
+  vals = collect(odesol)
+end
+
+i = get_vector_index_map(feop)
+fesnaps = Snapshots(vals,i,r)
+v = get_values(fesnaps)

@@ -37,7 +37,6 @@ export AbstractSnapshots
 export BasicSnapshots
 export SnapshotsAtIndices
 export SparseSnapshots
-export UnfoldingSnapshots
 export UnfoldingSteadySnapshots
 export BlockSnapshots
 export Snapshots

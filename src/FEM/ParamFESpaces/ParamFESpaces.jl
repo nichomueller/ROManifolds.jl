@@ -2,6 +2,7 @@ module ParamFESpaces
 
 using LinearAlgebra
 using BlockArrays
+using FillArrays
 using SparseArrays
 
 using Gridap
@@ -20,6 +21,7 @@ using Mabla.FEM.ParamAlgebra
 
 import Test: @test
 import ArraysOfArrays: _innerlength
+import PartitionedArrays: tuple_of_arrays
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 

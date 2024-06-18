@@ -1,7 +1,7 @@
 function reduced_operator(
   solver::RBSolver,
   op::PODOperator,
-  s::AbstractSnapshots)
+  s)
 
   red_lhs,red_rhs = reduced_jacobian_residual(solver,op,s)
   trians_rhs = get_domains(red_rhs)
@@ -13,7 +13,7 @@ end
 function reduced_operator(
   solver::RBSolver,
   op::PODOperator{LinearNonlinearParamEq},
-  s::AbstractSnapshots)
+  s)
 
   red_op_lin = reduced_operator(solver,get_linear_operator(op),s)
   red_op_nlin = reduced_operator(solver,get_nonlinear_operator(op),s)
@@ -83,7 +83,7 @@ function Algebra.jacobian!(
   return Â
 end
 
-function jacobian_and_residual(solver::RBSolver,op::PODMDEIMOperator,s::AbstractSnapshots)
+function jacobian_and_residual(solver::RBSolver,op::PODMDEIMOperator,s)
   x = get_values(s)
   r = get_realization(s)
   fesolver = get_fe_solver(solver)
@@ -210,7 +210,7 @@ end
 
 # Solve a POD-MDEIM problem
 
-function Algebra.solve(solver::RBSolver,op::RBOperator,s::AbstractSnapshots)
+function Algebra.solve(solver::RBSolver,op::RBOperator,s)
   son = select_snapshots(s,online_params(solver))
   ron = get_realization(son)
   solve(solver,op,ron)
@@ -247,7 +247,7 @@ end
 
 # for testing/visualization purposes
 
-function pod_mdeim_error(solver,feop,op::RBOperator,s::AbstractSnapshots)
+function pod_mdeim_error(solver,feop,op::RBOperator,s)
   pod_err = pod_error(get_trial(op),s,assemble_norm_matrix(feop))
   mdeim_err = mdeim_error(solver,feop,op,s)
   return pod_err,mdeim_err

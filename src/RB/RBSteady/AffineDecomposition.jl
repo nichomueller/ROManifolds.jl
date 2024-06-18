@@ -197,7 +197,7 @@ function reduced_jacobian(solver::RBSolver,op,c::ArrayContribution;kwargs...)
   return Contribution(a,trians)
 end
 
-function reduced_jacobian_residual(solver::RBSolver,op,s::AbstractSnapshots)
+function reduced_jacobian_residual(solver::RBSolver,op,s)
   smdeim = select_snapshots(s,mdeim_params(solver))
   jac,res = jacobian_and_residual(solver,op,smdeim)
   red_jac = reduced_jacobian(solver,op,jac)

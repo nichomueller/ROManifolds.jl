@@ -3,6 +3,7 @@ using Test
 using DrWatson
 
 using Mabla.FEM
+using Mabla.FEM.TProduct
 using Mabla.FEM.ParamDataStructures
 using Mabla.FEM.ParamFESpaces
 using Mabla.FEM.ParamSteady
@@ -22,9 +23,11 @@ tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 model_dir = datadir(joinpath("models","elasticity_3cyl2D.json"))
 model = DiscreteModelFromFile(model_dir)
+
+# interface for TT-RB
 # domain = (0,1,0,1)
 # partition = (5,5)
-# model = CartesianDiscreteModel(domain,partition)
+# model = TProductModel(domain,partition)
 # labels = get_face_labeling(model)
 # add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
 # add_tag_from_tags!(labels,"neumann",[7])

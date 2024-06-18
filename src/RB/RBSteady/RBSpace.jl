@@ -7,28 +7,24 @@ function reduced_fe_space(solver,feop,s)
   return reduced_trial,reduced_test
 end
 
-function reduced_basis(s::AbstractSnapshots,args...;kwargs...)
+function reduced_basis(s,args...;kwargs...)
   Projection(s,args...;kwargs...)
 end
 
-function reduced_basis(
-  feop::ParamFEOperator,s::AbstractSnapshots,norm_matrix;kwargs...)
+function reduced_basis(feop::ParamFEOperator,s,norm_matrix;kwargs...)
   reduced_basis(s,norm_matrix;kwargs...)
 end
 
-function reduced_basis(
-  feop::ParamSaddlePointFEOp,s::AbstractSnapshots,norm_matrix;kwargs...)
+function reduced_basis(feop::ParamSaddlePointFEOp,s,norm_matrix;kwargs...)
   bases = reduced_basis(feop.op,s,norm_matrix;kwargs...)
   enrich_basis(feop,bases,norm_matrix)
 end
 
-function reduced_basis(
-  feop::ParamFEOperatorWithTrian,s::AbstractSnapshots,norm_matrix;kwargs...)
+function reduced_basis(feop::ParamFEOperatorWithTrian,s,norm_matrix;kwargs...)
   reduced_basis(feop.op,s,norm_matrix;kwargs...)
 end
 
-function reduced_basis(
-  feop::ParamLinearNonlinearFEOperator,s::AbstractSnapshots,norm_matrix;kwargs...)
+function reduced_basis(feop::ParamLinearNonlinearFEOperator,s,norm_matrix;kwargs...)
   reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
 end
 

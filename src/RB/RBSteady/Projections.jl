@@ -158,7 +158,7 @@ end
 Base.size(a::BlockProjection,i...) = size(a.array,i...)
 
 function Base.getindex(a::BlockProjection,i...)
-  if !b.touched[i...]
+  if !a.touched[i...]
     return nothing
   end
   a.array[i...]

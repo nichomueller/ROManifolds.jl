@@ -169,19 +169,15 @@ function FESpaces.FEFunction(
   dirichlet_values::AbstractParamVector)
 
   zf = f.space
-  fv = similar(free_values)
-  dv = similar(dirichlet_values)
-  @check param_length(fv) == param_length(dv)
-  @inbounds for i = param_eachindex(fv)
-    fv_i = param_getindex(fv,i)
-    dv_i = param_getindex(dv,i)
-    c = FESpaces._compute_new_fixedval(
-      fv_i,dv_i,zf.vol_i,zf.vol,zf.space.dof_to_fix)
-    fv_i .+= c
-    dv_i .+= c
-  end
+  @check param_length(free_values) == param_length(dirichlet_values)
+  fv,dv = map(param_data(free_values),param_data(dirichlet_values)) do fv,dv
+    c = FESpaces._compute_new_fixedval(fv,dv,zf.vol_i,zf.vol,zf.space.dof_to_fix)
+    _fv = lazy_map(+,fv,Fill(c,length(fv)))
+    _dv = dv .+ c
+    return _fv,_dv
+  end |> tuple_of_arrays
   f′ = TrivialParamFESpace(zf.space,param_length(f))
-  FEFunction(f′,fv,dv)
+  FEFunction(f′,ParamArray(fv),ParamArray(dv))
 end
 
 function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:ZeroMeanFESpace},free_values)
@@ -217,17 +213,14 @@ function FESpaces.scatter_free_and_dirichlet_values(
   ) where T<:FESpaces.FixConstant
 
   ff = f.space
-  fv = similar(free_values)
-  dv = similar(dirichlet_values)
-  @check param_length(fv) == param_length(dv)
-  @inbounds for i = param_eachindex(fv)
-    fv_i = param_getindex(fv,i)
-    dv_i = param_getindex(dv,i)
-    fv_i .= FESpaces.VectorWithEntryInserted(fv_i,ff.dof_to_fix,dv_i[1])
-    dv_i .= similar(dv_i,eltype(dv_i),0)
-  end
+  @check param_length(free_values) == param_length(dirichlet_values)
+  fv,dv = map(param_data(free_values),param_data(dirichlet_values)) do fv,dv
+    _fv = FESpaces.VectorWithEntryInserted(fv,ff.dof_to_fix,dv[1])
+    _dv = similar(dv,eltype(dv),0)
+    return _fv,_dv
+  end |> tuple_of_arrays
   f′ = TrivialParamFESpace(ff.space,param_length(f))
-  FEFunction(f′,fv,dv)
+  scatter_free_and_dirichlet_values(f′,ParamArray(fv),ParamArray(dv))
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(

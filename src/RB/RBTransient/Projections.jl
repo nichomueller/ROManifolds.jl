@@ -173,7 +173,7 @@ function RBSteady.enrich_basis(
 
   basis_space = add_space_supremizers(get_basis_space(b),norm_matrix,supr_op)
   basis_time = add_time_supremizers(get_basis_time(b))
-  basis = BlockProjection(map(PODBasis,basis_space,basis_time),b.touched)
+  basis = BlockProjection(map(TransientPODBasis,basis_space,basis_time),b.touched)
   return basis
 end
 

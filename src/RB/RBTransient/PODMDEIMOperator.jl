@@ -1,7 +1,7 @@
 function RBSteady.reduced_operator(
   solver::RBSolver,
   op::TransientPODOperator,
-  s::AbstractTransientSnapshots)
+  s)
 
   red_lhs,red_rhs = reduced_jacobian_residual(solver,op,s)
   trians_rhs = get_domains(red_rhs)
@@ -13,7 +13,7 @@ end
 function RBSteady.reduced_operator(
   solver::RBSolver,
   op::TransientPODOperator{LinearNonlinearParamODE},
-  s::AbstractTransientSnapshots)
+  s)
 
   red_op_lin = reduced_operator(solver,get_linear_operator(op),s)
   red_op_nlin = reduced_operator(solver,get_nonlinear_operator(op),s)
@@ -95,7 +95,7 @@ function Algebra.jacobian!(
   return Â
 end
 
-function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientPODMDEIMOperator,s::AbstractTransientSnapshots)
+function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientPODMDEIMOperator,s)
   x = get_values(s)
   r = get_realization(s)
   fesolver = get_fe_solver(solver)
@@ -329,7 +329,7 @@ end
 
 # Solve a POD-MDEIM problem
 
-function Algebra.solve(solver::RBSolver,op::TransientRBOperator,s::AbstractTransientSnapshots)
+function Algebra.solve(solver::RBSolver,op::TransientRBOperator,s)
   son = select_snapshots(s,RBSteady.online_params(solver))
   ron = get_realization(son)
   solve(solver,op,ron)

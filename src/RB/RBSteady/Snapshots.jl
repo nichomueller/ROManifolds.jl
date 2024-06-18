@@ -158,7 +158,6 @@ function ParamDataStructures.recast(s::SparseSnapshots,a::AbstractMatrix)
   return recast(s.data,a)
 end
 
-const UnfoldingSnapshots{T,L,I,R} = AbstractSnapshots{T,2,L,1,I,R}
 const UnfoldingSteadySnapshots{T,L,I,R} = AbstractSteadySnapshots{T,2,L,1,I,R}
 const UnfoldingSparseSnapshots{T,L,I,R,A} = SparseSnapshots{T,2,L,1,I,R,A}
 
@@ -191,13 +190,13 @@ function Fields.BlockMap(s::NTuple,inds::Vector{<:Integer})
   BlockMap(s,cis)
 end
 
-function Snapshots(data::BlockArrayOfArrays,i::AbstractIndexMap,r::AbstractParamRealization)
+function Snapshots(data::BlockArrayOfArrays,i::AbstractVector{<:AbstractIndexMap},r::AbstractParamRealization)
   block_values = blocks(data)
   nblocks = blocksize(data)
   active_block_ids = findall(!iszero,block_values)
   block_map = BlockMap(nblocks,active_block_ids)
-  active_block_snaps = [Snapshots(block_values[n],i,r) for n in active_block_ids]
-  BlockSnapshots(block_map,active_block_snaps...)
+  active_block_snaps = [Snapshots(block_values[n],i[n],r) for n in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps)
 end
 
 Base.size(s::BlockSnapshots) = size(s.array)
@@ -229,3 +228,28 @@ get_touched_blocks(s::BlockSnapshots) = findall(s.touched)
 
 IndexMaps.get_index_map(s::BlockSnapshots) = get_index_map(testitem(s))
 get_realization(s::BlockSnapshots) = get_realization(testitem(s))
+
+function ParamDataStructures.get_values(s::BlockSnapshots)
+  map(get_values,s.array) |> mortar
+end
+
+function flatten_snapshots(s::BlockSnapshots{S,N}) where {S,N}
+  active_block_ids = get_touched_blocks(s)
+  block_map = BlockMap(size(s),active_block_ids)
+  active_block_snaps = [flatten_snapshots(s[n]) for n in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps)
+end
+
+function select_snapshots(s::BlockSnapshots{S,N},args...;kwargs...) where {S,N}
+  active_block_ids = get_touched_blocks(s)
+  block_map = BlockMap(size(s),active_block_ids)
+  active_block_snaps = [select_snapshots(s[n],args...;kwargs...) for n in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps)
+end
+
+function select_snapshots_entries(s::BlockSnapshots{S,N},srange::ArrayBlock{<:Any,N}) where {S,N}
+  active_block_ids = get_touched_blocks(s)
+  block_map = BlockMap(size(s),active_block_ids)
+  active_block_snaps = [select_snapshots_entries(s[n],srange[n]) for n in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps)
+end

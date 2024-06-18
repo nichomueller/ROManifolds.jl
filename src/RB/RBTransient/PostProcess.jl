@@ -7,7 +7,7 @@ function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...;kw
   rb_results(solver,feop,args...;kwargs...)
 end
 
-function RBSteady.compute_error(sol::UnfoldingTransientSnapshots,sol_approx::UnfoldingTransientSnapshots,norm_matrix=nothing)
+function RBSteady.compute_error(sol::ModeTransientSnapshots,sol_approx::ModeTransientSnapshots,norm_matrix=nothing)
   err_norm = zeros(num_times(sol))
   sol_norm = zeros(num_times(sol))
   space_time_norm = zeros(num_params(sol))

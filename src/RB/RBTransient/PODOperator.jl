@@ -1,7 +1,7 @@
 function RBSteady.reduced_operator(
   solver::RBSolver,
   feop::TransientParamFEOperator,
-  s::AbstractTransientSnapshots)
+  s)
 
   red_trial,red_test = reduced_fe_space(solver,feop,s)
   op = get_algebraic_operator(feop)
@@ -13,7 +13,7 @@ function RBSteady.reduced_operator(
   op::ODEParamOperator,
   trial::RBSpace,
   test::RBSpace,
-  s::AbstractTransientSnapshots)
+  s)
 
   pop = TransientPODOperator(op,trial,test)
   reduced_operator(solver,pop,s)
@@ -120,11 +120,11 @@ function Algebra.jacobian!(
   return Snapshots(A,i,r)
 end
 
-function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientRBOperator,s::AbstractTransientSnapshots)
+function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientRBOperator,s)
   jacobian_and_residual(get_fe_solver(solver),op.op,s)
 end
 
-function RBSteady.jacobian_and_residual(fesolver::ODESolver,odeop::ODEParamOperator,s::AbstractTransientSnapshots)
+function RBSteady.jacobian_and_residual(fesolver::ODESolver,odeop::ODEParamOperator,s)
   us = (get_values(s),)
   r = get_realization(s)
   odecache = allocate_odecache(fesolver,odeop,r,us)

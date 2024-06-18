@@ -137,7 +137,9 @@ Base.getindex(i::IndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,
 """
     IndexMapView{D,Ti,I<:AbstractIndexMap{D,Ti},L} <: AbstractIndexMap{D,Ti}
 
-Most standard implementation of an index map.
+View of an AbstractIndexMap at selected locations. Both the index map and the set of locations
+have the same dimension. Therefore, this map cannot be used to view boundary indices,
+only portions of the domain.
 """
 
 struct IndexMapView{D,Ti,I<:AbstractIndexMap{D,Ti},L} <: AbstractIndexMap{D,Ti}
@@ -154,6 +156,13 @@ end
 
 Base.size(i::IndexMapView) = size(i.locations)
 Base.getindex(i::IndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.locations[j...]]
+
+"""
+    FixedDofIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
+
+Index map to be used when imposing a zero mean constraint on a given FE space. The fixed
+dof is seen as a CartesianIndex of dimension D.
+"""
 
 struct FixedDofIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
   indices::I
@@ -175,6 +184,13 @@ function Base.getindex(i::FixedDofIndexMap{D},j::Vararg{Integer,D}) where D
 end
 
 Base.view(i::FixedDofIndexMap,locations) = FixedDofIndexMap(IndexMapView(i.indices,locations),i.dof_to_fix)
+
+"""
+    TProductIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
+
+Index map to be used when defining a tensor product FE space on a CartesianDiscreteModel.
+
+"""
 
 struct TProductIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
   indices::I

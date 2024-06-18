@@ -354,3 +354,18 @@ function change_mode(a::AbstractMatrix,np::Integer)
   end
   return a′
 end
+
+# block snapshots
+
+function RBSteady.Snapshots(
+  data::AbstractVector{<:BlockArrayOfArrays},
+  i::AbstractVector{<:AbstractIndexMap},
+  r::AbstractParamRealization)
+
+  block_values = blocks.(data)
+  nblocks = blocksize(first(data))
+  active_block_ids = findall(!iszero,blocks(first(data)))
+  block_map = BlockMap(nblocks,active_block_ids)
+  active_block_snaps = [Snapshots(map(v->getindex(v,n),block_values),i[n],r) for n in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps)
+end
