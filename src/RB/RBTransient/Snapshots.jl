@@ -188,6 +188,12 @@ Base.@propagate_inbounds function Base.setindex!(
   setindex!(s.snaps,v,ispace,itime′,iparam′)
 end
 
+function RBSteady.flatten_snapshots(s::Union{TransientSnapshots,TransientSnapshotsAtIndices})
+  data = get_values(s)
+  sbasic = Snapshots(data,get_index_map(s),get_realization(s))
+  flatten_snapshots(sbasic)
+end
+
 function RBSteady.select_snapshots(s::TransientSnapshotsAtIndices,trange,prange)
   old_trange,old_prange = s.indices
   @check intersect(old_trange,trange) == trange
@@ -206,8 +212,8 @@ function RBSteady.select_snapshots(s::AbstractTransientSnapshots,prange;trange=B
 end
 
 function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange)
-  _getindex(s::TransientBasicSnapshots,is,it,ip) = s.data.data[ip+(it-1)*num_params(s)][is]
-  _getindex(s::TransientSnapshots,is,it,ip) = s.data[it].data[ip][is]
+  _getindex(s::TransientBasicSnapshots,is,it,ip) = param_getindex(s.data,ip+(it-1)*num_params(s))[is]
+  _getindex(s::TransientSnapshots,is,it,ip) = param_getindex(s.data[it],ip)[is]
 
   @assert length(srange) == length(trange)
 

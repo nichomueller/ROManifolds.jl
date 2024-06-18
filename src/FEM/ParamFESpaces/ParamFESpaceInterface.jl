@@ -1,6 +1,7 @@
 function get_dirichlet_cells end
 get_dirichlet_cells(f::FESpace) = @abstractmethod
 get_dirichlet_cells(f::UnconstrainedFESpace) = f.dirichlet_cells
+get_dirichlet_cells(f::TProductFESpace) = get_dirichlet_cells(f.space)
 
 ParamDataStructures.param_length(f::FESpace) = 0
 

@@ -1,8 +1,18 @@
 using Gridap
 using Test
 using DrWatson
+
 using Mabla.FEM
+using Mabla.FEM.IndexMaps
+using Mabla.FEM.TProduct
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamSteady
+using Mabla.FEM.ParamODEs
+
 using Mabla.RB
+using Mabla.RB.RBSteady
+using Mabla.RB.RBTransient
 
 θ = 0.5
 dt = 0.01
@@ -77,7 +87,10 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-println(RB.compute_error(results))
+println(compute_error(results))
+
+sol = flatten_snapshots(results.sol)
+sol_approx = flatten_snapshots(results.sol_approx)
 
 for ϵ = (1e-2,1e-3,1e-4)
   rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
@@ -102,3 +115,8 @@ for ϵ = (1e-2,1e-3,1e-4)
   println("Accuracy: $(RB.compute_error(_results))")
   println("Speedup: $(RB.compute_speedup(_results))")
 end
+
+
+ad = rbop.rhs[1]
+ad.coefficient
+ad.mdeim_interpolation

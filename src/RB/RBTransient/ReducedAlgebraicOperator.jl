@@ -140,7 +140,7 @@ end
 function RBSteady.compress_cores(core::TransientTTSVDCores,bases::TransientTTSVDCores...;kwargs...)
   ccores = map((a,b...)->compress_core(a,b...;kwargs...),get_cores(core),get_cores.(bases)...)
   ccore = multiply_cores(ccores...)
-  _dropdims(ccore)
+  RBSteady._dropdims(ccore)
 end
 
 function combine_basis_time(B::AbstractMatrix,C::AbstractMatrix;combine=(x,y)->x)

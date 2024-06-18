@@ -93,6 +93,8 @@ get_basis_time(a::TransientTTSVDCores) = cores2basis(get_temporal_core(a))
 ParamDataStructures.num_times(a::TransientTTSVDCores) = size(get_temporal_core(a),2)
 num_reduced_times(a::TransientTTSVDCores) = size(get_temporal_core(a),3)
 
+RBSteady.num_reduced_dofs(a::TransientTTSVDCores) = num_reduced_times(a)
+
 get_basis_spacetime(a::TransientTTSVDCores) = a.basis_spacetime
 
 _num_tot_space_dofs(a::TransientTTSVDCores{3}) = size.(get_spatial_cores(a),2)
