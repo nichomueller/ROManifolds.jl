@@ -59,9 +59,7 @@ function RBSteady.mdeim(mdeim_style::MDEIMStyle,b::TransientTTSVDCores)
   return lu_interp,integration_domain
 end
 
-const TransientAffineContribution{A<:TransientAffineDecomposition,V,K} = AffineContribution{A,V,K}
-
-function union_reduced_times(a::TransientAffineContribution)
+function union_reduced_times(a::AffineContribution)
   idom = ()
   for values in get_values(a)
     idom = (idom...,get_integration_domain(values))
@@ -112,7 +110,7 @@ const BlockTransientAffineDecomposition{A<:TransientAffineDecomposition,N,C} = B
 
 function RBSteady.get_integration_domain(a::BlockTransientAffineDecomposition)
   active_block_ids = get_touched_blocks(a)
-  block_indices_space = get_indices_space(a)
+  block_indices_space = RBSteady.get_indices_space(a)
   union_indices_space = union([block_indices_space[i] for i in active_block_ids]...)
   union_indices_time = get_indices_time(a)
   TransientIntegrationDomain(union_indices_space,union_indices_time)

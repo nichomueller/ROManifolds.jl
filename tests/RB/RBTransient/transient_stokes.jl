@@ -98,7 +98,7 @@ fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
-h1_l2_err = RB.compute_error(results)
+h1_l2_err = compute_error(results)
 
 println(h1_l2_err)
 save(test_dir,fesnaps)
@@ -108,23 +108,8 @@ save(test_dir,results)
 # POD-MDEIM error
 pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
 
-ϵ = 1e-4
-rbsolver_space = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
-
-# we can load & solve directly, if the offline structures have been previously saved to file
-# load_solve(rbsolver_space,dir=test_dir_space)
-
-rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
-rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
-results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbstats_space)
-err_space = RB.compute_error(results_space)
-
-println(err_space)
-save(test_dir,rbop_space)
-save(test_dir,results_space)
-
 using BlockArrays
+using Gridap.FESpaces
 using Gridap.Fields
 
 nparams = num_params(rbsolver)
@@ -139,3 +124,23 @@ end
 i = get_vector_index_map(feop)
 fesnaps = Snapshots(vals,i,r)
 v = get_values(fesnaps)
+
+using Gridap.ODEs
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+op = get_algebraic_operator(feop)
+pop = TransientPODOperator(op,red_trial,red_test)
+smdeim = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
+jacs,ress = jacobian_and_residual(rbsolver,pop,smdeim)
+
+red_jac = reduced_jacobian(rbsolver,pop,jacs)
+red_res = reduced_residual(rbsolver,pop,ress)
+
+i,j = 2,1
+U,V = get_trial(pop)[j],get_test(pop)[i]
+s = jacs[1][1][i,j]
+trian = Ω
+basis = reduced_basis(s)
+
+s′ = flatten_snapshots(s)
+basis_space = tpod(s′)
+sparse_basis_space = recast(s,basis_space)

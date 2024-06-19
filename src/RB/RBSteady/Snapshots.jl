@@ -11,14 +11,18 @@ function Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractParamRealizat
   @abstractmethod
 end
 
-function Snapshots(a::ArrayContribution,i::AbstractIndexMap,r::AbstractParamRealization)
-  contribution(a.trians) do trian
-    Snapshots(a[trian],i,r)
-  end
-end
+for I in (:AbstractIndexMap,:(AbstractArray{<:AbstractIndexMap}))
+  @eval begin
+    function Snapshots(a::ArrayContribution,i::$I,r::AbstractParamRealization)
+      contribution(a.trians) do trian
+        Snapshots(a[trian],i,r)
+      end
+    end
 
-function RBSteady.Snapshots(a::TupOfArrayContribution,i::AbstractIndexMap,r::AbstractParamRealization)
-  map(a->Snapshots(a,i,r),a)
+    function RBSteady.Snapshots(a::TupOfArrayContribution,i::$I,r::AbstractParamRealization)
+      map(a->Snapshots(a,i,r),a)
+    end
+  end
 end
 
 function IndexMaps.change_index_map(f,s::AbstractSnapshots)
@@ -190,7 +194,7 @@ function Fields.BlockMap(s::NTuple,inds::Vector{<:Integer})
   BlockMap(s,cis)
 end
 
-function Snapshots(data::BlockArrayOfArrays,i::AbstractVector{<:AbstractIndexMap},r::AbstractParamRealization)
+function Snapshots(data::BlockArrayOfArrays,i::AbstractArray{<:AbstractIndexMap},r::AbstractParamRealization)
   block_values = blocks(data)
   nblocks = blocksize(data)
   active_block_ids = findall(!iszero,block_values)
@@ -251,5 +255,5 @@ function select_snapshots_entries(s::BlockSnapshots{S,N},srange::ArrayBlock{<:An
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
   active_block_snaps = [select_snapshots_entries(s[n],srange[n]) for n in active_block_ids]
-  BlockSnapshots(block_map,active_block_snaps)
+  return_cache(block_map,active_block_snaps...)
 end

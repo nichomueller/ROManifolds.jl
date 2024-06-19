@@ -137,8 +137,8 @@ function _select_odecache_at_time_locations(us::Tuple{Vararg{BlockVectorOfVector
     VT = spacei.vector_type
     style = spacei.multi_field_style
     spacesi = [_select_fe_space_at_time_locations(spaceij,indices) for spaceij in spacei]
-    new_Us = (new_Us...,MultiFieldParamFESpace(VT,spacesi,style))
-    new_xhF = (new_xhF...,ParamArray(us[i].data[indices]))
+    new_Us = (new_Us...,MultiFieldFESpace(VT,spacesi,style))
+    new_xhF = (new_xhF...,mortar([ParamArray(us_i.data[indices]) for us_i in blocks(us[i])]))
   end
   new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_odeopcache
@@ -150,6 +150,10 @@ end
 
 function _select_cache_at_time_locations(A::MatrixOfSparseMatricesCSC,indices)
   MatrixOfSparseMatricesCSC(A.m,A.n,A.colptr,A.rowval,A.data[:,indices])
+end
+
+function _select_cache_at_time_locations(A::BlockArrayOfArrays,indices)
+  map(a -> _select_cache_at_time_locations(a,indices),blocks(A)) |> mortar
 end
 
 function _select_cache_at_time_locations(cache::ArrayContribution,indices)

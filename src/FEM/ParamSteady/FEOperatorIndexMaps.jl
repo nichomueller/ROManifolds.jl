@@ -25,9 +25,10 @@ function get_vector_index_map(test::TProductFESpace)
 end
 
 function get_vector_index_map(tests::MultiFieldFESpace)
-  index_maps = AbstractIndexMap[]
-  for test in tests
-    push!(index_maps,get_vector_index_map(test))
+  ntests = num_fields(tests)
+  index_maps = Vector{AbstractIndexMap}(undef,ntests)
+  for i in 1:ntests
+    index_maps[i] = get_vector_index_map(tests[i])
   end
   return index_maps
 end
@@ -54,9 +55,11 @@ for F in (:TrialFESpace,:TransientTrialFESpace)
 end
 
 function get_matrix_index_map(trials::MultiFieldFESpace,tests::MultiFieldFESpace)
-  index_maps = AbstractIndexMap[]
-  for (trial,test) in zip(trials,tests)
-    push!(index_maps,get_matrix_index_map(trial,test))
+  ntests = num_fields(tests)
+  ntrials = num_fields(trials)
+  index_maps = Matrix{AbstractIndexMap}(undef,ntests,ntrials)
+  for (i,j) in Iterators.product(1:ntests,1:ntrials)
+    index_maps[i,j] = get_matrix_index_map(trials[j],tests[i])
   end
   return index_maps
 end

@@ -241,16 +241,14 @@ end
 
 function allocate_result(solver::RBSolver,test::MultiFieldRBSpace)
   active_block_ids = get_touched_blocks(test)
-  block_lincomb = [allocate_result(solver,test[i]) for i in active_block_ids]
-  block_lc = tuple_of_arrays(block_lincomb)
-  return mortar(block_lc)
+  block_result = [allocate_result(solver,test[i]) for i in active_block_ids]
+  return mortar(block_result)
 end
 
 function allocate_result(solver::RBSolver,trial::MultiFieldRBSpace,test::MultiFieldRBSpace)
   active_block_ids = Iterators.product(get_touched_blocks(test),get_touched_blocks(trial))
-  block_lincomb = [allocate_result(solver,trial[j],test[i]) for (i,j) in active_block_ids]
-  block_lc = tuple_of_arrays(block_lincomb)
-  return mortar(block_lc)
+  block_result = [allocate_result(solver,trial[j],test[i]) for (i,j) in active_block_ids]
+  return mortar(block_result)
 end
 
 struct BlockAffineDecomposition{A,N,C} <: AbstractArray{A,N}
@@ -332,7 +330,7 @@ end
 
 function reduced_residual(
   solver::RBSolver,
-  op::RBOperator,
+  op,
   s::BlockSnapshots,
   trian::Triangulation)
 
@@ -342,7 +340,7 @@ function reduced_residual(
   ads,red_trians = Any[
     reduced_form(solver,s[i],trian,test[i]) for i in active_block_ids
     ] |> tuple_of_arrays
-  red_trian = ParamUtils.merge_triangulations(red_trians)
+  red_trian = ParamDataStructures.merge_triangulations(red_trians)
   cache = allocate_result(solver,test)
   ad = BlockAffineDecomposition(block_map,ads,cache)
   return ad,red_trian
@@ -350,7 +348,7 @@ end
 
 function reduced_jacobian(
   solver::RBSolver,
-  op::RBOperator,
+  op,
   s::BlockSnapshots,
   trian::Triangulation;
   kwargs...)
@@ -359,28 +357,19 @@ function reduced_jacobian(
   test = get_test(op)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  ads,red_trians = Any[
-    reduced_form(solver,s[i,j],trian,trial[j],test[i];kwargs...) for (i,j) in Tuple.(active_block_ids)
-    ] |> tuple_of_arrays
-  red_trian = ParamUtils.merge_triangulations(red_trians)
+  ads,red_trians = [reduced_form(solver,s[i,j],trian,trial[j],test[i];kwargs...)
+    for (i,j) in Tuple.(active_block_ids)] |> tuple_of_arrays
+  red_trian = ParamDataStructures.merge_triangulations(red_trians)
   cache = allocate_result(solver,trial,test)
   ad = BlockAffineDecomposition(block_map,ads,cache)
   return ad,red_trian
 end
 
-function mdeim_coeff(a::BlockAffineDecomposition,b::BlockSnapshots)
-  @check get_touched_blocks(a) == get_touched_blocks(b)
-  active_block_ids = get_touched_blocks(a)
-  block_map = BlockMap(size(a),active_block_ids)
-  coeff = [mdeim_coeff(a[i],b[i]) for i in active_block_ids]
-  return_cache(block_map,coeff...)
-end
-
-function mdeim_result(a::BlockAffineDecomposition,coeff::ArrayBlock)
+function mdeim_result(a::BlockAffineDecomposition,b::ArrayBlock)
   fill!(a.cache,zero(eltype(a.cache)))
   active_block_ids = get_touched_blocks(a)
   for i in active_block_ids
-    a.cache[Block(i)] = mdeim_result(a[i],coeff[i])
+    a.cache[Block(i)] = mdeim_result(a[i],b[i])
   end
   return a.cache
 end

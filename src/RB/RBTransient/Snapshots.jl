@@ -83,7 +83,7 @@ function ParamDataStructures.get_values(s::TransientSnapshots)
     ip,it = index.I
     @views data[ipt] = s.data[it][ip]
   end
-  return ArrayOfArrays(data)
+  return data
 end
 
 IndexMaps.get_index_map(s::TransientSnapshots) = s.index_map
@@ -145,7 +145,7 @@ function ParamDataStructures.get_values(
     ip,it = index.I
     @views data[ipt] = snaps.data[ip+(it-1)*num_params(s)]
   end
-  return ArrayOfArrays(data)
+  return data
 end
 
 function ParamDataStructures.get_values(
@@ -160,7 +160,7 @@ function ParamDataStructures.get_values(
     ip,it = index.I
     data[ipt] = snaps.data[it][ip]
   end
-  return ArrayOfArrays(data)
+  return data
 end
 
 Base.@propagate_inbounds function Base.getindex(
@@ -368,4 +368,15 @@ function RBSteady.Snapshots(
   block_map = BlockMap(nblocks,active_block_ids)
   active_block_snaps = [Snapshots(map(v->getindex(v,n),block_values),i[n],r) for n in active_block_ids]
   BlockSnapshots(block_map,active_block_snaps)
+end
+
+function RBSteady.select_snapshots_entries(
+  s::BlockSnapshots{S,N},
+  srange::ArrayBlock{<:Any,N},
+  trange) where {S,N}
+
+  active_block_ids = get_touched_blocks(s)
+  block_map = BlockMap(size(s),active_block_ids)
+  active_block_snaps = [select_snapshots_entries(s[n],srange[n],trange) for n in active_block_ids]
+  return_cache(block_map,active_block_snaps...)
 end
