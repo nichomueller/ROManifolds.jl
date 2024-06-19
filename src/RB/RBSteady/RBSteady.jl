@@ -85,8 +85,10 @@ export enrich_basis
 export add_space_supremizers
 include("Projections.jl")
 
+export FESubspace
 export RBSpace
 export MultiFieldRBSpace
+export fe_subspace
 export reduced_fe_space
 export reduced_basis
 export pod_error

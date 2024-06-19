@@ -115,6 +115,26 @@ end
   return A
 end
 
+Base.@propagate_inbounds function Base.getindex(A::BlockVectorOfVectors{T},i::Block{1}) where T
+  @boundscheck blockcheckbounds(A,i)
+  getindex(A.data,i.n...)
+end
+
+Base.@propagate_inbounds function Base.getindex(A::BlockArrayOfArrays{T,N},i::Block{N}) where {T,N}
+  @boundscheck blockcheckbounds(A,i)
+  getindex(A.data,i.n...)
+end
+
+Base.@propagate_inbounds function Base.setindex!(A::BlockVectorOfVectors{T},v,i::Block{1}) where T
+  @boundscheck blockcheckbounds(A,i)
+  setindex!(A.data,v,i.n...)
+end
+
+Base.@propagate_inbounds function Base.setindex!(A::BlockArrayOfArrays{T,N},v,i::Block{N}) where {T,N}
+  @boundscheck blockcheckbounds(A,i)
+  setindex!(A.data,v,i.n...)
+end
+
 function Base.similar(A::BlockArrayOfArrays{T,N},::Type{<:AbstractArray{T′,N}}) where {T,T′,N}
   BlockArrayOfArrays(map(a->similar(a,Array{T′,N}),A.data),A.axes)
 end

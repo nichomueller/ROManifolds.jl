@@ -373,10 +373,10 @@ end
 function RBSteady.select_snapshots_entries(
   s::BlockSnapshots{S,N},
   srange::ArrayBlock{<:Any,N},
-  trange) where {S,N}
+  trange::ArrayBlock{<:Any,N}) where {S,N}
 
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  active_block_snaps = [select_snapshots_entries(s[n],srange[n],trange) for n in active_block_ids]
+  active_block_snaps = [select_snapshots_entries(s[n],srange[n],trange[n]) for n in active_block_ids]
   return_cache(block_map,active_block_snaps...)
 end

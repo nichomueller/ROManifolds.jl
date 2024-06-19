@@ -76,7 +76,7 @@ function get_reduced_cells(
   return red_integr_cells
 end
 
-function reduce_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,r::RBSpace...)
+function reduce_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,r::FESubspace...)
   f = map(get_space,r)
   indices_space = get_indices_space(i)
   red_integr_cells = get_reduced_cells(trian,indices_space,f...)
@@ -97,7 +97,7 @@ function allocate_coefficient(solver::RBSolver,b::Projection)
   return coeff
 end
 
-function allocate_result(solver::RBSolver,test::RBSpace)
+function allocate_result(solver::RBSolver,test::FESubspace)
   V = get_vector_type(test)
   nfree_test = num_free_dofs(test)
   nparams = num_online_params(solver)
@@ -106,7 +106,7 @@ function allocate_result(solver::RBSolver,test::RBSpace)
   return result
 end
 
-function allocate_result(solver::RBSolver,trial::RBSpace,test::RBSpace)
+function allocate_result(solver::RBSolver,trial::FESubspace,test::FESubspace)
   T = get_dof_value_type(test)
   nfree_trial = num_free_dofs(trial)
   nfree_test = num_free_dofs(test)
@@ -307,25 +307,15 @@ function get_touched_blocks(a::BlockAffineDecomposition)
   findall(a.touched)
 end
 
-function get_integration_domain(a::BlockAffineDecomposition)
-  active_block_ids = get_touched_blocks(a)
-  block_indices_space = get_indices_space(a)
-  union_indices_space = union([block_indices_space[i] for i in active_block_ids]...)
-  IntegrationDomain(union_indices_space)
-end
-
-function get_interp_matrix(a::BlockAffineDecomposition)
-  active_block_ids = get_touched_blocks(a)
-  block_map = BlockMap(size(a),active_block_ids)
-  mdeim_interp = [get_interp_matrix(a[i]) for i = active_block_ids(a)]
-  return_cache(block_map,mdeim_interp...)
-end
-
-function get_indices_space(a::BlockAffineDecomposition)
-  active_block_ids = get_touched_blocks(a)
-  block_map = BlockMap(size(a),active_block_ids)
-  indices_space = Any[get_indices_space(a[i]) for i = get_touched_blocks(a)]
-  return_cache(block_map,indices_space...)
+for f in (:get_integration_domain,:get_interp_matrix,:get_indices_space)
+  @eval begin
+    function $f(a::BlockAffineDecomposition)
+      active_block_ids = get_touched_blocks(a)
+      block_map = BlockMap(size(a),active_block_ids)
+      blocks = [$f(a[i]) for i in active_block_ids]
+      return_cache(block_map,blocks...)
+    end
+  end
 end
 
 function reduced_residual(
@@ -368,8 +358,8 @@ end
 function mdeim_result(a::BlockAffineDecomposition,b::ArrayBlock)
   fill!(a.cache,zero(eltype(a.cache)))
   active_block_ids = get_touched_blocks(a)
-  for i in active_block_ids
-    a.cache[Block(i)] = mdeim_result(a[i],b[i])
+  for i in Tuple.(active_block_ids)
+    a.cache[Block(i)] = mdeim_result(a[i...],b[i...])
   end
   return a.cache
 end

@@ -10,7 +10,7 @@ struct ReducedMatrixOperator{A,B} <: ReducedAlgebraicOperator{A}
   basis::B
 end
 
-function reduce_operator(mdeim_style::MDEIMStyle,b::Projection,r::RBSpace...;kwargs...)
+function reduce_operator(mdeim_style::MDEIMStyle,b::Projection,r::FESubspace...;kwargs...)
   reduce_operator(mdeim_style,b,map(get_basis,r)...;kwargs...)
 end
 

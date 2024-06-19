@@ -11,8 +11,8 @@ end
 function reduced_operator(
   solver::RBSolver,
   op::ParamOperator,
-  trial::RBSpace,
-  test::RBSpace,
+  trial::FESubspace,
+  test::FESubspace,
   s::AbstractSnapshots)
 
   pop = PODOperator(op,trial,test)
@@ -23,8 +23,8 @@ abstract type RBOperator{T<:ParamOperatorType} <: ParamOperatorWithTrian{T} end
 
 struct PODOperator{T} <: RBOperator{T}
   op::ParamOperatorWithTrian{T}
-  trial::RBSpace
-  test::RBSpace
+  trial::FESubspace
+  test::FESubspace
 end
 
 FESpaces.get_trial(op::PODOperator) = op.trial

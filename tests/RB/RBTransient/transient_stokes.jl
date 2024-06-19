@@ -111,6 +111,8 @@ pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
 using BlockArrays
 using Gridap.FESpaces
 using Gridap.Fields
+using Gridap.ODEs
+using Gridap.Algebra
 
 nparams = num_params(rbsolver)
 sol = solve(fesolver,feop,xh0μ;nparams)
@@ -125,7 +127,6 @@ i = get_vector_index_map(feop)
 fesnaps = Snapshots(vals,i,r)
 v = get_values(fesnaps)
 
-using Gridap.ODEs
 red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
 op = get_algebraic_operator(feop)
 pop = TransientPODOperator(op,red_trial,red_test)
@@ -144,3 +145,54 @@ basis = reduced_basis(s)
 s′ = flatten_snapshots(s)
 basis_space = tpod(s′)
 sparse_basis_space = recast(s,basis_space)
+
+# solve(rbsolver,rbop,fesnaps)
+op = rbop
+s = select_snapshots(fesnaps,RBSteady.online_params(rbsolver))
+r = get_realization(s)
+
+trial = get_trial(op)(r)
+fe_trial = get_fe_trial(op)(r)
+x̂ = zero_free_values(trial)
+y = zero_free_values(fe_trial)
+odecache = allocate_odecache(fesolver,op,r,(y,))
+solve!((x̂,),fesolver,op,r,(y,),odecache)
+# x = recast(x̂,trial)
+# cache = return_cache(RBSteady.RecastMap(),x̂,trial)
+block_cache = [return_cache(RBSteady.RecastMap(),x̂[Block(i)],trial[i]) for i = 1:blocklength(x̂)]
+evaluate!(cache,RecastMap(),x,r)
+
+
+sysslvr = fesolver.sysslvr
+odeslvrcache,odeopcache = odecache
+reuse,A,b,sysslvrcache = odeslvrcache
+
+# stageop = get_stage_operator(fesolver,op,r,(y,),odecache)
+dtθ = θ*dt
+us = (y,y)
+ws = (1,1/dtθ)
+
+B = residual!(b,op,r,us,odeopcache)
+
+fe_sb = fe_residual!(b,op,r,us,odeopcache)
+# b̂ = mdeim_result(op.rhs,fe_sb)
+ad,bb = op.rhs[1],fe_sb[1]
+fill!(ad.cache,zero(eltype(ad.cache)))
+active_block_ids = get_touched_blocks(ad)
+i = 1
+ad.cache[Block(i)] = mdeim_result(ad[i],bb[i])
+i = 2
+ad.cache[Block(i)] = mdeim_result(ad[i],bb[i])
+
+AA = jacobian!(A,op,r,us,ws,odeopcache)
+fe_sA = fe_jacobian!(A,op,r,us,ws,odeopcache)
+# Â = mdeim_result(op.lhs,fe_sA)
+mdeim_result(op.lhs[1],fe_sA[1])
+mdeim_result(op.lhs[1][1],fe_sA[1][1])
+
+aa,bb = op.lhs[1][1],fe_sA[1][1]
+# mdeim_result(aa,bb)
+fill!(aa.cache,zero(eltype(aa.cache)))
+active_block_ids = get_touched_blocks(aa)
+i = active_block_ids[1]
+aa.cache[Block(i.I)] = mdeim_result(aa[i],bb[i])

@@ -27,9 +27,15 @@ function get_nonzero_indices(A::AbstractArray{T,3} where T)
   return axes(A,2)
 end
 
-@inline slow_index(i,N::Integer) = cld.(i,N)
+"""
+    slow_index(i,nfast::Integer) ->
+
+Returns the
+"""
+
+@inline slow_index(i,nfast::Integer) = cld.(i,nfast)
 @inline slow_index(i::Colon,::Integer) = i
-@inline fast_index(i,N::Integer) = mod.(i .- 1,N) .+ 1
+@inline fast_index(i,nfast::Integer) = mod.(i .- 1,nfast) .+ 1
 @inline fast_index(i::Colon,::Integer) = i
 
 function tensorize_indices(i::Integer,dofs::AbstractVector{<:Integer})

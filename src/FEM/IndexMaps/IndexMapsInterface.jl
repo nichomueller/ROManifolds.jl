@@ -206,15 +206,9 @@ Base.getindex(i::TProductIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.
 get_tp_indices(i::TProductIndexMap) = i.indices
 get_univariate_indices(i::TProductIndexMap) = i.indices_1d
 
-struct SparseIndexMap{D,Ti,A,B} <: AbstractIndexMap{D,Ti}
+struct SparseIndexMap{D,Ti,A<:AbstractIndexMap{D,Ti},B<:TProductSparsityPattern} <: AbstractIndexMap{D,Ti}
   indices::A
   sparsity::B
-  function SparseIndexMap(
-    indices::A,
-    sparsity::B
-    ) where {D,Ti,A<:AbstractIndexMap{D,Ti},B<:TProductSparsityPattern}
-    new{D,Ti,A,B}(indices,sparsity)
-  end
 end
 
 Base.size(i::SparseIndexMap) = size(i.indices)

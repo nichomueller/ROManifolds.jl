@@ -34,66 +34,70 @@ function enrich_basis(feop,bases,norm_matrix)
 end
 
 function fe_subspace(space::FESpace,basis)
-  RBSpace(space,basis)
+  @abstractmethod
 end
 
 abstract type FESubspace <: FESpace end
 
-struct RBSpace{A,B} <: FESubspace
-  space::A
-  basis::B
-end
+(U::FESubspace)(μ) = evaluate(U,μ)
 
-function Arrays.evaluate(U::RBSpace,args...)
-  space = evaluate(U.space,args...)
-  RBSpace(space,U.basis)
-end
+get_space(r::FESubspace) = r.space
+get_basis(r::FESubspace) = r.basis
 
-(U::RBSpace)(μ) = evaluate(U,μ)
+get_basis_space(r::FESubspace) = get_basis_space(r.basis)
+num_space_dofs(r::FESubspace) = num_space_dofs(r.basis)
+num_reduced_space_dofs(r::FESubspace) = num_reduced_space_dofs(r.basis)
 
-get_space(r::RBSpace) = r.space
-get_basis(r::RBSpace) = r.basis
+num_fe_free_dofs(r::FESubspace) = num_fe_dofs(r.basis)
 
-get_basis_space(r::RBSpace) = get_basis_space(r.basis)
-num_space_dofs(r::RBSpace) = num_space_dofs(r.basis)
-num_reduced_space_dofs(r::RBSpace) = num_reduced_space_dofs(r.basis)
+FESpaces.num_free_dofs(r::FESubspace) = num_reduced_dofs(r.basis)
 
-num_fe_free_dofs(r::RBSpace) = num_fe_dofs(r.basis)
+FESpaces.get_free_dof_ids(r::FESubspace) = Base.OneTo(num_free_dofs(r))
 
-FESpaces.num_free_dofs(r::RBSpace) = num_reduced_dofs(r.basis)
+FESpaces.get_dirichlet_dof_ids(r::FESubspace) = get_dirichlet_dof_ids(r.space)
 
-FESpaces.get_free_dof_ids(r::RBSpace) = Base.OneTo(num_free_dofs(r))
+FESpaces.num_dirichlet_dofs(r::FESubspace) = num_dirichlet_dofs(r.space)
 
-FESpaces.get_dirichlet_dof_ids(r::RBSpace) = get_dirichlet_dof_ids(r.space)
+FESpaces.num_dirichlet_tags(r::FESubspace) = num_dirichlet_tags(r.space)
 
-FESpaces.num_dirichlet_dofs(r::RBSpace) = num_dirichlet_dofs(r.space)
+FESpaces.get_dirichlet_dof_tag(r::FESubspace) = get_dirichlet_dof_tag(r.space)
 
-FESpaces.num_dirichlet_tags(r::RBSpace) = num_dirichlet_tags(r.space)
+FESpaces.get_vector_type(r::FESubspace) = get_vector_type(r.space)
 
-FESpaces.get_dirichlet_dof_tag(r::RBSpace) = get_dirichlet_dof_tag(r.space)
+FESpaces.get_dof_value_type(r::FESubspace) = get_dof_value_type(r.space)
 
-FESpaces.get_vector_type(r::RBSpace) = get_vector_type(r.space)
-
-FESpaces.get_dof_value_type(r::RBSpace) = get_dof_value_type(r.space)
-
-function Algebra.allocate_in_domain(r::RBSpace)
+function Algebra.allocate_in_domain(r::FESubspace)
   zero_free_values(r)
 end
 
-function Algebra.allocate_in_range(r::RBSpace)
+function Algebra.allocate_in_range(r::FESubspace)
   zero_free_values(r.space)
 end
 
-function ParamDataStructures.recast(x::AbstractVector,r::RBSpace)
+function Arrays.evaluate(U::FESubspace,args...)
+  space = evaluate(U.space,args...)
+  fe_subspace(space,U.basis)
+end
+
+struct RecastMap <: Map end
+
+function ParamDataStructures.recast(x::AbstractVector,r::FESubspace)
   cache = return_cache(RecastMap(),x,r)
   evaluate!(cache,RecastMap(),x,r)
   return cache
 end
 
-struct RecastMap <: Map end
-
-function Arrays.return_cache(k::RecastMap,x::AbstractParamVector,r::RBSpace)
+function Arrays.return_cache(k::RecastMap,x::AbstractParamVector,r::FESubspace)
   allocate_in_range(r)
+end
+
+struct RBSpace{A<:SingleFieldFESpace,B<:Projection} <: FESubspace
+  space::A
+  basis::B
+end
+
+function fe_subspace(space::SingleFieldFESpace,basis::Projection)
+  RBSpace(space,basis)
 end
 
 function Arrays.evaluate!(cache,k::RecastMap,x::AbstractParamVector,r::RBSpace)
@@ -104,7 +108,14 @@ end
 
 # multi field interface
 
-const MultiFieldRBSpace{A,B<:BlockProjection} = RBSpace{A,B}
+struct MultiFieldRBSpace{A<:MultiFieldFESpace,B<:BlockProjection} <: FESubspace
+  space::A
+  basis::B
+end
+
+function fe_subspace(space::MultiFieldFESpace,basis::BlockProjection)
+  MultiFieldRBSpace(space,basis)
+end
 
 function Base.getindex(r::MultiFieldRBSpace,i...)
   if isa(r.space,MultiFieldFESpace)
@@ -112,7 +123,7 @@ function Base.getindex(r::MultiFieldRBSpace,i...)
   else
     fs = evaluate(r.space,nothing)
   end
-  return RBSpace(fs.spaces[i...],r.basis[i...])
+  return fe_subspace(fs.spaces[i...],r.basis[i...])
 end
 
 function Base.iterate(r::MultiFieldRBSpace)
@@ -122,7 +133,7 @@ function Base.iterate(r::MultiFieldRBSpace)
     fs = evaluate(r.space,nothing)
   end
   i = 1
-  ri = RBSpace(fs.spaces[i],r.basis[i])
+  ri = fe_subspace(fs.spaces[i],r.basis[i])
   state = i+1,fs
   return ri,state
 end
@@ -132,7 +143,7 @@ function Base.iterate(r::MultiFieldRBSpace,state)
   if i > length(fs.spaces)
     return nothing
   end
-  ri = RBSpace(fs.spaces[i],r.basis[i])
+  ri = fe_subspace(fs.spaces[i],r.basis[i])
   state = i+1,fs
   return ri,state
 end

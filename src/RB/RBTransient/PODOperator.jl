@@ -11,8 +11,8 @@ end
 function RBSteady.reduced_operator(
   solver::RBSolver,
   op::ODEParamOperator,
-  trial::RBSpace,
-  test::RBSpace,
+  trial::FESubspace,
+  test::FESubspace,
   s)
 
   pop = TransientPODOperator(op,trial,test)
@@ -23,8 +23,8 @@ abstract type TransientRBOperator{T<:ODEParamOperatorType} <: ODEParamOperatorWi
 
 struct TransientPODOperator{T} <: TransientRBOperator{T}
   op::ODEParamOperatorWithTrian{T}
-  trial::RBSpace
-  test::RBSpace
+  trial::FESubspace
+  test::FESubspace
 end
 
 FESpaces.get_trial(op::TransientPODOperator) = op.trial

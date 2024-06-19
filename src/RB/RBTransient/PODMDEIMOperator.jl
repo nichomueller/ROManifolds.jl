@@ -183,9 +183,20 @@ function _select_fe_quantities_at_time_locations(cache,a,r,us,odeopcache)
   return red_cache,red_r,red_times,red_xhF,red_odeopcache
 end
 
-function _select_snapshots_at_space_time_locations(s,a,red_times)
+_time_locations(a,red_times)::Vector{Int} = filter(!isnothing,indexin(get_indices_time(a),red_times))
+
+function _select_snapshots_at_space_time_locations(s::AbstractSnapshots,a,red_times)
   ids_space = RBSteady.get_indices_space(a)
-  ids_time::Vector{Int} = filter(!isnothing,indexin(get_indices_time(a),red_times))
+  ids_time::Vector{Int} = _time_locations(a,red_times)
+  select_snapshots_entries(s,ids_space,ids_time)
+end
+
+function _select_snapshots_at_space_time_locations(s::BlockSnapshots,a,red_times)
+  ids_space = RBSteady.get_indices_space(a)
+  active_block_ids = get_touched_blocks(a)
+  block_map = BlockMap(size(a),active_block_ids)
+  blocks = [_time_locations(a[i],red_times) for i in active_block_ids]
+  ids_time = return_cache(block_map,blocks...)
   select_snapshots_entries(s,ids_space,ids_time)
 end
 

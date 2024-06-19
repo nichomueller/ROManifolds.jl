@@ -25,6 +25,8 @@ end
 
 const TransientAffineDecomposition{A,B,C<:TransientIntegrationDomain,D,E} = AffineDecomposition{A,B,C,D,E}
 
+const TupOfAffineContribution = Tuple{Vararg{AffineContribution{T}}} where T
+
 get_indices_time(a::TransientAffineDecomposition) = get_indices_time(get_integration_domain(a))
 
 function _time_indices_and_interp_matrix(::SpaceTimeMDEIM,interp_basis_space,basis_time)
@@ -67,8 +69,8 @@ function union_reduced_times(a::AffineContribution)
   union_indices_time(idom...)
 end
 
-function union_reduced_times(a::NTuple)
-  union([union_reduced_times(ai) for ai in a]...)
+function union_reduced_times(a::TupOfAffineContribution)
+  union(union_reduced_times.(a)...)
 end
 
 function RBSteady.reduced_jacobian(
@@ -88,8 +90,6 @@ end
 
 # ONLINE PHASE
 
-const TupOfAffineContribution = Tuple{Vararg{AffineContribution{T}}} where T
-
 function RBSteady.coefficient!(
   a::TransientAffineDecomposition{<:ReducedAlgebraicOperator{T}},
   b::AbstractParamArray
@@ -106,25 +106,18 @@ end
 
 # multi field interface
 
+function union_indices_time(i::ArrayBlock{<:AbstractIntegrationDomain}...)
+  times = map(i) do i
+    union_indices_time(i.array[findall(i.touched)]...)
+  end
+  union(times...)
+end
+
 const BlockTransientAffineDecomposition{A<:TransientAffineDecomposition,N,C} = BlockAffineDecomposition{A,N,C}
 
-function RBSteady.get_integration_domain(a::BlockTransientAffineDecomposition)
+function get_indices_time(a::BlockAffineDecomposition)
   active_block_ids = get_touched_blocks(a)
-  block_indices_space = RBSteady.get_indices_space(a)
-  union_indices_space = union([block_indices_space[i] for i in active_block_ids]...)
-  union_indices_time = get_indices_time(a)
-  TransientIntegrationDomain(union_indices_space,union_indices_time)
-end
-
-function get_indices_time(a::BlockTransientAffineDecomposition)
-  indices_time = Any[get_indices_time(a[i]) for i = get_touched_blocks(a)]
-  union(indices_time...)
-end
-
-function ParamDataStructures.num_times(a::BlockTransientAffineDecomposition)
-  num_times(testitem(a))
-end
-
-function num_reduced_times(a::BlockTransientAffineDecomposition)
-  length(get_indices_time(a))
+  block_map = BlockMap(size(a),active_block_ids)
+  blocks = [get_indices_time(a[i]) for i in active_block_ids]
+  return_cache(block_map,blocks...)
 end
