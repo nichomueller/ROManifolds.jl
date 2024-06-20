@@ -1,3 +1,12 @@
+"""
+    struct FEOperatorIndexMap{A,B}
+      matrix_map::A
+      vector_map::B
+    end
+
+Used to store the index maps related to jacobians and residuals in a FE problem
+
+"""
 struct FEOperatorIndexMap{A,B}
   matrix_map::A
   vector_map::B
@@ -16,6 +25,14 @@ function FEOperatorIndexMap(trial::FESpace,test::FESpace)
   FEOperatorIndexMap(matrix_map,vector_map)
 end
 
+"""
+    get_vector_index_map(test::FESpace) -> AbstractIndexMap
+
+Returns the index maps related to residuals in a FE problem. The default output
+is a TrivialIndexMap; when the test space is of type TProductFESpace, a
+nontrivial index map is returned
+
+"""
 function get_vector_index_map(test::FESpace)
   TrivialIndexMap(LinearIndices((num_free_dofs(test),)))
 end
@@ -33,18 +50,26 @@ function get_vector_index_map(tests::MultiFieldFESpace)
   return index_maps
 end
 
+"""
+    get_matrix_index_map(trial::FESpace,test::FESpace) -> AbstractIndexMap
+
+Returns the index maps related to jacobians in a FE problem. The default output
+is a TrivialIndexMap; when the trial and test spaces are of type TProductFESpace,
+a SparseIndexMap is returned
+
+"""
 function get_matrix_index_map(trial::FESpace,test::FESpace)
   sparsity = get_sparsity(trial,test)
   return TrivialIndexMap(get_nonzero_indices(sparsity))
 end
 
-function get_matrix_index_map(U::TProductFESpace,V::TProductFESpace)
-  sparsity = get_sparsity(U,V)
-  psparsity = permute_sparsity(sparsity,U,V)
+function get_matrix_index_map(trial::TProductFESpace,test::TProductFESpace)
+  sparsity = get_sparsity(trial,test)
+  psparsity = permute_sparsity(sparsity,trial,test)
   I,J,_ = findnz(psparsity)
   i,j,_ = IndexMaps.univariate_findnz(psparsity)
-  g2l = global_2_local_nnz(psparsity,I,J,i,j)
-  pg2l = permute_index_map(psparsity,g2l,U,V)
+  g2l = _global_2_local_nnz(psparsity,I,J,i,j)
+  pg2l = permute_index_map(psparsity,g2l,trial,test)
   return SparseIndexMap(pg2l,psparsity)
 end
 
@@ -66,7 +91,7 @@ end
 
 # utils
 
-function global_2_local_nnz(sparsity::TProductSparsityPattern,I,J,i,j)
+function _global_2_local_nnz(sparsity::TProductSparsityPattern,I,J,i,j)
   IJ = get_nonzero_indices(sparsity)
   lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
 
@@ -96,8 +121,8 @@ function _permute_index_map(index_map,I,J)
   return IndexMap(iperm)
 end
 
-function permute_index_map(::TProductSparsityPattern,index_map,U::TProductFESpace,V::TProductFESpace)
-  I = get_dof_index_map(V)
-  J = get_dof_index_map(U)
+function permute_index_map(::TProductSparsityPattern,index_map,trial::TProductFESpace,test::TProductFESpace)
+  I = get_dof_index_map(test)
+  J = get_dof_index_map(trial)
   return _permute_index_map(index_map,I,J)
 end

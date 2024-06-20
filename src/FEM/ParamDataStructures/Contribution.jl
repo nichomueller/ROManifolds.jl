@@ -1,3 +1,13 @@
+"""
+    abstract type Contribution end
+
+Represents quantitites whose values vary upon a triangulation. The values can
+be accessed by indexing a the corresponding triangulation. See [`DomainContribution`](@ref)
+in [`Gridap`](@ref) for more details. Subtypes:
+- [`ArrayContribution`](@ref)
+- [`AffineContribution`](@ref)
+
+"""
 abstract type Contribution end
 
 CellData.get_domains(a::Contribution) = a.trians
@@ -9,6 +19,7 @@ Base.getindex(a::Contribution,i...) = a.values[i...]
 Base.setindex!(a::Contribution,v,i...) = a.values[i...] = v
 Base.eachindex(a::Contribution) = eachindex(a.values)
 
+# Allow do-block syntax
 @inline function contribution(f,trians)
   values = map(f,trians)
   @check typeof(trians) <: Tuple{Vararg{Triangulation}}  "$(typeof(trians))"
@@ -44,6 +55,12 @@ function Contribution(
   ArrayContribution{T,N}(v,t)
 end
 
+"""
+    struct ArrayContribution{T,N,V,K} <: Contribution
+
+Contribution whose values are arrays and/or parametric arrays.
+
+"""
 struct ArrayContribution{T,N,V,K} <: Contribution
   values::V
   trians::K
@@ -139,8 +156,7 @@ function Base.materialize!(a::ArrayContribution,c::ContributionBroadcast)
   a
 end
 
-# quite hacky
-
+# small hack, it allows to efficiently deal with jacobians in an unsteady setting
 const TupOfArrayContribution = Tuple{Vararg{ArrayContribution{T}}} where T
 
 Base.eltype(::TupOfArrayContribution{T}) where T = T
@@ -163,6 +179,12 @@ end
 
 # triangulation utils
 
+"""
+    is_parent(tparent::Triangulation,tchild::Triangulation) -> Bool
+
+Returns true if `tchild` is a triangulation view of `tparent`, false otherwise
+
+"""
 function is_parent(tparent::Triangulation,tchild::Triangulation)
   false
 end
@@ -200,6 +222,13 @@ function get_parent(t::AbstractVector{<:Triangulation})
   get_parent(first(t))
 end
 
+"""
+    is_parent(t::Triangulation) -> Triangulation
+
+When `t` is a triangulation view, returns its parent; throws an error when `t`
+is not a triangulation view
+
+"""
 function get_parent(t::Triangulation)
   @abstractmethod
 end
@@ -218,6 +247,14 @@ function get_union_indices(trians)
   union(indices...) |> unique
 end
 
+"""
+    merge_triangulations(trians::Tuple{Vararg{Triangulation}}) -> Triangulation
+
+Given a tuple of triangulation views `trians`, returns the triangulation view
+on the union of the viewed cells. In other words, the minimum common integration
+domain is found
+
+"""
 function merge_triangulations(trians)
   parent = get_parent(trians)
   uindices = get_union_indices(trians)
@@ -229,6 +266,13 @@ function find_trian_permutation(a,b)
   map(a -> findfirst(b -> compare(a,b),b),a)
 end
 
+"""
+    order_triangulations(tparents::Tuple{Vararg{Triangulation}},
+      tchildren::Tuple{Vararg{Triangulation}}) -> Tuple{Vararg{Triangulation}}
+
+Orders the triangulation children in the same way as the triangulation parents
+
+"""
 function order_triangulations(tparents,tchildren)
   @check length(tparents) == length(tchildren)
   iperm = find_trian_permutation(tparents,tchildren)

@@ -166,6 +166,14 @@ function Algebra.push_coo!(::Type{T},I,J,V::AbstractParamArray,i,j,v) where T<:A
   end
 end
 
+"""
+    ParamCounter{C,L}
+
+Extends the concept of `counter` in Gridap to accommodate a parametric setting.
+L represents the parametric length of the quantity to be assembled.
+
+"""
+
 struct ParamCounter{C,L}
   counter::C
   function ParamCounter(counter::C,::Val{L}) where {C,L}
@@ -199,30 +207,41 @@ function Algebra.nz_allocation(a::ParamCounter{C,L}) where {C,L}
   ParamInserter(inserter,L)
 end
 
-# CSC format
+function ParamInserter(inserter,L::Integer)
+  @notimplemented "Only implemented the CSC format"
+end
 
 function ParamInserter(inserter::Algebra.InserterCSC,L::Integer)
   ParamInserterCSC(inserter,Val{L}())
 end
 
-struct ParamInserterCSC{Tv,Ti,P}
+"""
+    ParamInserterCSC{Tv,Ti}
+
+Extends the concept of `InserterCSC` in Gridap to accommodate a parametric setting.
+Tv is the type of the parametric nonzero entries of the CSC matrices to be
+assembled.
+
+"""
+
+struct ParamInserterCSC{Tv,Ti}
   nrows::Int
   ncols::Int
   colptr::Vector{Ti}
   colnnz::Vector{Ti}
   rowval::Vector{Ti}
-  nzval::P
-  function ParamInserterCSC(inserter::Algebra.InserterCSC{Tv,Ti},::Val{L}) where {Tv,Ti,L}
+  nzval::Tv
+  function ParamInserterCSC(inserter::Algebra.InserterCSC{Tv′,Ti},::Val{L}) where {Tv′,Ti,L}
     @unpack nrows,ncols,colptr,colnnz,rowval,nzval = inserter
     pnzval = array_of_similar_arrays(nzval,L)
-    P = typeof(pnzval)
-    new{Tv,Ti,P}(nrows,ncols,colptr,colnnz,rowval,pnzval)
+    Tv = typeof(pnzval)
+    new{Tv,Ti}(nrows,ncols,colptr,colnnz,rowval,pnzval)
   end
 end
 
 Algebra.LoopStyle(::Type{<:ParamInserterCSC}) = Loop()
 
-@inline function Algebra.add_entry!(::typeof(+),a::ParamInserterCSC{Tv,Ti},v::Nothing,i,j)  where {Tv,Ti}
+@inline function Algebra.add_entry!(::typeof(+),a::ParamInserterCSC,v::Nothing,i,j)
   pini = Int(a.colptr[j])
   pend = pini + Int(a.colnnz[j]) - 1
   p = searchsortedfirst(a.rowval,i,pini,pend,Base.Order.Forward)
@@ -245,7 +264,7 @@ Algebra.LoopStyle(::Type{<:ParamInserterCSC}) = Loop()
 end
 
 @noinline function Algebra.add_entry!(
-  ::typeof(+),a::ParamInserterCSC{Tv,Ti,P},v::Union{ParamNumber,Number},i,j) where {Tv,Ti,P}
+  ::typeof(+),a::ParamInserterCSC{Tv},v::Union{ParamNumber,Number},i,j) where Tv
   pini = Int(a.colptr[j])
   pend = pini + Int(a.colnnz[j]) - 1
   p = searchsortedfirst(a.rowval,i,pini,pend,Base.Order.Forward)
@@ -253,7 +272,7 @@ end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    @inbounds for l = param_eachindex(P)
+    @inbounds for l = param_eachindex(Tv)
       a.nzval.data[l][p] = v[l]
     end
   elseif a.rowval[p] != i
@@ -262,32 +281,32 @@ end
     for k in pend:-1:p
       o = k + 1
       a.rowval[o] = a.rowval[k]
-      @inbounds for l = param_eachindex(P)
+      @inbounds for l = param_eachindex(Tv)
         a.nzval[l][o] = a.nzval[l][k]
       end
     end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    @inbounds for l = param_eachindex(P)
+    @inbounds for l = param_eachindex(Tv)
       a.nzval[l][p] = v[l]
     end
   else
     # update existing entry
-    @inbounds for l = param_eachindex(P)
+    @inbounds for l = param_eachindex(Tv)
       a.nzval[l][p] += v[l]
     end
   end
   nothing
 end
 
-function Algebra.create_from_nz(a::ParamInserterCSC{Tv,Ti,P}) where {Tv,Ti,P}
+function Algebra.create_from_nz(a::ParamInserterCSC{Tv}) where Tv
   k = 1
   for j in 1:a.ncols
     pini = Int(a.colptr[j])
     pend = pini + Int(a.colnnz[j]) - 1
     for p in pini:pend
-      @inbounds for l = param_eachindex(P)
+      @inbounds for l = param_eachindex(Tv)
         a.nzval[l][k] = a.nzval[l][p]
       end
       a.rowval[k] = a.rowval[p]

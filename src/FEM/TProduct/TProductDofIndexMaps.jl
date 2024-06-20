@@ -1,3 +1,26 @@
+"""
+    get_tp_dof_index_map(space::FESpace,spaces_1d::AbstractVector{<:FESpace}) -> AbstractIndexMap
+
+Returns the dofs of the FE space defined as the tensor product of `spaces_1d`,
+sorted by coordinate order, for every dimension. The variable `space` represents
+the FESpace defined on the TProductModel with a standard Gridap procedure.
+The role of `space` is limited to providing the algorithm with the correct dof type
+and polynomial order. If `space` is a D-dimensional FESpace, the vector `spaces_1d`
+is of length D, and the output index map will be a subtype of AbstractIndexMap{D}.
+
+The following example clarifies the function's task:
+
+cell_dof_ids_1 = Table([[1, 3, 2]])
+cell_dof_ids_2 = Table([[1, 4, 2, 5, 3]])
+
+  get_tp_dof_index_map(⋅)
+        ⟹ ⟹ ⟹
+
+      [ 1  7  4  10  7
+        3  9  6  11  9
+        2  8  5  12  8 ]
+
+"""
 function get_tp_dof_index_map(space::FESpace,spaces_1d::AbstractVector{<:FESpace})
   @abstractmethod
 end

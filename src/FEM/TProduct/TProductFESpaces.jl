@@ -1,3 +1,10 @@
+"""
+    TProductFESpace{A,B} <: SingleFieldFESpace
+
+Tensor product single field FE space, storing a vector of 1-D FE spaces `spaces_1d`
+of length D, and the D-dimensional FE space `space` defined as their tensor product.
+
+"""
 struct TProductFESpace{A,B} <: SingleFieldFESpace
   space::A
   spaces_1d::B

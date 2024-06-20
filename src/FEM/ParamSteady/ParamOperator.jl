@@ -4,6 +4,17 @@ struct NonlinearParamEq <: ParamOperatorType end
 struct LinearParamEq <: ParamOperatorType end
 struct LinearNonlinearParamEq <: ParamOperatorType end
 
+"""
+    abstract type ParamOperator{T<:ParamOperatorType} <: NonlinearOperator end
+
+Similar to [`ODEOperator`](@ref) in [`Gridap`](@ref), when dealing with steady
+parametric problems
+
+Subtypes:
+- [`ParamOperatorWithTrian`](@ref)
+- [`ParamOpFromFEOp`](@ref)
+
+"""
 abstract type ParamOperator{T<:ParamOperatorType} <: NonlinearOperator end
 
 function allocate_paramcache(
@@ -89,6 +100,16 @@ mutable struct ParamOpFromFEOpCache <: GridapType
   form
 end
 
+"""
+    abstract type ParamOperatorWithTrian{T<:ParamOperatorType} <: ParamOperator{T} end
+
+Is to a ParamOperator as a ParamFEOperatorWithTrian is to a ParamFEOperator.
+
+Suptypes:
+- [`ParamOpFromFEOpWithTrian`](@ref)
+- [`RBOperator`](@ref)
+
+"""
 abstract type ParamOperatorWithTrian{T<:ParamOperatorType} <: ParamOperator{T} end
 
 function Algebra.allocate_residual(

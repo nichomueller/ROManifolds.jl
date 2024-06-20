@@ -239,7 +239,7 @@ function RBSteady.fe_residual!(
 end
 
 struct LinearNonlinearTransientPODMDEIMOperator <: TransientRBOperator{LinearNonlinearParamODE}
-  op_linear::TransientPODMDEIMOperator{AbstractLinearParamODE}
+  op_linear::TransientPODMDEIMOperator{<:AbstractLinearParamODE}
   op_nonlinear::TransientPODMDEIMOperator{NonlinearParamODE}
 end
 
@@ -261,7 +261,7 @@ function ParamDataStructures.realization(op::LinearNonlinearTransientPODMDEIMOpe
 end
 
 function ParamSteady.get_fe_operator(op::LinearNonlinearTransientPODMDEIMOperator)
-  join_operators(get_fe_operator(op.op_linear),get_fe_operator(op.op_nonlinear))
+  join_operators(ParamSteady.get_fe_operator(op.op_linear),ParamSteady.get_fe_operator(op.op_nonlinear))
 end
 
 function RBSteady.get_fe_trial(op::LinearNonlinearTransientPODMDEIMOperator)
@@ -272,6 +272,16 @@ end
 function RBSteady.get_fe_test(op::LinearNonlinearTransientPODMDEIMOperator)
   @check RBSteady.get_fe_test(op.op_linear) === RBSteady.get_fe_test(op.op_nonlinear)
   RBSteady.get_fe_test(op.op_nonlinear)
+end
+
+function ParamSteady.get_vector_index_map(op::LinearNonlinearTransientPODMDEIMOperator)
+  @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
+  get_vector_index_map(op.op_linear)
+end
+
+function ParamSteady.get_matrix_index_map(op::LinearNonlinearTransientPODMDEIMOperator)
+  @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))
+  get_matrix_index_map(op.op_linear)
 end
 
 function ODEs.allocate_odeopcache(

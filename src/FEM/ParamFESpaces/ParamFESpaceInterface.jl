@@ -5,6 +5,21 @@ get_dirichlet_cells(f::TProductFESpace) = get_dirichlet_cells(f.space)
 
 ParamDataStructures.param_length(f::FESpace) = 0
 
+"""
+    abstract type SingleFieldParamFESpace <: SingleFieldFESpace end
+
+Parametric extension of a [`SingleFieldFESpace`](@ref) in [`Gridap`](@ref). The
+FE spaces inhereting are (trial) spaces on which we can easily define a
+[`ParamFEFunction`](@ref). Most commonly, a SingleFieldParamFESpace is
+characterized by parametric Dirichlet boundary conditions, but a standard
+nonparametric DBC can be prescribed on such spaces.
+
+
+Subtypes:
+- TrivialParamFESpace{S,L} <: SingleFieldParamFESpace
+- TrialParamFESpace{S} <: SingleFieldParamFESpace
+
+"""
 abstract type SingleFieldParamFESpace <: SingleFieldFESpace end
 
 FESpaces.get_free_dof_ids(f::SingleFieldParamFESpace) = get_free_dof_ids(f.space)
@@ -145,8 +160,12 @@ function FESpaces._free_and_dirichlet_values_fill!(
   end
 end
 
-# This artifact aims to make a FESpace behave like a ParamFESpace with free and
-# dirichlet values being ParamArrays of length L
+"""
+    TrivialParamFESpace{S,L} <: SingleFieldParamFESpace
+
+Wrapper for nonparametric FE spaces that we wish assumed a parametric length `L`
+
+"""
 
 struct TrivialParamFESpace{S,L} <: SingleFieldParamFESpace
   space::S

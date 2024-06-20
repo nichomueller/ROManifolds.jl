@@ -1,3 +1,9 @@
+"""
+    TrialParamFESpace{S} <: SingleFieldParamFESpace
+
+Most standard implementation of a parametric trial FE space
+
+"""
 struct TrialParamFESpace{S} <: SingleFieldParamFESpace
   dirichlet_values::AbstractParamVector
   space::S
@@ -56,8 +62,6 @@ function HomogeneousTrialParamFESpace!(dirichlet_values::AbstractParamVector,U::
   fill!(dirichlet_values,zero(eltype(dirichlet_values)))
   TrialParamFESpace(dirichlet_values,U)
 end
-
-# Delegated functions
 
 FESpaces.get_dirichlet_dof_values(f::TrialParamFESpace) = f.dirichlet_values
 

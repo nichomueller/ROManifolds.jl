@@ -22,9 +22,13 @@ function ODEs.ode_finish!(
   (uF,odecache)
 end
 
-abstract type ODEParamSolution{V} <: ODESolution end
+"""
+    struct GenericODEParamSolution{V} <: ODESolution
 
-struct GenericODEParamSolution{V} <: ODEParamSolution{V}
+Generic wrapper for the evolution of an `ODEParamOperator` with an `ODESolver`.
+
+"""
+struct GenericODEParamSolution{V} <: ODESolution
   solver::ODESolver
   odeop::ODEParamOperator
   r::TransientParamRealization

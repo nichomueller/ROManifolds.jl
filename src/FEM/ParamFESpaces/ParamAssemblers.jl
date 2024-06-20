@@ -22,6 +22,14 @@ function get_param_vector_builder(
   ArrayBuilder(pvector_type)
 end
 
+"""
+    get_param_assembler(a::SparseMatrixAssembler,r::AbstractParamRealization) -> SparseMatrixAssembler
+
+Returns a parametric assembler, which assembles parametric residuals and jacobians.
+The consequent assembly routines remain the same as in [`Gridap`](@ref), i.e.
+SparseMatrixBuilder -> ArrayCounter -> ArrayAllocator -> Array
+
+"""
 function get_param_assembler(
   a::SparseMatrixAssembler,
   r::AbstractParamRealization)
@@ -34,6 +42,7 @@ function get_param_assembler(
   GenericSparseMatrixAssembler(matrix_builder,vector_builder,rows,cols,strategy)
 end
 
+# like collect_cell_matrix, but for a fixed triangulation `strian`
 function collect_cell_matrix_for_trian(
   trial::FESpace,
   test::FESpace,
@@ -50,6 +59,7 @@ function collect_cell_matrix_for_trian(
   [cell_mat_rc],[rows],[cols]
 end
 
+# like collect_cell_vector, but for a fixed triangulation `strian`
 function collect_cell_vector_for_trian(
   test::FESpace,
   a::DomainContribution,

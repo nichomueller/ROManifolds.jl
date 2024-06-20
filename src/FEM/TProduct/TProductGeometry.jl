@@ -1,12 +1,14 @@
-struct TProductModel{D,A,B} <: DiscreteModel{D,D}
+"""
+    TProductModel{D,A,B} <: DiscreteModel{D,D} end
+
+Tensor product discrete model, storing a vector of 1-D models `models_1d` of length D,
+and the D-dimensional model `model` defined as their tensor product.
+
+"""
+
+struct TProductModel{D,A<:CartesianDiscreteModel{D},B<:AbstractVector{<:CartesianDiscreteModel}} <: DiscreteModel{D,D}
   model::A
   models_1d::B
-  function TProductModel(
-    model::A,
-    models_1d::B
-    ) where {D,A<:CartesianDiscreteModel{D},B<:AbstractVector{<:CartesianDiscreteModel}}
-    new{D,A,B}(model,models_1d)
-  end
 end
 
 Geometry.get_grid(model::TProductModel) = get_grid(model.model)
@@ -49,14 +51,24 @@ function _axes_to_lower_dim_entities(coords::AbstractArray{VectorValue{D,T},D}) 
   return entities
 end
 
-function entities_1d_in_tag(coords::AbstractArray{VectorValue{D,T},D},nodes_in_tag)  where {D,T}
+"""
+    entities_1d_in_tag(coords::AbstractArray{VectorValue{D,T},D}, nodes_in_tag
+      ) where {D,T} -> (Vector{Int}, Vector{Int})
+
+Given the node coordinates of a D-dimensional tensor product discrete model `coords`
+and the subset of nodes in a given tag `nodes_in_tag`, returns the vector of
+corresponding 1-D tags, and a vector of axes whose entries are ∈ {1, ..., D}
+specify the direction (i.e. dimension) of the tag
+
+"""
+function entities_1d_in_tag(coords::AbstractArray{VectorValue{D,T},D},nodes_in_tag) where {D,T}
   ax_to_entities = _axes_to_lower_dim_entities(coords)
   vec_of_tags = Int[]
   vec_of_axes = Int[]
   for (axis,entities) in enumerate(ax_to_entities)
     for (loc,entity) in enumerate(entities)
       Iset = intersect(nodes_in_tag,entity)
-      # check_tp_condition(Iset) here i should check that the tags are set correctly
+      #TODO check_tp_condition(Iset) here i should check that the tags are set correctly
       Iset != entity && continue
       push!(vec_of_tags,loc)
       push!(vec_of_axes,axis)
@@ -65,6 +77,14 @@ function entities_1d_in_tag(coords::AbstractArray{VectorValue{D,T},D},nodes_in_t
   return vec_of_tags,vec_of_axes
 end
 
+"""
+    add_1d_tags!(model::TProductModel,name) -> Nothing
+
+Adds the tags corresponding to `name` (usually a String or Vector{String}), which
+encodes a set of tags on a D-dimensional TProductModel, to the vector of 1-D
+models
+
+"""
 function add_1d_tags!(model::TProductModel,name)
   isempty(name) && return
   nodes = get_node_coordinates(model)
@@ -85,17 +105,18 @@ function add_1d_tags!(model::TProductModel,names::AbstractVector)
   map(name->add_1d_tags!(model,name),names)
 end
 
-struct TProductTriangulation{Dt,Dp,A,B,C} <: Triangulation{Dt,Dp}
+"""
+    TProductTriangulation{Dt,Dp,A,B,C} <: Triangulation{Dt,Dp}
+
+Tensor product triangulation, storing a tensor product model, a vector of 1-D
+triangulations `trians_1d` of length D, and the D-dimensional triangulation `trian`
+defined as their tensor product.
+
+"""
+struct TProductTriangulation{Dt,Dp,A<:TProductModel,B<:BodyFittedTriangulation{Dt,Dp},C<:AbstractVector{<:Triangulation}} <: Triangulation{Dt,Dp}
   model::A
   trian::B
   trians_1d::C
-  function TProductTriangulation(
-    model::A,
-    trian::B,
-    trians_1d::C
-    ) where {Dt,Dp,A<:TProductModel,B<:BodyFittedTriangulation{Dt,Dp},C<:AbstractVector{<:Triangulation}}
-    new{Dt,Dp,A,B,C}(model,trian,trians_1d)
-  end
 end
 
 function TProductTriangulation(trian::Triangulation,trians_1d::AbstractVector{<:Triangulation})

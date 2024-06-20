@@ -1,3 +1,27 @@
+"""
+    get_dof_index_map(space::FESpace) -> AbstractIndexMap
+
+Returns the dofs sorted by coordinate order, for every dimension. Therefore,
+if `space` is a D-dimensional FESpace, the output index map will be a subtype
+of AbstractIndexMap{D}.
+
+The following example clarifies the function's task:
+
+cell_dof_ids = Table([
+  [1, 3, 9, 7],
+  [3, 2, 8, 9],
+  [7, 9, 6, 4],
+  [9, 8, 6, 5]
+])
+
+  get_dof_index_map(⋅)
+      ⟹ ⟹ ⟹
+
+      [ 1  7  4
+        3  9  6
+        2  8  5 ]
+
+"""
 function get_dof_index_map(space::FESpace)
   trian = get_triangulation(space)
   model = get_background_model(trian)
@@ -93,14 +117,20 @@ end
 
 # utils
 
+"""
+    get_polynomial_order(fs::FESpace) -> Integer
+
+Retrieves the polynomial order of `fs`
+
+"""
+get_polynomial_order(fs::SingleFieldFESpace) = get_polynomial_order(get_fe_basis(fs))
+get_polynomial_order(fs::MultiFieldFESpace) = maximum(map(get_polynomial_order,fs.spaces))
+
 function get_polynomial_order(basis)
   cell_basis = get_data(basis)
   shapefun = first(cell_basis).fields
   get_order(shapefun)
 end
-
-get_polynomial_order(fs::SingleFieldFESpace) = get_polynomial_order(get_fe_basis(fs))
-get_polynomial_order(fs::MultiFieldFESpace) = maximum(map(get_polynomial_order,fs.spaces))
 
 get_dof_type(b) = @abstractmethod
 get_dof_type(b::LagrangianDofBasis{P,V}) where {P,V} = change_eltype(V,Float64)

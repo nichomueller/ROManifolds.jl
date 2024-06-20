@@ -1,3 +1,14 @@
+"""
+    abstract type ParamField <: Field end
+
+Represents a parametric field. Subtypes:
+- [`TrivialParamField`](@ref)
+- [`GenericParamField`](@ref)
+- [`ParamFieldGradient`](@ref)
+- [`OperationParamField`](@ref)
+- [`InverseParamField`](@ref)
+
+"""
 abstract type ParamField <: Field end
 
 Base.length(f::ParamField) = param_length(f)
@@ -13,7 +24,12 @@ Arrays.return_value(b::Broadcasting{<:Function},f::ParamField,x...) = evaluate(b
 to_param_quantity(f::ParamField,plength::Integer) = f
 to_param_quantity(f::Field,plength::Integer) = TrivialParamField(f,plength)
 
-# this aims to make a field of type F behave like a pfield of length plength
+"""
+    TrivialParamField{F<:Field} <: ParamField
+
+Wrapper for nonparametric fields that we wish assumed a parametric length.
+
+"""
 struct TrivialParamField{F<:Field} <: ParamField
   field::F
   plength::Int
@@ -31,6 +47,12 @@ param_getindex(f::TrivialParamField,i::Integer) = f.field
 
 Arrays.evaluate(f::TrivialParamField,x::Point) = fill(evaluate(f.field,x),f.plength)
 
+"""
+    GenericParamField{T<:AbstractParamFunction} <: ParamField
+
+Parametric extension of a GenericField in [`Gridap`](@ref)
+
+"""
 struct GenericParamField{T<:AbstractParamFunction} <: ParamField
   object::T
 end
@@ -43,6 +65,12 @@ Arrays.return_value(f::GenericParamField,x::Point) = return_value(f.object,x)
 Arrays.return_cache(f::GenericParamField,x::Point) = return_cache(f.object,x)
 Arrays.evaluate!(cache,f::GenericParamField,x::Point) = evaluate!(cache,f.object,x)
 
+"""
+    ParamFieldGradient{N,F} <: ParamField
+
+Parametric extension of a FieldGradient in [`Gridap`](@ref)
+
+"""
 struct ParamFieldGradient{N,F} <: ParamField
   object::F
   ParamFieldGradient{N}(object::F) where {N,F} = new{N,F}(object)
@@ -69,6 +97,12 @@ end
 Arrays.return_cache(f::ParamFieldGradient{N,<:Function},x::Point) where N = gradient(f.object,Val{N}())
 Arrays.evaluate!(c,f::ParamFieldGradient{N,<:Function},x::Point) where N = c(x)
 
+"""
+    OperationParamField{O,F} <: ParamField
+
+Parametric extension of a OperationField in [`Gridap`](@ref)
+
+"""
 struct OperationParamField{O,F} <: ParamField
   op::O
   fields::F
@@ -137,6 +171,12 @@ function Fields.gradient(f::OperationParamField{<:Field})
   y⋅x
 end
 
+"""
+    InverseParamField{F} <: ParamField
+
+Parametric extension of a InverseField in [`Gridap`](@ref)
+
+"""
 struct InverseParamField{F} <: ParamField
   original::F
 end
@@ -154,6 +194,12 @@ function Arrays.evaluate!(cache,c::InverseParamField,x::Point)
   map(i->evaluate!(cache[i],param_getindex(c,i),x),param_eachindex(c))
 end
 
+"""
+    BroadcastOpParamFieldArray{O,T,N,A} <: AbstractVector{BroadcastOpFieldArray{O,T,N,A}}
+
+Parametric extension of a BroadcastOpFieldArray in [`Gridap`](@ref)
+
+"""
 struct BroadcastOpParamFieldArray{O,T,N,A} <: AbstractVector{BroadcastOpFieldArray{O,T,N,A}}
   array::Vector{BroadcastOpFieldArray{O,T,N,A}}
 end

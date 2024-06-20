@@ -1,18 +1,19 @@
 using Gridap
-using Gridap.FESpaces
-using ForwardDiff
-using BlockArrays
-using LinearAlgebra
-using Test
 using Gridap.Algebra
-using Gridap.ODEs
-using Gridap.Helpers
-using Gridap.Fields
 using Gridap.MultiField
-using BlockArrays
+using Test
 using DrWatson
+
 using Mabla.FEM
+using Mabla.FEM.TProduct
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamSteady
+using Mabla.FEM.ParamODEs
+
 using Mabla.RB
+using Mabla.RB.RBSteady
+using Mabla.RB.RBTransient
 
 θ = 0.5
 dt = 0.01
@@ -23,7 +24,7 @@ pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
-n = 10
+n = 5
 domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain, partition)
@@ -70,7 +71,7 @@ trian_jac = (Ω,)
 trian_jac_t = (Ω,)
 
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
-induced_norm((du,dp),(v,q)) = ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
+induced_norm((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
@@ -91,7 +92,7 @@ nls = NewtonRaphsonSolver(LUSolver(),1e-10,20)
 fesolver = ThetaMethod(nls,dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","toy_mesh")))
 
 fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
@@ -101,7 +102,7 @@ results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 # fesnaps = Serialization.deserialize(RB.get_snapshots_filename(test_dir))
 
-println(RB.compute_error(results))
+println(compute_error(results))
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)

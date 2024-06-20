@@ -1,3 +1,16 @@
+"""
+    abstract type UnEvalParamSingleFieldFESpace <: SingleFieldFESpace end
+
+Represents a trial FESpace with a function representing the Dirichlet boundary
+condition, instead of a vector of values. When evaluating an instance of
+UnEvalParamSingleFieldFESpace in a parametric realization, a parametric trial
+FE space is returned
+
+Subtypes:
+- [`ParamTrialFESpace`](@ref)
+- [`TransientTrialParamFESpace`](@ref)
+
+"""
 abstract type UnEvalParamSingleFieldFESpace <: SingleFieldFESpace end
 
 function Arrays.evaluate(U::UnEvalParamSingleFieldFESpace,args...)
@@ -48,12 +61,19 @@ function get_matrix_index_map(f::UnEvalParamSingleFieldFESpace,g::SingleFieldFES
   get_matrix_index_map(f.space,g)
 end
 
-struct ParamTrialESpace{A,B} <: UnEvalParamSingleFieldFESpace
+"""
+    ParamTrialFESpace{A,B} <: UnEvalParamSingleFieldFESpace
+
+Structure used in steady applications. When a ParamTrialFESpace is evaluated in a
+[`ParamRealization`](@ref), a parametric trial FE space is returned
+
+"""
+struct ParamTrialFESpace{A,B} <: UnEvalParamSingleFieldFESpace
   space::A
   space0::B
   dirichlet::Union{Function,AbstractVector{<:Function}}
 
-  function ParamTrialESpace(
+  function ParamTrialFESpace(
     space::A,
     dirichlet::Union{Function,AbstractVector{<:Function}}) where A
 
@@ -63,30 +83,30 @@ struct ParamTrialESpace{A,B} <: UnEvalParamSingleFieldFESpace
   end
 end
 
-function ParamTrialESpace(space)
+function ParamTrialFESpace(space)
   HomogeneousTrialFESpace(space)
 end
 
-FESpaces.ConstraintStyle(::Type{<:ParamTrialESpace{A}}) where A = ConstraintStyle(A)
+FESpaces.ConstraintStyle(::Type{<:ParamTrialFESpace{A}}) where A = ConstraintStyle(A)
 
-function ODEs.allocate_space(U::ParamTrialESpace,params)
+function ODEs.allocate_space(U::ParamTrialFESpace,params)
   HomogeneousTrialParamFESpace(U.space,Val(length(params)))
 end
 
-function Arrays.evaluate!(Upt::TrialParamFESpace,U::ParamTrialESpace,params)
+function Arrays.evaluate!(Upt::TrialParamFESpace,U::ParamTrialFESpace,params)
   dir(f) = f(params)
   dir(f::Vector) = dir.(f)
   TrialParamFESpace!(Upt,dir(U.dirichlet))
   Upt
 end
 
-function Arrays.evaluate!(Upt::TrialParamFESpace,U::ParamTrialESpace,r::ParamRealization)
+function Arrays.evaluate!(Upt::TrialParamFESpace,U::ParamTrialFESpace,r::ParamRealization)
   evaluate!(Upt,U,get_params(r))
 end
 
-Arrays.evaluate(U::ParamTrialESpace,r::Nothing) = U.space0
+Arrays.evaluate(U::ParamTrialFESpace,r::Nothing) = U.space0
 
-# Define the ParamTrialESpace interface for stationary spaces
+# Define the ParamTrialFESpace interface for stationary spaces
 
 ODEs.allocate_space(U::FESpace,r) = U
 Arrays.evaluate!(Upt::FESpace,U::FESpace,r) = U
@@ -97,7 +117,7 @@ Arrays.evaluate(U::FESpace,r) = U
 const ParamMultiFieldFESpace = MultiFieldFESpace
 
 function has_param(U::MultiFieldFESpace)
-  any(space -> space isa ParamTrialESpace,U.spaces)
+  any(space -> space isa ParamTrialFESpace,U.spaces)
 end
 
 function ODEs.allocate_space(U::MultiFieldFESpace,r::ParamRealization)

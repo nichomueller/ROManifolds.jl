@@ -1,3 +1,9 @@
+"""
+    ArrayOfTrivialArrays{T,N,L,P<:AbstractArray{T,N}} <: ParamArray{T,N,L}
+
+Wrapper for nonparametric arrays that we wish assumed a parametric length.
+
+"""
 struct ArrayOfTrivialArrays{T,N,L,P<:AbstractArray{T,N}} <: ParamArray{T,N,L}
   data::P
   plength::Int
@@ -22,31 +28,29 @@ Base.size(A::ArrayOfTrivialArrays{T,N}) where {T,N} = ntuple(_ -> A.plength,Val{
 end
 
 param_data(A::ArrayOfTrivialArrays) = fill(A.data,param_length(A))
-param_getindex(A::ArrayOfTrivialArrays,i::Integer...) = diagonal_getindex(A,i...)
-param_setindex!(A::ArrayOfTrivialArrays,v,i::Integer...) = diagonal_setindex!(A,v,i...)
 param_entry(A::ArrayOfTrivialArrays,i::Integer...) = ParamNumber(fill(A.data[i...],A.plength))
 
 Base.@propagate_inbounds function Base.getindex(A::ArrayOfTrivialArrays{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
   if all(i.==iblock)
-    diagonal_getindex(A,iblock)
+    param_getindex(A,iblock)
   else
     fill(zero(T),innersize(A))
   end
 end
 
-Base.@propagate_inbounds function diagonal_getindex(A::ArrayOfTrivialArrays{T,N},iblock::Integer) where {T,N}
+Base.@propagate_inbounds function param_getindex(A::ArrayOfTrivialArrays{T,N},i::Integer) where {T,N}
   A.data
 end
 
 Base.@propagate_inbounds function Base.setindex!(A::ArrayOfTrivialArrays,v,i::Integer...)
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
-  all(i.==iblock) && diagonal_setindex!(A,v,iblock)
+  all(i.==iblock) && param_setindex!(A,v,iblock)
 end
 
-Base.@propagate_inbounds function diagonal_setindex!(A::ArrayOfTrivialArrays{T,N},v,iblock::Integer) where {T,N}
+Base.@propagate_inbounds function param_setindex!(A::ArrayOfTrivialArrays{T,N},v,i::Integer) where {T,N}
   copyto(A.data,v)
 end
 

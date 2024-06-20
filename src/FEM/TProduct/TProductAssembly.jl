@@ -1,5 +1,9 @@
-# assembly
+"""
+    TProductSparseMatrixAssembler{D,Ti} <: SparseMatrixAssembler
 
+Assembly-related information when constructing a [`TProductArray`](ref)
+
+"""
 struct TProductSparseMatrixAssembler{D,Ti} <: SparseMatrixAssembler
   assem::GenericSparseMatrixAssembler
   assems_1d::Vector{GenericSparseMatrixAssembler}

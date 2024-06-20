@@ -176,15 +176,20 @@ function Algebra.solve!(
   nonlinear_rb_solve!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,stageop,trial)
 end
 
-function ParamDataStructures.shift!(a::AbstractParamContainer,r::TransientParamRealization,α::Number,β::Number)
+function ParamDataStructures.shift!(a::VectorOfVectors,r::TransientParamRealization,α::Number,β::Number)
   b = copy(a)
-  nt = num_times(r)
   np = num_params(r)
-  @assert length(a) == nt*np
-  for i = eachindex(a)
+  @assert param_length(a) == param_length(r)
+  for i = param_eachindex(a)
     it = slow_index(i,np)
     if it > 1
       a[i] .= α*a[i] + β*b[i-np]
     end
+  end
+end
+
+function ParamDataStructures.shift!(a::BlockVectorOfVectors,r::TransientParamRealization,α::Number,β::Number)
+  @inbounds for ai in blocks(a)
+    ParamDataStructures.shift!(ai,r,α,β)
   end
 end

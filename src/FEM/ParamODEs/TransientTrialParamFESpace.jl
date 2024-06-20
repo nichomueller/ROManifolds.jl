@@ -1,3 +1,10 @@
+"""
+    TransientTrialParamFESpace{A,B} <: UnEvalParamSingleFieldFESpace
+
+Structure used in transient applications. When a TransientTrialParamFESpace is
+evaluated in a [`TransientParamRealization`](@ref), a parametric trial FE space is returned
+
+"""
 struct TransientTrialParamFESpace{A,B} <: UnEvalParamSingleFieldFESpace
   space::A
   space0::B

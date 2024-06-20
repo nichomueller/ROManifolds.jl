@@ -1,10 +1,26 @@
-# interface to accommodate the separation of terms depending on the linearity/nonlinearity
+"""
+    GenericTransientParamLinearNonlinearFEOperator <:
+      TransientParamFEOperator{LinearNonlinearParamODE}
 
+Interface to accommodate the separation of terms depending on their linearity in
+a nonlinear problem. This allows to build and store once and for all linear
+residuals/jacobians, and in the Newton-like iterations only evaluate and assemble
+only the nonlinear components
+
+"""
 struct GenericTransientParamLinearNonlinearFEOperator <: TransientParamFEOperator{LinearNonlinearParamODE}
   op_linear::TransientParamFEOperator{LinearParamODE}
   op_nonlinear::TransientParamFEOperator
 end
 
+"""
+   TransientParamLinearNonlinearFEOperatorWithTrian <:
+    TransientParamFEOperatorWithTrian{LinearNonlinearParamODE}
+
+Is to a TransientParamFEOperatorWithTrian as a GenericTransientParamLinearNonlinearFEOperator is to
+a TransientParamFEOperator
+
+"""
 struct TransientParamLinearNonlinearFEOperatorWithTrian <: TransientParamFEOperatorWithTrian{LinearNonlinearParamODE}
   op_linear::TransientParamFEOperatorWithTrian{LinearParamODE}
   op_nonlinear::TransientParamFEOperatorWithTrian
@@ -22,6 +38,13 @@ function TransientParamLinNonlinFEOperator(
   TransientParamLinearNonlinearFEOperatorWithTrian(op_linear,op_nonlinear)
 end
 
+"""
+    const TransientParamLinearNonlinearFEOperator = Union{
+      GenericTransientParamLinearNonlinearFEOperator,
+      TransientParamLinearNonlinearFEOperatorWithTrian
+    }
+
+"""
 const TransientParamLinearNonlinearFEOperator = Union{
   GenericTransientParamLinearNonlinearFEOperator,
   TransientParamLinearNonlinearFEOperatorWithTrian
@@ -38,6 +61,12 @@ end
 function FESpaces.get_trial(op::TransientParamLinearNonlinearFEOperator)
   @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
   get_trial(op.op_linear)
+end
+
+function IndexMaps.get_index_map(op::TransientParamLinearNonlinearFEOperator)
+  @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
+  @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))
+  get_index_map(op.op_linear)
 end
 
 function ReferenceFEs.get_order(op::TransientParamLinearNonlinearFEOperator)

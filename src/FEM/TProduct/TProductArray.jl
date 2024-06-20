@@ -1,3 +1,16 @@
+"""
+    abstract type AbstractTProductArray{T,N} <: AbstractArray{T,N} end
+
+Type storing information related to FE arrays in a 1-D setting, and the FE array
+defined as their permuted tensor product. The index permutation is encoded in an
+AbstractIndexMap, to be provided with factors and tensor product arrays.
+
+Subtypes:
+- [`TProductArray`](@ref)
+- [`TProductGradientArray`](@ref)
+
+"""
+#TODO I'm only using this for matrices, not vectors. Can change to <: AbstractMatrix{T} ?
 abstract type AbstractTProductArray{T,N} <: AbstractArray{T,N} end
 
 Arrays.get_array(a::AbstractTProductArray) = @abstractmethod
@@ -63,6 +76,18 @@ function LinearAlgebra.lu!(a::AbstractTProductArray,b::AbstractTProductArray)
   lu!(get_array(a),get_array(b))
 end
 
+"""
+    TProductArray{T,N,A,I} <: AbstractTProductArray{T,N}
+
+Represents a mass matrix associated to a couple of tensor product FE spaces
+[`TProductFESpace`](@ref). In fact:
+
+    M₁₂₃... = U+1D4D8(M₁ ⊗ M₂ ⊗ M₃ ⊗ ...),
+
+where M₁, M₂, M₃, ... represent the 1-D mass matrices on their respective axes,
+U+1D4D8(⋅) is the index map, and M₁₂₃... is the D-dimensional mass matrix
+
+"""
 struct TProductArray{T,N,A,I} <: AbstractTProductArray{T,N}
   array::A
   arrays_1d::Vector{A}
@@ -314,6 +339,19 @@ end
   return C
 end
 
+"""
+    TProductGradientArray{T,N,A,I} <: AbstractTProductArray{T,N}
+
+Represents a stiffness matrix associated to a couple of tensor product FE spaces
+[`TProductFESpace`](@ref). In fact:
+
+    A₁₂₃... = U+1D4D8(M₁ ⊗ M₂ ⊗ M₃ ⊗ ... + A₁ ⊗ M₂ ⊗ M₃ ⊗ ... + M₁ ⊗ A₂ ⊗ M₃ ⊗ ... + ...),
+
+where M₁, M₂, M₃, ... represent the 1-D mass matrices on their respective axes,
+A₁, A₂, A₃, ... represent the 1-D stiffness matrices on their respective axes,
+U+1D4D8(⋅) is the index map, and A₁₂₃... is the D-dimensional stiffness matrix
+
+"""
 struct TProductGradientArray{T,N,A,I} <: AbstractTProductArray{T,N}
   array::A
   arrays_1d::Vector{A}

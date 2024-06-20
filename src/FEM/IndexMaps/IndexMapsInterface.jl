@@ -40,7 +40,7 @@ end
 Index mapping operator that serves to view a finite element function according to
 a nonstandard indexing strategy. Just like the connectivity matrix, the entries of
 the index maps are positive when the corresponding dof is free, and negative when
-the corresponding dof is Dirichlet.
+the corresponding dof is dirichlet.
 """
 
 abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D} end
@@ -75,7 +75,7 @@ end
 """
     inv_index_map(i::AbstractIndexMap) -> AbstractIndexMap
 
-Returns the inverse index map.
+Returns the inverse of the index map defined by `i`.
 """
 
 function inv_index_map(i::AbstractIndexMap)
@@ -86,7 +86,7 @@ end
 """
     change_index_map(f,i::AbstractIndexMap) -> AbstractIndexMap
 
-Returns an index map given by f∘i, where f is a function encoding an index map.
+Returns an index map given by `f`∘`i`, where f is a function encoding an index map.
 """
 
 function change_index_map(f,i::AbstractIndexMap)
@@ -160,7 +160,7 @@ Base.getindex(i::IndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.loc
 """
     FixedDofIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
 
-Index map to be used when imposing a zero mean constraint on a given FE space. The fixed
+Index map to be used when imposing a zero mean constraint on a given `FESpace`. The fixed
 dof is seen as a CartesianIndex of dimension D.
 """
 
@@ -188,7 +188,7 @@ Base.view(i::FixedDofIndexMap,locations) = FixedDofIndexMap(IndexMapView(i.indic
 """
     TProductIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
 
-Index map to be used when defining a tensor product FE space on a CartesianDiscreteModel.
+Index map to be used when defining a [`TProductFESpace`](@ref) on a CartesianDiscreteModel.
 
 """
 
@@ -205,6 +205,14 @@ Base.size(i::TProductIndexMap) = size(i.indices)
 Base.getindex(i::TProductIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 get_tp_indices(i::TProductIndexMap) = i.indices
 get_univariate_indices(i::TProductIndexMap) = i.indices_1d
+
+"""
+    SparseIndexMap{D,Ti,A<:AbstractIndexMap{D,Ti},B<:TProductSparsityPattern} <: AbstractIndexMap{D,Ti}
+
+Index map used to select the nonzero entries of a sparse matrix. The field `sparsity`
+contains the tensor product sparsity of the matrix to be indexed.
+
+"""
 
 struct SparseIndexMap{D,Ti,A<:AbstractIndexMap{D,Ti},B<:TProductSparsityPattern} <: AbstractIndexMap{D,Ti}
   indices::A

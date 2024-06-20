@@ -17,7 +17,6 @@ export recast_indices
 export sparsify_indices
 export get_nonzero_indices
 export tensorize_indices
-export split_row_col_indices
 include("IndexOperations.jl")
 
 export SparsityPattern

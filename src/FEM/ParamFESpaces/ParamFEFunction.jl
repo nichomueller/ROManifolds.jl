@@ -1,3 +1,8 @@
+"""
+    abstract type ParamFEFunction <: FEFunction end
+
+Parametric extension of a [`FEFunction`](@ref) in [`Gridap`](@ref)
+"""
 abstract type ParamFEFunction <: FEFunction end
 
 struct SingleFieldParamFEFunction{T<:CellField} <: ParamFEFunction

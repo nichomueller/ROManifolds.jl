@@ -1,4 +1,38 @@
+"""
+    AbstractParamRealization
+
+Type representing parametric realizations, i.e. samples extracted from a given
+parameter space. Two categories of such realizations are implemented:
+- [`ParamRealization`](@ref).
+- [`TransientParamRealization`](@ref).
+
+"""
+
 abstract type AbstractParamRealization end
+
+"""
+    ParamRealization{P<:AbstractVector} <: AbstractParamRealization
+
+Represents standard parametric realizations, i.e. samples extracted from
+a given parameter space. The field `params` is most commonly a vector of vectors.
+When the parameters are scalars, they still need to be defined as vectors of
+vectors of unit length. In other words, we treat the case in which `params` is a
+vector of numbers as the case in which `params` is a vector of one vector.
+
+# Examples
+
+```jldoctest
+julia> r = ParamRealization([[1, 2],[3, 4]])
+ParamRealization{Vector{Vector{Int64}}}([[1, 2], [3, 4]])
+julia> μ = r[1]
+ParamRealization{Vector{Int64}}([1, 2])
+julia> r′ = ParamRealization([1, 2])
+ParamRealization{Vector{Int64}}([1, 2])
+julia> μ′ = r′[1]
+ParamRealization{Vector{Int64}}([1, 2])
+```
+
+"""
 
 struct ParamRealization{P<:AbstractVector} <: AbstractParamRealization
   params::P
@@ -24,8 +58,17 @@ function Base.iterate(r::ParamRealization,state=1)
   return rstate, state+1
 end
 
-# Convention: we separate the initial time instant t0 from the others:
-# in unsteady FEM applications, the value of the solution at t0 is given
+"""
+    TransientParamRealization{P<:ParamRealization,T<:Real} <: AbstractParamRealization
+
+Represents temporal parametric realizations, i.e. samples extracted from
+a given parameter space for every time step in a temporal range. The most obvious
+application of this type are transient PDEs, where an initial condition is given.
+Following this convention, the initial time instant is kept separate from the
+other time steps.
+
+"""
+
 abstract type TransientParamRealization{P<:ParamRealization,T<:Real} <: AbstractParamRealization end
 
 Base.length(r::TransientParamRealization) = num_params(r)*num_times(r)
@@ -33,6 +76,13 @@ get_params(r::TransientParamRealization) = get_params(r.params)
 _get_params(r::TransientParamRealization) = _get_params(r.params)
 num_params(r::TransientParamRealization) = num_params(r.params)
 num_times(r::TransientParamRealization) = length(get_times(r))
+
+"""
+    GenericTransientParamRealization{P,T,A} <: TransientParamRealization{P,T}
+
+Most standard implementation of an transient parametric realization.
+
+"""
 
 struct GenericTransientParamRealization{P,T,A} <: TransientParamRealization{P,T}
   params::P
@@ -98,6 +148,14 @@ function get_at_time(r::GenericTransientParamRealization{P,T} where P,time::T)  
   TransientParamRealizationAt(get_params(r),Ref(time))
 end
 
+"""
+    TransientParamRealizationAt{P,T} <: TransientParamRealization{P,T}
+
+Represents a GenericTransientParamRealization{P,T} at a certain time instant `t`.
+For reusability purposes, the time instant `t` is stored as a Base.RefValue{T}.
+
+"""
+
 struct TransientParamRealizationAt{P,T} <: TransientParamRealization{P,T}
   params::P
   t::Base.RefValue{T}
@@ -128,6 +186,13 @@ abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end
 struct NormalSampling <: SamplingStyle end
 
+"""
+    ParamSpace{P,S} <: AbstractSet{ParamRealization}
+
+Represents a standard set of parameters.
+
+"""
+
 struct ParamSpace{P,S} <: AbstractSet{ParamRealization}
   param_domain::P
   sampling_style::S
@@ -151,9 +216,23 @@ function generate_param(p::ParamSpace)
   [_value(d,p.sampling_style) for d = p.param_domain]
 end
 
+"""
+    realization(p::ParamSpace;nparams=1) -> ParamRealization
+    realization(p::TransientParamSpace;nparams=1) -> TransientParamRealization
+
+Extraction of a set of parameters from a given parametric space
+"""
+
 function realization(p::ParamSpace;nparams=1)
   ParamRealization([generate_param(p) for i = 1:nparams])
 end
+
+"""
+    TransientParamSpace{P,T} <: AbstractSet{TransientParamRealization}
+
+Represents a transient set of parameters.
+
+"""
 
 struct TransientParamSpace{P,T} <: AbstractSet{TransientParamRealization}
   parametric_space::P
@@ -188,7 +267,45 @@ function shift!(p::TransientParamSpace,δ::Real)
   p.temporal_domain .+= δ
 end
 
+"""
+    AbstractParamFunction{P<:ParamRealization} <: Function
+
+Representation of parametric functions with domain a parametric space.
+Two categories of such functions are implemented:
+- [`ParamFunction`](@ref).
+- [`TransientParamFunction`](@ref).
+
+"""
+
 abstract type AbstractParamFunction{P<:ParamRealization} <: Function end
+
+"""
+    ParamFunction{F,P} <: AbstractParamFunction{P}
+
+Representation of parametric functions with domain a parametric space. Given a
+function `f` : Ω₁ × ... × Ωₙ × U+1D4DF, where U+1D4DF is a `ParamSpace`,
+the evaluation of `f` in `μ ∈ U+1D4DF` returns the restriction of `f` to Ω₁ × ... × Ωₙ
+
+# Examples
+
+```jldoctest
+julia> U+1D4DF = ParamSpace([[0, 1],[0, 1]])
+Set of parameters in [[0, 1], [0, 1]], sampled with UniformSampling()
+julia> μ = realization(U+1D4DF; nparams = 2)
+ParamRealization{Vector{Vector{Float64}}}([...])
+julia> a(x, μ) = sum(x) * sum(μ)
+a (generic function with 1 method)
+julia> a(μ) = x -> a(x, μ)
+a (generic function with 2 methods)
+julia> aμ = ParamFunction(a, μ)
+#15 (generic function with 1 method)
+julia> aμ(Point(0, 1))
+2-element Vector{Float64}:
+ 0.068032791851195
+ 0.9263487710801264
+```
+
+"""
 
 struct ParamFunction{F,P} <: AbstractParamFunction{P}
   fun::F
@@ -263,6 +380,18 @@ function pteval(f::ParamFunction,x)
 end
 
 Arrays.return_value(f::ParamFunction,x) = f.fun(x,testitem(_get_params(f)))
+
+"""
+    TransientParamFunction{F,P,T} <: AbstractParamFunction{P}
+
+Representation of parametric functions with domain a transient parametric space.
+Given a function `f` : Ω₁ × ... × Ωₙ × [t₁,t₂] × U+1D4DF, where [t₁,t₂] is a
+temporal domain and U+1D4DF is a `ParamSpace`, or equivalently
+`f` : Ω₁ × ... × Ωₙ × [t₁,t₂] × U+1D4E3 U+1D4DF, where U+1D4E3 U+1D4DF is a
+`TransientParamSpace`, the evaluation of `f` in `μ ∈ U+1D4E3 U+1D4DF` returns
+the restriction of `f` to Ω₁ × ... × Ωₙ
+
+"""
 
 struct TransientParamFunction{F,P,T} <: AbstractParamFunction{P}
   fun::F

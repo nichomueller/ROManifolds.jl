@@ -1,11 +1,10 @@
-struct TProductCellPoint{DS<:DomainStyle,A,B} <: CellDatum
+"""
+    TProductCellPoint{DS<:DomainStyle,A,B} <: CellDatum
+
+"""
+struct TProductCellPoint{DS<:DomainStyle,A<:CellPoint{DS},B<:AbstractVector{<:CellPoint{DS}}} <: CellDatum
   point::A
   single_points::B
-  function TProductCellPoint(
-    point::A,single_points::B
-    ) where {DS,A<:CellPoint{DS},B<:AbstractVector{<:CellPoint{DS}}}
-    new{DS,A,B}(point,single_points)
-  end
 end
 
 CellData.get_data(f::TProductCellPoint) = f.point
@@ -25,6 +24,10 @@ function Arrays.evaluate!(cache,f::CellField,x::TProductCellPoint)
   evaluate!(cache,f,x.point)
 end
 
+"""
+    TProductCellField{DS<:DomainStyle,A} <: CellField
+
+"""
 struct TProductCellField{DS<:DomainStyle,A} <: CellField
   single_fields::A
   domain_style::DS
@@ -59,6 +62,10 @@ end
 
 # gradients
 
+"""
+    TProductGradientCellField{A,B} <: CellField
+
+"""
 struct TProductGradientCellField{A,B} <: CellField
   cell_data::A
   gradient_cell_data::B
@@ -76,6 +83,7 @@ function Fields.gradient(f::TProductCellField)
   return TProductGradientCellField(f,g)
 end
 
+# stores the evaluation of a TProductGradientCellField on a quadrature
 struct TProductGradientEval{A,B,C}
   f::A
   g::B
@@ -194,9 +202,13 @@ function CellData.integrate(f::TProductGradientCellField,a::TProductMeasure)
   TProductGradientEval(fi,dfi)
 end
 
-# deal with cell field + gradient cell field
+# this deals with a cell field +- a gradient cell field; for now, the result of
+# these operations is simply the gradient cell field itself, since I'm only dealing with
+# mass and stiffness matrices. See TProductArray and TProductGradientArray for
+# more details. If in the future I consider more complicated structures (e.g.
+# divergence/curl terms) this will have to change
 
 for op in (:+,:-)
-  @eval ($op)(a::Vector,b::TProductGradientEval) = TProductGradientEval(b.f,b.g,$op)
-  @eval ($op)(a::TProductGradientEval,b::Vector) = TProductGradientEval(a.f,a.g,$op)
+  @eval ($op)(a::AbstractArray,b::TProductGradientEval) = TProductGradientEval(b.f,b.g,$op)
+  @eval ($op)(a::TProductGradientEval,b::AbstractArray) = TProductGradientEval(a.f,a.g,$op)
 end

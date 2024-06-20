@@ -1,7 +1,26 @@
 """
-A parametric version of the `Gridap` `TransientFEOperator`
-"""
+    abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: TransientFEOperator{T} end
 
+Parametric extension of a [`TransientFEOperator`](@ref) in [`Gridap`](@ref). Compared to
+a standard TransientFEOperator, there are the following novelties:
+
+- a TransientParamSpace is provided, so that transient parametric realizations
+  can be extracted directly from the TransientParamFEOperator
+- an AbstractIndexMap is provided, so that a nonstandard indexing strategy can
+  take place when dealing with FEFunctions
+- a function representing a norm matrix is provided, so that errors in the
+  desired norm can be automatically computed
+
+Subtypes:
+
+- [`TransientParamFEOpFromWeakForm`](@ref)
+- [`TransientParamSemilinearFEOpFromWeakForm`](@ref)
+- [`TransientParamLinearFEOpFromWeakForm`](@ref)
+- [`TransientParamSaddlePointFEOp`](@ref)
+- [`TransientParamFEOperatorWithTrian`](@ref)
+- [`GenericTransientParamLinearNonlinearFEOperator`](@ref)
+
+"""
 abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: TransientFEOperator{T} end
 
 function FESpaces.get_algebraic_operator(op::TransientParamFEOperator)
@@ -55,6 +74,13 @@ end
 ParamSteady.get_linear_operator(op::TransientParamFEOperator) = @abstractmethod
 ParamSteady.get_nonlinear_operator(op::TransientParamFEOperator) = @abstractmethod
 
+"""
+    TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParamODE}
+
+Most standard instance of TransientParamFEOperator, when the transient problem is
+nonlinear
+
+"""
 struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParamODE}
   res::Function
   jacs::Tuple{Vararg{Function}}
@@ -126,6 +152,13 @@ IndexMaps.get_index_map(op::TransientParamFEOpFromWeakForm) = op.index_map
 ParamDataStructures.realization(op::TransientParamFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 ParamSteady.get_induced_norm(op::TransientParamFEOpFromWeakForm) = op.induced_norm
 
+"""
+    TransientParamSemilinearFEOpFromWeakForm <: TransientParamFEOperator{SemilinearParamODE}
+
+Most standard instance of TransientParamFEOperator, when the transient problem is
+semilinear
+
+"""
 struct TransientParamSemilinearFEOpFromWeakForm <: TransientParamFEOperator{SemilinearParamODE}
   mass::Function
   res::Function
@@ -225,6 +258,13 @@ function ODEs.is_form_constant(op::TransientParamSemilinearFEOpFromWeakForm,k::I
   (k == get_order(op)+1) && op.constant_mass
 end
 
+"""
+    TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE}
+
+Most standard instance of TransientParamFEOperator, when the transient problem is
+linear
+
+"""
 struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE}
   forms::Tuple{Vararg{Function}}
   res::Function

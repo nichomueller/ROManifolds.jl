@@ -1,3 +1,5 @@
+"""
+"""
 struct ParamOpFromFEOp{T} <: ParamOperator{T}
   op::ParamFEOperator{T}
 end
@@ -17,6 +19,14 @@ function get_nonlinear_operator(op::ParamOpFromFEOp)
   ParamOpFromFEOp(get_nonlinear_operator(op.op))
 end
 
+"""
+    allocate_paramcache(op::ParamOpFromFEOp,r::ParamRealization,u::AbstractParamVector
+      ) -> CacheType
+
+Similar to [`allocate_odecache`](@ref) in [`Gridap`](@ref), when dealing with steady
+parametric problems
+
+"""
 function allocate_paramcache(
   op::ParamOpFromFEOp,
   r::ParamRealization,
@@ -42,6 +52,14 @@ function allocate_paramcache(
   OpFromFEOpCache(trial,ptrial,pfeopcache,A)
 end
 
+"""
+    update_paramcache!(opcache, op::ParamOpFromFEOp, r::ParamRealization, u::AbstractParamVector
+      ) -> CacheType
+
+Similar to [`update_odeopcache!`](@ref) in [`Gridap`](@ref), when dealing with steady
+parametric problems
+
+"""
 function update_paramcache!(opcache,op::ParamOpFromFEOp,r::ParamRealization)
   opcache.Us = evaluate!(opcache.Us,opcache.Ups,r)
   pfeopcache,op = opcache.pfeopcache,op.op
@@ -132,6 +150,8 @@ function Algebra.jacobian!(
   A
 end
 
+"""
+"""
 struct ParamOpFromFEOpWithTrian{T} <: ParamOperatorWithTrian{T}
   op::ParamFEOperatorWithTrian{T}
 end

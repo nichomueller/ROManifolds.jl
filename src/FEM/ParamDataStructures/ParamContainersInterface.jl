@@ -1,16 +1,78 @@
+"""
+    param_length(a) -> Int
+
+Returns the parametric length of `a`
+
+"""
 param_length(a) = @abstractmethod
 param_length(a::Union{Nothing,Function,Map}) = 0
-param_length(a::AbstractParamFunction) = length(a)
+param_length(a::Union{AbstractParamRealization,AbstractParamFunction}) = length(a)
 param_length(a::Union{Number,AbstractArray{<:Number}}) = 0
+
+"""
+    param_data(a) -> Int
+
+Returns the parametric data of `a`
+
+"""
 param_data(a) = @abstractmethod
-param_getindex(a,i::Integer...) = @abstractmethod
-param_getindex(a::Union{Nothing,Function,Map},i::Integer...) = a
-param_setindex!(a,v,i::Integer...) = @abstractmethod
+
+"""
+    param_getindex(a,i::Integer) -> Any
+
+Returns the parametric entry of `a` at the index `i` ∈ {1,...,`param_length`(`a`)}
+
+"""
+param_getindex(a,i::Integer) = @abstractmethod
+param_getindex(a::Union{Nothing,Function,Map},i::Integer) = a
+
+param_setindex!(a,v,i::Integer) = @abstractmethod
+
+"""
+    param_entry(a,i::Integer...) -> AbstractVector{eltype(a)}
+
+Same as getindex(a,i::Integer...), but across every parameter defining `a`. The
+result is an abstract vector of length `param_length`(`a`). It often outputs a
+[`ParamNumber`]
+
+"""
 param_entry(a,i::Integer...) = @abstractmethod
+
 param_eachindex(a) = Base.OneTo(param_length(a))
-array_of_similar_arrays(a,l::Integer) = @abstractmethod
+
+"""
+    array_of_similar_arrays(a,plength::Integer) -> AbstractArray{typeof(a),ndims(a)}
+
+Creates an instance of `AbstractArray`{typeof(`a`),ndims(`a`)} of parametric
+length `plength` from `a`.
+
+"""
+array_of_similar_arrays(a,plength::Integer) = @abstractmethod
+
+function array_of_zero_arrays(a,plength::Integer)
+  A = array_of_similar_arrays(a,plength)
+  fill!(A,zero(eltype(a)))
+  return A
+end
+
+"""
+    to_param_quantity(a,plength::Integer) -> Any
+
+Returns a quantity with parametric length `plength` from `a`. When `a` already
+possesses a parametric length, i.e. it is a parametrized quantity, it returns `a`
+
+"""
 to_param_quantity(a,plength::Integer) = @abstractmethod
 to_param_quantity(a::Union{Nothing,Function,Map},plength::Integer) = a
+
+"""
+    find_param_length(a...) -> Int
+
+Returns the parametric length of all parametric quantities. An error is thrown
+if there are no parametric quantities or if at least two quantities have different
+parametric length
+
+"""
 
 function find_param_length(a...)
   plengths::Tuple{Vararg{Int}} = filter(!iszero,param_length.(a))
@@ -18,10 +80,29 @@ function find_param_length(a...)
   return first(plengths)
 end
 
+"""
+    to_param_quantities(a...;plength=find_param_length(a...)) -> Any
+
+Converts the input quantities to parametric quantities
+
+"""
+
 function to_param_quantities(a...;plength=find_param_length(a...))
   pa = map(f->to_param_quantity(f,plength),a)
   return pa
 end
+
+"""
+    AbstractParamContainer{T,N,L} <: AbstractArray{T,N}
+
+Type representing generic parametric quantities. L encodes the parametric length.
+Subtypes:
+- [`ParamContainer`](@ref).
+- [`ParamNumber`](@ref).
+- [`AbstractParamArray`](@ref).
+- [`AbstractSnapshots`](@ref).
+
+"""
 
 abstract type AbstractParamContainer{T,N,L} <: AbstractArray{T,N} end
 
@@ -29,6 +110,13 @@ param_length(::Type{<:AbstractParamContainer{T,N,L}}) where {T,N,L} = L
 param_length(::T) where {T<:AbstractParamContainer} = param_length(T)
 
 param_data(A::AbstractParamContainer) = map(i->param_getindex(A,i),param_eachindex(A))
+
+"""
+    ParamContainer{T,L} <: AbstractArray{T,1,L}
+
+Used as a wrapper for non-array structures, e.g. factorizations
+
+"""
 
 struct ParamContainer{T,L} <: AbstractParamContainer{T,1,L}
   data::Vector{T}
@@ -44,6 +132,14 @@ param_getindex(a::ParamContainer,v,i::Integer) = setindex!(a,v,i)
 Base.size(a::ParamContainer) = (param_length(a),)
 Base.getindex(a::ParamContainer,i::Integer) = getindex(a.data,i)
 Base.setindex!(a::ParamContainer,v,i::Integer) = setindex!(a.data,v,i)
+
+"""
+    ParamNumber{T<:Number,L} <: AbstractParamContainer{T,1,L}
+
+Represents parametric scalars, e.g. entries of parametric arrays across all
+parameters.
+
+"""
 
 struct ParamNumber{T<:Number,L} <: AbstractParamContainer{T,1,L}
   data::Vector{T}

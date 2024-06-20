@@ -1,3 +1,11 @@
+"""
+    BlockArrayOfArrays{T,N,L,A<:AbstractArray{<:AbstractParamArray{T,N,L},N},B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N,L}
+
+Is to a [`ParamArray`](@ref) as a BlockArray is to a regular AbstractArray.
+Instances of BlockArrayOfArrays are obtained by extending the function `_BlockArray`
+in the package BlockArrays.
+
+"""
 struct BlockArrayOfArrays{T,N,L,A<:AbstractArray{<:AbstractParamArray{T,N,L},N},B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N,L}
   data::A
   axes::B
@@ -165,6 +173,7 @@ for f in (:(Base.maximum),:(Base.minimum))
   end
 end
 
+#TODO we never use this
 struct BlockParamView{T,N,L,A} <: AbstractBlockArray{T,N}
   data::BlockArrayOfArrays{T,N,L,A}
   index::Int

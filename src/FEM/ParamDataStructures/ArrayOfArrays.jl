@@ -1,3 +1,12 @@
+"""
+    ArrayOfArrays{T,N,L,P<:AbstractVector{<:AbstractArray{T,N}}} <: ParamArray{T,N,L}
+
+Represents a vector of arrays. For sake of coherence, an instance of
+`ArrayOfArrays{T,N}` inherits from AbstractArray{<:AbstractArray{T,N},N} rather than
+AbstractVector{<:AbstractArray{T,N}}, but should conceptually be thought as an
+AbstractVector{<:AbstractArray{T,N}}.
+
+"""
 struct ArrayOfArrays{T,N,L,P<:AbstractVector{<:AbstractArray{T,N}}} <: ParamArray{T,N,L}
   data::P
   function ArrayOfArrays(data::P) where {T,N,P<:AbstractVector{<:AbstractArray{T,N}}}
@@ -18,32 +27,30 @@ Base.size(A::ArrayOfArrays{T,N}) where {T,N} = ntuple(_->param_length(A),Val{N}(
 end
 
 param_data(A::ArrayOfArrays{T,N}) where {T,N} = A.data
-param_getindex(A::ArrayOfArrays,i::Integer) = diagonal_getindex(A,i)
-param_setindex!(A::ArrayOfArrays,v,i::Integer) = diagonal_setindex!(A,v,i)
 param_entry(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N} = ParamNumber(map(a->getindex(a,i...),A.data))
 
 Base.@propagate_inbounds function Base.getindex(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
   if all(i.==iblock)
-    diagonal_getindex(A,iblock)
+    param_getindex(A,iblock)
   else
     fill(zero(T),innersize(A))
   end
 end
 
-Base.@propagate_inbounds function diagonal_getindex(A::ArrayOfArrays{T,N},iblock::Integer) where {T,N}
-  getindex(A.data,iblock)
+Base.@propagate_inbounds function param_getindex(A::ArrayOfArrays{T,N},i::Integer) where {T,N}
+  getindex(A.data,i)
 end
 
 Base.@propagate_inbounds function Base.setindex!(A::ArrayOfArrays{T,N},v,i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
-  all(i.==iblock) && diagonal_setindex!(A,v,iblock)
+  all(i.==iblock) && param_setindex!(A,v,iblock)
 end
 
-Base.@propagate_inbounds function diagonal_setindex!(A::ArrayOfArrays{T,N},v,iblock::Integer) where {T,N}
-  setindex!(A.data,v,iblock)
+Base.@propagate_inbounds function param_setindex!(A::ArrayOfArrays{T,N},v,i::Integer) where {T,N}
+  setindex!(A.data,v,i)
 end
 
 function Base.similar(A::ArrayOfArrays{T,N},::Type{<:AbstractArray{T′}}) where {T,T′,N}

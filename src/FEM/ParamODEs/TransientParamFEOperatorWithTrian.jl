@@ -1,11 +1,38 @@
-# interface to accommodate the separation of terms depending on the triangulation
+"""
+    abstract type TransientParamFEOperatorWithTrian{T<:ODEParamOperatorType} <:
+      TransientParamFEOperator{T} end
 
+Interface to accommodate the separation of terms in the problem's weak formulation
+depending on the triangulation on which the integration occurs. When employing
+a TransientParamFEOperatorWithTrian, the residual and jacobian are returned as
+[`Contribution`](@ref) objects, instead of standard arrays. To correctly define
+an instance of TransientParamFEOperatorWithTrian, one needs to:
+- provide the integration domains of the residual and jacobian, i.e. their
+  respective triangulations
+- define the residual and jacobian as functions of the Measure objects corresponding
+  to the aforementioned triangulations
+
+Subtypes:
+
+- [`TransientParamFEOpFromWeakFormWithTrian`](@ref)
+- [`TransientParamSaddlePointFEOpWithTrian`](@ref)
+- [`TransientParamLinearNonlinearFEOperatorWithTrian`](@ref)
+
+"""
 abstract type TransientParamFEOperatorWithTrian{T<:ODEParamOperatorType} <: TransientParamFEOperator{T} end
 
 function FESpaces.get_algebraic_operator(feop::TransientParamFEOperatorWithTrian)
   ODEParamOpFromTFEOpWithTrian(feop)
 end
 
+"""
+    TransientParamFEOpFromWeakFormWithTrian{T,N} <: TransientParamFEOperatorWithTrian{T}
+
+Corresponds to a [`TransientParamFEOpFromWeakForm`](@ref) object, but in a triangulation
+separation setting. `N` corresponds to the length of the jacobians in the transient
+problem, i.e. the order of the time derivative
+
+"""
 struct TransientParamFEOpFromWeakFormWithTrian{T,N} <: TransientParamFEOperatorWithTrian{T}
   op::TransientParamFEOperator{T}
   trian_res::Tuple{Vararg{Triangulation}}
@@ -26,8 +53,8 @@ function TransientParamFEOpFromWeakForm(
   jacs::Tuple{Vararg{Function}},
   induced_norm::Function,
   tpspace::TransientParamSpace,
-  index_map::FEOperatorIndexMap,
   assem::Assembler,
+  index_map::FEOperatorIndexMap,
   trial::FESpace,
   test::FESpace,
   order::Integer,
@@ -92,6 +119,14 @@ IndexMaps.get_index_map(op::TransientParamFEOpFromWeakFormWithTrian) = get_index
 ParamDataStructures.realization(op::TransientParamFEOpFromWeakFormWithTrian;kwargs...) = realization(op.op;kwargs...)
 ParamSteady.get_induced_norm(op::TransientParamFEOpFromWeakFormWithTrian) = get_induced_norm(op.op)
 
+"""
+    TransientParamSaddlePointFEOpWithTrian{T,N} <: TransientParamFEOperatorWithTrian{T}
+
+Corresponds to a [`TransientParamSaddlePointFEOp`](@ref) object, but in a triangulation
+separation setting. `N` corresponds to the length of the jacobians in the transient
+problem, i.e. the order of the time derivative
+
+"""
 struct TransientParamSaddlePointFEOpWithTrian{T,N} <: TransientParamFEOperatorWithTrian{T}
   op::TransientParamSaddlePointFEOp{T}
   trian_res::Tuple{Vararg{Triangulation}}

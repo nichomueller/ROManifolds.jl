@@ -1,5 +1,3 @@
-# interface to deal with the inf-sup stability condition of saddle point problems
-
 function TransientParamFEOpFromWeakForm(
   res::Function,
   jacs::Tuple{Vararg{Function}},
@@ -58,6 +56,13 @@ function TransientParamLinearFEOpFromWeakForm(
   return saddlep_op
 end
 
+"""
+    TransientParamSaddlePointFEOp{T<:ODEParamOperatorType} <: TransientParamFEOperator{T}
+
+Interface to deal with the Inf-Sup stability condition of saddle point problems;
+the field `coupling` encodes the Inf-Sup operator
+
+"""
 struct TransientParamSaddlePointFEOp{T<:ODEParamOperatorType} <: TransientParamFEOperator{T}
   op::TransientParamFEOperator{T}
   coupling::Function

@@ -1,3 +1,12 @@
+"""
+    MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSC{Tv,Ti,L}
+
+Represents a vector of sparse matrices in CSC format. For sake of coherence, an
+instance of `MatrixOfSparseMatricesCSC` inherits from AbstractMatrix{<:SparseMatrixCSC{Tv,Ti}
+rather than AbstractVector{<:SparseMatrixCSC{Tv,Ti}, but should conceptually be
+thought as an AbstractVector{<:SparseMatrixCSC{Tv,Ti}.
+
+"""
 struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSC{Tv,Ti,L}
   m::Int64
   n::Int64
@@ -45,31 +54,29 @@ Base.size(A::MatrixOfSparseMatricesCSC) = (param_length(A),param_length(A))
   (A.m,A.n)
 end
 
-param_getindex(A::MatrixOfSparseMatricesCSC,i::Integer) = diagonal_getindex(A,i)
-param_setindex!(A::MatrixOfSparseMatricesCSC,v,i::Integer) = diagonal_setindex!(A,v,i)
 param_entry(A::MatrixOfSparseMatricesCSC,i::Integer...) = ParamNumber(A.data[i...,:])
 
 Base.@propagate_inbounds function Base.getindex(A::MatrixOfSparseMatricesCSC,i::Vararg{Integer,2})
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
   if all(i.==iblock)
-    diagonal_getindex(A,iblock)
+    param_getindex(A,iblock)
   else
     spzeros(innersize(A))
   end
 end
 
-Base.@propagate_inbounds function diagonal_getindex(A::MatrixOfSparseMatricesCSC,iblock::Integer)
-  SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,_nonzeros(A,iblock))
+Base.@propagate_inbounds function param_getindex(A::MatrixOfSparseMatricesCSC,i::Integer)
+  SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,_nonzeros(A,i))
 end
 
 Base.@propagate_inbounds function Base.setindex!(A::MatrixOfSparseMatricesCSC,v,i::Vararg{Integer,2})
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
-  irow==icol && diagonal_setindex!(A,v,iblock)
+  irow==icol && param_setindex!(A,v,i)
 end
 
-Base.@propagate_inbounds function diagonal_setindex!(A::MatrixOfSparseMatricesCSC,v,iblock::Integer)
+Base.@propagate_inbounds function param_setindex!(A::MatrixOfSparseMatricesCSC,v,i::Integer)
   @boundscheck iblock ≤ param_length(A)
   setindex!(_nonzeros(A,iblock),v)
 end
@@ -100,7 +107,7 @@ function LinearAlgebra.fillstored!(A::MatrixOfSparseMatricesCSC,z::Number)
   return A
 end
 
-# small hack
+# small hack, we shouldn't be able to fill an abstract array with a non-scalar
 function LinearAlgebra.fillstored!(A::MatrixOfSparseMatricesCSC,z::AbstractMatrix{<:Number})
   @check all(z.==first(z))
   LinearAlgebra.fillstored!(A,first(z))

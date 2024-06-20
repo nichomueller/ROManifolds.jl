@@ -1,3 +1,12 @@
+"""
+    abstract type ParamStageOperator <: NonlinearOperator end
+
+Parametric extension of the type [`StageOperator`](@ref) in [`Gridap`](@ref)
+
+Subtypes:
+- [`LinearParamStageOperator`](@ref)
+- [`NonlinearParamStageOperator`](@ref)
+"""
 abstract type ParamStageOperator <: NonlinearOperator end
 
 # have to write overwrite NonlinearOperator interface since some concrete types
@@ -14,6 +23,8 @@ function Algebra.jacobian(op::ParamStageOperator,x::AbstractVector)
   return jacobian!(A,op,x)
 end
 
+"""
+"""
 struct NonlinearParamStageOperator <: ParamStageOperator
   odeop::ODEOperator
   odeopcache
@@ -60,6 +71,8 @@ function Algebra.jacobian!(
   A
 end
 
+"""
+"""
 struct LinearParamStageOperator{Ta,Tb} <: ParamStageOperator
   A::Ta
   b::Tb

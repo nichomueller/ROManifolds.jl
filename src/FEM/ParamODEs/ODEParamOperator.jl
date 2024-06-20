@@ -1,11 +1,29 @@
+"""
+    abstract type ODEParamOperatorType <: ODEOperatorType end
+
+Parametric extension of the type [`ODEOperatorType`](@ref) in [`Gridap`](@ref)
+
+"""
 abstract type ODEParamOperatorType <: ODEOperatorType end
+
 struct NonlinearParamODE <: ODEParamOperatorType end
+
 abstract type AbstractLinearParamODE <: ODEParamOperatorType end
 struct QuasilinearParamODE <: AbstractLinearParamODE end
 struct SemilinearParamODE <: AbstractLinearParamODE end
 struct LinearParamODE <: AbstractLinearParamODE end
 struct LinearNonlinearParamODE <: ODEParamOperatorType end
 
+"""
+    abstract type ODEParamOperator{T<:ODEParamOperatorType} <: ODEOperator{T} end
+
+Parametric extension of the type [`ODEOperator`](@ref) in [`Gridap`](@ref).
+
+Subtypes:
+- [`ODEParamOperatorWithTrian`](@ref)
+- [`ODEParamOpFromTFEOp`](@ref)
+
+"""
 abstract type ODEParamOperator{T<:ODEParamOperatorType} <: ODEOperator{T} end
 
 function ODEs.allocate_odeopcache(
@@ -109,6 +127,16 @@ mutable struct ParamODEOpFromTFEOpCache <: GridapType
   const_forms
 end
 
+"""
+    abstract type ODEParamOperatorWithTrian{T<:ODEParamOperatorType} <: ODEParamOperator{T} end
+
+Is to a ODEParamOperator as a TransientParamFEOperatorWithTrian is to a TransientParamFEOperator.
+
+Suptypes:
+- [`ODEParamOpFromTFEOpWithTrian`](@ref)
+- [`TransientRBOperator`](@ref)
+
+"""
 abstract type ODEParamOperatorWithTrian{T<:ODEParamOperatorType} <: ODEParamOperator{T} end
 
 function Algebra.residual!(

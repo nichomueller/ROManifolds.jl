@@ -1,26 +1,65 @@
+"""
+    AbstractParamArray{T,N,L,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N,L}
+
+Type representing parametric abstract arrays of type A. L encodes the parametric length.
+Subtypes:
+- [`ParamArray`](@ref).
+- [`ParamSparseMatrix`](@ref).
+
+"""
+
 abstract type AbstractParamArray{T,N,L,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N,L} end
+
+"""
+    ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}}
+
+Type representing parametric arrays of type A. L encodes the parametric length.
+Subtypes:
+- [`ArrayOfArrays`](@ref).
+- [`ArrayOfTrivialArrays`](@ref).
+- [`BlockArrayOfArrays`](@ref).
+
+"""
 abstract type ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}} end
-abstract type ParamCachedArray{T,N,L} <: AbstractParamArray{T,N,L,CachedArray{T,N}} end
+
+"""
+    ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,L,A}
+
+Type representing parametric abstract sparse matrices of type A. L encodes the parametric length.
+Subtypes:
+- [`ParamSparseMatrixCSC`](@ref).
+
+"""
 abstract type ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,L,A} end
+
+"""
+    ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSC{Tv,Ti}}
+
+Type representing parametric sparse matrices in CSC format. L encodes the parametric length.
+Subtypes:
+- [`MatrixOfSparseMatricesCSC`](@ref).
+
+"""
 abstract type ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSC{Tv,Ti}} end
 
+"""
+    ParamArray(A::AbstractArray{<:Any}) -> AbstractArray{<:Any}
+
+Generic constructor of an AbstractParamArray
+
+"""
 ParamArray(A::AbstractVector{<:AbstractArray}) = ArrayOfArrays(A)
 ParamArray(A::AbstractVector{<:SparseMatrixCSC}) = MatrixOfSparseMatricesCSC(A)
 ParamArray(A::AbstractArray{<:Number},plength=1) = ArrayOfTrivialArrays(A,plength)
 ParamArray(A::AbstractArray{<:ParamArray}) = mortar(A)
 
+# Allow do-block syntax
 function param_array(f,A::AbstractArray{<:AbstractArray}...)
   ParamArray(map(f,A...))
 end
 
 function array_of_similar_arrays(a::AbstractArray{<:Number},l::Integer)
   ParamArray([similar(a) for _ = 1:l])
-end
-
-function array_of_zero_arrays(a::AbstractArray{<:Number},l::Integer)
-  A = array_of_similar_arrays(a,l)
-  fill!(A,zero(eltype(a)))
-  return A
 end
 
 to_param_quantity(A::AbstractParamArray,plength::Integer) = A
@@ -66,7 +105,7 @@ function Base.vec(A::AbstractParamArray)
   end
 end
 
-# small hack
+# small hack, zero(::Type{<:AbstractArray}) is not implemented in Base
 function Base.zero(::Type{<:AbstractArray{T,N}}) where {T<:Number,N}
   zeros(T,tfill(1,Val{N}()))
 end
@@ -76,7 +115,7 @@ function Base.fill!(A::AbstractParamArray,z::Number)
   return A
 end
 
-# small hack
+# small hack, we shouldn't be able to fill an abstract array with a non-scalar
 for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
   @eval begin
     function $f(A::AbstractParamArray{T,N},z::AbstractArray{<:Number,N}) where {T,N}
@@ -196,6 +235,12 @@ function Arrays.setsize!(A::AbstractParamArray{T,N},s::NTuple{N,Integer}) where 
   return A
 end
 
+"""
+    param_return_value(f::Union{Function,Map},A...) -> Any
+
+Generalization of [`return_value`](@ref) to the parametric case
+
+"""
 function param_return_value(f::Union{Function,Map},A...)
   pA = to_param_quantities(A...)
   c = return_value(f,testitem.(pA)...)
@@ -203,6 +248,12 @@ function param_return_value(f::Union{Function,Map},A...)
   return data
 end
 
+"""
+    param_return_cache(f::Union{Function,Map},A...) -> Any
+
+Generalization of [`return_cache`](@ref) to the parametric case
+
+"""
 function param_return_cache(f::Union{Function,Map},A...)
   pA = to_param_quantities(A...)
   c = return_cache(f,testitem.(pA)...)
@@ -215,6 +266,13 @@ function param_return_cache(f::Union{Function,Map},A...)
   return cache,data
 end
 
+
+"""
+    param_evaluate!(C,f::Union{Function,Map},A...) -> Any
+
+Generalization of [`evaluate!`](@ref) to the parametric case
+
+"""
 function param_evaluate!(C,f::Union{Function,Map},A...)
   cache,data = C
   pA = to_param_quantities(A...;plength=param_length(data))

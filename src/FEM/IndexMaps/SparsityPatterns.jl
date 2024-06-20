@@ -1,5 +1,18 @@
+"""
+    abstract type SparsityPattern end
+
+Type used to represent the sparsity pattern of a sparse matrix, usually the
+jacobian in a FE problem.
+
+Subtypes:
+- [`SparsityPatternCSC`](@ref)
+- [`TProductSparsityPattern`](@ref)
+
+"""
 abstract type SparsityPattern end
 
+"""
+"""
 struct SparsityPatternCSC{Tv,Ti} <: SparsityPattern
   matrix::SparseMatrixCSC{Tv,Ti}
 end
@@ -13,6 +26,13 @@ SparseArrays.findnz(a::SparsityPatternCSC) = findnz(a.matrix)
 SparseArrays.nnz(a::SparsityPatternCSC) = nnz(a.matrix)
 get_nonzero_indices(a::SparsityPatternCSC) = get_nonzero_indices(a.matrix)
 
+"""
+    permute_sparsity(a::SparsityPattern,i,j) -> SparsityPattern
+
+Permutes a sparsity patterns according to indices specified by `i` and `j`,
+representing the rows and columns respectively
+
+"""
 function permute_sparsity(a::SparsityPatternCSC,i::AbstractVector,j::AbstractVector)
   SparsityPatternCSC(a.matrix[i,j])
 end
@@ -21,6 +41,8 @@ function permute_sparsity(a::SparsityPatternCSC,i::AbstractArray,j::AbstractArra
   permute_sparsity(a,vec(i),vec(j))
 end
 
+"""
+"""
 struct TProductSparsityPattern{A,B} <: SparsityPattern
   sparsity::A
   sparsities_1d::B
@@ -33,11 +55,11 @@ num_cols(a::TProductSparsityPattern) = num_cols(a.sparsity)
 SparseArrays.findnz(a::TProductSparsityPattern) = findnz(a.sparsity)
 SparseArrays.nnz(a::TProductSparsityPattern) = nnz(a.sparsity)
 get_nonzero_indices(a::TProductSparsityPattern) = get_nonzero_indices(a.sparsity)
-univariate_num_rows(a::TProductSparsityPattern) = num_rows.(a.sparsities_1d)
-univariate_num_cols(a::TProductSparsityPattern) = num_cols.(a.sparsities_1d)
+univariate_num_rows(a::TProductSparsityPattern) = Tuple(num_rows.(a.sparsities_1d))
+univariate_num_cols(a::TProductSparsityPattern) = Tuple(num_cols.(a.sparsities_1d))
 univariate_findnz(a::TProductSparsityPattern) = tuple_of_arrays(findnz.(a.sparsities_1d))
-univariate_nnz(a::TProductSparsityPattern) = nnz.(a.sparsities_1d)
-univariate_nonzero_indices(a::TProductSparsityPattern) = get_nonzero_indices.(a.sparsities_1d)
+univariate_nnz(a::TProductSparsityPattern) = Tuple(nnz.(a.sparsities_1d))
+univariate_nonzero_indices(a::TProductSparsityPattern) = Tuple(get_nonzero_indices.(a.sparsities_1d))
 
 function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
   m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
