@@ -1,42 +1,62 @@
 function RBSteady.reduced_operator(
   solver::RBSolver,
-  op::TransientPODOperator,
+  op::TransientPGOperator,
   s)
 
   red_lhs,red_rhs = reduced_jacobian_residual(solver,op,s)
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
   new_op = change_triangulation(op,trians_rhs,trians_lhs)
-  TransientPODMDEIMOperator(new_op,red_lhs,red_rhs)
+  TransientPGMDEIMOperator(new_op,red_lhs,red_rhs)
 end
 
 function RBSteady.reduced_operator(
   solver::RBSolver,
-  op::TransientPODOperator{LinearNonlinearParamODE},
+  op::TransientPGOperator{LinearNonlinearParamODE},
   s)
 
   red_op_lin = reduced_operator(solver,get_linear_operator(op),s)
   red_op_nlin = reduced_operator(solver,get_nonlinear_operator(op),s)
-  LinearNonlinearTransientPODMDEIMOperator(red_op_lin,red_op_nlin)
+  LinearNonlinearTransientPGMDEIMOperator(red_op_lin,red_op_nlin)
 end
 
-struct TransientPODMDEIMOperator{T} <: TransientRBOperator{T}
-  op::TransientPODOperator{T}
+"""
+    struct TransientPGMDEIMOperator{T} <: TransientRBOperator{T}
+
+Represents the composition operator
+
+[`TransientPGOperator`][@ref] ∘ [`ReducedAlgebraicOperator`][@ref]
+
+This allows the projection of MDEIM-approximated residuals/jacobians `rhs` and
+`lhs` onto the FESubspace encoded in `op`. In particular, the residual of a
+TransientPGMDEIMOperator is computed as follows:
+
+1) numerical integration is performed to compute the residual on its reduced
+  integration domain
+2) the MDEIM online phase takes place for the assembly of the projected, MDEIM-
+  approximated residual
+
+The same reasoning holds for all the jacobians, which are as many as the order
+of the temporal derivative
+
+"""
+struct TransientPGMDEIMOperator{T} <: TransientRBOperator{T}
+  op::TransientPGOperator{T}
   lhs
   rhs
 end
 
-FESpaces.get_trial(op::TransientPODMDEIMOperator) = get_trial(op.op)
-FESpaces.get_test(op::TransientPODMDEIMOperator) = get_test(op.op)
-ParamDataStructures.realization(op::TransientPODMDEIMOperator;kwargs...) = realization(op.op;kwargs...)
-ParamSteady.get_fe_operator(op::TransientPODMDEIMOperator) = ParamSteady.get_fe_operator(op.op)
-ParamSteady.get_vector_index_map(op::TransientPODMDEIMOperator) = get_vector_index_map(op.op)
-ParamSteady.get_matrix_index_map(op::TransientPODMDEIMOperator) = get_matrix_index_map(op.op)
-RBSteady.get_fe_trial(op::TransientPODMDEIMOperator) = get_fe_trial(op.op)
-RBSteady.get_fe_test(op::TransientPODMDEIMOperator) = get_fe_test(op.op)
+FESpaces.get_trial(op::TransientPGMDEIMOperator) = get_trial(op.op)
+FESpaces.get_test(op::TransientPGMDEIMOperator) = get_test(op.op)
+ParamDataStructures.realization(op::TransientPGMDEIMOperator;kwargs...) = realization(op.op;kwargs...)
+ParamSteady.get_fe_operator(op::TransientPGMDEIMOperator) = ParamSteady.get_fe_operator(op.op)
+ParamSteady.get_vector_index_map(op::TransientPGMDEIMOperator) = get_vector_index_map(op.op)
+ParamSteady.get_matrix_index_map(op::TransientPGMDEIMOperator) = get_matrix_index_map(op.op)
+RBSteady.get_fe_trial(op::TransientPGMDEIMOperator) = get_fe_trial(op.op)
+RBSteady.get_fe_test(op::TransientPGMDEIMOperator) = get_fe_test(op.op)
 
 function ODEs.allocate_odeopcache(
-  op::TransientPODMDEIMOperator,
+  op::TransientPGMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 
@@ -45,14 +65,14 @@ end
 
 function ODEs.update_odeopcache!(
   ode_cache,
-  op::TransientPODMDEIMOperator,
+  op::TransientPGMDEIMOperator,
   r::TransientParamRealization)
 
   update_odeopcache!(ode_cache,op.op,r)
 end
 
 function Algebra.allocate_residual(
-  op::TransientPODMDEIMOperator,
+  op::TransientPGMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache)
@@ -61,7 +81,7 @@ function Algebra.allocate_residual(
 end
 
 function Algebra.allocate_jacobian(
-  op::TransientPODMDEIMOperator,
+  op::TransientPGMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache)
@@ -71,7 +91,7 @@ end
 
 function Algebra.residual!(
   b::Contribution,
-  op::TransientPODMDEIMOperator,
+  op::TransientPGMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache;
@@ -84,7 +104,7 @@ end
 
 function Algebra.jacobian!(
   A::TupOfArrayContribution,
-  op::TransientPODMDEIMOperator,
+  op::TransientPGMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   ws::Tuple{Vararg{Real}},
@@ -95,7 +115,7 @@ function Algebra.jacobian!(
   return Â
 end
 
-function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientPODMDEIMOperator,s)
+function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientPGMDEIMOperator,s)
   x = get_values(s)
   r = get_realization(s)
   fesolver = get_fe_solver(solver)
@@ -175,16 +195,26 @@ function _select_indices_at_time_locations(red_times;nparams=1)
 end
 
 function _select_fe_quantities_at_time_locations(cache,a,r,us,odeopcache)
+  # common temporal reduced integration domain
   red_times = union_reduced_times(a)
   red_r = r[:,red_times]
+  # indices corresponding to the newly found temporal reduced integration domain,
+  # for every parameter
   indices = _select_indices_at_time_locations(red_times;nparams=num_params(r))
+  # returns the cache in the appropriate time-parameter locations
   red_cache = _select_cache_at_time_locations(cache,indices)
-  red_xhF,red_odeopcache = _select_odecache_at_time_locations(us,odeopcache,indices)
-  return red_cache,red_r,red_times,red_xhF,red_odeopcache
+  # does the same with the stage variable `us` and the ode cache `odeopcache`
+  red_us,red_odeopcache = _select_odecache_at_time_locations(us,odeopcache,indices)
+  return red_cache,red_r,red_times,red_us,red_odeopcache
 end
 
+# from `red_times`, i.e. the union of all the reduced time indices across every
+# affine contribution, finds the entries of the reduced time indices specific to
+# the affine decomposition `a`
 _time_locations(a,red_times)::Vector{Int} = filter(!isnothing,indexin(get_indices_time(a),red_times))
 
+# selects the entries of the snapshots relevant to the reduced integration domain
+# in `a`
 function _select_snapshots_at_space_time_locations(s::AbstractSnapshots,a,red_times)
   ids_space = RBSteady.get_indices_space(a)
   ids_time::Vector{Int} = _time_locations(a,red_times)
@@ -209,7 +239,7 @@ end
 
 function RBSteady.fe_jacobian!(
   cache,
-  op::TransientPODMDEIMOperator,
+  op::TransientPGMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   ws::Tuple{Vararg{Real}},
@@ -226,7 +256,7 @@ end
 
 function RBSteady.fe_residual!(
   cache,
-  op::TransientPODMDEIMOperator,
+  op::TransientPGMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache)
@@ -238,54 +268,61 @@ function RBSteady.fe_residual!(
   return bi
 end
 
-struct LinearNonlinearTransientPODMDEIMOperator <: TransientRBOperator{LinearNonlinearParamODE}
-  op_linear::TransientPODMDEIMOperator{<:AbstractLinearParamODE}
-  op_nonlinear::TransientPODMDEIMOperator{NonlinearParamODE}
+"""
+    struct LinearNonlinearTransientPGMDEIMOperator <: TransientRBOperator{LinearNonlinearParamODE} end
+
+Extends the concept of [`TransientPGMDEIMOperator`](@ref) to accommodate the linear/nonlinear
+splitting of terms in nonlinear applications
+
+"""
+struct LinearNonlinearTransientPGMDEIMOperator <: TransientRBOperator{LinearNonlinearParamODE}
+  op_linear::TransientPGMDEIMOperator{<:AbstractLinearParamODE}
+  op_nonlinear::TransientPGMDEIMOperator{NonlinearParamODE}
 end
 
-ParamSteady.get_linear_operator(op::LinearNonlinearTransientPODMDEIMOperator) = op.op_linear
-ParamSteady.get_nonlinear_operator(op::LinearNonlinearTransientPODMDEIMOperator) = op.op_nonlinear
+ParamSteady.get_linear_operator(op::LinearNonlinearTransientPGMDEIMOperator) = op.op_linear
+ParamSteady.get_nonlinear_operator(op::LinearNonlinearTransientPGMDEIMOperator) = op.op_nonlinear
 
-function FESpaces.get_test(op::LinearNonlinearTransientPODMDEIMOperator)
+function FESpaces.get_test(op::LinearNonlinearTransientPGMDEIMOperator)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
   get_test(op.op_nonlinear)
 end
 
-function FESpaces.get_trial(op::LinearNonlinearTransientPODMDEIMOperator)
+function FESpaces.get_trial(op::LinearNonlinearTransientPGMDEIMOperator)
   @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
   get_trial(op.op_nonlinear)
 end
 
-function ParamDataStructures.realization(op::LinearNonlinearTransientPODMDEIMOperator;kwargs...)
+function ParamDataStructures.realization(op::LinearNonlinearTransientPGMDEIMOperator;kwargs...)
   realization(op.op_nonlinear;kwargs...)
 end
 
-function ParamSteady.get_fe_operator(op::LinearNonlinearTransientPODMDEIMOperator)
+function ParamSteady.get_fe_operator(op::LinearNonlinearTransientPGMDEIMOperator)
   join_operators(ParamSteady.get_fe_operator(op.op_linear),ParamSteady.get_fe_operator(op.op_nonlinear))
 end
 
-function RBSteady.get_fe_trial(op::LinearNonlinearTransientPODMDEIMOperator)
+function RBSteady.get_fe_trial(op::LinearNonlinearTransientPGMDEIMOperator)
   @check RBSteady.get_fe_trial(op.op_linear) === get_fe_trial(op.op_nonlinear)
   RBSteady.get_fe_trial(op.op_nonlinear)
 end
 
-function RBSteady.get_fe_test(op::LinearNonlinearTransientPODMDEIMOperator)
+function RBSteady.get_fe_test(op::LinearNonlinearTransientPGMDEIMOperator)
   @check RBSteady.get_fe_test(op.op_linear) === RBSteady.get_fe_test(op.op_nonlinear)
   RBSteady.get_fe_test(op.op_nonlinear)
 end
 
-function ParamSteady.get_vector_index_map(op::LinearNonlinearTransientPODMDEIMOperator)
+function ParamSteady.get_vector_index_map(op::LinearNonlinearTransientPGMDEIMOperator)
   @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
   get_vector_index_map(op.op_linear)
 end
 
-function ParamSteady.get_matrix_index_map(op::LinearNonlinearTransientPODMDEIMOperator)
+function ParamSteady.get_matrix_index_map(op::LinearNonlinearTransientPGMDEIMOperator)
   @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))
   get_matrix_index_map(op.op_linear)
 end
 
 function ODEs.allocate_odeopcache(
-  op::LinearNonlinearTransientPODMDEIMOperator,
+  op::LinearNonlinearTransientPGMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 
@@ -294,14 +331,14 @@ end
 
 function ODEs.update_odeopcache!(
   ode_cache,
-  op::LinearNonlinearTransientPODMDEIMOperator,
+  op::LinearNonlinearTransientPGMDEIMOperator,
   r::TransientParamRealization)
 
   update_odeopcache!(ode_cache,op.op_nonlinear,r)
 end
 
 function Algebra.allocate_residual(
-  op::LinearNonlinearTransientPODMDEIMOperator,
+  op::LinearNonlinearTransientPGMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache)
@@ -312,7 +349,7 @@ function Algebra.allocate_residual(
 end
 
 function Algebra.allocate_jacobian(
-  op::LinearNonlinearTransientPODMDEIMOperator,
+  op::LinearNonlinearTransientPGMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache)
@@ -324,7 +361,7 @@ end
 
 function Algebra.residual!(
   b::Tuple,
-  op::LinearNonlinearTransientPODMDEIMOperator,
+  op::LinearNonlinearTransientPGMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache;
@@ -339,7 +376,7 @@ end
 
 function Algebra.jacobian!(
   A::Tuple,
-  op::LinearNonlinearTransientPODMDEIMOperator,
+  op::LinearNonlinearTransientPGMDEIMOperator,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   ws::Tuple{Vararg{Real}},

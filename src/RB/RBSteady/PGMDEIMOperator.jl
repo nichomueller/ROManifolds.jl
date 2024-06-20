@@ -1,50 +1,87 @@
+"""
+    reduced_operator(solver::RBSolver,op::PGOperator,
+      s::Union{AbstractSteadySnapshots,BlockSnapshots}) -> PGMDEIMOperator
+
+    reduced_operator(solver::RBSolver,op::TransientPGOperator,
+      s::Union{AbstractTransientSnapshots,BlockSnapshots}) -> TransientPGMDEIMOperator
+
+In steady settings, computes the composition operator
+  [`PGOperator`][@ref] ∘ [`ReducedAlgebraicOperator`][@ref]
+
+In transient settings, computes the composition operator
+  [`TransientPGOperator`][@ref] ∘ [`ReducedAlgebraicOperator`][@ref]
+
+This allows the projection of MDEIM-approximated residuals/jacobians onto the
+FESubspace encoded in `op`. A change of triangulation occurs for residuals/jacobians
+so that the numerical integration can be efficiently ran to assemble them
+
+"""
 function reduced_operator(
   solver::RBSolver,
-  op::PODOperator,
+  op::PGOperator,
   s)
 
   red_lhs,red_rhs = reduced_jacobian_residual(solver,op,s)
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
   new_op = change_triangulation(op,trians_rhs,trians_lhs)
-  PODMDEIMOperator(new_op,red_lhs,red_rhs)
+  PGMDEIMOperator(new_op,red_lhs,red_rhs)
 end
 
 function reduced_operator(
   solver::RBSolver,
-  op::PODOperator{LinearNonlinearParamEq},
+  op::PGOperator{LinearNonlinearParamEq},
   s)
 
   red_op_lin = reduced_operator(solver,get_linear_operator(op),s)
   red_op_nlin = reduced_operator(solver,get_nonlinear_operator(op),s)
-  LinearNonlinearPODMDEIMOperator(red_op_lin,red_op_nlin)
+  LinearNonlinearPGMDEIMOperator(red_op_lin,red_op_nlin)
 end
 
-struct PODMDEIMOperator{T} <: RBOperator{T}
-  op::PODOperator{T}
+"""
+    struct PGMDEIMOperator{T} <: RBOperator{T} end
+
+Represents the composition operator
+
+[`PGOperator`][@ref] ∘ [`ReducedAlgebraicOperator`][@ref]
+
+This allows the projection of MDEIM-approximated residuals/jacobians `rhs` and
+`lhs` onto the FESubspace encoded in `op`. In particular, the residual of a
+PGMDEIMOperator is computed as follows:
+
+1) numerical integration is performed to compute the residual on its reduced
+  integration domain
+2) the MDEIM online phase takes place for the assembly of the projected, MDEIM-
+  approximated residual
+
+The same reasoning holds for the jacobian
+
+"""
+struct PGMDEIMOperator{T} <: RBOperator{T}
+  op::PGOperator{T}
   lhs
   rhs
 end
 
-FESpaces.get_trial(op::PODMDEIMOperator) = get_trial(op.op)
-FESpaces.get_test(op::PODMDEIMOperator) = get_test(op.op)
-ParamDataStructures.realization(op::PODMDEIMOperator;kwargs...) = realization(op.op;kwargs...)
-ParamSteady.get_fe_operator(op::PODMDEIMOperator) = ParamSteady.get_fe_operator(op.op)
-ParamSteady.get_vector_index_map(op::PODMDEIMOperator) = get_vector_index_map(op.op)
-ParamSteady.get_matrix_index_map(op::PODMDEIMOperator) = get_matrix_index_map(op.op)
-get_fe_trial(op::PODMDEIMOperator) = get_fe_trial(op.op)
-get_fe_test(op::PODMDEIMOperator) = get_fe_test(op.op)
+FESpaces.get_trial(op::PGMDEIMOperator) = get_trial(op.op)
+FESpaces.get_test(op::PGMDEIMOperator) = get_test(op.op)
+ParamDataStructures.realization(op::PGMDEIMOperator;kwargs...) = realization(op.op;kwargs...)
+ParamSteady.get_fe_operator(op::PGMDEIMOperator) = ParamSteady.get_fe_operator(op.op)
+ParamSteady.get_vector_index_map(op::PGMDEIMOperator) = get_vector_index_map(op.op)
+ParamSteady.get_matrix_index_map(op::PGMDEIMOperator) = get_matrix_index_map(op.op)
+get_fe_trial(op::PGMDEIMOperator) = get_fe_trial(op.op)
+get_fe_test(op::PGMDEIMOperator) = get_fe_test(op.op)
 
-function Algebra.allocate_residual(op::PODMDEIMOperator,r::AbstractParamRealization,u::AbstractParamVector)
+function Algebra.allocate_residual(op::PGMDEIMOperator,r::AbstractParamRealization,u::AbstractParamVector)
   allocate_residual(op.op,r,u)
 end
 
-function Algebra.allocate_jacobian(op::PODMDEIMOperator,r::AbstractParamRealization,u::AbstractParamVector)
+function Algebra.allocate_jacobian(op::PGMDEIMOperator,r::AbstractParamRealization,u::AbstractParamVector)
   allocate_jacobian(op.op,r,u)
 end
 
 function ParamSteady.allocate_paramcache(
-  op::PODMDEIMOperator,
+  op::PGMDEIMOperator,
   r::ParamRealization,
   u::AbstractParamVector)
 
@@ -53,7 +90,7 @@ end
 
 function ParamSteady.update_paramcache!(
   paramcache,
-  op::PODMDEIMOperator,
+  op::PGMDEIMOperator,
   r::ParamRealization)
 
   update_odeopcache!(paramcache,op.op,r)
@@ -61,7 +98,7 @@ end
 
 function Algebra.residual!(
   b::Contribution,
-  op::PODMDEIMOperator,
+  op::PGMDEIMOperator,
   r::AbstractParamRealization,
   u::AbstractParamVector,
   paramcache)
@@ -73,7 +110,7 @@ end
 
 function Algebra.jacobian!(
   A::Contribution,
-  op::PODMDEIMOperator,
+  op::PGMDEIMOperator,
   r::AbstractParamRealization,
   u::AbstractParamVector,
   paramcache)
@@ -83,13 +120,15 @@ function Algebra.jacobian!(
   return Â
 end
 
-function jacobian_and_residual(solver::RBSolver,op::PODMDEIMOperator,s)
+function jacobian_and_residual(solver::RBSolver,op::PGMDEIMOperator,s)
   x = get_values(s)
   r = get_realization(s)
   fesolver = get_fe_solver(solver)
   jacobian_and_residual(fesolver,op,r,x)
 end
 
+# selects the entries of the snapshots relevant to the reduced integration domain
+# in `a`
 function _select_snapshots_at_space_locations(s,a)
   ids_space = get_indices_space(a)
   select_snapshots_entries(s,ids_space)
@@ -104,7 +143,7 @@ end
 
 function fe_jacobian!(
   cache,
-  op::PODMDEIMOperator,
+  op::PGMDEIMOperator,
   r::AbstractParamRealization,
   u::AbstractParamVector,
   paramcache)
@@ -116,7 +155,7 @@ end
 
 function fe_residual!(
   cache,
-  op::PODMDEIMOperator,
+  op::PGMDEIMOperator,
   r::AbstractParamRealization,
   u::AbstractParamVector,
   paramcache)
@@ -126,44 +165,51 @@ function fe_residual!(
   return bi
 end
 
-struct LinearNonlinearPODMDEIMOperator <: RBOperator{LinearNonlinearParamEq}
-  op_linear::PODMDEIMOperator{LinearParamEq}
-  op_nonlinear::PODMDEIMOperator{NonlinearParamEq}
+"""
+    struct LinearNonlinearPGMDEIMOperator <: RBOperator{LinearNonlinearParamEq} end
+
+Extends the concept of [`PGMDEIMOperator`](@ref) to accommodate the linear/nonlinear
+splitting of terms in nonlinear applications
+
+"""
+struct LinearNonlinearPGMDEIMOperator <: RBOperator{LinearNonlinearParamEq}
+  op_linear::PGMDEIMOperator{LinearParamEq}
+  op_nonlinear::PGMDEIMOperator{NonlinearParamEq}
 end
 
-ParamSteady.get_linear_operator(op::LinearNonlinearPODMDEIMOperator) = op.op_linear
-ParamSteady.get_nonlinear_operator(op::LinearNonlinearPODMDEIMOperator) = op.op_nonlinear
+ParamSteady.get_linear_operator(op::LinearNonlinearPGMDEIMOperator) = op.op_linear
+ParamSteady.get_nonlinear_operator(op::LinearNonlinearPGMDEIMOperator) = op.op_nonlinear
 
-function FESpaces.get_test(op::LinearNonlinearPODMDEIMOperator)
+function FESpaces.get_test(op::LinearNonlinearPGMDEIMOperator)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
   get_test(op.op_nonlinear)
 end
 
-function FESpaces.get_trial(op::LinearNonlinearPODMDEIMOperator)
+function FESpaces.get_trial(op::LinearNonlinearPGMDEIMOperator)
   @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
   get_trial(op.op_nonlinear)
 end
 
-function ParamDataStructures.realization(op::LinearNonlinearPODMDEIMOperator;kwargs...)
+function ParamDataStructures.realization(op::LinearNonlinearPGMDEIMOperator;kwargs...)
   realization(op.op_nonlinear;kwargs...)
 end
 
-function ParamSteady.get_fe_operator(op::LinearNonlinearPODMDEIMOperator)
+function ParamSteady.get_fe_operator(op::LinearNonlinearPGMDEIMOperator)
   join_operators(get_fe_operator(op.op_linear),get_fe_operator(op.op_nonlinear))
 end
 
-function get_fe_trial(op::LinearNonlinearPODMDEIMOperator)
+function get_fe_trial(op::LinearNonlinearPGMDEIMOperator)
   @check get_fe_trial(op.op_linear) === get_fe_trial(op.op_nonlinear)
   get_fe_trial(op.op_nonlinear)
 end
 
-function get_fe_test(op::LinearNonlinearPODMDEIMOperator)
+function get_fe_test(op::LinearNonlinearPGMDEIMOperator)
   @check get_fe_test(op.op_linear) === get_fe_test(op.op_nonlinear)
   get_fe_test(op.op_nonlinear)
 end
 
 function Algebra.allocate_residual(
-  op::LinearNonlinearPODMDEIMOperator,
+  op::LinearNonlinearPGMDEIMOperator,
   r::AbstractParamRealization,
   u::AbstractParamVector)
 
@@ -173,7 +219,7 @@ function Algebra.allocate_residual(
 end
 
 function Algebra.allocate_jacobian(
-  op::LinearNonlinearPODMDEIMOperator,
+  op::LinearNonlinearPGMDEIMOperator,
   r::AbstractParamRealization,
   u::AbstractParamVector)
 
@@ -184,7 +230,7 @@ end
 
 function Algebra.residual!(
   b::Tuple,
-  op::LinearNonlinearPODMDEIMOperator,
+  op::LinearNonlinearPGMDEIMOperator,
   r::AbstractParamRealization,
   u::AbstractParamVector)
 
@@ -197,7 +243,7 @@ end
 
 function Algebra.jacobian!(
   A::Tuple,
-  op::LinearNonlinearPODMDEIMOperator,
+  op::LinearNonlinearPGMDEIMOperator,
   r::AbstractParamRealization,
   u::AbstractParamVector)
 

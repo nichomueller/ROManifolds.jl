@@ -12,7 +12,7 @@ abstract type ParamStageOperator <: NonlinearOperator end
 # have to write overwrite NonlinearOperator interface since some concrete types
 # that inherit from ParamStageOperator do not return the updated cache when
 # computing residuals or jacobians. See, for example, how residual! and jacobian!
-# work in the case of PODMDEIMOperator
+# work in the case of PGMDEIMOperator
 function Algebra.residual(op::ParamStageOperator,x::AbstractVector)
   b = allocate_residual(op,x)
   return residual!(b,op,x)

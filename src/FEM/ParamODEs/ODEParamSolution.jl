@@ -28,7 +28,7 @@ end
 Generic wrapper for the evolution of an `ODEParamOperator` with an `ODESolver`.
 
 """
-struct GenericODEParamSolution{V} <: ODESolution
+struct ODEParamSolution{V} <: ODESolution
   solver::ODESolver
   odeop::ODEParamOperator
   r::TransientParamRealization

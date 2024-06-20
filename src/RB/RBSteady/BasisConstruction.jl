@@ -1,4 +1,13 @@
-function truncation(s::AbstractVector;ϵ=1e-4,rank=length(s))
+"""
+    truncation(s::AbstractVector;ϵ=1e-4,rank::Integer=length(s)) -> Integer
+
+Returns the minimum between `rank` and the first integer `tolrank` such that
+(`s`[1]² + ... + `s`[`tolrank`]²) / (`s`[1]² + ... + `s`[end]²) ≥ `ϵ`²,
+where `s` are the singular values of the SVD of a given matrix. The equation
+above is the so-called relative energy criterion
+
+"""
+function truncation(s::AbstractVector;ϵ=1e-4,rank::Integer=length(s))
   energies = cumsum(s.^2;dims=1)
   tolrank = findfirst(energies .>= (1-ϵ^2)*energies[end])
   min(rank,tolrank)
@@ -14,6 +23,14 @@ function _cholesky_factor_and_perm(mat::AbstractSparseMatrix)
   return sparse(C.L),C.p
 end
 
+"""
+    tpod(mat::AbstractMatrix,args...;kwargs...) -> AbstractMatrix
+
+Truncated proper orthogonal decomposition. When a symmetric, positive definite
+matrix `X` is provided as an argument, the output's columns are `X`-orthogonal,
+otherwise they are ℓ²-orthogonal
+
+"""
 function tpod(mat::AbstractMatrix,args...;kwargs...)
   U,Σ,V = svd(mat)
   rank = truncation(Σ;kwargs...)
@@ -160,6 +177,15 @@ function _get_norm_matrix_from_weights(norms,weights)
   return XW
 end
 
+"""
+    ttsvd(mat::AbstractMatrix,args...;kwargs...) -> Vector{<:AbstractArray}
+
+Tensor train singular value decomposition. When a symmetric, positive definite
+matrix `X` is provided as an argument, the columns of A₁ ⊗ ... ⊗ Aₙ, where
+A₁, ..., Aₙ are the components of the outer vector, are `X`-orthogonal,
+otherwise they are ℓ²-orthogonal
+
+"""
 function ttsvd(mat::AbstractArray{T,N},X=nothing;kwargs...) where {T,N}
   cores = Vector{Array{T,3}}(undef,N-1)
   ranks = fill(1,N)
@@ -180,6 +206,14 @@ function ttsvd(mat::AbstractArray{T,N},X::AbstractTProductArray;kwargs...) where
   return cores
 end
 
+"""
+    orth_projection(v::AbstractVector, basis::AbstractMatrix, args...) -> AbstractVector
+
+Orthogonal projection of `v` on the column space of `basis`. When a symmetric,
+positive definite matrix `X` is provided as an argument, the output is `X`-orthogonal,
+otherwise it is ℓ²-orthogonal
+
+"""
 function orth_projection(
   v::AbstractVector,
   basis::AbstractMatrix)
@@ -216,6 +250,14 @@ end
 _norm(v::AbstractVector,args...) = norm(v)
 _norm(v::AbstractVector,X::AbstractMatrix) = sqrt(v'*X*v)
 
+"""
+    gram_schmidt!(mat::AbstractMatrix, basis::AbstractMatrix, args...) -> AbstractMatrix
+
+Gram-Schmidt algorithm for an abstract matrix `mat` with respect to the column
+space of `basis`. When a symmetric, positive definite matrix `X` is provided as
+an argument, the output is `X`-orthogonal, otherwise it is ℓ²-orthogonal
+
+"""
 function gram_schmidt!(
   mat::AbstractMatrix,
   basis::AbstractMatrix,

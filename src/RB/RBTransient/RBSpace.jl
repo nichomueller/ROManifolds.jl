@@ -15,6 +15,12 @@ function RBSteady.reduced_basis(feop::TransientParamLinearNonlinearFEOperator,s,
   reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
 end
 
+"""
+    TransientRBSpace{A<:SingleFieldFESpace,B<:TransientProjection} <: FESubspace
+
+Reduced basis subspace in a transient setting
+
+"""
 struct TransientRBSpace{A<:SingleFieldFESpace,B<:TransientProjection} <: FESubspace
   space::A
   basis::B

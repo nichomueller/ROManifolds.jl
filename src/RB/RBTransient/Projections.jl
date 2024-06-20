@@ -1,3 +1,14 @@
+"""
+    abstract type TransientProjection <: Projection end
+
+Specialization for projections in transient problems. A constructor is given by
+the function Projection
+
+Subtypes:
+- [`TransientPODBasis`](@ref)
+- [`TransientTTSVDCores`](@ref)
+
+"""
 abstract type TransientProjection <: Projection end
 
 get_basis_time(a::TransientProjection) = @abstractmethod
@@ -37,6 +48,12 @@ function RBSteady.Projection(s::TransientSparseSnapshots,args...;kwargs...)
   TransientTTSVDCores(cores_space′,core_time,index_map)
 end
 
+"""
+    TransientPODBasis{A<:AbstractMatrix,B<:AbstractMatrix} <: TransientProjection
+
+TransientProjection stemming from a truncated proper orthogonal decomposition [`tpod`](@ref)
+
+"""
 struct TransientPODBasis{A<:AbstractMatrix,B<:AbstractMatrix} <: TransientProjection
   basis_space::A
   basis_time::B
@@ -63,6 +80,14 @@ end
 
 # TT interface
 
+"""
+    TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},
+      C<:AbstractMatrix,I} <: TransientProjection
+
+TransientProjection stemming from a tensor train singular value decomposition [`ttsvd`](@ref).
+An index map of type `I` is provided for indexing purposes
+
+"""
 struct TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},C<:AbstractMatrix,I} <: TransientProjection
   cores_space::A
   core_time::B
@@ -177,6 +202,14 @@ function RBSteady.enrich_basis(
   return basis
 end
 
+"""
+    add_space_supremizers(basis_time::MatrixBlock;kwargs...) -> Vector{<:Matrix}
+
+Enriches the temporal basis `basis_time` with temporal supremizers computed from
+the kernel of the temporal basis associated to the primal field onto the column
+space of the temporal basis (bases) associated to the duel field(s)
+
+"""
 function add_time_supremizers(basis_time;kwargs...)
   basis_primal,basis_dual... = basis_time.array
   for i = eachindex(basis_dual)

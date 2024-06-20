@@ -1,10 +1,36 @@
+"""
+    abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
+
+Type for nonstandard representations of tensor train cores.
+
+Subtypes:
+- [`SparseCore`](@ref)
+
+"""
 abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
 
 Base.IndexStyle(::Type{<:AbstractTTCore}) = IndexCartesian()
 Base.getindex(a::AbstractTTCore,i::Integer...) = getindex(a,CartesianIndex(i))
 
+"""
+    abstract type SparseCore{T} <: AbstractTTCore{T,4} end
+
+Tensor train cores for sparse matrices. In contrast with standard (3-D) tensor train
+cores, a SparseCore is a 4-D abstract array. Information on the sparsity pattern
+of the matrices must be provided for indexing purposes.
+
+Subtypes:
+- [`SparseCoreCSC`](@ref)
+
+"""
 abstract type SparseCore{T} <: AbstractTTCore{T,4} end
 
+"""
+    struct SparseCoreCSC{T,Ti} <: SparseCore{T} end
+
+Tensor train cores for sparse matrices in CSC format
+
+"""
 struct SparseCoreCSC{T,Ti} <: SparseCore{T}
   array::Array{T,3}
   sparsity::SparsityPatternCSC{T,Ti}

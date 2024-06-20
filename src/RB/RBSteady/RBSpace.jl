@@ -1,3 +1,15 @@
+"""
+    reduced_fe_space(solver::RBSolver,feop::ParamFEOperator,s::AbstractSteadySnapshots
+      ) -> (FESubspace, FESubspace)
+    reduced_fe_space(solver::RBSolver,feop::TransientParamFEOperator,s::AbstractTransientSnapshots
+      ) -> (FESubspace, FESubspace)
+    reduced_fe_space(solver::RBSolver,feop::TransientParamFEOperator,s::BlockSnapshots
+      ) -> (FESubspace, FESubspace)
+
+Computes the subspace of the test, trial FE spaces contained in the FE operator
+`feop` by compressing the snapshots `s`
+
+"""
 function reduced_fe_space(solver,feop,s)
   soff = select_snapshots(s,offline_params(solver))
   norm_matrix = assemble_norm_matrix(feop)
@@ -7,6 +19,13 @@ function reduced_fe_space(solver,feop,s)
   return reduced_trial,reduced_test
 end
 
+"""
+    reduced_basis(s::AbstractSnapshots,args...;kwargs...) -> (Projection, Projection)
+
+Computes the bases spanning the subspace of test, trial FE spaces by compressing
+the snapshots `s`
+
+"""
 function reduced_basis(s,args...;kwargs...)
   Projection(s,args...;kwargs...)
 end
@@ -37,6 +56,17 @@ function fe_subspace(space::FESpace,basis)
   @abstractmethod
 end
 
+"""
+    abstract type FESubspace <: FESpace end
+
+Represents a vector subspace of a FE space.
+
+Subtypes:
+- [`RBSpace`](@ref)
+- [`MultiFieldRBSpace`](@ref)
+- [`BlockRBSpace`](@ref)
+
+"""
 abstract type FESubspace <: FESpace end
 
 (U::FESubspace)(μ) = evaluate(U,μ)
@@ -91,7 +121,13 @@ function Arrays.return_cache(k::RecastMap,x::AbstractParamVector,r::FESubspace)
   allocate_in_range(r)
 end
 
-struct RBSpace{A<:SingleFieldFESpace,B<:Projection} <: FESubspace
+"""
+    RBSpace{A<:SingleFieldFESpace,B<:SteadyProjection} <: FESubspace
+
+Reduced basis subspace in a steady setting
+
+"""
+struct RBSpace{A<:SingleFieldFESpace,B<:SteadyProjection} <: FESubspace
   space::A
   basis::B
 end
@@ -108,6 +144,12 @@ end
 
 # multi field interface
 
+"""
+    MultiFieldRBSpace{A<:MultiFieldFESpace,B<:BlockProjection} <: FESubspace
+
+Reduced basis subspace in a MultiField setting
+
+"""
 struct MultiFieldRBSpace{A<:MultiFieldFESpace,B<:BlockProjection} <: FESubspace
   space::A
   basis::B

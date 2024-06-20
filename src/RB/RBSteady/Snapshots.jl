@@ -1,12 +1,39 @@
+"""
+    abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractParamRealization}
+      <: AbstractParamContainer{T,N,L} end
+
+Type representing a collection of parametric abstract arrays of eltype T and
+parametric length L, that are associated with a realization of type R. The (spatial)
+entries of any instance of AbstractSnapshots are indexed according to an index
+map of type I<:AbstractIndexMap{D}, where D encodes the spatial dimension.
+
+Subtypes:
+- [`AbstractSteadySnapshots`](@ref)
+- [`AbstractTransientSnapshots`](@ref)
+
+"""
 abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractParamRealization} <: AbstractParamContainer{T,N,L} end
 
 ParamDataStructures.get_values(s::AbstractSnapshots) = @abstractmethod
 IndexMaps.get_index_map(s::AbstractSnapshots) = @abstractmethod
 get_realization(s::AbstractSnapshots) = @abstractmethod
 
+"""
+    num_space_dofs(s::AbstractSnapshots{T,N,L,D}) where {T,N,L,D} -> NTuple{D,Integer}
+
+Returns the spatial size of the snapshots
+
+"""
 num_space_dofs(s::AbstractSnapshots) = size(get_index_map(s))
 ParamDataStructures.num_params(s::AbstractSnapshots) = num_params(get_realization(s))
 
+"""
+    Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractParamRealization
+      ) -> AbstractSnapshots
+
+Constructor of an instance of AbstractSnapshots
+
+"""
 function Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractParamRealization)
   @abstractmethod
 end
@@ -30,14 +57,70 @@ function IndexMaps.change_index_map(f,s::AbstractSnapshots)
   Snapshots(s,index_map′,get_realization(s))
 end
 
+"""
+    flatten_snapshots(s::AbstractSnapshots) -> AbstractSnapshots
+
+The output snapshots are indexed according to a [`TrivialIndexMap`](@ref)
+
+"""
 function flatten_snapshots(s::AbstractSnapshots)
   change_index_map(TrivialIndexMap,s)
 end
 
+"""
+    abstract type AbstractSteadySnapshots{T,N,L,D,I,R<:ParamRealization}
+      <: AbstractSnapshots{T,N,L,D,I,R} end
+
+Spatial specialization of an [`AbstractSnapshots`](@ref). The dimension `N` of a
+AbstractSteadySnapshots is equal to `D` + 1, where `D` represents the number of
+spatial axes, to which a parametric dimension is added.
+
+Subtypes:
+- [`BasicSnapshots`](@ref).
+- [`SnapshotsAtIndices`](@ref).
+
+# Examples
+
+```jldoctest
+julia> ns1,ns2,np = 2,2,2
+(2, 2, 2)
+julia> data = [rand(ns1*ns2) for ip = 1:np]
+2-element Vector{Vector{Float64}}:
+ [0.4684452123483283, 0.1195886171030737, 0.1151790990455997, 0.0375575515915656]
+ [0.9095165124078269, 0.7346081836882059, 0.8939511550403715, 0.2288086807377305]
+julia> i = IndexMap(collect(LinearIndices((ns1,ns2))))
+2×2 IndexMap{2, Int64}:
+ 1  3
+ 2  4
+julia> pspace = ParamSpace(fill([0,1],3))
+Set of parameters in [[0, 1], [0, 1], [0, 1]], sampled with UniformSampling()
+julia> r = realization(pspace,nparams=np)
+ParamRealization{Vector{Vector{Float64}}}([
+  [0.4021870679335007, 0.6585653527784044, 0.5110768420820191],
+  [0.0950901750101361, 0.7049711670440882, 0.3490097863258958]])
+julia> s = Snapshots(ParamArray(data),i,r)
+2×2×2 BasicSnapshots{Float64, 3, 2, 2, IndexMap{2, Int64},
+  ParamRealization{Vector{Vector{Float64}}}, VectorOfVectors{Float64, 2}}:
+  [:, :, 1] =
+  0.468445  0.115179
+  0.119589  0.0375576
+
+  [:, :, 2] =
+  0.909517  0.893951
+  0.734608  0.228809
+```
+
+"""
 abstract type AbstractSteadySnapshots{T,N,L,D,I,R<:ParamRealization} <: AbstractSnapshots{T,N,L,D,I,R} end
 
 Base.size(s::AbstractSteadySnapshots) = (num_space_dofs(s)...,num_params(s))
 
+"""
+    struct BasicSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R} end
+
+Most standard implementation of a AbstractSteadySnapshots
+
+"""
 struct BasicSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R}
   data::A
   index_map::I
@@ -90,6 +173,17 @@ Base.@propagate_inbounds function Base.setindex!(
   setindex!(sparam,v,ispace′)
 end
 
+"""
+    struct SnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractSteadySnapshots{T,N,L,D,I,R},B<:AbstractUnitRange{Int}}
+      <: AbstractSteadySnapshots{T,N,L,D,I,R} end
+
+Represents a AbstractSteadySnapshots `snaps` whose parametric range is restricted
+to the indices in `prange`. This type essentially acts as a view for suptypes of
+AbstractSteadySnapshots, at every space location, on a selected number of
+parameter indices. An instance of SnapshotsAtIndices is created by calling the
+function [`select_snapshots`](@ref)
+
+"""
 struct SnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractSteadySnapshots{T,N,L,D,I,R},B<:AbstractUnitRange{Int}} <: AbstractSteadySnapshots{T,N,L,D,I,R}
   snaps::A
   prange::B
@@ -129,6 +223,15 @@ format_range(a::AbstractUnitRange,l::Int) = a
 format_range(a::Number,l::Int) = Base.OneTo(a)
 format_range(a::Colon,l::Int) = Base.OneTo(l)
 
+"""
+    select_snapshots(s::AbstractSteadySnapshots,prange) -> SnapshotsAtIndices
+    select_snapshots(s::AbstractTransientSnapshots,trange,prange) -> TransientSnapshotsAtIndices
+
+Restricts the parametric range of `s` to the indices `prange` steady cases, to
+the indices `trange` and `prange` in transient cases, while leaving the spatial
+entries intact. The restriction operation is lazy.
+
+"""
 function select_snapshots(s::SnapshotsAtIndices,prange)
   old_prange = s.indices
   @check intersect(old_prange,prange) == prange
@@ -140,6 +243,15 @@ function select_snapshots(s::AbstractSteadySnapshots,prange)
   SnapshotsAtIndices(s,prange)
 end
 
+"""
+    select_snapshots_entries(s::AbstractSteadySnapshots,srange) -> ArrayOfArrays
+    select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange) -> ArrayOfArrays
+
+Selects the snapshots' entries corresponding to the spatial range `srange` in
+steady cases, to the spatial-temporal ranges `srange` and `trange` in transient
+cases, for every parameter.
+
+"""
 function select_snapshots_entries(s::AbstractSteadySnapshots,srange)
   T = eltype(s)
   nval = length(srange)
@@ -165,6 +277,13 @@ end
 const UnfoldingSteadySnapshots{T,L,I,R} = AbstractSteadySnapshots{T,2,L,1,I,R}
 const UnfoldingSparseSnapshots{T,L,I,R,A} = SparseSnapshots{T,2,L,1,I,R,A}
 
+"""
+    struct BlockSnapshots{S,N,L} <: AbstractParamContainer{S,N,L}
+
+Block container for AbstractSnapshots of type `S` in a MultiField setting. This
+type is conceived similarly to [`ArrayBlock`](@ref) in [`Gridap`](@ref)
+
+"""
 struct BlockSnapshots{S,N,L} <: AbstractParamContainer{S,N,L}
   array::Array{S,N}
   touched::Array{Bool,N}
@@ -226,6 +345,12 @@ function Arrays.testitem(s::BlockSnapshots)
   end
 end
 
+"""
+    get_touched_blocks(a::AbstractArray{T,N}) where {T,N} -> Array{Bool,N}
+
+Returns the indices corresponding to the touched entries of a block object
+
+"""
 get_touched_blocks(s) = @abstractmethod
 get_touched_blocks(s::ArrayBlock) = findall(s.touched)
 get_touched_blocks(s::BlockSnapshots) = findall(s.touched)

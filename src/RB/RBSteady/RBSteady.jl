@@ -95,12 +95,12 @@ export pod_error
 include("RBSpace.jl")
 
 export RBOperator
-export PODOperator
+export PGOperator
 export reduced_operator
 export get_fe_trial
 export get_fe_test
 export jacobian_and_residual
-include("PODOperator.jl")
+include("PGOperator.jl")
 
 export ReducedAlgebraicOperator
 export ReducedVectorOperator
@@ -128,12 +128,12 @@ export coefficient!
 export mdeim_result
 include("AffineDecomposition.jl")
 
-export PODMDEIMOperator
-export LinearNonlinearPODMDEIMOperator
+export PGMDEIMOperator
+export LinearNonlinearPGMDEIMOperator
 export fe_jacobian!
 export fe_residual!
 export pod_mdeim_error
-include("PODMDEIMOperator.jl")
+include("PGMDEIMOperator.jl")
 
 export ComputationalStats
 export RBResults

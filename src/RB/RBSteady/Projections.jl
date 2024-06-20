@@ -1,3 +1,16 @@
+"""
+    abstract type Projection end
+
+Represents a basis for a vector (sub)space, used as a (Petrov)-Galerkin projection
+operator. In other words, Projection variables are operators from a high dimensional
+vector space to a low dimensional one
+
+Subtypes:
+- [`SteadyProjection`](@ref)
+- [`TransientProjection`](@ref)
+- [`ReducedAlgebraicOperator`](@ref)
+
+"""
 abstract type Projection end
 
 get_basis_space(a::Projection) = @abstractmethod
@@ -6,6 +19,17 @@ num_reduced_space_dofs(a::Projection) = @abstractmethod
 num_fe_dofs(a::Projection) = @abstractmethod
 num_reduced_dofs(a::Projection) = @abstractmethod
 
+"""
+    abstract type SteadyProjection <: Projection end
+
+Specialization for projections in steady problems. A constructor is given by
+the function Projection
+
+Subtypes:
+- [`PODBasis`](@ref)
+- [`TTSVDCores`](@ref)
+
+"""
 abstract type SteadyProjection <: Projection end
 
 num_fe_dofs(a::SteadyProjection) = num_space_dofs(a)
@@ -35,12 +59,24 @@ function Projection(s::SparseSnapshots,args...;kwargs...)
   TTSVDCores(cores′,index_map)
 end
 
+"""
+    recast(x̂::AbstractVector,a::Projection) -> AbstractVector
+
+Returns the action of the transposed Projection operator `a` on `x̂`
+
+"""
 function ParamDataStructures.recast(x̂::AbstractVector,a::SteadyProjection)
   basis = get_basis_space(a)
   x = basis*x̂
   return x
 end
 
+"""
+    struct PODBasis{A<:AbstractMatrix} <: SteadyProjection
+
+SteadyProjection stemming from a truncated proper orthogonal decomposition [`tpod`](@ref)
+
+"""
 struct PODBasis{A<:AbstractMatrix} <: SteadyProjection
   basis::A
 end
@@ -51,6 +87,13 @@ num_reduced_space_dofs(a::PODBasis) = size(get_basis_space(a),2)
 
 # TT interface
 
+"""
+    TTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I} <: SteadyProjection
+
+SteadyProjection stemming from a tensor train singular value decomposition [`ttsvd`](@ref).
+An index map of type `I` is provided for indexing purposes
+
+"""
 struct TTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I} <: SteadyProjection
   cores::A
   index_map::I
@@ -76,6 +119,12 @@ function _num_tot_space_dofs(a::TTSVDCores{4})
   return tot_ndofs
 end
 
+"""
+    cores2basis(index_map::AbstractIndexMap,cores::AbstractArray...) -> AbstractMatrix
+
+Computes the kronecker product of the suitably indexed input cores
+
+"""
 function cores2basis(index_map::AbstractIndexMap,cores::AbstractArray...)
   cores2basis(_cores2basis(index_map,cores...))
 end
@@ -131,6 +180,13 @@ end
 
 # multi field interface
 
+"""
+    struct BlockProjection{A,N} <: AbstractArray{Projection,N} end
+
+Block container for Projection of type `A` in a MultiField setting. This
+type is conceived similarly to [`ArrayBlock`](@ref) in [`Gridap`](@ref)
+
+"""
 struct BlockProjection{A,N} <: AbstractArray{Projection,N}
   array::Array{A,N}
   touched::Array{Bool,N}
@@ -216,11 +272,31 @@ function Projection(s::BlockSnapshots,norm_matrix;kwargs...)
   BlockProjection(block_map,bases)
 end
 
+"""
+    enrich_basis(
+      a::BlockProjection,
+      norm_matrix::BlockMatrix,
+      supr_op::BlockMatrix) -> BlockProjection
+
+Returns the supremizer-enriched BlockProjection. This function stabilizes Inf-Sup
+problems projected on a reduced vector space
+
+"""
 function enrich_basis(a::BlockProjection{<:PODBasis},norm_matrix::BlockMatrix,supr_op::BlockMatrix)
   bases = add_space_supremizers(get_basis_space(a),norm_matrix,supr_op)
   return BlockProjection(bases,a.touched)
 end
 
+"""
+    add_space_supremizers(
+      basis_space::MatrixBlock,
+      norm_matrix::BlockMatrix,
+      supr_op::BlockMatrix) -> Vector{<:Matrix}
+
+Enriches the spatial basis `basis_space` with spatial supremizers computed from
+the action of the supremizing operator `supr_op` on the dual field(s)
+
+"""
 function add_space_supremizers(basis_space,norm_matrix::BlockMatrix,supr_op::BlockMatrix)
   basis_primal,basis_dual... = basis_space.array
   A = norm_matrix[Block(1,1)]
