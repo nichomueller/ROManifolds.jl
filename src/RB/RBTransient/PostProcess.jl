@@ -2,6 +2,36 @@ function DrWatson.save(dir,op::TransientRBOperator)
   serialize(dir * "/operator.jld",op)
 end
 
+function RBSteady.deserialize_operator(feop::TransientParamFEOperatorWithTrian,rbop::TransientPGMDEIMOperator)
+  trian_res = feop.trian_res
+  trian_jacs = feop.trian_jacs
+  rhs_old,lhs_old = rbop.rhs,rbop.lhs
+
+  lhs_new = ()
+  for i = eachindex(lhs_old)
+    lhs_old_i = lhs_old[i]
+    trian_jac_i = trian_jacs[i]
+    iperm_jac,trian_jac_new = map(t->find_closest_view(trian_jac_i,t),lhs_old_i.trians) |> tuple_of_arrays
+    value_jac_new = map(i -> getindex(lhs_old_i.values,i...),iperm_jac)
+    lhs_new = (lhs_new...,Contribution(value_jac_new,trian_jac_new))
+  end
+
+  iperm_res,trian_res_new = map(t->find_closest_view(trian_res,t),rhs_old.trians) |> tuple_of_arrays
+  value_res_new = map(i -> getindex(rhs_old.values,i...),iperm_res)
+  rhs_new = Contribution(value_res_new,trian_res_new)
+
+  return TransientPGMDEIMOperator(rbop.op,lhs_new,rhs_new)
+end
+
+function RBSteady.deserialize_operator(
+  feop::LinearNonlinearTransientParamFEOperatorWithTrian,
+  rbop::LinearNonlinearTransientPGMDEIMOperator)
+
+  rbop_lin = deserialize_operator(get_linear_operator(feop),get_linear_operator(rbop))
+  rbop_nlin = deserialize_operator(get_nonlinear_operator(feop),get_nonlinear_operator(rbop))
+  return LinearNonlinearTransientPGMDEIMOperator(rbop_lin,rbop_nlin)
+end
+
 function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...;kwargs...)
   feop = ParamSteady.get_fe_operator(op)
   rb_results(solver,feop,args...;kwargs...)
@@ -24,51 +54,19 @@ function RBSteady.compute_error(sol::ModeTransientSnapshots,sol_approx::ModeTran
   return avg_error
 end
 
-# # plots
+function RBSteady.average_plot(
+  trial::TrialParamFESpace,
+  mat::AbstractMatrix;
+  name=:vel,
+  dir=joinpath(pwd(),"plots"))
 
-# function FESpaces.FEFunction(
-#   fs::SingleFieldParamFESpace,s::AbstractSnapshots{Mode1Axis})
-#   r = get_realization(s)
-#   @assert param_length(fs) == length(r)
-#   free_values = _to_param_array(s.values)
-#   diri_values = get_dirichlet_dof_values(fs)
-#   FEFunction(fs,free_values,diri_values)
-# end
-
-# function _plot(solh::SingleFieldParamFEFunction,r::TransientParamRealization;dir=pwd(),varname="vel")
-#   trian = get_triangulation(solh)
-#   create_dir(dir)
-#   createpvd(dir) do pvd
-#     for (i,t) in enumerate(get_times(r))
-#       solh_t = param_getindex(solh,i)
-#       vtk = createvtk(trian,dir,cellfields=[varname=>solh_t])
-#       pvd[t] = vtk
-#     end
-#   end
-# end
-
-# function _plot(trial,s;kwargs...)
-#   r,sh = _get_at_first_param(trial,s)
-#   _plot(sh,r;kwargs...)
-# end
-
-# function _plot(trial::TransientMultiFieldParamFESpace,s::BlockSnapshots;varname=("vel","press"),kwargs...)
-#   free_values = get_values(s)
-#   r = get_realization(s)
-#   trial = trial(r)
-#   sh = FEFunction(trial,free_values)
-#   nfields = length(trial.spaces)
-#   for n in 1:nfields
-#     _plot(sh[n],r,varname=varname[n];kwargs...)
-#   end
-# end
-
-# function generate_plots(feop::TransientParamFEOperator,r::RBResults;dir=pwd())
-#   sol,sol_approx = r.sol,r.sol_approx
-#   trial = get_trial(feop)
-#   plt_dir = joinpath(dir,"plots")
-#   fe_plt_dir = joinpath(plt_dir,"fe_solution")
-#   _plot(trial,sol;dir=fe_plt_dir,varname=r.name)
-#   rb_plt_dir = joinpath(plt_dir,"rb_solution")
-#   _plot(trial,sol_approx;dir=rb_plt_dir,varname=r.name)
-# end
+  create_dir(dir)
+  trian = get_triangulation(trial)
+  createpvd(dir) do pvd
+    for i in axes(mat,2)
+      solh_i = FEFunction(param_getindex(trial,i),mat[:,i])
+      vtk = createvtk(trian,dir,cellfields=[name=>solh_i])
+      pvd[i] = vtk
+    end
+  end
+end

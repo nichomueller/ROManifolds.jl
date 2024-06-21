@@ -1,6 +1,7 @@
-function load_solve(solver;dir=pwd(),kwargs...)
+function load_solve(solver,feop;dir=pwd(),kwargs...)
   snaps = deserialize(get_snapshots_filename(dir))
-  rbop = deserialize(get_op_filename(dir))
+  old_rbop = deserialize(get_op_filename(dir))
+  rbop = deserialize_operator(feop,old_rbop)
   rb_sol,rb_stats = solve(solver,rbop,snaps)
   old_results = deserialize(get_results_filename(dir))
   old_fem_stats = old_results.fem_stats
@@ -13,8 +14,7 @@ function DrWatson.save(dir,args::Tuple)
 end
 
 function get_snapshots_filename(dir)
-  parent_dir, = splitdir(dir)
-  parent_dir * "/snapshots.jld"
+  dir * "/snapshots.jld"
 end
 
 function DrWatson.save(dir,s::Union{AbstractSnapshots,BlockSnapshots})
@@ -27,6 +27,35 @@ end
 
 function DrWatson.save(dir,op::RBOperator)
   serialize(dir * "/operator.jld",op)
+end
+
+function deserialize_operator(feop,op)
+  @abstractmethod
+end
+
+function deserialize_operator(feop::ParamFEOperatorWithTrian,rbop::PGMDEIMOperator)
+  trian_res = feop.trian_res
+  trian_jac = feop.trian_jac
+  rhs_old,lhs_old = rbop.rhs,rbop.lhs
+
+  iperm_jac,trian_jac_new = map(t->find_closest_view(trian_jac,t),lhs_old.trians) |> tuple_of_arrays
+  value_jac_new = map(i -> getindex(lhs_old.values,i...),iperm_jac)
+  lhs_new = Contribution(value_jac_new,trian_jac_new)
+
+  iperm_res,trian_res_new = map(t->find_closest_view(trian_res,t),rhs_old.trians) |> tuple_of_arrays
+  value_res_new = map(i -> getindex(rhs_old.values,i...),iperm_res)
+  rhs_new = Contribution(value_res_new,trian_res_new)
+
+  return PGMDEIMOperator(rbop.op,lhs_new,rhs_new)
+end
+
+function deserialize_operator(
+  feop::LinearNonlinearParamFEOperatorWithTrian,
+  rbop::LinearNonlinearPGMDEIMOperator)
+
+  rbop_lin = deserialize_operator(get_linear_operator(feop),get_linear_operator(rbop))
+  rbop_nlin = deserialize_operator(get_nonlinear_operator(feop),get_nonlinear_operator(rbop))
+  return LinearNonlinearPGMDEIMOperator(rbop_lin,rbop_nlin)
 end
 
 struct ComputationalStats
@@ -81,6 +110,8 @@ end
 function compute_speedup(fem_stats::ComputationalStats,rb_stats::ComputationalStats)
   speedup_time = get_avg_time(fem_stats) / get_avg_time(rb_stats)
   speedup_memory = get_avg_nallocs(fem_stats) / get_avg_nallocs(rb_stats)
+  println("Speedup in time: $(speedup_time)")
+  println("Speedup in memory: $(speedup_memory)")
   return speedup_time,speedup_memory
 end
 
@@ -118,51 +149,30 @@ function compute_error(r::RBResults)
   compute_error(r.sol,r.sol_approx,r.norm_matrix)
 end
 
-# # plots
+function average_plot(
+  trial::TrialParamFESpace,
+  v::AbstractVector;
+  name=:vel,
+  dir=joinpath(pwd(),"plots"))
 
-# function FESpaces.FEFunction(
-#   fs::SingleFieldParamFESpace,s::AbstractSnapshots{Mode1Axis})
-#   r = get_realization(s)
-#   @assert param_length(fs) == length(r)
-#   free_values = _to_param_array(s.values)
-#   diri_values = get_dirichlet_dof_values(fs)
-#   FEFunction(fs,free_values,diri_values)
-# end
+  create_dir(dir)
+  trian = get_triangulation(trial)
+  vh = FEFunction(param_getindex(trial,1),v)
+  vtk = createvtk(trian,dir,cellfields=[name=>vh])
+end
 
-# function _plot(solh::SingleFieldParamFEFunction,r::TransientParamRealization;dir=pwd(),varname="vel")
-#   trian = get_triangulation(solh)
-#   create_dir(dir)
-#   createpvd(dir) do pvd
-#     for (i,t) in enumerate(get_times(r))
-#       solh_t = param_getindex(solh,i)
-#       vtk = createvtk(trian,dir,cellfields=[varname=>solh_t])
-#       pvd[t] = vtk
-#     end
-#   end
-# end
+function average_plot(trial::FESpace,r::RBResults;kwargs...)
+  r̄ = mean(get_realization(r.sol))
+  r₀ = zero(get_realization(r.sol))
+  average_plot(trial(r̄),mean(r.sol);name=r.name,kwargs...)
+  average_plot(trial(r₀),mean(r.sol - r.sol_approx);name=r.name,kwargs...)
+end
 
-# function _plot(trial,s;kwargs...)
-#   r,sh = _get_at_first_param(trial,s)
-#   _plot(sh,r;kwargs...)
-# end
-
-# function _plot(trial::TransientMultiFieldParamFESpace,s::BlockSnapshots;varname=("vel","press"),kwargs...)
-#   free_values = get_values(s)
-#   r = get_realization(s)
-#   trial = trial(r)
-#   sh = FEFunction(trial,free_values)
-#   nfields = length(trial.spaces)
-#   for n in 1:nfields
-#     _plot(sh[n],r,varname=varname[n];kwargs...)
-#   end
-# end
-
-# function generate_plots(feop::TransientParamFEOperator,r::RBResults;dir=pwd())
-#   sol,sol_approx = r.sol,r.sol_approx
-#   trial = get_trial(feop)
-#   plt_dir = joinpath(dir,"plots")
-#   fe_plt_dir = joinpath(plt_dir,"fe_solution")
-#   _plot(trial,sol;dir=fe_plt_dir,varname=r.name)
-#   rb_plt_dir = joinpath(plt_dir,"rb_solution")
-#   _plot(trial,sol_approx;dir=rb_plt_dir,varname=r.name)
-# end
+function average_plot(trial::MultiFieldFESpace,r::RBResults;kwargs...)
+  r̄ = mean(get_realization(r.sol))
+  r₀ = zero(get_realization(r.sol))
+  for (i,Ui) in trial
+    average_plot(Ui(r̄),mean(r.sol[i]);name=r.name[i],kwargs...)
+    average_plot(Ui(r₀),mean(r.sol[i] - r.sol_approx[i]);name=r.name[i],kwargs...)
+  end
+end

@@ -56,7 +56,7 @@ end
 function _param_entry(A::BlockArrayOfArrays{T,N},i::BlockIndex{N}) where {T,N}
   @boundscheck blockcheckbounds(A,Block(i.I))
   @inbounds bl = A.data[i.I...]
-  @inbounds ParamNumber(map(a->getindex(a,i.α...),bl.data))
+  @inbounds param_entry(bl.data,i.α...)
 end
 
 Base.@propagate_inbounds function param_setindex!(

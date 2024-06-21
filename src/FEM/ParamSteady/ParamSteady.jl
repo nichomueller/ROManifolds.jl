@@ -63,12 +63,13 @@ export change_triangulation
 include("ParamFEOperator.jl")
 
 export LinearNonlinearParamODE
-export ParamLinNonlinFEOperator
-export ParamLinearNonlinearFEOperator
+export LinNonlinParamFEOperator
+export LinearNonlinearParamFEOperator
+export LinearNonlinearParamFEOperatorWithTrian
 export get_linear_operator
 export get_nonlinear_operator
 export join_operators
-include("ParamLinearNonlinearFEOperator.jl")
+include("LinearNonlinearParamFEOperator.jl")
 
 export ParamOpFromFEOp
 export ParamOpFromFEOpWithTrian

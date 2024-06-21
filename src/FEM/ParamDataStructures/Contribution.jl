@@ -233,6 +233,32 @@ function get_parent(t::Triangulation)
   @abstractmethod
 end
 
+function Base.isapprox(t::Triangulation,s::Triangulation)
+  false
+end
+
+function Base.isapprox(t::BodyFittedTriangulation,s::BodyFittedTriangulation)
+  (
+    t.tface_to_mface == s.tface_to_mface &&
+    t.grid.cell_node_ids == s.grid.cell_node_ids &&
+    t.grid.cell_types == s.grid.cell_types &&
+    t.grid.node_coordinates == s.grid.node_coordinates
+  )
+end
+
+function Base.isapprox(t::BoundaryTriangulation,s::BoundaryTriangulation)
+  (
+    t.trian.tface_to_mface == s.trian.tface_to_mface &&
+    t.trian.grid.parent.cell_node_ids == s.trian.grid.parent.cell_node_ids &&
+    t.trian.grid.parent.cell_types == s.trian.grid.parent.cell_types &&
+    t.trian.grid.parent.node_coordinates == s.trian.grid.parent.node_coordinates
+  )
+end
+
+function isapprox_parent(tparent::Triangulation,tchild::Triangulation)
+  tparent ≈ get_parent(tchild)
+end
+
 function get_view_indices(t::BodyFittedTriangulation)
   grid = get_grid(t)
   grid.cell_to_parent_cell
@@ -261,9 +287,8 @@ function merge_triangulations(trians)
   view(parent,uindices)
 end
 
-function find_trian_permutation(a,b)
-  compare(a,b) = a == b || is_parent(a,b)
-  map(a -> findfirst(b -> compare(a,b),b),a)
+function find_trian_permutation(a,b;cmp=(a,b) -> a == b || is_parent(a,b))
+  map(a -> findfirst(b -> cmp(a,b),b),a)
 end
 
 """
@@ -277,4 +302,20 @@ function order_triangulations(tparents,tchildren)
   @check length(tparents) == length(tchildren)
   iperm = find_trian_permutation(tparents,tchildren)
   map(iperm->tchildren[iperm],iperm)
+end
+
+"""
+    find_closest_view(tparents::Tuple{Vararg{Triangulation}},
+      tchild::Triangulation) -> Integer, Triangulation
+
+Finds the approximate parent of `tchild`; it returns the parent's index and its
+view in the same indices as `tchild` (which should be a triangulation view)
+
+"""
+function find_closest_view(tparents,tchild::Triangulation)
+  cmp(a,b) = isapprox_parent(b,a)
+  iperm = find_trian_permutation((tchild,),tparents;cmp)
+  @check length(iperm) == 1
+  indices = get_view_indices(tchild)
+  return iperm,view(tparents[iperm...],indices)
 end

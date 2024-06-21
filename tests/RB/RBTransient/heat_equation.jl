@@ -91,24 +91,21 @@ rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 println(compute_error(results))
+println(compute_speedup(results))
+
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)
 
-# POD-MDEIM error
-pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
+load_solve(rbsolver,feop;dir=test_dir)
 
-ϵ = 1e-4
-rbsolver_space = RBSolver(fesolver,ϵ;mdeim_style=SpaceOnlyMDEIM(),nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-test_dir_space = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
+# # NEED TO IMPROVE:
 
-# we can load & solve directly, if the offline structures have been previously saved to file
-# load_solve(rbsolver_space,dir=test_dir_space)
+# using BenchmarkTools
+# v = get_fe_basis(test)
+# u = get_trial_fe_basis(test)
+# @btime ∫(∇(v)⋅∇(u))dΩ
 
-rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
-rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
-results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbstats_space)
-
-println(compute_error(results_space))
-save(test_dir,rbop_space)
-save(test_dir,results_space)
+# Ωv = view(Ω,rand(1:num_cells(Ω),10))
+# dΩv = Measure(Ωv,degree)
+# @btime ∫(∇(v)⋅∇(u))dΩv

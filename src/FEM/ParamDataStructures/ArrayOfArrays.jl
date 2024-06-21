@@ -27,7 +27,14 @@ Base.size(A::ArrayOfArrays{T,N}) where {T,N} = ntuple(_->param_length(A),Val{N}(
 end
 
 param_data(A::ArrayOfArrays{T,N}) where {T,N} = A.data
-param_entry(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N} = ParamNumber(map(a->getindex(a,i...),A.data))
+
+function param_entry(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
+  Ai = zeros(T,param_length(A))
+  @inbounds for k = param_eachindex(A)
+    Ai[k] = A.data[k][i...]
+  end
+  return Ai
+end
 
 Base.@propagate_inbounds function Base.getindex(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)

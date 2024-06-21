@@ -23,7 +23,7 @@ function ODEs.ode_finish!(
 end
 
 """
-    struct GenericODEParamSolution{V} <: ODESolution
+    struct ODEParamSolution{V} <: ODESolution
 
 Generic wrapper for the evolution of an `ODEParamOperator` with an `ODESolver`.
 
@@ -82,7 +82,7 @@ function Algebra.solve(
   r::TransientParamRealization,
   u0::T) where T
 
-  GenericODEParamSolution(solver,odeop,r,u0)
+  ODEParamSolution(solver,odeop,r,u0)
 end
 
 # for testing purposes

@@ -18,7 +18,7 @@ Subtypes:
 - [`TransientParamLinearFEOpFromWeakForm`](@ref)
 - [`TransientParamSaddlePointFEOp`](@ref)
 - [`TransientParamFEOperatorWithTrian`](@ref)
-- [`GenericTransientParamLinearNonlinearFEOperator`](@ref)
+- [`GenericLinearNonlinearTransientParamFEOperator`](@ref)
 
 """
 abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: TransientFEOperator{T} end

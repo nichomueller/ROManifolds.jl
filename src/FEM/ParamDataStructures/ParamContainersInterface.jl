@@ -111,6 +111,11 @@ param_length(::T) where {T<:AbstractParamContainer} = param_length(T)
 
 param_data(A::AbstractParamContainer) = map(i->param_getindex(A,i),param_eachindex(A))
 
+function to_param_quantity(a::AbstractParamContainer,plength::Integer)
+  @check param_length(a) == plength
+  return a
+end
+
 """
     ParamContainer{T,L} <: AbstractArray{T,1,L}
 
@@ -151,7 +156,6 @@ param_setindex!(a::ParamNumber,v,i::Integer) = setindex!(a,v,i)
 param_entry(a::ParamNumber,i::Integer) = getindex(a,i)
 
 to_param_quantity(a::Number,plength::Integer) = ParamNumber(fill(a,plength))
-to_param_quantity(a::ParamNumber,plength::Integer) = a
 
 Base.size(a::ParamNumber) = (param_length(a),)
 Base.getindex(a::ParamNumber,i::Integer) = getindex(a.data,i)

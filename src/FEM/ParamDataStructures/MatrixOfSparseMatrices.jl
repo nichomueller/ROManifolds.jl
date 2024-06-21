@@ -54,7 +54,7 @@ Base.size(A::MatrixOfSparseMatricesCSC) = (param_length(A),param_length(A))
   (A.m,A.n)
 end
 
-param_entry(A::MatrixOfSparseMatricesCSC,i::Integer...) = ParamNumber(A.data[i...,:])
+param_entry(A::MatrixOfSparseMatricesCSC,i::Integer...) = A.data[i...,:]
 
 Base.@propagate_inbounds function Base.getindex(A::MatrixOfSparseMatricesCSC,i::Vararg{Integer,2})
   @boundscheck checkbounds(A,i...)

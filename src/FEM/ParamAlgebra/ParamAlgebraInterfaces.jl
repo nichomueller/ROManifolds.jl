@@ -74,9 +74,9 @@ end
   A
 end
 
-@inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::ParamNumber,i)
+@inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::AbstractArray,i)
   @inbounds for k = param_eachindex(A)
-    A.data[k][i] = combine(A.data[k][i],v.data[k])
+    A.data[k][i] = combine(A.data[k][i],v[k])
   end
   A
 end
@@ -92,22 +92,31 @@ end
   A
 end
 
-@inline function Algebra.add_entry!(combine::Function,A::AbstractParamMatrix,v::ParamNumber,i,j)
+@inline function Algebra.add_entry!(combine::Function,A::AbstractParamMatrix,v::AbstractArray,i,j)
   @inbounds for k = param_eachindex(A)
-    A.data[k][i,j] = combine(A.data[k][i,j],v.data[k])
+    A.data[k][i,j] = combine(A.data[k][i,j],v[k])
   end
   A
 end
 
 function Algebra.add_entry!(combine::Function,A::MatrixOfSparseMatricesCSC,v::Number,i,j)
-  add_entry!(combine,A,ParamNumber(fill(v,param_length(A))),i,j)
-end
-
-function Algebra.add_entry!(combine::Function,A::MatrixOfSparseMatricesCSC,v::ParamNumber,i,j)
   k = nz_index(A,i,j)
   nz = nonzeros(A)
-  Aij = nz[k,:]
-  @inbounds nz[k,:] = combine(Aij,v)
+  @inbounds for l = param_eachindex(A)
+    Aijl = nz[k,l]
+    nz[k,l] = combine(Aijl,v)
+  end
+  A
+end
+
+function Algebra.add_entry!(combine::Function,A::MatrixOfSparseMatricesCSC,v::AbstractArray,i,j)
+  k = nz_index(A,i,j)
+  nz = nonzeros(A)
+  @inbounds for l = param_eachindex(A)
+    Aijl = nz[k,l]
+    vl = v[l]
+    nz[k,l] = combine(Aijl,vl)
+  end
   A
 end
 
@@ -155,8 +164,14 @@ function Algebra.finalize_coo!(::Type{T},I,J,V::AbstractParamArray,m,n) where T<
   end
 end
 
-function Algebra.nz_index(a::AbstractParamMatrix,i0,i1)
-  nz_index(testitem(a),i0,i1)
+function Algebra.nz_index(A::MatrixOfSparseMatricesCSC,i0,i1)
+  if !(1 <= i0 <= innersize(A,1) && 1 <= i1 <= innersize(A,2)); throw(BoundsError()); end
+  ptrs = SparseArrays.getcolptr(A)
+  r1 = Int(ptrs[i1])
+  r2 = Int(ptrs[i1+1]-1)
+  (r1 > r2) && return -1
+  r1 = searchsortedfirst(rowvals(A),i0,r1,r2,Base.Order.Forward)
+  ((r1 > r2) || (rowvals(A)[r1] != i0)) ? -1 : r1
 end
 
 function Algebra.push_coo!(::Type{T},I,J,V::AbstractParamArray,i,j,v) where T<:AbstractParamMatrix
@@ -264,7 +279,12 @@ Algebra.LoopStyle(::Type{<:ParamInserterCSC}) = Loop()
 end
 
 @noinline function Algebra.add_entry!(
-  ::typeof(+),a::ParamInserterCSC{Tv},v::Union{ParamNumber,Number},i,j) where Tv
+  ::typeof(+),a::ParamInserterCSC{Tv},v::Number,i,j) where Tv
+  @notimplemented
+end
+
+@noinline function Algebra.add_entry!(
+  ::typeof(+),a::ParamInserterCSC{Tv},v::AbstractArray,i,j) where Tv
   pini = Int(a.colptr[j])
   pend = pini + Int(a.colnnz[j]) - 1
   p = searchsortedfirst(a.rowval,i,pini,pend,Base.Order.Forward)

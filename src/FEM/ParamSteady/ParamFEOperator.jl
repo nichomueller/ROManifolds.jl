@@ -16,7 +16,7 @@ Subtypes:
 - [`ParamFEOpFromWeakForm`](@ref)
 - [`ParamSaddlePointFEOp`](@ref)
 - [`ParamFEOperatorWithTrian`](@ref)
-- [`GenericParamLinearNonlinearFEOperator`](@ref)
+- [`GenericLinearNonlinearParamFEOperator`](@ref)
 
 """
 abstract type ParamFEOperator{T<:ParamOperatorType} <: FEOperator end
@@ -191,7 +191,7 @@ Subtypes:
 
 - [`ParamFEOpFromWeakFormWithTrian`](@ref)
 - [`ParamSaddlePointFEOpWithTrian`](@ref)
-- [`ParamLinearNonlinearFEOperatorWithTrian`](@ref)
+- [`LinearNonlinearParamFEOperatorWithTrian`](@ref)
 
 """
 abstract type ParamFEOperatorWithTrian{T} <: ParamFEOperator{T} end

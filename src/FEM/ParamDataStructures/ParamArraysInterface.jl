@@ -50,7 +50,8 @@ Generic constructor of an AbstractParamArray
 """
 ParamArray(A::AbstractVector{<:AbstractArray}) = ArrayOfArrays(A)
 ParamArray(A::AbstractVector{<:SparseMatrixCSC}) = MatrixOfSparseMatricesCSC(A)
-ParamArray(A::AbstractArray{<:Number},plength=1) = ArrayOfTrivialArrays(A,plength)
+ParamArray(A::AbstractArray{<:Number},plength::Int) = ArrayOfTrivialArrays(A,plength)
+ParamArray(A::AbstractArray{<:Number}) = ParamNumber(A)
 ParamArray(A::AbstractArray{<:ParamArray}) = mortar(A)
 
 # Allow do-block syntax
@@ -62,7 +63,6 @@ function array_of_similar_arrays(a::AbstractArray{<:Number},l::Integer)
   ParamArray([similar(a) for _ = 1:l])
 end
 
-to_param_quantity(A::AbstractParamArray,plength::Integer) = A
 to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
 
 Base.:(==)(A::AbstractParamArray,B::AbstractParamArray) = all(param_data(A) .== param_data(B))
@@ -111,7 +111,9 @@ function Base.zero(::Type{<:AbstractArray{T,N}}) where {T<:Number,N}
 end
 
 function Base.fill!(A::AbstractParamArray,z::Number)
-  map(a -> fill!(a,z),param_data(A))
+  for a in A.data
+    fill!(a,z)
+  end
   return A
 end
 
@@ -281,6 +283,140 @@ function param_evaluate!(C,f::Union{Function,Map},A...)
     param_setindex!(data,vi,i)
   end
   data
+end
+
+# optimizations
+
+function param_return_value(
+  f::Union{Function,Map},
+  A::AbstractParamArray,
+  b::Union{Field,AbstractArray{<:Number}}...)
+
+  v = return_value(f,testitem(A),b...)
+  data = Vector{typeof(v)}(undef,param_length(A))
+  @inbounds for i = param_eachindex(A)
+    data[i] = return_value(f,param_getindex(A,i),b...)
+  end
+  return ParamArray(data)
+end
+
+function param_return_value(
+  f::Union{Function,Map},
+  a::Union{Field,AbstractArray{<:Number}},
+  B::AbstractParamArray,
+  c::Union{Field,AbstractArray{<:Number}}...)
+
+  v = return_value(f,a,testitem(B),c...)
+  data = Vector{typeof(v)}(undef,param_length(B))
+  @inbounds for i = param_eachindex(B)
+    data[i] = return_value(f,a,param_getindex(B,i),c...)
+  end
+  return ParamArray(data)
+end
+
+function param_return_value(
+  f::Union{Function,Map},
+  a::Union{Field,AbstractArray{<:Number}},
+  b::Union{Field,AbstractArray{<:Number}},
+  C::AbstractParamArray,
+  d::Union{Field,AbstractArray{<:Number}}...)
+
+  v = return_value(f,a,b,testitem(C),d...)
+  data = Vector{typeof(v)}(undef,param_length(C))
+  @inbounds for i = param_eachindex(C)
+    data[i] = return_value(f,a,b,param_getindex(C,i),d...)
+  end
+  return ParamArray(data)
+end
+
+function param_return_cache(
+  f::Union{Function,Map},
+  A::AbstractParamArray,
+  b::Union{Field,AbstractArray{<:Number}}...)
+
+  c = return_cache(f,testitem(A),b...)
+  cx = evaluate!(c,f,testitem(A),b...)
+  cache = Vector{typeof(c)}(undef,param_length(A))
+  data = Vector{typeof(cx)}(undef,param_length(A))
+  @inbounds for i = param_eachindex(A)
+    cache[i] = return_cache(f,param_getindex(A,i),b...)
+  end
+  return cache,ParamArray(data)
+end
+
+function param_return_cache(
+  f::Union{Function,Map},
+  a::Union{Field,AbstractArray{<:Number}},
+  B::AbstractParamArray,
+  c::Union{Field,AbstractArray{<:Number}}...)
+
+  c′ = return_cache(f,a,testitem(B),c...)
+  cx = evaluate!(c′,f,a,testitem(B),c...)
+  cache = Vector{typeof(c′)}(undef,param_length(B))
+  data = Vector{typeof(cx)}(undef,param_length(B))
+  @inbounds for i = param_eachindex(B)
+    cache[i] = return_cache(f,a,param_getindex(B,i),c...)
+  end
+  return cache,ParamArray(data)
+end
+
+function param_return_cache(
+  f::Union{Function,Map},
+  a::Union{Field,AbstractArray{<:Number}},
+  b::Union{Field,AbstractArray{<:Number}},
+  C::AbstractParamArray,
+  d::Union{Field,AbstractArray{<:Number}}...)
+
+  c′ = return_cache(f,a,b,testitem(C),d...)
+  cx = evaluate!(c′,f,a,b,testitem(C),d...)
+  cache = Vector{typeof(c′)}(undef,param_length(C))
+  data = Vector{typeof(cx)}(undef,param_length(C))
+  @inbounds for i = param_eachindex(C)
+    cache[i] = return_cache(f,a,b,param_getindex(C,i),d...)
+  end
+  return cache,ParamArray(data)
+end
+
+function param_evaluate!(
+  C,
+  f::Union{Function,Map},
+  A::AbstractParamArray,
+  b::Union{Field,AbstractArray{<:Number}}...)
+
+  cache,data = C
+  @inbounds for i = param_eachindex(A)
+    data.data[i] = evaluate!(cache[i],f,param_getindex(A,i),b...)
+  end
+  return data
+end
+
+function param_evaluate!(
+  C,
+  f::Union{Function,Map},
+  a::Union{Field,AbstractArray{<:Number}},
+  B::AbstractParamArray,
+  c::Union{Field,AbstractArray{<:Number}}...)
+
+  cache,data = C
+  @inbounds for i = param_eachindex(B)
+    data.data[i] = evaluate!(cache[i],f,a,param_getindex(B,i),c...)
+  end
+  return data
+end
+
+function param_evaluate!(
+  C′,
+  f::Union{Function,Map},
+  a::Union{Field,AbstractArray{<:Number}},
+  b::Union{Field,AbstractArray{<:Number}},
+  C::AbstractParamArray,
+  d::Union{Field,AbstractArray{<:Number}}...)
+
+  cache,data = C′
+  @inbounds for i = param_eachindex(C)
+    data.data[i] = evaluate!(cache[i],f,a,b,param_getindex(C,i),d...)
+  end
+  return data
 end
 
 for T in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamTensor3D)

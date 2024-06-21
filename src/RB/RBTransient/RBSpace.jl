@@ -11,7 +11,7 @@ function RBSteady.reduced_basis(feop::TransientParamFEOperatorWithTrian,s,norm_m
   reduced_basis(feop.op,s,norm_matrix;kwargs...)
 end
 
-function RBSteady.reduced_basis(feop::TransientParamLinearNonlinearFEOperator,s,norm_matrix;kwargs...)
+function RBSteady.reduced_basis(feop::LinearNonlinearTransientParamFEOperator,s,norm_matrix;kwargs...)
   reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
 end
 

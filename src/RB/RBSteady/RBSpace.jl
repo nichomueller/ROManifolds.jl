@@ -43,7 +43,7 @@ function reduced_basis(feop::ParamFEOperatorWithTrian,s,norm_matrix;kwargs...)
   reduced_basis(feop.op,s,norm_matrix;kwargs...)
 end
 
-function reduced_basis(feop::ParamLinearNonlinearFEOperator,s,norm_matrix;kwargs...)
+function reduced_basis(feop::LinearNonlinearParamFEOperator,s,norm_matrix;kwargs...)
   reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
 end
 

@@ -1,5 +1,12 @@
 # OFFLINE PHASE
 
+"""
+    empirical_interpolation(A::AbstractMatrix) -> (Vector{Int}, AbstractMatrix)
+
+Returns a list of indices U+1D4D8 corresponding to the rows of `A` selected by the
+discrete empirical interpolation method, and `A[U+1D4D8, :]`
+
+"""
 function empirical_interpolation(A::AbstractMatrix)
   m,n = size(A)
   res = zeros(eltype(A),m)
@@ -512,7 +519,7 @@ end
 #   return InterpolationError(errA,errb;kwargs...)
 # end
 
-# function interpolation_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
+# function interpolation_error(solver,feop::LinearNonlinearTransientParamFEOperator,rbop,s)
 #   err_lin = interpolation_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
 #   err_nlin = interpolation_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
 #   return err_lin,err_nlin
@@ -535,7 +542,7 @@ end
 #   return LincombError(errA,errb;kwargs...)
 # end
 
-# function linear_combination_error(solver,feop::TransientParamLinearNonlinearFEOperator,rbop,s)
+# function linear_combination_error(solver,feop::LinearNonlinearTransientParamFEOperator,rbop,s)
 #   err_lin = linear_combination_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
 #   err_nlin = linear_combination_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
 #   return err_lin,err_nlin

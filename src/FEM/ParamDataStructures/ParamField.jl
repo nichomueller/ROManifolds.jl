@@ -14,7 +14,6 @@ abstract type ParamField <: Field end
 Base.length(f::ParamField) = param_length(f)
 Base.size(f::ParamField) = (length(f),)
 Base.eltype(f::ParamField) = typeof(testitem(f))
-Base.IteratorSize(::Type{<:ParamField}) = Base.HasShape{length(f)}()
 
 Arrays.testitem(f::ParamField) = param_getindex(f,1)
 Arrays.testargs(f::ParamField,x::Point) = testargs(testitem(f),x)
@@ -108,11 +107,12 @@ struct OperationParamField{O,F} <: ParamField
   fields::F
 end
 
-function Fields.OperationField(op,fields::Tuple{Vararg{Field}})
-  try
+function Fields.OperationField(op,fields::Tuple{Vararg{Any}})
+  T = Union{ParamField,ParamContainer{<:Field}}
+  if any(isa.(fields,T)) || isa(op,T)
     pop,pfields... = to_param_quantities(op,fields...)
     OperationParamField(pop,pfields)
-  catch
+  else
     Fields.OperationField{typeof(op),typeof(fields)}(op,fields)
   end
 end
@@ -121,17 +121,17 @@ param_length(f::OperationParamField) = find_param_length(f.op,f.fields...)
 param_getindex(f::OperationParamField,i::Integer) = Fields.OperationField(f.op,param_getindex.(f.fields,i))
 param_getindex(f::OperationParamField{<:ParamField},i::Integer) = Fields.OperationField(param_getindex(f.op,i),param_getindex.(f.fields,i))
 
-function Arrays.return_value(c::OperationParamField,x::Point)
-  map(i->return_value(param_getindex(c,i),x),param_eachindex(c))
-end
+# function Arrays.return_value(c::OperationParamField,x::Point)
+#   map(i->return_value(param_getindex(c,i),x),param_eachindex(c))
+# end
 
-function Arrays.return_cache(c::OperationParamField,x::Point)
-  map(i->return_cache(param_getindex(c,i),x),param_eachindex(c))
-end
+# function Arrays.return_cache(c::OperationParamField,x::Point)
+#   map(i->return_cache(param_getindex(c,i),x),param_eachindex(c))
+# end
 
-function Arrays.evaluate!(cache,c::OperationParamField,x::Point)
-  map(i->evaluate!(cache[i],param_getindex(c,i),x),param_eachindex(c))
-end
+# function Arrays.evaluate!(cache,c::OperationParamField,x::Point)
+#   map(i->evaluate!(cache[i],param_getindex(c,i),x),param_eachindex(c))
+# end
 
 for op in (:+,:-)
   @eval begin
@@ -281,4 +281,23 @@ function Arrays.evaluate!(cache,f::ParamContainer{Union{Field,ParamField}},x::Ab
     pcache[i] = evaluate!(c,param_getindex(f,i),x)
   end
   return pcache
+end
+
+# used to correctly deal with parametric FEFunctions
+
+function Arrays.return_value(
+  k::Broadcasting{<:Operation},
+  args::Union{Field,ParamContainer{<:Field}}...)
+
+  pargs = to_param_quantities(args...)
+  Fields.OperationField(k.f.op,pargs)
+end
+
+function Arrays.evaluate!(
+  cache,
+  k::Broadcasting{<:Operation},
+  args::Union{Field,ParamContainer{<:Field}}...)
+
+  pargs = to_param_quantities(args...)
+  Fields.OperationField(k.f.op,pargs)
 end

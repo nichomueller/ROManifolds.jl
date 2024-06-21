@@ -17,6 +17,7 @@ using Gridap.Helpers
 
 import Base:+,-,*,/,\
 import Distributions: Uniform,Normal
+import Statistics: mean
 import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
 import SparseArrays.getcolptr
@@ -105,6 +106,7 @@ export contribution
 export get_values
 export get_parent
 export order_triangulations
+export find_closest_view
 include("Contribution.jl")
 
 # include("LazyMaps.jl")
