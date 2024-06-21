@@ -82,9 +82,10 @@ end
 function ParamSteady.change_triangulation(
   op::PGOperator,
   trians_rhs,
-  trians_lhs)
+  trians_lhs;
+  kwargs...)
 
-  PGOperator(change_triangulation(op.op,trians_rhs,trians_lhs),op.trial,op.test)
+  PGOperator(change_triangulation(op.op,trians_rhs,trians_lhs;kwargs...),op.trial,op.test)
 end
 
 function Algebra.allocate_residual(op::PGOperator,r::AbstractParamRealization,u::AbstractParamVector)

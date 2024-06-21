@@ -233,20 +233,39 @@ function get_parent(t::Triangulation)
   @abstractmethod
 end
 
-function Base.isapprox(t::Triangulation,s::Triangulation)
+function Base.isapprox(t::Grid,s::Grid)
   false
 end
 
-function Base.isapprox(t::BodyFittedTriangulation,s::BodyFittedTriangulation)
+function Base.isapprox(t::T,s::T) where {T<:UnstructuredGrid}
   (
-    t.tface_to_mface == s.tface_to_mface &&
-    t.grid.cell_node_ids == s.grid.cell_node_ids &&
-    t.grid.cell_types == s.grid.cell_types &&
-    t.grid.node_coordinates == s.grid.node_coordinates
+    t.cell_node_ids == s.cell_node_ids &&
+    t.cell_types == s.cell_types &&
+    t.node_coordinates == s.node_coordinates
   )
 end
 
-function Base.isapprox(t::BoundaryTriangulation,s::BoundaryTriangulation)
+function Base.isapprox(t::T,s::T) where {T<:Geometry.GridView}
+  t.parent ≈ s.parent
+end
+
+get_tface_to_mface(t::Triangulation) = @abstractmethod "$(typeof(t))"
+get_tface_to_mface(t::BodyFittedTriangulation) = t.tface_to_mface
+get_tface_to_mface(t::BoundaryTriangulation) = get_tface_to_mface(t.trian)
+
+function Base.isapprox(t::T,s::S) where {T<:Triangulation,S<:Triangulation}
+  false
+end
+
+function Base.isapprox(t::T,s::T) where {T<:Triangulation}
+  get_tface_to_mface(t) == get_tface_to_mface(s) && get_grid(t) ≈ get_grid(s)
+end
+
+function Base.isapprox(t::T,s::T) where {T<:Geometry.TriangulationView}
+  get_view_indices(t) == get_view_indices(s) && get_parent(t) ≈ get_parent(s)
+end
+
+function Base.isapprox(t::T,s::T) where {T<:BoundaryTriangulation}
   (
     t.trian.tface_to_mface == s.trian.tface_to_mface &&
     t.trian.grid.parent.cell_node_ids == s.trian.grid.parent.cell_node_ids &&
@@ -287,20 +306,30 @@ function merge_triangulations(trians)
   view(parent,uindices)
 end
 
-function find_trian_permutation(a,b;cmp=(a,b) -> a == b || is_parent(a,b))
+function find_trian_permutation(a,b,cmp::Function)
+  map(a -> findfirst(b -> cmp(a,b),b),a)
+end
+
+function find_trian_permutation(a,b;approximate=false)
+  if approximate
+    cmp = (a,b) -> a ≈ b || isapprox_parent(a,b)
+  else
+    cmp = (a,b) -> a == b || is_parent(a,b)
+  end
   map(a -> findfirst(b -> cmp(a,b),b),a)
 end
 
 """
     order_triangulations(tparents::Tuple{Vararg{Triangulation}},
-      tchildren::Tuple{Vararg{Triangulation}}) -> Tuple{Vararg{Triangulation}}
+      tchildren::Tuple{Vararg{Triangulation}};
+      kwargs...) -> Tuple{Vararg{Triangulation}}
 
 Orders the triangulation children in the same way as the triangulation parents
 
 """
-function order_triangulations(tparents,tchildren)
+function order_triangulations(tparents,tchildren;kwargs...)
   @check length(tparents) == length(tchildren)
-  iperm = find_trian_permutation(tparents,tchildren)
+  iperm = find_trian_permutation(tparents,tchildren;kwargs...)
   map(iperm->tchildren[iperm],iperm)
 end
 
@@ -314,7 +343,7 @@ view in the same indices as `tchild` (which should be a triangulation view)
 """
 function find_closest_view(tparents,tchild::Triangulation)
   cmp(a,b) = isapprox_parent(b,a)
-  iperm = find_trian_permutation((tchild,),tparents;cmp)
+  iperm::Tuple{Vararg{Int}} = find_trian_permutation((tchild,),tparents,cmp)
   @check length(iperm) == 1
   indices = get_view_indices(tchild)
   return iperm,view(tparents[iperm...],indices)

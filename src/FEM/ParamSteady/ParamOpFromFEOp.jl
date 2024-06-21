@@ -173,8 +173,8 @@ function set_triangulation(op::ParamOpFromFEOpWithTrian,trians_rhs,trians_lhs)
   ParamOpFromFEOpWithTrian(set_triangulation(op.op,trians_rhs,trians_lhs))
 end
 
-function change_triangulation(op::ParamOpFromFEOpWithTrian,trians_rhs,trians_lhs)
-  ParamOpFromFEOpWithTrian(change_triangulation(op.op,trians_rhs,trians_lhs))
+function change_triangulation(op::ParamOpFromFEOpWithTrian,trians_rhs,trians_lhs;kwargs...)
+  ParamOpFromFEOpWithTrian(change_triangulation(op.op,trians_rhs,trians_lhs;kwargs...))
 end
 
 function allocate_paramcache(

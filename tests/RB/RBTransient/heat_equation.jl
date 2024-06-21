@@ -99,6 +99,18 @@ save(test_dir,results)
 
 load_solve(rbsolver,feop;dir=test_dir)
 
+using Serialization
+old_rbop = deserialize(RBSteady.get_op_filename(test_dir))
+load_rbop = deserialize_operator(feop,old_rbop)
+
+rrhs = rbop.rhs
+trians = rrhs.trians
+ParamDataStructures.is_parent(Ω,trians[1])
+ParamDataStructures.is_parent(Γn,trians[2])
+
+jjac = rbop.lhs[2]
+trians = jjac.trians
+ParamDataStructures.is_parent(Ω,trians[1])
 # # NEED TO IMPROVE:
 
 # using BenchmarkTools
@@ -109,3 +121,9 @@ load_solve(rbsolver,feop;dir=test_dir)
 # Ωv = view(Ω,rand(1:num_cells(Ω),10))
 # dΩv = Measure(Ωv,degree)
 # @btime ∫(∇(v)⋅∇(u))dΩv
+
+old_rbop = deserialize(RBSteady.get_op_filename(test_dir))
+rhs_old,lhs_old = old_rbop.rhs,old_rbop.lhs
+iperm_res,trian_res_new = map(t->find_closest_view(trian_res,t),rhs_old.trians) |> tuple_of_arrays
+value_res_new = map(i -> getindex(rhs_old.values,i...),iperm_res)
+rhs_new = Contribution(value_res_new,trian_res_new)

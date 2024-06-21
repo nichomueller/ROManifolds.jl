@@ -71,9 +71,10 @@ end
 function ParamSteady.change_triangulation(
   op::TransientPGOperator,
   trians_rhs,
-  trians_lhs)
+  trians_lhs;
+  kwargs...)
 
-  TransientPGOperator(change_triangulation(op.op,trians_rhs,trians_lhs),op.trial,op.test)
+  TransientPGOperator(change_triangulation(op.op,trians_rhs,trians_lhs;kwargs...),op.trial,op.test)
 end
 
 function ODEs.allocate_odeopcache(

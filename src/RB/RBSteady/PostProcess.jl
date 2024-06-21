@@ -46,7 +46,9 @@ function deserialize_operator(feop::ParamFEOperatorWithTrian,rbop::PGMDEIMOperat
   value_res_new = map(i -> getindex(rhs_old.values,i...),iperm_res)
   rhs_new = Contribution(value_res_new,trian_res_new)
 
-  return PGMDEIMOperator(rbop.op,lhs_new,rhs_new)
+  op_new = change_triangulation(rbop.op,trian_res_new,trian_lhs_new;approximate=true)
+
+  return PGMDEIMOperator(op_new,lhs_new,rhs_new)
 end
 
 function deserialize_operator(

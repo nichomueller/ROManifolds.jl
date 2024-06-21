@@ -7,12 +7,14 @@ function RBSteady.deserialize_operator(feop::TransientParamFEOperatorWithTrian,r
   trian_jacs = feop.trian_jacs
   rhs_old,lhs_old = rbop.rhs,rbop.lhs
 
+  trian_lhs_new = ()
   lhs_new = ()
   for i = eachindex(lhs_old)
     lhs_old_i = lhs_old[i]
     trian_jac_i = trian_jacs[i]
     iperm_jac,trian_jac_new = map(t->find_closest_view(trian_jac_i,t),lhs_old_i.trians) |> tuple_of_arrays
     value_jac_new = map(i -> getindex(lhs_old_i.values,i...),iperm_jac)
+    trian_lhs_new = (trian_lhs_new...,trian_jac_new)
     lhs_new = (lhs_new...,Contribution(value_jac_new,trian_jac_new))
   end
 
@@ -20,7 +22,9 @@ function RBSteady.deserialize_operator(feop::TransientParamFEOperatorWithTrian,r
   value_res_new = map(i -> getindex(rhs_old.values,i...),iperm_res)
   rhs_new = Contribution(value_res_new,trian_res_new)
 
-  return TransientPGMDEIMOperator(rbop.op,lhs_new,rhs_new)
+  op_new = change_triangulation(rbop.op,trian_res_new,trian_lhs_new;approximate=true)
+
+  return TransientPGMDEIMOperator(op_new,lhs_new,rhs_new)
 end
 
 function RBSteady.deserialize_operator(
