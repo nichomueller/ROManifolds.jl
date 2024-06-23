@@ -231,14 +231,13 @@ function ParamInserter(inserter::Algebra.InserterCSC,L::Integer)
 end
 
 """
-    ParamInserterCSC{Tv,Ti}
+    struct ParamInserterCSC{Tv,Ti} end
 
 Extends the concept of `InserterCSC` in Gridap to accommodate a parametric setting.
 Tv is the type of the parametric nonzero entries of the CSC matrices to be
 assembled.
 
 """
-
 struct ParamInserterCSC{Tv,Ti}
   nrows::Int
   ncols::Int

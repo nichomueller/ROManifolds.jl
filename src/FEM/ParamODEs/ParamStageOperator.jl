@@ -6,6 +6,7 @@ Parametric extension of the type [`StageOperator`](@ref) in [`Gridap`](@ref)
 Subtypes:
 - [`LinearParamStageOperator`](@ref)
 - [`NonlinearParamStageOperator`](@ref)
+
 """
 abstract type ParamStageOperator <: NonlinearOperator end
 

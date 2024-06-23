@@ -1,5 +1,5 @@
 """
-    ArrayOfArrays{T,N,L,P<:AbstractVector{<:AbstractArray{T,N}}} <: ParamArray{T,N,L}
+    struct ArrayOfArrays{T,N,L,P<:AbstractVector{<:AbstractArray{T,N}}} <: ParamArray{T,N,L} end
 
 Represents a vector of arrays. For sake of coherence, an instance of
 `ArrayOfArrays{T,N}` inherits from AbstractArray{<:AbstractArray{T,N},N} rather than

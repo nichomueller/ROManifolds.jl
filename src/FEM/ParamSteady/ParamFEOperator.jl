@@ -65,7 +65,7 @@ get_linear_operator(op::ParamFEOperator) = @abstractmethod
 get_nonlinear_operator(op::ParamFEOperator) = @abstractmethod
 
 """
-    ParamFEOpFromWeakForm{T} <: ParamFEOperator{T}
+    struct ParamFEOpFromWeakForm{T} <: ParamFEOperator{T} end
 
 Most standard instance of ParamFEOperator{T}
 
@@ -154,7 +154,7 @@ function ParamFEOpFromWeakForm(
 end
 
 """
-    ParamSaddlePointFEOp{T} <: ParamFEOperator{T}
+    struct ParamSaddlePointFEOp{T} <: ParamFEOperator{T} end
 
 Interface to deal with the Inf-Sup stability condition of saddle point problems;
 the field `coupling` encodes the Inf-Sup operator
@@ -201,7 +201,7 @@ function FESpaces.get_algebraic_operator(op::ParamFEOperatorWithTrian)
 end
 
 """
-    ParamFEOpFromWeakFormWithTrian{T} <: ParamFEOperatorWithTrian{T}
+    struct ParamFEOpFromWeakFormWithTrian{T} <: ParamFEOperatorWithTrian{T} end
 
 Corresponds to a [`ParamFEOpFromWeakForm`](@ref) object, but in a triangulation
 separation setting
@@ -249,12 +249,8 @@ get_jac(op::ParamFEOpFromWeakFormWithTrian) = get_jac(op.op)
 ODEs.get_assembler(op::ParamFEOpFromWeakFormWithTrian) = get_assembler(op.op)
 IndexMaps.get_index_map(op::ParamFEOpFromWeakFormWithTrian) = get_index_map(op)
 
-function assemble_norm_matrix(op::ParamFEOpFromWeakFormWithTrian)
-  assemble_norm_matrix(op.op)
-end
-
 """
-    ParamSaddlePointFEOpWithTrian{T} <: ParamFEOperatorWithTrian{T}
+    struct ParamSaddlePointFEOpWithTrian{T} <: ParamFEOperatorWithTrian{T} end
 
 Corresponds to a [`ParamSaddlePointFEOp`](@ref) object, but in a triangulation
 separation setting

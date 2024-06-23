@@ -232,6 +232,6 @@ end
 function pod_error(r::MultiFieldRBSpace,s::BlockSnapshots,norm_matrix::BlockMatrix)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  errors = Any[pod_error(r[i],s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
+  errors = [pod_error(r[i],s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
   return_cache(block_map,errors...)
 end

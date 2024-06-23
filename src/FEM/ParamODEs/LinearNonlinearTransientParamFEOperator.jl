@@ -1,6 +1,6 @@
 """
-    GenericLinearNonlinearTransientParamFEOperator <:
-      TransientParamFEOperator{LinearNonlinearParamODE}
+    struct GenericLinearNonlinearTransientParamFEOperator <:
+      TransientParamFEOperator{LinearNonlinearParamODE} end
 
 Interface to accommodate the separation of terms depending on their linearity in
 a nonlinear problem. This allows to build and store once and for all linear
@@ -14,8 +14,8 @@ struct GenericLinearNonlinearTransientParamFEOperator <: TransientParamFEOperato
 end
 
 """
-   LinearNonlinearTransientParamFEOperatorWithTrian <:
-    TransientParamFEOperatorWithTrian{LinearNonlinearParamODE}
+    structLinearNonlinearTransientParamFEOperatorWithTrian <:
+      TransientParamFEOperatorWithTrian{LinearNonlinearParamODE} end
 
 Is to a TransientParamFEOperatorWithTrian as a GenericLinearNonlinearTransientParamFEOperator is to
 a TransientParamFEOperator

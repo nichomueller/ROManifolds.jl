@@ -1,5 +1,5 @@
 """
-    ArrayOfTrivialArrays{T,N,L,P<:AbstractArray{T,N}} <: ParamArray{T,N,L}
+    struct ArrayOfTrivialArrays{T,N,L,P<:AbstractArray{T,N}} <: ParamArray{T,N,L} end
 
 Wrapper for nonparametric arrays that we wish assumed a parametric length.
 

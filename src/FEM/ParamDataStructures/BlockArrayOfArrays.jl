@@ -1,5 +1,6 @@
 """
-    BlockArrayOfArrays{T,N,L,A<:AbstractArray{<:AbstractParamArray{T,N,L},N},B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N,L}
+    struct BlockArrayOfArrays{T,N,L,A<:AbstractArray{<:AbstractParamArray{T,N,L},N},
+      B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N,L} end
 
 Is to a [`ParamArray`](@ref) as a BlockArray is to a regular AbstractArray.
 Instances of BlockArrayOfArrays are obtained by extending the function `_BlockArray`

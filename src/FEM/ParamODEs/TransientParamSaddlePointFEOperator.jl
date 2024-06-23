@@ -57,7 +57,7 @@ function TransientParamLinearFEOpFromWeakForm(
 end
 
 """
-    TransientParamSaddlePointFEOp{T<:ODEParamOperatorType} <: TransientParamFEOperator{T}
+    struct TransientParamSaddlePointFEOp{T<:ODEParamOperatorType} <: TransientParamFEOperator{T} end
 
 Interface to deal with the Inf-Sup stability condition of saddle point problems;
 the field `coupling` encodes the Inf-Sup operator

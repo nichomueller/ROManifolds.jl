@@ -139,7 +139,6 @@ export ComputationalStats
 export RBResults
 export rb_results
 export load_solve
-export deserialize_operator
 export compute_speedup
 export compute_error
 export average_plot

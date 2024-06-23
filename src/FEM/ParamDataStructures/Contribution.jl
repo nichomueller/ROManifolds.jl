@@ -56,7 +56,7 @@ function Contribution(
 end
 
 """
-    struct ArrayContribution{T,N,V,K} <: Contribution
+    struct ArrayContribution{T,N,V,K} <: Contribution end
 
 Contribution whose values are arrays and/or parametric arrays.
 

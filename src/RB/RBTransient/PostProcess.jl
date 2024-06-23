@@ -22,7 +22,8 @@ function RBSteady.deserialize_operator(feop::TransientParamFEOperatorWithTrian,r
   value_res_new = map(i -> getindex(rhs_old.values,i...),iperm_res)
   rhs_new = Contribution(value_res_new,trian_res_new)
 
-  op_new = change_triangulation(rbop.op,trian_res_new,trian_lhs_new;approximate=true)
+  pop_new =  RBSteady.change_operator(feop,rbop.op)
+  op_new = change_triangulation(pop_new,trian_res_new,trian_lhs_new;approximate=true)
 
   return TransientPGMDEIMOperator(op_new,lhs_new,rhs_new)
 end
@@ -34,6 +35,17 @@ function RBSteady.deserialize_operator(
   rbop_lin = deserialize_operator(get_linear_operator(feop),get_linear_operator(rbop))
   rbop_nlin = deserialize_operator(get_nonlinear_operator(feop),get_nonlinear_operator(rbop))
   return LinearNonlinearTransientPGMDEIMOperator(rbop_lin,rbop_nlin)
+end
+
+function RBSteady.change_operator(feop::TransientParamFEOperatorWithTrian,pop::TransientPGOperator)
+  op = get_algebraic_operator(feop)
+  test = get_test(feop)
+  trial = get_trial(feop)
+  basis_test = RBSteady.get_basis(get_test(pop))
+  basis_trial = RBSteady.get_basis(get_trial(pop))
+  test′ = fe_subspace(test,basis_test)
+  trial′ = fe_subspace(trial,basis_trial)
+  return TransientPGOperator(op,trial′,test′)
 end
 
 function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...;kwargs...)
@@ -61,10 +73,10 @@ end
 function RBSteady.average_plot(
   trial::TrialParamFESpace,
   mat::AbstractMatrix;
-  name=:vel,
+  name="vel",
   dir=joinpath(pwd(),"plots"))
 
-  create_dir(dir)
+  RBSteady.create_dir(dir)
   trian = get_triangulation(trial)
   createpvd(dir) do pvd
     for i in axes(mat,2)
@@ -73,4 +85,8 @@ function RBSteady.average_plot(
       pvd[i] = vtk
     end
   end
+end
+
+function RBSteady.average_plot(op::TransientRBOperator,r::RBResults;kwargs...)
+  average_plot(get_fe_trial(op),r;kwargs...)
 end

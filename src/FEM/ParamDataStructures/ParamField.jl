@@ -24,7 +24,7 @@ to_param_quantity(f::ParamField,plength::Integer) = f
 to_param_quantity(f::Field,plength::Integer) = TrivialParamField(f,plength)
 
 """
-    TrivialParamField{F<:Field} <: ParamField
+    struct TrivialParamField{F<:Field} <: ParamField end
 
 Wrapper for nonparametric fields that we wish assumed a parametric length.
 
@@ -47,7 +47,7 @@ param_getindex(f::TrivialParamField,i::Integer) = f.field
 Arrays.evaluate(f::TrivialParamField,x::Point) = fill(evaluate(f.field,x),f.plength)
 
 """
-    GenericParamField{T<:AbstractParamFunction} <: ParamField
+    struct GenericParamField{T<:AbstractParamFunction} <: ParamField end
 
 Parametric extension of a GenericField in [`Gridap`](@ref)
 
@@ -65,7 +65,7 @@ Arrays.return_cache(f::GenericParamField,x::Point) = return_cache(f.object,x)
 Arrays.evaluate!(cache,f::GenericParamField,x::Point) = evaluate!(cache,f.object,x)
 
 """
-    ParamFieldGradient{N,F} <: ParamField
+    struct ParamFieldGradient{N,F} <: ParamField end
 
 Parametric extension of a FieldGradient in [`Gridap`](@ref)
 
@@ -97,7 +97,7 @@ Arrays.return_cache(f::ParamFieldGradient{N,<:Function},x::Point) where N = grad
 Arrays.evaluate!(c,f::ParamFieldGradient{N,<:Function},x::Point) where N = c(x)
 
 """
-    OperationParamField{O,F} <: ParamField
+    struct OperationParamField{O,F} <: ParamField end
 
 Parametric extension of a OperationField in [`Gridap`](@ref)
 
@@ -120,18 +120,6 @@ end
 param_length(f::OperationParamField) = find_param_length(f.op,f.fields...)
 param_getindex(f::OperationParamField,i::Integer) = Fields.OperationField(f.op,param_getindex.(f.fields,i))
 param_getindex(f::OperationParamField{<:ParamField},i::Integer) = Fields.OperationField(param_getindex(f.op,i),param_getindex.(f.fields,i))
-
-# function Arrays.return_value(c::OperationParamField,x::Point)
-#   map(i->return_value(param_getindex(c,i),x),param_eachindex(c))
-# end
-
-# function Arrays.return_cache(c::OperationParamField,x::Point)
-#   map(i->return_cache(param_getindex(c,i),x),param_eachindex(c))
-# end
-
-# function Arrays.evaluate!(cache,c::OperationParamField,x::Point)
-#   map(i->evaluate!(cache[i],param_getindex(c,i),x),param_eachindex(c))
-# end
 
 for op in (:+,:-)
   @eval begin
@@ -172,7 +160,7 @@ function Fields.gradient(f::OperationParamField{<:Field})
 end
 
 """
-    InverseParamField{F} <: ParamField
+    struct InverseParamField{F} <: ParamField end
 
 Parametric extension of a InverseField in [`Gridap`](@ref)
 
@@ -195,7 +183,7 @@ function Arrays.evaluate!(cache,c::InverseParamField,x::Point)
 end
 
 """
-    BroadcastOpParamFieldArray{O,T,N,A} <: AbstractVector{BroadcastOpFieldArray{O,T,N,A}}
+    struct BroadcastOpParamFieldArray{O,T,N,A} <: AbstractVector{BroadcastOpFieldArray{O,T,N,A}} end
 
 Parametric extension of a BroadcastOpFieldArray in [`Gridap`](@ref)
 

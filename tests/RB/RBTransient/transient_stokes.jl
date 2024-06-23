@@ -22,16 +22,15 @@ tf = 0.1
 pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
-# model_dir = datadir(joinpath("meshes","perforated_plate.json"))
-# model = DiscreteModelFromFile(model_dir)
+model_dir = datadir(joinpath("meshes","perforated_plate.json"))
+model = DiscreteModelFromFile(model_dir)
 
-n = 5
-domain = (0,1,0,1)
-partition = (n,n)
-model = CartesianDiscreteModel(domain, partition)
-
-labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
+# n = 5
+# domain = (0,1,0,1)
+# partition = (n,n)
+# model = CartesianDiscreteModel(domain, partition)
+# labels = get_face_labeling(model)
+# add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
 
 order = 2
 degree = 2*order
@@ -42,8 +41,8 @@ a(x,μ,t) = 1+exp(-sin(2π*t/tf)^2*(1-x[2])/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
-# inflow(μ,t) = 1-cos(2π*t/tf)+sin(μ[2]*2π*t/tf)/μ[1]
-inflow(μ,t) = 1-cos(2π*t/(μ[1]*tf))
+inflow(μ,t) = 1-cos(2π*t/tf)+sin(μ[2]*2π*t/tf)/μ[1]
+# inflow(μ,t) = 1-cos(2π*t/(μ[1]*tf))
 g_in(x,μ,t) = VectorValue(-x[2]*(1-x[2])*inflow(μ,t),0.0)
 g_in(μ,t) = x->g_in(x,μ,t)
 gμt_in(μ,t) = TransientParamFunction(g_in,μ,t)
@@ -69,17 +68,17 @@ trian_res = (Ω,)
 trian_stiffness = (Ω,)
 trian_mass = (Ω,)
 
-coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
-induced_norm((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
+coupling((du,dp),(v,q),dΩ) = ∫(dp*(∇⋅(v)))dΩ
+induced_norm((du,dp),(v,q),dΩ) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-# test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","walls","cylinder"])
-# trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_w,gμt_c])
-test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial_u = TransientTrialParamFESpace(test_u,gμt_in)
+test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","walls","cylinder"])
+trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_w,gμt_c])
+# test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
+# trial_u = TransientTrialParamFESpace(test_u,gμt_in)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
-# test_p = TestFESpace(model,reffe_p;conformity=:C0)
+# test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -90,9 +89,9 @@ xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=1,nsnaps_mdeim=20)
-# test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated_plate")))
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated_plate")))
+# test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
 
 fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
@@ -105,5 +104,20 @@ save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)
 
-# POD-MDEIM error
-pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
+using Serialization
+fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
+
+s = select_snapshots(fesnaps,RBSteady.offline_params(rbsolver))
+
+using BlockArrays
+s1 = s[1]
+X = assemble_norm_matrix(feop)
+X1 = X[Block(1,1)]
+s′ = flatten_snapshots(s1)
+basis_space = tpod(s′,X1)
+compressed_s2 = compress(s′,basis_space,X1;swap_mode=true)
+basis_time = tpod(compressed_s2)
+
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+s = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
+jjac,rres = jacobian_and_residual(solver,op,s)

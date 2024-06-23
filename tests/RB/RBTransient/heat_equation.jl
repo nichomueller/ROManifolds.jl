@@ -68,7 +68,7 @@ trian_res = (Ω,Γn)
 trian_stiffness = (Ω,)
 trian_mass = (Ω,)
 
-induced_norm(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
+induced_norm(du,v) = ∫(du*v)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
@@ -83,34 +83,25 @@ rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
 # we can load & solve directly, if the offline structures have been previously saved to file
-# load_solve(rbsolver,dir=test_dir)
 
-fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+try
+  results = load_solve(rbsolver,feop,test_dir)
+catch
+  println("Loading offline structures failed: running offline phase")
+  fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
+  rbop = reduced_operator(rbsolver,feop,fesnaps)
+  rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+  results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+
+  save(test_dir,fesnaps)
+  save(test_dir,rbop)
+  save(test_dir,results)
+end
 
 println(compute_error(results))
 println(compute_speedup(results))
+average_plot(rbop,results;dir=joinpath(test_dir,"plots"))
 
-save(test_dir,fesnaps)
-save(test_dir,rbop)
-save(test_dir,results)
-
-load_solve(rbsolver,feop;dir=test_dir)
-
-using Serialization
-old_rbop = deserialize(RBSteady.get_op_filename(test_dir))
-load_rbop = deserialize_operator(feop,old_rbop)
-
-rrhs = rbop.rhs
-trians = rrhs.trians
-ParamDataStructures.is_parent(Ω,trians[1])
-ParamDataStructures.is_parent(Γn,trians[2])
-
-jjac = rbop.lhs[2]
-trians = jjac.trians
-ParamDataStructures.is_parent(Ω,trians[1])
 # # NEED TO IMPROVE:
 
 # using BenchmarkTools
@@ -121,9 +112,3 @@ ParamDataStructures.is_parent(Ω,trians[1])
 # Ωv = view(Ω,rand(1:num_cells(Ω),10))
 # dΩv = Measure(Ωv,degree)
 # @btime ∫(∇(v)⋅∇(u))dΩv
-
-old_rbop = deserialize(RBSteady.get_op_filename(test_dir))
-rhs_old,lhs_old = old_rbop.rhs,old_rbop.lhs
-iperm_res,trian_res_new = map(t->find_closest_view(trian_res,t),rhs_old.trians) |> tuple_of_arrays
-value_res_new = map(i -> getindex(rhs_old.values,i...),iperm_res)
-rhs_new = Contribution(value_res_new,trian_res_new)

@@ -62,7 +62,7 @@ function get_matrix_index_map(f::UnEvalParamSingleFieldFESpace,g::SingleFieldFES
 end
 
 """
-    ParamTrialFESpace{A,B} <: UnEvalParamSingleFieldFESpace
+    struct ParamTrialFESpace{A,B} <: UnEvalParamSingleFieldFESpace end
 
 Structure used in steady applications. When a ParamTrialFESpace is evaluated in a
 [`ParamRealization`](@ref), a parametric trial FE space is returned

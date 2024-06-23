@@ -108,4 +108,4 @@ save(test_dir,rbop)
 save(test_dir,results)
 
 # POD-MDEIM error
-pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
+pod_err,mdeim_error = pod_mdeim_error(rbsolver,feop,rbop,fesnaps)

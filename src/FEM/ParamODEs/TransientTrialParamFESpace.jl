@@ -1,5 +1,5 @@
 """
-    TransientTrialParamFESpace{A,B} <: UnEvalParamSingleFieldFESpace
+    struct TransientTrialParamFESpace{A,B} <: UnEvalParamSingleFieldFESpace end
 
 Structure used in transient applications. When a TransientTrialParamFESpace is
 evaluated in a [`TransientParamRealization`](@ref), a parametric trial FE space is returned

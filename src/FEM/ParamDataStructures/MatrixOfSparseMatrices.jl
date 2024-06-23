@@ -1,5 +1,5 @@
 """
-    MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSC{Tv,Ti,L}
+    struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSC{Tv,Ti,L} end
 
 Represents a vector of sparse matrices in CSC format. For sake of coherence, an
 instance of `MatrixOfSparseMatricesCSC` inherits from AbstractMatrix{<:SparseMatrixCSC{Tv,Ti}

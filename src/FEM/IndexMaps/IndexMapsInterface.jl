@@ -35,14 +35,14 @@ function _shape_per_dir(i::AbstractVector{<:Integer})
 end
 
 """
-    abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D}
+    abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D} end
 
 Index mapping operator that serves to view a finite element function according to
 a nonstandard indexing strategy. Just like the connectivity matrix, the entries of
 the index maps are positive when the corresponding dof is free, and negative when
 the corresponding dof is dirichlet.
-"""
 
+"""
 abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D} end
 
 Base.view(i::AbstractIndexMap,locations) = IndexMapView(i,locations)
@@ -52,8 +52,8 @@ Base.view(i::AbstractIndexMap,locations) = IndexMapView(i,locations)
 
 Removes the negative indices from the index map, which correspond to Dirichlet
 boundary conditions.
-"""
 
+"""
 function free_dofs_map(i::AbstractIndexMap)
   free_dofs_locations = findall(i.>zero(eltype(i)))
   s = _shape_per_dir(free_dofs_locations)
@@ -65,8 +65,8 @@ end
     dirichlet_dofs_map(i::AbstractIndexMap) -> AbstractVector
 
 Removes the positive indices from the index map, which correspond to free dofs.
-"""
 
+"""
 function dirichlet_dofs_map(i::AbstractIndexMap)
   dir_dofs_locations = findall(i.<zero(eltype(i)))
   i.indices[dir_dofs_locations]
@@ -76,8 +76,8 @@ end
     inv_index_map(i::AbstractIndexMap) -> AbstractIndexMap
 
 Returns the inverse of the index map defined by `i`.
-"""
 
+"""
 function inv_index_map(i::AbstractIndexMap)
   invi = reshape(invperm(vec(i)),size(i))
   IndexMap(invi)
@@ -87,8 +87,8 @@ end
     change_index_map(f,i::AbstractIndexMap) -> AbstractIndexMap
 
 Returns an index map given by `f`∘`i`, where f is a function encoding an index map.
-"""
 
+"""
 function change_index_map(f,i::AbstractIndexMap)
   i′::AbstractIndexMap = f(vec(collect(i)))
   i′
@@ -96,8 +96,8 @@ end
 
 """
     fix_dof_index_map(i::AbstractIndexMap,dof_to_fix::Integer) -> FixedDofIndexMap
-"""
 
+"""
 function fix_dof_index_map(i::AbstractIndexMap,dof_to_fix::Integer)
   FixedDofIndexMap(i,dof_to_fix)
 end
@@ -108,8 +108,8 @@ end
 Represents an index map that does not change the indexing strategy of the FEM function.
 In other words, this is simply a wrapper for a LinearIndices list. In the case of sparse
 matrices, the indices in a TrivialIndexMap are those of the nonzero elements.
-"""
 
+"""
 struct TrivialIndexMap{Ti,I<:AbstractVector{Ti}} <: AbstractIndexMap{1,Ti}
   indices::I
 end
@@ -125,8 +125,8 @@ Base.getindex(i::TrivialIndexMap,j::Integer) = getindex(i.indices,j)
     IndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
 
 Most standard implementation of an index map.
-"""
 
+"""
 struct IndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
   indices::Array{Ti,D}
 end
@@ -140,8 +140,8 @@ Base.getindex(i::IndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,
 View of an AbstractIndexMap at selected locations. Both the index map and the set of locations
 have the same dimension. Therefore, this map cannot be used to view boundary indices,
 only portions of the domain.
-"""
 
+"""
 struct IndexMapView{D,Ti,I<:AbstractIndexMap{D,Ti},L} <: AbstractIndexMap{D,Ti}
   indices::I
   locations::L
@@ -162,8 +162,8 @@ Base.getindex(i::IndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.loc
 
 Index map to be used when imposing a zero mean constraint on a given `FESpace`. The fixed
 dof is seen as a CartesianIndex of dimension D.
-"""
 
+"""
 struct FixedDofIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
   indices::I
   dof_to_fix::CartesianIndex{D}
@@ -191,7 +191,6 @@ Base.view(i::FixedDofIndexMap,locations) = FixedDofIndexMap(IndexMapView(i.indic
 Index map to be used when defining a [`TProductFESpace`](@ref) on a CartesianDiscreteModel.
 
 """
-
 struct TProductIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
   indices::I
   indices_1d::Vector{Vector{Ti}}
@@ -213,7 +212,6 @@ Index map used to select the nonzero entries of a sparse matrix. The field `spar
 contains the tensor product sparsity of the matrix to be indexed.
 
 """
-
 struct SparseIndexMap{D,Ti,A<:AbstractIndexMap{D,Ti},B<:TProductSparsityPattern} <: AbstractIndexMap{D,Ti}
   indices::A
   sparsity::B

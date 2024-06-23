@@ -23,7 +23,7 @@ function ODEs.ode_finish!(
 end
 
 """
-    struct ODEParamSolution{V} <: ODESolution
+    struct ODEParamSolution{V} <: ODESolution end
 
 Generic wrapper for the evolution of an `ODEParamOperator` with an `ODESolver`.
 

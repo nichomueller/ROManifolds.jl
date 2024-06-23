@@ -1,5 +1,5 @@
 """
-    AbstractParamArray{T,N,L,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N,L}
+    abstract type AbstractParamArray{T,N,L,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N,L} end
 
 Type representing parametric abstract arrays of type A. L encodes the parametric length.
 Subtypes:
@@ -7,11 +7,10 @@ Subtypes:
 - [`ParamSparseMatrix`](@ref).
 
 """
-
 abstract type AbstractParamArray{T,N,L,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N,L} end
 
 """
-    ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}}
+    abstract type ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}} end
 
 Type representing parametric arrays of type A. L encodes the parametric length.
 Subtypes:
@@ -23,7 +22,8 @@ Subtypes:
 abstract type ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}} end
 
 """
-    ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,L,A}
+    abstract type ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}
+      } <: AbstractParamArray{Tv,2,L,A} end
 
 Type representing parametric abstract sparse matrices of type A. L encodes the parametric length.
 Subtypes:
@@ -33,7 +33,7 @@ Subtypes:
 abstract type ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,L,A} end
 
 """
-    ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSC{Tv,Ti}}
+    abstract type ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSC{Tv,Ti}} end
 
 Type representing parametric sparse matrices in CSC format. L encodes the parametric length.
 Subtypes:
@@ -43,9 +43,13 @@ Subtypes:
 abstract type ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSC{Tv,Ti}} end
 
 """
-    ParamArray(A::AbstractArray{<:Any}) -> AbstractArray{<:Any}
+    ParamArray(A::AbstractVector{<:AbstractArray}) -> ArrayOfArrays
+    ParamArray(A::AbstractVector{<:SparseMatrixCSC}) -> MatrixOfSparseMatricesCSC
+    ParamArray(A::AbstractArray{<:Number},plength::Int) -> ArrayOfTrivialArrays
+    ParamArray(A::AbstractArray{<:Number}) -> ParamNumber
+    ParamArray(A::AbstractArray{<:ParamArray}) -> BlockArrayOfArrays
 
-Generic constructor of an AbstractParamArray
+Generic constructor of a AbstractParamArray
 
 """
 ParamArray(A::AbstractVector{<:AbstractArray}) = ArrayOfArrays(A)

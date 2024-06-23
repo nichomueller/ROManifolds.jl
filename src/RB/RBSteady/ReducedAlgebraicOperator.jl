@@ -1,15 +1,51 @@
+"""
+    abstract type ReducedAlgebraicOperator{A} <: Projection end
+
+Type representing a basis for a vector (sub)space (computed by compressing either
+residual or jacobian snapshots) projected on a FESubspace. In practice:
+1) we are given a manifold of parametrized residuals/jacobians, and a FESubspace
+2) we compress the manifold, thus identifying a reduced subspace
+3) we project the reduced subspace on the FESubspace by means of a (Petrov-)Galerkin
+  projection
+
+This Projection subtype is implemented for two reasons:
+
+- a field containing the mdeim style is provided for multiple dispatching
+- a specialization for Base.* is implemented in order to compute linear
+  combinations of ReducedAlgebraicOperator by vectors of coefficients just as in
+  the case of a standard matrix × vector product
+
+Subtypes:
+- [`ReducedVectorOperator`](@ref)
+- [`ReducedMatrixOperator`](@ref)
+
+"""
 abstract type ReducedAlgebraicOperator{A} <: Projection end
 
+"""
+"""
 struct ReducedVectorOperator{A,B} <: ReducedAlgebraicOperator{A}
   mdeim_style::A
   basis::B
 end
 
+"""
+"""
 struct ReducedMatrixOperator{A,B} <: ReducedAlgebraicOperator{A}
   mdeim_style::A
   basis::B
 end
 
+"""
+    reduce_operator(mdeim_style::MDEIMStyle,b::Projection,r::FESubspace...;kwargs...
+      ) -> ReducedAlgebraicOperator
+
+Computes a ReducedAlgebraicOperator from a Projection `b` and FESubspace(s) `r`.
+When `b` consists of compressed residual snapshots, `r` stands for the `test` FE
+space; when it consists of compressed jacobian snapshots, `r` stands for the
+`trial` and `test` FE spaces
+
+"""
 function reduce_operator(mdeim_style::MDEIMStyle,b::Projection,r::FESubspace...;kwargs...)
   reduce_operator(mdeim_style,b,map(get_basis,r)...;kwargs...)
 end

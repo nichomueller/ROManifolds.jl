@@ -60,7 +60,7 @@ end
 
 function Base.zero(r::ParamRealization)
   μ1 = first(_get_params(r))
-  ParamRealization(zeros(eltype(μ1),length(μ1)))
+  ParamRealization(zeros(eltype(μ1),length(μ1)) .+ 1e-16)
 end
 
 function mean(r::ParamRealization)

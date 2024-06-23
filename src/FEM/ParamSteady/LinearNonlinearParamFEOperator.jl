@@ -1,5 +1,5 @@
 """
-    GenericLinearNonlinearParamFEOperator <: ParamFEOperator{LinearNonlinearParamEq}
+    struct GenericLinearNonlinearParamFEOperator <: ParamFEOperator{LinearNonlinearParamEq} end
 
 Interface to accommodate the separation of terms depending on their linearity in
 a nonlinear problem. This allows to build and store once and for all linear
@@ -13,7 +13,7 @@ struct GenericLinearNonlinearParamFEOperator <: ParamFEOperator{LinearNonlinearP
 end
 
 """
-    LinearNonlinearParamFEOperatorWithTrian <: ParamFEOperatorWithTrian{LinearNonlinearParamEq}
+    struct LinearNonlinearParamFEOperatorWithTrian <: ParamFEOperatorWithTrian{LinearNonlinearParamEq} end
 
 Is to a ParamFEOperatorWithTrian as a GenericLinearNonlinearParamFEOperator is to
 a ParamFEOperator

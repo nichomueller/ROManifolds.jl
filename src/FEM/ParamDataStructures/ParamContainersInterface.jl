@@ -73,7 +73,6 @@ if there are no parametric quantities or if at least two quantities have differe
 parametric length
 
 """
-
 function find_param_length(a...)
   plengths::Tuple{Vararg{Int}} = filter(!iszero,param_length.(a))
   @check all(plengths .== first(plengths))
@@ -86,14 +85,13 @@ end
 Converts the input quantities to parametric quantities
 
 """
-
 function to_param_quantities(a...;plength=find_param_length(a...))
   pa = map(f->to_param_quantity(f,plength),a)
   return pa
 end
 
 """
-    AbstractParamContainer{T,N,L} <: AbstractArray{T,N}
+    abstract type AbstractParamContainer{T,N,L} <: AbstractArray{T,N} end
 
 Type representing generic parametric quantities. L encodes the parametric length.
 Subtypes:
@@ -103,7 +101,6 @@ Subtypes:
 - [`AbstractSnapshots`](@ref).
 
 """
-
 abstract type AbstractParamContainer{T,N,L} <: AbstractArray{T,N} end
 
 param_length(::Type{<:AbstractParamContainer{T,N,L}}) where {T,N,L} = L
@@ -117,12 +114,11 @@ function to_param_quantity(a::AbstractParamContainer,plength::Integer)
 end
 
 """
-    ParamContainer{T,L} <: AbstractArray{T,1,L}
+    struct ParamContainer{T,L} <: AbstractArray{T,1,L} end
 
 Used as a wrapper for non-array structures, e.g. factorizations
 
 """
-
 struct ParamContainer{T,L} <: AbstractParamContainer{T,1,L}
   data::Vector{T}
   ParamContainer(data::Vector{T}) where T = new{T,length(data)}(data)
@@ -139,13 +135,12 @@ Base.getindex(a::ParamContainer,i::Integer) = getindex(a.data,i)
 Base.setindex!(a::ParamContainer,v,i::Integer) = setindex!(a.data,v,i)
 
 """
-    ParamNumber{T<:Number,L} <: AbstractParamContainer{T,1,L}
+    struct ParamNumber{T<:Number,L} <: AbstractParamContainer{T,1,L} end
 
 Represents parametric scalars, e.g. entries of parametric arrays across all
 parameters.
 
 """
-
 struct ParamNumber{T<:Number,L} <: AbstractParamContainer{T,1,L}
   data::Vector{T}
   ParamNumber(data::Vector{T}) where T<:Number = new{T,length(data)}(data)
