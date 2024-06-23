@@ -135,8 +135,8 @@ end
 
 function RBSteady.compress(A::MatrixOfSparseMatricesCSC,trial::TransientPODBasis,test::TransientPODBasis;combine=(x,y)->x)
   function compress_basis_space(A,B,C)
-    map(param_eachindex(A)) do i
-      C'*param_getindex(A,i)*B
+    map(param_data(A)) do a
+      C'*a*B
     end
   end
   basis_space_test = get_basis_space(test)

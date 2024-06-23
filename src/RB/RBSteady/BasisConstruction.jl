@@ -13,6 +13,11 @@ function truncation(s::AbstractVector;ϵ=1e-4,rank::Integer=length(s))
   min(rank,tolrank)
 end
 
+function select_modes(U::AbstractMatrix,Σ::AbstractVector,V::AbstractMatrix;kwargs...)
+  rank = truncation(Σ;kwargs...)
+  return U[:,1:rank],Σ[1:rank],V[:,1:rank]
+end
+
 function _cholesky_factor_and_perm(mat::AbstractMatrix)
   C = cholesky(mat,RowMaximum();tol = 0.0,check=true)
   return C.L,C.p
@@ -23,6 +28,11 @@ function _cholesky_factor_and_perm(mat::AbstractSparseMatrix)
   return sparse(C.L),C.p
 end
 
+_size_condition(mat::AbstractMatrix) = (
+  length(mat) > 1e5 &&
+  (size(mat,1) > 1e2*size(mat,2) || size(mat,2) > 1e2*size(mat,1))
+  )
+
 """
     tpod(mat::AbstractMatrix,args...;kwargs...) -> AbstractMatrix
 
@@ -32,47 +42,49 @@ otherwise they are ℓ²-orthogonal
 
 """
 function tpod(mat::AbstractMatrix,args...;kwargs...)
-  U,Σ,V = svd(mat)
-  rank = truncation(Σ;kwargs...)
-  U[:,1:rank]
+  U,Σ,V = _tpod(mat,args...;kwargs...)
+  return U
 end
 
-function tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
+function _tpod(mat::AbstractMatrix,args...;kwargs...)
+  if _size_condition(mat)
+    @warn "The input matrix has been classified as massive; the compression will
+      take a while ..."
+    Ur,Σr,Vr = standard_tpod(mat,args...;kwargs...)
+    println("Compression ended successfully!")
+  else
+    Ur,Σr,Vr = standard_tpod(mat,args...;kwargs...)
+  end
+  return Ur,Σr,Vr
+end
+
+function standard_tpod(mat::AbstractMatrix,args...;kwargs...)
+  U,Σ,V = svd(mat)
+  Ur,Σr,Vr = select_modes(U,Σ,V;kwargs...)
+  return Ur,Σr,Vr
+end
+
+function standard_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
   L,p = _cholesky_factor_and_perm(X)
   Xmat = L'*mat[p,:]
-  U,Σ,V = svd(Xmat)
-  rank = truncation(Σ;kwargs...)
-  (L'\U[:,1:rank])[invperm(p),:]
+  Ũ,Σ,V = svd(Xmat)
+  Ũr,Σr,Vr = select_modes(Ũ,Σ,V;kwargs...)
+  Ur = (L'\Ũr)[invperm(p),:]
+  return Ur,Σr,Vr
 end
 
-# we are not interested in the last dimension (corresponds to the parameter)
-
+# We are not interested in the last dimension (corresponds to the parameter).
+# Note: when X is provided as norm matrix, ids_range has length 1, so we actually
+# are not computing a cholesky decomposition numerous times
 function ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...) where {T,N}
   cores,ranks,sizes = cache
   for k in ids_range
     mat_k = reshape(mat,ranks[k]*sizes[k],:)
-    U,Σ,V = svd(mat_k)
-    rank = truncation(Σ;kwargs...)
-    core_k = U[:,1:rank]
+    Ur,Σr,Vr = _tpod(mat_k;kwargs...)
+    rank = size(Ur,2)
     ranks[k+1] = rank
-    mat = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
-    cores[k] = reshape(core_k,ranks[k],sizes[k],rank)
-  end
-  return mat
-end
-
-function ttsvd!(cache,mat::AbstractArray{T,N},X::AbstractMatrix;ids_range=1:N-1,kwargs...) where {T,N}
-  L,p = _cholesky_factor_and_perm(X)
-  Ip = invperm(p)
-  cores,ranks,sizes = cache
-  for k in ids_range
-    Xmat_k = L'*reshape(mat,ranks[k]*sizes[k],:)[p,:]
-    U,Σ,V = svd(Xmat_k)
-    rank = truncation(Σ;kwargs...)
-    core_k = (L'\U[:,1:rank])[Ip,:]
-    ranks[k+1] = rank
-    mat = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
-    cores[k] = reshape(core_k,ranks[k],sizes[k],rank)
+    mat = reshape(Σr.*Vr',rank,sizes[k+1],:)
+    cores[k] = reshape(Ur,ranks[k],sizes[k],rank)
   end
   return mat
 end
@@ -81,12 +93,11 @@ function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;kw
   cores,weights,ranks,sizes = cache
   for k in 1:length(X.arrays_1d)-1
     mat_k = reshape(mat,ranks[k]*sizes[k],:)
-    U,Σ,V = svd(mat_k)
-    rank = truncation(Σ;kwargs...)
-    core_k = U[:,1:rank]
+    Ur,Σr,Vr = _tpod(mat_k;kwargs...)
+    rank = size(Ur,2)
     ranks[k+1] = rank
-    mat = reshape(Σ[1:rank].*V[:,1:rank]',rank,sizes[k+1],:)
-    cores[k] = reshape(core_k,ranks[k],sizes[k],rank)
+    mat = reshape(Σr.*Vr',rank,sizes[k+1],:)
+    cores[k] = reshape(Ur,ranks[k],sizes[k],rank)
     _weight_array!(weights,cores,X,Val{k}())
   end
   XW = _get_norm_matrix_from_weights(X,weights)
