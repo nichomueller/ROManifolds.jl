@@ -102,12 +102,11 @@ println(compute_speedup(results))
 average_plot(rbop,results;dir=joinpath(test_dir,"plots"))
 
 # # NEED TO IMPROVE:
+using Gridap
+using BenchmarkTools
 
-# using BenchmarkTools
-# v = get_fe_basis(test)
-# u = get_trial_fe_basis(test)
-# @btime ∫(∇(v)⋅∇(u))dΩ
-
-# Ωv = view(Ω,rand(1:num_cells(Ω),10))
-# dΩv = Measure(Ωv,degree)
-# @btime ∫(∇(v)⋅∇(u))dΩv
+# A = fesnaps
+# A′ = flatten_snapshots(A)
+# @btime A′*A′
+# B = copy(A′)
+# @btime B'*B

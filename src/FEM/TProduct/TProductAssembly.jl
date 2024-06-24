@@ -4,11 +4,11 @@
 Assembly-related information when constructing a [`TProductArray`](ref)
 
 """
-struct TProductSparseMatrixAssembler{D,Ti} <: SparseMatrixAssembler
+struct TProductSparseMatrixAssembler{R<:TProductIndexMap,C<:TProductIndexMap} <: SparseMatrixAssembler
   assem::GenericSparseMatrixAssembler
   assems_1d::Vector{GenericSparseMatrixAssembler}
-  row_index_map::TProductIndexMap{D,Ti}
-  col_index_map::TProductIndexMap{D,Ti}
+  row_index_map::R
+  col_index_map::C
 end
 
 function FESpaces.SparseMatrixAssembler(

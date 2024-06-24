@@ -29,7 +29,7 @@ function _cholesky_factor_and_perm(mat::AbstractSparseMatrix)
 end
 
 _size_condition(mat::AbstractMatrix) = (
-  length(mat) > 1e5 &&
+  length(mat) > 1e6 &&
   (size(mat,1) > 1e2*size(mat,2) || size(mat,2) > 1e2*size(mat,1))
   )
 
@@ -48,14 +48,10 @@ end
 
 function _tpod(mat::AbstractMatrix,args...;kwargs...)
   if _size_condition(mat)
-    @warn "The input matrix has been classified as massive; the compression will
-      take a while ..."
-    Ur,Σr,Vr = standard_tpod(mat,args...;kwargs...)
-    println("Compression ended successfully!")
+    massive_tpod(mat,args...;kwargs...)
   else
-    Ur,Σr,Vr = standard_tpod(mat,args...;kwargs...)
+    standard_tpod(mat,args...;kwargs...)
   end
-  return Ur,Σr,Vr
 end
 
 function standard_tpod(mat::AbstractMatrix,args...;kwargs...)
@@ -70,6 +66,69 @@ function standard_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
   Ũ,Σ,V = svd(Xmat)
   Ũr,Σr,Vr = select_modes(Ũ,Σ,V;kwargs...)
   Ur = (L'\Ũr)[invperm(p),:]
+  return Ur,Σr,Vr
+end
+
+function massive_tpod(mat::AbstractMatrix,args...;kwargs...)
+  @warn "The input matrix has been classified as massive; the compression will
+    take a while ..."
+  mat′ = copy(mat)
+  Ur,Σr,Vr = massive_tpod(Val{size(mat,1) > size(mat,2)}(),mat′,args...;kwargs...)
+  println("Compression ended successfully!")
+  return Ur,Σr,Vr
+end
+
+function massive_tpod(::Val{true},mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
+  L,p = _cholesky_factor_and_perm(X)
+  Xmat = L'*mat[p,:]
+  mXmat = Xmat'*Xmat
+  Vt,Σ²,V = svd(mXmat)
+  Σ = sqrt.(Σ²)
+  _,Σr,Vr = select_modes(Vt,Σ,V;kwargs...)
+  Ũr = Xmat*Vr
+  @inbounds for i = axes(Ũr,2)
+    Ũr[:,i] /= Σr[i]+eps()
+  end
+  Ur = (L'\Ũr)[invperm(p),:]
+  return Ur,Σr,Vr
+end
+
+function massive_tpod(::Val{true},mat::AbstractMatrix,args...;kwargs...)
+  mmat = mat'*mat
+  Vt,Σ²,V = svd(mat)
+  Σ = sqrt.(Σ²)
+  _,Σr,Vr = select_modes(Vt,Σ,V;kwargs...)
+  Ur = mat*Vr
+  @inbounds for i = axes(Ur,2)
+    Ur[:,i] /= Σr[i]+eps()
+  end
+  return Ur,Σr,Vr
+end
+
+function massive_tpod(::Val{false},mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
+  L,p = _cholesky_factor_and_perm(X)
+  Xmat = L'*mat[p,:]
+  mXmat = Xmat*Xmat'
+  U,Σ²,Ut = svd(mXmat)
+  Σ = sqrt.(Σ²)
+  Ũr,Σr,_ = select_modes(U,Σ,Ut;kwargs...)
+  Ur = (L'\Ũr)[invperm(p),:]
+  Vr = Ur'*Xmat
+  @inbounds for i = axes(Ur,2)
+    Vr[:,i] /= Σr[i]+eps()
+  end
+  return Ur,Σr,Vr
+end
+
+function massive_tpod(::Val{false},mat::AbstractMatrix,args...;kwargs...)
+  mmat = mat*mat'
+  U,Σ²,Ut = svd(mat)
+  Σ = sqrt.(Σ²)
+  Ur,Σr,_ = select_modes(U,Σ,Ut;kwargs...)
+  Vr = Ur'*mat
+  @inbounds for i = axes(Ur,2)
+    Vr[:,i] /= Σr[i]+eps()
+  end
   return Ur,Σr,Vr
 end
 

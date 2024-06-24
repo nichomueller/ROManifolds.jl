@@ -188,7 +188,6 @@ Extends the concept of `counter` in Gridap to accommodate a parametric setting.
 L represents the parametric length of the quantity to be assembled.
 
 """
-
 struct ParamCounter{C,L}
   counter::C
   function ParamCounter(counter::C,::Val{L}) where {C,L}

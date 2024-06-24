@@ -60,11 +60,10 @@ function get_tp_dof_index_map(
   order::Integer
   ) where T<:MultiValue
 
-  msg = """
-  Instead of using a single field FESpace with a dof type $T, define $(num_components(T))
-  FESpaces of dof type $(eltype(T)) and put them in a MultiFieldFESpace
-  """
-  @notimplemented msg
+  ncomp = num_components(T)
+  dof_map,dof_maps_1d = get_tp_dof_index_map(eltype(T),models,spaces,order)
+  ncomp_dof_map = compose_indices(dof_map,ncomp)
+  return ncomp_dof_map,dof_maps_1d
 end
 
 # this function computes only the free dofs tensor product permutation
@@ -123,7 +122,6 @@ end
 function get_tp_dof_index_map(zs::ZeroMeanFESpace,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
   space = zs.space.space
   dof_to_fix = zs.space.dof_to_fix
-  index_map = get_tp_dof_index_map(space,spaces_1d)
-  @warn "the code has changed, check if this is ok"
-  return FixedDofIndexMap(index_map,findfirst(vec(index_map).==dof_to_fix))
+  i = get_tp_dof_index_map(space,spaces_1d)
+  return TProductIndexMap(FixedDofIndexMap(i.indices,dof_to_fix),i.indices_1d)
 end
