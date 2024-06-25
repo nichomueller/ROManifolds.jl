@@ -122,16 +122,19 @@ function _permute_index_map(index_map,I,J,nrows)
   return IndexMap(iperm)
 end
 
-function _permute_index_map(index_map,I::FixedDofIndexMap,J,nrows)
-  _permute_index_map(index_map,remove_fixed_dof(I),J,nrows)
+function _permute_index_map(index_map,I::FixedDofsIndexMap,J,nrows)
+  index_map′ = _permute_index_map(index_map,remove_fixed_dof(I),J,nrows)
+  FixedDofsIndexMap(index_map′,findall(index_map′.==zero(eltype(index_map′))))
 end
 
-function _permute_index_map(index_map,I,J::FixedDofIndexMap,nrows)
-  _permute_index_map(index_map,I,remove_fixed_dof(J),nrows)
+function _permute_index_map(index_map,I,J::FixedDofsIndexMap,nrows)
+  index_map′ = _permute_index_map(index_map,I,remove_fixed_dof(J),nrows)
+  FixedDofsIndexMap(index_map′,findall(index_map′.==zero(eltype(index_map′))))
 end
 
-function _permute_index_map(index_map,I::FixedDofIndexMap,J::FixedDofIndexMap,nrows)
-  _permute_index_map(index_map,remove_fixed_dof(I),remove_fixed_dof(J),nrows)
+function _permute_index_map(index_map,I::FixedDofsIndexMap,J::FixedDofsIndexMap,nrows)
+  index_map′ = _permute_index_map(index_map,remove_fixed_dof(I),remove_fixed_dof(J),nrows)
+  FixedDofsIndexMap(index_map′,findall(index_map′.==zero(eltype(index_map′))))
 end
 
 function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractMultiValueIndexMap,nrows)
@@ -162,7 +165,7 @@ function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractM
   return MultiValueIndexMap(index_map′′)
 end
 
-for T in (:AbstractIndexMap,:FixedDofIndexMap)
+for T in (:AbstractIndexMap,:FixedDofsIndexMap)
   @eval begin
     function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::$T,nrows)
       function _to_component_indices(i,ncomps,icomp,nrows)

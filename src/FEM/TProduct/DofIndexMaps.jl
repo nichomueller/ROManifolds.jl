@@ -112,9 +112,9 @@ end
 
 function get_dof_index_map(model::CartesianDiscreteModel,zs::ZeroMeanFESpace)
   space = zs.space.space
-  dof_to_fix = zs.space.dof_to_fix
+  dofs_to_fix = zs.space.dof_to_fix
   index_map = get_dof_index_map(model,space)
-  return FixedDofIndexMap(index_map,dof_to_fix)
+  return FixedDofsIndexMap(index_map,dofs_to_fix)
 end
 
 # utils

@@ -31,7 +31,7 @@ export AbstractIndexMap
 export TrivialIndexMap
 export IndexMap
 export IndexMapView
-export FixedDofIndexMap
+export FixedDofsIndexMap
 export TProductIndexMap
 export SparseIndexMap
 export AbstractMultiValueIndexMap

@@ -46,7 +46,7 @@ Subtypes:
 - [`TrivialIndexMap`](@ref)
 - [`IndexMap`](@ref)
 - [`IndexMapView`](@ref)
-- [`FixedDofIndexMap`](@ref)
+- [`FixedDofsIndexMap`](@ref)
 - [`TProductIndexMap`](@ref)
 - [`SparseIndexMap`](@ref)
 - [`AbstractMultiValueIndexMap`](@ref)
@@ -104,11 +104,11 @@ function change_index_map(f,i::AbstractIndexMap)
 end
 
 """
-    fix_dof_index_map(i::AbstractIndexMap,dof_to_fix::Integer) -> FixedDofIndexMap
+    fix_dof_index_map(i::AbstractIndexMap,dofs_to_fix) -> FixedDofsIndexMap
 
 """
-function fix_dof_index_map(i::AbstractIndexMap,dof_to_fix::Integer)
-  FixedDofIndexMap(i,dof_to_fix)
+function fix_dof_index_map(i::AbstractIndexMap,dofs_to_fix)
+  FixedDofsIndexMap(i,dofs_to_fix)
 end
 
 """
@@ -167,51 +167,56 @@ Base.size(i::IndexMapView) = size(i.locations)
 Base.getindex(i::IndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.locations[j...]]
 
 """
-    FixedDofIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
+    FixedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
 
 Index map to be used when imposing a zero mean constraint on a given `FESpace`. The fixed
-dof is seen as a CartesianIndex of dimension D.
+dofs are stored as a vector of CartesianIndex of dimension D; when indexing vectors
+defined on the zero mean `FESpace`, the length of the vector is 1
 
 """
-struct FixedDofIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
+struct FixedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
   indices::I
-  dof_to_fix::CartesianIndex{D}
+  dofs_to_fix::Vector{CartesianIndex{D}}
 end
 
-function FixedDofIndexMap(indices::AbstractIndexMap,dof_to_fix::Integer)
-  FixedDofIndexMap(indices,CartesianIndices(size(indices))[dof_to_fix])
+function FixedDofsIndexMap(indices::AbstractIndexMap,dofs_to_fix::AbstractVector{<:Integer})
+  FixedDofsIndexMap(indices,CartesianIndices(size(indices))[dofs_to_fix])
 end
 
-Base.size(i::FixedDofIndexMap) = size(i.indices)
+function FixedDofsIndexMap(indices::AbstractIndexMap,dof_to_fix::Integer)
+  FixedDofsIndexMap(indices,[dof_to_fix])
+end
 
-function Base.getindex(i::FixedDofIndexMap{D},j::Vararg{Integer,D}) where D
-  if CartesianIndex(j) == i.dof_to_fix
-    -zero(eltype(i))
+Base.size(i::FixedDofsIndexMap) = size(i.indices)
+
+function Base.getindex(i::FixedDofsIndexMap{D},j::Vararg{Integer,D}) where D
+  if j ∈ Tuple.(i.dofs_to_fix)
+    zero(eltype(i))
   else
     getindex(i.indices,j...)
   end
 end
 
-function free_dofs_map(i::FixedDofIndexMap)
+function free_dofs_map(i::FixedDofsIndexMap)
   free_i = free_dofs_map(i.indices)
-  FixedDofIndexMap(free_i,i.dof_to_fix)
+  FixedDofsIndexMap(free_i,i.dofs_to_fix)
 end
 
-Base.view(i::FixedDofIndexMap,locations) = FixedDofIndexMap(IndexMapView(i.indices,locations),i.dof_to_fix)
+Base.view(i::FixedDofsIndexMap,locations) = FixedDofsIndexMap(IndexMapView(i.indices,locations),i.dofs_to_fix)
 
-function remove_fixed_dof(i::FixedDofIndexMap)
+function remove_fixed_dof(i::FixedDofsIndexMap)
   filter(x -> x != 0,i)
 end
 
-function permute_sparsity(a::SparsityPatternCSC,i::FixedDofIndexMap,j::AbstractIndexMap)
+function permute_sparsity(a::SparsityPatternCSC,i::FixedDofsIndexMap,j::AbstractIndexMap)
   permute_sparsity(a,remove_fixed_dof(i),vec(j))
 end
 
-function permute_sparsity(a::SparsityPatternCSC,i::AbstractIndexMap,j::FixedDofIndexMap)
+function permute_sparsity(a::SparsityPatternCSC,i::AbstractIndexMap,j::FixedDofsIndexMap)
   permute_sparsity(a,vec(i),remove_fixed_dof(j))
 end
 
-function permute_sparsity(a::SparsityPatternCSC,i::FixedDofIndexMap,j::FixedDofIndexMap)
+function permute_sparsity(a::SparsityPatternCSC,i::FixedDofsIndexMap,j::FixedDofsIndexMap)
   permute_sparsity(a,remove_fixed_dof(i),remove_fixed_dof(j))
 end
 
@@ -305,7 +310,7 @@ function permute_sparsity(a::SparsityPatternCSC,i::AbstractMultiValueIndexMap,j:
   return MultiValueSparsityPatternCSC(pa.matrix,ncomps_i)
 end
 
-for T in (:AbstractIndexMap,:FixedDofIndexMap)
+for T in (:AbstractIndexMap,:FixedDofsIndexMap)
   @eval begin
     function permute_sparsity(a::SparsityPatternCSC,i::AbstractMultiValueIndexMap,j::$T)
       i1 = get_component(i,1)

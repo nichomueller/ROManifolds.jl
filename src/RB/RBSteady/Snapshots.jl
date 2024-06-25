@@ -46,7 +46,7 @@ for I in (:AbstractIndexMap,:(AbstractArray{<:AbstractIndexMap}))
       end
     end
 
-    function RBSteady.Snapshots(a::TupOfArrayContribution,i::$I,r::AbstractParamRealization)
+    function Snapshots(a::TupOfArrayContribution,i::$I,r::AbstractParamRealization)
       map(a->Snapshots(a,i,r),a)
     end
   end
@@ -138,10 +138,6 @@ end
 
 function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::ParamRealization)
   BasicSnapshots(s,i,r)
-end
-
-function Snapshots(s::BasicSnapshots,i::AbstractIndexMap,r::ParamRealization)
-  BasicSnapshots(s.data,i,r)
 end
 
 ParamDataStructures.get_values(s::BasicSnapshots) = s.data
@@ -266,6 +262,68 @@ function select_snapshots_entries(s::AbstractSteadySnapshots,srange)
   end
 
   return entries
+end
+
+struct MultiValueSnapshots{T,N,L,D,I,R} <: AbstractSteadySnapshots{T,N,L,D,I,R}
+  data::A
+  index_map::I
+  realization::R
+  icomp::Base.RefValue{Int}
+
+  function MultiValueSnapshots(
+    data::A,
+    index_map::I,
+    realization::R,
+    icomp::Int=1
+    ) where {T,N,L,D,R,A<:AbstractParamArray{T,N,L},I<:AbstractMultiValueIndexMap{D}}
+
+    new{T,D+1,L,D,I,R}(data,index_map,realization,Ref(icomp))
+  end
+end
+
+function Snapshots(data::AbstractParamArray,i::AbstractMultiValueIndexMap,r::AbstractParamRealization)
+  MultiValueSnapshots(data,i,r)
+end
+
+ParamDataStructures.get_values(s::MultiValueSnapshots) = s.data
+IndexMaps.get_index_map(s::MultiValueSnapshots) = s.index_map
+get_realization(s::MultiValueSnapshots) = s.realization
+TensorValues.num_components(s::MultiValueSnapshots) = num_components(get_index_map(i))
+
+function change_component!(s::MultiValueSnapshots,icomp)
+  s.icomp[] = icomp
+end
+
+function IndexMaps.get_component(s::MultiValueSnapshots,args...;kwargs...)
+  i′ = get_component(s.index_map,args...;kwargs...)
+  return Snapshots(s.data,i′,s.realization)
+end
+
+function IndexMaps.split_components(s::MultiValueSnapshots)
+  i′ = split_components(s.index_map)
+  return Snapshots(s.data,i′,s.realization)
+end
+
+function IndexMaps.merge_components(s::MultiValueSnapshots)
+  i′ = merge_components(s.index_map)
+  return Snapshots(s.data,i′,s.realization)
+end
+
+Base.@propagate_inbounds function Base.getindex(
+  s::MultiValueSnapshots{T,N},
+  i::Vararg{Integer,N}
+  ) where {T,N}
+
+  getindex(get_component(s,s.icomp[]),i...)
+end
+
+Base.@propagate_inbounds function Base.setindex!(
+  s::MultiValueSnapshots{T,N},
+  v,
+  i::Vararg{Integer,N}
+  ) where {T,N}
+
+  setindex!(get_component(s,s.icomp[]),v,i...)
 end
 
 const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = BasicSnapshots{T,N,L,D,I,R,A}

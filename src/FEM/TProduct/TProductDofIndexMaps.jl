@@ -123,5 +123,5 @@ function get_tp_dof_index_map(zs::ZeroMeanFESpace,spaces_1d::AbstractVector{<:Un
   space = zs.space.space
   dof_to_fix = zs.space.dof_to_fix
   i = get_tp_dof_index_map(space,spaces_1d)
-  return TProductIndexMap(FixedDofIndexMap(i.indices,dof_to_fix),i.indices_1d)
+  return TProductIndexMap(FixedDofsIndexMap(i.indices,dof_to_fix),i.indices_1d)
 end
