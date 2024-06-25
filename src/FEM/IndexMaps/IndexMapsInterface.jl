@@ -55,7 +55,6 @@ Subtypes:
 abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D} end
 
 Base.view(i::AbstractIndexMap,locations) = IndexMapView(i,locations)
-TensorValues.num_components(i::AbstractIndexMap) = 1
 
 """
     free_dofs_map(i::AbstractIndexMap) -> AbstractIndexMap
@@ -200,10 +199,20 @@ end
 
 Base.view(i::FixedDofIndexMap,locations) = FixedDofIndexMap(IndexMapView(i.indices,locations),i.dof_to_fix)
 
-Base.vec(i::FixedDofIndexMap) = vec(remove_fixed_dof(i))
-
 function remove_fixed_dof(i::FixedDofIndexMap)
   filter(x -> x != 0,i)
+end
+
+function permute_sparsity(a::SparsityPatternCSC,i::FixedDofIndexMap,j::AbstractIndexMap)
+  permute_sparsity(a,remove_fixed_dof(i),vec(j))
+end
+
+function permute_sparsity(a::SparsityPatternCSC,i::AbstractIndexMap,j::FixedDofIndexMap)
+  permute_sparsity(a,vec(i),remove_fixed_dof(j))
+end
+
+function permute_sparsity(a::SparsityPatternCSC,i::FixedDofIndexMap,j::FixedDofIndexMap)
+  permute_sparsity(a,remove_fixed_dof(i),remove_fixed_dof(j))
 end
 
 """
@@ -267,10 +276,6 @@ function _to_scalar_values!(indices::AbstractArray,D::Integer,d::Integer)
   indices .= (indices .- d) ./ D .+ 1
 end
 
-function get_component(i::AbstractIndexMap,args...;kwargs...)
-  return i
-end
-
 function get_component(i::AbstractMultiValueIndexMap{D},d;multivalue=true) where D
   ncomps = num_components(i)
   indices = collect(selectdim(i,D,d))
@@ -290,26 +295,26 @@ function merge_components(i::AbstractVector{<:AbstractArray{Ti}}) where Ti
   return indices
 end
 
-for T in (:AbstractIndexMap,:AbstractMultiValueIndexMap)
-  for S in (:AbstractIndexMap,:AbstractMultiValueIndexMap)
-    (T==:AbstractIndexMap && S==:AbstractIndexMap) && continue
-    @eval begin
-      function permute_sparsity(a::SparsityPatternCSC,i::$T,j::$S)
-        ncomps_i = num_components(i)
-        ncomps_j = num_components(j)
-        if isa(i,AbstractMultiValueIndexMap) && isa(j,AbstractMultiValueIndexMap)
-          @check ncomps_i == ncomps_j
-          ncomps = ncomps_i
-        elseif isa(i,AbstractMultiValueIndexMap)
-          ncomps = ncomps_i
-        else isa(j,AbstractMultiValueIndexMap)
-          ncomps = ncomps_j
-        end
-        i1 = get_component(i,1)
-        j1 = get_component(j,1)
-        pa = permute_sparsity(a,i1,j1)
-        return MultiValueSparsityPatternCSC(pa.matrix,ncomps)
-      end
+function permute_sparsity(a::SparsityPatternCSC,i::AbstractMultiValueIndexMap,j::AbstractMultiValueIndexMap)
+  ncomps_i = num_components(i)
+  ncomps_j = num_components(j)
+  @check ncomps_i == ncomps_j
+  i1 = get_component(i,1)
+  j1 = get_component(j,1)
+  pa = permute_sparsity(a,i1,j1)
+  return MultiValueSparsityPatternCSC(pa.matrix,ncomps_i)
+end
+
+for T in (:AbstractIndexMap,:FixedDofIndexMap)
+  @eval begin
+    function permute_sparsity(a::SparsityPatternCSC,i::AbstractMultiValueIndexMap,j::$T)
+      i1 = get_component(i,1)
+      permute_sparsity(a,i1,j)
+    end
+
+    function permute_sparsity(a::SparsityPatternCSC,i::$T,j::AbstractMultiValueIndexMap)
+      j1 = get_component(j,1)
+      permute_sparsity(a,i,j1)
     end
   end
 end

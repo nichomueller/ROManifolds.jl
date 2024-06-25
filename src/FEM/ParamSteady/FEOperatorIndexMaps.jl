@@ -69,7 +69,7 @@ function get_matrix_index_map(trial::TProductFESpace,test::TProductFESpace)
   I,J,_ = findnz(psparsity)
   i,j,_ = IndexMaps.univariate_findnz(psparsity)
   g2l = _global_2_local_nnz(psparsity,I,J,i,j)
-  pg2l = permute_index_map(psparsity,g2l,trial,test)
+  pg2l = _permute_index_map(g2l,trial,test)
   return SparseIndexMap(pg2l,psparsity)
 end
 
@@ -111,32 +111,34 @@ function _global_2_local_nnz(sparsity::TProductSparsityPattern,I,J,i,j)
   return g2l
 end
 
-function _permute_index_map(index_map,I,J)
-  nrows = length(I)
+function _permute_index_map(index_map,I,J,nrows)
   IJ = vec(I) .+ nrows .* (vec(J)'.-1)
   iperm = copy(index_map)
   @inbounds for (k,pk) in enumerate(index_map)
-    iperm[k] = IJ[pk]
+    if pk > 0
+      iperm[k] = IJ[pk]
+    end
   end
   return IndexMap(iperm)
 end
 
-function permute_index_map(::TProductSparsityPattern,index_map,trial::TProductFESpace,test::TProductFESpace)
-  I = get_dof_index_map(test)
-  J = get_dof_index_map(trial)
-  return _permute_index_map(index_map,I,J)
+function _permute_index_map(index_map,I::FixedDofIndexMap,J,nrows)
+  _permute_index_map(index_map,remove_fixed_dof(I),J,nrows)
 end
 
-function permute_index_map(
-  sparsity::TProductSparsityPattern{<:MultiValueSparsityPatternCSC},
-  index_map,
-  trial::TProductFESpace,
-  test::TProductFESpace)
+function _permute_index_map(index_map,I,J::FixedDofIndexMap,nrows)
+  _permute_index_map(index_map,I,remove_fixed_dof(J),nrows)
+end
 
-  function _to_component_indices(i,ncomps,icomp)
-    nrows = Int(num_free_dofs(test)/ncomps)
+function _permute_index_map(index_map,I::FixedDofIndexMap,J::FixedDofIndexMap,nrows)
+  _permute_index_map(index_map,remove_fixed_dof(I),remove_fixed_dof(J),nrows)
+end
+
+function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractMultiValueIndexMap,nrows)
+  function _to_component_indices(i,ncomps,icomp,nrows)
     ic = copy(i)
     @inbounds for (j,IJ) in enumerate(i)
+      IJ == 0 && continue
       I = fast_index(IJ,nrows)
       J = slow_index(IJ,nrows)
       I′ = (I-1)*ncomps + icomp
@@ -146,12 +148,72 @@ function permute_index_map(
     return ic
   end
 
-  I = get_dof_index_map(test)
-  J = get_dof_index_map(trial)
+  ncomps_I = num_components(I)
+  ncomps_J = num_components(J)
+  @check ncomps_I == ncomps_J
+  ncomps = ncomps_I
+  nrows_per_comp = Int(nrows/ncomps)
+
   I1 = get_component(I,1;multivalue=false)
   J1 = get_component(J,1;multivalue=false)
-  indices = _permute_index_map(index_map,I1,J1)
-  ncomps = num_components(sparsity)
-  indices′ = map(icomp->_to_component_indices(indices,ncomps,icomp),1:ncomps)
-  return MultiValueIndexMap(indices′)
+  index_map′ = _permute_index_map(index_map,I1,J1,nrows_per_comp)
+
+  index_map′′ = map(icomp->_to_component_indices(index_map′,ncomps,icomp,nrows_per_comp),1:ncomps)
+  return MultiValueIndexMap(index_map′′)
+end
+
+for T in (:AbstractIndexMap,:FixedDofIndexMap)
+  @eval begin
+    function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::$T,nrows)
+      function _to_component_indices(i,ncomps,icomp,nrows)
+        ic = copy(i)
+        @inbounds for (j,IJ) in enumerate(i)
+          IJ == 0 && continue
+          I = fast_index(IJ,nrows)
+          J = slow_index(IJ,nrows)
+          I′ = (I-1)*ncomps + icomp
+          ic[j] = (J-1)*nrows*ncomps + I′
+        end
+        return ic
+      end
+
+      ncomps = num_components(I)
+      nrows_per_comp = Int(nrows/ncomps)
+
+      I1 = get_component(I,1;multivalue=false)
+      index_map′ = _permute_index_map(index_map,I1,J,nrows_per_comp)
+
+      index_map′′ = map(icomp->_to_component_indices(index_map′,ncomps,icomp,nrows_per_comp),1:ncomps)
+      return MultiValueIndexMap(index_map′′)
+    end
+
+    function _permute_index_map(index_map,I::$T,J::AbstractMultiValueIndexMap,nrows)
+      function _to_component_indices(i,ncomps,icomp,nrows)
+        ic = copy(i)
+        @inbounds for (j,IJ) in enumerate(i)
+          IJ == 0 && continue
+          I = fast_index(IJ,nrows)
+          J = slow_index(IJ,nrows)
+          J′ = (J-1)*ncomps + icomp
+          ic[j] = (J′-1)*nrows + I
+        end
+        return ic
+      end
+
+      ncomps = num_components(J)
+
+      J1 = get_component(J,1;multivalue=false)
+      index_map′ = _permute_index_map(index_map,I,J1,nrows)
+
+      index_map′′ = map(icomp->_to_component_indices(index_map′,ncomps,icomp,nrows),1:ncomps)
+      return MultiValueIndexMap(index_map′′)
+    end
+  end
+end
+
+function _permute_index_map(index_map,trial::TProductFESpace,test::TProductFESpace)
+  I = get_dof_index_map(test)
+  J = get_dof_index_map(trial)
+  nrows = num_free_dofs(test)
+  return _permute_index_map(index_map,I,J,nrows)
 end
