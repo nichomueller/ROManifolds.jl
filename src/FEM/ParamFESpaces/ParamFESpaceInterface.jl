@@ -205,8 +205,30 @@ function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:ZeroMeanFESpace},f
   FEFunction(f′,free_values)
 end
 
+function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:TrialFESpace{<:ZeroMeanFESpace}},free_values)
+  zf = f.space
+  f′ = TrivialParamFESpace(zf.space,param_length(f))
+  FEFunction(f′,free_values)
+end
+
+function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:TrivialParamFESpace{<:ZeroMeanFESpace}},free_values)
+  zf = f.space
+  f′ = TrivialParamFESpace(zf.space,param_length(f))
+  FEFunction(f′,free_values)
+end
+
 function FESpaces.scatter_free_and_dirichlet_values(
   f::TrivialParamFESpace{<:TrialFESpace},
+  fv::AbstractParamVector,
+  dv::AbstractParamVector)
+
+  tf = f.space
+  f′ = TrivialParamFESpace(tf.space,param_length(f))
+  scatter_free_and_dirichlet_values(f′,fv,dv)
+end
+
+function FESpaces.scatter_free_and_dirichlet_values(
+  f::TrivialParamFESpace{<:TProductFESpace},
   fv::AbstractParamVector,
   dv::AbstractParamVector)
 

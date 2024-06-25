@@ -17,6 +17,7 @@ using Gridap.Fields
 using Gridap.CellData
 using Gridap.MultiField
 using Gridap.ODEs
+using Gridap.TensorValues
 using Gridap.Helpers
 
 using Mabla.FEM

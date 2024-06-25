@@ -81,3 +81,28 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 ϵ = 1e-4
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
+
+fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
+
+nparams = num_params(rbsolver)
+sol = solve(fesolver,feop,xh0μ;nparams)
+odesol = sol.odesol
+r = odesol.r
+stats = @timed begin
+  vals = collect(odesol)
+end
+i = get_vector_index_map(feop)
+snaps = Snapshots(vals,i,r)
+
+using BlockArrays
+using Gridap.Fields
+
+data = vals
+block_values = blocks.(data)
+nblocks = blocksize(first(data))
+active_block_ids = findall(!iszero,blocks(first(data)))
+block_map = BlockMap(nblocks,active_block_ids)
+active_block_snaps = [Snapshots(map(v->getindex(v,n),block_values),i[n],r) for n in active_block_ids]
+
+n = 1
+boh = Snapshots(map(v->getindex(v,n),block_values),i[n],r)

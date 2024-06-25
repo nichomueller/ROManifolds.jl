@@ -324,6 +324,10 @@ for T in (:AbstractIndexMap,:FixedDofsIndexMap)
   end
 end
 
+function TrivialIndexMap(i::AbstractMultiValueIndexMap)
+  TrivialIndexMap(merge_components(i))
+end
+
 struct MultiValueIndexMap{D,Ti,I<:AbstractArray{Ti,D}} <: AbstractMultiValueIndexMap{D,Ti}
   indices::I
 end
