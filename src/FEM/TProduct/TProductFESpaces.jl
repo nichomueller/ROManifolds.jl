@@ -130,25 +130,23 @@ function get_tp_triangulation(f::MultiFieldFESpace)
 end
 
 function get_tp_fe_basis(f::MultiFieldFESpace)
-  nfields = length(f.spaces)
-  all_febases = MultiFieldTProductFEBasisComponent[]
-  for field_i in 1:nfields
-    dv_i = get_tp_fe_basis(f.spaces[field_i])
-    @assert BasisStyle(dv_i) == FESpaces.TestBasis()
-    dv_i_b = MultiFieldTProductFEBasisComponent(dv_i,field_i,nfields)
-    push!(all_febases,dv_i_b)
+  D = length(f.spaces[1].spaces_1d)
+  basis = map(1:D) do d
+    sfd = map(sf -> sf.spaces_1d[d],f.spaces)
+    mfd = MultiFieldFESpace(sfd)
+    get_fe_basis(mfd)
   end
-  MultiFieldCellField(all_febases)
+  trian = get_tp_triangulation(f)
+  TProductFEBasis(basis,trian)
 end
 
 function get_tp_trial_fe_basis(f::MultiFieldFESpace)
-  nfields = length(f.spaces)
-  all_febases = MultiFieldTProductFEBasisComponent[]
-  for field_i in 1:nfields
-    du_i = get_tp_trial_fe_basis(f.spaces[field_i])
-    @assert BasisStyle(du_i) == FESpaces.TrialBasis()
-    du_i_b = MultiFieldTProductFEBasisComponent(du_i,field_i,nfields)
-    push!(all_febases,du_i_b)
+  D = length(f.spaces[1].spaces_1d)
+  basis = map(1:D) do d
+    sfd = map(sf -> sf.spaces_1d[d],f.spaces)
+    mfd = MultiFieldFESpace(sfd)
+    get_trial_fe_basis(mfd)
   end
-  MultiFieldCellField(all_febases)
+  trian = get_tp_triangulation(f)
+  TProductFEBasis(basis,trian)
 end

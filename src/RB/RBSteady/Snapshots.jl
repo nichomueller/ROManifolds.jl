@@ -309,6 +309,61 @@ end
 const UnfoldingSteadySnapshots{T,L,I,R} = AbstractSteadySnapshots{T,2,L,1,I,R}
 const UnfoldingSparseSnapshots{T,L,I,R,A} = SparseSnapshots{T,2,L,1,I,R,A}
 
+function Base.:*(B::AbstractSnapshots,A::AbstractSnapshots)
+  @notimplemented "This operation is too expensive"
+end
+
+function Base.:*(B::AbstractSnapshots,A::Adjoint{T,<:AbstractSnapshots}) where T
+  @notimplemented "This operation is too expensive"
+end
+
+function Base.:*(B::AbstractSnapshots,A::AbstractArray) where T
+  @notimplemented "This operation is too expensive"
+end
+
+function Base.:*(B::AbstractSnapshots,A::Adjoint{T,<:AbstractArray}) where T
+  @notimplemented "This operation is too expensive"
+end
+
+function Base.:*(A::Adjoint{T,<:AbstractSnapshots{T,2}},B::AbstractSnapshots{S,2}) where {T,S}
+  a = A.parent.snaps.data
+  b = B.snaps.data
+  nsA,npA = num_space_dofs(A),num_params(A)
+  nsB,npB = num_space_dofs(B),num_params(B)
+  @check nsA == nsB
+  Tab = promote_eltype(T,S)
+  c = zeros(Tab,(npA,npB))
+
+  @inbounds for ipA in 1:npA
+    row = a[ipA]
+    @inbounds for ipB in 1:npB
+      col = b[ipB]
+      c[iA,iB] = dot(row,col)
+    end
+  end
+
+  return c
+end
+
+function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::ModeTransientSnapshots{S}) where {T,S}
+  a = A.parent
+  b = B.snaps.data
+  ns,np = num_space_dofs(B),num_params(B)
+  @check size(a,1) == nsB
+  Tab = promote_eltype(T,S)
+  c = zeros(Tab,(size(a,2),nt*np))
+
+  @inbounds for ipB in 1:np
+    col = col_block[ipB]
+    @inbounds for iA in axes(a,2)
+      row = a[:,iA]
+      c[iA,iB] = dot(row,col)
+    end
+  end
+
+  return c
+end
+
 """
     struct BlockSnapshots{S,N,L} <: AbstractParamContainer{S,N,L}
 

@@ -74,26 +74,10 @@ trian_mass = (Ω,)
 induced_norm(du,v) = ∫(du*v)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
 feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
   trial,test,trian_res,trian_stiffness,trian_mass)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 A = assemble_norm_matrix(feop)
-
-feop = feop.op
-imap = feop.index_map
-imat = imap.matrix_map
-
-A = assemble_matrix((u,v) -> ∫(∇(v)⋅∇(u))dΩ,trial(nothing,nothing),test)
-A[imat]
-
-assem = SparseMatrixAssembler(test,test)
-vp,up = get_tp_fe_basis(test),get_tp_trial_fe_basis(test)
-using Gridap.CellData
-using Gridap.FESpaces
-A′ = assemble_matrix(assem,collect_cell_matrix(test,test,∫(∇(vp)⋅∇(up))dΩ))
-Akron = A′.array[assem.row_index_map[:],assem.col_index_map[:]]
-
-A[feop.index_map.vector_map[:],feop.index_map.vector_map[:]] ≈ Akron

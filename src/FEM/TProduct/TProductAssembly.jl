@@ -55,8 +55,8 @@ function FESpaces.collect_cell_matrix(
   test::TProductFESpace,
   a::TProductGradientEval)
 
-  f = collect_cell_matrix(trial,test,get_data(a))
-  g = collect_cell_matrix(trial,test,get_gradient_data(a))
+  f = collect_cell_matrix(trial,test,get_tp_data(a))
+  g = collect_cell_matrix(trial,test,get_tp_gradient_data(a))
   TProductGradientEval(f,g,a.op)
 end
 
@@ -64,8 +64,8 @@ function FESpaces.collect_cell_vector(
   test::TProductFESpace,
   a::TProductGradientEval)
 
-  f = collect_cell_vector(test,get_data(a))
-  g = collect_cell_vector(test,get_gradient_data(a))
+  f = collect_cell_vector(test,get_tp_data(a))
+  g = collect_cell_vector(test,get_tp_gradient_data(a))
   TProductGradientEval(f,g,a.op)
 end
 

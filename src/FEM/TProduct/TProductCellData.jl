@@ -7,7 +7,7 @@ struct TProductCellPoint{DS<:DomainStyle,A<:CellPoint{DS},B<:AbstractVector{<:Ce
   single_points::B
 end
 
-CellData.get_data(f::TProductCellPoint) = f.point
+get_tp_data(f::TProductCellPoint) = f.single_points
 
 function CellData.get_triangulation(f::TProductCellPoint)
   s1 = first(f.single_points)
@@ -44,7 +44,7 @@ struct TProductCellField{DS<:DomainStyle,A} <: CellField
   end
 end
 
-CellData.get_data(f::TProductCellField) = f.single_fields
+get_tp_data(f::TProductCellField) = f.single_fields
 
 function CellData.get_triangulation(f::TProductCellField)
   s1 = first(f.single_fields)
@@ -71,9 +71,9 @@ struct TProductGradientCellField{A,B} <: CellField
   gradient_cell_data::B
 end
 
-CellData.get_data(a::TProductGradientCellField) = a.cell_data
-CellData.DomainStyle(a::TProductGradientCellField) = DomainStyle(get_data(a))
-CellData.get_triangulation(a::TProductGradientCellField) = get_triangulation(get_data(a))
+get_tp_data(a::TProductGradientCellField) = a.cell_data
+CellData.DomainStyle(a::TProductGradientCellField) = DomainStyle(get_tp_data(a))
+CellData.get_triangulation(a::TProductGradientCellField) = get_triangulation(get_tp_data(a))
 get_gradient_data(a::TProductGradientCellField) = a.gradient_cell_data
 
 (g::TProductGradientCellField)(x) = evaluate(g,x)
@@ -95,8 +95,8 @@ function TProductGradientEval(f::AbstractVector,g::AbstractVector)
   TProductGradientEval(f,g,op)
 end
 
-CellData.get_data(a::TProductGradientEval) = a.f
-get_gradient_data(a::TProductGradientEval) = a.g
+get_tp_data(a::TProductGradientEval) = a.f
+get_tp_gradient_data(a::TProductGradientEval) = a.g
 
 # fe basis
 
@@ -107,7 +107,7 @@ struct TProductFEBasis{DS,BS,A,B} <: FEBasis
   basis_style::BS
 end
 
-function TProductFEBasis(basis::Vector,trian::TProductTriangulation)
+function TProductFEBasis(basis::Vector{<:FESpaces.SingleFieldFEBasis},trian::TProductTriangulation)
   b1 = testitem(basis)
   DS = DomainStyle(b1)
   BS = BasisStyle(b1)
@@ -115,7 +115,15 @@ function TProductFEBasis(basis::Vector,trian::TProductTriangulation)
   TProductFEBasis(basis,trian,DS,BS)
 end
 
-CellData.get_data(f::TProductFEBasis) = f.basis
+function TProductFEBasis(basis::Vector{<:MultiField.MultiFieldCellField},trian::TProductTriangulation)
+  b1 = testitem(basis)
+  DS = DomainStyle(b1)
+  BS = BasisStyle(first(b1))
+  @check all(map(i -> DS===DomainStyle(i) && BS===BasisStyle(first(i)),basis))
+  TProductFEBasis(basis,trian,DS,BS)
+end
+
+get_tp_data(f::TProductFEBasis) = f.basis
 CellData.get_triangulation(f::TProductFEBasis) = f.trian
 FESpaces.BasisStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = BS()
 CellData.DomainStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = DS()
@@ -127,105 +135,64 @@ function Fields.gradient(f::TProductFEBasis)
   return TProductGradientCellField(f,g)
 end
 
-# MultiField
-
-struct MultiFieldTProductFEBasisComponent{A,B} <: FEBasis
-  basis::A
-  single_field::B
-  fieldid::Int
-  nfields::Int
-
-  function MultiFieldTProductFEBasisComponent(
-    single_field::TProductFEBasis,
-    fieldid::Integer,
-    nfields::Integer)
-
-    function block_dofs(basis,::FESpaces.TestBasis,fieldid,nfields)
-      cell_bs = get_data(basis)
-      lazy_map(BlockMap(nfields,fieldid),cell_bs)
-    end
-    function block_dofs(basis,::FESpaces.TrialBasis,fieldid,nfields)
-      cell_bs = get_data(basis)
-      lazy_map(BlockMap((1,nfields),fieldid),cell_bs)
-    end
-
-    bsty = BasisStyle(single_field)
-    basis = map(b->block_dofs(b,bsty,fieldid,nfields),single_field.basis)
-
-    A = typeof(basis)
-    B = typeof(single_field)
-    new{A,B}(basis,single_field,fieldid,nfields)
-  end
-end
-
-CellData.get_data(f::MultiFieldTProductFEBasisComponent) = f.basis
-CellData.get_triangulation(f::MultiFieldTProductFEBasisComponent) = get_triangulation(f.single_field)
-FESpaces.BasisStyle(::Type{<:MultiFieldTProductFEBasisComponent{A,B}}) where {A,B} = BasisStyle(B)
-CellData.DomainStyle(::Type{<:MultiFieldTProductFEBasisComponent{A,B}}) where {A,B} = DomainStyle(B)
-
-function Fields.gradient(f::MultiFieldTProductFEBasisComponent)
-  g = gradient(f.single_field)
-  return MultiFieldTProductFEBasisComponent(g,f.fieldid,f.nfields)
-end
-
 # evaluations
 
-const TProductCellDatum = Union{TProductFEBasis,MultiFieldTProductFEBasisComponent,TProductCellField}
+const TProductCellDatum = Union{TProductFEBasis,TProductCellField}
 
 function Arrays.return_cache(f::TProductCellDatum,x::TProductCellPoint)
-  @assert length(get_data(f)) == length(x.single_points)
-  fitem = testitem(get_data(f))
-  xitem = testitem(get_data(x))
+  @assert length(get_tp_data(f)) == length(get_tp_data(x))
+  fitem = testitem(get_tp_data(f))
+  xitem = testitem(get_tp_data(x))
   c1 = return_cache(fitem,xitem)
   fx1 = evaluate(fitem,xitem)
-  cache = Vector{typeof(c1)}(undef,length(get_data(f)))
-  array = Vector{typeof(fx1)}(undef,length(get_data(f)))
+  cache = Vector{typeof(c1)}(undef,length(get_tp_data(f)))
+  array = Vector{typeof(fx1)}(undef,length(get_tp_data(f)))
   return cache,array
 end
 
 function Arrays.evaluate!(_cache,f::TProductCellDatum,x::TProductCellPoint)
   cache,b = _cache
-  @inbounds for i = 1:length(get_data(f))
-    b[i] = evaluate!(cache[i],get_data(f)[i],get_data(x)[i])
+  @inbounds for i = eachindex(get_tp_data(f))
+    b[i] = evaluate!(cache[i],get_tp_data(f)[i],get_tp_data(x)[i])
   end
   return b
 end
 
 function Arrays.return_cache(k::Operation,f::TProductCellDatum...)
-  D = length(get_data(first(f)))
-  @assert all(map(fi -> length(get_data(fi)) == D,f))
-  fitem = map(testitem,get_data.(f))
+  D = length(get_tp_data(first(f)))
+  @assert all(map(fi -> length(get_tp_data(fi)) == D,f))
+  fitem = map(testitem,get_tp_data.(f))
   c1 = return_cache(k,fitem...)
   Fill(c1,D)
 end
 
 function Arrays.evaluate!(cache,k::Operation,α::TProductCellDatum,β::TProductCellDatum)
-  αβ = map(evaluate!,cache,Fill(k,length(cache)),get_data(α),get_data(β))
+  αβ = map(evaluate!,cache,Fill(k,length(cache)),get_tp_data(α),get_tp_data(β))
   TProductCellField(αβ)
 end
 
 function Arrays.return_cache(f::TProductGradientCellField,x::TProductCellPoint)
-  cache = return_cache(get_data(f),x)
+  cache = return_cache(get_tp_data(f),x)
   gradient_cache = return_cache(get_gradient_data(f),x)
   return cache,gradient_cache
 end
 
 function Arrays.evaluate!(_cache,f::TProductGradientCellField,x::TProductCellPoint)
   cache,gradient_cache = _cache
-  fx = evaluate!(cache,get_data(f),x)
+  fx = evaluate!(cache,get_tp_data(f),x)
   dfx = evaluate!(gradient_cache,get_gradient_data(f),x)
   return TProductGradientEval(fx,dfx)
 end
 
 function Arrays.return_cache(k::Operation,f::TProductGradientCellField...)
-  cache = return_cache(k,map(get_data,f)...)
+  cache = return_cache(k,map(get_tp_data,f)...)
   gradient_cache = return_cache(k,map(get_gradient_data,f)...)
   return cache,gradient_cache
 end
 
 function Arrays.evaluate!(_cache,k::Operation,α::TProductGradientCellField,β::TProductGradientCellField)
   cache,gradient_cache = _cache
-  αβ = evaluate!(cache,k,get_data(α),get_data(β))
+  αβ = evaluate!(cache,k,get_tp_data(α),get_tp_data(β))
   dαβ = evaluate!(gradient_cache,k,get_gradient_data(α),get_gradient_data(β))
   return TProductGradientCellField(αβ,dαβ)
 end
@@ -233,11 +200,11 @@ end
 # integration
 
 function CellData.integrate(f::TProductCellDatum,a::TProductMeasure)
-  map(integrate,get_data(f),a.measures_1d)
+  map(integrate,get_tp_data(f),a.measures_1d)
 end
 
 function CellData.integrate(f::TProductGradientCellField,a::TProductMeasure)
-  fi = integrate(get_data(f),a)
+  fi = integrate(get_tp_data(f),a)
   dfi = integrate(get_gradient_data(f),a)
   TProductGradientEval(fi,dfi)
 end

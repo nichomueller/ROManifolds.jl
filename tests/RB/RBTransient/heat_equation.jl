@@ -110,3 +110,71 @@ using BenchmarkTools
 # @btime A′*A′
 # B = copy(A′)
 # @btime B'*B
+
+fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
+A = flatten_snapshots(fesnaps)
+
+using Mabla.FEM.IndexMaps
+A = ModeTransientSnapshots(Snapshots(fesnaps.data,TrivialIndexMap(collect(1:647)),fesnaps.realization))
+
+using BenchmarkTools
+At = A'
+@btime A'*A
+
+A′ = copy(A)
+@btime A′'*A′
+
+using LinearAlgebra
+
+function LinearAlgebra.:*(A::ModeTransientSnapshots,B::Adjoint{T,<:ModeTransientSnapshots}) where T
+  C = adjoint(A)*B.parent
+  return adjoint(C)
+end
+
+function LinearAlgebra.:*(A::Adjoint{T,<:ModeTransientSnapshots},B::ModeTransientSnapshots) where T
+  a = A.parent.snaps.data
+  b = B.snaps.data
+  ns,nt,np = num_space_dofs(B),num_times(B),num_params(B)
+  ntnp = nt*np
+  c = zeros(eltype(A),(ntnp,ntnp))
+
+  @inbounds for itA in 1:nt
+    row_block = a[itA]
+    @inbounds for itB in 1:nt
+      col_block = b[itB]
+      @inbounds for ipA in 1:np
+        @fastmath iA = (itA-1)*np + ipA
+        row = row_block[ipA]
+        @inbounds for ipB in 1:np
+          @fastmath iB = (itB-1)*np + ipB
+          col = col_block[ipB]
+          c[iA,iB] = dot(row,col)
+        end
+      end
+    end
+  end
+  return c
+end
+
+At*A
+@btime $At*$A
+
+@btime begin
+  A′ = copy(A)
+  A′'*A′
+end
+
+nt = 10
+np = 60
+v = A.snaps.data[1].data[1]
+@btime begin
+  @inbounds for itA in 1:nt
+    @inbounds for itB in 1:nt
+      @inbounds for ipA in 1:np
+        @inbounds for ipB in 1:np
+          dot($v,$v)
+        end
+      end
+    end
+  end
+end

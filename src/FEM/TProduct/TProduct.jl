@@ -56,7 +56,6 @@ include("TProductArray.jl")
 export TProductCellPoint
 export TProductCellFields
 export TProductFEBasis
-export MultiFieldTProductFEBasisComponent
 export TProductGradientCellField
 export TProductGradientEval
 include("TProductCellData.jl")

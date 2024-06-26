@@ -478,6 +478,112 @@ function change_mode(a::AbstractMatrix,np::Integer)
   return a′
 end
 
+function Base.:*(
+  A::Adjoint{T,<:Mode1TransientSnapshots{T,L,I,R,<:TransientBasicSnapshots}},
+  B::Mode1TransientSnapshots{T′,L′,I′,R′,<:TransientBasicSnapshots}
+  ) where {T,L,I,R,T′,L′,I′,R′}
+
+  a = A.parent.snaps.data
+  b = B.snaps.data
+  nsA = num_space_dofs(A.parent)
+  nsB = num_space_dofs(B)
+  @check nsA == nsB
+  Tab = promote_eltype(T,T′)
+  c = zeros(Tab,(size(a,2),size(B,2)))
+
+  @inbounds for iA in axes(a,2)
+    row = a[iA]
+    @inbounds for iB in axes(B,2)
+      col = b[iB]
+      c[iA,iB] = dot(row,col)
+    end
+  end
+
+  return c
+end
+
+function Base.:*(
+  A::Adjoint{T,<:AbstractMatrix},
+  B::Mode1TransientSnapshots{T′,L′,I′,R′,<:TransientBasicSnapshots}
+  ) where {T,T′,L′,I′,R′}
+
+  a = A.parent
+  b = B.snaps.data
+  @check size(a,1) == nsB
+  Tab = promote_eltype(T,T′)
+  c = zeros(Tab,(size(a,2),size(B,2)))
+
+  @inbounds for iB in axes(B,2)
+    col = b[iB]
+    @inbounds for iA in axes(a,2)
+      @fastmath iB = (itB-1)*np + ipB
+      row = a[:,iA]
+      c[iA,iB] = dot(row,col)
+    end
+  end
+
+  return c
+end
+
+function Base.:*(
+  A::Adjoint{T,<:Mode1TransientSnapshots{T,L,I,R,<:TransientSnapshots}},
+  B::Mode1TransientSnapshots{T′,L′,I′,R′,<:TransientSnapshots}
+  ) where {T,L,I,R,T′,L′,I′,R′}
+
+  a = A.parent.snaps.data
+  b = B.snaps.data
+  nsA,ntA,npA = num_space_dofs(A.parent),num_times(A.parent),num_params(A.parent)
+  nsB,ntB,npB = num_space_dofs(B),num_times(B),num_params(B)
+  @check nsA == nsB
+  Tab = promote_eltype(T,T′)
+  c = zeros(Tab,(ntA*npA,ntB*npB))
+
+  @inbounds for itA in 1:ntA
+    row_block = a[itA]
+    @inbounds for itB in 1:ntB
+      col_block = b[itB]
+      @inbounds for ipA in 1:npA
+        @fastmath iA = (itA-1)*npA + ipA
+        row = row_block[ipA]
+        @inbounds for ipB in 1:npB
+          @fastmath iB = (itB-1)*npB + ipB
+          col = col_block[ipB]
+          c[iA,iB] = dot(row,col)
+        end
+      end
+    end
+  end
+
+  return c
+end
+
+function Base.:*(
+  A::Adjoint{T,<:AbstractMatrix},
+  B::Mode1TransientSnapshots{T′,L′,I′,R′,<:TransientSnapshots}
+  ) where {T,T′,L′,I′,R′}
+
+  a = A.parent
+  b = B.snaps.data
+  ns,nt,np = num_space_dofs(B),num_times(B),num_params(B)
+  @check size(a,1) == ns
+  Tab = promote_eltype(T,T′)
+  c = zeros(Tab,(size(a,2),nt*np))
+
+  @inbounds for itB in 1:nt
+    col_block = b[itB]
+    @inbounds for ipB in 1:np
+      @fastmath iB = (itB-1)*np + ipB
+      col = col_block[ipB]
+      @inbounds for iA in axes(a,2)
+        row = a[:,iA]
+        c[iA,iB] = dot(row,col)
+      end
+    end
+  end
+
+  return c
+end
+
 # block snapshots
 
 function RBSteady.Snapshots(

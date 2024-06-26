@@ -96,12 +96,21 @@ snaps = Snapshots(vals,i,r)
 
 s = snaps
 soff = select_snapshots(s,RBSteady.offline_params(rbsolver))
+
 # norm_matrix = assemble_norm_matrix(feop)
 V = test
 U = evaluate(trial,nothing)
 assem = TProductBlockSparseMatrixAssembler(U,V)
 v = get_tp_fe_basis(V)
 u = get_tp_trial_fe_basis(U)
+
+D = length(V.spaces[1].spaces_1d)
+basis = map(1:D) do d
+  sfd = map(sf -> sf.spaces_1d[d],V.spaces)
+  mfd = MultiFieldFESpace(sfd)
+  get_fe_basis(mfd)
+end
+trian = get_triangulation(V)
 
 # induced_norm((u[1],u[2]),(v[1],v[1]))
 using Gridap.Arrays
@@ -111,7 +120,7 @@ using Gridap.CellData
 # u[1]⋅v[1]
 c = return_cache(Operation(⋅),u[1],v[1])
 # evaluate!(c,Operation(⋅),u[1],v[1])
-evaluate!(c[1],Operation(⋅),get_data(u[1])[1],get_data(v[1])[1])
+evaluate!(c[1],Operation(⋅),get_tp_data(u[1])[1],get_tp_data(v[1])[1])
 
 
 v′ = get_fe_basis(V)
