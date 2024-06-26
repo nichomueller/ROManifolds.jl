@@ -139,11 +139,6 @@ function cores2basis(core::AbstractArray{T,3}) where T
   return reshape(pcore,size(pcore,1),:)
 end
 
-function cores2basis(core::AbstractArray{T,4}) where T
-  pcore = permutedims(core,(2,3,1,4))
-  return reshape(pcore,size(pcore,1)*size(pcore,2),:)
-end
-
 function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
   @check size(a,3) == size(b,1)
   TS = promote_type(T,S)
@@ -157,9 +152,7 @@ function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
   return ab
 end
 
-# when we multiply two 4-D spatial cores, the result is a 3-D core that stacks
-# the matrices' rows and columns
-function _cores2basis(a::AbstractArray{S,4},b::AbstractArray{T,4}) where {S,T}
+function _cores2basis(a::AbstractArray{S,N},b::AbstractArray{T,N}) where {S,T,N}
   @abstractmethod
 end
 
@@ -172,10 +165,6 @@ function _cores2basis(i::AbstractIndexMap,a::AbstractArray{T,3}...) where T
   basis = _cores2basis(a...)
   invi = inv_index_map(i)
   return view(basis,:,vec(invi),:)
-end
-
-function _cores2basis(i::AbstractIndexMap,a::AbstractArray{T,4}...) where T
-  @abstractmethod
 end
 
 # multi field interface

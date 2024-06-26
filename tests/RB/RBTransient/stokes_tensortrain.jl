@@ -27,7 +27,7 @@ ptspace = TransientParamSpace(pranges,tdomain)
 n = 5
 domain = (0,1,0,1)
 partition = (n,n)
-model = TProductModel(domain, partition)
+model = TProductModel(domain,partition)
 labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
 
@@ -64,10 +64,10 @@ coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 induced_norm((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
+test_u = TestFESpace(Ω,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial_u = TransientTrialParamFESpace(test_u,gμt_in)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+test_p = TestFESpace(Ω,reffe_p;conformity=:H1,constraint=:zeromean)
 # test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
@@ -82,7 +82,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
 
-fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
+# fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
 
 nparams = num_params(rbsolver)
 sol = solve(fesolver,feop,xh0μ;nparams)
@@ -94,15 +94,46 @@ end
 i = get_vector_index_map(feop)
 snaps = Snapshots(vals,i,r)
 
-using BlockArrays
-using Gridap.Fields
+s = snaps
+soff = select_snapshots(s,RBSteady.offline_params(rbsolver))
+# norm_matrix = assemble_norm_matrix(feop)
+V = test
+U = evaluate(trial,nothing)
+assem = TProductBlockSparseMatrixAssembler(U,V)
+v = get_tp_fe_basis(V)
+u = get_tp_trial_fe_basis(U)
 
-data = vals
-block_values = blocks.(data)
-nblocks = blocksize(first(data))
-active_block_ids = findall(!iszero,blocks(first(data)))
-block_map = BlockMap(nblocks,active_block_ids)
-active_block_snaps = [Snapshots(map(v->getindex(v,n),block_values),i[n],r) for n in active_block_ids]
+# induced_norm((u[1],u[2]),(v[1],v[1]))
+using Gridap.Arrays
+using Gridap.CellData
 
-n = 1
-boh = Snapshots(map(v->getindex(v,n),block_values),i[n],r)
+∫(u[1]⋅v[1])dΩ
+# u[1]⋅v[1]
+c = return_cache(Operation(⋅),u[1],v[1])
+# evaluate!(c,Operation(⋅),u[1],v[1])
+evaluate!(c[1],Operation(⋅),get_data(u[1])[1],get_data(v[1])[1])
+
+
+v′ = get_fe_basis(V)
+u′ = get_trial_fe_basis(U)
+# u′[1]⋅v′[1]
+c′ = return_cache(Operation(⋅),u′[1],v′[1])
+evaluate!(c′,Operation(⋅),u′[1],v′[1])
+
+# m1 = CartesianDiscreteModel((0,1),(5,))
+# Ω1 = Triangulation(m1)
+# dΩ1 = Measure(Ω1,degree)
+# t1 = TestFESpace(m1,reffe_u;conformity=:H1)
+# t2 = TestFESpace(m1,reffe_p;conformity=:C0)
+
+# v1 = get_fe_basis(t1)
+# u1 = get_trial_fe_basis(t1)
+# v2 = get_fe_basis(t2)
+# u2 = get_trial_fe_basis(t2)
+
+# _test_u = TestFESpace(Ω,reffe_u;conformity=:H1)
+# assemble_matrix((u,v)->∫(u⋅v)dΩ.measure,_test_u.space,_test_u.space)
+# assemble_matrix((u,v)->∫(u⋅v)dΩ1,t1,t1)
+# assemble_matrix((u,v)->∫(v*(∇⋅(u)))dΩ1,t1,t2)
+# cf = ∇⋅(u1)
+# cf(get_cell_points(Ω1))

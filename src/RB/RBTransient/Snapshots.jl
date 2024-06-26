@@ -302,171 +302,36 @@ function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,srange,
   return entries
 end
 
-abstract type AbstractTransientMultiValueSnapshots{T,N,L,D,I,R} <: AbstractTransientSnapshots{T,N,L,D,I,R} end
+const MultiValueTransientBasicSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = TransientBasicSnapshots{T,N,L,D,I,R,A}
+const MultiValueTransientSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = TransientSnapshots{T,N,L,D,I,R,A}
+const MultiValueTransientSnapshotsAtIndices{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A,B} = TransientSnapshotsAtIndices{T,N,L,D,I,R,A,B}
+const TransientMultiValueSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = Union{
+  MultiValueTransientBasicSnapshots{T,N,L,D,I,R,A},
+  MultiValueTransientSnapshots{T,N,L,D,I,R,A},
+  MultiValueTransientSnapshotsAtIndices{T,N,L,D,I,R,A}
+}
 
-function RBSteady.num_space_dofs(s::AbstractTransientMultiValueSnapshots)
-  i′ = get_component(get_index_map(s),RBSteady.component_index(s))
-  size(i′)
-end
+TensorValues.num_components(s::TransientMultiValueSnapshots) = num_components(get_index_map(i))
 
-RBSteady.component_index(s::AbstractTransientMultiValueSnapshots) = @abstractmethod
-
-TensorValues.num_components(s::AbstractTransientMultiValueSnapshots) = num_components(get_index_map(i))
-
-function IndexMaps.get_component(s::AbstractTransientMultiValueSnapshots,args...;kwargs...)
+function IndexMaps.get_component(s::TransientMultiValueSnapshots,args...;kwargs...)
   i′ = get_component(get_index_map(s),args...;kwargs...)
   return Snapshots(get_values(s),i′,get_realization(s))
 end
 
-function IndexMaps.split_components(s::AbstractTransientMultiValueSnapshots)
+function IndexMaps.split_components(s::TransientMultiValueSnapshots)
   i′ = split_components(get_index_map(s))
   return Snapshots(get_values(s),i′,get_realization(s))
 end
 
-function IndexMaps.merge_components(s::AbstractTransientMultiValueSnapshots)
+function IndexMaps.merge_components(s::TransientMultiValueSnapshots)
   i′ = merge_components(get_index_map(s))
   return Snapshots(get_values(s),i′,get_realization(s))
-end
-
-function RBSteady.change_component!(s::AbstractTransientMultiValueSnapshots,icomp)
-  @abstractmethod
-end
-
-Base.@propagate_inbounds function Base.getindex(
-  s::AbstractTransientMultiValueSnapshots{T,N},
-  i::Vararg{Integer,N}
-  ) where {T,N}
-
-  getindex(get_component(s,s.icomp[]),i...)
-end
-
-function Base.setindex!(
-  s::AbstractTransientMultiValueSnapshots{T,N},
-  v,
-  i::Vararg{Integer,N}
-  ) where {T,N}
-
-  @notimplemented
-end
-
-struct TransientBasicMultiValueSnapshots{T,N,L,D,I,R,A} <: AbstractTransientMultiValueSnapshots{T,N,L,D,I,R}
-  data::A
-  index_map::I
-  realization::R
-  icomp::Base.RefValue{Int}
-
-  function TransientBasicMultiValueSnapshots(
-    data::A,
-    index_map::I,
-    realization::R,
-    icomp::Int=1
-    ) where {T,N,L,D,R,A<:AbstractParamArray{T,N,L},I<:AbstractMultiValueIndexMap{D}}
-
-    new{T,D+1,L,D,I,R,A}(data,index_map,realization,Ref(icomp))
-  end
-end
-
-function RBSteady.Snapshots(data::AbstractParamArray,i::AbstractMultiValueIndexMap,r::TransientParamRealization)
-  TransientBasicMultiValueSnapshots(data,i,r)
-end
-
-ParamDataStructures.get_values(s::TransientBasicMultiValueSnapshots) = s.data
-IndexMaps.get_index_map(s::TransientBasicMultiValueSnapshots) = s.index_map
-RBSteady.get_realization(s::TransientBasicMultiValueSnapshots) = s.realization
-RBSteady.component_index(s::TransientBasicMultiValueSnapshots) = s.icomp[]
-
-function RBSteady.change_component!(s::TransientBasicMultiValueSnapshots,icomp)
-  s.icomp[] = icomp
-end
-
-struct TransientMultiValueSnapshots{T,N,L,D,I,R,A} <: AbstractTransientMultiValueSnapshots{T,N,L,D,I,R}
-  data::Vector{A}
-  index_map::I
-  realization::R
-  icomp::Base.RefValue{Int}
-
-  function TransientMultiValueSnapshots(
-    data::Vector{A},
-    index_map::I,
-    realization::R,
-    icomp::Int=1
-    ) where {T,N,L,D,R,A<:AbstractParamArray{T,N,L},I<:AbstractMultiValueIndexMap{D}}
-
-    new{T,D+1,L,D,I,R,A}(data,index_map,realization,Ref(icomp))
-  end
-end
-
-function RBSteady.Snapshots(data::Vector{<:AbstractParamArray},i::AbstractMultiValueIndexMap,r::TransientParamRealization)
-  TransientMultiValueSnapshots(data,i,r)
-end
-
-function ParamDataStructures.get_values(s::TransientMultiValueSnapshots)
-  item = testitem(first(s.data).data)
-  data = array_of_similar_arrays(item,num_params(s)*num_times(s))
-  @inbounds for (ipt,index) in enumerate(CartesianIndices((num_params(s),num_times(s))))
-    ip,it = index.I
-    @views data[ipt] = s.data[it][ip]
-  end
-  return data
-end
-
-IndexMaps.get_index_map(s::TransientMultiValueSnapshots) = s.index_map
-RBSteady.get_realization(s::TransientMultiValueSnapshots) = s.realization
-RBSteady.component_index(s::TransientMultiValueSnapshots) = s.icomp[]
-
-function RBSteady.change_component!(s::TransientMultiValueSnapshots,icomp)
-  s.icomp[] = icomp
-end
-
-struct MultiValueTransientSnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractTransientMultiValueSnapshots{T,N,L,D,I,R},B<:AbstractUnitRange{Int}} <: AbstractTransientMultiValueSnapshots{T,N,L,D,I,R}
-  snaps::A
-  prange::B
-end
-
-function TransientSnapshotsAtIndices(snaps::AbstractTransientMultiValueSnapshots,prange)
-  MultiValueSnapshotsAtIndices(snaps,prange)
-end
-
-RBSteady.get_realization(s::MultiValueTransientSnapshotsAtIndices) = get_realization(s.snaps)[s.prange,s.trange]
-RBSteady.component_index(s::MultiValueTransientSnapshotsAtIndices) = s.icomp[]
-
-function ParamDataStructures.get_values(
-  s::MultiValueTransientSnapshotsAtIndices{T,N,L,D,I,R,<:TransientBasicMultiValueSnapshots}
-  ) where {T,N,L,D,I,R}
-
-  snaps = s.snaps
-  item = testitem(snaps.data)
-  data = array_of_similar_arrays(item,num_params(s)*num_times(s))
-  indices = CartesianIndices((RBSteady.param_indices(s),time_indices(s)))
-  @inbounds for (ipt,index) in enumerate(indices)
-    ip,it = index.I
-    @views data[ipt] = snaps.data[ip+(it-1)*num_params(s)]
-  end
-  return data
-end
-
-function ParamDataStructures.get_values(
-  s::MultiValueTransientSnapshotsAtIndices{T,N,L,D,I,R,<:TransientMultiValueSnapshots}
-  ) where {T,N,L,D,I,R}
-
-  snaps = s.snaps
-  item = testitem(first(snaps.data).data)
-  data = array_of_similar_arrays(item,num_params(s)*num_times(s))
-  indices = CartesianIndices((RBSteady.param_indices(s),time_indices(s)))
-  @inbounds for (ipt,index) in enumerate(indices)
-    ip,it = index.I
-    data[ipt] = snaps.data[it][ip]
-  end
-  return data
-end
-
-function RBSteady.change_component!(s::TransientSnapshotsAtIndices,icomp)
-  s.icomp[] = icomp
 end
 
 const TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
   TransientBasicSnapshots{T,N,L,D,I,R,A},
   TransientSnapshots{T,N,L,D,I,R,A},
+  TransientMultiValueSnapshots{T,N,L,D,I,R,A}
 }
 
 function ParamDataStructures.recast(s::TransientSparseSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T

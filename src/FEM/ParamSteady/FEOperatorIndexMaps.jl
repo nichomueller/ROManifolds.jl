@@ -38,7 +38,11 @@ function get_vector_index_map(test::FESpace)
 end
 
 function get_vector_index_map(test::TProductFESpace)
-  get_dof_index_map(test)
+  if length(test.spaces_1d) == 1 # in the 1-D case, we return a trivial map
+    get_vector_index_map(test.space)
+  else
+    get_dof_index_map(test)
+  end
 end
 
 function get_vector_index_map(tests::MultiFieldFESpace)
@@ -64,13 +68,17 @@ function get_matrix_index_map(trial::FESpace,test::FESpace)
 end
 
 function get_matrix_index_map(trial::TProductFESpace,test::TProductFESpace)
-  sparsity = get_sparsity(trial,test)
-  psparsity = permute_sparsity(sparsity,trial,test)
-  I,J,_ = findnz(psparsity)
-  i,j,_ = IndexMaps.univariate_findnz(psparsity)
-  g2l = _global_2_local_nnz(psparsity,I,J,i,j)
-  pg2l = _permute_index_map(g2l,trial,test)
-  return SparseIndexMap(pg2l,psparsity)
+  if length(trial.spaces_1d) == length(test.spaces_1d) == 1 # in the 1-D case, we return a trivial map
+    get_matrix_index_map(trial.space,test.space)
+  else
+    sparsity = get_sparsity(trial,test)
+    psparsity = permute_sparsity(sparsity,trial,test)
+    I,J,_ = findnz(psparsity)
+    i,j,_ = IndexMaps.univariate_findnz(psparsity)
+    g2l = _global_2_local_nnz(psparsity,I,J,i,j)
+    pg2l = _permute_index_map(g2l,trial,test)
+    SparseIndexMap(pg2l,psparsity)
+  end
 end
 
 for F in (:TrialFESpace,:TransientTrialFESpace)

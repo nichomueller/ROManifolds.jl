@@ -124,7 +124,9 @@ get_basis_spacetime(a::TransientTTSVDCores) = a.basis_spacetime
 
 _num_tot_space_dofs(a::TransientTTSVDCores{3}) = size.(get_spatial_cores(a),2)
 
-function _num_tot_space_dofs(a::TransientTTSVDCores{4})
+const TransientTTSVDSparseCores{T,A<:AbstractVector{<:SparseCore{T}},B,C} = TransientTTSVDCores{4,T,A,B,C}
+
+function _num_tot_space_dofs(a::TransientTTSVDSparseCores)
   scores = get_spatial_cores(a)
   tot_ndofs = zeros(Int,2,length(scores))
   @inbounds for i = eachindex(scores)

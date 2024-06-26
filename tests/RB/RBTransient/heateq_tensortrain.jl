@@ -86,7 +86,7 @@ feop = feop.op
 imap = feop.index_map
 imat = imap.matrix_map
 
-A = assemble_matrix((u,v) -> ∫(∇(v)⋅∇(u))dΩ,trial(nothing),test)
+A = assemble_matrix((u,v) -> ∫(∇(v)⋅∇(u))dΩ,trial(nothing,nothing),test)
 A[imat]
 
 assem = SparseMatrixAssembler(test,test)

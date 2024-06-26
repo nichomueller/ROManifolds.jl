@@ -272,111 +272,35 @@ function select_snapshots_entries(s::AbstractSteadySnapshots,srange)
   return entries
 end
 
-abstract type AbstractSteadyMultiValueSnapshots{T,N,L,D,I,R} <: AbstractSteadySnapshots{T,N,L,D,I,R} end
 
-function RBSteady.num_space_dofs(s::AbstractSteadyMultiValueSnapshots)
-  i′ = get_component(get_index_map(s),component_index(s))
-  num_space_dofs(i′)
-end
+const MultiValueBasicSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = BasicSnapshots{T,N,L,D,I,R,A}
+const MultiValueSnapshotsAtIndices{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A,B} = SnapshotsAtIndices{T,N,L,D,I,R,A,B}
+const SteadyMultiValueSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = Union{
+  MultiValueBasicSnapshots{T,N,L,D,I,R,A},
+  MultiValueSnapshotsAtIndices{T,N,L,D,I,R,A}
+}
 
-component_index(s::AbstractSteadyMultiValueSnapshots) = @abstractmethod
+TensorValues.num_components(s::SteadyMultiValueSnapshots) = num_components(get_index_map(i))
 
-TensorValues.num_components(s::AbstractSteadyMultiValueSnapshots) = num_components(get_index_map(i))
-
-function IndexMaps.get_component(s::AbstractSteadyMultiValueSnapshots,args...;kwargs...)
+function IndexMaps.get_component(s::SteadyMultiValueSnapshots,args...;kwargs...)
   i′ = get_component(get_index_map(s),args...;kwargs...)
   return Snapshots(get_values(s),i′,get_realization(s))
 end
 
-function IndexMaps.split_components(s::AbstractSteadyMultiValueSnapshots)
+function IndexMaps.split_components(s::SteadyMultiValueSnapshots)
   i′ = split_components(get_index_map(s))
   return Snapshots(get_values(s),i′,get_realization(s))
 end
 
-function IndexMaps.merge_components(s::AbstractSteadyMultiValueSnapshots)
+function IndexMaps.merge_components(s::SteadyMultiValueSnapshots)
   i′ = merge_components(get_index_map(s))
   return Snapshots(get_values(s),i′,get_realization(s))
 end
 
-function change_component!(s::AbstractSteadyMultiValueSnapshots,icomp)
-  @abstractmethod
-end
-
-Base.@propagate_inbounds function Base.getindex(
-  s::AbstractSteadyMultiValueSnapshots{T,N},
-  i::Vararg{Integer,N}
-  ) where {T,N}
-
-  getindex(get_component(s,s.icomp[]),i...)
-end
-
-function Base.setindex!(
-  s::AbstractSteadyMultiValueSnapshots{T,N},
-  v,
-  i::Vararg{Integer,N}
-  ) where {T,N}
-
-  @notimplemented
-end
-
-struct MultiValueSnapshots{T,N,L,D,I,R,A} <: AbstractSteadyMultiValueSnapshots{T,N,L,D,I,R}
-  data::A
-  index_map::I
-  realization::R
-  icomp::Base.RefValue{Int}
-
-  function MultiValueSnapshots(
-    data::A,
-    index_map::I,
-    realization::R,
-    icomp::Int=1
-    ) where {T,N,L,D,R,A<:AbstractParamArray{T,N,L},I<:AbstractMultiValueIndexMap{D}}
-
-    new{T,D+1,L,D,I,R,A}(data,index_map,realization,Ref(icomp))
-  end
-end
-
-function Snapshots(data::AbstractParamArray,i::AbstractMultiValueIndexMap,r::AbstractParamRealization)
-  MultiValueSnapshots(data,i,r)
-end
-
-ParamDataStructures.get_values(s::MultiValueSnapshots) = s.data
-IndexMaps.get_index_map(s::MultiValueSnapshots) = s.index_map
-get_realization(s::MultiValueSnapshots) = s.realization
-component_index(s::MultiValueSnapshots) = s.icomp[]
-
-function change_component!(s::MultiValueSnapshots,icomp)
-  s.icomp[] = icomp
-end
-
-struct MultiValueSnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractSteadyMultiValueSnapshots{T,N,L,D,I,R},B<:AbstractUnitRange{Int}} <: AbstractSteadyMultiValueSnapshots{T,N,L,D,I,R}
-  snaps::A
-  prange::B
-end
-
-function SnapshotsAtIndices(snaps::AbstractSteadyMultiValueSnapshots,prange)
-  MultiValueSnapshotsAtIndices(snaps,prange)
-end
-
-get_realization(s::MultiValueSnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
-
-function ParamDataStructures.get_values(s::MultiValueSnapshotsAtIndices)
-  snaps = s.snaps
-  item = testitem(snaps.data)
-  data = array_of_similar_arrays(item,num_params(s))
-  @inbounds for (ip,ip′) in enumerate(param_indices(s))
-    @views data[ip] = snaps.data[ip′]
-  end
-  return data
-end
-
-component_index(s::MultiValueSnapshotsAtIndices) = component_index(s.snaps)
-
-function change_component!(s::MultiValueSnapshotsAtIndices,icomp)
-  change_component!(s.snaps,icomp)
-end
-
-const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = BasicSnapshots{T,N,L,D,I,R,A}
+const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
+  BasicSnapshots{T,N,L,D,I,R,A},
+  SteadyMultiValueSnapshots{T,N,L,D,I,R,A}
+}
 
 function ParamDataStructures.recast(s::SparseSnapshots,a::AbstractMatrix)
   return recast(s.data,a)
@@ -396,17 +320,14 @@ struct BlockSnapshots{S,N,L} <: AbstractParamContainer{S,N,L}
   array::Array{S,N}
   touched::Array{Bool,N}
 
-  function BlockSnapshots(
-    array::Array{S,N},
-    touched::Array{Bool,N}
-    ) where {T′,N′,L,S<:AbstractSnapshots{T′,N′,L},N}
-
+  function BlockSnapshots(array::Array{S,N},touched::Array{Bool,N}) where {S,N}
     @check size(array) == size(touched)
+    L = param_length(first(array))
     new{S,N,L}(array,touched)
   end
 end
 
-function BlockSnapshots(k::BlockMap{N},a::AbstractArray{S}) where {S<:AbstractSnapshots,N}
+function BlockSnapshots(k::BlockMap{N},a::AbstractArray{S}) where {S,N}
   array = Array{S,N}(undef,k.size)
   touched = fill(false,k.size)
   for (t,i) in enumerate(k.indices)

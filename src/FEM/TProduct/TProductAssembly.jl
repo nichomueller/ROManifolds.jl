@@ -25,6 +25,16 @@ function FESpaces.SparseMatrixAssembler(
   TProductSparseMatrixAssembler(assem,assems_1d,row_index_map,col_index_map)
 end
 
+function FESpaces.SparseMatrixAssembler(
+  mat,
+  vec,
+  trial::TrialFESpace{<:TProductFESpace},
+  test::TProductFESpace,
+  strategy::AssemblyStrategy=DefaultAssemblyStrategy())
+
+  SparseMatrixAssembler(mat,vec,trial.space,test,strategy)
+end
+
 function FESpaces.collect_cell_matrix(
   trial::TProductFESpace,
   test::TProductFESpace,
@@ -153,4 +163,26 @@ function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::TPro
   gradmats_1d = map(assemble_matrix,a.assems_1d,matdata.g)
   mat = kronecker_gradients(mats_1d,gradmats_1d,matdata.op)
   return TProductGradientArray(mat,mats_1d,gradmats_1d,(a.row_index_map,a.col_index_map))
+end
+
+# multi field
+
+function TProductBlockSparseMatrixAssembler(
+  trial::MultiFieldFESpace{MS},
+  test::MultiFieldFESpace{MS},
+  strategy::AssemblyStrategy=DefaultAssemblyStrategy()
+  ) where {NB,SB,P,MS<:BlockMultiFieldStyle{NB,SB,P}}
+
+  @notimplementedif any(SB.!=1)
+  NV = length(test.spaces)
+
+  T = get_dof_value_type(trial)
+  mat = SparseMatrixCSC{T,Int}
+  vec = Vector{T}
+  block_idx = CartesianIndices((NB,NB))
+  block_assemblers = map(block_idx) do idx
+    SparseMatrixAssembler(mat,vec,trial[idx[2]],test[idx[1]],strategy)
+  end
+
+  return MultiField.BlockSparseMatrixAssembler{NB,NV,SB,P}(block_assemblers)
 end

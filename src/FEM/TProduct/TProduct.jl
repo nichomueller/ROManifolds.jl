@@ -12,6 +12,7 @@ using Gridap.CellData
 using Gridap.FESpaces
 using Gridap.Fields
 using Gridap.Geometry
+using Gridap.MultiField
 using Gridap.Polynomials
 using Gridap.ReferenceFEs
 using Gridap.TensorValues
@@ -55,11 +56,13 @@ include("TProductArray.jl")
 export TProductCellPoint
 export TProductCellFields
 export TProductFEBasis
+export MultiFieldTProductFEBasisComponent
 export TProductGradientCellField
 export TProductGradientEval
 include("TProductCellData.jl")
 
 export TProductSparseMatrixAssembler
+export TProductBlockSparseMatrixAssembler
 include("TProductAssembly.jl")
 
 end # module

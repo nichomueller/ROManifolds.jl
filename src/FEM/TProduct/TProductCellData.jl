@@ -117,8 +117,8 @@ end
 
 CellData.get_data(f::TProductFEBasis) = f.basis
 CellData.get_triangulation(f::TProductFEBasis) = f.trian
-FESpaces.BasisStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = BS
-CellData.DomainStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = DS
+FESpaces.BasisStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = BS()
+CellData.DomainStyle(::Type{<:TProductFEBasis{DS,BS}}) where {DS,BS} = DS()
 
 function Fields.gradient(f::TProductFEBasis)
   dbasis = map(gradient,f.basis)
@@ -127,9 +127,50 @@ function Fields.gradient(f::TProductFEBasis)
   return TProductGradientCellField(f,g)
 end
 
+# MultiField
+
+struct MultiFieldTProductFEBasisComponent{A,B} <: FEBasis
+  basis::A
+  single_field::B
+  fieldid::Int
+  nfields::Int
+
+  function MultiFieldTProductFEBasisComponent(
+    single_field::TProductFEBasis,
+    fieldid::Integer,
+    nfields::Integer)
+
+    function block_dofs(basis,::FESpaces.TestBasis,fieldid,nfields)
+      cell_bs = get_data(basis)
+      lazy_map(BlockMap(nfields,fieldid),cell_bs)
+    end
+    function block_dofs(basis,::FESpaces.TrialBasis,fieldid,nfields)
+      cell_bs = get_data(basis)
+      lazy_map(BlockMap((1,nfields),fieldid),cell_bs)
+    end
+
+    bsty = BasisStyle(single_field)
+    basis = map(b->block_dofs(b,bsty,fieldid,nfields),single_field.basis)
+
+    A = typeof(basis)
+    B = typeof(single_field)
+    new{A,B}(basis,single_field,fieldid,nfields)
+  end
+end
+
+CellData.get_data(f::MultiFieldTProductFEBasisComponent) = f.basis
+CellData.get_triangulation(f::MultiFieldTProductFEBasisComponent) = get_triangulation(f.single_field)
+FESpaces.BasisStyle(::Type{<:MultiFieldTProductFEBasisComponent{A,B}}) where {A,B} = BasisStyle(B)
+CellData.DomainStyle(::Type{<:MultiFieldTProductFEBasisComponent{A,B}}) where {A,B} = DomainStyle(B)
+
+function Fields.gradient(f::MultiFieldTProductFEBasisComponent)
+  g = gradient(f.single_field)
+  return MultiFieldTProductFEBasisComponent(g,f.fieldid,f.nfields)
+end
+
 # evaluations
 
-const TProductCellDatum = Union{TProductFEBasis,TProductCellField}
+const TProductCellDatum = Union{TProductFEBasis,MultiFieldTProductFEBasisComponent,TProductCellField}
 
 function Arrays.return_cache(f::TProductCellDatum,x::TProductCellPoint)
   @assert length(get_data(f)) == length(x.single_points)
@@ -155,12 +196,11 @@ function Arrays.return_cache(k::Operation,f::TProductCellDatum...)
   @assert all(map(fi -> length(get_data(fi)) == D,f))
   fitem = map(testitem,get_data.(f))
   c1 = return_cache(k,fitem...)
-  Fill(c1,D),Fill(k,D)
+  Fill(c1,D)
 end
 
-function Arrays.evaluate!(_cache,k::Operation,α::TProductCellDatum,β::TProductCellDatum)
-  cache,K = _cache
-  αβ = map(evaluate!,cache,K,get_data(α),get_data(β))
+function Arrays.evaluate!(cache,k::Operation,α::TProductCellDatum,β::TProductCellDatum)
+  αβ = map(evaluate!,cache,Fill(k,length(cache)),get_data(α),get_data(β))
   TProductCellField(αβ)
 end
 
