@@ -15,6 +15,7 @@ abstract type AbstractParamArray{T,N,L,A<:AbstractArray{T,N}} <: AbstractParamCo
 Type representing parametric arrays of type A. L encodes the parametric length.
 Subtypes:
 - [`ArrayOfArrays`](@ref).
+- [`ConsecutiveArrayOfArrays`](@ref).
 - [`ArrayOfTrivialArrays`](@ref).
 - [`BlockArrayOfArrays`](@ref).
 

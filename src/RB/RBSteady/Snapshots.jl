@@ -54,7 +54,7 @@ end
 
 function IndexMaps.change_index_map(f,s::AbstractSnapshots)
   index_map′ = change_index_map(f,get_index_map(s))
-  Snapshots(s,index_map′,get_realization(s))
+  Snapshots(param_data(s),index_map′,get_realization(s))
 end
 
 """
@@ -140,6 +140,7 @@ function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::ParamRealization
   BasicSnapshots(s,i,r)
 end
 
+ParamDataStructures.param_data(s::BasicSnapshots) = s.data
 ParamDataStructures.get_values(s::BasicSnapshots) = s.data
 IndexMaps.get_index_map(s::BasicSnapshots) = s.index_map
 get_realization(s::BasicSnapshots) = s.realization
@@ -187,6 +188,7 @@ end
 
 param_indices(s::SnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
+ParamDataStructures.param_data(s::SnapshotsAtIndices) = param_data(s.snaps)
 
 function ParamDataStructures.get_values(s::SnapshotsAtIndices)
   snaps = s.snaps
@@ -317,27 +319,26 @@ function Base.:*(B::AbstractSnapshots,A::Adjoint{T,<:AbstractSnapshots}) where T
   @notimplemented "This operation is too expensive"
 end
 
-function Base.:*(B::AbstractSnapshots,A::AbstractArray) where T
+function Base.:*(B::AbstractSnapshots,A::AbstractMatrix)
   @notimplemented "This operation is too expensive"
 end
 
-function Base.:*(B::AbstractSnapshots,A::Adjoint{T,<:AbstractArray}) where T
+function Base.:*(B::AbstractSnapshots,A::Adjoint{T,<:AbstractMatrix}) where T
   @notimplemented "This operation is too expensive"
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractSnapshots{T,2}},B::AbstractSnapshots{S,2}) where {T,S}
+  @check size(A,2) == size(B,1)
+
   a = A.parent.snaps.data
   b = B.snaps.data
-  nsA,npA = num_space_dofs(A),num_params(A)
-  nsB,npB = num_space_dofs(B),num_params(B)
-  @check nsA == nsB
-  Tab = promote_eltype(T,S)
-  c = zeros(Tab,(npA,npB))
+  Tab = promote_type(T,S)
+  c = zeros(Tab,(size(A,1),size(B,2)))
 
-  @inbounds for ipA in 1:npA
-    row = a[ipA]
-    @inbounds for ipB in 1:npB
-      col = b[ipB]
+  @inbounds for iA in axes(A,1)
+    row = a[iA]
+    @inbounds for iB in axes(B,2)
+      col = b[iB]
       c[iA,iB] = dot(row,col)
     end
   end
@@ -345,23 +346,69 @@ function Base.:*(A::Adjoint{T,<:AbstractSnapshots{T,2}},B::AbstractSnapshots{S,2
   return c
 end
 
-function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::ModeTransientSnapshots{S}) where {T,S}
+function Base.:*(a::AbstractMatrix{T},B::AbstractSnapshots{S,2}) where {T,S}
+  @check size(a,2) == size(B,1)
+
+  b = B.snaps.data
+  Tab = promote_type(T,S)
+  c = zeros(Tab,(size(a,1),size(B,2)))
+
+  @inbounds for iB in axes(B,2)
+    col = b[iB]
+    @inbounds for iA in axes(a,1)
+      row = a[iA,:]
+      c[iA,iB] = dot(row,col)
+    end
+  end
+
+  return c
+end
+
+function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::AbstractSnapshots{S,2}) where {T,S}
+  @check size(A,2) == size(B,1)
+
   a = A.parent
   b = B.snaps.data
-  ns,np = num_space_dofs(B),num_params(B)
-  @check size(a,1) == nsB
-  Tab = promote_eltype(T,S)
-  c = zeros(Tab,(size(a,2),nt*np))
+  Tab = promote_type(T,S)
+  c = zeros(Tab,(size(A,1),size(B,2)))
 
-  @inbounds for ipB in 1:np
-    col = col_block[ipB]
-    @inbounds for iA in axes(a,2)
+  @inbounds for iB in axes(B,2)
+    col = b[iB]
+    @inbounds for iA in axes(A,1)
       row = a[:,iA]
       c[iA,iB] = dot(row,col)
     end
   end
 
   return c
+end
+
+function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::SparseSnapshots{S,2}) where {T,S}
+  _sparse_mul(A,B)
+end
+
+function Base.:*(A::Adjoint{T,<:SparseSnapshots{T,2}},B::SparseSnapshots{S,2}) where {T,S}
+  _sparse_mul(A,B)
+end
+
+function _sparse_mul(A::Adjoint{T,<:AbstractMatrix},B::AbstractSnapshots{S,2}) where {T,S}
+  @check size(A,2) == size(B,1)
+  A*B.data.data
+end
+
+function _sparse_mul(A::AbstractMatrix,B::AbstractSnapshots{S,2}) where {T,S}
+  @check size(A,2) == size(B,1)
+  A*B.data.data
+end
+
+function _sparse_mul(A::Adjoint{T,<:AbstractSnapshots{T,2}},B::AbstractSnapshots{S,2}) where {T,S}
+  @check size(A,2) == size(B,1)
+  a = A.parent.data
+  b = B.data
+  colptrA,rowvalA = first(a).colptr,first(a).rowval
+  colptrB,rowvalB = first(b).colptr,first(b).rowval
+  @check colptrA == colptrB && rowvalA == rowvalB
+  adjoint(a.data)*b.data
 end
 
 """

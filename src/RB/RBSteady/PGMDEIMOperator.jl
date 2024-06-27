@@ -294,7 +294,8 @@ end
 # for testing/visualization purposes
 
 function pod_mdeim_error(solver,feop,op,s)
-  pod_err = pod_error(get_trial(op),s,assemble_norm_matrix(feop))
-  mdeim_err = mdeim_error(solver,feop,op,s)
+  s′ = flatten_partition(s)
+  pod_err = pod_error(get_trial(op),s′,assemble_norm_matrix(feop))
+  mdeim_err = mdeim_error(solver,feop,op,s′)
   return pod_err,mdeim_err
 end

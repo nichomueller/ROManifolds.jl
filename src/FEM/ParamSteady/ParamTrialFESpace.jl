@@ -110,7 +110,7 @@ Arrays.evaluate(U::ParamTrialFESpace,r::Nothing) = U.space0
 
 ODEs.allocate_space(U::FESpace,r) = U
 Arrays.evaluate!(Upt::FESpace,U::FESpace,r::AbstractParamRealization) = U
-Arrays.evaluate(U::FESpace,r::AbstractParamRealization) = U
+Arrays.evaluate(U::FESpace,r) = U
 
 # Define the interface for MultiField
 

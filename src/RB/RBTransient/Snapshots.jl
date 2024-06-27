@@ -77,6 +77,7 @@ function RBSteady.Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::Transie
   TransientBasicSnapshots(s,i,r)
 end
 
+ParamDataStructures.param_data(s::TransientBasicSnapshots) = s.data
 ParamDataStructures.get_values(s::TransientBasicSnapshots) = s.data
 IndexMaps.get_index_map(s::TransientBasicSnapshots) = s.index_map
 RBSteady.get_realization(s::TransientBasicSnapshots) = s.realization
@@ -145,6 +146,7 @@ function ParamDataStructures.get_values(s::TransientSnapshots)
   return data
 end
 
+ParamDataStructures.param_data(s::TransientSnapshots) = s.data
 IndexMaps.get_index_map(s::TransientSnapshots) = s.index_map
 RBSteady.get_realization(s::TransientSnapshots) = s.realization
 
@@ -200,6 +202,7 @@ ParamDataStructures.num_times(s::TransientSnapshotsAtIndices) = length(time_indi
 RBSteady.param_indices(s::TransientSnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::TransientSnapshotsAtIndices) = length(RBSteady.param_indices(s))
 
+ParamDataStructures.param_data(s::TransientSnapshotsAtIndices) = param_data(s.snaps)
 IndexMaps.get_index_map(s::TransientSnapshotsAtIndices) = get_index_map(s.snaps)
 RBSteady.get_realization(s::TransientSnapshotsAtIndices) = get_realization(s.snaps)[s.prange,s.trange]
 
@@ -395,6 +398,7 @@ function RBSteady.flatten_snapshots(s::AbstractTransientSnapshots)
   ModeTransientSnapshots(s′)
 end
 
+ParamDataStructures.param_data(s::ModeTransientSnapshots) = param_data(s.snaps)
 RBSteady.num_space_dofs(s::ModeTransientSnapshots) = prod(num_space_dofs(s.snaps))
 ParamDataStructures.get_values(s::ModeTransientSnapshots) = get_values(s.snaps)
 RBSteady.get_realization(s::ModeTransientSnapshots) = get_realization(s.snaps)
@@ -479,63 +483,17 @@ function change_mode(a::AbstractMatrix,np::Integer)
 end
 
 function Base.:*(
-  A::Adjoint{T,<:Mode1TransientSnapshots{T,L,I,R,<:TransientBasicSnapshots}},
-  B::Mode1TransientSnapshots{T′,L′,I′,R′,<:TransientBasicSnapshots}
-  ) where {T,L,I,R,T′,L′,I′,R′}
-
-  a = A.parent.snaps.data
-  b = B.snaps.data
-  nsA = num_space_dofs(A.parent)
-  nsB = num_space_dofs(B)
-  @check nsA == nsB
-  Tab = promote_eltype(T,T′)
-  c = zeros(Tab,(size(a,2),size(B,2)))
-
-  @inbounds for iA in axes(a,2)
-    row = a[iA]
-    @inbounds for iB in axes(B,2)
-      col = b[iB]
-      c[iA,iB] = dot(row,col)
-    end
-  end
-
-  return c
-end
-
-function Base.:*(
-  A::Adjoint{T,<:AbstractMatrix},
-  B::Mode1TransientSnapshots{T′,L′,I′,R′,<:TransientBasicSnapshots}
-  ) where {T,T′,L′,I′,R′}
-
-  a = A.parent
-  b = B.snaps.data
-  @check size(a,1) == nsB
-  Tab = promote_eltype(T,T′)
-  c = zeros(Tab,(size(a,2),size(B,2)))
-
-  @inbounds for iB in axes(B,2)
-    col = b[iB]
-    @inbounds for iA in axes(a,2)
-      @fastmath iB = (itB-1)*np + ipB
-      row = a[:,iA]
-      c[iA,iB] = dot(row,col)
-    end
-  end
-
-  return c
-end
-
-function Base.:*(
   A::Adjoint{T,<:Mode1TransientSnapshots{T,L,I,R,<:TransientSnapshots}},
   B::Mode1TransientSnapshots{T′,L′,I′,R′,<:TransientSnapshots}
   ) where {T,L,I,R,T′,L′,I′,R′}
 
+  @check size(A,2) == size(B,1)
+
   a = A.parent.snaps.data
   b = B.snaps.data
-  nsA,ntA,npA = num_space_dofs(A.parent),num_times(A.parent),num_params(A.parent)
-  nsB,ntB,npB = num_space_dofs(B),num_times(B),num_params(B)
-  @check nsA == nsB
-  Tab = promote_eltype(T,T′)
+  ntA,npA = num_times(A.parent),num_params(A.parent)
+  ntB,npB = num_times(B),num_params(B)
+  Tab = promote_type(T,T′)
   c = zeros(Tab,(ntA*npA,ntB*npB))
 
   @inbounds for itA in 1:ntA
@@ -562,26 +520,17 @@ function Base.:*(
   B::Mode1TransientSnapshots{T′,L′,I′,R′,<:TransientSnapshots}
   ) where {T,T′,L′,I′,R′}
 
-  a = A.parent
-  b = B.snaps.data
-  ns,nt,np = num_space_dofs(B),num_times(B),num_params(B)
-  @check size(a,1) == ns
-  Tab = promote_eltype(T,T′)
-  c = zeros(Tab,(size(a,2),nt*np))
+  @check size(A,2) == size(B,1)
+  RBSteady._sparse_mul(A,B)
+end
 
-  @inbounds for itB in 1:nt
-    col_block = b[itB]
-    @inbounds for ipB in 1:np
-      @fastmath iB = (itB-1)*np + ipB
-      col = col_block[ipB]
-      @inbounds for iA in axes(a,2)
-        row = a[:,iA]
-        c[iA,iB] = dot(row,col)
-      end
-    end
-  end
+function Base.:*(
+  A::Adjoint{T,<:Mode1TransientSnapshots{T,L,I,R,<:TransientSparseSnapshots}},
+  B::Mode1TransientSnapshots{T′,L′,I′,R′,<:TransientSparseSnapshots}
+  ) where {T,L,I,R,T′,L′,I′,R′}
 
-  return c
+  @check size(A,2) == size(B,1)
+  RBSteady._sparse_mul(A,B)
 end
 
 # block snapshots
