@@ -69,12 +69,58 @@ function Base.materialize!(A::AbstractParamArray,B::ParamBroadcast)
   A
 end
 
-struct BlockParamBroadcast{D,N} <: AbstractArray{ParamBroadcast{D},N}
-  data::Array{ParamBroadcast{D},N}
+struct ConsecutiveParamBroadcast{D} <: AbstractParamBroadcast
+  data::D
+  plength::Int
+end
+
+# Base.axes(A::ConsecutiveParamBroadcast) = (Base.OneTo(param_length(A)),)
+
+consecutive_data(A::ConsecutiveArrayOfArrays) = A.data
+consecutive_data(A::ConsecutiveParamBroadcast) = A.data
+param_length(A::ConsecutiveParamBroadcast) = A.plength
+
+function Base.broadcasted(f,A::Union{ConsecutiveArrayOfArrays,ConsecutiveParamBroadcast}...)
+  bc = Base.broadcasted(f,map(consecutive_data,A)...)
+  plength = find_param_length(A...)
+  ConsecutiveParamBroadcast(bc,plength)
+end
+
+function Base.broadcasted(f,A::Union{ConsecutiveArrayOfArrays,ConsecutiveParamBroadcast},b::Number)
+  bc = Base.broadcasted(f,consecutive_data(A),b)
+  plength = param_length(A)
+  ConsecutiveParamBroadcast(bc,plength)
+end
+
+function Base.broadcasted(f,a::Number,B::Union{ConsecutiveArrayOfArrays,ConsecutiveParamBroadcast})
+  bc = Base.broadcasted(f,a,consecutive_data(B))
+  plength = param_length(B)
+  ConsecutiveParamBroadcast(bc,plength)
+end
+
+function Base.broadcasted(f,
+  A::Union{ConsecutiveArrayOfArrays,ConsecutiveParamBroadcast},
+  b::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}})
+  Base.broadcasted(f,A,Base.materialize(b))
+end
+
+function Base.broadcasted(
+  f,
+  a::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}},
+  B::Union{ConsecutiveArrayOfArrays,ConsecutiveParamBroadcast})
+  Base.broadcasted(f,Base.materialize(a),B)
+end
+
+function Base.materialize(B::ConsecutiveParamBroadcast)
+  ConsecutiveArrayOfArrays(Base.materialize(consecutive_data(B)))
+end
+
+struct BlockParamBroadcast{A<:AbstractParamBroadcast,N} <: AbstractArray{A,N}
+  data::Array{A,N}
 end
 
 Base.size(A::BlockParamBroadcast) = size(A.data)
-Base.getindex(A::BlockParamBroadcast{D,N},i::Vararg{Integer,N}) where {D,N} = getindex(A.data,i...)
+Base.getindex(A::BlockParamBroadcast{B,N},i::Vararg{Integer,N}) where {B,N} = getindex(A.data,i...)
 
 param_length(A::BlockParamBroadcast) = testitem(A.data)
 BlockArrays.blocks(A::BlockParamBroadcast) = A.data

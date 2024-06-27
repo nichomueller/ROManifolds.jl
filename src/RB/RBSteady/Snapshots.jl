@@ -153,8 +153,7 @@ Base.@propagate_inbounds function Base.getindex(
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
   ispace′ = s.index_map[ispace...]
-  sparam = param_getindex(s.data,iparam)
-  getindex(sparam,ispace′)
+  consecutive_getindex(s.data,ispace′,iparam)
 end
 
 Base.@propagate_inbounds function Base.setindex!(
@@ -166,8 +165,7 @@ Base.@propagate_inbounds function Base.setindex!(
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
   ispace′ = s.index_map[ispace...]
-  sparam = param_getindex(s.data,iparam)
-  setindex!(sparam,v,ispace′)
+  consecutive_setindex!(s.data,v,ispace′,iparam)
 end
 
 """
@@ -189,16 +187,7 @@ end
 param_indices(s::SnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
 ParamDataStructures.param_data(s::SnapshotsAtIndices) = param_data(s.snaps)
-
-function ParamDataStructures.get_values(s::SnapshotsAtIndices)
-  snaps = s.snaps
-  item = testitem(snaps.data)
-  data = array_of_similar_arrays(item,num_params(s))
-  @inbounds for (ip,ip′) in enumerate(param_indices(s))
-    @views data[ip] = snaps.data[ip′]
-  end
-  return data
-end
+ParamDataStructures.get_values(s::SnapshotsAtIndices) = consecutive_getindex(s.snaps.data,:,param_indices(s))
 
 get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
 
@@ -262,12 +251,12 @@ function select_snapshots_entries(s::AbstractSteadySnapshots,srange)
   T = eltype(s)
   nval = length(srange)
   np = num_params(s)
-  entries = array_of_similar_arrays(zeros(T,nval),np)
+  entries = array_of_consecutive_arrays(zeros(T,nval),np)
 
   for ip = 1:np
-    vip = entries.data[ip]
     for (i,is) in enumerate(srange)
-      vip[i] = param_getindex(s.data,ip)[is]
+      v = consecutive_getindex(s.data,is,ip)
+      consecutive_setindex!(entries,v,i,ip)
     end
   end
 
@@ -311,104 +300,32 @@ end
 const UnfoldingSteadySnapshots{T,L,I,R} = AbstractSteadySnapshots{T,2,L,1,I,R}
 const UnfoldingSparseSnapshots{T,L,I,R,A} = SparseSnapshots{T,2,L,1,I,R,A}
 
-function Base.:*(B::AbstractSnapshots,A::AbstractSnapshots)
-  @notimplemented "This operation is too expensive"
+function Base.:*(A::AbstractSnapshots{T,2},B::AbstractSnapshots{S,2}) where {T,S}
+  consecutive_mul(get_values(A),get_values(B))
 end
 
-function Base.:*(B::AbstractSnapshots,A::Adjoint{T,<:AbstractSnapshots}) where T
-  @notimplemented "This operation is too expensive"
+function Base.:*(A::AbstractSnapshots{T,2},B::Adjoint{S,<:AbstractSnapshots}) where {T,S}
+  consecutive_mul(get_values(A),adjoint(get_values(B.parent)))
 end
 
-function Base.:*(B::AbstractSnapshots,A::AbstractMatrix)
-  @notimplemented "This operation is too expensive"
+function Base.:*(A::AbstractSnapshots{T,2},B::AbstractMatrix{S}) where {T,S}
+  consecutive_mul(get_values(A),B)
 end
 
-function Base.:*(B::AbstractSnapshots,A::Adjoint{T,<:AbstractMatrix}) where T
-  @notimplemented "This operation is too expensive"
+function Base.:*(A::AbstractSnapshots{T,2},B::Adjoint{T,<:AbstractMatrix{S}}) where {T,S}
+  consecutive_mul(get_values(A),B)
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractSnapshots{T,2}},B::AbstractSnapshots{S,2}) where {T,S}
-  @check size(A,2) == size(B,1)
-
-  a = A.parent.snaps.data
-  b = B.snaps.data
-  Tab = promote_type(T,S)
-  c = zeros(Tab,(size(A,1),size(B,2)))
-
-  @inbounds for iA in axes(A,1)
-    row = a[iA]
-    @inbounds for iB in axes(B,2)
-      col = b[iB]
-      c[iA,iB] = dot(row,col)
-    end
-  end
-
-  return c
+  consecutive_mul(adjoint(get_values(A.parent)),get_values(B))
 end
 
-function Base.:*(a::AbstractMatrix{T},B::AbstractSnapshots{S,2}) where {T,S}
-  @check size(a,2) == size(B,1)
-
-  b = B.snaps.data
-  Tab = promote_type(T,S)
-  c = zeros(Tab,(size(a,1),size(B,2)))
-
-  @inbounds for iB in axes(B,2)
-    col = b[iB]
-    @inbounds for iA in axes(a,1)
-      row = a[iA,:]
-      c[iA,iB] = dot(row,col)
-    end
-  end
-
-  return c
+function Base.:*(A::AbstractMatrix{T},B::AbstractSnapshots{S,2}) where {T,S}
+  consecutive_mul(A,get_values(B))
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::AbstractSnapshots{S,2}) where {T,S}
-  @check size(A,2) == size(B,1)
-
-  a = A.parent
-  b = B.snaps.data
-  Tab = promote_type(T,S)
-  c = zeros(Tab,(size(A,1),size(B,2)))
-
-  @inbounds for iB in axes(B,2)
-    col = b[iB]
-    @inbounds for iA in axes(A,1)
-      row = a[:,iA]
-      c[iA,iB] = dot(row,col)
-    end
-  end
-
-  return c
-end
-
-function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::SparseSnapshots{S,2}) where {T,S}
-  _sparse_mul(A,B)
-end
-
-function Base.:*(A::Adjoint{T,<:SparseSnapshots{T,2}},B::SparseSnapshots{S,2}) where {T,S}
-  _sparse_mul(A,B)
-end
-
-function _sparse_mul(A::Adjoint{T,<:AbstractMatrix},B::AbstractSnapshots{S,2}) where {T,S}
-  @check size(A,2) == size(B,1)
-  A*B.data.data
-end
-
-function _sparse_mul(A::AbstractMatrix{T},B::AbstractSnapshots{S,2}) where {T,S}
-  @check size(A,2) == size(B,1)
-  A*B.data.data
-end
-
-function _sparse_mul(A::Adjoint{T,<:AbstractSnapshots{T,2}},B::AbstractSnapshots{S,2}) where {T,S}
-  @check size(A,2) == size(B,1)
-  a = A.parent.data
-  b = B.data
-  colptrA,rowvalA = first(a).colptr,first(a).rowval
-  colptrB,rowvalB = first(b).colptr,first(b).rowval
-  @check colptrA == colptrB && rowvalA == rowvalB
-  adjoint(a.data)*b.data
+  consecutive_mul(A,get_values(B))
 end
 
 """

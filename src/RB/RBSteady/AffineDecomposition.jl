@@ -115,7 +115,7 @@ function allocate_coefficient(solver::RBSolver,b::Projection)
   n = num_reduced_dofs(b)
   nparams = num_online_params(solver)
   coeffvec = allocate_vector(Vector{Float64},n)
-  coeff = array_of_similar_arrays(coeffvec,nparams)
+  coeff = array_of_consecutive_arrays(coeffvec,nparams)
   return coeff
 end
 
@@ -124,7 +124,7 @@ function allocate_result(solver::RBSolver,test::FESubspace)
   nfree_test = num_free_dofs(test)
   nparams = num_online_params(solver)
   kronprod = allocate_vector(V,nfree_test)
-  result = array_of_similar_arrays(kronprod,nparams)
+  result = array_of_consecutive_arrays(kronprod,nparams)
   return result
 end
 
@@ -134,7 +134,7 @@ function allocate_result(solver::RBSolver,trial::FESubspace,test::FESubspace)
   nfree_test = num_free_dofs(test)
   nparams = num_online_params(solver)
   kronprod = allocate_matrix(Matrix{T},nfree_test,nfree_trial)
-  result = array_of_similar_arrays(kronprod,nparams)
+  result = array_of_consecutive_arrays(kronprod,nparams)
   return result
 end
 
@@ -282,12 +282,12 @@ end
 # ONLINE PHASE
 
 function expand_cache!(a::AffineDecomposition,b::AbstractParamArray)
-  coefficient = a.coefficient
+  coeff = a.coefficient
   result = a.result
-  @check param_length(coefficient) == param_length(result)
-  param_length(coefficient) == param_length(b) && return
-  a.coefficient .= array_of_similar_arrays(testitem(coefficient),param_length(b))
-  a.result .= array_of_similar_arrays(testitem(result),param_length(b))
+  @check param_length(coeff) == param_length(result)
+  param_length(coeff) == param_length(b) && return
+  a.coefficient.data .= similar(coeff,eltype(coeff),innersize(coeff),param_length(b))
+  a.result.data .= similar(coeff,eltype(result),innersize(result),param_length(b))
 end
 
 """

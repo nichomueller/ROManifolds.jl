@@ -1,97 +1,58 @@
-using Test
-using FillArrays
-using Gridap.Helpers
-using Gridap.Fields
-using Gridap.ReferenceFEs
-using Gridap.Arrays
-using Gridap.CellData
-using Gridap.TensorValues
-using Gridap.Geometry
-using Mabla.FEM
-using Mabla.FEM.ParamDataStructures
-using Mabla.FEM.ParamFESpaces
+v = rand(100)
+pv = array_of_consecutive_zero_arrays(v,10)
 
-domain = (0,1,0,1)
-cells = (2,2)
-model = simplexify(CartesianDiscreteModel(domain,cells))
-Ω = Triangulation(model)
-dΩ = Measure(Ω,2)
+nparams = 60
+sol = solve(fesolver,feop,uh0μ;nparams)
+odesol = sol.odesol
+r = odesol.r
+μ = get_params(r)
+xh = uh0μ(μ)
+sol = odesol
 
-v = GenericCellField(get_cell_shapefuns(Ω),Ω,ReferenceDomain())
-u = GenericCellField(lazy_map(transpose,get_data(v)),Ω,ReferenceDomain())
+using Gridap.ODEs
+r = ParamDataStructures.get_at_time(r,:initial)
+cache = allocate_odecache(sol.solver,sol.odeop,r,sol.us0)
+state0,cache = ode_start(sol.solver,sol.odeop,r,sol.us0,cache)
+statef = copy.(state0)
+rf,statef,cache = ode_march!(statef,sol.solver,sol.odeop,r,state0,cache)
 
-μ = ParamRealization([[1],[2],[3]])
-μ₀ = ParamRealization([[0],[0],[0]])
-f(x,μ) = 1+sum(μ)
-f(μ) = x -> f(x,μ)
-fμ = 𝑓ₚ(f,μ)
-fμ₀ = 𝑓ₚ(f,μ₀)
+w0 = state0[1]
+odeslvrcache,odeopcache = cache
+reuse,A,b,sysslvrcache = odeslvrcache
 
-aa = ∫(fμ*u*v)*dΩ + ∫(fμ*∇(u)⋅∇(v))*dΩ
+sysslvr = fesolver.sysslvr
 
-cf1 = fμ*u
-# cf = cf1*v
-args = cf1,v
-x = CellData._get_cell_points(args...)
-ax = map(i->i(x),args)
-axi = map(first,ax)
-fi = Fields.BroadcastingFieldOpMap(*)
-r = fi(axi...)
+x = statef[1]
+fill!(x,zero(eltype(x)))
+dtθ = θ*dt
+shift!(r,dtθ)
+usx = (w0,x)
+ws = (dtθ,1)
 
-# axi1 = map(testitem,axi)
-c1 = return_cache(fi,axi...)
-evaluate!(c1,fi,axi...)
+update_odeopcache!(odeopcache,sol.odeop,r)
 
-cell_field = get_data(cf1)
-cell_point = get_data(x)
-# α = cf1(x)
-cα = return_cache(testitem(cell_field),testitem(cell_point))
+stageop = LinearParamStageOperator(sol.odeop,odeopcache,r,usx,ws,A,b,reuse,sysslvrcache)
 
-# fμ*u
-args = CellData._convert_to_cellfields(fμ,u)
-x = CellData._get_cell_points(args...)
-ax = map(i->i(x),args)
-axi = map(first,ax)
-fi = Fields.BroadcastingFieldOpMap(*)
-# r = fi(axi...)
-# cα = return_cache(fi,axi...)
-# evaluate!(cα,fi,axi...)
-A,b = axi
-c = return_cache(fi,testitem(A),b)
-cx = evaluate!(c,fi,testitem(A),b)
-cache = Vector{typeof(c)}(undef,param_length(A))
-data = Vector{typeof(cx)}(undef,param_length(A))
-@inbounds for i = param_eachindex(A)
-  cache[i] = return_cache(fi,param_getindex(A,i),b)
-end
-data = ParamArray(data)
+# sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
+using LinearAlgebra
+A = stageop.A
+numerical_setup!(sysslvrcache,A)
+b = stageop.b
+rmul!(b,-1)
+# solve!(x,sysslvrcache,b)
+ldiv!(x,sysslvrcache.factors,b)
 
-@inbounds for i = param_eachindex(A)
-  data[i] = evaluate!(cache[i],fi,param_getindex(A,i),b)
-end
+ldiv!(x.data[:,1],sysslvrcache.factors[1],b.data[:,1])
+y = view(x.data,:,1)
+ldiv!(y,sysslvrcache.factors[1],b.data[:,1])
 
-# args = CellData._convert_to_cellfields(fμ,∇(u))
-aa = fμ,∇(u)
-a1 = filter(i->isa(i,CellField),aa)
-a2 = CellData._to_common_domain(a1...)
-target_domain = DomainStyle(first(a2))
-target_trian = get_triangulation(first(a2))
-map(i->CellField(i,target_trian,target_domain),aa)
+x′ = array_of_similar_arrays(x.data[:,1],60)
+ldiv!(x′.data[1],sysslvrcache.factors[1],b.data[:,1])
 
-t1 =  @btime filter(i->isa(i,CellField),aa)
-t2 =  @btime CellData._to_common_domain(a1...)
-t3 =  @btime DomainStyle(first(a2))
-t4 =  @btime get_triangulation(first(a2))
-t5 =  @btime map(i->CellField(i,target_trian,target_domain),aa)
+# state0,cache = ode_start(sol.solver,sol.odeop,r,sol.us0,cache)
 
-# ∇(v)
-cell_∇a = lazy_map(Broadcasting(∇),get_data(v))
-if DomainStyle(v) == PhysicalDomain()
-  g = cell_∇a
-else
-  cell_map = get_cell_map(get_triangulation(v))
-  gg = lazy_map(Broadcasting(push_∇),cell_∇a,cell_map)
-end
-similar_cell_field(v,g,get_triangulation(v),DomainStyle(v))
+# statef = copy.(state0)
+# rf,statef,cache = ode_march!(statef,sol.solver,sol.odeop,r,state0,cache)
 
-# lazy_map(Broadcasting(push_∇),cell_∇a,cell_map)
+# uf = copy(first(sol.us0))
+# uf,cache = ode_finish!(uf,sol.solver,sol.odeop,r,rf,statef,cache)

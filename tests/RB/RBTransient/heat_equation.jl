@@ -105,6 +105,12 @@ average_plot(rbop,results;dir=joinpath(test_dir,"plots"))
 using Gridap
 using BenchmarkTools
 
+fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+
+
 # A = fesnaps
 # A′ = flatten_snapshots(A)
 # @btime A′*A′

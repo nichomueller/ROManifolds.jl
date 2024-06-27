@@ -21,7 +21,7 @@ function RBSteady.allocate_coefficient(
   ntime = num_times(b)
   nparams = RBSteady.num_online_params(solver)
   coeffmat = allocate_matrix(Vector{Float64},nspace,ntime)
-  coeff = array_of_similar_arrays(coeffmat,nparams)
+  coeff = array_of_consecutive_arrays(coeffmat,nparams)
   return coeff
 end
 

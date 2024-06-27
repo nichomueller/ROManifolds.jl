@@ -176,7 +176,7 @@ function Algebra.solve!(
   nonlinear_rb_solve!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,stageop,trial)
 end
 
-function ParamDataStructures.shift!(a::VectorOfVectors,r::TransientParamRealization,α::Number,β::Number)
+function ParamDataStructures.shift!(a::AbstractParamArray,r::TransientParamRealization,α::Number,β::Number)
   b = copy(a)
   np = num_params(r)
   @assert param_length(a) == param_length(r)

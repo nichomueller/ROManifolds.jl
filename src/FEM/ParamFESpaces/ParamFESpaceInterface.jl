@@ -67,7 +67,7 @@ get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(f.space)
 function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   V = get_vector_type(f.space)
   L = param_length(f)
-  typeof(array_of_similar_arrays(V(),L))
+  typeof(array_of_consecutive_arrays(V(),L))
 end
 
 function FESpaces.gather_free_and_dirichlet_values!(
@@ -122,11 +122,29 @@ function FESpaces._fill_dirichlet_values_for_tag!(
   tag,
   dirichlet_dof_to_tag)
 
+  println(typeof(dirichlet_values))
+  println(typeof(dv))
   @check param_length(dirichlet_values) == param_length(dv)
   for dof in 1:_innerlength(dv)
     if dirichlet_dof_to_tag[dof] == tag
       @inbounds for k in param_eachindex(dirichlet_values)
         dirichlet_values.data[k][dof] = dv.data[k][dof]
+      end
+    end
+  end
+end
+
+function FESpaces._fill_dirichlet_values_for_tag!(
+  dirichlet_values::ConsecutiveVectorOfVectors,
+  dv::ConsecutiveVectorOfVectors,
+  tag,
+  dirichlet_dof_to_tag)
+
+  @check param_length(dirichlet_values) == param_length(dv)
+  for dof in 1:_innerlength(dv)
+    if dirichlet_dof_to_tag[dof] == tag
+      @inbounds for k in param_eachindex(dirichlet_values)
+        dirichlet_values.data[dof,k] = dv.data[dof,k]
       end
     end
   end
@@ -152,6 +170,34 @@ function FESpaces._free_and_dirichlet_values_fill!(
           free_vals.data[k][dof] = val
         elseif dof < 0
           dirichlet_vals.data[k][-dof] = val
+        else
+          @unreachable "dof ids either positive or negative, not zero"
+        end
+      end
+    end
+  end
+end
+
+function FESpaces._free_and_dirichlet_values_fill!(
+  free_vals::ConsecutiveVectorOfVectors,
+  dirichlet_vals::ConsecutiveVectorOfVectors,
+  cache_vals,
+  cache_dofs,
+  cell_vals,
+  cell_dofs,
+  cells)
+
+  @check param_length(free_vals) == param_length(dirichlet_vals)
+  for cell in cells
+    vals = getindex!(cache_vals,cell_vals,cell)
+    dofs = getindex!(cache_dofs,cell_dofs,cell)
+    for (i,dof) in enumerate(dofs)
+      @inbounds for k in param_eachindex(dirichlet_vals)
+        val = vals.data[k][i]
+        if dof > 0
+          free_vals.data[dof,k] = val
+        elseif dof < 0
+          dirichlet_vals.data[-dof,k] = val
         else
           @unreachable "dof ids either positive or negative, not zero"
         end

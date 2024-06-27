@@ -190,17 +190,13 @@ function _select_cache_at_time_locations(cache::TupOfArrayContribution,indices)
   return red_cache
 end
 
-function _select_indices_at_time_locations(red_times;nparams=1)
-  vec(transpose((red_times.-1)*nparams .+ collect(1:nparams)'))
-end
-
 function _select_fe_quantities_at_time_locations(cache,a,r,us,odeopcache)
   # common temporal reduced integration domain
   red_times = union_reduced_times(a)
   red_r = r[:,red_times]
   # indices corresponding to the newly found temporal reduced integration domain,
   # for every parameter
-  indices = _select_indices_at_time_locations(red_times;nparams=num_params(r))
+  indices = _param_time_range(collect(1:num_params(r)),red_times,num_params(r))
   # returns the cache in the appropriate time-parameter locations
   red_cache = _select_cache_at_time_locations(cache,indices)
   # does the same with the stage variable `us` and the ode cache `odeopcache`
