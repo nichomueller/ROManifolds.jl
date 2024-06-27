@@ -52,7 +52,7 @@ num_reduced_times(r::AbstractTransientRBSpace) = num_reduced_times(r.basis)
 
 function FESpaces.get_vector_type(r::AbstractTransientRBSpace)
   change_length(x) = x
-  change_length(::Type{VectorOfVectors{T,L}}) where {T,L} = VectorOfVectors{T,Int(L/num_times(r))}
+  change_length(::Type{ConsecutiveVectorOfVectors{T,L}}) where {T,L} = ConsecutiveVectorOfVectors{T,Int(L/num_times(r))}
   change_length(::Type{<:BlockVectorOfVectors{T,L}}) where {T,L} = BlockVectorOfVectors{T,Int(L/num_times(r))}
   V = get_vector_type(r.space)
   newV = change_length(V)

@@ -56,6 +56,21 @@ function array_of_zero_arrays(a,plength::Integer)
 end
 
 """
+    array_of_consecutive_arrays(a,plength::Integer) -> AbstractArray{typeof(a),ndims(a)}
+
+Like [`array_of_similar_arrays`](@ref), but the result has entries stored in
+consecutive memory cells
+
+"""
+array_of_consecutive_arrays(a,plength::Integer) = @abstractmethod
+
+function array_of_consecutive_zero_arrays(a,plength::Integer)
+  A = array_of_consecutive_arrays(a,plength)
+  fill!(A,zero(eltype(a)))
+  return A
+end
+
+"""
     to_param_quantity(a,plength::Integer) -> Any
 
 Returns a quantity with parametric length `plength` from `a`. When `a` already
@@ -157,6 +172,10 @@ Base.getindex(a::ParamNumber,i::Integer) = getindex(a.data,i)
 Base.setindex!(a::ParamNumber,v,i::Integer) = setindex!(a.data,v,i)
 
 function array_of_similar_arrays(a::Union{Number,AbstractArray{<:Number,0}},l::Integer)
+  ParamNumber(fill(zero(eltype(a)),l))
+end
+
+function array_of_consecutive_arrays(a::Union{Number,AbstractArray{<:Number,0}},l::Integer)
   ParamNumber(fill(zero(eltype(a)),l))
 end
 

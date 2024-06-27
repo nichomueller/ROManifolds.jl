@@ -2,11 +2,11 @@ eltype2(x) = eltype(eltype(x))
 
 function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamContainer
   vector = zeros(eltype2(V),n)
-  array_of_zero_arrays(vector,param_length(V))
+  array_of_consecutive_arrays(vector,param_length(V))
 end
 
 function Algebra.allocate_vector(::Type{<:BlockVectorOfVectors{T,L}},indices::BlockedUnitRange) where {T,L}
-  V = VectorOfVectors{T,L}
+  V = ConsecutiveVectorOfVectors{T,L}
   mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
 end
 
@@ -16,7 +16,7 @@ function Algebra.allocate_in_range(::Type{V},matrix) where V<:AbstractParamConta
 end
 
 function Algebra.allocate_in_range(matrix::AbstractParamMatrix)
-  V = VectorOfVectors{T,L}
+  V = ConsecutiveVectorOfVectors{T,L}
   allocate_in_range(V,matrix)
 end
 
@@ -31,7 +31,7 @@ function Algebra.allocate_in_domain(::Type{V},matrix) where V<:AbstractParamCont
 end
 
 function Algebra.allocate_in_domain(matrix::AbstractParamMatrix)
-  V = VectorOfVectors{T,L}
+  V = ConsecutiveVectorOfVectors{T,L}
   allocate_in_domain(V,matrix)
 end
 
@@ -147,7 +147,7 @@ function Algebra.allocate_coo_vectors(::Type{T},n::Integer) where {Tv,Ti,T<:Matr
   I = zeros(Ti,n)
   J = zeros(Ti,n)
   V = zeros(Tv,n)
-  PV = array_of_similar_arrays(V,param_length(T))
+  PV = array_of_consecutive_arrays(V,param_length(T))
   I,J,PV
 end
 
@@ -213,7 +213,7 @@ end
 function Algebra.nz_allocation(a::Algebra.ArrayCounter{T}) where T<:AbstractParamVector
   S = eltype(T)
   v = similar(S,map(length,a.axes))
-  array_of_zero_arrays(v,param_length(T))
+  array_of_consecutive_arrays(v,param_length(T))
 end
 
 function Algebra.nz_allocation(a::ParamCounter{C,L}) where {C,L}
@@ -226,7 +226,9 @@ function ParamInserter(inserter,L::Integer)
 end
 
 function ParamInserter(inserter::Algebra.InserterCSC,L::Integer)
-  ParamInserterCSC(inserter,Val{L}())
+  @unpack nrows,ncols,colptr,colnnz,rowval,nzval = inserter
+  pnzval = array_of_consecutive_arrays(nzval,L)
+  ParamInserterCSC(nrows,ncols,colptr,colnnz,rowval,pnzval)
 end
 
 """
@@ -244,12 +246,6 @@ struct ParamInserterCSC{Tv,Ti}
   colnnz::Vector{Ti}
   rowval::Vector{Ti}
   nzval::Tv
-  function ParamInserterCSC(inserter::Algebra.InserterCSC{Tv′,Ti},::Val{L}) where {Tv′,Ti,L}
-    @unpack nrows,ncols,colptr,colnnz,rowval,nzval = inserter
-    pnzval = array_of_similar_arrays(nzval,L)
-    Tv = typeof(pnzval)
-    new{Tv,Ti}(nrows,ncols,colptr,colnnz,rowval,pnzval)
-  end
 end
 
 Algebra.LoopStyle(::Type{<:ParamInserterCSC}) = Loop()
@@ -291,7 +287,7 @@ end
     a.colnnz[j] += 1
     a.rowval[p] = i
     @inbounds for l = param_eachindex(Tv)
-      a.nzval.data[l][p] = v[l]
+      a.nzval.data[p,l] = v[l]
     end
   elseif a.rowval[p] != i
     # shift one forward from p to pend
@@ -300,14 +296,14 @@ end
       o = k + 1
       a.rowval[o] = a.rowval[k]
       @inbounds for l = param_eachindex(Tv)
-        a.nzval[l][o] = a.nzval[l][k]
+        a.nzval[o,l] = a.nzval[k,l]
       end
     end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
     @inbounds for l = param_eachindex(Tv)
-      a.nzval[l][p] = v[l]
+      a.nzval[p,l] = v[l]
     end
   else
     # update existing entry
@@ -325,7 +321,7 @@ function Algebra.create_from_nz(a::ParamInserterCSC{Tv}) where Tv
     pend = pini + Int(a.colnnz[j]) - 1
     for p in pini:pend
       @inbounds for l = param_eachindex(Tv)
-        a.nzval[l][k] = a.nzval[l][p]
+        a.nzval[k,l] = a.nzval[p,l]
       end
       a.rowval[k] = a.rowval[p]
       k += 1
@@ -338,8 +334,5 @@ function Algebra.create_from_nz(a::ParamInserterCSC{Tv}) where Tv
   nnz = a.colptr[end]-1
   resize!(a.rowval,nnz)
 
-  param_array(param_data(a.nzval)) do v
-    resize!(v,nnz)
-    SparseMatrixCSC(a.nrows,a.ncols,a.colptr,a.rowval,v)
-  end
+  MatrixOfSparseMatricesCSC(a.nrows,a.ncols,a.colptr,a.rowval,a.nzval)
 end

@@ -396,7 +396,7 @@ function _sparse_mul(A::Adjoint{T,<:AbstractMatrix},B::AbstractSnapshots{S,2}) w
   A*B.data.data
 end
 
-function _sparse_mul(A::AbstractMatrix,B::AbstractSnapshots{S,2}) where {T,S}
+function _sparse_mul(A::AbstractMatrix{T},B::AbstractSnapshots{S,2}) where {T,S}
   @check size(A,2) == size(B,1)
   A*B.data.data
 end

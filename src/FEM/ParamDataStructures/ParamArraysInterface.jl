@@ -68,6 +68,10 @@ function array_of_similar_arrays(a::AbstractArray{<:Number},l::Integer)
   ParamArray([similar(a) for _ = 1:l])
 end
 
+function array_of_consecutive_arrays(a::AbstractArray{<:Number},l::Integer)
+  ConsecutiveArrayOfArrays(similar(a,eltype(a),size(a)...,l))
+end
+
 to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
 
 Base.:(==)(A::AbstractParamArray,B::AbstractParamArray) = all(param_data(A) .== param_data(B))

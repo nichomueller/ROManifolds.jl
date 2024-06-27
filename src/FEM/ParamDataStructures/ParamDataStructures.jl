@@ -77,6 +77,11 @@ export VectorOfVectors
 export MatrixOfMatrices
 include("ArrayOfArrays.jl")
 
+export ConsecutiveArrayOfArrays
+export ConsecutiveVectorOfVectors
+export ConsecutiveMatrixOfMatrices
+include("ConsecutiveArrayOfArrays.jl")
+
 export MatrixOfSparseMatricesCSC
 export recast
 include("MatrixOfSparseMatrices.jl")
