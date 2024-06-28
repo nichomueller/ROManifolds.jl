@@ -66,6 +66,7 @@ include("ParamField.jl")
 export AbstractParamArray
 export AbstractParamVector
 export AbstractParamMatrix
+export ParamSparseMatrix
 export ParamArray
 export param_array
 export array_of_similar_arrays

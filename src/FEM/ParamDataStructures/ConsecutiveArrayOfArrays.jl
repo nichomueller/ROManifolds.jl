@@ -15,6 +15,10 @@ struct ConsecutiveArrayOfArrays{T,N,L,M,P<:AbstractArray{T,M}} <: ParamArray{T,N
   end
 end
 
+function ConsecutiveArrayOfArrays(data::AbstractArray{<:AbstractArray})
+  ConsecutiveArrayOfArrays(stack(data))
+end
+
 const ConsecutiveVectorOfVectors{T,L} = ConsecutiveArrayOfArrays{T,1,L,2,Array{T,2}}
 const ConsecutiveMatrixOfMatrices{T,L} = ConsecutiveArrayOfArrays{T,2,L,3,Array{T,3}}
 
@@ -67,6 +71,14 @@ end
 
 Base.:(==)(A::ConsecutiveArrayOfArrays,B::ConsecutiveArrayOfArrays) = A.data == B.data
 Base.:(≈)(A::ConsecutiveArrayOfArrays,B::ConsecutiveArrayOfArrays) = A.data ≈ B.data
+
+function (+)(A::ConsecutiveArrayOfArrays,B::ConsecutiveArrayOfArrays)
+  (+)(A.data,B.data)
+end
+
+function (-)(A::ConsecutiveArrayOfArrays,B::ConsecutiveArrayOfArrays)
+  (-)(A.data,B.data)
+end
 
 function (+)(A::ConsecutiveArrayOfArrays{T,N},b::AbstractArray{<:Number}) where {T,N}
   B = copy(A.data)

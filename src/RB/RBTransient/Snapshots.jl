@@ -215,7 +215,8 @@ function ParamDataStructures.get_values(
   trange = time_indices(s)
   np = num_params(s)
   ptrange = _param_time_range(prange,trange,np)
-  return consecutive_getindex(s.snaps.data,:,ptrange)
+  v = consecutive_getindex(s.snaps.data,:,ptrange)
+  ConsecutiveArrayOfArrays(v)
 end
 
 function ParamDataStructures.get_values(
@@ -413,7 +414,6 @@ get_mode(s::ModeTransientSnapshots) = s.mode
 function RBSteady.select_snapshots_entries(s::UnfoldingTransientSnapshots,srange,trange)
   _getindex(s::TransientBasicSnapshots,is,it,ip) = consecutive_getindex(s.data,is,ip+(it-1)*num_params(s))
   _getindex(s::TransientSnapshots,is,it,ip) = consecutive_getindex(s.data[it],is,ip)
-
 
   T = eltype(s)
   nval = length(srange),length(trange)

@@ -110,30 +110,58 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-
 # A = fesnaps
 # A′ = flatten_snapshots(A)
 # @btime A′*A′
 # B = copy(A′)
 # @btime B'*B
 
-A = fesnaps
-A′ = flatten_snapshots(A)
-B = copy(A′)
+using Gridap.ODEs
+using Gridap.FESpaces
+son = select_snapshots(fesnaps,RBSteady.online_params(rbsolver))
+r = get_realization(son)
+op = rbop
+fesolver = get_fe_solver(rbsolver)
+red_trial = get_trial(op)(r)
+fe_trial = get_fe_trial(op)(r)
+x̂ = zero_free_values(red_trial)
+y = zero_free_values(fe_trial)
+odecache = allocate_odecache(fesolver,op,r,(y,))
+# solve!((x̂,),fesolver,op,r,(y,),odecache)
 
-A′'*A′ ≈ B'*B
-ϕ = rand(647,10)
-ϕ'*A′ ≈ ϕ'*B
-ϕ = rand(10,647)
-ϕ*A′ ≈ ϕ*B
+sysslvr = fesolver.sysslvr
+odeslvrcache,odeopcache = odecache
+reuse,A,b,sysslvrcache = odeslvrcache
 
-using BenchmarkTools
-r = realization(ptspace;nparams=10)
+# stageop = get_stage_operator(fesolver,op,r,(y,),odecache)
+using Gridap.Algebra
+ws = (1,1/(dt*θ))
+red_cache,red_r,red_times,red_us,red_odeopcache = RBTransient._select_fe_quantities_at_time_locations(
+  A,rbop.lhs,r,(y,y),odeopcache)
+A = jacobian!(red_cache,rbop.op,red_r,red_us,ws,red_odeopcache)
+s = A[1][1]
+ad = rbop.lhs[1][1]
 
-N = 100000 # (100,1000,10000)
-i = TrivialIndexMap(collect(1:N))
-data = ArrayOfArrays([rand(N) for _ = 1:100])
-s = flatten_snapshots(Snapshots(data,i,r))
-@benchmark s'*s
-A′ = copy(s)
-@benchmark A′'*A′
+ids_space = RBSteady.get_indices_space(ad)
+ids_time::Vector{Int} = RBTransient._time_locations(ad,red_times)
+# select_snapshots_entries(s,ids_space,ids_time)
+_getindex(s::TransientBasicSnapshots,is,it,ip) = consecutive_getindex(s.data,is,ip+(it-1)*num_params(s))
+_getindex(s::TransientSnapshots,is,it,ip) = consecutive_getindex(s.data[it],is,ip)
+
+T = eltype(s)
+nval = length(ids_space),length(ids_time)
+np = num_params(s)
+entries = array_of_consecutive_arrays(zeros(T,nval),np)
+
+@inbounds for ip = 1:np, (i,it) = enumerate(ids_time)
+  ipt = ip+(it-1)*num_params(s)
+  v = _getindex(s,ids_space,it,ip)
+  consecutive_setindex!(entries,v,:,ipt)
+end
+# op = TransientPGOperator(get_algebraic_operator(feop),red_trial,red_test)
+# jjac,rres = jacobian_and_residual(rbsolver,op,smdeim)
+# AA = jjac[1][1]
+
+# ispace,itime,iparam = 2,1,1
+# ispace′ = AA.index_map[2]
+# consecutive_getindex(AA.data,ispace′,1)

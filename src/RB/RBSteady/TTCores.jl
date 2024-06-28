@@ -55,13 +55,13 @@ Base.size(a::SparseCoreCSC) = (size(a.array,1),IndexMaps.num_rows(a.sparsity),
 
 function Base.getindex(a::SparseCoreCSC,i::Vararg{Integer,4})
   if CartesianIndex(i[2:3]) ∈ a.sparse_indexes
-    sparse_getindex(a,i)
+    core_getindex(a,i)
   else
     zero(eltype(a))
   end
 end
 
-function sparse_getindex(a::SparseCoreCSC{T},i::Vararg{Integer,4}) where T
+function core_getindex(a::SparseCoreCSC{T},i::Vararg{Integer,4}) where T
   i2 = findfirst(a.sparse_indexes .== [CartesianIndex(i[2:3])])
   i1,i3 = i[1],i[4]
   getindex(a.array,i1,i2,i3)
@@ -140,13 +140,13 @@ Base.size(a::MultiValueSparseCoreCSC) = (size(a.array,1),IndexMaps.num_rows(a.sp
 
 function Base.getindex(a::MultiValueSparseCoreCSC,i::Vararg{Integer,5})
   if CartesianIndex(i[2:3]) ∈ a.sparse_indexes
-    sparse_getindex(a,i)
+    core_getindex(a,i)
   else
     zero(eltype(a))
   end
 end
 
-function sparse_getindex(a::MultiValueSparseCoreCSC{T},i::Vararg{Integer,5}) where T
+function core_getindex(a::MultiValueSparseCoreCSC{T},i::Vararg{Integer,5}) where T
   i2 = findfirst(a.sparse_indexes .== [CartesianIndex(i[2:3])])
   i1,i3,i4 = i[1],i[5]
   getindex(a.array,i1,i2,i3,i4)

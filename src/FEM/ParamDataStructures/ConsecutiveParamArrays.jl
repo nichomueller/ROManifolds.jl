@@ -1,15 +1,15 @@
 const ConsecutiveParamArrays{T} = Union{ConsecutiveArrayOfArrays{T},MatrixOfSparseMatricesCSC{T}}
 
 Base.@propagate_inbounds function consecutive_getindex(A::ConsecutiveParamArrays,i...)
-  ConsecutiveArrayOfArrays(A.data[i...])
-end
-
-Base.@propagate_inbounds function consecutive_getindex(A::ConsecutiveParamArrays,i::Integer...)
   A.data[i...]
 end
 
 Base.@propagate_inbounds function consecutive_setindex!(A::ConsecutiveParamArrays,v,i...)
   A.data[i...] = v
+end
+
+Base.@propagate_inbounds function consecutive_getindex(A::MatrixOfSparseMatricesCSC,i,j::Integer)
+  param_getindex(A,j)[i]
 end
 
 function consecutive_mul(A::AbstractArray,B::AbstractArray)

@@ -50,6 +50,7 @@ RaRb × CaCb, can be indexed as AB[i,j] = A[slow_index(i,RbCb)] * B[fast_index(i
 
 """
 @inline slow_index(i,nfast::Integer) = cld.(i,nfast)
+@inline slow_index(i::Integer,nfast::Integer) = cld(i,nfast)
 @inline slow_index(i::Colon,::Integer) = i
 
 """
@@ -61,6 +62,7 @@ RaRb × CaCb, can be indexed as AB[i,j] = A[slow_index(i,RbCb)] * B[fast_index(i
 
 """
 @inline fast_index(i,nfast::Integer) = mod.(i .- 1,nfast) .+ 1
+@inline fast_index(i::Integer,nfast::Integer) = mod(i - 1,nfast) + 1
 @inline fast_index(i::Colon,::Integer) = i
 
 """

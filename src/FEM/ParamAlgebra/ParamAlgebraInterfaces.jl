@@ -187,7 +187,7 @@ function Algebra.finalize_coo!(::Type{T},I,J,V::AbstractParamArray,m,n) where T<
   @notimplemented
 end
 
-function Algebra.nz_index(A::MatrixOfSparseMatricesCSC,i0,i1)
+Base.@propagate_inbounds function Algebra.nz_index(A::MatrixOfSparseMatricesCSC,i0::Integer,i1::Integer)
   if !(1 <= i0 <= innersize(A,1) && 1 <= i1 <= innersize(A,2)); throw(BoundsError()); end
   ptrs = SparseArrays.getcolptr(A)
   r1 = Int(ptrs[i1])

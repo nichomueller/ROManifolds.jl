@@ -132,17 +132,18 @@ function _select_fe_space_at_time_locations(fs::TrivialParamFESpace,indices)
 end
 
 function _select_fe_space_at_time_locations(fs::SingleFieldParamFESpace,indices)
-  dvi = ParamArray(fs.dirichlet_values.data[indices])
+  dvi = ConsecutiveArrayOfArrays(fs.dirichlet_values.data[:,indices])
   TrialParamFESpace(dvi,fs.space)
 end
 
-function _select_odecache_at_time_locations(us::Tuple{Vararg{AbstractParamVector}},odeopcache,indices)
+function _select_odecache_at_time_locations(us::Tuple{Vararg{ConsecutiveArrayOfArrays}},odeopcache,indices)
   @unpack Us,Uts,tfeopcache,const_forms = odeopcache
   new_xhF = ()
   new_Us = ()
   for i = eachindex(us)
     new_Us = (new_Us...,_select_fe_space_at_time_locations(Us[i],indices))
-    new_xhF = (new_xhF...,ParamArray(us[i].data[indices]))
+    new_XhF_i = ConsecutiveArrayOfArrays(us[i].data[:,indices])
+    new_xhF = (new_xhF...,new_XhF_i)
   end
   new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_odeopcache
@@ -158,14 +159,15 @@ function _select_odecache_at_time_locations(us::Tuple{Vararg{BlockVectorOfVector
     style = spacei.multi_field_style
     spacesi = [_select_fe_space_at_time_locations(spaceij,indices) for spaceij in spacei]
     new_Us = (new_Us...,MultiFieldFESpace(VT,spacesi,style))
-    new_xhF = (new_xhF...,mortar([ParamArray(us_i.data[indices]) for us_i in blocks(us[i])]))
+    new_XhF_i = mortar([ConsecutiveArrayOfArrays(us_i.data[:,indices]) for us_i in blocks(us[i])])
+    new_xhF = (new_xhF...,new_XhF_i)
   end
   new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_odeopcache
 end
 
-function _select_cache_at_time_locations(b::ArrayOfArrays,indices)
-  ArrayOfArrays(b.data[indices])
+function _select_cache_at_time_locations(b::ConsecutiveArrayOfArrays,indices)
+  ConsecutiveArrayOfArrays(b.data[:,indices])
 end
 
 function _select_cache_at_time_locations(A::MatrixOfSparseMatricesCSC,indices)

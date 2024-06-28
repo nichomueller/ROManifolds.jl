@@ -133,7 +133,7 @@ function RBSteady.compress(A::AbstractMatrix,r::TransientRBSpace)
   return v
 end
 
-function RBSteady.compress(A::MatrixOfSparseMatricesCSC,trial::TransientPODBasis,test::TransientPODBasis;combine=(x,y)->x)
+function RBSteady.compress(A::ParamSparseMatrix,trial::TransientPODBasis,test::TransientPODBasis;combine=(x,y)->x)
   function compress_basis_space(A,B,C)
     map(param_data(A)) do a
       C'*a*B

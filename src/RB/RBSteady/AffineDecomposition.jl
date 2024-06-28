@@ -25,10 +25,8 @@ function empirical_interpolation(A::AbstractMatrix)
   return I,Ai
 end
 
-function empirical_interpolation(A::MatrixOfSparseMatricesCSC)
-  I,Ai = empirical_interpolation(A.data)
-  I′ = recast_indices(I,param_getindex(A,1))
-  return I′,Ai
+function empirical_interpolation(A::ParamSparseMatrix)
+  empirical_interpolation(A.data)
 end
 
 """
@@ -73,6 +71,7 @@ end
 function get_reduced_cells(
   trian::Triangulation,
   ids::AbstractVector,
+  b::AbstractMatrix,
   test::FESpace)
 
   cell_dof_ids = get_cell_dof_ids(test,trian)
@@ -84,24 +83,26 @@ end
 function get_reduced_cells(
   trian::Triangulation,
   ids::AbstractVector,
+  b::ParamSparseMatrix,
   trial::FESpace,
   test::FESpace)
 
+  ids′ = recast_indices(ids,param_getindex(b,1))
   cell_dof_ids_trial = get_cell_dof_ids(trial,trian)
   cell_dof_ids_test = get_cell_dof_ids(test,trian)
-  # indices_space_cols = slow_index(ids,num_free_dofs(trial))
-  indices_space_cols = slow_index(ids,num_free_dofs(test))
-  indices_space_rows = fast_index(ids,num_free_dofs(test))
+  indices_space_cols = slow_index(ids′,num_free_dofs(test))
+  indices_space_rows = fast_index(ids′,num_free_dofs(test))
   red_integr_cells_trial = get_reduced_cells(cell_dof_ids_trial,indices_space_cols)
   red_integr_cells_test = get_reduced_cells(cell_dof_ids_test,indices_space_rows)
   red_integr_cells = union(red_integr_cells_trial,red_integr_cells_test)
   return red_integr_cells
 end
 
-function reduce_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,r::FESubspace...)
+function reduce_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,b::Projection,r::FESubspace...)
   f = map(get_space,r)
   indices_space = get_indices_space(i)
-  red_integr_cells = get_reduced_cells(trian,indices_space,f...)
+  basis_space = get_basis_space(b)
+  red_integr_cells = get_reduced_cells(trian,indices_space,basis_space,f...)
   red_trian = view(trian,red_integr_cells)
   return red_trian
 end
@@ -218,7 +219,7 @@ function reduced_form(
   basis = reduced_basis(s;ϵ=get_tol(solver))
   lu_interp,integration_domain = mdeim(mdeim_style,basis)
   proj_basis = reduce_operator(mdeim_style,basis,args...;kwargs...)
-  red_trian = reduce_triangulation(trian,integration_domain,args...)
+  red_trian = reduce_triangulation(trian,integration_domain,basis,args...)
   coefficient = allocate_coefficient(solver,basis)
   result = allocate_result(solver,args...)
   ad = AffineDecomposition(proj_basis,lu_interp,integration_domain,coefficient,result)
@@ -496,7 +497,7 @@ function compress(A::AbstractMatrix,r::RBSpace)
   return v
 end
 
-function compress(A::MatrixOfSparseMatricesCSC,trial::RBSpace,test::RBSpace)
+function compress(A::ParamSparseMatrix,trial::RBSpace,test::RBSpace)
   basis_space_test = get_basis_space(test)
   basis_space_trial = get_basis_space(trial)
   s_proj_a = basis_space_test'*param_getindex(A,1)*basis_space_trial

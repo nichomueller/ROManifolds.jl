@@ -242,7 +242,7 @@ function FESpaces.FEFunction(
     return _fv,_dv
   end |> tuple_of_arrays
   f′ = TrivialParamFESpace(zf.space,param_length(f))
-  FEFunction(f′,ParamArray(fv),ParamArray(dv))
+  FEFunction(f′,ConsecutiveArrayOfArrays(fv),ConsecutiveArrayOfArrays(dv))
 end
 
 function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:ZeroMeanFESpace},free_values)
@@ -307,7 +307,7 @@ function FESpaces.scatter_free_and_dirichlet_values(
     return _fv,_dv
   end |> tuple_of_arrays
   f′ = TrivialParamFESpace(ff.space,param_length(f))
-  scatter_free_and_dirichlet_values(f′,ParamArray(fv),ParamArray(dv))
+  scatter_free_and_dirichlet_values(f′,ConsecutiveArrayOfArrays(fv),ConsecutiveArrayOfArrays(dv))
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(

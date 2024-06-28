@@ -187,7 +187,11 @@ end
 param_indices(s::SnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
 ParamDataStructures.param_data(s::SnapshotsAtIndices) = param_data(s.snaps)
-ParamDataStructures.get_values(s::SnapshotsAtIndices) = consecutive_getindex(s.snaps.data,:,param_indices(s))
+
+function ParamDataStructures.get_values(s::SnapshotsAtIndices)
+  v = consecutive_getindex(s.snaps.data,:,param_indices(s))
+  ConsecutiveArrayOfArrays(v)
+end
 
 get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
 
