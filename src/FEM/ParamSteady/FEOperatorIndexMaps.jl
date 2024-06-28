@@ -64,7 +64,7 @@ a SparseIndexMap is returned
 """
 function get_matrix_index_map(trial::FESpace,test::FESpace)
   sparsity = get_sparsity(trial,test)
-  TrivialIndexMap(get_nonzero_indices(sparsity))
+  TrivialIndexMap(LinearIndices((nnz(sparsity),)))
 end
 
 function get_matrix_index_map(trial::TProductFESpace,test::TProductFESpace)

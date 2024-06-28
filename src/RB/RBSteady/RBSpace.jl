@@ -138,7 +138,7 @@ end
 
 function Arrays.evaluate!(cache,k::RecastMap,x::AbstractParamVector,r::RBSpace)
   @inbounds for ip in eachindex(x)
-    cache[ip] .= recast(x[ip],r.basis)
+    cache[ip] = recast(x[ip],r.basis)
   end
 end
 

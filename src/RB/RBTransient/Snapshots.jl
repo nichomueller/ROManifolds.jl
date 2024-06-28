@@ -285,28 +285,6 @@ function RBSteady.select_snapshots(s::AbstractTransientSnapshots,prange;trange=B
   select_snapshots(s,trange,prange)
 end
 
-function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange)
-  _getindex(s::TransientBasicSnapshots,is,it,ip) = consecutive_getindex(s.data,is,ip+(it-1)*num_params(s))
-  _getindex(s::TransientSnapshots,is,it,ip) = consecutive_getindex(s.data[it],is,ip)
-
-  @assert length(srange) == length(trange)
-
-  T = eltype(s)
-  nval = length(srange)
-  np = num_params(s)
-  entries = array_of_consecutive_arrays(zeros(T,nval),np)
-
-  for ip = 1:np
-    for (i,(is,it)) in enumerate(zip(srange,trange))
-      ipt = ip+(it-1)*num_params(s)
-      v = _getindex(s,is,it,ip)
-      consecutive_setindex!(entries,v,is,ipt)
-    end
-  end
-
-  return entries
-end
-
 const MultiValueTransientBasicSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = TransientBasicSnapshots{T,N,L,D,I,R,A}
 const MultiValueTransientSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = TransientSnapshots{T,N,L,D,I,R,A}
 const MultiValueTransientSnapshotsAtIndices{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A,B} = TransientSnapshotsAtIndices{T,N,L,D,I,R,A,B}
@@ -344,6 +322,28 @@ function ParamDataStructures.recast(s::TransientSparseSnapshots,a::AbstractVecto
   ls = IndexMaps.get_univariate_sparsity(index_map)
   asparse = map(SparseCore,a,ls)
   return asparse
+end
+
+function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange)
+  _getindex(s::TransientBasicSnapshots,is,it,ip) = consecutive_getindex(s.data,is,ip+(it-1)*num_params(s))
+  _getindex(s::TransientSnapshots,is,it,ip) = consecutive_getindex(s.data[it],is,ip)
+  _getindex(s::TransientSparseSnapshots,is,it,ip) = param_getindex(s.data,ip+(it-1)*num_params(s))[is]
+
+  @assert length(srange) == length(trange)
+
+  T = eltype(s)
+  nval = length(srange)
+  np = num_params(s)
+  entries = array_of_consecutive_arrays(zeros(T,nval),np)
+
+  for ip = 1:np
+    for (i,(is,it)) in enumerate(zip(srange,trange))
+      v = _getindex(s,is,it,ip)
+      consecutive_setindex!(entries,v,:,ip)
+    end
+  end
+
+  return entries
 end
 
 """
@@ -414,6 +414,7 @@ get_mode(s::ModeTransientSnapshots) = s.mode
 function RBSteady.select_snapshots_entries(s::UnfoldingTransientSnapshots,srange,trange)
   _getindex(s::TransientBasicSnapshots,is,it,ip) = consecutive_getindex(s.data,is,ip+(it-1)*num_params(s))
   _getindex(s::TransientSnapshots,is,it,ip) = consecutive_getindex(s.data[it],is,ip)
+  _getindex(s::TransientSparseSnapshots,is,it,ip) = param_getindex(s.data,ip+(it-1)*num_params(s))[is]
 
   T = eltype(s)
   nval = length(srange),length(trange)
@@ -423,7 +424,7 @@ function RBSteady.select_snapshots_entries(s::UnfoldingTransientSnapshots,srange
   @inbounds for ip = 1:np, (i,it) = enumerate(trange)
     ipt = ip+(it-1)*num_params(s)
     v = _getindex(s,srange,it,ip)
-    consecutive_setindex!(entries,v,:,ipt)
+    consecutive_setindex!(entries,v,:,i,ip)
   end
 
   return entries

@@ -73,11 +73,13 @@ Base.:(==)(A::ConsecutiveArrayOfArrays,B::ConsecutiveArrayOfArrays) = A.data == 
 Base.:(≈)(A::ConsecutiveArrayOfArrays,B::ConsecutiveArrayOfArrays) = A.data ≈ B.data
 
 function (+)(A::ConsecutiveArrayOfArrays,B::ConsecutiveArrayOfArrays)
-  (+)(A.data,B.data)
+  AB = (+)(A.data,B.data)
+  ConsecutiveArrayOfArrays(AB)
 end
 
 function (-)(A::ConsecutiveArrayOfArrays,B::ConsecutiveArrayOfArrays)
-  (-)(A.data,B.data)
+  AB = (-)(A.data,B.data)
+  ConsecutiveArrayOfArrays(AB)
 end
 
 function (+)(A::ConsecutiveArrayOfArrays{T,N},b::AbstractArray{<:Number}) where {T,N}

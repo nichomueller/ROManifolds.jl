@@ -242,31 +242,6 @@ function select_snapshots(s::AbstractSteadySnapshots,prange)
   SnapshotsAtIndices(s,prange)
 end
 
-"""
-    select_snapshots_entries(s::AbstractSteadySnapshots,srange) -> ArrayOfArrays
-    select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange) -> ArrayOfArrays
-
-Selects the snapshots' entries corresponding to the spatial range `srange` in
-steady cases, to the spatial-temporal ranges `srange` and `trange` in transient
-cases, for every parameter.
-
-"""
-function select_snapshots_entries(s::AbstractSteadySnapshots,srange)
-  T = eltype(s)
-  nval = length(srange)
-  np = num_params(s)
-  entries = array_of_consecutive_arrays(zeros(T,nval),np)
-
-  for ip = 1:np
-    for (i,is) in enumerate(srange)
-      v = consecutive_getindex(s.data,is,ip)
-      consecutive_setindex!(entries,v,i,ip)
-    end
-  end
-
-  return entries
-end
-
 
 const MultiValueBasicSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = BasicSnapshots{T,N,L,D,I,R,A}
 const MultiValueSnapshotsAtIndices{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A,B} = SnapshotsAtIndices{T,N,L,D,I,R,A,B}
@@ -299,6 +274,34 @@ const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
 
 function ParamDataStructures.recast(s::SparseSnapshots,a::AbstractMatrix)
   return recast(s.data,a)
+end
+
+"""
+    select_snapshots_entries(s::AbstractSteadySnapshots,srange) -> ArrayOfArrays
+    select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange) -> ArrayOfArrays
+
+Selects the snapshots' entries corresponding to the spatial range `srange` in
+steady cases, to the spatial-temporal ranges `srange` and `trange` in transient
+cases, for every parameter.
+
+"""
+function select_snapshots_entries(s::AbstractSteadySnapshots,srange)
+  _getindex(s::AbstractSteadySnapshots,is,it,ip) = consecutive_getindex(s.data,is,ip)
+  _getindex(s::SparseSnapshots,is,it,ip) = param_getindex(s.data,ip)[is]
+
+  T = eltype(s)
+  nval = length(srange)
+  np = num_params(s)
+  entries = array_of_consecutive_arrays(zeros(T,nval),np)
+
+  for ip = 1:np
+    for (i,is) in enumerate(srange)
+      v = _getindex(s.data,is,ip)
+      consecutive_setindex!(entries,v,i,ip)
+    end
+  end
+
+  return entries
 end
 
 const UnfoldingSteadySnapshots{T,L,I,R} = AbstractSteadySnapshots{T,2,L,1,I,R}
