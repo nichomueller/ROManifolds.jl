@@ -90,7 +90,7 @@ Base.@propagate_inbounds function Base.getindex(
   @boundscheck checkbounds(s,i...)
   ispace...,itime,iparam = i
   ispace′ = s.index_map[ispace...]
-  consecutive_getindex(s.data,ispace′,iparam+(itime-1)*num_params(s))
+  ispace′ == 0 ? zero(eltype(s)) : consecutive_getindex(s.data,ispace′,iparam+(itime-1)*num_params(s))
 end
 
 Base.@propagate_inbounds function Base.setindex!(
@@ -102,7 +102,7 @@ Base.@propagate_inbounds function Base.setindex!(
   @boundscheck checkbounds(s,i...)
   ispace...,itime,iparam = i
   ispace′ = s.index_map[ispace...]
-  consecutive_setindex!(s.data,v,ispace′,iparam+(itime-1)*num_params(s))
+  ispace′ != 0 && consecutive_setindex!(s.data,v,ispace′,iparam+(itime-1)*num_params(s))
 end
 
 """
@@ -160,7 +160,7 @@ Base.@propagate_inbounds function Base.getindex(
   @boundscheck checkbounds(s,i...)
   ispace...,itime,iparam = i
   ispace′ = s.index_map[ispace...]
-  consecutive_getindex(s.data[itime],ispace′,iparam)
+  ispace′ == 0 ? zero(eltype(s)) : consecutive_getindex(s.data[itime],ispace′,iparam)
 end
 
 Base.@propagate_inbounds function Base.setindex!(
@@ -172,7 +172,7 @@ Base.@propagate_inbounds function Base.setindex!(
   @boundscheck checkbounds(s,i...)
   ispace...,itime,iparam = i
   ispace′ = s.index_map[ispace...]
-  consecutive_setindex!(s.data[itime],v,ispace′,iparam)
+  ispace′ != 0 && consecutive_setindex!(s.data[itime],v,ispace′,iparam)
 end
 
 """

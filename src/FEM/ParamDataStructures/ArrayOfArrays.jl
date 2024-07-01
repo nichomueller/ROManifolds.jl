@@ -78,6 +78,6 @@ function Base.copyto!(A::ArrayOfArrays,B::ArrayOfArrays)
   A
 end
 
-function param_view(A::ArrayOfArrays{T,N},i::Union{Integer,AbstractVector,Colon}...) where {T,N}
+function param_view(A::ArrayOfArrays,i::Union{Integer,AbstractVector,Colon}...)
   ArrayOfArrays(map(a -> view(a,i...),A.data))
 end

@@ -153,7 +153,7 @@ Base.@propagate_inbounds function Base.getindex(
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
   ispace′ = s.index_map[ispace...]
-  consecutive_getindex(s.data,ispace′,iparam)
+  ispace′ == 0 ? zero(eltype(s)) : consecutive_getindex(s.data,ispace′,iparam)
 end
 
 Base.@propagate_inbounds function Base.setindex!(
@@ -165,7 +165,7 @@ Base.@propagate_inbounds function Base.setindex!(
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
   ispace′ = s.index_map[ispace...]
-  consecutive_setindex!(s.data,v,ispace′,iparam)
+  ispace′ != 0 && consecutive_setindex!(s.data,v,ispace′,iparam)
 end
 
 """

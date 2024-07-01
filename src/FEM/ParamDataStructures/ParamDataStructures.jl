@@ -83,6 +83,8 @@ include("ArrayOfArrays.jl")
 export ConsecutiveArrayOfArrays
 export ConsecutiveVectorOfVectors
 export ConsecutiveMatrixOfMatrices
+export AbstractConsecutiveParamVector
+export AbstractConsecutiveParamMatrix
 include("ConsecutiveArrayOfArrays.jl")
 
 export MatrixOfSparseMatricesCSC

@@ -125,8 +125,9 @@ function ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...)
 end
 
 function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;kwargs...)
+  N = TProduct.univariate_length(X)
   cores,weights,ranks,sizes = cache
-  for k in 1:length(X.arrays_1d)-1
+  for k in 1:N-1
     mat_k = reshape(mat,ranks[k]*sizes[k],:)
     Ur,Σr,Vr = _tpod(mat_k;kwargs...)
     rank = size(Ur,2)
@@ -136,7 +137,7 @@ function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;kw
     _weight_array!(weights,cores,X,Val{k}())
   end
   XW = _get_norm_matrix_from_weights(X,weights)
-  M = ttsvd!((cores,ranks,sizes),mat,XW;ids_range=length(X.arrays_1d),kwargs...)
+  M = ttsvd!((cores,ranks,sizes),mat,XW;ids_range=N,kwargs...)
   return M
 end
 
@@ -164,7 +165,8 @@ function _get_norm_matrices(X::TProductGradientArray,::Val{3},::Val{3})
 end
 
 function _get_norm_matrices(X::TProductGradientArray,::Val{d}) where d
-  _get_norm_matrices(X,Val(d),Val{length(X.arrays_1d)}())
+  N = TProduct.univariate_length(X)
+  _get_norm_matrices(X,Val(d),Val{N}())
 end
 
 function _weight_array!(weights,cores,X,::Val{1})
@@ -184,7 +186,7 @@ function _weight_array!(weights,cores,X,::Val{1})
 end
 
 function _weight_array!(weights,cores,X,::Val{d}) where d
-  Xd = _get_norm_matrices(X,Val(d))
+  Xd = _get_norm_matrices(X,Val{d}())
   K = length(Xd)
   W_prev = weights[d-1]
   core = cores[d]
@@ -193,12 +195,12 @@ function _weight_array!(weights,cores,X,::Val{d}) where d
   W = zeros(rank,K,rank)
   @inbounds for k = 1:K
     Xdk = Xd[k]
-    Wk = W[:,k,:]
+    @views Wk = W[:,k,:]
     Wk_prev = W_prev[:,k,:]
-    for i = 1:rank, i′ = 1:rank
-      Wk_ii′ = Wk[i,i′]
-      for i_prev = 1:rank_prev, i′_prev = 1:rank_prev
-        Wk_ii′ += Wk_prev[i_prev,i′_prev]*core[i_prev,:,i]'*Xdk*core[i′_prev,:,i′]
+    for i_prev = 1:rank_prev, i′_prev = 1:rank_prev
+      Wk_prev′ = Wk_prev[i_prev,i′_prev]
+      for i = 1:rank, i′ = 1:rank
+        Wk[i,i′] += Wk_prev′*core[i_prev,:,i]'*Xdk*core[i′_prev,:,i′]
       end
     end
   end
@@ -206,8 +208,8 @@ function _weight_array!(weights,cores,X,::Val{d}) where d
   return
 end
 
-function _get_norm_matrix_from_weights(norms,weights)
-  N_space = length(weights)+1
+function _get_norm_matrix_from_weights(norms::AbstractTProductArray,weights)
+  N_space = TProduct.univariate_length(norms)
   X = _get_norm_matrices(norms,Val{N_space}())
   W = weights[end]
   @check length(X) == size(W,2)
@@ -232,13 +234,13 @@ A₁, ..., Aₙ are the components of the outer vector, are `X`-orthogonal,
 otherwise they are ℓ²-orthogonal
 
 """
-function ttsvd(mat::AbstractArray{T,N},X=nothing;kwargs...) where {T,N}
+function ttsvd(mat::AbstractArray{T,N};kwargs...) where {T,N}
   cores = Vector{Array{T,3}}(undef,N-1)
   ranks = fill(1,N)
   sizes = size(mat)
   cache = cores,ranks,sizes
   # routine on the spatial indices
-  ttsvd!(cache,mat,X;ids_range=1:N-1,kwargs...)
+  ttsvd!(cache,mat;ids_range=1:N-1,kwargs...)
   return cores
 end
 
@@ -249,6 +251,18 @@ function ttsvd(mat::AbstractArray{T,N},X::AbstractTProductArray;kwargs...) where
   sizes = size(mat)
   # routine on the spatial indices
   ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;kwargs...)
+  return cores
+end
+
+function ttsvd(mat::SteadyMultiValueSnapshots{T,N},X::AbstractTProductArray;kwargs...) where {T,N}
+  cores = Vector{Array{T,3}}(undef,N-1)
+  weights = Vector{Array{T,3}}(undef,N-1)
+  ranks = fill(1,N)
+  sizes = size(mat)
+  # routine on the spatial indices
+  M = ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;kwargs...)
+  # routine on the component index
+  _ = ttsvd!((cores,weights,ranks,sizes),M;ids_range=N,kwargs...)
   return cores
 end
 

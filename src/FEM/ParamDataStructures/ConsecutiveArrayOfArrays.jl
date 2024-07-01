@@ -19,6 +19,9 @@ function ConsecutiveArrayOfArrays(data::AbstractArray{<:AbstractArray})
   ConsecutiveArrayOfArrays(stack(data))
 end
 
+const AbstractConsecutiveParamVector{T,L,A} = ConsecutiveArrayOfArrays{T,1,L,2,A}
+const AbstractConsecutiveParamMatrix{T,L,A} = ConsecutiveArrayOfArrays{T,1,L,2,A}
+
 const ConsecutiveVectorOfVectors{T,L} = ConsecutiveArrayOfArrays{T,1,L,2,Array{T,2}}
 const ConsecutiveMatrixOfMatrices{T,L} = ConsecutiveArrayOfArrays{T,2,L,3,Array{T,3}}
 
@@ -135,4 +138,8 @@ function LinearAlgebra.axpy!(α::Number,A::ConsecutiveArrayOfArrays,B::Consecuti
   @check size(A) == size(B)
   axpy!(α,A.data,B.data)
   return B
+end
+
+function param_view(A::ConsecutiveArrayOfArrays,i::Union{Integer,AbstractVector,Colon}...)
+  ConsecutiveArrayOfArrays(view(A.data,i...,:))
 end

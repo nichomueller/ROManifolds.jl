@@ -122,8 +122,6 @@ function FESpaces._fill_dirichlet_values_for_tag!(
   tag,
   dirichlet_dof_to_tag)
 
-  println(typeof(dirichlet_values))
-  println(typeof(dv))
   @check param_length(dirichlet_values) == param_length(dv)
   for dof in 1:_innerlength(dv)
     if dirichlet_dof_to_tag[dof] == tag
@@ -135,8 +133,8 @@ function FESpaces._fill_dirichlet_values_for_tag!(
 end
 
 function FESpaces._fill_dirichlet_values_for_tag!(
-  dirichlet_values::ConsecutiveVectorOfVectors,
-  dv::ConsecutiveVectorOfVectors,
+  dirichlet_values::AbstractConsecutiveParamVector,
+  dv::AbstractConsecutiveParamVector,
   tag,
   dirichlet_dof_to_tag)
 
@@ -159,6 +157,8 @@ function FESpaces._free_and_dirichlet_values_fill!(
   cell_dofs,
   cells)
 
+  println(typeof(free_vals))
+  println(typeof(dirichlet_vals))
   @check param_length(free_vals) == param_length(dirichlet_vals)
   for cell in cells
     vals = getindex!(cache_vals,cell_vals,cell)
@@ -179,8 +179,8 @@ function FESpaces._free_and_dirichlet_values_fill!(
 end
 
 function FESpaces._free_and_dirichlet_values_fill!(
-  free_vals::ConsecutiveVectorOfVectors,
-  dirichlet_vals::ConsecutiveVectorOfVectors,
+  free_vals::AbstractConsecutiveParamVector,
+  dirichlet_vals::AbstractConsecutiveParamVector,
   cache_vals,
   cache_dofs,
   cell_vals,

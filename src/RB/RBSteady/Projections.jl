@@ -167,6 +167,16 @@ function _cores2basis(i::AbstractIndexMap,a::AbstractArray{T,3}...) where T
   return view(basis,:,vec(invi),:)
 end
 
+function _cores2basis(i::FixedDofsIndexMap,a::AbstractArray{T,3}...) where T
+  basis = _cores2basis(a...)
+  invi = inv_index_map(i)
+  basis′ = similar(basis)
+  fill!(basis′,zero(eltype(basis′)))
+  @views basis′[:,remove_fixed_dof(invi),:] = basis[:,remove_fixed_dof(invi),:]
+  fixed_entries = findall(basis′.==zero(eltype(basis′)))
+  return FixedEntriesArray(basis′,fixed_entries)
+end
+
 # multi field interface
 
 """

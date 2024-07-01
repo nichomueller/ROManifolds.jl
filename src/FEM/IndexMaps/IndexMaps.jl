@@ -27,6 +27,9 @@ export get_sparsity
 export permute_sparsity
 include("SparsityPatterns.jl")
 
+export FixedEntriesArray
+include("FixedEntriesArrays.jl")
+
 export AbstractIndexMap
 export TrivialIndexMap
 export IndexMap

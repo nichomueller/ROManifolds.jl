@@ -47,6 +47,7 @@ include("TProductFESpaces.jl")
 export AbstractTProductArray
 export TProductArray
 export TProductGradientArray
+export MultiValueTProductArray
 export symbolic_kron
 export symbolic_kron!
 export numerical_kron!

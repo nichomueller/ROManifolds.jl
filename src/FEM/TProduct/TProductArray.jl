@@ -8,6 +8,7 @@ AbstractIndexMap, to be provided with factors and tensor product arrays.
 Subtypes:
 - [`TProductArray`](@ref)
 - [`TProductGradientArray`](@ref)
+- [`MultiValueTProductArray`](@ref)
 
 """
 #TODO I'm only using this for matrices, not vectors. Can change to <: AbstractMatrix{T} ?
@@ -15,6 +16,7 @@ abstract type AbstractTProductArray{T,N} <: AbstractArray{T,N} end
 
 Arrays.get_array(a::AbstractTProductArray) = @abstractmethod
 get_index_map(a::AbstractTProductArray) = @abstractmethod
+univariate_length(a::AbstractTProductArray) = @abstractmethod
 
 Base.size(a::AbstractTProductArray) = size(get_array(a))
 
@@ -26,11 +28,25 @@ Base.@propagate_inbounds function _find_block_index(imap::Vector{<:TProductIndex
 end
 
 _map_getindex(args...) = @abstractmethod
-Base.@propagate_inbounds _map_getindex(imap::TProductIndexMap,i::Int) = (imap[i],)
-Base.@propagate_inbounds _map_getindex(imap::TProductIndexMap,jmap::TProductIndexMap,i::Int,j::Int) = (imap[i],jmap[j])
-function _map_getindex(
-  imap::Vector{<:TProductIndexMap},
-  jmap::Vector{<:TProductIndexMap},
+Base.@propagate_inbounds _map_getindex(imap::AbstractIndexMap,i::Int) = (imap[i],)
+Base.@propagate_inbounds _map_getindex(imap::AbstractIndexMap,jmap::AbstractIndexMap,i::Int,j::Int) = (imap[i],jmap[j])
+
+Base.@propagate_inbounds function _map_getindex(
+  imap::AbstractMultiValueIndexMap{D,Ti},
+  jmap::AbstractMultiValueIndexMap{D,Ti},
+  i::Int,
+  j::Int,
+  n::Int
+  ) where {D,Ti}
+
+  imapn = selectdim(imap,D,n)
+  jmapn = selectdim(jmap,D,n)
+  (imapn[i],jmapn[j])
+end
+
+Base.@propagate_inbounds function _map_getindex(
+  imap::Vector{<:AbstractIndexMap},
+  jmap::Vector{<:AbstractIndexMap},
   i::Int,j::Int)
 
   i′ = _find_block_index(imap,i)
@@ -41,15 +57,13 @@ end
 Base.@propagate_inbounds function Base.getindex(a::AbstractTProductArray{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(a,i...)
   i′ = _map_getindex(get_index_map(a)...,i...)
-  i′ == 0 && return zero(eltype(a))
-  getindex(a.array,i′...)
+  any(i′ .== 0) ? zero(eltype(a)) : getindex(get_array(a),i′...)
 end
 
 Base.@propagate_inbounds function Base.setindex!(a::AbstractTProductArray{T,N},v,i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(a,i...)
   i′ = _map_getindex(get_index_map(a)...,i...)
-  i′ == 0 && return
-  setindex!(a.array,v,i′...)
+  all(i′ .!= 0) && setindex!(get_array(a),v,i′...)
 end
 
 Base.fill!(a::AbstractTProductArray,v) = fill!(get_array(a),v)
@@ -121,6 +135,7 @@ end
 
 Arrays.get_array(a::TProductArray) = a.array
 get_index_map(a::TProductArray) = a.index_map
+univariate_length(a::TProductArray) = length(a.arrays_1d)
 
 function TProductArray(arrays_1d::Vector{A},index_map::NTuple) where A
   array::A = _kron(arrays_1d...)
@@ -137,6 +152,12 @@ function Base.copyto!(a::TProductArray,b::TProductArray)
   map(copyto!,a.arrays_1d,b.arrays_1d)
   map(copyto!,a.index_map,b.index_map)
   a
+end
+
+function IndexMaps.change_index_map(f,a::TProductArray)
+  i = get_index_map(a)
+  i′ = map(i->change_index_map(f,i),i)
+  TProductArray(a.array,a.arrays_1d,i′)
 end
 
 const TProductSparseMatrix = TProductArray{T,2,A} where {T,A<:AbstractSparseMatrix}
@@ -421,6 +442,7 @@ end
 
 Arrays.get_array(a::TProductGradientArray) = a.array
 get_index_map(a::TProductGradientArray) = a.index_map
+univariate_length(a::TProductGradientArray) = length(a.arrays_1d)
 
 function TProductGradientArray(arrays_1d::Vector{A},gradients_1d::Vector{A},index_map...) where A
   array::A = kronecker_gradients(arrays_1d,gradients_1d)
@@ -440,12 +462,74 @@ function Base.copyto!(a::TProductGradientArray,b::TProductGradientArray)
   a
 end
 
+function IndexMaps.change_index_map(f,a::TProductGradientArray)
+  i = get_index_map(a)
+  i′ = map(f,i)
+  TProductGradientArray(a.array,a.arrays_1d,a.gradients_1d,i′)
+end
+
 const TProductGradientSparseMatrix{T,A<:AbstractSparseMatrix} = TProductGradientArray{T,2,A}
 
 SparseArrays.nnz(a::TProductGradientSparseMatrix) = nnz(a.array)
 SparseArrays.nzrange(a::TProductGradientSparseMatrix,col::Integer) = nzrange(a.array,col)
 SparseArrays.rowvals(a::TProductGradientSparseMatrix) = rowvals(a.array)
 SparseArrays.nonzeros(a::TProductGradientSparseMatrix) = a.array
+
+# MultiField interface
+const BlockTProductArray{T,N,A<:BlockArray,I<:Vector{<:AbstractIndexMap}} = TProductArray{T,N,A,I}
+const BlockTProductGradientArray{T,N,A<:BlockArray,I<:Vector{<:AbstractIndexMap}} = TProductGradientArray{T,N,A,I}
+const AbstractBlockTProductArray{T,N,A<:BlockArray,I<:Vector{<:AbstractIndexMap}} = Union{
+  BlockTProductArray{T,N,A,I},
+  BlockTProductGradientArray{T,N,A,I}
+}
+
+Base.@propagate_inbounds function Base.getindex(a::BlockTProductArray{T,2},i::Block{2}) where T
+  @boundscheck blockcheckbounds(a.array,i)
+  row_indices,col_indices = a.index_map
+  imaps = (row_indices[i.n[1]],col_indices[i.n[2]])
+  TProductArray(a.array[i],getindex.(a.arrays_1d,i),imaps)
+end
+
+Base.@propagate_inbounds function Base.getindex(a::BlockTProductGradientArray{T,2},i::Block{2}) where T
+  @boundscheck blockcheckbounds(a.array,i)
+  row_indices,col_indices = a.index_map
+  imaps = (row_indices[i.n[1]],col_indices[i.n[2]])
+  TProductGradientArray(a.array[i],getindex.(a.arrays_1d,i),getindex.(a.gradients_1d,i),imaps)
+end
+
+"""
+    struct MultiValueTProductArray{T,N,A} <: AbstractTProductArray{T,N} end
+
+Used to unfold a multi value TProductArray into the correct dimensions
+
+"""
+struct MultiValueTProductArray{T,N,A} <: AbstractTProductArray{T,N}
+  array::A
+  ncomps::Int
+  function MultiValueTProductArray(array::A) where {T,N′,A<:AbstractTProductArray{T,N′}}
+    i = get_index_map(array)
+    ncomps = num_components(first(i))
+    N = N′ + 1
+    new{T,N,A}(array,ncomps)
+  end
+end
+
+Arrays.get_array(a::MultiValueTProductArray) = get_array(a.array)
+get_index_map(a::MultiValueTProductArray) = get_index_map(a.array)
+univariate_length(a::MultiValueTProductArray) = univariate_length(a.array) + 1
+TensorValues.num_components(a::MultiValueTProductArray) = a.ncomps
+
+Base.size(a::MultiValueTProductArray{T,N}) where {T,N} = (size(a.array)...,a.ncomps)
+
+function unfold(a::AbstractTProductArray)
+  _remove_tprod_map(i) = i
+  _remove_tprod_map(i::TProductIndexMap) = i.indices
+
+  a′ = change_index_map(_remove_tprod_map,a)
+  i′ = get_index_map(a′)
+  @check all(isa.(i′,AbstractMultiValueIndexMap))
+  MultiValueTProductArray(a′)
+end
 
 # need to implement this to avoid errors in the multi field case
 function Base.:+(A::AbstractBlockArray,B::AbstractBlockArray)

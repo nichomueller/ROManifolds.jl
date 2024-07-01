@@ -97,54 +97,26 @@ snaps = Snapshots(vals,i,r)
 s = snaps
 soff = select_snapshots(s,RBSteady.offline_params(rbsolver))
 
+using BlockArrays
 norm_matrix = assemble_norm_matrix(feop)
+X1 = norm_matrix[Block(1,1)]
+TProduct.unfold(X1)
 
-X = assemble_matrix(induced_norm,test,test)
+using Gridap.Fields
+active_block_ids = get_touched_blocks(s)
+block_map = BlockMap(size(s),active_block_ids)
+# bases = [reduced_basis(s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
 
-U,V = test,test
-assem = TProductBlockSparseMatrixAssembler(U,V)
-v = get_tp_fe_basis(V)
-u = get_tp_trial_fe_basis(U)
-dc = induced_norm(u,v)
-# assemble_matrix(assem,collect_cell_matrix(U,V,induced_norm(u,v)))
-u1,u2 = u
-v1,v2 = v
-dc1 = ∫(u1⋅v1)dΩ + ∫(∇(v1)⊙∇(u1))dΩ
-dc2 = ∫(u2*v2)dΩ
+using Mabla.FEM.IndexMaps
+cores_space...,core_time = ttsvd(s[1],norm_matrix[Block(1,1)])
+index_map = get_index_map(s[1])
+cores = TransientTTSVDCores(cores_space,core_time,index_map)
 
-reffe_u′ = ReferenceFE(lagrangian,Float64,order)
-test_u′ = TestFESpace(Ω,reffe_u′;conformity=:H1,dirichlet_tags=["dirichlet"])
-test′ = MultiFieldFESpace([test_u′,test_p];style=BlockMultiFieldStyle())
+cores_space...,core_time = ttsvd(s[2],norm_matrix[Block(2,2)])
+index_map = get_index_map(s[2])
+# cores = TransientTTSVDCores(cores_space,core_time,index_map)
+basis = RBSteady._cores2basis(cores_space...)
+invi = inv_index_map(index_map)
+view(basis,:,vec(invi),:)
 
-XX = assemble_matrix(induced_norm,test′,test′)
-M
-
-################# remove pressure #############
-using Gridap.FESpaces
-_norm_u((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ
-_norm_mat = assemble_matrix(assem,collect_cell_matrix(U,V,_norm_u(u,v)))
-
-_X = assemble_matrix(_norm_u,test′,test′)
-
-_M1 = assemble_matrix((du,v)->∫(du⋅v)dΩ.measures_1d[1],test′[1].spaces_1d[1],test′[1].spaces_1d[1])
-_A1 = assemble_matrix((du,v)->∫(∇(v)⊙∇(du))dΩ.measures_1d[1],test′[1].spaces_1d[1],test′[1].spaces_1d[1])
-
-_M2 = assemble_matrix((du,v)->∫(du⋅v)dΩ.measures_1d[2],test′[1].spaces_1d[2],test′[1].spaces_1d[2])
-_A2 = assemble_matrix((du,v)->∫(∇(v)⊙∇(du))dΩ.measures_1d[2],test′[1].spaces_1d[2],test′[1].spaces_1d[2])
-
-_XX = kron(_M2,_M1) + kron(_A2,_M1) + kron(_M2,_A1)
-
-_m_u((du,dp),(v,q)) = ∫(∇(v)⊙∇(du))dΩ + ∫(du⋅v)dΩ
-_M = assemble_matrix(assem,collect_cell_matrix(U,V,_m_u(u,v)))
-
-_Mok = assemble_matrix(_m_u,test′,test′)
-
-dc1 = ∫(∇(v1)⊙∇(u1))dΩ
-dc2 = ∫(v1⊙u1)dΩ
-dc = dc1 + dc2
-
-p1,p2 = get_fe_basis(test_p)
-
-v′ = get_fe_basis(test′)
-u′ = get_trial_fe_basis(test′)
-dc′ = _m_u(u′,v′)
+bb = RBSteady._cores2basis(index_map,cores_space...)

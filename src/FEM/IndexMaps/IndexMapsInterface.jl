@@ -175,34 +175,32 @@ defined on the zero mean `FESpace`, the length of the vector is 1
 
 """
 struct FixedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
-  indices::I
-  dofs_to_fix::Vector{CartesianIndex{D}}
+  indices::FixedEntriesArray{Ti,D,I}
 end
 
-function FixedDofsIndexMap(indices::AbstractIndexMap,dofs_to_fix::AbstractVector{<:Integer})
-  FixedDofsIndexMap(indices,CartesianIndices(size(indices))[dofs_to_fix])
-end
-
-function FixedDofsIndexMap(indices::AbstractIndexMap,dof_to_fix::Integer)
-  FixedDofsIndexMap(indices,[dof_to_fix])
+function FixedDofsIndexMap(indices::AbstractIndexMap,dofs_to_fix)
+  indices′ = FixedEntriesArray(indices,dofs_to_fix)
+  FixedDofsIndexMap(indices′)
 end
 
 Base.size(i::FixedDofsIndexMap) = size(i.indices)
 
-function Base.getindex(i::FixedDofsIndexMap{D},j::Vararg{Integer,D}) where D
-  if j ∈ Tuple.(i.dofs_to_fix)
-    zero(eltype(i))
-  else
-    getindex(i.indices,j...)
+Base.getindex(i::FixedDofsIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
+
+Base.view(i::FixedDofsIndexMap,locations) = FixedDofsIndexMap(view(i.indices,locations))
+
+for f in (:free_dofs_map,:inv_index_map)
+  @eval begin
+    function $f(a::FixedEntriesArray)
+      FixedEntriesArray($f(a.array),a.fixed_entries)
+    end
+
+    function $f(i::FixedDofsIndexMap)
+      indices′ = $f(i.indices)
+      FixedDofsIndexMap(indices′)
+    end
   end
 end
-
-function free_dofs_map(i::FixedDofsIndexMap)
-  free_i = free_dofs_map(i.indices)
-  FixedDofsIndexMap(free_i,i.dofs_to_fix)
-end
-
-Base.view(i::FixedDofsIndexMap,locations) = FixedDofsIndexMap(IndexMapView(i.indices,locations),i.dofs_to_fix)
 
 function remove_fixed_dof(i::FixedDofsIndexMap)
   filter(x -> x != 0,i)
@@ -270,10 +268,11 @@ abstract type AbstractMultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti} end
 Base.view(i::AbstractMultiValueIndexMap,locations) = MultiValueIndexMapView(i,locations)
 
 function compose_indices(index::AbstractArray{Ti,D},ncomps::Integer) where {Ti,D}
-  indices = zeros(Ti,size(index)...,ncomps)
-  @inbounds for comp = 1:ncomps
-    selectdim(indices,D+1,comp) .= (index.-1).*ncomps .+ comp
-  end
+  # indices = zeros(Ti,size(index)...,ncomps)
+  # @inbounds for comp = 1:ncomps
+  #   selectdim(indices,D+1,comp) .= (index.-1).*ncomps .+ comp
+  # end
+  indices = repeat(index;outer=(ntuple(_->1,Val{D}())...,ncomps))
   return MultiValueIndexMap(indices)
 end
 

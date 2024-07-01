@@ -143,8 +143,8 @@ function Arrays.evaluate(U::MultiFieldFESpace,μ,t)
   if !has_param_transient(U)
     return U
   end
-  Upt = allocate_space(U,r)
-  evaluate!(Upt,U,r)
+  Upt = allocate_space(U,μ,t)
+  evaluate!(Upt,U,μ,t)
   Upt
 end
 
