@@ -237,7 +237,7 @@ function ttsvd(mat::AbstractArray{T,N},X=nothing;kwargs...) where {T,N}
   ranks = fill(1,N)
   sizes = size(mat)
   cache = cores,ranks,sizes
-  # routine on the spatial indexes
+  # routine on the spatial indices
   ttsvd!(cache,mat,X;ids_range=1:N-1,kwargs...)
   return cores
 end
@@ -247,7 +247,7 @@ function ttsvd(mat::AbstractArray{T,N},X::AbstractTProductArray;kwargs...) where
   weights = Vector{Array{T,3}}(undef,N-1)
   ranks = fill(1,N)
   sizes = size(mat)
-  # routine on the spatial indexes
+  # routine on the spatial indices
   ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;kwargs...)
   return cores
 end

@@ -1,12 +1,12 @@
 """
-    TProductSparseMatrixAssembler{D,Ti} <: SparseMatrixAssembler
+    TProductSparseMatrixAssembler{A<:SparseMatrixAssemblerR,C} <: SparseMatrixAssembler
 
 Assembly-related information when constructing a [`TProductArray`](ref)
 
 """
-struct TProductSparseMatrixAssembler{R<:TProductIndexMap,C<:TProductIndexMap} <: SparseMatrixAssembler
-  assem::GenericSparseMatrixAssembler
-  assems_1d::Vector{GenericSparseMatrixAssembler}
+struct TProductSparseMatrixAssembler{A<:SparseMatrixAssembler,R,C} <: SparseMatrixAssembler
+  assem::A
+  assems_1d::Vector{A}
   row_index_map::R
   col_index_map::C
 end
@@ -51,8 +51,33 @@ function FESpaces.collect_cell_vector(
 end
 
 function FESpaces.collect_cell_matrix(
-  trial::TProductFESpace,
-  test::TProductFESpace,
+  trial::MultiFieldFESpace,
+  test::MultiFieldFESpace,
+  a::Vector{<:DomainContribution})
+
+  map(eachindex(a)) do d
+    trials_d = map(f->_remove_trial(f).spaces_1d[d],trial.spaces)
+    tests_d = map(f->f.spaces_1d[d],test.spaces)
+    trial′ = MultiFieldFESpace(trial.vector_type,trials_d,trial.multi_field_style)
+    test′ = MultiFieldFESpace(test.vector_type,tests_d,test.multi_field_style)
+    collect_cell_matrix(trial′,test′,a[d])
+  end
+end
+
+function FESpaces.collect_cell_vector(
+  test::MultiFieldFESpace,
+  a::Vector{<:DomainContribution})
+
+  map(eachindex(a)) do d
+    tests_d = map(f->f.spaces_1d[d],test.spaces)
+    test′ = MultiFieldFESpace(test.vector_type,tests_d,test.multi_field_style)
+    collect_cell_vector(test′,a[d])
+  end
+end
+
+function FESpaces.collect_cell_matrix(
+  trial::FESpace,
+  test::FESpace,
   a::TProductGradientEval)
 
   f = collect_cell_matrix(trial,test,get_tp_data(a))
@@ -61,7 +86,7 @@ function FESpaces.collect_cell_matrix(
 end
 
 function FESpaces.collect_cell_vector(
-  test::TProductFESpace,
+  test::FESpace,
   a::TProductGradientEval)
 
   f = collect_cell_vector(test,get_tp_data(a))
@@ -167,22 +192,16 @@ end
 
 # multi field
 
-function TProductBlockSparseMatrixAssembler(
-  trial::MultiFieldFESpace{MS},
-  test::MultiFieldFESpace{MS},
-  strategy::AssemblyStrategy=DefaultAssemblyStrategy()
-  ) where {NB,SB,P,MS<:BlockMultiFieldStyle{NB,SB,P}}
-
-  @notimplementedif any(SB.!=1)
-  NV = length(test.spaces)
-
-  T = get_dof_value_type(trial)
-  mat = SparseMatrixCSC{T,Int}
-  vec = Vector{T}
-  block_idx = CartesianIndices((NB,NB))
-  block_assemblers = map(block_idx) do idx
-    SparseMatrixAssembler(mat,vec,trial[idx[2]],test[idx[1]],strategy)
+function TProductBlockSparseMatrixAssembler(trial::MultiFieldFESpace,test::MultiFieldFESpace)
+  assem = SparseMatrixAssembler(trial,test)
+  assems_1d = map(eachindex(test.spaces[1].spaces_1d)) do d
+    trials_d = map(f->_remove_trial(f).spaces_1d[d],trial.spaces)
+    tests_d = map(f->f.spaces_1d[d],test.spaces)
+    trial′ = MultiFieldFESpace(trial.vector_type,trials_d,trial.multi_field_style)
+    test′ = MultiFieldFESpace(test.vector_type,tests_d,test.multi_field_style)
+    SparseMatrixAssembler(trial′,test′)
   end
-
-  return MultiField.BlockSparseMatrixAssembler{NB,NV,SB,P}(block_assemblers)
+  row_index_map = map(get_tp_dof_index_map,test.spaces)
+  col_index_map = map(get_tp_dof_index_map,_remove_trial.(trial.spaces))
+  TProductSparseMatrixAssembler(assem,assems_1d,row_index_map,col_index_map)
 end

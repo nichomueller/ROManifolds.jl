@@ -107,7 +107,7 @@ struct TProductFEBasis{DS,BS,A,B} <: FEBasis
   basis_style::BS
 end
 
-function TProductFEBasis(basis::Vector{<:FESpaces.SingleFieldFEBasis},trian::TProductTriangulation)
+function TProductFEBasis(basis::Vector{<:FESpaces.FEBasis},trian::TProductTriangulation)
   b1 = testitem(basis)
   DS = DomainStyle(b1)
   BS = BasisStyle(b1)
@@ -133,6 +133,24 @@ function Fields.gradient(f::TProductFEBasis)
   trian = get_triangulation(f)
   g = TProductFEBasis(dbasis,trian)
   return TProductGradientCellField(f,g)
+end
+
+const MultiFieldTProductFEBasis{DS,BS,B} = TProductFEBasis{DS,BS,Vector{MultiFieldCellField{DS}},B}
+
+MultiField.num_fields(a::MultiFieldTProductFEBasis) = length(a.basis[1])
+
+Base.length(a::MultiFieldTProductFEBasis) = num_fields(a)
+
+function Base.getindex(a::MultiFieldTProductFEBasis,i::Integer)
+  TProductFEBasis(getindex.(a.basis,i),a.trian,a.domain_style,a.basis_style)
+end
+
+function Base.iterate(a::MultiFieldTProductFEBasis,state=1)
+  if state > num_fields(a)
+    return nothing
+  end
+  astate = TProductFEBasis(getindex.(a.basis,state),a.trian,a.domain_style,a.basis_style)
+  return astate,state+1
 end
 
 # evaluations
@@ -216,6 +234,49 @@ end
 # divergence/curl terms) this will have to change
 
 for op in (:+,:-)
-  @eval ($op)(a::AbstractArray,b::TProductGradientEval) = TProductGradientEval(b.f,b.g,$op)
-  @eval ($op)(a::TProductGradientEval,b::AbstractArray) = TProductGradientEval(a.f,a.g,$op)
+  @eval ($op)(a::AbstractArray,b::TProductGradientEval) = _add_tp_cell_data($op,a,b)
+  @eval ($op)(a::TProductGradientEval,b::AbstractArray) = _add_tp_cell_data($op,a,b)
+  @eval ($op)(a::TProductGradientEval,b::TProductGradientEval) = @notimplemented
+end
+
+Arrays.testitem(a::DomainContribution) = a[first([get_domains(a)...])]
+
+function _add_tp_cell_data(op,a::AbstractVector{<:DomainContribution},b::TProductGradientEval)
+  a1 = testitem(a[1])
+  b1 = testitem(b.f[1])
+  if isa(a1,AbstractArray{<:ArrayBlock})
+    @check isa(b1,AbstractArray{<:ArrayBlock})
+    if all(_is_different_block.(a,b.f))
+      TProductGradientEval(op(a,b.f),b.g,op)
+    else
+      TProductGradientEval(b.f,b.g,op)
+    end
+  else
+    TProductGradientEval(b.f,b.g,op)
+  end
+end
+
+function _add_tp_cell_data(op,a::TProductGradientEval,b::AbstractVector{<:DomainContribution})
+  a1 = testitem(a.f[1])
+  b1 = testitem(b[1])
+  if isa(b1,AbstractArray{<:ArrayBlock})
+    @check isa(a1,AbstractArray{<:ArrayBlock})
+    if all(_is_different_block.(a.f,b))
+      TProductGradientEval(op(a.f,b),a.g,op)
+    else
+      TProductGradientEval(a.f,a.g,op)
+    end
+  else
+    TProductGradientEval(a.f,a.g,op)
+  end
+end
+
+function _is_different_block(a::DomainContribution,b::DomainContribution)
+  b1 = testitem(b)
+  for ai in values(a.dict)
+    if b1[1].touched == ai[1].touched
+      return false
+    end
+  end
+  return true
 end

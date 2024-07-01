@@ -95,6 +95,8 @@ function get_tp_trial_fe_basis(f::TProductFESpace)
   TProductFEBasis(basis,trian)
 end
 
+get_tp_trial_fe_basis(f::TrialFESpace{<:TProductFESpace}) = get_tp_trial_fe_basis(f.space)
+
 function IndexMaps.get_sparsity(U::TProductFESpace,V::TProductFESpace)
   a = SparseMatrixAssembler(U,V)
   sparsity = get_sparsity(a.assem,U.space,V.space)
@@ -120,19 +122,20 @@ end
 
 # multi field
 
-get_tp_trial_fe_basis(f::TrialFESpace{<:TProductFESpace}) = get_tp_trial_fe_basis(f.space)
+_remove_trial(f::SingleFieldFESpace) = f
+_remove_trial(f::TrialFESpace) = f.space
 
 function get_tp_triangulation(f::MultiFieldFESpace)
-  s1 = first(f.spaces)
+  s1 = _remove_trial(first(f.spaces))
   trian = get_tp_triangulation(s1)
-  @check all(map(i->trian===get_tp_triangulation(i),f.spaces))
+  @check all(map(i->trian===get_tp_triangulation(_remove_trial(i)),f.spaces))
   trian
 end
 
 function get_tp_fe_basis(f::MultiFieldFESpace)
-  D = length(f.spaces[1].spaces_1d)
+  D = length(_remove_trial(f[1]).spaces_1d)
   basis = map(1:D) do d
-    sfd = map(sf -> sf.spaces_1d[d],f.spaces)
+    sfd = map(sf -> _remove_trial(sf).spaces_1d[d],f.spaces)
     mfd = MultiFieldFESpace(sfd)
     get_fe_basis(mfd)
   end
@@ -141,9 +144,9 @@ function get_tp_fe_basis(f::MultiFieldFESpace)
 end
 
 function get_tp_trial_fe_basis(f::MultiFieldFESpace)
-  D = length(f.spaces[1].spaces_1d)
+  D = length(_remove_trial(f[1]).spaces_1d)
   basis = map(1:D) do d
-    sfd = map(sf -> sf.spaces_1d[d],f.spaces)
+    sfd = map(sf -> _remove_trial(sf).spaces_1d[d],f.spaces)
     mfd = MultiFieldFESpace(sfd)
     get_trial_fe_basis(mfd)
   end

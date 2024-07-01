@@ -18,19 +18,37 @@ get_index_map(a::AbstractTProductArray) = @abstractmethod
 
 Base.size(a::AbstractTProductArray) = size(get_array(a))
 
-Base.@propagate_inbounds _map_getindex(args...) = @abstractmethod
+Base.@propagate_inbounds function _find_block_index(imap::Vector{<:TProductIndexMap},i::Int)
+  slengths = cumsum(length.(imap))
+  blocki = findfirst(i .≤ slengths)
+  i0 = blocki>1 ? slengths[blocki-1] : 0
+  imap[blocki][i-i0]
+end
+
+_map_getindex(args...) = @abstractmethod
 Base.@propagate_inbounds _map_getindex(imap::TProductIndexMap,i::Int) = (imap[i],)
 Base.@propagate_inbounds _map_getindex(imap::TProductIndexMap,jmap::TProductIndexMap,i::Int,j::Int) = (imap[i],jmap[j])
+function _map_getindex(
+  imap::Vector{<:TProductIndexMap},
+  jmap::Vector{<:TProductIndexMap},
+  i::Int,j::Int)
+
+  i′ = _find_block_index(imap,i)
+  j′ = _find_block_index(jmap,j)
+  (i′,j′)
+end
 
 Base.@propagate_inbounds function Base.getindex(a::AbstractTProductArray{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(a,i...)
   i′ = _map_getindex(get_index_map(a)...,i...)
+  i′ == 0 && return zero(eltype(a))
   getindex(a.array,i′...)
 end
 
 Base.@propagate_inbounds function Base.setindex!(a::AbstractTProductArray{T,N},v,i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(a,i...)
   i′ = _map_getindex(get_index_map(a)...,i...)
+  i′ == 0 && return
   setindex!(a.array,v,i′...)
 end
 
@@ -96,7 +114,7 @@ struct TProductArray{T,N,A,I} <: AbstractTProductArray{T,N}
     array::A,
     arrays_1d::Vector{A},
     index_map::NTuple{N,I}
-    ) where {T,N,A<:AbstractArray{T,N},I<:TProductIndexMap}
+    ) where {T,N,A<:AbstractArray{T,N},I}
     new{T,N,A,I}(array,arrays_1d,index_map)
   end
 end
@@ -132,6 +150,12 @@ function _kron(A::AbstractArray...)
   kron(reverse(A)...)
 end
 
+function _kron(A::AbstractBlockArray...)
+  map(zip(eachblock.(A)...)) do block
+    _kron(block...)
+  end |> mortar
+end
+
 function symbolic_kron(A::AbstractArray)
   A
 end
@@ -150,6 +174,12 @@ function symbolic_kron(A::AbstractSparseMatrixCSC{T1,S1},B::AbstractSparseMatrix
   C = spzeros(Tv,Ti,mC,nC)
   sizehint!(C,nnz(A)*nnz(B))
   symbolic_kron!(C,B,A)
+end
+
+function symbolic_kron(A::AbstractBlockArray,B::AbstractBlockArray)
+  map(zip(eachblock(A),eachblock(B))) do blockA,blockB
+    symbolic_kron(blockA,blockB)
+  end |> mortar
 end
 
 function symbolic_kron(A::AbstractArray,B::AbstractArray...)
@@ -248,6 +278,12 @@ end
   return C
 end
 
+@inline function numerical_kron!(C::AbstractBlockArray,A::AbstractBlockArray,B::AbstractBlockArray)
+  @inbounds for (blockC,blockA,blockB) in zip(eachblock(C),eachblock(A),eachblock(B))
+    numerical_kron!(blockC,blockA,blockB)
+  end
+end
+
 # for gradients
 
 function kronecker_gradients(f,g,op=nothing)
@@ -339,6 +375,21 @@ end
   return C
 end
 
+@inline function numerical_kron!(
+  C::AbstractBlockArray,
+  A::Vector{<:AbstractBlockArray},
+  B::Vector{<:AbstractBlockArray})
+
+  blocksA = map(eachblock)
+  blockinds = CartesianIndices(axes.(blocklasts.(axes(mat)),1))
+  for I in blockinds
+    blockC = C[Block(Tuple(I))]
+    blocksA = getindex.(A,Block(Tuple(I)))
+    blocksB = getindex.(B,Block(Tuple(I)))
+    numerical_kron!(blockC,blocksA,blocksB)
+  end
+end
+
 """
     TProductGradientArray{T,N,A,I} <: AbstractTProductArray{T,N}
 
@@ -362,7 +413,7 @@ struct TProductGradientArray{T,N,A,I} <: AbstractTProductArray{T,N}
     arrays_1d::Vector{A},
     gradients_1d::Vector{A},
     index_map::NTuple{N,I}
-    ) where {T,N,A<:AbstractArray{T,N},I<:TProductIndexMap}
+    ) where {T,N,A<:AbstractArray{T,N},I}
 
     new{T,N,A,I}(array,arrays_1d,gradients_1d,index_map)
   end
@@ -395,3 +446,16 @@ SparseArrays.nnz(a::TProductGradientSparseMatrix) = nnz(a.array)
 SparseArrays.nzrange(a::TProductGradientSparseMatrix,col::Integer) = nzrange(a.array,col)
 SparseArrays.rowvals(a::TProductGradientSparseMatrix) = rowvals(a.array)
 SparseArrays.nonzeros(a::TProductGradientSparseMatrix) = a.array
+
+# need to implement this to avoid errors in the multi field case
+function Base.:+(A::AbstractBlockArray,B::AbstractBlockArray)
+  @check axes(A) == axes(B)
+  AB = (+)(A.blocks,B.blocks)
+  BlockArrays._BlockArray(AB,A.axes)
+end
+
+function Base.:-(A::AbstractBlockArray,B::AbstractBlockArray)
+  @check axes(A) == axes(B)
+  AB = (-)(A.blocks,B.blocks)
+  BlockArrays._BlockArray(AB,A.axes)
+end

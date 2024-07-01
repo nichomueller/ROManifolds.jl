@@ -97,52 +97,54 @@ snaps = Snapshots(vals,i,r)
 s = snaps
 soff = select_snapshots(s,RBSteady.offline_params(rbsolver))
 
-# norm_matrix = assemble_norm_matrix(feop)
-V = test
-U = evaluate(trial,nothing)
+norm_matrix = assemble_norm_matrix(feop)
+
+X = assemble_matrix(induced_norm,test,test)
+
+U,V = test,test
 assem = TProductBlockSparseMatrixAssembler(U,V)
 v = get_tp_fe_basis(V)
 u = get_tp_trial_fe_basis(U)
+dc = induced_norm(u,v)
+# assemble_matrix(assem,collect_cell_matrix(U,V,induced_norm(u,v)))
+u1,u2 = u
+v1,v2 = v
+dc1 = ∫(u1⋅v1)dΩ + ∫(∇(v1)⊙∇(u1))dΩ
+dc2 = ∫(u2*v2)dΩ
 
-D = length(V.spaces[1].spaces_1d)
-basis = map(1:D) do d
-  sfd = map(sf -> sf.spaces_1d[d],V.spaces)
-  mfd = MultiFieldFESpace(sfd)
-  get_fe_basis(mfd)
-end
-trian = get_triangulation(V)
+reffe_u′ = ReferenceFE(lagrangian,Float64,order)
+test_u′ = TestFESpace(Ω,reffe_u′;conformity=:H1,dirichlet_tags=["dirichlet"])
+test′ = MultiFieldFESpace([test_u′,test_p];style=BlockMultiFieldStyle())
 
-# induced_norm((u[1],u[2]),(v[1],v[1]))
-using Gridap.Arrays
-using Gridap.CellData
+XX = assemble_matrix(induced_norm,test′,test′)
+M
 
-∫(u[1]⋅v[1])dΩ
-# u[1]⋅v[1]
-c = return_cache(Operation(⋅),u[1],v[1])
-# evaluate!(c,Operation(⋅),u[1],v[1])
-evaluate!(c[1],Operation(⋅),get_tp_data(u[1])[1],get_tp_data(v[1])[1])
+################# remove pressure #############
+using Gridap.FESpaces
+_norm_u((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ
+_norm_mat = assemble_matrix(assem,collect_cell_matrix(U,V,_norm_u(u,v)))
 
+_X = assemble_matrix(_norm_u,test′,test′)
 
-v′ = get_fe_basis(V)
-u′ = get_trial_fe_basis(U)
-# u′[1]⋅v′[1]
-c′ = return_cache(Operation(⋅),u′[1],v′[1])
-evaluate!(c′,Operation(⋅),u′[1],v′[1])
+_M1 = assemble_matrix((du,v)->∫(du⋅v)dΩ.measures_1d[1],test′[1].spaces_1d[1],test′[1].spaces_1d[1])
+_A1 = assemble_matrix((du,v)->∫(∇(v)⊙∇(du))dΩ.measures_1d[1],test′[1].spaces_1d[1],test′[1].spaces_1d[1])
 
-# m1 = CartesianDiscreteModel((0,1),(5,))
-# Ω1 = Triangulation(m1)
-# dΩ1 = Measure(Ω1,degree)
-# t1 = TestFESpace(m1,reffe_u;conformity=:H1)
-# t2 = TestFESpace(m1,reffe_p;conformity=:C0)
+_M2 = assemble_matrix((du,v)->∫(du⋅v)dΩ.measures_1d[2],test′[1].spaces_1d[2],test′[1].spaces_1d[2])
+_A2 = assemble_matrix((du,v)->∫(∇(v)⊙∇(du))dΩ.measures_1d[2],test′[1].spaces_1d[2],test′[1].spaces_1d[2])
 
-# v1 = get_fe_basis(t1)
-# u1 = get_trial_fe_basis(t1)
-# v2 = get_fe_basis(t2)
-# u2 = get_trial_fe_basis(t2)
+_XX = kron(_M2,_M1) + kron(_A2,_M1) + kron(_M2,_A1)
 
-# _test_u = TestFESpace(Ω,reffe_u;conformity=:H1)
-# assemble_matrix((u,v)->∫(u⋅v)dΩ.measure,_test_u.space,_test_u.space)
-# assemble_matrix((u,v)->∫(u⋅v)dΩ1,t1,t1)
-# assemble_matrix((u,v)->∫(v*(∇⋅(u)))dΩ1,t1,t2)
-# cf = ∇⋅(u1)
-# cf(get_cell_points(Ω1))
+_m_u((du,dp),(v,q)) = ∫(∇(v)⊙∇(du))dΩ + ∫(du⋅v)dΩ
+_M = assemble_matrix(assem,collect_cell_matrix(U,V,_m_u(u,v)))
+
+_Mok = assemble_matrix(_m_u,test′,test′)
+
+dc1 = ∫(∇(v1)⊙∇(u1))dΩ
+dc2 = ∫(v1⊙u1)dΩ
+dc = dc1 + dc2
+
+p1,p2 = get_fe_basis(test_p)
+
+v′ = get_fe_basis(test′)
+u′ = get_trial_fe_basis(test′)
+dc′ = _m_u(u′,v′)

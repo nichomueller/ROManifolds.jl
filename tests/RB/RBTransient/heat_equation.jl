@@ -77,33 +77,8 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 # solvers
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=20,nsnaps_test=1,nsnaps_mdeim=10)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
-
-μ = ParamRealization([
-  [0.1,0.2,0.3],
-  [0.3,0.6,0.7],
-  [0.1,0.2,0.5],
-  [0.1,0.8,0.4],
-  [0.9,0.7,0.3],
-  [0.1,0.2,0.2],
-  [0.2,0.5,0.1],
-  [0.1,0.2,0.6],
-  [0.1,0.1,0.7],
-  [0.4,0.5,0.8],
-  [0.1,0.2,0.9],
-  [0.7,0.4,0.4],
-  [0.9,0.2,0.1],
-  [0.3,0.2,0.2],
-  [0.1,0.4,0.8],
-  [0.2,0.2,0.9],
-  [0.8,0.2,0.5],
-  [0.2,0.5,0.5],
-  [0.1,0.2,0.2],
-  [0.7,0.4,0.1],
-  [0.5,0.3,0.9]
-])
-r = TransientParamRealization(μ,tdomain)
 
 # RB method
 # we can load & solve directly, if the offline structures have been previously saved to file
@@ -127,89 +102,10 @@ println(compute_speedup(results))
 average_plot(rbop,results;dir=joinpath(test_dir,"plots"))
 
 # # NEED TO IMPROVE:
-using Gridap
 using BenchmarkTools
-
-fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ;r)
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 # A = fesnaps
 # A′ = flatten_snapshots(A)
 # @btime A′*A′
 # B = copy(A′)
 # @btime B'*B
-
-using Gridap.ODEs
-using Gridap.FESpaces
-using Gridap.Algebra
-
-son = select_snapshots(fesnaps,RBSteady.online_params(rbsolver))
-r = get_realization(son)
-op = rbop
-fesolver = get_fe_solver(rbsolver)
-red_trial = get_trial(op)(r)
-fe_trial = get_fe_trial(op)(r)
-x̂ = zero_free_values(red_trial)
-y = zero_free_values(fe_trial)
-odecache = allocate_odecache(fesolver,op,r,(y,))
-solve!((x̂,),fesolver,op,r,(y,),odecache)
-
-x = recast(x̂,red_trial)
-i = get_vector_index_map(op)
-s = Snapshots(x,i,r)
-
-sysslvr = fesolver.sysslvr
-odeslvrcache,odeopcache = odecache
-reuse,A,b,sysslvrcache = odeslvrcache
-
-# stageop = get_stage_operator(fesolver,op,r,(y,),odecache)
-ws = (1,1/(dt*θ))
-fe_sA = fe_jacobian!(A,op,r,(y,y),ws,odeopcache)
-Â = mdeim_result(op.lhs,fe_sA)
-
-fe_sb = fe_residual!(b,op,r,(y,y),odeopcache)
-b̂ = mdeim_result(op.rhs,fe_sb)
-
-red_cache,red_r,red_times,red_us,red_odeopcache = RBTransient._select_fe_quantities_at_time_locations(
-  b,op.rhs,r,(y,y),odeopcache)
-b = residual!(red_cache,op.op,red_r,red_us,red_odeopcache)
-
-ids_space = RBSteady.get_indices_space(op.rhs[1])
-ids_time::Vector{Int} = RBTransient._time_locations(op.rhs[1],red_times)
-# select_snapshots_entries(b[1],ids_space,ids_time)
-s,srange,trange = b[1],ids_space,ids_time
-T = eltype(s)
-nval = length(srange),length(trange)
-np = num_params(s)
-entries = array_of_consecutive_arrays(zeros(T,nval),np)
-
-_getindex(s::TransientBasicSnapshots,is,it,ip) = consecutive_getindex(s.data,is,ip+(it-1)*num_params(s))
-_getindex(s::TransientSnapshots,is,it,ip) = consecutive_getindex(s.data[it],is,ip)
-_getindex(s::TransientSparseSnapshots,is,it,ip) = param_getindex(s.data,ip+(it-1)*num_params(s))[is]
-
-# ip,i,it = 1,1,1
-# ipt = ip+(it-1)*num_params(s)
-# v = _getindex(s,srange,it,ip)
-# consecutive_setindex!(entries,v,:,ipt)
-@inbounds for ip = 1:np, (i,it) = enumerate(trange)
-  ipt = ip+(it-1)*num_params(s)
-  v = _getindex(s,srange,it,ip)
-  consecutive_setindex!(entries,v,:,ipt)
-end
-# mdeim_result(op.rhs,fe_sb)
-
-aa,bb = op.lhs[1][1],fe_sA[1][1]
-RBSteady.expand_cache!(aa,bb)
-RBSteady.coefficient!(aa,bb)
-
-basis = aa.basis
-coefficient = aa.coefficient
-result = aa.result
-
-fill!(result,zero(eltype(result)))
-
-@inbounds for i = eachindex(result)
-  result[i] = basis*coefficient[i]
-end
