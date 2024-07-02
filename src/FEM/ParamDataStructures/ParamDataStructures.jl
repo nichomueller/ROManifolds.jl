@@ -22,7 +22,7 @@ import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
 import SparseArrays.getcolptr
 
-import Mabla.FEM.IndexMaps: fast_index,slow_index
+import Mabla.FEM.IndexMaps: fast_index,slow_index,recast
 
 export AbstractParamRealization
 export ParamRealization
@@ -88,7 +88,6 @@ export AbstractConsecutiveParamMatrix
 include("ConsecutiveArrayOfArrays.jl")
 
 export MatrixOfSparseMatricesCSC
-export recast
 include("MatrixOfSparseMatrices.jl")
 
 export ConsecutiveParamArrays

@@ -21,27 +21,13 @@ RBSteady.num_reduced_dofs(a::TransientProjection) = RBSteady.num_reduced_space_d
 function RBSteady.Projection(s::UnfoldingTransientSnapshots,args...;kwargs...)
   s′ = flatten_snapshots(s)
   basis_space = tpod(s′,args...;kwargs...)
+  basis_space′ = recast(s,basis_space)
   compressed_s2 = compress(s′,basis_space,args...;swap_mode=true)
   basis_time = tpod(compressed_s2;kwargs...)
-  TransientPODBasis(basis_space,basis_time)
-end
-
-function RBSteady.Projection(s::UnfoldingTransientSparseSnapshots,args...;kwargs...)
-  s′ = flatten_snapshots(s)
-  basis_space = tpod(s′,args...;kwargs...)
-  compressed_s2 = compress(s′,basis_space,args...;swap_mode=true)
-  basis_time = tpod(compressed_s2;kwargs...)
-  sparse_basis_space = recast(s,basis_space)
-  TransientPODBasis(sparse_basis_space,basis_time)
+  TransientPODBasis(basis_space′,basis_time)
 end
 
 function RBSteady.Projection(s::AbstractTransientSnapshots,args...;kwargs...)
-  cores_space...,core_time = ttsvd(s,args...;kwargs...)
-  index_map = get_index_map(s)
-  TransientTTSVDCores(cores_space,core_time,index_map)
-end
-
-function RBSteady.Projection(s::TransientSparseSnapshots,args...;kwargs...)
   cores_space...,core_time = ttsvd(s,args...;kwargs...)
   cores_space′ = recast(s,cores_space)
   index_map = get_index_map(s)
@@ -67,7 +53,7 @@ get_basis_time(a::TransientPODBasis) = a.basis_time
 ParamDataStructures.num_times(a::TransientPODBasis) = size(get_basis_time(a),1)
 num_reduced_times(a::TransientPODBasis) = size(get_basis_time(a),2)
 
-function ParamDataStructures.recast(x̂::AbstractVector,a::TransientPODBasis)
+function IndexMaps.recast(x̂::AbstractVector,a::TransientPODBasis)
   basis_space = get_basis_space(a)
   basis_time = get_basis_time(a)
   ns = RBSteady.num_reduced_space_dofs(a)
@@ -158,7 +144,7 @@ function get_basis_spacetime(index_map::AbstractIndexMap,cores_space,core_time)
   cores2basis(RBSteady._cores2basis(index_map,cores_space...),core_time)
 end
 
-function ParamDataStructures.recast(x̂::AbstractVector,a::TransientTTSVDCores)
+function IndexMaps.recast(x̂::AbstractVector,a::TransientTTSVDCores)
   basis_spacetime = get_basis_spacetime(a)
   Ns = num_space_dofs(a)
   Nt = num_times(a)
@@ -194,25 +180,26 @@ function num_reduced_times(a::BlockProjection)
 end
 
 function RBSteady.enrich_basis(
-  b::BlockProjection{<:TransientProjection},
-  norm_matrix::BlockMatrix,
-  supr_op::BlockMatrix)
+  a::BlockProjection{<:TransientProjection},
+  norm_matrix::AbstractMatrix,
+  supr_op::AbstractMatrix)
 
-  basis_space = add_space_supremizers(get_basis_space(b),norm_matrix,supr_op)
-  basis_time = add_time_supremizers(get_basis_time(b))
+  basis_space = add_space_supremizers(a,norm_matrix,supr_op)
+  basis_time = add_time_supremizers(a)
   basis = BlockProjection(map(TransientPODBasis,basis_space,basis_time),b.touched)
   return basis
 end
 
 """
-    add_space_supremizers(basis_time::MatrixBlock;kwargs...) -> Vector{<:Matrix}
+    add_time_supremizers(a::BlockProjection{<:TransientProjection};kwargs...) -> Vector{<:Matrix}
 
-Enriches the temporal basis `basis_time` with temporal supremizers computed from
-the kernel of the temporal basis associated to the primal field onto the column
-space of the temporal basis (bases) associated to the duel field(s)
+Enriches the temporal basis with temporal supremizers computed from
+the kernel of the temporal basis associated to the primal field projected onto
+the column space of the temporal basis (bases) associated to the duel field(s)
 
 """
-function add_time_supremizers(basis_time;kwargs...)
+function add_time_supremizers(a::BlockProjection{<:TransientProjection};kwargs...)
+  basis_time = get_basis_time(a)
   basis_primal,basis_dual... = basis_time.array
   for i = eachindex(basis_dual)
     basis_primal = add_time_supremizers(basis_primal,basis_dual[i];kwargs...)

@@ -25,7 +25,7 @@ function RBSteady.ttsvd(mat::AbstractTransientSnapshots{T,N},X::AbstractTProduct
   return cores
 end
 
-function RBSteady.ttsvd(mat::TransientMultiValueSnapshots{T,N},X::AbstractTProductArray;kwargs...) where {T,N}
+function RBSteady.ttsvd(mat::TransientMultiValueSnapshots{T,N},X::MultiValueTProductArray;kwargs...) where {T,N}
   N_space = N-3
   cores = Vector{Array{T,3}}(undef,N-1)
   weights = Vector{Array{T,3}}(undef,N_space-1)

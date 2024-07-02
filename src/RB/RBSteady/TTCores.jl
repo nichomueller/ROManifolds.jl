@@ -9,9 +9,6 @@ Subtypes:
 """
 abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
 
-Base.IndexStyle(::Type{<:AbstractTTCore}) = IndexCartesian()
-Base.getindex(a::AbstractTTCore,i::Integer...) = getindex(a,CartesianIndex(i))
-
 """
     abstract type SparseCore{T,N} <: AbstractTTCore{T,N} end
 

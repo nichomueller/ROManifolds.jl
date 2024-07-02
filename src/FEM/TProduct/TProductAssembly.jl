@@ -97,7 +97,7 @@ end
 function FESpaces.allocate_vector(a::TProductSparseMatrixAssembler,vecdata::Vector)
   vecs_1d = map(allocate_vector,a.assems_1d,vecdata)
   vec = symbolic_kron(vecs_1d...)
-  return TProductArray(vec,vecs_1d,(a.row_index_map,))
+  return tproduct_array(vec,vecs_1d,(a.row_index_map,))
 end
 
 function FESpaces.assemble_vector!(b,a::TProductSparseMatrixAssembler,vecdata::Vector)
@@ -113,13 +113,13 @@ end
 function FESpaces.assemble_vector(a::TProductSparseMatrixAssembler,vecdata::Vector)
   vecs_1d = map(assemble_vector,a.assems_1d,vecdata)
   vec = _kron(vecs_1d...)
-  return TProductArray(vec,vecs_1d,(a.row_index_map,))
+  return tproduct_array(vec,vecs_1d,(a.row_index_map,))
 end
 
 function FESpaces.allocate_matrix(a::TProductSparseMatrixAssembler,matdata::Vector)
   mats_1d = map(allocate_matrix,a.assems_1d,matdata)
   mat = symbolic_kron(mats_1d...)
-  return TProductArray(mat,mats_1d,(a.row_index_map,a.col_index_map))
+  return tproduct_array(mat,mats_1d,(a.row_index_map,a.col_index_map))
 end
 
 function FESpaces.assemble_matrix!(A,a::TProductSparseMatrixAssembler,matdata::Vector)
@@ -135,14 +135,14 @@ end
 function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::Vector)
   mats_1d = map(assemble_matrix,a.assems_1d,matdata)
   mat = _kron(mats_1d...)
-  return TProductArray(mat,mats_1d,(a.row_index_map,a.col_index_map))
+  return tproduct_array(mat,mats_1d,(a.row_index_map,a.col_index_map))
 end
 
 function FESpaces.allocate_vector(a::TProductSparseMatrixAssembler,vecdata::TProductGradientEval)
   vecs_1d = map(allocate_vector,a.assems_1d,vecdata.f)
   gradvecs_1d = map(allocate_vector,a.assems_1d,vecdata.g)
   vec = symbolic_kron(vecs_1d,gradvecs_1d)
-  return TProductGradientArray(vec,vecs_1d,gradvecs_1d)
+  return tproduct_array(vec,vecs_1d,gradvecs_1d)
 end
 
 function FESpaces.assemble_vector!(b,a::TProductSparseMatrixAssembler,vecdata::TProductGradientEval)
@@ -161,14 +161,14 @@ function FESpaces.assemble_vector(a::TProductSparseMatrixAssembler,vecdata::TPro
   vecs_1d = map(assemble_vector,a.assems_1d,vecdata.f)
   gradvecs_1d = map(assemble_vector,a.assems_1d,vecdata.g)
   vec = kronecker_gradients(vecs_1d,gradvecs_1d,vecdata.op)
-  return TProductGradientArray(vec,vecs_1d,gradvecs_1d)
+  return tproduct_array(vec,vecs_1d,gradvecs_1d)
 end
 
 function FESpaces.allocate_matrix(a::TProductSparseMatrixAssembler,matdata::TProductGradientEval)
   mats_1d = map(allocate_matrix,a.assems_1d,matdata.f)
   gradmats_1d = map(allocate_matrix,a.assems_1d,matdata.g)
   mat = symbolic_kron(mats_1d,gradmats_1d)
-  return TProductGradientArray(mat,mats_1d,gradmats_1d,(a.row_index_map,a.col_index_map))
+  return tproduct_array(mat,mats_1d,gradmats_1d,(a.row_index_map,a.col_index_map))
 end
 
 function FESpaces.assemble_matrix!(A,a::TProductSparseMatrixAssembler,matdata::TProductGradientEval)
@@ -187,7 +187,7 @@ function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::TPro
   mats_1d = map(assemble_matrix,a.assems_1d,matdata.f)
   gradmats_1d = map(assemble_matrix,a.assems_1d,matdata.g)
   mat = kronecker_gradients(mats_1d,gradmats_1d,matdata.op)
-  return TProductGradientArray(mat,mats_1d,gradmats_1d,(a.row_index_map,a.col_index_map))
+  return tproduct_array(mat,mats_1d,gradmats_1d,(a.row_index_map,a.col_index_map))
 end
 
 # multi field

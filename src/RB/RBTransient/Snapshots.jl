@@ -317,7 +317,7 @@ const TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union
   TransientMultiValueSnapshots{T,N,L,D,I,R,A}
 }
 
-function ParamDataStructures.recast(s::TransientSparseSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T
+function IndexMaps.recast(s::TransientSparseSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T
   index_map = get_index_map(s)
   ls = IndexMaps.get_univariate_sparsity(index_map)
   asparse = map(SparseCore,a,ls)
@@ -354,7 +354,7 @@ end
 const UnfoldingTransientSnapshots{T,L,I<:TrivialIndexMap,R} = AbstractTransientSnapshots{T,3,L,1,I,R}
 const UnfoldingTransientSparseSnapshots{T,L,I<:TrivialIndexMap,R,A<:MatrixOfSparseMatricesCSC} = TransientSparseSnapshots{T,3,L,1,I,R,A}
 
-function ParamDataStructures.recast(s::UnfoldingTransientSparseSnapshots,a::AbstractMatrix)
+function IndexMaps.recast(s::UnfoldingTransientSparseSnapshots,a::AbstractMatrix)
   return recast(s.data,a)
 end
 

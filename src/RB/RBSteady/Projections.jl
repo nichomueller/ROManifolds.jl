@@ -37,22 +37,11 @@ num_reduced_dofs(a::SteadyProjection) = num_reduced_space_dofs(a)
 
 function Projection(s::UnfoldingSteadySnapshots,args...;kwargs...)
   basis = tpod(s,args...;kwargs...)
-  PODBasis(basis)
-end
-
-function Projection(s::UnfoldingSparseSnapshots,args...;kwargs...)
-  basis = tpod(s,args...;kwargs...)
-  sparse_basis = recast(s,basis)
-  PODBasis(sparse_basis)
+  basis′ = recast(s,basis)
+  PODBasis(basis′)
 end
 
 function Projection(s::AbstractSteadySnapshots,args...;kwargs...)
-  cores = ttsvd(s,args...;kwargs...)
-  index_map = get_index_map(s)
-  TTSVDCores(cores,index_map)
-end
-
-function Projection(s::SparseSnapshots,args...;kwargs...)
   cores = ttsvd(s,args...;kwargs...)
   cores′ = recast(s,cores)
   index_map = get_index_map(s)
@@ -65,7 +54,7 @@ end
 Returns the action of the transposed Projection operator `a` on `x̂`
 
 """
-function ParamDataStructures.recast(x̂::AbstractVector,a::SteadyProjection)
+function IndexMaps.recast(x̂::AbstractVector,a::SteadyProjection)
   basis = get_basis_space(a)
   x = basis*x̂
   return x
@@ -170,11 +159,7 @@ end
 function _cores2basis(i::FixedDofsIndexMap,a::AbstractArray{T,3}...) where T
   basis = _cores2basis(a...)
   invi = inv_index_map(i)
-  basis′ = similar(basis)
-  fill!(basis′,zero(eltype(basis′)))
-  @views basis′[:,remove_fixed_dof(invi),:] = basis[:,remove_fixed_dof(invi),:]
-  fixed_entries = findall(basis′.==zero(eltype(basis′)))
-  return FixedEntriesArray(basis′,fixed_entries)
+  return view(basis,:,remove_fixed_dof(invi),:)
 end
 
 # multi field interface
@@ -261,50 +246,98 @@ end
 
 function Projection(s::BlockSnapshots;kwargs...)
   norm_matrix = fill(nothing,size(s))
-  reduced_basis(s,norm_matrix;kwargs...)
+  Projection(s,norm_matrix;kwargs...)
 end
 
 function Projection(s::BlockSnapshots,norm_matrix;kwargs...)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  bases = [reduced_basis(s[i],norm_matrix[Block(i,i)];kwargs...) for i in active_block_ids]
+  bases = [Projection(s[i],norm_matrix[Block(i,i)];kwargs...) for i in active_block_ids]
   BlockProjection(block_map,bases)
 end
 
 """
     enrich_basis(
       a::BlockProjection,
-      norm_matrix::BlockMatrix,
-      supr_op::BlockMatrix) -> BlockProjection
+      norm_matrix::AbstractMatrix,
+      supr_op::AbstractMatrix) -> BlockProjection
 
 Returns the supremizer-enriched BlockProjection. This function stabilizes Inf-Sup
 problems projected on a reduced vector space
 
 """
-function enrich_basis(a::BlockProjection{<:PODBasis},norm_matrix::BlockMatrix,supr_op::BlockMatrix)
-  bases = add_space_supremizers(get_basis_space(a),norm_matrix,supr_op)
+function enrich_basis(a::BlockProjection,norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
+  bases = add_space_supremizers(a,norm_matrix,supr_op)
   return BlockProjection(bases,a.touched)
 end
 
 """
     add_space_supremizers(
       basis_space::MatrixBlock,
-      norm_matrix::BlockMatrix,
-      supr_op::BlockMatrix) -> Vector{<:Matrix}
+      norm_matrix::AbstractMatrix,
+      supr_op::AbstractMatrix) -> Vector{<:AbstractArray}
 
 Enriches the spatial basis `basis_space` with spatial supremizers computed from
 the action of the supremizing operator `supr_op` on the dual field(s)
 
 """
-function add_space_supremizers(basis_space,norm_matrix::BlockMatrix,supr_op::BlockMatrix)
+function add_space_supremizers(a::BlockProjection,norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
+  index_map = get_index_map(a)
+  basis_space = get_basis_space(a)
   basis_primal,basis_dual... = basis_space.array
   A = norm_matrix[Block(1,1)]
   H = cholesky(A)
   for i = eachindex(basis_dual)
-    b_i = supr_op[Block(1,i+1)] * basis_dual[i]
-    supr_i = H \ b_i
-    gram_schmidt!(supr_i,basis_primal,A)
-    basis_primal = hcat(basis_primal,supr_i)
+    C = supr_op[Block(1,i+1)]
+    basis_primal = add_space_supremizers(index_map,basis_primal,basis_dual[i],H,C)
   end
   return [basis_primal,basis_dual...]
+end
+
+function add_space_supremizers(a::BlockProjection,norm_matrix::BlockTProductArray,supr_op::BlockMatrix)
+  basis_space = get_basis_space(a)
+  basis_primal,basis_dual... = basis_space.array
+  A = norm_matrix[Block(1,1)].array
+  H = cholesky(A)
+  if num_space_dofs(a[1]) == size(A,1)
+    for i = eachindex(basis_dual)
+      C = supr_op[Block(1,i+1)]
+      basis_primal = add_space_supremizers(basis_primal,basis_dual[i],H,C)
+    end
+  else
+    imap = get_index_map(a[1])
+    basis_primal′ = map(1:num_components(imap)) do comp
+      basis_primal_comp = _get_component(basis_primal,imap,comp)
+      for i = eachindex(basis_dual)
+        C = supr_op[Block(1,i+1)]
+        @check num_space_dofs(a[i+1]) == size(C,1)
+        basis_primal_comp = add_space_supremizers(basis_primal_comp,basis_dual[i],H,C)
+      end
+      basis_primal_comp
+    end
+    basis_primal = _to_multivalue(basis_primal′...)
+  end
+  cores_primal = basis2cores(get_index_map(a[1]),basis_primal)
+  cores_dual = map(basis2cores,get_index_map(a[2:end]),basis_dual)
+  return [cores_primal,cores_dual...]
+end
+
+function add_space_supremizers(basis_primal,basis_dual,H,C)
+  b_i = C * basis_dual
+  supr_i = H \ b_i
+  gram_schmidt!(supr_i,basis_primal,A)
+  basis_primal = hcat(basis_primal,supr_i)
+  return basis_primal
+end
+
+function _get_component(a::AbstractMatrix,i::AbstractMultiValueIndexMap,comp::Integer)
+  icomp = get_component(i,comp)
+  n = num_components(i)
+  s,l = size(icomp),length(icomp)
+  i′ = LinearIndices(s) .+ n*(icomp-1)
+  view(a,i′,:)
+end
+
+function _to_multivalue(a::AbstractMatrix...)
+  vcat(a...)
 end

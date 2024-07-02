@@ -57,6 +57,12 @@ function IndexMaps.change_index_map(f,s::AbstractSnapshots)
   Snapshots(param_data(s),index_map′,get_realization(s))
 end
 
+function IndexMaps.recast(s::AbstractSnapshots,a::AbstractArray)
+  i = get_index_map(s)
+  a′ = recast(i,a)
+  return a′
+end
+
 """
     flatten_snapshots(s::AbstractSnapshots) -> AbstractSnapshots
 
@@ -272,8 +278,11 @@ const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
   SteadyMultiValueSnapshots{T,N,L,D,I,R,A}
 }
 
-function ParamDataStructures.recast(s::SparseSnapshots,a::AbstractMatrix)
-  return recast(s.data,a)
+function IndexMaps.recast(s::SparseSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T
+  index_map = get_index_map(s)
+  ls = IndexMaps.get_univariate_sparsity(index_map)
+  asparse = map(SparseCore,a,ls)
+  return asparse
 end
 
 """
@@ -304,8 +313,11 @@ function select_snapshots_entries(s::AbstractSteadySnapshots,srange)
   return entries
 end
 
-const UnfoldingSteadySnapshots{T,L,I,R} = AbstractSteadySnapshots{T,2,L,1,I,R}
-const UnfoldingSparseSnapshots{T,L,I,R,A} = SparseSnapshots{T,2,L,1,I,R,A}
+const UnfoldingSteadySnapshots{T,L,I<:TrivialIndexMap,R} = AbstractSteadySnapshots{T,2,L,1,I,R}
+
+function IndexMaps.recast(s::UnfoldingSteadySnapshots,a::AbstractMatrix)
+  return recast(s.data,a)
+end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::AbstractSnapshots{S,2}) where {T,S}
   consecutive_mul(get_values(A),get_values(B))

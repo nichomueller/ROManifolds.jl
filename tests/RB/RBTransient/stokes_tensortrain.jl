@@ -94,29 +94,30 @@ end
 i = get_vector_index_map(feop)
 snaps = Snapshots(vals,i,r)
 
+# serialize(RBSteady.get_snapshots_filename(test_dir),snaps)
+snaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
+
 s = snaps
 soff = select_snapshots(s,RBSteady.offline_params(rbsolver))
-
-using BlockArrays
 norm_matrix = assemble_norm_matrix(feop)
-X1 = norm_matrix[Block(1,1)]
-TProduct.unfold(X1)
+basis = reduced_basis(soff,norm_matrix)
+# enrich_basis(feop,basis,norm_matrix)
+supr_op = assemble_coupling_matrix(feop)
+enrich_basis(basis,norm_matrix,supr_op)
 
-using Gridap.Fields
-active_block_ids = get_touched_blocks(s)
-block_map = BlockMap(size(s),active_block_ids)
-# bases = [reduced_basis(s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
+basis_space = get_basis_space(basis)
 
-using Mabla.FEM.IndexMaps
-cores_space...,core_time = ttsvd(s[1],norm_matrix[Block(1,1)])
-index_map = get_index_map(s[1])
-cores = TransientTTSVDCores(cores_space,core_time,index_map)
+red_trial,red_test = reduced_fe_space(rbsolver,feop,snaps)
+op = get_algebraic_operator(feop)
 
-cores_space...,core_time = ttsvd(s[2],norm_matrix[Block(2,2)])
-index_map = get_index_map(s[2])
-# cores = TransientTTSVDCores(cores_space,core_time,index_map)
-basis = RBSteady._cores2basis(cores_space...)
-invi = inv_index_map(index_map)
-view(basis,:,vec(invi),:)
+X11 = norm_matrix[Block(1,1)]
 
-bb = RBSteady._cores2basis(index_map,cores_space...)
+reffe_u′ = ReferenceFE(lagrangian,Float64,order)
+test_u′ = TestFESpace(Ω,reffe_u′;conformity=:H1,dirichlet_tags=["dirichlet"])
+induced_norm′(du,v) = ∫(du*v)dΩ.measure + ∫(∇(v)⋅∇(du))dΩ.measure
+X = assemble_matrix(induced_norm′,test_u′.space,test_u′.space)
+
+
+#
+basis_space_1 = get_basis_space(basis[1])
+cores_space_1 = basis[1].cores_space

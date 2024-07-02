@@ -112,6 +112,15 @@ function fix_dof_index_map(i::AbstractIndexMap,dofs_to_fix)
 end
 
 """
+    recast(i::AbstractIndexMap,a::AbstractArray) -> AbstractArray
+
+Recasting operation of an array according to the index map `i`
+"""
+function recast(i::AbstractIndexMap,a::AbstractArray)
+  return a
+end
+
+"""
     TrivialIndexMap{Ti,I<:AbstractVector{Ti}} <: AbstractIndexMap{1,Ti}
 
 Represents an index map that does not change the indexing strategy of the FEM function.

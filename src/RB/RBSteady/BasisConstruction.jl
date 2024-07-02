@@ -168,6 +168,9 @@ function _get_norm_matrices(X::TProductGradientArray,::Val{d}) where d
   N = TProduct.univariate_length(X)
   _get_norm_matrices(X,Val(d),Val{N}())
 end
+function _get_norm_matrices(X::MultiValueTProductArray,args...)
+  _get_norm_matrices(get_component(X,num_components(X)),args...)
+end
 
 function _weight_array!(weights,cores,X,::Val{1})
   X1 = _get_norm_matrices(X,Val(1))
@@ -254,7 +257,7 @@ function ttsvd(mat::AbstractArray{T,N},X::AbstractTProductArray;kwargs...) where
   return cores
 end
 
-function ttsvd(mat::SteadyMultiValueSnapshots{T,N},X::AbstractTProductArray;kwargs...) where {T,N}
+function ttsvd(mat::AbstractArray{T,N},X::MultiValueTProductArray;kwargs...) where {T,N}
   cores = Vector{Array{T,3}}(undef,N-1)
   weights = Vector{Array{T,3}}(undef,N-1)
   ranks = fill(1,N)

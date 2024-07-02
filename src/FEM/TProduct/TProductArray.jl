@@ -9,6 +9,7 @@ Subtypes:
 - [`TProductArray`](@ref)
 - [`TProductGradientArray`](@ref)
 - [`MultiValueTProductArray`](@ref)
+- [`BlockTProductArray`](@ref)
 
 """
 #TODO I'm only using this for matrices, not vectors. Can change to <: AbstractMatrix{T} ?
@@ -120,26 +121,28 @@ where M₁, M₂, M₃, ... represent the 1-D mass matrices on their respective 
 U+1D4D8(⋅) is the index map, and M₁₂₃... is the D-dimensional mass matrix
 
 """
-struct TProductArray{T,N,A,I} <: AbstractTProductArray{T,N}
+struct TProductArray{T,N,A<:AbstractArray{T,N},I} <: AbstractTProductArray{T,N}
   array::A
   arrays_1d::Vector{A}
   index_map::NTuple{N,I}
-  function TProductArray(
-    array::A,
-    arrays_1d::Vector{A},
-    index_map::NTuple{N,I}
-    ) where {T,N,A<:AbstractArray{T,N},I}
-    new{T,N,A,I}(array,arrays_1d,index_map)
-  end
+end
+
+function tproduct_array(
+  array::A,
+  arrays_1d::Vector{A},
+  index_map::NTuple{N,I}
+  ) where {T,N,A<:AbstractArray{T,N},I<:TProductIndexMap}
+
+  TProductArray(array,arrays_1d,index_map)
 end
 
 Arrays.get_array(a::TProductArray) = a.array
 get_index_map(a::TProductArray) = a.index_map
 univariate_length(a::TProductArray) = length(a.arrays_1d)
 
-function TProductArray(arrays_1d::Vector{A},index_map::NTuple) where A
+function tproduct_array(arrays_1d::Vector{A},index_map::NTuple) where A
   array::A = _kron(arrays_1d...)
-  TProductArray(array,arrays_1d,index_map)
+  tproduct_array(array,arrays_1d,index_map)
 end
 
 function Base.similar(a::TProductArray{T,N},::Type{T′},dims::Dims{N}) where {T,T′,N}
@@ -150,7 +153,6 @@ function Base.copyto!(a::TProductArray,b::TProductArray)
   @check size(a) == size(b)
   copyto!(a.array,a.array)
   map(copyto!,a.arrays_1d,b.arrays_1d)
-  map(copyto!,a.index_map,b.index_map)
   a
 end
 
@@ -424,20 +426,21 @@ A₁, A₂, A₃, ... represent the 1-D stiffness matrices on their respective a
 U+1D4D8(⋅) is the index map, and A₁₂₃... is the D-dimensional stiffness matrix
 
 """
-struct TProductGradientArray{T,N,A,I} <: AbstractTProductArray{T,N}
+struct TProductGradientArray{T,N,A<:AbstractArray{T,N},I} <: AbstractTProductArray{T,N}
   array::A
   arrays_1d::Vector{A}
   gradients_1d::Vector{A}
   index_map::NTuple{N,I}
-  function TProductGradientArray(
-    array::A,
-    arrays_1d::Vector{A},
-    gradients_1d::Vector{A},
-    index_map::NTuple{N,I}
-    ) where {T,N,A<:AbstractArray{T,N},I}
+end
 
-    new{T,N,A,I}(array,arrays_1d,gradients_1d,index_map)
-  end
+function tproduct_array(
+  array::A,
+  arrays_1d::Vector{A},
+  gradients_1d::Vector{A},
+  index_map::NTuple{N,I}
+  ) where {T,N,A<:AbstractArray{T,N},I<:TProductIndexMap}
+
+  TProductGradientArray(array,arrays_1d,gradients_1d,index_map)
 end
 
 Arrays.get_array(a::TProductGradientArray) = a.array
@@ -458,7 +461,6 @@ function Base.copyto!(a::TProductGradientArray,b::TProductGradientArray)
   copyto!(a.array,a.array)
   map(copyto!,a.arrays_1d,b.arrays_1d)
   map(copyto!,a.gradients_1d,b.gradients_1d)
-  map(copyto!,a.index_map,b.index_map)
   a
 end
 
@@ -475,43 +477,36 @@ SparseArrays.nzrange(a::TProductGradientSparseMatrix,col::Integer) = nzrange(a.a
 SparseArrays.rowvals(a::TProductGradientSparseMatrix) = rowvals(a.array)
 SparseArrays.nonzeros(a::TProductGradientSparseMatrix) = a.array
 
-# MultiField interface
-const BlockTProductArray{T,N,A<:BlockArray,I<:Vector{<:AbstractIndexMap}} = TProductArray{T,N,A,I}
-const BlockTProductGradientArray{T,N,A<:BlockArray,I<:Vector{<:AbstractIndexMap}} = TProductGradientArray{T,N,A,I}
-const AbstractBlockTProductArray{T,N,A<:BlockArray,I<:Vector{<:AbstractIndexMap}} = Union{
-  BlockTProductArray{T,N,A,I},
-  BlockTProductGradientArray{T,N,A,I}
-}
-
-Base.@propagate_inbounds function Base.getindex(a::BlockTProductArray{T,2},i::Block{2}) where T
-  @boundscheck blockcheckbounds(a.array,i)
-  row_indices,col_indices = a.index_map
-  imaps = (row_indices[i.n[1]],col_indices[i.n[2]])
-  TProductArray(a.array[i],getindex.(a.arrays_1d,i),imaps)
-end
-
-Base.@propagate_inbounds function Base.getindex(a::BlockTProductGradientArray{T,2},i::Block{2}) where T
-  @boundscheck blockcheckbounds(a.array,i)
-  row_indices,col_indices = a.index_map
-  imaps = (row_indices[i.n[1]],col_indices[i.n[2]])
-  TProductGradientArray(a.array[i],getindex.(a.arrays_1d,i),getindex.(a.gradients_1d,i),imaps)
-end
-
 """
-    struct MultiValueTProductArray{T,N,A} <: AbstractTProductArray{T,N} end
-
-Used to unfold a multi value TProductArray into the correct dimensions
-
 """
-struct MultiValueTProductArray{T,N,A} <: AbstractTProductArray{T,N}
+struct MultiValueTProductArray{T,N,A<:AbstractTProductArray{T,N}} <: AbstractTProductArray{T,N}
   array::A
   ncomps::Int
-  function MultiValueTProductArray(array::A) where {T,N′,A<:AbstractTProductArray{T,N′}}
-    i = get_index_map(array)
-    ncomps = num_components(first(i))
-    N = N′ + 1
-    new{T,N,A}(array,ncomps)
-  end
+end
+
+function tproduct_array(
+  array::A,
+  arrays_1d::Vector{A},
+  index_map::NTuple{N,I}
+  ) where {T,N,A<:AbstractArray{T,N},I<:TProductIndexMap{D,Ti,<:AbstractMultiValueIndexMap}}
+
+  array = TProductArray(array,arrays_1d,index_map)
+  ncomps = num_components(first(index_map).indices)
+  @check all(num_components(index_map[i].indices) for i = 2:N)
+  MultiValueTProductArray(array,ncomps)
+end
+
+function tproduct_array(
+  array::A,
+  arrays_1d::Vector{A},
+  gradients_1d::Vector{A},
+  index_map::NTuple{N,I}
+  ) where {T,N,A<:AbstractArray{T,N},I<:TProductIndexMap{D,Ti,<:AbstractMultiValueIndexMap}}
+
+  array = TProductGradientArray(array,arrays_1d,gradients_1d,index_map)
+  ncomps = num_components(first(index_map).indices)
+  @check all(num_components(index_map[i].indices) for i = 2:N)
+  MultiValueTProductArray(array,ncomps)
 end
 
 Arrays.get_array(a::MultiValueTProductArray) = get_array(a.array)
@@ -519,19 +514,89 @@ get_index_map(a::MultiValueTProductArray) = get_index_map(a.array)
 univariate_length(a::MultiValueTProductArray) = univariate_length(a.array) + 1
 TensorValues.num_components(a::MultiValueTProductArray) = a.ncomps
 
-Base.size(a::MultiValueTProductArray{T,N}) where {T,N} = (size(a.array)...,a.ncomps)
-
-function unfold(a::AbstractTProductArray)
-  _remove_tprod_map(i) = i
-  _remove_tprod_map(i::TProductIndexMap) = i.indices
-
-  a′ = change_index_map(_remove_tprod_map,a)
-  i′ = get_index_map(a′)
-  @check all(isa.(i′,AbstractMultiValueIndexMap))
-  MultiValueTProductArray(a′)
+function IndexMaps.get_component(a::MultiValueTProductArray{T,N,<:TProductArray},ncomp::Integer) where {T,N}
+  @check ncomp ≤ num_components(a)
+  @unpack array,arrays_1d,index_map = a.array
+  index_map′ = get_component(index_map,ncomp)
+  tproduct_array(array,arrays_1d,index_map′)
 end
 
-# need to implement this to avoid errors in the multi field case
+function IndexMaps.get_component(a::MultiValueTProductArray{T,N,<:TProductGradientArray},ncomp::Integer) where {T,N}
+  @check ncomp ≤ num_components(a)
+  @unpack array,arrays_1d,gradients_1d,index_map = a.array
+  index_map′ = get_component(index_map,ncomp)
+  tproduct_array(array,arrays_1d,gradients_1d,index_map′)
+end
+
+const TProductMultiValueSparseMatrix{
+  T,A<:Union{TProductSparseMatrix,TProductGradientSparseMatrix}
+  } = TProductMultiValueArray{T,2,A}
+
+SparseArrays.nnz(a::TProductMultiValueSparseMatrix) = nnz(a.array)
+SparseArrays.nzrange(a::TProductMultiValueSparseMatrix,col::Integer) = nzrange(a.array,col)
+SparseArrays.rowvals(a::TProductMultiValueSparseMatrix) = rowvals(a.array)
+SparseArrays.nonzeros(a::TProductMultiValueSparseMatrix) = nonzeros(a.array)
+
+# MultiField interface
+struct BlockTProductArray{A<:AbstractTProductArray,N} <: AbstractArray{A,N}
+  array::Array{A,N}
+end
+
+function tproduct_array(
+  array::A,
+  arrays_1d::Vector{A},
+  index_map::NTuple{N,I}
+  ) where {A<:BlockArray,I<:Vector{<:TProductIndexMap}}
+
+  nblocks = blocklength(array)
+  arrays = map(1:nblocks) do i
+    array_i = blocks(array)[i]
+    arrays_1d_i = map(blocks,arrays_1d)[i]
+    index_map_i = getindex.(index_map,i)
+    tproduct_array(array_i,arrays_1d_i,index_map_i)
+  end
+  BlockTProductArray(array)
+end
+
+function tproduct_array(
+  array::A,
+  arrays_1d::Vector{A},
+  gradients_1d::Vector{A},
+  index_map::NTuple{N,I}
+  ) where {A<:BlockArray,I<:Vector{<:TProductIndexMap}}
+
+  nblocks = blocklength(array)
+  arrays = map(1:nblocks) do i
+    array_i = blocks(array)[i]
+    arrays_1d_i = map(blocks,arrays_1d)[i]
+    gradients_1d_i = map(blocks,gradients_1d)[i]
+    index_map_i = getindex.(index_map,i)
+    tproduct_array(array_i,arrays_1d_i,gradients_1d_i,index_map_i)
+  end
+  BlockTProductArray(array)
+end
+
+Base.size(a::BlockTProductArray) = size(a.array)
+
+Base.@propagate_inbounds function Base.getindex(
+  a::BlockTProductArray{A,N},
+  i::Vararg{Integer,N}
+  ) where {A,N}
+
+  @boundscheck blockcheckbounds(a.array,i)
+  getindex(a.array,i...)
+end
+
+Base.@propagate_inbounds function Base.setindex!(
+  a::BlockTProductArray{A,N},
+  v,i::Vararg{Integer,N}
+  ) where {A,N}
+
+  @boundscheck blockcheckbounds(a.array,i)
+  setindex!(a.array,v,i...)
+end
+
+# otherwise the sum/subtraction is a regular array
 function Base.:+(A::AbstractBlockArray,B::AbstractBlockArray)
   @check axes(A) == axes(B)
   AB = (+)(A.blocks,B.blocks)

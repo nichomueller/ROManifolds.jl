@@ -111,7 +111,7 @@ end
 
 struct RecastMap <: Map end
 
-function ParamDataStructures.recast(x::AbstractVector,r::FESubspace)
+function IndexMaps.recast(x::AbstractVector,r::FESubspace)
   cache = return_cache(RecastMap(),x,r)
   evaluate!(cache,RecastMap(),x,r)
   return cache

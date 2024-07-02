@@ -48,6 +48,7 @@ export AbstractTProductArray
 export TProductArray
 export TProductGradientArray
 export MultiValueTProductArray
+export BlockTProductArray
 export symbolic_kron
 export symbolic_kron!
 export numerical_kron!
