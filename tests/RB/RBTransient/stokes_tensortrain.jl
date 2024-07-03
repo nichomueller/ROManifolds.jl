@@ -191,6 +191,11 @@ V2=assemble_vector((v)->∫((∇⋅(v)))dΩ.measures_1d[2],test_u.spaces_1d[2])
 W1=assemble_vector((v)->∫(v)dΩ.measures_1d[1],test_u.spaces_1d[1])
 W2=assemble_vector((v)->∫(v)dΩ.measures_1d[2],test_u.spaces_1d[2])
 
+tp_row_index_map = get_tp_dof_index_map(test_u)
+tp_col_index_map = get_tp_dof_index_map(test_p)
+row_index_map = get_dof_index_map(test_u)
+col_index_map = get_dof_index_map(test_p)
+
 # gradient in direction 1
 V1′ = kron(W2,V1)
 V1′[tp_row_index_map[:,:,1]] ≈ V[row_index_map[:,:,1]]
@@ -198,10 +203,6 @@ V1′[tp_row_index_map[:,:,1]] ≈ V[row_index_map[:,:,1]]
 # gradient in direction 2
 V2′ = kron(V2,W1)
 V2′[tp_row_index_map[:,:,1]] ≈ V[row_index_map[:,:,2]]
-
-row_index_map = get_dof_index_map(test_u)
-col_index_map = get_dof_index_map(test_p)
-tp_row_index_map = get_tp_dof_index_map(test_u)
 
 # with matrix
 B = assemble_matrix((u,q) -> ∫(q*(∇⋅(u)))dΩ.measure,test_u.space,test_p.space)
@@ -226,9 +227,22 @@ B2 = MySparseMatrix(B,mmap[:,:,2])
 
 # ASSEMBLE TPRODUCT B
 v,p = get_tp_fe_basis(test_u),get_tp_trial_fe_basis(test_p)
-B = assemble_matrix((p,v) -> ∫(p*(∇⋅(v)))dΩ,test_u,test_p)
 
 ∫(p*(∇⋅(v)))dΩ
 assem = SparseMatrixAssembler(test_u,test_p)
 
-∇⋅(v)
+x = get_cell_points(Ω)
+∇(v)(x)
+(∇⋅(v))(x)
+(p*(∇⋅(v)))(x)
+
+using Gridap.FESpaces
+dc = ∫(p*(∇⋅(v)))dΩ
+assem = SparseMatrixAssembler(test_p,test_u)
+matdata = collect_cell_matrix(test_p,test_u,dc)
+B = assemble_matrix(assem,matdata)
+B1 = kron(B.arrays_1d[2],B.gradients_1d[1])[tp_row_index_map[:,:,1][:],tp_col_index_map[:]]
+B2 = kron(B.gradients_1d[2],B.arrays_1d[1])[tp_row_index_map[:,:,2][:],tp_col_index_map[:]]
+B′ = vcat(B1,B2)
+
+Bok = assemble_matrix((p,v) -> ∫(p*(∇⋅(v)))dΩ.measure,test_p.space,test_u.space)

@@ -25,14 +25,35 @@ function Arrays.evaluate!(cache,f::CellField,x::TProductCellPoint)
 end
 
 """
-    TProductCellField{DS<:DomainStyle,A} <: CellField
+    abstract type TProductCellField <: CellField end
+
+Subtypes:
+- [`GenericTProductCellField`](@ref)
+- [`TProductDiffCellField`](@ref)
 
 """
-struct TProductCellField{DS<:DomainStyle,A} <: CellField
+abstract type TProductCellField <: CellField end
+
+get_tp_data(f::AbstractVector{<:AbstractArray}) = f
+get_tp_data(f::AbstractVector{<:CellField}) = f
+get_tp_data(f::TProductCellField) = @abstractmethod
+
+get_diff_data(f::TProductCellField) = @abstractmethod
+
+get_tp_diff_data(f::AbstractVector{<:AbstractArray}) = f
+get_tp_diff_data(f::AbstractVector{<:CellField}) = f
+get_tp_diff_data(f::TProductCellField) = @abstractmethod
+
+"""
+    GenericTProductCellField{DS<:DomainStyle,A,B} <: TProductCellField
+
+"""
+struct GenericTProductCellField{DS<:DomainStyle,A,B} <: TProductCellField
   single_fields::A
+  trian::B
   domain_style::DS
 
-  function TProductCellField(single_fields::A) where {A<:Vector{<:CellField}}
+  function GenericTProductCellField(single_fields::A,trian::B) where {A<:Vector{<:CellField},B<:TProductTriangulation}
     @assert length(single_fields) > 0
     if any( map(i->DomainStyle(i)==ReferenceDomain(),single_fields) )
       domain_style = ReferenceDomain()
@@ -40,91 +61,77 @@ struct TProductCellField{DS<:DomainStyle,A} <: CellField
       domain_style = PhysicalDomain()
     end
     DS = typeof(domain_style)
-    new{DS,A}(single_fields,domain_style)
+    new{DS,A,B}(single_fields,trian,domain_style)
   end
 end
 
-get_tp_data(f::TProductCellField) = f.single_fields
+get_tp_data(f::GenericTProductCellField) = f.single_fields
 
-function CellData.get_triangulation(f::TProductCellField)
-  s1 = first(f.single_fields)
-  trian = get_triangulation(s1)
-  @check all(map(i->trian===get_triangulation(i),f.single_fields))
-  trian
-end
+CellData.get_triangulation(f::GenericTProductCellField) = f.trian
 
-CellData.DomainStyle(::Type{TProductCellField{DS}}) where DS = DS()
+CellData.DomainStyle(::Type{<:GenericTProductCellField{DS}}) where DS = DS()
 
-function LinearAlgebra.dot(a::TProductCellField,b::TProductCellField)
-  @check length(a.single_fields) == length(b.single_fields)
-  return sum(map(dot,a.single_fields,b.single_fields))
-end
+# function LinearAlgebra.dot(f::GenericTProductCellField,b::GenericTProductCellField)
+#   @check length(f.single_fields) == length(b.single_fields)
+#   return sum(map(dot,f.single_fields,b.single_fields))
+# end
 
-# gradients
+# differentiation
 
 """
-    TProductGradientCellField{A,B} <: CellField
+    abstract type TProductDiffCellField <: TProductCellField end
 
 """
-struct TProductGradientCellField{A,B} <: CellField
+abstract type TProductDiffCellField <: TProductCellField end
+
+"""
+    GenericTProductDiffCellField{A,B} <: TProductDiffCellField
+
+"""
+struct GenericTProductDiffCellField{O,A,B} <: TProductDiffCellField
+  op::O
   cell_data::A
-  gradient_cell_data::B
+  diff_cell_data::B
 end
 
-get_tp_data(a::TProductGradientCellField) = a.cell_data
-CellData.DomainStyle(a::TProductGradientCellField) = DomainStyle(get_tp_data(a))
-CellData.get_triangulation(a::TProductGradientCellField) = get_triangulation(get_tp_data(a))
-get_gradient_data(a::TProductGradientCellField) = a.gradient_cell_data
+const GradientTProductCellField{A,B} = GenericTProductDiffCellField{typeof(gradient),A,B}
+const DivergenceTProductCellField{A,B} = GenericTProductDiffCellField{typeof(divergence),A,B}
+
+CellData.get_data(f::GenericTProductDiffCellField) = f.cell_data
+get_diff_data(f::GenericTProductDiffCellField) = f.diff_cell_data
+
+get_tp_data(f::GenericTProductDiffCellField) = get_tp_data(f.cell_data)
+get_tp_diff_data(f::GenericTProductDiffCellField) = get_tp_data(f.diff_cell_data)
+
+CellData.get_triangulation(f::GenericTProductDiffCellField) = get_triangulation(f.cell_data)
+
+CellData.DomainStyle(f::GenericTProductDiffCellField) = DomainStyle(f.cell_data)
 
 function Fields.gradient(f::TProductCellField)
-  g = TProductCellField(gradient.(f.single_fields))
-  return TProductGradientCellField(f,g)
+  g = GenericTProductCellField(gradient.(f.single_fields),f.trian)
+  return GenericTProductDiffCellField(gradient,f,g)
 end
-
-# stores the evaluation of a TProductGradientCellField on a quadrature
-struct TProductGradientEval{A,B,C}
-  f::A
-  g::B
-  op::C
-end
-
-function TProductGradientEval(f::AbstractVector,g::AbstractVector)
-  op = nothing
-  TProductGradientEval(f,g,op)
-end
-
-get_tp_data(a::TProductGradientEval) = a.f
-get_tp_gradient_data(a::TProductGradientEval) = a.g
-
-# divergence
-
-"""
-    TProductDivCellField{A,B} <: CellField
-
-"""
-struct TProductDivCellField{A,B} <: CellField
-  cell_data::A
-  div_cell_data::B
-end
-
-get_tp_data(a::TProductDivCellField) = a.cell_data
-CellData.DomainStyle(a::TProductDivCellField) = DomainStyle(get_tp_data(a))
-CellData.get_triangulation(a::TProductDivCellField) = get_triangulation(get_tp_data(a))
-get_tp_gradient_data(a::TProductDivCellField) = a.div_cell_data
 
 function Fields.divergence(f::TProductCellField)
-  g = TProductCellField(divergence.(f.single_fields))
-  return TProductDivCellField(f,g)
+  g = GenericTProductCellField(divergence.(f.single_fields),f.trian)
+  return GenericTProductDiffCellField(divergence,f,g)
 end
 
-# stores the evaluation of a TProductDivCellField on a quadrature
-struct TProductDivEval{A,B,C}
+# stores the evaluation of a GenericTProductDiffCellField on a quadrature
+struct GenericTProductDiffEval{O,A,B}
+  op::O
   f::A
   g::B
 end
 
-get_tp_data(a::TProductDivEval) = a.f
-get_tp_gradient_data(a::TProductDivEval) = a.g
+const GradientTProductEval{A,B} = GenericTProductDiffEval{typeof(gradient),A,B}
+const DivergenceTProductEval{A,B} = GenericTProductDiffEval{typeof(divergence),A,B}
+
+CellData.get_data(f::GenericTProductDiffEval) = f.f
+get_diff_data(f::GenericTProductDiffEval) = f.g
+
+get_tp_data(f::GenericTProductDiffEval) = get_tp_data(f.f)
+get_tp_diff_data(f::GenericTProductDiffEval) = get_tp_data(f.g)
 
 # fe basis
 
@@ -160,29 +167,30 @@ function Fields.gradient(f::TProductFEBasis)
   dbasis = map(gradient,f.basis)
   trian = get_triangulation(f)
   g = TProductFEBasis(dbasis,trian)
-  return TProductGradientCellField(f,g)
+  return GenericTProductDiffCellField(gradient,f,g)
 end
 
 function Fields.divergence(f::TProductFEBasis)
-  g = map(divergence,f.basis)
-  return TProductDivCellField(f,g)
+  dbasis = map(divergence,f.basis)
+  g = GenericTProductCellField(dbasis,f.trian)
+  return GenericTProductDiffCellField(divergence,f,g)
 end
 
 const MultiFieldTProductFEBasis{DS,BS,B} = TProductFEBasis{DS,BS,Vector{MultiFieldCellField{DS}},B}
 
-MultiField.num_fields(a::MultiFieldTProductFEBasis) = length(a.basis[1])
+MultiField.num_fields(f::MultiFieldTProductFEBasis) = length(f.basis[1])
 
-Base.length(a::MultiFieldTProductFEBasis) = num_fields(a)
+Base.length(f::MultiFieldTProductFEBasis) = num_fields(f)
 
-function Base.getindex(a::MultiFieldTProductFEBasis,i::Integer)
-  TProductFEBasis(getindex.(a.basis,i),a.trian,a.domain_style,a.basis_style)
+function Base.getindex(f::MultiFieldTProductFEBasis,i::Integer)
+  TProductFEBasis(getindex.(f.basis,i),f.trian,f.domain_style,f.basis_style)
 end
 
-function Base.iterate(a::MultiFieldTProductFEBasis,state=1)
-  if state > num_fields(a)
+function Base.iterate(f::MultiFieldTProductFEBasis,state=1)
+  if state > num_fields(f)
     return nothing
   end
-  astate = TProductFEBasis(getindex.(a.basis,state),a.trian,a.domain_style,a.basis_style)
+  astate = TProductFEBasis(getindex.(f.basis,state),f.trian,f.domain_style,f.basis_style)
   return astate,state+1
 end
 
@@ -219,59 +227,59 @@ end
 
 function Arrays.evaluate!(cache,k::Operation,α::TProductCellDatum,β::TProductCellDatum)
   αβ = map(evaluate!,cache,Fill(k,length(cache)),get_tp_data(α),get_tp_data(β))
-  TProductCellField(αβ)
+  GenericTProductCellField(αβ,get_triangulation(α))
 end
 
-function Arrays.return_cache(f::TProductGradientCellField,x::TProductCellPoint)
-  cache = return_cache(get_tp_data(f),x)
-  gradient_cache = return_cache(get_gradient_data(f),x)
-  return cache,gradient_cache
+function Arrays.return_cache(f::GenericTProductDiffCellField,x::TProductCellPoint)
+  cache = return_cache(get_data(f),x)
+  diff_cache = return_cache(get_diff_data(f),x)
+  return cache,diff_cache
 end
 
-function Arrays.evaluate!(_cache,f::TProductGradientCellField,x::TProductCellPoint)
-  cache,gradient_cache = _cache
-  fx = evaluate!(cache,get_tp_data(f),x)
-  dfx = evaluate!(gradient_cache,get_gradient_data(f),x)
-  return TProductGradientEval(fx,dfx)
+function Arrays.evaluate!(_cache,f::GenericTProductDiffCellField,x::TProductCellPoint)
+  cache,diff_cache = _cache
+  fx = evaluate!(cache,get_data(f),x)
+  dfx = evaluate!(diff_cache,get_diff_data(f),x)
+  return GenericTProductDiffEval(f.op,fx,dfx)
 end
 
-function Arrays.return_cache(k::Operation,f::TProductGradientCellField...)
-  cache = return_cache(k,map(get_tp_data,f)...)
-  gradient_cache = return_cache(k,map(get_gradient_data,f)...)
-  return cache,gradient_cache
+function Arrays.return_cache(k::Operation,α::GradientTProductCellField,β::GradientTProductCellField)
+  cache = return_cache(k,get_data(α),get_data(β))
+  diff_cache = return_cache(k,get_diff_data(α),get_diff_data(β))
+  return cache,diff_cache
 end
 
-function Arrays.evaluate!(_cache,k::Operation,α::TProductGradientCellField,β::TProductGradientCellField)
-  cache,gradient_cache = _cache
-  αβ = evaluate!(cache,k,get_tp_data(α),get_tp_data(β))
-  dαβ = evaluate!(gradient_cache,k,get_gradient_data(α),get_gradient_data(β))
-  return TProductGradientCellField(αβ,dαβ)
+function Arrays.return_cache(k::Operation{typeof(*)},α::TProductCellDatum,β::DivergenceTProductCellField)
+  cache = return_cache(k,α,get_data(β))
+  diff_cache = return_cache(k,α,get_diff_data(β))
+  return cache,diff_cache
 end
 
-function Arrays.return_cache(f::TProductDivCellField,x::TProductCellPoint)
-  cache = return_cache(get_tp_data(f),x)
-  div_cache = map(return_cache,get_tp_gradient_data(f),get_tp_data(x))
-  return cache,div_cache
+function Arrays.return_cache(k::Operation{typeof(*)},α::DivergenceTProductCellField,β::TProductCellDatum)
+  cache = return_cache(k,get_data(α),β)
+  diff_cache = return_cache(k,α,get_diff_data(β),β)
+  return cache,diff_cache
 end
 
-function Arrays.evaluate!(_cache,f::TProductDivCellField,x::TProductCellPoint)
-  cache,div_cache = _cache
-  fx = evaluate!(cache,get_tp_data(f),x)
-  dfx = map(evaluate!,div_cache,get_gradient_data(f),x)
-  return TProductDivEval(fx,dfx)
+function Arrays.evaluate!(_cache,k::Operation,α::GradientTProductCellField,β::GradientTProductCellField)
+  cache,diff_cache = _cache
+  αβ = evaluate!(cache,k,get_data(α),get_data(β))
+  dαβ = evaluate!(diff_cache,k,get_diff_data(α),get_diff_data(β))
+  return GenericTProductDiffCellField(gradient,αβ,dαβ)
 end
 
-function Arrays.return_cache(k::Operation,f::TProductDivCellField...)
-  cache = return_cache(k,map(get_tp_data,f)...)
-  gradient_cache = return_cache(k,map(get_gradient_data,f)...)
-  return cache,gradient_cache
+function Arrays.evaluate!(_cache,k::Operation{typeof(*)},α::TProductCellDatum,β::DivergenceTProductCellField)
+  cache,diff_cache = _cache
+  αβ = evaluate!(cache,k,α,get_data(β))
+  dαβ = evaluate!(cache,k,α,get_diff_data(β))
+  return GenericTProductDiffCellField(divergence,αβ,dαβ)
 end
 
-function Arrays.evaluate!(_cache,k::Operation,α::TProductDivCellField,β::TProductDivCellField)
-  cache,gradient_cache = _cache
-  αβ = evaluate!(cache,k,get_tp_data(α),get_tp_data(β))
-  dαβ = evaluate!(gradient_cache,k,get_gradient_data(α),get_gradient_data(β))
-  return TProductDivCellField(αβ,dαβ)
+function Arrays.evaluate!(_cache,k::Operation{typeof(*)},α::DivergenceTProductCellField,β::TProductCellDatum)
+  cache,diff_cache = _cache
+  αβ = evaluate!(cache,k,get_data(α),β)
+  dαβ = evaluate!(cache,k,get_diff_data(α),β)
+  return GenericTProductDiffCellField(divergence,αβ,dαβ)
 end
 
 # integration
@@ -280,68 +288,14 @@ function CellData.integrate(f::TProductCellDatum,a::TProductMeasure)
   map(integrate,get_tp_data(f),a.measures_1d)
 end
 
-function CellData.integrate(f::TProductGradientCellField,a::TProductMeasure)
-  fi = integrate(get_tp_data(f),a)
-  dfi = integrate(get_gradient_data(f),a)
-  TProductGradientEval(fi,dfi)
+function CellData.integrate(f::GenericTProductDiffCellField,a::TProductMeasure)
+  fi = map(integrate,get_tp_data(f),a.measures_1d)
+  dfi = map(integrate,get_tp_diff_data(f),a.measures_1d)
+  GenericTProductDiffEval(f.op,fi,dfi)
 end
-
-function CellData.integrate(f::TProductDivCellField,a::TProductMeasure)
-  fi = integrate(get_tp_data(f),a)
-  dfi = integrate(get_gradient_data(f),a)
-  TProductDivEval(fi,dfi)
-end
-
-# this deals with a cell field +- a gradient cell field; for now, the result of
-# these operations is simply the gradient cell field itself, since I'm only dealing with
-# mass and stiffness matrices. See TProductArray and TProductGradientArray for
-# more details. If in the future I consider more complicated structures (e.g.
-# divergence/curl terms) this will have to change
 
 for op in (:+,:-)
-  @eval ($op)(a::AbstractArray,b::TProductGradientEval) = _add_tp_cell_data($op,a,b)
-  @eval ($op)(a::TProductGradientEval,b::AbstractArray) = _add_tp_cell_data($op,a,b)
-  @eval ($op)(a::TProductGradientEval,b::TProductGradientEval) = @notimplemented
-end
-
-Arrays.testitem(a::DomainContribution) = a[first([get_domains(a)...])]
-
-function _add_tp_cell_data(op,a::AbstractVector{<:DomainContribution},b::TProductGradientEval)
-  a1 = testitem(a[1])
-  b1 = testitem(b.f[1])
-  if isa(a1,AbstractArray{<:ArrayBlock})
-    @check isa(b1,AbstractArray{<:ArrayBlock})
-    if all(_is_different_block.(a,b.f))
-      TProductGradientEval(op(a,b.f),b.g,op)
-    else
-      TProductGradientEval(b.f,b.g,op)
-    end
-  else
-    TProductGradientEval(b.f,b.g,op)
-  end
-end
-
-function _add_tp_cell_data(op,a::TProductGradientEval,b::AbstractVector{<:DomainContribution})
-  a1 = testitem(a.f[1])
-  b1 = testitem(b[1])
-  if isa(b1,AbstractArray{<:ArrayBlock})
-    @check isa(a1,AbstractArray{<:ArrayBlock})
-    if all(_is_different_block.(a.f,b))
-      TProductGradientEval(op(a.f,b),a.g,op)
-    else
-      TProductGradientEval(a.f,a.g,op)
-    end
-  else
-    TProductGradientEval(a.f,a.g,op)
-  end
-end
-
-function _is_different_block(a::DomainContribution,b::DomainContribution)
-  b1 = testitem(b)
-  for ai in values(a.dict)
-    if b1[1].touched == ai[1].touched
-      return false
-    end
-  end
-  return true
+  @eval ($op)(a::AbstractArray,b::GenericTProductDiffEval) = GenericTProductDiffEval(b.op,$op(a,b.f),b.g)
+  @eval ($op)(a::GenericTProductDiffEval,b::AbstractArray) = GenericTProductDiffEval(a.op,$op(a.f,b),a.g)
+  @eval ($op)(a::GenericTProductDiffEval,b::GenericTProductDiffEval) = @notimplemented
 end

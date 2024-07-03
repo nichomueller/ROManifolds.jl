@@ -48,7 +48,7 @@ include("TProductFESpaces.jl")
 export AbstractTProductArray
 export TProductArray
 export TProductGradientArray
-export MultiValueTProductArray
+export TProductDivergenceArray
 export BlockTProductArray
 export symbolic_kron
 export symbolic_kron!
@@ -58,9 +58,10 @@ include("TProductArray.jl")
 
 export TProductCellPoint
 export TProductCellFields
+export GenericTProductCellField
 export TProductFEBasis
-export TProductGradientCellField
-export TProductGradientEval
+export GenericTProductDiffCellField
+export GenericTProductDiffEval
 include("TProductCellData.jl")
 
 export TProductSparseMatrixAssembler

@@ -98,9 +98,8 @@ end
 get_tp_trial_fe_basis(f::TrialFESpace{<:TProductFESpace}) = get_tp_trial_fe_basis(f.space)
 
 function IndexMaps.get_sparsity(U::TProductFESpace,V::TProductFESpace)
-  a = SparseMatrixAssembler(U,V)
-  sparsity = get_sparsity(a.assem,U.space,V.space)
-  sparsities_1d = map(get_sparsity,a.assems_1d,U.spaces_1d,V.spaces_1d)
+  sparsity = get_sparsity(U.space,V.space)
+  sparsities_1d = map(get_sparsity,U.spaces_1d,V.spaces_1d)
   return TProductSparsityPattern(sparsity,sparsities_1d)
 end
 

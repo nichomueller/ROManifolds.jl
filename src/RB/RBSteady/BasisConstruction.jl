@@ -124,10 +124,9 @@ function ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...)
   return mat
 end
 
-function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;kwargs...)
-  N = TProduct.univariate_length(X)
+function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;ids_range=1:length(X)-1,kwargs...)
   cores,weights,ranks,sizes = cache
-  for k in 1:N-1
+  for k in ids_range
     mat_k = reshape(mat,ranks[k]*sizes[k],:)
     Ur,Σr,Vr = _tpod(mat_k;kwargs...)
     rank = size(Ur,2)
@@ -137,7 +136,7 @@ function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;kw
     _weight_array!(weights,cores,X,Val{k}())
   end
   XW = _get_norm_matrix_from_weights(X,weights)
-  M = ttsvd!((cores,ranks,sizes),mat,XW;ids_range=N,kwargs...)
+  M = ttsvd!((cores,ranks,sizes),mat,XW;ids_range=last(ids_range)+1,kwargs...)
   return M
 end
 
@@ -165,11 +164,8 @@ function _get_norm_matrices(X::TProductGradientArray,::Val{3},::Val{3})
 end
 
 function _get_norm_matrices(X::TProductGradientArray,::Val{d}) where d
-  N = TProduct.univariate_length(X)
+  N = length(X)
   _get_norm_matrices(X,Val(d),Val{N}())
-end
-function _get_norm_matrices(X::MultiValueTProductArray,args...)
-  _get_norm_matrices(get_component(X,num_components(X)),args...)
 end
 
 function _weight_array!(weights,cores,X,::Val{1})
@@ -212,7 +208,7 @@ function _weight_array!(weights,cores,X,::Val{d}) where d
 end
 
 function _get_norm_matrix_from_weights(norms::AbstractTProductArray,weights)
-  N_space = TProduct.univariate_length(norms)
+  N_space = length(weights) + 1
   X = _get_norm_matrices(norms,Val{N_space}())
   W = weights[end]
   @check length(X) == size(W,2)
@@ -257,13 +253,13 @@ function ttsvd(mat::AbstractArray{T,N},X::AbstractTProductArray;kwargs...) where
   return cores
 end
 
-function ttsvd(mat::AbstractArray{T,N},X::MultiValueTProductArray;kwargs...) where {T,N}
+function ttsvd(mat::SteadyMultiValueSnapshots{T,N},X::AbstractTProductArray;kwargs...) where {T,N}
   cores = Vector{Array{T,3}}(undef,N-1)
   weights = Vector{Array{T,3}}(undef,N-1)
   ranks = fill(1,N)
   sizes = size(mat)
   # routine on the spatial indices
-  M = ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;kwargs...)
+  M = ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;ids_range=1:N-1,kwargs...)
   # routine on the component index
   _ = ttsvd!((cores,weights,ranks,sizes),M;ids_range=N,kwargs...)
   return cores
