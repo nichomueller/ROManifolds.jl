@@ -488,7 +488,7 @@ function tproduct_array(
   array::A,
   arrays_1d::Vector{A},
   index_map::NTuple{N,I}
-  ) where {T,N,A<:AbstractArray{T,N},I<:TProductIndexMap{D,Ti,<:AbstractMultiValueIndexMap}}
+  ) where {T,N,D,Ti,A<:AbstractArray{T,N},I<:TProductIndexMap{D,Ti,<:AbstractMultiValueIndexMap}}
 
   array = TProductArray(array,arrays_1d,index_map)
   ncomps = num_components(first(index_map).indices)
@@ -501,7 +501,7 @@ function tproduct_array(
   arrays_1d::Vector{A},
   gradients_1d::Vector{A},
   index_map::NTuple{N,I}
-  ) where {T,N,A<:AbstractArray{T,N},I<:TProductIndexMap{D,Ti,<:AbstractMultiValueIndexMap}}
+  ) where {T,N,D,Ti,A<:AbstractArray{T,N},I<:TProductIndexMap{D,Ti,<:AbstractMultiValueIndexMap}}
 
   array = TProductGradientArray(array,arrays_1d,gradients_1d,index_map)
   ncomps = num_components(first(index_map).indices)
@@ -530,7 +530,7 @@ end
 
 const TProductMultiValueSparseMatrix{
   T,A<:Union{TProductSparseMatrix,TProductGradientSparseMatrix}
-  } = TProductMultiValueArray{T,2,A}
+  } = MultiValueTProductArray{T,2,A}
 
 SparseArrays.nnz(a::TProductMultiValueSparseMatrix) = nnz(a.array)
 SparseArrays.nzrange(a::TProductMultiValueSparseMatrix,col::Integer) = nzrange(a.array,col)
@@ -546,7 +546,7 @@ function tproduct_array(
   array::A,
   arrays_1d::Vector{A},
   index_map::NTuple{N,I}
-  ) where {A<:BlockArray,I<:Vector{<:TProductIndexMap}}
+  ) where {A<:BlockArray,N,I<:Vector{<:TProductIndexMap}}
 
   nblocks = blocklength(array)
   arrays = map(1:nblocks) do i
@@ -563,7 +563,7 @@ function tproduct_array(
   arrays_1d::Vector{A},
   gradients_1d::Vector{A},
   index_map::NTuple{N,I}
-  ) where {A<:BlockArray,I<:Vector{<:TProductIndexMap}}
+  ) where {A<:BlockArray,N,I<:Vector{<:TProductIndexMap}}
 
   nblocks = blocklength(array)
   arrays = map(1:nblocks) do i

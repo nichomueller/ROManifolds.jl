@@ -180,13 +180,24 @@ function num_reduced_times(a::BlockProjection)
 end
 
 function RBSteady.enrich_basis(
-  a::BlockProjection{<:TransientProjection},
+  a::BlockProjection{<:TransientPODBasis},
   norm_matrix::AbstractMatrix,
   supr_op::AbstractMatrix)
 
   basis_space = add_space_supremizers(a,norm_matrix,supr_op)
   basis_time = add_time_supremizers(a)
-  basis = BlockProjection(map(TransientPODBasis,basis_space,basis_time),b.touched)
+  basis = BlockProjection(map(TransientPODBasis,basis_space,basis_time),a.touched)
+  return basis
+end
+
+function RBSteady.enrich_basis(
+  a::BlockProjection{<:TransientTTSVDCores},
+  norm_matrix::AbstractMatrix,
+  supr_op::AbstractMatrix)
+
+  basis_space = add_space_supremizers(a,norm_matrix,supr_op)
+  basis_time = add_time_supremizers(a)
+  basis = BlockProjection(map(TransientTTSVDCores,basis_space,basis_time),a.touched)
   return basis
 end
 

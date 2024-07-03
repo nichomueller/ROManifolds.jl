@@ -82,6 +82,11 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
 
+test_p = TestFESpace(Ω,reffe_p;conformity=:H1)
+B = assemble_matrix((dp,v)->∫(dp*(∇⋅(v)))dΩ.measure,test_p.space,test_u.space)
+m2 = feop.op.op.index_map.matrix_map[2]
+B[m2]
+
 # fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
 
 nparams = num_params(rbsolver)
@@ -118,6 +123,85 @@ induced_norm′(du,v) = ∫(du*v)dΩ.measure + ∫(∇(v)⋅∇(du))dΩ.measure
 X = assemble_matrix(induced_norm′,test_u′.space,test_u′.space)
 
 
-#
-basis_space_1 = get_basis_space(basis[1])
-cores_space_1 = basis[1].cores_space
+# #
+# basis_space_1 = get_basis_space(basis[1])
+# cores_space_1 = basis[1].cores_space
+
+# dp,v = get_trial_fe_basis(test_p.spaces_1d[1]),get_fe_basis(test_u.spaces_1d[1])
+# # ∫(dp*(∇⋅(v)))dΩ.measures_1d[1]
+# using Gridap.CellData
+# using Gridap.Arrays
+# using Gridap.Fields
+
+# x = get_cell_points(Ω.trians_1d[1])
+# dv = ∇⋅(v)
+# dvx = dv(x)
+# px = dp(x)
+# (dp*dv)(x)[1]
+
+# assemble_matrix((dp,v)->∫(dp*v)dΩ.measures_1d[1],)
+
+# dp2 = get_trial_fe_basis(test_p)
+# v2 = get_fe_basis(test_u)
+# x2 = get_cell_points(Ω.trian)
+# dv2 = ∇⋅(v2)
+# dvx2 = dv2(x2)
+# px2 = dp2(x2)
+
+# (dp2*dv2)(x2)[1]
+
+# test_u′ = TestFESpace(Ω,reffe_u;conformity=:H1)
+# test_p′ = TestFESpace(Ω,reffe_p;conformity=:H1)
+
+# B1=assemble_matrix((dp,v)->∫(dp*(∇⋅(v)))dΩ.measures_1d[1],test_p′.spaces_1d[1],test_u′.spaces_1d[1])
+# B2=assemble_matrix((dp,v)->∫(dp*(∇⋅(v)))dΩ.measures_1d[2],test_p′.spaces_1d[2],test_u′.spaces_1d[2])
+# C1=assemble_matrix((dp,v)->∫(dp*v)dΩ.measures_1d[1],test_p′.spaces_1d[1],test_u′.spaces_1d[1])
+# C2=assemble_matrix((dp,v)->∫(dp*v)dΩ.measures_1d[2],test_p′.spaces_1d[2],test_u′.spaces_1d[2])
+# B̃ = kron(B2,C1)+kron(C2,B1)
+# row_index_map = get_tp_dof_index_map(test_u′)
+# row_index_map1 = row_index_map[:,:,1]
+# B̃′ = B̃[vec(row_index_map1),:]
+
+# B = assemble_matrix((dp,v)->∫(dp*(∇⋅(v)))dΩ.measure,test_p′.space,test_u′.space)
+# imap = get_vector_index_map(feop)[1]
+# imap1 = imap[:,:,1]
+# B′ = B[vec(imap1),:]
+
+n = 2
+domain = (0,1,0,1)
+partition = (n,n)
+model = TProductModel(domain,partition)
+order = 2
+degree = 2*order
+Ω = Triangulation(model)
+dΩ = Measure(Ω,degree)
+
+test_u′ = TestFESpace(Ω,reffe_u;conformity=:H1)
+test_p′ = TestFESpace(Ω,reffe_p;conformity=:H1)
+
+V1=assemble_vector((v)->∫((∇⋅(v)))dΩ.measures_1d[1],test_u′.spaces_1d[1])
+V2=assemble_vector((v)->∫((∇⋅(v)))dΩ.measures_1d[2],test_u′.spaces_1d[2])
+W1=assemble_vector((v)->∫(v)dΩ.measures_1d[1],test_u′.spaces_1d[1])
+W2=assemble_vector((v)->∫(v)dΩ.measures_1d[2],test_u′.spaces_1d[2])
+V′ = kron(V2,W1) + kron(W2,V1)
+
+V = assemble_vector((v)->∫((∇⋅(v)))dΩ.measure,test_u′.space)#[1:121]
+
+row_index_map = get_dof_index_map(test_u′)
+col_index_map = get_dof_index_map(test_p′)
+tp_row_index_map = get_tp_dof_index_map(test_u′)
+matmap = get_matrix_index_map(test_u′,test_p′)
+
+V[row_index_map[:]][1:25] ≈ V′[tp_row_index_map[:,:,1][:]]
+
+using Mabla.FEM.IndexMaps
+using Mabla.FEM.ParamSteady
+using SparseArrays
+
+sparsity = get_sparsity(test_p′,test_u′)
+psparsity = permute_sparsity(sparsity,test_p′,test_u′)
+I,J,_ = findnz(psparsity)
+i,j,_ = IndexMaps.univariate_findnz(psparsity)
+g2l = ParamSteady._global_2_local_nnz(psparsity,I,J,i,j)
+pg2l = ParamSteady._permute_index_map(g2l,test_p′,test_u′)
+SparseIndexMap(pg2l,psparsity)

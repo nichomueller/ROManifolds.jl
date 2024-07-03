@@ -273,7 +273,7 @@ end
 
 """
     add_space_supremizers(
-      basis_space::MatrixBlock,
+      a::BlockProjection,
       norm_matrix::AbstractMatrix,
       supr_op::AbstractMatrix) -> Vector{<:AbstractArray}
 
@@ -282,62 +282,33 @@ the action of the supremizing operator `supr_op` on the dual field(s)
 
 """
 function add_space_supremizers(a::BlockProjection,norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
-  index_map = get_index_map(a)
   basis_space = get_basis_space(a)
   basis_primal,basis_dual... = basis_space.array
   A = norm_matrix[Block(1,1)]
   H = cholesky(A)
   for i = eachindex(basis_dual)
     C = supr_op[Block(1,i+1)]
-    basis_primal = add_space_supremizers(index_map,basis_primal,basis_dual[i],H,C)
+    basis_primal = add_space_supremizers(basis_primal,basis_dual[i],A,H,C)
   end
   return [basis_primal,basis_dual...]
 end
 
-function add_space_supremizers(a::BlockProjection,norm_matrix::BlockTProductArray,supr_op::BlockMatrix)
-  basis_space = get_basis_space(a)
-  basis_primal,basis_dual... = basis_space.array
-  A = norm_matrix[Block(1,1)].array
-  H = cholesky(A)
-  if num_space_dofs(a[1]) == size(A,1)
-    for i = eachindex(basis_dual)
-      C = supr_op[Block(1,i+1)]
-      basis_primal = add_space_supremizers(basis_primal,basis_dual[i],H,C)
-    end
-  else
-    imap = get_index_map(a[1])
-    basis_primal′ = map(1:num_components(imap)) do comp
-      basis_primal_comp = _get_component(basis_primal,imap,comp)
-      for i = eachindex(basis_dual)
-        C = supr_op[Block(1,i+1)]
-        @check num_space_dofs(a[i+1]) == size(C,1)
-        basis_primal_comp = add_space_supremizers(basis_primal_comp,basis_dual[i],H,C)
-      end
-      basis_primal_comp
-    end
-    basis_primal = _to_multivalue(basis_primal′...)
+function add_space_supremizers(a::BlockProjection,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
+  cores_space = get_spatial_cores(a)
+  cores_primal,cores_dual... = cores_space.array
+  A = norm_matrix[Block(1,1)].arrays_1d
+  H = cholesky.(A)
+  for i = eachindex(basis_dual)
+    C = supr_op[Block(1,i+1)].arrays_1d
+    basis_primal = add_space_supremizers.(index_map,basis_primal,basis_dual[i],A,H,C)
   end
-  cores_primal = basis2cores(get_index_map(a[1]),basis_primal)
-  cores_dual = map(basis2cores,get_index_map(a[2:end]),basis_dual)
   return [cores_primal,cores_dual...]
 end
 
-function add_space_supremizers(basis_primal,basis_dual,H,C)
+function add_space_supremizers(basis_primal,basis_dual,A,H,C)
   b_i = C * basis_dual
   supr_i = H \ b_i
   gram_schmidt!(supr_i,basis_primal,A)
   basis_primal = hcat(basis_primal,supr_i)
   return basis_primal
-end
-
-function _get_component(a::AbstractMatrix,i::AbstractMultiValueIndexMap,comp::Integer)
-  icomp = get_component(i,comp)
-  n = num_components(i)
-  s,l = size(icomp),length(icomp)
-  i′ = LinearIndices(s) .+ n*(icomp-1)
-  view(a,i′,:)
-end
-
-function _to_multivalue(a::AbstractMatrix...)
-  vcat(a...)
 end

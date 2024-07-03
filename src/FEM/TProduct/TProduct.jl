@@ -26,6 +26,7 @@ import Kronecker: kronecker
 import Gridap.ReferenceFEs: get_order
 import PartitionedArrays: tuple_of_arrays
 import SparseArrays: AbstractSparseMatrixCSC
+import UnPack: @unpack
 
 export get_dof_index_map
 export get_polynomial_order
