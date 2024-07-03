@@ -1,12 +1,12 @@
 # tt-svd
 
-function RBSteady.ttsvd(mat::AbstractTransientSnapshots{T,N},X=nothing;kwargs...) where {T,N}
+function RBSteady.ttsvd(mat::AbstractTransientSnapshots{T,N};kwargs...) where {T,N}
   cores = Vector{Array{T,3}}(undef,N-1)
   ranks = fill(1,N)
   sizes = size(mat)
   cache = cores,ranks,sizes
   # routine on the spatial indices
-  M = RBSteady.ttsvd!(cache,mat,X;ids_range=1:N-2,kwargs...)
+  M = RBSteady.ttsvd!(cache,mat;ids_range=1:N-2,kwargs...)
   # routine on the temporal index
   _ = RBSteady.ttsvd!(cache,M;ids_range=N-1,kwargs...)
   return cores

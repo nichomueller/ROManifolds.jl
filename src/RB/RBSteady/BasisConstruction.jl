@@ -140,36 +140,8 @@ function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;id
   return M
 end
 
-function _get_norm_matrices(X::TProductArray,::Val{d}) where d
-  return [X.arrays_1d[d]]
-end
-
-function _get_norm_matrices(X::TProductGradientArray,::Val{1},::Val{1})
-  return [X.arrays_1d[1],X.gradients_1d[1]]
-end
-function _get_norm_matrices(X::TProductGradientArray,::Val{1},::Val{2})
-  return [X.arrays_1d[1],X.gradients_1d[1],X.arrays_1d[1]]
-end
-function _get_norm_matrices(X::TProductGradientArray,::Val{2},::Val{2})
-  return [X.arrays_1d[2],X.arrays_1d[2],X.gradients_1d[2]]
-end
-function _get_norm_matrices(X::TProductGradientArray,::Val{1},::Val{3})
-  return [X.arrays_1d[1],X.gradients_1d[1],X.arrays_1d[1],X.arrays_1d[1]]
-end
-function _get_norm_matrices(X::TProductGradientArray,::Val{2},::Val{3})
-  return [X.arrays_1d[2],X.arrays_1d[2],X.gradients_1d[2],X.arrays_1d[2]]
-end
-function _get_norm_matrices(X::TProductGradientArray,::Val{3},::Val{3})
-  return [X.arrays_1d[3],X.arrays_1d[3],X.arrays_1d[3],X.gradients_1d[3]]
-end
-
-function _get_norm_matrices(X::TProductGradientArray,::Val{d}) where d
-  N = length(X)
-  _get_norm_matrices(X,Val(d),Val{N}())
-end
-
 function _weight_array!(weights,cores,X,::Val{1})
-  X1 = _get_norm_matrices(X,Val(1))
+  X1 = tp_getindex(X,1)
   K = length(X1)
   core = cores[1]
   rank = size(core,3)
@@ -185,7 +157,7 @@ function _weight_array!(weights,cores,X,::Val{1})
 end
 
 function _weight_array!(weights,cores,X,::Val{d}) where d
-  Xd = _get_norm_matrices(X,Val{d}())
+  Xd = tp_getindex(X,d)
   K = length(Xd)
   W_prev = weights[d-1]
   core = cores[d]
@@ -208,8 +180,8 @@ function _weight_array!(weights,cores,X,::Val{d}) where d
 end
 
 function _get_norm_matrix_from_weights(norms::AbstractTProductArray,weights)
-  N_space = length(weights) + 1
-  X = _get_norm_matrices(norms,Val{N_space}())
+  N_space = tp_length(norms)
+  X = tp_getindex(norms,N_space)
   W = weights[end]
   @check length(X) == size(W,2)
   iX = first(X)
@@ -244,8 +216,9 @@ function ttsvd(mat::AbstractArray{T,N};kwargs...) where {T,N}
 end
 
 function ttsvd(mat::AbstractArray{T,N},X::AbstractTProductArray;kwargs...) where {T,N}
+  N_space = N-1
   cores = Vector{Array{T,3}}(undef,N-1)
-  weights = Vector{Array{T,3}}(undef,N-1)
+  weights = Vector{Array{T,3}}(undef,N_space-1)
   ranks = fill(1,N)
   sizes = size(mat)
   # routine on the spatial indices
@@ -254,12 +227,13 @@ function ttsvd(mat::AbstractArray{T,N},X::AbstractTProductArray;kwargs...) where
 end
 
 function ttsvd(mat::SteadyMultiValueSnapshots{T,N},X::AbstractTProductArray;kwargs...) where {T,N}
+  N_space = N-1
   cores = Vector{Array{T,3}}(undef,N-1)
-  weights = Vector{Array{T,3}}(undef,N-1)
+  weights = Vector{Array{T,3}}(undef,N_space-1)
   ranks = fill(1,N)
   sizes = size(mat)
   # routine on the spatial indices
-  M = ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;ids_range=1:N-1,kwargs...)
+  M = ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;ids_range=1:N_space,kwargs...)
   # routine on the component index
   _ = ttsvd!((cores,weights,ranks,sizes),M;ids_range=N,kwargs...)
   return cores

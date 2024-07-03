@@ -179,6 +179,13 @@ function num_reduced_times(a::BlockProjection)
   return dofs
 end
 
+function get_temporal_cores(a::BlockProjection)
+  active_block_ids = get_touched_blocks(a)
+  block_map = BlockMap(size(a),active_block_ids)
+  cores = [get_temporal_cores(a[i]) for i = get_touched_blocks(a)]
+  return return_cache(block_map,cores...)
+end
+
 function RBSteady.enrich_basis(
   a::BlockProjection{<:TransientPODBasis},
   norm_matrix::AbstractMatrix,

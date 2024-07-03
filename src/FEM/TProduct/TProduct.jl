@@ -50,10 +50,8 @@ export TProductArray
 export TProductGradientArray
 export TProductDivergenceArray
 export BlockTProductArray
-export symbolic_kron
-export symbolic_kron!
-export numerical_kron!
-export kronecker_gradients
+export tp_length
+export tp_getindex
 include("TProductArray.jl")
 
 export TProductCellPoint
