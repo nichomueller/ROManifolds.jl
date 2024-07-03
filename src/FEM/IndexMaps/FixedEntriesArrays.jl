@@ -3,6 +3,8 @@ struct FixedEntriesArray{T,N,A<:AbstractArray{T,N}} <: AbstractArray{T,N}
   fixed_entries::Vector{NTuple{N,Int}}
 end
 
+Arrays.get_array(a::FixedEntriesArray) = a.array
+
 function FixedEntriesArray(array::AbstractArray,fixed_entries::AbstractVector{<:CartesianIndex})
   FixedEntriesArray(array,Tuple.(fixed_entries))
 end
@@ -25,8 +27,8 @@ Base.@propagate_inbounds function Base.setindex!(a::FixedEntriesArray{T,N},v,i::
   i ∈ a.fixed_entries && setindex!(a.array,v,i...)
 end
 
-# function Base.view(a::FixedEntriesArray{T,N},i::Vararg{<:Any,N}) where {T,N}
-#   iints = findall((!isa).(i,Integer))
-#   fixed_entries = map(a->getindex(a,iints),a.array)
-#   FixedEntriesArray(view(a.array,i...),fixed_entries)
-# end
+function Base.stack(a::AbstractArray{<:FixedEntriesArray})
+  array = stack(get_array.(a))
+  indices = findall(array.==zero(eltype(array)))
+  FixedEntriesArray(array,indices)
+end

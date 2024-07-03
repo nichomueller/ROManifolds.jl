@@ -119,6 +119,17 @@ function _global_2_local_nnz(sparsity::TProductSparsityPattern,I,J,i,j)
   return g2l
 end
 
+function _add_fixed_dofs(index_map::AbstractIndexMap)
+  if any(index_map.==0)
+    return FixedDofsIndexMap(index_map,findall(index_map.==zero(eltype(index_map))))
+  end
+  return index_map
+end
+
+function _add_fixed_dofs(index_map::AbstractMatrix)
+  _add_fixed_dofs(IndexMap(index_map))
+end
+
 function _permute_index_map(index_map,I,J,nrows)
   IJ = vec(I) .+ nrows .* (vec(J)'.-1)
   iperm = copy(index_map)
@@ -127,22 +138,19 @@ function _permute_index_map(index_map,I,J,nrows)
       iperm[k] = IJ[pk]
     end
   end
-  return IndexMap(iperm)
+  return _add_fixed_dofs(iperm)
 end
 
 function _permute_index_map(index_map,I::FixedDofsIndexMap,J,nrows)
-  index_map′ = _permute_index_map(index_map,remove_fixed_dof(I),J,nrows)
-  FixedDofsIndexMap(index_map′,findall(index_map′.==zero(eltype(index_map′))))
+  _permute_index_map(index_map,remove_fixed_dof(I),J,nrows)
 end
 
 function _permute_index_map(index_map,I,J::FixedDofsIndexMap,nrows)
-  index_map′ = _permute_index_map(index_map,I,remove_fixed_dof(J),nrows)
-  FixedDofsIndexMap(index_map′,findall(index_map′.==zero(eltype(index_map′))))
+  _permute_index_map(index_map,I,remove_fixed_dof(J),nrows)
 end
 
 function _permute_index_map(index_map,I::FixedDofsIndexMap,J::FixedDofsIndexMap,nrows)
-  index_map′ = _permute_index_map(index_map,remove_fixed_dof(I),remove_fixed_dof(J),nrows)
-  FixedDofsIndexMap(index_map′,findall(index_map′.==zero(eltype(index_map′))))
+  _permute_index_map(index_map,remove_fixed_dof(I),remove_fixed_dof(J),nrows)
 end
 
 function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractMultiValueIndexMap,nrows)
@@ -156,7 +164,7 @@ function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractM
       J′ = (J-1)*ncomps + icomp
       ic[j] = (J′-1)*nrows*ncomps + I′
     end
-    return ic
+    return _add_fixed_dofs(ic)
   end
 
   ncomps_I = num_components(I)
@@ -185,7 +193,7 @@ for T in (:AbstractIndexMap,:FixedDofsIndexMap)
           I′ = (I-1)*ncomps + icomp
           ic[j] = (J-1)*nrows*ncomps + I′
         end
-        return ic
+        return _add_fixed_dofs(ic)
       end
 
       ncomps = num_components(I)
@@ -208,14 +216,13 @@ for T in (:AbstractIndexMap,:FixedDofsIndexMap)
           J′ = (J-1)*ncomps + icomp
           ic[j] = (J′-1)*nrows + I
         end
-        return ic
+        return _add_fixed_dofs(ic)
       end
 
       ncomps = num_components(J)
 
       J1 = get_component(J,1;multivalue=false)
       index_map′ = _permute_index_map(index_map,I,J1,nrows)
-
       index_map′′ = map(icomp->_to_component_indices(index_map′,ncomps,icomp,nrows),1:ncomps)
       return MultiValueIndexMap(index_map′′)
     end

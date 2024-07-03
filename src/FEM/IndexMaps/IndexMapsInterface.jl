@@ -151,6 +151,8 @@ end
 
 Base.size(i::IndexMap) = size(i.indices)
 Base.getindex(i::IndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
+Arrays.get_array(i::IndexMap) = i.indices
+Base.stack(i::AbstractArray{<:IndexMap}) = IndexMap(stack(get_array.(i)))
 
 """
     IndexMapView{D,Ti,I<:AbstractIndexMap{D,Ti},L} <: AbstractIndexMap{D,Ti}
@@ -197,6 +199,10 @@ Base.size(i::FixedDofsIndexMap) = size(i.indices)
 Base.getindex(i::FixedDofsIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 
 Base.view(i::FixedDofsIndexMap,locations) = FixedDofsIndexMap(view(i.indices,locations))
+
+Arrays.get_array(i::FixedDofsIndexMap) = i.indices
+
+Base.stack(i::AbstractArray{<:FixedDofsIndexMap}) = FixedDofsIndexMap(stack(get_array.(i)))
 
 for f in (:free_dofs_map,:inv_index_map)
   @eval begin

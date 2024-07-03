@@ -76,8 +76,6 @@ CellData.DomainStyle(a::TProductGradientCellField) = DomainStyle(get_tp_data(a))
 CellData.get_triangulation(a::TProductGradientCellField) = get_triangulation(get_tp_data(a))
 get_gradient_data(a::TProductGradientCellField) = a.gradient_cell_data
 
-(g::TProductGradientCellField)(x) = evaluate(g,x)
-
 function Fields.gradient(f::TProductCellField)
   g = TProductCellField(gradient.(f.single_fields))
   return TProductGradientCellField(f,g)
@@ -97,6 +95,36 @@ end
 
 get_tp_data(a::TProductGradientEval) = a.f
 get_tp_gradient_data(a::TProductGradientEval) = a.g
+
+# divergence
+
+"""
+    TProductDivCellField{A,B} <: CellField
+
+"""
+struct TProductDivCellField{A,B} <: CellField
+  cell_data::A
+  div_cell_data::B
+end
+
+get_tp_data(a::TProductDivCellField) = a.cell_data
+CellData.DomainStyle(a::TProductDivCellField) = DomainStyle(get_tp_data(a))
+CellData.get_triangulation(a::TProductDivCellField) = get_triangulation(get_tp_data(a))
+get_tp_gradient_data(a::TProductDivCellField) = a.div_cell_data
+
+function Fields.divergence(f::TProductCellField)
+  g = TProductCellField(divergence.(f.single_fields))
+  return TProductDivCellField(f,g)
+end
+
+# stores the evaluation of a TProductDivCellField on a quadrature
+struct TProductDivEval{A,B,C}
+  f::A
+  g::B
+end
+
+get_tp_data(a::TProductDivEval) = a.f
+get_tp_gradient_data(a::TProductDivEval) = a.g
 
 # fe basis
 
@@ -133,6 +161,11 @@ function Fields.gradient(f::TProductFEBasis)
   trian = get_triangulation(f)
   g = TProductFEBasis(dbasis,trian)
   return TProductGradientCellField(f,g)
+end
+
+function Fields.divergence(f::TProductFEBasis)
+  g = map(divergence,f.basis)
+  return TProductDivCellField(f,g)
 end
 
 const MultiFieldTProductFEBasis{DS,BS,B} = TProductFEBasis{DS,BS,Vector{MultiFieldCellField{DS}},B}
@@ -215,6 +248,32 @@ function Arrays.evaluate!(_cache,k::Operation,α::TProductGradientCellField,β::
   return TProductGradientCellField(αβ,dαβ)
 end
 
+function Arrays.return_cache(f::TProductDivCellField,x::TProductCellPoint)
+  cache = return_cache(get_tp_data(f),x)
+  div_cache = map(return_cache,get_tp_gradient_data(f),get_tp_data(x))
+  return cache,div_cache
+end
+
+function Arrays.evaluate!(_cache,f::TProductDivCellField,x::TProductCellPoint)
+  cache,div_cache = _cache
+  fx = evaluate!(cache,get_tp_data(f),x)
+  dfx = map(evaluate!,div_cache,get_gradient_data(f),x)
+  return TProductDivEval(fx,dfx)
+end
+
+function Arrays.return_cache(k::Operation,f::TProductDivCellField...)
+  cache = return_cache(k,map(get_tp_data,f)...)
+  gradient_cache = return_cache(k,map(get_gradient_data,f)...)
+  return cache,gradient_cache
+end
+
+function Arrays.evaluate!(_cache,k::Operation,α::TProductDivCellField,β::TProductDivCellField)
+  cache,gradient_cache = _cache
+  αβ = evaluate!(cache,k,get_tp_data(α),get_tp_data(β))
+  dαβ = evaluate!(gradient_cache,k,get_gradient_data(α),get_gradient_data(β))
+  return TProductDivCellField(αβ,dαβ)
+end
+
 # integration
 
 function CellData.integrate(f::TProductCellDatum,a::TProductMeasure)
@@ -225,6 +284,12 @@ function CellData.integrate(f::TProductGradientCellField,a::TProductMeasure)
   fi = integrate(get_tp_data(f),a)
   dfi = integrate(get_gradient_data(f),a)
   TProductGradientEval(fi,dfi)
+end
+
+function CellData.integrate(f::TProductDivCellField,a::TProductMeasure)
+  fi = integrate(get_tp_data(f),a)
+  dfi = integrate(get_gradient_data(f),a)
+  TProductDivEval(fi,dfi)
 end
 
 # this deals with a cell field +- a gradient cell field; for now, the result of

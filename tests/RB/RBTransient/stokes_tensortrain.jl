@@ -167,6 +167,8 @@ X = assemble_matrix(induced_norm′,test_u′.space,test_u′.space)
 # imap1 = imap[:,:,1]
 # B′ = B[vec(imap1),:]
 
+############################# sparsity tests #################################
+
 n = 2
 domain = (0,1,0,1)
 partition = (n,n)
@@ -176,32 +178,57 @@ degree = 2*order
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
 
-test_u′ = TestFESpace(Ω,reffe_u;conformity=:H1)
-test_p′ = TestFESpace(Ω,reffe_p;conformity=:H1)
+reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
+reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 
-V1=assemble_vector((v)->∫((∇⋅(v)))dΩ.measures_1d[1],test_u′.spaces_1d[1])
-V2=assemble_vector((v)->∫((∇⋅(v)))dΩ.measures_1d[2],test_u′.spaces_1d[2])
-W1=assemble_vector((v)->∫(v)dΩ.measures_1d[1],test_u′.spaces_1d[1])
-W2=assemble_vector((v)->∫(v)dΩ.measures_1d[2],test_u′.spaces_1d[2])
-V′ = kron(V2,W1) + kron(W2,V1)
+test_u = TestFESpace(Ω,reffe_u;conformity=:H1)
+test_p = TestFESpace(Ω,reffe_p;conformity=:H1)
 
-V = assemble_vector((v)->∫((∇⋅(v)))dΩ.measure,test_u′.space)#[1:121]
+V = assemble_vector((v)->∫((∇⋅(v)))dΩ,test_u.space)
 
-row_index_map = get_dof_index_map(test_u′)
-col_index_map = get_dof_index_map(test_p′)
-tp_row_index_map = get_tp_dof_index_map(test_u′)
-matmap = get_matrix_index_map(test_u′,test_p′)
+V1=assemble_vector((v)->∫((∇⋅(v)))dΩ.measures_1d[1],test_u.spaces_1d[1])
+V2=assemble_vector((v)->∫((∇⋅(v)))dΩ.measures_1d[2],test_u.spaces_1d[2])
+W1=assemble_vector((v)->∫(v)dΩ.measures_1d[1],test_u.spaces_1d[1])
+W2=assemble_vector((v)->∫(v)dΩ.measures_1d[2],test_u.spaces_1d[2])
 
-V[row_index_map[:]][1:25] ≈ V′[tp_row_index_map[:,:,1][:]]
+# gradient in direction 1
+V1′ = kron(W2,V1)
+V1′[tp_row_index_map[:,:,1]] ≈ V[row_index_map[:,:,1]]
 
-using Mabla.FEM.IndexMaps
-using Mabla.FEM.ParamSteady
+# gradient in direction 2
+V2′ = kron(V2,W1)
+V2′[tp_row_index_map[:,:,1]] ≈ V[row_index_map[:,:,2]]
+
+row_index_map = get_dof_index_map(test_u)
+col_index_map = get_dof_index_map(test_p)
+tp_row_index_map = get_tp_dof_index_map(test_u)
+
+# with matrix
+B = assemble_matrix((u,q) -> ∫(q*(∇⋅(u)))dΩ.measure,test_u.space,test_p.space)
+mmap = get_matrix_index_map(test_u,test_p)
+B[mmap[:,:,1]]
+
+# zeromean constraint
+test_p = TestFESpace(Ω,reffe_p;conformity=:H1,constraint=:zeromean)
+B = assemble_matrix((u,q) -> ∫(q*(∇⋅(u)))dΩ.measure,test_u.space,test_p.space)
+mmap = get_matrix_index_map(test_u,test_p)
+
 using SparseArrays
+struct MySparseMatrix{Tv,Ti} <: AbstractSparseMatrix{Tv,Ti}
+  a::SparseMatrixCSC{Tv,Ti}
+  imap
+end
+Base.size(a::MySparseMatrix) = size(a.imap)
+Base.getindex(a::MySparseMatrix,i,j) = a.imap[i,j] == 0 ? 0.0 : a.a[a.imap[i,j]]
 
-sparsity = get_sparsity(test_p′,test_u′)
-psparsity = permute_sparsity(sparsity,test_p′,test_u′)
-I,J,_ = findnz(psparsity)
-i,j,_ = IndexMaps.univariate_findnz(psparsity)
-g2l = ParamSteady._global_2_local_nnz(psparsity,I,J,i,j)
-pg2l = ParamSteady._permute_index_map(g2l,test_p′,test_u′)
-SparseIndexMap(pg2l,psparsity)
+B1 = MySparseMatrix(B,mmap[:,:,1])
+B2 = MySparseMatrix(B,mmap[:,:,2])
+
+# ASSEMBLE TPRODUCT B
+v,p = get_tp_fe_basis(test_u),get_tp_trial_fe_basis(test_p)
+B = assemble_matrix((p,v) -> ∫(p*(∇⋅(v)))dΩ,test_u,test_p)
+
+∫(p*(∇⋅(v)))dΩ
+assem = SparseMatrixAssembler(test_u,test_p)
+
+∇⋅(v)
