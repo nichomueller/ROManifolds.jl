@@ -59,7 +59,7 @@ function ParamSteady.assemble_norm_matrix(op::TransientParamFEOperator)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
   inorm = get_induced_norm(op)
-  assemble_norm_matrix(inorm,trial,test)
+  ParamSteady._assemble_matrix(inorm,trial,test)
 end
 
 ParamSteady.get_coupling(op::TransientParamFEOperator) = @abstractmethod
@@ -68,7 +68,7 @@ function ParamSteady.assemble_coupling_matrix(op::TransientParamFEOperator)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
   coupling = get_coupling(op)
-  assemble_matrix(coupling,trial,test)
+  ParamSteady._assemble_matrix(coupling,trial,test)
 end
 
 ParamSteady.get_linear_operator(op::TransientParamFEOperator) = @abstractmethod

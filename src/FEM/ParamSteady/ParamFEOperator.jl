@@ -45,20 +45,33 @@ get_matrix_index_map(op::ParamFEOperator) = get_matrix_index_map(get_index_map(o
 
 get_induced_norm(op::ParamFEOperator) = @abstractmethod
 
+"""
+    assemble_norm_matrix(op::ParamFEOperator) -> AbstractMatrix
+
+Assembles the symmetric, positive definite matrix representing a norm operator on
+the couple of FESpaces (trial,test) defined in `op`
+
+"""
 function assemble_norm_matrix(op::ParamFEOperator)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
   inorm = get_induced_norm(op)
-  assemble_norm_matrix(inorm,trial,test)
+  _assemble_matrix(inorm,trial,test)
 end
 
 get_coupling(op::ParamFEOperator) = @abstractmethod
 
+"""
+    assemble_coupling_matrix(op::ParamFEOperator) -> AbstractMatrix
+
+Assembles the matrix representing a saddle point operator defined in `op`
+
+"""
 function assemble_coupling_matrix(op::ParamFEOperator)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
   c = get_coupling(op)
-  assemble_matrix(c,trial,test)
+  _assemble_matrix(c,trial,test)
 end
 
 get_linear_operator(op::ParamFEOperator) = @abstractmethod
@@ -108,58 +121,30 @@ get_jac(op::ParamFEOpFromWeakForm) = op.jac
 ODEs.get_assembler(op::ParamFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::ParamFEOpFromWeakForm) = op.index_map
 
-"""
-    assemble_norm_matrix(op::ParamFEOperator) -> AbstractMatrix
-
-Assembles the symmetric, positive definite matrix representing a norm operator on
-the couple of FESpaces (trial,test) defined in `op`
-
-"""
-function assemble_norm_matrix(op::ParamFEOpFromWeakForm)
-  test = get_test(op)
-  trial = evaluate(get_trial(op),nothing)
-  inorm = get_induced_norm(op)
-  assemble_norm_matrix(inorm,trial,test)
-end
-
-function assemble_norm_matrix(f,U::FESpace,V::FESpace)
+function _assemble_matrix(f,U::FESpace,V::FESpace)
   assemble_matrix(f,U,V)
 end
 
-function assemble_norm_matrix(f,U::TProductFESpace,V::TProductFESpace)
+function _assemble_matrix(f,U::TProductFESpace,V::TProductFESpace)
   a = SparseMatrixAssembler(U,V)
   v = get_tp_fe_basis(V)
   u = get_tp_trial_fe_basis(U)
   assemble_matrix(a,collect_cell_matrix(U,V,f(u,v)))
 end
 
-function assemble_norm_matrix(f,U::TrialFESpace{<:TProductFESpace},V::TProductFESpace)
-  assemble_norm_matrix(f,U.space,V)
+function _assemble_matrix(f,U::TrialFESpace{<:TProductFESpace},V::TProductFESpace)
+  _assemble_matrix(f,U.space,V)
 end
 
-function assemble_norm_matrix(f,U::MultiFieldFESpace,V::MultiFieldFESpace)
-  assemble_block_norm_matrix(typeof(V.spaces),f,U,V)
-end
-
-function assemble_block_norm_matrix(
-  ::Type{<:Vector{<:SingleFieldFESpace}},
-  f,
-  U::MultiFieldFESpace,
-  V::MultiFieldFESpace)
-
-  assemble_matrix(f,U,V)
-end
-
-function assemble_block_norm_matrix(
-  ::Type{<:Vector{<:TProductFESpace}},
-  f,
-  U::MultiFieldFESpace,
-  V::MultiFieldFESpace)
-
-  a = TProductBlockSparseMatrixAssembler(U,V)
-  v = get_tp_fe_basis(V)
-  u = get_tp_trial_fe_basis(U)
-  assemble_matrix(a,collect_cell_matrix(U,V,f(u,v)))
+function _assemble_matrix(f,U::MultiFieldFESpace,V::MultiFieldFESpace)
+  if all(isa.(V.spaces,TProductFESpace))
+    a = TProductBlockSparseMatrixAssembler(U,V)
+    v = get_tp_fe_basis(V)
+    u = get_tp_trial_fe_basis(U)
+    assemble_matrix(a,collect_cell_matrix(U,V,f(u,v)))
+  else
+    assemble_matrix(f,U,V)
+  end
 end
 
 function ParamFEOpFromWeakForm(

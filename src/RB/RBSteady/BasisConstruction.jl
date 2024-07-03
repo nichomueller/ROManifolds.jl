@@ -124,9 +124,9 @@ function ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...)
   return mat
 end
 
-function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;ids_range=1:length(X)-1,kwargs...)
+function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;ids_range=eachindex(X),kwargs...)
   cores,weights,ranks,sizes = cache
-  for k in ids_range
+  for k in first(ids_range):last(ids_range)-1
     mat_k = reshape(mat,ranks[k]*sizes[k],:)
     Ur,Σr,Vr = _tpod(mat_k;kwargs...)
     rank = size(Ur,2)
@@ -136,7 +136,7 @@ function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;id
     _weight_array!(weights,cores,X,Val{k}())
   end
   XW = _get_norm_matrix_from_weights(X,weights)
-  M = ttsvd!((cores,ranks,sizes),mat,XW;ids_range=last(ids_range)+1,kwargs...)
+  M = ttsvd!((cores,ranks,sizes),mat,XW;ids_range=last(ids_range),kwargs...)
   return M
 end
 

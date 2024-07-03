@@ -84,8 +84,12 @@ CellData.DomainStyle(::Type{<:GenericTProductCellField{DS}}) where DS = DS()
 """
 abstract type TProductDiffCellField <: TProductCellField end
 
+#TODO this has to change when we implement the tproduct properly
 """
     GenericTProductDiffCellField{A,B} <: TProductDiffCellField
+
+Note: for now, this is not only the gradient, but also the data itself; this
+corresponds to mass matrix plus stiffness matrix
 
 """
 struct GenericTProductDiffCellField{O,A,B} <: TProductDiffCellField
@@ -294,8 +298,9 @@ function CellData.integrate(f::GenericTProductDiffCellField,a::TProductMeasure)
   GenericTProductDiffEval(f.op,fi,dfi)
 end
 
+#TODO this has to change when we implement the tproduct properly
 for op in (:+,:-)
-  @eval ($op)(a::AbstractArray,b::GenericTProductDiffEval) = GenericTProductDiffEval(b.op,$op(a,b.f),b.g)
-  @eval ($op)(a::GenericTProductDiffEval,b::AbstractArray) = GenericTProductDiffEval(a.op,$op(a.f,b),a.g)
+  @eval ($op)(a::AbstractArray,b::GenericTProductDiffEval) = b
+  @eval ($op)(a::GenericTProductDiffEval,b::AbstractArray) = a
   @eval ($op)(a::GenericTProductDiffEval,b::GenericTProductDiffEval) = @notimplemented
 end

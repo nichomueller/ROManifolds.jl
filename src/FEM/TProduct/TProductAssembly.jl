@@ -171,7 +171,6 @@ end
 # multi field
 
 function TProductBlockSparseMatrixAssembler(trial::MultiFieldFESpace,test::MultiFieldFESpace)
-  assem = SparseMatrixAssembler(trial,test)
   assems_1d = map(eachindex(test.spaces[1].spaces_1d)) do d
     trials_d = map(f->_remove_trial(f).spaces_1d[d],trial.spaces)
     tests_d = map(f->f.spaces_1d[d],test.spaces)
@@ -179,5 +178,5 @@ function TProductBlockSparseMatrixAssembler(trial::MultiFieldFESpace,test::Multi
     test′ = MultiFieldFESpace(test.vector_type,tests_d,test.multi_field_style)
     SparseMatrixAssembler(trial′,test′)
   end
-  TProductSparseMatrixAssembler(assem,assems_1d)
+  TProductSparseMatrixAssembler(assems_1d)
 end

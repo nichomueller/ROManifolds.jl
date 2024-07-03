@@ -101,14 +101,19 @@ function tproduct_array(arrays_1d::Vector{<:BlockArray})
   BlockTProductArray(arrays)
 end
 
-function tproduct_array(arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray})
-  nblocks = blocklength(first(arrays_1d))
-  arrays = map(1:nblocks) do i
-    arrays_1d_i = map(blocks,arrays_1d)[i]
-    gradients_1d_i = map(blocks,gradients_1d)[i]
-    tproduct_array(arrays_1d_i,gradients_1d_i)
+for T in (:(typeof(gradient)),:(typeof(divergence)))
+  @eval begin
+    function tproduct_array(op::$T,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray})
+      s_blocks = blocksize(first(arrays_1d))
+      arrays = map(CartesianIndices(s_blocks)) do i
+        iblock = Block(Tuple(i))
+        arrays_1d_i = getindex.(arrays_1d,iblock)
+        gradients_1d_i = getindex.(gradients_1d,iblock)
+        tproduct_array(op,arrays_1d_i,gradients_1d_i)
+      end
+      BlockTProductArray(arrays)
+    end
   end
-  BlockTProductArray(arrays)
 end
 
 Base.size(a::BlockTProductArray) = size(a.array)
@@ -118,7 +123,7 @@ Base.@propagate_inbounds function Base.getindex(
   i::Vararg{Integer,N}
   ) where {A,N}
 
-  @boundscheck blockcheckbounds(a.array,i)
+  @boundscheck checkbounds(a.array,i...)
   getindex(a.array,i...)
 end
 
@@ -127,6 +132,10 @@ Base.@propagate_inbounds function Base.setindex!(
   v,i::Vararg{Integer,N}
   ) where {A,N}
 
-  @boundscheck blockcheckbounds(a.array,i)
+  @boundscheck checkbounds(a.array,i...)
   setindex!(a.array,v,i...)
+end
+
+Base.@propagate_inbounds function Base.getindex(a::BlockTProductArray{A,N},i::Block{N}) where {A,N}
+  getindex(a.array,i.n...)
 end

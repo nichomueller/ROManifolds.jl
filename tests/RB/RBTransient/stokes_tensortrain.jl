@@ -82,11 +82,6 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
 
-test_p = TestFESpace(Ω,reffe_p;conformity=:H1)
-B = assemble_matrix((dp,v)->∫(dp*(∇⋅(v)))dΩ.measure,test_p.space,test_u.space)
-m2 = feop.op.op.index_map.matrix_map[2]
-B[m2]
-
 # fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
 
 nparams = num_params(rbsolver)
@@ -106,6 +101,7 @@ s = snaps
 soff = select_snapshots(s,RBSteady.offline_params(rbsolver))
 norm_matrix = assemble_norm_matrix(feop)
 basis = reduced_basis(soff,norm_matrix)
+
 # enrich_basis(feop,basis,norm_matrix)
 supr_op = assemble_coupling_matrix(feop)
 enrich_basis(basis,norm_matrix,supr_op)
@@ -121,128 +117,3 @@ reffe_u′ = ReferenceFE(lagrangian,Float64,order)
 test_u′ = TestFESpace(Ω,reffe_u′;conformity=:H1,dirichlet_tags=["dirichlet"])
 induced_norm′(du,v) = ∫(du*v)dΩ.measure + ∫(∇(v)⋅∇(du))dΩ.measure
 X = assemble_matrix(induced_norm′,test_u′.space,test_u′.space)
-
-
-# #
-# basis_space_1 = get_basis_space(basis[1])
-# cores_space_1 = basis[1].cores_space
-
-# dp,v = get_trial_fe_basis(test_p.spaces_1d[1]),get_fe_basis(test_u.spaces_1d[1])
-# # ∫(dp*(∇⋅(v)))dΩ.measures_1d[1]
-# using Gridap.CellData
-# using Gridap.Arrays
-# using Gridap.Fields
-
-# x = get_cell_points(Ω.trians_1d[1])
-# dv = ∇⋅(v)
-# dvx = dv(x)
-# px = dp(x)
-# (dp*dv)(x)[1]
-
-# assemble_matrix((dp,v)->∫(dp*v)dΩ.measures_1d[1],)
-
-# dp2 = get_trial_fe_basis(test_p)
-# v2 = get_fe_basis(test_u)
-# x2 = get_cell_points(Ω.trian)
-# dv2 = ∇⋅(v2)
-# dvx2 = dv2(x2)
-# px2 = dp2(x2)
-
-# (dp2*dv2)(x2)[1]
-
-# test_u′ = TestFESpace(Ω,reffe_u;conformity=:H1)
-# test_p′ = TestFESpace(Ω,reffe_p;conformity=:H1)
-
-# B1=assemble_matrix((dp,v)->∫(dp*(∇⋅(v)))dΩ.measures_1d[1],test_p′.spaces_1d[1],test_u′.spaces_1d[1])
-# B2=assemble_matrix((dp,v)->∫(dp*(∇⋅(v)))dΩ.measures_1d[2],test_p′.spaces_1d[2],test_u′.spaces_1d[2])
-# C1=assemble_matrix((dp,v)->∫(dp*v)dΩ.measures_1d[1],test_p′.spaces_1d[1],test_u′.spaces_1d[1])
-# C2=assemble_matrix((dp,v)->∫(dp*v)dΩ.measures_1d[2],test_p′.spaces_1d[2],test_u′.spaces_1d[2])
-# B̃ = kron(B2,C1)+kron(C2,B1)
-# row_index_map = get_tp_dof_index_map(test_u′)
-# row_index_map1 = row_index_map[:,:,1]
-# B̃′ = B̃[vec(row_index_map1),:]
-
-# B = assemble_matrix((dp,v)->∫(dp*(∇⋅(v)))dΩ.measure,test_p′.space,test_u′.space)
-# imap = get_vector_index_map(feop)[1]
-# imap1 = imap[:,:,1]
-# B′ = B[vec(imap1),:]
-
-############################# sparsity tests #################################
-
-n = 2
-domain = (0,1,0,1)
-partition = (n,n)
-model = TProductModel(domain,partition)
-order = 2
-degree = 2*order
-Ω = Triangulation(model)
-dΩ = Measure(Ω,degree)
-
-reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-
-test_u = TestFESpace(Ω,reffe_u;conformity=:H1)
-test_p = TestFESpace(Ω,reffe_p;conformity=:H1)
-
-V = assemble_vector((v)->∫((∇⋅(v)))dΩ,test_u.space)
-
-V1=assemble_vector((v)->∫((∇⋅(v)))dΩ.measures_1d[1],test_u.spaces_1d[1])
-V2=assemble_vector((v)->∫((∇⋅(v)))dΩ.measures_1d[2],test_u.spaces_1d[2])
-W1=assemble_vector((v)->∫(v)dΩ.measures_1d[1],test_u.spaces_1d[1])
-W2=assemble_vector((v)->∫(v)dΩ.measures_1d[2],test_u.spaces_1d[2])
-
-tp_row_index_map = get_tp_dof_index_map(test_u)
-tp_col_index_map = get_tp_dof_index_map(test_p)
-row_index_map = get_dof_index_map(test_u)
-col_index_map = get_dof_index_map(test_p)
-
-# gradient in direction 1
-V1′ = kron(W2,V1)
-V1′[tp_row_index_map[:,:,1]] ≈ V[row_index_map[:,:,1]]
-
-# gradient in direction 2
-V2′ = kron(V2,W1)
-V2′[tp_row_index_map[:,:,1]] ≈ V[row_index_map[:,:,2]]
-
-# with matrix
-B = assemble_matrix((u,q) -> ∫(q*(∇⋅(u)))dΩ.measure,test_u.space,test_p.space)
-mmap = get_matrix_index_map(test_u,test_p)
-B[mmap[:,:,1]]
-
-# zeromean constraint
-test_p = TestFESpace(Ω,reffe_p;conformity=:H1,constraint=:zeromean)
-B = assemble_matrix((u,q) -> ∫(q*(∇⋅(u)))dΩ.measure,test_u.space,test_p.space)
-mmap = get_matrix_index_map(test_u,test_p)
-
-using SparseArrays
-struct MySparseMatrix{Tv,Ti} <: AbstractSparseMatrix{Tv,Ti}
-  a::SparseMatrixCSC{Tv,Ti}
-  imap
-end
-Base.size(a::MySparseMatrix) = size(a.imap)
-Base.getindex(a::MySparseMatrix,i,j) = a.imap[i,j] == 0 ? 0.0 : a.a[a.imap[i,j]]
-
-B1 = MySparseMatrix(B,mmap[:,:,1])
-B2 = MySparseMatrix(B,mmap[:,:,2])
-
-# ASSEMBLE TPRODUCT B
-v,p = get_tp_fe_basis(test_u),get_tp_trial_fe_basis(test_p)
-
-∫(p*(∇⋅(v)))dΩ
-assem = SparseMatrixAssembler(test_u,test_p)
-
-x = get_cell_points(Ω)
-∇(v)(x)
-(∇⋅(v))(x)
-(p*(∇⋅(v)))(x)
-
-using Gridap.FESpaces
-dc = ∫(p*(∇⋅(v)))dΩ
-assem = SparseMatrixAssembler(test_p,test_u)
-matdata = collect_cell_matrix(test_p,test_u,dc)
-B = assemble_matrix(assem,matdata)
-B1 = kron(B.arrays_1d[2],B.gradients_1d[1])[tp_row_index_map[:,:,1][:],tp_col_index_map[:]]
-B2 = kron(B.gradients_1d[2],B.arrays_1d[1])[tp_row_index_map[:,:,2][:],tp_col_index_map[:]]
-B′ = vcat(B1,B2)
-
-Bok = assemble_matrix((p,v) -> ∫(p*(∇⋅(v)))dΩ.measure,test_p.space,test_u.space)
