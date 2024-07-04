@@ -273,9 +273,14 @@ Returns the supremizer-enriched BlockProjection. This function stabilizes Inf-Su
 problems projected on a reduced vector space
 
 """
-function enrich_basis(a::BlockProjection,norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
+function enrich_basis(a::BlockProjection{<:PODBasis},norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
   bases = add_space_supremizers(a,norm_matrix,supr_op)
-  return BlockProjection(bases,a.touched)
+  return BlockProjection(map(PODBasis,bases),a.touched)
+end
+
+function enrich_basis(a::BlockProjection{<:TTSVDCores},norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
+  bases = add_space_supremizers(a,norm_matrix,supr_op)
+  return BlockProjection(map(TTSVDCores,bases),a.touched)
 end
 
 """
@@ -284,7 +289,7 @@ end
       norm_matrix::AbstractMatrix,
       supr_op::AbstractMatrix) -> Vector{<:AbstractArray}
 
-Enriches the spatial basis `basis_space` with spatial supremizers computed from
+Enriches the spatial basis with spatial supremizers computed from
 the action of the supremizing operator `supr_op` on the dual field(s)
 
 """
@@ -300,15 +305,33 @@ function add_space_supremizers(a::BlockProjection,norm_matrix::AbstractMatrix,su
   return [basis_primal,basis_dual...]
 end
 
+#TODO work in progress
+# function add_space_supremizers(a::BlockProjection,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
+#   cores_space = get_spatial_cores(a)
+#   cores_primal,cores_dual... = cores_space.array
+#   A = norm_matrix[Block(1,1)]
+#   H = cholesky.(A.arrays_1d)
+#   Hgrad = cholesky.(A.gradients_1d)
+#   for i = eachindex(basis_dual)
+#     C = supr_op[Block(1,i+1)].arrays_1d
+#     basis_primal = add_space_supremizers.(basis_primal,basis_dual[i],A,H,C)
+#   end
+#   return [cores_primal,cores_dual...]
+# end
+
 function add_space_supremizers(a::BlockProjection,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
   cores_space = get_spatial_cores(a)
   cores_primal,cores_dual... = cores_space.array
-  A = norm_matrix[Block(1,1)].arrays_1d
-  H = cholesky.(A)
+  basis_space = get_basis_space(a)
+  basis_primal,basis_dual... = basis_space.array
+  A = kron(norm_matrix[Block(1,1)])
   for i = eachindex(basis_dual)
-    C = supr_op[Block(1,i+1)].arrays_1d
-    basis_primal = add_space_supremizers.(index_map,basis_primal,basis_dual[i],A,H,C)
+    C = kron(supr_op[Block(1,i+1)])
+    basis_primal = hcat(basis_primal,C*basis_dual[i])
   end
+  imap_primal = get_index_map(a[1,1])
+  basis_primal′ = view(basis_primal,imap_primal,:)
+  cores_primal = full_ttsvd(basis_primal′,norm_matrix[Block(1,1)];ϵ=1e-10)
   return [cores_primal,cores_dual...]
 end
 

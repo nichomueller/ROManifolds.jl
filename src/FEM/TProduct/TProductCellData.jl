@@ -71,11 +71,6 @@ CellData.get_triangulation(f::GenericTProductCellField) = f.trian
 
 CellData.DomainStyle(::Type{<:GenericTProductCellField{DS}}) where DS = DS()
 
-# function LinearAlgebra.dot(f::GenericTProductCellField,b::GenericTProductCellField)
-#   @check length(f.single_fields) == length(b.single_fields)
-#   return sum(map(dot,f.single_fields,b.single_fields))
-# end
-
 # differentiation
 
 """
@@ -84,22 +79,23 @@ CellData.DomainStyle(::Type{<:GenericTProductCellField{DS}}) where DS = DS()
 """
 abstract type TProductDiffCellField <: TProductCellField end
 
-#TODO this has to change when we implement the tproduct properly
 """
-    GenericTProductDiffCellField{A,B} <: TProductDiffCellField
-
-Note: for now, this is not only the gradient, but also the data itself; this
-corresponds to mass matrix plus stiffness matrix
+    GenericTProductDiffCellField{O,A,B,C} <: TProductDiffCellField
 
 """
-struct GenericTProductDiffCellField{O,A,B} <: TProductDiffCellField
+struct GenericTProductDiffCellField{O,A,B,C} <: TProductDiffCellField
   op::O
   cell_data::A
   diff_cell_data::B
+  summation::C
 end
 
-const GradientTProductCellField{A,B} = GenericTProductDiffCellField{typeof(gradient),A,B}
-const DivergenceTProductCellField{A,B} = GenericTProductDiffCellField{typeof(divergence),A,B}
+function GenericTProductDiffCellField(op,cell_data,diff_cell_data)
+  GenericTProductDiffCellField(op,cell_data,diff_cell_data,nothing)
+end
+
+const GradientTProductCellField{A,B,C} = GenericTProductDiffCellField{typeof(gradient),A,B,C}
+const DivergenceTProductCellField{A,B,C} = GenericTProductDiffCellField{typeof(divergence),A,B,C}
 
 CellData.get_data(f::GenericTProductDiffCellField) = f.cell_data
 get_diff_data(f::GenericTProductDiffCellField) = f.diff_cell_data
@@ -122,14 +118,19 @@ function Fields.divergence(f::TProductCellField)
 end
 
 # stores the evaluation of a GenericTProductDiffCellField on a quadrature
-struct GenericTProductDiffEval{O,A,B}
+struct GenericTProductDiffEval{O,A,B,C}
   op::O
   f::A
   g::B
+  summation::C
 end
 
-const GradientTProductEval{A,B} = GenericTProductDiffEval{typeof(gradient),A,B}
-const DivergenceTProductEval{A,B} = GenericTProductDiffEval{typeof(divergence),A,B}
+function GenericTProductDiffEval(op,f,g)
+  GenericTProductDiffEval(op,f,g,nothing)
+end
+
+const GradientTProductEval{A,B,C} = GenericTProductDiffEval{typeof(gradient),A,B,C}
+const DivergenceTProductEval{A,B,C} = GenericTProductDiffEval{typeof(divergence),A,B,C}
 
 CellData.get_data(f::GenericTProductDiffEval) = f.f
 get_diff_data(f::GenericTProductDiffEval) = f.g
@@ -298,9 +299,44 @@ function CellData.integrate(f::GenericTProductDiffCellField,a::TProductMeasure)
   GenericTProductDiffEval(f.op,fi,dfi)
 end
 
-#TODO this has to change when we implement the tproduct properly
-for op in (:+,:-)
-  @eval ($op)(a::AbstractArray,b::GenericTProductDiffEval) = b
-  @eval ($op)(a::GenericTProductDiffEval,b::AbstractArray) = a
-  @eval ($op)(a::GenericTProductDiffEval,b::GenericTProductDiffEval) = @notimplemented
+for f in (:+,:-)
+  @eval ($f)(a::AbstractArray,b::GenericTProductDiffEval) = _add_tp_cell_data($f,a,b)
+  @eval ($f)(a::GenericTProductDiffEval,b::AbstractArray) = _add_tp_cell_data($f,a,b)
+  @eval ($f)(a::GenericTProductDiffEval,b::GenericTProductDiffEval) = @notimplemented
+end
+
+Arrays.testitem(a::DomainContribution) = a[first([get_domains(a)...])]
+
+function _add_tp_cell_data(f,a::AbstractVector{<:DomainContribution},b::GenericTProductDiffEval)
+  a1 = testitem(a[1])
+  b1 = testitem(b.f[1])
+  if isa(a1,AbstractArray{<:ArrayBlock})
+    @check isa(b1,AbstractArray{<:ArrayBlock})
+    if all(_is_different_block.(a,b.f))
+      return GenericTProductDiffEval(b.op,f(a,b.f),b.g,b.summation)
+    end
+  end
+  return GenericTProductDiffEval(b.op,b.f,b.g,f)
+end
+
+function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::AbstractVector{<:DomainContribution})
+  a1 = testitem(a.f[1])
+  b1 = testitem(b[1])
+  if isa(a1,AbstractArray{<:ArrayBlock})
+    @check isa(b1,AbstractArray{<:ArrayBlock})
+    if all(_is_different_block.(a.f,b))
+      return GenericTProductDiffEval(a.op,f(a.f,b),a.g,a.summation)
+    end
+  end
+  return GenericTProductDiffEval(a.op,a.f,a.g,f)
+end
+
+function _is_different_block(a::DomainContribution,b::DomainContribution)
+  b1 = testitem(b)
+  for ai in values(a.dict)
+    if b1[1].touched == ai[1].touched
+      return false
+    end
+  end
+  return true
 end

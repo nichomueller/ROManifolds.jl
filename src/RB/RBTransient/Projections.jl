@@ -179,10 +179,10 @@ function num_reduced_times(a::BlockProjection)
   return dofs
 end
 
-function get_temporal_cores(a::BlockProjection)
+function get_temporal_core(a::BlockProjection)
   active_block_ids = get_touched_blocks(a)
   block_map = BlockMap(size(a),active_block_ids)
-  cores = [get_temporal_cores(a[i]) for i = get_touched_blocks(a)]
+  cores = [get_temporal_core(a[i]) for i = get_touched_blocks(a)]
   return return_cache(block_map,cores...)
 end
 
@@ -202,9 +202,9 @@ function RBSteady.enrich_basis(
   norm_matrix::AbstractMatrix,
   supr_op::AbstractMatrix)
 
-  basis_space = add_space_supremizers(a,norm_matrix,supr_op)
-  basis_time = add_time_supremizers(a)
-  basis = BlockProjection(map(TransientTTSVDCores,basis_space,basis_time),a.touched)
+  cores_space = add_space_supremizers(a,norm_matrix,supr_op)
+  core_time = add_time_supremizers(a)
+  basis = BlockProjection(map(TransientTTSVDCores,cores_space,core_time),a.touched)
   return basis
 end
 
@@ -216,13 +216,27 @@ the kernel of the temporal basis associated to the primal field projected onto
 the column space of the temporal basis (bases) associated to the duel field(s)
 
 """
-function add_time_supremizers(a::BlockProjection{<:TransientProjection};kwargs...)
+function add_time_supremizers(a::BlockProjection{<:TransientPODBasis};kwargs...)
   basis_time = get_basis_time(a)
   basis_primal,basis_dual... = basis_time.array
   for i = eachindex(basis_dual)
     basis_primal = add_time_supremizers(basis_primal,basis_dual[i];kwargs...)
   end
   return [basis_primal,basis_dual...]
+end
+
+function add_time_supremizers(a::BlockProjection{<:TransientTTSVDCores};kwargs...)
+  core_time = get_temporal_core(a)
+  core_primal,core_dual... = core_time.array
+  basis_time = get_basis_time(a)
+  basis_primal,basis_dual... = basis_time.array
+  for i = eachindex(basis_dual)
+    basis_primal = add_time_supremizers(basis_primal,basis_dual[i];kwargs...)
+  end
+  if size(basis_primal,2) > num_reduced_times(a)
+    core_primal = ttsvd(basis_primal;ϵ=1e-10)
+  end
+  return [core_primal,core_dual...]
 end
 
 function add_time_supremizers(basis_primal,basis_dual;tol=1e-2)
