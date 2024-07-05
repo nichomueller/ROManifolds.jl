@@ -154,6 +154,14 @@ function IndexMaps.recast(x̂::AbstractVector,a::TransientTTSVDCores)
   return X
 end
 
+function RBSteady.basis2cores(mat::AbstractMatrix,a::TransientTTSVDCores)
+  index_map = get_index_map(a)
+  D = ndims(index_map)
+  s = reverse(size(index_map))
+  v = reshape(mat,num_times(a),s...,:)
+  permutedims(v,(reverse(1:D+1)...,D+2))
+end
+
 # multi field interface
 
 function get_basis_time(a::BlockProjection{A,N}) where {A,N}
@@ -202,9 +210,16 @@ function RBSteady.enrich_basis(
   norm_matrix::AbstractMatrix,
   supr_op::AbstractMatrix)
 
-  cores_space = add_space_supremizers(a,norm_matrix,supr_op)
-  core_time = add_time_supremizers(a)
-  basis = BlockProjection(map(TransientTTSVDCores,cores_space,core_time),a.touched)
+  bs_primal,bs_dual... = add_space_supremizers(a,norm_matrix,supr_op)
+  bt_primal,bt_dual... = add_time_supremizers(a)
+  bst_primal = kronecker(bt_primal,bs_primal)
+  snaps_primal = basis2cores(bst_primal,a[1,1])
+  cores_space_primal...,core_time_primal = ttsvd(snaps_primal,norm_matrix[1,1];ϵ=1e-10)
+  _,cores_space_dual... = get_cores_space(a).array
+  _,core_time_dual... = get_cores_time(a).array
+  cores_space = (cores_space_primal,cores_space_dual...)
+  cores_time = (core_time_primal,core_time_dual...)
+  basis = BlockProjection(map(TransientTTSVDCores,cores_space,cores_time),a.touched)
   return basis
 end
 
@@ -216,27 +231,13 @@ the kernel of the temporal basis associated to the primal field projected onto
 the column space of the temporal basis (bases) associated to the duel field(s)
 
 """
-function add_time_supremizers(a::BlockProjection{<:TransientPODBasis};kwargs...)
+function add_time_supremizers(a::BlockProjection;kwargs...)
   basis_time = get_basis_time(a)
   basis_primal,basis_dual... = basis_time.array
   for i = eachindex(basis_dual)
     basis_primal = add_time_supremizers(basis_primal,basis_dual[i];kwargs...)
   end
   return [basis_primal,basis_dual...]
-end
-
-function add_time_supremizers(a::BlockProjection{<:TransientTTSVDCores};kwargs...)
-  core_time = get_temporal_core(a)
-  core_primal,core_dual... = core_time.array
-  basis_time = get_basis_time(a)
-  basis_primal,basis_dual... = basis_time.array
-  for i = eachindex(basis_dual)
-    basis_primal = add_time_supremizers(basis_primal,basis_dual[i];kwargs...)
-  end
-  if size(basis_primal,2) > num_reduced_times(a)
-    core_primal = ttsvd(basis_primal;ϵ=1e-10)
-  end
-  return [core_primal,core_dual...]
 end
 
 function add_time_supremizers(basis_primal,basis_dual;tol=1e-2)

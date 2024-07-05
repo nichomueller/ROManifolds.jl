@@ -239,19 +239,6 @@ function ttsvd(mat::SteadyMultiValueSnapshots{T,N},X::AbstractTProductArray;kwar
   return cores
 end
 
-function full_ttsvd(mat::AbstractArray{T,N},X::AbstractTProductArray;kwargs...) where {T,N}
-  N_space = N-1
-  cores = Vector{Array{T,3}}(undef,N)
-  weights = Vector{Array{T,3}}(undef,N_space-1)
-  ranks = fill(1,N+1)
-  sizes = (size(mat)...,1)
-  # routine on the spatial indices
-  M = ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;ids_range=1:N_space,kwargs...)
-  # routine on the remaining indices
-  _ = ttsvd!((cores,ranks,sizes),M;ids_range=N_space+1:N,kwargs...)
-  return cores
-end
-
 """
     orth_projection(v::AbstractVector, basis::AbstractMatrix, args...) -> AbstractVector
 

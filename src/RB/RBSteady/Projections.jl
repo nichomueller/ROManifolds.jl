@@ -162,6 +162,14 @@ function _cores2basis(i::FixedDofsIndexMap,a::AbstractArray{T,3}...) where T
   return view(basis,:,remove_fixed_dof(invi),:)
 end
 
+function basis2cores(mat::AbstractMatrix,a::TTSVDCores)
+  index_map = get_index_map(a)
+  D = ndims(index_map)
+  s = reverse(size(index_map))
+  v = reshape(mat,s...,:)
+  permutedims(v,(reverse(1:D)...,D+1))
+end
+
 # multi field interface
 
 """
@@ -251,6 +259,12 @@ function get_spatial_cores(a::BlockProjection)
   return return_cache(block_map,cores...)
 end
 
+function IndexMaps.get_index_map(a::BlockProjection)
+  active_block_ids = get_touched_blocks(a)
+  index_map = [get_index_map(a[i]) for i = get_touched_blocks(a)]
+  return index_map
+end
+
 function Projection(s::BlockSnapshots;kwargs...)
   norm_matrix = fill(nothing,size(s))
   Projection(s,norm_matrix;kwargs...)
@@ -300,45 +314,22 @@ function add_space_supremizers(a::BlockProjection,norm_matrix::AbstractMatrix,su
   H = cholesky(A)
   for i = eachindex(basis_dual)
     C = supr_op[Block(1,i+1)]
-    basis_primal = add_space_supremizers(basis_primal,basis_dual[i],A,H,C)
+    b_i = C * basis_dual[i]
+    supr_i = H \ b_i
+    gram_schmidt!(supr_i,basis_primal,A)
+    basis_primal = hcat(basis_primal,supr_i)
   end
   return [basis_primal,basis_dual...]
 end
 
-#TODO work in progress
-# function add_space_supremizers(a::BlockProjection,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
-#   cores_space = get_spatial_cores(a)
-#   cores_primal,cores_dual... = cores_space.array
-#   A = norm_matrix[Block(1,1)]
-#   H = cholesky.(A.arrays_1d)
-#   Hgrad = cholesky.(A.gradients_1d)
-#   for i = eachindex(basis_dual)
-#     C = supr_op[Block(1,i+1)].arrays_1d
-#     basis_primal = add_space_supremizers.(basis_primal,basis_dual[i],A,H,C)
-#   end
-#   return [cores_primal,cores_dual...]
-# end
-
 function add_space_supremizers(a::BlockProjection,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
-  cores_space = get_spatial_cores(a)
-  cores_primal,cores_dual... = cores_space.array
   basis_space = get_basis_space(a)
   basis_primal,basis_dual... = basis_space.array
   A = kron(norm_matrix[Block(1,1)])
+  H = cholesky(A)
   for i = eachindex(basis_dual)
     C = kron(supr_op[Block(1,i+1)])
-    basis_primal = hcat(basis_primal,C*basis_dual[i])
+    basis_primal = hcat(basis_primal,H\C*basis_dual[i])
   end
-  imap_primal = get_index_map(a[1,1])
-  basis_primal′ = view(basis_primal,imap_primal,:)
-  cores_primal = full_ttsvd(basis_primal′,norm_matrix[Block(1,1)];ϵ=1e-10)
-  return [cores_primal,cores_dual...]
-end
-
-function add_space_supremizers(basis_primal,basis_dual,A,H,C)
-  b_i = C * basis_dual
-  supr_i = H \ b_i
-  gram_schmidt!(supr_i,basis_primal,A)
-  basis_primal = hcat(basis_primal,supr_i)
-  return basis_primal
+  return [basis_primal,basis_dual...]
 end

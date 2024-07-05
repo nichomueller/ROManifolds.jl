@@ -217,13 +217,35 @@ end
 
 function LinearAlgebra.kron(a::TProductGradientArray{T,2}) where T
   rows,cols = get_index_map(a)
-  kp = _kron(Val{tp_length(a)}(),a)
-  kp[vec(rows),vec(cols)]
+  _kron(Val{tp_length(a)}(),a,rows,cols)
 end
 
 function LinearAlgebra.kron(a::TProductDivergenceArray{T,2}) where T
   rows,cols = get_index_map(a)
   _kron(Val{tp_length(a)}(),a,rows,cols)
+end
+
+function _kron(::Val{d},a::TProductGradientArray,rows::TProductIndexMap,cols::TProductIndexMap) where d
+  _kron(Val{d}(),a,rows.indices,cols.indices)
+end
+function _kron(::Val{d},a::TProductGradientArray,rows::AbstractIndexMap,cols::AbstractIndexMap) where d
+  _kron(Val{d}(),a)[vec(rows),vec(cols)]
+end
+function _kron(::Val{d},a::TProductGradientArray,rows::AbstractMultiValueIndexMap,cols::AbstractMultiValueIndexMap) where d
+  kp = _kron(Val{d}(),a)[vec(rows),vec(cols)]
+  @check num_components(rows) == num_components(cols)
+  ncomps = num_components(rows)
+  row_blocks = cumsum(map(i -> length(get_component(rows,i)),1:ncomps))
+  col_blocks = cumsum(map(i -> length(get_component(rows,i)),1:ncomps))
+  pushfirst!(row_blocks,0)
+  pushfirst!(col_blocks,0)
+  for icomp in 1:ncomps, jcomp in icomp+1:ncomps
+    irows = row_blocks[icomp]+1:row_blocks[icomp+1]
+    jcols = col_blocks[jcomp]+1:col_blocks[jcomp+1]
+    kp[irows,jcols] .= zero(eltype(kp))
+    kp[jcols,irows] .= zero(eltype(kp))
+  end
+  kp
 end
 
 function _kron(::Val{1},a::TProductGradientArray)

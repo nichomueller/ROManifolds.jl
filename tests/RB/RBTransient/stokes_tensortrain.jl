@@ -102,42 +102,21 @@ soff = select_snapshots(s,RBSteady.offline_params(rbsolver))
 norm_matrix = assemble_norm_matrix(feop)
 basis = reduced_basis(soff,norm_matrix)
 
-enrich_basis(feop,basis,norm_matrix)
+# enrich_basis(feop,basis,norm_matrix)
 supr_op = assemble_coupling_matrix(feop)
+# enrich_basis(basis,norm_matrix,supr_op)
+bs_primal,bs_dual... = add_space_supremizers(basis,norm_matrix,supr_op)
+bt_primal,bt_dual... = add_time_supremizers(basis)
+bst_primal = kron(bt_primal,bs_primal)
+snaps_primal = basis2cores(bst_primal,basis[1,1])
+cores_space_primal...,core_time_primal = ttsvd(snaps_primal,norm_matrix[1,1];ϵ=1e-10)
+_,cores_space_dual... = get_cores_space(basis).array
+_,core_time_dual... = get_cores_time(basis).array
+cores_space = (cores_space_primal,cores_space_dual...)
+cores_time = (core_time_primal,core_time_dual...)
+basis = BlockProjection(map(TransientTTSVDCores,cores_space,cores_time),basis.touched)
 
-using Mabla.FEM.IndexMaps
-
-cores_space = get_spatial_cores(basis)
-cores_primal,cores_dual... = cores_space.array
 basis_space = get_basis_space(basis)
 basis_primal,basis_dual... = basis_space.array
 A = kron(norm_matrix[Block(1,1)])
-for i = eachindex(basis_dual)
-  C = kron(supr_op[Block(1,i+1)])
-  basis_primal = hcat(basis_primal,C*basis_dual[i])
-end
-imap_primal = get_index_map(basis[1,1])
-basis_primal′ = view(basis_primal,imap_primal,:)
-cores_primal = RBSteady.full_ttsvd(basis_primal′,norm_matrix[Block(1,1)];ϵ=1e-10)
-boh = ttsvd(basis_primal′,norm_matrix[Block(1,1)];ϵ=1e-10)
-
-X = norm_matrix[Block(1,1)]
-mat = basis_primal′
-T,N = Float64,4
-N_space = N-1
-cores = Vector{Array{T,3}}(undef,N)
-weights = Vector{Array{T,3}}(undef,N_space-1)
-ranks = fill(1,N+1)
-sizes = size(mat)
-# routine on the spatial indices
-M = RBSteady.ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;ids_range=1:N_space)
-# routine on the remaining indices
-# _ = RBSteady.ttsvd!((cores,ranks,sizes),M;ids_range=N_space+1:N)
-cores,ranks,sizes = cache
-k = N
-mat_k = reshape(M,ranks[k]*sizes[k],:)
-Ur,Σr,Vr = RBSteady._tpod(mat_k)
-rank = size(Ur,2)
-ranks[k+1] = rank
-M = reshape(Σr.*Vr',rank,sizes[k+1],:)
-cores[k] = reshape(Ur,ranks[k],sizes[k],rank)
+H = cholesky(A)
