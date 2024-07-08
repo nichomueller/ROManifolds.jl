@@ -269,7 +269,7 @@ function RBSteady.flatten_snapshots(s::Union{TransientSnapshots,TransientSnapsho
 end
 
 function RBSteady.select_snapshots(s::TransientSnapshotsAtIndices,trange,prange)
-  old_trange,old_prange = s.indices
+  old_trange,old_prange = s.trange,s.prange
   @check intersect(old_trange,trange) == trange
   @check intersect(old_prange,prange) == prange
   TransientSnapshotsAtIndices(s.snaps,trange,prange)

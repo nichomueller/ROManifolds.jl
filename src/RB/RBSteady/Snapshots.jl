@@ -238,7 +238,7 @@ entries intact. The restriction operation is lazy.
 
 """
 function select_snapshots(s::SnapshotsAtIndices,prange)
-  old_prange = s.indices
+  old_prange = s.prange
   @check intersect(old_prange,prange) == prange
   SnapshotsAtIndices(s.snaps,prange)
 end

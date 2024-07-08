@@ -129,6 +129,16 @@ function compress_core(a::AbstractArray{T,4},btrial::AbstractArray{S,3},btest::A
   return bab
 end
 
+function compress_core(a::AbstractArray,btest::BlockArrayTTCores;kwargs...)
+  ccore = map(b -> compress_core(a,btest[i];kwargs...),get_touched_blocks(best))
+  union_cores(a,ccore...)
+end
+
+function compress_core(a::AbstractArray,btrial::BlockArrayTTCores,btest::BlockArrayTTCores;kwargs...)
+  ccore = map(b -> compress_core(a,btrial[i],btest[i];kwargs...),get_touched_blocks(best))
+  union_cores(a,ccore...)
+end
+
 function multiply_cores(a::AbstractArray{T,4},b::AbstractArray{S,4}) where {T,S}
   @check (size(a,3)==size(b,1) && size(a,4)==size(b,2))
   TS = promote_type(T,S)
@@ -151,9 +161,22 @@ function multiply_cores(a::AbstractArray{T,6},b::AbstractArray{S,6}) where {T,S}
   return ab
 end
 
+function multiply_cores(a::BlockArrayTTCores{T,D},b::BlockArrayTTCores{S,D}) where {T,S,D}
+  @check get_touched_blocks(a) == get_touched_blocks(b)
+  ab = map(b -> multiply_cores(a[i],b[i]),get_touched_blocks(b))
+  union_cores(ab...)
+end
+
 function multiply_cores(c1::AbstractArray,cores::AbstractArray...)
   _c1,_cores... = cores
   multiply_cores(multiply_cores(c1,_c1),_cores...)
+end
+
+function multiply_cores(c1::BlockArrayTTCores,cores::BlockArrayTTCores...)
+  _c1,_cores... = cores
+  mcores = multiply_cores(multiply_cores(c1,_c1),_cores...)
+  D = ndims(first(mcores.array))
+  cat(mcores.array...;dims=D)
 end
 
 function _dropdims(a::AbstractArray{T,4}) where T

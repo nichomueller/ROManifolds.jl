@@ -102,21 +102,6 @@ soff = select_snapshots(s,RBSteady.offline_params(rbsolver))
 norm_matrix = assemble_norm_matrix(feop)
 basis = reduced_basis(soff,norm_matrix)
 
-# enrich_basis(feop,basis,norm_matrix)
-supr_op = assemble_coupling_matrix(feop)
-# enrich_basis(basis,norm_matrix,supr_op)
-bs_primal,bs_dual... = add_space_supremizers(basis,norm_matrix,supr_op)
-bt_primal,bt_dual... = add_time_supremizers(basis)
-bst_primal = kron(bt_primal,bs_primal)
-snaps_primal = basis2cores(bst_primal,basis[1,1])
-cores_space_primal...,core_time_primal = ttsvd(snaps_primal,norm_matrix[1,1];ϵ=1e-10)
-_,cores_space_dual... = get_cores_space(basis).array
-_,core_time_dual... = get_cores_time(basis).array
-cores_space = (cores_space_primal,cores_space_dual...)
-cores_time = (core_time_primal,core_time_dual...)
-basis = BlockProjection(map(TransientTTSVDCores,cores_space,cores_time),basis.touched)
-
-basis_space = get_basis_space(basis)
-basis_primal,basis_dual... = basis_space.array
-A = kron(norm_matrix[Block(1,1)])
-H = cholesky(A)
+using Gridap.FESpaces
+red_trial,red_test = RBSteady.fe_subspace(test,basis),RBSteady.fe_subspace(trial,basis)
+op = get_algebraic_operator(feop)

@@ -154,14 +154,6 @@ function IndexMaps.recast(x̂::AbstractVector,a::TransientTTSVDCores)
   return X
 end
 
-function RBSteady.basis2cores(mat::AbstractMatrix,a::TransientTTSVDCores)
-  index_map = get_index_map(a)
-  D = ndims(index_map)
-  s = reverse(size(index_map))
-  v = reshape(mat,num_times(a),s...,:)
-  permutedims(v,(reverse(1:D+1)...,D+2))
-end
-
 # multi field interface
 
 function get_basis_time(a::BlockProjection{A,N}) where {A,N}
@@ -210,17 +202,17 @@ function RBSteady.enrich_basis(
   norm_matrix::AbstractMatrix,
   supr_op::AbstractMatrix)
 
-  bs_primal,bs_dual... = add_space_supremizers(a,norm_matrix,supr_op)
-  bt_primal,bt_dual... = add_time_supremizers(a)
-  bst_primal = kronecker(bt_primal,bs_primal)
-  snaps_primal = basis2cores(bst_primal,a[1,1])
-  cores_space_primal...,core_time_primal = ttsvd(snaps_primal,norm_matrix[1,1];ϵ=1e-10)
-  _,cores_space_dual... = get_cores_space(a).array
-  _,core_time_dual... = get_cores_time(a).array
-  cores_space = (cores_space_primal,cores_space_dual...)
-  cores_time = (core_time_primal,core_time_dual...)
-  basis = BlockProjection(map(TransientTTSVDCores,cores_space,cores_time),a.touched)
-  return basis
+  # bs_primal,bs_dual... = add_space_supremizers(a,norm_matrix,supr_op)
+  # bt_primal,bt_dual... = add_time_supremizers(a)
+  # bst_primal = kronecker(bt_primal,bs_primal)
+  # snaps_primal = basis2cores(bst_primal,a[1,1])
+  # cores_space_primal...,core_time_primal = ttsvd(snaps_primal,norm_matrix[1,1];ϵ=1e-10)
+  # _,cores_space_dual... = get_cores_space(a).array
+  # _,core_time_dual... = get_cores_time(a).array
+  # cores_space = (cores_space_primal,cores_space_dual...)
+  # cores_time = (core_time_primal,core_time_dual...)
+  # basis = BlockProjection(map(TransientTTSVDCores,cores_space,cores_time),a.touched)
+  # return basis
 end
 
 """

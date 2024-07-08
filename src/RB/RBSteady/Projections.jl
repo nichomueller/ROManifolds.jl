@@ -108,68 +108,6 @@ function _num_tot_space_dofs(a::TTSVDCores{4})
   return tot_ndofs
 end
 
-"""
-    cores2basis(index_map::AbstractIndexMap,cores::AbstractArray...) -> AbstractMatrix
-
-Computes the kronecker product of the suitably indexed input cores
-
-"""
-function cores2basis(index_map::AbstractIndexMap,cores::AbstractArray...)
-  cores2basis(_cores2basis(index_map,cores...))
-end
-
-function cores2basis(cores::AbstractArray...)
-  c2m = _cores2basis(cores...)
-  return dropdims(c2m;dims=1)
-end
-
-function cores2basis(core::AbstractArray{T,3}) where T
-  pcore = permutedims(core,(2,1,3))
-  return reshape(pcore,size(pcore,1),:)
-end
-
-function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
-  @check size(a,3) == size(b,1)
-  TS = promote_type(T,S)
-  nrows = size(a,2)*size(b,2)
-  ab = zeros(TS,size(a,1),nrows,size(b,3))
-  for i = axes(a,1), j = axes(b,3)
-    for α = axes(a,3)
-      @inbounds @views ab[i,:,j] += kronecker(b[α,:,j],a[i,:,α])
-    end
-  end
-  return ab
-end
-
-function _cores2basis(a::AbstractArray{S,N},b::AbstractArray{T,N}) where {S,T,N}
-  @abstractmethod
-end
-
-function _cores2basis(a::AbstractArray,b::AbstractArray...)
-  c,d... = b
-  return _cores2basis(_cores2basis(a,c),d...)
-end
-
-function _cores2basis(i::AbstractIndexMap,a::AbstractArray{T,3}...) where T
-  basis = _cores2basis(a...)
-  invi = inv_index_map(i)
-  return view(basis,:,vec(invi),:)
-end
-
-function _cores2basis(i::FixedDofsIndexMap,a::AbstractArray{T,3}...) where T
-  basis = _cores2basis(a...)
-  invi = inv_index_map(i)
-  return view(basis,:,remove_fixed_dof(invi),:)
-end
-
-function basis2cores(mat::AbstractMatrix,a::TTSVDCores)
-  index_map = get_index_map(a)
-  D = ndims(index_map)
-  s = reverse(size(index_map))
-  v = reshape(mat,s...,:)
-  permutedims(v,(reverse(1:D)...,D+1))
-end
-
 # multi field interface
 
 """
