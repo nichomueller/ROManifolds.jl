@@ -261,13 +261,64 @@ function add_space_supremizers(a::BlockProjection,norm_matrix::AbstractMatrix,su
 end
 
 function add_space_supremizers(a::BlockProjection,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
-  basis_space = get_basis_space(a)
-  basis_primal,basis_dual... = basis_space.array
-  A = kron(norm_matrix[Block(1,1)])
-  H = cholesky(A)
-  for i = eachindex(basis_dual)
-    C = kron(supr_op[Block(1,i+1)])
-    basis_primal = hcat(basis_primal,H\C*basis_dual[i])
+  cores_space = get_spatial_cores(a)
+  cores_primal,cores_dual... = cores_space.array
+  # A = norm_matrix[Block(1,1)]
+  # H = cholesky(A) #tp_getindex
+  for i = eachindex(cores_dual)
+    C = supr_op[Block(1,i+1)]
+    cores_primal = _add_supremizer_cores(cores_primal,C,cores_dual[i])
   end
-  return [basis_primal,basis_dual...]
+  return [cores_primal,cores_dual...]
+end
+
+function _add_supremizer_cores(p::AbstractVector,C::AbstractTProductArray,d::AbstractVector)
+  @abstractmethod
+end
+
+function _add_supremizer_cores(p::AbstractVector,C::TProductDivergenceArray,d::AbstractVector)
+  pitem = testitem(p)
+  cache = Vector{typeof(pitem)}(undef,tp_length(C)+1)
+  array = Vector{typeof(cache)}(undef,length(p))
+  @inbounds for i in eachindex(array)
+    cache[1] = p[i]
+    if i ≤ tp_length(C)
+      Ci = tp_getindex(C,i)
+      for j in 1:tp_length(C)
+        cache[j+1] = Ci[j]*d[j]
+      end
+    else
+      for j in 1:tp_length(C)
+        n = size(cache[j],ndims(cache[j]))
+        cache[j+1] = ones(n,size(p[i],2),n)
+      end
+    end
+    array[i] = cache
+  end
+  pblock = union_cores(array...)
+  return pblock
+end
+
+function _add_supremizer_cores(p::AbstractVector{<:BlockArrayTTCores},C::TProductDivergenceArray,d::AbstractVector)
+  pitem = testitem(p)
+  l = length(pitem.array)
+  cache = Vector{typeof(pitem)}(undef,l+tp_length(C))
+  array = Vector{typeof(cache)}(undef,length(p))
+  @inbounds for i in eachindex(array)
+    cache[1:l] = p[i].array
+    if i ≤ tp_length(C)
+      Ci = tp_getindex(C,i)
+      for j in 1:tp_length(C)
+        cache[l+j] = Ci[j]*d[j]
+      end
+    else
+      for j in 1:tp_length(C)
+        n = size(cache[l],ndims(cache[l]))
+        cache[l+j] = ones(n,size(p[i],2),n)
+      end
+    end
+    array[i] = cache
+  end
+  pblock = union_cores(array...)
+  return pblock
 end

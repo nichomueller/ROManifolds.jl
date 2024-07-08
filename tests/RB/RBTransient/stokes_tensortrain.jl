@@ -56,7 +56,7 @@ stiffness(μ,t,(u,p),(v,q),dΩ) = ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(�
 mass(μ,t,(uₜ,pₜ),(v,q),dΩ) = ∫(v⋅uₜ)dΩ
 res(μ,t,(u,p),(v,q),dΩ) = ∫(v⋅∂t(u))dΩ + stiffness(μ,t,(u,p),(v,q),dΩ)
 
-trian_res = (Ω,)
+trian_res = (Ω.trian,)
 trian_stiffness = (Ω,)
 trian_mass = (Ω,)
 
@@ -102,6 +102,30 @@ soff = select_snapshots(s,RBSteady.offline_params(rbsolver))
 norm_matrix = assemble_norm_matrix(feop)
 basis = reduced_basis(soff,norm_matrix)
 
+# cores_space = get_spatial_cores(basis)
+# cores_primal,cores_dual... = cores_space.array
+# supr_op = assemble_coupling_matrix(feop)
+
+# p = cores_primal
+# C = supr_op[1,2]
+# d = cores_dual[1]
+
+# bs_primal,bs_dual... = add_space_supremizers(basis,norm_matrix,supr_op)
+
+# MDEIM
 using Gridap.FESpaces
-red_trial,red_test = RBSteady.fe_subspace(test,basis),RBSteady.fe_subspace(trial,basis)
-op = get_algebraic_operator(feop)
+smdeim = select_snapshots(snaps,RBSteady.mdeim_params(rbsolver))
+rbtrial,rbtest = fe_subspace(trial,basis),fe_subspace(test,basis)
+op = TransientPGOperator(get_algebraic_operator(feop),rbtrial,rbtest)
+jjac,rres = jacobian_and_residual(rbsolver,op,smdeim)
+
+using BlockArrays
+using LinearAlgebra
+test′ = MultiFieldFESpace([test_u.space,test_p.space];style=BlockMultiFieldStyle())
+X = assemble_matrix(induced_norm,test′,test′)
+X1 = X[Block(1,1)]
+imap = feop.op.op.index_map.matrix_map
+imap1 = imap[1,1]
+X1nnz = Matrix(X1[imap1[:,:,1]])
+U,S,V = svd(X1nnz)
+ttsvd(X1nnz)

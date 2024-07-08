@@ -106,17 +106,25 @@ struct BlockArrayTTCores{T,D,N,A<:AbstractArray{T,D}} <: AbstractArray{AbstractA
   touched::Array{Bool,N}
 end
 
-const BlockVectorTTCores{T,D,A} = BlockArrayTTCores{T,1,D,A}
-const BlockMatrixTTCores{T,D,A} = BlockArrayTTCores{T,2,D,A}
+const BlockVectorTTCores{T,D,A<:AbstractArray{T,D}} = BlockArrayTTCores{T,D,1,A}
+const BlockMatrixTTCores{T,D,A<:AbstractArray{T,D}} = BlockArrayTTCores{T,D,2,A}
 
 Base.size(a::BlockArrayTTCores) = size(a.touched)
+
+size_of_block(a::BlockVectorTTCores,irow) = size(a.array[irow])
+function size_of_block(a::BlockMatrixTTCores{T,3} where T,irow,icol)
+  brow = a.array[irow]
+  bcol = a.array[icol]
+  @check size(brow,2) == size(bcol,2)
+  (size(brow,1),size(brow,2),size(bcol,3))
+end
 
 function Base.getindex(a::BlockArrayTTCores{T,D,N},i::Vararg{Integer,N}) where {T,D,N}
   iblock = first(i)
   if all(i.==iblock)
     a.array[iblock]
   else
-    fill(zero(T),first(a.array))
+    fill(zero(T),size_of_block(a,i...))
   end
 end
 
@@ -125,6 +133,26 @@ function get_touched_blocks(a::BlockArrayTTCores)
 end
 
 # core operations
+
+function Base.:*(a::AbstractMatrix{T},b::AbstractArray{S,3}) where {T,S}
+  @check size(a,2) == size(b,2)
+  TS = promote_type(T,S)
+  ab = zeros(TS,size(b,1),size(a,1),size(b,3))
+  @inbounds for i = axes(b,1), j = axes(b,3)
+    ab[i,:,j] = a*b[i,:,j]
+  end
+  return ab
+end
+
+function Base.:*(a::AbstractArray{T,3},b::AbstractMatrix{S}) where {T,S}
+  @check size(a,2) == size(b,1)
+  TS = promote_type(T,S)
+  ab = zeros(TS,size(a,1),size(b,2),size(a,3))
+  @inbounds for i = axes(a,1), j = axes(a,3)
+    ab[i,:,j] = a[i,:,j]*b
+  end
+  return ab
+end
 
 """
     cores2basis(index_map::AbstractIndexMap,cores::AbstractArray...) -> AbstractMatrix
@@ -284,12 +312,15 @@ end
 
 function union_cores(a::AbstractVector{<:AbstractArray}...)
   @check all(length(ai) == length(first(a)) for ai in a)
-  [union_first_cores(first.(a)...),union_cores.(getindex.(a,2:length(a)))...]
+  b1 = union_first_cores(first(a)...)
+  b = [union_cores(ai...) for ai in a[2:end]]
+  return [b1,b...]
 end
 
 function union_first_cores(a::A...) where {T,D,A<:AbstractArray{T,D}} # -> BlockVectorTTCores
   @check all(size(ai,2) == size(first(a),2) for ai in a)
   array = [a...]
+  s = (length(a),)
   touched = fill(true,s)
   BlockArrayTTCores(array,touched)
 end
@@ -298,7 +329,7 @@ function union_cores(a::A...) where {T,D,A<:AbstractArray{T,D}} # -> BlockMatrix
   @check all(size(ai,2) == size(first(a),2) for ai in a)
   array = [a...]
   s = (length(a),length(a))
-  touched = fill(false,k.size)
+  touched = fill(false,s)
   for i in diag(CartesianIndices(s))
     touched[i] = true
   end
@@ -332,5 +363,5 @@ function _cores2basis(i::AbstractIndexMap,a::BlockArrayTTCores...)
   invi = inv_index_map(i)
   array = map(b -> view(b,:,vec(invi),:),basis.array)
   touched = basis.touched
-  ArrayBlock(array,touched)
+  BlockArrayTTCores(array,touched)
 end
