@@ -332,7 +332,7 @@ function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,srange,
   for ip = 1:np
     for (i,(is,it)) in enumerate(zip(srange,trange))
       v = _getindex(s,is,it,ip)
-      consecutive_setindex!(entries,v,:,ip)
+      consecutive_setindex!(entries,v,i,ip)
     end
   end
 

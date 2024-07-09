@@ -43,6 +43,7 @@ export get_index_map
 export inv_index_map
 export free_dofs_map
 export change_index_map
+export get_sparse_index_map
 export recast
 export remove_fixed_dof
 export compose_indices

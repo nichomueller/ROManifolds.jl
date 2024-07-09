@@ -29,7 +29,7 @@ ptspace = TransientParamSpace(pranges,tdomain)
 n = 5
 domain = (0,1,0,1)
 partition = (n,n)
-model = TProductModel(domain, partition)
+model = TProductModel(domain,partition)
 labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
 add_tag_from_tags!(labels,"neumann",[7])
@@ -67,9 +67,9 @@ mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
 rhs(μ,t,v,dΩ,dΓn) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
 res(μ,t,u,v,dΩ,dΓn) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rhs(μ,t,v,dΩ,dΓn)
 
-trian_res = (Ω,Γn)
-trian_stiffness = (Ω,)
-trian_mass = (Ω,)
+trian_res = (Ω.trian,Γn)
+trian_stiffness = (Ω.trian,)
+trian_mass = (Ω.trian,)
 
 induced_norm(du,v) = ∫(du*v)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
@@ -80,4 +80,15 @@ feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
   trial,test,trian_res,trian_stiffness,trian_mass)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
-A = assemble_norm_matrix(feop)
+fesolver = ThetaMethod(LUSolver(),dt,θ)
+ϵ = 1e-4
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
+
+fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+
+println(compute_error(results))
+println(compute_speedup(results))

@@ -61,9 +61,9 @@ mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
 rhs(μ,t,v,dΩ,dΓn) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
 res(μ,t,u,v,dΩ,dΓn) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rhs(μ,t,v,dΩ,dΓn)
 
-trian_res = (Ω.trian,Γn.trian)
-trian_stiffness = (Ω.trian,)
-trian_mass = (Ω.trian,)
+trian_res = (Ω,Γn)
+trian_stiffness = (Ω,)
+trian_mass = (Ω,)
 
 induced_norm(du,v) = ∫(du*v)dΩ + ∫(∇(v)⋅∇(du))dΩ
 

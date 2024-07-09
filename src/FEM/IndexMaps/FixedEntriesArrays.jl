@@ -27,6 +27,8 @@ Base.@propagate_inbounds function Base.setindex!(a::FixedEntriesArray{T,N},v,i::
   !(i ∈ a.fixed_entries) && setindex!(a.array,v,i...)
 end
 
+Base.copy(a::FixedEntriesArray) = FixedEntriesArray(copy(a.array),a.fixed_entries)
+
 function Base.stack(a::AbstractArray{<:FixedEntriesArray})
   array = stack(get_array.(a))
   indices = findall(array.==zero(eltype(array)))

@@ -229,16 +229,12 @@ function _cores2basis(
   ) where {S,T}
 
   @check size(a,4) == size(b,1)
-  Is = get_index_map(I)
+  Is = get_sparse_index_map(I)
   TS = promote_type(T,S)
   nrows = size(a,2)*size(b,2)
   ncols = size(a,3)*size(b,3)
   ab = zeros(TS,size(a,1),nrows*ncols,size(b,4))
-  for i = axes(a,1), j = axes(b,4)
-    for α = axes(a,4)
-      @inbounds @views ab[i,vec(Is),j] += kronecker(b.array[α,:,j],a.array[i,:,α])
-    end
-  end
+  _cores2basis!(ab,Is,a,b)
   return ab
 end
 
@@ -250,16 +246,12 @@ function _cores2basis(
   ) where {S,T,U}
 
   @check size(a,4) == size(b,1) && size(b,4) == size(c,1)
-  Is = get_index_map(I)
+  Is = get_sparse_index_map(I)
   TSU = promote_type(T,S,U)
   nrows = size(a,2)*size(b,2)*size(c,2)
   ncols = size(a,3)*size(b,3)*size(c,3)
   abc = zeros(TSU,size(a,1),nrows*ncols,size(c,4))
-  for i = axes(a,1), j = axes(c,4)
-    for α = axes(a,4), β = axes(b,4)
-      @inbounds @views abc[i,vec(Is),j] += kronecker(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α])
-    end
-  end
+  _cores2basis!(abc,Is,a,b,c)
   return abc
 end
 
@@ -273,17 +265,13 @@ function _cores2basis(
   ) where {S,T,U}
 
   @check size(a,4) == size(b,1) && size(b,4) == size(c,1)
-  Is = get_index_map(I)
+  Is = get_sparse_index_map(I)
   TSU = promote_type(T,S,U)
   nrows = size(a,2)*size(b,2)
   ncols = size(a,3)*size(b,3)
   ncomps = size(c,2)
   abc = zeros(TSU,size(a,1),nrows*ncols*ncomps,size(c,4))
-  for i = axes(a,1), j = axes(c,4)
-    for α = axes(a,4), β = axes(b,4)
-      @inbounds @views abc[i,vec(Is),j] += kronecker(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α])
-    end
-  end
+  _cores2basis!(abc,Is,a,b,c)
   return abc
 end
 
@@ -296,16 +284,78 @@ function _cores2basis(
   ) where {S,T,U,V}
 
   @check size(a,4) == size(b,1) && size(b,4) == size(c,1) && size(c,4) == size(d,1)
-  Is = get_index_map(I)
+  Is = get_sparse_index_map(I)
   TSUV = promote_type(T,S,U,V)
   nrows = size(a,2)*size(b,2)*size(c,2)
   ncols = size(a,3)*size(b,3)*size(c,3)
   ncomps = size(d,2)
   abcd = zeros(TSUV,size(a,1),nrows*ncols,size(c,4))
+  _cores2basis!(abc,Is,a,b,c,d)
+  return abcd
+end
+
+function _cores2basis!(ab,I::AbstractIndexMap,a,b)
+  for i = axes(a,1), j = axes(b,4)
+    for α = axes(a,4)
+      @inbounds @views ab[i,vec(I),j] += kronecker(b.array[α,:,j],a.array[i,:,α])
+    end
+  end
+  return ab
+end
+
+function _cores2basis!(abc,I::AbstractIndexMap,a,b,c)
+  for i = axes(a,1), j = axes(c,4)
+    for α = axes(a,4), β = axes(b,4)
+      @inbounds @views abc[i,vec(I),j] += kronecker(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α])
+    end
+  end
+  return abc
+end
+
+function _cores2basis!(abcd,I::AbstractIndexMap,a,b,c,d)
   for i = axes(a,1), j = axes(d,4)
     for α = axes(a,4), β = axes(b,4), γ = axes(c,4)
       @inbounds @views abcd[i,vec(Is),j] += kronecker(d.array[γ,:,j],c.array[β,:,γ],b.array[α,:,β],a.array[i,:,α])
     end
   end
   return abcd
+end
+
+# Fixed dofs
+
+function _cores2basis!(ab,I::FixedDofsIndexMap,a,b)
+  nz_indices = findall(I[:].!=0)
+  for i = axes(a,1), j = axes(b,4)
+    for α = axes(a,4)
+      @inbounds @views ab[i,vec(I),j] += kronecker(b.array[α,:,j],a.array[i,:,α]
+        )[nz_indices]
+    end
+  end
+  return ab
+end
+
+function _cores2basis!(abc,I::FixedDofsIndexMap,a,b,c)
+  nz_indices = findall(I[:].!=0)
+  for i = axes(a,1), j = axes(c,4)
+    for α = axes(a,4), β = axes(b,4)
+      @inbounds @views abc[i,vec(I),j] += kronecker(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α]
+        )
+    end
+  end
+  return abc
+end
+
+function _cores2basis!(abcd,I::FixedDofsIndexMap,a,b,c,d)
+  nz_indices = findall(I[:].!=0)
+  for i = axes(a,1), j = axes(d,4)
+    for α = axes(a,4), β = axes(b,4), γ = axes(c,4)
+      @inbounds @views abcd[i,vec(Is),j] += kronecker(d.array[γ,:,j],c.array[β,:,γ],
+        b.array[α,:,β],a.array[i,:,α])[nz_indices]
+    end
+  end
+  return abcd
+end
+
+function _cores2basis!(cache,I::MultiValueIndexMap{<:FixedDofsIndexMap},args...)
+  _cores2basis!(cache,I.indices,args...)
 end

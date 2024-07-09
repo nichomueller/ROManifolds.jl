@@ -146,14 +146,21 @@ cores_space′ = recast(index_map,cores_space)
 # RBSteady._cores2basis(index_map,cores_space′...)
 aa,bb,cc = cores_space′
 Is = get_index_map(index_map)
-TSU = promote_type(T,S,U)
+TSU = Float64
 nrows = size(aa,2)*size(bb,2)
 ncols = size(aa,3)*size(bb,3)
 ncomps = size(cc,2)
 abc = zeros(TSU,size(aa,1),nrows*ncols*ncomps,size(cc,4))
+nz_indices = findall(Is[:].!=0)
 for i = axes(aa,1), j = axes(cc,4)
   for α = axes(aa,4), β = axes(bb,4)
-    @inbounds @views abc[i,vec(Is),j] += kronecker(cc.array[β,:,j],bb.array[α,:,β],aa.array[i,:,α])
+    abc[i,vec(Is),j] += kronecker(cc.array[β,:,j],bb.array[α,:,β],aa.array[i,:,α])[nz_indices]
+  end
+end
+
+for i = axes(aa,1), j = axes(cc,4)
+  for α = axes(aa,4), β = axes(bb,4)
+    abc[i,vec(Is),j] += kronecker(cc.array[β,:,j],bb.array[α,:,β],aa.array[i,:,α])[nz_indices]
   end
 end
 

@@ -139,6 +139,7 @@ end
 Base.size(i::TrivialIndexMap) = (length(i.indices),)
 Base.getindex(i::TrivialIndexMap,j::Integer) = getindex(i.indices,j)
 Base.setindex!(i::TrivialIndexMap,v::Integer,j::Integer) = setindex!(i.indices,v,j)
+Base.copy(i::TrivialIndexMap) = TrivialIndexMap(copy(i.indices))
 
 """
     IndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
@@ -153,8 +154,9 @@ end
 Base.size(i::IndexMap) = size(i.indices)
 Base.getindex(i::IndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::IndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
-Arrays.get_array(i::IndexMap) = i.indices
+Base.copy(i::IndexMap) = IndexMap(copy(i.indices))
 Base.stack(i::AbstractArray{<:IndexMap}) = IndexMap(stack(get_array.(i)))
+Arrays.get_array(i::IndexMap) = i.indices
 
 """
     IndexMapView{D,Ti,I<:AbstractIndexMap{D,Ti},L} <: AbstractIndexMap{D,Ti}
@@ -202,6 +204,7 @@ Arrays.get_array(i::FixedDofsIndexMap) = i.indices
 Base.size(i::FixedDofsIndexMap) = size(i.indices)
 Base.getindex(i::FixedDofsIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::FixedDofsIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
+Base.copy(i::FixedDofsIndexMap) = FixedDofsIndexMap(copy(i.indices))
 Base.view(i::FixedDofsIndexMap,locations) = FixedDofsIndexMap(view(i.indices,locations))
 Base.vec(i::FixedDofsIndexMap) = remove_fixed_dof(i)
 Base.stack(i::AbstractArray{<:FixedDofsIndexMap}) = FixedDofsIndexMap(stack(get_array.(i)))
@@ -241,6 +244,8 @@ end
 Base.size(i::TProductIndexMap) = size(i.indices)
 Base.getindex(i::TProductIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::TProductIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
+Base.copy(i::TProductIndexMap) = TProductIndexMap(copy(i.indices),i.indices_1d)
+Base.vec(i::TProductIndexMap) = vec(i.indices)
 get_tp_indices(i::TProductIndexMap) = i.indices
 get_univariate_indices(i::TProductIndexMap) = i.indices_1d
 
@@ -248,24 +253,31 @@ get_univariate_indices(i::TProductIndexMap) = i.indices_1d
     SparseIndexMap{D,Ti,A<:AbstractIndexMap{D,Ti},B<:TProductSparsityPattern} <: AbstractIndexMap{D,Ti}
 
 Index map used to select the nonzero entries of a sparse matrix. The field `sparsity`
-contains the tensor product sparsity of the matrix to be indexed.
+contains the tensor product sparsity of the matrix to be indexed. The field `indices`
+refers to the nonzero entries of the sparse matrix, whereas `indices_sparse` is
+used to access the corresponding sparse entries
 
 """
 struct SparseIndexMap{D,Ti,A<:AbstractIndexMap{D,Ti},B<:TProductSparsityPattern} <: AbstractIndexMap{D,Ti}
   indices::A
+  indices_sparse::A
   sparsity::B
 end
 
 Base.size(i::SparseIndexMap) = size(i.indices)
 Base.getindex(i::SparseIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::SparseIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
+Base.copy(i::SparseIndexMap) = SparseIndexMap(copy(i.indices),copy(i.indices_sparse),i.sparsity)
+Base.vec(i::SparseIndexMap) = vec(i.indices)
 get_index_map(i::SparseIndexMap) = i.indices
+get_sparse_index_map(i::SparseIndexMap) = i.indices_sparse
 get_sparsity(i::SparseIndexMap) = get_sparsity(i.sparsity)
 get_univariate_sparsity(i::SparseIndexMap) = get_univariate_sparsity(i.sparsity)
 
 function inv_index_map(i::SparseIndexMap)
-  invi = IndexMap(reshape(sortperm(i[:]),size(i)))
-  SparseIndexMap(invi,i.sparsity)
+  invi = IndexMap(reshape(sortperm(vec(i.indices)),size(i)))
+  invi_sparse = IndexMap(reshape(sortperm(vec(i.indices_sparse)),size(i)))
+  SparseIndexMap(invi,invi_sparse,i.sparsity)
 end
 
 # MultiField interface
@@ -346,6 +358,8 @@ end
 Base.size(i::MultiValueIndexMap) = size(i.indices)
 Base.getindex(i::MultiValueIndexMap,j...) = getindex(i.indices,j...)
 Base.setindex!(i::MultiValueIndexMap,v,j...) = setindex!(i.indices,v,j...)
+Base.copy(i::MultiValueIndexMap) = MultiValueIndexMap(copy(i.indices))
+Base.vec(i::MultiValueIndexMap) = vec(i.indices)
 TensorValues.num_components(i::MultiValueIndexMap{D}) where D = size(i.indices,D)
 
 struct MultiValueIndexMapView{D,Ti,I<:AbstractMultiValueIndexMap{D,Ti},L} <: AbstractMultiValueIndexMap{D,Ti}
@@ -356,4 +370,5 @@ end
 Base.size(i::MultiValueIndexMapView) = size(i.locations)
 Base.getindex(i::MultiValueIndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.locations[j...]]
 Base.setindex!(i::MultiValueIndexMapView{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
+Base.vec(i::MultiValueIndexMapView) = vec(i.indices)
 TensorValues.num_components(i::MultiValueIndexMapView{D}) where D = size(i,D)

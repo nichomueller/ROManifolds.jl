@@ -75,10 +75,10 @@ function get_matrix_index_map(trial::TProductFESpace,test::TProductFESpace)
     psparsity = permute_sparsity(sparsity,trial,test)
     I,J,_ = findnz(psparsity)
     i,j,_ = IndexMaps.univariate_findnz(psparsity)
-    g2l = _global_2_local_nnz(psparsity,I,J,i,j)
-    pg2l = _permute_index_map(g2l,trial,test)
-    _to_nz_index!(pg2l,sparsity)
-    SparseIndexMap(pg2l,psparsity)
+    g2l_sparse = _global_2_local(psparsity,I,J,i,j)
+    pg2l_sparse = _permute_index_map(g2l_sparse,trial,test)
+    pg2l = _to_nz_index(pg2l_sparse,sparsity)
+    SparseIndexMap(pg2l,pg2l_sparse,psparsity)
   end
 end
 
@@ -100,7 +100,7 @@ end
 
 # utils
 
-function _global_2_local_nnz(sparsity::TProductSparsityPattern,I,J,i,j)
+function _global_2_local(sparsity::TProductSparsityPattern,I,J,i,j)
   IJ = get_nonzero_indices(sparsity)
   lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
 
@@ -225,7 +225,15 @@ function _permute_index_map(index_map,trial::TProductFESpace,test::TProductFESpa
   return _permute_index_map(index_map,I,J,nrows)
 end
 
-_to_nz_index!(index_map,sparsity::TProductSparsityPattern) = _to_nz_index!(index_map,get_sparsity(sparsity))
+function _to_nz_index(index_map,sparsity)
+  index_map′ = copy(index_map)
+  _to_nz_index!(index_map′,sparsity)
+  return index_map′
+end
+
+function _to_nz_index!(index_map,sparsity::TProductSparsityPattern)
+  _to_nz_index!(index_map,get_sparsity(sparsity))
+end
 
 function _to_nz_index!(index_map,sparsity::SparsityPatternCSC)
   nrows = IndexMaps.num_rows(sparsity)
