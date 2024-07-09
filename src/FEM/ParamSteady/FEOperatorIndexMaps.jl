@@ -77,6 +77,7 @@ function get_matrix_index_map(trial::TProductFESpace,test::TProductFESpace)
     i,j,_ = IndexMaps.univariate_findnz(psparsity)
     g2l = _global_2_local_nnz(psparsity,I,J,i,j)
     pg2l = _permute_index_map(g2l,trial,test)
+    _to_nz_index!(pg2l,sparsity)
     SparseIndexMap(pg2l,psparsity)
   end
 end
@@ -139,18 +140,6 @@ function _permute_index_map(index_map,I,J,nrows)
     end
   end
   return _add_fixed_dofs(iperm)
-end
-
-function _permute_index_map(index_map,I::FixedDofsIndexMap,J,nrows)
-  _permute_index_map(index_map,remove_fixed_dof(I),J,nrows)
-end
-
-function _permute_index_map(index_map,I,J::FixedDofsIndexMap,nrows)
-  _permute_index_map(index_map,I,remove_fixed_dof(J),nrows)
-end
-
-function _permute_index_map(index_map,I::FixedDofsIndexMap,J::FixedDofsIndexMap,nrows)
-  _permute_index_map(index_map,remove_fixed_dof(I),remove_fixed_dof(J),nrows)
 end
 
 function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractMultiValueIndexMap,nrows)
@@ -234,4 +223,17 @@ function _permute_index_map(index_map,trial::TProductFESpace,test::TProductFESpa
   J = get_dof_index_map(trial)
   nrows = num_free_dofs(test)
   return _permute_index_map(index_map,I,J,nrows)
+end
+
+_to_nz_index!(index_map,sparsity::TProductSparsityPattern) = _to_nz_index!(index_map,get_sparsity(sparsity))
+
+function _to_nz_index!(index_map,sparsity::SparsityPatternCSC)
+  nrows = IndexMaps.num_rows(sparsity)
+  for (i,index) in enumerate(index_map)
+    if index > 0
+      irow = fast_index(index,nrows)
+      icol = slow_index(index,nrows)
+      index_map[i] = nz_index(sparsity.matrix,irow,icol)
+    end
+  end
 end

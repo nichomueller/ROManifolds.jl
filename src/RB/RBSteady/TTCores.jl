@@ -1,3 +1,23 @@
+function IndexMaps.recast(i::SparseIndexMap,a::AbstractVector{<:AbstractArray{T,3}}) where T
+  us = IndexMaps.get_univariate_sparsity(i)
+  @check length(us) == length(a)
+  asparse = map(SparseCore,a,us)
+  return asparse
+end
+
+function IndexMaps.recast(
+  i::SparseIndexMap{D,Ti,<:AbstractMultiValueIndexMap},
+  a::AbstractVector{<:AbstractArray{T,3}}
+  ) where {D,Ti,T}
+
+  us = IndexMaps.get_univariate_sparsity(i)
+  @check length(us) == length(a) - 1
+  aaxes...,acomp = a
+  aaxessparse = map(SparseCore,aaxes,us)
+  acompsparse = TrivialTTCore(acomp)
+  return [aaxessparse...,acompsparse]
+end
+
 """
     abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
 
@@ -13,8 +33,7 @@ abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
     abstract type SparseCore{T,N} <: AbstractTTCore{T,N} end
 
 Tensor train cores for sparse matrices. In contrast with standard (3-D) tensor train
-cores, a SparseCore is either a 4-D array (in scalar problems) or a 5-D array (in
-multivalued problems). Information on the sparsity pattern of the matrices must
+cores, a SparseCore is a 4-D array. Information on the sparsity pattern of the matrices must
 be provided for indexing purposes.
 
 Subtypes:
@@ -52,7 +71,7 @@ Base.size(a::SparseCoreCSC) = (size(a.array,1),IndexMaps.num_rows(a.sparsity),
 
 function Base.getindex(a::SparseCoreCSC,i::Vararg{Integer,4})
   if CartesianIndex(i[2:3]) ∈ a.sparse_indexes
-    core_getindex(a,i)
+    core_getindex(a,i...)
   else
     zero(eltype(a))
   end
@@ -64,41 +83,15 @@ function core_getindex(a::SparseCoreCSC{T},i::Vararg{Integer,4}) where T
   getindex(a.array,i1,i2,i3)
 end
 
-"""
-    struct MultiValueSparseCoreCSC{T,Ti} <: SparseCore{T,5} end
-
-Tensor train cores for multivalued sparse matrices in CSC format
-
-"""
-struct MultiValueSparseCoreCSC{T,Ti} <: SparseCore{T,5}
-  array::Array{T,4}
-  sparsity::MultiValueSparsityPatternCSC{T,Ti}
-  sparse_indexes::Vector{CartesianIndex{2}}
+struct TrivialTTCore{T} <: AbstractTTCore{T,4}
+  array::Array{T,3}
 end
 
-function SparseCore(
-  array::AbstractArray{T},
-  sparsity::MultiValueSparsityPatternCSC{T}) where T
+Base.size(a::TrivialTTCore) = (size(a.array,1),size(a.array,2),size(a.array,2),size(a.array,3))
 
-  irows,icols,_ = findnz(sparsity)
-  SparseCoreCSC(array,sparsity,CartesianIndex.(irows,icols))
-end
-
-Base.size(a::MultiValueSparseCoreCSC) = (size(a.array,1),IndexMaps.num_rows(a.sparsity),
-  IndexMaps.num_cols(a.sparsity),num_components(a.sparsity),size(a.array,3))
-
-function Base.getindex(a::MultiValueSparseCoreCSC,i::Vararg{Integer,5})
-  if CartesianIndex(i[2:3]) ∈ a.sparse_indexes
-    core_getindex(a,i)
-  else
-    zero(eltype(a))
-  end
-end
-
-function core_getindex(a::MultiValueSparseCoreCSC{T},i::Vararg{Integer,5}) where T
-  i2 = findfirst(a.sparse_indexes .== [CartesianIndex(i[2:3])])
-  i1,i3,i4 = i[1],i[5]
-  getindex(a.array,i1,i2,i3,i4)
+function Base.getindex(a::TrivialTTCore,i::Vararg{Integer,4})
+  i1,i2,i3 = i[1],i[2],i[4]
+  (i[3] == i2) ? a.array[i1,i2,i3] : zero(eltype(a))
 end
 
 struct BlockArrayTTCores{T,D,N,A<:AbstractArray{T,D}} <: AbstractArray{AbstractArray{T,D},N}
@@ -180,11 +173,6 @@ function cores2basis(core::SparseCoreCSC{T}) where T
   return reshape(pcore,size(pcore,1)*size(pcore,2),:)
 end
 
-function cores2basis(core::MultiValueSparseCoreCSC{T}) where T
-  pcore = permutedims(core,(2,3,4,1,5))
-  return reshape(pcore,size(pcore,1)*size(pcore,2)*size(pcore,3),:)
-end
-
 function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
   @check size(a,3) == size(b,1)
   TS = promote_type(T,S)
@@ -196,6 +184,25 @@ function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
     end
   end
   return ab
+end
+
+# when we multiply a 4-D spatial core with a 3-D temporal core
+function _cores2basis(a::AbstractArray{S,4},b::AbstractArray{T,3}) where {S,T}
+  @check size(a,4) == size(b,1)
+  TS = promote_type(T,S)
+  nrows = size(a,2)*size(b,2)
+  ncols = size(a,3)
+  ab = zeros(TS,size(a,1),nrows*ncols,size(b,3)) # returns a 3-D array
+  for i = axes(a,1), j = axes(b,3)
+    for α = axes(a,4)
+      @inbounds @views ab[i,:,j] += vec(kronecker(b[α,:,j],a[i,:,:,α]))
+    end
+  end
+  return ab
+end
+
+function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,4}) where {S,T}
+  @notimplemented "Usually the spatial cores are computed before the temporal ones"
 end
 
 function _cores2basis(a::AbstractArray{S,N},b::AbstractArray{T,N}) where {S,T,N}
@@ -211,12 +218,6 @@ function _cores2basis(i::AbstractIndexMap,a::AbstractArray{T,3}...) where T
   basis = _cores2basis(a...)
   invi = inv_index_map(i)
   return view(basis,:,vec(invi),:)
-end
-
-function _cores2basis(i::FixedDofsIndexMap,a::AbstractArray{T,3}...) where T
-  basis = _cores2basis(a...)
-  invi = inv_index_map(i)
-  return view(basis,:,remove_fixed_dof(invi),:)
 end
 
 # when we multiply two SparseCoreCSC objects, the result is a 3-D core that stacks
@@ -262,106 +263,49 @@ function _cores2basis(
   return abc
 end
 
-# when we multiply two MultiValueSparseCoreCSC objects, the result is a 3-D core that stacks
-# the matrices' rows, columns and components
-function _cores2basis(
-  I::SparseIndexMap,
-  a::MultiValueSparseCoreCSC{S},
-  b::MultiValueSparseCoreCSC{T}
-  ) where {S,T}
+# with components
 
-  error("stop here")
-  @check size(a,5) == size(b,1)
-  @check size(a,4) == size(b,4)
+function _cores2basis(
+  I::SparseIndexMap{3,<:Integer,<:AbstractMultiValueIndexMap},
+  a::SparseCoreCSC{S},
+  b::SparseCoreCSC{T},
+  c::TrivialTTCore{U}
+  ) where {S,T,U}
+
+  @check size(a,4) == size(b,1) && size(b,4) == size(c,1)
   Is = get_index_map(I)
-  TS = promote_type(T,S)
+  TSU = promote_type(T,S,U)
   nrows = size(a,2)*size(b,2)
   ncols = size(a,3)*size(b,3)
-  ncomp = size(a,4)
-  ab = zeros(TS,size(a,1),nrows*ncols*ncomp,size(b,4))
-  for c = 1:ncomp
-    for i = axes(a,1), j = axes(b,4)
-      for α = axes(a,4)
-        @inbounds @views ab[i,vec(Is),j] += kronecker(b.array[α,:,c,j],a.array[i,:,c,α])
-      end
+  ncomps = size(c,2)
+  abc = zeros(TSU,size(a,1),nrows*ncols*ncomps,size(c,4))
+  for i = axes(a,1), j = axes(c,4)
+    for α = axes(a,4), β = axes(b,4)
+      @inbounds @views abc[i,vec(Is),j] += kronecker(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α])
     end
   end
-  return ab
+  return abc
 end
 
-# function _cores2basis(
-#   I::SparseIndexMap,
-#   a::MultiValueSparseCoreCSC{S},
-#   b::MultiValueSparseCoreCSC{T},
-#   c::MultiValueSparseCoreCSC{U}
-#   ) where {S,T,U}
+function _cores2basis(
+  I::SparseIndexMap{4,<:Integer,<:AbstractMultiValueIndexMap},
+  a::SparseCoreCSC{S},
+  b::SparseCoreCSC{T},
+  c::SparseCoreCSC{U},
+  d::TrivialTTCore{V}
+  ) where {S,T,U,V}
 
-#   @check size(a,4) == size(b,1) && size(b,4) == size(c,1)
-#   Is = get_index_map(I)
-#   TSU = promote_type(T,S,U)
-#   nrows = size(a,2)*size(b,2)*size(c,2)
-#   ncols = size(a,3)*size(b,3)*size(c,3)
-#   abc = zeros(TSU,size(a,1),nrows*ncols,size(c,4))
-#   for i = axes(a,1), j = axes(c,4)
-#     for α = axes(a,4), β = axes(b,4)
-#       @inbounds @views abc[i,vec(Is),j] += kronecker(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α])
-#     end
-#   end
-#   return abc
-# end
-
-function union_cores(a::AbstractVector{<:AbstractArray}...)
-  @check all(length(ai) == length(first(a)) for ai in a)
-  b1 = union_first_cores(first(a)...)
-  b = [union_cores(ai...) for ai in a[2:end]]
-  return [b1,b...]
-end
-
-function union_first_cores(a::A...) where {T,D,A<:AbstractArray{T,D}} # -> BlockVectorTTCores
-  @check all(size(ai,2) == size(first(a),2) for ai in a)
-  array = [a...]
-  s = (length(a),)
-  touched = fill(true,s)
-  BlockArrayTTCores(array,touched)
-end
-
-function union_cores(a::A...) where {T,D,A<:AbstractArray{T,D}} # -> BlockMatrixTTCores
-  @check all(size(ai,2) == size(first(a),2) for ai in a)
-  array = [a...]
-  s = (length(a),length(a))
-  touched = fill(false,s)
-  for i in diag(CartesianIndices(s))
-    touched[i] = true
+  @check size(a,4) == size(b,1) && size(b,4) == size(c,1) && size(c,4) == size(d,1)
+  Is = get_index_map(I)
+  TSUV = promote_type(T,S,U,V)
+  nrows = size(a,2)*size(b,2)*size(c,2)
+  ncols = size(a,3)*size(b,3)*size(c,3)
+  ncomps = size(d,2)
+  abcd = zeros(TSUV,size(a,1),nrows*ncols,size(c,4))
+  for i = axes(a,1), j = axes(d,4)
+    for α = axes(a,4), β = axes(b,4), γ = axes(c,4)
+      @inbounds @views abcd[i,vec(Is),j] += kronecker(d.array[γ,:,j],c.array[β,:,γ],b.array[α,:,β],a.array[i,:,α])
+    end
   end
-  BlockArrayTTCores(array,touched)
-end
-
-function cores2basis(cores::BlockArrayTTCores...)
-  c2m = _cores2basis(cores...)
-  array = dropdims.(c2m.array;dims=1)
-  touched = c2m.touched
-  BlockArrayTTCores(array,touched)
-end
-
-function _cores2basis(a::BlockVectorTTCores,b::BlockMatrixTTCores)
-  @check length(a) == size(b,1)
-  @check (a.touched[i] && b.touched[i,i] for i in eachindex(a))
-  array = [_cores2basis(a[i],b[i,i]) for i in eachindex(a)]
-  touched = a.touched
-  BlockArrayTTCores(array,touched)
-end
-
-function _cores2basis(a::BlockMatrixTTCores,b::BlockMatrixTTCores)
-  @check (a.touched[i,i] && b.touched[i,i] for i in eachindex(a))
-  array = [_cores2basis(a[i],b[i,i]) for i in eachindex(a)]
-  touched = a.touched
-  BlockArrayTTCores(array,touched)
-end
-
-function _cores2basis(i::AbstractIndexMap,a::BlockArrayTTCores...)
-  basis = _cores2basis(a...)
-  invi = inv_index_map(i)
-  array = map(b -> view(b,:,vec(invi),:),basis.array)
-  touched = basis.touched
-  BlockArrayTTCores(array,touched)
+  return abcd
 end

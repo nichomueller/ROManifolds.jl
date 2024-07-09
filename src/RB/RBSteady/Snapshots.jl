@@ -278,13 +278,6 @@ const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
   SteadyMultiValueSnapshots{T,N,L,D,I,R,A}
 }
 
-function IndexMaps.recast(s::SparseSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T
-  index_map = get_index_map(s)
-  ls = IndexMaps.get_univariate_sparsity(index_map)
-  asparse = map(SparseCore,a,ls)
-  return asparse
-end
-
 """
     select_snapshots_entries(s::AbstractSteadySnapshots,srange) -> ArrayOfArrays
     select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange) -> ArrayOfArrays

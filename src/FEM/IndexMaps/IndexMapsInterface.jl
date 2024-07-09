@@ -138,6 +138,7 @@ end
 
 Base.size(i::TrivialIndexMap) = (length(i.indices),)
 Base.getindex(i::TrivialIndexMap,j::Integer) = getindex(i.indices,j)
+Base.setindex!(i::TrivialIndexMap,v::Integer,j::Integer) = setindex!(i.indices,v,j)
 
 """
     IndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
@@ -151,6 +152,7 @@ end
 
 Base.size(i::IndexMap) = size(i.indices)
 Base.getindex(i::IndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
+Base.setindex!(i::IndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
 Arrays.get_array(i::IndexMap) = i.indices
 Base.stack(i::AbstractArray{<:IndexMap}) = IndexMap(stack(get_array.(i)))
 
@@ -176,6 +178,7 @@ end
 
 Base.size(i::IndexMapView) = size(i.locations)
 Base.getindex(i::IndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.locations[j...]]
+Base.setindex!(i::IndexMapView{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,i.locations[j...])
 
 """
     FixedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
@@ -194,14 +197,13 @@ function FixedDofsIndexMap(indices::AbstractIndexMap,dofs_to_fix)
   FixedDofsIndexMap(indices′)
 end
 
-Base.size(i::FixedDofsIndexMap) = size(i.indices)
-
-Base.getindex(i::FixedDofsIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
-
-Base.view(i::FixedDofsIndexMap,locations) = FixedDofsIndexMap(view(i.indices,locations))
-
 Arrays.get_array(i::FixedDofsIndexMap) = i.indices
 
+Base.size(i::FixedDofsIndexMap) = size(i.indices)
+Base.getindex(i::FixedDofsIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
+Base.setindex!(i::FixedDofsIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
+Base.view(i::FixedDofsIndexMap,locations) = FixedDofsIndexMap(view(i.indices,locations))
+Base.vec(i::FixedDofsIndexMap) = remove_fixed_dof(i)
 Base.stack(i::AbstractArray{<:FixedDofsIndexMap}) = FixedDofsIndexMap(stack(get_array.(i)))
 
 for f in (:free_dofs_map,:inv_index_map)
@@ -221,18 +223,6 @@ function remove_fixed_dof(i::FixedDofsIndexMap)
   filter(x -> x != 0,i)
 end
 
-function permute_sparsity(a::SparsityPatternCSC,i::FixedDofsIndexMap,j::AbstractIndexMap)
-  permute_sparsity(a,remove_fixed_dof(i),vec(j))
-end
-
-function permute_sparsity(a::SparsityPatternCSC,i::AbstractIndexMap,j::FixedDofsIndexMap)
-  permute_sparsity(a,vec(i),remove_fixed_dof(j))
-end
-
-function permute_sparsity(a::SparsityPatternCSC,i::FixedDofsIndexMap,j::FixedDofsIndexMap)
-  permute_sparsity(a,remove_fixed_dof(i),remove_fixed_dof(j))
-end
-
 """
     TProductIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
 
@@ -250,6 +240,7 @@ end
 
 Base.size(i::TProductIndexMap) = size(i.indices)
 Base.getindex(i::TProductIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
+Base.setindex!(i::TProductIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
 get_tp_indices(i::TProductIndexMap) = i.indices
 get_univariate_indices(i::TProductIndexMap) = i.indices_1d
 
@@ -267,6 +258,7 @@ end
 
 Base.size(i::SparseIndexMap) = size(i.indices)
 Base.getindex(i::SparseIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
+Base.setindex!(i::SparseIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
 get_index_map(i::SparseIndexMap) = i.indices
 get_sparsity(i::SparseIndexMap) = get_sparsity(i.sparsity)
 get_univariate_sparsity(i::SparseIndexMap) = get_univariate_sparsity(i.sparsity)
@@ -353,6 +345,7 @@ end
 
 Base.size(i::MultiValueIndexMap) = size(i.indices)
 Base.getindex(i::MultiValueIndexMap,j...) = getindex(i.indices,j...)
+Base.setindex!(i::MultiValueIndexMap,v,j...) = setindex!(i.indices,v,j...)
 TensorValues.num_components(i::MultiValueIndexMap{D}) where D = size(i.indices,D)
 
 struct MultiValueIndexMapView{D,Ti,I<:AbstractMultiValueIndexMap{D,Ti},L} <: AbstractMultiValueIndexMap{D,Ti}
@@ -362,4 +355,5 @@ end
 
 Base.size(i::MultiValueIndexMapView) = size(i.locations)
 Base.getindex(i::MultiValueIndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.locations[j...]]
+Base.setindex!(i::MultiValueIndexMapView{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
 TensorValues.num_components(i::MultiValueIndexMapView{D}) where D = size(i,D)

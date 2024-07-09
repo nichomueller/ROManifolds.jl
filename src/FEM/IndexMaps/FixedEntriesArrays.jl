@@ -24,7 +24,7 @@ Base.@propagate_inbounds function Base.getindex(a::FixedEntriesArray{T,N},i::Var
 end
 
 Base.@propagate_inbounds function Base.setindex!(a::FixedEntriesArray{T,N},v,i::Vararg{Integer,N}) where {T,N}
-  i ∈ a.fixed_entries && setindex!(a.array,v,i...)
+  !(i ∈ a.fixed_entries) && setindex!(a.array,v,i...)
 end
 
 function Base.stack(a::AbstractArray{<:FixedEntriesArray})

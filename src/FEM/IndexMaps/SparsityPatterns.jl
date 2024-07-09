@@ -12,6 +12,12 @@ Subtypes:
 """
 abstract type SparsityPattern end
 
+# random sparsity pattern
+function SparsityPattern(;s=(1,1))
+  matrix = sparse(rand(s...))
+  SparsityPattern(matrix)
+end
+
 """
 """
 struct SparsityPatternCSC{Tv,Ti} <: SparsityPattern
@@ -118,7 +124,7 @@ function permute_sparsity(a::TProductSparsityPattern,i,j)
   TProductSparsityPattern(psparsity,psparsities_1d)
 end
 
-function permute_sparsity(s::SparsityPattern,U::FESpace,V::FESpace)
+function permute_sparsity(s::TProductSparsityPattern,U::FESpace,V::FESpace)
   psparsity = permute_sparsity(s.sparsity,U.space,V.space)
   psparsities = map(permute_sparsity,s.sparsities_1d,U.spaces_1d,V.spaces_1d)
   TProductSparsityPattern(psparsity,psparsities)

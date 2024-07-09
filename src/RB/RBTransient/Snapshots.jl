@@ -317,13 +317,6 @@ const TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union
   TransientMultiValueSnapshots{T,N,L,D,I,R,A}
 }
 
-function IndexMaps.recast(s::TransientSparseSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T
-  index_map = get_index_map(s)
-  ls = IndexMaps.get_univariate_sparsity(index_map)
-  asparse = map(SparseCore,a,ls)
-  return asparse
-end
-
 function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange)
   _getindex(s::TransientBasicSnapshots,is,it,ip) = consecutive_getindex(s.data,is,ip+(it-1)*num_params(s))
   _getindex(s::TransientSnapshots,is,it,ip) = consecutive_getindex(s.data[it],is,ip)
