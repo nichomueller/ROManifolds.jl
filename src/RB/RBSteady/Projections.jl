@@ -88,9 +88,7 @@ struct TTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I} <: SteadyProjec
   index_map::I
 end
 
-const FixedDofsTTSVDCores{
-  D,T,A<:AbstractVector{<:AbstractArray{T,D}},I<:Union{<:FixedDofsIndexMap,<:FixedDofsSparseIndexMap}
-  } = TTSVDCores{D,T,A,I}
+const FixedDofsTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I<:FixedDofsIndexMap} = TTSVDCores{D,T,A,I}
 
 IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
 

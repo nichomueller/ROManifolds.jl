@@ -183,7 +183,7 @@ function compute_error(_sol::AbstractSnapshots,_sol_approx::AbstractSnapshots,ar
   compute_error(sol,sol_approx,args...)
 end
 
-function compute_error(sol::UnfoldingSteadySnapshots,sol_approx::UnfoldingSteadySnapshots,norm_matrix=nothing)
+function compute_error(sol::UnfoldingSteadySnapshots,sol_approx::UnfoldingSteadySnapshots,norm_matrix)
   @check size(sol) == size(sol_approx)
   space_norm = zeros(num_params(sol))
   @inbounds for i = axes(sol,2)
@@ -195,7 +195,15 @@ function compute_error(sol::UnfoldingSteadySnapshots,sol_approx::UnfoldingSteady
   return avg_error
 end
 
-function compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix::BlockMatrix)
+function compute_error(
+  sol::UnfoldingSteadySnapshots,
+  sol_approx::UnfoldingSteadySnapshots,
+  norm_matrix::AbstractTProductArray)
+
+  compute_error(sol,sol_approx,kron(norm_matrix))
+end
+
+function compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
   @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
   active_block_ids = get_touched_blocks(sol)
   block_map = BlockMap(size(sol),active_block_ids)

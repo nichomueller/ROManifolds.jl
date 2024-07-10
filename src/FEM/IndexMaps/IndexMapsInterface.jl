@@ -98,7 +98,7 @@ Returns an index map given by `f`∘`i`, where f is a function encoding an index
 
 """
 function change_index_map(f,i::AbstractIndexMap)
-  i′::AbstractIndexMap = f(vec(collect(i)))
+  i′::AbstractIndexMap = f(collect(vec(i)))
   i′
 end
 

@@ -210,7 +210,8 @@ function _cores2basis(
   nrows = size(a,2)*size(b,2)
   ncols = size(a,3)*size(b,3)
   ab = zeros(TS,size(a,1),nrows*ncols,size(b,4))
-  return _cores2basis!(ab,Is,a,b)
+  _cores2basis!(ab,Is,a,b)
+  return ab
 end
 
 function _cores2basis(
@@ -226,7 +227,8 @@ function _cores2basis(
   nrows = size(a,2)*size(b,2)*size(c,2)
   ncols = size(a,3)*size(b,3)*size(c,3)
   abc = zeros(TSU,size(a,1),nrows*ncols,size(c,4))
-  return _cores2basis!(abc,Is,a,b,c)
+  _cores2basis!(abc,Is,a,b,c)
+  return abc
 end
 
 function _cores2basis!(ab,I::AbstractIndexMap,a,b)
@@ -257,7 +259,7 @@ function _cores2basis!(ab,I::FixedDofsIndexMap,a,b)
         )[nz_indices]
     end
   end
-  return view(ab,:,nz_indices,:)
+  return ab
 end
 
 function _cores2basis!(abc,I::FixedDofsIndexMap,a,b,c)
@@ -268,5 +270,5 @@ function _cores2basis!(abc,I::FixedDofsIndexMap,a,b,c)
         )[nz_indices]
     end
   end
-  return view(abc,:,nz_indices,:)
+  return abc
 end

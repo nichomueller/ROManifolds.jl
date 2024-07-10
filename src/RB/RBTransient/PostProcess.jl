@@ -53,7 +53,7 @@ function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...;kw
   rb_results(solver,feop,args...;kwargs...)
 end
 
-function RBSteady.compute_error(sol::ModeTransientSnapshots,sol_approx::ModeTransientSnapshots,norm_matrix=nothing)
+function RBSteady.compute_error(sol::ModeTransientSnapshots,sol_approx::ModeTransientSnapshots,norm_matrix)
   err_norm = zeros(num_times(sol))
   sol_norm = zeros(num_times(sol))
   space_time_norm = zeros(num_params(sol))
@@ -68,6 +68,14 @@ function RBSteady.compute_error(sol::ModeTransientSnapshots,sol_approx::ModeTran
   end
   avg_error = sum(space_time_norm) / length(space_time_norm)
   return avg_error
+end
+
+function RBSteady.compute_error(
+  sol::ModeTransientSnapshots,
+  sol_approx::ModeTransientSnapshots,
+  norm_matrix::AbstractTProductArray)
+
+  compute_error(sol,sol_approx,kron(norm_matrix))
 end
 
 function RBSteady.average_plot(

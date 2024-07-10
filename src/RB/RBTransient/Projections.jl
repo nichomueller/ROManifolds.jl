@@ -83,7 +83,7 @@ end
 
 const TransientFixedDofsTTSVDCores{
   D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},C<:AbstractMatrix,
-  I<:Union{<:FixedDofsIndexMap,<:FixedDofsSparseIndexMap}} = TransientTTSVDCores{D,T,A,B,C,I}
+  I<:FixedDofsIndexMap} = TransientTTSVDCores{D,T,A,B,C,I}
 
 function TransientTTSVDCores(
   cores_space::Vector{<:AbstractArray},
