@@ -47,11 +47,13 @@ end
 
 function get_vector_index_map(tests::MultiFieldFESpace)
   ntests = num_fields(tests)
-  index_maps = Vector{AbstractIndexMap}(undef,ntests)
-  for i in 1:ntests
-    index_maps[i] = get_vector_index_map(tests[i])
+  index_maps = AbstractIndexMap[]
+  for test in tests
+    push!(index_maps,get_vector_index_map(test))
   end
-  return index_maps
+  indices = collect1d(CartesianIndices((ntests,)))
+  block_index = BlockMap((ntests,),1:ntests)
+  return return_cache(block_index,index_maps...)
 end
 
 """
@@ -91,11 +93,13 @@ end
 function get_matrix_index_map(trials::MultiFieldFESpace,tests::MultiFieldFESpace)
   ntests = num_fields(tests)
   ntrials = num_fields(trials)
-  index_maps = Matrix{AbstractIndexMap}(undef,ntests,ntrials)
-  for (i,j) in Iterators.product(1:ntests,1:ntrials)
-    index_maps[i,j] = get_matrix_index_map(trials[j],tests[i])
+  index_maps = AbstractIndexMap[]
+  for (test,trial) in Iterators.product(tests,trials)
+    push!(index_maps,get_matrix_index_map(trial,test))
   end
-  return index_maps
+  indices = collect1d(CartesianIndices((ntests,ntrials)))
+  block_index = BlockMap((ntests,ntrials),indices)
+  return return_cache(block_index,index_maps...)
 end
 
 # utils

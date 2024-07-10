@@ -484,7 +484,7 @@ end
 
 function RBSteady.Snapshots(
   data::AbstractVector{<:BlockArrayOfArrays},
-  i::AbstractVector{<:AbstractIndexMap},
+  i::ArrayBlock{<:AbstractIndexMap},
   r::AbstractParamRealization)
 
   block_values = blocks.(data)

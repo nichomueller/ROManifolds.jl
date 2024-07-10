@@ -368,12 +368,12 @@ function BlockSnapshots(k::BlockMap{N},a::AbstractArray{S}) where {S,N}
   BlockSnapshots(array,touched)
 end
 
-function Fields.BlockMap(s::NTuple,inds::Vector{<:Integer})
+function Fields.BlockMap(s::NTuple,inds::AbstractVector{<:Integer})
   cis = [CartesianIndex((i,)) for i in inds]
   BlockMap(s,cis)
 end
 
-function Snapshots(data::BlockArrayOfArrays,i::AbstractArray{<:AbstractIndexMap},r::AbstractParamRealization)
+function Snapshots(data::BlockArrayOfArrays,i::ArrayBlock{<:AbstractIndexMap},r::AbstractParamRealization)
   block_values = blocks(data)
   nblocks = blocksize(data)
   active_block_ids = findall(!iszero,block_values)

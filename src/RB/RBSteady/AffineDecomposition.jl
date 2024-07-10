@@ -421,7 +421,7 @@ function reduced_residual(
   test = get_test(op)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  ads,red_trians = Any[
+  ads,red_trians = [
     reduced_form(solver,s[i],trian,test[i]) for i in active_block_ids
     ] |> tuple_of_arrays
   red_trian = ParamDataStructures.merge_triangulations(red_trians)
@@ -543,7 +543,7 @@ end
 function interpolation_error(a::BlockAffineDecomposition,fes::BlockSnapshots,rbs::BlockSnapshots)
   active_block_ids = get_touched_blocks(a)
   block_map = BlockMap(size(a),active_block_ids)
-  errors = Any[interpolation_error(a[i],fes[i],rbs[i]) for i = get_touched_blocks(a)]
+  errors = [interpolation_error(a[i],fes[i],rbs[i]) for i = get_touched_blocks(a)]
   return_cache(block_map,errors...)
 end
 

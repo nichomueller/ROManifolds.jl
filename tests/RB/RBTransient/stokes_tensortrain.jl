@@ -84,15 +84,15 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h
 
 # fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
 
-# nparams = num_params(rbsolver)
-# sol = solve(fesolver,feop,xh0μ;nparams)
-# odesol = sol.odesol
-# r = odesol.r
-# stats = @timed begin
-#   vals = collect(odesol)
-# end
-# i = get_vector_index_map(feop)
-# snaps = Snapshots(vals,i,r)
+nparams = num_params(rbsolver)
+sol = solve(fesolver,feop,xh0μ;nparams)
+odesol = sol.odesol
+r = odesol.r
+stats = @timed begin
+  vals = collect(odesol)
+end
+i = get_vector_index_map(feop)
+snaps = Snapshots(vals,i,r)
 
 # serialize(RBSteady.get_snapshots_filename(test_dir),snaps)
 snaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
@@ -136,38 +136,17 @@ jjac,rres = jacobian_and_residual(rbsolver,op,smdeim)
 # red_jac = reduced_jacobian(rbsolver,op,jjac)
 # red_res = reduced_residual(rbsolver,op,rres)
 
+using Kronecker
 using Mabla.FEM.IndexMaps
 A1 = jjac[1][1][2,1]
-# basis = reduced_basis(A1)
-cores_space...,core_time = ttsvd(A1)
-index_map = get_index_map(A1)
-cores_space′ = recast(index_map,cores_space)
-# basis_spacetime = get_basis_spacetime(index_map,cores_space′,core_time)
-# RBSteady._cores2basis(index_map,cores_space′...)
-aa,bb,cc = cores_space′
-Is = get_index_map(index_map)
-TSU = Float64
-nrows = size(aa,2)*size(bb,2)
-ncols = size(aa,3)*size(bb,3)
-ncomps = size(cc,2)
-abc = zeros(TSU,size(aa,1),nrows*ncols*ncomps,size(cc,4))
-nz_indices = findall(Is[:].!=0)
-for i = axes(aa,1), j = axes(cc,4)
-  for α = axes(aa,4), β = axes(bb,4)
-    abc[i,vec(Is),j] += kronecker(cc.array[β,:,j],bb.array[α,:,β],aa.array[i,:,α])[nz_indices]
-  end
-end
-
-for i = axes(aa,1), j = axes(cc,4)
-  for α = axes(aa,4), β = axes(bb,4)
-    abc[i,vec(Is),j] += kronecker(cc.array[β,:,j],bb.array[α,:,β],aa.array[i,:,α])[nz_indices]
-  end
-end
-
+basis = reduced_basis(A1)
 lu_interp,integration_domain = mdeim(rbsolver.mdeim_style,basis)
 combine = (x,y) -> θ*x+(1-θ)*y
-proj_basis = reduce_operator(rbsolver.mdeim_style,basis,rbtrial[1,1],rbtest[1,1];combine)
-red_trian = reduce_triangulation(Ω.trian,integration_domain,rbtrial[1,1],rbtest[1,1])
-coefficient = allocate_coefficient(rbsolver,basis)
-result = allocate_result(rbsolver,rbtrial[1,1],rbtest[1,1])
-ad = AffineDecomposition(proj_basis,lu_interp,integration_domain,coefficient,result)
+proj_basis = reduce_operator(rbsolver.mdeim_style,basis,rbtrial[2,1],rbtest[2,1];combine)
+
+aa,bb,cc = basis.cores_space[1],rbtrial[2,1].basis.cores_space[1],rbtest[2,1].basis.cores_space[1]
+compress_cores(aa,bb,cc)
+# red_trian = reduce_triangulation(Ω.trian,integration_domain,rbtrial[2,1],rbtest[2,1])
+# coefficient = allocate_coefficient(rbsolver,basis)
+# result = allocate_result(rbsolver,rbtrial[2,1],rbtest[2,1])
+# ad = AffineDecomposition(proj_basis,lu_interp,integration_domain,coefficient,result)

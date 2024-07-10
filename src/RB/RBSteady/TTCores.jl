@@ -339,7 +339,7 @@ function _cores2basis!(abc,I::FixedDofsIndexMap,a,b,c)
   for i = axes(a,1), j = axes(c,4)
     for α = axes(a,4), β = axes(b,4)
       @inbounds @views abc[i,vec(I),j] += kronecker(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α]
-        )
+        )[nz_indices]
     end
   end
   return abc
@@ -356,6 +356,6 @@ function _cores2basis!(abcd,I::FixedDofsIndexMap,a,b,c,d)
   return abcd
 end
 
-function _cores2basis!(cache,I::MultiValueIndexMap{<:FixedDofsIndexMap},args...)
+function _cores2basis!(cache,I::MultiValueIndexMap{D,Ti,<:FixedDofsIndexMap} where {D,Ti},args...)
   _cores2basis!(cache,I.indices,args...)
 end

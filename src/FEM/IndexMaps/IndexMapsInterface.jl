@@ -190,7 +190,7 @@ dofs are stored as a vector of CartesianIndex of dimension D; when indexing vect
 defined on the zero mean `FESpace`, the length of the vector is 1
 
 """
-struct FixedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
+struct FixedDofsIndexMap{D,Ti,I} <: AbstractIndexMap{D,Ti}
   indices::FixedEntriesArray{Ti,D,I}
 end
 
@@ -271,7 +271,7 @@ Base.copy(i::SparseIndexMap) = SparseIndexMap(copy(i.indices),copy(i.indices_spa
 Base.vec(i::SparseIndexMap) = vec(i.indices)
 get_index_map(i::SparseIndexMap) = i.indices
 get_sparse_index_map(i::SparseIndexMap) = i.indices_sparse
-get_sparsity(i::SparseIndexMap) = get_sparsity(i.sparsity)
+get_sparsity(i::SparseIndexMap) = i.sparsity
 get_univariate_sparsity(i::SparseIndexMap) = get_univariate_sparsity(i.sparsity)
 
 function inv_index_map(i::SparseIndexMap)
@@ -280,7 +280,7 @@ function inv_index_map(i::SparseIndexMap)
   SparseIndexMap(invi,invi_sparse,i.sparsity)
 end
 
-# MultiField interface
+# multi value interface
 
 abstract type AbstractMultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti} end
 
@@ -346,6 +346,10 @@ function TrivialIndexMap(i::AbstractMultiValueIndexMap)
   TrivialIndexMap(merge_components(i))
 end
 
+to_multivalue_map(i::AbstractMultiValueIndexMap) = i
+to_multivalue_map(i::AbstractIndexMap) = MultiValueIndexMap(reshape(i,size(i)...,1))
+to_multivalue_map(i::FixedDofsIndexMap) = MultiValueIndexMap(FixedDofsIndexMap(reshape(i.indices,size(i.indices)...,1)))
+
 struct MultiValueIndexMap{D,Ti,I<:AbstractArray{Ti,D}} <: AbstractMultiValueIndexMap{D,Ti}
   indices::I
 end
@@ -370,5 +374,40 @@ end
 Base.size(i::MultiValueIndexMapView) = size(i.locations)
 Base.getindex(i::MultiValueIndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.locations[j...]]
 Base.setindex!(i::MultiValueIndexMapView{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
-Base.vec(i::MultiValueIndexMapView) = vec(i.indices)
 TensorValues.num_components(i::MultiValueIndexMapView{D}) where D = size(i,D)
+
+# multi field interface
+
+function Arrays.return_cache(k::BlockMap{N},a::AbstractIndexMap{D,Ti}...) where {N,D,Ti}
+  I = AbstractIndexMap{D,Ti}
+  array = Array{I,N}(undef,k.size)
+  touched = fill(false,k.size)
+  for (t,i) in enumerate(k.indices)
+    array[i] = a[t]
+    touched[i] = true
+  end
+  ArrayBlock(array,touched)
+end
+
+function Arrays.return_cache(k::BlockMap{N},i::Union{AbstractMultiValueIndexMap,AbstractIndexMap}...) where N
+  i′ = to_multivalue_map.(i)
+  return_cache(k,i′...)
+end
+
+function Arrays.return_cache(k::BlockMap{N},a::SparseIndexMap{D,Ti}...) where {N,D,Ti}
+  I = AbstractIndexMap{D,Ti}
+  array = Array{I,N}(undef,k.size)
+  touched = fill(false,k.size)
+  for (t,i) in enumerate(k.indices)
+    array[i] = a[t]
+    touched[i] = true
+  end
+  ArrayBlock(array,touched)
+end
+
+function Arrays.return_cache(k::BlockMap{N},i::SparseIndexMap...) where N
+  i′ = return_cache(k,get_index_map.(i)...)
+  i′_sparse = return_cache(k,get_sparse_index_map.(i)...)
+  sparsity = get_sparsity.(i)
+  return_cache(k,map(SparseIndexMap,i′.array,i′_sparse.array,sparsity)...)
+end

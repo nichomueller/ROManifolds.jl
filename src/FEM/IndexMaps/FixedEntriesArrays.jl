@@ -29,6 +29,12 @@ end
 
 Base.copy(a::FixedEntriesArray) = FixedEntriesArray(copy(a.array),a.fixed_entries)
 
+function Base.reshape(a::FixedEntriesArray,s::Vararg{Int})
+  array′ = reshape(a.array,s...)
+  indices = findall(array′.==zero(eltype(array′)))
+  FixedEntriesArray(array′,indices)
+end
+
 function Base.stack(a::AbstractArray{<:FixedEntriesArray})
   array = stack(get_array.(a))
   indices = findall(array.==zero(eltype(array)))

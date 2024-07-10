@@ -6,6 +6,7 @@ using SparseArrays
 using Gridap
 using Gridap.Arrays
 using Gridap.Algebra
+using Gridap.Fields
 using Gridap.FESpaces
 using Gridap.TensorValues
 using Gridap.Helpers
