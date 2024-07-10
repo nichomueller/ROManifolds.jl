@@ -47,7 +47,7 @@ end
 get_arrays(a::TProductArray) = a.arrays_1d
 IndexMaps.get_index_map(a::TProductArray) = a.index_map
 
-tp_getindex(a::TProductArray,::Val{d},::Val{D}) where {d,D} = get_arrays(a)[d]
+tp_getindex(a::TProductArray,::Val{d},::Val{D}) where {d,D} = [get_arrays(a)[d]]
 
 """
     TProductGradientArray{T,N,A,I,B} <: AbstractTProductArray
@@ -237,23 +237,6 @@ end
 function _kron(::Val{d},a::TProductGradientArray,rows::AbstractIndexMap,cols::AbstractIndexMap) where d
   _kron(Val{d}(),a)[vec(rows),vec(cols)]
 end
-function _kron(::Val{d},a::TProductGradientArray,rows::AbstractMultiValueIndexMap,cols::AbstractMultiValueIndexMap) where d
-  kp = _kron(Val{d}(),a)[vec(rows),vec(cols)]
-  @check num_components(rows) == num_components(cols)
-  ncomps = num_components(rows)
-  row_blocks = cumsum(map(i -> length(get_component(rows,i)),1:ncomps))
-  col_blocks = cumsum(map(i -> length(get_component(rows,i)),1:ncomps))
-  pushfirst!(row_blocks,0)
-  pushfirst!(col_blocks,0)
-  for icomp in 1:ncomps, jcomp in icomp+1:ncomps
-    irows = row_blocks[icomp]+1:row_blocks[icomp+1]
-    jcols = col_blocks[jcomp]+1:col_blocks[jcomp+1]
-    kp[irows,jcols] .= zero(eltype(kp))
-    kp[jcols,irows] .= zero(eltype(kp))
-  end
-  kp
-end
-
 function _kron(::Val{1},a::TProductGradientArray)
   a.summation(get_arrays(a)[1],get_gradients(a)[1])
 end
@@ -300,24 +283,6 @@ end
 function _kron(::Val{d},a::TProductDivergenceArray,rows::TProductIndexMap,cols::TProductIndexMap) where d
   _kron(Val{d}(),a,rows.indices,cols.indices)
 end
-function _kron(::Val{d},a::TProductDivergenceArray,rows::AbstractMultiValueIndexMap,cols::FixedDofsIndexMap) where d
-  _kron(Val{d}(),a,rows,remove_fixed_dof(cols))
-end
-function _kron(::Val{d},a::TProductDivergenceArray,rows::FixedDofsIndexMap,cols::AbstractMultiValueIndexMap) where d
-  _kron(Val{d}(),a,remove_fixed_dof(rows),cols)
-end
 function _kron(::Val{d},a::TProductDivergenceArray,rows::FixedDofsIndexMap,cols::FixedDofsIndexMap) where d
   _kron(Val{d}(),a,remove_fixed_dof(rows),remove_fixed_dof(cols))
-end
-function _kron(::Val{d},a::TProductDivergenceArray,rows::AbstractMultiValueIndexMap,cols::AbstractArray) where d
-  vcat(
-    _kron(get_gradients(a)[1],get_arrays(a)[2]),
-    _kron(get_arrays(a)[1],get_gradients(a)[2])
-  )[vec(rows),cols]
-end
-function _kron(::Val{d},a::TProductDivergenceArray,cols::AbstractArray,rows::AbstractMultiValueIndexMap) where d
-  hcat(
-    _kron(get_gradients(a)[1],get_arrays(a)[2]),
-    _kron(get_arrays(a)[1],get_gradients(a)[2])
-  )[vec(rows),cols]
 end

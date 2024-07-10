@@ -47,13 +47,11 @@ end
 
 function get_vector_index_map(tests::MultiFieldFESpace)
   ntests = num_fields(tests)
-  index_maps = AbstractIndexMap[]
-  for test in tests
-    push!(index_maps,get_vector_index_map(test))
+  index_maps = Vector{AbstractIndexMap}(undef,ntests)
+  for i in 1:ntests
+    index_maps[i] = get_vector_index_map(tests[i])
   end
-  indices = collect1d(CartesianIndices((ntests,)))
-  block_index = BlockMap((ntests,),1:ntests)
-  return return_cache(block_index,index_maps...)
+  return index_maps
 end
 
 """
@@ -93,13 +91,11 @@ end
 function get_matrix_index_map(trials::MultiFieldFESpace,tests::MultiFieldFESpace)
   ntests = num_fields(tests)
   ntrials = num_fields(trials)
-  index_maps = AbstractIndexMap[]
-  for (test,trial) in Iterators.product(tests,trials)
-    push!(index_maps,get_matrix_index_map(trial,test))
+  index_maps = Matrix{AbstractIndexMap}(undef,ntests,ntrials)
+  for (i,j) in Iterators.product(1:ntests,1:ntrials)
+    index_maps[i,j] = get_matrix_index_map(trials[j],tests[i])
   end
-  indices = collect1d(CartesianIndices((ntests,ntrials)))
-  block_index = BlockMap((ntests,ntrials),indices)
-  return return_cache(block_index,index_maps...)
+  return index_maps
 end
 
 # utils
@@ -144,82 +140,6 @@ function _permute_index_map(index_map,I,J,nrows)
     end
   end
   return _add_fixed_dofs(iperm)
-end
-
-function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractMultiValueIndexMap,nrows)
-  function _to_component_indices(i,ncomps,icomp,nrows)
-    ic = copy(i)
-    @inbounds for (j,IJ) in enumerate(i)
-      IJ == 0 && continue
-      I = fast_index(IJ,nrows)
-      J = slow_index(IJ,nrows)
-      I′ = (I-1)*ncomps + icomp
-      J′ = (J-1)*ncomps + icomp
-      ic[j] = (J′-1)*nrows*ncomps + I′
-    end
-    return _add_fixed_dofs(ic)
-  end
-
-  ncomps_I = num_components(I)
-  ncomps_J = num_components(J)
-  @check ncomps_I == ncomps_J
-  ncomps = ncomps_I
-  nrows_per_comp = Int(nrows/ncomps)
-
-  I1 = get_component(I,1;multivalue=false)
-  J1 = get_component(J,1;multivalue=false)
-  index_map′ = _permute_index_map(index_map,I1,J1,nrows_per_comp)
-
-  index_map′′ = map(icomp->_to_component_indices(index_map′,ncomps,icomp,nrows_per_comp),1:ncomps)
-  return MultiValueIndexMap(index_map′′)
-end
-
-for T in (:AbstractIndexMap,:FixedDofsIndexMap)
-  @eval begin
-    function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::$T,nrows)
-      function _to_component_indices(i,ncomps,icomp,nrows)
-        ic = copy(i)
-        @inbounds for (j,IJ) in enumerate(i)
-          IJ == 0 && continue
-          I = fast_index(IJ,nrows)
-          J = slow_index(IJ,nrows)
-          I′ = (I-1)*ncomps + icomp
-          ic[j] = (J-1)*nrows*ncomps + I′
-        end
-        return _add_fixed_dofs(ic)
-      end
-
-      ncomps = num_components(I)
-      nrows_per_comp = Int(nrows/ncomps)
-
-      I1 = get_component(I,1;multivalue=false)
-      index_map′ = _permute_index_map(index_map,I1,J,nrows_per_comp)
-
-      index_map′′ = map(icomp->_to_component_indices(index_map′,ncomps,icomp,nrows_per_comp),1:ncomps)
-      return MultiValueIndexMap(index_map′′)
-    end
-
-    function _permute_index_map(index_map,I::$T,J::AbstractMultiValueIndexMap,nrows)
-      function _to_component_indices(i,ncomps,icomp,nrows)
-        ic = copy(i)
-        @inbounds for (j,IJ) in enumerate(i)
-          IJ == 0 && continue
-          I = fast_index(IJ,nrows)
-          J = slow_index(IJ,nrows)
-          J′ = (J-1)*ncomps + icomp
-          ic[j] = (J′-1)*nrows + I
-        end
-        return _add_fixed_dofs(ic)
-      end
-
-      ncomps = num_components(J)
-
-      J1 = get_component(J,1;multivalue=false)
-      index_map′ = _permute_index_map(index_map,I,J1,nrows)
-      index_map′′ = map(icomp->_to_component_indices(index_map′,ncomps,icomp,nrows),1:ncomps)
-      return MultiValueIndexMap(index_map′′)
-    end
-  end
 end
 
 function _permute_index_map(index_map,trial::TProductFESpace,test::TProductFESpace)

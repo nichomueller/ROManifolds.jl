@@ -6,7 +6,6 @@ using SparseArrays
 using Gridap
 using Gridap.Arrays
 using Gridap.Algebra
-using Gridap.Fields
 using Gridap.FESpaces
 using Gridap.TensorValues
 using Gridap.Helpers
@@ -22,7 +21,6 @@ include("IndexOperations.jl")
 
 export SparsityPattern
 export SparsityPatternCSC
-export MultiValueSparsityPatternCSC
 export TProductSparsityPattern
 export get_sparsity
 export permute_sparsity
@@ -38,19 +36,15 @@ export IndexMapView
 export FixedDofsIndexMap
 export TProductIndexMap
 export SparseIndexMap
-export AbstractMultiValueIndexMap
-export MultiValueIndexMap
+export FixedDofsSparseIndexMap
 export get_index_map
 export inv_index_map
 export free_dofs_map
 export change_index_map
 export get_sparse_index_map
 export recast
+export get_fixed_dofs
 export remove_fixed_dof
-export compose_indices
-export get_component
-export split_components
-export merge_components
 include("IndexMapsInterface.jl")
 
 end # module

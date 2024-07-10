@@ -31,6 +31,7 @@ using Mabla.FEM.ParamODEs
 
 import Base: +,-,*,\
 import UnPack: @unpack
+import ArraysOfArrays: innersize
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
 

@@ -60,10 +60,9 @@ function get_tp_dof_index_map(
   order::Integer
   ) where T<:MultiValue
 
-  ncomp = num_components(T)
-  dof_map,dof_maps_1d = get_tp_dof_index_map(eltype(T),models,spaces,order)
-  ncomp_dof_map = compose_indices(dof_map,ncomp)
-  return ncomp_dof_map,dof_maps_1d
+  msg = """Instead of employing a multivalued reffe, consider instead employing two
+  separate reffes (i.e. solving a multifield problem)"""
+  @notimplemented msg
 end
 
 # this function computes only the free dofs tensor product permutation

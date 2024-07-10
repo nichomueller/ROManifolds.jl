@@ -49,7 +49,6 @@ Subtypes:
 - [`FixedDofsIndexMap`](@ref)
 - [`TProductIndexMap`](@ref)
 - [`SparseIndexMap`](@ref)
-- [`AbstractMultiValueIndexMap`](@ref)
 
 """
 abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D} end
@@ -200,6 +199,7 @@ function FixedDofsIndexMap(indices::AbstractIndexMap,dofs_to_fix)
 end
 
 Arrays.get_array(i::FixedDofsIndexMap) = i.indices
+get_fixed_dofs(i::FixedDofsIndexMap) = get_fixed_entries(i.indices)
 
 Base.size(i::FixedDofsIndexMap) = size(i.indices)
 Base.getindex(i::FixedDofsIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
@@ -264,6 +264,9 @@ struct SparseIndexMap{D,Ti,A<:AbstractIndexMap{D,Ti},B<:TProductSparsityPattern}
   sparsity::B
 end
 
+const FixedDofsSparseIndexMap{D,Ti,A<:FixedDofsIndexMap{D,Ti},B} = SparseIndexMap{D,Ti,A,B}
+get_fixed_dofs(i::FixedDofsSparseIndexMap) = get_fixed_dofs(i.indices)
+
 Base.size(i::SparseIndexMap) = size(i.indices)
 Base.getindex(i::SparseIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::SparseIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
@@ -278,136 +281,4 @@ function inv_index_map(i::SparseIndexMap)
   invi = IndexMap(reshape(sortperm(vec(i.indices)),size(i)))
   invi_sparse = IndexMap(reshape(sortperm(vec(i.indices_sparse)),size(i)))
   SparseIndexMap(invi,invi_sparse,i.sparsity)
-end
-
-# multi value interface
-
-abstract type AbstractMultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti} end
-
-Base.view(i::AbstractMultiValueIndexMap,locations) = MultiValueIndexMapView(i,locations)
-
-function compose_indices(index::AbstractArray{Ti,D},ncomps::Integer) where {Ti,D}
-  # indices = zeros(Ti,size(index)...,ncomps)
-  # @inbounds for comp = 1:ncomps
-  #   selectdim(indices,D+1,comp) .= (index.-1).*ncomps .+ comp
-  # end
-  indices = repeat(index;outer=(ntuple(_->1,Val{D}())...,ncomps))
-  return MultiValueIndexMap(indices)
-end
-
-function _to_scalar_values!(indices::AbstractArray,D::Integer,d::Integer)
-  indices .= (indices .- d) ./ D .+ 1
-end
-
-function get_component(i::AbstractMultiValueIndexMap{D},d;multivalue=true) where D
-  ncomps = num_components(i)
-  indices = collect(selectdim(i,D,d))
-  !multivalue && _to_scalar_values!(indices,ncomps,d)
-  return IndexMap(indices)
-end
-
-function split_components(i::AbstractMultiValueIndexMap{D}) where D
-  indices = collect(eachslice(i;dims=D))
-  return IndexMaps.(indices)
-end
-
-function merge_components(i::AbstractVector{<:AbstractArray{Ti}}) where Ti
-  sizes = map(size,i)
-  @check all(sizes .== [first(sizes)])
-  indices = stack(i)
-  return indices
-end
-
-function permute_sparsity(a::SparsityPatternCSC,i::AbstractMultiValueIndexMap,j::AbstractMultiValueIndexMap)
-  ncomps_i = num_components(i)
-  ncomps_j = num_components(j)
-  @check ncomps_i == ncomps_j
-  i1 = get_component(i,1)
-  j1 = get_component(j,1)
-  pa = permute_sparsity(a,i1,j1)
-  return MultiValueSparsityPatternCSC(pa.matrix,ncomps_i)
-end
-
-for T in (:AbstractIndexMap,:FixedDofsIndexMap)
-  @eval begin
-    function permute_sparsity(a::SparsityPatternCSC,i::AbstractMultiValueIndexMap,j::$T)
-      i1 = get_component(i,1)
-      permute_sparsity(a,i1,j)
-    end
-
-    function permute_sparsity(a::SparsityPatternCSC,i::$T,j::AbstractMultiValueIndexMap)
-      j1 = get_component(j,1)
-      permute_sparsity(a,i,j1)
-    end
-  end
-end
-
-function TrivialIndexMap(i::AbstractMultiValueIndexMap)
-  TrivialIndexMap(merge_components(i))
-end
-
-to_multivalue_map(i::AbstractMultiValueIndexMap) = i
-to_multivalue_map(i::AbstractIndexMap) = MultiValueIndexMap(reshape(i,size(i)...,1))
-to_multivalue_map(i::FixedDofsIndexMap) = MultiValueIndexMap(FixedDofsIndexMap(reshape(i.indices,size(i.indices)...,1)))
-
-struct MultiValueIndexMap{D,Ti,I<:AbstractArray{Ti,D}} <: AbstractMultiValueIndexMap{D,Ti}
-  indices::I
-end
-
-function MultiValueIndexMap(indices::AbstractVector{<:AbstractArray})
-  mindices = merge_components(indices)
-  return MultiValueIndexMap(mindices)
-end
-
-Base.size(i::MultiValueIndexMap) = size(i.indices)
-Base.getindex(i::MultiValueIndexMap,j...) = getindex(i.indices,j...)
-Base.setindex!(i::MultiValueIndexMap,v,j...) = setindex!(i.indices,v,j...)
-Base.copy(i::MultiValueIndexMap) = MultiValueIndexMap(copy(i.indices))
-Base.vec(i::MultiValueIndexMap) = vec(i.indices)
-TensorValues.num_components(i::MultiValueIndexMap{D}) where D = size(i.indices,D)
-
-struct MultiValueIndexMapView{D,Ti,I<:AbstractMultiValueIndexMap{D,Ti},L} <: AbstractMultiValueIndexMap{D,Ti}
-  indices::I
-  locations::L
-end
-
-Base.size(i::MultiValueIndexMapView) = size(i.locations)
-Base.getindex(i::MultiValueIndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.locations[j...]]
-Base.setindex!(i::MultiValueIndexMapView{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
-TensorValues.num_components(i::MultiValueIndexMapView{D}) where D = size(i,D)
-
-# multi field interface
-
-function Arrays.return_cache(k::BlockMap{N},a::AbstractIndexMap{D,Ti}...) where {N,D,Ti}
-  I = AbstractIndexMap{D,Ti}
-  array = Array{I,N}(undef,k.size)
-  touched = fill(false,k.size)
-  for (t,i) in enumerate(k.indices)
-    array[i] = a[t]
-    touched[i] = true
-  end
-  ArrayBlock(array,touched)
-end
-
-function Arrays.return_cache(k::BlockMap{N},i::Union{AbstractMultiValueIndexMap,AbstractIndexMap}...) where N
-  i′ = to_multivalue_map.(i)
-  return_cache(k,i′...)
-end
-
-function Arrays.return_cache(k::BlockMap{N},a::SparseIndexMap{D,Ti}...) where {N,D,Ti}
-  I = AbstractIndexMap{D,Ti}
-  array = Array{I,N}(undef,k.size)
-  touched = fill(false,k.size)
-  for (t,i) in enumerate(k.indices)
-    array[i] = a[t]
-    touched[i] = true
-  end
-  ArrayBlock(array,touched)
-end
-
-function Arrays.return_cache(k::BlockMap{N},i::SparseIndexMap...) where N
-  i′ = return_cache(k,get_index_map.(i)...)
-  i′_sparse = return_cache(k,get_sparse_index_map.(i)...)
-  sparsity = get_sparsity.(i)
-  return_cache(k,map(SparseIndexMap,i′.array,i′_sparse.array,sparsity)...)
 end

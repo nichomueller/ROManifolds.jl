@@ -6,7 +6,6 @@ jacobian in a FE problem.
 
 Subtypes:
 - [`SparsityPatternCSC`](@ref)
-- [`MultiValueSparsityPatternCSC`](@ref)
 - [`TProductSparsityPattern`](@ref)
 
 """
@@ -50,21 +49,6 @@ end
 
 """
 """
-struct MultiValueSparsityPatternCSC{Tv,Ti} <: SparsityPattern
-  matrix::SparseMatrixCSC{Tv,Ti}
-  ncomps::Int
-end
-
-get_sparsity(a::MultiValueSparsityPatternCSC) = a
-num_rows(a::MultiValueSparsityPatternCSC) = size(a.matrix,1)
-num_cols(a::MultiValueSparsityPatternCSC) = size(a.matrix,2)
-SparseArrays.findnz(a::MultiValueSparsityPatternCSC) = findnz(a.matrix)
-SparseArrays.nnz(a::MultiValueSparsityPatternCSC) = nnz(a.matrix)
-get_nonzero_indices(a::MultiValueSparsityPatternCSC) = get_nonzero_indices(a.matrix)
-TensorValues.num_components(a::MultiValueSparsityPatternCSC) = a.ncomps
-
-"""
-"""
 struct TProductSparsityPattern{A,B} <: SparsityPattern
   sparsity::A
   sparsities_1d::B
@@ -82,8 +66,6 @@ univariate_num_cols(a::TProductSparsityPattern) = Tuple(num_cols.(a.sparsities_1
 univariate_findnz(a::TProductSparsityPattern) = tuple_of_arrays(findnz.(a.sparsities_1d))
 univariate_nnz(a::TProductSparsityPattern) = Tuple(nnz.(a.sparsities_1d))
 univariate_nonzero_indices(a::TProductSparsityPattern) = Tuple(get_nonzero_indices.(a.sparsities_1d))
-
-TensorValues.num_components(a::TProductSparsityPattern{<:MultiValueSparsityPatternCSC}) = num_components(a.sparsity)
 
 function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
   m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))

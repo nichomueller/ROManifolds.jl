@@ -88,6 +88,10 @@ struct TTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I} <: SteadyProjec
   index_map::I
 end
 
+const FixedDofsTTSVDCores{
+  D,T,A<:AbstractVector{<:AbstractArray{T,D}},I<:Union{<:FixedDofsIndexMap,<:FixedDofsSparseIndexMap}
+  } = TTSVDCores{D,T,A,I}
+
 IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
 
 get_cores(a::TTSVDCores) = a.cores
@@ -95,6 +99,9 @@ get_spatial_cores(a::TTSVDCores) = a.cores
 
 get_basis_space(a::TTSVDCores) = cores2basis(get_index_map(a),get_spatial_cores(a)...)
 num_space_dofs(a::TTSVDCores) = prod(_num_tot_space_dofs(a))
+function num_space_dofs(a::FixedDofsTTSVDCores)
+  prod(_num_tot_space_dofs(a)) - length(get_fixed_dofs(get_index_map(a)))
+end
 num_reduced_space_dofs(a::TTSVDCores) = size(last(get_spatial_cores(a)),3)
 
 _num_tot_space_dofs(a::TTSVDCores{3}) = size.(get_spatial_cores(a),2)

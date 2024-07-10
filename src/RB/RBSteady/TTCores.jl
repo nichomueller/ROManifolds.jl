@@ -5,19 +5,6 @@ function IndexMaps.recast(i::SparseIndexMap,a::AbstractVector{<:AbstractArray{T,
   return asparse
 end
 
-function IndexMaps.recast(
-  i::SparseIndexMap{D,Ti,<:AbstractMultiValueIndexMap},
-  a::AbstractVector{<:AbstractArray{T,3}}
-  ) where {D,Ti,T}
-
-  us = IndexMaps.get_univariate_sparsity(i)
-  @check length(us) == length(a) - 1
-  aaxes...,acomp = a
-  aaxessparse = map(SparseCore,aaxes,us)
-  acompsparse = TrivialTTCore(acomp)
-  return [aaxessparse...,acompsparse]
-end
-
 """
     abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
 
@@ -81,17 +68,6 @@ function core_getindex(a::SparseCoreCSC{T},i::Vararg{Integer,4}) where T
   i2 = findfirst(a.sparse_indexes .== [CartesianIndex(i[2:3])])
   i1,i3 = i[1],i[4]
   getindex(a.array,i1,i2,i3)
-end
-
-struct TrivialTTCore{T} <: AbstractTTCore{T,4}
-  array::Array{T,3}
-end
-
-Base.size(a::TrivialTTCore) = (size(a.array,1),size(a.array,2),size(a.array,2),size(a.array,3))
-
-function Base.getindex(a::TrivialTTCore,i::Vararg{Integer,4})
-  i1,i2,i3 = i[1],i[2],i[4]
-  (i[3] == i2) ? a.array[i1,i2,i3] : zero(eltype(a))
 end
 
 struct BlockArrayTTCores{T,D,N,A<:AbstractArray{T,D}} <: AbstractArray{AbstractArray{T,D},N}
@@ -234,8 +210,7 @@ function _cores2basis(
   nrows = size(a,2)*size(b,2)
   ncols = size(a,3)*size(b,3)
   ab = zeros(TS,size(a,1),nrows*ncols,size(b,4))
-  _cores2basis!(ab,Is,a,b)
-  return ab
+  return _cores2basis!(ab,Is,a,b)
 end
 
 function _cores2basis(
@@ -251,47 +226,7 @@ function _cores2basis(
   nrows = size(a,2)*size(b,2)*size(c,2)
   ncols = size(a,3)*size(b,3)*size(c,3)
   abc = zeros(TSU,size(a,1),nrows*ncols,size(c,4))
-  _cores2basis!(abc,Is,a,b,c)
-  return abc
-end
-
-# with components
-
-function _cores2basis(
-  I::SparseIndexMap{3,<:Integer,<:AbstractMultiValueIndexMap},
-  a::SparseCoreCSC{S},
-  b::SparseCoreCSC{T},
-  c::TrivialTTCore{U}
-  ) where {S,T,U}
-
-  @check size(a,4) == size(b,1) && size(b,4) == size(c,1)
-  Is = get_sparse_index_map(I)
-  TSU = promote_type(T,S,U)
-  nrows = size(a,2)*size(b,2)
-  ncols = size(a,3)*size(b,3)
-  ncomps = size(c,2)
-  abc = zeros(TSU,size(a,1),nrows*ncols*ncomps,size(c,4))
-  _cores2basis!(abc,Is,a,b,c)
-  return abc
-end
-
-function _cores2basis(
-  I::SparseIndexMap{4,<:Integer,<:AbstractMultiValueIndexMap},
-  a::SparseCoreCSC{S},
-  b::SparseCoreCSC{T},
-  c::SparseCoreCSC{U},
-  d::TrivialTTCore{V}
-  ) where {S,T,U,V}
-
-  @check size(a,4) == size(b,1) && size(b,4) == size(c,1) && size(c,4) == size(d,1)
-  Is = get_sparse_index_map(I)
-  TSUV = promote_type(T,S,U,V)
-  nrows = size(a,2)*size(b,2)*size(c,2)
-  ncols = size(a,3)*size(b,3)*size(c,3)
-  ncomps = size(d,2)
-  abcd = zeros(TSUV,size(a,1),nrows*ncols,size(c,4))
-  _cores2basis!(abc,Is,a,b,c,d)
-  return abcd
+  return _cores2basis!(abc,Is,a,b,c)
 end
 
 function _cores2basis!(ab,I::AbstractIndexMap,a,b)
@@ -312,15 +247,6 @@ function _cores2basis!(abc,I::AbstractIndexMap,a,b,c)
   return abc
 end
 
-function _cores2basis!(abcd,I::AbstractIndexMap,a,b,c,d)
-  for i = axes(a,1), j = axes(d,4)
-    for α = axes(a,4), β = axes(b,4), γ = axes(c,4)
-      @inbounds @views abcd[i,vec(Is),j] += kronecker(d.array[γ,:,j],c.array[β,:,γ],b.array[α,:,β],a.array[i,:,α])
-    end
-  end
-  return abcd
-end
-
 # Fixed dofs
 
 function _cores2basis!(ab,I::FixedDofsIndexMap,a,b)
@@ -331,7 +257,7 @@ function _cores2basis!(ab,I::FixedDofsIndexMap,a,b)
         )[nz_indices]
     end
   end
-  return ab
+  return view(ab,:,nz_indices,:)
 end
 
 function _cores2basis!(abc,I::FixedDofsIndexMap,a,b,c)
@@ -342,20 +268,5 @@ function _cores2basis!(abc,I::FixedDofsIndexMap,a,b,c)
         )[nz_indices]
     end
   end
-  return abc
-end
-
-function _cores2basis!(abcd,I::FixedDofsIndexMap,a,b,c,d)
-  nz_indices = findall(I[:].!=0)
-  for i = axes(a,1), j = axes(d,4)
-    for α = axes(a,4), β = axes(b,4), γ = axes(c,4)
-      @inbounds @views abcd[i,vec(Is),j] += kronecker(d.array[γ,:,j],c.array[β,:,γ],
-        b.array[α,:,β],a.array[i,:,α])[nz_indices]
-    end
-  end
-  return abcd
-end
-
-function _cores2basis!(cache,I::MultiValueIndexMap{D,Ti,<:FixedDofsIndexMap} where {D,Ti},args...)
-  _cores2basis!(cache,I.indices,args...)
+  return view(abc,:,nz_indices,:)
 end

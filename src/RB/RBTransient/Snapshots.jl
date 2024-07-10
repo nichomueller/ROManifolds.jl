@@ -285,36 +285,9 @@ function RBSteady.select_snapshots(s::AbstractTransientSnapshots,prange;trange=B
   select_snapshots(s,trange,prange)
 end
 
-const MultiValueTransientBasicSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = TransientBasicSnapshots{T,N,L,D,I,R,A}
-const MultiValueTransientSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = TransientSnapshots{T,N,L,D,I,R,A}
-const MultiValueTransientSnapshotsAtIndices{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A,B} = TransientSnapshotsAtIndices{T,N,L,D,I,R,A,B}
-const TransientMultiValueSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = Union{
-  MultiValueTransientBasicSnapshots{T,N,L,D,I,R,A},
-  MultiValueTransientSnapshots{T,N,L,D,I,R,A},
-  MultiValueTransientSnapshotsAtIndices{T,N,L,D,I,R,A}
-}
-
-TensorValues.num_components(s::TransientMultiValueSnapshots) = num_components(get_index_map(i))
-
-function IndexMaps.get_component(s::TransientMultiValueSnapshots,args...;kwargs...)
-  i′ = get_component(get_index_map(s),args...;kwargs...)
-  return Snapshots(get_values(s),i′,get_realization(s))
-end
-
-function IndexMaps.split_components(s::TransientMultiValueSnapshots)
-  i′ = split_components(get_index_map(s))
-  return Snapshots(get_values(s),i′,get_realization(s))
-end
-
-function IndexMaps.merge_components(s::TransientMultiValueSnapshots)
-  i′ = merge_components(get_index_map(s))
-  return Snapshots(get_values(s),i′,get_realization(s))
-end
-
 const TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
   TransientBasicSnapshots{T,N,L,D,I,R,A},
-  TransientSnapshots{T,N,L,D,I,R,A},
-  TransientMultiValueSnapshots{T,N,L,D,I,R,A}
+  TransientSnapshots{T,N,L,D,I,R,A}
 }
 
 function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange)
@@ -484,7 +457,7 @@ end
 
 function RBSteady.Snapshots(
   data::AbstractVector{<:BlockArrayOfArrays},
-  i::ArrayBlock{<:AbstractIndexMap},
+  i::AbstractArray{<:AbstractIndexMap},
   r::AbstractParamRealization)
 
   block_values = blocks.(data)

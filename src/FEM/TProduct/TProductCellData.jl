@@ -336,13 +336,18 @@ function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::AbstractVector{<:Doma
 end
 
 function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::GenericTProductDiffEval)
-  a1 = testitem(a.f[1])
-  b1 = testitem(b.f[1])
-  summation = _block_operation(f,a1,b1,a.summation)
-  if _is_different_block(a1,b1)
+  bf = _is_different_block(testitem(a.f[1]),testitem(b.f[1]))
+  bg = _is_different_block(testitem(a.g[1]),testitem(b.g[1]))
+  summation = _block_operation(f,testitem(a.f[1]),testitem(b.f[1]),a.summation)
+  @notimplementedif bf && bg
+  if bf && bg
     GenericTProductDiffEval(a.op,f(a.f,b.f),f(a.g,b.g),summation)
+  elseif bf
+    GenericTProductDiffEval(a.op,f(a.f,b.f),a.g,summation)
+  elseif bg
+    GenericTProductDiffEval(a.op,a.f,f(a.g,b.g),summation)
   else
-    GenericTProductDiffEval(a.op,a.f,a.g,summation)
+    @notimplemented
   end
 end
 

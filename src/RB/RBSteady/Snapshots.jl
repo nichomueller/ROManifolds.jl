@@ -38,7 +38,7 @@ function Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractParamRealizat
   @abstractmethod
 end
 
-for I in (:AbstractIndexMap,:(ArrayBlock{<:AbstractIndexMap}))
+for I in (:AbstractIndexMap,:(AbstractArray{<:AbstractIndexMap}))
   @eval begin
     function Snapshots(a::ArrayContribution,i::$I,r::AbstractParamRealization)
       contribution(a.trians) do trian
@@ -248,35 +248,7 @@ function select_snapshots(s::AbstractSteadySnapshots,prange)
   SnapshotsAtIndices(s,prange)
 end
 
-
-const MultiValueBasicSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = BasicSnapshots{T,N,L,D,I,R,A}
-const MultiValueSnapshotsAtIndices{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A,B} = SnapshotsAtIndices{T,N,L,D,I,R,A,B}
-const SteadyMultiValueSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = Union{
-  MultiValueBasicSnapshots{T,N,L,D,I,R,A},
-  MultiValueSnapshotsAtIndices{T,N,L,D,I,R,A}
-}
-
-TensorValues.num_components(s::SteadyMultiValueSnapshots) = num_components(get_index_map(i))
-
-function IndexMaps.get_component(s::SteadyMultiValueSnapshots,args...;kwargs...)
-  i′ = get_component(get_index_map(s),args...;kwargs...)
-  return Snapshots(get_values(s),i′,get_realization(s))
-end
-
-function IndexMaps.split_components(s::SteadyMultiValueSnapshots)
-  i′ = split_components(get_index_map(s))
-  return Snapshots(get_values(s),i′,get_realization(s))
-end
-
-function IndexMaps.merge_components(s::SteadyMultiValueSnapshots)
-  i′ = merge_components(get_index_map(s))
-  return Snapshots(get_values(s),i′,get_realization(s))
-end
-
-const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
-  BasicSnapshots{T,N,L,D,I,R,A},
-  SteadyMultiValueSnapshots{T,N,L,D,I,R,A}
-}
+const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = BasicSnapshots{T,N,L,D,I,R,A}
 
 """
     select_snapshots_entries(s::AbstractSteadySnapshots,srange) -> ArrayOfArrays
@@ -373,7 +345,7 @@ function Fields.BlockMap(s::NTuple,inds::AbstractVector{<:Integer})
   BlockMap(s,cis)
 end
 
-function Snapshots(data::BlockArrayOfArrays,i::ArrayBlock{<:AbstractIndexMap},r::AbstractParamRealization)
+function Snapshots(data::BlockArrayOfArrays,i::AbstractArray{<:AbstractIndexMap},r::AbstractParamRealization)
   block_values = blocks(data)
   nblocks = blocksize(data)
   active_block_ids = findall(!iszero,block_values)

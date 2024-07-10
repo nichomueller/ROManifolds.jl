@@ -4,6 +4,7 @@ struct FixedEntriesArray{T,N,A<:AbstractArray{T,N}} <: AbstractArray{T,N}
 end
 
 Arrays.get_array(a::FixedEntriesArray) = a.array
+get_fixed_entries(a::FixedEntriesArray) = a.fixed_entries
 
 function FixedEntriesArray(array::AbstractArray,fixed_entries::AbstractVector{<:CartesianIndex})
   FixedEntriesArray(array,Tuple.(fixed_entries))

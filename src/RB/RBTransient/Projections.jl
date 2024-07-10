@@ -81,6 +81,10 @@ struct TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:Abstra
   index_map::I
 end
 
+const TransientFixedDofsTTSVDCores{
+  D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},C<:AbstractMatrix,
+  I<:Union{<:FixedDofsIndexMap,<:FixedDofsSparseIndexMap}} = TransientTTSVDCores{D,T,A,B,C,I}
+
 function TransientTTSVDCores(
   cores_space::Vector{<:AbstractArray},
   core_time::AbstractArray,
@@ -98,8 +102,9 @@ get_temporal_core(a::TransientTTSVDCores) = a.core_time
 
 RBSteady.get_basis_space(a::TransientTTSVDCores) = cores2basis(get_index_map(a),get_spatial_cores(a)...)
 RBSteady.num_space_dofs(a::TransientTTSVDCores) = prod(_num_tot_space_dofs(a))
-RBSteady.num_reduced_space_dofs(a::TransientTTSVDCores) = size(last(get_spatial_cores(a)),3)
-
+function RBSteady.num_space_dofs(a::TransientFixedDofsTTSVDCores)
+  prod(_num_tot_space_dofs(a)) - length(get_fixed_dofs(get_index_map(a)))
+end
 get_basis_time(a::TransientTTSVDCores) = cores2basis(get_temporal_core(a))
 ParamDataStructures.num_times(a::TransientTTSVDCores) = size(get_temporal_core(a),2)
 num_reduced_times(a::TransientTTSVDCores) = size(get_temporal_core(a),3)
@@ -110,20 +115,7 @@ get_basis_spacetime(a::TransientTTSVDCores) = a.basis_spacetime
 
 _num_tot_space_dofs(a::TransientTTSVDCores{3}) = size.(get_spatial_cores(a),2)
 
-const TransientTTSVDSparseCores{T,A<:AbstractVector{<:SparseCore{T}},B,C} = TransientTTSVDCores{4,T,A,B,C}
-
-function _num_tot_space_dofs(a::TransientTTSVDSparseCores)
-  scores = get_spatial_cores(a)
-  tot_ndofs = zeros(Int,2,length(scores))
-  @inbounds for i = eachindex(scores)
-    tot_ndofs[:,i] .= size(scores[i],2),size(scores[i],3)
-  end
-  return tot_ndofs
-end
-
-const TransientMultiValueTTSVDSparseCores{T,A<:AbstractVector{<:AbstractTTCore{T}},B,C} = TransientTTSVDCores{4,T,A,B,C}
-
-function _num_tot_space_dofs(a::TransientMultiValueTTSVDSparseCores)
+function _num_tot_space_dofs(a::TransientTTSVDCores{4})
   scores = get_spatial_cores(a)
   tot_ndofs = zeros(Int,2,length(scores))
   @inbounds for i = eachindex(scores)
