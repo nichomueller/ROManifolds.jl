@@ -78,7 +78,11 @@ function tproduct_array(
   index_map,
   summation=nothing)
 
-  TProductGradientArray(arrays_1d,gradients_1d,index_map,summation)
+  if all(iszero.(gradients_1d)) || all(isempty.(gradients_1d))
+    TProductArray(arrays_1d,index_map)
+  else
+    TProductGradientArray(arrays_1d,gradients_1d,index_map,summation)
+  end
 end
 
 get_arrays(a::TProductGradientArray) = a.arrays_1d
@@ -130,6 +134,7 @@ function tproduct_array(
   index_map,
   summation=nothing)
 
+  @notimplementedif (all(iszero.(gradients_1d) || isempty.(gradients_1d)))
   @notimplementedif !isnothing(summation)
   TProductDivergenceArray(arrays_1d,gradients_1d,index_map)
 end
@@ -165,14 +170,15 @@ end
 
 for T in (:(typeof(gradient)),:(typeof(divergence)))
   @eval begin
-    function tproduct_array(op::$T,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},index_map,args...)
+    function tproduct_array(op::$T,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},index_map,s::ArrayBlock)
       s_blocks = blocksize(first(arrays_1d))
       arrays = map(CartesianIndices(s_blocks)) do i
         iblock = Block(Tuple(i))
         arrays_1d_i = getindex.(arrays_1d,iblock)
         gradients_1d_i = getindex.(gradients_1d,iblock)
         index_map_i = getindex.(index_map,Tuple(i))
-        tproduct_array(op,arrays_1d_i,gradients_1d_i,index_map_i,args...)
+        s_i = s[Tuple(i)...]
+        tproduct_array(op,arrays_1d_i,gradients_1d_i,index_map_i,s_i)
       end
       BlockTProductArray(arrays)
     end

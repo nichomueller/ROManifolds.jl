@@ -129,6 +129,11 @@ function GenericTProductDiffEval(op,f,g)
   GenericTProductDiffEval(op,f,g,nothing)
 end
 
+function GenericTProductDiffEval(op,f::Vector{DomainContribution},g::Vector{DomainContribution})
+  s = _block_operation(nothing,testitem(first(f)),testitem(first(g)))
+  GenericTProductDiffEval(op,f,g,s)
+end
+
 const GradientTProductEval{A,B,C} = GenericTProductDiffEval{typeof(gradient),A,B,C}
 const DivergenceTProductEval{A,B,C} = GenericTProductDiffEval{typeof(divergence),A,B,C}
 
@@ -302,41 +307,82 @@ end
 for f in (:+,:-)
   @eval ($f)(a::AbstractArray,b::GenericTProductDiffEval) = _add_tp_cell_data($f,a,b)
   @eval ($f)(a::GenericTProductDiffEval,b::AbstractArray) = _add_tp_cell_data($f,a,b)
-  @eval ($f)(a::GenericTProductDiffEval,b::GenericTProductDiffEval) = @notimplemented
+  @eval ($f)(a::GenericTProductDiffEval,b::GenericTProductDiffEval) = _add_tp_cell_data($f,a,b)
 end
 
-Arrays.testitem(a::DomainContribution) = a[first([get_domains(a)...])]
+Arrays.testitem(a::DomainContribution) = testitem(a[first([get_domains(a)...])])
 
 function _add_tp_cell_data(f,a::AbstractVector{<:DomainContribution},b::GenericTProductDiffEval)
   a1 = testitem(a[1])
   b1 = testitem(b.f[1])
-  if isa(a1,AbstractArray{<:ArrayBlock})
-    @check isa(b1,AbstractArray{<:ArrayBlock})
-    if all(_is_different_block.(a,b.f))
-      return GenericTProductDiffEval(b.op,f(a,b.f),b.g,b.summation)
-    end
+  summation = _block_operation(f,a1,b1,b.summation)
+  if _is_different_block(a1,b1)
+    GenericTProductDiffEval(b.op,f(a,b.f),b.g,summation)
+  else
+    GenericTProductDiffEval(b.op,a,b.g,summation)
   end
-  return GenericTProductDiffEval(b.op,b.f,b.g,f)
 end
 
 function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::AbstractVector{<:DomainContribution})
   a1 = testitem(a.f[1])
   b1 = testitem(b[1])
-  if isa(a1,AbstractArray{<:ArrayBlock})
-    @check isa(b1,AbstractArray{<:ArrayBlock})
-    if all(_is_different_block.(a.f,b))
-      return GenericTProductDiffEval(a.op,f(a.f,b),a.g,a.summation)
-    end
+  summation = _block_operation(f,a1,b1,a.summation)
+  if _is_different_block(a1,b1)
+    GenericTProductDiffEval(a.op,f(a.f,b),a.g,summation)
+  else
+    summation = _block_operation(f,a1,b1,a.summation)
+    GenericTProductDiffEval(a.op,a.f,a.g,summation)
   end
-  return GenericTProductDiffEval(a.op,a.f,a.g,f)
 end
 
-function _is_different_block(a::DomainContribution,b::DomainContribution)
-  b1 = testitem(b)
-  for ai in values(a.dict)
-    if b1[1].touched == ai[1].touched
-      return false
+function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::GenericTProductDiffEval)
+  a1 = testitem(a.f[1])
+  b1 = testitem(b.f[1])
+  summation = _block_operation(f,a1,b1,a.summation)
+  if _is_different_block(a1,b1)
+    GenericTProductDiffEval(a.op,f(a.f,b.f),f(a.g,b.g),summation)
+  else
+    GenericTProductDiffEval(a.op,a.f,a.g,summation)
+  end
+end
+
+function _is_different_block(a1,b1)
+  false
+end
+
+function _is_different_block(a1::ArrayBlock,b1::ArrayBlock)
+  all(findall(a1.touched) .!= findall(b1.touched))
+end
+
+function _block_operation(f,a1,b1)
+  f
+end
+
+function _block_operation(f,a1::ArrayBlock{A,N},b1::ArrayBlock{A,N}) where {A,N}
+  @check size(a1) == size(b1)
+  overlap = CartesianIndex{N}[]
+  for ib in findall(b1.touched)
+    if ib ∈ findall(a1.touched)
+      push!(overlap,ib)
     end
   end
-  return true
+  block_map = BlockMap(size(a1.touched),overlap)
+  return_cache(block_map,fill(f,length(overlap))...)
+end
+
+function _block_operation(f,a1,b1,fprev)
+  fprev
+end
+
+function _block_operation(f,a1::ArrayBlock{A,N},b1::ArrayBlock{A,N},fprev::ArrayBlock{B,N}) where {A,B,N}
+  @check size(a1) == size(b1)
+  overlap = CartesianIndex{N}[]
+  for ib in findall(b1.touched)
+    if ib ∈ findall(a1.touched)
+      push!(overlap,ib)
+    end
+  end
+  sum_overlap = vcat(findall(fprev.touched)...,overlap...)
+  block_map = BlockMap(size(a1.touched),sum_overlap)
+  return_cache(block_map,fill(f,length(sum_overlap))...)
 end

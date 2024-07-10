@@ -84,15 +84,15 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h
 
 # fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
 
-nparams = num_params(rbsolver)
-sol = solve(fesolver,feop,xh0μ;nparams)
-odesol = sol.odesol
-r = odesol.r
-stats = @timed begin
-  vals = collect(odesol)
-end
-i = get_vector_index_map(feop)
-snaps = Snapshots(vals,i,r)
+# nparams = num_params(rbsolver)
+# sol = solve(fesolver,feop,xh0μ;nparams)
+# odesol = sol.odesol
+# r = odesol.r
+# stats = @timed begin
+#   vals = collect(odesol)
+# end
+# i = get_vector_index_map(feop)
+# snaps = Snapshots(vals,i,r)
 
 # serialize(RBSteady.get_snapshots_filename(test_dir),snaps)
 snaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
@@ -142,11 +142,28 @@ A1 = jjac[1][1][2,1]
 basis = reduced_basis(A1)
 lu_interp,integration_domain = mdeim(rbsolver.mdeim_style,basis)
 combine = (x,y) -> θ*x+(1-θ)*y
-proj_basis = reduce_operator(rbsolver.mdeim_style,basis,rbtrial[2,1],rbtest[2,1];combine)
+proj_basis = reduce_operator(rbsolver.mdeim_style,basis,rbtrial[1],rbtest[2];combine)
 
-aa,bb,cc = basis.cores_space[1],rbtrial[2,1].basis.cores_space[1],rbtest[2,1].basis.cores_space[1]
-compress_cores(aa,bb,cc)
+aa,bb,cc = basis.cores_space[1],rbtrial[1].basis.cores_space[1],rbtest[2].basis.cores_space[1]
+aa,bb,cc = basis.cores_space[2],rbtrial[1].basis.cores_space[2],rbtest[2].basis.cores_space[2]
+aa,bb,cc = basis.cores_space[3],rbtrial[1].basis.cores_space[3],rbtest[2].basis.cores_space[3]
+compress_core(aa,bb,cc)
+
+
 # red_trian = reduce_triangulation(Ω.trian,integration_domain,rbtrial[2,1],rbtest[2,1])
 # coefficient = allocate_coefficient(rbsolver,basis)
 # result = allocate_result(rbsolver,rbtrial[2,1],rbtest[2,1])
 # ad = AffineDecomposition(proj_basis,lu_interp,integration_domain,coefficient,result)
+
+bform(dp,v) = ∫(dp*(∇⋅(v)))dΩ.measure
+aform(du,v) = ∫(du⋅v)dΩ.measure
+
+B = assemble_matrix(bform,test_p.space,test_u.space)
+A = assemble_matrix(aform,test_u.space,test_u.space)
+
+imapA_row = feop.op.op.index_map.vector_map[1]
+imapA_col = imapA_row
+A[imapA_row[:,:,1][:],imapA_row[:,:,1][:]]
+
+imapA = feop.op.op.index_map.matrix_map[1]
+A[imapA[:,:,1]]

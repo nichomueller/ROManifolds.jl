@@ -38,7 +38,7 @@ function Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractParamRealizat
   @abstractmethod
 end
 
-for I in (:AbstractIndexMap,:(AbstractArray{<:AbstractIndexMap}))
+for I in (:AbstractIndexMap,:(ArrayBlock{<:AbstractIndexMap}))
   @eval begin
     function Snapshots(a::ArrayContribution,i::$I,r::AbstractParamRealization)
       contribution(a.trians) do trian
