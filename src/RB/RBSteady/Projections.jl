@@ -121,6 +121,12 @@ function basis2cores(mat::AbstractMatrix,a::TTSVDCores)
   permutedims(v,(reverse(1:D)...,D+1))
 end
 
+function compress_cores(core::TTSVDCores,bases::TTSVDCores...;kwargs...)
+  ccores = map((a,b...)->compress_core(a,b...;kwargs...),get_cores(core),get_cores.(bases)...)
+  ccore = multiply_cores(ccores...)
+  _dropdims(ccore)
+end
+
 # multi field interface
 
 """
@@ -210,6 +216,13 @@ function get_spatial_cores(a::BlockProjection)
   return return_cache(block_map,cores...)
 end
 
+function get_cores(a::BlockProjection)
+  active_block_ids = get_touched_blocks(a)
+  block_map = BlockMap(size(a),active_block_ids)
+  cores = [get_cores(a[i]) for i = get_touched_blocks(a)]
+  return return_cache(block_map,cores...)
+end
+
 function IndexMaps.get_index_map(a::BlockProjection)
   active_block_ids = get_touched_blocks(a)
   index_map = [get_index_map(a[i]) for i = get_touched_blocks(a)]
@@ -274,13 +287,60 @@ function add_space_supremizers(a::BlockProjection,norm_matrix::AbstractMatrix,su
 end
 
 function add_space_supremizers(a::BlockProjection,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
-  basis_space = get_basis_space(a)
-  basis_primal,basis_dual... = basis_space.array
-  A = kron(norm_matrix[Block(1,1)])
-  H = cholesky(A)
-  for i = eachindex(basis_dual)
-    C = kron(supr_op[Block(1,i+1)])
-    basis_primal = hcat(basis_primal,H\C*basis_dual[i])
+  pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
+  cores = get_cores(a)
+
+  for id in dblocks
+    rcores = Array{T,3}[]
+    rcore = Matrix{T}[]
+    C = supr_op[Block(ip,id)]
+    for ip in pblocks
+      A = norm_matrix[Block(ip,ip)]
+      reduced_coupling!((rcores,rcore),cores[ip],cores[id],A,C)
+    end
+    cores[ip] = enrich(cores[ip],rcores,vcat(rcore...))
   end
-  return [basis_primal,basis_dual...]
+
+  return cores
+end
+
+function reduced_coupling(cache,cores_primal_i,cores_dual_i,norm_matrix_i,coupling_i)
+  rcores_dual,rcore = cache
+  # cores_norm_i = TProduct.tp_decomposition(norm_matrix_i) # add here the norm matrix
+  cores_coupling_i = TProduct.tp_decomposition(coupling_i)
+  rcores_dual_i = compress_core.(cores_coupling_i,cores_dual_i) # add here the norm matrix
+  rcores_i = compress_core.(cores_primal_i,rcores_dual_i)
+  rcore_i = multiply_cores(rcores_i...) |> _dropdims
+  push!(rcores_dual,rcores_dual_i)
+  push!(rcore,rcore_i)
+end
+
+function enrich(basis_primal,basis_dual;tol=1e-2)
+  basis_pd = basis_primal'*basis_dual
+
+  function _enrich(basis_primal,basis_pd,v)
+    vnew = copy(v)
+    orth_complement!(vnew,basis_primal)
+    vnew /= norm(vnew)
+    hcat(basis_primal,vnew),vcat(basis_pd,vnew'*basis_dual)
+  end
+
+  for i = size(basis_pd,2) - size(basis_pd,1)
+    basis_primal,basis_pd = _enrich(basis_primal,basis_pd,basis_dual[:,i])
+  end
+
+  i = 1
+  while i ≤ size(basis_pd,2)
+    proj = i == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,i],basis_pd[:,1:i-1])
+    dist = norm(basis_pd[:,1]-proj)
+    if dist ≤ tol
+      basis_primal,basis_pd = _enrich(basis_primal,basis_pd,basis_dual[:,i])
+      i = 0
+    else
+      basis_pd[:,i] .-= proj
+    end
+    i += 1
+  end
+
+  return basis_primal
 end

@@ -55,11 +55,12 @@ export tp_getindex
 include("TProductArray.jl")
 
 export TProductCellPoint
-export TProductCellFields
+export TProductCellField
 export GenericTProductCellField
 export TProductFEBasis
 export GenericTProductDiffCellField
 export GenericTProductDiffEval
+export TProductCellDatum
 include("TProductCellData.jl")
 
 export TProductSparseMatrixAssembler

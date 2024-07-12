@@ -12,7 +12,10 @@ using Gridap.ReferenceFEs
 using Gridap.TensorValues
 using Gridap.Helpers
 
+using Mabla.FEM.TProduct
 using Mabla.FEM.ParamDataStructures
+
+import BlockArrays: BlockArray, Block, blocksize
 
 include("LagrangianDofBases.jl")
 

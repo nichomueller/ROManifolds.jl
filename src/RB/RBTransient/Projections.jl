@@ -234,27 +234,21 @@ function add_time_supremizers(basis_primal,basis_dual;tol=1e-2)
     hcat(basis_primal,vnew),vcat(basis_pd,vnew'*basis_dual)
   end
 
-  count = 0
-  ntd_minus_ntp = size(basis_dual,2) - size(basis_primal,2)
-  if ntd_minus_ntp > 0
-    for ntd = 1:ntd_minus_ntp
-      basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,ntd])
-      count += 1
-    end
+  for i = size(basis_pd,2) - size(basis_pd,1)
+    basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,i])
   end
 
-  ntd = 1
-  while ntd ≤ size(basis_pd,2)
-    proj = ntd == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,ntd],basis_pd[:,1:ntd-1])
+  i = 1
+  while i ≤ size(basis_pd,2)
+    proj = i == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,i],basis_pd[:,1:i-1])
     dist = norm(basis_pd[:,1]-proj)
     if dist ≤ tol
-      basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,ntd])
-      count += 1
-      ntd = 0
+      basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,i])
+      i = 0
     else
-      basis_pd[:,ntd] .-= proj
+      basis_pd[:,i] .-= proj
     end
-    ntd += 1
+    i += 1
   end
 
   return basis_primal

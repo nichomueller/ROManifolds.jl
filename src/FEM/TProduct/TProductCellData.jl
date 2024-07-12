@@ -95,7 +95,6 @@ function GenericTProductDiffCellField(op,cell_data,diff_cell_data)
 end
 
 const GradientTProductCellField{A,B,C} = GenericTProductDiffCellField{typeof(gradient),A,B,C}
-const DivergenceTProductCellField{A,B,C} = GenericTProductDiffCellField{typeof(divergence),A,B,C}
 
 CellData.get_data(f::GenericTProductDiffCellField) = f.cell_data
 get_diff_data(f::GenericTProductDiffCellField) = f.diff_cell_data
@@ -110,11 +109,6 @@ CellData.DomainStyle(f::GenericTProductDiffCellField) = DomainStyle(f.cell_data)
 function Fields.gradient(f::TProductCellField)
   g = GenericTProductCellField(gradient.(f.single_fields),f.trian)
   return GenericTProductDiffCellField(gradient,f,g)
-end
-
-function Fields.divergence(f::TProductCellField)
-  g = GenericTProductCellField(divergence.(f.single_fields),f.trian)
-  return GenericTProductDiffCellField(divergence,f,g)
 end
 
 # stores the evaluation of a GenericTProductDiffCellField on a quadrature
@@ -135,7 +129,6 @@ function GenericTProductDiffEval(op,f::Vector{DomainContribution},g::Vector{Doma
 end
 
 const GradientTProductEval{A,B,C} = GenericTProductDiffEval{typeof(gradient),A,B,C}
-const DivergenceTProductEval{A,B,C} = GenericTProductDiffEval{typeof(divergence),A,B,C}
 
 CellData.get_data(f::GenericTProductDiffEval) = f.f
 get_diff_data(f::GenericTProductDiffEval) = f.g
@@ -178,12 +171,6 @@ function Fields.gradient(f::TProductFEBasis)
   trian = get_triangulation(f)
   g = TProductFEBasis(dbasis,trian)
   return GenericTProductDiffCellField(gradient,f,g)
-end
-
-function Fields.divergence(f::TProductFEBasis)
-  dbasis = map(divergence,f.basis)
-  g = GenericTProductCellField(dbasis,f.trian)
-  return GenericTProductDiffCellField(divergence,f,g)
 end
 
 const MultiFieldTProductFEBasis{DS,BS,B} = TProductFEBasis{DS,BS,Vector{MultiFieldCellField{DS}},B}
@@ -259,37 +246,11 @@ function Arrays.return_cache(k::Operation,α::GradientTProductCellField,β::Grad
   return cache,diff_cache
 end
 
-function Arrays.return_cache(k::Operation{typeof(*)},α::TProductCellDatum,β::DivergenceTProductCellField)
-  cache = return_cache(k,α,get_data(β))
-  diff_cache = return_cache(k,α,get_diff_data(β))
-  return cache,diff_cache
-end
-
-function Arrays.return_cache(k::Operation{typeof(*)},α::DivergenceTProductCellField,β::TProductCellDatum)
-  cache = return_cache(k,get_data(α),β)
-  diff_cache = return_cache(k,α,get_diff_data(β),β)
-  return cache,diff_cache
-end
-
 function Arrays.evaluate!(_cache,k::Operation,α::GradientTProductCellField,β::GradientTProductCellField)
   cache,diff_cache = _cache
   αβ = evaluate!(cache,k,get_data(α),get_data(β))
   dαβ = evaluate!(diff_cache,k,get_diff_data(α),get_diff_data(β))
   return GenericTProductDiffCellField(gradient,αβ,dαβ)
-end
-
-function Arrays.evaluate!(_cache,k::Operation{typeof(*)},α::TProductCellDatum,β::DivergenceTProductCellField)
-  cache,diff_cache = _cache
-  αβ = evaluate!(cache,k,α,get_data(β))
-  dαβ = evaluate!(cache,k,α,get_diff_data(β))
-  return GenericTProductDiffCellField(divergence,αβ,dαβ)
-end
-
-function Arrays.evaluate!(_cache,k::Operation{typeof(*)},α::DivergenceTProductCellField,β::TProductCellDatum)
-  cache,diff_cache = _cache
-  αβ = evaluate!(cache,k,get_data(α),β)
-  dαβ = evaluate!(cache,k,get_diff_data(α),β)
-  return GenericTProductDiffCellField(divergence,αβ,dαβ)
 end
 
 # integration
@@ -330,7 +291,6 @@ function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::AbstractVector{<:Doma
   if _is_different_block(a1,b1)
     GenericTProductDiffEval(a.op,f(a.f,b),a.g,summation)
   else
-    summation = _block_operation(f,a1,b1,a.summation)
     GenericTProductDiffEval(a.op,a.f,a.g,summation)
   end
 end
@@ -339,7 +299,6 @@ function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::GenericTProductDiffEv
   bf = _is_different_block(testitem(a.f[1]),testitem(b.f[1]))
   bg = _is_different_block(testitem(a.g[1]),testitem(b.g[1]))
   summation = _block_operation(f,testitem(a.f[1]),testitem(b.f[1]),a.summation)
-  @notimplementedif bf && bg
   if bf && bg
     GenericTProductDiffEval(a.op,f(a.f,b.f),f(a.g,b.g),summation)
   elseif bf
@@ -359,7 +318,7 @@ function _is_different_block(a1::ArrayBlock,b1::ArrayBlock)
   all(findall(a1.touched) .!= findall(b1.touched))
 end
 
-function _block_operation(f,a1,b1)
+function _block_operation(f,a1,b1,args...)
   f
 end
 
@@ -373,10 +332,6 @@ function _block_operation(f,a1::ArrayBlock{A,N},b1::ArrayBlock{A,N}) where {A,N}
   end
   block_map = BlockMap(size(a1.touched),overlap)
   return_cache(block_map,fill(f,length(overlap))...)
-end
-
-function _block_operation(f,a1,b1,fprev)
-  fprev
 end
 
 function _block_operation(f,a1::ArrayBlock{A,N},b1::ArrayBlock{A,N},fprev::ArrayBlock{B,N}) where {A,B,N}
