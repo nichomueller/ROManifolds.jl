@@ -96,27 +96,27 @@ end
 
 IndexMaps.get_index_map(a::TransientTTSVDCores) = a.index_map
 
-RBSteady.get_cores(a::TransientTTSVDCores) = (get_spatial_cores(a)...,get_temporal_core(a))
-RBSteady.get_spatial_cores(a::TransientTTSVDCores) = a.cores_space
-get_temporal_core(a::TransientTTSVDCores) = a.core_time
+RBSteady.get_cores(a::TransientTTSVDCores) = (get_cores_space(a)...,get_core_time(a))
+RBSteady.get_cores_space(a::TransientTTSVDCores) = a.cores_space
+get_core_time(a::TransientTTSVDCores) = a.core_time
 
-RBSteady.get_basis_space(a::TransientTTSVDCores) = cores2basis(get_index_map(a),get_spatial_cores(a)...)
+RBSteady.get_basis_space(a::TransientTTSVDCores) = cores2basis(get_index_map(a),get_cores_space(a)...)
 RBSteady.num_space_dofs(a::TransientTTSVDCores) = prod(_num_tot_space_dofs(a))
 function RBSteady.num_space_dofs(a::TransientFixedDofsTTSVDCores)
   prod(_num_tot_space_dofs(a)) - length(get_fixed_dofs(get_index_map(a)))
 end
-get_basis_time(a::TransientTTSVDCores) = cores2basis(get_temporal_core(a))
-ParamDataStructures.num_times(a::TransientTTSVDCores) = size(get_temporal_core(a),2)
-num_reduced_times(a::TransientTTSVDCores) = size(get_temporal_core(a),3)
+get_basis_time(a::TransientTTSVDCores) = cores2basis(get_core_time(a))
+ParamDataStructures.num_times(a::TransientTTSVDCores) = size(get_core_time(a),2)
+num_reduced_times(a::TransientTTSVDCores) = size(get_core_time(a),3)
 
 RBSteady.num_reduced_dofs(a::TransientTTSVDCores) = num_reduced_times(a)
 
 get_basis_spacetime(a::TransientTTSVDCores) = a.basis_spacetime
 
-_num_tot_space_dofs(a::TransientTTSVDCores{3}) = size.(get_spatial_cores(a),2)
+_num_tot_space_dofs(a::TransientTTSVDCores{3}) = size.(get_cores_space(a),2)
 
 function _num_tot_space_dofs(a::TransientTTSVDCores{4})
-  scores = get_spatial_cores(a)
+  scores = get_cores_space(a)
   tot_ndofs = zeros(Int,2,length(scores))
   @inbounds for i = eachindex(scores)
     tot_ndofs[:,i] .= size(scores[i],2),size(scores[i],3)
@@ -124,16 +124,14 @@ function _num_tot_space_dofs(a::TransientTTSVDCores{4})
   return tot_ndofs
 end
 
-function RBSteady.basis2cores(mat::AbstractMatrix,a::TransientTTSVDCores)
-  index_map = get_index_map(a)
-  D = ndims(index_map)
-  s = reverse(size(index_map))
-  v = reshape(mat,num_times(a),s...,:)
-  permutedims(v,(reverse(1:D+1)...,D+2))
-end
-
 function get_basis_spacetime(index_map::AbstractIndexMap,cores_space,core_time)
   cores2basis(RBSteady._cores2basis(index_map,cores_space...),core_time)
+end
+
+function RBSteady.compress_cores(core::TransientTTSVDCores,bases::TransientTTSVDCores...;kwargs...)
+  ccores = map((a,b...)->compress_core(a,b...;kwargs...),get_cores(core),get_cores.(bases)...)
+  ccore = multiply_cores(ccores...)
+  RBSteady._dropdims(ccore)
 end
 
 function IndexMaps.recast(x̂::AbstractVector,a::TransientTTSVDCores)
@@ -171,10 +169,10 @@ function num_reduced_times(a::BlockProjection)
   return dofs
 end
 
-function get_temporal_core(a::BlockProjection)
+function get_core_time(a::BlockProjection)
   active_block_ids = get_touched_blocks(a)
   block_map = BlockMap(size(a),active_block_ids)
-  cores = [get_temporal_core(a[i]) for i = get_touched_blocks(a)]
+  cores = [get_core_time(a[i]) for i = get_touched_blocks(a)]
   return return_cache(block_map,cores...)
 end
 
@@ -183,8 +181,8 @@ function RBSteady.enrich_basis(
   norm_matrix::AbstractMatrix,
   supr_op::AbstractMatrix)
 
-  basis_space = add_space_supremizers(a,norm_matrix,supr_op)
-  basis_time = add_time_supremizers(a)
+  basis_space = add_space_supremizers(get_basis_space(a),norm_matrix,supr_op)
+  basis_time = add_time_supremizers(get_basis_time(a))
   basis = BlockProjection(map(TransientPODBasis,basis_space,basis_time),a.touched)
   return basis
 end
@@ -194,29 +192,26 @@ function RBSteady.enrich_basis(
   norm_matrix::AbstractMatrix,
   supr_op::AbstractMatrix)
 
-  bs_primal,bs_dual... = add_space_supremizers(a,norm_matrix,supr_op)
-  bt_primal,bt_dual... = add_time_supremizers(a)
-  bst_primal = kronecker(bt_primal,bs_primal)
-  snaps_primal = basis2cores(bst_primal,a[1,1])
-  cores_space_primal...,core_time_primal = ttsvd(snaps_primal,norm_matrix[1,1];ϵ=1e-10)
-  _,cores_space_dual... = get_cores_space(a).array
-  _,core_time_dual... = get_cores_time(a).array
-  cores_space = (cores_space_primal,cores_space_dual...)
-  cores_time = (core_time_primal,core_time_dual...)
-  basis = BlockProjection(map(TransientTTSVDCores,cores_space,cores_time),a.touched)
-  return basis
+  cores_space,core_time,enrich = add_tt_supremizers(
+    get_cores_space(a),get_core_time(a),norm_matrix,supr_op)
+  if enrich # we have added supremizers
+    index_map = get_index_map(a)
+    a′ = BlockProjection(map(TransientTTSVDCores,cores_space,core_time,index_map),a.touched)
+    return a′
+  else
+    return a
+  end
 end
 
 """
-    add_time_supremizers(a::BlockProjection{<:TransientProjection};kwargs...) -> Vector{<:Matrix}
+    add_time_supremizers(basis_time::MatrixBlock;kwargs...) -> Vector{<:Matrix}
 
 Enriches the temporal basis with temporal supremizers computed from
 the kernel of the temporal basis associated to the primal field projected onto
 the column space of the temporal basis (bases) associated to the duel field(s)
 
 """
-function add_time_supremizers(a::BlockProjection;kwargs...)
-  basis_time = get_basis_time(a)
+function add_time_supremizers(basis_time::MatrixBlock;kwargs...)
   basis_primal,basis_dual... = basis_time.array
   for i = eachindex(basis_dual)
     basis_primal = add_time_supremizers(basis_primal,basis_dual[i];kwargs...)

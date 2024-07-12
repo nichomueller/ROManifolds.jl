@@ -129,7 +129,7 @@ red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
 basis = RBSteady.get_basis(red_test)
 bs = RBTransient.get_basis_space(basis)
 
-@check bs ≈ cores2basis(RBSteady.get_spatial_cores(basis)...)
+@check bs ≈ cores2basis(RBSteady.get_cores_space(basis)...)
 @check norm(bs'*X*bs - I) ≤ 1e-12
 
 u = get_values(fesnaps)

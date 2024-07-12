@@ -48,7 +48,7 @@ include("TProductFESpaces.jl")
 export AbstractTProductArray
 export TProductArray
 export TProductGradientArray
-export TProductDivergenceArray
+export TProductPDerivativeArray
 export BlockTProductArray
 export tp_length
 export tp_getindex

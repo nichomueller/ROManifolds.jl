@@ -87,17 +87,23 @@ struct TProductGradientArray{T,N,A<:AbstractArray{T,N},I,B} <: AbstractTProductA
 end
 
 function tproduct_array(
+  ::Nothing,
+  arrays_1d::Vector{<:AbstractArray},
+  gradients_1d::Vector{<:AbstractArray},
+  index_map,
+  summation=nothing)
+
+  TProductArray(arrays_1d,index_map)
+end
+
+function tproduct_array(
   ::typeof(gradient),
   arrays_1d::Vector{<:AbstractArray},
   gradients_1d::Vector{<:AbstractArray},
   index_map,
   summation=nothing)
 
-  if all(iszero.(gradients_1d)) .|| all(isempty.(gradients_1d))
-    TProductArray(arrays_1d,index_map)
-  else
-    TProductGradientArray(arrays_1d,gradients_1d,index_map,summation)
-  end
+  TProductGradientArray(arrays_1d,gradients_1d,index_map,summation)
 end
 
 get_arrays(a::TProductGradientArray) = a.arrays_1d
@@ -206,15 +212,16 @@ function tproduct_array(arrays_1d::Vector{<:BlockArray},index_map)
   BlockTProductArray(arrays)
 end
 
-function tproduct_array(op::typeof(gradient),arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},index_map,s::ArrayBlock)
+function tproduct_array(op::ArrayBlock,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},index_map,s::ArrayBlock)
   s_blocks = blocksize(first(arrays_1d))
   arrays = map(CartesianIndices(s_blocks)) do i
     iblock = Block(Tuple(i))
     arrays_1d_i = getindex.(arrays_1d,iblock)
     gradients_1d_i = getindex.(gradients_1d,iblock)
     index_map_i = getindex.(index_map,Tuple(i))
+    op_i = op[Tuple(i)...]
     s_i = s[Tuple(i)...]
-    tproduct_array(op,arrays_1d_i,gradients_1d_i,index_map_i,s_i)
+    tproduct_array(op_i,arrays_1d_i,gradients_1d_i,index_map_i,s_i)
   end
   BlockTProductArray(arrays)
 end

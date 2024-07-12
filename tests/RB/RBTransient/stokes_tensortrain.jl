@@ -107,9 +107,19 @@ cores = get_cores(basis)
 T = Float64
 id = dblocks[1]
 ip = pblocks[1]
-rcores = Array{T,3}[]
+rcores_dual = Array{T,3}[]
 rcore = Matrix{T}[]
 C = supr_op[Block(ip,id)]
+A = norm_matrix[Block(ip,ip)]
+
+# cores_norm_i = TProduct.tp_decomposition(A) # add here the norm matrix
+cores_primal_i,cores_dual_i = cores[ip],cores[id]
+cores_coupling_i = TProduct.tp_decomposition(C)
+rcores_dual_i = compress_core(cores_coupling_i,cores_dual_i) # add here the norm matrix
+rcores_i = compress_core(cores_primal_i,rcores_dual_i)
+rcore_i = multiply_cores(rcores_i...) |> _dropdims
+push!(rcores_dual,rcores_dual_i)
+push!(rcore,rcore_i)
 ##########################################
 
 using Gridap.CellData

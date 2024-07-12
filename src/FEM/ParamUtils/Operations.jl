@@ -58,31 +58,7 @@ function TProduct.tproduct_array(
   index_map,
   args...) where N
 
-  if all(iszero.(gradients_1d)) .|| all(isempty.(gradients_1d))
-    TProductArray(arrays_1d,index_map)
-  else
-    TProductPDerivativeArray{N}(arrays_1d,gradients_1d,index_map)
-  end
-end
-
-function TProduct.tproduct_array(
-  op::Type{<:PartialDerivative{N}},
-  arrays_1d::Vector{<:BlockArray},
-  gradients_1d::Vector{<:BlockArray},
-  index_map,
-  s::ArrayBlock
-  ) where N
-
-  s_blocks = blocksize(first(arrays_1d))
-  arrays = map(CartesianIndices(s_blocks)) do i
-    iblock = Block(Tuple(i))
-    arrays_1d_i = getindex.(arrays_1d,iblock)
-    gradients_1d_i = getindex.(gradients_1d,iblock)
-    index_map_i = getindex.(index_map,Tuple(i))
-    s_i = s[Tuple(i)...]
-    TProduct.tproduct_array(op,arrays_1d_i,gradients_1d_i,index_map_i,s_i)
-  end
-  BlockTProductArray(arrays)
+  TProductPDerivativeArray{N}(arrays_1d,gradients_1d,index_map)
 end
 
 function PartialDerivative{N}(f::Function,x::Point,fx) where N

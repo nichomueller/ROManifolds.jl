@@ -125,10 +125,9 @@ end
 
 function GenericTProductDiffEval(op,f::Vector{DomainContribution},g::Vector{DomainContribution})
   s = _block_operation(nothing,testitem(first(f)),testitem(first(g)))
-  GenericTProductDiffEval(op,f,g,s)
+  op′ = _block_operation(op,testitem(first(f)),testitem(first(g)))
+  GenericTProductDiffEval(op′,f,g,s)
 end
-
-const GradientTProductEval{A,B,C} = GenericTProductDiffEval{typeof(gradient),A,B,C}
 
 CellData.get_data(f::GenericTProductDiffEval) = f.f
 get_diff_data(f::GenericTProductDiffEval) = f.g
@@ -296,15 +295,18 @@ function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::AbstractVector{<:Doma
 end
 
 function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::GenericTProductDiffEval)
-  bf = _is_different_block(testitem(a.f[1]),testitem(b.f[1]))
-  bg = _is_different_block(testitem(a.g[1]),testitem(b.g[1]))
-  summation = _block_operation(f,testitem(a.f[1]),testitem(b.f[1]),a.summation)
+  af1,ag1 = testitem(a.f[1]),testitem(a.g[1])
+  bf1,bg1 = testitem(b.f[1]),testitem(b.g[1])
+  bf = _is_different_block(af1,testitem(b.f[1]))
+  bg = _is_different_block(ag1,testitem(b.g[1]))
+  op = _disjoint_block_operation(a.op,af1,bf1,b.op)
+  summation = _block_operation(f,af1,bf1,a.summation)
   if bf && bg
-    GenericTProductDiffEval(a.op,f(a.f,b.f),f(a.g,b.g),summation)
+    GenericTProductDiffEval(op,f(a.f,b.f),f(a.g,b.g),summation)
   elseif bf
-    GenericTProductDiffEval(a.op,f(a.f,b.f),a.g,summation)
+    GenericTProductDiffEval(op,f(a.f,b.f),a.g,summation)
   elseif bg
-    GenericTProductDiffEval(a.op,a.f,f(a.g,b.g),summation)
+    GenericTProductDiffEval(op,a.f,f(a.g,b.g),summation)
   else
     @notimplemented
   end
@@ -319,6 +321,10 @@ function _is_different_block(a1::ArrayBlock,b1::ArrayBlock)
 end
 
 function _block_operation(f,a1,b1,args...)
+  f
+end
+
+function _disjoint_block_operation(f,a1,b1,args...)
   f
 end
 
@@ -345,4 +351,17 @@ function _block_operation(f,a1::ArrayBlock{A,N},b1::ArrayBlock{A,N},fprev::Array
   sum_overlap = vcat(findall(fprev.touched)...,overlap...)
   block_map = BlockMap(size(a1.touched),sum_overlap)
   return_cache(block_map,fill(f,length(sum_overlap))...)
+end
+
+function _disjoint_block_operation(f,a1::ArrayBlock{A,N},b1::ArrayBlock{A,N},fprev::ArrayBlock{B,N}) where {A,B,N}
+  @check size(a1) == size(b1)
+  touched_a = findall(a1.touched)
+  touched_b = findall(b1.touched)
+  @check isempty(intersect(touched_a,touched_b))
+  array_a = f[touched_a...]
+  array_b = fprev[touched_b...]
+  union_touched = vcat(touched_a,touched_b)
+  union_array = vcat(array_a,array_b)
+  block_map = BlockMap(size(a1.touched),union_touched)
+  return_cache(block_map,union_array...)
 end

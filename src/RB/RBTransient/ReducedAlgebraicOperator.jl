@@ -137,12 +137,6 @@ function RBSteady.compress_core(a::AbstractArray{T,3},btrial::AbstractArray{S,3}
   return combine(bab,bab_shift)
 end
 
-function RBSteady.compress_cores(core::TransientTTSVDCores,bases::TransientTTSVDCores...;kwargs...)
-  ccores = map((a,b...)->compress_core(a,b...;kwargs...),get_cores(core),get_cores.(bases)...)
-  ccore = multiply_cores(ccores...)
-  RBSteady._dropdims(ccore)
-end
-
 function combine_basis_time(B::AbstractMatrix,C::AbstractMatrix;combine=(x,y)->x)
   time_ndofs = size(C,1)
   nt_row = size(C,2)

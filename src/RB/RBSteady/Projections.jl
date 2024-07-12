@@ -93,32 +93,24 @@ const FixedDofsTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I<:FixedDo
 IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
 
 get_cores(a::TTSVDCores) = a.cores
-get_spatial_cores(a::TTSVDCores) = a.cores
+get_cores_space(a::TTSVDCores) = a.cores
 
-get_basis_space(a::TTSVDCores) = cores2basis(get_index_map(a),get_spatial_cores(a)...)
+get_basis_space(a::TTSVDCores) = cores2basis(get_index_map(a),get_cores_space(a)...)
 num_space_dofs(a::TTSVDCores) = prod(_num_tot_space_dofs(a))
 function num_space_dofs(a::FixedDofsTTSVDCores)
   prod(_num_tot_space_dofs(a)) - length(get_fixed_dofs(get_index_map(a)))
 end
-num_reduced_space_dofs(a::TTSVDCores) = size(last(get_spatial_cores(a)),3)
+num_reduced_space_dofs(a::TTSVDCores) = size(last(get_cores_space(a)),3)
 
-_num_tot_space_dofs(a::TTSVDCores{3}) = size.(get_spatial_cores(a),2)
+_num_tot_space_dofs(a::TTSVDCores{3}) = size.(get_cores_space(a),2)
 
 function _num_tot_space_dofs(a::TTSVDCores{4})
-  scores = get_spatial_cores(a)
+  scores = get_cores_space(a)
   tot_ndofs = zeros(Int,2,length(scores))
   @inbounds for i = eachindex(scores)
     tot_ndofs[:,i] .= size(scores[i],2),size(scores[i],3)
   end
   return tot_ndofs
-end
-
-function basis2cores(mat::AbstractMatrix,a::TTSVDCores)
-  index_map = get_index_map(a)
-  D = ndims(index_map)
-  s = reverse(size(index_map))
-  v = reshape(mat,s...,:)
-  permutedims(v,(reverse(1:D)...,D+1))
 end
 
 function compress_cores(core::TTSVDCores,bases::TTSVDCores...;kwargs...)
@@ -209,10 +201,10 @@ function num_reduced_space_dofs(a::BlockProjection)
   return dofs
 end
 
-function get_spatial_cores(a::BlockProjection)
+function get_cores_space(a::BlockProjection)
   active_block_ids = get_touched_blocks(a)
   block_map = BlockMap(size(a),active_block_ids)
-  cores = [get_spatial_cores(a[i]) for i = get_touched_blocks(a)]
+  cores = [get_cores_space(a[i]) for i = get_touched_blocks(a)]
   return return_cache(block_map,cores...)
 end
 
@@ -252,18 +244,18 @@ problems projected on a reduced vector space
 
 """
 function enrich_basis(a::BlockProjection{<:PODBasis},norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
-  bases = add_space_supremizers(a,norm_matrix,supr_op)
+  bases = add_space_supremizers(get_basis_space(a),norm_matrix,supr_op)
   return BlockProjection(map(PODBasis,bases),a.touched)
 end
 
 function enrich_basis(a::BlockProjection{<:TTSVDCores},norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
-  bases = add_space_supremizers(a,norm_matrix,supr_op)
-  return BlockProjection(map(TTSVDCores,bases),a.touched)
+  cores = add_tt_supremizers(get_cores_space(a),norm_matrix,supr_op)
+  return BlockProjection(map(TTSVDCores,cores),a.touched)
 end
 
 """
     add_space_supremizers(
-      a::BlockProjection,
+      basis_space::MatrixBlock,
       norm_matrix::AbstractMatrix,
       supr_op::AbstractMatrix) -> Vector{<:AbstractArray}
 
@@ -271,8 +263,7 @@ Enriches the spatial basis with spatial supremizers computed from
 the action of the supremizing operator `supr_op` on the dual field(s)
 
 """
-function add_space_supremizers(a::BlockProjection,norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
-  basis_space = get_basis_space(a)
+function add_space_supremizers(basis_space::MatrixBlock,norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
   basis_primal,basis_dual... = basis_space.array
   A = norm_matrix[Block(1,1)]
   H = cholesky(A)
@@ -286,9 +277,9 @@ function add_space_supremizers(a::BlockProjection,norm_matrix::AbstractMatrix,su
   return [basis_primal,basis_dual...]
 end
 
-function add_space_supremizers(a::BlockProjection,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
+function add_tt_supremizers(cores_space::MatrixBlock,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
   pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
-  cores = get_cores(a)
+  cores_primal′ = BlockVectorTTCores()
 
   for id in dblocks
     rcores = Array{T,3}[]
@@ -296,23 +287,31 @@ function add_space_supremizers(a::BlockProjection,norm_matrix::BlockTProductArra
     C = supr_op[Block(ip,id)]
     for ip in pblocks
       A = norm_matrix[Block(ip,ip)]
-      reduced_coupling!((rcores,rcore),cores[ip],cores[id],A,C)
+      reduced_coupling!((rcores,rcore),cores_space[ip],cores_space[id],A,C)
     end
-    cores[ip] = enrich(cores[ip],rcores,vcat(rcore...))
+    cores[ip] = enrich(cores_space[ip],rcores,vcat(rcore...))
   end
 
   return cores
 end
 
-function reduced_coupling(cache,cores_primal_i,cores_dual_i,norm_matrix_i,coupling_i)
+function reduced_coupling!(cache,cores_primal_i,cores_dual_i,norm_matrix_i,coupling_i)
   rcores_dual,rcore = cache
   # cores_norm_i = TProduct.tp_decomposition(norm_matrix_i) # add here the norm matrix
   cores_coupling_i = TProduct.tp_decomposition(coupling_i)
-  rcores_dual_i = compress_core.(cores_coupling_i,cores_dual_i) # add here the norm matrix
-  rcores_i = compress_core.(cores_primal_i,rcores_dual_i)
+  rcores_dual_i = _compress1.(cores_coupling_i,cores_dual_i) # add here the norm matrix
+  rcores_i = compress2.(cores_primal_i,rcores_dual_i)
   rcore_i = multiply_cores(rcores_i...) |> _dropdims
   push!(rcores_dual,rcores_dual_i)
   push!(rcore,rcore_i)
+end
+
+function _coupling_kron_dual(B::Vector{<:AbstractSparseMatrix{T}},cores::Vector{<:AbstractArray{S}}) where {T,S}
+
+end
+
+function _primal_kron_rcoupling(B::Vector{<:AbstractSparseMatrix},)
+
 end
 
 function enrich(basis_primal,basis_dual;tol=1e-2)

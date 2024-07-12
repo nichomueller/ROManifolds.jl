@@ -51,7 +51,7 @@ export num_space_dofs
 include("Snapshots.jl")
 
 export AbstractTTCore
-export BlockArrayTTCores
+export BlockVectorTTCores
 export SparseCore
 export SparseCoreCSC
 include("TTCores.jl")
@@ -81,7 +81,7 @@ export get_basis_space
 export num_fe_dofs
 export num_reduced_dofs
 export get_cores
-export get_spatial_cores
+export get_cores_space
 export cores2basis
 export enrich_basis
 export add_space_supremizers

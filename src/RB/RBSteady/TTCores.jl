@@ -70,36 +70,13 @@ function core_getindex(a::SparseCoreCSC{T},i::Vararg{Integer,4}) where T
   getindex(a.array,i1,i2,i3)
 end
 
-struct BlockArrayTTCores{T,D,N,A<:AbstractArray{T,D}} <: AbstractArray{AbstractArray{T,D},N}
+struct BlockVectorTTCores{T,D,A<:AbstractArray{T,D}} <: AbstractVector{AbstractArray{T,D}}
   array::Vector{A}
-  touched::Array{Bool,N}
 end
 
-const BlockVectorTTCores{T,D,A<:AbstractArray{T,D}} = BlockArrayTTCores{T,D,1,A}
-const BlockMatrixTTCores{T,D,A<:AbstractArray{T,D}} = BlockArrayTTCores{T,D,2,A}
-
-Base.size(a::BlockArrayTTCores) = size(a.touched)
-
-size_of_block(a::BlockVectorTTCores,irow) = size(a.array[irow])
-function size_of_block(a::BlockMatrixTTCores{T,3} where T,irow,icol)
-  brow = a.array[irow]
-  bcol = a.array[icol]
-  @check size(brow,2) == size(bcol,2)
-  (size(brow,1),size(brow,2),size(bcol,3))
-end
-
-function Base.getindex(a::BlockArrayTTCores{T,D,N},i::Vararg{Integer,N}) where {T,D,N}
-  iblock = first(i)
-  if all(i.==iblock)
-    a.array[iblock]
-  else
-    fill(zero(T),size_of_block(a,i...))
-  end
-end
-
-function get_touched_blocks(a::BlockArrayTTCores)
-  findall(a.touched)
-end
+Base.size(a::BlockVectorTTCores) = size(a.array)
+Base.getindex(a::BlockVectorTTCores,i::Integer) = getindex(a.array,i)
+Base.setindex!(a::BlockVectorTTCores,v,i::Integer) = setindex(a.array,v,i)
 
 # core operations
 
@@ -297,12 +274,12 @@ function compress_core(a::AbstractArray{T,4},btrial::AbstractArray{S,3},btest::A
   return bab
 end
 
-function compress_core(a::AbstractArray,btest::BlockArrayTTCores;kwargs...)
+function compress_core(a::AbstractArray,btest::BlockVectorTTCores;kwargs...)
   ccore = map(b -> compress_core(a,btest[i];kwargs...),get_touched_blocks(best))
   union_cores(a,ccore...)
 end
 
-function compress_core(a::AbstractArray,btrial::BlockArrayTTCores,btest::BlockArrayTTCores;kwargs...)
+function compress_core(a::AbstractArray,btrial::BlockVectorTTCores,btest::BlockVectorTTCores;kwargs...)
   ccore = map(b -> compress_core(a,btrial[i],btest[i];kwargs...),get_touched_blocks(best))
   union_cores(a,ccore...)
 end
@@ -329,7 +306,7 @@ function multiply_cores(a::AbstractArray{T,6},b::AbstractArray{S,6}) where {T,S}
   return ab
 end
 
-function multiply_cores(a::BlockArrayTTCores{T,D},b::BlockArrayTTCores{S,D}) where {T,S,D}
+function multiply_cores(a::BlockVectorTTCores{T,D},b::BlockVectorTTCores{S,D}) where {T,S,D}
   @check get_touched_blocks(a) == get_touched_blocks(b)
   ab = map(b -> multiply_cores(a[i],b[i]),get_touched_blocks(b))
   union_cores(ab...)
@@ -340,7 +317,7 @@ function multiply_cores(c1::AbstractArray,cores::AbstractArray...)
   multiply_cores(multiply_cores(c1,_c1),_cores...)
 end
 
-function multiply_cores(c1::BlockArrayTTCores,cores::BlockArrayTTCores...)
+function multiply_cores(c1::BlockVectorTTCores,cores::BlockVectorTTCores...)
   _c1,_cores... = cores
   mcores = multiply_cores(multiply_cores(c1,_c1),_cores...)
   D = ndims(first(mcores.array))
