@@ -70,18 +70,65 @@ function core_getindex(a::SparseCoreCSC{T},i::Vararg{Integer,4}) where T
   getindex(a.array,i1,i2,i3)
 end
 
-struct BlockVectorTTCores{T,D,A<:AbstractArray{T,D}} <: AbstractVector{AbstractArray{T,D}}
+struct BlockTTCore{T,A<:AbstractArray{T,3}} <: AbstractArray{T,3}
   array::Vector{A}
+  offset1::Vector{Int}
+  offset3::Vector{Int}
 end
 
-function BlockVectorTTCores(a::AbstractArray{<:Number})
-  BlockVectorTTCores([a])
+function BlockTTCore(array::Vector{<:AbstractArray{T,3}}) where T
+  @check all(size(a,2)==size(array[1],2) for a in array)
+  s1 = size.(array,1)
+  s3 = size.(array,3)
+  o1 = all(s1 .== 1) ? [1] : s1
+  o3 = all(s3 .== 1) ? [1] : s3
+  pushfirst!(o1,0)
+  pushfirst!(o3,0)
+  BlockTTCore(array,o1,o3)
 end
 
-Base.size(a::BlockVectorTTCores) = size(a.array)
-Base.getindex(a::BlockVectorTTCores,i::Integer) = getindex(a.array,i)
-Base.setindex!(a::BlockVectorTTCores,v,i::Integer) = setindex(a.array,v,i)
-Base.push!(a::BlockVectorTTCores{T,D},v::AbstractArray{T,D}) where {T,D} = push!(a.array,v)
+function BlockTTCore(a::AbstractArray{T,3}) where T
+  BlockTTCore([a],[0,size(a,1)],[0,size(a,3)])
+end
+
+Base.size(a::BlockTTCore) = (a.offset1[end],size(a.array[1],2),a.offset3[end])
+
+@inline function Base.getindex(a::BlockTTCore,i1::Integer,i2::Integer,i3::Integer)
+  @boundscheck checkbounds(a,i1,i2,i3)
+  b1,i1′ = _block_local_index(a.offset1,i1)
+  b3,i3′ = _block_local_index(a.offset3,i3)
+  if size(a,1) == 1
+    a.array[b3][i1′,i2,i3′]
+  elseif size(a,3) == 1
+    a.array[b1][i1′,i2,i3′]
+  else
+    if b1 != b3
+      zero(eltype(a))
+    else
+      a.array[b1][i1′,i2,i3′]
+    end
+  end
+end
+
+function _block_local_index(offset,i)
+  blockidx = BlockArrays._searchsortedfirst(offset,i)-1
+  local_index = i - offset[blockidx]
+  return blockidx,local_index
+end
+
+Base.setindex!(a::BlockTTCore,v,i::Integer...) = setindex(a.array,v,i...)
+
+function Base.push!(a::BlockTTCore{T},v::AbstractArray{T,3}) where T
+  @check size(v,2) == size(a,2)
+  push!(a.array,v)
+  s1 = size.(a.array,1)
+  s3 = size.(a.array,3)
+  !all(s1 .== 1) && push!(a.offset1,a.offset1[end]+size(v,1))
+  !all(s3 .== 1) && push!(a.offset3,a.offset3[end]+size(v,3))
+  return
+end
+
+BlockArrays.blocks(a::BlockTTCore) = a.array
 
 # core operations
 
@@ -279,16 +326,6 @@ function compress_core(a::AbstractArray{T,4},btrial::AbstractArray{S,3},btest::A
   return bab
 end
 
-function compress_core(a::AbstractArray,btest::BlockVectorTTCores;kwargs...)
-  ccore = map(b -> compress_core(a,btest[i];kwargs...),get_touched_blocks(best))
-  union_cores(a,ccore...)
-end
-
-function compress_core(a::AbstractArray,btrial::BlockVectorTTCores,btest::BlockVectorTTCores;kwargs...)
-  ccore = map(b -> compress_core(a,btrial[i],btest[i];kwargs...),get_touched_blocks(best))
-  union_cores(a,ccore...)
-end
-
 function multiply_cores(a::AbstractArray{T,4},b::AbstractArray{S,4}) where {T,S}
   @check (size(a,3)==size(b,1) && size(a,4)==size(b,2))
   TS = promote_type(T,S)
@@ -311,22 +348,9 @@ function multiply_cores(a::AbstractArray{T,6},b::AbstractArray{S,6}) where {T,S}
   return ab
 end
 
-function multiply_cores(a::BlockVectorTTCores{T,D},b::BlockVectorTTCores{S,D}) where {T,S,D}
-  @check get_touched_blocks(a) == get_touched_blocks(b)
-  ab = map(b -> multiply_cores(a[i],b[i]),get_touched_blocks(b))
-  union_cores(ab...)
-end
-
 function multiply_cores(c1::AbstractArray,cores::AbstractArray...)
   _c1,_cores... = cores
   multiply_cores(multiply_cores(c1,_c1),_cores...)
-end
-
-function multiply_cores(c1::BlockVectorTTCores,cores::BlockVectorTTCores...)
-  _c1,_cores... = cores
-  mcores = multiply_cores(multiply_cores(c1,_c1),_cores...)
-  D = ndims(first(mcores.array))
-  cat(mcores.array...;dims=D)
 end
 
 function _dropdims(a::AbstractArray{T,4}) where T

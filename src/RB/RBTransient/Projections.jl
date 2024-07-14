@@ -252,7 +252,11 @@ function RBSteady.add_tt_supremizers(
   supr_op::BlockTProductArray)
 
   pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
-  cores_primal′ = map(ip -> BlockVectorTTCores.([cores_space[ip]...,core_time[ip]]),pblocks)
+  cores_primal_space = map(ip -> cores_space[ip],pblocks)
+  core_primal_time = map(ip -> core_time[ip],pblocks)
+  cores_primal_space′ = map(cores -> BlockTTCore.([cores]),cores_primal_space)
+  core_primal_time′ = map(core -> BlockTTCore.([core]),core_primal_time)
+  flag = false
 
   for id in dblocks
     rcores = Vector{Array{T,3}}[]
@@ -267,10 +271,14 @@ function RBSteady.add_tt_supremizers(
       reduced_coupling!((rcores,rcore),cores_primal_space_i,core_primal_time_i,
         cores_dual_space_i,core_dual_time_i,A,C)
     end
-    enrich!(cores_primal′,rcores,vcat(rcore...))
+    flag = enrich!(cores_primal_space′,core_primal_time′,rcores,vcat(rcore...))
   end
 
-  return cores_primal′
+  if flag
+    return [cores_primal_space′...,cores_dual...]
+  else
+    return [cores_primal...,cores_dual...]
+  end
 end
 
 function RBSteady.reduced_coupling!(

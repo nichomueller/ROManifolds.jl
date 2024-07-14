@@ -51,7 +51,7 @@ export num_space_dofs
 include("Snapshots.jl")
 
 export AbstractTTCore
-export BlockVectorTTCores
+export BlockTTCore
 export SparseCore
 export SparseCoreCSC
 include("TTCores.jl")

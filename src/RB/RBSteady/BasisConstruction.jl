@@ -156,6 +156,26 @@ function _weight_array!(weights,cores,X,::Val{1})
   return
 end
 
+function _weight_array!(weights,cores::Vector{<:BlockTTCore},X,::Val{1})
+  X1 = tp_getindex(X,1)
+  K = length(X1)
+  bcore = cores[1]
+  offset = bcore.offset3
+  rank = size(bcore,3)
+  W = zeros(rank,K,rank)
+  for (i,core) in enumerate(blocks(bcore))
+    range = offset[i]+1:offset[i+1]
+    @inbounds for k = 1:K
+      X1k = X1[k]
+      for i = range, i′ = range
+        W[i,k,i′] = core[1,:,i]'*X1k*core[1,:,i′]
+      end
+    end
+  end
+  weights[1] = W
+  return
+end
+
 function _weight_array!(weights,cores,X,::Val{d}) where d
   Xd = tp_getindex(X,d)
   K = length(Xd)
@@ -172,6 +192,36 @@ function _weight_array!(weights,cores,X,::Val{d}) where d
       Wk_prev′ = Wk_prev[i_prev,i′_prev]
       for i = 1:rank, i′ = 1:rank
         Wk[i,i′] += Wk_prev′*core[i_prev,:,i]'*Xdk*core[i′_prev,:,i′]
+      end
+    end
+  end
+  weights[d] = W
+  return
+end
+
+function _weight_array!(weights,cores::Vector{<:BlockTTCore},X,::Val{d}) where d
+  Xd = tp_getindex(X,d)
+  K = length(Xd)
+  W_prev = weights[d-1]
+  bcore = cores[d]
+  offset = bcore.offset3
+  rank = size(bcore,3)
+  bcore_prev = cores[d-1]
+  offset_prev = bcore_prev.offset3
+  rank_prev = size(bcore_prev,3)
+  W = zeros(rank,K,rank)
+  for (i,core) in enumerate(blocks(bcore))
+    range = offset[i]+1:offset[i+1]
+    range_prev = offset_prev[i]+1:offset_prev[i+1]
+    @inbounds for k = 1:K
+      Xdk = Xd[k]
+      @views Wk = W[:,k,:]
+      Wk_prev = W_prev[:,k,:]
+      for i_prev = range_prev, i′_prev = range_prev
+        Wk_prev′ = Wk_prev[i_prev,i′_prev]
+        for i = range, i′ = range
+          Wk[i,i′] += Wk_prev′*core[i_prev,:,i]'*Xdk*core[i′_prev,:,i′]
+        end
       end
     end
   end
@@ -294,13 +344,12 @@ function gram_schmidt!(
   end
 end
 
-function orthogonalize!(cores::BlockVectorTTCores,X::AbstractTProductArray,weights)
-  N_space = length(weights)
+function orthogonalize!(core::AbstractArray{T,3},X::AbstractTProductArray,weights) where T
   XW = _get_norm_matrix_from_weights(X,weights)
   L,p = _cholesky_factor_and_perm(XW)
-  cN = cores[N_space]
-  mat = reshape(cN,:,size(cN,3))
+  mat = reshape(core,:,size(core,3))
   XWmat = L'*mat[p,:]
   Q̃,R = qr(XWmat)
-  cores[N_space] = reshape((L'\Q̃)[invperm(p),:],size(cN))
+  core .= reshape((L'\Q̃)[invperm(p),:],size(core))
+  return R
 end

@@ -105,7 +105,7 @@ pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
 cores_space = get_cores_space(basis)
 core_time = RBTransient.get_core_time(basis)
 norms_primal = map(ip -> norm_matrix[Block(ip,ip)],pblocks)
-cores_primal = map(ip -> BlockVectorTTCores.([cores_space[ip]...,core_time[ip]]),pblocks)
+cores_primal = map(ip -> BlockTTCore.([cores_space[ip]...,core_time[ip]]),pblocks)
 
 T = Float64
 
@@ -130,28 +130,27 @@ flag=false
 i = 10
 
 # flag = RBSteady._push_to_primal!(cores_primal[ip],rcores[ip],norms_primal[ip],i;flag)
-
+ip = 1
 D = length(cores_primal[ip])
 T = eltype(eltype(first(cores_primal[ip])))
-weights = Vector{Array{T,3}}(undef,D-1)
+weights = Vector{Array{T,3}}(undef,D-2)
 
-for d in 1:D-1
-  push!(cores_primal[ip][d],rcores[ip][d])
-  RBSteady._weight_array!(weights,cores_primal[ip][d],norms_primal[ip],Val{d}())
-end
+push!(cores_primal[ip][1],rcores[ip][1])
+RBSteady._weight_array!(weights,cores_primal[ip],norms_primal[ip],Val{1}())
 
-push!(cores_primal[ip][D],rcores[ip][D][:,:,i:i])
-# RBSteady.orthogonalize!(cores_primal[ip][D],norms_primal[ip])
-N_space = length(weights)
-X = norms_primal[ip]
-XW = RBSteady._get_norm_matrix_from_weights(X,weights)
+push!(cores_primal[ip][2],rcores[ip][2])
+RBSteady.orthogonalize!(cores_primal[ip][2],norms_primal[ip],weights)
+
+push!(cores_primal[ip][3],rcores[ip][3][:,:,i:i])
+RBSteady.orthogonalize!(cores_primal[ip][3],norms_primal[ip],weights)
+
+using LinearAlgebra
+XW = RBSteady._get_norm_matrix_from_weights(norms_primal[ip],weights)
 L,p = RBSteady._cholesky_factor_and_perm(XW)
-cN = cores_primal[ip][D][N_space]
-mat = reshape(cN,:,size(cN,3))
+mat = reshape(core,:,size(core,3))
 XWmat = L'*mat[p,:]
 Q̃,R = qr(XWmat)
-cores[N_space] = reshape((L'\Q̃)[invperm(p),:],size(cN))
-
+core .= reshape((L'\Q̃)[invperm(p),:],size(core))
 ##########################################
 
 using Gridap.CellData

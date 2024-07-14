@@ -279,8 +279,10 @@ end
 
 function add_tt_supremizers(cores_space::MatrixBlock,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
   pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
-  cores_primal′ = map(ip -> BlockVectorTTCores.([cores_space[ip]]),pblocks)
-  pAblocks = map(ip -> norm_matrix[Block(ip,ip)],pblocks)
+  cores_primal = map(ip -> cores_space[ip],pblocks)
+  cores_primal′ = map(cores -> BlockTTCore.(cores),cores_primal)
+  cores_dual = map(id -> cores_space[id],dblocks)
+  norms_primal = map(ip -> norm_matrix[Block(ip,ip)],pblocks)
   flag = false
 
   for id in dblocks
@@ -293,10 +295,14 @@ function add_tt_supremizers(cores_space::MatrixBlock,norm_matrix::BlockTProductA
       cores_primal_i = cores_space[ip]
       reduced_coupling!((rcores,rcore),cores_primal_i,cores_dual_i,A,C)
     end
-    flag = enrich!(cores_primal′,rcores,vcat(rcore...),pAblocks,flag)
+    flag = enrich!(cores_primal′,rcores,vcat(rcore...),norms_primal;flag)
   end
 
-  flag ? cores_primal′ : cores_primal
+  if flag
+    return [cores_primal′...,cores_dual...]
+  else
+    return [cores_primal...,cores_dual...]
+  end
 end
 
 function reduced_coupling!(cache,cores_primal_i,cores_dual_i,norm_matrix_i,coupling_i)
@@ -310,57 +316,61 @@ function reduced_coupling!(cache,cores_primal_i,cores_dual_i,norm_matrix_i,coupl
   push!(rcore,rcore_i)
 end
 
-function enrich!(
-  cores_primal::Vector{<:BlockVectorTTCores},
-  rcores::Vector{<:AbstractArray{T,3}},
-  rcore::AbstractMatrix{T},
-  norms_primal,
-  flag=false;
-  tol=1e-2) where T
-
+function enrich!(cores_primal,rcores,rcore,norms_primal;flag=false,tol=1e-2,kwargs...)
   @check length(cores_primal) == length(rcores)
 
   i = 1
+  R = nothing
   while i ≤ size(rcore,2)
     proj = i == 1 ? zeros(size(rcore,1)) : orth_projection(rcore[:,i],rcore[:,1:i-1])
     dist = norm(rcore[:,1]-proj)
     if dist ≤ tol
       for ip in eachindex(cores_primal)
-        flag = _push_to_primal!(cores_primal[ip],rcores[ip],norms_primal[ip],i;flag)
+        R = add_and_orthogonalize!(cores_primal[ip],rcores[ip],norms_primal[ip],i,R;flag)
       end
-      rcore = _update_reduced_coupling()
+      rcore = _update_reduced_coupling(cores_primal,rcores,rcore)
+      flag = true
     end
     i += 1
   end
-
-  return flag
 end
 
-function _push_to_primal!(cores_primal,rcores,norms_primal,i;flag=false)
-  @check length(cores_primal) == length(rcores)
+function add_and_orthogonalize!(cores_primal,rcores,norms_primal,i,R;flag=false)
   D = length(cores_primal)
   T = eltype(eltype(first(cores_primal)))
   weights = Vector{Array{T,3}}(undef,D-1)
 
   if !flag
-    for d in 1:D-1
-      push!(cores_primal[d],rcores[d])
-      _weight_array!(weights,cores_primal[d],norms_primal,Val{d}())
+    for d in 1:D-2
+      cores_primal[d] = _add_to_core(cores_primal[d],rcores[d])
+      _weight_array!(weights,cores_primal,norms_primal,Val{d}())
     end
+    push!(cores_primal[D-1],rcores[D-1])
+    R = orthogonalize!(cores_primal[D-1],norms_primal,weights)
     push!(cores_primal[D],rcores[D][:,:,i:i])
-    orthogonalize!(cores_primal[D],norms_primal,weights)
+    absorb!(cores_primal[D],norms_primal,R)
   else
     cores_primal[D] = hcat(cores_primal[D],rcores[D][:,:,i:i])
-    orthogonalize!(cores_primal[D],norms_primal,weights)
+    absorb!(cores_primal[D],norms_primal,R)
   end
-
-  flag = true
+  return R
 end
 
 function _update_reduced_coupling(cores_primal,rcores,rcore)
-  for n in eachindex(cores_primal)
+  offsets = size.(last.(cores_primal),3)
+  @check size(rcore,1) == sum(offsets)
+  enriched_offsets = offsets .+ 1
+  pushfirst!(0,offsets)
+  pushfirst!(0,enriched_offsets)
+  rcore_new = similar(rcore,sum(enriched_offsets),size(rcore,2))
+  for (ip,cores_primal_i) in enumerate(cores_primal)
+    range = offsets[ip]+1:offsets[ip+1]
+    enriched_range = enriched_offsets[ip]+1:enriched_offsets[ip+1]-1
+    @views rcore_new[enriched_range,:] = rcore[range,:]
+    @views rcore_new[enriched_offsets[ip+1],:] =
+    rcores_i = compress_core.(rcores[ip],blocks(cores_primal_i)[end])
     rcore_i = multiply_cores(rcores_i...) |> _dropdims
-    rcore = hcat(rcore,rcore_i)
+    @views rcore_new[enriched_offsets[ip+1],:] = rcore_i
   end
-  return rcore
+  return rcore_new
 end
