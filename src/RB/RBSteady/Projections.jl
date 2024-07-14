@@ -279,67 +279,88 @@ end
 
 function add_tt_supremizers(cores_space::MatrixBlock,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
   pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
-  cores_primal′ = BlockVectorTTCores()
+  cores_primal′ = map(ip -> BlockVectorTTCores.([cores_space[ip]]),pblocks)
+  pAblocks = map(ip -> norm_matrix[Block(ip,ip)],pblocks)
+  flag = false
 
   for id in dblocks
-    rcores = Array{T,3}[]
+    rcores = Vector{Array{T,3}}[]
     rcore = Matrix{T}[]
-    C = supr_op[Block(ip,id)]
-    for ip in pblocks
+    cores_dual_i = cores_space[id]
+    for ip in eachindex(pblocks)
       A = norm_matrix[Block(ip,ip)]
-      reduced_coupling!((rcores,rcore),cores_space[ip],cores_space[id],A,C)
+      C = supr_op[Block(ip,id)]
+      cores_primal_i = cores_space[ip]
+      reduced_coupling!((rcores,rcore),cores_primal_i,cores_dual_i,A,C)
     end
-    cores[ip] = enrich(cores_space[ip],rcores,vcat(rcore...))
+    flag = enrich!(cores_primal′,rcores,vcat(rcore...),pAblocks,flag)
   end
 
-  return cores
+  flag ? cores_primal′ : cores_primal
 end
 
 function reduced_coupling!(cache,cores_primal_i,cores_dual_i,norm_matrix_i,coupling_i)
   rcores_dual,rcore = cache
   # cores_norm_i = TProduct.tp_decomposition(norm_matrix_i) # add here the norm matrix
   cores_coupling_i = TProduct.tp_decomposition(coupling_i)
-  rcores_dual_i = _compress1.(cores_coupling_i,cores_dual_i) # add here the norm matrix
-  rcores_i = compress2.(cores_primal_i,rcores_dual_i)
+  rcores_dual_i = map(*,cores_coupling_i,cores_dual_i) # add here the norm matrix
+  rcores_i = compress_core.(rcores_dual_i,cores_primal_i)
   rcore_i = multiply_cores(rcores_i...) |> _dropdims
   push!(rcores_dual,rcores_dual_i)
   push!(rcore,rcore_i)
 end
 
-function _coupling_kron_dual(B::Vector{<:AbstractSparseMatrix{T}},cores::Vector{<:AbstractArray{S}}) where {T,S}
+function enrich!(
+  cores_primal::Vector{<:BlockVectorTTCores},
+  rcores::Vector{<:AbstractArray{T,3}},
+  rcore::AbstractMatrix{T},
+  norms_primal,
+  flag=false;
+  tol=1e-2) where T
 
-end
-
-function _primal_kron_rcoupling(B::Vector{<:AbstractSparseMatrix},)
-
-end
-
-function enrich(basis_primal,basis_dual;tol=1e-2)
-  basis_pd = basis_primal'*basis_dual
-
-  function _enrich(basis_primal,basis_pd,v)
-    vnew = copy(v)
-    orth_complement!(vnew,basis_primal)
-    vnew /= norm(vnew)
-    hcat(basis_primal,vnew),vcat(basis_pd,vnew'*basis_dual)
-  end
-
-  for i = size(basis_pd,2) - size(basis_pd,1)
-    basis_primal,basis_pd = _enrich(basis_primal,basis_pd,basis_dual[:,i])
-  end
+  @check length(cores_primal) == length(rcores)
 
   i = 1
-  while i ≤ size(basis_pd,2)
-    proj = i == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,i],basis_pd[:,1:i-1])
-    dist = norm(basis_pd[:,1]-proj)
+  while i ≤ size(rcore,2)
+    proj = i == 1 ? zeros(size(rcore,1)) : orth_projection(rcore[:,i],rcore[:,1:i-1])
+    dist = norm(rcore[:,1]-proj)
     if dist ≤ tol
-      basis_primal,basis_pd = _enrich(basis_primal,basis_pd,basis_dual[:,i])
-      i = 0
-    else
-      basis_pd[:,i] .-= proj
+      for ip in eachindex(cores_primal)
+        flag = _push_to_primal!(cores_primal[ip],rcores[ip],norms_primal[ip],i;flag)
+      end
+      rcore = _update_reduced_coupling()
     end
     i += 1
   end
 
-  return basis_primal
+  return flag
+end
+
+function _push_to_primal!(cores_primal,rcores,norms_primal,i;flag=false)
+  @check length(cores_primal) == length(rcores)
+  D = length(cores_primal)
+  T = eltype(eltype(first(cores_primal)))
+  weights = Vector{Array{T,3}}(undef,D-1)
+
+  if !flag
+    for d in 1:D-1
+      push!(cores_primal[d],rcores[d])
+      _weight_array!(weights,cores_primal[d],norms_primal,Val{d}())
+    end
+    push!(cores_primal[D],rcores[D][:,:,i:i])
+    orthogonalize!(cores_primal[D],norms_primal,weights)
+  else
+    cores_primal[D] = hcat(cores_primal[D],rcores[D][:,:,i:i])
+    orthogonalize!(cores_primal[D],norms_primal,weights)
+  end
+
+  flag = true
+end
+
+function _update_reduced_coupling(cores_primal,rcores,rcore)
+  for n in eachindex(cores_primal)
+    rcore_i = multiply_cores(rcores_i...) |> _dropdims
+    rcore = hcat(rcore,rcore_i)
+  end
+  return rcore
 end

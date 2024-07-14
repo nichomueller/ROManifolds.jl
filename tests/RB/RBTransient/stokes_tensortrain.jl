@@ -102,24 +102,56 @@ using BlockArrays
 
 supr_op = assemble_coupling_matrix(feop)
 pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
-cores = get_cores(basis)
+cores_space = get_cores_space(basis)
+core_time = RBTransient.get_core_time(basis)
+norms_primal = map(ip -> norm_matrix[Block(ip,ip)],pblocks)
+cores_primal = map(ip -> BlockVectorTTCores.([cores_space[ip]...,core_time[ip]]),pblocks)
 
 T = Float64
-id = dblocks[1]
-ip = pblocks[1]
-rcores_dual = Array{T,3}[]
-rcore = Matrix{T}[]
-C = supr_op[Block(ip,id)]
-A = norm_matrix[Block(ip,ip)]
 
-# cores_norm_i = TProduct.tp_decomposition(A) # add here the norm matrix
-cores_primal_i,cores_dual_i = cores[ip],cores[id]
-cores_coupling_i = TProduct.tp_decomposition(C)
-rcores_dual_i = compress_core(cores_coupling_i,cores_dual_i) # add here the norm matrix
-rcores_i = compress_core(cores_primal_i,rcores_dual_i)
-rcore_i = multiply_cores(rcores_i...) |> _dropdims
-push!(rcores_dual,rcores_dual_i)
-push!(rcore,rcore_i)
+id = dblocks[1]
+rcores = Vector{Array{T,3}}[]
+rcore = Matrix{T}[]
+cores_dual_space_i = cores_space[id]
+core_dual_time_i = core_time[id]
+for ip in pblocks
+  A = norm_matrix[Block(ip,ip)]
+  C = supr_op[Block(ip,id)]
+  cores_primal_space_i = cores_space[ip]
+  core_primal_time_i = core_time[ip]
+  RBSteady.reduced_coupling!((rcores,rcore),cores_primal_space_i,core_primal_time_i,
+    cores_dual_space_i,core_dual_time_i,A,C)
+end
+# enrich!(cores_primal′,rcores,vcat(rcore...))
+rcore = vcat(rcore...)
+
+flag=false
+# suppose we have to update with i = 10
+i = 10
+
+# flag = RBSteady._push_to_primal!(cores_primal[ip],rcores[ip],norms_primal[ip],i;flag)
+
+D = length(cores_primal[ip])
+T = eltype(eltype(first(cores_primal[ip])))
+weights = Vector{Array{T,3}}(undef,D-1)
+
+for d in 1:D-1
+  push!(cores_primal[ip][d],rcores[ip][d])
+  RBSteady._weight_array!(weights,cores_primal[ip][d],norms_primal[ip],Val{d}())
+end
+
+push!(cores_primal[ip][D],rcores[ip][D][:,:,i:i])
+# RBSteady.orthogonalize!(cores_primal[ip][D],norms_primal[ip])
+N_space = length(weights)
+X = norms_primal[ip]
+XW = RBSteady._get_norm_matrix_from_weights(X,weights)
+L,p = RBSteady._cholesky_factor_and_perm(XW)
+cN = cores_primal[ip][D][N_space]
+mat = reshape(cN,:,size(cN,3))
+XWmat = L'*mat[p,:]
+Q̃,R = qr(XWmat)
+cores[N_space] = reshape((L'\Q̃)[invperm(p),:],size(cN))
+
 ##########################################
 
 using Gridap.CellData

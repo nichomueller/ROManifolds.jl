@@ -74,9 +74,14 @@ struct BlockVectorTTCores{T,D,A<:AbstractArray{T,D}} <: AbstractVector{AbstractA
   array::Vector{A}
 end
 
+function BlockVectorTTCores(a::AbstractArray{<:Number})
+  BlockVectorTTCores([a])
+end
+
 Base.size(a::BlockVectorTTCores) = size(a.array)
 Base.getindex(a::BlockVectorTTCores,i::Integer) = getindex(a.array,i)
 Base.setindex!(a::BlockVectorTTCores,v,i::Integer) = setindex(a.array,v,i)
+Base.push!(a::BlockVectorTTCores{T,D},v::AbstractArray{T,D}) where {T,D} = push!(a.array,v)
 
 # core operations
 

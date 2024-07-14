@@ -96,7 +96,7 @@ end
 
 IndexMaps.get_index_map(a::TransientTTSVDCores) = a.index_map
 
-RBSteady.get_cores(a::TransientTTSVDCores) = (get_cores_space(a)...,get_core_time(a))
+RBSteady.get_cores(a::TransientTTSVDCores) = [get_cores_space(a)...,get_core_time(a)]
 RBSteady.get_cores_space(a::TransientTTSVDCores) = a.cores_space
 get_core_time(a::TransientTTSVDCores) = a.core_time
 
@@ -229,10 +229,6 @@ function add_time_supremizers(basis_primal,basis_dual;tol=1e-2)
     hcat(basis_primal,vnew),vcat(basis_pd,vnew'*basis_dual)
   end
 
-  for i = size(basis_pd,2) - size(basis_pd,1)
-    basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,i])
-  end
-
   i = 1
   while i ≤ size(basis_pd,2)
     proj = i == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,i],basis_pd[:,1:i-1])
@@ -247,4 +243,48 @@ function add_time_supremizers(basis_primal,basis_dual;tol=1e-2)
   end
 
   return basis_primal
+end
+
+function RBSteady.add_tt_supremizers(
+  cores_space::MatrixBlock,
+  core_time::MatrixBlock,
+  norm_matrix::BlockTProductArray,
+  supr_op::BlockTProductArray)
+
+  pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
+  cores_primal′ = map(ip -> BlockVectorTTCores.([cores_space[ip]...,core_time[ip]]),pblocks)
+
+  for id in dblocks
+    rcores = Vector{Array{T,3}}[]
+    rcore = Matrix{T}[]
+    cores_dual_space_i = cores_space[id]
+    core_dual_time_i = core_time[id]
+    for ip in eachindex(pblocks)
+      A = norm_matrix[Block(ip,ip)]
+      C = supr_op[Block(ip,id)]
+      cores_primal_space_i = cores_space[ip]
+      core_primal_time_i = core_time[ip]
+      reduced_coupling!((rcores,rcore),cores_primal_space_i,core_primal_time_i,
+        cores_dual_space_i,core_dual_time_i,A,C)
+    end
+    enrich!(cores_primal′,rcores,vcat(rcore...))
+  end
+
+  return cores_primal′
+end
+
+function RBSteady.reduced_coupling!(
+  cache,
+  cores_primal_space_i,core_primal_time_i,
+  cores_dual_space_i,core_dual_time_i,
+  norm_matrix_i,coupling_i)
+
+  rcores_dual,rcore = cache
+  cores_coupling_i = TProduct.tp_decomposition(coupling_i)
+  rcores_dual_i = [map(*,cores_coupling_i,cores_dual_space_i)...,core_dual_time_i]
+  cores_primal_i = [cores_primal_space_i...,core_primal_time_i]
+  rcores_i = compress_core.(rcores_dual_i,cores_primal_i)
+  rcore_i = multiply_cores(rcores_i...) |> RBSteady._dropdims
+  push!(rcores_dual,rcores_dual_i)
+  push!(rcore,rcore_i)
 end

@@ -297,9 +297,9 @@ end
 function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::GenericTProductDiffEval)
   af1,ag1 = testitem(a.f[1]),testitem(a.g[1])
   bf1,bg1 = testitem(b.f[1]),testitem(b.g[1])
-  bf = _is_different_block(af1,testitem(b.f[1]))
-  bg = _is_different_block(ag1,testitem(b.g[1]))
-  op = _disjoint_block_operation(a.op,af1,bf1,b.op)
+  bf = _is_different_block(af1,bf1)
+  bg = _is_different_block(ag1,bg1)
+  op = _disjoint_block_operation(a.op,ag1,bg1,b.op)
   summation = _block_operation(f,af1,bf1,a.summation)
   if bf && bg
     GenericTProductDiffEval(op,f(a.f,b.f),f(a.g,b.g),summation)

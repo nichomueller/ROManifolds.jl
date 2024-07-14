@@ -60,7 +60,7 @@ function standard_tpod(mat::AbstractMatrix,args...;kwargs...)
   return Ur,Σr,Vr
 end
 
-function standard_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
+function standard_tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
   L,p = _cholesky_factor_and_perm(X)
   Xmat = L'*mat[p,:]
   Ũ,Σ,V = svd(Xmat)
@@ -115,7 +115,7 @@ function ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...)
   cores,ranks,sizes = cache
   for k in ids_range
     mat_k = reshape(mat,ranks[k]*sizes[k],:)
-    Ur,Σr,Vr = _tpod(mat_k;kwargs...)
+    Ur,Σr,Vr = _tpod(mat_k,args...;kwargs...)
     rank = size(Ur,2)
     ranks[k+1] = rank
     mat = reshape(Σr.*Vr',rank,sizes[k+1],:)
@@ -239,7 +239,7 @@ function orth_projection(
   basis::AbstractMatrix)
 
   proj = similar(v)
-  proj .= zero(eltype(proj))
+  fill!(proj,zero(eltype(proj)))
   @inbounds for b = eachcol(basis)
     proj += b*dot(v,b)/dot(b,b)
   end
@@ -252,7 +252,7 @@ function orth_projection(
   X::AbstractMatrix)
 
   proj = similar(v)
-  proj .= zero(eltype(proj))
+  fill!(proj,zero(eltype(proj)))
   @inbounds for b = eachcol(basis)
     proj += b*dot(v,X,b)/dot(b,X,b)
   end
@@ -292,4 +292,15 @@ function gram_schmidt!(
     mat_i /= _norm(mat_i,args...)
     mat[:,i] .= mat_i
   end
+end
+
+function orthogonalize!(cores::BlockVectorTTCores,X::AbstractTProductArray,weights)
+  N_space = length(weights)
+  XW = _get_norm_matrix_from_weights(X,weights)
+  L,p = _cholesky_factor_and_perm(XW)
+  cN = cores[N_space]
+  mat = reshape(cN,:,size(cN,3))
+  XWmat = L'*mat[p,:]
+  Q̃,R = qr(XWmat)
+  cores[N_space] = reshape((L'\Q̃)[invperm(p),:],size(cN))
 end
