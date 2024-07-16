@@ -486,25 +486,25 @@ function Base.show(io::IO,k::MIME"text/plain",err::LincombError)
   print(io,"Projection error $(err.name) (matrix,vector): ($(err.err_matrix),$(err.err_vector))")
 end
 
-function compress(A::AbstractMatrix,r::RBSpace)
+function project(A::AbstractMatrix,r::RBSpace)
   basis_space = get_basis_space(r)
   a = basis_space'*A
   v = vec(a)
   return v
 end
 
-function compress(A::ParamSparseMatrix,trial::RBSpace,test::RBSpace)
+function project(A::ParamSparseMatrix,trial::RBSpace,test::RBSpace)
   basis_space_test = get_basis_space(test)
   basis_space_trial = get_basis_space(trial)
   s_proj_a = basis_space_test'*param_getindex(A,1)*basis_space_trial
   return s_proj_a
 end
 
-function compress(fesolver,fes::ArrayContribution,args::RBSpace...;kwargs...)
-  sum(map(i->compress(fes[i],args...;kwargs...),eachindex(fes)))
+function project(fesolver,fes::ArrayContribution,args::RBSpace...;kwargs...)
+  sum(map(i->project(fes[i],args...;kwargs...),eachindex(fes)))
 end
 
-function compress(fesolver,fes::ArrayContribution,test::MultiFieldRBSpace;kwargs...)
+function project(fesolver,fes::ArrayContribution,test::MultiFieldRBSpace;kwargs...)
   active_block_ids = get_touched_blocks(fes[1])
   block_map = BlockMap(size(fes[1]),active_block_ids)
   rb_blocks = map(active_block_ids) do i
@@ -513,12 +513,12 @@ function compress(fesolver,fes::ArrayContribution,test::MultiFieldRBSpace;kwargs
       val[i]
     end
     testi = test[i]
-    compress(fesolver,fesi,testi;kwargs...)
+    project(fesolver,fesi,testi;kwargs...)
   end
   return_cache(block_map,rb_blocks...)
 end
 
-function compress(fesolver,fes::ArrayContribution,trial::MultiFieldRBSpace,test::MultiFieldRBSpace;kwargs...)
+function project(fesolver,fes::ArrayContribution,trial::MultiFieldRBSpace,test::MultiFieldRBSpace;kwargs...)
   active_block_ids = get_touched_blocks(fes[1])
   block_map = BlockMap(size(fes[1]),active_block_ids)
   rb_blocks = map(Tuple.(active_block_ids)) do (i,j)
@@ -528,7 +528,7 @@ function compress(fesolver,fes::ArrayContribution,trial::MultiFieldRBSpace,test:
     end
     trialj = trial[j]
     testi = test[i]
-    compress(fesolver,fesij,trialj,testi;kwargs...)
+    project(fesolver,fesij,trialj,testi;kwargs...)
   end
   return_cache(block_map,rb_blocks...)
 end
@@ -570,8 +570,8 @@ function linear_combination_error(solver,feop,rbop,s;kwargs...)
   odeop = get_algebraic_operator(feop)
   fesolver = get_fe_solver(solver)
   feA,feb = jacobian_and_residual(fesolver,odeop,s)
-  feA_comp = compress(fesolver,feA,get_trial(rbop),get_test(rbop))
-  feb_comp = compress(fesolver,feb,get_test(rbop))
+  feA_comp = project(fesolver,feA,get_trial(rbop),get_test(rbop))
+  feb_comp = project(fesolver,feb,get_test(rbop))
   rbA,rbb = jacobian_and_residual(solver,rbop,s)
   errA = rel_norm(feA_comp,rbA)
   errb = rel_norm(feb_comp,rbb)

@@ -25,7 +25,7 @@ pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
-n = 5
+n = 30
 domain = (0,1,0,1)
 partition = (n,n)
 model = TProductModel(domain,partition)
@@ -86,112 +86,44 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
+test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","tensor_train")))
 
-# fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
-# save(test_dir,fesnaps)
+fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
+# rbop = reduced_operator(rbsolver,feop,fesnaps)
+# rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+# results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
-
-s = fesnaps
-soff = select_snapshots(s,RBSteady.offline_params(rbsolver))
-norm_matrix = assemble_norm_matrix(feop)
-basis = reduced_basis(soff,norm_matrix)
-
-############### enrichment ###############
-using BlockArrays
-
-supr_op = assemble_coupling_matrix(feop)
-pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
-cores_space = get_cores_space(basis)
-core_time = RBTransient.get_core_time(basis)
-norms_primal = map(ip -> norm_matrix[Block(ip,ip)],pblocks)
-cores_primal = map(ip -> BlockTTCore.([cores_space[ip]...,core_time[ip]]),pblocks)
-
-T = Float64
-
-id = dblocks[1]
-rcores = Vector{Array{T,3}}[]
-rcore = Matrix{T}[]
-cores_dual_space_i = cores_space[id]
-core_dual_time_i = core_time[id]
-for ip in pblocks
-  A = norm_matrix[Block(ip,ip)]
-  C = supr_op[Block(ip,id)]
-  cores_primal_space_i = cores_space[ip]
-  core_primal_time_i = core_time[ip]
-  RBSteady.reduced_coupling!((rcores,rcore),cores_primal_space_i,core_primal_time_i,
-    cores_dual_space_i,core_dual_time_i,A,C)
-end
-# enrich!(cores_primal′,rcores,vcat(rcore...))
-rcore = vcat(rcore...)
-
-flag=false
-# suppose we have to update with i = 10
-i = 10
-
-# flag = RBSteady._push_to_primal!(cores_primal[ip],rcores[ip],norms_primal[ip],i;flag)
-ip = 1
-D = length(cores_primal[ip])
-T = eltype(eltype(first(cores_primal[ip])))
-weights = Vector{Array{T,3}}(undef,D-2)
-
-push!(cores_primal[ip][1],rcores[ip][1])
-RBSteady._weight_array!(weights,cores_primal[ip],norms_primal[ip],Val{1}())
-
-push!(cores_primal[ip][2],rcores[ip][2])
-RBSteady.orthogonalize!(cores_primal[ip][2],norms_primal[ip],weights)
-
-push!(cores_primal[ip][3],rcores[ip][3][:,:,i:i])
-RBSteady.orthogonalize!(cores_primal[ip][3],norms_primal[ip],weights)
-
-using LinearAlgebra
-XW = RBSteady._get_norm_matrix_from_weights(norms_primal[ip],weights)
-L,p = RBSteady._cholesky_factor_and_perm(XW)
-mat = reshape(core,:,size(core,3))
-XWmat = L'*mat[p,:]
-Q̃,R = qr(XWmat)
-core .= reshape((L'\Q̃)[invperm(p),:],size(core))
-##########################################
-
-using Gridap.CellData
-using Gridap.FESpaces
-
-smdeim = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
-rbtrial,rbtest = fe_subspace(trial,basis),fe_subspace(test,basis)
-op = TransientPGOperator(get_algebraic_operator(feop),rbtrial,rbtest)
-jjac,rres = jacobian_and_residual(rbsolver,op,smdeim)
-red_jac = reduced_jacobian(rbsolver,op,jjac)
-red_res = reduced_residual(rbsolver,op,rres)
-trians_rhs = get_domains(red_res)
-trians_lhs = map(get_domains,red_jac)
-new_op = change_triangulation(op,trians_rhs,trians_lhs)
-rbop = TransientPGMDEIMOperator(new_op,red_jac,red_res)
-
-# ######
-# using Mabla.FEM.IndexMaps
-# s = jjac[1][1][1,3]
-# basis = Projection(s)
-
-# cores_space...,core_time = ttsvd(s)
-# cores_space′ = recast(s,cores_space)
-# index_map = get_index_map(s)
-# bs = RBSteady._cores2basis(index_map,cores_space′[1],cores_space′[2])
-
-
-# basis_spacetime = RBTransient.get_basis_spacetime(basis)
-# indices_spacetime,interp_basis_spacetime = empirical_interpolation(basis_spacetime)
-# indices_space = fast_index(indices_spacetime,num_space_dofs(basis))
-# indices_time = slow_index(indices_spacetime,num_space_dofs(basis))
-# lu_interp = lu(interp_basis_spacetime)
-# integration_domain = TransientIntegrationDomain(indices_space,indices_time)
-# ######
-
+rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
-println(compute_error(results))
-println(compute_speedup(results))
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,rbstats,rbstats)
 
+compute_error(results)
+
+# comparison with standard TT-SVD
+sTT = fesnaps
+X = assemble_norm_matrix(feop)
+@time ttsvd(sTT[1],X[1]);
+
+# basis for velocity
+using Mabla.FEM.IndexMaps
 using BlockArrays
-compute_error(results.sol[1],results.sol_approx[1],results.norm_matrix[Block(1,1)])
-compute_error(results.sol[2],results.sol_approx[2],results.norm_matrix[Block(2,2)])
-compute_error(results.sol[3],results.sol_approx[3],results.norm_matrix[Block(3,3)])
+using SparseArrays
+using LinearAlgebra
+_dΩ = dΩ.measure
+
+_coupling((u1,u2,p),(v1,v2,q)) = ∫(p*∂ₓ₁(v1))_dΩ + ∫(p*∂ₓ₂(v2))_dΩ
+_induced_norm((u1,u2,p),(v1,v2,q)) = ∫(v1*u1)_dΩ + ∫(v2*u2)_dΩ + ∫(∇(v1)⊙∇(u1))_dΩ + ∫(∇(v2)⊙∇(u2))_dΩ + ∫(p*q)_dΩ
+
+_test_u = TestFESpace(model.model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
+_trial_u1 = TransientTrialParamFESpace(_test_u,gμt_in_1)
+_trial_u2 = TransientTrialParamFESpace(_test_u,gμt_in_2)
+_test_p = TestFESpace(model.model,reffe_p;conformity=:C0)
+_trial_p = TrialFESpace(_test_p)
+_test = TransientMultiFieldParamFESpace([_test_u,_test_u,test_p];style=BlockMultiFieldStyle())
+_trial = TransientMultiFieldParamFESpace([_trial_u1,_trial_u2,_trial_p];style=BlockMultiFieldStyle())
+_feop = TransientParamLinearFEOperator((stiffness,mass),res,_induced_norm,ptspace,
+  _trial,_test,_coupling,trian_res,trian_stiffness,trian_mass)
+
+_s = change_index_map(TrivialIndexMap,fesnaps)
+_X = assemble_norm_matrix(_feop)
+@time Projection(_s[1],_X[Block(1,1)])

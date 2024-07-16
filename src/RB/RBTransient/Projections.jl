@@ -192,26 +192,22 @@ function RBSteady.enrich_basis(
   norm_matrix::AbstractMatrix,
   supr_op::AbstractMatrix)
 
-  cores_space,core_time,enrich = add_tt_supremizers(
+  cores_space,core_time = RBSteady.add_tt_supremizers(
     get_cores_space(a),get_core_time(a),norm_matrix,supr_op)
-  if enrich # we have added supremizers
-    index_map = get_index_map(a)
-    a′ = BlockProjection(map(TransientTTSVDCores,cores_space,core_time,index_map),a.touched)
-    return a′
-  else
-    return a
-  end
+  index_map = get_index_map(a)
+  a′ = BlockProjection(map(TransientTTSVDCores,cores_space,core_time,index_map),a.touched)
+  return a′
 end
 
 """
-    add_time_supremizers(basis_time::MatrixBlock;kwargs...) -> Vector{<:Matrix}
+    add_time_supremizers(basis_time::ArrayBlock;kwargs...) -> Vector{<:Matrix}
 
 Enriches the temporal basis with temporal supremizers computed from
 the kernel of the temporal basis associated to the primal field projected onto
 the column space of the temporal basis (bases) associated to the duel field(s)
 
 """
-function add_time_supremizers(basis_time::MatrixBlock;kwargs...)
+function add_time_supremizers(basis_time::ArrayBlock;kwargs...)
   basis_primal,basis_dual... = basis_time.array
   for i = eachindex(basis_dual)
     basis_primal = add_time_supremizers(basis_primal,basis_dual[i];kwargs...)
@@ -232,7 +228,7 @@ function add_time_supremizers(basis_primal,basis_dual;tol=1e-2)
   i = 1
   while i ≤ size(basis_pd,2)
     proj = i == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,i],basis_pd[:,1:i-1])
-    dist = norm(basis_pd[:,1]-proj)
+    dist = norm(basis_pd[:,i]-proj)
     if dist ≤ tol
       basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,i])
       i = 0
@@ -246,21 +242,25 @@ function add_time_supremizers(basis_primal,basis_dual;tol=1e-2)
 end
 
 function RBSteady.add_tt_supremizers(
-  cores_space::MatrixBlock,
-  core_time::MatrixBlock,
+  cores_space::ArrayBlock,
+  core_time::ArrayBlock,
   norm_matrix::BlockTProductArray,
   supr_op::BlockTProductArray)
 
   pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
   cores_primal_space = map(ip -> cores_space[ip],pblocks)
   core_primal_time = map(ip -> core_time[ip],pblocks)
-  cores_primal_space′ = map(cores -> BlockTTCore.([cores]),cores_primal_space)
-  core_primal_time′ = map(core -> BlockTTCore.([core]),core_primal_time)
+  cores_dual_space = map(id -> cores_space[id],dblocks)
+  core_dual_time = map(id -> core_time[id],dblocks)
+  cores_primal_space′ = map(cores -> BlockTTCore.(cores),cores_primal_space)
+  core_primal_time′ = map(core -> BlockTTCore(core),core_primal_time)
+  norms_primal = map(ip -> norm_matrix[Block(ip,ip)],pblocks)
   flag = false
 
   for id in dblocks
-    rcores = Vector{Array{T,3}}[]
-    rcore = Matrix{T}[]
+    rcores_space = Vector{Array{Float64,3}}[]
+    rcore_time = Array{Float64,3}[]
+    rcore = Matrix{Float64}[]
     cores_dual_space_i = cores_space[id]
     core_dual_time_i = core_time[id]
     for ip in eachindex(pblocks)
@@ -268,16 +268,17 @@ function RBSteady.add_tt_supremizers(
       C = supr_op[Block(ip,id)]
       cores_primal_space_i = cores_space[ip]
       core_primal_time_i = core_time[ip]
-      reduced_coupling!((rcores,rcore),cores_primal_space_i,core_primal_time_i,
+      RBSteady.reduced_coupling!((rcores_space,rcore_time,rcore),cores_primal_space_i,core_primal_time_i,
         cores_dual_space_i,core_dual_time_i,A,C)
     end
-    flag = enrich!(cores_primal_space′,core_primal_time′,rcores,vcat(rcore...))
+    flag = RBSteady.enrich!(cores_primal_space′,core_primal_time′,rcores_space,rcore_time,
+      vcat(rcore...),norms_primal;flag)
   end
 
   if flag
-    return [cores_primal_space′...,cores_dual...]
+    return [cores_primal_space′...,cores_dual_space...],[core_primal_time′...,core_dual_time...]
   else
-    return [cores_primal...,cores_dual...]
+    return [cores_primal_space...,cores_dual_space...],[core_primal_time...,core_dual_time...]
   end
 end
 
@@ -287,12 +288,62 @@ function RBSteady.reduced_coupling!(
   cores_dual_space_i,core_dual_time_i,
   norm_matrix_i,coupling_i)
 
-  rcores_dual,rcore = cache
+  rcores_space,rcore_time,rcore = cache
   cores_coupling_i = TProduct.tp_decomposition(coupling_i)
-  rcores_dual_i = [map(*,cores_coupling_i,cores_dual_space_i)...,core_dual_time_i]
-  cores_primal_i = [cores_primal_space_i...,core_primal_time_i]
-  rcores_i = compress_core.(rcores_dual_i,cores_primal_i)
-  rcore_i = multiply_cores(rcores_i...) |> RBSteady._dropdims
-  push!(rcores_dual,rcores_dual_i)
+  _rcores_space_i = map(*,cores_coupling_i,cores_dual_space_i)
+  rcores_space_i = compress_core.(_rcores_space_i,cores_primal_space_i)
+  rcore_time_i = compress_core(core_dual_time_i,core_primal_time_i)
+  rcore_i = multiply_cores(rcores_space_i...,rcore_time_i) |> RBSteady._dropdims
+  push!(rcores_space,_rcores_space_i)
+  push!(rcore_time,core_dual_time_i)
   push!(rcore,rcore_i)
+end
+
+function RBSteady.enrich!(
+  cores_primal_space,core_primal_time,
+  rcores_space,rcore_time,
+  rcore,norms_primal;flag=false,tol=1e-2)
+
+  @check length(cores_primal_space) == length(rcores_space)
+
+  i = 1
+  R = nothing
+  while i ≤ size(rcore,2)
+    proj = i == 1 ? zeros(size(rcore,1)) : orth_projection(rcore[:,i],rcore[:,1:i-1])
+    dist = norm(rcore[:,i]-proj)
+    if dist ≤ tol
+      for ip in eachindex(cores_primal)
+        R = add_and_orthogonalize!(cores_primal_space[ip],core_primal_time[ip],
+          rcores_space[ip],rcore_time[ip],norms_primal[ip],i,R;flag)
+      end
+      rcore = RBSteady._update_reduced_coupling(cores_primal,rcores,rcore)
+      flag = true
+    end
+    i += 1
+  end
+  return flag
+end
+
+function RBSteady.add_and_orthogonalize!(
+  cores_primal_space,core_primal_time,
+  rcores_space,rcore_time,
+  i,R;flag=false)
+
+  D = length(cores_primal_space)
+  weights = Vector{Array{Float64,3}}(undef,D-2)
+
+  if !flag
+    for d in 1:D-1
+      cores_primal_space[d] = _add_to_core(cores_primal_space[d],rcores_space[d])
+      _weight_array!(weights,cores_primal_space,norms_primal,Val{d}())
+    end
+    push!(cores_primal_space[D],rcores_space[D])
+    R = orthogonalize!(cores_primal_space[D],norms_primal,weights)
+    push!(core_primal_time,rcore_time[D][:,:,i:i])
+    absorb!(core_primal_time,norms_primal,R)
+  else
+    core_primal_time = hcat(core_primal_time,rcore_time[D][:,:,i:i])
+    absorb!(core_primal_time,norms_primal,R)
+  end
+  return R
 end

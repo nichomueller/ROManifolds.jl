@@ -436,7 +436,7 @@ _compress(s,a,X::AbstractMatrix) = a'*X*s
 _compress(s,a,args...) = a'*s
 
 function compress(s::Mode1TransientSnapshots,a::AbstractMatrix,args...;swap_mode=true)
-  s′ = _compress(collect(s),a,args...)
+  s′ = _compress(s,a,args...)
   if swap_mode
     s′ = change_mode(s′,num_params(s))
   end
@@ -452,6 +452,8 @@ function change_mode(a::AbstractMatrix,np::Integer)
   end
   return a′
 end
+
+ParamDataStructures.get_values(s::Mode2TransientSnapshots) = collect(s)
 
 # block snapshots
 

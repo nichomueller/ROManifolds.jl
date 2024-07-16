@@ -124,7 +124,7 @@ end
 
 # for testing/visualization purposes
 
-function RBSteady.compress(A::AbstractMatrix,r::TransientRBSpace)
+function RBSteady.project(A::AbstractMatrix,r::TransientRBSpace)
   basis_space = get_basis_space(r)
   basis_time = get_basis_time(r)
 
@@ -133,7 +133,7 @@ function RBSteady.compress(A::AbstractMatrix,r::TransientRBSpace)
   return v
 end
 
-function RBSteady.compress(A::ParamSparseMatrix,trial::TransientPODBasis,test::TransientPODBasis;combine=(x,y)->x)
+function RBSteady.project(A::ParamSparseMatrix,trial::TransientPODBasis,test::TransientPODBasis;combine=(x,y)->x)
   function compress_basis_space(A,B,C)
     map(param_data(A)) do a
       C'*a*B
@@ -162,11 +162,11 @@ function RBSteady.compress(A::ParamSparseMatrix,trial::TransientPODBasis,test::T
   return st_proj_a
 end
 
-function RBSteady.compress(fesolver,fes::TupOfAffineContribution,trial,test)
+function RBSteady.project(fesolver,fes::TupOfAffineContribution,trial,test)
   cmp = ()
   for i = eachindex(fes)
     combine = (x,y) -> i == 1 ? fesolver.θ*x+(1-fesolver.θ)*y : fesolver.θ*(x-y)
-    cmp = (cmp...,compress(fesolver,fes[i],trial,test;combine))
+    cmp = (cmp...,RBSteady.project(fesolver,fes[i],trial,test;combine))
   end
   sum(cmp)
 end
@@ -176,7 +176,7 @@ function RBSteady.interpolation_error(
   fes::AbstractTransientSnapshots,
   rbs::AbstractTransientSnapshots)
 
-  ids_space,ids_time = get_indices_space(a),get_indices_time(a)
+  ids_space,ids_time = RBSteady.get_indices_space(a),get_indices_time(a)
   fes_ids = select_snapshots_entries(fes,ids_space,ids_time)
   rbs_ids = select_snapshots_entries(rbs,ids_space,ids_time)
   norm(fes_ids - rbs_ids)
@@ -186,19 +186,19 @@ function RBSteady.interpolation_error(a::Tuple,fes::Tuple,rbs::Tuple)
   @check length(a) == length(fes) == length(rbs)
   err = ()
   for i = eachindex(a)
-    err = (err...,interpolation_error(a[i],fes[i],rbs[i]))
+    err = (err...,RBSteady.interpolation_error(a[i],fes[i],rbs[i]))
   end
   err
 end
 
 function RBSteady.interpolation_error(solver,feop::LinearNonlinearTransientParamFEOperator,rbop,s)
-  err_lin = interpolation_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
-  err_nlin = interpolation_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
+  err_lin = RBSteady.interpolation_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
+  err_nlin = RBSteady.interpolation_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
   return err_lin,err_nlin
 end
 
 function RBSteady.linear_combination_error(solver,feop::LinearNonlinearTransientParamFEOperator,rbop,s)
-  err_lin = linear_combination_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
-  err_nlin = linear_combination_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
+  err_lin = RBSteady.linear_combination_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
+  err_nlin = RBSteady.linear_combination_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
   return err_lin,err_nlin
 end

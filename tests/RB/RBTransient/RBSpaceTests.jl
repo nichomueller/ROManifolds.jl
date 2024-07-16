@@ -229,7 +229,7 @@ basis_primal,basis_dual = _basis_time.array
 basis_pd = basis_primal'*basis_dual
 for ntd = axes(basis_dual,2)
   proj = ntd == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,ntd],basis_pd[:,1:ntd-1])
-  dist = norm(basis_pd[:,1]-proj)
+  dist = norm(basis_pd[:,i]-proj)
   println(dist > 1e-2)
 end
 

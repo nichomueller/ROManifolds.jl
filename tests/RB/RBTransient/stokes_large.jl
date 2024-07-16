@@ -94,3 +94,22 @@ println(h1_l2_err)
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)
+
+# ERRORS ARE LARGER THAN EXPECTED
+
+# using Gridap.FESpaces
+# odeop = get_algebraic_operator(feop)
+# s = select_snapshots(fesnaps,1)
+# feA,feb = jacobian_and_residual(fesolver,odeop,s)
+# rbA,rbb = jacobian_and_residual(fesolver,rbop.op.op,s)
+# errA = RBSteady.interpolation_error(rbop.lhs,feA,rbA)
+# errb = RBSteady.interpolation_error(rbop.rhs,feb,rbb)
+
+# # errA = RBSteady.linear_combination_error(rbop.lhs,feA,rbA)
+# odeop = get_algebraic_operator(feop)
+# fesolver = get_fe_solver(rbsolver)
+# feA_comp = compress(fesolver,feA,get_trial(rbop),get_test(rbop))
+# feb_comp = compress(fesolver,feb,get_test(rbop))
+# rbA,rbb = jacobian_and_residual(solver,rbop,s)
+# errA = rel_norm(feA_comp,rbA)
+# errb = rel_norm(feb_comp,rbb)

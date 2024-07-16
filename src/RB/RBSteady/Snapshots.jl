@@ -394,6 +394,13 @@ function ParamDataStructures.get_values(s::BlockSnapshots)
   map(get_values,s.array) |> mortar
 end
 
+function IndexMaps.change_index_map(f,s::BlockSnapshots{S,N}) where {S,N}
+  active_block_ids = get_touched_blocks(s)
+  block_map = BlockMap(size(s),active_block_ids)
+  active_block_snaps = [change_index_map(f,s[n]) for n in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps)
+end
+
 function flatten_snapshots(s::BlockSnapshots{S,N}) where {S,N}
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)

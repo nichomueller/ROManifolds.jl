@@ -255,7 +255,7 @@ end
 
 """
     add_space_supremizers(
-      basis_space::MatrixBlock,
+      basis_space::ArrayBlock,
       norm_matrix::AbstractMatrix,
       supr_op::AbstractMatrix) -> Vector{<:AbstractArray}
 
@@ -263,7 +263,7 @@ Enriches the spatial basis with spatial supremizers computed from
 the action of the supremizing operator `supr_op` on the dual field(s)
 
 """
-function add_space_supremizers(basis_space::MatrixBlock,norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
+function add_space_supremizers(basis_space::ArrayBlock,norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
   basis_primal,basis_dual... = basis_space.array
   A = norm_matrix[Block(1,1)]
   H = cholesky(A)
@@ -277,7 +277,7 @@ function add_space_supremizers(basis_space::MatrixBlock,norm_matrix::AbstractMat
   return [basis_primal,basis_dual...]
 end
 
-function add_tt_supremizers(cores_space::MatrixBlock,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
+function add_tt_supremizers(cores_space::ArrayBlock,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
   pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
   cores_primal = map(ip -> cores_space[ip],pblocks)
   cores_primal′ = map(cores -> BlockTTCore.(cores),cores_primal)
@@ -286,8 +286,8 @@ function add_tt_supremizers(cores_space::MatrixBlock,norm_matrix::BlockTProductA
   flag = false
 
   for id in dblocks
-    rcores = Vector{Array{T,3}}[]
-    rcore = Matrix{T}[]
+    rcores = Vector{Array{Float64,3}}[]
+    rcore = Matrix{Float64}[]
     cores_dual_i = cores_space[id]
     for ip in eachindex(pblocks)
       A = norm_matrix[Block(ip,ip)]
@@ -299,9 +299,9 @@ function add_tt_supremizers(cores_space::MatrixBlock,norm_matrix::BlockTProductA
   end
 
   if flag
-    return [cores_primal′...,cores_dual...]
+    return cores_primal′,cores_dual
   else
-    return [cores_primal...,cores_dual...]
+    return cores_primal,cores_dual
   end
 end
 
@@ -316,44 +316,40 @@ function reduced_coupling!(cache,cores_primal_i,cores_dual_i,norm_matrix_i,coupl
   push!(rcore,rcore_i)
 end
 
-function enrich!(cores_primal,rcores,rcore,norms_primal;flag=false,tol=1e-2,kwargs...)
+function enrich!(cores_primal,rcores,rcore,norms_primal;flag=false,tol=1e-2)
   @check length(cores_primal) == length(rcores)
 
   i = 1
-  R = nothing
   while i ≤ size(rcore,2)
     proj = i == 1 ? zeros(size(rcore,1)) : orth_projection(rcore[:,i],rcore[:,1:i-1])
-    dist = norm(rcore[:,1]-proj)
+    dist = norm(rcore[:,i]-proj)
     if dist ≤ tol
       for ip in eachindex(cores_primal)
-        R = add_and_orthogonalize!(cores_primal[ip],rcores[ip],norms_primal[ip],i,R;flag)
+        add_and_orthogonalize!(cores_primal[ip],rcores[ip],norms_primal[ip],i;flag)
       end
       rcore = _update_reduced_coupling(cores_primal,rcores,rcore)
       flag = true
     end
     i += 1
   end
+  return flag
 end
 
-function add_and_orthogonalize!(cores_primal,rcores,norms_primal,i,R;flag=false)
+function add_and_orthogonalize!(cores_primal,rcores,norms_primal,i;flag=false)
   D = length(cores_primal)
-  T = eltype(eltype(first(cores_primal)))
-  weights = Vector{Array{T,3}}(undef,D-1)
+  weights = Vector{Array{Float64,3}}(undef,D-1)
 
   if !flag
-    for d in 1:D-2
+    for d in 1:D-1
       cores_primal[d] = _add_to_core(cores_primal[d],rcores[d])
       _weight_array!(weights,cores_primal,norms_primal,Val{d}())
     end
-    push!(cores_primal[D-1],rcores[D-1])
-    R = orthogonalize!(cores_primal[D-1],norms_primal,weights)
-    push!(cores_primal[D],rcores[D][:,:,i:i])
-    absorb!(cores_primal[D],norms_primal,R)
+    push!(cores_primal[D],rcores[D])
+    _ = orthogonalize!(cores_primal[D],norms_primal,weights)
   else
     cores_primal[D] = hcat(cores_primal[D],rcores[D][:,:,i:i])
-    absorb!(cores_primal[D],norms_primal,R)
+    _ = orthogonalize!(cores_primal[D],norms_primal,weights)
   end
-  return R
 end
 
 function _update_reduced_coupling(cores_primal,rcores,rcore)

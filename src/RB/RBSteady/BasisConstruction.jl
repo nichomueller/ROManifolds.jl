@@ -18,20 +18,11 @@ function select_modes(U::AbstractMatrix,Σ::AbstractVector,V::AbstractMatrix;kwa
   return U[:,1:rank],Σ[1:rank],V[:,1:rank]
 end
 
-function _cholesky_factor_and_perm(mat::AbstractMatrix)
-  C = cholesky(mat,RowMaximum();tol = 0.0,check=true)
-  return C.L,C.p
-end
-
-function _cholesky_factor_and_perm(mat::AbstractSparseMatrix)
-  C = cholesky(mat)
-  return sparse(C.L),C.p
-end
-
 _size_condition(mat::AbstractMatrix) = (
-  length(mat) > 1e6 &&
+  length(mat) > 1e6 && size(mat,1) ≥ size(mat,2) &&
   (size(mat,1) > 1e2*size(mat,2) || size(mat,2) > 1e2*size(mat,1))
   )
+
 
 """
     tpod(mat::AbstractMatrix,args...;kwargs...) -> AbstractMatrix
@@ -61,7 +52,8 @@ function standard_tpod(mat::AbstractMatrix,args...;kwargs...)
 end
 
 function standard_tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
-  L,p = _cholesky_factor_and_perm(X)
+  C = cholesky(X)
+  L,p = sparse(C.L),C.p
   Xmat = L'*mat[p,:]
   Ũ,Σ,V = svd(Xmat)
   Ũr,Σr,Vr = select_modes(Ũ,Σ,V;kwargs...)
@@ -69,20 +61,9 @@ function standard_tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
   return Ur,Σr,Vr
 end
 
-function massive_tpod(mat::AbstractMatrix,args...;kwargs...)
-  @notimplementedif size(mat,1) ≤ size(mat,2)
-  @warn "The input matrix has been classified as massive; the compression will
-    take a while ..."
-
-  Ur,Σr,Vr = _massive_tpod(mat,args...;kwargs...)
-
-  println("Compression ended successfully!")
-
-  return Ur,Σr,Vr
-end
-
-function _massive_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
-  L,p = _cholesky_factor_and_perm(X)
+function massive_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
+  C = cholesky(X)
+  L,p = sparse(C.L),C.p
   Xmat = L'*mat[p,:]
   mXmat = Xmat'*Xmat
   Vt,Σ²,V = svd(mXmat)
@@ -96,7 +77,7 @@ function _massive_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
   return Ur,Σr,Vr
 end
 
-function _massive_tpod(mat::AbstractMatrix,args...;kwargs...)
+function massive_tpod(mat::AbstractMatrix,args...;kwargs...)
   mmat = mat'*mat
   Vt,Σ²,V = svd(mat)
   Σ = sqrt.(Σ²)
@@ -187,7 +168,7 @@ function _weight_array!(weights,cores,X,::Val{d}) where d
   @inbounds for k = 1:K
     Xdk = Xd[k]
     @views Wk = W[:,k,:]
-    Wk_prev = W_prev[:,k,:]
+    @views Wk_prev = W_prev[:,k,:]
     for i_prev = 1:rank_prev, i′_prev = 1:rank_prev
       Wk_prev′ = Wk_prev[i_prev,i′_prev]
       for i = 1:rank, i′ = 1:rank
@@ -243,7 +224,7 @@ function _get_norm_matrix_from_weights(norms::AbstractTProductArray,weights)
     XW += kron(X[k],W[:,k,:])
   end
   @. XW = (XW+XW')/2 # needed to eliminate roundoff errors
-  return XW
+  return sparse(XW)
 end
 
 """
