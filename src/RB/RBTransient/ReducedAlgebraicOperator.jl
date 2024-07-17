@@ -88,8 +88,12 @@ function RBSteady.reduce_operator(
 
   b̂t = combine_basis_time(bt,bt_trial,bt_test;kwargs...)
 
+  cache = zeros(T,num_free_dofs(b_trial))
+
   @inbounds for is = 1:RBSteady.num_reduced_space_dofs(b)
-    b̂si = bs_test'*param_getindex(bs,is)*bs_trial
+    Bis = param_getindex(bs,is)
+    mul!(cache,Bis,bs_trial)
+    b̂si = bs_test'*cache
     for it = 1:num_reduced_times(b)
       ist = (it-1)*RBSteady.num_reduced_space_dofs(b)+is
       b̂ti = b̂t[:,it,:]

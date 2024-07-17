@@ -263,7 +263,7 @@ function RBSteady.add_tt_supremizers(
     rcore = Matrix{Float64}[]
     cores_dual_space_i = cores_space[id]
     core_dual_time_i = core_time[id]
-    for ip in eachindex(pblocks)
+    for ip in pblocks
       A = norm_matrix[Block(ip,ip)]
       C = supr_op[Block(ip,id)]
       cores_primal_space_i = cores_space[ip]
@@ -290,8 +290,10 @@ function RBSteady.reduced_coupling!(
 
   rcores_space,rcore_time,rcore = cache
   cores_coupling_i = TProduct.tp_decomposition(coupling_i)
-  _rcores_space_i = map(*,cores_coupling_i,cores_dual_space_i)
-  rcores_space_i = compress_core.(_rcores_space_i,cores_primal_space_i)
+  _rcores_space_i,rcores_space_i = map(cores_primal_space_i,cores_dual_space_i,cores_coupling_i) do cp,cd,cc
+    rc = cc*cd
+    rc,compress_core(rc,cp)
+  end |> tuple_of_arrays
   rcore_time_i = compress_core(core_dual_time_i,core_primal_time_i)
   rcore_i = multiply_cores(rcores_space_i...,rcore_time_i) |> RBSteady._dropdims
   push!(rcores_space,_rcores_space_i)
@@ -302,21 +304,23 @@ end
 function RBSteady.enrich!(
   cores_primal_space,core_primal_time,
   rcores_space,rcore_time,
-  rcore,norms_primal;flag=false,tol=1e-2)
+  rcore,norms_primal;flag=false,tol=5e-2)
 
   @check length(cores_primal_space) == length(rcores_space)
+  nprimal = length(cores_primal_space)
 
   i = 1
-  R = nothing
+  R = Vector{Matrix{Float64}}(undef,nprimal)
   while i ≤ size(rcore,2)
     proj = i == 1 ? zeros(size(rcore,1)) : orth_projection(rcore[:,i],rcore[:,1:i-1])
     dist = norm(rcore[:,i]-proj)
     if dist ≤ tol
-      for ip in eachindex(cores_primal)
-        R = add_and_orthogonalize!(cores_primal_space[ip],core_primal_time[ip],
-          rcores_space[ip],rcore_time[ip],norms_primal[ip],i,R;flag)
+      for ip in 1:nprimal
+        if !flag R[ip] = zeros(1,1) end
+        R[ip] = RBSteady.add_and_orthogonalize!(cores_primal_space[ip],core_primal_time[ip],
+          rcores_space[ip],rcore_time[ip],norms_primal[ip],R[ip],i;flag)
       end
-      rcore = RBSteady._update_reduced_coupling(cores_primal,rcores,rcore)
+      rcore = RBSteady._update_reduced_coupling(cores_primal_space,core_primal_time,rcores_space,rcore_time,rcore)
       flag = true
     end
     i += 1
@@ -326,24 +330,48 @@ end
 
 function RBSteady.add_and_orthogonalize!(
   cores_primal_space,core_primal_time,
-  rcores_space,rcore_time,
-  i,R;flag=false)
+  rcores_space,rcore_time,norms_primal,
+  R,i;flag=false)
 
   D = length(cores_primal_space)
-  weights = Vector{Array{Float64,3}}(undef,D-2)
+  weights = Vector{Array{Float64,3}}(undef,D-1)
 
   if !flag
     for d in 1:D-1
-      cores_primal_space[d] = _add_to_core(cores_primal_space[d],rcores_space[d])
-      _weight_array!(weights,cores_primal_space,norms_primal,Val{d}())
+      push!(cores_primal_space[d],rcores_space[d])
+      RBSteady._weight_array!(weights,cores_primal_space,norms_primal,Val{d}())
     end
     push!(cores_primal_space[D],rcores_space[D])
-    R = orthogonalize!(cores_primal_space[D],norms_primal,weights)
-    push!(core_primal_time,rcore_time[D][:,:,i:i])
-    absorb!(core_primal_time,norms_primal,R)
+    R = RBSteady.orthogonalize!(cores_primal_space[D],norms_primal,weights)
+    push!(core_primal_time,rcore_time[:,:,i:i])
+    RBSteady.absorb!(core_primal_time,R)
   else
-    core_primal_time = hcat(core_primal_time,rcore_time[D][:,:,i:i])
-    absorb!(core_primal_time,norms_primal,R)
+    RBSteady.pushlast!(core_primal_time,rcore_time[:,:,i:i])
+    RBSteady.absorb!(core_primal_time,R)
   end
   return R
+end
+
+function RBSteady._update_reduced_coupling(
+  cores_primal_space,core_primal_time,
+  rcores_space,rcore_time,
+  rcore)
+
+  rprimal,rdual = size(rcore)
+  nprimal = length(cores_primal_space)
+  rcore_new = similar(rcore,rprimal+nprimal,rdual)
+  @views rcore_new[1:rprimal,:] = rcore
+  for ip in 1:nprimal
+    cores_primal_space_i = cores_primal_space[ip]
+    core_primal_time_i = core_primal_time[ip]
+    rcores_space_i = rcores_space[ip]
+    rcore_time_i = rcore_time[ip]
+    last_block_space = last.(blocks.(cores_primal_space_i))
+    last_block_time = last(blocks(core_primal_time_i))[:,:,end:end]
+    rcores_space_i2 = compress_core.(rcores_space_i,last_block_space)
+    rcores_time_i2 = compress_core(rcore_time_i,last_block_time)
+    rcore_i = multiply_cores(rcores_space_i2...,rcores_time_i2) |> RBSteady._dropdims
+    rcore_new[rprimal+ip,:] = rcore_i
+  end
+  return rcore_new
 end

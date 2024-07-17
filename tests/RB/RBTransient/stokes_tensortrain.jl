@@ -88,7 +88,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","tensor_train")))
 
-fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
+# fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
 # rbop = reduced_operator(rbsolver,feop,fesnaps)
 # rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 # results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
@@ -102,9 +102,60 @@ compute_error(results)
 # comparison with standard TT-SVD
 sTT = fesnaps
 X = assemble_norm_matrix(feop)
-@time ttsvd(sTT[1],X[1]);
+@time ttsvd(sTT[1],X[1])
+basis = Projection(sTT,X)
 
-# basis for velocity
+#supr
+# B = assemble_coupling_matrix(feop)
+# Be = enrich_basis(basis,X,B)
+B = assemble_coupling_matrix(feop)
+cores_space = get_cores_space(basis)
+core_time = RBTransient.get_core_time(basis)
+pblocks = (1,2)
+dblocks = (3,)
+cores_primal_space = map(ip -> cores_space[ip],pblocks)
+core_primal_time = map(ip -> core_time[ip],pblocks)
+cores_dual_space = map(id -> cores_space[id],dblocks)
+core_dual_time = map(id -> core_time[id],dblocks)
+cores_primal_space′ = map(cores -> BlockTTCore.(cores),cores_primal_space)
+core_primal_time′ = map(core -> BlockTTCore(core),core_primal_time)
+norms_primal = map(ip -> X[Block(ip,ip)],pblocks)
+
+id = 3
+rcores_space = Vector{Array{Float64,3}}[]
+rcore_time = Array{Float64,3}[]
+rcore = Matrix{Float64}[]
+cores_dual_space_i = cores_space[id]
+core_dual_time_i = core_time[id]
+for ip in eachindex(pblocks)
+  A = X[Block(ip,ip)]
+  C = B[Block(ip,id)]
+  cores_primal_space_i = cores_space[ip]
+  core_primal_time_i = core_time[ip]
+  RBSteady.reduced_coupling!((rcores_space,rcore_time,rcore),cores_primal_space_i,core_primal_time_i,
+    cores_dual_space_i,core_dual_time_i,A,C)
+end
+rcore = vcat(rcore...)
+
+i = 4
+# D = length(cores_primal_space′[1])
+# weights = Vector{Array{Float64,3}}(undef,D-1)
+# push!(cores_primal_space′[1][1],rcores_space[1][1])
+# RBSteady._weight_array!(weights,cores_primal_space′[1],norms_primal[1],Val{1}())
+
+# push!(cores_primal_space′[1][D],rcores_space[1][D])
+# R = RBSteady.orthogonalize!(cores_primal_space′[1][D],norms_primal[1],weights)
+# push!(core_primal_time′[1],rcore_time[D][:,:,i:i])
+# RBSteady.absorb!(core_primal_time′[1],R)
+
+R = nothing
+for ip in eachindex(cores_primal_space)
+  R = RBSteady.add_and_orthogonalize!(cores_primal_space′[ip],core_primal_time′[ip],
+    rcores_space[ip],rcore_time[ip],norms_primal[ip],R,i;flag=false)
+end
+rcore = RBSteady._update_reduced_coupling(cores_primal_space′,core_primal_time′,rcores_space,rcore_time,rcore)
+
+# TPOD
 using Mabla.FEM.IndexMaps
 using BlockArrays
 using SparseArrays
@@ -124,6 +175,10 @@ _trial = TransientMultiFieldParamFESpace([_trial_u1,_trial_u2,_trial_p];style=Bl
 _feop = TransientParamLinearFEOperator((stiffness,mass),res,_induced_norm,ptspace,
   _trial,_test,_coupling,trian_res,trian_stiffness,trian_mass)
 
+# basis (comp 1 velocity)
 _s = change_index_map(TrivialIndexMap,fesnaps)
 _X = assemble_norm_matrix(_feop)
 @time Projection(_s[1],_X[Block(1,1)])
+_basis = Projection(_s,_X)
+
+# supr

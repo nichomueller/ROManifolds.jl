@@ -267,10 +267,13 @@ function add_space_supremizers(basis_space::ArrayBlock,norm_matrix::AbstractMatr
   basis_primal,basis_dual... = basis_space.array
   A = norm_matrix[Block(1,1)]
   H = cholesky(A)
+  T = eltype(A)
+  b_i = zeros(T,size(A,1))
+  supr_i = similar(b_i)
   for i = eachindex(basis_dual)
     C = supr_op[Block(1,i+1)]
-    b_i = C * basis_dual[i]
-    supr_i = H \ b_i
+    mul!(b_i,C,basis_dual[i])
+    ldiv!(supr_i,H,b_i)
     gram_schmidt!(supr_i,basis_primal,A)
     basis_primal = hcat(basis_primal,supr_i)
   end
@@ -309,8 +312,10 @@ function reduced_coupling!(cache,cores_primal_i,cores_dual_i,norm_matrix_i,coupl
   rcores_dual,rcore = cache
   # cores_norm_i = TProduct.tp_decomposition(norm_matrix_i) # add here the norm matrix
   cores_coupling_i = TProduct.tp_decomposition(coupling_i)
-  rcores_dual_i = map(*,cores_coupling_i,cores_dual_i) # add here the norm matrix
-  rcores_i = compress_core.(rcores_dual_i,cores_primal_i)
+  rcores_dual_i,rcores_i = map(cores_primal_i,cores_dual_i,cores_coupling_i) do cp,cd,cc
+    rc = cc*cd
+    rc,compress_core(rc,cp)
+  end |> tuple_of_arrays
   rcore_i = multiply_cores(rcores_i...) |> _dropdims
   push!(rcores_dual,rcores_dual_i)
   push!(rcore,rcore_i)
@@ -341,7 +346,7 @@ function add_and_orthogonalize!(cores_primal,rcores,norms_primal,i;flag=false)
 
   if !flag
     for d in 1:D-1
-      cores_primal[d] = _add_to_core(cores_primal[d],rcores[d])
+      push!(cores_primal[d],rcores[d])
       _weight_array!(weights,cores_primal,norms_primal,Val{d}())
     end
     push!(cores_primal[D],rcores[D])
@@ -363,7 +368,6 @@ function _update_reduced_coupling(cores_primal,rcores,rcore)
     range = offsets[ip]+1:offsets[ip+1]
     enriched_range = enriched_offsets[ip]+1:enriched_offsets[ip+1]-1
     @views rcore_new[enriched_range,:] = rcore[range,:]
-    @views rcore_new[enriched_offsets[ip+1],:] =
     rcores_i = compress_core.(rcores[ip],blocks(cores_primal_i)[end])
     rcore_i = multiply_cores(rcores_i...) |> _dropdims
     @views rcore_new[enriched_offsets[ip+1],:] = rcore_i

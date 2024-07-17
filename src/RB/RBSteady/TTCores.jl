@@ -70,43 +70,67 @@ function core_getindex(a::SparseCoreCSC{T},i::Vararg{Integer,4}) where T
   getindex(a.array,i1,i2,i3)
 end
 
-struct BlockTTCore{T,A<:AbstractArray{T,3}} <: AbstractArray{T,3}
+struct BlockTTCore{T,A<:AbstractArray{T,3},N} <: AbstractArray{T,3}
   array::Vector{A}
+  touched::Array{Bool,N}
   offset1::Vector{Int}
   offset3::Vector{Int}
 end
 
-function BlockTTCore(array::Vector{<:AbstractArray{T,3}}) where T
+const BlockTTCore1D{T,A<:AbstractArray{T,3}} = BlockTTCore{T,A,1}
+const BlockTTCore2D{T,A<:AbstractArray{T,3}} = BlockTTCore{T,A,2}
+
+_first_size_condition(a::Vector{<:AbstractArray}) = all(size.(a,1).==1)
+_first_size_condition(a::BlockTTCore) = _first_size_condition(a.array)
+
+function BlockTTCore(array::Vector{<:AbstractArray{T,3}},touched=[[true,false] [false,true]]) where T
   @check all(size(a,2)==size(array[1],2) for a in array)
-  s1 = size.(array,1)
-  s3 = size.(array,3)
-  o1 = all(s1 .== 1) ? [1] : s1
-  o3 = all(s3 .== 1) ? [1] : s3
+  if _first_size_condition(array)
+    touched = [true,true]
+  end
+  o1 = cumsum(size.(array,1))
+  o3 = cumsum(size.(array,3))
   pushfirst!(o1,0)
   pushfirst!(o3,0)
-  BlockTTCore(array,o1,o3)
+  BlockTTCore(array,touched,o1,o3)
 end
 
 function BlockTTCore(a::AbstractArray{T,3}) where T
-  BlockTTCore([a],[0,size(a,1)],[0,size(a,3)])
+  BlockTTCore([a])
 end
 
-Base.size(a::BlockTTCore) = (a.offset1[end],size(a.array[1],2),a.offset3[end])
+Base.size(a::BlockTTCore1D) = (1,size(a.array[1],2),a.offset3[end])
+Base.size(a::BlockTTCore2D) = (a.offset1[end],size(a.array[1],2),a.offset3[end])
 
-@inline function Base.getindex(a::BlockTTCore,i1::Integer,i2::Integer,i3::Integer)
+@inline function Base.getindex(a::BlockTTCore1D,i1::Integer,i2::Integer,i3::Integer)
+  @boundscheck checkbounds(a,i1,i2,i3)
+  b3,i3′ = _block_local_index(a.offset3,i3)
+  @inbounds a.array[b3][i1,i2,i3′]
+end
+
+@inline function Base.getindex(a::BlockTTCore2D,i1::Integer,i2::Integer,i3::Integer)
   @boundscheck checkbounds(a,i1,i2,i3)
   b1,i1′ = _block_local_index(a.offset1,i1)
   b3,i3′ = _block_local_index(a.offset3,i3)
-  if size(a,1) == 1
-    a.array[b3][i1′,i2,i3′]
-  elseif size(a,3) == 1
-    a.array[b1][i1′,i2,i3′]
+  if b1 != b3
+    zero(eltype(a))
   else
-    if b1 != b3
-      zero(eltype(a))
-    else
-      a.array[b1][i1′,i2,i3′]
-    end
+    @inbounds a.array[b1][i1′,i2,i3′]
+  end
+end
+
+@inline function Base.setindex!(a::BlockTTCore1D,v,i1::Integer,i2::Integer,i3::Integer)
+  @boundscheck checkbounds(a,i1,i2,i3)
+  b3,i3′ = _block_local_index(a.offset3,i3)
+  @inbounds a.array[b3][i1,i2,i3′] = v
+end
+
+@inline function Base.setindex!(a::BlockTTCore2D,v,i1::Integer,i2::Integer,i3::Integer)
+  @boundscheck checkbounds(a,i1,i2,i3)
+  b1,i1′ = _block_local_index(a.offset1,i1)
+  b3,i3′ = _block_local_index(a.offset3,i3)
+  if b1 == b3
+    @inbounds a.array[b1][i1′,i2,i3′] = v
   end
 end
 
@@ -116,15 +140,20 @@ function _block_local_index(offset,i)
   return blockidx,local_index
 end
 
-Base.setindex!(a::BlockTTCore,v,i::Integer...) = setindex(a.array,v,i...)
-
 function Base.push!(a::BlockTTCore{T},v::AbstractArray{T,3}) where T
   @check size(v,2) == size(a,2)
   push!(a.array,v)
-  s1 = size.(a.array,1)
-  s3 = size.(a.array,3)
-  !all(s1 .== 1) && push!(a.offset1,a.offset1[end]+size(v,1))
-  !all(s3 .== 1) && push!(a.offset3,a.offset3[end]+size(v,3))
+  push!(a.offset1,a.offset1[end]+size(v,1))
+  push!(a.offset3,a.offset3[end]+size(v,3))
+  touched = _first_size_condition(a.array) ? [true,true] : a.touched
+  return
+end
+
+function pushlast!(a::BlockTTCore{T},v::AbstractArray{T,3}) where T
+  alast = last(a.array)
+  @check size(v,1) == size(alast,1) && size(v,2) == size(alast,2) && size(v,3) == 1
+  a.array[end] = cat(a.array[end],v;dims=3)
+  a.offset3[end] += 1
   return
 end
 
@@ -319,9 +348,11 @@ function compress_core(a::AbstractArray{T,4},btrial::AbstractArray{S,3},btest::A
 
   TS = promote_type(T,S)
   bab = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,4),size(btrial,3))
+  w = zeros(TS,size(a,2))
   @inbounds for i = CartesianIndices(size(bab))
     ibV1,ia1,ibU1,ibV3,ia4,ibU3 = Tuple(i)
-    bab[i] = btest[ibV1,:,ibV3]'*a[ia1,:,:,ia4]*btrial[ibU1,:,ibU3]
+    mul!(w,a[ia1,:,:,ia4],btrial[ibU1,:,ibU3])
+    bab[i] = btest[ibV1,:,ibV3]'*w
   end
   return bab
 end

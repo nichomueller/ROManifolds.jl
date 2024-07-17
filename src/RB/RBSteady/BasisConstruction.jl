@@ -127,10 +127,14 @@ function _weight_array!(weights,cores,X,::Val{1})
   core = cores[1]
   rank = size(core,3)
   W = zeros(rank,K,rank)
+  w = zeros(size(core,2))
   @inbounds for k = 1:K
     X1k = X1[k]
-    for i = 1:rank, i′ = 1:rank
-      W[i,k,i′] = core[1,:,i]'*X1k*core[1,:,i′]
+    for i′ = 1:rank
+      mul!(w,X1k,core[1,:,i′])
+      for i = 1:rank
+        W[i,k,i′] = core[1,:,i]'*w
+      end
     end
   end
   weights[1] = W
@@ -144,12 +148,16 @@ function _weight_array!(weights,cores::Vector{<:BlockTTCore},X,::Val{1})
   offset = bcore.offset3
   rank = size(bcore,3)
   W = zeros(rank,K,rank)
-  for (i,core) in enumerate(blocks(bcore))
-    range = offset[i]+1:offset[i+1]
+  w = zeros(size(bcore,2))
+  for (b,core) in enumerate(blocks(bcore))
+    range = offset[b]+1:offset[b+1]
     @inbounds for k = 1:K
       X1k = X1[k]
-      for i = range, i′ = range
-        W[i,k,i′] = core[1,:,i]'*X1k*core[1,:,i′]
+      for (ib′,i′) = enumerate(range)
+        mul!(w,X1k,core[1,:,ib′])
+        for (ib,i) = enumerate(range)
+          W[i,k,i′] = core[1,:,ib]'*w
+        end
       end
     end
   end
@@ -165,14 +173,20 @@ function _weight_array!(weights,cores,X,::Val{d}) where d
   rank = size(core,3)
   rank_prev = size(W_prev,3)
   W = zeros(rank,K,rank)
+  w = zeros(size(core,2))
   @inbounds for k = 1:K
     Xdk = Xd[k]
     @views Wk = W[:,k,:]
     @views Wk_prev = W_prev[:,k,:]
-    for i_prev = 1:rank_prev, i′_prev = 1:rank_prev
-      Wk_prev′ = Wk_prev[i_prev,i′_prev]
-      for i = 1:rank, i′ = 1:rank
-        Wk[i,i′] += Wk_prev′*core[i_prev,:,i]'*Xdk*core[i′_prev,:,i′]
+    for i′_prev = 1:rank_prev
+      for i′ = 1:rank
+        mul!(w,Xdk,core[i′_prev,:,i′])
+        for i_prev = 1:rank_prev
+          Wk_prev′ = Wk_prev[i_prev,i′_prev]
+          for i = 1:rank
+            Wk[i,i′] += Wk_prev′*core[i_prev,:,i]'*w
+          end
+        end
       end
     end
   end
@@ -191,17 +205,23 @@ function _weight_array!(weights,cores::Vector{<:BlockTTCore},X,::Val{d}) where d
   offset_prev = bcore_prev.offset3
   rank_prev = size(bcore_prev,3)
   W = zeros(rank,K,rank)
-  for (i,core) in enumerate(blocks(bcore))
-    range = offset[i]+1:offset[i+1]
-    range_prev = offset_prev[i]+1:offset_prev[i+1]
+  w = zeros(size(core,2))
+  for (b,core) in enumerate(blocks(bcore))
+    range = offset[b]+1:offset[b+1]
+    range_prev = offset_prev[b]+1:offset_prev[b+1]
     @inbounds for k = 1:K
       Xdk = Xd[k]
       @views Wk = W[:,k,:]
       Wk_prev = W_prev[:,k,:]
-      for i_prev = range_prev, i′_prev = range_prev
-        Wk_prev′ = Wk_prev[i_prev,i′_prev]
-        for i = range, i′ = range
-          Wk[i,i′] += Wk_prev′*core[i_prev,:,i]'*Xdk*core[i′_prev,:,i′]
+      for i′_prev = range_prev
+        for (ib′,i′) = enumerate(range)
+          mul!(w,Xdk,core[i′_prev,:,ib′])
+          for i_prev = range_prev
+            Wk_prev′ = Wk_prev[i_prev,i′_prev]
+            for (ib,i) = enumerate(range)
+              Wk[i,i′] += Wk_prev′*core[i_prev,:,ib]'*w
+            end
+          end
         end
       end
     end
@@ -284,8 +304,10 @@ function orth_projection(
 
   proj = similar(v)
   fill!(proj,zero(eltype(proj)))
+  w = similar(proj)
   @inbounds for b = eachcol(basis)
-    proj += b*dot(v,X,b)/dot(b,X,b)
+    mul!(w,X,b)
+    proj += b*dot(v,w)/dot(b,w)
   end
   proj
 end
@@ -327,10 +349,17 @@ end
 
 function orthogonalize!(core::AbstractArray{T,3},X::AbstractTProductArray,weights) where T
   XW = _get_norm_matrix_from_weights(X,weights)
-  L,p = _cholesky_factor_and_perm(XW)
+  C = cholesky(XW)
+  L,p = sparse(C.L),C.p
   mat = reshape(core,:,size(core,3))
   XWmat = L'*mat[p,:]
   Q̃,R = qr(XWmat)
-  core .= reshape((L'\Q̃)[invperm(p),:],size(core))
+  core .= reshape((L'\Q̃)[invperm(p),axes(XWmat,2)],size(core))
   return R
+end
+
+function absorb!(core::AbstractArray{T,3},R::AbstractMatrix) where T
+  Rcore = R*reshape(core,size(core,1),:)
+  Q̃,_ = qr(reshape(Rcore,:,size(core,3)))
+  core .= reshape(Q̃[:,axes(core,3)],size(core))
 end
