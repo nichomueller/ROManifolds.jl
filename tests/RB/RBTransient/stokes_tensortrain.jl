@@ -104,11 +104,27 @@ sTT = fesnaps
 X = assemble_norm_matrix(feop)
 @time ttsvd(sTT[1],X[1])
 basis = Projection(sTT,X)
+b1 = basis[1]
+cores1 = get_cores(b1)
+RBTransient.check_orthogonality(cores1,X[1])
 
 #supr
-# B = assemble_coupling_matrix(feop)
-# Be = enrich_basis(basis,X,B)
 B = assemble_coupling_matrix(feop)
+basis′ = enrich_basis(basis,X,B)
+b1′ = basis′[1]
+cores1′ = get_cores(b1′)
+basis_space = dropdims(RBSteady._cores2basis(cores1′[1:2]...);dims=1)
+basis_space'*Xglobal_space*basis_space
+
+# c1 = cores1′[1]
+# cb1,cb2 = blocks(c1)
+# cb1,cb2 = cb1[1,:,:],cb2[1,:,:]
+# gram_schmidt!(cb2,cb1)
+# newcore1 = reshape(hcat(cb1,cb2),1,size(hcat(cb1,cb2))...)
+# weights = Vector{Array{Float64,3}}(undef,D-1)
+# RBSteady._weight_array!(weights,[newcore1],norms_primal[1],Val{1}())
+# newcores =
+
 cores_space = get_cores_space(basis)
 core_time = RBTransient.get_core_time(basis)
 pblocks = (1,2)
@@ -137,16 +153,24 @@ for ip in eachindex(pblocks)
 end
 rcore = vcat(rcore...)
 
-i = 4
-# D = length(cores_primal_space′[1])
-# weights = Vector{Array{Float64,3}}(undef,D-1)
-# push!(cores_primal_space′[1][1],rcores_space[1][1])
-# RBSteady._weight_array!(weights,cores_primal_space′[1],norms_primal[1],Val{1}())
+i = 1
+D = length(cores_primal_space′[1])
+weights = Vector{Array{Float64,3}}(undef,D-1)
+push!(cores_primal_space′[1][1],rcores_space[1][1])
+RBSteady._weight_array!(weights,cores_primal_space′[1],norms_primal[1],Val{1}())
 
-# push!(cores_primal_space′[1][D],rcores_space[1][D])
+push!(cores_primal_space′[1][D],rcores_space[1][D])
 # R = RBSteady.orthogonalize!(cores_primal_space′[1][D],norms_primal[1],weights)
 # push!(core_primal_time′[1],rcore_time[D][:,:,i:i])
 # RBSteady.absorb!(core_primal_time′[1],R)
+XW = RBSteady._get_norm_matrix_from_weights(norms_primal[1],weights)
+core = cores_primal_space′[1][D]
+C = cholesky(XW)
+L,p = sparse(C.L),C.p
+mat = reshape(core,:,size(core,3))
+XWmat = L'*mat[p,:]
+Q̃,R = qr(XWmat)
+core .= reshape((L'\Q̃)[invperm(p),axes(XWmat,2)],size(core))
 
 R = nothing
 for ip in eachindex(cores_primal_space)
@@ -182,3 +206,55 @@ _X = assemble_norm_matrix(_feop)
 _basis = Projection(_s,_X)
 
 # supr
+
+#######
+
+function test_weight_array1(weights,cores,X,::Val{1})
+  X1 = tp_getindex(X,1)
+  K = length(X1)
+  core = cores[1]
+  rank = size(core,3)
+  W = zeros(rank,K,rank)
+  w = zeros(size(core,2))
+  @inbounds for k = 1:K
+    X1k = X1[k]
+    for i′ = 1:rank
+      mul!(w,X1k,core[1,:,i′])
+      for i = 1:rank
+        W[i,k,i′] = core[1,:,i]'*w
+      end
+    end
+  end
+  weights[1] = W
+  return
+end
+
+weights1 = Vector{Array{Float64,3}}(undef,D-1)
+test_weight_array1(weights1,cores_primal_space′[1],norms_primal[1],Val{1}())
+
+function test_weight_array2(weights,cores,X,::Val{1})
+  X1 = tp_getindex(X,1)
+  K = length(X1)
+  bcore = cores[1]
+  offset = bcore.offset3
+  rank = size(bcore,3)
+  W = zeros(rank,K,rank)
+  w = zeros(size(bcore,2))
+  for (b,core) in enumerate(blocks(bcore))
+    range = offset[b]+1:offset[b+1]
+    @inbounds for k = 1:K
+      X1k = X1[k]
+      for (ib′,i′) = enumerate(range)
+        mul!(w,X1k,core[1,:,ib′])
+        for (ib,i) = enumerate(range)
+          W[i,k,i′] = core[1,:,ib]'*w
+        end
+      end
+    end
+  end
+  weights[1] = W
+  return
+end
+
+weights2 = Vector{Array{Float64,3}}(undef,D-1)
+test_weight_array2(weights2,cores_primal_space′[1],norms_primal[1],Val{1}())

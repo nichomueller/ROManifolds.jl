@@ -14,7 +14,6 @@ Subtypes:
 abstract type AbstractTProductArray end
 
 get_arrays(a::AbstractTProductArray) = @abstractmethod
-IndexMaps.get_index_map(a::AbstractTProductArray) = @abstractmethod
 tp_length(a::AbstractTProductArray) = length(get_arrays(a))
 
 function tp_getindex(a::AbstractTProductArray,d::Integer)
@@ -37,8 +36,25 @@ function tp_decomposition(a::AbstractTProductArray)
   return ka
 end
 
+function tp_sort!(a::AbstractVector{<:AbstractVector},i::NTuple{1,<:TProductIndexMap})
+  irow, = i
+  irow1d = IndexMaps.get_univariate_indices(irow)
+  for (i,(ai,irowi)) in enumerate(zip(a,irow1d))
+    a[i] = ai[vec(irowi)]
+  end
+end
+
+function tp_sort!(a::AbstractVector{<:AbstractMatrix},i::NTuple{2,<:TProductIndexMap})
+  irow,icol = i
+  irow1d = IndexMaps.get_univariate_indices(irow)
+  icol1d = IndexMaps.get_univariate_indices(icol)
+  for (i,(ai,irowi,icoli)) in enumerate(zip(a,irow1d,icol1d))
+    a[i] = ai[vec(irowi),vec(icoli)]
+  end
+end
+
 """
-    TProductArray{T,N,A,I} <: AbstractTProductArray
+    TProductArray{T,N,A} <: AbstractTProductArray
 
 Represents a mass matrix associated to a couple of tensor product FE spaces
 [`TProductFESpace`](@ref). In fact:
@@ -49,23 +65,22 @@ where M₁, M₂, M₃, ... represent the 1-D mass matrices on their respective 
 U+1D4D8(⋅) is the index map, and M₁₂₃... is the D-dimensional mass matrix
 
 """
-struct TProductArray{T,N,A<:AbstractArray{T,N},I} <: AbstractTProductArray
+struct TProductArray{T,N,A<:AbstractArray{T,N}} <: AbstractTProductArray
   arrays_1d::Vector{A}
-  index_map::I
 end
 
 function tproduct_array(arrays_1d::Vector{<:AbstractArray},index_map)
-  TProductArray(arrays_1d,index_map)
+  tp_sort!(arrays_1d,index_map)
+  TProductArray(arrays_1d)
 end
 
 get_arrays(a::TProductArray) = a.arrays_1d
-IndexMaps.get_index_map(a::TProductArray) = a.index_map
 
 tp_getindex(a::TProductArray,::Val{d},::Val{D}) where {d,D} = [get_arrays(a)[d]]
 tp_decomposition(a::TProductArray,::Val{d},::Val{D}) where {d,D} = get_arrays(a)
 
 """
-    TProductGradientArray{T,N,A,I,B} <: AbstractTProductArray
+    TProductGradientArray{T,N,A,B} <: AbstractTProductArray
 
 Represents a stiffness matrix associated to a couple of tensor product FE spaces
 [`TProductFESpace`](@ref). In fact:
@@ -79,10 +94,9 @@ The field `summation` (`nothing` by default) can represent a sum operation, in
 which case the mass matrix is added to the stiffness
 
 """
-struct TProductGradientArray{T,N,A<:AbstractArray{T,N},I,B} <: AbstractTProductArray
+struct TProductGradientArray{T,N,A<:AbstractArray{T,N},B} <: AbstractTProductArray
   arrays_1d::Vector{A}
   gradients_1d::Vector{A}
-  index_map::I
   summation::B
 end
 
@@ -93,7 +107,7 @@ function tproduct_array(
   index_map,
   summation=nothing)
 
-  TProductArray(arrays_1d,index_map)
+  tproduct_array(arrays_1d,index_map)
 end
 
 function tproduct_array(
@@ -103,13 +117,13 @@ function tproduct_array(
   index_map,
   summation=nothing)
 
-  TProductGradientArray(arrays_1d,gradients_1d,index_map,summation)
+  tp_sort!(arrays_1d,index_map)
+  tp_sort!(gradients_1d,index_map)
+  TProductGradientArray(arrays_1d,gradients_1d,summation)
 end
 
 get_arrays(a::TProductGradientArray) = a.arrays_1d
 get_gradients(a::TProductGradientArray) = a.gradients_1d
-
-IndexMaps.get_index_map(a::TProductGradientArray) = a.index_map
 
 tp_getindex(a::TProductGradientArray,::Val{d},::Val{D}) where {d,D} = @notimplemented
 tp_getindex(a::TProductGradientArray,::Val{1},::Val{1}) = [get_arrays(a)[1],get_gradients(a)[1]]
@@ -128,7 +142,7 @@ tp_decomposition(a::TProductGradientArray,::Val{2},::Val{3}) = [get_gradients(a)
 tp_decomposition(a::TProductGradientArray,::Val{3},::Val{3}) = [get_arrays(a)[1],get_gradients(a)[2],get_arrays(a)[3]]
 tp_decomposition(a::TProductGradientArray,::Val{4},::Val{3}) = [get_arrays(a)[1],get_arrays(a)[2],get_gradients(a)[3]]
 
-const TProductGradientOnly{T,N,A,I} = TProductGradientArray{T,N,A,I,Nothing}
+const TProductGradientOnly{T,N,A} = TProductGradientArray{T,N,A,Nothing}
 
 tp_getindex(a::TProductGradientOnly,::Val{d},::Val{D}) where {d,D} = @notimplemented
 tp_getindex(a::TProductGradientOnly,::Val{1},::Val{2}) = [get_gradients(a)[1],get_arrays(a)[1]]
@@ -145,7 +159,7 @@ tp_decomposition(a::TProductGradientOnly,::Val{2},::Val{3}) = [get_arrays(a)[1],
 tp_decomposition(a::TProductGradientOnly,::Val{3},::Val{3}) = [get_arrays(a)[1],get_arrays(a)[2],get_gradients(a)[3]]
 
 """
-    TProductPDerivativeArray{O,T,N,A,I} <: AbstractTProductArray
+    TProductPDerivativeArray{O,T,N,A} <: AbstractTProductArray
 
 Represents a pressure-velocity matrix associated to a couple of tensor product FE spaces
 [`TProductFESpace`](@ref). In fact:
@@ -157,29 +171,25 @@ B₁, B₂, B₃, ... represent the 1-D pressure-velocity matrices on their resp
 U+1D4D8(⋅) is the index map, and B₁₂₃... is the D-dimensional pressure-velocity matrix
 
 """
-struct TProductPDerivativeArray{O,T,N,A<:AbstractArray{T,N},I} <: AbstractTProductArray
+struct TProductPDerivativeArray{O,T,N,A<:AbstractArray{T,N}} <: AbstractTProductArray
   arrays_1d::Vector{A}
   gradients_1d::Vector{A}
-  index_map::I
   function TProductPDerivativeArray{O}(
     arrays_1d::Vector{A},
-    gradients_1d::Vector{A},
-    index_map::I
-    ) where {O,T,N,A<:AbstractArray{T,N},I}
+    gradients_1d::Vector{A}
+    ) where {O,T,N,A<:AbstractArray{T,N}}
 
     @check O ∈ (1,2,3)
-    new{O,T,N,A,I}(arrays_1d,gradients_1d,index_map)
+    new{O,T,N,A}(arrays_1d,gradients_1d)
   end
 end
 
-const TProductPDerivativeArray1{T,N,A<:AbstractArray{T,N},I} = TProductPDerivativeArray{1,T,N,A,I}
-const TProductPDerivativeArray2{T,N,A<:AbstractArray{T,N},I} = TProductPDerivativeArray{2,T,N,A,I}
-const TProductPDerivativeArray3{T,N,A<:AbstractArray{T,N},I} = TProductPDerivativeArray{3,T,N,A,I}
+const TProductPDerivativeArray1{T,N,A<:AbstractArray{T,N}} = TProductPDerivativeArray{1,T,N,A}
+const TProductPDerivativeArray2{T,N,A<:AbstractArray{T,N}} = TProductPDerivativeArray{2,T,N,A}
+const TProductPDerivativeArray3{T,N,A<:AbstractArray{T,N}} = TProductPDerivativeArray{3,T,N,A}
 
 get_arrays(a::TProductPDerivativeArray) = a.arrays_1d
 get_gradients(a::TProductPDerivativeArray) = a.gradients_1d
-
-IndexMaps.get_index_map(a::TProductPDerivativeArray) = a.index_map
 
 tp_getindex(a::TProductPDerivativeArray,::Val{d},::Val{D}) where {d,D} = @notimplemented
 tp_getindex(a::TProductPDerivativeArray,::Val{1},::Val{2}) = [get_arrays(a)[1],get_gradients(a)[1]]
@@ -272,25 +282,17 @@ function _kron(a::AbstractArray...)
 end
 
 function LinearAlgebra.kron(a::TProductArray{T,2}) where T
-  rows,cols = get_index_map(a)
-  kp = _kron(get_arrays(a)...)
-  kp[vec(rows),vec(cols)]
+  _kron(get_arrays(a)...)
 end
 
 function LinearAlgebra.kron(a::TProductGradientArray{T,2}) where T
-  rows,cols = get_index_map(a)
-  _kron(Val{tp_length(a)}(),a,rows,cols)
+  _kron(Val{tp_length(a)}(),a)
 end
 
-function _kron(::Val{d},a::TProductGradientArray,rows::TProductIndexMap,cols::TProductIndexMap) where d
-  _kron(Val{d}(),a,rows.indices,cols.indices)
-end
-function _kron(::Val{d},a::TProductGradientArray,rows::AbstractIndexMap,cols::AbstractIndexMap) where d
-  _kron(Val{d}(),a)[vec(rows),vec(cols)]
-end
 function _kron(::Val{1},a::TProductGradientArray)
   a.summation(get_arrays(a)[1],get_gradients(a)[1])
 end
+
 function _kron(::Val{2},a::TProductGradientArray)
   (
     a.summation(
@@ -300,6 +302,7 @@ function _kron(::Val{2},a::TProductGradientArray)
     )
   )
 end
+
 function _kron(::Val{3},a::TProductGradientArray)
   (
     a.summation(
@@ -314,16 +317,18 @@ end
 function _kron(::Val{1},a::TProductGradientOnly)
   get_gradients(a)[1]
 end
+
 function _kron(::Val{2},a::TProductGradientOnly)
-  (
-    _kron(get_arrays(a)[1],get_gradients(a)[2]) +
+  hcat(
+    _kron(get_arrays(a)[1],get_gradients(a)[2]),
     _kron(get_gradients(a)[1],get_arrays(a)[2])
   )
 end
+
 function _kron(::Val{3},a::TProductGradientOnly)
-  (
-    _kron(get_gradients(a)[1],get_arrays(a)[2],get_arrays(a)[3]) +
-    _kron(get_arrays(a)[1],get_gradients(a)[2],get_arrays(a)[3]) +
+  hcat(
+    _kron(get_gradients(a)[1],get_arrays(a)[2],get_arrays(a)[3]),
+    _kron(get_arrays(a)[1],get_gradients(a)[2],get_arrays(a)[3]),
     _kron(get_arrays(a)[1],get_arrays(a)[2],get_gradients(a)[3])
   )
 end

@@ -304,7 +304,7 @@ end
 function RBSteady.enrich!(
   cores_primal_space,core_primal_time,
   rcores_space,rcore_time,
-  rcore,norms_primal;flag=false,tol=5e-2)
+  rcore,norms_primal;flag=false,tol=5e-1)
 
   @check length(cores_primal_space) == length(rcores_space)
   nprimal = length(cores_primal_space)

@@ -58,7 +58,9 @@ function TProduct.tproduct_array(
   index_map,
   args...) where N
 
-  TProductPDerivativeArray{N}(arrays_1d,gradients_1d,index_map)
+  TProduct.tp_sort!(arrays_1d,index_map)
+  TProduct.tp_sort!(gradients_1d,index_map)
+  TProductPDerivativeArray{N}(arrays_1d,gradients_1d)
 end
 
 function PartialDerivative{N}(f::Function,x::Point,fx) where N
