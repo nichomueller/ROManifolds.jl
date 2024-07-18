@@ -141,30 +141,6 @@ function _weight_array!(weights,cores,X,::Val{1})
   return
 end
 
-# function _weight_array!(weights,cores::Vector{<:BlockTTCore},X,::Val{1})
-#   X1 = tp_getindex(X,1)
-#   K = length(X1)
-#   bcore = cores[1]
-#   offset = bcore.offset3
-#   rank = size(bcore,3)
-#   W = zeros(rank,K,rank)
-#   w = zeros(size(bcore,2))
-#   for (b,core) in enumerate(blocks(bcore))
-#     range = offset[b]+1:offset[b+1]
-#     @inbounds for k = 1:K
-#       X1k = X1[k]
-#       for (ib′,i′) = enumerate(range)
-#         mul!(w,X1k,core[1,:,ib′])
-#         for (ib,i) = enumerate(range)
-#           W[i,k,i′] = core[1,:,ib]'*w
-#         end
-#       end
-#     end
-#   end
-#   weights[1] = W
-#   return
-# end
-
 function _weight_array!(weights,cores,X,::Val{d}) where d
   Xd = tp_getindex(X,d)
   K = length(Xd)
@@ -193,42 +169,6 @@ function _weight_array!(weights,cores,X,::Val{d}) where d
   weights[d] = W
   return
 end
-
-# function _weight_array!(weights,cores::Vector{<:BlockTTCore},X,::Val{d}) where d
-#   Xd = tp_getindex(X,d)
-#   K = length(Xd)
-#   W_prev = weights[d-1]
-#   bcore = cores[d]
-#   offset = bcore.offset3
-#   rank = size(bcore,3)
-#   bcore_prev = cores[d-1]
-#   offset_prev = bcore_prev.offset3
-#   rank_prev = size(bcore_prev,3)
-#   W = zeros(rank,K,rank)
-#   w = zeros(size(core,2))
-#   for (b,core) in enumerate(blocks(bcore))
-#     range = offset[b]+1:offset[b+1]
-#     range_prev = offset_prev[b]+1:offset_prev[b+1]
-#     @inbounds for k = 1:K
-#       Xdk = Xd[k]
-#       @views Wk = W[:,k,:]
-#       Wk_prev = W_prev[:,k,:]
-#       for i′_prev = range_prev
-#         for (ib′,i′) = enumerate(range)
-#           mul!(w,Xdk,core[i′_prev,:,ib′])
-#           for i_prev = range_prev
-#             Wk_prev′ = Wk_prev[i_prev,i′_prev]
-#             for (ib,i) = enumerate(range)
-#               Wk[i,i′] += Wk_prev′*core[i_prev,:,ib]'*w
-#             end
-#           end
-#         end
-#       end
-#     end
-#   end
-#   weights[d] = W
-#   return
-# end
 
 function _get_norm_matrix_from_weights(norms::AbstractTProductArray,weights)
   N_space = tp_length(norms)
@@ -362,18 +302,6 @@ function orthogonalize!(core::AbstractArray{T,3},X::AbstractTProductArray,weight
   mat = reshape(core,:,size(core,3))
   XWmat = L'*mat[p,:]
   Q̃,R = pivoted_qr(XWmat)
-  core .= reshape((L'\Q̃)[invperm(p),axes(XWmat,2)],size(core))
-  return R
-end
-
-function orthogonalize!(core::BlockTTCore{T},X::AbstractTProductArray,weights) where T
-  XW = _get_norm_matrix_from_weights(X,weights)
-  C = cholesky(XW)
-  L,p = sparse(C.L),C.p
-  mat = reshape(core,:,size(core,3))
-  XWmat = L'*mat[p,:]
-  Q̃,R = pivoted_qr(XWmat)
-  _all_touched!(core)
   core .= reshape((L'\Q̃)[invperm(p),axes(XWmat,2)],size(core))
   return R
 end

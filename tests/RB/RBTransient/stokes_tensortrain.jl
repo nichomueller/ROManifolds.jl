@@ -133,8 +133,6 @@ cores_primal_space = map(ip -> cores_space[ip],pblocks)
 core_primal_time = map(ip -> core_time[ip],pblocks)
 cores_dual_space = map(id -> cores_space[id],dblocks)
 core_dual_time = map(id -> core_time[id],dblocks)
-cores_primal_space′ = map(cores -> BlockTTCore.(cores),cores_primal_space)
-core_primal_time′ = map(core -> BlockTTCore(core),core_primal_time)
 norms_primal = map(ip -> X[Block(ip,ip)],pblocks)
 
 id = 3
@@ -154,27 +152,27 @@ end
 rcore = vcat(rcore...)
 
 i = 1
-D = length(cores_primal_space′[1])
+D = length(cores_primal_space[1])
 weights = Vector{Array{Float64,3}}(undef,D-1)
-push!(cores_primal_space′[1][1],rcores_space[1][1])
-RBSteady._weight_array!(weights,cores_primal_space′[1],norms_primal[1],Val{1}())
+cores_primal_space[1][1] = cat_cores(cores_primal_space[1][1],rcores_space[1][1])
+RBSteady._weight_array!(weights,cores_primal_space[1],norms_primal[1],Val{1}())
 
-push!(cores_primal_space′[1][D],rcores_space[1][D])
-# R = RBSteady.orthogonalize!(cores_primal_space′[1][D],norms_primal[1],weights)
-# push!(core_primal_time′[1],rcore_time[D][:,:,i:i])
-# RBSteady.absorb!(core_primal_time′[1],R)
-XW = RBSteady._get_norm_matrix_from_weights(norms_primal[1],weights)
-core = cores_primal_space′[1][D]
-C = cholesky(XW)
-L,p = sparse(C.L),C.p
-mat = reshape(core,:,size(core,3))
-XWmat = L'*mat[p,:]
-Q̃,R = qr(XWmat)
-core .= reshape((L'\Q̃)[invperm(p),axes(XWmat,2)],size(core))
+cores_primal_space[1][2] = cat_cores(cores_primal_space[1][2],rcores_space[1][2])
+R = RBSteady.orthogonalize!(cores_primal_space[1][2],norms_primal[1],weights)
+# core_primal_time = RBSteady.pushlast(core_primal_time[1],rcore_time[1][:,:,i])
+aa = core_primal_time[1]
+bb = rcore_time[1][:,:,i]
+s1,s2,s3 = size(aa)
+s1′ = size(bb,1)
+boh = zeros(aa,s1,s2,s3+1)
+@views boh[:,:,1:s3] = aa
+@views boh[s1-s1′+1:end,:,s3+1] = bb
+
+RBSteady.absorb!(core_primal_time,R)
 
 R = nothing
 for ip in eachindex(cores_primal_space)
-  R = RBSteady.add_and_orthogonalize!(cores_primal_space′[ip],core_primal_time′[ip],
+  R = RBSteady.add_and_orthogonalize(cores_primal_space′[ip],core_primal_time′[ip],
     rcores_space[ip],rcore_time[ip],norms_primal[ip],R,i;flag=false)
 end
 rcore = RBSteady._update_reduced_coupling(cores_primal_space′,core_primal_time′,rcores_space,rcore_time,rcore)

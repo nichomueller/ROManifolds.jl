@@ -70,153 +70,40 @@ function core_getindex(a::SparseCoreCSC{T},i::Vararg{Integer,4}) where T
   getindex(a.array,i1,i2,i3)
 end
 
-struct BlockTTCore{T,A<:AbstractArray{T,3},N} <: AbstractArray{T,3}
-  array::Vector{A}
-  touched::Ref{Array{Bool,N}}
-  offset1::Vector{Int}
-  offset3::Vector{Int}
-end
-
-const BlockTTCore1D{T,A<:AbstractArray{T,3}} = BlockTTCore{T,A,1}
-const BlockTTCore2D{T,A<:AbstractArray{T,3}} = BlockTTCore{T,A,2}
-
-_first_size_condition(a::Vector{<:AbstractArray}) = all(size.(a,1).==1)
-
-function _blocks_from_touched(touched::Array{Bool},a::A...) where {T,A<:AbstractArray{T,3}}
-  vtouched = vec(touched)
-  l = length(vtouched)
-  block = Vector{A}(undef,l)
-  for (i,ti) in findall(vtouched)
-    block[ti] = a[i]
-  end
-  return block
-end
-
-function BlockTTCore(array::Vector{<:AbstractArray},touched=Matrix(I(length(array))))
-  @check all(size(a,2)==size(array[1],2) for a in array)
-  if _first_size_condition(array)
-    touched = fill(true,length(array))
-  end
-  block = _blocks_from_touched(touched,array...)
-  o1 = cumsum(size.(array,1))
-  o3 = cumsum(size.(array,3))
-  pushfirst!(o1,0)
-  pushfirst!(o3,0)
-  BlockTTCore(block,Ref(touched),o1,o3)
-end
-
-function BlockTTCore(a::AbstractArray{T,3}) where T
-  BlockTTCore([a])
-end
-
-Base.size(a::BlockTTCore1D) = (1,size(a.array[1],2),a.offset3[end])
-Base.size(a::BlockTTCore2D) = (a.offset1[end],size(a.array[1],2),a.offset3[end])
-
-@inline function Base.getindex(a::BlockTTCore1D,i1::Integer,i2::Integer,i3::Integer)
-  @boundscheck checkbounds(a,i1,i2,i3)
-  b3,i3′ = _block_local_index(a.offset3,i3)
-  if a.touched[][b3]
-    @inbounds a.array[b3][i1,i2,i3′]
-  else
-    zero(eltype(a))
-  end
-end
-
-@inline function Base.getindex(a::BlockTTCore2D,i1::Integer,i2::Integer,i3::Integer)
-  @boundscheck checkbounds(a,i1,i2,i3)
-  b1,i1′ = _block_local_index(a.offset1,i1)
-  b3,i3′ = _block_local_index(a.offset3,i3)
-  touched = a.touched[]
-  if touched[b1,b3]
-    b13 = (b3-1)*size(touched,1) + b1
-    @inbounds a.array[b13][i1′,i2,i3′]
-  else
-    zero(eltype(a))
-  end
-end
-
-@inline function Base.setindex!(a::BlockTTCore1D,v,i1::Integer,i2::Integer,i3::Integer)
-  @boundscheck checkbounds(a,i1,i2,i3)
-  b3,i3′ = _block_local_index(a.offset3,i3)
-  if a.touched[][b3]
-    @inbounds a.array[b3][i1,i2,i3′] = v
-  end
-end
-
-@inline function Base.setindex!(a::BlockTTCore2D,v,i1::Integer,i2::Integer,i3::Integer)
-  @boundscheck checkbounds(a,i1,i2,i3)
-  b1,i1′ = _block_local_index(a.offset1,i1)
-  b3,i3′ = _block_local_index(a.offset3,i3)
-  touched = a.touched[]
-  if touched[b1,b3]
-    b13 = (b3-1)*size(touched,1) + b1
-    @inbounds a.array[b13][i1′,i2,i3′] = v
-  end
-end
-
-function _block_local_index(offset,i)
-  blockidx = BlockArrays._searchsortedfirst(offset,i)-1
-  local_index = i - offset[blockidx]
-  return blockidx,local_index
-end
-
-function _all_touched!(a::BlockTTCore)
-  touched = a.touched[]
-  fill!(touched,true)
-  a.touched[] = touched
-  return
-end
-
-function _push_touched!(a::BlockTTCore1D)
-  touched = a.touched[]
-  append!(touched,true)
-  a.touched[] = touched
-  return
-end
-
-function Base.push!(a::BlockTTCore1D{T},v::AbstractArray{T,3}) where T
-  @check size(v,2) == size(a,2)
-  push!(a.array,v)
-  push!(a.offset1,a.offset1[end]+size(v,1))
-  push!(a.offset3,a.offset3[end]+size(v,3))
-  _push_touched!(a)
-  return
-end
-
-function _push_touched!(a::BlockTTCore2D)
-  t = a.touched[]
-  touched = similar(t,dims=size(t).+1)
-  @views touched[axes(t)...] = t
-  touched[end,end] = true
-  a.touched[] = touched
-  return
-end
-
-function Base.push!(a::BlockTTCore2D{T},v::AbstractArray{T,3}) where T
-  @check size(v,2) == size(a,2)
-  touched = a.touched[]
-  for i in axes(touched)
-    push!(a.array,zeros(typeof(v),fill(0,3)))
-  end
-  blocks = a.array[findall(vec(touched))]
-  a.array = _blocks_from_touched(touched,blocks...,v)
-  push!(a.offset1,a.offset1[end]+size(v,1))
-  push!(a.offset3,a.offset3[end]+size(v,3))
-  _push_touched!(a)
-  return
-end
-
-function pushlast!(a::BlockTTCore{T},v::AbstractArray{T,3}) where T
-  alast = last(a.array)
-  @check size(v,1) == size(alast,1) && size(v,2) == size(alast,2) && size(v,3) == 1
-  a.array[end] = cat(a.array[end],v;dims=3)
-  a.offset3[end] += 1
-  return
-end
-
-BlockArrays.blocks(a::BlockTTCore) = a.array
-
 # core operations
+
+function cat_cores(a::AbstractArray{T,3},b::AbstractArray{T,3}) where T
+  @check size(a,2) == size(b,2)
+  if size(a,1) == size(b,1)
+    ab = cat(a,b;dims=3)
+  else
+    ab = similar(a,size(a,1)+size(b,1),size(a,2),size(a,3)+size(b,3))
+    fill!(ab,zero(T))
+    @views ab[axes(a,1),:,axes(a,3)] = a
+    @views ab[size(a,1)+1:end,:,size(a,3)+1:end] = b
+  end
+  return ab
+end
+
+function cat_cores(a::AbstractArray{T,3},b::AbstractMatrix{T}) where T
+  @check size(a,2) == size(b,2)
+  ab = similar(a,size(a,1)+size(b,1),size(a,2),size(a,3)+1)
+  fill!(ab,zero(T))
+  @views ab[axes(a,1),:,axes(a,3)] = a
+  @views ab[size(a,1)+1:end,:,end] = b
+  return ab
+end
+
+function pushlast(a::AbstractArray{T,3},b::AbstractMatrix{T}) where T
+  @check size(a,2) == size(b,2)
+  s1,s2,s3 = size(a)
+  s1′ = size(b,1)
+  ab = similar(a,s1,s2,s3+1)
+  fill!(ab,zero(T))
+  @views ab[:,:,1:s3] = a
+  @views ab[s1-s1′+1:end,:,s3+1] = b
+  return ab
+end
 
 function Base.:*(a::AbstractMatrix{T},b::AbstractArray{S,3}) where {T,S}
   @check size(a,2) == size(b,2)

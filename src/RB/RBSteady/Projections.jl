@@ -283,10 +283,8 @@ end
 function add_tt_supremizers(cores_space::ArrayBlock,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
   pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
   cores_primal = map(ip -> cores_space[ip],pblocks)
-  cores_primal′ = map(cores -> BlockTTCore.(cores),cores_primal)
   cores_dual = map(id -> cores_space[id],dblocks)
   norms_primal = map(ip -> norm_matrix[Block(ip,ip)],pblocks)
-  flag = false
 
   for id in dblocks
     rcores = Vector{Array{Float64,3}}[]
@@ -298,14 +296,10 @@ function add_tt_supremizers(cores_space::ArrayBlock,norm_matrix::BlockTProductAr
       cores_primal_i = cores_space[ip]
       reduced_coupling!((rcores,rcore),cores_primal_i,cores_dual_i,A,C)
     end
-    flag = enrich!(cores_primal′,rcores,vcat(rcore...),norms_primal;flag)
+    enrich!(cores_primal,rcores,vcat(rcore...),norms_primal)
   end
 
-  if flag
-    return cores_primal′,cores_dual
-  else
-    return cores_primal,cores_dual
-  end
+  cores_primal,cores_dual
 end
 
 function reduced_coupling!(cache,cores_primal_i,cores_dual_i,norm_matrix_i,coupling_i)
@@ -321,26 +315,27 @@ function reduced_coupling!(cache,cores_primal_i,cores_dual_i,norm_matrix_i,coupl
   push!(rcore,rcore_i)
 end
 
-function enrich!(cores_primal,rcores,rcore,norms_primal;flag=false,tol=1e-2)
+function enrich!(cores_primal,rcores,rcore,norms_primal;tol=1e-2)
   @check length(cores_primal) == length(rcores)
 
+  flag = false
   i = 1
   while i ≤ size(rcore,2)
     proj = i == 1 ? zeros(size(rcore,1)) : orth_projection(rcore[:,i],rcore[:,1:i-1])
     dist = norm(rcore[:,i]-proj)
     if dist ≤ tol
       for ip in eachindex(cores_primal)
-        add_and_orthogonalize!(cores_primal[ip],rcores[ip],norms_primal[ip],i;flag)
+        cp,rc,np = cores_primal[ip],rcores[ip],norms_primal[ip]
+        cores_primal[ip] = add_and_orthogonalize(cp,rc,np,i;flag)
       end
       rcore = _update_reduced_coupling(cores_primal,rcores,rcore)
       flag = true
     end
     i += 1
   end
-  return flag
 end
 
-function add_and_orthogonalize!(cores_primal,rcores,norms_primal,i;flag=false)
+function add_and_orthogonalize(cores_primal,rcores,norms_primal,i;flag=false)
   D = length(cores_primal)
   weights = Vector{Array{Float64,3}}(undef,D-1)
 
@@ -352,7 +347,7 @@ function add_and_orthogonalize!(cores_primal,rcores,norms_primal,i;flag=false)
     push!(cores_primal[D],rcores[D])
     _ = orthogonalize!(cores_primal[D],norms_primal,weights)
   else
-    cores_primal[D] = hcat(cores_primal[D],rcores[D][:,:,i:i])
+    cores_primal[D] = hcat(cores_primal[D],rcores[D][:,:,i])
     _ = orthogonalize!(cores_primal[D],norms_primal,weights)
   end
 end

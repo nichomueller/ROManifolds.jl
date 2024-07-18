@@ -51,9 +51,9 @@ export num_space_dofs
 include("Snapshots.jl")
 
 export AbstractTTCore
-export BlockTTCore
 export SparseCore
 export SparseCoreCSC
+export cat_cores
 include("TTCores.jl")
 
 export RBSolver

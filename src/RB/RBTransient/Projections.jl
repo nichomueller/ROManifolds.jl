@@ -252,10 +252,7 @@ function RBSteady.add_tt_supremizers(
   core_primal_time = map(ip -> core_time[ip],pblocks)
   cores_dual_space = map(id -> cores_space[id],dblocks)
   core_dual_time = map(id -> core_time[id],dblocks)
-  cores_primal_space′ = map(cores -> BlockTTCore.(cores),cores_primal_space)
-  core_primal_time′ = map(core -> BlockTTCore(core),core_primal_time)
   norms_primal = map(ip -> norm_matrix[Block(ip,ip)],pblocks)
-  flag = false
 
   for id in dblocks
     rcores_space = Vector{Array{Float64,3}}[]
@@ -271,15 +268,11 @@ function RBSteady.add_tt_supremizers(
       RBSteady.reduced_coupling!((rcores_space,rcore_time,rcore),cores_primal_space_i,core_primal_time_i,
         cores_dual_space_i,core_dual_time_i,A,C)
     end
-    flag = RBSteady.enrich!(cores_primal_space′,core_primal_time′,rcores_space,rcore_time,
-      vcat(rcore...),norms_primal;flag)
+    RBSteady.enrich!(cores_primal_space,core_primal_time,rcores_space,rcore_time,
+      vcat(rcore...),norms_primal)
   end
 
-  if flag
-    return [cores_primal_space′...,cores_dual_space...],[core_primal_time′...,core_dual_time...]
-  else
-    return [cores_primal_space...,cores_dual_space...],[core_primal_time...,core_dual_time...]
-  end
+  return [cores_primal_space...,cores_dual_space...],[core_primal_time...,core_dual_time...]
 end
 
 function RBSteady.reduced_coupling!(
@@ -304,10 +297,11 @@ end
 function RBSteady.enrich!(
   cores_primal_space,core_primal_time,
   rcores_space,rcore_time,
-  rcore,norms_primal;flag=false,tol=5e-1)
+  rcore,norms_primal;tol=5e-1)
 
   @check length(cores_primal_space) == length(rcores_space)
   nprimal = length(cores_primal_space)
+  flag = false
 
   i = 1
   R = Vector{Matrix{Float64}}(undef,nprimal)
@@ -317,8 +311,10 @@ function RBSteady.enrich!(
     if dist ≤ tol
       for ip in 1:nprimal
         if !flag R[ip] = zeros(1,1) end
-        R[ip] = RBSteady.add_and_orthogonalize!(cores_primal_space[ip],core_primal_time[ip],
-          rcores_space[ip],rcore_time[ip],norms_primal[ip],R[ip],i;flag)
+        cps,cpt = cores_primal_space[ip],core_primal_time[ip]
+        rcs,rct = rcores_space[ip],rcore_time[ip]
+        cores_primal_space[ip],core_primal_time[ip],R[ip] = RBSteady.add_and_orthogonalize(
+          cps,cpt,rcs,rct,norms_primal[ip],R[ip],i;flag)
       end
       rcore = RBSteady._update_reduced_coupling(cores_primal_space,core_primal_time,rcores_space,rcore_time,rcore)
       flag = true
@@ -328,7 +324,7 @@ function RBSteady.enrich!(
   return flag
 end
 
-function RBSteady.add_and_orthogonalize!(
+function RBSteady.add_and_orthogonalize(
   cores_primal_space,core_primal_time,
   rcores_space,rcore_time,norms_primal,
   R,i;flag=false)
@@ -338,18 +334,18 @@ function RBSteady.add_and_orthogonalize!(
 
   if !flag
     for d in 1:D-1
-      push!(cores_primal_space[d],rcores_space[d])
+      cores_primal_space[d] = cat_cores(cores_primal_space[d],rcores_space[d])
       RBSteady._weight_array!(weights,cores_primal_space,norms_primal,Val{d}())
     end
-    push!(cores_primal_space[D],rcores_space[D])
+    cores_primal_space[D] = cat_cores(cores_primal_space[D],rcores_space[D])
     R = RBSteady.orthogonalize!(cores_primal_space[D],norms_primal,weights)
-    push!(core_primal_time,rcore_time[:,:,i:i])
-    RBSteady.absorb!(core_primal_time,R)
+    _core_primal_time = cat_cores(core_primal_time,rcore_time[:,:,i])
+    RBSteady.absorb!(_core_primal_time,R)
   else
-    RBSteady.pushlast!(core_primal_time,rcore_time[:,:,i:i])
-    RBSteady.absorb!(core_primal_time,R)
+    _core_primal_time = RBSteady.pushlast(core_primal_time,rcore_time[:,:,i])
+    RBSteady.absorb!(_core_primal_time,R)
   end
-  return R
+  return cores_primal_space,_core_primal_time,R
 end
 
 function RBSteady._update_reduced_coupling(
