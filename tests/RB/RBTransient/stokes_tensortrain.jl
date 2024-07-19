@@ -138,6 +138,11 @@ proj_basis = reduce_operator(rbsolver.mdeim_style,basis,red_trial1,red_test1)
 mat_k = reshape(j1[1,1],size(j1[1,1],1),:)
 Ur,Σr,Vr = RBSteady._tpod(mat_k;randomized=true)
 
+@time cores_space...,core_time = ttsvd(j1[1,1];randomized=true)
+@time cores_space′ = recast(j1[1,1],cores_space)
+index_map = get_index_map(j1[1,1])
+@time TransientTTSVDCores(cores_space′,core_time,index_map)
+
 # reduced_form(rbsolver,j[1,1],trian,trial[j],test[i];kwargs...)
 
 # TPOD
@@ -187,10 +192,10 @@ _mat = flatten_snapshots(_j1[1,1])
 _Ur,_Σr,_Vr = RBSteady._tpod(_mat;randomized=true)
 
 
-# product of reshape
-sizes = size(sTT[1])
-mat_k = reshape(sTT[1],sizes[1],:)
-@time RBSteady._tpod(mat_k)
-
-mat_k′ = Base.ReshapedArray(mat_k.snaps,mat_k.size,mat_k.mi)
-@time RBSteady._tpod(mat_k′)
+# projecting function
+s = _j1[1,1]
+s′ = flatten_snapshots(s)
+basis_space = truncated_pod(s′;randomized=true) # leading term
+# basis_space′ = recast(s,basis_space)
+# compressed_s2 = compress(s′,basis_space;swap_mode=true)
+# basis_time = truncated_pod(compressed_s2)
