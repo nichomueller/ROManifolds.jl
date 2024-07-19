@@ -193,9 +193,8 @@ function _cores2basis(a::AbstractArray,b::AbstractArray...)
 end
 
 function _cores2basis(i::AbstractIndexMap,a::AbstractArray{T,3}...) where T
-  basis = _cores2basis(a...)
-  invi = inv_index_map(i)
-  return view(basis,:,vec(invi),:)
+  basis = _cores2basis(a...) # dofs are already ordered if the cores are full
+  return basis
 end
 
 # when we multiply two SparseCoreCSC objects, the result is a 3-D core that stacks

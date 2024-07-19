@@ -11,7 +11,7 @@ Base.@propagate_inbounds function consecutive_setindex!(A::ConsecutiveParamArray
 end
 
 function consecutive_mul(A::AbstractArray,B::AbstractArray)
-  @abstractmethod
+  A*B
 end
 
 function consecutive_mul(A::ConsecutiveParamArrays{T},B::ConsecutiveParamArrays{S}) where {T,S}

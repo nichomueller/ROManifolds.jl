@@ -36,7 +36,7 @@ num_fe_dofs(a::SteadyProjection) = num_space_dofs(a)
 num_reduced_dofs(a::SteadyProjection) = num_reduced_space_dofs(a)
 
 function Projection(s::UnfoldingSteadySnapshots,args...;kwargs...)
-  basis = tpod(s,args...;kwargs...)
+  basis = truncated_pod(s,args...;kwargs...)
   basis′ = recast(s,basis)
   PODBasis(basis′)
 end
@@ -63,7 +63,7 @@ end
 """
     struct PODBasis{A<:AbstractMatrix} <: SteadyProjection
 
-SteadyProjection stemming from a truncated proper orthogonal decomposition [`tpod`](@ref)
+SteadyProjection stemming from a truncated proper orthogonal decomposition [`truncated_pod`](@ref)
 
 """
 struct PODBasis{A<:AbstractMatrix} <: SteadyProjection
@@ -267,13 +267,9 @@ function add_space_supremizers(basis_space::ArrayBlock,norm_matrix::AbstractMatr
   basis_primal,basis_dual... = basis_space.array
   A = norm_matrix[Block(1,1)]
   H = cholesky(A)
-  T = eltype(A)
-  b_i = zeros(T,size(A,1))
-  supr_i = similar(b_i)
   for i = eachindex(basis_dual)
     C = supr_op[Block(1,i+1)]
-    mul!(b_i,C,basis_dual[i])
-    ldiv!(supr_i,H,b_i)
+    supr_i = H \ C * basis_dual[i]
     gram_schmidt!(supr_i,basis_primal,A)
     basis_primal = hcat(basis_primal,supr_i)
   end

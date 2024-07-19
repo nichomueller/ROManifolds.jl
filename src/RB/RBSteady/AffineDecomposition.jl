@@ -214,7 +214,7 @@ function reduced_form(
   kwargs...)
 
   mdeim_style = solver.mdeim_style
-  basis = reduced_basis(s;ϵ=get_tol(solver))
+  basis = reduced_basis(s;ϵ=get_tol(solver),randomized=true)
   lu_interp,integration_domain = mdeim(mdeim_style,basis)
   proj_basis = reduce_operator(mdeim_style,basis,args...;kwargs...)
   red_trian = reduce_triangulation(trian,integration_domain,args...)

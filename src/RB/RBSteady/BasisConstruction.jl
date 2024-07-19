@@ -7,8 +7,8 @@ where `s` are the singular values of the SVD of a given matrix. The equation
 above is the so-called relative energy criterion
 
 """
-function truncation(s::AbstractVector;ϵ=1e-4,rank::Integer=length(s))
-  energies = cumsum(s.^2;dims=1)
+function truncation(s::AbstractVector;ϵ=1e-4,rank::Integer=length(s),squares=false)
+  energies = squares ? cumsum(s;dims=1) : cumsum(s.^2;dims=1)
   tolrank = findfirst(energies .>= (1-ϵ^2)*energies[end])
   min(rank,tolrank)
 end
@@ -18,57 +18,76 @@ function select_modes(U::AbstractMatrix,Σ::AbstractVector,V::AbstractMatrix;kwa
   return U[:,1:rank],Σ[1:rank],V[:,1:rank]
 end
 
+function truncated_svd(mat::AbstractMatrix;randomized=false,kwargs...)
+  if randomized
+    smin = minimum(size(mat))
+    rank = cld(smin,2)
+    U,Σ,V = rsvd(mat,rank)
+  else
+    U,Σ,V = svd(mat)
+  end
+  select_modes(U,Σ,V;kwargs...)
+end
+
 _size_condition(mat::AbstractMatrix) = (
-  length(mat) > 1e6 && size(mat,1) ≥ size(mat,2) &&
-  (size(mat,1) > 1e2*size(mat,2) || size(mat,2) > 1e2*size(mat,1))
+  length(mat) > 1e6 && (size(mat,1) > 1e2*size(mat,2) || size(mat,2) > 1e2*size(mat,1))
   )
 
 
 """
-    tpod(mat::AbstractMatrix,args...;kwargs...) -> AbstractMatrix
+    truncated_pod(mat::AbstractMatrix,args...;kwargs...) -> AbstractMatrix
 
 Truncated proper orthogonal decomposition. When a symmetric, positive definite
 matrix `X` is provided as an argument, the output's columns are `X`-orthogonal,
 otherwise they are ℓ²-orthogonal
 
 """
-function tpod(mat::AbstractMatrix,args...;kwargs...)
+function truncated_pod(mat::AbstractMatrix,args...;kwargs...)
   U,Σ,V = _tpod(mat,args...;kwargs...)
   return U
 end
 
 function _tpod(mat::AbstractMatrix,args...;kwargs...)
   if _size_condition(mat)
-    massive_tpod(mat,args...;kwargs...)
+    if size(mat,1) > size(mat,2)
+      massive_rows_tpod(mat,args...;kwargs...)
+    else
+      massive_cols_tpod(mat,args...;kwargs...)
+    end
   else
     standard_tpod(mat,args...;kwargs...)
   end
 end
 
 function standard_tpod(mat::AbstractMatrix,args...;kwargs...)
-  U,Σ,V = svd(mat)
-  Ur,Σr,Vr = select_modes(U,Σ,V;kwargs...)
-  return Ur,Σr,Vr
+  truncated_svd(mat;kwargs...)
 end
 
 function standard_tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
   C = cholesky(X)
   L,p = sparse(C.L),C.p
   Xmat = L'*mat[p,:]
-  Ũ,Σ,V = svd(Xmat)
-  Ũr,Σr,Vr = select_modes(Ũ,Σ,V;kwargs...)
+  Ũr,Σr,Vr = truncated_svd(Xmat;kwargs...)
   Ur = (L'\Ũr)[invperm(p),:]
   return Ur,Σr,Vr
 end
 
-function massive_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
+function massive_rows_tpod(mat::AbstractMatrix,args...;kwargs...)
+  mmat = mat'*mat
+  _,Σr,Vr = truncated_svd(mmat;squares=true,kwargs...)
+  Ur = mat*Vr
+  @inbounds for i = axes(Ur,2)
+    Ur[:,i] /= Σr[i]+eps()
+  end
+  return Ur,Σr,Vr
+end
+
+function massive_rows_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
   C = cholesky(X)
   L,p = sparse(C.L),C.p
   Xmat = L'*mat[p,:]
   mXmat = Xmat'*Xmat
-  Vt,Σ²,V = svd(mXmat)
-  Σ = sqrt.(Σ²)
-  _,Σr,Vr = select_modes(Vt,Σ,V;kwargs...)
+  _,Σr,Vr = truncated_svd(mXmat;squares=true,kwargs...)
   Ũr = Xmat*Vr
   @inbounds for i = axes(Ũr,2)
     Ũr[:,i] /= Σr[i]+eps()
@@ -77,16 +96,28 @@ function massive_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
   return Ur,Σr,Vr
 end
 
-function massive_tpod(mat::AbstractMatrix,args...;kwargs...)
-  mmat = mat'*mat
-  Vt,Σ²,V = svd(mat)
-  Σ = sqrt.(Σ²)
-  _,Σr,Vr = select_modes(Vt,Σ,V;kwargs...)
-  Ur = mat*Vr
+function massive_cols_tpod(mat::AbstractMatrix,args...;kwargs...)
+  mmat = mat*mat'
+  Ur,Σr,_ = truncated_svd(mmat;squares=true,kwargs...)
+  Vr = Ur'*mat
   @inbounds for i = axes(Ur,2)
-    Ur[:,i] /= Σr[i]+eps()
+    Vr[:,i] /= Σr[i]+eps()
   end
-  return Ur,Σr,Vr
+  return Ur,Σr,Vr'
+end
+
+function massive_cols_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
+  C = cholesky(X)
+  L,p = sparse(C.L),C.p
+  Xmat = L'*mat[p,:]
+  mXmat = Xmat*Xmat'
+  Ũr,Σr,_ = truncated_svd(mXmat;squares=true,kwargs...)
+  Ur = (L'\Ũr)[invperm(p),:]
+  Vr = Ur'*Xmat
+  @inbounds for i = axes(Ur,2)
+    Vr[:,i] /= Σr[i]+eps()
+  end
+  return Ur,Σr,Vr'
 end
 
 # We are not interested in the last dimension (corresponds to the parameter).

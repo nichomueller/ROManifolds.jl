@@ -88,7 +88,7 @@ function RBSteady.reduce_operator(
 
   b̂t = combine_basis_time(bt,bt_trial,bt_test;kwargs...)
 
-  cache = zeros(T,num_free_dofs(b_trial))
+  cache = zeros(T,num_space_dofs(b_trial),RBSteady.num_reduced_space_dofs(b_trial))
 
   @inbounds for is = 1:RBSteady.num_reduced_space_dofs(b)
     Bis = param_getindex(bs,is)

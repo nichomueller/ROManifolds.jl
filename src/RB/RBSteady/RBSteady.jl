@@ -1,6 +1,7 @@
 module RBSteady
 
 using LinearAlgebra
+using RandomizedLinAlg
 using BlockArrays
 using SparseArrays
 using DrWatson
@@ -65,7 +66,7 @@ export fe_solutions
 export nonlinear_rb_solve!
 include("RBSolver.jl")
 
-export tpod
+export truncated_pod
 export ttsvd
 export gram_schmidt!
 export orth_complement!

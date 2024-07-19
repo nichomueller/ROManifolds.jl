@@ -285,6 +285,56 @@ function RBSteady.select_snapshots(s::AbstractTransientSnapshots,prange;trange=B
   select_snapshots(s,trange,prange)
 end
 
+struct TransientReshapedSnapshots{T,N,N′,L,D,I,R,A<:AbstractTransientSnapshots{T,N′,L,D,I,R},B} <: AbstractTransientSnapshots{T,N,L,D,I,R}
+  snaps::A
+  size::NTuple{N,Int}
+  mi::B
+end
+
+Base.size(s::TransientReshapedSnapshots) = s.size
+
+function Base.reshape(s::AbstractTransientSnapshots,dims::Dims)
+  n = length(s)
+  prod(dims) == n || Base._throw_dmrs(n,"size",dims)
+
+  strds = Base.front(Base.size_to_strides(map(length,axes(s))..., 1))
+  strds1 = map(s->max(1,Int(s)),strds)
+  mi = map(Base.SignedMultiplicativeInverse,strds1)
+  TransientReshapedSnapshots(s,dims,reverse(mi))
+end
+
+function Base.getindex(
+  s::TransientReshapedSnapshots{T,N},
+  i::Vararg{Integer,N}
+  ) where {T,N}
+
+  @boundscheck checkbounds(s,i...)
+  ax = axes(s.snaps)
+  i′ = Base.offset_if_vec(Base._sub2ind(size(s),i...),ax)
+  i′′ = Base.ind2sub_rs(ax,s.mi,i′)
+  Base._unsafe_getindex_rs(s.snaps,i′′)
+end
+
+function Base.setindex!(
+  s::TransientReshapedSnapshots{T,N},
+  v,i::Vararg{Integer,N}
+  ) where {T,N}
+
+  @boundscheck checkbounds(s,i...)
+  ax = axes(s.snaps)
+  i′ = Base.offset_if_vec(Base._sub2ind(size(s),i...),ax)
+  s.snaps[Base.ind2sub_rs(ax,s.mi,i′)] = v
+  v
+end
+
+RBSteady.get_realization(s::TransientReshapedSnapshots) = get_realization(s.snaps)
+IndexMaps.get_index_map(s::TransientReshapedSnapshots) = get_index_map(s.snaps)
+
+function ParamDataStructures.get_values(s::TransientReshapedSnapshots)
+  v = get_values(s.snaps)
+  reshape(v.data,s.size)
+end
+
 const TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
   TransientBasicSnapshots{T,N,L,D,I,R,A},
   TransientSnapshots{T,N,L,D,I,R,A}

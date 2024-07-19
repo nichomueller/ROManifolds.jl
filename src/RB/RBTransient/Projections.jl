@@ -20,10 +20,10 @@ RBSteady.num_reduced_dofs(a::TransientProjection) = RBSteady.num_reduced_space_d
 
 function RBSteady.Projection(s::UnfoldingTransientSnapshots,args...;kwargs...)
   s′ = flatten_snapshots(s)
-  basis_space = tpod(s′,args...;kwargs...)
+  basis_space = truncated_pod(s′,args...;kwargs...)
   basis_space′ = recast(s,basis_space)
   compressed_s2 = compress(s′,basis_space,args...;swap_mode=true)
-  basis_time = tpod(compressed_s2;kwargs...)
+  basis_time = truncated_pod(compressed_s2;kwargs...)
   TransientPODBasis(basis_space′,basis_time)
 end
 
@@ -37,7 +37,7 @@ end
 """
     TransientPODBasis{A<:AbstractMatrix,B<:AbstractMatrix} <: TransientProjection
 
-TransientProjection stemming from a truncated proper orthogonal decomposition [`tpod`](@ref)
+TransientProjection stemming from a truncated proper orthogonal decomposition [`truncated_pod`](@ref)
 
 """
 struct TransientPODBasis{A<:AbstractMatrix,B<:AbstractMatrix} <: TransientProjection

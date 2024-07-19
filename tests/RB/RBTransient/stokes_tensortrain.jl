@@ -109,73 +109,36 @@ cores1 = get_cores(b1)
 RBTransient.check_orthogonality(cores1,X[1])
 
 #supr
-B = assemble_coupling_matrix(feop)
-basis′ = enrich_basis(basis,X,B)
+@time B = assemble_coupling_matrix(feop)
+@time basis′ = enrich_basis(basis,X,B)
 b1′ = basis′[1]
 cores1′ = get_cores(b1′)
-basis_space = dropdims(RBSteady._cores2basis(cores1′[1:2]...);dims=1)
-basis_space'*Xglobal_space*basis_space
+RBTransient.check_orthogonality(cores1′,X[1])
 
-# c1 = cores1′[1]
-# cb1,cb2 = blocks(c1)
-# cb1,cb2 = cb1[1,:,:],cb2[1,:,:]
-# gram_schmidt!(cb2,cb1)
-# newcore1 = reshape(hcat(cb1,cb2),1,size(hcat(cb1,cb2))...)
-# weights = Vector{Array{Float64,3}}(undef,D-1)
-# RBSteady._weight_array!(weights,[newcore1],norms_primal[1],Val{1}())
-# newcores =
+#MDEIM
+using Gridap.CellData
+using Gridap.FESpaces
+using Gridap.ODEs
 
-cores_space = get_cores_space(basis)
-core_time = RBTransient.get_core_time(basis)
-pblocks = (1,2)
-dblocks = (3,)
-cores_primal_space = map(ip -> cores_space[ip],pblocks)
-core_primal_time = map(ip -> core_time[ip],pblocks)
-cores_dual_space = map(id -> cores_space[id],dblocks)
-core_dual_time = map(id -> core_time[id],dblocks)
-norms_primal = map(ip -> X[Block(ip,ip)],pblocks)
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+op = get_algebraic_operator(feop)
+op = TransientPGOperator(op,red_trial,red_test)
+smdeim = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
+j,r = jacobian_and_residual(rbsolver,op,smdeim)
+red_jac = reduced_jacobian(rbsolver,op,j)
+red_res = reduced_residual(rbsolver,op,r)
 
-id = 3
-rcores_space = Vector{Array{Float64,3}}[]
-rcore_time = Array{Float64,3}[]
-rcore = Matrix{Float64}[]
-cores_dual_space_i = cores_space[id]
-core_dual_time_i = core_time[id]
-for ip in eachindex(pblocks)
-  A = X[Block(ip,ip)]
-  C = B[Block(ip,id)]
-  cores_primal_space_i = cores_space[ip]
-  core_primal_time_i = core_time[ip]
-  RBSteady.reduced_coupling!((rcores_space,rcore_time,rcore),cores_primal_space_i,core_primal_time_i,
-    cores_dual_space_i,core_dual_time_i,A,C)
-end
-rcore = vcat(rcore...)
+j1 = j[1][1]
+trian = get_domains(j1)[1]
+basis = reduced_basis(j1[1,1];randomized=true)
+lu_interp,integration_domain = mdeim(rbsolver.mdeim_style,basis)
+red_trial1,red_test1 = red_trial[1],red_test[1]
+proj_basis = reduce_operator(rbsolver.mdeim_style,basis,red_trial1,red_test1)
 
-i = 1
-D = length(cores_primal_space[1])
-weights = Vector{Array{Float64,3}}(undef,D-1)
-cores_primal_space[1][1] = cat_cores(cores_primal_space[1][1],rcores_space[1][1])
-RBSteady._weight_array!(weights,cores_primal_space[1],norms_primal[1],Val{1}())
+mat_k = reshape(j1[1,1],size(j1[1,1],1),:)
+Ur,Σr,Vr = RBSteady._tpod(mat_k;randomized=true)
 
-cores_primal_space[1][2] = cat_cores(cores_primal_space[1][2],rcores_space[1][2])
-R = RBSteady.orthogonalize!(cores_primal_space[1][2],norms_primal[1],weights)
-# core_primal_time = RBSteady.pushlast(core_primal_time[1],rcore_time[1][:,:,i])
-aa = core_primal_time[1]
-bb = rcore_time[1][:,:,i]
-s1,s2,s3 = size(aa)
-s1′ = size(bb,1)
-boh = zeros(aa,s1,s2,s3+1)
-@views boh[:,:,1:s3] = aa
-@views boh[s1-s1′+1:end,:,s3+1] = bb
-
-RBSteady.absorb!(core_primal_time,R)
-
-R = nothing
-for ip in eachindex(cores_primal_space)
-  R = RBSteady.add_and_orthogonalize(cores_primal_space′[ip],core_primal_time′[ip],
-    rcores_space[ip],rcore_time[ip],norms_primal[ip],R,i;flag=false)
-end
-rcore = RBSteady._update_reduced_coupling(cores_primal_space′,core_primal_time′,rcores_space,rcore_time,rcore)
+# reduced_form(rbsolver,j[1,1],trian,trial[j],test[i];kwargs...)
 
 # TPOD
 using Mabla.FEM.IndexMaps
@@ -199,60 +162,35 @@ _feop = TransientParamLinearFEOperator((stiffness,mass),res,_induced_norm,ptspac
 
 # basis (comp 1 velocity)
 _s = change_index_map(TrivialIndexMap,fesnaps)
-_X = assemble_norm_matrix(_feop)
+@time _X = assemble_norm_matrix(_feop)
 @time Projection(_s[1],_X[Block(1,1)])
-_basis = Projection(_s,_X)
+@time _basis = Projection(_s,_X)
 
-# supr
+@time _B = assemble_coupling_matrix(_feop)
+@time _basis′ = enrich_basis(_basis,_X,_B)
 
-#######
+#MDEIM
+_red_trial,_red_test = reduced_fe_space(rbsolver,_feop,_s)
+_op = get_algebraic_operator(_feop)
+_op = TransientPGOperator(_op,_red_trial,_red_test)
+_smdeim = select_snapshots(_s,RBSteady.mdeim_params(rbsolver))
+_j,_r = jacobian_and_residual(rbsolver,_op,_smdeim)
 
-function test_weight_array1(weights,cores,X,::Val{1})
-  X1 = tp_getindex(X,1)
-  K = length(X1)
-  core = cores[1]
-  rank = size(core,3)
-  W = zeros(rank,K,rank)
-  w = zeros(size(core,2))
-  @inbounds for k = 1:K
-    X1k = X1[k]
-    for i′ = 1:rank
-      mul!(w,X1k,core[1,:,i′])
-      for i = 1:rank
-        W[i,k,i′] = core[1,:,i]'*w
-      end
-    end
-  end
-  weights[1] = W
-  return
-end
+_j1 = _j[1][1]
+_trian = get_domains(_j[1])[1]
+_basis = reduced_basis(_j1[1,1])
+_lu_interp,_integration_domain = mdeim(rbsolver.mdeim_style,_basis)
+_red_trial1,_red_test1 = _red_trial[1],_red_test[1]
+_proj_basis = reduce_operator(rbsolver.mdeim_style,_basis,_red_trial1,_red_test1)
 
-weights1 = Vector{Array{Float64,3}}(undef,D-1)
-test_weight_array1(weights1,cores_primal_space′[1],norms_primal[1],Val{1}())
+_mat = flatten_snapshots(_j1[1,1])
+_Ur,_Σr,_Vr = RBSteady._tpod(_mat;randomized=true)
 
-function test_weight_array2(weights,cores,X,::Val{1})
-  X1 = tp_getindex(X,1)
-  K = length(X1)
-  bcore = cores[1]
-  offset = bcore.offset3
-  rank = size(bcore,3)
-  W = zeros(rank,K,rank)
-  w = zeros(size(bcore,2))
-  for (b,core) in enumerate(blocks(bcore))
-    range = offset[b]+1:offset[b+1]
-    @inbounds for k = 1:K
-      X1k = X1[k]
-      for (ib′,i′) = enumerate(range)
-        mul!(w,X1k,core[1,:,ib′])
-        for (ib,i) = enumerate(range)
-          W[i,k,i′] = core[1,:,ib]'*w
-        end
-      end
-    end
-  end
-  weights[1] = W
-  return
-end
 
-weights2 = Vector{Array{Float64,3}}(undef,D-1)
-test_weight_array2(weights2,cores_primal_space′[1],norms_primal[1],Val{1}())
+# product of reshape
+sizes = size(sTT[1])
+mat_k = reshape(sTT[1],sizes[1],:)
+@time RBSteady._tpod(mat_k)
+
+mat_k′ = Base.ReshapedArray(mat_k.snaps,mat_k.size,mat_k.mi)
+@time RBSteady._tpod(mat_k′)
