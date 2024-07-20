@@ -67,32 +67,22 @@ end
 # TT interface
 
 """
-    TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},
-      C<:AbstractMatrix,I} <: TransientProjection
+    TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},I} <: TransientProjection
 
 TransientProjection stemming from a tensor train singular value decomposition [`ttsvd`](@ref).
 An index map of type `I` is provided for indexing purposes
 
 """
-struct TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},C<:AbstractMatrix,I} <: TransientProjection
+struct TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},I} <: TransientProjection
   cores_space::A
   core_time::B
-  basis_spacetime::C
   index_map::I
 end
 
 const TransientFixedDofsTTSVDCores{
-  D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},C<:AbstractMatrix,
-  I<:FixedDofsIndexMap} = TransientTTSVDCores{D,T,A,B,C,I}
+  D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},I<:FixedDofsIndexMap
+  } = TransientTTSVDCores{D,T,A,B,I}
 
-function TransientTTSVDCores(
-  cores_space::Vector{<:AbstractArray},
-  core_time::AbstractArray,
-  index_map::AbstractIndexMap)
-
-  basis_spacetime = get_basis_spacetime(index_map,cores_space,core_time)
-  TransientTTSVDCores(cores_space,core_time,basis_spacetime,index_map)
-end
 
 IndexMaps.get_index_map(a::TransientTTSVDCores) = a.index_map
 
@@ -110,8 +100,6 @@ ParamDataStructures.num_times(a::TransientTTSVDCores) = size(get_core_time(a),2)
 num_reduced_times(a::TransientTTSVDCores) = size(get_core_time(a),3)
 
 RBSteady.num_reduced_dofs(a::TransientTTSVDCores) = num_reduced_times(a)
-
-get_basis_spacetime(a::TransientTTSVDCores) = a.basis_spacetime
 
 _num_tot_space_dofs(a::TransientTTSVDCores{3}) = size.(get_cores_space(a),2)
 

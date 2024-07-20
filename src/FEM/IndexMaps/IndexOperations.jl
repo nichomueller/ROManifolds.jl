@@ -1,27 +1,31 @@
 """
-    recast_indices(indices::AbstractVector,A::AbstractArray) -> AbstractVector
+    recast_indices!(indices::AbstractVector,A::AbstractArray) -> AbstractVector
 
 Recasts an array of indices ∈ {1,...,nnz(A)} to an array of entire_indices ∈ {1,...,length(A)}
 when A is a sparse matrix, and it returns the original vector itself when A is
 an ordinary array.
 
 """
-function recast_indices(indices::AbstractVector,A::AbstractArray)
+function recast_indices!(indices::AbstractVector,A::AbstractArray)
   nonzero_indices = get_nonzero_indices(A)
-  entire_indices = nonzero_indices[indices]
-  return entire_indices
+  for (i,indi) in enumerate(indices)
+    indices[i] = nonzero_indices[indi]
+  end
+  return
 end
 
 """
-    sparsify_indices(indices::AbstractVector,A::AbstractArray) -> AbstractVector
+    sparsify_indices!(indices::AbstractVector,A::AbstractArray) -> AbstractVector
 
-Inverse map of recast_indices.
+Inverse map of recast_indices!.
 
 """
-function sparsify_indices(indices::AbstractVector,A::AbstractArray)
+function sparsify_indices!(indices::AbstractVector,A::AbstractArray)
   nonzero_indices = get_nonzero_indices(A)
-  sparse_indices = map(y->findfirst(x->x==y,nonzero_indices),indices)
-  return sparse_indices
+  for (i,indi) in enumerate(indices)
+    indices[i] = findfirst(x->x==indi,nonzero_indices)
+  end
+  return
 end
 
 function get_nonzero_indices(A::AbstractArray)

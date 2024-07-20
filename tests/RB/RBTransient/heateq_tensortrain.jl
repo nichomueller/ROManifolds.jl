@@ -92,3 +92,74 @@ results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 println(compute_error(results))
 println(compute_speedup(results))
+
+using Gridap.CellData
+using Gridap.FESpaces
+using Gridap.ODEs
+using Mabla.FEM.IndexMaps
+
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+op = get_algebraic_operator(feop)
+op = TransientPGOperator(op,red_trial,red_test)
+smdeim = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
+j,r = jacobian_and_residual(rbsolver,op,smdeim)
+red_jac = reduced_jacobian(rbsolver,op,j)
+red_res = reduced_residual(rbsolver,op,r)
+
+j1 = j[1][1]
+basis = reduced_basis(j1)
+lu_interp,integration_domain = mdeim(rbsolver.mdeim_style,basis)
+
+cores_space = get_cores_space(basis)
+core_time = RBTransient.get_core_time(basis)
+_indices_spacetime,_interp_basis_spacetime = empirical_interpolation(cores_space...,core_time)
+
+i = get_index_map(j1)
+bst = RBTransient.get_basis_spacetime(i,cores_space,core_time)
+# indices_spacetime,interp_basis_spacetime = empirical_interpolation(bst)
+
+b1 = vec(select_snapshots(j1,1))
+b1 - bst*(_interp_basis_spacetime\b1[_indices_spacetime])
+
+function old_mdeim(mdeim_style,b::TransientTTSVDCores)
+  i = get_index_map(b)
+  bst = RBTransient.get_basis_spacetime(i,get_cores_space(b),RBTransient.get_core_time(b))
+  indices_spacetime,interp_basis_spacetime = empirical_interpolation(bst)
+  indices_space = fast_index(indices_spacetime,num_space_dofs(b))
+  indices_time = slow_index(indices_spacetime,num_space_dofs(b))
+  lu_interp = lu(interp_basis_spacetime)
+  integration_domain = TransientIntegrationDomain(indices_space,indices_time)
+  return lu_interp,integration_domain
+end
+
+old_lu_interp,old_integration_domain = old_mdeim(rbsolver.mdeim_style,basis)
+
+_get_array(c::AbstractArray) = c
+_get_array(c::SparseCore) = c.array
+_recast_indices!(i,c::AbstractArray) = i
+_recast_indices!(i,c::SparseCore) = recast_indices!(i,c.sparsity.matrix)
+_get_size(c::AbstractArray) = size(c,2)
+_get_size(c::SparseCore) = size(c,2)*size(c,2)
+
+cores = get_cores(basis)
+
+C = _get_array(first(cores))
+A = dropdims(C;dims=1)
+m,n = size(A)
+r = zeros(eltype(A),m)
+I′ = zeros(Int32,n)
+I = Vector{Int32}[]
+s = Int32[]
+for i = eachindex(cores)
+  I′,Ai = RBSteady.empirical_interpolation!((I′,r),A)
+  _recast_indices!(I′,cores[i])
+  push!(I,copy(I′))
+  push!(s,_get_size(cores[i]))
+  if i < length(cores)
+    Ci = reshape(Ai,1,size(Ai)...)
+    A = cores2basis(Ci,_get_array(cores[i+1]))
+  else
+    Ig = _to_global_indices(I,s)
+    return Ig,Ai
+  end
+end

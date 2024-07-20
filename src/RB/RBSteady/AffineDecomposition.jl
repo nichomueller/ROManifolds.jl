@@ -1,16 +1,10 @@
 # OFFLINE PHASE
 
-"""
-    empirical_interpolation(A::AbstractMatrix) -> (Vector{Int}, AbstractMatrix)
-
-Returns a list of indices U+1D4D8 corresponding to the rows of `A` selected by the
-discrete empirical interpolation method, and `A[U+1D4D8, :]`
-
-"""
-function empirical_interpolation(A::AbstractMatrix)
+function empirical_interpolation!(cache,A::AbstractMatrix)
+  I,res = cache
   m,n = size(A)
-  res = zeros(eltype(A),m)
-  I = zeros(Int32,n)
+  resize!(res,m)
+  resize!(I,n)
   I[1] = argmax(abs.(A[:,1]))
   if n > 1
     @inbounds for i = 2:n
@@ -25,10 +19,99 @@ function empirical_interpolation(A::AbstractMatrix)
   return I,Ai
 end
 
+function empirical_interpolation!(cache,C::AbstractArray{T,3}) where T
+  @check size(C,1) == 1
+  c...,Ig,s = cache
+  A = dropdims(C;dims=1)
+  I,Ai = empirical_interpolation!(c,A)
+  push!(s,size(A,1))
+  push!(Ig,I)
+  return I,Ai
+end
+
+function empirical_interpolation!(cache,C::SparseCore)
+  @check size(C,1) == 1
+  c...,Ig,s = cache
+  C′ = dropdims(C;dims=1)
+  A = reshape(C′,:,size(C′,3))
+  I,Ai = empirical_interpolation!(c,A)
+  push!(s,size(A,1))
+  push!(Ig,I)
+  return I,Ai
+end
+
+"""
+    empirical_interpolation(A::AbstractMatrix) -> (Vector{Int}, AbstractMatrix)
+
+Returns a list of indices U+1D4D8 corresponding to the rows of `A` selected by the
+discrete empirical interpolation method, and `A[U+1D4D8, :]`
+
+"""
+function empirical_interpolation(A::AbstractMatrix)
+  m,n = size(A)
+  res = zeros(eltype(A),m)
+  I = zeros(Int32,n)
+  I,Ai = empirical_interpolation!((I,res),A)
+  return I,Ai
+end
+
 function empirical_interpolation(A::ParamSparseMatrix)
   I,Ai = empirical_interpolation(A.data)
-  I′ = recast_indices(I,param_getindex(A,1))
-  return I′,Ai
+  recast_indices!(I,param_getindex(A,1))
+  return I,Ai
+end
+
+function _global_index(local_indices::Vector{Vector{Int32}},global_sizes,i)
+  Iprev...,Ig = local_indices
+  sprev...,sg = global_sizes
+  if length(Iprev) == 0
+    return i
+  end
+  Il = last(Iprev)
+  rankl = length(Il)
+  islow = slow_index(i,rankl)
+  ifast = fast_index(i,rankl)
+  return _global_index(Iprev,sprev,Il[ifast]) + prod(sprev)*(islow-1)
+end
+
+function _to_global_indices(local_indices::Vector{Vector{Int32}},global_sizes)
+  Ig = local_indices[end]
+  for (i,ig) in enumerate(Ig)
+    Ig[i] = _global_index(local_indices,global_sizes,ig)
+  end
+  return Ig
+end
+
+function _eim_cache(C::AbstractArray{T,3}) where T
+  A = dropdims(C;dims=1)
+  m,n = size(A)
+  res = zeros(eltype(A),m)
+  I = zeros(Int32,n)
+  Ig = Vector{Int32}[]
+  s = Int32[]
+  return A,I,res,Ig,s
+end
+
+_eim_cache(core::SparseCore) = _eim_cache(C.array)
+
+function _next_core(Aprev::AbstractMatrix{T},Cnext::AbstractArray{T,3}) where T
+  Cprev = reshape(Aprev,1,size(Aprev)...)
+  _cores2basis(Cprev,Cnext)
+end
+
+function empirical_interpolation(cores::AbstractArray...)
+  A,I,res,Ig,s = _eim_cache(first(cores))
+  for i = eachindex(cores)
+    I′,Ai = empirical_interpolation!((I,res,Ig,s),A)
+    if i < length(cores)
+      A = _next_core(Ai,cores[i+1])
+      Ci = reshape(Ai,1,size(Ai)...)
+      A = _cores2basis(Ci,_get_array(cores[i+1]))
+    else
+      Ig = _to_global_indices(I,s)
+      return Ig,Ai
+    end
+  end
 end
 
 """
@@ -214,7 +297,7 @@ function reduced_form(
   kwargs...)
 
   mdeim_style = solver.mdeim_style
-  basis = reduced_basis(s;ϵ=get_tol(solver),randomized=true)
+  basis = reduced_basis(s;ϵ=get_tol(solver))
   lu_interp,integration_domain = mdeim(mdeim_style,basis)
   proj_basis = reduce_operator(mdeim_style,basis,args...;kwargs...)
   red_trian = reduce_triangulation(trian,integration_domain,args...)
