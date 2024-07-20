@@ -112,7 +112,10 @@ function _num_tot_space_dofs(a::TransientTTSVDCores{4})
   return tot_ndofs
 end
 
-function get_basis_spacetime(index_map::AbstractIndexMap,cores_space,core_time)
+get_basis_spacetime(a::TransientTTSVDCores{3}) = get_basis_spacetime(get_index_map(a),get_cores(a)...)
+
+function get_basis_spacetime(index_map::AbstractIndexMap,cores...)
+  cores_space...,core_time = cores
   cores2basis(RBSteady._cores2basis(index_map,cores_space...),core_time)
 end
 

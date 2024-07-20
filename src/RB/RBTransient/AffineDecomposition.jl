@@ -54,11 +54,10 @@ function RBSteady.mdeim(mdeim_style::MDEIMStyle,b::TransientPODBasis)
 end
 
 function RBSteady.mdeim(mdeim_style::MDEIMStyle,b::TransientTTSVDCores)
+  index_map = get_index_map(b)
   cores_space = get_cores_space(b)
   core_time = get_core_time(b)
-  indices_spacetime,interp_basis_spacetime = empirical_interpolation(cores_space...,core_time)
-  indices_space = fast_index(indices_spacetime,num_space_dofs(b))
-  indices_time = slow_index(indices_spacetime,num_space_dofs(b))
+  (indices_space,indices_time),interp_basis_spacetime = empirical_interpolation(index_map,cores_space...,core_time)
   lu_interp = lu(interp_basis_spacetime)
   integration_domain = TransientIntegrationDomain(indices_space,indices_time)
   return lu_interp,integration_domain

@@ -106,7 +106,7 @@ j,r = jacobian_and_residual(rbsolver,op,smdeim)
 red_jac = reduced_jacobian(rbsolver,op,j)
 red_res = reduced_residual(rbsolver,op,r)
 
-j1 = j[1][1]
+j1 = r[1]#j[1][1]
 basis = reduced_basis(j1)
 lu_interp,integration_domain = mdeim(rbsolver.mdeim_style,basis)
 
@@ -134,32 +134,26 @@ end
 
 old_lu_interp,old_integration_domain = old_mdeim(rbsolver.mdeim_style,basis)
 
-_get_array(c::AbstractArray) = c
-_get_array(c::SparseCore) = c.array
-_recast_indices!(i,c::AbstractArray) = i
-_recast_indices!(i,c::SparseCore) = recast_indices!(i,c.sparsity.matrix)
-_get_size(c::AbstractArray) = size(c,2)
-_get_size(c::SparseCore) = size(c,2)*size(c,2)
-
+index_map = get_index_map(basis)
 cores = get_cores(basis)
-
-C = _get_array(first(cores))
-A = dropdims(C;dims=1)
-m,n = size(A)
-r = zeros(eltype(A),m)
-I′ = zeros(Int32,n)
-I = Vector{Int32}[]
-s = Int32[]
+C,I,r,Iv = RBSteady._eim_cache(first(cores))
 for i = eachindex(cores)
-  I′,Ai = RBSteady.empirical_interpolation!((I′,r),A)
-  _recast_indices!(I′,cores[i])
-  push!(I,copy(I′))
-  push!(s,_get_size(cores[i]))
+  _,Ai = RBSteady.empirical_interpolation!((I,r,Iv),C)
   if i < length(cores)
-    Ci = reshape(Ai,1,size(Ai)...)
-    A = cores2basis(Ci,_get_array(cores[i+1]))
+    C = RBSteady._next_core(Ai,cores[i+1])
   else
-    Ig = _to_global_indices(I,s)
+    Ig = RBSteady._to_global_indices(Iv,index_map)
     return Ig,Ai
   end
+end
+
+local_indices = Iv
+
+Is...,It = local_indices
+Igt = It
+Igs = copy(It)
+for (i,ii) in enumerate(Igt)
+  igti = RBSteady._global_index(ii,last(Is))
+  Igt[i] = igti
+  Igs[i] = index_map[RBSteady._global_index(igti,Is)]
 end
