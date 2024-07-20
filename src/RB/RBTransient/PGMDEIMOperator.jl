@@ -408,19 +408,19 @@ function Algebra.solve(
   op::TransientRBOperator,
   r::TransientParamRealization)
 
-  stats = @timed begin
-    fesolver = get_fe_solver(solver)
-    trial = get_trial(op)(r)
-    fe_trial = get_fe_trial(op)(r)
-    x̂ = zero_free_values(trial)
-    y = zero_free_values(fe_trial)
-    odecache = allocate_odecache(fesolver,op,r,(y,))
-    solve!((x̂,),fesolver,op,r,(y,),odecache)
-  end
+  fesolver = get_fe_solver(solver)
+  trial = get_trial(op)(r)
+  fe_trial = get_fe_trial(op)(r)
+  x̂ = zero_free_values(trial)
+  y = zero_free_values(fe_trial)
+  odecache = allocate_odecache(fesolver,op,r,(y,))
+
+  stats = @timed solve!((x̂,),fesolver,op,r,(y,),odecache)
 
   x = recast(x̂,trial)
   i = get_vector_index_map(op)
   s = Snapshots(x,i,r)
-  cs = ComputationalStats(stats,num_params(r))
-  return s,cs
+  cost = ComputationalStats(stats,num_params(r))
+
+  return s,cost
 end

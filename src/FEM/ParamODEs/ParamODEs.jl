@@ -87,7 +87,9 @@ include("ODEParamOpFromTFEOp.jl")
 include("ThetaMethod.jl")
 
 export ODEParamSolution
-export ODEParamSolution
+export IterativeCostTracker
+export initialize_tracker
+export update_tracker!
 include("ODEParamSolution.jl")
 
 export TransientParamFESolution

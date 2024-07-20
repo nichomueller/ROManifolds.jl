@@ -93,15 +93,22 @@ end
 struct ComputationalStats
   avg_time::Float64
   avg_nallocs::Float64
-  function ComputationalStats(stats::NamedTuple,nruns::Integer)
-    avg_time = stats[:time] / nruns
-    avg_nallocs = stats[:bytes] / (1e6*nruns)
-    new(avg_time,avg_nallocs)
-  end
+end
+
+function ComputationalStats(stats::NamedTuple,nruns::Integer)
+  avg_time = stats[:time] / nruns
+  avg_nallocs = stats[:bytes] / (1e6*nruns)
+  ComputationalStats(avg_time,avg_nallocs)
 end
 
 get_avg_time(c::ComputationalStats) = c.avg_time
 get_avg_nallocs(c::ComputationalStats) = c.avg_nallocs
+
+function get_stats(t::IterativeCostTracker)
+  avg_time = t.time / t.nruns
+  avg_nallocs = t.nallocs / t.nruns
+  ComputationalStats(avg_time,avg_nallocs)
+end
 
 """
     struct RBResults{A,B,BA,C,D}

@@ -55,9 +55,8 @@ end
 
 function RBSteady.mdeim(mdeim_style::MDEIMStyle,b::TransientTTSVDCores)
   index_map = get_index_map(b)
-  cores_space = get_cores_space(b)
-  core_time = get_core_time(b)
-  (indices_space,indices_time),interp_basis_spacetime = empirical_interpolation(index_map,cores_space...,core_time)
+  cores = get_cores(b)
+  (indices_space,indices_time),interp_basis_spacetime = empirical_interpolation(index_map,cores...)
   lu_interp = lu(interp_basis_spacetime)
   integration_domain = TransientIntegrationDomain(indices_space,indices_time)
   return lu_interp,integration_domain

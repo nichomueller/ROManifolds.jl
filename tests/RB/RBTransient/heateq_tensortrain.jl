@@ -82,10 +82,37 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+# rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=20,nsnaps_test=1,nsnaps_mdeim=10)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
-fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
+params = [
+  [0.1,0.9,0.5],
+  [0.2,0.4,0.8],
+  [0.3,0.7,0.4],
+  [0.9,0.2,0.4],
+  [0.5,0.5,0.6],
+  [0.8,0.4,0.2],
+  [0.3,0.4,0.3],
+  [0.1,0.2,0.9],
+  [0.9,0.2,0.1],
+  [0.4,0.6,0.5],
+  [0.2,0.5,0.5],
+  [0.1,0.2,1.0],
+  [0.2,0.7,0.1],
+  [0.2,0.2,0.2],
+  [0.9,0.5,0.1],
+  [0.8,0.7,0.2],
+  [0.1,0.1,0.7],
+  [0.1,0.7,0.9],
+  [0.4,0.4,0.1],
+  [0.4,0.3,0.5],
+  [0.2,0.3,0.6]
+]
+r = TransientParamRealization(ParamRealization(params),t0:dt:tf)
+fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ;r)
+
+# fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)

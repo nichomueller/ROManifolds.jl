@@ -54,8 +54,8 @@ end
 
 function empirical_interpolation(A::ParamSparseMatrix)
   I,Ai = empirical_interpolation(A.data)
-  recast_indices!(I,param_getindex(A,1))
-  return I,Ai
+  I′ = recast_indices(I,param_getindex(A,1))
+  return I′,Ai
 end
 
 function _global_index(i,local_indices::Vector{Vector{Int32}})
@@ -74,7 +74,7 @@ end
 
 function _global_index(i,Il::Vector{Int32})
   rankl = length(Il)
-  li = fast_index(i,rankl)
+  li = Il[fast_index(i,rankl)]
   gi = slow_index(i,rankl)
   return li,gi
 end
