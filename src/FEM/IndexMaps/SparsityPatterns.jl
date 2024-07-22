@@ -30,6 +30,8 @@ num_rows(a::SparsityPatternCSC) = size(a.matrix,1)
 num_cols(a::SparsityPatternCSC) = size(a.matrix,2)
 SparseArrays.findnz(a::SparsityPatternCSC) = findnz(a.matrix)
 SparseArrays.nnz(a::SparsityPatternCSC) = nnz(a.matrix)
+SparseArrays.nzrange(a::SparsityPatternCSC,row::Integer) = nzrange(a.matrix,row)
+SparseArrays.rowvals(a::SparsityPatternCSC) = rowvals(a.matrix)
 get_nonzero_indices(a::SparsityPatternCSC) = get_nonzero_indices(a.matrix)
 
 """

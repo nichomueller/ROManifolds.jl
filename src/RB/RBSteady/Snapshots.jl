@@ -271,7 +271,7 @@ Base.size(s::ReshapedSnapshots) = s.size
 
 function Base.reshape(s::AbstractSnapshots,dims::Dims)
   n = length(s)
-  prod(dims) == n || Base._throw_dmrs(n,"size",dims)
+  prod(dims) == n || DimensionMismatch()
 
   strds = Base.front(Base.size_to_strides(map(length,axes(s))..., 1))
   strds1 = map(s->max(1,Int(s)),strds)

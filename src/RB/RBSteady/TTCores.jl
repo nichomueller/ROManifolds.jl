@@ -289,24 +289,53 @@ end
 
 function compress_core(a::AbstractArray{T,3},btest::AbstractArray{S,3};kwargs...) where {T,S}
   TS = promote_type(T,S)
-  ab = zeros(TS,size(btest,1),size(a,1),size(btest,3),size(a,3))
-  @inbounds for i = CartesianIndices(size(ab))
-    ib1,ia1,ib3,ia3 = Tuple(i)
-    ab[i] = btest[ib1,:,ib3]'*a[ia1,:,ia3]
+  ra_prev,ra = size(a,1),size(a,3)
+  rV_prev,rV = size(btest,1),size(btest,3)
+  ab = zeros(TS,rV_prev,ra_prev,rV,ra)
+  for ib1 = 1:rV_prev
+    @inbounds b′ = btest[ib1,:,:]
+    for ia1 = 1:ra_prev
+      @inbounds a′ = a[ia1,:,:]
+      for ib3 = 1:rV
+        @inbounds b′′ = b′[:,ib3]
+        for ia3 = 1:ra
+          @inbounds a′′ = a′[:,ia3]
+          @inbounds ab[ib1,ia1,ib3,ia3] = dot(b′′,a′′)
+        end
+      end
+    end
   end
   return ab
 end
 
-function compress_core(a::AbstractArray{T,4},btrial::AbstractArray{S,3},btest::AbstractArray{S,3};
+function compress_core(a::SparseCore{T},btrial::AbstractArray{S,3},btest::AbstractArray{S,3};
   kwargs...) where {T,S}
 
   TS = promote_type(T,S)
-  bab = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,4),size(btrial,3))
+  ra_prev,ra = size(a,1),size(a,4)
+  rU_prev,rU = size(btrial,1),size(btrial,3)
+  rV_prev,rV = size(btest,1),size(btest,3)
+  bab = zeros(TS,rV_prev,ra_prev,rU_prev,rV,ra,rU)
   w = zeros(TS,size(a,2))
-  @inbounds for i = CartesianIndices(size(bab))
-    ibV1,ia1,ibU1,ibV3,ia4,ibU3 = Tuple(i)
-    mul!(w,a[ia1,:,:,ia4],btrial[ibU1,:,ibU3])
-    bab[i] = btest[ibV1,:,ibV3]'*w
+  for ibU1 = 1:rU_prev
+    @inbounds bU′ = btrial[ibU1,:,:]
+    for ia1 = 1:ra_prev
+      @inbounds a′ = a.array[ia1,:,:]
+      for ibU3 = 1:rU
+        @inbounds bU′′ = bU′[:,ibU3]
+        for ia3 = 1:ra
+          @inbounds a′′ = a′[:,ia3]
+          _sparsemul!(w,a′′,bU′′,a.sparsity)
+          for ibV1 = 1:rV_prev
+            @inbounds bV′ = btest[ibV1,:,:]
+            for ibV3 = 1:rV
+              @inbounds bV′′ = bV′[:,ibV3]
+              @inbounds bab[ibV1,ia1,ibU1,ibV3,ia3,ibU3] = dot(bV′′,w)
+            end
+          end
+        end
+      end
+    end
   end
   return bab
 end
@@ -314,22 +343,54 @@ end
 function multiply_cores(a::AbstractArray{T,4},b::AbstractArray{S,4}) where {T,S}
   @check (size(a,3)==size(b,1) && size(a,4)==size(b,2))
   TS = promote_type(T,S)
-  ab = zeros(TS,size(a,1),size(a,2),size(b,3),size(b,4))
-  @inbounds for i = CartesianIndices(size(ab))
-    ia1,ia2,ib3,ib4 = Tuple(i)
-    ab[i] = dot(a[ia1,ia2,:,:],b[:,:,ib3,ib4])
+  ra1,ra2 = size(a,1),size(a,2)
+  rb3,rb4 = size(b,3),size(b,4)
+  ab = zeros(TS,ra1,ra2,rb3,rb4)
+
+  for ia1 = 1:ra1
+    @inbounds a′ = a[ia1,:,:,:]
+    for ia2 = 1:ra2
+      @inbounds a′′ = a′[ia2,:,:]
+      for ib3 = 1:rb3
+        @inbounds b′ = b[:,:,ib3,:]
+        for ib4 = 1:rb4
+          @inbounds b′′ = b′[:,:,ib4]
+          @inbounds ab[ia1,ia2,ib3,ib4] = dot(a′′,b′′)
+        end
+      end
+    end
   end
+
   return ab
 end
 
 function multiply_cores(a::AbstractArray{T,6},b::AbstractArray{S,6}) where {T,S}
   @check (size(a,4)==size(b,1) && size(a,5)==size(b,2) && size(a,6)==size(b,3))
   TS = promote_type(T,S)
-  ab = zeros(TS,size(a,1),size(a,2),size(a,3),size(b,4),size(b,5),size(b,6))
-  @inbounds for i = CartesianIndices(size(ab))
-    ia1,ia2,ia3,ib4,ib5,ib6 = Tuple(i)
-    ab[i] = dot(a[ia1,ia2,ia3,:,:,:],b[:,:,:,ib4,ib5,ib6])
+  ra1,ra2,ra3 = size(a,1),size(a,2),size(a,3)
+  rb4,rb5,rb6 = size(b,4),size(b,5),size(b,6)
+  ab = zeros(TS,ra1,ra2,ra3,rb4,rb5,rb6)
+
+  for ia1 = 1:ra1
+    @inbounds a′ = a[ia1,:,:,:,:,:]
+    for ia2 = 1:ra2
+      @inbounds a′′ = a′[ia2,:,:,:,:]
+      for ia3 = 1:ra3
+        @inbounds a′′′ = a′′[ia3,:,:,:]
+        for ib4 = 1:rb4
+          @inbounds b′ = b[:,:,:,ib4,:,:]
+          for ib5 = 1:rb5
+            @inbounds b′′ = b′[:,:,:,ib5,:]
+            for ib6 = 1:rb6
+              @inbounds b′′′ = b′′[:,:,:,ib6]
+              @inbounds ab[ia1,ia2,ia3,ib4,ib5,ib6] = dot(a′′′,b′′′)
+            end
+          end
+        end
+      end
+    end
   end
+
   return ab
 end
 
@@ -385,6 +446,17 @@ function _kronadd!(c::AbstractMatrix,a::AbstractVector,b::AbstractMatrix)
     ai = a[cld(i,rb)]
     for j in axes(c,2)
       @inbounds c[i,j] += ai*b[(i-1)%rb+1,(j-1)%cb+1]
+    end
+  end
+end
+
+function _sparsemul!(c::AbstractVector,nzv::AbstractVector,b::AbstractVector,sparsity::SparsityPatternCSC)
+  rv = rowvals(sparsity)
+  fill!(c,zero(eltype(c)))
+  @inbounds for icol in eachindex(b)
+    bi = b[icol]
+    for irow in nzrange(sparsity,icol)
+      c[rv[irow]] += nzv[irow]*bi
     end
   end
 end
