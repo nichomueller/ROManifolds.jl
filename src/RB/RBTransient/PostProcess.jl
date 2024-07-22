@@ -53,29 +53,36 @@ function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...;kw
   rb_results(solver,feop,args...;kwargs...)
 end
 
-function RBSteady.compute_error(sol::ModeTransientSnapshots,sol_approx::ModeTransientSnapshots,norm_matrix)
+function RBSteady.compute_error(
+  sol::AbstractTransientSnapshots{T,N},
+  sol_approx::AbstractTransientSnapshots{T,N},
+  norm_matrix) where {T,N}
+
+  @check size(sol) == size(sol_approx)
   err_norm = zeros(num_times(sol))
   sol_norm = zeros(num_times(sol))
   space_time_norm = zeros(num_params(sol))
-  @inbounds for i = axes(sol,2)
-    it = fast_index(i,num_times(sol))
-    ip = slow_index(i,num_times(sol))
-    err_norm[it] = RBSteady._norm(sol[:,i]-sol_approx[:,i],norm_matrix)
-    sol_norm[it] = RBSteady._norm(sol[:,i],norm_matrix)
-    if mod(i,num_params(sol)) == 0
-      space_time_norm[ip] = norm(err_norm) / norm(sol_norm)
+  @inbounds for ip = 1:num_params(sol)
+    solip = selectdim(sol,N,ip)
+    solip_approx = selectdim(sol_approx,N,ip)
+    for it in 1:num_times(sol)
+      solitp = selectdim(solip,N-1,it)
+      solitp_approx = selectdim(solip_approx,N-1,it)
+      err_norm[it] = RBSteady._norm(solitp-solitp_approx,norm_matrix)
+      sol_norm[it] = RBSteady._norm(solitp,norm_matrix)
     end
+    space_time_norm[ip] = norm(err_norm) / norm(sol_norm)
   end
   avg_error = sum(space_time_norm) / length(space_time_norm)
   return avg_error
 end
 
 function RBSteady.compute_error(
-  sol::ModeTransientSnapshots,
-  sol_approx::ModeTransientSnapshots,
+  sol::AbstractTransientSnapshots,
+  sol_approx::AbstractTransientSnapshots,
   norm_matrix::AbstractTProductArray)
 
-  compute_error(sol,sol_approx,kron(norm_matrix))
+  compute_error(sol,sol_approx,TProduct.tp_decomposition(norm_matrix))
 end
 
 function RBSteady.average_plot(

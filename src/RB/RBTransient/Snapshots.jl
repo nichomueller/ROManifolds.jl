@@ -271,7 +271,7 @@ function RBSteady.get_indexed_values(
   ConsecutiveArrayOfArrays(v)
 end
 
-function ParamDataStructures.get_values(
+function RBSteady.get_indexed_values(
   s::TransientSnapshotsAtIndices{T,N,L,D,I,R,<:TransientSnapshots}
   ) where {T,N,L,D,I,R}
 

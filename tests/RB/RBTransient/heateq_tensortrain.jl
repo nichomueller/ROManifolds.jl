@@ -93,54 +93,25 @@ results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 println(compute_error(results))
 println(compute_speedup(results))
 
-using Gridap.CellData
-using Gridap.FESpaces
-using Gridap.ODEs
-using Mabla.FEM.IndexMaps
-
-red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-op = get_algebraic_operator(feop)
-op = TransientPGOperator(op,red_trial,red_test)
-smdeim = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
-j,r = jacobian_and_residual(rbsolver,op,smdeim)
-red_jac = reduced_jacobian(rbsolver,op,j)
-red_res = reduced_residual(rbsolver,op,r)
-
-j1 = j[1][1] #r[1]#
-basis = reduced_basis(j1)
-proj_basis = reduce_operator(rbsolver.mdeim_style,basis,red_trial,red_test)
-
-cB,cU,cV = basis.cores_space[1],red_trial.basis.cores_space[1],red_test.basis.cores_space[1]
-cc = compress_core(cB,cU,cV)
-oldcc = old_compress_core(cB,cU,cV)
-
-w = zeros(Float64,size(cB,2))
-mul!(w,cB[ia1,:,:,ia4],cU[ibU1,:,ibU3])
-
-err = cc - oldcc
-ibV1,ia1,ibU1,ibV3,ia4,ibU3 = 1,1,1,1,2,1
-wold = zeros(Float64,size(cB,2))
-mul!(wold,cB[ia1,:,:,ia4],cU[ibU1,:,ibU3])
-
-s = j1[:,:,1,1]
-bs = get_basis_space(basis)
-
-spod = change_index_map(TrivialIndexMap,fesnaps)
-red_trialpod,red_testpod = reduced_fe_space(rbsolver,feop,spod)
-jpod = change_index_map(TrivialIndexMap,j1)
-bpod = reduced_basis(jpod)
-proj_bpod = reduce_operator(rbsolver.mdeim_style,bpod,red_trialpod,red_testpod)
-
-function old_compress_core(a::AbstractArray{T,4},btrial::AbstractArray{S,3},btest::AbstractArray{S,3};
-  kwargs...) where {T,S}
-
-  TS = promote_type(T,S)
-  bab = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,4),size(btrial,3))
-  w = zeros(TS,size(a,2))
-  @inbounds for i = CartesianIndices(size(bab))
-    ibV1,ia1,ibU1,ibV3,ia4,ibU3 = Tuple(i)
-    mul!(w,a[ia1,:,:,ia4],btrial[ibU1,:,ibU3])
-    bab[i] = btest[ibV1,:,ibV3]'*w
+function newerr(sol,sol_approx,norm_matrix)
+  nt,np = 10,10
+  X = kron(norm_matrix)
+  sv = reshape(copy(sol),:,nt*np)
+  sva = reshape(copy(sol_approx),:,nt*np)
+  err_norm = zeros(nt)
+  sol_norm = zeros(nt)
+  space_time_norm = zeros(np)
+  for i = axes(sv,2)
+    it = fast_index(i,nt)
+    ip = slow_index(i,nt)
+    err_norm[it] = RBSteady._norm(sv[:,i]-sva[:,i],X)
+    sol_norm[it] = RBSteady._norm(sv[:,i],X)
+    if mod(i,np) == 0
+      space_time_norm[ip] = norm(err_norm) / norm(sol_norm)
+    end
   end
-  return bab
+  avg_error = sum(space_time_norm) / length(space_time_norm)
+  return avg_error
 end
+
+newerr(results.sol,results.sol_approx,results.norm_matrix)

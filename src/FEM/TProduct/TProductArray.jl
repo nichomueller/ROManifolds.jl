@@ -25,7 +25,7 @@ end
 function tp_decomposition(a::AbstractTProductArray)
   D = tp_length(a)
   T = eltype(get_arrays(a))
-  ka = T[]
+  ka = Vector{T}[]
   for d in 1:tp_length(a)+1
     try kad = tp_decomposition(a,Val{d}(),Val{D}())
       push!(ka,kad)

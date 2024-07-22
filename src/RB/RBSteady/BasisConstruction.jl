@@ -13,9 +13,10 @@ function truncation(s::AbstractVector;ϵ=1e-4,rank::Integer=length(s),squares=fa
   min(rank,tolrank)
 end
 
-function select_modes(U::AbstractMatrix,Σ::AbstractVector,V::AbstractMatrix;kwargs...)
-  rank = truncation(Σ;kwargs...)
-  return U[:,1:rank],Σ[1:rank],V[:,1:rank]
+function select_modes(U::AbstractMatrix,Σ::AbstractVector,V::AbstractMatrix;squares=false,kwargs...)
+  Σ′ = squares ? sqrt.(Σ) : Σ
+  rank = truncation(Σ;squares,kwargs...)
+  return U[:,1:rank],Σ′[1:rank],V[:,1:rank]
 end
 
 function truncated_svd(mat::AbstractMatrix;randomized=false,kwargs...)
@@ -29,9 +30,9 @@ function truncated_svd(mat::AbstractMatrix;randomized=false,kwargs...)
   select_modes(U,Σ,V;kwargs...)
 end
 
-_size_condition(mat::AbstractMatrix) = (
-  length(mat) > 1e6 && (size(mat,1) > 1e2*size(mat,2) || size(mat,2) > 1e2*size(mat,1))
-  )
+ _size_condition(mat::AbstractMatrix) = false #(
+#   length(mat) > 1e6 && (size(mat,1) > 1e2*size(mat,2) || size(mat,2) > 1e2*size(mat,1))
+#   )
 
 
 """
@@ -293,6 +294,27 @@ end
 
 _norm(v::AbstractVector,args...) = norm(v)
 _norm(v::AbstractVector,X::AbstractMatrix) = sqrt(v'*X*v)
+
+function _norm(A::AbstractArray{T,3} where T,X::AbstractVector{<:AbstractMatrix})
+  @check length(X) == 3
+  X12,X3... = X
+  n2 = vec(A)*vec([_norm(M,X12)^2 for M in eachslice(A,dims=3,drop=true)]*X3)
+  return sqrt(n2)
+end
+
+function _norm(M::AbstractMatrix,X::AbstractVector{<:AbstractMatrix})
+  @check length(X) == 2
+  n2 = vec(M)'*vec(X[1]'*M*X[2])
+  return sqrt(n2)
+end
+
+function _norm(a::AbstractArray,X::AbstractVector{<:AbstractVector{<:AbstractMatrix}})
+  vXv = 0.0
+  for Xd in X
+    vXv += _norm(a,Xd)^2
+  end
+  return sqrt(vXv)
+end
 
 """
     gram_schmidt!(mat::AbstractMatrix, basis::AbstractMatrix, args...) -> AbstractMatrix

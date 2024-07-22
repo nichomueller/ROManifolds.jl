@@ -157,8 +157,6 @@ function FESpaces._free_and_dirichlet_values_fill!(
   cell_dofs,
   cells)
 
-  println(typeof(free_vals))
-  println(typeof(dirichlet_vals))
   @check param_length(free_vals) == param_length(dirichlet_vals)
   for cell in cells
     vals = getindex!(cache_vals,cell_vals,cell)

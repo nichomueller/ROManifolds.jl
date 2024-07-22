@@ -184,18 +184,18 @@ function compute_speedup(r::RBResults)
   compute_speedup(r.fem_stats,r.rb_stats)
 end
 
-function compute_error(_sol::AbstractSnapshots,_sol_approx::AbstractSnapshots,args...)
-  sol = flatten_snapshots(_sol)
-  sol_approx = flatten_snapshots(_sol_approx)
-  compute_error(sol,sol_approx,args...)
-end
+function compute_error(
+  sol::AbstractSteadySnapshots{T,N},
+  sol_approx::AbstractSteadySnapshots{T,N},
+  norm_matrix) where {T,N}
 
-function compute_error(sol::UnfoldingSteadySnapshots,sol_approx::UnfoldingSteadySnapshots,norm_matrix)
   @check size(sol) == size(sol_approx)
   space_norm = zeros(num_params(sol))
-  @inbounds for i = axes(sol,2)
-    err_norm = _norm(sol[:,i]-sol_approx[:,i],norm_matrix)
-    sol_norm = _norm(sol[:,i],norm_matrix)
+  @inbounds for i = num_params(sol)
+    soli = selectdim(sol,N,i)
+    soli_approx = selectdim(sol_approx,N,i)
+    err_norm = _norm(soli-soli_approx,norm_matrix)
+    sol_norm = _norm(soli,norm_matrix)
     space_norm[i] = err_norm / sol_norm
   end
   avg_error = sum(space_norm) / length(space_norm)
@@ -203,11 +203,11 @@ function compute_error(sol::UnfoldingSteadySnapshots,sol_approx::UnfoldingSteady
 end
 
 function compute_error(
-  sol::UnfoldingSteadySnapshots,
-  sol_approx::UnfoldingSteadySnapshots,
+  sol::AbstractSteadySnapshots,
+  sol_approx::AbstractSteadySnapshots,
   norm_matrix::AbstractTProductArray)
 
-  compute_error(sol,sol_approx,kron(norm_matrix))
+  compute_error(sol,sol_approx,tp_decomposition(norm_matrix))
 end
 
 function compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
