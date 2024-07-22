@@ -33,7 +33,7 @@ get_indices_time(a::TransientAffineDecomposition) = get_indices_time(get_integra
 
 function _time_indices_and_interp_matrix(::SpaceTimeMDEIM,interp_basis_space,basis_time)
   indices_time,interp_basis_time = empirical_interpolation(basis_time)
-  interp_basis_space_time = kronecker(interp_basis_time,interp_basis_space)
+  interp_basis_space_time = kron(interp_basis_time,interp_basis_space)
   lu_interp = lu(interp_basis_space_time)
   return indices_time,lu_interp
 end

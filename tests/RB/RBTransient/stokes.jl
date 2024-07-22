@@ -24,12 +24,13 @@ pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
-n = 10
+n = 5
 domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain, partition)
 labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
+add_tag_from_tags!(labels,"inlet",[7])
+add_tag_from_tags!(labels,"dirichlet0",[1,2,3,4,5,6])
 
 order = 2
 degree = 2*order
@@ -44,6 +45,9 @@ inflow(μ,t) = 1-cos(2π*t/tf)+sin(μ[2]*2π*t/tf)/μ[1]
 g_in(x,μ,t) = VectorValue(-x[2]*(1-x[2])*inflow(μ,t),0.0)
 g_in(μ,t) = x->g_in(x,μ,t)
 gμt_in(μ,t) = TransientParamFunction(g_in,μ,t)
+g_0(x,μ,t) = VectorValue(0.0,0.0)
+g_0(μ,t) = x->g_in(x,μ,t)
+gμt_0(μ,t) = TransientParamFunction(g_in,μ,t)
 
 u0(x,μ) = VectorValue(0.0,0.0)
 u0(μ) = x->u0(x,μ)
@@ -64,11 +68,11 @@ coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 induced_norm((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
+test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","dirichlet0"])
 trial_u = TransientTrialParamFESpace(test_u,gμt_in)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
-# test_p = TestFESpace(model,reffe_p;conformity=:C0)
+# test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -96,3 +100,9 @@ save(test_dir,results)
 println(compute_error(results))
 println(compute_speedup(results))
 # average_plot(rbop,results;dir=joinpath(test_dir,"plots"))
+
+urand = fesnaps[1][:,5,16]
+rrand = get_realization(fesnaps[1])[16,5:5]
+U = TrialFESpace(trial_u(rrand).dirichlet_values[1],test_u)
+uh = FEFunction(U,urand)
+bu = assemble_vector(q -> ∫(q*(∇⋅uh))dΩ,test_p)

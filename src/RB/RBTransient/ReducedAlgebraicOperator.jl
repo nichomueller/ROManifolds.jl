@@ -14,7 +14,7 @@ function RBSteady.reduce_operator(
   b̂s = bs_test'*bs
   @inbounds for i = eachindex(b̂st)
     b̂si = b̂s[:,i]
-    b̂st[i] = eachcol(kronecker(bt_test',b̂si))
+    b̂st[i] = eachcol(kron(bt_test',b̂si))
   end
 
   return ReducedVectorOperator(mdeim_style,b̂st)
@@ -40,7 +40,7 @@ function RBSteady.reduce_operator(
 
   @inbounds for i = eachindex(b̂st)
     b̂si = bs_test'*param_getindex(bs,i)*bs_trial
-    b̂st[i] = map(k->kronecker(b̂t[k,:,:],b̂si),axes(b̂t,1))
+    b̂st[i] = map(k->kron(b̂t[k,:,:],b̂si),axes(b̂t,1))
   end
 
   return ReducedMatrixOperator(mdeim_style,b̂st)
@@ -63,7 +63,7 @@ function RBSteady.reduce_operator(
 
   b̂s = bs_test'*bs
   b̂t = bt_test'*bt
-  b̂st .= kronecker(b̂t,b̂s)
+  b̂st .= kron(b̂t,b̂s)
 
   return ReducedVectorOperator(mdeim_style,b̂st)
 end
@@ -97,7 +97,7 @@ function RBSteady.reduce_operator(
     for it = 1:num_reduced_times(b)
       ist = (it-1)*RBSteady.num_reduced_space_dofs(b)+is
       b̂ti = b̂t[:,it,:]
-      b̂st[:,ist,:] .= kronecker(b̂ti,b̂si)
+      b̂st[:,ist,:] .= kron(b̂ti,b̂si)
     end
   end
 

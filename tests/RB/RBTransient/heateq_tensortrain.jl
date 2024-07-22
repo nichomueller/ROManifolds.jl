@@ -26,7 +26,7 @@ tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
 # geometry
-n = 5
+n = 20
 domain = (0,1,0,1)
 partition = (n,n)
 model = TProductModel(domain,partition)
@@ -82,37 +82,10 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 ϵ = 1e-4
-# rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=20,nsnaps_test=1,nsnaps_mdeim=10)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
-params = [
-  [0.1,0.9,0.5],
-  [0.2,0.4,0.8],
-  [0.3,0.7,0.4],
-  [0.9,0.2,0.4],
-  [0.5,0.5,0.6],
-  [0.8,0.4,0.2],
-  [0.3,0.4,0.3],
-  [0.1,0.2,0.9],
-  [0.9,0.2,0.1],
-  [0.4,0.6,0.5],
-  [0.2,0.5,0.5],
-  [0.1,0.2,1.0],
-  [0.2,0.7,0.1],
-  [0.2,0.2,0.2],
-  [0.9,0.5,0.1],
-  [0.8,0.7,0.2],
-  [0.1,0.1,0.7],
-  [0.1,0.7,0.9],
-  [0.4,0.4,0.1],
-  [0.4,0.3,0.5],
-  [0.2,0.3,0.6]
-]
-r = TransientParamRealization(ParamRealization(params),t0:dt:tf)
-fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ;r)
-
-# fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
+fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
@@ -133,7 +106,7 @@ j,r = jacobian_and_residual(rbsolver,op,smdeim)
 red_jac = reduced_jacobian(rbsolver,op,j)
 red_res = reduced_residual(rbsolver,op,r)
 
-j1 = r[1]#j[1][1]
+j1 = j[1][1] #r[1]#
 basis = reduced_basis(j1)
 lu_interp,integration_domain = mdeim(rbsolver.mdeim_style,basis)
 
@@ -183,4 +156,124 @@ for (i,ii) in enumerate(Igt)
   igti = RBSteady._global_index(ii,last(Is))
   Igt[i] = igti
   Igs[i] = index_map[RBSteady._global_index(igti,Is)]
+end
+
+# TPOD
+using Mabla.FEM.IndexMaps
+using BlockArrays
+using SparseArrays
+using LinearAlgebra
+_dΩ = dΩ.measure
+
+_induced_norm(u,v) = ∫(v*u)_dΩ + ∫(∇(v)⋅∇(u))_dΩ
+
+_test = TestFESpace(model.model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
+_trial = TransientTrialParamFESpace(_test,gμt)
+_feop = TransientParamLinearFEOperator((stiffness,mass),res,_induced_norm,ptspace,
+  _trial,_test,trian_res,trian_stiffness,trian_mass)
+
+_fesnaps,_festats = fe_solutions(rbsolver,_feop,uh0μ;r)
+
+_rbop = reduced_operator(rbsolver,_feop,_fesnaps)
+_rbsnaps,_rbstats = solve(rbsolver,_rbop,_fesnaps)
+_results = rb_results(rbsolver,_rbop,_fesnaps,_rbsnaps,festats,_rbstats)
+
+println(compute_error(_results))
+
+ad = rbop.lhs[1][1]
+_ad = _rbop.lhs[1][1]
+
+
+# old mdeim
+using Gridap.CellData
+using Gridap.FESpaces
+using Gridap.ODEs
+using Mabla.FEM.IndexMaps
+
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+op = get_algebraic_operator(feop)
+op = TransientPGOperator(op,red_trial,red_test)
+smdeim = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
+j,r = jacobian_and_residual(rbsolver,op,smdeim)
+red_jac = old_reduced_jacobian(rbsolver,op,j)
+red_res = old_reduced_residual(rbsolver,op,r)
+
+red_lhs,red_rhs = red_jac,red_res
+trians_rhs = get_domains(red_rhs)
+trians_lhs = map(get_domains,red_lhs)
+new_op = change_triangulation(op,trians_rhs,trians_lhs)
+rbop_old = TransientPGMDEIMOperator(new_op,red_lhs,red_rhs)
+rbsnaps_old,rbstats_old = solve(rbsolver,rbop_old,fesnaps)
+results_old = rb_results(rbsolver,rbop_old,fesnaps,rbsnaps_old,festats,rbstats_old)
+println(compute_error(results_old))
+
+using PartitionedArrays
+
+function old_mdeim(mdeim_style,b::TransientTTSVDCores)
+  i = get_index_map(b)
+  bst = RBTransient.get_basis_spacetime(i,get_cores(b)...)
+  indices_spacetime,interp_basis_spacetime = empirical_interpolation(bst)
+  indices_space = fast_index(indices_spacetime,num_space_dofs(b))
+  indices_time = slow_index(indices_spacetime,num_space_dofs(b))
+  lu_interp = lu(interp_basis_spacetime)
+  integration_domain = TransientIntegrationDomain(indices_space,indices_time)
+  return lu_interp,integration_domain
+end
+
+function old_reduced_form(
+  solver::RBSolver,
+  s::AbstractSnapshots,
+  trian::Triangulation,
+  args...;
+  kwargs...)
+
+  mdeim_style = solver.mdeim_style
+  basis = reduced_basis(s;ϵ=RBSteady.get_tol(solver))
+  lu_interp,integration_domain = old_mdeim(mdeim_style,basis)
+  proj_basis = reduce_operator(mdeim_style,basis,args...;kwargs...)
+  red_trian = RBSteady.reduce_triangulation(trian,integration_domain,args...)
+  coefficient = RBSteady.allocate_coefficient(solver,basis)
+  result = RBSteady.allocate_result(solver,args...)
+  ad = AffineDecomposition(proj_basis,lu_interp,integration_domain,coefficient,result)
+  return ad,red_trian
+end
+
+function old_reduced_residual(solver::RBSolver,op,s::AbstractSnapshots,trian::Triangulation)
+  test = get_test(op)
+  old_reduced_form(solver,s,trian,test)
+end
+
+function old_reduced_jacobian(solver::RBSolver,op,s::AbstractSnapshots,trian::Triangulation;kwargs...)
+  trial = get_trial(op)
+  test = get_test(op)
+  old_reduced_form(solver,s,trian,trial,test;kwargs...)
+end
+
+function old_reduced_jacobian(
+  solver::ThetaMethodRBSolver,
+  op::TransientRBOperator,
+  contribs::Tuple{Vararg{Any}})
+
+  fesolver = get_fe_solver(solver)
+  θ = fesolver.θ
+  a = ()
+  for (i,c) in enumerate(contribs)
+    combine = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*(x-y)
+    a = (a...,old_reduced_jacobian(solver,op,c;combine))
+  end
+  return a
+end
+
+function old_reduced_residual(solver::RBSolver,op,c::ArrayContribution)
+  a,trians = map(get_domains(c),get_values(c)) do trian,values
+    old_reduced_residual(solver,op,values,trian)
+  end |> tuple_of_arrays
+  return Contribution(a,trians)
+end
+
+function old_reduced_jacobian(solver::RBSolver,op,c::ArrayContribution;kwargs...)
+  a,trians = map(get_domains(c),get_values(c)) do trian,values
+    old_reduced_jacobian(solver,op,values,trian;kwargs...)
+  end |> tuple_of_arrays
+  return Contribution(a,trians)
 end

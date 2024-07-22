@@ -158,7 +158,9 @@ function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
   ab = zeros(TS,size(a,1),nrows,size(b,3))
   for i = axes(a,1), j = axes(b,3)
     for α = axes(a,3)
-      @inbounds @views ab[i,:,j] += kronecker(b[α,:,j],a[i,:,α])
+      @inbounds cache = ab[i,:,j]
+      _kronadd!(cache,b[α,:,j],a[i,:,α])
+      @inbounds ab[i,:,j] = cache
     end
   end
   return ab
@@ -173,7 +175,9 @@ function _cores2basis(a::AbstractArray{S,4},b::AbstractArray{T,3}) where {S,T}
   ab = zeros(TS,size(a,1),nrows*ncols,size(b,3)) # returns a 3-D array
   for i = axes(a,1), j = axes(b,3)
     for α = axes(a,4)
-      @inbounds @views ab[i,:,j] += vec(kronecker(b[α,:,j],a[i,:,:,α]))
+      @inbounds cache = ab[i,:,j]
+      _kronadd!(cache,b[α,:,j],a[i,:,:,α])
+      @inbounds ab[i,:,j] = cache
     end
   end
   return ab
@@ -234,18 +238,24 @@ function _cores2basis(
 end
 
 function _cores2basis!(ab,I::AbstractIndexMap,a,b)
+  vI = vec(I)
   for i = axes(a,1), j = axes(b,4)
     for α = axes(a,4)
-      @inbounds @views ab[i,vec(I),j] += kronecker(b.array[α,:,j],a.array[i,:,α])
+      @inbounds cache = ab[i,vI,j]
+      _kronadd!(cache,b.array[α,:,j],a.array[i,:,α])
+      @inbounds ab[i,vI,j] = cache
     end
   end
   return ab
 end
 
 function _cores2basis!(abc,I::AbstractIndexMap,a,b,c)
+  vI = vec(I)
   for i = axes(a,1), j = axes(c,4)
     for α = axes(a,4), β = axes(b,4)
-      @inbounds @views abc[i,vec(I),j] += kronecker(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α])
+      @inbounds cache = ab[i,vI,j]
+      _kronadd!(cache,c.array[β,:,j],b.array[α,:,β],a.array[i,:,α])
+      @inbounds abc[i,vI,j] = cache
     end
   end
   return abc
@@ -257,7 +267,7 @@ function _cores2basis!(ab,I::FixedDofsIndexMap,a,b)
   nz_indices = findall(I[:].!=0)
   for i = axes(a,1), j = axes(b,4)
     for α = axes(a,4)
-      @inbounds @views ab[i,vec(I),j] += kronecker(b.array[α,:,j],a.array[i,:,α]
+      @inbounds @views ab[i,vec(I),j] += kron(b.array[α,:,j],a.array[i,:,α]
         )[nz_indices]
     end
   end
@@ -268,7 +278,7 @@ function _cores2basis!(abc,I::FixedDofsIndexMap,a,b,c)
   nz_indices = findall(I[:].!=0)
   for i = axes(a,1), j = axes(c,4)
     for α = axes(a,4), β = axes(b,4)
-      @inbounds @views abc[i,vec(I),j] += kronecker(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α]
+      @inbounds @views abc[i,vec(I),j] += kron(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α]
         )[nz_indices]
     end
   end
@@ -336,4 +346,45 @@ end
 function _dropdims(a::AbstractArray{T,6}) where T
   @check size(a,1) == size(a,2) == size(a,3) == 1
   dropdims(a;dims=(1,2,3))
+end
+
+function _kronadd!(c::AbstractVector,a::AbstractVector,b::AbstractVector)
+  @check length(c) == length(a)*length(b)
+  rb = length(b)
+  for i in eachindex(c)
+    @inbounds c[i] += a[cld(i,rb)]*b[(i-1)%rb+1]
+  end
+end
+
+function _kronadd!(c::AbstractMatrix,a::AbstractMatrix,b::AbstractMatrix)
+  @check size(c,1) == size(a,1)*size(b,1)
+  @check size(c,2) == size(a,2)*size(b,2)
+  rb,cb = size(b)
+  for i in axes(c,1), j in axes(c,2)
+    @inbounds c[i,j] += a[cld(i,rb),cld(j,cb)]*b[(i-1)%rb+1,(j-1)%cb+1]
+  end
+end
+
+function _kronadd!(c::AbstractMatrix,a::AbstractMatrix,b::AbstractVector)
+  @check size(c,1) == size(a,1)*size(b,1)
+  @check size(c,2) == size(a,2)
+  rb = length(b)
+  for i in axes(c,1)
+    bi = b[(i-1)%rb+1]
+    for j in axes(c,2)
+      @inbounds c[i,j] += a[cld(i,rb),j]*bi
+    end
+  end
+end
+
+function _kronadd!(c::AbstractMatrix,a::AbstractVector,b::AbstractMatrix)
+  @check size(c,1) == size(a,1)*size(b,1)
+  @check size(c,2) == size(b,2)
+  rb,cb = size(b)
+  for i in axes(c,1)
+    ai = a[cld(i,rb)]
+    for j in axes(c,2)
+      @inbounds c[i,j] += ai*b[(i-1)%rb+1,(j-1)%cb+1]
+    end
+  end
 end

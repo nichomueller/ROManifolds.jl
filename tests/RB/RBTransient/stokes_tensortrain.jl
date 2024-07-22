@@ -129,21 +129,36 @@ red_jac = reduced_jacobian(rbsolver,op,j)
 red_res = reduced_residual(rbsolver,op,r)
 
 j1 = j[1][1]
-trian = get_domains(j1)[1]
-basis = reduced_basis(j1[1,1];randomized=true)
+basis = reduced_basis(j1[1,1])
 lu_interp,integration_domain = mdeim(rbsolver.mdeim_style,basis)
 red_trial1,red_test1 = red_trial[1],red_test[1]
 proj_basis = reduce_operator(rbsolver.mdeim_style,basis,red_trial1,red_test1)
 
-mat_k = reshape(j1[1,1],size(j1[1,1],1),:)
-Ur,Σr,Vr = RBSteady._tpod(mat_k;randomized=true)
+b,b_trial,b_test = basis,RBSteady.get_basis(red_trial1),RBSteady.get_basis(red_test1)
+b1 = get_cores(b)[1]
+b_trial1 = get_cores(RBSteady.get_basis(red_trial1))[1]
+b_test1 = get_cores(RBSteady.get_basis(red_test1))[1]
+compress_core(b1,b_trial1,b_test1)
 
-@time cores_space...,core_time = ttsvd(j1[1,1];randomized=true)
-@time cores_space′ = recast(j1[1,1],cores_space)
-index_map = get_index_map(j1[1,1])
-@time TransientTTSVDCores(cores_space′,core_time,index_map)
+# boh = ttsvd(j1[1,1])
+mat = j1[1,1]
+sizes = size(mat)
+T,N = eltype(mat),ndims(mat)
+cores = Vector{Array{T,3}}(undef,N-1)
+ranks = fill(1,N)
 
-# reduced_form(rbsolver,j[1,1],trian,trial[j],test[i];kwargs...)
+k = 1
+mat_k = reshape(mat,ranks[k]*sizes[k],:)
+Ur,Σr,Vr = RBSteady._tpod(mat_k)
+rank = size(Ur,2)
+ranks[k+1] = rank
+mat = reshape(Σr.*Vr',rank,sizes[k+1],:)
+cores[k] = reshape(Ur,ranks[k],sizes[k],rank)
+
+######
+# mat_k*mat_k'
+v = get_values(mat_k)
+
 
 # TPOD
 using Mabla.FEM.IndexMaps

@@ -15,6 +15,7 @@ Subtypes:
 abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractParamRealization} <: AbstractParamContainer{T,N,L} end
 
 ParamDataStructures.get_values(s::AbstractSnapshots) = @abstractmethod
+get_indexed_values(s::AbstractSnapshots) = @abstractmethod
 IndexMaps.get_index_map(s::AbstractSnapshots) = @abstractmethod
 get_realization(s::AbstractSnapshots) = @abstractmethod
 
@@ -151,6 +152,12 @@ ParamDataStructures.get_values(s::BasicSnapshots) = s.data
 IndexMaps.get_index_map(s::BasicSnapshots) = s.index_map
 get_realization(s::BasicSnapshots) = s.realization
 
+function get_indexed_values(s::BasicSnapshots)
+  vi = vec(get_index_map(s))
+  v = consecutive_getindex(s.data,vi,:)
+  ConsecutiveArrayOfArrays(v)
+end
+
 Base.@propagate_inbounds function Base.getindex(
   s::BasicSnapshots{T,N},
   i::Vararg{Integer,N}
@@ -196,6 +203,12 @@ ParamDataStructures.param_data(s::SnapshotsAtIndices) = param_data(s.snaps)
 
 function ParamDataStructures.get_values(s::SnapshotsAtIndices)
   v = consecutive_getindex(s.snaps.data,:,param_indices(s))
+  ConsecutiveArrayOfArrays(v)
+end
+
+function get_indexed_values(s::SnapshotsAtIndices)
+  vi = vec(get_index_map(s))
+  v = consecutive_getindex(s.snaps.data,vi,param_indices(s))
   ConsecutiveArrayOfArrays(v)
 end
 
@@ -298,6 +311,11 @@ function ParamDataStructures.get_values(s::ReshapedSnapshots)
   reshape(v.data,s.size)
 end
 
+function get_indexed_values(s::ReshapedSnapshots)
+  v = get_indexed_values(s.snaps)
+  reshape(v.data,s.size)
+end
+
 const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = BasicSnapshots{T,N,L,D,I,R,A}
 
 """
@@ -335,31 +353,31 @@ function IndexMaps.recast(s::UnfoldingSteadySnapshots,a::AbstractMatrix)
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::AbstractSnapshots{S,2}) where {T,S}
-  consecutive_mul(get_values(A),get_values(B))
+  consecutive_mul(get_indexed_values(A),get_indexed_values(B))
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::Adjoint{S,<:AbstractSnapshots}) where {T,S}
-  consecutive_mul(get_values(A),adjoint(get_values(B.parent)))
+  consecutive_mul(get_indexed_values(A),adjoint(get_indexed_values(B.parent)))
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::AbstractMatrix{S}) where {T,S}
-  consecutive_mul(get_values(A),B)
+  consecutive_mul(get_indexed_values(A),B)
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::Adjoint{T,<:AbstractMatrix{S}}) where {T,S}
-  consecutive_mul(get_values(A),B)
+  consecutive_mul(get_indexed_values(A),B)
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractSnapshots{T,2}},B::AbstractSnapshots{S,2}) where {T,S}
-  consecutive_mul(adjoint(get_values(A.parent)),get_values(B))
+  consecutive_mul(adjoint(get_indexed_values(A.parent)),get_indexed_values(B))
 end
 
 function Base.:*(A::AbstractMatrix{T},B::AbstractSnapshots{S,2}) where {T,S}
-  consecutive_mul(A,get_values(B))
+  consecutive_mul(A,get_indexed_values(B))
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::AbstractSnapshots{S,2}) where {T,S}
-  consecutive_mul(A,get_values(B))
+  consecutive_mul(A,get_indexed_values(B))
 end
 
 """
@@ -442,6 +460,10 @@ get_realization(s::BlockSnapshots) = get_realization(testitem(s))
 
 function ParamDataStructures.get_values(s::BlockSnapshots)
   map(get_values,s.array) |> mortar
+end
+
+function get_indexed_values(s::BlockSnapshots)
+  map(get_indexed_values,s.array) |> mortar
 end
 
 function IndexMaps.change_index_map(f,s::BlockSnapshots{S,N}) where {S,N}
