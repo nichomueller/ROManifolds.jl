@@ -92,26 +92,3 @@ results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 println(compute_error(results))
 println(compute_speedup(results))
-
-function newerr(sol,sol_approx,norm_matrix)
-  nt,np = 10,10
-  X = kron(norm_matrix)
-  sv = reshape(copy(sol),:,nt*np)
-  sva = reshape(copy(sol_approx),:,nt*np)
-  err_norm = zeros(nt)
-  sol_norm = zeros(nt)
-  space_time_norm = zeros(np)
-  for i = axes(sv,2)
-    it = fast_index(i,nt)
-    ip = slow_index(i,nt)
-    err_norm[it] = RBSteady._norm(sv[:,i]-sva[:,i],X)
-    sol_norm[it] = RBSteady._norm(sv[:,i],X)
-    if mod(i,np) == 0
-      space_time_norm[ip] = norm(err_norm) / norm(sol_norm)
-    end
-  end
-  avg_error = sum(space_time_norm) / length(space_time_norm)
-  return avg_error
-end
-
-newerr(results.sol,results.sol_approx,results.norm_matrix)

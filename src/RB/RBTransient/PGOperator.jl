@@ -77,6 +77,23 @@ function ParamSteady.change_triangulation(
   TransientPGOperator(change_triangulation(op.op,trians_rhs,trians_lhs;kwargs...),op.trial,op.test)
 end
 
+function ODEs.allocate_odecache(
+  fesolver::ThetaMethod,
+  op::TransientPGOperator,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractParamVector}})
+
+  dt,θ = fesolver.dt,fesolver.θ
+  dtθ = θ*dt
+  shift!(r,dt*(θ-1))
+
+  (odeslvrcache,odeopcache) = allocate_odecache(fesolver,op.op,r,us)
+  update_odeopcache!(odeopcache,op.op,r)
+  shift!(r,dt*(1-θ))
+
+  return (odeslvrcache,odeopcache)
+end
+
 function ODEs.allocate_odeopcache(
   op::TransientPGOperator,
   r::TransientParamRealization,
@@ -90,6 +107,8 @@ function ODEs.update_odeopcache!(
   op::TransientPGOperator,
   r::TransientParamRealization)
 
+  @warn "For performance reasons, it would be best to update the cache at the very
+    start, given that the online phase of a space-time ROM is time-independent"
   update_odeopcache!(odeopcache,op.op,r)
 end
 

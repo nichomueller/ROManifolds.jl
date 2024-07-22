@@ -55,6 +55,15 @@ ParamSteady.get_matrix_index_map(op::TransientPGMDEIMOperator) = get_matrix_inde
 RBSteady.get_fe_trial(op::TransientPGMDEIMOperator) = get_fe_trial(op.op)
 RBSteady.get_fe_test(op::TransientPGMDEIMOperator) = get_fe_test(op.op)
 
+function ODEs.allocate_odecache(
+  fesolver::ThetaMethod,
+  op::TransientPGMDEIMOperator,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractParamVector}})
+
+  allocate_odecache(fesolver,op.op,r,us)
+end
+
 function ODEs.allocate_odeopcache(
   op::TransientPGMDEIMOperator,
   r::TransientParamRealization,
@@ -68,6 +77,8 @@ function ODEs.update_odeopcache!(
   op::TransientPGMDEIMOperator,
   r::TransientParamRealization)
 
+  @warn "For performance reasons, it would be best to update the cache at the very
+    start, given that the online phase of a space-time ROM is time-independent"
   update_odeopcache!(ode_cache,op.op,r)
 end
 
