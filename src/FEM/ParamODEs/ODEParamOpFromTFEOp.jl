@@ -310,8 +310,8 @@ function ParamSteady.set_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trian
   ODEParamOpFromTFEOpWithTrian(set_triangulation(odeop.op,trians_rhs,trians_lhs))
 end
 
-function ParamSteady.change_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs;kwargs...)
-  ODEParamOpFromTFEOpWithTrian(change_triangulation(odeop.op,trians_rhs,trians_lhs;kwargs...))
+function ParamSteady.change_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
+  ODEParamOpFromTFEOpWithTrian(change_triangulation(odeop.op,trians_rhs,trians_lhs))
 end
 
 function ODEs.allocate_odeopcache(

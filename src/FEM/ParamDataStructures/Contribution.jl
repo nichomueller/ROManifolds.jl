@@ -310,26 +310,21 @@ function find_trian_permutation(a,b,cmp::Function)
   map(a -> findfirst(b -> cmp(a,b),b),a)
 end
 
-function find_trian_permutation(a,b;approximate=false)
-  if approximate
-    cmp = (a,b) -> a ≈ b || isapprox_parent(a,b)
-  else
-    cmp = (a,b) -> a == b || is_parent(a,b)
-  end
+function find_trian_permutation(a,b)
+  cmp = (a,b) -> a == b || is_parent(a,b)
   map(a -> findfirst(b -> cmp(a,b),b),a)
 end
 
 """
     order_triangulations(tparents::Tuple{Vararg{Triangulation}},
-      tchildren::Tuple{Vararg{Triangulation}};
-      kwargs...) -> Tuple{Vararg{Triangulation}}
+      tchildren::Tuple{Vararg{Triangulation}}) -> Tuple{Vararg{Triangulation}}
 
 Orders the triangulation children in the same way as the triangulation parents
 
 """
-function order_triangulations(tparents,tchildren;kwargs...)
+function order_triangulations(tparents,tchildren)
   @check length(tparents) == length(tchildren)
-  iperm = find_trian_permutation(tparents,tchildren;kwargs...)
+  iperm = find_trian_permutation(tparents,tchildren)
   map(iperm->tchildren[iperm],iperm)
 end
 

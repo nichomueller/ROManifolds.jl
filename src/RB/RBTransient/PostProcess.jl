@@ -1,31 +1,39 @@
-function DrWatson.save(dir,op::TransientRBOperator)
-  serialize(dir * "/operator.jld",op)
-end
-
-function RBSteady.deserialize_operator(feop::TransientParamFEOperatorWithTrian,rbop::TransientPGMDEIMOperator)
+function RBSteady.deserialize_operator(feop::TransientParamFEOperatorWithTrian,dir)
   trian_res = feop.trian_res
   trian_jacs = feop.trian_jacs
-  rhs_old,lhs_old = rbop.rhs,rbop.lhs
 
-  trian_lhs_new = ()
-  lhs_new = ()
-  for i = eachindex(lhs_old)
-    lhs_old_i = lhs_old[i]
-    trian_jac_i = trian_jacs[i]
-    iperm_jac,trian_jac_new = map(t->find_closest_view(trian_jac_i,t),lhs_old_i.trians) |> tuple_of_arrays
-    value_jac_new = map(i -> getindex(lhs_old_i.values,i...),iperm_jac)
-    trian_lhs_new = (trian_lhs_new...,trian_jac_new)
-    lhs_new = (lhs_new...,Contribution(value_jac_new,trian_jac_new))
+  op = RBSteady.deserialize_pg_operator(feop,dir)
+  red_rhs = RBSteady.deserialize_contribution(dir,trian_res,get_test(op);label="res")
+  red_lhs = ()
+  for (i,trian_jac) in enumerate(trian_jacs)
+    rlhsi = RBSteady.deserialize_contribution(dir,trian_jac,get_trial(op),get_test(op);label="jac_$i")
+    red_lhs = (red_lhs...,rlhsi)
   end
 
-  iperm_res,trian_res_new = map(t->find_closest_view(trian_res,t),rhs_old.trians) |> tuple_of_arrays
-  value_res_new = map(i -> getindex(rhs_old.values,i...),iperm_res)
-  rhs_new = Contribution(value_res_new,trian_res_new)
+  trians_rhs = get_domains(red_rhs)
+  trians_lhs = map(get_domains,red_lhs)
+  new_op = change_triangulation(op,trians_rhs,trians_lhs)
+  rbop = TransientPGMDEIMOperator(new_op,red_lhs,red_rhs)
+  return rbop
+end
 
-  pop_new =  RBSteady.change_operator(feop,rbop.op)
-  op_new = change_triangulation(pop_new,trian_res_new,trian_lhs_new;approximate=true)
+function DrWatson.save(dir,op::TransientPGMDEIMOperator;kwargs...)
+  save(dir,op.op;kwargs...)
+  for (i,ad_res) in enumerate(op.rhs.values)
+    save(dir,ad_res;label="res_$i")
+  end
+  for (ilhs,lhs) in enumerate(op.lhs)
+    for (i,ad_jac) in enumerate(lhs.values)
+      save(dir,ad_jac;label="jac_$(ilhs)_$i")
+    end
+  end
+end
 
-  return TransientPGMDEIMOperator(op_new,lhs_new,rhs_new)
+function DrWatson.save(dir,op::TransientPGOperator;kwargs...)
+  btest = RBSteady.get_basis(get_test(op))
+  btrial = RBSteady.get_basis(get_trial(op))
+  save(dir,btest;label="test")
+  save(dir,btest;label="trial")
 end
 
 function RBSteady.deserialize_operator(
@@ -37,15 +45,15 @@ function RBSteady.deserialize_operator(
   return LinearNonlinearTransientPGMDEIMOperator(rbop_lin,rbop_nlin)
 end
 
-function RBSteady.change_operator(feop::TransientParamFEOperatorWithTrian,pop::TransientPGOperator)
+function RBSteady.deserialize_pg_operator(feop::TransientParamFEOperatorWithTrian,dir)
   op = get_algebraic_operator(feop)
-  test = get_test(feop)
-  trial = get_trial(feop)
-  basis_test = RBSteady.get_basis(get_test(pop))
-  basis_trial = RBSteady.get_basis(get_trial(pop))
-  test′ = fe_subspace(test,basis_test)
-  trial′ = fe_subspace(trial,basis_trial)
-  return TransientPGOperator(op,trial′,test′)
+  fe_test = get_test(feop)
+  fe_trial = get_trial(feop)
+  basis_test = deserialize(RBSteady.get_projection_filename(dir;label="test"))
+  basis_trial = deserialize(RBSteady.get_projection_filename(dir;label="trial"))
+  test = fe_subspace(fe_test,basis_test)
+  trial = fe_subspace(fe_trial,basis_trial)
+  return TransientPGOperator(op,trial,test)
 end
 
 function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...;kwargs...)

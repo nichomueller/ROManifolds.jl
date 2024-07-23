@@ -11,8 +11,7 @@ case has been run at least once!
 """
 function load_solve(solver,feop,dir;kwargs...)
   snaps = deserialize(get_snapshots_filename(dir))
-  old_rbop = deserialize(get_op_filename(dir))
-  rbop = deserialize_operator(feop,old_rbop)
+  rbop = deserialize_operator(feop,dir)
   rb_sol,rb_stats = solve(solver,rbop,snaps)
   old_results = deserialize(get_results_filename(dir))
   old_fem_stats = old_results.fem_stats
@@ -20,27 +19,18 @@ function load_solve(solver,feop,dir;kwargs...)
   return results
 end
 
-function deserialize_operator(feop,op)
-  @abstractmethod
-end
-
-function deserialize_operator(feop::ParamFEOperatorWithTrian,rbop::PGMDEIMOperator)
+function deserialize_operator(feop::ParamFEOperatorWithTrian,dir)
   trian_res = feop.trian_res
   trian_jac = feop.trian_jac
-  rhs_old,lhs_old = rbop.rhs,rbop.lhs
 
-  iperm_jac,trian_jac_new = map(t->find_closest_view(trian_jac,t),lhs_old.trians) |> tuple_of_arrays
-  value_jac_new = map(i -> getindex(lhs_old.values,i...),iperm_jac)
-  lhs_new = Contribution(value_jac_new,trian_jac_new)
-
-  iperm_res,trian_res_new = map(t->find_closest_view(trian_res,t),rhs_old.trians) |> tuple_of_arrays
-  value_res_new = map(i -> getindex(rhs_old.values,i...),iperm_res)
-  rhs_new = Contribution(value_res_new,trian_res_new)
-
-  pop_new = change_operator(feop,rbop.op)
-  rbop_new = change_triangulation(pop_new,trian_res_new,trian_jac_new;approximate=true)
-
-  return PGMDEIMOperator(rbop_new,lhs_new,rhs_new)
+  op = deserialize_pg_operator(feop,dir)
+  red_rhs = deserialize_contribution(dir,trian_res,get_test(op);label="res")
+  red_lhs = deserialize_contribution(dir,trian_jac,get_trial(op),get_test(op);label="jac")
+  trians_rhs = get_domains(red_rhs)
+  trians_lhs = get_domains(red_lhs)
+  new_op = change_triangulation(op,trians_rhs,trians_lhs)
+  rbop = PGMDEIMOperator(new_op,red_lhs,red_rhs)
+  return rbop
 end
 
 function deserialize_operator(
@@ -52,15 +42,29 @@ function deserialize_operator(
   return LinearNonlinearPGMDEIMOperator(rbop_lin,rbop_nlin)
 end
 
-function change_operator(feop::ParamFEOperatorWithTrian,pop::PGOperator)
+function deserialize_pg_operator(feop::ParamFEOperatorWithTrian,dir)
   op = get_algebraic_operator(feop)
-  test = get_test(feop)
-  trial = get_trial(feop)
-  basis_test = get_basis(get_test(pop))
-  basis_trial = get_basis(get_trial(pop))
-  test′ = fe_subspace(test,basis_test)
-  trial′ = fe_subspace(trial,basis_trial)
-  return PGOperator(op,trial′,test′)
+  fe_test = get_test(feop)
+  fe_trial = get_trial(feop)
+  basis_test = deserialize(get_projection_filename(dir;label="test"))
+  basis_trial = deserialize(get_projection_filename(dir;label="trial"))
+  test = fe_subspace(fe_test,basis_test)
+  trial = fe_subspace(fe_trial,basis_trial)
+  return PGOperator(op,trial,test)
+end
+
+function deserialize_contribution(dir,trian,args...;label="res")
+  ad,redt = (),()
+  for (i,t) in enumerate(trian)
+    adi = deserialize(get_decomposition_filename(dir;label=label*"_$i"))
+    redti = reduce_triangulation(t,get_integration_domain(adi),args...)
+    if isa(redti,AbstractArray)
+      redti = ParamDataStructures.merge_triangulations(redti)
+    end
+    ad = (ad...,adi)
+    redt = (redt...,redti)
+  end
+  return Contribution(ad,redt)
 end
 
 function DrWatson.save(dir,args::Tuple)
@@ -75,12 +79,37 @@ function DrWatson.save(dir,s::Union{AbstractSnapshots,BlockSnapshots})
   serialize(get_snapshots_filename(dir),s)
 end
 
-function get_op_filename(dir)
-  dir * "/operator.jld"
+function get_projection_filename(dir;label="test")
+  dir * "/basis_$(label).jld"
 end
 
-function DrWatson.save(dir,op::RBOperator)
-  serialize(dir * "/operator.jld",op)
+function DrWatson.save(dir,b::Projection;kwargs...)
+  serialize(get_projection_filename(dir;kwargs...),b)
+end
+
+function get_decomposition_filename(dir;label="res")
+  dir * "/affdec_$(label).jld"
+end
+
+function DrWatson.save(dir,ad::AffineDecomposition;kwargs...)
+  serialize(get_decomposition_filename(dir;kwargs...),ad)
+end
+
+function DrWatson.save(dir,op::PGMDEIMOperator;kwargs...)
+  save(dir,op.op;kwargs...)
+  for (i,ad_res) in enumerate(op.rhs.values)
+    save(dir,ad_res;label="res_$i")
+  end
+  for (i,ad_jac) in enumerate(op.lhs.values)
+    save(dir,ad_jac;label="jac_$i")
+  end
+end
+
+function DrWatson.save(dir,op::PGOperator;kwargs...)
+  btest = get_basis(get_test(op))
+  btrial = get_basis(get_trial(op))
+  save(dir,btest;label="test")
+  save(dir,btest;label="trial")
 end
 
 """

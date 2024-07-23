@@ -367,20 +367,20 @@ function set_triangulation(
 end
 
 """
-    change_triangulation(op::ParamFEOperatorWithTrian,trian_res,trian_jac;kwargs...) -> ParamFEOperatorWithTrian
+    change_triangulation(op::ParamFEOperatorWithTrian,trian_res,trian_jac) -> ParamFEOperatorWithTrian
 
 Replaces the old triangulations relative to the residual and jacobian in `op` with
 two new tuples `trian_res` and `trian_jac`, and returns the resulting ParamFEOperatorWithTrian
 
 """
-function change_triangulation(op::ParamFEOperatorWithTrian,trian_res,trian_jac;kwargs...)
-  newtrian_res = order_triangulations(op.trian_res,trian_res;kwargs...)
-  newtrian_jac = order_triangulations(op.trian_jac,trian_jac;kwargs...)
+function change_triangulation(op::ParamFEOperatorWithTrian,trian_res,trian_jac)
+  newtrian_res = order_triangulations(op.trian_res,trian_res)
+  newtrian_jac = order_triangulations(op.trian_jac,trian_jac)
   newop = set_triangulation(op,newtrian_res,newtrian_jac)
   ParamFEOpFromWeakFormWithTrian(newop,newtrian_res,newtrian_jac)
 end
 
-function change_triangulation(op::ParamSaddlePointFEOpWithTrian,trian_res,trian_jac;kwargs...)
+function change_triangulation(op::ParamSaddlePointFEOpWithTrian,trian_res,trian_jac)
   newtrian_res = order_triangulations(op.trian_res,trian_res;kwargs...)
   newtrian_jac = order_triangulations(op.trian_jac,trian_jac;kwargs...)
   newop = set_triangulation(op,newtrian_res,newtrian_jac)

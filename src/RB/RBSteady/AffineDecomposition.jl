@@ -518,6 +518,18 @@ for f in (:get_integration_domain,:get_interp_matrix,:get_indices_space)
   end
 end
 
+function reduce_triangulation(trian::Triangulation,idom::VectorBlock,test::MultiFieldRBSpace)
+  active_block_ids = findall(idom.touched)
+  red_trian = [reduce_triangulation(trian,idom[i],test[i]) for i in active_block_ids] |> tuple_of_arrays
+  return red_trian
+end
+
+function reduce_triangulation(trian::Triangulation,idom::MatrixBlock,trial::MultiFieldRBSpace,test::MultiFieldRBSpace)
+  active_block_ids = findall(idom.touched)
+  red_trian = [reduce_triangulation(trian,idom[i,j],trial[j],test[i]) for (i,j) in Tuple.(active_block_ids)] |> tuple_of_arrays
+  return red_trian
+end
+
 function reduced_residual(
   solver::RBSolver,
   op,

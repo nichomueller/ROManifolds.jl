@@ -92,3 +92,6 @@ results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 println(compute_error(results))
 println(compute_speedup(results))
+
+save(test_dir,fesnaps)
+save(test_dir,rbop)
