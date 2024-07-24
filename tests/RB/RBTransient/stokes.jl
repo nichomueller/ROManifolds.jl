@@ -24,7 +24,7 @@ pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
-n = 5
+n = 20
 domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain, partition)
@@ -37,11 +37,11 @@ degree = 2*order
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
 
-a(x,μ,t) = 1+exp(-sin(2π*t/tf)^2*(1-x[2])/sum(μ))
+a(x,μ,t) = μ[1]*exp(sin(π*t/tf)*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
-inflow(μ,t) = 1-cos(2π*t/tf)+sin(μ[2]*2π*t/tf)/μ[1]
+inflow(μ,t) = 1-cos(π*t/tf)+sin(π*t/(μ[2]*tf))/μ[3]
 g_in(x,μ,t) = VectorValue(-x[2]*(1-x[2])*inflow(μ,t),0.0)
 g_in(μ,t) = x->g_in(x,μ,t)
 gμt_in(μ,t) = TransientParamFunction(g_in,μ,t)
@@ -69,7 +69,7 @@ induced_norm((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","dirichlet0"])
-trial_u = TransientTrialParamFESpace(test_u,gμt_in)
+trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_0])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 # test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
 test_p = TestFESpace(model,reffe_p;conformity=:C0)
@@ -101,8 +101,36 @@ println(compute_error(results))
 println(compute_speedup(results))
 # average_plot(rbop,results;dir=joinpath(test_dir,"plots"))
 
-urand = fesnaps[1][:,5,16]
-rrand = get_realization(fesnaps[1])[16,5:5]
-U = TrialFESpace(trial_u(rrand).dirichlet_values[1],test_u)
-uh = FEFunction(U,urand)
-bu = assemble_vector(q -> ∫(q*(∇⋅uh))dΩ,test_p)
+# eliminate dual field
+
+stiffness_u(μ,t,u,v,dΩ) = ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ
+mass_u(μ,t,uₜ,v,dΩ) = ∫(v⋅uₜ)dΩ
+res_u(μ,t,u,v,dΩ) = ∫(v⋅∂t(u))dΩ + stiffness_u(μ,t,u,v,dΩ)
+induced_norm_u(u,v) = (∫(v⋅u)dΩ + ∫(∇(v)⊙∇(u))dΩ)*(1/dt)
+
+feop_u = TransientParamLinearFEOperator((stiffness_u,mass_u),res_u,induced_norm_u,ptspace,
+  trial_u,test_u,trian_res,trian_stiffness,trian_mass)
+
+fesnaps_u = fesnaps[1]
+rbop_u = reduced_operator(rbsolver,feop_u,fesnaps_u)
+rbsnaps_u,rbstats = solve(rbsolver,rbop_u,fesnaps_u)
+results = rb_results(rbsolver,rbop_u,fesnaps_u,rbsnaps_u,festats,rbstats)
+println(compute_error(results))
+println(compute_speedup(results))
+
+u1 = select_snapshots(fesnaps_u,1)
+v1 = get_values(u1)
+r1 = get_realization(u1)
+U1 = trial_u(r1)
+
+using Gridap.Visualization
+dir = datadir("plts")
+createpvd(dir) do pvd
+  for i in param_eachindex(r1)
+    file = dir*"/u$i"*".vtu"
+    Ui = param_getindex(U1,i)
+    vi = param_getindex(v1,i)
+    uhi = FEFunction(Ui,vi)
+    pvd[i] = createvtk(Ω,file,cellfields=["u"=>uhi])
+  end
+end

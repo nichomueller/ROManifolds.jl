@@ -27,6 +27,10 @@ Base.size(A::ArrayOfTrivialArrays{T,N}) where {T,N} = ntuple(_ -> A.plength,Val{
   size(A.data)
 end
 
+@inline function inneraxes(A::ArrayOfTrivialArrays)
+  axes(A.data)
+end
+
 param_data(A::ArrayOfTrivialArrays) = fill(A.data,param_length(A))
 param_entry(A::ArrayOfTrivialArrays,i::Integer...) = fill(A.data[i...],A.plength)
 

@@ -68,6 +68,10 @@ function array_of_similar_arrays(a::AbstractArray{<:Number},l::Integer)
   ParamArray([similar(a) for _ = 1:l])
 end
 
+function array_of_copy_arrays(a::AbstractArray{<:Number},l::Integer)
+  ParamArray([copy(a) for _ = 1:l])
+end
+
 function array_of_consecutive_arrays(a::AbstractArray{<:Number},l::Integer)
   ConsecutiveArrayOfArrays(similar(a,eltype(a),size(a)...,l))
 end
@@ -117,6 +121,10 @@ end
 # small hack, zero(::Type{<:AbstractArray}) is not implemented in Base
 function Base.zero(::Type{<:AbstractArray{T,N}}) where {T<:Number,N}
   zeros(T,tfill(1,Val{N}()))
+end
+# small hack, one(::Type{<:AbstractArray}) is not implemented in Base
+function Base.one(::Type{<:AbstractArray{T,N}}) where {T<:Number,N}
+  ones(T,tfill(1,Val{N}()))
 end
 
 function Base.fill!(A::AbstractParamArray,z::Number)
@@ -603,6 +611,32 @@ function Fields.linear_combination(A::AbstractParamArray,b::AbstractVector{<:Fie
     data[i] = linear_combination(param_getindex(A,i),b)
   end
   ParamContainer(data)
+end
+
+function Arrays.return_cache(
+  f::ParamContainer{<:Union{Field,ParamField,AbstractArray{<:Field}}},
+  x::AbstractArray{<:Point})
+
+  ci = return_cache(testitem(f),x)
+  bi = evaluate!(ci,testitem(f),x)
+  cache = Vector{typeof(ci)}(undef,param_length(f))
+  array = Vector{typeof(bi)}(undef,param_length(f))
+  @inbounds for i = param_eachindex(f)
+    cache[i] = return_cache(param_getindex(f,i),x)
+  end
+  cache,ParamArray(array)
+end
+
+function Arrays.evaluate!(
+  cache,
+  f::ParamContainer{<:Union{Field,ParamField,AbstractArray{<:Field}}},
+  x::AbstractArray{<:Point})
+
+  cx,array = cache
+  @inbounds for i = param_eachindex(array)
+    array[i] = evaluate!(cx[i],param_getindex(f,i),x)
+  end
+  return array
 end
 
 for T in (:AbstractVector,:AbstractMatrix,:AbstractArray)

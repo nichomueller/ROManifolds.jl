@@ -26,6 +26,10 @@ Base.size(A::ArrayOfArrays{T,N}) where {T,N} = ntuple(_->param_length(A),Val{N}(
   size(first(A.data))
 end
 
+@inline function inneraxes(A::ArrayOfArrays)
+  Base.OneTo.(innersize(A))
+end
+
 param_data(A::ArrayOfArrays{T,N}) where {T,N} = A.data
 
 function param_entry(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}

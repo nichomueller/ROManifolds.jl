@@ -5,9 +5,10 @@ Returns the parametric length of `a`
 
 """
 param_length(a) = @abstractmethod
-param_length(a::Union{Nothing,Function,Map}) = 0
+param_length(a::Union{Nothing,Function,Map,Field,AbstractArray{<:Field}}) = 0
 param_length(a::Union{AbstractParamRealization,AbstractParamFunction}) = length(a)
 param_length(a::Union{Number,AbstractArray{<:Number}}) = 0
+param_length(a::CellField) = param_length(testitem(get_data(a)))
 
 """
     param_data(a) -> Int
@@ -48,6 +49,8 @@ length `plength` from `a`.
 
 """
 array_of_similar_arrays(a,plength::Integer) = @abstractmethod
+
+array_of_copy_arrays(a,plength::Integer) = @abstractmethod
 
 function array_of_zero_arrays(a,plength::Integer)
   A = array_of_similar_arrays(a,plength)

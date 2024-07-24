@@ -90,6 +90,9 @@ include("ConsecutiveArrayOfArrays.jl")
 export MatrixOfSparseMatricesCSC
 include("MatrixOfSparseMatrices.jl")
 
+export VectorOfSparseVectors
+include("VectorOfSparseVectors.jl")
+
 export ConsecutiveParamArrays
 export consecutive_getindex
 export consecutive_setindex!

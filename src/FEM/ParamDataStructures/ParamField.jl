@@ -21,25 +21,20 @@ Arrays.testargs(f::ParamField,x::AbstractArray{<:Point}) = testargs(testitem(f),
 Arrays.return_value(b::Broadcasting{<:Function},f::ParamField,x...) = evaluate(b.f,f,x...)
 
 to_param_quantity(f::ParamField,plength::Integer) = f
-to_param_quantity(f::Field,plength::Integer) = TrivialParamField(f,plength)
+to_param_quantity(f::Union{Field,AbstractArray{<:Field}},plength::Integer) = TrivialParamField(f,plength)
 
 """
-    struct TrivialParamField{F<:Field} <: ParamField end
+    struct TrivialParamField{F} <: ParamField end
 
 Wrapper for nonparametric fields that we wish assumed a parametric length.
 
 """
-struct TrivialParamField{F<:Field} <: ParamField
+struct TrivialParamField{F} <: ParamField
   field::F
   plength::Int
-  function TrivialParamField(field::F,::Val{L}) where {F,L}
-    new{F}(field,L)
-  end
+  TrivialParamField(f::F,plength::Int) where {F<:Union{Field,AbstractArray{<:Field}}} = new{F}(f,plength)
+  TrivialParamField(f,plength::Int) = f
 end
-
-TrivialParamField(f::Field,plength::Int) = TrivialParamField(f,Val(plength))
-TrivialParamField(f::ParamField,plength::Int) = f
-TrivialParamField(f,args...) = f
 
 param_length(f::TrivialParamField) = f.plength
 param_getindex(f::TrivialParamField,i::Integer) = f.field
@@ -192,8 +187,11 @@ struct BroadcastOpParamFieldArray{O,T,N,A} <: AbstractVector{BroadcastOpFieldArr
   array::Vector{BroadcastOpFieldArray{O,T,N,A}}
 end
 
-function Fields.BroadcastOpFieldArray(op,args...)
-  BroadcastOpParamFieldArray(map(a->BroadcastOpFieldArray(op,a),args...))
+function BroadcastOpParamFieldArray(op,args...)
+  param_args = to_param_quantities(args...)
+  plength = param_length(first(param_args))
+  param_fa = map(i -> BroadcastOpFieldArray(op,param_getindex.(param_args,i)...),1:plength)
+  BroadcastOpParamFieldArray(param_fa)
 end
 
 param_length(a::BroadcastOpParamFieldArray) = length(a.array)
@@ -252,23 +250,6 @@ function Arrays.evaluate!(cache,f::Broadcasting{typeof(∇)},a::BroadcastOpParam
     array[i] = evaluate!(cx[i],f,param_getindex(a,i))
   end
   array
-end
-
-function Arrays.return_cache(f::ParamContainer{Union{Field,ParamField}},x::AbstractArray{<:Point})
-  c = return_cache(testitem(f),x)
-  cache = Vector{typeof(c)}(undef,param_length(f))
-  @inbounds for i = param_eachindex(cache)
-    cache[i] = return_cache(param_getindex(f,i),x)
-  end
-  return c,ParamContainer(cache)
-end
-
-function Arrays.evaluate!(cache,f::ParamContainer{Union{Field,ParamField}},x::AbstractArray{<:Point})
-  c,pcache = cache
-  @inbounds for i = param_eachindex(pcache)
-    pcache[i] = evaluate!(c,param_getindex(f,i),x)
-  end
-  return pcache
 end
 
 # used to correctly deal with parametric FEFunctions

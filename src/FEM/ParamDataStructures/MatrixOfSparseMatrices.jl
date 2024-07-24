@@ -29,6 +29,7 @@ end
 SparseArrays.getcolptr(A::MatrixOfSparseMatricesCSC) = A.colptr
 SparseArrays.rowvals(A::MatrixOfSparseMatricesCSC) = A.rowval
 SparseArrays.nonzeros(A::MatrixOfSparseMatricesCSC) = A.data
+SparseArrays.nnz(A::MatrixOfSparseMatricesCSC) = Int(getcolptr(A)[innersize(A,2)+1])-1
 _nonzeros(A::MatrixOfSparseMatricesCSC,iblock::Integer...) = @inbounds getindex(A.data,:,iblock...)
 
 function MatrixOfSparseMatricesCSC(A::AbstractVector{SparseMatrixCSC{Tv,Ti}}) where {Tv,Ti}
@@ -52,6 +53,10 @@ Base.size(A::MatrixOfSparseMatricesCSC) = (param_length(A),param_length(A))
 
 @inline function ArraysOfArrays.innersize(A::MatrixOfSparseMatricesCSC)
   (A.m,A.n)
+end
+
+@inline function inneraxes(A::MatrixOfSparseMatricesCSC)
+  Base.OneTo.(innersize(A))
 end
 
 param_entry(A::MatrixOfSparseMatricesCSC,i::Integer...) = A.data[i...,:]
@@ -100,7 +105,33 @@ function Base.copyto!(A::MatrixOfSparseMatricesCSC,B::MatrixOfSparseMatricesCSC)
   A
 end
 
+function LinearAlgebra.diag(A::MatrixOfSparseMatricesCSC{Tv,Ti},d::Integer=0) where {Tv,Ti}
+  m,n = innersize(A)
+  k = Int(d)
+  l = k < 0 ? min(m+k,n) : min(n-k,m)
+  r,c = k <= 0 ? (-k,0) : (0,k) # start row/col -1
+  ind = Vector{Ti}()
+  val = zeros(Tv,l,param_length(A))
+  for i in 1:l
+    r += 1; c += 1
+    r1 = Int(getcolptr(A)[c])
+    r2 = Int(getcolptr(A)[c+1]-1)
+    r1 > r2 && continue
+    r1 = searchsortedfirst(rowvals(A),r,r1,r2,SparseArrays.Forward)
+    ((r1 > r2) || (rowvals(A)[r1] != r)) && continue
+    push!(ind,i)
+    val[length(ind),:] = A.data[r1,:]
+  end
+  return VectorOfSparseVectors(l,ind,val)
+end
+
 # some sparse operations
+
+function array_of_zero_arrays(a::SparseMatrixCSC,plength::Integer)
+  A = array_of_similar_arrays(a,plength)
+  LinearAlgebra.fillstored!(A,zero(eltype(a)))
+  return A
+end
 
 function LinearAlgebra.fillstored!(A::MatrixOfSparseMatricesCSC,z::Number)
   fill!(A.data,z)

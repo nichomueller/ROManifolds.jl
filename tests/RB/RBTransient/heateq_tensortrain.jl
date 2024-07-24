@@ -71,7 +71,7 @@ trian_res = (Ω.trian,Γn)
 trian_stiffness = (Ω.trian,)
 trian_mass = (Ω.trian,)
 
-induced_norm(du,v) = ∫(du*v)dΩ + ∫(∇(v)⋅∇(du))dΩ
+induced_norm(du,v) = (∫(du*v)dΩ + ∫(∇(v)⋅∇(du))dΩ)/dt
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
@@ -95,3 +95,31 @@ println(compute_speedup(results))
 
 save(test_dir,fesnaps)
 save(test_dir,rbop)
+
+# X = assemble_norm_matrix(feop)
+# X1 = X.arrays_1d[1] + X.gradients_1d[1]
+# X2 = X.arrays_1d[2] + X.gradients_1d[2]
+
+# s = select_snapshots(fesnaps,1:20)
+
+# using LinearAlgebra
+# using SparseArrays
+
+# mat = s
+# sizes = size(s)
+# Φ = Array{Float64,3}[]
+
+# mat_k = reshape(mat,sizes[1],:)
+# Ur,Σr,Vr = RBSteady._tpod(mat_k,X1)
+# push!(Φ,reshape(Ur,1,sizes[1],size(Ur,2)))
+# mat = reshape(Σr.*Vr',size(Ur,2),sizes[2],:)
+
+# mat_k = reshape(mat,size(Φ[1],3)*sizes[2],:)
+# Ur,Σr,Vr = RBSteady._tpod(mat_k,X2)
+# push!(Φ,reshape(Ur,size(Φ[1],3),sizes[2],size(Ur,2)))
+# mat = reshape(Σr.*Vr',size(Ur,2),sizes[3],:)
+
+# mat_k = reshape(mat,sizes[3],:)
+# Ur,Σr,Vr = RBSteady._tpod(mat_k)
+# push!(Φ,reshape(Ur,size(Φ[2],3),sizes[3],size(Ur,2)))
+# mat = reshape(Σr.*Vr',size(Ur,2),sizes[4],:)

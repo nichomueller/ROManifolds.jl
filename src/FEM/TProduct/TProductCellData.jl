@@ -55,11 +55,8 @@ struct GenericTProductCellField{DS<:DomainStyle,A,B} <: TProductCellField
 
   function GenericTProductCellField(single_fields::A,trian::B) where {A<:Vector{<:CellField},B<:TProductTriangulation}
     @assert length(single_fields) > 0
-    if any( map(i->DomainStyle(i)==ReferenceDomain(),single_fields) )
-      domain_style = ReferenceDomain()
-    else
-      domain_style = PhysicalDomain()
-    end
+    domain_style = DomainStyle(first(single_fields))
+    @check all(DomainStyle(sf)==domain_style for sf in single_fields)
     DS = typeof(domain_style)
     new{DS,A,B}(single_fields,trian,domain_style)
   end
@@ -134,6 +131,16 @@ get_diff_data(f::GenericTProductDiffEval) = f.g
 
 get_tp_data(f::GenericTProductDiffEval) = get_tp_data(f.f)
 get_tp_diff_data(f::GenericTProductDiffEval) = get_tp_data(f.g)
+
+function Base.:*(f::GenericTProductDiffEval,a::Number)
+  f1,f2end... = f.f
+  g1,g2end... = f.g
+  newf = [f1*a,f2end...]
+  newg = [g1*a,g2end...]
+  GenericTProductDiffEval(f.op,newf,newg,f.summation)
+end
+Base.:*(a::Number,f::GenericTProductDiffEval) = f*a
+Base.:/(f::GenericTProductDiffEval,a::Number) = f*(1/a)
 
 # fe basis
 

@@ -1,3 +1,27 @@
+function GridapSolvers.MultilevelTools._return_cache(k::LocalProjectionMap,f::ParamField)
+  q = get_shapefuns(k.reffe)
+  pq = get_coordinates(k.quad)
+  wq = get_weights(k.quad)
+
+  lq = ParamDataStructures.BroadcastOpParamFieldArray(⋅,q,f)
+  eval_cache = return_cache(lq,pq)
+  lqx = evaluate!(eval_cache,lq,pq)
+  integration_cache = return_cache(Fields.IntegrationMap(),lqx,wq)
+  return eval_cache,integration_cache
+end
+
+function GridapSolvers.MultilevelTools._evaluate!(cache,k::LocalProjectionMap,f::ParamField)
+  eval_cache,integration_cache = cache
+  q = get_shapefuns(k.reffe)
+
+  lq = ParamDataStructures.BroadcastOpParamFieldArray(⋅,q,f)
+  lqx = evaluate!(eval_cache,lq,get_coordinates(k.quad))
+  bq = evaluate!(integration_cache,Fields.IntegrationMap(),lqx,get_weights(k.quad))
+
+  λ = ldiv!(k.Mq,bq)
+  return linear_combination(λ,q)
+end
+
 function Algebra.symbolic_setup(
   solver::GridapSolvers.BlockTriangularSolver,
   mat::BlockMatrixOfMatrices)
@@ -31,7 +55,7 @@ function Algebra.numerical_setup(
 
   y = mortar(map(allocate_in_domain,diag(ss.block_caches))); fill!(y,0.0)
   w = allocate_in_range(mat); fill!(w,0.0)
-  work_caches = w, y
+  work_caches = w,y
   return BlockSolvers.BlockTriangularSolverNS(solver,block_ns,ss.block_caches,work_caches)
 end
 
@@ -45,7 +69,7 @@ function Algebra.numerical_setup(
 
   y = mortar(map(allocate_in_domain,diag(ss.block_caches))); fill!(y,0.0)
   w = allocate_in_range(mat); fill!(w,0.0)
-  work_caches = w, y
+  work_caches = w,y
   return BlockSolvers.BlockTriangularSolverNS(solver,block_ns,ss.block_caches,work_caches)
 end
 
@@ -56,7 +80,7 @@ function Algebra.numerical_setup!(
   solver       = ns.solver
   mat_blocks   = blocks(mat)
   block_caches = map(BlockSolvers.update_block_cache!,ns.block_caches,solver.blocks,mat_blocks)
-  map(diag(solver.blocks),ns.block_ns,diag(block_caches)) do bi, nsi, ci
+  map(diag(solver.blocks),ns.block_ns,diag(block_caches)) do bi,nsi,ci
     if BlockSolvers.is_nonlinear(bi)
       numerical_setup!(nsi,ci)
     end
@@ -75,7 +99,7 @@ function Algebra.numerical_setup!(
   block_caches = map(CartesianIndices(solver.blocks)) do I
     update_block_cache!(ns.block_caches[I],solver.blocks[I],mat_blocks[I],vec_blocks[I[2]])
   end
-  map(diag(solver.blocks),ns.block_ns,diag(block_caches),vec_blocks) do bi, nsi, ci, xi
+  map(diag(solver.blocks),ns.block_ns,diag(block_caches),vec_blocks) do bi,nsi,ci,xi
     if BlockSolvers.is_nonlinear(bi)
       numerical_setup!(nsi,ci,xi)
     end
@@ -85,22 +109,22 @@ end
 
 function BlockSolvers.instantiate_block_cache(
   block::BlockSolvers.BiformBlock,
-  mat::BlockMatrixOfMatrices)
+  mat::MatrixOfSparseMatricesCSC)
 
   cache = assemble_matrix(block.f,block.assem,block.trial,block.test)
-  return array_of_similar_arrays(cache,param_length(mat))
+  return ParamArray([copy(cache) for _ = 1:param_length(mat)])#array_of_copy_arrays(cache,param_length(mat))
 end
 
 function BlockSolvers.instantiate_block_cache(
   block::TriformBlock,
-  mat::BlockMatrixOfMatrices,
-  x::BlockVectorOfVectors)
+  mat::MatrixOfSparseMatricesCSC,
+  x::ConsecutiveVectorOfVectors)
 
   @check param_length(mat) == param_length(vec)
   uh = FEFunction(block.trial,x)
   f(u,v) = block.f(uh,u,v)
   cache = assemble_matrix(f,block.assem,block.trial,block.test)
-  return array_of_similar_arrays(cache,param_length(mat))
+  return array_of_copy_arrays(cache,param_length(mat))
 end
 
 function Algebra.solve!(
@@ -111,7 +135,7 @@ function Algebra.solve!(
   @check blocklength(x) == blocklength(b) == length(ns.block_ns)
   NB = length(ns.block_ns)
   c = ns.solver.coeffs
-  w, y = ns.work_caches
+  w,y = ns.work_caches
   mats = ns.block_caches
   for iB in 1:NB
     # Add lower off-diagonal contributions
@@ -143,7 +167,7 @@ function Algebra.solve!(
   @check blocklength(x) == blocklength(b) == length(ns.block_ns)
   NB = length(ns.block_ns)
   c = ns.solver.coeffs
-  w, y = ns.work_caches
+  w,y = ns.work_caches
   mats = ns.block_caches
   for iB in NB:-1:1
     # Add upper off-diagonal contributions
@@ -164,5 +188,127 @@ function Algebra.solve!(
     solve!(yi,nsi,wi)
     copy!(xi,yi) # Remove this with PA 0.4
   end
+  return x
+end
+
+# function Gridap.Algebra.solve!(
+#   x::ConsecutiveVectorOfVectors,
+#   ns::LinearSolvers.FGMRESNumericalSetup,
+#   b::ConsecutiveVectorOfVectors)
+
+#   solver,A,Pl,Pr,caches = ns.solver,ns.A,ns.Pl_ns,ns.Pr_ns,ns.caches
+#   V,Z,zl,H,g,c,s = caches
+#   m   = LinearSolvers.krylov_cache_length(ns)
+#   log = solver.log
+
+#   fill!(V[1],zero(eltype(V[1])))
+#   fill!(zl,zero(eltype(zl)))
+#   # Initial residual
+#   LinearSolvers.krylov_residual!(V[1],x,A,b,Pl,zl)
+#   β    = norm(V[1])
+#   done = LinearSolvers.init!(log,β)
+#   while !done
+#     # Arnoldi process
+#     j = 1
+#     V[1] ./= β
+#     fill!(H,0.0)
+#     fill!(g,0.0); g[1] = β
+#     while !done && !restart(solver,j)
+#       # Expand Krylov basis if needed
+#       if j > m
+#         H,g,c,s = LinearSolvers.expand_krylov_caches!(ns)
+#         m = LinearSolvers.krylov_cache_length(ns)
+#       end
+
+#       # Arnoldi orthogonalization by Modified Gram-Schmidt
+#       fill!(V[j+1],zero(eltype(V[j+1])))
+#       fill!(Z[j],zero(eltype(Z[j])))
+#       LinearSolvers.krylov_mul!(V[j+1],A,V[j],Pr,Pl,Z[j],zl)
+#       for i in 1:j
+#         H[i,j] = dot(V[j+1],V[i])
+#         V[j+1] .= V[j+1] .- H[i,j] .* V[i]
+#       end
+#       H[j+1,j] = norm(V[j+1])
+#       V[j+1] ./= H[j+1,j]
+
+#       # Update QR
+#       for i in 1:j-1
+#         γ = c[i]*H[i,j] + s[i]*H[i+1,j]
+#         H[i+1,j] = -s[i]*H[i,j] + c[i]*H[i+1,j]
+#         H[i,j] = γ
+#       end
+
+#       # New Givens rotation, update QR and residual
+#       c[j],s[j],_ = LinearAlgebra.givensAlgorithm(H[j,j],H[j+1,j])
+#       H[j,j] = c[j]*H[j,j] + s[j]*H[j+1,j]; H[j+1,j] = 0.0
+#       g[j+1] = -s[j]*g[j]; g[j] = c[j]*g[j]
+
+#       β  = abs(g[j+1])
+#       j += 1
+#       done = update!(log,β)
+#     end
+#     j = j-1
+
+#     # Solve least squares problem Hy = g by backward substitution
+#     for i in j:-1:1
+#       g[i] = (g[i] - dot(H[i,i+1:j],g[i+1:j])) / H[i,i]
+#     end
+
+#     # Update solution & residual
+#     for i in 1:j
+#       x .+= g[i] .* Z[i]
+#     end
+#     LinearSolvers.krylov_residual!(V[1],x,A,b,Pl,zl)
+#   end
+
+#   LinearSolvers.finalize!(log,β)
+#   return x
+# end
+
+function Algebra.solve!(
+  x::ConsecutiveVectorOfVectors,
+  ns::LinearSolvers.CGNumericalSetup,
+  b::ConsecutiveVectorOfVectors)
+
+  solver,A,Pl,caches = ns.solver,ns.A,ns.Pl_ns,ns.caches
+  flexible,log = solver.flexible,solver.log
+  w,p,z,r = caches
+
+  # Initial residual
+  mul!(w,A,x); r .= b .- w
+  fill!(p,zero(eltype(p)))
+  fill!(z,zero(eltype(z)))
+  γ = ones(eltype2(p),param_length(p))
+
+  res  = maximum(norm(r))
+  done = LinearSolvers.init!(log,res)
+  while !done
+
+    if !flexible # β = (zₖ₊₁ ⋅ rₖ₊₁)/(zₖ ⋅ rₖ)
+      solve!(z,Pl,r)
+      β = γ; γ = dot(z,r); β = γ ./ β
+    else         # β = (zₖ₊₁ ⋅ (rₖ₊₁-rₖ))/(zₖ ⋅ rₖ)
+      δ = dot(z,r)
+      solve!(z,Pl,r)
+      β = γ; γ = dot(z,r); β = (γ-δ) ./ β
+    end
+
+    println(size(z))
+    println(size(β .* p))
+    p .= z .+ β .* p
+
+    # w = A⋅p
+    mul!(w,A,p)
+    α = γ ./ dot(p,w)
+
+    # Update solution and residual
+    x .+= α .* p
+    r .-= α .* w
+
+    res  = maximum(norm(r))
+    done = LinearSolvers.update!(log,res)
+  end
+
+  LinearSolvers.finalize!(log,res)
   return x
 end

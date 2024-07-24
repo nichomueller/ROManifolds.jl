@@ -115,6 +115,11 @@ function Base.materialize(B::ConsecutiveParamBroadcast)
   ConsecutiveArrayOfArrays(Base.materialize(consecutive_data(B)))
 end
 
+function Base.materialize!(A::ConsecutiveArrayOfArrays,B::ConsecutiveParamBroadcast)
+  Base.materialize!(consecutive_data(A),consecutive_data(B))
+  A
+end
+
 struct BlockParamBroadcast{A<:AbstractParamBroadcast,N} <: AbstractArray{A,N}
   data::Array{A,N}
 end

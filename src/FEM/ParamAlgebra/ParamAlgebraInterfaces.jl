@@ -11,11 +11,11 @@ function Algebra.allocate_vector(::Type{<:BlockVectorOfVectors{T,L}},indices::Bl
 end
 
 function Algebra.allocate_in_range(::Type{V},matrix) where V<:AbstractParamContainer
-  rows = Base.OneTo(innersize(matrix,1))
+  rows = ParamDataStructures.inneraxes(matrix)[1]
   allocate_vector(V,rows)
 end
 
-function Algebra.allocate_in_range(matrix::AbstractParamMatrix)
+function Algebra.allocate_in_range(matrix::AbstractParamMatrix{T,L}) where {T,L}
   V = ConsecutiveVectorOfVectors{T,L}
   allocate_in_range(V,matrix)
 end
@@ -26,11 +26,11 @@ function Algebra.allocate_in_range(matrix::BlockMatrixOfMatrices{T,L}) where {T,
 end
 
 function Algebra.allocate_in_domain(::Type{V},matrix) where V<:AbstractParamContainer
-  cols = Base.OneTo(innersize(matrix,2))
+  cols = ParamDataStructures.inneraxes(matrix)[2]
   allocate_vector(V,cols)
 end
 
-function Algebra.allocate_in_domain(matrix::AbstractParamMatrix)
+function Algebra.allocate_in_domain(matrix::AbstractParamMatrix{T,L}) where {T,L}
   V = ConsecutiveVectorOfVectors{T,L}
   allocate_in_domain(V,matrix)
 end
