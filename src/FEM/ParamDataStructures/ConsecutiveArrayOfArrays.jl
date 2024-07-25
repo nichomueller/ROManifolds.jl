@@ -144,17 +144,6 @@ function LinearAlgebra.axpy!(α::Number,A::ConsecutiveArrayOfArrays,B::Consecuti
   return B
 end
 
-function LinearAlgebra.dot(A::ConsecutiveArrayOfArrays{T,N},B::ConsecutiveArrayOfArrays{S,N}) where {T,S,N}
-  @check size(A) == size(B)
-  AB = map(i -> dot(selectdim(A.data,N+1,i),selectdim(B.data,N+1,i)),param_eachindex(A))
-  return AB
-end
-
-function LinearAlgebra.norm(A::ConsecutiveArrayOfArrays{T,N}) where {T,N}
-  AB = map(i -> norm(selectdim(A.data,N+1,i)),param_eachindex(A))
-  return AB
-end
-
 function param_view(A::ConsecutiveArrayOfArrays,i::Union{Integer,AbstractVector,Colon}...)
   ConsecutiveArrayOfArrays(view(A.data,i...,:))
 end

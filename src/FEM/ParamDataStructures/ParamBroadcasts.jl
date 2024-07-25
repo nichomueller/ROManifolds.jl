@@ -38,15 +38,29 @@ function Base.broadcasted(f,a::Number,B::Union{AbstractParamArray,ParamBroadcast
   ParamBroadcast(bc,plength)
 end
 
+function Base.broadcasted(f,A::Union{AbstractParamVector,ParamBroadcast},b::AbstractVector{<:Number})
+  @check length(b) == param_length(A)
+  bc = map((a,b)->Base.broadcasted(f,a,b),param_data(A),b)
+  plength = param_length(A)
+  ParamBroadcast(bc,plength)
+end
+
+function Base.broadcasted(f,a::AbstractVector{<:Number},B::Union{AbstractParamVector,ParamBroadcast})
+  @check length(a) == param_length(B)
+  bc = map((a,b)->Base.broadcasted(f,a,b),a,param_data(B))
+  plength = param_length(B)
+  ParamBroadcast(bc,plength)
+end
+
 function Base.broadcasted(f,
   A::Union{AbstractParamArray,ParamBroadcast},
-  b::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}})
+  b::Base.Broadcast.Broadcasted{<:Base.Broadcast.DefaultArrayStyle})
   Base.broadcasted(f,A,Base.materialize(b))
 end
 
 function Base.broadcasted(
   f,
-  a::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}},
+  a::Base.Broadcast.Broadcasted{<:Base.Broadcast.DefaultArrayStyle},
   B::Union{AbstractParamArray,ParamBroadcast})
   Base.broadcasted(f,Base.materialize(a),B)
 end
@@ -118,6 +132,36 @@ end
 function Base.materialize!(A::ConsecutiveArrayOfArrays,B::ConsecutiveParamBroadcast)
   Base.materialize!(consecutive_data(A),consecutive_data(B))
   A
+end
+
+function Base.broadcasted(f,A::ConsecutiveArrayOfArrays,b::AbstractVector{<:Number})
+  @check length(b) == param_length(A)
+  B = similar(A)
+  Base.broadcast!(f,B,A,b)
+  return B
+end
+
+function Base.broadcasted(f,a::AbstractVector{<:Number},B::ConsecutiveArrayOfArrays)
+  @check length(a) == param_length(B)
+  A = similar(B)
+  Base.broadcast!(f,A,a,B)
+  return A
+end
+
+function Base.broadcast!(f,C::ConsecutiveArrayOfArrays,A::ConsecutiveArrayOfArrays,b::AbstractVector{<:Number})
+  @check length(b) == param_length(A) == param_length(C)
+  for (i,ai) in enumerate(param_data(A))
+    C[i] = f(ai,b[i])
+  end
+  return C
+end
+
+function Base.broadcast!(f,C::ConsecutiveArrayOfArrays,a::AbstractVector{<:Number},B::ConsecutiveArrayOfArrays)
+  @check length(a) == param_length(B) == param_length(C)
+  for (i,bi) in enumerate(param_data(B))
+    C[i] = f(a[i],bi)
+  end
+  return C
 end
 
 struct BlockParamBroadcast{A<:AbstractParamBroadcast,N} <: AbstractArray{A,N}

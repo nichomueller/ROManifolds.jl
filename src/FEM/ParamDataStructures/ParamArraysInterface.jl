@@ -185,6 +185,15 @@ function LinearAlgebra.axpy!(α::Number,A::AbstractParamArray,B::AbstractParamAr
   return B
 end
 
+function LinearAlgebra.dot(A::AbstractParamArray,B::AbstractParamArray)
+  @check size(A) == size(B)
+  return map(dot,param_data(A),param_data(B))
+end
+
+function LinearAlgebra.norm(A::AbstractParamArray)
+  return map(norm,param_data(A))
+end
+
 for factorization in (:LU,:Cholesky)
   @eval begin
     function LinearAlgebra.ldiv!(a::$factorization,B::AbstractParamArray)
