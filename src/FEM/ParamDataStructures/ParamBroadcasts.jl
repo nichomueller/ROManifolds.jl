@@ -134,34 +134,31 @@ function Base.materialize!(A::ConsecutiveArrayOfArrays,B::ConsecutiveParamBroadc
   A
 end
 
+struct TrivialConsecutiveBroadcast{D<:ConsecutiveArrayOfArrays} <: AbstractParamBroadcast
+  data::D
+end
+
 function Base.broadcasted(f,A::ConsecutiveArrayOfArrays,b::AbstractVector{<:Number})
   @check length(b) == param_length(A)
-  B = similar(A)
-  Base.broadcast!(f,B,A,b)
-  return B
+  C = similar(A)
+  for (i,ai) in enumerate(param_data(A))
+    C[i] = f(ai,b[i])
+  end
+  return TrivialConsecutiveBroadcast(C)
 end
 
 function Base.broadcasted(f,a::AbstractVector{<:Number},B::ConsecutiveArrayOfArrays)
   @check length(a) == param_length(B)
-  A = similar(B)
-  Base.broadcast!(f,A,a,B)
-  return A
-end
-
-function Base.broadcast!(f,C::ConsecutiveArrayOfArrays,A::ConsecutiveArrayOfArrays,b::AbstractVector{<:Number})
-  @check length(b) == param_length(A) == param_length(C)
-  for (i,ai) in enumerate(param_data(A))
-    C[i] = f(ai,b[i])
-  end
-  return C
-end
-
-function Base.broadcast!(f,C::ConsecutiveArrayOfArrays,a::AbstractVector{<:Number},B::ConsecutiveArrayOfArrays)
-  @check length(a) == param_length(B) == param_length(C)
+  C = similar(B)
   for (i,bi) in enumerate(param_data(B))
     C[i] = f(a[i],bi)
   end
-  return C
+  return TrivialConsecutiveBroadcast(C)
+end
+
+function Base.materialize!(A::ConsecutiveArrayOfArrays,B::TrivialConsecutiveBroadcast)
+  Base.copyto!(A,B.data)
+  A
 end
 
 struct BlockParamBroadcast{A<:AbstractParamBroadcast,N} <: AbstractArray{A,N}

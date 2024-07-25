@@ -141,81 +141,128 @@ A = stageop.A
 ss = symbolic_setup(sysslvr,A)
 ns = numerical_setup(ss,A)
 
-solver, A, Pl, Pr, caches = ns.solver, ns.A, ns.Pl_ns, ns.Pr_ns, ns.caches
-V, Z, zl, H, g, c, s = caches
-m   = GridapSolvers.LinearSolvers.krylov_cache_length(ns)
+ns1 = param_getindex(ns,1)
 
-fill!(V[1],zero(eltype(V[1])))
-fill!(zl,zero(eltype(zl)))
-# Initial residual
-LinearSolvers.krylov_residual!(V[1],x,A,b,Pl,zl)
-β    = norm(V[1])
-done = LinearSolvers.init!(solver.log,maximum(β))
+typeof(ns.A)
+typeof(ns1.A)
 
-# Arnoldi process
-j = 1
-V[1] ./= β
-fill!(H,0.0)
-fill!(g,0.0); g.data[1,:] = β
-done = false
+typeof(ns.Pl_ns)
+typeof(ns1.Pl_ns)
 
-# Expand Krylov basis if needed
-if j > m
-  H,g,c,s = ParamAlgebra.expand_param_krylov_caches!(ns)
-  m = LinearSolvers.krylov_cache_length(ns)
-end
+typeof(ns.Pr_ns)
+typeof(ns1.Pr_ns)
 
-# Arnoldi orthogonalization by Modified Gram-Schmidt
-fill!(V[j+1],zero(eltype(V[j+1])))
-fill!(Z[j],zero(eltype(Z[j])))
-LinearSolvers.krylov_mul!(V[j+1],A,V[j],Pr,Pl,Z[j],zl)
-for k in param_eachindex(H)
-  Vj1 = param_getindex(V[j+1],k)
-  for i in 1:j
-    H.data[i,j,:] = dot(V[j+1],V[i])
-    Vi = param_getindex(V[i],k)
-    Hij = H.data[i,j,:]
-    for (Vjib,Vib) in zip(blocks(Vj1),blocks(Vi))
-      Vjib.data[:,k] .= Vjib.data[:,k] .- Hij[k] .* Vib.data[:,k]
+typeof(ns.caches)
+typeof(ns1.caches)
+
+typeof(ns.solver)
+typeof(ns1.solver)
+
+ms = ns.Pr_ns
+ms1 = ns1.Pr_ns
+
+typeof(ms.block_caches)
+typeof(ms1.block_caches)
+
+typeof(ms.block_ns)
+typeof(ms1.block_ns)
+
+typeof(ms.solver)
+typeof(ms1.solver)
+
+typeof(ms.work_caches)
+typeof(ms1.work_caches)
+
+ks = ms.block_ns[2]
+ks1 = ms1.block_ns[2]
+
+ks.A
+ks1.A
+
+ks.Pl_ns
+ks1.Pl_ns
+
+ks.caches
+ks1.caches
+
+ks.solver
+ks1.solver
+
+function Gridap.Algebra.solve!(x::AbstractVector,ns::LinearSolvers.FGMRESNumericalSetup,b::AbstractVector)
+  solver, A, Pl, Pr, caches = ns.solver, ns.A, ns.Pl_ns, ns.Pr_ns, ns.caches
+  V, Z, zl, H, g, c, s = caches
+  m   = LinearSolvers.krylov_cache_length(ns)
+  log = solver.log
+
+  fill!(V[1],zero(eltype(V[1])))
+  fill!(zl,zero(eltype(zl)))
+
+  # Initial residual
+  # println(norm(A))
+  LinearSolvers.krylov_residual!(V[1],x,A,b,Pl,zl)
+  β    = norm(V[1])
+  println(β)
+  # done = LinearSolvers.init!(log,β)
+  done =false
+  while !done
+    # Arnoldi process
+    j = 1
+    V[1] ./= β
+    fill!(H,0.0)
+    fill!(g,0.0); g[1] = β
+    while !done && !LinearSolvers.restart(solver,j)
+      # Expand Krylov basis if needed
+      if j > m
+        H, g, c, s = LinearSolvers.expand_krylov_caches!(ns)
+        m = LinearSolvers.krylov_cache_length(ns)
+      end
+
+      # Arnoldi orthogonalization by Modified Gram-Schmidt
+      fill!(V[j+1],zero(eltype(V[j+1])))
+      fill!(Z[j],zero(eltype(Z[j])))
+      LinearSolvers.krylov_mul!(V[j+1],A,V[j],Pr,Pl,Z[j],zl)
+      for i in 1:j
+        H[i,j] = dot(V[j+1],V[i])
+        V[j+1] .= V[j+1] .- H[i,j] .* V[i]
+      end
+      H[j+1,j] = norm(V[j+1])
+      V[j+1] ./= H[j+1,j]
+      println(H[j+1,j])
+      # Update QR
+      for i in 1:j-1
+        γ = c[i]*H[i,j] + s[i]*H[i+1,j]
+        H[i+1,j] = -s[i]*H[i,j] + c[i]*H[i+1,j]
+        H[i,j] = γ
+        println(γ)
+      end
+
+      # New Givens rotation, update QR and residual
+      c[j], s[j], _ = LinearAlgebra.givensAlgorithm(H[j,j],H[j+1,j])
+      H[j,j] = c[j]*H[j,j] + s[j]*H[j+1,j]; H[j+1,j] = 0.0
+      g[j+1] = -s[j]*g[j]; g[j] = c[j]*g[j]
+
+      β  = abs(g[j+1])
+      println(β)
+      j += 1
+      done = LinearSolvers.update!(log,β)
     end
+    j = j-1
+
+    # Solve least squares problem Hy = g by backward substitution
+    for i in j:-1:1
+      g[i] = (g[i] - dot(H[i,i+1:j],g[i+1:j])) / H[i,i]
+    end
+
+    # Update solution & residual
+    for i in 1:j
+      x .+= g[i] .* Z[i]
+    end
+    LinearSolvers.krylov_residual!(V[1],x,A,b,Pl,zl)
   end
-  for Vjib in blocks(Vj1)
-    H.data[j+1,j,k] = norm(Vjib.data[:,k])
-    Vjib.data[:,k] ./= H.data[j+1,j,:]
-  end
+
+  # LinearSolvers.finalize!(log,β)
+  return x
 end
-
-
-# Update QR
-for i in 1:j-1
-  γ = c.data[i,:].*H.data[i,j,:] .+ s.data[i,:].*H.data[i+1,j,:]
-  H.data[i+1,j,:] = -s.data[i,:].*H.data[i,j,:] .+ c.data[i,:].*H.data[i+1,j,:]
-  H.data[i,j,:] .= γ
-end
-
-# New Givens rotation, update QR and residual
-c.data[j,:],s.data[j,:],_ = LinearAlgebra.givensAlgorithm.(H.data[j,j,:],H.data[j+1,j,:]) |> tuple_of_arrays
-H.data[j,j,:] = c.data[j,:].*H.data[j,j,:] .+ s.data[j,:].*H.data[j+1,j,:]; H.data[j+1,j,:] .= 0.0
-g.data[j+1,:] = -s.data[j,:].*g.data[j,:]; g.data[j,:] = c.data[j,:].*g.data[j,:]
-
-β  = abs.(g.data[j+1,:])
-j += 1
-done = LinearSolvers.update!(solver.log,maximum(β))
-j = j-1
-
-# Solve least squares problem Hy = g by backward substitution
-for i in j:-1:1
-  for k in param_eachindex(g)
-    g.data[i,k] = (g.data[i,k] - dot(H.data[i,i+1:j,k],g.data[i+1:j,k])) / H.data[i,i,k]
-  end
-end
-
-# Update solution & residual
-for i in 1:j
-  x .+= g.data[i,:] .* Z[i]
-end
-LinearSolvers.krylov_residual!(V[1],x,A,b,Pl,zl)
-
 
 # GRIDAP
 μ = get_params(r0).params[1]
@@ -249,7 +296,7 @@ _b = param_getindex(stageop.b,1)
 _ss = symbolic_setup(_solver,_A)
 _ns = numerical_setup(_ss,_A)
 
-# solve!(__x,__ns,__b)
+solve!(_x,_ns,_b)
 _solver, _A, _Pl, _Pr, _caches = _ns.solver, _ns.A, _ns.Pl_ns, _ns.Pr_ns, _ns.caches
 _V, _Z, _zl, _H, _g, _c, _s = _caches
 _m   = GridapSolvers.LinearSolvers.krylov_cache_length(_ns)

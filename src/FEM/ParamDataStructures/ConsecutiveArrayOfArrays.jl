@@ -46,7 +46,7 @@ function Base.getindex(A::ConsecutiveArrayOfArrays{T,N},i::Vararg{Integer,N}) wh
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
   if all(i.==iblock)
-    getindex(A.data,ArraysOfArrays._ncolons(Val{N}())...,i...)
+    getindex(A.data,ArraysOfArrays._ncolons(Val{N}())...,iblock)
   else
     fill(zero(T),innersize(A))
   end
@@ -55,11 +55,7 @@ end
 function Base.setindex!(A::ConsecutiveArrayOfArrays{T,N},v,i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
-  all(i.==iblock) && param_setindex!(A,v,iblock)
-end
-
-function param_setindex!(A::ConsecutiveArrayOfArrays{T,N},v,i::Integer) where {T,N}
-  setindex!(A.data,v,ArraysOfArrays._ncolons(Val{N}())...,i)
+  all(i.==iblock) && setindex!(A.data,v,ArraysOfArrays._ncolons(Val{N}())...,iblock)
 end
 
 function Base.similar(A::ConsecutiveArrayOfArrays{T,N},::Type{<:AbstractArray{T′}}) where {T,T′,N}
@@ -67,7 +63,7 @@ function Base.similar(A::ConsecutiveArrayOfArrays{T,N},::Type{<:AbstractArray{T�
 end
 
 function Base.similar(A::ConsecutiveArrayOfArrays{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N}
-  ConsecutiveArrayOfArrays(similar(A.data,T′,dims))
+  ConsecutiveArrayOfArrays(similar(A.data,T′,dims...,param_length(A)))
 end
 
 function Base.copyto!(A::ConsecutiveArrayOfArrays,B::ConsecutiveArrayOfArrays)
