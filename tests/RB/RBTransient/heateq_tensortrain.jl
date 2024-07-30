@@ -1,3 +1,5 @@
+using Pkg; Pkg.activate(".")
+
 using Gridap
 using Test
 using DrWatson
@@ -96,30 +98,135 @@ println(compute_speedup(results))
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 
-# X = assemble_norm_matrix(feop)
-# X1 = X.arrays_1d[1] + X.gradients_1d[1]
-# X2 = X.arrays_1d[2] + X.gradients_1d[2]
+X = assemble_norm_matrix(feop)
+X1 = X.arrays_1d[1] + X.gradients_1d[1]
+X2 = X.arrays_1d[2] + X.gradients_1d[2]
+Xk = kron(X)
 
-# s = select_snapshots(fesnaps,1:20)
+s = select_snapshots(fesnaps,1:20)
 
-# using LinearAlgebra
-# using SparseArrays
+using LinearAlgebra
+using SparseArrays
 
-# mat = s
-# sizes = size(s)
-# Φ = Array{Float64,3}[]
+mat = s
+sizes = size(s)
+Φ = Array{Float64,3}[]
 
-# mat_k = reshape(mat,sizes[1],:)
-# Ur,Σr,Vr = RBSteady._tpod(mat_k,X1)
-# push!(Φ,reshape(Ur,1,sizes[1],size(Ur,2)))
-# mat = reshape(Σr.*Vr',size(Ur,2),sizes[2],:)
+mat_k = reshape(mat,sizes[1],:)
+Ur,Σr,Vr = RBSteady._tpod(mat_k,X1)
+push!(Φ,reshape(Ur,1,sizes[1],size(Ur,2)))
+mat_k = reshape(Σr.*Vr',size(Ur,2)*sizes[2],:)
+# X1_hat = Ur'*X1*Ur
+X2′ = kron(X2,Float64.(I(size(Ur,2))))
+C = cholesky(X2′)
+L,p = sparse(C.L),C.p
+Xmat = L'*mat_k[p,:]
+Ũr,Σr,Vr = RBSteady.truncated_svd(Xmat)
+Ur = (L'\Ũr)[invperm(p),:]
+push!(Φ,reshape(Ur,size(Φ[1],3),sizes[2],size(Ur,2)))
 
-# mat_k = reshape(mat,size(Φ[1],3)*sizes[2],:)
-# Ur,Σr,Vr = RBSteady._tpod(mat_k,X2)
-# push!(Φ,reshape(Ur,size(Φ[1],3),sizes[2],size(Ur,2)))
-# mat = reshape(Σr.*Vr',size(Ur,2),sizes[3],:)
+mat_k = reshape(Σr.*Vr',size(Ur,2)*sizes[3],:)
+Ur,Σr,Vr = RBSteady._tpod(mat_k)
+push!(Φ,reshape(Ur,size(Φ[2],3),sizes[3],size(Ur,2)))
+mat = reshape(Σr.*Vr',size(Ur,2),sizes[3],:)
 
-# mat_k = reshape(mat,sizes[3],:)
-# Ur,Σr,Vr = RBSteady._tpod(mat_k)
-# push!(Φ,reshape(Ur,size(Φ[2],3),sizes[3],size(Ur,2)))
-# mat = reshape(Σr.*Vr',size(Ur,2),sizes[4],:)
+b1 = Φ[1][1,:,:]
+b1'*X1*b1
+
+bs′ = cores2basis(Φ[1],Φ[2])
+X′ = kron(X2,X1)
+bs′'*X′*bs′
+
+# re orthogonalize wrt Xk
+H′ = cholesky(X′)
+L′,p′ = sparse(H′.L),H′.p
+H = cholesky(Xk)
+L,p = sparse(H.L),H.p
+
+# bs = H\H′*bs′
+bs_temp = L′'*bs′[p′,:]
+# Bs = L'\bs_temp[invperm(p),:]
+Q,R = RBSteady.pivoted_qr(L'*bs_temp[p,:])
+Bs = (L'\Q)[invperm(p),:]
+Bs'*Xk*Bs
+
+sflat = reshape(s,size(s,1)*size(s,2),size(s,3)*size(s,4))
+s′ = L′'\(L'*sflat[p,:])[invperm(p′),:]
+s′′ = reshape(s′,size(s))
+mat = s′′
+Φ′ = Array{Float64,3}[]
+
+mat_k = reshape(mat,sizes[1],:)
+Ur,Σr,Vr = RBSteady._tpod(mat_k,X1)
+push!(Φ′,reshape(Ur,1,sizes[1],size(Ur,2)))
+mat_k = reshape(Σr.*Vr',size(Ur,2)*sizes[2],:)
+# X1_hat = Ur'*X1*Ur
+X2′ = kron(X2,Float64.(I(size(Ur,2))))
+C = cholesky(X2′)
+L,p = sparse(C.L),C.p
+Xmat = L'*mat_k[p,:]
+Ũr,Σr,Vr = RBSteady.truncated_svd(Xmat)
+Ur = (L'\Ũr)[invperm(p),:]
+push!(Φ′,reshape(Ur,size(Φ′[1],3),sizes[2],size(Ur,2)))
+
+mat_k = reshape(Σr.*Vr',size(Ur,2)*sizes[3],:)
+Ur,Σr,Vr = RBSteady._tpod(mat_k)
+push!(Φ′,reshape(Ur,size(Φ′[2],3),sizes[3],size(Ur,2)))
+mat = reshape(Σr.*Vr',size(Ur,2),sizes[3],:)
+
+bs′ = cores2basis(Φ′[1],Φ′[2])
+bs′'*X′*bs′
+
+bs′′ = L'\(L′'*cores2basis(Φ′[1],Φ′[2])[p,:])[invperm(p′),:]
+bs′′'*Xk*bs′′
+
+function f1(N)
+  n = 20
+  for i = 1:N
+    println(i)
+    A = exp.(randn(n,2*n))
+    Ur,Σr,Vr = RBSteady._tpod(A)
+    c1 = reshape(Ur,1,size(Ur)...)
+    Ur,Σr,Vr = RBSteady._tpod(reshape(Σr.*Vr',n*size(c1,3),:))
+    c2 = reshape(Ur,size(c1,3),n,:)
+
+    c12 = cores2basis(c1,c2)
+    println(norm(c12'*c12-I))
+    I12,c12I = empirical_interpolation(c12)
+
+    # using Mabla.FEM.IndexMaps
+    α,β = empirical_interpolation(TrivialIndexMap(LinearIndices((n^2,))),c1,c2)
+
+    if β != c12I
+      return c1,c2
+    end
+  end
+  return nothing
+end
+
+function f2(N)
+  n = 20
+  for i = 1:N
+    println(i)
+    A1 = randn(n,n)
+    Ur,Σr,Vr = RBSteady._tpod(A1)
+    c1 = reshape(Ur,1,size(Ur)...)
+    A2 = randn(n*size(Ur,2),n)
+    Ur,Σr,Vr = RBSteady._tpod(A2)
+    c2 = reshape(Ur,size(c1,3),n,:)
+
+    c12 = cores2basis(c1,c2)
+    I12,c12I = empirical_interpolation(c12)
+
+    # using Mabla.FEM.IndexMaps
+    α,β = empirical_interpolation(TrivialIndexMap(LinearIndices((n^2,))),c1,c2)
+
+    if β != c12I
+      return c1,c2
+    end
+  end
+  return nothing
+end
+
+c1,c2 = f1(100)
+c1,c2 = f2(10000)

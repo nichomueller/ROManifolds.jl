@@ -291,8 +291,10 @@ function Algebra.solve!(x::AbstractParamVector,ns::LinearSolvers.FGMRESNumerical
       end
 
       # Update solution & residual
+      xk = param_getindex(x,k)
       for i in 1:j
-        x.data[:,k] .+= g.data[i,k] .* Z[i].data[:,k]
+        Zik = param_getindex(Z[i],k)
+        xk .+= g.data[i,k] .* Zik
       end
     end
     LinearSolvers.krylov_residual!(V[1],x,A,b,Pl,zl)
@@ -377,136 +379,6 @@ function Algebra.solve!(x::AbstractParamVector,ns::LinearSolvers.CGNumericalSetu
   return x
 end
 
-# function Gridap.Algebra.solve!(
-#   x::BlockVectorOfVectors,
-#   ns::LinearSolvers.FGMRESNumericalSetup,
-#   b::BlockVectorOfVectors)
-
-#   solver,A,Pl,Pr,caches = ns.solver,ns.A,ns.Pl_ns,ns.Pr_ns,ns.caches
-#   V,Z,zl,H,g,c,s = caches
-#   m   = LinearSolvers.krylov_cache_length(ns)
-#   log = solver.log
-
-#   fill!(V[1],zero(eltype(V[1])))
-#   fill!(zl,zero(eltype(zl)))
-#   # Initial residual
-#   LinearSolvers.krylov_residual!(V[1],x,A,b,Pl,zl)
-#   β    = norm(V[1])
-#   done = LinearSolvers.init!(log,maximum(β))
-#   while !done
-#     # Arnoldi process
-#     j = 1
-#     V[1] ./= β
-#     fill!(H,0.0)
-#     fill!(g,0.0); g.data[1,:] = β
-#     while !done && !LinearSolvers.restart(solver,j)
-#       # Expand Krylov basis if needed
-#       if j > m
-#         H,g,c,s = expand_param_krylov_caches!(ns)
-#         m = LinearSolvers.krylov_cache_length(ns)
-#       end
-
-#       # Arnoldi orthogonalization by Modified Gram-Schmidt
-#       fill!(V[j+1],zero(eltype(V[j+1])))
-#       fill!(Z[j],zero(eltype(Z[j])))
-#       LinearSolvers.krylov_mul!(V[j+1],A,V[j],Pr,Pl,Z[j],zl)
-#       for i in 1:j
-#         H.data[i,j,:] = dot(V[j+1],V[i])
-#         for k in param_eachindex(H)
-#           Vjk = param_getindex(V[j+1],k)
-#           Vi = param_getindex(V[i],k)
-#           # println(norm(V[j+1]))
-#           Vjk .= Vjk .- H.data[j+1,j,k] .* Vi
-#           # println(norm(V[j+1]))
-#         end
-#       end
-#       H.data[j+1,j,:] = norm(V[j+1])
-#       for k in param_eachindex(H)
-#         param_getindex(V[j+1],k) ./= H.data[j+1,j,k]
-#       end
-
-#       # Update QR
-#       for i in 1:j-1
-#         γ = c.data[i,:].*H.data[i,j,:] .+ s.data[i,:].*H.data[i+1,j,:]
-#         H.data[i+1,j,:] = -s.data[i,:].*H.data[i,j,:] .+ c.data[i,:].*H.data[i+1,j,:]
-#         H.data[i,j,:] .= γ
-#       end
-
-#       # New Givens rotation, update QR and residual
-#       c.data[j,:],s.data[j,:],_ = LinearAlgebra.givensAlgorithm.(H.data[j,j,:],H.data[j+1,j,:]) |> tuple_of_arrays
-#       H.data[j,j,:] = c.data[j,:].*H.data[j,j,:] .+ s.data[j,:].*H.data[j+1,j,:]; H.data[j+1,j,:] .= 0.0
-#       g.data[j+1,:] = -s.data[j,:].*g.data[j,:]; g.data[j,:] = c.data[j,:].*g.data[j,:]
-
-#       β  = abs.(g.data[j+1,:])
-#       j += 1
-#       done = LinearSolvers.update!(log,maximum(β))
-#     end
-#     j = j-1
-
-#     # Solve least squares problem Hy = g by backward substitution
-#     for i in j:-1:1
-#       for k in param_eachindex(g)
-#         g.data[i,k] = (g.data[i,k] - dot(H.data[i,i+1:j,k],g.data[i+1:j,k])) / H.data[i,i,k]
-#       end
-#     end
-
-#     # Update solution & residual
-#     for i in 1:j
-#       x .+= g.data[i,:] .* Z[i]
-#     end
-#     LinearSolvers.krylov_residual!(V[1],x,A,b,Pl,zl)
-#   end
-
-#   LinearSolvers.finalize!(log,maximum(β))
-#   return x
-# end
-
-# function Algebra.solve!(
-#   x::ConsecutiveVectorOfVectors,
-#   ns::LinearSolvers.CGNumericalSetup,
-#   b::ConsecutiveVectorOfVectors)
-
-#   solver,A,Pl,caches = ns.solver,ns.A,ns.Pl_ns,ns.caches
-#   flexible,log = solver.flexible,solver.log
-#   w,p,z,r = caches
-
-#   # Initial residual
-#   mul!(w,A,x); r .= b .- w
-#   fill!(p,zero(eltype(p)))
-#   fill!(z,zero(eltype(z)))
-#   γ = ones(eltype2(p),param_length(p))
-
-#   res  = norm(r)
-#   done = LinearSolvers.init!(log,maximum(res))
-#   while !done
-
-#     if !flexible # β = (zₖ₊₁ ⋅ rₖ₊₁)/(zₖ ⋅ rₖ)
-#       solve!(z,Pl,r)
-#       β = γ; γ = dot(z,r); β = γ ./ β
-#     else         # β = (zₖ₊₁ ⋅ (rₖ₊₁-rₖ))/(zₖ ⋅ rₖ)
-#       δ = dot(z,r)
-#       solve!(z,Pl,r)
-#       β = γ; γ = dot(z,r); β = (γ-δ) ./ β
-#     end
-
-#     for k in param_eachindex(p)
-#       p.data[:,k] .= z.data[:,k] .+ β[k] .* p.data[:,k]
-#     end
-
-#     # w = A⋅p
-#     mul!(w,A,p)
-#     α = γ ./ dot(p,w)
-
-#     # Update solution and residual
-#     for k in param_eachindex(x)
-#       x.data[:,k] .+= α[k] .* p.data[:,k]
-#       r.data[:,k] .-= α[k] .* w.data[:,k]
-#     end
-
-#     res  = norm(r)
-#     done = LinearSolvers.update!(log,maximum(res))
-#   end
-
-#   LinearSolvers.finalize!(log,maximum(res))
-#   return x
-# end
+function Gridap.Algebra.numerical_setup!(ns::LinearSolvers.JacobiNumericalSetup,A::AbstractParamMatrix)
+  ns.inv_diag .= 1.0 ./ diag(A)
+end
