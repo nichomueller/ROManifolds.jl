@@ -197,7 +197,7 @@ end
 param_length(a::BroadcastOpParamFieldArray) = length(a.array)
 param_getindex(a::BroadcastOpParamFieldArray,i::Integer) = a.array[i]
 
-Base.size(a::BroadcastOpParamFieldArray) = param_length(a)
+Base.size(a::BroadcastOpParamFieldArray) = (param_length(a),)
 Base.getindex(a::BroadcastOpParamFieldArray,i::Integer) = param_getindex(a,i)
 Arrays.testitem(a::BroadcastOpParamFieldArray) = param_getindex(a,1)
 
@@ -227,8 +227,8 @@ end
 
 function Arrays.evaluate!(cache,f::Union{ParamField,BroadcastOpParamFieldArray},x::AbstractArray{<:Point})
   l,g = cache
-  for i in param_eachindex(f)
-    g[i] = evaluate!(l[i],param_getindex(f,i),x)
+  @inbounds for i in param_eachindex(f)
+    g.data[i] = evaluate!(l[i],param_getindex(f,i),x)
   end
   g
 end
@@ -247,7 +247,7 @@ end
 function Arrays.evaluate!(cache,f::Broadcasting{typeof(∇)},a::BroadcastOpParamFieldArray)
   cx,array = cache
   @inbounds for i = param_eachindex(array)
-    array[i] = evaluate!(cx[i],f,param_getindex(a,i))
+    array.data[i] = evaluate!(cx[i],f,param_getindex(a,i))
   end
   array
 end

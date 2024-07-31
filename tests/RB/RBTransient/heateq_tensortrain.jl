@@ -28,7 +28,7 @@ tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
 # geometry
-n = 20
+n = 100
 domain = (0,1,0,1)
 partition = (n,n)
 model = TProductModel(domain,partition)
@@ -130,12 +130,9 @@ Ur,Σr,Vr = RBSteady._tpod(mat_k)
 push!(Φ,reshape(Ur,size(Φ[2],3),sizes[3],size(Ur,2)))
 mat = reshape(Σr.*Vr',size(Ur,2),sizes[3],:)
 
-b1 = Φ[1][1,:,:]
-b1'*X1*b1
-
-bs′ = cores2basis(Φ[1],Φ[2])
+bs = cores2basis(Φ[1],Φ[2])
 X′ = kron(X2,X1)
-bs′'*X′*bs′
+bs'*X′*bs
 
 # re orthogonalize wrt Xk
 H′ = cholesky(X′)
@@ -143,17 +140,16 @@ L′,p′ = sparse(H′.L),H′.p
 H = cholesky(Xk)
 L,p = sparse(H.L),H.p
 
-# bs = H\H′*bs′
-bs_temp = L′'*bs′[p′,:]
-# Bs = L'\bs_temp[invperm(p),:]
-Q,R = RBSteady.pivoted_qr(L'*bs_temp[p,:])
-Bs = (L'\Q)[invperm(p),:]
-Bs'*Xk*Bs
+# # bs = H\H′*bs′
+# bs_temp = L′'*bs′[p′,:]
+# # Bs = L'\bs_temp[invperm(p),:]
+# Q,R = RBSteady.pivoted_qr(L'*bs_temp[p,:])
+# Bs = (L'\Q)[invperm(p),:]
+# Bs'*Xk*Bs
 
 sflat = reshape(s,size(s,1)*size(s,2),size(s,3)*size(s,4))
-s′ = L′'\(L'*sflat[p,:])[invperm(p′),:]
-s′′ = reshape(s′,size(s))
-mat = s′′
+s′ = reshape(L′'\(L'*sflat[p,:])[invperm(p′),:],size(s))
+mat = s′
 Φ′ = Array{Float64,3}[]
 
 mat_k = reshape(mat,sizes[1],:)
@@ -162,11 +158,11 @@ push!(Φ′,reshape(Ur,1,sizes[1],size(Ur,2)))
 mat_k = reshape(Σr.*Vr',size(Ur,2)*sizes[2],:)
 # X1_hat = Ur'*X1*Ur
 X2′ = kron(X2,Float64.(I(size(Ur,2))))
-C = cholesky(X2′)
-L,p = sparse(C.L),C.p
-Xmat = L'*mat_k[p,:]
+c = cholesky(X2′)
+l,q = sparse(c.L),c.p
+Xmat = l'*mat_k[q,:]
 Ũr,Σr,Vr = RBSteady.truncated_svd(Xmat)
-Ur = (L'\Ũr)[invperm(p),:]
+Ur = (l'\Ũr)[invperm(q),:]
 push!(Φ′,reshape(Ur,size(Φ′[1],3),sizes[2],size(Ur,2)))
 
 mat_k = reshape(Σr.*Vr',size(Ur,2)*sizes[3],:)
@@ -177,56 +173,96 @@ mat = reshape(Σr.*Vr',size(Ur,2),sizes[3],:)
 bs′ = cores2basis(Φ′[1],Φ′[2])
 bs′'*X′*bs′
 
-bs′′ = L'\(L′'*cores2basis(Φ′[1],Φ′[2])[p,:])[invperm(p′),:]
+bs′′ = L'\(L′'*cores2basis(Φ′[1],Φ′[2])[p′,:])[invperm(p),:]
 bs′′'*Xk*bs′′
 
-function f1(N)
-  n = 20
-  for i = 1:N
-    println(i)
-    A = exp.(randn(n,2*n))
-    Ur,Σr,Vr = RBSteady._tpod(A)
-    c1 = reshape(Ur,1,size(Ur)...)
-    Ur,Σr,Vr = RBSteady._tpod(reshape(Σr.*Vr',n*size(c1,3),:))
-    c2 = reshape(Ur,size(c1,3),n,:)
+Y = L′'*cores2basis(Φ′[1],Φ′[2])[p′,:]
+Y'*Y # orthogonal
+Z = L'\Y[invperm(p),:]#[invperm(p),:] # should be Xk orthogonal
+Z'*Xk[p,p]*Z
+Z[invperm(p),:]'*Xk*Z[invperm(p),:]
 
-    c12 = cores2basis(c1,c2)
-    println(norm(c12'*c12-I))
-    I12,c12I = empirical_interpolation(c12)
+u1 = reshape(select_snapshots(fesnaps,1,1),:,1)
 
-    # using Mabla.FEM.IndexMaps
-    α,β = empirical_interpolation(TrivialIndexMap(LinearIndices((n^2,))),c1,c2)
+v = u1 - Z[invperm(p),:]*Z[invperm(p),:]'Xk*u1
+vnorm = v'*Xk*v
+bok = cores2basis(b.cores_space...)
+vok = u1 - bok*bok'Xk*u1
+vnormok = vok'*Xk*vok
 
-    if β != c12I
-      return c1,c2
-    end
-  end
-  return nothing
-end
+ϕs = truncated_pod(sflat,Xk)
+vok = u1 - ϕs*ϕs'Xk*u1
+vnormok = vok'*Xk*vok
 
-function f2(N)
-  n = 20
-  for i = 1:N
-    println(i)
-    A1 = randn(n,n)
-    Ur,Σr,Vr = RBSteady._tpod(A1)
-    c1 = reshape(Ur,1,size(Ur)...)
-    A2 = randn(n*size(Ur,2),n)
-    Ur,Σr,Vr = RBSteady._tpod(A2)
-    c2 = reshape(Ur,size(c1,3),n,:)
+# what if we consider X′ = 1/h^2 M?
+δ = 1/20
+M1 = X.arrays_1d[1] / δ
+M2 = X.arrays_1d[2] / δ
+X′ = kron(M2,M1)
+H′ = cholesky(X′)
+L′,p′ = sparse(H′.L),H′.p
 
-    c12 = cores2basis(c1,c2)
-    I12,c12I = empirical_interpolation(c12)
+sflat = reshape(s,size(s,1)*size(s,2),size(s,3)*size(s,4))
+s′ = reshape(L′'\(L'*sflat[p,:])[invperm(p′),:],size(s))
+mat = s′
+Φ′ = Array{Float64,3}[]
 
-    # using Mabla.FEM.IndexMaps
-    α,β = empirical_interpolation(TrivialIndexMap(LinearIndices((n^2,))),c1,c2)
+mat_k = reshape(mat,sizes[1],:)
+Ur,Σr,Vr = RBSteady._tpod(mat_k,M1)
+push!(Φ′,reshape(Ur,1,sizes[1],size(Ur,2)))
+mat_k = reshape(Σr.*Vr',size(Ur,2)*sizes[2],:)
+X2′ = kron(M2,Float64.(I(size(Ur,2))))
+c = cholesky(X2′)
+l,q = sparse(c.L),c.p
+Xmat = l'*mat_k[q,:]
+Ũr,Σr,Vr = RBSteady.truncated_svd(Xmat)
+Ur = (l'\Ũr)[invperm(q),:]
+push!(Φ′,reshape(Ur,size(Φ′[1],3),sizes[2],size(Ur,2)))
 
-    if β != c12I
-      return c1,c2
-    end
-  end
-  return nothing
-end
+mat_k = reshape(Σr.*Vr',size(Ur,2)*sizes[3],:)
+Ur,Σr,Vr = RBSteady._tpod(mat_k)
+push!(Φ′,reshape(Ur,size(Φ′[2],3),sizes[3],size(Ur,2)))
+mat = reshape(Σr.*Vr',size(Ur,2),sizes[3],:)
 
-c1,c2 = f1(100)
-c1,c2 = f2(10000)
+bs′ = cores2basis(Φ′[1],Φ′[2])
+bs′'*X′*bs′
+v = u1 - bs′*bs′'X′*u1
+vnorm = v'*X′*v
+
+Y = L′'*cores2basis(Φ′[1],Φ′[2])[p′,:]
+Y'*Y # orthogonal
+Z = L'\Y[invperm(p),:]#[invperm(p),:] # should be Xk orthogonal
+Z'*Xk[p,p]*Z
+Z[invperm(p),:]'*Xk*Z[invperm(p),:]
+
+v = u1 - Z[invperm(p),:]*Z[invperm(p),:]'Xk*u1
+vnorm = v'*Xk*v
+
+bl2 = ttsvd(s)
+bsl2 = cores2basis(bl2[1],bl2[2])
+vl2 = u1 - bsl2*bsl2'*u1
+
+X′ = kron(M2,M1)
+H′ = cholesky(X′)
+L′,p′ = sparse(H′.L),H′.p
+Xk = kron(X)
+H = cholesky(Xk)
+L,p = sparse(H.L),H.p
+
+MX = TProductArray([X.arrays_1d[1]/δ,X.arrays_1d[2]/δ])
+MK = kron(MX)
+sl2 = reshape(L′'\(L'*sflat[p,:])[invperm(p′),:],size(s))
+bl2 = ttsvd(s,MX)
+bsl2 = cores2basis(bl2[1],bl2[2])
+vl2 = u1 - bsl2*bsl2'*MK*u1
+vl2 = u1 - bsl2*bsl2'*Xk*u1
+
+Y = L′'*bsl2[p′,:]
+Z = L'\Y[invperm(p),:]
+v = u1 - Z[invperm(p),:]*Z[invperm(p),:]'Xk*u1
+v = u1[p] - Z[p,:]*Z[p,:]'Xk[p,p]*u1[p]
+
+bh1 = ttsvd(s,X)
+bsh1 = cores2basis(bh1[1],bh1[2])
+vh1 = u1 - bsh1*bsh1'*Xk*u1
+vh1'*Xk*vh1
