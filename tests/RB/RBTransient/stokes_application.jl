@@ -115,3 +115,297 @@ fesolver′ = LUSolver()
 odesolver′ = ThetaMethod(fesolver′,dt,θ)
 rbsolver′ = RBSolver(odesolver′,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 fesnaps′,festats′ = fe_solutions(rbsolver′,feop,xh0μ;r)
+
+################################################################################
+#################################################################################
+#################################################################################
+# CASE j=4
+solver,A,Pl,Pr,caches = ns.solver,ns.A,ns.Pl_ns,ns.Pr_ns,ns.caches
+V,Z,zl,H,g,c,s = copy.(caches)
+m   = LinearSolvers.krylov_cache_length(ns)
+log = solver.log
+
+plength = param_length(x)
+
+fill!(V[1],zero(eltype(V[1])))
+fill!(zl,zero(eltype(zl)))
+
+# Initial residual
+LinearSolvers.krylov_residual!(V[1],x,A,b,Pl,zl)
+β    = norm(V[1])
+done = LinearSolvers.init!(log,maximum(β))
+
+# Arnoldi process
+j = 1
+V[1] ./= β
+fill!(H,0.0)
+fill!(g,0.0); g.data[1,:] = β
+for j = 1:1
+  # Expand Krylov basis if needed
+  if j > m
+    H,g,c,s = expand_param_krylov_caches!(ns)
+    m = LinearSolvers.krylov_cache_length(ns)
+  end
+
+  # Arnoldi orthogonalization by Modified Gram-Schmidt
+  fill!(V[j+1],zero(eltype(V[j+1])))
+  fill!(Z[j],zero(eltype(Z[j])))
+  LinearSolvers.krylov_mul!(V[j+1],A,V[j],Pr,Pl,Z[j],zl)
+
+  using Mabla.FEM.ParamAlgebra
+  for k in 1:plength
+    Vk = map(V->param_getindex(V,k),V)
+    Zk = map(Z->param_getindex(Z,k),Z)
+    zlk = param_getindex(zl,k)
+    Hk = param_getindex(H,k)
+    gk = param_getindex(g,k)
+    ck = param_getindex(c,k)
+    sk = param_getindex(s,k)
+    ParamAlgebra._gs_qr_givens!(Vk,Zk,zlk,Hk,gk,ck,sk;j)
+  end
+
+  β  = abs.(g.data[j+1,:])
+  j += 1
+  done = LinearSolvers.update!(log,maximum(β))
+end
+
+j = 2
+fill!(V[j+1],zero(eltype(V[j+1])))
+fill!(Z[j],zero(eltype(Z[j])))
+
+wr = copy(Z[j])
+y = copy(V[j])
+# solve!(wr,Pr,y)
+using BlockArrays
+NB = length(Pr.block_ns)
+cc = Pr.solver.coeffs
+ww,yy = Pr.work_caches
+mats = Pr.block_caches
+iB = 1
+wi = ww[Block(iB)]
+copy!(wi,y[Block(iB)])
+for jB in iB+1:NB
+  println("dio porco")
+  cij = cc[iB,jB]
+  if abs(cij) > eps(cij)
+    xj = wr[Block(jB)]
+    mul!(wi,mats[iB,jB],xj,-cij,1.0)
+  end
+end
+###
+iB=1
+jB=2
+cij = cc[iB,jB]
+xj = wr[Block(jB)]
+mul!(wi,mats[iB,jB],xj,-cij,1.0)
+_xj = _wr[Block(jB)]
+mul!(_wi,_mats[iB,jB],_xj,-cij,1.0)
+###
+# Solve diagonal block
+nsi = Pr.block_ns[iB]
+xi  = wr[Block(iB)]
+yi  = yy[Block(iB)]
+solve!(yi,nsi,wi)
+copy!(xi,yi)
+
+# ssolver,AA,Pl,caches = nsi.solver,nsi.A,nsi.Pl_ns,nsi.caches
+# flexible,log = ssolver.flexible,ssolver.log
+# w,p,z,r = caches
+
+# plength = param_length(y)
+
+# # Initial residual
+# mul!(w,AA,y); r .= b .- w
+# fill!(p,zero(eltype(p)))
+# fill!(z,zero(eltype(z)))
+# γ = ones(eltype2(p),plength)
+
+# res  = norm(r)
+# done = LinearSolvers.init!(log,maximum(res))
+# while !done
+
+#   if !flexible # β = (zₖ₊₁ ⋅ rₖ₊₁)/(zₖ ⋅ rₖ)
+#     solve!(z,Pl,r)
+#     β = γ; γ = dot(z,r); β = γ / β
+#   else         # β = (zₖ₊₁ ⋅ (rₖ₊₁-rₖ))/(zₖ ⋅ rₖ)
+#     δ = dot(z,r)
+#     solve!(z,Pl,r)
+#     β = γ; γ = dot(z,r); β = (γ-δ) / β
+#   end
+
+#   for k in 1:plength
+#     xk = param_getindex(y,k)
+#     wk = param_getindex(w,k)
+#     Ak = param_getindex(AA,k)
+#     zk = param_getindex(z,k)
+#     pk = param_getindex(p,k)
+#     rk = param_getindex(r,k)
+
+#     pk .= zk .+ β[k] .* pk
+
+#     # w = A⋅p
+#     mul!(wk,Ak,pk)
+#     α = γ[k] / dot(pk,wk)
+
+#     # Update solution and residual
+#     xk .+= α .* pk
+#     rk .-= α .* wk
+#   end
+
+#   res  = norm(r)
+#   done = LinearSolvers.update!(log,maximum(res))
+# end
+
+################################################################################
+# GRIDAP
+
+# solve!(_x,_ns,_b)
+_solver, _A, _Pl, _Pr, _caches = _ns.solver, _ns.A, _ns.Pl_ns, _ns.Pr_ns, _ns.caches
+_V, _Z, _zl, _H, _g, _c, _s = copy.(_caches)
+_m   = LinearSolvers.krylov_cache_length(_ns)
+_log = _solver.log
+
+fill!(_V[1],zero(eltype(_V[1])))
+fill!(_zl,zero(eltype(_zl)))
+
+# Initial residual
+LinearSolvers.krylov_residual!(_V[1],_x,_A,_b,_Pl,_zl)
+_β    = norm(_V[1])
+done = LinearSolvers.init!(_log,_β)
+
+_j = 1
+_V[1] ./= _β
+fill!(_H,0.0)
+fill!(_g,0.0); _g[1] = _β
+for _j = 1:1
+  # Expand Krylov basis if needed
+  if _j > _m
+    _H, _g, _c, _s = LinearSolvers.expand_krylov_caches!(_ns)
+    _m = LinearSolvers.krylov_cache_length(_ns)
+  end
+
+  # Arnoldi orthogonalization by Modified Gram-Schmidt
+  fill!(_V[_j+1],zero(eltype(_V[_j+1])))
+  fill!(_Z[_j],zero(eltype(_Z[_j])))
+  LinearSolvers.krylov_mul!(_V[_j+1],_A,_V[_j],_Pr,_Pl,_Z[_j],_zl)
+  for i in 1:_j
+    _H[i,_j] = dot(_V[_j+1],_V[i])
+    _V[_j+1] .= _V[_j+1] .- _H[i,_j] .* _V[i]
+  end
+  _H[_j+1,_j] = norm(_V[_j+1])
+  _V[_j+1] ./= _H[_j+1,_j]
+
+  # Update QR
+  for i in 1:_j-1
+    _γ = _c[i]*_H[i,_j] + _s[i]*_H[i+1,_j]
+    _H[i+1,_j] = -_s[i]*_H[i,_j] + _c[i]*_H[i+1,_j]
+    _H[i,_j] = _γ
+  end
+
+  # New Givens rotation, update QR and residual
+  _c[_j], _s[_j], _ = LinearAlgebra.givensAlgorithm(_H[_j,_j],_H[_j+1,_j])
+  _H[_j,_j] = _c[_j]*_H[_j,_j] + _s[_j]*_H[_j+1,_j]; _H[_j+1,_j] = 0.0
+  _g[_j+1] = -_s[_j]*_g[_j]; _g[_j] = _c[_j]*_g[_j]
+
+  _β  = abs(_g[_j+1])
+  _j += 1
+  done = LinearSolvers.update!(_log,_β)
+end
+
+_j = 2
+fill!(_V[_j+1],zero(eltype(_V[_j+1])))
+fill!(_Z[_j],zero(eltype(_Z[_j])))
+
+_wr = copy(_Z[_j])
+_y = copy(_V[_j])
+
+# solve!(_wr,_Pr,_y)
+_cc = _Pr.solver.coeffs
+_ww,_yy = _Pr.work_caches
+_mats = _Pr.block_caches
+_wi = _ww[Block(iB)]
+copy!(_wi,_y[Block(iB)])
+@assert _ww[Block(1)] ≈ param_getindex(ww[Block(1)],1)
+@assert _ww[Block(2)] ≈ param_getindex(ww[Block(2)],1)
+@assert _y[Block(1)] ≈ param_getindex(y[Block(1)],1)
+@assert _y[Block(2)] ≈ param_getindex(y[Block(2)],1)
+for jB in iB+1:NB
+  println("dio porco")
+  _cij = _cc[iB,jB]
+  if abs(_cij) > eps(_cij)
+    _xj = _wr[Block(jB)]
+    mul!(_wi,_mats[iB,jB],_xj,-_cij,1.0)
+  end
+end
+# Solve diagonal block
+_nsi = _Pr.block_ns[iB]
+_xi  = _wr[Block(iB)]
+_yi  = _yy[Block(iB)]
+solve!(_yi,_nsi,_wi)
+copy!(_xi,_yi)
+
+# _ssolver,_AA,_Pl,_caches = _Pr.solver,_Pr.A,_Pr.Pl_ns,_Pr.caches
+# _flexible,_log = _ssolver.flexible,_ssolver.log
+# _w,_p,_z,_r = _caches
+
+# # Initial residual
+# mul!(_w,_AA,_y); _r .= _b .- _w
+# fill!(_p,zero(eltype(_p)))
+# fill!(_z,zero(eltype(_z)))
+# _γ = 1.0
+
+# _res  = norm(_r)
+# _done = LinearSolvers.init!(_log,_res)
+# while !_done
+
+#   if !_flexible # β = (zₖ₊₁ ⋅ rₖ₊₁)/(zₖ ⋅ rₖ)
+#     solve!(_z,_Pl,_r)
+#     _β = _γ; _γ = dot(_z,_r); _β = _γ / _β
+#   else         # β = (zₖ₊₁ ⋅ (rₖ₊₁-rₖ))/(zₖ ⋅ rₖ)
+#     _δ = dot(_z,_r)
+#     solve!(_z,_Pl,_r)
+#     _β = _γ; _γ = dot(_z,_r); _β = (_γ-_δ) / _β
+#   end
+
+#   _p .= _z .+ _β .* _p
+
+#   # w = A⋅p
+#   mul!(_w,_A,_p)
+#   _α = _γ / dot(_p,_w)
+
+#   # Update solution and residual
+#   _x .+= _α .* _p
+#   _r .-= _α .* _w
+
+#   _res  = norm(_r)
+#   _done = LinearSolvers.update!(_log,_res)
+# end
+
+function Algebra.solve!(x::AbstractBlockVector,ns::GridapSolvers.BlockSolvers.BlockTriangularSolverNS{Val{:upper}},b::AbstractBlockVector)
+  @assert blocklength(x) == blocklength(b) == length(ns.block_ns)
+  NB = length(ns.block_ns)
+  c = ns.solver.coeffs
+  w, y = ns.work_caches
+  mats = ns.block_caches
+  for iB in NB:-1:1
+    # Add upper off-diagonal contributions
+    wi  = blocks(w)[iB]
+    copy!(wi,blocks(b)[iB])
+    for jB in iB+1:NB
+      cij = c[iB,jB]
+      if abs(cij) > eps(cij)
+        xj = blocks(x)[jB]
+        mul!(wi,mats[iB,jB],xj,-cij,1.0)
+        # println(norm(wi))
+      end
+    end
+
+    # Solve diagonal block
+    nsi = ns.block_ns[iB]
+    xi  = blocks(x)[iB]
+    yi  = blocks(y)[iB]
+    solve!(yi,nsi,wi)
+    copy!(xi,yi) # Remove this with PA 0.4
+  end
+  return x
+end
