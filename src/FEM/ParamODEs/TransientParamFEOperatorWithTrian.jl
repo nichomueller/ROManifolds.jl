@@ -16,7 +16,7 @@ Subtypes:
 
 - [`TransientParamFEOpFromWeakFormWithTrian`](@ref)
 - [`TransientParamSaddlePointFEOpWithTrian`](@ref)
-- [`TransientParamLinearNonlinearFEOperatorWithTrian`](@ref)
+- [`LinearNonlinearTransientParamFEOperatorWithTrian`](@ref)
 
 """
 abstract type TransientParamFEOperatorWithTrian{T<:ODEParamOperatorType} <: TransientParamFEOperator{T} end
@@ -26,7 +26,7 @@ function FESpaces.get_algebraic_operator(feop::TransientParamFEOperatorWithTrian
 end
 
 """
-    TransientParamFEOpFromWeakFormWithTrian{T,N} <: TransientParamFEOperatorWithTrian{T}
+    struct TransientParamFEOpFromWeakFormWithTrian{T,N} <: TransientParamFEOperatorWithTrian{T} end
 
 Corresponds to a [`TransientParamFEOpFromWeakForm`](@ref) object, but in a triangulation
 separation setting. `N` corresponds to the length of the jacobians in the transient
@@ -120,7 +120,7 @@ ParamDataStructures.realization(op::TransientParamFEOpFromWeakFormWithTrian;kwar
 ParamSteady.get_induced_norm(op::TransientParamFEOpFromWeakFormWithTrian) = get_induced_norm(op.op)
 
 """
-    TransientParamSaddlePointFEOpWithTrian{T,N} <: TransientParamFEOperatorWithTrian{T}
+    struct TransientParamSaddlePointFEOpWithTrian{T,N} <: TransientParamFEOperatorWithTrian{T} end
 
 Corresponds to a [`TransientParamSaddlePointFEOp`](@ref) object, but in a triangulation
 separation setting. `N` corresponds to the length of the jacobians in the transient

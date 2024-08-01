@@ -129,7 +129,7 @@ red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
 basis = RBSteady.get_basis(red_test)
 bs = RBTransient.get_basis_space(basis)
 
-@check bs ≈ cores2basis(RBSteady.get_spatial_cores(basis)...)
+@check bs ≈ cores2basis(RBSteady.get_cores_space(basis)...)
 @check norm(bs'*X*bs - I) ≤ 1e-12
 
 u = get_values(fesnaps)
@@ -229,7 +229,7 @@ basis_primal,basis_dual = _basis_time.array
 basis_pd = basis_primal'*basis_dual
 for ntd = axes(basis_dual,2)
   proj = ntd == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,ntd],basis_pd[:,1:ntd-1])
-  dist = norm(basis_pd[:,1]-proj)
+  dist = norm(basis_pd[:,i]-proj)
   println(dist > 1e-2)
 end
 

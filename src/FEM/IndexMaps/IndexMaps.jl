@@ -26,17 +26,25 @@ export get_sparsity
 export permute_sparsity
 include("SparsityPatterns.jl")
 
+export FixedEntriesArray
+include("FixedEntriesArrays.jl")
+
 export AbstractIndexMap
 export TrivialIndexMap
 export IndexMap
 export IndexMapView
-export FixedDofIndexMap
+export FixedDofsIndexMap
 export TProductIndexMap
 export SparseIndexMap
+export FixedDofsSparseIndexMap
 export get_index_map
 export inv_index_map
 export free_dofs_map
 export change_index_map
+export get_sparse_index_map
+export recast
+export get_fixed_dofs
+export remove_fixed_dof
 include("IndexMapsInterface.jl")
 
 end # module

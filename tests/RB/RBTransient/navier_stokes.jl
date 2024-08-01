@@ -3,6 +3,7 @@ using Gridap.Algebra
 using Gridap.MultiField
 using Test
 using DrWatson
+using Serialization
 
 using Mabla.FEM
 using Mabla.FEM.TProduct
@@ -15,7 +16,7 @@ using Mabla.RB
 using Mabla.RB.RBSteady
 using Mabla.RB.RBTransient
 
-θ = 0.5
+θ = 1.0
 dt = 0.01
 t0 = 0.0
 tf = 0.1
@@ -24,7 +25,7 @@ pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
-n = 5
+n = 10
 domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain, partition)
@@ -85,7 +86,7 @@ feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptsp
   trial,test,coupling,trian_res,trian_jac,trian_jac_t)
 feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,induced_norm,ptspace,
   trial,test,trian_res,trian_jac)
-feop = TransientParamLinNonlinFEOperator(feop_lin,feop_nlin)
+feop = LinNonlinTransientParamFEOperator(feop_lin,feop_nlin)
 
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 nls = NewtonRaphsonSolver(LUSolver(),1e-10,20)
@@ -95,17 +96,19 @@ fesolver = ThetaMethod(nls,dt,θ)
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","toy_mesh")))
 
-fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+try
+  results = load_solve(rbsolver,feop,test_dir)
+catch
+  @warn "Loading offline structures failed: running offline phase"
+  fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
+  rbop = reduced_operator(rbsolver,feop,fesnaps)
+  rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+  results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-# fesnaps = Serialization.deserialize(RB.get_snapshots_filename(test_dir))
+  save(test_dir,fesnaps)
+  save(test_dir,rbop)
+  save(test_dir,results)
+end
 
 println(compute_error(results))
-save(test_dir,fesnaps)
-save(test_dir,rbop)
-save(test_dir,results)
-
-# POD-MDEIM error
-pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
+println(compute_speedup(results))

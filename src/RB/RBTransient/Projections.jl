@@ -20,28 +20,14 @@ RBSteady.num_reduced_dofs(a::TransientProjection) = RBSteady.num_reduced_space_d
 
 function RBSteady.Projection(s::UnfoldingTransientSnapshots,args...;kwargs...)
   s′ = flatten_snapshots(s)
-  basis_space = tpod(s′,args...;kwargs...)
+  basis_space = truncated_pod(s′,args...;kwargs...)
+  basis_space′ = recast(s,basis_space)
   compressed_s2 = compress(s′,basis_space,args...;swap_mode=true)
-  basis_time = tpod(compressed_s2;kwargs...)
-  TransientPODBasis(basis_space,basis_time)
-end
-
-function RBSteady.Projection(s::UnfoldingTransientSparseSnapshots,args...;kwargs...)
-  s′ = flatten_snapshots(s)
-  basis_space = tpod(s′,args...;kwargs...)
-  compressed_s2 = compress(s′,basis_space,args...;swap_mode=true)
-  basis_time = tpod(compressed_s2;kwargs...)
-  sparse_basis_space = recast(s,basis_space)
-  TransientPODBasis(sparse_basis_space,basis_time)
+  basis_time = truncated_pod(compressed_s2;kwargs...)
+  TransientPODBasis(basis_space′,basis_time)
 end
 
 function RBSteady.Projection(s::AbstractTransientSnapshots,args...;kwargs...)
-  cores_space...,core_time = ttsvd(s,args...;kwargs...)
-  index_map = get_index_map(s)
-  TransientTTSVDCores(cores_space,core_time,index_map)
-end
-
-function RBSteady.Projection(s::TransientSparseSnapshots,args...;kwargs...)
   cores_space...,core_time = ttsvd(s,args...;kwargs...)
   cores_space′ = recast(s,cores_space)
   index_map = get_index_map(s)
@@ -51,7 +37,7 @@ end
 """
     TransientPODBasis{A<:AbstractMatrix,B<:AbstractMatrix} <: TransientProjection
 
-TransientProjection stemming from a truncated proper orthogonal decomposition [`tpod`](@ref)
+TransientProjection stemming from a truncated proper orthogonal decomposition [`truncated_pod`](@ref)
 
 """
 struct TransientPODBasis{A<:AbstractMatrix,B<:AbstractMatrix} <: TransientProjection
@@ -67,7 +53,7 @@ get_basis_time(a::TransientPODBasis) = a.basis_time
 ParamDataStructures.num_times(a::TransientPODBasis) = size(get_basis_time(a),1)
 num_reduced_times(a::TransientPODBasis) = size(get_basis_time(a),2)
 
-function ParamDataStructures.recast(x̂::AbstractVector,a::TransientPODBasis)
+function IndexMaps.recast(x̂::AbstractVector,a::TransientPODBasis)
   basis_space = get_basis_space(a)
   basis_time = get_basis_time(a)
   ns = RBSteady.num_reduced_space_dofs(a)
@@ -81,51 +67,44 @@ end
 # TT interface
 
 """
-    TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},
-      C<:AbstractMatrix,I} <: TransientProjection
+    TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},I} <: TransientProjection
 
 TransientProjection stemming from a tensor train singular value decomposition [`ttsvd`](@ref).
 An index map of type `I` is provided for indexing purposes
 
 """
-struct TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},C<:AbstractMatrix,I} <: TransientProjection
+struct TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},I} <: TransientProjection
   cores_space::A
   core_time::B
-  basis_spacetime::C
   index_map::I
 end
 
-function TransientTTSVDCores(
-  cores_space::Vector{<:AbstractArray},
-  core_time::AbstractArray,
-  index_map::AbstractIndexMap)
+const TransientFixedDofsTTSVDCores{
+  D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},I<:FixedDofsIndexMap
+  } = TransientTTSVDCores{D,T,A,B,I}
 
-  basis_spacetime = get_basis_spacetime(index_map,cores_space,core_time)
-  TransientTTSVDCores(cores_space,core_time,basis_spacetime,index_map)
-end
 
 IndexMaps.get_index_map(a::TransientTTSVDCores) = a.index_map
 
-RBSteady.get_cores(a::TransientTTSVDCores) = (get_spatial_cores(a)...,get_temporal_core(a))
-RBSteady.get_spatial_cores(a::TransientTTSVDCores) = a.cores_space
-get_temporal_core(a::TransientTTSVDCores) = a.core_time
+RBSteady.get_cores(a::TransientTTSVDCores) = [get_cores_space(a)...,get_core_time(a)]
+RBSteady.get_cores_space(a::TransientTTSVDCores) = a.cores_space
+get_core_time(a::TransientTTSVDCores) = a.core_time
 
-RBSteady.get_basis_space(a::TransientTTSVDCores) = cores2basis(get_index_map(a),get_spatial_cores(a)...)
+RBSteady.get_basis_space(a::TransientTTSVDCores) = cores2basis(get_index_map(a),get_cores_space(a)...)
 RBSteady.num_space_dofs(a::TransientTTSVDCores) = prod(_num_tot_space_dofs(a))
-RBSteady.num_reduced_space_dofs(a::TransientTTSVDCores) = size(last(get_spatial_cores(a)),3)
-
-get_basis_time(a::TransientTTSVDCores) = cores2basis(get_temporal_core(a))
-ParamDataStructures.num_times(a::TransientTTSVDCores) = size(get_temporal_core(a),2)
-num_reduced_times(a::TransientTTSVDCores) = size(get_temporal_core(a),3)
+function RBSteady.num_space_dofs(a::TransientFixedDofsTTSVDCores)
+  prod(_num_tot_space_dofs(a)) - length(get_fixed_dofs(get_index_map(a)))
+end
+get_basis_time(a::TransientTTSVDCores) = cores2basis(get_core_time(a))
+ParamDataStructures.num_times(a::TransientTTSVDCores) = size(get_core_time(a),2)
+num_reduced_times(a::TransientTTSVDCores) = size(get_core_time(a),3)
 
 RBSteady.num_reduced_dofs(a::TransientTTSVDCores) = num_reduced_times(a)
 
-get_basis_spacetime(a::TransientTTSVDCores) = a.basis_spacetime
-
-_num_tot_space_dofs(a::TransientTTSVDCores{3}) = size.(get_spatial_cores(a),2)
+_num_tot_space_dofs(a::TransientTTSVDCores{3}) = size.(get_cores_space(a),2)
 
 function _num_tot_space_dofs(a::TransientTTSVDCores{4})
-  scores = get_spatial_cores(a)
+  scores = get_cores_space(a)
   tot_ndofs = zeros(Int,2,length(scores))
   @inbounds for i = eachindex(scores)
     tot_ndofs[:,i] .= size(scores[i],2),size(scores[i],3)
@@ -133,30 +112,20 @@ function _num_tot_space_dofs(a::TransientTTSVDCores{4})
   return tot_ndofs
 end
 
-# when we multiply a 4-D spatial core with a 3-D temporal core
-function RBSteady._cores2basis(a::AbstractArray{S,4},b::AbstractArray{T,3}) where {S,T}
-  @check size(a,4) == size(b,1)
-  TS = promote_type(T,S)
-  nrows = size(a,2)*size(b,2)
-  ncols = size(a,3)
-  ab = zeros(TS,size(a,1),nrows*ncols,size(b,3)) # returns a 3-D array
-  for i = axes(a,1), j = axes(b,3)
-    for α = axes(a,4)
-      @inbounds @views ab[i,:,j] += vec(kronecker(b[α,:,j],a[i,:,:,α]))
-    end
-  end
-  return ab
-end
+get_basis_spacetime(a::TransientTTSVDCores{3}) = get_basis_spacetime(get_index_map(a),get_cores(a)...)
 
-function RBSteady._cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,4}) where {S,T}
-  @notimplemented "Usually the spatial cores are computed before the temporal ones"
-end
-
-function get_basis_spacetime(index_map::AbstractIndexMap,cores_space,core_time)
+function get_basis_spacetime(index_map::AbstractIndexMap,cores...)
+  cores_space...,core_time = cores
   cores2basis(RBSteady._cores2basis(index_map,cores_space...),core_time)
 end
 
-function ParamDataStructures.recast(x̂::AbstractVector,a::TransientTTSVDCores)
+function RBSteady.compress_cores(core::TransientTTSVDCores,bases::TransientTTSVDCores...;kwargs...)
+  ccores = map((a,b...)->compress_core(a,b...;kwargs...),get_cores(core),get_cores.(bases)...)
+  ccore = multiply_cores(ccores...)
+  RBSteady._dropdims(ccore)
+end
+
+function IndexMaps.recast(x̂::AbstractVector,a::TransientTTSVDCores)
   basis_spacetime = get_basis_spacetime(a)
   Ns = num_space_dofs(a)
   Nt = num_times(a)
@@ -191,26 +160,45 @@ function num_reduced_times(a::BlockProjection)
   return dofs
 end
 
-function RBSteady.enrich_basis(
-  b::BlockProjection{<:TransientProjection},
-  norm_matrix::BlockMatrix,
-  supr_op::BlockMatrix)
+function get_core_time(a::BlockProjection)
+  active_block_ids = get_touched_blocks(a)
+  block_map = BlockMap(size(a),active_block_ids)
+  cores = [get_core_time(a[i]) for i = get_touched_blocks(a)]
+  return return_cache(block_map,cores...)
+end
 
-  basis_space = add_space_supremizers(get_basis_space(b),norm_matrix,supr_op)
-  basis_time = add_time_supremizers(get_basis_time(b))
-  basis = BlockProjection(map(TransientPODBasis,basis_space,basis_time),b.touched)
+function RBSteady.enrich_basis(
+  a::BlockProjection{<:TransientPODBasis},
+  norm_matrix::AbstractMatrix,
+  supr_op::AbstractMatrix)
+
+  basis_space = add_space_supremizers(get_basis_space(a),norm_matrix,supr_op)
+  basis_time = add_time_supremizers(get_basis_time(a))
+  basis = BlockProjection(map(TransientPODBasis,basis_space,basis_time),a.touched)
   return basis
 end
 
-"""
-    add_space_supremizers(basis_time::MatrixBlock;kwargs...) -> Vector{<:Matrix}
+function RBSteady.enrich_basis(
+  a::BlockProjection{<:TransientTTSVDCores},
+  norm_matrix::AbstractMatrix,
+  supr_op::AbstractMatrix)
 
-Enriches the temporal basis `basis_time` with temporal supremizers computed from
-the kernel of the temporal basis associated to the primal field onto the column
-space of the temporal basis (bases) associated to the duel field(s)
+  cores_space,core_time = RBSteady.add_tt_supremizers(
+    get_cores_space(a),get_core_time(a),norm_matrix,supr_op)
+  index_map = get_index_map(a)
+  a′ = BlockProjection(map(TransientTTSVDCores,cores_space,core_time,index_map),a.touched)
+  return a′
+end
 
 """
-function add_time_supremizers(basis_time;kwargs...)
+    add_time_supremizers(basis_time::ArrayBlock;kwargs...) -> Vector{<:Matrix}
+
+Enriches the temporal basis with temporal supremizers computed from
+the kernel of the temporal basis associated to the primal field projected onto
+the column space of the temporal basis (bases) associated to the duel field(s)
+
+"""
+function add_time_supremizers(basis_time::ArrayBlock;kwargs...)
   basis_primal,basis_dual... = basis_time.array
   for i = eachindex(basis_dual)
     basis_primal = add_time_supremizers(basis_primal,basis_dual[i];kwargs...)
@@ -228,28 +216,149 @@ function add_time_supremizers(basis_primal,basis_dual;tol=1e-2)
     hcat(basis_primal,vnew),vcat(basis_pd,vnew'*basis_dual)
   end
 
-  count = 0
-  ntd_minus_ntp = size(basis_dual,2) - size(basis_primal,2)
-  if ntd_minus_ntp > 0
-    for ntd = 1:ntd_minus_ntp
-      basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,ntd])
-      count += 1
-    end
-  end
-
-  ntd = 1
-  while ntd ≤ size(basis_pd,2)
-    proj = ntd == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,ntd],basis_pd[:,1:ntd-1])
-    dist = norm(basis_pd[:,1]-proj)
+  i = 1
+  while i ≤ size(basis_pd,2)
+    proj = i == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,i],basis_pd[:,1:i-1])
+    dist = norm(basis_pd[:,i]-proj)
     if dist ≤ tol
-      basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,ntd])
-      count += 1
-      ntd = 0
+      basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,i])
+      i = 0
     else
-      basis_pd[:,ntd] .-= proj
+      basis_pd[:,i] .-= proj
     end
-    ntd += 1
+    i += 1
   end
 
   return basis_primal
+end
+
+function RBSteady.add_tt_supremizers(
+  cores_space::ArrayBlock,
+  core_time::ArrayBlock,
+  norm_matrix::BlockTProductArray,
+  supr_op::BlockTProductArray)
+
+  pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
+  cores_primal_space = map(ip -> cores_space[ip],pblocks)
+  core_primal_time = map(ip -> core_time[ip],pblocks)
+  cores_dual_space = map(id -> cores_space[id],dblocks)
+  core_dual_time = map(id -> core_time[id],dblocks)
+  norms_primal = map(ip -> norm_matrix[Block(ip,ip)],pblocks)
+
+  for id in dblocks
+    rcores_space = Vector{Array{Float64,3}}[]
+    rcore_time = Array{Float64,3}[]
+    rcore = Matrix{Float64}[]
+    cores_dual_space_i = cores_space[id]
+    core_dual_time_i = core_time[id]
+    for ip in pblocks
+      A = norm_matrix[Block(ip,ip)]
+      C = supr_op[Block(ip,id)]
+      cores_primal_space_i = cores_space[ip]
+      core_primal_time_i = core_time[ip]
+      RBSteady.reduced_coupling!((rcores_space,rcore_time,rcore),cores_primal_space_i,core_primal_time_i,
+        cores_dual_space_i,core_dual_time_i,A,C)
+    end
+    RBSteady.enrich!(cores_primal_space,core_primal_time,rcores_space,rcore_time,
+      vcat(rcore...),norms_primal)
+  end
+
+  return [cores_primal_space...,cores_dual_space...],[core_primal_time...,core_dual_time...]
+end
+
+function RBSteady.reduced_coupling!(
+  cache,
+  cores_primal_space_i,core_primal_time_i,
+  cores_dual_space_i,core_dual_time_i,
+  norm_matrix_i,coupling_i)
+
+  rcores_space,rcore_time,rcore = cache
+  cores_coupling_i = TProduct.tp_decomposition(coupling_i)
+  _rcores_space_i,rcores_space_i = map(cores_primal_space_i,cores_dual_space_i,cores_coupling_i) do cp,cd,cc
+    rc = cc*cd
+    rc,compress_core(rc,cp)
+  end |> tuple_of_arrays
+  rcore_time_i = compress_core(core_dual_time_i,core_primal_time_i)
+  rcore_i = multiply_cores(rcores_space_i...,rcore_time_i) |> RBSteady._dropdims
+  push!(rcores_space,_rcores_space_i)
+  push!(rcore_time,core_dual_time_i)
+  push!(rcore,rcore_i)
+end
+
+function RBSteady.enrich!(
+  cores_primal_space,core_primal_time,
+  rcores_space,rcore_time,
+  rcore,norms_primal;tol=5e-1)
+
+  @check length(cores_primal_space) == length(rcores_space)
+  nprimal = length(cores_primal_space)
+  flag = false
+
+  i = 1
+  R = Vector{Matrix{Float64}}(undef,nprimal)
+  while i ≤ size(rcore,2)
+    proj = i == 1 ? zeros(size(rcore,1)) : orth_projection(rcore[:,i],rcore[:,1:i-1])
+    dist = norm(rcore[:,i]-proj)
+    if dist ≤ tol
+      for ip in 1:nprimal
+        if !flag R[ip] = zeros(1,1) end
+        cps,cpt = cores_primal_space[ip],core_primal_time[ip]
+        rcs,rct = rcores_space[ip],rcore_time[ip]
+        cores_primal_space[ip],core_primal_time[ip],R[ip] = RBSteady.add_and_orthogonalize(
+          cps,cpt,rcs,rct,norms_primal[ip],R[ip],i;flag)
+      end
+      rcore = RBSteady._update_reduced_coupling(cores_primal_space,core_primal_time,rcores_space,rcore_time,rcore)
+      flag = true
+    end
+    i += 1
+  end
+  return flag
+end
+
+function RBSteady.add_and_orthogonalize(
+  cores_primal_space,core_primal_time,
+  rcores_space,rcore_time,norms_primal,
+  R,i;flag=false)
+
+  D = length(cores_primal_space)
+  weights = Vector{Array{Float64,3}}(undef,D-1)
+
+  if !flag
+    for d in 1:D-1
+      cores_primal_space[d] = cat_cores(cores_primal_space[d],rcores_space[d])
+      RBSteady._weight_array!(weights,cores_primal_space,norms_primal,Val{d}())
+    end
+    cores_primal_space[D] = cat_cores(cores_primal_space[D],rcores_space[D])
+    R = RBSteady.orthogonalize!(cores_primal_space[D],norms_primal,weights)
+    _core_primal_time = cat_cores(core_primal_time,rcore_time[:,:,i])
+    RBSteady.absorb!(_core_primal_time,R)
+  else
+    _core_primal_time = RBSteady.pushlast(core_primal_time,rcore_time[:,:,i])
+    RBSteady.absorb!(_core_primal_time,R)
+  end
+  return cores_primal_space,_core_primal_time,R
+end
+
+function RBSteady._update_reduced_coupling(
+  cores_primal_space,core_primal_time,
+  rcores_space,rcore_time,
+  rcore)
+
+  rprimal,rdual = size(rcore)
+  nprimal = length(cores_primal_space)
+  rcore_new = similar(rcore,rprimal+nprimal,rdual)
+  @views rcore_new[1:rprimal,:] = rcore
+  for ip in 1:nprimal
+    cores_primal_space_i = cores_primal_space[ip]
+    core_primal_time_i = core_primal_time[ip]
+    rcores_space_i = rcores_space[ip]
+    rcore_time_i = rcore_time[ip]
+    last_block_space = last.(blocks.(cores_primal_space_i))
+    last_block_time = last(blocks(core_primal_time_i))[:,:,end:end]
+    rcores_space_i2 = compress_core.(rcores_space_i,last_block_space)
+    rcores_time_i2 = compress_core(rcore_time_i,last_block_time)
+    rcore_i = multiply_cores(rcores_space_i2...,rcores_time_i2) |> RBSteady._dropdims
+    rcore_new[rprimal+ip,:] = rcore_i
+  end
+  return rcore_new
 end

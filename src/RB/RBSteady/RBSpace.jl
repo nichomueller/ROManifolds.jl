@@ -43,7 +43,7 @@ function reduced_basis(feop::ParamFEOperatorWithTrian,s,norm_matrix;kwargs...)
   reduced_basis(feop.op,s,norm_matrix;kwargs...)
 end
 
-function reduced_basis(feop::ParamLinearNonlinearFEOperator,s,norm_matrix;kwargs...)
+function reduced_basis(feop::LinearNonlinearParamFEOperator,s,norm_matrix;kwargs...)
   reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
 end
 
@@ -111,7 +111,7 @@ end
 
 struct RecastMap <: Map end
 
-function ParamDataStructures.recast(x::AbstractVector,r::FESubspace)
+function IndexMaps.recast(x::AbstractVector,r::FESubspace)
   cache = return_cache(RecastMap(),x,r)
   evaluate!(cache,RecastMap(),x,r)
   return cache
@@ -138,7 +138,7 @@ end
 
 function Arrays.evaluate!(cache,k::RecastMap,x::AbstractParamVector,r::RBSpace)
   @inbounds for ip in eachindex(x)
-    cache[ip] .= recast(x[ip],r.basis)
+    cache[ip] = recast(x[ip],r.basis)
   end
 end
 
@@ -232,6 +232,6 @@ end
 function pod_error(r::MultiFieldRBSpace,s::BlockSnapshots,norm_matrix::BlockMatrix)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  errors = Any[pod_error(r[i],s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
+  errors = [pod_error(r[i],s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
   return_cache(block_map,errors...)
 end

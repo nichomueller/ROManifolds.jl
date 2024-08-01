@@ -36,23 +36,12 @@ num_fe_dofs(a::SteadyProjection) = num_space_dofs(a)
 num_reduced_dofs(a::SteadyProjection) = num_reduced_space_dofs(a)
 
 function Projection(s::UnfoldingSteadySnapshots,args...;kwargs...)
-  basis = tpod(s,args...;kwargs...)
-  PODBasis(basis)
-end
-
-function Projection(s::UnfoldingSparseSnapshots,args...;kwargs...)
-  basis = tpod(s,args...;kwargs...)
-  sparse_basis = recast(s,basis)
-  PODBasis(sparse_basis)
+  basis = truncated_pod(s,args...;kwargs...)
+  basis′ = recast(s,basis)
+  PODBasis(basis′)
 end
 
 function Projection(s::AbstractSteadySnapshots,args...;kwargs...)
-  cores = ttsvd(s,args...;kwargs...)
-  index_map = get_index_map(s)
-  TTSVDCores(cores,index_map)
-end
-
-function Projection(s::SparseSnapshots,args...;kwargs...)
   cores = ttsvd(s,args...;kwargs...)
   cores′ = recast(s,cores)
   index_map = get_index_map(s)
@@ -65,7 +54,7 @@ end
 Returns the action of the transposed Projection operator `a` on `x̂`
 
 """
-function ParamDataStructures.recast(x̂::AbstractVector,a::SteadyProjection)
+function IndexMaps.recast(x̂::AbstractVector,a::SteadyProjection)
   basis = get_basis_space(a)
   x = basis*x̂
   return x
@@ -74,7 +63,7 @@ end
 """
     struct PODBasis{A<:AbstractMatrix} <: SteadyProjection
 
-SteadyProjection stemming from a truncated proper orthogonal decomposition [`tpod`](@ref)
+SteadyProjection stemming from a truncated proper orthogonal decomposition [`truncated_pod`](@ref)
 
 """
 struct PODBasis{A<:AbstractMatrix} <: SteadyProjection
@@ -99,19 +88,24 @@ struct TTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I} <: SteadyProjec
   index_map::I
 end
 
+const FixedDofsTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I<:FixedDofsIndexMap} = TTSVDCores{D,T,A,I}
+
 IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
 
 get_cores(a::TTSVDCores) = a.cores
-get_spatial_cores(a::TTSVDCores) = a.cores
+get_cores_space(a::TTSVDCores) = a.cores
 
-get_basis_space(a::TTSVDCores) = cores2basis(get_index_map(a),get_spatial_cores(a)...)
+get_basis_space(a::TTSVDCores) = cores2basis(get_index_map(a),get_cores_space(a)...)
 num_space_dofs(a::TTSVDCores) = prod(_num_tot_space_dofs(a))
-num_reduced_space_dofs(a::TTSVDCores) = size(last(get_spatial_cores(a)),3)
+function num_space_dofs(a::FixedDofsTTSVDCores)
+  prod(_num_tot_space_dofs(a)) - length(get_fixed_dofs(get_index_map(a)))
+end
+num_reduced_space_dofs(a::TTSVDCores) = size(last(get_cores_space(a)),3)
 
-_num_tot_space_dofs(a::TTSVDCores{3}) = size.(get_spatial_cores(a),2)
+_num_tot_space_dofs(a::TTSVDCores{3}) = size.(get_cores_space(a),2)
 
 function _num_tot_space_dofs(a::TTSVDCores{4})
-  scores = get_spatial_cores(a)
+  scores = get_cores_space(a)
   tot_ndofs = zeros(Int,2,length(scores))
   @inbounds for i = eachindex(scores)
     tot_ndofs[:,i] .= size(scores[i],2),size(scores[i],3)
@@ -119,63 +113,10 @@ function _num_tot_space_dofs(a::TTSVDCores{4})
   return tot_ndofs
 end
 
-"""
-    cores2basis(index_map::AbstractIndexMap,cores::AbstractArray...) -> AbstractMatrix
-
-Computes the kronecker product of the suitably indexed input cores
-
-"""
-function cores2basis(index_map::AbstractIndexMap,cores::AbstractArray...)
-  cores2basis(_cores2basis(index_map,cores...))
-end
-
-function cores2basis(cores::AbstractArray...)
-  c2m = _cores2basis(cores...)
-  return dropdims(c2m;dims=1)
-end
-
-function cores2basis(core::AbstractArray{T,3}) where T
-  pcore = permutedims(core,(2,1,3))
-  return reshape(pcore,size(pcore,1),:)
-end
-
-function cores2basis(core::AbstractArray{T,4}) where T
-  pcore = permutedims(core,(2,3,1,4))
-  return reshape(pcore,size(pcore,1)*size(pcore,2),:)
-end
-
-function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
-  @check size(a,3) == size(b,1)
-  TS = promote_type(T,S)
-  nrows = size(a,2)*size(b,2)
-  ab = zeros(TS,size(a,1),nrows,size(b,3))
-  for i = axes(a,1), j = axes(b,3)
-    for α = axes(a,3)
-      @inbounds @views ab[i,:,j] += kronecker(b[α,:,j],a[i,:,α])
-    end
-  end
-  return ab
-end
-
-# when we multiply two 4-D spatial cores, the result is a 3-D core that stacks
-# the matrices' rows and columns
-function _cores2basis(a::AbstractArray{S,4},b::AbstractArray{T,4}) where {S,T}
-  @abstractmethod
-end
-
-function _cores2basis(a::AbstractArray,b::AbstractArray...)
-  c,d... = b
-  return _cores2basis(_cores2basis(a,c),d...)
-end
-
-function _cores2basis(i::AbstractIndexMap,a::AbstractArray{T,3}...) where T
-  basis = _cores2basis(a...)
-  invi = inv_index_map(i)
-  return view(basis,:,vec(invi),:)
-end
-
-function _cores2basis(i::AbstractIndexMap,a::AbstractArray{T,4}...) where T
-  @abstractmethod
+function compress_cores(core::TTSVDCores,bases::TTSVDCores...;kwargs...)
+  ccores = map((a,b...)->compress_core(a,b...;kwargs...),get_cores(core),get_cores.(bases)...)
+  ccore = multiply_cores(ccores...)
+  _dropdims(ccore)
 end
 
 # multi field interface
@@ -260,52 +201,167 @@ function num_reduced_space_dofs(a::BlockProjection)
   return dofs
 end
 
+function get_cores_space(a::BlockProjection)
+  active_block_ids = get_touched_blocks(a)
+  block_map = BlockMap(size(a),active_block_ids)
+  cores = [get_cores_space(a[i]) for i = get_touched_blocks(a)]
+  return return_cache(block_map,cores...)
+end
+
+function get_cores(a::BlockProjection)
+  active_block_ids = get_touched_blocks(a)
+  block_map = BlockMap(size(a),active_block_ids)
+  cores = [get_cores(a[i]) for i = get_touched_blocks(a)]
+  return return_cache(block_map,cores...)
+end
+
+function IndexMaps.get_index_map(a::BlockProjection)
+  active_block_ids = get_touched_blocks(a)
+  index_map = [get_index_map(a[i]) for i = get_touched_blocks(a)]
+  return index_map
+end
+
 function Projection(s::BlockSnapshots;kwargs...)
   norm_matrix = fill(nothing,size(s))
-  reduced_basis(s,norm_matrix;kwargs...)
+  Projection(s,norm_matrix;kwargs...)
 end
 
 function Projection(s::BlockSnapshots,norm_matrix;kwargs...)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  bases = [reduced_basis(s[i],norm_matrix[Block(i,i)];kwargs...) for i in active_block_ids]
+  bases = [Projection(s[i],norm_matrix[Block(i,i)];kwargs...) for i in active_block_ids]
   BlockProjection(block_map,bases)
 end
 
 """
     enrich_basis(
       a::BlockProjection,
-      norm_matrix::BlockMatrix,
-      supr_op::BlockMatrix) -> BlockProjection
+      norm_matrix::AbstractMatrix,
+      supr_op::AbstractMatrix) -> BlockProjection
 
 Returns the supremizer-enriched BlockProjection. This function stabilizes Inf-Sup
 problems projected on a reduced vector space
 
 """
-function enrich_basis(a::BlockProjection{<:PODBasis},norm_matrix::BlockMatrix,supr_op::BlockMatrix)
+function enrich_basis(a::BlockProjection{<:PODBasis},norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
   bases = add_space_supremizers(get_basis_space(a),norm_matrix,supr_op)
-  return BlockProjection(bases,a.touched)
+  return BlockProjection(map(PODBasis,bases),a.touched)
+end
+
+function enrich_basis(a::BlockProjection{<:TTSVDCores},norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
+  cores = add_tt_supremizers(get_cores_space(a),norm_matrix,supr_op)
+  return BlockProjection(map(TTSVDCores,cores),a.touched)
 end
 
 """
     add_space_supremizers(
-      basis_space::MatrixBlock,
-      norm_matrix::BlockMatrix,
-      supr_op::BlockMatrix) -> Vector{<:Matrix}
+      basis_space::ArrayBlock,
+      norm_matrix::AbstractMatrix,
+      supr_op::AbstractMatrix) -> Vector{<:AbstractArray}
 
-Enriches the spatial basis `basis_space` with spatial supremizers computed from
+Enriches the spatial basis with spatial supremizers computed from
 the action of the supremizing operator `supr_op` on the dual field(s)
 
 """
-function add_space_supremizers(basis_space,norm_matrix::BlockMatrix,supr_op::BlockMatrix)
+function add_space_supremizers(basis_space::ArrayBlock,norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
   basis_primal,basis_dual... = basis_space.array
   A = norm_matrix[Block(1,1)]
   H = cholesky(A)
   for i = eachindex(basis_dual)
-    b_i = supr_op[Block(1,i+1)] * basis_dual[i]
-    supr_i = H \ b_i
+    C = supr_op[Block(1,i+1)]
+    supr_i = H \ C * basis_dual[i]
     gram_schmidt!(supr_i,basis_primal,A)
     basis_primal = hcat(basis_primal,supr_i)
   end
   return [basis_primal,basis_dual...]
+end
+
+function add_tt_supremizers(cores_space::ArrayBlock,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
+  pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
+  cores_primal = map(ip -> cores_space[ip],pblocks)
+  cores_dual = map(id -> cores_space[id],dblocks)
+  norms_primal = map(ip -> norm_matrix[Block(ip,ip)],pblocks)
+
+  for id in dblocks
+    rcores = Vector{Array{Float64,3}}[]
+    rcore = Matrix{Float64}[]
+    cores_dual_i = cores_space[id]
+    for ip in eachindex(pblocks)
+      A = norm_matrix[Block(ip,ip)]
+      C = supr_op[Block(ip,id)]
+      cores_primal_i = cores_space[ip]
+      reduced_coupling!((rcores,rcore),cores_primal_i,cores_dual_i,A,C)
+    end
+    enrich!(cores_primal,rcores,vcat(rcore...),norms_primal)
+  end
+
+  cores_primal,cores_dual
+end
+
+function reduced_coupling!(cache,cores_primal_i,cores_dual_i,norm_matrix_i,coupling_i)
+  rcores_dual,rcore = cache
+  # cores_norm_i = TProduct.tp_decomposition(norm_matrix_i) # add here the norm matrix
+  cores_coupling_i = TProduct.tp_decomposition(coupling_i)
+  rcores_dual_i,rcores_i = map(cores_primal_i,cores_dual_i,cores_coupling_i) do cp,cd,cc
+    rc = cc*cd
+    rc,compress_core(rc,cp)
+  end |> tuple_of_arrays
+  rcore_i = multiply_cores(rcores_i...) |> _dropdims
+  push!(rcores_dual,rcores_dual_i)
+  push!(rcore,rcore_i)
+end
+
+function enrich!(cores_primal,rcores,rcore,norms_primal;tol=1e-2)
+  @check length(cores_primal) == length(rcores)
+
+  flag = false
+  i = 1
+  while i ≤ size(rcore,2)
+    proj = i == 1 ? zeros(size(rcore,1)) : orth_projection(rcore[:,i],rcore[:,1:i-1])
+    dist = norm(rcore[:,i]-proj)
+    if dist ≤ tol
+      for ip in eachindex(cores_primal)
+        cp,rc,np = cores_primal[ip],rcores[ip],norms_primal[ip]
+        cores_primal[ip] = add_and_orthogonalize(cp,rc,np,i;flag)
+      end
+      rcore = _update_reduced_coupling(cores_primal,rcores,rcore)
+      flag = true
+    end
+    i += 1
+  end
+end
+
+function add_and_orthogonalize(cores_primal,rcores,norms_primal,i;flag=false)
+  D = length(cores_primal)
+  weights = Vector{Array{Float64,3}}(undef,D-1)
+
+  if !flag
+    for d in 1:D-1
+      push!(cores_primal[d],rcores[d])
+      _weight_array!(weights,cores_primal,norms_primal,Val{d}())
+    end
+    push!(cores_primal[D],rcores[D])
+    _ = orthogonalize!(cores_primal[D],norms_primal,weights)
+  else
+    cores_primal[D] = hcat(cores_primal[D],rcores[D][:,:,i])
+    _ = orthogonalize!(cores_primal[D],norms_primal,weights)
+  end
+end
+
+function _update_reduced_coupling(cores_primal,rcores,rcore)
+  offsets = size.(last.(cores_primal),3)
+  @check size(rcore,1) == sum(offsets)
+  enriched_offsets = offsets .+ 1
+  pushfirst!(0,offsets)
+  pushfirst!(0,enriched_offsets)
+  rcore_new = similar(rcore,sum(enriched_offsets),size(rcore,2))
+  for (ip,cores_primal_i) in enumerate(cores_primal)
+    range = offsets[ip]+1:offsets[ip+1]
+    enriched_range = enriched_offsets[ip]+1:enriched_offsets[ip+1]-1
+    @views rcore_new[enriched_range,:] = rcore[range,:]
+    rcores_i = compress_core.(rcores[ip],blocks(cores_primal_i)[end])
+    rcore_i = multiply_cores(rcores_i...) |> _dropdims
+    @views rcore_new[enriched_offsets[ip+1],:] = rcore_i
+  end
+  return rcore_new
 end

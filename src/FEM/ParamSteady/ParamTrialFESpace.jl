@@ -62,7 +62,7 @@ function get_matrix_index_map(f::UnEvalParamSingleFieldFESpace,g::SingleFieldFES
 end
 
 """
-    ParamTrialFESpace{A,B} <: UnEvalParamSingleFieldFESpace
+    struct ParamTrialFESpace{A,B} <: UnEvalParamSingleFieldFESpace end
 
 Structure used in steady applications. When a ParamTrialFESpace is evaluated in a
 [`ParamRealization`](@ref), a parametric trial FE space is returned
@@ -109,7 +109,7 @@ Arrays.evaluate(U::ParamTrialFESpace,r::Nothing) = U.space0
 # Define the ParamTrialFESpace interface for stationary spaces
 
 ODEs.allocate_space(U::FESpace,r) = U
-Arrays.evaluate!(Upt::FESpace,U::FESpace,r) = U
+Arrays.evaluate!(Upt::FESpace,U::FESpace,r::AbstractParamRealization) = U
 Arrays.evaluate(U::FESpace,r) = U
 
 # Define the interface for MultiField
@@ -139,10 +139,13 @@ function Arrays.evaluate!(Upt::MultiFieldFESpace,U::MultiFieldFESpace,r::ParamRe
   Upt
 end
 
-function Arrays.evaluate(U::MultiFieldFESpace,args...)
-  Upt = allocate_space(U,args...)
-  evaluate!(Upt,U,args...)
-  Upt
+function Arrays.evaluate(U::MultiFieldFESpace,r::ParamRealization)
+  if !has_param(U)
+    return U
+  end
+  Ut = allocate_space(U,r)
+  evaluate!(Ut,U,r)
+  Ut
 end
 
 function test_param_trial_fe_space(Uh,μ)

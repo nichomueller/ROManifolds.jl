@@ -1,6 +1,7 @@
 module RBSteady
 
 using LinearAlgebra
+using RandomizedLinAlg
 using BlockArrays
 using SparseArrays
 using DrWatson
@@ -17,6 +18,7 @@ using Gridap.Fields
 using Gridap.CellData
 using Gridap.MultiField
 using Gridap.ODEs
+using Gridap.TensorValues
 using Gridap.Helpers
 
 using Mabla.FEM
@@ -30,6 +32,7 @@ using Mabla.FEM.ParamODEs
 
 import Base: +,-,*,\
 import UnPack: @unpack
+import ArraysOfArrays: innersize
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
 
@@ -45,25 +48,27 @@ export select_snapshots
 export select_snapshots_entries
 export get_touched_blocks
 export get_realization
+export get_indexed_values
 export num_space_dofs
 include("Snapshots.jl")
 
 export AbstractTTCore
-export TTCore
 export SparseCore
 export SparseCoreCSC
+export cat_cores
 include("TTCores.jl")
 
 export RBSolver
 export MDEIMStyle
 export SpaceMDEIM
+export get_stats
 export get_test_directory
 export get_fe_solver
 export fe_solutions
 export nonlinear_rb_solve!
 include("RBSolver.jl")
 
-export tpod
+export truncated_pod
 export ttsvd
 export gram_schmidt!
 export orth_complement!
@@ -79,7 +84,7 @@ export get_basis_space
 export num_fe_dofs
 export num_reduced_dofs
 export get_cores
-export get_spatial_cores
+export get_cores_space
 export cores2basis
 export enrich_basis
 export add_space_supremizers
@@ -141,6 +146,7 @@ export rb_results
 export load_solve
 export compute_speedup
 export compute_error
+export average_plot
 include("PostProcess.jl")
 
 end # module

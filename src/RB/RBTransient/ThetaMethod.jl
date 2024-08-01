@@ -5,7 +5,8 @@ function get_stage_operator(
   odeop::ODEParamOperator,
   r::TransientParamRealization,
   state0::NTuple{1,AbstractVector},
-  odecache)
+  odecache;
+  update_cache=true)
 
   u0 = state0[1]
   odeslvrcache,odeopcache = odecache
@@ -27,7 +28,7 @@ function get_stage_operator(
   end
   ws = (1,1/dtθ)
 
-  update_odeopcache!(odeopcache,odeop,r)
+  update_cache && update_odeopcache!(odeopcache,odeop,r)
   stageop = NonlinearParamStageOperator(odeop,odeopcache,r,us,ws)
   shift!(r,dt*(1-θ))
 
@@ -47,7 +48,7 @@ function Algebra.solve!(
   odeslvrcache,odeopcache = odecache
   uθ,sysslvrcache = odeslvrcache
 
-  stageop = get_stage_operator(solver,odeop,r,state0,odecache)
+  stageop = get_stage_operator(solver,odeop,r,state0,odecache;update_cache=false)
   solve!(x,sysslvr,stageop,sysslvrcache)
   return x
 end
@@ -57,11 +58,12 @@ function RBSteady.jacobian_and_residual(
   odeop::ODEParamOperator,
   r::TransientParamRealization,
   state0::NTuple{1,AbstractVector},
-  odecache)
+  odecache;
+  kwargs...)
 
   x = state0[1]
 
-  stageop = get_stage_operator(solver,odeop,r,state0,odecache)
+  stageop = get_stage_operator(solver,odeop,r,state0,odecache;kwargs...)
   A = jacobian(stageop,x)
   b = residual(stageop,x)
   return A,b
@@ -74,7 +76,8 @@ function get_stage_operator(
   odeop::ODEParamOperator{LinearParamODE},
   r::TransientParamRealization,
   state0::NTuple{1,AbstractVector},
-  odecache)
+  odecache;
+  update_cache=true)
 
   u0 = state0[1]
   odeslvrcache,odeopcache = odecache
@@ -89,7 +92,7 @@ function get_stage_operator(
   us = (x,x)
   ws = (1,1/dtθ)
 
-  update_odeopcache!(odeopcache,odeop,r)
+  update_cache && update_odeopcache!(odeopcache,odeop,r)
   stageop = LinearParamStageOperator(odeop,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
   shift!(r,dt*(1-θ))
 
@@ -109,7 +112,7 @@ function Algebra.solve!(
   odeslvrcache,odeopcache = odecache
   reuse,A,b,sysslvrcache = odeslvrcache
 
-  stageop = get_stage_operator(solver,odeop,r,state0,odecache)
+  stageop = get_stage_operator(solver,odeop,r,state0,odecache;update_cache=false)
   solve!(x,sysslvr,stageop,sysslvrcache)
   return x
 end
@@ -143,13 +146,13 @@ function Algebra.solve!(
   lop = get_linear_operator(odeop)
   nlop = get_nonlinear_operator(odeop)
 
-  A_lin,b_lin = jacobian_and_residual(solver,lop,r,statefe,odecache_lin)
+  A_lin,b_lin = jacobian_and_residual(solver,lop,r,statefe,odecache_lin;update_cache=false)
   A_nlin = allocate_jacobian(nlop,r,statefe,odeopcache_nlin)
   b_nlin = allocate_residual(nlop,r,statefe,odeopcache_nlin)
   sysslvrcache = ((A_lin,A_nlin),(b_lin,b_nlin))
   sysslvr = solver.sysslvr
 
-  stageop = get_stage_operator(solver,odeop,r,statefe,odecache_nlin)
+  stageop = get_stage_operator(solver,odeop,r,statefe,odecache_nlin;update_cache=false)
   solve!(x̂,x,sysslvr,stageop,sysslvrcache)
   return x̂
 end
@@ -176,7 +179,7 @@ function Algebra.solve!(
   nonlinear_rb_solve!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,stageop,trial)
 end
 
-function ParamDataStructures.shift!(a::VectorOfVectors,r::TransientParamRealization,α::Number,β::Number)
+function ParamDataStructures.shift!(a::AbstractParamArray,r::TransientParamRealization,α::Number,β::Number)
   b = copy(a)
   np = num_params(r)
   @assert param_length(a) == param_length(r)

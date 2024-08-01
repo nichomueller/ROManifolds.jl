@@ -1,5 +1,5 @@
 """
-    TransientTrialParamFESpace{A,B} <: UnEvalParamSingleFieldFESpace
+    struct TransientTrialParamFESpace{A,B} <: UnEvalParamSingleFieldFESpace end
 
 Structure used in transient applications. When a TransientTrialParamFESpace is
 evaluated in a [`TransientParamRealization`](@ref), a parametric trial FE space is returned
@@ -78,6 +78,13 @@ Arrays.evaluate(U::FESpace,params,times) = U
 
 const TransientMultiFieldParamFESpace = MultiFieldFESpace
 
+function has_unevaluated(U::MultiFieldFESpace)
+  (
+    any(space -> space isa TransientTrialFESpace,U.spaces) ||
+    any(space -> space isa UnEvalParamSingleFieldFESpace,U.spaces)
+  )
+end
+
 function has_param_transient(U::MultiFieldFESpace)
   any(space -> space isa TransientTrialParamFESpace,U.spaces)
 end
@@ -111,6 +118,38 @@ end
 
 function ODEs.evaluate!(Upt::MultiFieldFESpace,U::MultiFieldFESpace,r::TransientParamRealization)
   evaluate!(Upt,U,get_params(r),get_times(r))
+end
+
+# overrides Gridap
+function Arrays.evaluate(U::MultiFieldFESpace,μ::Nothing)
+  if !has_unevaluated(U)
+    return U
+  end
+  spaces = map(space -> evaluate(space,μ),U.spaces)
+  style = MultiFieldStyle(U)
+  MultiFieldFESpace(spaces;style)
+end
+
+function Arrays.evaluate(U::MultiFieldFESpace,μ::Nothing,t::Nothing)
+  if !has_param_transient(U)
+    return U
+  end
+  spaces = map(space -> evaluate(space,μ,t),U.spaces)
+  style = MultiFieldStyle(U)
+  MultiFieldFESpace(spaces;style)
+end
+
+function Arrays.evaluate(U::MultiFieldFESpace,μ,t)
+  if !has_param_transient(U)
+    return U
+  end
+  Upt = allocate_space(U,μ,t)
+  evaluate!(Upt,U,μ,t)
+  Upt
+end
+
+function Arrays.evaluate(U::MultiFieldFESpace,r::TransientParamRealization)
+  evaluate(U,get_params(r),get_times(r))
 end
 
 function test_transient_trial_fe_space(Uh,μ)

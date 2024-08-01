@@ -1,5 +1,5 @@
 """
-    ArrayOfTrivialArrays{T,N,L,P<:AbstractArray{T,N}} <: ParamArray{T,N,L}
+    struct ArrayOfTrivialArrays{T,N,L,P<:AbstractArray{T,N}} <: ParamArray{T,N,L} end
 
 Wrapper for nonparametric arrays that we wish assumed a parametric length.
 
@@ -27,8 +27,12 @@ Base.size(A::ArrayOfTrivialArrays{T,N}) where {T,N} = ntuple(_ -> A.plength,Val{
   size(A.data)
 end
 
+@inline function inneraxes(A::ArrayOfTrivialArrays)
+  axes(A.data)
+end
+
 param_data(A::ArrayOfTrivialArrays) = fill(A.data,param_length(A))
-param_entry(A::ArrayOfTrivialArrays,i::Integer...) = ParamNumber(fill(A.data[i...],A.plength))
+param_entry(A::ArrayOfTrivialArrays,i::Integer...) = fill(A.data[i...],A.plength)
 
 Base.@propagate_inbounds function Base.getindex(A::ArrayOfTrivialArrays{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)

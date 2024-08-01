@@ -18,7 +18,7 @@ Subtypes:
 - [`TransientParamLinearFEOpFromWeakForm`](@ref)
 - [`TransientParamSaddlePointFEOp`](@ref)
 - [`TransientParamFEOperatorWithTrian`](@ref)
-- [`GenericTransientParamLinearNonlinearFEOperator`](@ref)
+- [`GenericLinearNonlinearTransientParamFEOperator`](@ref)
 
 """
 abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: TransientFEOperator{T} end
@@ -59,7 +59,7 @@ function ParamSteady.assemble_norm_matrix(op::TransientParamFEOperator)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
   inorm = get_induced_norm(op)
-  assemble_norm_matrix(inorm,trial,test)
+  ParamSteady._assemble_matrix(inorm,trial,test)
 end
 
 ParamSteady.get_coupling(op::TransientParamFEOperator) = @abstractmethod
@@ -67,15 +67,15 @@ ParamSteady.get_coupling(op::TransientParamFEOperator) = @abstractmethod
 function ParamSteady.assemble_coupling_matrix(op::TransientParamFEOperator)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
-  c = get_coupling(op)
-  assemble_matrix(c,trial,test)
+  coupling = get_coupling(op)
+  ParamSteady._assemble_matrix(coupling,trial,test)
 end
 
 ParamSteady.get_linear_operator(op::TransientParamFEOperator) = @abstractmethod
 ParamSteady.get_nonlinear_operator(op::TransientParamFEOperator) = @abstractmethod
 
 """
-    TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParamODE}
+    struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParamODE} end
 
 Most standard instance of TransientParamFEOperator, when the transient problem is
 nonlinear
@@ -153,7 +153,7 @@ ParamDataStructures.realization(op::TransientParamFEOpFromWeakForm;kwargs...) = 
 ParamSteady.get_induced_norm(op::TransientParamFEOpFromWeakForm) = op.induced_norm
 
 """
-    TransientParamSemilinearFEOpFromWeakForm <: TransientParamFEOperator{SemilinearParamODE}
+    struct TransientParamSemilinearFEOpFromWeakForm <: TransientParamFEOperator{SemilinearParamODE} end
 
 Most standard instance of TransientParamFEOperator, when the transient problem is
 semilinear
@@ -259,7 +259,7 @@ function ODEs.is_form_constant(op::TransientParamSemilinearFEOpFromWeakForm,k::I
 end
 
 """
-    TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE}
+    struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE} end
 
 Most standard instance of TransientParamFEOperator, when the transient problem is
 linear

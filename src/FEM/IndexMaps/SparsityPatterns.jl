@@ -11,6 +11,12 @@ Subtypes:
 """
 abstract type SparsityPattern end
 
+# random sparsity pattern
+function SparsityPattern(;s=(1,1))
+  matrix = sparse(rand(s...))
+  SparsityPattern(matrix)
+end
+
 """
 """
 struct SparsityPatternCSC{Tv,Ti} <: SparsityPattern
@@ -24,6 +30,8 @@ num_rows(a::SparsityPatternCSC) = size(a.matrix,1)
 num_cols(a::SparsityPatternCSC) = size(a.matrix,2)
 SparseArrays.findnz(a::SparsityPatternCSC) = findnz(a.matrix)
 SparseArrays.nnz(a::SparsityPatternCSC) = nnz(a.matrix)
+SparseArrays.nzrange(a::SparsityPatternCSC,row::Integer) = nzrange(a.matrix,row)
+SparseArrays.rowvals(a::SparsityPatternCSC) = rowvals(a.matrix)
 get_nonzero_indices(a::SparsityPatternCSC) = get_nonzero_indices(a.matrix)
 
 """
@@ -100,7 +108,7 @@ function permute_sparsity(a::TProductSparsityPattern,i,j)
   TProductSparsityPattern(psparsity,psparsities_1d)
 end
 
-function permute_sparsity(s::SparsityPattern,U::FESpace,V::FESpace)
+function permute_sparsity(s::TProductSparsityPattern,U::FESpace,V::FESpace)
   psparsity = permute_sparsity(s.sparsity,U.space,V.space)
   psparsities = map(permute_sparsity,s.sparsities_1d,U.spaces_1d,V.spaces_1d)
   TProductSparsityPattern(psparsity,psparsities)

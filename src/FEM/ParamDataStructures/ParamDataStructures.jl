@@ -17,11 +17,12 @@ using Gridap.Helpers
 
 import Base:+,-,*,/,\
 import Distributions: Uniform,Normal
+import Statistics: mean
 import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
 import SparseArrays.getcolptr
 
-import Mabla.FEM.IndexMaps: fast_index,slow_index
+import Mabla.FEM.IndexMaps: fast_index,slow_index,recast
 
 export AbstractParamRealization
 export ParamRealization
@@ -65,10 +66,13 @@ include("ParamField.jl")
 export AbstractParamArray
 export AbstractParamVector
 export AbstractParamMatrix
+export ParamSparseMatrix
 export ParamArray
 export param_array
 export array_of_similar_arrays
 export array_of_zero_arrays
+export array_of_consecutive_arrays
+export array_of_consecutive_zero_arrays
 include("ParamArraysInterface.jl")
 
 export ArrayOfArrays
@@ -76,9 +80,24 @@ export VectorOfVectors
 export MatrixOfMatrices
 include("ArrayOfArrays.jl")
 
+export ConsecutiveArrayOfArrays
+export ConsecutiveVectorOfVectors
+export ConsecutiveMatrixOfMatrices
+export AbstractConsecutiveParamVector
+export AbstractConsecutiveParamMatrix
+include("ConsecutiveArrayOfArrays.jl")
+
 export MatrixOfSparseMatricesCSC
-export recast
 include("MatrixOfSparseMatrices.jl")
+
+export VectorOfSparseVectors
+include("VectorOfSparseVectors.jl")
+
+export ConsecutiveParamArrays
+export consecutive_getindex
+export consecutive_setindex!
+export consecutive_mul
+include("ConsecutiveParamArrays.jl")
 
 export ArrayOfTrivialArrays
 include("ArrayOfTrivialArrays.jl")
@@ -105,6 +124,7 @@ export contribution
 export get_values
 export get_parent
 export order_triangulations
+export find_closest_view
 include("Contribution.jl")
 
 # include("LazyMaps.jl")

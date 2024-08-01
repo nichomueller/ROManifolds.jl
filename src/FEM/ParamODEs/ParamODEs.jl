@@ -72,12 +72,13 @@ export change_triangulation
 include("TransientParamFEOperatorWithTrian.jl")
 
 export LinearNonlinearParamODE
-export TransientParamLinNonlinFEOperator
-export TransientParamLinearNonlinearFEOperator
+export LinNonlinTransientParamFEOperator
+export LinearNonlinearTransientParamFEOperator
+export LinearNonlinearTransientParamFEOperatorWithTrian
 export get_linear_operator
 export get_nonlinear_operator
 export join_operators
-include("TransientParamLinearNonlinearFEOperator.jl")
+include("LinearNonlinearTransientParamFEOperator.jl")
 
 export ODEParamOpFromTFEOp
 export ODEParamOpFromTFEOpWithTrian
@@ -86,7 +87,9 @@ include("ODEParamOpFromTFEOp.jl")
 include("ThetaMethod.jl")
 
 export ODEParamSolution
-export ODEParamSolution
+export IterativeCostTracker
+export initialize_tracker
+export update_tracker!
 include("ODEParamSolution.jl")
 
 export TransientParamFESolution

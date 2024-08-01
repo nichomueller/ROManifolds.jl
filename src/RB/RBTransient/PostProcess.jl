@@ -1,5 +1,59 @@
-function DrWatson.save(dir,op::TransientRBOperator)
-  serialize(dir * "/operator.jld",op)
+function RBSteady.deserialize_operator(feop::TransientParamFEOperatorWithTrian,dir)
+  trian_res = feop.trian_res
+  trian_jacs = feop.trian_jacs
+
+  op = RBSteady.deserialize_pg_operator(feop,dir)
+  red_rhs = RBSteady.deserialize_contribution(dir,trian_res,get_test(op);label="res")
+  red_lhs = ()
+  for (i,trian_jac) in enumerate(trian_jacs)
+    rlhsi = RBSteady.deserialize_contribution(dir,trian_jac,get_trial(op),get_test(op);label="jac_$i")
+    red_lhs = (red_lhs...,rlhsi)
+  end
+
+  trians_rhs = get_domains(red_rhs)
+  trians_lhs = map(get_domains,red_lhs)
+  new_op = change_triangulation(op,trians_rhs,trians_lhs)
+  rbop = TransientPGMDEIMOperator(new_op,red_lhs,red_rhs)
+  return rbop
+end
+
+function DrWatson.save(dir,op::TransientPGMDEIMOperator;kwargs...)
+  save(dir,op.op;kwargs...)
+  for (i,ad_res) in enumerate(op.rhs.values)
+    save(dir,ad_res;label="res_$i")
+  end
+  for (ilhs,lhs) in enumerate(op.lhs)
+    for (i,ad_jac) in enumerate(lhs.values)
+      save(dir,ad_jac;label="jac_$(ilhs)_$i")
+    end
+  end
+end
+
+function DrWatson.save(dir,op::TransientPGOperator;kwargs...)
+  btest = RBSteady.get_basis(get_test(op))
+  btrial = RBSteady.get_basis(get_trial(op))
+  save(dir,btest;label="test")
+  save(dir,btest;label="trial")
+end
+
+function RBSteady.deserialize_operator(
+  feop::LinearNonlinearTransientParamFEOperatorWithTrian,
+  rbop::LinearNonlinearTransientPGMDEIMOperator)
+
+  rbop_lin = deserialize_operator(get_linear_operator(feop),get_linear_operator(rbop))
+  rbop_nlin = deserialize_operator(get_nonlinear_operator(feop),get_nonlinear_operator(rbop))
+  return LinearNonlinearTransientPGMDEIMOperator(rbop_lin,rbop_nlin)
+end
+
+function RBSteady.deserialize_pg_operator(feop::TransientParamFEOperatorWithTrian,dir)
+  op = get_algebraic_operator(feop)
+  fe_test = get_test(feop)
+  fe_trial = get_trial(feop)
+  basis_test = deserialize(RBSteady.get_projection_filename(dir;label="test"))
+  basis_trial = deserialize(RBSteady.get_projection_filename(dir;label="trial"))
+  test = fe_subspace(fe_test,basis_test)
+  trial = fe_subspace(fe_trial,basis_trial)
+  return TransientPGOperator(op,trial,test)
 end
 
 function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...;kwargs...)
@@ -7,68 +61,55 @@ function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...;kw
   rb_results(solver,feop,args...;kwargs...)
 end
 
-function RBSteady.compute_error(sol::ModeTransientSnapshots,sol_approx::ModeTransientSnapshots,norm_matrix=nothing)
+function RBSteady.compute_error(
+  sol::AbstractTransientSnapshots{T,N},
+  sol_approx::AbstractTransientSnapshots{T,N},
+  norm_matrix) where {T,N}
+
+  @check size(sol) == size(sol_approx)
   err_norm = zeros(num_times(sol))
   sol_norm = zeros(num_times(sol))
   space_time_norm = zeros(num_params(sol))
-  @inbounds for i = axes(sol,2)
-    it = fast_index(i,num_times(sol))
-    ip = slow_index(i,num_times(sol))
-    err_norm[it] = RBSteady._norm(sol[:,i]-sol_approx[:,i],norm_matrix)
-    sol_norm[it] = RBSteady._norm(sol[:,i],norm_matrix)
-    if mod(i,num_params(sol)) == 0
-      space_time_norm[ip] = norm(err_norm) / norm(sol_norm)
+  @inbounds for ip = 1:num_params(sol)
+    solip = selectdim(sol,N,ip)
+    solip_approx = selectdim(sol_approx,N,ip)
+    for it in 1:num_times(sol)
+      solitp = selectdim(solip,N-1,it)
+      solitp_approx = selectdim(solip_approx,N-1,it)
+      err_norm[it] = RBSteady._norm(solitp-solitp_approx,norm_matrix)
+      sol_norm[it] = RBSteady._norm(solitp,norm_matrix)
     end
+    space_time_norm[ip] = norm(err_norm) / norm(sol_norm)
   end
   avg_error = sum(space_time_norm) / length(space_time_norm)
   return avg_error
 end
 
-# # plots
+function RBSteady.compute_error(
+  sol::AbstractTransientSnapshots,
+  sol_approx::AbstractTransientSnapshots,
+  norm_matrix::AbstractTProductArray)
 
-# function FESpaces.FEFunction(
-#   fs::SingleFieldParamFESpace,s::AbstractSnapshots{Mode1Axis})
-#   r = get_realization(s)
-#   @assert param_length(fs) == length(r)
-#   free_values = _to_param_array(s.values)
-#   diri_values = get_dirichlet_dof_values(fs)
-#   FEFunction(fs,free_values,diri_values)
-# end
+  compute_error(sol,sol_approx,TProduct.tp_decomposition(norm_matrix))
+end
 
-# function _plot(solh::SingleFieldParamFEFunction,r::TransientParamRealization;dir=pwd(),varname="vel")
-#   trian = get_triangulation(solh)
-#   create_dir(dir)
-#   createpvd(dir) do pvd
-#     for (i,t) in enumerate(get_times(r))
-#       solh_t = param_getindex(solh,i)
-#       vtk = createvtk(trian,dir,cellfields=[varname=>solh_t])
-#       pvd[t] = vtk
-#     end
-#   end
-# end
+function RBSteady.average_plot(
+  trial::TrialParamFESpace,
+  mat::AbstractMatrix;
+  name="vel",
+  dir=joinpath(pwd(),"plots"))
 
-# function _plot(trial,s;kwargs...)
-#   r,sh = _get_at_first_param(trial,s)
-#   _plot(sh,r;kwargs...)
-# end
+  RBSteady.create_dir(dir)
+  trian = get_triangulation(trial)
+  createpvd(dir) do pvd
+    for i in axes(mat,2)
+      solh_i = FEFunction(param_getindex(trial,i),mat[:,i])
+      vtk = createvtk(trian,dir,cellfields=[name=>solh_i])
+      pvd[i] = vtk
+    end
+  end
+end
 
-# function _plot(trial::TransientMultiFieldParamFESpace,s::BlockSnapshots;varname=("vel","press"),kwargs...)
-#   free_values = get_values(s)
-#   r = get_realization(s)
-#   trial = trial(r)
-#   sh = FEFunction(trial,free_values)
-#   nfields = length(trial.spaces)
-#   for n in 1:nfields
-#     _plot(sh[n],r,varname=varname[n];kwargs...)
-#   end
-# end
-
-# function generate_plots(feop::TransientParamFEOperator,r::RBResults;dir=pwd())
-#   sol,sol_approx = r.sol,r.sol_approx
-#   trial = get_trial(feop)
-#   plt_dir = joinpath(dir,"plots")
-#   fe_plt_dir = joinpath(plt_dir,"fe_solution")
-#   _plot(trial,sol;dir=fe_plt_dir,varname=r.name)
-#   rb_plt_dir = joinpath(plt_dir,"rb_solution")
-#   _plot(trial,sol_approx;dir=rb_plt_dir,varname=r.name)
-# end
+function RBSteady.average_plot(op::TransientRBOperator,r::RBResults;kwargs...)
+  average_plot(get_fe_trial(op),r;kwargs...)
+end

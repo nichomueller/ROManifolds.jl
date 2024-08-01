@@ -60,10 +60,8 @@ function get_tp_dof_index_map(
   order::Integer
   ) where T<:MultiValue
 
-  msg = """
-  Instead of using a single field FESpace with a dof type $T, define $(num_components(T))
-  FESpaces of dof type $(eltype(T)) and put them in a MultiFieldFESpace
-  """
+  msg = """Instead of employing a multivalued reffe, consider instead employing two
+  separate reffes (i.e. solving a multifield problem)"""
   @notimplemented msg
 end
 
@@ -123,7 +121,6 @@ end
 function get_tp_dof_index_map(zs::ZeroMeanFESpace,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
   space = zs.space.space
   dof_to_fix = zs.space.dof_to_fix
-  index_map = get_tp_dof_index_map(space,spaces_1d)
-  @warn "the code has changed, check if this is ok"
-  return FixedDofIndexMap(index_map,findfirst(vec(index_map).==dof_to_fix))
+  i = get_tp_dof_index_map(space,spaces_1d)
+  return TProductIndexMap(FixedDofsIndexMap(i.indices,dof_to_fix),i.indices_1d)
 end

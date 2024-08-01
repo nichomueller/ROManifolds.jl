@@ -18,7 +18,7 @@ function get_param_vector_builder(
   V = get_array_type(vec)
   T = eltype(V)
   L = length(r)
-  pvector_type = VectorOfVectors{T,L}
+  pvector_type = ConsecutiveVectorOfVectors{T,L}
   ArrayBuilder(pvector_type)
 end
 

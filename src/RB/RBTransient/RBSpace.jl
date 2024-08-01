@@ -11,7 +11,7 @@ function RBSteady.reduced_basis(feop::TransientParamFEOperatorWithTrian,s,norm_m
   reduced_basis(feop.op,s,norm_matrix;kwargs...)
 end
 
-function RBSteady.reduced_basis(feop::TransientParamLinearNonlinearFEOperator,s,norm_matrix;kwargs...)
+function RBSteady.reduced_basis(feop::LinearNonlinearTransientParamFEOperator,s,norm_matrix;kwargs...)
   reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
 end
 
@@ -34,7 +34,7 @@ function Arrays.evaluate!(cache,k::RBSteady.RecastMap,x::AbstractParamVector,r::
   @inbounds for ip in eachindex(x)
     Xip = recast(x[ip],r.basis)
     for it in 1:num_times(r)
-      cache[(it-1)*length(x)+ip] .= Xip[:,it]
+      cache[(it-1)*length(x)+ip] = Xip[:,it]
     end
   end
 end
@@ -52,7 +52,7 @@ num_reduced_times(r::AbstractTransientRBSpace) = num_reduced_times(r.basis)
 
 function FESpaces.get_vector_type(r::AbstractTransientRBSpace)
   change_length(x) = x
-  change_length(::Type{VectorOfVectors{T,L}}) where {T,L} = VectorOfVectors{T,Int(L/num_times(r))}
+  change_length(::Type{ConsecutiveVectorOfVectors{T,L}}) where {T,L} = ConsecutiveVectorOfVectors{T,Int(L/num_times(r))}
   change_length(::Type{<:BlockVectorOfVectors{T,L}}) where {T,L} = BlockVectorOfVectors{T,Int(L/num_times(r))}
   V = get_vector_type(r.space)
   newV = change_length(V)

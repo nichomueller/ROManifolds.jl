@@ -97,14 +97,9 @@ with the information related to the computational expense of the FE method
 function fe_solutions(solver::RBSolver,op::ParamFEOperator;nparams=50,r=realization(op;nparams))
   fesolver = get_fe_solver(solver)
   index_map = get_vector_index_map(op)
-
-  stats = @timed begin
-    values = solve(fesolver,op)
-  end
-
+  values,cost = solve(fesolver,op)
   snaps = Snapshots(values,index_map,r)
-  cs = ComputationalStats(stats,nparams)
-  return snaps,cs
+  return snaps,cost
 end
 
 function Algebra.solve(rbsolver::RBSolver,feop,args...;kwargs...)

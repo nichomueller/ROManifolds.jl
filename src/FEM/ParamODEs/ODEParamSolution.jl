@@ -1,3 +1,36 @@
+"""
+    mutable struct IterativeCostTracker
+      time::Float64
+      nallocs::Float64
+      nruns::Int
+    end
+
+"""
+mutable struct IterativeCostTracker
+  time::Float64
+  nallocs::Float64
+  nruns::Int
+end
+
+function IterativeCostTracker(stats::NamedTuple)
+  time = stats[:time]
+  nallocs = stats[:bytes] / 1e6
+  nruns = 1
+  IterativeCostTracker(time,nallocs,nruns)
+end
+
+function initialize_tracker()
+  IterativeCostTracker(0.0,0.0,0)
+end
+
+function update_tracker!(t::IterativeCostTracker,stats::NamedTuple)
+  time = stats[:time]
+  nallocs = stats[:bytes] / 1e6
+  t.time += time
+  t.nallocs += nallocs
+  t.nruns += 1
+end
+
 function ODEs.ode_start(
   solver::ODESolver,
   odeop::ODEOperator,
@@ -23,7 +56,7 @@ function ODEs.ode_finish!(
 end
 
 """
-    struct ODEParamSolution{V} <: ODESolution
+    struct ODEParamSolution{V} <: ODESolution end
 
 Generic wrapper for the evolution of an `ODEParamOperator` with an `ODESolver`.
 
@@ -33,6 +66,17 @@ struct ODEParamSolution{V} <: ODESolution
   odeop::ODEParamOperator
   r::TransientParamRealization
   us0::Tuple{Vararg{V}}
+  tracker::IterativeCostTracker
+
+  function ODEParamSolution(
+    solver::ODESolver,
+    odeop::ODEParamOperator,
+    r::TransientParamRealization,
+    us0::Tuple{Vararg{V}},
+    tracker = initialize_tracker()) where V
+
+    new{V}(solver,odeop,r,us0,tracker)
+  end
 end
 
 function Base.iterate(sol::ODEParamSolution)
@@ -42,7 +86,8 @@ function Base.iterate(sol::ODEParamSolution)
   state0,cache = ode_start(sol.solver,sol.odeop,r0,sol.us0,cache)
 
   statef = copy.(state0)
-  rf,statef,cache = ode_march!(statef,sol.solver,sol.odeop,r0,state0,cache)
+  stats = @timed rf,statef,cache = ode_march!(statef,sol.solver,sol.odeop,r0,state0,cache)
+  update_tracker!(sol.tracker,stats)
 
   uf = copy(first(sol.us0))
   uf,cache = ode_finish!(uf,sol.solver,sol.odeop,r0,rf,statef,cache)
@@ -58,7 +103,8 @@ function Base.iterate(sol::ODEParamSolution,state)
     return nothing
   end
 
-  rf,statef,cache = ode_march!(statef,sol.solver,sol.odeop,r0,state0,cache)
+  stats = @timed rf,statef,cache = ode_march!(statef,sol.solver,sol.odeop,r0,state0,cache)
+  update_tracker!(sol.tracker,stats)
 
   uf,cache = ode_finish!(uf,sol.solver,sol.odeop,r0,rf,statef,cache)
 
@@ -73,7 +119,8 @@ function Base.collect(sol::ODEParamSolution{V}) where V
   for (k,(rt,ut)) in enumerate(sol)
     free_values[k] = copy(ut)
   end
-  return free_values
+
+  return free_values,sol.tracker
 end
 
 function Algebra.solve(

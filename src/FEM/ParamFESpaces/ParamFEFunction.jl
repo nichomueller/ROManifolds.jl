@@ -136,7 +136,7 @@ function FESpaces.get_cell_dof_values(f::MultiFieldParamFEFunction,trian::Triang
   uhs = f.single_fe_functions
   blockmask = [is_change_possible(get_triangulation(uh),trian) for uh in uhs]
   active_block_ids = findall(blockmask)
-  active_block_data = Any[get_cell_dof_values(uhs[i],trian) for i in active_block_ids]
+  active_block_data = [get_cell_dof_values(uhs[i],trian) for i in active_block_ids]
   nblocks = length(uhs)
   lazy_map(BlockMap(nblocks,active_block_ids),active_block_data...)
 end

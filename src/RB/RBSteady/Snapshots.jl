@@ -15,6 +15,7 @@ Subtypes:
 abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractParamRealization} <: AbstractParamContainer{T,N,L} end
 
 ParamDataStructures.get_values(s::AbstractSnapshots) = @abstractmethod
+get_indexed_values(s::AbstractSnapshots) = @abstractmethod
 IndexMaps.get_index_map(s::AbstractSnapshots) = @abstractmethod
 get_realization(s::AbstractSnapshots) = @abstractmethod
 
@@ -46,7 +47,7 @@ for I in (:AbstractIndexMap,:(AbstractArray{<:AbstractIndexMap}))
       end
     end
 
-    function RBSteady.Snapshots(a::TupOfArrayContribution,i::$I,r::AbstractParamRealization)
+    function Snapshots(a::TupOfArrayContribution,i::$I,r::AbstractParamRealization)
       map(a->Snapshots(a,i,r),a)
     end
   end
@@ -54,7 +55,13 @@ end
 
 function IndexMaps.change_index_map(f,s::AbstractSnapshots)
   index_map′ = change_index_map(f,get_index_map(s))
-  Snapshots(s,index_map′,get_realization(s))
+  Snapshots(param_data(s),index_map′,get_realization(s))
+end
+
+function IndexMaps.recast(s::AbstractSnapshots,a::AbstractArray)
+  i = get_index_map(s)
+  a′ = recast(i,a)
+  return a′
 end
 
 """
@@ -140,13 +147,16 @@ function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::ParamRealization
   BasicSnapshots(s,i,r)
 end
 
-function Snapshots(s::BasicSnapshots,i::AbstractIndexMap,r::ParamRealization)
-  BasicSnapshots(s.data,i,r)
-end
-
+ParamDataStructures.param_data(s::BasicSnapshots) = s.data
 ParamDataStructures.get_values(s::BasicSnapshots) = s.data
 IndexMaps.get_index_map(s::BasicSnapshots) = s.index_map
 get_realization(s::BasicSnapshots) = s.realization
+
+function get_indexed_values(s::BasicSnapshots)
+  vi = vec(get_index_map(s))
+  v = consecutive_getindex(s.data,vi,:)
+  ConsecutiveArrayOfArrays(v)
+end
 
 Base.@propagate_inbounds function Base.getindex(
   s::BasicSnapshots{T,N},
@@ -156,8 +166,7 @@ Base.@propagate_inbounds function Base.getindex(
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
   ispace′ = s.index_map[ispace...]
-  sparam = param_getindex(s.data,iparam)
-  getindex(sparam,ispace′)
+  ispace′ == 0 ? zero(eltype(s)) : consecutive_getindex(s.data,ispace′,iparam)
 end
 
 Base.@propagate_inbounds function Base.setindex!(
@@ -169,8 +178,7 @@ Base.@propagate_inbounds function Base.setindex!(
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
   ispace′ = s.index_map[ispace...]
-  sparam = param_getindex(s.data,iparam)
-  setindex!(sparam,v,ispace′)
+  ispace′ != 0 && consecutive_setindex!(s.data,v,ispace′,iparam)
 end
 
 """
@@ -191,9 +199,19 @@ end
 
 param_indices(s::SnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
+ParamDataStructures.param_data(s::SnapshotsAtIndices) = param_data(s.snaps)
 
-ParamDataStructures.get_values(s::SnapshotsAtIndices) = get_values(s.snaps)
-IndexMaps.get_index_map(s::SnapshotsAtIndices) = get_index_map(s.snaps)
+function ParamDataStructures.get_values(s::SnapshotsAtIndices)
+  v = consecutive_getindex(s.snaps.data,:,param_indices(s))
+  ConsecutiveArrayOfArrays(v)
+end
+
+function get_indexed_values(s::SnapshotsAtIndices)
+  vi = vec(get_index_map(s))
+  v = consecutive_getindex(s.snaps.data,vi,param_indices(s))
+  ConsecutiveArrayOfArrays(v)
+end
+
 get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
 
 Base.@propagate_inbounds function Base.getindex(
@@ -233,7 +251,7 @@ entries intact. The restriction operation is lazy.
 
 """
 function select_snapshots(s::SnapshotsAtIndices,prange)
-  old_prange = s.indices
+  old_prange = s.prange
   @check intersect(old_prange,prange) == prange
   SnapshotsAtIndices(s.snaps,prange)
 end
@@ -242,6 +260,63 @@ function select_snapshots(s::AbstractSteadySnapshots,prange)
   prange = format_range(prange,num_params(s))
   SnapshotsAtIndices(s,prange)
 end
+
+struct ReshapedSnapshots{T,N,N′,L,D,I,R,A<:AbstractSteadySnapshots{T,N′,L,D,I,R},B} <: AbstractSteadySnapshots{T,N′,L,D,I,R}
+  snaps::A
+  size::NTuple{N,Int}
+  mi::B
+end
+
+Base.size(s::ReshapedSnapshots) = s.size
+
+function Base.reshape(s::AbstractSnapshots,dims::Dims)
+  n = length(s)
+  prod(dims) == n || DimensionMismatch()
+
+  strds = Base.front(Base.size_to_strides(map(length,axes(s))..., 1))
+  strds1 = map(s->max(1,Int(s)),strds)
+  mi = map(Base.SignedMultiplicativeInverse,strds1)
+  ReshapedSnapshots(parent,dims,reverse(mi))
+end
+
+Base.@propagate_inbounds function Base.getindex(
+  s::ReshapedSnapshots{T,N},
+  i::Vararg{Integer,N}
+  ) where {T,N}
+
+  @boundscheck checkbounds(s,i...)
+  ax = axes(s.snaps)
+  i′ = Base.offset_if_vec(Base._sub2ind(size(s),i...),ax)
+  i′′ = Base.ind2sub_rs(ax,s.mi,i′)
+  Base._unsafe_getindex_rs(s.snaps,i′′)
+end
+
+function Base.setindex!(
+  s::ReshapedSnapshots{T,N},
+  v,i::Vararg{Integer,N}
+  ) where {T,N}
+
+  @boundscheck checkbounds(s,i...)
+  ax = axes(s.snaps)
+  i′ = Base.offset_if_vec(Base._sub2ind(size(s),i...),ax)
+  s.snaps[Base.ind2sub_rs(ax,s.mi,i′)] = v
+  v
+end
+
+get_realization(s::ReshapedSnapshots) = get_realization(s.snaps)
+IndexMaps.get_index_map(s::ReshapedSnapshots) = get_index_map(s.snaps)
+
+function ParamDataStructures.get_values(s::ReshapedSnapshots)
+  v = get_values(s.snaps)
+  reshape(v.data,s.size)
+end
+
+function get_indexed_values(s::ReshapedSnapshots)
+  v = get_indexed_values(s.snaps)
+  reshape(v.data,s.size)
+end
+
+const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = BasicSnapshots{T,N,L,D,I,R,A}
 
 """
     select_snapshots_entries(s::AbstractSteadySnapshots,srange) -> ArrayOfArrays
@@ -253,29 +328,57 @@ cases, for every parameter.
 
 """
 function select_snapshots_entries(s::AbstractSteadySnapshots,srange)
+  _getindex(s::AbstractSteadySnapshots,is,it,ip) = consecutive_getindex(s.data,is,ip)
+  _getindex(s::SparseSnapshots,is,it,ip) = param_getindex(s.data,ip)[is]
+
   T = eltype(s)
   nval = length(srange)
   np = num_params(s)
-  entries = array_of_similar_arrays(zeros(T,nval),np)
+  entries = array_of_consecutive_arrays(zeros(T,nval),np)
 
   for ip = 1:np
-    vip = entries.data[ip]
     for (i,is) in enumerate(srange)
-      vip[i] = param_getindex(s.data,ip)[is]
+      v = _getindex(s.data,is,ip)
+      consecutive_setindex!(entries,v,i,ip)
     end
   end
 
   return entries
 end
 
-const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = BasicSnapshots{T,N,L,D,I,R,A}
+const UnfoldingSteadySnapshots{T,L,I<:TrivialIndexMap,R} = AbstractSteadySnapshots{T,2,L,1,I,R}
 
-function ParamDataStructures.recast(s::SparseSnapshots,a::AbstractMatrix)
+function IndexMaps.recast(s::UnfoldingSteadySnapshots,a::AbstractMatrix)
   return recast(s.data,a)
 end
 
-const UnfoldingSteadySnapshots{T,L,I,R} = AbstractSteadySnapshots{T,2,L,1,I,R}
-const UnfoldingSparseSnapshots{T,L,I,R,A} = SparseSnapshots{T,2,L,1,I,R,A}
+function Base.:*(A::AbstractSnapshots{T,2},B::AbstractSnapshots{S,2}) where {T,S}
+  consecutive_mul(get_indexed_values(A),get_indexed_values(B))
+end
+
+function Base.:*(A::AbstractSnapshots{T,2},B::Adjoint{S,<:AbstractSnapshots}) where {T,S}
+  consecutive_mul(get_indexed_values(A),adjoint(get_indexed_values(B.parent)))
+end
+
+function Base.:*(A::AbstractSnapshots{T,2},B::AbstractMatrix{S}) where {T,S}
+  consecutive_mul(get_indexed_values(A),B)
+end
+
+function Base.:*(A::AbstractSnapshots{T,2},B::Adjoint{T,<:AbstractMatrix{S}}) where {T,S}
+  consecutive_mul(get_indexed_values(A),B)
+end
+
+function Base.:*(A::Adjoint{T,<:AbstractSnapshots{T,2}},B::AbstractSnapshots{S,2}) where {T,S}
+  consecutive_mul(adjoint(get_indexed_values(A.parent)),get_indexed_values(B))
+end
+
+function Base.:*(A::AbstractMatrix{T},B::AbstractSnapshots{S,2}) where {T,S}
+  consecutive_mul(A,get_indexed_values(B))
+end
+
+function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::AbstractSnapshots{S,2}) where {T,S}
+  consecutive_mul(A,get_indexed_values(B))
+end
 
 """
     struct BlockSnapshots{S,N,L} <: AbstractParamContainer{S,N,L}
@@ -288,17 +391,14 @@ struct BlockSnapshots{S,N,L} <: AbstractParamContainer{S,N,L}
   array::Array{S,N}
   touched::Array{Bool,N}
 
-  function BlockSnapshots(
-    array::Array{S,N},
-    touched::Array{Bool,N}
-    ) where {T′,N′,L,S<:AbstractSnapshots{T′,N′,L},N}
-
+  function BlockSnapshots(array::Array{S,N},touched::Array{Bool,N}) where {S,N}
     @check size(array) == size(touched)
+    L = param_length(first(array))
     new{S,N,L}(array,touched)
   end
 end
 
-function BlockSnapshots(k::BlockMap{N},a::AbstractArray{S}) where {S<:AbstractSnapshots,N}
+function BlockSnapshots(k::BlockMap{N},a::AbstractArray{S}) where {S,N}
   array = Array{S,N}(undef,k.size)
   touched = fill(false,k.size)
   for (t,i) in enumerate(k.indices)
@@ -308,7 +408,7 @@ function BlockSnapshots(k::BlockMap{N},a::AbstractArray{S}) where {S<:AbstractSn
   BlockSnapshots(array,touched)
 end
 
-function Fields.BlockMap(s::NTuple,inds::Vector{<:Integer})
+function Fields.BlockMap(s::NTuple,inds::AbstractVector{<:Integer})
   cis = [CartesianIndex((i,)) for i in inds]
   BlockMap(s,cis)
 end
@@ -360,6 +460,17 @@ get_realization(s::BlockSnapshots) = get_realization(testitem(s))
 
 function ParamDataStructures.get_values(s::BlockSnapshots)
   map(get_values,s.array) |> mortar
+end
+
+function get_indexed_values(s::BlockSnapshots)
+  map(get_indexed_values,s.array) |> mortar
+end
+
+function IndexMaps.change_index_map(f,s::BlockSnapshots{S,N}) where {S,N}
+  active_block_ids = get_touched_blocks(s)
+  block_map = BlockMap(size(s),active_block_ids)
+  active_block_snaps = [change_index_map(f,s[n]) for n in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps)
 end
 
 function flatten_snapshots(s::BlockSnapshots{S,N}) where {S,N}

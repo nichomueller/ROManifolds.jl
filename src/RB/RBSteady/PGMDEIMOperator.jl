@@ -275,26 +275,28 @@ function Algebra.solve(
   op::RBOperator,
   r::AbstractParamRealization)
 
+  fesolver = get_fe_solver(solver)
+  trial = get_trial(op)(r)
+  fe_trial = get_fe_trial(op)(r)
+  x̂ = zero_free_values(trial)
+  y = zero_free_values(fe_trial)
+
   stats = @timed begin
-    fesolver = get_fe_solver(solver)
-    trial = get_trial(op)(r)
-    fe_trial = get_fe_trial(op)(r)
-    x̂ = zero_free_values(trial)
-    y = zero_free_values(fe_trial)
     solve!((x̂,),fesolver,op,r,(y,))
   end
 
   x = recast(x̂,trial)
   i = get_vector_index_map(op)
   s = Snapshots(x,i,r)
-  cs = ComputationalStats(stats,num_params(r))
-  return s,cs
+  cost = ComputationalStats(stats,num_params(r))
+  return s,cost
 end
 
 # for testing/visualization purposes
 
-function pod_mdeim_error(solver,feop,op::RBOperator,s)
-  pod_err = pod_error(get_trial(op),s,assemble_norm_matrix(feop))
-  mdeim_err = mdeim_error(solver,feop,op,s)
+function pod_mdeim_error(solver,feop,op,s)
+  s′ = flatten_partition(s)
+  pod_err = pod_error(get_trial(op),s′,assemble_norm_matrix(feop))
+  mdeim_err = mdeim_error(solver,feop,op,s′)
   return pod_err,mdeim_err
 end

@@ -58,6 +58,15 @@ function Base.iterate(r::ParamRealization,state=1)
   return rstate, state+1
 end
 
+function Base.zero(r::ParamRealization)
+  μ1 = first(_get_params(r))
+  ParamRealization(zeros(eltype(μ1),length(μ1)) .+ 1e-16)
+end
+
+function mean(r::ParamRealization)
+  ParamRealization(mean(_get_params(r)))
+end
+
 """
     TransientParamRealization{P<:ParamRealization,T<:Real} <: AbstractParamRealization
 
@@ -118,6 +127,14 @@ end
 function Base.iterate(r::GenericTransientParamRealization,state...)
   iterator = Iterators.product(_get_params(r),get_times(r))
   iterate(iterator,state...)
+end
+
+function Base.zero(r::GenericTransientParamRealization)
+  GenericTransientParamRealization(zero(get_params(r)),get_times(r),get_initial_time(r))
+end
+
+function mean(r::GenericTransientParamRealization)
+  GenericTransientParamRealization(mean(get_params(r)),get_times(r),get_initial_time(r))
 end
 
 get_final_time(r::GenericTransientParamRealization) = last(get_times(r))

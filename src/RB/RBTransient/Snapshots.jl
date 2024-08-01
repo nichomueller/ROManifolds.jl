@@ -77,13 +77,16 @@ function RBSteady.Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::Transie
   TransientBasicSnapshots(s,i,r)
 end
 
-function RBSteady.Snapshots(s::TransientBasicSnapshots,i::AbstractIndexMap,r::TransientParamRealization)
-  TransientBasicSnapshots(s.data,i,r)
-end
-
+ParamDataStructures.param_data(s::TransientBasicSnapshots) = s.data
 ParamDataStructures.get_values(s::TransientBasicSnapshots) = s.data
 IndexMaps.get_index_map(s::TransientBasicSnapshots) = s.index_map
 RBSteady.get_realization(s::TransientBasicSnapshots) = s.realization
+
+function RBSteady.get_indexed_values(s::TransientBasicSnapshots)
+  vi = vec(get_index_map(s))
+  v = consecutive_getindex(s.data,vi,:)
+  ConsecutiveArrayOfArrays(v)
+end
 
 Base.@propagate_inbounds function Base.getindex(
   s::TransientBasicSnapshots{T,N},
@@ -93,8 +96,7 @@ Base.@propagate_inbounds function Base.getindex(
   @boundscheck checkbounds(s,i...)
   ispace...,itime,iparam = i
   ispace′ = s.index_map[ispace...]
-  sparam = param_getindex(s.data,iparam+(itime-1)*num_params(s))
-  getindex(sparam,ispace′)
+  ispace′ == 0 ? zero(eltype(s)) : consecutive_getindex(s.data,ispace′,iparam+(itime-1)*num_params(s))
 end
 
 Base.@propagate_inbounds function Base.setindex!(
@@ -106,8 +108,7 @@ Base.@propagate_inbounds function Base.setindex!(
   @boundscheck checkbounds(s,i...)
   ispace...,itime,iparam = i
   ispace′ = s.index_map[ispace...]
-  sparam = param_getindex(s.data,iparam+(itime-1)*num_params(s))
-  setindex!(sparam,v,ispace′)
+  ispace′ != 0 && consecutive_setindex!(s.data,v,ispace′,iparam+(itime-1)*num_params(s))
 end
 
 """
@@ -139,20 +140,36 @@ function RBSteady.Snapshots(s::Vector{<:AbstractParamArray},i::AbstractIndexMap,
   TransientSnapshots(s,i,r)
 end
 
-function RBSteady.Snapshots(s::TransientSnapshots,i::AbstractIndexMap,r::TransientParamRealization)
-  TransientSnapshots(s.data,i,r)
-end
-
 function ParamDataStructures.get_values(s::TransientSnapshots)
-  item = testitem(first(s.data).data)
-  data = array_of_similar_arrays(item,num_params(s)*num_times(s))
-  @inbounds for (ipt,index) in enumerate(CartesianIndices((num_params(s),num_times(s))))
-    ip,it = index.I
-    @views data[ipt] = s.data[it][ip]
+  item = consecutive_getindex(first(s.data),:,1)
+  data = array_of_consecutive_arrays(item,num_params(s)*num_times(s))
+  @inbounds for it in 1:num_times(s)
+    dit = s.data[it]
+    @inbounds for ip in 1:num_params(s)
+      i = (it-1)*num_params(s)+ip
+      v = consecutive_getindex(dit,:,ip)
+      consecutive_setindex!(data,v,:,i)
+    end
   end
   return data
 end
 
+function RBSteady.get_indexed_values(s::TransientSnapshots)
+  vi = vec(get_index_map(s))
+  item = consecutive_getindex(first(s.data),:,1)
+  data = array_of_consecutive_arrays(item,num_params(s)*num_times(s))
+  @inbounds for it in 1:num_times(s)
+    dit = s.data[it]
+    @inbounds for ip in 1:num_params(s)
+      i = (it-1)*num_params(s)+ip
+      v = consecutive_getindex(dit,vi,ip)
+      consecutive_setindex!(data,v,:,i)
+    end
+  end
+  return data
+end
+
+ParamDataStructures.param_data(s::TransientSnapshots) = s.data
 IndexMaps.get_index_map(s::TransientSnapshots) = s.index_map
 RBSteady.get_realization(s::TransientSnapshots) = s.realization
 
@@ -164,8 +181,7 @@ Base.@propagate_inbounds function Base.getindex(
   @boundscheck checkbounds(s,i...)
   ispace...,itime,iparam = i
   ispace′ = s.index_map[ispace...]
-  sparam = param_getindex(s.data[itime],iparam)
-  getindex(sparam,ispace′)
+  ispace′ == 0 ? zero(eltype(s)) : consecutive_getindex(s.data[itime],ispace′,iparam)
 end
 
 Base.@propagate_inbounds function Base.setindex!(
@@ -177,8 +193,7 @@ Base.@propagate_inbounds function Base.setindex!(
   @boundscheck checkbounds(s,i...)
   ispace...,itime,iparam = i
   ispace′ = s.index_map[ispace...]
-  sparam = param_getindex(s.data[itime],iparam)
-  setindex!(sparam,v,ispace′)
+  ispace′ != 0 && consecutive_setindex!(s.data[itime],v,ispace′,iparam)
 end
 
 """
@@ -207,7 +222,9 @@ time_indices(s::TransientSnapshotsAtIndices) = s.trange
 ParamDataStructures.num_times(s::TransientSnapshotsAtIndices) = length(time_indices(s))
 RBSteady.param_indices(s::TransientSnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::TransientSnapshotsAtIndices) = length(RBSteady.param_indices(s))
+_param_time_range(prange,trange,np) = vec(((trange.-1)*np .+ prange')')
 
+ParamDataStructures.param_data(s::TransientSnapshotsAtIndices) = param_data(s.snaps)
 IndexMaps.get_index_map(s::TransientSnapshotsAtIndices) = get_index_map(s.snaps)
 RBSteady.get_realization(s::TransientSnapshotsAtIndices) = get_realization(s.snaps)[s.prange,s.trange]
 
@@ -215,15 +232,12 @@ function ParamDataStructures.get_values(
   s::TransientSnapshotsAtIndices{T,N,L,D,I,R,<:TransientBasicSnapshots}
   ) where {T,N,L,D,I,R}
 
-  snaps = s.snaps
-  item = testitem(snaps.data)
-  data = array_of_similar_arrays(item,num_params(s)*num_times(s))
-  indices = CartesianIndices((RBSteady.param_indices(s),time_indices(s)))
-  @inbounds for (ipt,index) in enumerate(indices)
-    ip,it = index.I
-    @views data[ipt] = snaps.data[ip+(it-1)*num_params(s)]
-  end
-  return data
+  prange = RBSteady.param_indices(s)
+  trange = time_indices(s)
+  np = num_params(s)
+  ptrange = _param_time_range(prange,trange,np)
+  v = consecutive_getindex(s.snaps.data,:,ptrange)
+  ConsecutiveArrayOfArrays(v)
 end
 
 function ParamDataStructures.get_values(
@@ -231,12 +245,47 @@ function ParamDataStructures.get_values(
   ) where {T,N,L,D,I,R}
 
   snaps = s.snaps
-  item = testitem(first(snaps.data).data)
-  data = array_of_similar_arrays(item,num_params(s)*num_times(s))
-  indices = CartesianIndices((RBSteady.param_indices(s),time_indices(s)))
-  @inbounds for (ipt,index) in enumerate(indices)
-    ip,it = index.I
-    data[ipt] = snaps.data[it][ip]
+  item = consecutive_getindex(first(snaps.data),:,1)
+  data = array_of_consecutive_arrays(item,num_params(s)*num_times(s))
+  @inbounds for (i,it) in enumerate(time_indices(s))
+    dit = snaps.data[it]
+    for (j,jp) in enumerate(RBSteady.param_indices(s))
+      v = consecutive_getindex(dit,:,jp)
+      ij = (i-1)*num_params(s)+j
+      consecutive_setindex!(data,v,:,ij)
+    end
+  end
+  return data
+end
+
+function RBSteady.get_indexed_values(
+  s::TransientSnapshotsAtIndices{T,N,L,D,I,R,<:TransientBasicSnapshots}
+  ) where {T,N,L,D,I,R}
+
+  vi = vec(get_index_map(s))
+  prange = RBSteady.param_indices(s)
+  trange = time_indices(s)
+  np = num_params(s)
+  ptrange = _param_time_range(prange,trange,np)
+  v = consecutive_getindex(s.snaps.data,vi,ptrange)
+  ConsecutiveArrayOfArrays(v)
+end
+
+function RBSteady.get_indexed_values(
+  s::TransientSnapshotsAtIndices{T,N,L,D,I,R,<:TransientSnapshots}
+  ) where {T,N,L,D,I,R}
+
+  snaps = s.snaps
+  vi = vec(get_index_map(s))
+  item = consecutive_getindex(first(snaps.data),:,1)
+  data = array_of_consecutive_arrays(item,num_params(s)*num_times(s))
+  @inbounds for (i,it) in enumerate(time_indices(s))
+    dit = snaps.data[it]
+    for (j,jp) in enumerate(RBSteady.param_indices(s))
+      v = consecutive_getindex(dit,vi,jp)
+      ij = (i-1)*num_params(s)+j
+      consecutive_setindex!(data,v,:,ij)
+    end
   end
   return data
 end
@@ -273,7 +322,7 @@ function RBSteady.flatten_snapshots(s::Union{TransientSnapshots,TransientSnapsho
 end
 
 function RBSteady.select_snapshots(s::TransientSnapshotsAtIndices,trange,prange)
-  old_trange,old_prange = s.indices
+  old_trange,old_prange = s.trange,s.prange
   @check intersect(old_trange,trange) == trange
   @check intersect(old_prange,prange) == prange
   TransientSnapshotsAtIndices(s.snaps,trange,prange)
@@ -289,37 +338,86 @@ function RBSteady.select_snapshots(s::AbstractTransientSnapshots,prange;trange=B
   select_snapshots(s,trange,prange)
 end
 
+struct TransientReshapedSnapshots{T,N,N′,L,D,I,R,A<:AbstractTransientSnapshots{T,N′,L,D,I,R},B} <: AbstractTransientSnapshots{T,N,L,D,I,R}
+  snaps::A
+  size::NTuple{N,Int}
+  mi::B
+end
+
+Base.size(s::TransientReshapedSnapshots) = s.size
+
+function Base.reshape(s::AbstractTransientSnapshots,dims::Dims)
+  n = length(s)
+  prod(dims) == n || DimensionMismatch()
+
+  strds = Base.front(Base.size_to_strides(map(length,axes(s))..., 1))
+  strds1 = map(s->max(1,Int(s)),strds)
+  mi = map(Base.SignedMultiplicativeInverse,strds1)
+  TransientReshapedSnapshots(s,dims,reverse(mi))
+end
+
+function Base.getindex(
+  s::TransientReshapedSnapshots{T,N},
+  i::Vararg{Integer,N}
+  ) where {T,N}
+
+  @boundscheck checkbounds(s,i...)
+  ax = axes(s.snaps)
+  i′ = Base.offset_if_vec(Base._sub2ind(size(s),i...),ax)
+  i′′ = Base.ind2sub_rs(ax,s.mi,i′)
+  Base._unsafe_getindex_rs(s.snaps,i′′)
+end
+
+function Base.setindex!(
+  s::TransientReshapedSnapshots{T,N},
+  v,i::Vararg{Integer,N}
+  ) where {T,N}
+
+  @boundscheck checkbounds(s,i...)
+  ax = axes(s.snaps)
+  i′ = Base.offset_if_vec(Base._sub2ind(size(s),i...),ax)
+  s.snaps[Base.ind2sub_rs(ax,s.mi,i′)] = v
+  v
+end
+
+RBSteady.get_realization(s::TransientReshapedSnapshots) = get_realization(s.snaps)
+IndexMaps.get_index_map(s::TransientReshapedSnapshots) = get_index_map(s.snaps)
+
+function ParamDataStructures.get_values(s::TransientReshapedSnapshots)
+  v = get_values(s.snaps)
+  reshape(v.data,s.size)
+end
+
+function RBSteady.get_indexed_values(s::TransientReshapedSnapshots)
+  v = get_indexed_values(s.snaps)
+  reshape(v.data,s.size)
+end
+
+const TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
+  TransientBasicSnapshots{T,N,L,D,I,R,A},
+  TransientSnapshots{T,N,L,D,I,R,A}
+}
+
 function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange)
-  _getindex(s::TransientBasicSnapshots,is,it,ip) = param_getindex(s.data,ip+(it-1)*num_params(s))[is]
-  _getindex(s::TransientSnapshots,is,it,ip) = param_getindex(s.data[it],ip)[is]
+  _getindex(s::TransientBasicSnapshots,is,it,ip) = consecutive_getindex(s.data,is,ip+(it-1)*num_params(s))
+  _getindex(s::TransientSnapshots,is,it,ip) = consecutive_getindex(s.data[it],is,ip)
+  _getindex(s::TransientSparseSnapshots,is,it,ip) = param_getindex(s.data,ip+(it-1)*num_params(s))[is]
 
   @assert length(srange) == length(trange)
 
   T = eltype(s)
   nval = length(srange)
   np = num_params(s)
-  entries = array_of_similar_arrays(zeros(T,nval),np)
+  entries = array_of_consecutive_arrays(zeros(T,nval),np)
 
-  @inbounds for ip = 1:np
-    vip = entries.data[ip]
+  for ip = 1:np
     for (i,(is,it)) in enumerate(zip(srange,trange))
-      vip[i] = _getindex(s,is,it,ip)
+      v = _getindex(s,is,it,ip)
+      consecutive_setindex!(entries,v,i,ip)
     end
   end
 
   return entries
-end
-
-const TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
-  TransientBasicSnapshots{T,N,L,D,I,R,A},
-  TransientSnapshots{T,N,L,D,I,R,A},
-}
-
-function ParamDataStructures.recast(s::TransientSparseSnapshots,a::AbstractVector{<:AbstractArray{T,3}}) where T
-  index_map = get_index_map(s)
-  ls = IndexMaps.get_univariate_sparsity(index_map)
-  asparse = map(SparseCore,a,ls)
-  return asparse
 end
 
 """
@@ -330,7 +428,7 @@ end
 const UnfoldingTransientSnapshots{T,L,I<:TrivialIndexMap,R} = AbstractTransientSnapshots{T,3,L,1,I,R}
 const UnfoldingTransientSparseSnapshots{T,L,I<:TrivialIndexMap,R,A<:MatrixOfSparseMatricesCSC} = TransientSparseSnapshots{T,3,L,1,I,R,A}
 
-function ParamDataStructures.recast(s::UnfoldingTransientSparseSnapshots,a::AbstractMatrix)
+function IndexMaps.recast(s::UnfoldingTransientSparseSnapshots,a::AbstractMatrix)
   return recast(s.data,a)
 end
 
@@ -376,9 +474,11 @@ function RBSteady.flatten_snapshots(s::AbstractTransientSnapshots)
   ModeTransientSnapshots(s′)
 end
 
+ParamDataStructures.param_data(s::ModeTransientSnapshots) = param_data(s.snaps)
 RBSteady.num_space_dofs(s::ModeTransientSnapshots) = prod(num_space_dofs(s.snaps))
 ParamDataStructures.get_values(s::ModeTransientSnapshots) = get_values(s.snaps)
 RBSteady.get_realization(s::ModeTransientSnapshots) = get_realization(s.snaps)
+RBSteady.get_indexed_values(s::ModeTransientSnapshots) = get_indexed_values(s.snaps)
 
 change_mode(s::UnfoldingTransientSnapshots) = ModeTransientSnapshots(s,change_mode(get_mode(s)))
 change_mode(s::ModeTransientSnapshots) = ModeTransientSnapshots(s.snaps,change_mode(get_mode(s)))
@@ -387,16 +487,19 @@ get_mode(s::UnfoldingTransientSnapshots) = Mode1Axes()
 get_mode(s::ModeTransientSnapshots) = s.mode
 
 function RBSteady.select_snapshots_entries(s::UnfoldingTransientSnapshots,srange,trange)
-  _getindex(s::TransientBasicSnapshots,is,it,ip) = param_getindex(s.data,ip+(it-1)*num_params(s))[is]
-  _getindex(s::TransientSnapshots,is,it,ip) = param_getindex(s.data[it],ip)[is]
+  _getindex(s::TransientBasicSnapshots,is,it,ip) = consecutive_getindex(s.data,is,ip+(it-1)*num_params(s))
+  _getindex(s::TransientSnapshots,is,it,ip) = consecutive_getindex(s.data[it],is,ip)
+  _getindex(s::TransientSparseSnapshots,is,it,ip) = param_getindex(s.data,ip+(it-1)*num_params(s))[is]
 
   T = eltype(s)
   nval = length(srange),length(trange)
   np = num_params(s)
-  entries = array_of_similar_arrays(zeros(T,nval),np)
+  entries = array_of_consecutive_arrays(zeros(T,nval),np)
 
   @inbounds for ip = 1:np, (i,it) = enumerate(trange)
-    entries.data[ip][:,i] = _getindex(s,srange,it,ip)
+    ipt = ip+(it-1)*num_params(s)
+    v = _getindex(s,srange,it,ip)
+    consecutive_setindex!(entries,v,:,i,ip)
   end
 
   return entries
@@ -442,7 +545,7 @@ _compress(s,a,X::AbstractMatrix) = a'*X*s
 _compress(s,a,args...) = a'*s
 
 function compress(s::Mode1TransientSnapshots,a::AbstractMatrix,args...;swap_mode=true)
-  s′ = _compress(collect(s),a,args...)
+  s′ = _compress(s,a,args...)
   if swap_mode
     s′ = change_mode(s′,num_params(s))
   end
@@ -459,11 +562,13 @@ function change_mode(a::AbstractMatrix,np::Integer)
   return a′
 end
 
+RBSteady.get_indexed_values(s::Mode2TransientSnapshots) = collect(s)
+
 # block snapshots
 
 function RBSteady.Snapshots(
   data::AbstractVector{<:BlockArrayOfArrays},
-  i::AbstractVector{<:AbstractIndexMap},
+  i::AbstractArray{<:AbstractIndexMap},
   r::AbstractParamRealization)
 
   block_values = blocks.(data)

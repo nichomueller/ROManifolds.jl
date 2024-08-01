@@ -1,5 +1,5 @@
 """
-    ArrayOfArrays{T,N,L,P<:AbstractVector{<:AbstractArray{T,N}}} <: ParamArray{T,N,L}
+    struct ArrayOfArrays{T,N,L,P<:AbstractVector{<:AbstractArray{T,N}}} <: ParamArray{T,N,L} end
 
 Represents a vector of arrays. For sake of coherence, an instance of
 `ArrayOfArrays{T,N}` inherits from AbstractArray{<:AbstractArray{T,N},N} rather than
@@ -26,8 +26,19 @@ Base.size(A::ArrayOfArrays{T,N}) where {T,N} = ntuple(_->param_length(A),Val{N}(
   size(first(A.data))
 end
 
+@inline function inneraxes(A::ArrayOfArrays)
+  Base.OneTo.(innersize(A))
+end
+
 param_data(A::ArrayOfArrays{T,N}) where {T,N} = A.data
-param_entry(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N} = ParamNumber(map(a->getindex(a,i...),A.data))
+
+function param_entry(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
+  Ai = zeros(T,param_length(A))
+  @inbounds for k = param_eachindex(A)
+    Ai[k] = A.data[k][i...]
+  end
+  return Ai
+end
 
 Base.@propagate_inbounds function Base.getindex(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
@@ -71,6 +82,6 @@ function Base.copyto!(A::ArrayOfArrays,B::ArrayOfArrays)
   A
 end
 
-function param_view(A::ArrayOfArrays{T,N},i::Union{Integer,AbstractVector,Colon}...) where {T,N}
+function param_view(A::ArrayOfArrays,i::Union{Integer,AbstractVector,Colon}...)
   ArrayOfArrays(map(a -> view(a,i...),A.data))
 end

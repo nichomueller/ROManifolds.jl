@@ -16,7 +16,7 @@ Subtypes:
 - [`ParamFEOpFromWeakForm`](@ref)
 - [`ParamSaddlePointFEOp`](@ref)
 - [`ParamFEOperatorWithTrian`](@ref)
-- [`GenericParamLinearNonlinearFEOperator`](@ref)
+- [`GenericLinearNonlinearParamFEOperator`](@ref)
 
 """
 abstract type ParamFEOperator{T<:ParamOperatorType} <: FEOperator end
@@ -45,27 +45,40 @@ get_matrix_index_map(op::ParamFEOperator) = get_matrix_index_map(get_index_map(o
 
 get_induced_norm(op::ParamFEOperator) = @abstractmethod
 
+"""
+    assemble_norm_matrix(op::ParamFEOperator) -> AbstractMatrix
+
+Assembles the symmetric, positive definite matrix representing a norm operator on
+the couple of FESpaces (trial,test) defined in `op`
+
+"""
 function assemble_norm_matrix(op::ParamFEOperator)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
   inorm = get_induced_norm(op)
-  assemble_norm_matrix(inorm,trial,test)
+  _assemble_matrix(inorm,trial,test)
 end
 
 get_coupling(op::ParamFEOperator) = @abstractmethod
 
+"""
+    assemble_coupling_matrix(op::ParamFEOperator) -> AbstractMatrix
+
+Assembles the matrix representing a saddle point operator defined in `op`
+
+"""
 function assemble_coupling_matrix(op::ParamFEOperator)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
   c = get_coupling(op)
-  assemble_matrix(c,trial,test)
+  _assemble_matrix(c,trial,test)
 end
 
 get_linear_operator(op::ParamFEOperator) = @abstractmethod
 get_nonlinear_operator(op::ParamFEOperator) = @abstractmethod
 
 """
-    ParamFEOpFromWeakForm{T} <: ParamFEOperator{T}
+    struct ParamFEOpFromWeakForm{T} <: ParamFEOperator{T} end
 
 Most standard instance of ParamFEOperator{T}
 
@@ -108,33 +121,30 @@ get_jac(op::ParamFEOpFromWeakForm) = op.jac
 ODEs.get_assembler(op::ParamFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::ParamFEOpFromWeakForm) = op.index_map
 
-"""
-    assemble_norm_matrix(op::ParamFEOperator) -> AbstractMatrix
-
-Assembles the symmetric, positive definite matrix representing a norm operator on
-the couple of FESpaces (trial,test) defined in `op`
-
-"""
-function assemble_norm_matrix(op::ParamFEOpFromWeakForm)
-  test = get_test(op)
-  trial = evaluate(get_trial(op),nothing)
-  inorm = get_induced_norm(op)
-  assemble_norm_matrix(inorm,trial,test)
-end
-
-function assemble_norm_matrix(f,U::FESpace,V::FESpace)
+function _assemble_matrix(f,U::FESpace,V::FESpace)
   assemble_matrix(f,U,V)
 end
 
-function assemble_norm_matrix(f,U::TProductFESpace,V::TProductFESpace)
+function _assemble_matrix(f,U::TProductFESpace,V::TProductFESpace)
   a = SparseMatrixAssembler(U,V)
   v = get_tp_fe_basis(V)
   u = get_tp_trial_fe_basis(U)
   assemble_matrix(a,collect_cell_matrix(U,V,f(u,v)))
 end
 
-function assemble_norm_matrix(f,U::TrialFESpace{<:TProductFESpace},V::TProductFESpace)
-  assemble_norm_matrix(f,U.space,V)
+function _assemble_matrix(f,U::TrialFESpace{<:TProductFESpace},V::TProductFESpace)
+  _assemble_matrix(f,U.space,V)
+end
+
+function _assemble_matrix(f,U::MultiFieldFESpace,V::MultiFieldFESpace)
+  if all(isa.(V.spaces,TProductFESpace))
+    a = TProductBlockSparseMatrixAssembler(U,V)
+    v = get_tp_fe_basis(V)
+    u = get_tp_trial_fe_basis(U)
+    assemble_matrix(a,collect_cell_matrix(U,V,f(u,v)))
+  else
+    assemble_matrix(f,U,V)
+  end
 end
 
 function ParamFEOpFromWeakForm(
@@ -154,7 +164,7 @@ function ParamFEOpFromWeakForm(
 end
 
 """
-    ParamSaddlePointFEOp{T} <: ParamFEOperator{T}
+    struct ParamSaddlePointFEOp{T} <: ParamFEOperator{T} end
 
 Interface to deal with the Inf-Sup stability condition of saddle point problems;
 the field `coupling` encodes the Inf-Sup operator
@@ -191,7 +201,7 @@ Subtypes:
 
 - [`ParamFEOpFromWeakFormWithTrian`](@ref)
 - [`ParamSaddlePointFEOpWithTrian`](@ref)
-- [`ParamLinearNonlinearFEOperatorWithTrian`](@ref)
+- [`LinearNonlinearParamFEOperatorWithTrian`](@ref)
 
 """
 abstract type ParamFEOperatorWithTrian{T} <: ParamFEOperator{T} end
@@ -201,7 +211,7 @@ function FESpaces.get_algebraic_operator(op::ParamFEOperatorWithTrian)
 end
 
 """
-    ParamFEOpFromWeakFormWithTrian{T} <: ParamFEOperatorWithTrian{T}
+    struct ParamFEOpFromWeakFormWithTrian{T} <: ParamFEOperatorWithTrian{T} end
 
 Corresponds to a [`ParamFEOpFromWeakForm`](@ref) object, but in a triangulation
 separation setting
@@ -249,12 +259,8 @@ get_jac(op::ParamFEOpFromWeakFormWithTrian) = get_jac(op.op)
 ODEs.get_assembler(op::ParamFEOpFromWeakFormWithTrian) = get_assembler(op.op)
 IndexMaps.get_index_map(op::ParamFEOpFromWeakFormWithTrian) = get_index_map(op)
 
-function assemble_norm_matrix(op::ParamFEOpFromWeakFormWithTrian)
-  assemble_norm_matrix(op.op)
-end
-
 """
-    ParamSaddlePointFEOpWithTrian{T} <: ParamFEOperatorWithTrian{T}
+    struct ParamSaddlePointFEOpWithTrian{T} <: ParamFEOperatorWithTrian{T} end
 
 Corresponds to a [`ParamSaddlePointFEOp`](@ref) object, but in a triangulation
 separation setting
@@ -367,7 +373,6 @@ Replaces the old triangulations relative to the residual and jacobian in `op` wi
 two new tuples `trian_res` and `trian_jac`, and returns the resulting ParamFEOperatorWithTrian
 
 """
-
 function change_triangulation(op::ParamFEOperatorWithTrian,trian_res,trian_jac)
   newtrian_res = order_triangulations(op.trian_res,trian_res)
   newtrian_jac = order_triangulations(op.trian_jac,trian_jac)
@@ -376,8 +381,8 @@ function change_triangulation(op::ParamFEOperatorWithTrian,trian_res,trian_jac)
 end
 
 function change_triangulation(op::ParamSaddlePointFEOpWithTrian,trian_res,trian_jac)
-  newtrian_res = order_triangulations(op.trian_res,trian_res)
-  newtrian_jac = order_triangulations(op.trian_jac,trian_jac)
+  newtrian_res = order_triangulations(op.trian_res,trian_res;kwargs...)
+  newtrian_jac = order_triangulations(op.trian_jac,trian_jac;kwargs...)
   newop = set_triangulation(op,newtrian_res,newtrian_jac)
   ParamSaddlePointFEOpWithTrian(newop,newtrian_res,newtrian_jac)
 end

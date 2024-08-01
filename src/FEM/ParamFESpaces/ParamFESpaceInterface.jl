@@ -67,7 +67,7 @@ get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(f.space)
 function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   V = get_vector_type(f.space)
   L = param_length(f)
-  typeof(array_of_similar_arrays(V(),L))
+  typeof(array_of_consecutive_arrays(V(),L))
 end
 
 function FESpaces.gather_free_and_dirichlet_values!(
@@ -132,6 +132,22 @@ function FESpaces._fill_dirichlet_values_for_tag!(
   end
 end
 
+function FESpaces._fill_dirichlet_values_for_tag!(
+  dirichlet_values::AbstractConsecutiveParamVector,
+  dv::AbstractConsecutiveParamVector,
+  tag,
+  dirichlet_dof_to_tag)
+
+  @check param_length(dirichlet_values) == param_length(dv)
+  for dof in 1:_innerlength(dv)
+    if dirichlet_dof_to_tag[dof] == tag
+      @inbounds for k in param_eachindex(dirichlet_values)
+        dirichlet_values.data[dof,k] = dv.data[dof,k]
+      end
+    end
+  end
+end
+
 function FESpaces._free_and_dirichlet_values_fill!(
   free_vals::AbstractParamVector,
   dirichlet_vals::AbstractParamVector,
@@ -152,6 +168,34 @@ function FESpaces._free_and_dirichlet_values_fill!(
           free_vals.data[k][dof] = val
         elseif dof < 0
           dirichlet_vals.data[k][-dof] = val
+        else
+          @unreachable "dof ids either positive or negative, not zero"
+        end
+      end
+    end
+  end
+end
+
+function FESpaces._free_and_dirichlet_values_fill!(
+  free_vals::AbstractConsecutiveParamVector,
+  dirichlet_vals::AbstractConsecutiveParamVector,
+  cache_vals,
+  cache_dofs,
+  cell_vals,
+  cell_dofs,
+  cells)
+
+  @check param_length(free_vals) == param_length(dirichlet_vals)
+  for cell in cells
+    vals = getindex!(cache_vals,cell_vals,cell)
+    dofs = getindex!(cache_dofs,cell_dofs,cell)
+    for (i,dof) in enumerate(dofs)
+      @inbounds for k in param_eachindex(dirichlet_vals)
+        val = vals.data[k][i]
+        if dof > 0
+          free_vals.data[dof,k] = val
+        elseif dof < 0
+          dirichlet_vals.data[-dof,k] = val
         else
           @unreachable "dof ids either positive or negative, not zero"
         end
@@ -196,7 +240,7 @@ function FESpaces.FEFunction(
     return _fv,_dv
   end |> tuple_of_arrays
   f′ = TrivialParamFESpace(zf.space,param_length(f))
-  FEFunction(f′,ParamArray(fv),ParamArray(dv))
+  FEFunction(f′,ConsecutiveArrayOfArrays(fv),ConsecutiveArrayOfArrays(dv))
 end
 
 function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:ZeroMeanFESpace},free_values)
@@ -205,8 +249,30 @@ function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:ZeroMeanFESpace},f
   FEFunction(f′,free_values)
 end
 
+function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:TrialFESpace{<:ZeroMeanFESpace}},free_values)
+  zf = f.space
+  f′ = TrivialParamFESpace(zf.space,param_length(f))
+  FEFunction(f′,free_values)
+end
+
+function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:TrivialParamFESpace{<:ZeroMeanFESpace}},free_values)
+  zf = f.space
+  f′ = TrivialParamFESpace(zf.space,param_length(f))
+  FEFunction(f′,free_values)
+end
+
 function FESpaces.scatter_free_and_dirichlet_values(
   f::TrivialParamFESpace{<:TrialFESpace},
+  fv::AbstractParamVector,
+  dv::AbstractParamVector)
+
+  tf = f.space
+  f′ = TrivialParamFESpace(tf.space,param_length(f))
+  scatter_free_and_dirichlet_values(f′,fv,dv)
+end
+
+function FESpaces.scatter_free_and_dirichlet_values(
+  f::TrivialParamFESpace{<:TProductFESpace},
   fv::AbstractParamVector,
   dv::AbstractParamVector)
 
@@ -239,7 +305,7 @@ function FESpaces.scatter_free_and_dirichlet_values(
     return _fv,_dv
   end |> tuple_of_arrays
   f′ = TrivialParamFESpace(ff.space,param_length(f))
-  scatter_free_and_dirichlet_values(f′,ParamArray(fv),ParamArray(dv))
+  scatter_free_and_dirichlet_values(f′,ConsecutiveArrayOfArrays(fv),ConsecutiveArrayOfArrays(dv))
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(

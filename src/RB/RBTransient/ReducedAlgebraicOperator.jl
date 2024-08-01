@@ -14,7 +14,7 @@ function RBSteady.reduce_operator(
   b̂s = bs_test'*bs
   @inbounds for i = eachindex(b̂st)
     b̂si = b̂s[:,i]
-    b̂st[i] = eachcol(kronecker(bt_test',b̂si))
+    b̂st[i] = eachcol(kron(bt_test',b̂si))
   end
 
   return ReducedVectorOperator(mdeim_style,b̂st)
@@ -40,7 +40,7 @@ function RBSteady.reduce_operator(
 
   @inbounds for i = eachindex(b̂st)
     b̂si = bs_test'*param_getindex(bs,i)*bs_trial
-    b̂st[i] = map(k->kronecker(b̂t[k,:,:],b̂si),axes(b̂t,1))
+    b̂st[i] = map(k->kron(b̂t[k,:,:],b̂si),axes(b̂t,1))
   end
 
   return ReducedMatrixOperator(mdeim_style,b̂st)
@@ -63,7 +63,7 @@ function RBSteady.reduce_operator(
 
   b̂s = bs_test'*bs
   b̂t = bt_test'*bt
-  b̂st .= kronecker(b̂t,b̂s)
+  b̂st .= kron(b̂t,b̂s)
 
   return ReducedVectorOperator(mdeim_style,b̂st)
 end
@@ -88,12 +88,16 @@ function RBSteady.reduce_operator(
 
   b̂t = combine_basis_time(bt,bt_trial,bt_test;kwargs...)
 
+  cache = zeros(T,num_space_dofs(b_trial),RBSteady.num_reduced_space_dofs(b_trial))
+
   @inbounds for is = 1:RBSteady.num_reduced_space_dofs(b)
-    b̂si = bs_test'*param_getindex(bs,is)*bs_trial
+    Bis = param_getindex(bs,is)
+    mul!(cache,Bis,bs_trial)
+    b̂si = bs_test'*cache
     for it = 1:num_reduced_times(b)
       ist = (it-1)*RBSteady.num_reduced_space_dofs(b)+is
       b̂ti = b̂t[:,it,:]
-      b̂st[:,ist,:] .= kronecker(b̂ti,b̂si)
+      b̂st[:,ist,:] .= kron(b̂ti,b̂si)
     end
   end
 
@@ -135,12 +139,6 @@ function RBSteady.compress_core(a::AbstractArray{T,3},btrial::AbstractArray{S,3}
     bab_shift[i] = sum(btest[ibV1,2:end,ibV3].*a[ia1,2:end,ia3].*btrial[ibU1,1:end-1,ibU3])
   end
   return combine(bab,bab_shift)
-end
-
-function RBSteady.compress_cores(core::TransientTTSVDCores,bases::TransientTTSVDCores...;kwargs...)
-  ccores = map((a,b...)->compress_core(a,b...;kwargs...),get_cores(core),get_cores.(bases)...)
-  ccore = multiply_cores(ccores...)
-  RBSteady._dropdims(ccore)
 end
 
 function combine_basis_time(B::AbstractMatrix,C::AbstractMatrix;combine=(x,y)->x)

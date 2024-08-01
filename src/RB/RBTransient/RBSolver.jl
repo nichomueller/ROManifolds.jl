@@ -29,12 +29,10 @@ function RBSteady.fe_solutions(
   odesol = sol.odesol
   r = odesol.r
 
-  stats = @timed begin
-    values = collect(odesol)
-  end
+  values,icost = collect(odesol)
+  stats = get_stats(icost)
 
   i = get_vector_index_map(op)
   snaps = Snapshots(values,i,r)
-  cs = ComputationalStats(stats,nparams)
-  return snaps,cs
+  return snaps,stats
 end

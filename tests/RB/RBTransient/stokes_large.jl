@@ -1,25 +1,20 @@
 using Gridap
-using Gridap.Algebra
-using Gridap.Arrays
-using Gridap.CellData
-using Gridap.FESpaces
-using Gridap.Fields
-using Gridap.Geometry
 using Gridap.MultiField
-using Gridap.ODEs
-using Gridap.Polynomials
-using Gridap.ReferenceFEs
-using Gridap.Helpers
-using Gridap.TensorValues
-using BlockArrays
+using Test
 using DrWatson
-using SparseArrays
-using LinearAlgebra
-using Kronecker
-using Mabla.FEM
-using Mabla.RB
 
-θ = 0.5
+using Mabla.FEM
+using Mabla.FEM.TProduct
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamSteady
+using Mabla.FEM.ParamODEs
+
+using Mabla.RB
+using Mabla.RB.RBSteady
+using Mabla.RB.RBTransient
+
+θ = 1.0
 dt = 0.01
 t0 = 0.0
 tf = 0.1
@@ -27,14 +22,8 @@ tf = 0.1
 pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
-
-n = 5
-domain = (0,1,0,1)
-partition = (n,n)
-model = TProductModel(domain,partition)
-
-labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
+model_dir = datadir(joinpath("meshes","perforated_plate.json"))
+model = DiscreteModelFromFile(model_dir)
 
 order = 2
 degree = 2*order
@@ -45,6 +34,7 @@ a(x,μ,t) = 1+exp(-sin(2π*t/tf)^2*(1-x[2])/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
+# inflow(μ,t) = 1-cos(2π*t/tf)+sin(μ[2]*2π*t/tf)/μ[1]
 inflow(μ,t) = 1-cos(2π*t/(μ[1]*tf))
 g_in(x,μ,t) = VectorValue(-x[2]*(1-x[2])*inflow(μ,t),0.0)
 g_in(μ,t) = x->g_in(x,μ,t)
@@ -75,10 +65,12 @@ coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 induced_norm((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
+test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","walls","cylinder"])
+trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_w,gμt_c])
 trial_u = TransientTrialParamFESpace(test_u,gμt_in)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+# test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -89,20 +81,35 @@ xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=10,nsnaps_test=5,nsnaps_mdeim=5)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=10)
+test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated_plate")))
 
 fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+h1_l2_err = compute_error(results)
 
-nparams = num_params(rbsolver)
-sol = solve(fesolver,feop,xh0μ;nparams)
-odesol = sol.odesol
-r = odesol.r
-vals = collect(odesol)
+println(h1_l2_err)
+save(test_dir,fesnaps)
+save(test_dir,rbop)
+save(test_dir,results)
 
-r = realization(feop)
-NB,SB,P = 2,(1,1),(1,2)
-U = trial(r)
-values = map(zero_free_values,U.spaces)
-block_values = mortar(values)
-fill!(block_values,zero(eltype(block_values)))
+# ERRORS ARE LARGER THAN EXPECTED
+
+# using Gridap.FESpaces
+# odeop = get_algebraic_operator(feop)
+# s = select_snapshots(fesnaps,1)
+# feA,feb = jacobian_and_residual(fesolver,odeop,s)
+# rbA,rbb = jacobian_and_residual(fesolver,rbop.op.op,s)
+# errA = RBSteady.interpolation_error(rbop.lhs,feA,rbA)
+# errb = RBSteady.interpolation_error(rbop.rhs,feb,rbb)
+
+# # errA = RBSteady.linear_combination_error(rbop.lhs,feA,rbA)
+# odeop = get_algebraic_operator(feop)
+# fesolver = get_fe_solver(rbsolver)
+# feA_comp = compress(fesolver,feA,get_trial(rbop),get_test(rbop))
+# feb_comp = compress(fesolver,feb,get_test(rbop))
+# rbA,rbb = jacobian_and_residual(solver,rbop,s)
+# errA = rel_norm(feA_comp,rbA)
+# errb = rel_norm(feb_comp,rbb)

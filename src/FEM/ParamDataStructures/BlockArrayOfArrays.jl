@@ -1,5 +1,6 @@
 """
-    BlockArrayOfArrays{T,N,L,A<:AbstractArray{<:AbstractParamArray{T,N,L},N},B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N,L}
+    struct BlockArrayOfArrays{T,N,L,A<:AbstractArray{<:AbstractParamArray{T,N,L},N},
+      B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N,L} end
 
 Is to a [`ParamArray`](@ref) as a BlockArray is to a regular AbstractArray.
 Instances of BlockArrayOfArrays are obtained by extending the function `_BlockArray`
@@ -56,7 +57,7 @@ end
 function _param_entry(A::BlockArrayOfArrays{T,N},i::BlockIndex{N}) where {T,N}
   @boundscheck blockcheckbounds(A,Block(i.I))
   @inbounds bl = A.data[i.I...]
-  @inbounds ParamNumber(map(a->getindex(a,i.α...),bl.data))
+  @inbounds param_entry(bl.data,i.α...)
 end
 
 Base.@propagate_inbounds function param_setindex!(

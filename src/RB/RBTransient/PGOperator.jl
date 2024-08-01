@@ -68,12 +68,25 @@ function ParamSteady.set_triangulation(
   TransientPGOperator(set_triangulation(op.op,trians_rhs,trians_lhs),op.trial,op.test)
 end
 
-function ParamSteady.change_triangulation(
-  op::TransientPGOperator,
-  trians_rhs,
-  trians_lhs)
-
+function ParamSteady.change_triangulation(op::TransientPGOperator,trians_rhs,trians_lhs)
   TransientPGOperator(change_triangulation(op.op,trians_rhs,trians_lhs),op.trial,op.test)
+end
+
+function ODEs.allocate_odecache(
+  fesolver::ThetaMethod,
+  op::TransientPGOperator,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractParamVector}})
+
+  dt,θ = fesolver.dt,fesolver.θ
+  dtθ = θ*dt
+  shift!(r,dt*(θ-1))
+
+  (odeslvrcache,odeopcache) = allocate_odecache(fesolver,op.op,r,us)
+  update_odeopcache!(odeopcache,op.op,r)
+  shift!(r,dt*(1-θ))
+
+  return (odeslvrcache,odeopcache)
 end
 
 function ODEs.allocate_odeopcache(
@@ -89,6 +102,8 @@ function ODEs.update_odeopcache!(
   op::TransientPGOperator,
   r::TransientParamRealization)
 
+  @warn "For performance reasons, it would be best to update the cache at the very
+    start, given that the online phase of a space-time ROM is time-independent"
   update_odeopcache!(odeopcache,op.op,r)
 end
 
@@ -136,11 +151,11 @@ function Algebra.jacobian!(
   return Snapshots(A,i,r)
 end
 
-function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientRBOperator,s::AbstractTransientSnapshots)
+function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientRBOperator,s)
   jacobian_and_residual(get_fe_solver(solver),op.op,s)
 end
 
-function RBSteady.jacobian_and_residual(fesolver::ODESolver,odeop::ODEParamOperator,s::AbstractTransientSnapshots)
+function RBSteady.jacobian_and_residual(fesolver::ODESolver,odeop::ODEParamOperator,s)
   us = (get_values(s),)
   r = get_realization(s)
   odecache = allocate_odecache(fesolver,odeop,r,us)

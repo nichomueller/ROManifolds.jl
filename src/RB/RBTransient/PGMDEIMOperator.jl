@@ -55,6 +55,15 @@ ParamSteady.get_matrix_index_map(op::TransientPGMDEIMOperator) = get_matrix_inde
 RBSteady.get_fe_trial(op::TransientPGMDEIMOperator) = get_fe_trial(op.op)
 RBSteady.get_fe_test(op::TransientPGMDEIMOperator) = get_fe_test(op.op)
 
+function ODEs.allocate_odecache(
+  fesolver::ThetaMethod,
+  op::TransientPGMDEIMOperator,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractParamVector}})
+
+  allocate_odecache(fesolver,op.op,r,us)
+end
+
 function ODEs.allocate_odeopcache(
   op::TransientPGMDEIMOperator,
   r::TransientParamRealization,
@@ -68,6 +77,8 @@ function ODEs.update_odeopcache!(
   op::TransientPGMDEIMOperator,
   r::TransientParamRealization)
 
+  @warn "For performance reasons, it would be best to update the cache at the very
+    start, given that the online phase of a space-time ROM is time-independent"
   update_odeopcache!(ode_cache,op.op,r)
 end
 
@@ -132,17 +143,18 @@ function _select_fe_space_at_time_locations(fs::TrivialParamFESpace,indices)
 end
 
 function _select_fe_space_at_time_locations(fs::SingleFieldParamFESpace,indices)
-  dvi = ParamArray(fs.dirichlet_values.data[indices])
+  dvi = ConsecutiveArrayOfArrays(fs.dirichlet_values.data[:,indices])
   TrialParamFESpace(dvi,fs.space)
 end
 
-function _select_odecache_at_time_locations(us::Tuple{Vararg{AbstractParamVector}},odeopcache,indices)
+function _select_odecache_at_time_locations(us::Tuple{Vararg{ConsecutiveArrayOfArrays}},odeopcache,indices)
   @unpack Us,Uts,tfeopcache,const_forms = odeopcache
   new_xhF = ()
   new_Us = ()
   for i = eachindex(us)
     new_Us = (new_Us...,_select_fe_space_at_time_locations(Us[i],indices))
-    new_xhF = (new_xhF...,ParamArray(us[i].data[indices]))
+    new_XhF_i = ConsecutiveArrayOfArrays(us[i].data[:,indices])
+    new_xhF = (new_xhF...,new_XhF_i)
   end
   new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_odeopcache
@@ -158,14 +170,15 @@ function _select_odecache_at_time_locations(us::Tuple{Vararg{BlockVectorOfVector
     style = spacei.multi_field_style
     spacesi = [_select_fe_space_at_time_locations(spaceij,indices) for spaceij in spacei]
     new_Us = (new_Us...,MultiFieldFESpace(VT,spacesi,style))
-    new_xhF = (new_xhF...,mortar([ParamArray(us_i.data[indices]) for us_i in blocks(us[i])]))
+    new_XhF_i = mortar([ConsecutiveArrayOfArrays(us_i.data[:,indices]) for us_i in blocks(us[i])])
+    new_xhF = (new_xhF...,new_XhF_i)
   end
   new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_odeopcache
 end
 
-function _select_cache_at_time_locations(b::ArrayOfArrays,indices)
-  ArrayOfArrays(b.data[indices])
+function _select_cache_at_time_locations(b::ConsecutiveArrayOfArrays,indices)
+  ConsecutiveArrayOfArrays(b.data[:,indices])
 end
 
 function _select_cache_at_time_locations(A::MatrixOfSparseMatricesCSC,indices)
@@ -190,17 +203,13 @@ function _select_cache_at_time_locations(cache::TupOfArrayContribution,indices)
   return red_cache
 end
 
-function _select_indices_at_time_locations(red_times;nparams=1)
-  vec(transpose((red_times.-1)*nparams .+ collect(1:nparams)'))
-end
-
 function _select_fe_quantities_at_time_locations(cache,a,r,us,odeopcache)
   # common temporal reduced integration domain
   red_times = union_reduced_times(a)
   red_r = r[:,red_times]
   # indices corresponding to the newly found temporal reduced integration domain,
   # for every parameter
-  indices = _select_indices_at_time_locations(red_times;nparams=num_params(r))
+  indices = _param_time_range(collect(1:num_params(r)),red_times,num_params(r))
   # returns the cache in the appropriate time-parameter locations
   red_cache = _select_cache_at_time_locations(cache,indices)
   # does the same with the stage variable `us` and the ode cache `odeopcache`
@@ -410,19 +419,19 @@ function Algebra.solve(
   op::TransientRBOperator,
   r::TransientParamRealization)
 
-  stats = @timed begin
-    fesolver = get_fe_solver(solver)
-    trial = get_trial(op)(r)
-    fe_trial = get_fe_trial(op)(r)
-    x̂ = zero_free_values(trial)
-    y = zero_free_values(fe_trial)
-    odecache = allocate_odecache(fesolver,op,r,(y,))
-    solve!((x̂,),fesolver,op,r,(y,),odecache)
-  end
+  fesolver = get_fe_solver(solver)
+  trial = get_trial(op)(r)
+  fe_trial = get_fe_trial(op)(r)
+  x̂ = zero_free_values(trial)
+  y = zero_free_values(fe_trial)
+  odecache = allocate_odecache(fesolver,op,r,(y,))
+
+  stats = @timed solve!((x̂,),fesolver,op,r,(y,),odecache)
 
   x = recast(x̂,trial)
   i = get_vector_index_map(op)
   s = Snapshots(x,i,r)
-  cs = ComputationalStats(stats,num_params(r))
-  return s,cs
+  cost = ComputationalStats(stats,num_params(r))
+
+  return s,cost
 end

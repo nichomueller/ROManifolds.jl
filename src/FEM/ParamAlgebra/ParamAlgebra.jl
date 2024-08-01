@@ -8,7 +8,9 @@ using SparseMatricesCSR
 using Gridap
 using Gridap.Algebra
 using Gridap.Arrays
+using Gridap.Fields
 using Gridap.Helpers
+using Gridap.ReferenceFEs
 
 using GridapSolvers
 using GridapSolvers.LinearSolvers

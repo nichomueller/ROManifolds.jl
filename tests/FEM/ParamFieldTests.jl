@@ -1,9 +1,14 @@
-module ParamFieldTests
+# module ParamFieldTests
 
 using Gridap.Fields
 using Gridap.TensorValues
 using Gridap.Arrays
 using Mabla.FEM
+using Mabla.FEM.TProduct
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamSteady
+using Mabla.FEM.ParamODEs
 using Test
 
 # Parametric information
@@ -217,5 +222,3 @@ test_field(vt,x,zero(v(x)),grad=zero(∇(v)(x)))
 test_field(vf,x,v(x),grad=∇(v)(x))
 test_field(vt,x,zero(v(x)),grad=zero(∇(v)(x)),gradgrad=zero(∇∇(v)(x)))
 test_field(vf,x,v(x),grad=∇(v)(x),gradgrad=∇∇(v)(x))
-
-end # module

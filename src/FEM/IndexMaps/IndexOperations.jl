@@ -7,9 +7,12 @@ an ordinary array.
 
 """
 function recast_indices(indices::AbstractVector,A::AbstractArray)
+  indices′ = copy(indices)
   nonzero_indices = get_nonzero_indices(A)
-  entire_indices = nonzero_indices[indices]
-  return entire_indices
+  for (i,indi) in enumerate(indices′)
+    indices′[i] = nonzero_indices[indi]
+  end
+  return indices′
 end
 
 """
@@ -19,9 +22,12 @@ Inverse map of recast_indices.
 
 """
 function sparsify_indices(indices::AbstractVector,A::AbstractArray)
+  indices′ = copy(indices)
   nonzero_indices = get_nonzero_indices(A)
-  sparse_indices = map(y->findfirst(x->x==y,nonzero_indices),indices)
-  return sparse_indices
+  for (i,indi) in enumerate(indices′)
+    indices′[i] = findfirst(x->x==indi,nonzero_indices)
+  end
+  return indices′
 end
 
 function get_nonzero_indices(A::AbstractArray)
@@ -50,6 +56,7 @@ RaRb × CaCb, can be indexed as AB[i,j] = A[slow_index(i,RbCb)] * B[fast_index(i
 
 """
 @inline slow_index(i,nfast::Integer) = cld.(i,nfast)
+@inline slow_index(i::Integer,nfast::Integer) = cld(i,nfast)
 @inline slow_index(i::Colon,::Integer) = i
 
 """
@@ -61,6 +68,7 @@ RaRb × CaCb, can be indexed as AB[i,j] = A[slow_index(i,RbCb)] * B[fast_index(i
 
 """
 @inline fast_index(i,nfast::Integer) = mod.(i .- 1,nfast) .+ 1
+@inline fast_index(i::Integer,nfast::Integer) = mod(i - 1,nfast) + 1
 @inline fast_index(i::Colon,::Integer) = i
 
 """

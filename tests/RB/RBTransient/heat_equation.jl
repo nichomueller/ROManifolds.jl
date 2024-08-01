@@ -1,6 +1,7 @@
 using Gridap
 using Test
 using DrWatson
+using Serialization
 
 using Mabla.FEM
 using Mabla.FEM.TProduct
@@ -13,25 +14,20 @@ using Mabla.RB
 using Mabla.RB.RBSteady
 using Mabla.RB.RBTransient
 
+# time marching
 θ = 0.5
 dt = 0.01
 t0 = 0.0
 tf = 0.1
 
+# parametric space
 pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
+
+# geometry
 model_dir = datadir(joinpath("models","elasticity_3cyl2D.json"))
 model = DiscreteModelFromFile(model_dir)
-
-# interface for TT-RB
-# domain = (0,1,0,1)
-# partition = (5,5)
-# model = TProductModel(domain,partition)
-# labels = get_face_labeling(model)
-# add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
-# add_tag_from_tags!(labels,"neumann",[7])
-
 order = 1
 degree = 2*order
 Ω = Triangulation(model)
@@ -39,6 +35,7 @@ dΩ = Measure(Ω,degree)
 Γn = BoundaryTriangulation(model,tags=["neumann"])
 dΓn = Measure(Γn,degree)
 
+# weak formulation
 a(x,μ,t) = 1+exp(-sin(t)^2*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
@@ -68,7 +65,7 @@ trian_res = (Ω,Γn)
 trian_stiffness = (Ω,)
 trian_mass = (Ω,)
 
-induced_norm(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
+induced_norm(du,v) = ∫(du*v)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
@@ -76,39 +73,35 @@ trial = TransientTrialParamFESpace(test,gμt)
 feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
   trial,test,trian_res,trian_stiffness,trian_mass)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
-fesolver = ThetaMethod(LUSolver(),dt,θ)
 
+# solvers
+fesolver = ThetaMethod(LUSolver(),dt,θ)
 ϵ = 1e-4
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
+# RB method
 # we can load & solve directly, if the offline structures have been previously saved to file
-# load_solve(rbsolver,dir=test_dir)
+try
+  results = load_solve(rbsolver,feop,test_dir)
+catch
+  @warn "Loading offline structures failed: running offline phase"
+  fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
+  rbop = reduced_operator(rbsolver,feop,fesnaps)
+  rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+  results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+
+  save(test_dir,fesnaps)
+  save(test_dir,rbop)
+  save(test_dir,results)
+end
+
+# post process
+println(compute_error(results))
+println(compute_speedup(results))
+average_plot(rbop,results;dir=joinpath(test_dir,"plots"))
 
 fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
-
-println(compute_error(results))
-save(test_dir,fesnaps)
-save(test_dir,rbop)
-save(test_dir,results)
-
-# POD-MDEIM error
-pod_err,mdeim_error = RB.pod_mdeim_error(rbsolver,feop,rbop,fesnaps)
-
-ϵ = 1e-4
-rbsolver_space = RBSolver(fesolver,ϵ;mdeim_style=SpaceOnlyMDEIM(),nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-test_dir_space = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
-
-# we can load & solve directly, if the offline structures have been previously saved to file
-# load_solve(rbsolver_space,dir=test_dir_space)
-
-rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
-rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
-results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbstats_space)
-
-println(compute_error(results_space))
-save(test_dir,rbop_space)
-save(test_dir,results_space)

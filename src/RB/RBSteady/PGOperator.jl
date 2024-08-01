@@ -79,11 +79,7 @@ function ParamSteady.set_triangulation(
   PGOperator(set_triangulation(op.op,trians_rhs,trians_lhs),op.trial,op.test)
 end
 
-function ParamSteady.change_triangulation(
-  op::PGOperator,
-  trians_rhs,
-  trians_lhs)
-
+function ParamSteady.change_triangulation(op::PGOperator,trians_rhs,trians_lhs)
   PGOperator(change_triangulation(op.op,trians_rhs,trians_lhs),op.trial,op.test)
 end
 

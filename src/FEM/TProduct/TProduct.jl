@@ -12,6 +12,7 @@ using Gridap.CellData
 using Gridap.FESpaces
 using Gridap.Fields
 using Gridap.Geometry
+using Gridap.MultiField
 using Gridap.Polynomials
 using Gridap.ReferenceFEs
 using Gridap.TensorValues
@@ -25,6 +26,7 @@ import Kronecker: kronecker
 import Gridap.ReferenceFEs: get_order
 import PartitionedArrays: tuple_of_arrays
 import SparseArrays: AbstractSparseMatrixCSC
+import UnPack: @unpack
 
 export get_dof_index_map
 export get_polynomial_order
@@ -46,20 +48,23 @@ include("TProductFESpaces.jl")
 export AbstractTProductArray
 export TProductArray
 export TProductGradientArray
-export symbolic_kron
-export symbolic_kron!
-export numerical_kron!
-export kronecker_gradients
+export TProductPDerivativeArray
+export BlockTProductArray
+export tp_length
+export tp_getindex
 include("TProductArray.jl")
 
 export TProductCellPoint
-export TProductCellFields
+export TProductCellField
+export GenericTProductCellField
 export TProductFEBasis
-export TProductGradientCellField
-export TProductGradientEval
+export GenericTProductDiffCellField
+export GenericTProductDiffEval
+export TProductCellDatum
 include("TProductCellData.jl")
 
 export TProductSparseMatrixAssembler
+export TProductBlockSparseMatrixAssembler
 include("TProductAssembly.jl")
 
 end # module

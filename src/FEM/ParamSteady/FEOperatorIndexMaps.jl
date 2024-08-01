@@ -38,7 +38,11 @@ function get_vector_index_map(test::FESpace)
 end
 
 function get_vector_index_map(test::TProductFESpace)
-  get_dof_index_map(test)
+  if length(test.spaces_1d) == 1 # in the 1-D case, we return a trivial map
+    get_vector_index_map(test.space)
+  else
+    get_dof_index_map(test)
+  end
 end
 
 function get_vector_index_map(tests::MultiFieldFESpace)
@@ -60,17 +64,22 @@ a SparseIndexMap is returned
 """
 function get_matrix_index_map(trial::FESpace,test::FESpace)
   sparsity = get_sparsity(trial,test)
-  return TrivialIndexMap(get_nonzero_indices(sparsity))
+  TrivialIndexMap(LinearIndices((nnz(sparsity),)))
 end
 
 function get_matrix_index_map(trial::TProductFESpace,test::TProductFESpace)
-  sparsity = get_sparsity(trial,test)
-  psparsity = permute_sparsity(sparsity,trial,test)
-  I,J,_ = findnz(psparsity)
-  i,j,_ = IndexMaps.univariate_findnz(psparsity)
-  g2l = _global_2_local_nnz(psparsity,I,J,i,j)
-  pg2l = permute_index_map(psparsity,g2l,trial,test)
-  return SparseIndexMap(pg2l,psparsity)
+  if length(trial.spaces_1d) == length(test.spaces_1d) == 1 # in the 1-D case, we return a trivial map
+    get_matrix_index_map(trial.space,test.space)
+  else
+    sparsity = get_sparsity(trial,test)
+    psparsity = permute_sparsity(sparsity,trial,test)
+    I,J,_ = findnz(psparsity)
+    i,j,_ = IndexMaps.univariate_findnz(psparsity)
+    g2l_sparse = _global_2_local(psparsity,I,J,i,j)
+    pg2l_sparse = _permute_index_map(g2l_sparse,trial,test)
+    pg2l = _to_nz_index(pg2l_sparse,sparsity)
+    SparseIndexMap(pg2l,pg2l_sparse,psparsity)
+  end
 end
 
 for F in (:TrialFESpace,:TransientTrialFESpace)
@@ -91,7 +100,7 @@ end
 
 # utils
 
-function _global_2_local_nnz(sparsity::TProductSparsityPattern,I,J,i,j)
+function _global_2_local(sparsity::TProductSparsityPattern,I,J,i,j)
   IJ = get_nonzero_indices(sparsity)
   lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
 
@@ -111,18 +120,52 @@ function _global_2_local_nnz(sparsity::TProductSparsityPattern,I,J,i,j)
   return g2l
 end
 
-function _permute_index_map(index_map,I,J)
-  nrows = length(I)
+function _add_fixed_dofs(index_map::AbstractIndexMap)
+  if any(index_map.==0)
+    return FixedDofsIndexMap(index_map,findall(index_map.==zero(eltype(index_map))))
+  end
+  return index_map
+end
+
+function _add_fixed_dofs(index_map::AbstractMatrix)
+  _add_fixed_dofs(IndexMap(index_map))
+end
+
+function _permute_index_map(index_map,I,J,nrows)
   IJ = vec(I) .+ nrows .* (vec(J)'.-1)
   iperm = copy(index_map)
   @inbounds for (k,pk) in enumerate(index_map)
-    iperm[k] = IJ[pk]
+    if pk > 0
+      iperm[k] = IJ[pk]
+    end
   end
-  return IndexMap(iperm)
+  return _add_fixed_dofs(iperm)
 end
 
-function permute_index_map(::TProductSparsityPattern,index_map,trial::TProductFESpace,test::TProductFESpace)
+function _permute_index_map(index_map,trial::TProductFESpace,test::TProductFESpace)
   I = get_dof_index_map(test)
   J = get_dof_index_map(trial)
-  return _permute_index_map(index_map,I,J)
+  nrows = num_free_dofs(test)
+  return _permute_index_map(index_map,I,J,nrows)
+end
+
+function _to_nz_index(index_map,sparsity)
+  index_map′ = copy(index_map)
+  _to_nz_index!(index_map′,sparsity)
+  return index_map′
+end
+
+function _to_nz_index!(index_map,sparsity::TProductSparsityPattern)
+  _to_nz_index!(index_map,get_sparsity(sparsity))
+end
+
+function _to_nz_index!(index_map,sparsity::SparsityPatternCSC)
+  nrows = IndexMaps.num_rows(sparsity)
+  for (i,index) in enumerate(index_map)
+    if index > 0
+      irow = fast_index(index,nrows)
+      icol = slow_index(index,nrows)
+      index_map[i] = nz_index(sparsity.matrix,irow,icol)
+    end
+  end
 end
