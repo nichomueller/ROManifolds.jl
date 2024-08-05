@@ -75,6 +75,8 @@ export orth_complement!
 export orth_projection
 include("BasisConstruction.jl")
 
+include("NewTTSVD.jl")
+
 export Projection
 export SteadyProjection
 export PODBasis

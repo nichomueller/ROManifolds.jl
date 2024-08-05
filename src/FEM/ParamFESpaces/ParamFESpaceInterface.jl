@@ -228,8 +228,8 @@ FESpaces.ConstraintStyle(::Type{<:TrivialParamFESpace{S}}) where S = ConstraintS
 # Extend some of Gridap's functions when needed
 function FESpaces.FEFunction(
   f::TrivialParamFESpace{<:ZeroMeanFESpace},
-  free_values::AbstractParamVector,
-  dirichlet_values::AbstractParamVector)
+  free_values::AbstractVector,
+  dirichlet_values::AbstractVector)
 
   zf = f.space
   @check param_length(free_values) == param_length(dirichlet_values)

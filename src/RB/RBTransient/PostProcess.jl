@@ -1,12 +1,12 @@
-function RBSteady.deserialize_operator(feop::TransientParamFEOperatorWithTrian,dir)
+function RBSteady.deserialize_operator(feop::TransientParamFEOperatorWithTrian,dir;linearity="lin")
   trian_res = feop.trian_res
   trian_jacs = feop.trian_jacs
 
   op = RBSteady.deserialize_pg_operator(feop,dir)
-  red_rhs = RBSteady.deserialize_contribution(dir,trian_res,get_test(op);label="res")
+  red_rhs = RBSteady.deserialize_contribution(dir,trian_res,get_test(op);label=linearity*"res")
   red_lhs = ()
   for (i,trian_jac) in enumerate(trian_jacs)
-    rlhsi = RBSteady.deserialize_contribution(dir,trian_jac,get_trial(op),get_test(op);label="jac_$i")
+    rlhsi = RBSteady.deserialize_contribution(dir,trian_jac,get_trial(op),get_test(op);label=linearity*"jac_$i")
     red_lhs = (red_lhs...,rlhsi)
   end
 
@@ -17,23 +17,35 @@ function RBSteady.deserialize_operator(feop::TransientParamFEOperatorWithTrian,d
   return rbop
 end
 
-function DrWatson.save(dir,op::TransientPGMDEIMOperator;kwargs...)
+function DrWatson.save(dir,op::TransientPGMDEIMOperator;linearity="lin",kwargs...)
   save(dir,op.op;kwargs...)
   for (i,ad_res) in enumerate(op.rhs.values)
-    save(dir,ad_res;label="res_$i")
+    save(dir,ad_res;label=linearity*"res_$i")
   end
   for (ilhs,lhs) in enumerate(op.lhs)
     for (i,ad_jac) in enumerate(lhs.values)
-      save(dir,ad_jac;label="jac_$(ilhs)_$i")
+      save(dir,ad_jac;label=linearity*"jac_$(ilhs)_$i")
     end
   end
+end
+
+function RBSteady.deserialize_operator(feop::LinearNonlinearTransientParamFEOperatorWithTrian,dir)
+  op_lin = deserialize_operator(get_linear_operator(feop),dir;linearity="lin")
+  op_nlin = deserialize_operator(get_nonlinear_operator(feop),dir;linearity="nlin")
+  rbop = LinearNonlinearTransientPGMDEIMOperator(new_op,red_lhs,red_rhs)
+  return rbop
 end
 
 function DrWatson.save(dir,op::TransientPGOperator;kwargs...)
   btest = RBSteady.get_basis(get_test(op))
   btrial = RBSteady.get_basis(get_trial(op))
   save(dir,btest;label="test")
-  save(dir,btest;label="trial")
+  save(dir,btrial;label="trial")
+end
+
+function DrWatson.save(dir,op::LinearNonlinearTransientPGMDEIMOperator)
+  save(dir,get_linear_operator(op);linearity="lin")
+  save(dir,get_nonlinear_operator(op);linearity="nlin")
 end
 
 function RBSteady.deserialize_operator(

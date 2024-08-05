@@ -56,6 +56,8 @@ include("RBSolver.jl")
 
 include("BasisConstruction.jl")
 
+include("NewTTSVD.jl")
+
 export TransientProjection
 export TransientPODBasis
 export TransientTTSVDCores

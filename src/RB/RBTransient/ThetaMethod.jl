@@ -122,9 +122,10 @@ function RBSteady.jacobian_and_residual(
   odeop::ODEParamOperator{LinearParamODE},
   r::TransientParamRealization,
   state0::NTuple{1,AbstractVector},
-  odecache)
+  odecache;
+  kwargs...)
 
-  stageop = get_stage_operator(solver,odeop,r,state0,odecache)
+  stageop = get_stage_operator(solver,odeop,r,state0,odecache;kwargs...)
   return stageop.A,stageop.b
 end
 

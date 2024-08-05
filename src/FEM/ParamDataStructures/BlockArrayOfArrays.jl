@@ -149,8 +149,7 @@ function Base.similar(A::BlockArrayOfArrays{T,N},::Type{<:AbstractArray{T′,N}}
 end
 
 function Base.similar(A::BlockArrayOfArrays{T,N},::Type{<:AbstractArray{T′,N}},axes::BlockedUnitRange) where {T,T′,N}
-  sz = map(length,blocks(axes))
-  BlockArrayOfArrays(map((a,s)->similar(a,Array{T′,N},s),A.data,sz),A.axes)
+  BlockArrayOfArrays(map(a->similar(a,Array{T′,N}),A.data),A.axes)
 end
 
 function Base.copyto!(A::BlockArrayOfArrays,B::BlockArrayOfArrays)

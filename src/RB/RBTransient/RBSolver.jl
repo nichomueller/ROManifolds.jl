@@ -29,7 +29,7 @@ function RBSteady.fe_solutions(
   odesol = sol.odesol
   r = odesol.r
 
-  values,icost = collect(odesol)
+  values,icost = collect(sol)
   stats = get_stats(icost)
 
   i = get_vector_index_map(op)

@@ -262,7 +262,22 @@ function Algebra.solve(solver::RBSolver,op::RBOperator,s)
   solve(solver,op,ron)
 end
 
+function Algebra.solve!(cache,solver::RBSolver,op::RBOperator,s)
+  son = select_snapshots(s,online_params(solver))
+  ron = get_realization(son)
+  solve!(cache,solver,op,ron)
+end
+
 function Algebra.solve(
+  solver::RBSolver,
+  op::RBOperator{NonlinearParamEq},
+  r::AbstractParamRealization)
+
+  @notimplemented "Split affine from nonlinear operator when running the RB solve"
+end
+
+function Algebra.solve!(
+  cache,
   solver::RBSolver,
   op::RBOperator{NonlinearParamEq},
   r::AbstractParamRealization)
@@ -275,11 +290,23 @@ function Algebra.solve(
   op::RBOperator,
   r::AbstractParamRealization)
 
-  fesolver = get_fe_solver(solver)
   trial = get_trial(op)(r)
   fe_trial = get_fe_trial(op)(r)
   x̂ = zero_free_values(trial)
   y = zero_free_values(fe_trial)
+  cache = x̂,y
+  solve!(cache,solver,op,r)
+end
+
+function Algebra.solve!(
+  cache,
+  solver::RBSolver,
+  op::RBOperator,
+  r::AbstractParamRealization)
+
+  fesolver = get_fe_solver(solver)
+  trial = get_trial(op)(r)
+  x̂,y = cache
 
   stats = @timed begin
     solve!((x̂,),fesolver,op,r,(y,))
@@ -289,7 +316,7 @@ function Algebra.solve(
   i = get_vector_index_map(op)
   s = Snapshots(x,i,r)
   cost = ComputationalStats(stats,num_params(r))
-  return s,cost
+  return s,cost,cache
 end
 
 # for testing/visualization purposes

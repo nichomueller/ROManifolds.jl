@@ -83,7 +83,7 @@ reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","dirichlet0"])
 trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_w])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean) #conformity=:C0)#
+test_p = TestFESpace(model,reffe_p;conformity=:C0) #)#
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -97,11 +97,10 @@ end
 coeffs = [1.0 1.0;
           0.0 1.0]
 solver_u = LUSolver()
-# solver_p = CGSolver(RichardsonSmoother(JacobiLinearSolver(),10,0.2);maxiter=20,atol=1e-14,rtol=1.e-6,verbose=false)
-# solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=false)
+# solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-7,verbose=false)
 solver_p = LUSolver()
 P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
-solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-10,verbose=true)
+solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-7,verbose=false)
 odesolver = ThetaMethod(solver,dt,θ)
 
 r = realization(feop;nparams=1)
@@ -119,8 +118,8 @@ fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ;r)
 # using Gridap.Algebra
 sol = solve(odesolver,feop,xh0μ;r)
 vals,_ = collect(sol.odesol)
-x1 = param_getindex(vals[1],1)
-U1 = trial(nothing)
+x1 = vals[1]
+U1 = trial(r)
 xh1 = FEFunction(U1,x1)
 uh1,ph1 = xh1
 sum(∫(ph1)dΩ)

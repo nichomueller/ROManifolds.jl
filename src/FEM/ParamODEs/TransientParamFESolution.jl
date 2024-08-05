@@ -74,7 +74,7 @@ function Base.collect(sol::TransientParamFESolution{V}) where V
     free_values[k] = copy(ut)
   end
 
-  return free_values
+  return free_values,odesol.tracker
 end
 
 function Algebra.solve(

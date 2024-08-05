@@ -135,7 +135,7 @@ function nonlinear_rb_solve!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,op,trial)
     maxk = maximum(abs,b)
     println(maxk)
 
-    maxk < 1e-5*max0 && return
+    maxk < 1e-6*max0 && return
 
     if k == nls.max_nliters
       @unreachable

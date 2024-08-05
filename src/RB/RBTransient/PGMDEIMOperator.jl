@@ -406,7 +406,22 @@ function Algebra.solve(solver::RBSolver,op::TransientRBOperator,s)
   solve(solver,op,ron)
 end
 
+function Algebra.solve!(cache,solver::RBSolver,op::TransientRBOperator,s)
+  son = select_snapshots(s,online_params(solver))
+  ron = get_realization(son)
+  solve!(cache,solver,op,ron)
+end
+
 function Algebra.solve(
+  solver::RBSolver,
+  op::TransientRBOperator{NonlinearParamODE},
+  r::AbstractParamRealization)
+
+  @notimplemented "Split affine from nonlinear operator when running the RB solve"
+end
+
+function Algebra.solve!(
+  cache,
   solver::RBSolver,
   op::TransientRBOperator{NonlinearParamODE},
   r::AbstractParamRealization)
@@ -425,6 +440,19 @@ function Algebra.solve(
   x̂ = zero_free_values(trial)
   y = zero_free_values(fe_trial)
   odecache = allocate_odecache(fesolver,op,r,(y,))
+  cache = x̂,y,odecache
+  solve!(cache,solver,op,r)
+end
+
+function Algebra.solve!(
+  cache,
+  solver::RBSolver,
+  op::TransientRBOperator,
+  r::TransientParamRealization)
+
+  x̂,y,odecache = cache
+  fesolver = get_fe_solver(solver)
+  trial = get_trial(op)(r)
 
   stats = @timed solve!((x̂,),fesolver,op,r,(y,),odecache)
 
@@ -433,5 +461,5 @@ function Algebra.solve(
   s = Snapshots(x,i,r)
   cost = ComputationalStats(stats,num_params(r))
 
-  return s,cost
+  return s,cost,cache
 end
