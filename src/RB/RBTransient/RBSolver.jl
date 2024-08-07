@@ -9,10 +9,11 @@ function RBSteady.RBSolver(
   ϵ::Float64;
   mdeim_style=SpaceTimeMDEIM(),
   nsnaps_state=50,
-  nsnaps_mdeim=20,
+  nsnaps_res=20,
+  nsnaps_jac=20,
   nsnaps_test=10)
 
-  RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_mdeim,nsnaps_test)
+  RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_res,nsnaps_jac,nsnaps_test)
 end
 
 const ThetaMethodRBSolver = RBSolver{ThetaMethod}

@@ -393,9 +393,14 @@ function RBSteady.get_indexed_values(s::TransientReshapedSnapshots)
   reshape(v.data,s.size)
 end
 
-const TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
+const TransientStandardSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
   TransientBasicSnapshots{T,N,L,D,I,R,A},
   TransientSnapshots{T,N,L,D,I,R,A}
+}
+
+const TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
+  TransientStandardSparseSnapshots{T,N,L,D,I,R,A},
+  TransientSnapshotsAtIndices{T,N,L,D,I,R,<:TransientStandardSparseSnapshots{T,N,L,D,I,R,A}}
 }
 
 function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange)
@@ -429,7 +434,7 @@ const UnfoldingTransientSnapshots{T,L,I<:TrivialIndexMap,R} = AbstractTransientS
 const UnfoldingTransientSparseSnapshots{T,L,I<:TrivialIndexMap,R,A<:MatrixOfSparseMatricesCSC} = TransientSparseSnapshots{T,3,L,1,I,R,A}
 
 function IndexMaps.recast(s::UnfoldingTransientSparseSnapshots,a::AbstractMatrix)
-  return recast(s.data,a)
+  return recast(param_data(s),a)
 end
 
 abstract type ModeAxes end

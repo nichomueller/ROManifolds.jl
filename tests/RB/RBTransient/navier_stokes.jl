@@ -39,17 +39,18 @@ degree = 2*order+1
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
 
-a(x,μ,t) = μ[1]*exp(sin(π*t/tf)*x[1]/sum(μ))
+a(x,μ,t) = μ[1]*exp((sin(t)+cos(t))/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
-inflow(μ,t) = abs(1-cos(π*t/tf)+sin(π*t/(μ[2]*tf))/μ[3])
-g_in(x,μ,t) = VectorValue(-x[2]*(1-x[2])*inflow(μ,t),0.0)
+const W = 0.5
+inflow(μ,t) = abs(1-cos(9*π*t/(5*tf))+μ[3]*sin(μ[2]*9*π*t/(5*tf))/100)
+g_in(x,μ,t) = VectorValue(-x[2]*(W-x[2])*inflow(μ,t),0.0)
 g_in(μ,t) = x->g_in(x,μ,t)
 gμt_in(μ,t) = TransientParamFunction(g_in,μ,t)
 g_0(x,μ,t) = VectorValue(0.0,0.0)
 g_0(μ,t) = x->g_in(x,μ,t)
-gμt_0(μ,t) = TransientParamFunction(g_in,μ,t)
+gμt_0(μ,t) = TransientParamFunction(g_0,μ,t)
 
 u0(x,μ) = VectorValue(0.0,0.0)
 u0(μ) = x->u0(x,μ)

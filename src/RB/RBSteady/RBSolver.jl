@@ -42,7 +42,8 @@ In particular:
 - mdeim_style: in transient applications, the user can choose to perform MDEIM in
   space only or in space and time (default)
 - nsnaps_state: number of snapshots considered when running TPOD or TT-SVD
-- nsnaps_mdeim: number of snapshots considered when running MDEIM
+- nsnaps_res: number of snapshots considered when running MDEIM for the residual
+- nsnaps_jac: number of snapshots considered when running MDEIM for the jacobian
 - nsnaps_test:  number of snapshots considered when computing the error the RB
   method commits with respect to the FE procedure
 
@@ -52,7 +53,8 @@ struct RBSolver{S,M}
   ϵ::Float64
   mdeim_style::M
   nsnaps_state::Int
-  nsnaps_mdeim::Int
+  nsnaps_res::Int
+  nsnaps_jac::Int
   nsnaps_test::Int
 end
 
@@ -61,19 +63,24 @@ function RBSolver(
   ϵ::Float64;
   mdeim_style=SpaceMDEIM(),
   nsnaps_state=50,
-  nsnaps_mdeim=20,
+  nsnaps_res=20,
+  nsnaps_jac=20,
   nsnaps_test=10)
 
-  RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_mdeim,nsnaps_test)
+  RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_res,nsnaps_jac,nsnaps_test)
 end
 
 get_fe_solver(s::RBSolver) = s.fesolver
-num_offline_params(solver::RBSolver) = solver.nsnaps_state
+num_offline_params(solver::RBSolver) = max(solver.nsnaps_state,num_mdeim_params(solver))
 offline_params(solver::RBSolver) = 1:num_offline_params(solver)
 num_online_params(solver::RBSolver) = solver.nsnaps_test
 online_params(solver::RBSolver) = 1+num_offline_params(solver):num_online_params(solver)+num_offline_params(solver)
 ParamDataStructures.num_params(solver::RBSolver) = num_offline_params(solver) + num_online_params(solver)
-num_mdeim_params(solver::RBSolver) = solver.nsnaps_mdeim
+num_res_params(solver::RBSolver) = solver.nsnaps_res
+res_params(solver::RBSolver) = 1:num_res_params(solver)
+num_jac_params(solver::RBSolver) = solver.nsnaps_jac
+jac_params(solver::RBSolver) = 1:num_jac_params(solver)
+num_mdeim_params(solver::RBSolver) = max(num_res_params(solver),num_jac_params(solver))
 mdeim_params(solver::RBSolver) = 1:num_mdeim_params(solver)
 get_tol(solver::RBSolver) = solver.ϵ
 

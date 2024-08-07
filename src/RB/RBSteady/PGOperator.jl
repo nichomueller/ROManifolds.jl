@@ -147,7 +147,10 @@ the time derivative
 
 """
 function jacobian_and_residual(solver::RBSolver,op::RBOperator,s)
-  jacobian_and_residual(get_fe_solver(solver),op.op,s)
+  jac,res = jacobian_and_residual(get_fe_solver(solver),op.op,s)
+  jac′ = select_snapshots(jac,jac_params(solver))
+  res′ = select_snapshots(res,res_params(solver))
+  return jac′,res′
 end
 
 function jacobian_and_residual(fesolver::FESolver,op::ParamOperator,s)
