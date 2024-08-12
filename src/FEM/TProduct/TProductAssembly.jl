@@ -1,7 +1,7 @@
 """
     TProductSparseMatrixAssembler{A<:SparseMatrixAssembler,R,C} <: SparseMatrixAssembler
 
-Assembly-related information when constructing a [`TProductArray`](ref)
+Assembly-related information when constructing a [`AbstractTProductTensor`](ref)
 
 """
 struct TProductSparseMatrixAssembler{A<:SparseMatrixAssembler,R,C} <: SparseMatrixAssembler

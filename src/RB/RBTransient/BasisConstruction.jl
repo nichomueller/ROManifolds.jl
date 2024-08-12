@@ -10,20 +10,19 @@ function RBSteady.ttsvd(mat::AbstractTransientSnapshots{T,N};kwargs...) where {T
   return cores
 end
 
-function RBSteady.ttsvd(mat::AbstractTransientSnapshots{T,N},X::AbstractTProductArray;kwargs...) where {T,N}
+function RBSteady.ttsvd(mat::AbstractTransientSnapshots{T,N},X::AbstractTProductTensor;kwargs...) where {T,N}
   N_space = N-2
   cores = Vector{Array{T,3}}(undef,N-1)
-  weights = Vector{Array{T,3}}(undef,N_space-1)
   ranks = fill(1,N)
   sizes = size(mat)
   # routine on the spatial indices
-  M = RBSteady.ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;ids_range=1:N_space,kwargs...)
+  M = RBSteady.ttsvd!((cores,ranks,sizes),mat,X;ids_range=1:N_space,kwargs...)
   # routine on the temporal index
   _ = RBSteady.ttsvd!((cores,ranks,sizes),M;ids_range=N_space+1,kwargs...)
   return cores
 end
 
-function check_orthogonality(cores::AbstractVector{<:AbstractArray{T,3}},X::AbstractTProductArray) where T
+function check_orthogonality(cores::AbstractVector{<:AbstractArray{T,3}},X::AbstractTProductTensor) where T
   Xglobal_space = kron(X)
   cores_space...,core_time = cores
   basis_space = cores2basis(cores_space...)

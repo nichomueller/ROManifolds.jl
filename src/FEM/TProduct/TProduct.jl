@@ -45,14 +45,13 @@ export get_tp_fe_basis
 export get_tp_trial_fe_basis
 include("TProductFESpaces.jl")
 
-export AbstractTProductArray
-export TProductArray
-export TProductGradientArray
-export TProductPDerivativeArray
-export BlockTProductArray
-export tp_length
-export tp_getindex
-include("TProductArray.jl")
+export AbstractTProductTensor
+export AbstractRank1Tensor
+export AbstractRankTensor
+export BlockGenericRankTensor
+export get_factors
+export get_decomposition
+include("TProductTensor.jl")
 
 export TProductCellPoint
 export TProductCellField

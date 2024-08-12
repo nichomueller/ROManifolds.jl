@@ -132,16 +132,6 @@ get_diff_data(f::GenericTProductDiffEval) = f.g
 get_tp_data(f::GenericTProductDiffEval) = get_tp_data(f.f)
 get_tp_diff_data(f::GenericTProductDiffEval) = get_tp_data(f.g)
 
-function Base.:*(f::GenericTProductDiffEval,a::Number)
-  f1,f2end... = f.f
-  g1,g2end... = f.g
-  newf = [f1*a,f2end...]
-  newg = [g1*a,g2end...]
-  GenericTProductDiffEval(f.op,newf,newg,f.summation)
-end
-Base.:*(a::Number,f::GenericTProductDiffEval) = f*a
-Base.:/(f::GenericTProductDiffEval,a::Number) = f*(1/a)
-
 # fe basis
 
 struct TProductFEBasis{DS,BS,A,B} <: FEBasis

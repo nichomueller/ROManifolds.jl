@@ -55,6 +55,7 @@ include("Snapshots.jl")
 export AbstractTTCore
 export SparseCore
 export SparseCoreCSC
+export BlockCore
 export cat_cores
 include("TTCores.jl")
 
@@ -74,8 +75,6 @@ export gram_schmidt!
 export orth_complement!
 export orth_projection
 include("BasisConstruction.jl")
-
-include("NewTTSVD.jl")
 
 export Projection
 export SteadyProjection
