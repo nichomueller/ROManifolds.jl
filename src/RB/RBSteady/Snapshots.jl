@@ -316,7 +316,11 @@ function get_indexed_values(s::ReshapedSnapshots)
   reshape(v.data,s.size)
 end
 
-const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = BasicSnapshots{T,N,L,D,I,R,A}
+const StandardSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = BasicSnapshots{T,N,L,D,I,R,A}
+const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
+  StandardSparseSnapshots{T,N,L,D,I,R,A},
+  SnapshotsAtIndices{T,N,L,D,I,R,StandardSparseSnapshots{T,N,L,D,I,R,A}}
+}
 
 """
     select_snapshots_entries(s::AbstractSteadySnapshots,srange) -> ArrayOfArrays
@@ -492,4 +496,16 @@ function select_snapshots_entries(s::BlockSnapshots{S,N},srange::ArrayBlock{<:An
   block_map = BlockMap(size(s),active_block_ids)
   active_block_snaps = [select_snapshots_entries(s[n],srange[n]) for n in active_block_ids]
   return_cache(block_map,active_block_snaps...)
+end
+
+# utils
+
+function select_snapshots(a::ArrayContribution,args...;kwargs...)
+  contribution(a.trians) do trian
+    select_snapshots(a[trian],args...;kwargs...)
+  end
+end
+
+function select_snapshots(a::TupOfArrayContribution,args...;kwargs...)
+  map(a->select_snapshots(a,args...;kwargs...),a)
 end

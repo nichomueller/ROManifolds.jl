@@ -77,7 +77,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 # solvers
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_res=20,nsnaps_jac=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
 # RB method
@@ -105,3 +105,32 @@ fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+
+# using Gridap.FESpaces
+# red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+# op = get_algebraic_operator(feop)
+# pop = TransientPGOperator(op,red_trial,red_test)
+# smdeim = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
+# jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
+
+# isa(jjac[1][1],
+#   RBTransient.TransientSnapshotsAtIndices{T,N,L,D,I,R,
+#   <:RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,<:MatrixOfSparseMatricesCSC},B,C
+#   } where {T,N,L,D,I,R,B,C})
+# isa(jjac[1][1],TransientSparseSnapshots)
+
+# const _TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC,B,C} = Union{
+#   RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,A},
+#   RBTransient.TransientSnapshotsAtIndices{T,N,L,D,I,R,
+#   RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,A},B,C}
+# }
+# isa(jjac[1][1],_TransientSparseSnapshots)
+
+# S1{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,A}
+# SSSS2{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
+#   S1{T,N,L,D,I,R,A},RBTransient.TransientSnapshotsAtIndices{T,N,L,D,I,R,<:S1{T,N,L,D,I,R,A}}
+# }
+
+# const S1{T,N,L,D,I,R} = RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,<:MatrixOfSparseMatricesCSC}
+# # const S2{T,N,L,D,I,R}
+# isa(jjac[1][1],SSSS2)

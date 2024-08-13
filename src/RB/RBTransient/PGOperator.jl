@@ -152,7 +152,10 @@ function Algebra.jacobian!(
 end
 
 function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientRBOperator,s)
-  jacobian_and_residual(get_fe_solver(solver),op.op,s)
+  jac,res = jacobian_and_residual(get_fe_solver(solver),op.op,s)
+  jac′ = select_snapshots(jac,RBSteady.jac_params(solver))
+  res′ = select_snapshots(res,RBSteady.res_params(solver))
+  return jac′,res′
 end
 
 function RBSteady.jacobian_and_residual(fesolver::ODESolver,odeop::ODEParamOperator,s)
