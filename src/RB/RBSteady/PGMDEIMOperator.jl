@@ -93,7 +93,9 @@ function ParamSteady.update_paramcache!(
   op::PGMDEIMOperator,
   r::ParamRealization)
 
-  update_odeopcache!(paramcache,op.op,r)
+  @warn "For performance reasons, it would be best to update the cache at the very
+    start of the online phase"
+  update_paramcache!(paramcache,op.op,r)
 end
 
 function Algebra.residual!(
@@ -127,17 +129,75 @@ function jacobian_and_residual(solver::RBSolver,op::PGMDEIMOperator,s)
   jacobian_and_residual(fesolver,op,r,x)
 end
 
+function select_fe_space_at_indices(fs::FESpace,indices)
+  @notimplemented
+end
+
+function select_fe_space_at_indices(fs::TrivialParamFESpace,indices)
+  TrivialParamFESpace(fs.space,Val(length(indices)))
+end
+
+function select_fe_space_at_indices(fs::SingleFieldParamFESpace,indices)
+  dvi = ConsecutiveArrayOfArrays(fs.dirichlet_values.data[:,indices])
+  TrialParamFESpace(dvi,fs.space)
+end
+
+function select_cache_at_indices(u::ConsecutiveArrayOfArrays,paramcache,indices)
+  @unpack Us,Ups,pfeopcache,form = paramcache
+  new_Us = select_fe_space_at_indices(Us,indices)
+  new_XhF = ConsecutiveArrayOfArrays(u.data[:,indices])
+  new_paramcache = ParamOpFromFEOpCache(new_Us,Uts,tfeopcache,const_forms)
+  return new_xhF,new_paramcache
+end
+
+function select_cache_at_indices(us::BlockVectorOfVectors,odeopcache,indices)
+  @unpack Us,Ups,pfeopcache,form = paramcache
+  VT = Us.vector_type
+  style = Us.multi_field_style
+  spaces = select_fe_space_at_indices(Us,indices)
+  new_Us = MultiFieldFESpace(VT,spaces,style)
+  new_XhF = mortar([ConsecutiveArrayOfArrays(b.data[:,indices]) for b in blocks(u)])
+  new_paramcache = ParamOpFromFEOpCache(new_Us,Uts,tfeopcache,const_forms)
+  return new_xhF,new_paramcache
+end
+
+function select_slvrcache_at_indices(b::ConsecutiveArrayOfArrays,indices)
+  ConsecutiveArrayOfArrays(b.data[:,indices])
+end
+
+function select_slvrcache_at_indices(A::MatrixOfSparseMatricesCSC,indices)
+  MatrixOfSparseMatricesCSC(A.m,A.n,A.colptr,A.rowval,A.data[:,indices])
+end
+
+function select_slvrcache_at_indices(A::BlockArrayOfArrays,indices)
+  map(a -> select_slvrcache_at_indices(a,indices),blocks(A)) |> mortar
+end
+
+function select_slvrcache_at_indices(cache::ArrayContribution,indices)
+  contribution(cache.trians) do trian
+    select_slvrcache_at_indices(cache[trian],indices)
+  end
+end
+
+function select_fe_quantities_at_indices(cache,r,u,param_indices)
+  slvrcache,paramcache = cache
+  red_r = r[param_indices]
+  red_cache = select_slvrcache_at_indices(cache,indices)
+  red_u,red_paramcache = select_cache_at_indices(u,paramcache,indices)
+  return red_cache,red_r,red_u,red_paramcache
+end
+
 # selects the entries of the snapshots relevant to the reduced integration domain
 # in `a`
-function _select_snapshots_at_space_locations(s,a)
+function _select_snapshots_at_indices(s,a)
   ids_space = get_indices_space(a)
   select_snapshots_entries(s,ids_space)
 end
 
-function _select_snapshots_at_space_locations(
+function _select_snapshots_at_indices(
   s::ArrayContribution,a::AffineContribution)
   contribution(s.trians) do trian
-    _select_snapshots_at_space_time_locations(s[trian],a[trian])
+    _select_snapshots_at_indices(s[trian],a[trian])
   end
 end
 
@@ -149,7 +209,7 @@ function fe_jacobian!(
   paramcache)
 
   A = jacobian!(cache,op.op,r,u,paramcache)
-  Ai = _select_snapshots_at_space_locations(A,op.lhs)
+  Ai = _select_snapshots_at_indices(A,op.lhs)
   return Ai
 end
 
@@ -161,7 +221,7 @@ function fe_residual!(
   paramcache)
 
   b = residual!(cache,op.op,r,u,paramcache)
-  bi = _select_snapshots_at_space_locations(b,op.rhs)
+  bi = _select_snapshots_at_indices(b,op.rhs)
   return bi
 end
 
