@@ -22,6 +22,26 @@ function ParamSteady.get_nonlinear_operator(odeop::ODEParamOpFromTFEOp)
   ODEParamOpFromTFEOp(get_nonlinear_operator(odeop.op))
 end
 
+function ParamSteady.allocate_ode_spaces(
+  odeop::ODEParamOpFromTFEOp,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}})
+
+  order = get_order(odeop)
+  pttrial = get_trial(odeop.op)
+  trial = allocate_space(pttrial,r)
+  pttrials = (pttrial,)
+  trials = (trial,)
+  for k in 1:order
+    pttrials = (pttrials...,∂t(pttrials[k]))
+    trials = (trials...,allocate_space(pttrials[k+1],r))
+  end
+
+  tfeopcache = allocate_tfeopcache(odeop.op,r,us)
+
+  ODEOpFromTFEOpCache(trials,pttrials,tfeopcache,nothing)
+end
+
 function ODEs.allocate_odeopcache(
   odeop::ODEParamOpFromTFEOp,
   r::TransientParamRealization,
@@ -312,6 +332,26 @@ end
 
 function ParamSteady.change_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
   ODEParamOpFromTFEOpWithTrian(change_triangulation(odeop.op,trians_rhs,trians_lhs))
+end
+
+function allocate_ode_spaces(
+  odeop::ODEParamOpFromTFEOpWithTrian,
+  r::TransientParamRealization,
+  us::Tuple{Vararg{AbstractVector}})
+
+  order = get_order(odeop)
+  pttrial = get_trial(odeop.op)
+  trial = allocate_space(pttrial,r)
+  pttrials = (pttrial,)
+  trials = (trial,)
+  for k in 1:order
+    pttrials = (pttrials...,∂t(pttrials[k]))
+    trials = (trials...,allocate_space(pttrials[k+1],r))
+  end
+
+  tfeopcache = allocate_tfeopcache(odeop.op,r,us)
+
+  ODEOpFromTFEOpCache(trials,pttrials,tfeopcache,nothing)
 end
 
 function ODEs.allocate_odeopcache(
