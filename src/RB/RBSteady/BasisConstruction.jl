@@ -124,11 +124,11 @@ end
 # We are not interested in the last dimension (corresponds to the parameter).
 # Note: when X is provided as norm matrix, ids_range has length 1, so we actually
 # are not computing a cholesky decomposition numerous times
-function ttsvd!(cache,mat::AbstractArray{T,N};ids_range=1:N-1,kwargs...) where {T,N}
+function ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...) where {T,N}
   cores,ranks,sizes = cache
   for d in ids_range
     mat_d = reshape(mat,ranks[d]*sizes[d],:)
-    Ur,Σr,Vr = _tpod(mat_d;kwargs...)
+    Ur,Σr,Vr = _tpod(mat_d,args...;kwargs...)
     rank = size(Ur,2)
     ranks[d+1] = rank
     mat = reshape(Σr.*Vr',rank,sizes[d+1],:)
@@ -153,24 +153,20 @@ end
 
 function ttsvd!(cache,mat::AbstractArray{T,N},X::AbstractRankTensor;ids_range=1:N,kwargs...) where {T,N}
   cores,ranks,sizes = cache
-  K = rank(X)
-  ids_range′ = first(ids_range):last(ids_range)-1
-  cores′ = cores[ids_range′]
-  ranks′ = ranks[ids_range′]
-  k_cores = fill(cores′,K)
-  k_ranks = fill(ranks′,K)
-  mats = ()
-  for k in 1:K
-    ck = k_cores[k]
-    rk = k_ranks[k]
-    Xk = X[k]
-    mat_k = ttsvd!((ck,rk,sizes),mat,Xk;ids_range=ids_range′,kwargs...)
-    mats = (mats...,mat_k)
+  cores_k,mats = map(1:rank(X)) do k
+    cores_k = copy(cores[ids_range])
+    ranks_k = copy(ranks)
+    mat_k = ttsvd!((cores_k,ranks_k,sizes),mat,X[k];ids_range,kwargs...)
+    cores_k,mat_k
+  end |> tuple_of_arrays
+  for d in ids_range
+    touched = d == first(ids_range) ? fill(true,rank(X)) : I(rank(X))
+    cores_d = getindex.(cores_k,d)
+    cores[d] = BlockCore(cores_d,touched)
   end
-  cores′ .= BlockCore.(k_cores)
-  R = orthogonalize!(cores′,X)
-  mat = vec(mats...)
-  return absorb(mat,R)
+  R = orthogonalize!(cores,ranks,X;ids_range)
+  mat = absorb(cat(mats...;dims=1),R)
+  return mat
 end
 
 function pivoted_qr(A;tol=1e-10)
@@ -181,19 +177,23 @@ function pivoted_qr(A;tol=1e-10)
   return Q,R
 end
 
-function orthogonalize!(cores,X::AbstractTProductTensor)
+function orthogonalize!(cores,ranks,X::AbstractTProductTensor;ids_range=eachindex(cores))
   weight = ones(1,rank(X),1)
-  for (d,core) in enumerate(cores)
-    if d == length(cores)
+  decomp = get_decomposition(X)
+  for d in ids_range
+    core = cores[d]
+    if d == last(ids_range)
       XW = _get_norm_matrix_from_weight(X,weight)
       core′,R = reduce_rank(core,XW)
       cores[d] = core′
+      ranks[d+1] = size(core′,3)
       return R
     end
     next_core = cores[d+1]
-    Xd = get_decomposition(X,d)
+    Xd = getindex.(decomp,d)
     core′,R = reduce_rank(core)
     cores[d] = core′
+    ranks[d+1] = size(core′,3)
     cores[d+1] = absorb(next_core,R)
     weight = _weight_array(weight,core′,Xd)
   end
@@ -247,13 +247,12 @@ function _weight_array(weight,core,X)
   return W
 end
 
-function _get_norm_matrix_from_weights(X::AbstractRankTensor,weights)
+function _get_norm_matrix_from_weight(X::AbstractRankTensor,WD)
   K = rank(X)
-  WD = map(k -> weights[k][end],1:K)
   XD = map(k -> X[k][end],1:K)
-  XW = kron(XD[1],WD[1])
+  XW = kron(XD[1],WD[:,1,:])
   @inbounds for k = 2:K
-    XW += kron(XD[k],WD[k])
+    XW += kron(XD[k],WD[:,k,:])
   end
   @. XW = (XW+XW')/2 # needed to eliminate roundoff errors
   return sparse(XW)

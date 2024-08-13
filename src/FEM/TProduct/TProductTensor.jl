@@ -221,6 +221,5 @@ function LinearAlgebra.kron(a::AbstractRank1Tensor)
 end
 
 function LinearAlgebra.kron(a::AbstractRankTensor)
-  b = sum(get_decomposition(a))
-  kron(reverse(b)...)
+  sum([kron(get_decomposition(a,k)) for k in eachindex(a)])
 end

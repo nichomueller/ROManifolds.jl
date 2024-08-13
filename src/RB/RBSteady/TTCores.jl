@@ -72,63 +72,62 @@ end
 
 # block cores
 
-struct BlockCore{T,N,D,A<:AbstractArray{T,D},BS} <: AbstractArray{T,D}
+struct BlockCore{T,D,A<:AbstractArray{T,D},BS} <: AbstractArray{T,D}
   array::Vector{A}
-  touched::Array{Bool,N}
   axes::BS
-  function BlockCore(array::Vector{A},touched::Array{Bool,N},axes::BS) where {T,N,D,A<:AbstractArray{T,D},BS}
+  function BlockCore(array::Vector{A},axes::BS) where {T,D,A<:AbstractArray{T,D},BS<:NTuple}
     @assert all((size(a,2)==size(first(array),2) for a in array))
-    new{T,N,D,A,BS}(array,touched,axes)
+    new{T,D,A,BS}(array,axes)
   end
 end
 
-function BlockCore(array::Vector{<:AbstractArray},touched::AbstractArray{Bool})
+function BlockCore(array::Vector{<:AbstractArray},touched::AbstractArray{Bool}=I(length(array)))
   block_sizes = _sizes_from_blocks(array,touched)
   axes = map(blockedrange,block_sizes)
-  BlockCore(array,touched,axes)
+  BlockCore(array,axes)
 end
 
 function BlockCore(array::Vector{<:Vector{<:AbstractArray}})
-  cores = BlockCore[]
-  n = length(array)
-  touched = fill(true,n)
-  core = BlockCore(first.(array),touched)
-  push!(cores,core)
-  for k = 2:length(first(array))
-    touched = fill(true,(n,n))
-    core = BlockCore(getindex.(array,k),touched)
-    push!(cores,core)
+  N = length(array)
+  map(eachindex(first(array))) do n
+    touched = n == 1 ? fill(true,N) : I(N)
+    arrays_n = getindex.(array,n)
+    BlockCore(arrays_n,touched)
   end
-  return cores
 end
 
-const BlockVectorCore{T,D,A<:AbstractArray{T,D}} = BlockCore{T,1,D,A}
-const BlockMatrixCore{T,D,A<:AbstractArray{T,D}} = BlockCore{T,2,D,A}
-const BlockVectorCore3D{T} = BlockVectorCore{T,3,Array{T,3}}
-const BlockMatrixCore3D{T} = BlockMatrixCore{T,3,Array{T,3}}
+const BlockCore3D{T} = BlockCore{T,3,Array{T,3}}
 
 Base.size(a::BlockCore) = map(length,axes(a))
 Base.axes(a::BlockCore) = a.axes
 
-function Base.getindex(a::BlockVectorCore3D{T},i::Vararg{Integer,3}) where T
+function Base.getindex(a::BlockCore3D,i::Vararg{Integer,3})
+  if size(a,1) == 1
+    _getindex_vector(a,i...)
+  else
+    _getindex_matrix(a,i...)
+  end
+end
+
+function _getindex_vector(a::BlockCore3D,i::Vararg{Integer,3})
   i1,i2,i3 = i
   @assert i1 == 1
   b3 = BlockArrays.findblockindex(axes(a,3),i3)
   a.array[b3.I...][i1,i2,b3.α...]
 end
 
-function Base.getindex(a::BlockMatrixCore3D{T},i::Vararg{Integer,3}) where T
+function _getindex_matrix(a::BlockCore3D,i::Vararg{Integer,3})
   i1,i2,i3 = i
   b1 = BlockArrays.findblockindex(axes(a,1),i1)
   b3 = BlockArrays.findblockindex(axes(a,3),i3)
   if b1.I == b3.I
     a.array[b1.I...][b1.α...,i2,b3.α...]
   else
-    zero(T)
+    zero(eltype(a))
   end
 end
 
-function _sizes_from_blocks(a::Vector{<:AbstractArray},touched::Vector{Bool})
+function _sizes_from_blocks(a::Vector{<:AbstractArray},touched::AbstractVector{Bool})
   s1 = fill(1,length(a))
   s2 = fill(size(a[1],2),length(a))
   s3 = map(a -> size(a,3),a)
@@ -139,7 +138,7 @@ function _sizes_from_blocks(a::Vector{<:AbstractArray},touched::Vector{Bool})
   return (s1,s2,s3)
 end
 
-function _sizes_from_blocks(a::Vector{<:AbstractArray},touched::Matrix{Bool})
+function _sizes_from_blocks(a::Vector{<:AbstractArray},touched::AbstractMatrix{Bool})
   s1 = map(a -> size(a,1),a)
   s2 = fill(size(a[1],2),length(a))
   s3 = map(a -> size(a,3),a)
