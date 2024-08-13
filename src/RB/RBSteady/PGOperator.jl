@@ -146,10 +146,10 @@ settings, the jacobians are ntuples of order `N`, with `N` equal to the order of
 the time derivative
 
 """
-function RBSteady.jacobian_and_residual(solver::RBSolver,op::RBOperator,s)
+function jacobian_and_residual(solver::RBSolver,op::RBOperator,s)
   fesolver = get_fe_solver(solver)
-  sjac = select_snapshots(s,RBSteady.jac_params(solver))
-  sres = select_snapshots(s,RBSteady.res_params(solver))
+  sjac = select_snapshots(s,jac_params(solver))
+  sres = select_snapshots(s,res_params(solver))
   us_jac,us_res = get_values(sjac),get_values(sres)
   r_jac,r_res = get_realization(sjac),get_realization(sres)
   A = jacobian(fesolver,op.op,r_jac,us_jac)
