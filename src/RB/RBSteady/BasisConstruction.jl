@@ -205,7 +205,8 @@ function reduce_rank(core::AbstractArray{T,3},X::AbstractMatrix) where T
   mat = reshape(core,:,size(core,3))
   Xmat = L'*mat[p,:]
   Q̃,R = pivoted_qr(Xmat)
-  core′ = reshape((L'\Q̃)[invperm(p),:],size(core,1),size(core,2),:)
+  Q = (L'\Q̃)[invperm(p),:]
+  core′ = reshape(Q,size(core,1),size(core,2),:)
   return core′,R
 end
 
@@ -332,7 +333,7 @@ end
 
 _norm(v::AbstractVector,args...) = norm(v)
 _norm(v::AbstractVector,X::AbstractMatrix) = sqrt(v'*X*v)
-_norm(a::AbstractArray,X::AbstractTProductTensor) = sqrt(vec(a)'*vec(X*v))
+_norm(a::AbstractArray,X::AbstractTProductTensor) = sqrt(vec(a)'*vec(X*a))
 
 """
     gram_schmidt!(mat::AbstractMatrix, basis::AbstractMatrix, args...) -> AbstractMatrix

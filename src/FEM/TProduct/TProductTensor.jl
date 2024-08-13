@@ -174,44 +174,50 @@ end
 
 # linear algebra
 
-function Base.:*(a::AbstractRank1Tensor,b::AbstractArray{T,N}) where {T,N}
-  @check length(a) == N
-  @check all((size(a[i],2) == size(b,i)) for i = 1:N)
-  c = similar(b,ntuple(i->size(a[i],1),Val{N}()))
-  for i = 1:N
-    bi = eachslice(b,dims=i)
-    ci = eachslice(c,dims=i)
-    ci .= get_factor(a,i)*bi
-  end
-  return c
-end
+for T in (:AbstractMatrix,:AbstractArray)
+  @eval begin
+    function Base.:*(a::AbstractRank1Tensor,b::$T)
+      N = ndims(b)
+      @check length(a) == N
+      @check all((size(a[i],2) == size(b,i)) for i = 1:N)
+      c = similar(b,ntuple(i->size(a[i],1),Val{N}()))
+      for i = 1:N
+        bi = eachslice(b,dims=i)
+        ci = eachslice(c,dims=i)
+        ci .= a[i]*bi
+      end
+      return c
+    end
 
-function Base.:*(a::AbstractArray{T,N},b::AbstractRank1Tensor) where {T,N}
-  @check length(b) == N
-  @check all((size(a,i) == size(b[i],1)) for i = 1:N)
-  c = similar(a,ntuple(i->size(b[i],2),Val{N}()))
-  for i = 1:N
-    ai = eachslice(a,dims=i)
-    ci = eachslice(c,dims=i)
-    ci .= ai*get_factor(b,i)
-  end
-  return c
-end
+    function Base.:*(a::$T,b::AbstractRank1Tensor)
+      N = ndims(a)
+      @check length(b) == N
+      @check all((size(a,i) == size(b[i],1)) for i = 1:N)
+      c = similar(a,ntuple(i->size(b[i],2),Val{N}()))
+      for i = 1:N
+        ai = eachslice(a,dims=i)
+        ci = eachslice(c,dims=i)
+        ci .= ai*b[i]
+      end
+      return c
+    end
 
-function Base.:*(a::AbstractRankTensor,b::AbstractArray{T,N}) where {T,N}
-  c = get_decomposition(a,1)*b
-  for k = 2:rank(a)
-    c += get_decomposition(a,k)*b
-  end
-  return c
-end
+    function Base.:*(a::AbstractRankTensor,b::$T)
+      c = get_decomposition(a,1)*b
+      for k = 2:rank(a)
+        c += get_decomposition(a,k)*b
+      end
+      return c
+    end
 
-function Base.:*(a::AbstractArray{T,N},b::AbstractRankTensor) where {T,N}
-  c = a*get_decomposition(b,1)
-  for k = 2:rank(b)
-    c += a*get_decomposition(b,k)
+    function Base.:*(a::$T,b::AbstractRankTensor)
+      c = a*get_decomposition(b,1)
+      for k = 2:rank(b)
+        c += a*get_decomposition(b,k)
+      end
+      return c
+    end
   end
-  return c
 end
 
 # to global array - should try avoiding using these functions

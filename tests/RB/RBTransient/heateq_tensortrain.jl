@@ -82,7 +82,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=5,nsnaps_test=5,nsnaps_mdeim=2)
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=5,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
 fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
@@ -174,13 +174,14 @@ c2 = BlockCore([cores1[2],cores2[2]],[true false
   false true])
 c3 = cores1[end]
 
-weights = Vector{Array{T,3}}(undef,1)
+# weights = Vector{Array{T,3}}(undef,1)
 c1′,r1 = RBSteady.reduce_rank(c1)
 c2′ = RBSteady.absorb(c2,r1)
-_weight_array!(weights,[c1′,c2′],X,Val{1}())
-XW = RBSteady._get_norm_matrix_from_weight(X,weights[end])
-c2′,r2 = RBSteady.reduce_rank(c2′,XW)
-c3′ = RBSteady.absorb(c3,r2)
+# _weight_array!(weights,[c1′,c2′],X,Val{1}())
+# XW = RBSteady._get_norm_matrix_from_weight(X,weights[end])
+# c2′,r2 = RBSteady.reduce_rank(c2′,XW)
+c2′,r2 = RBSteady.reduce_rank(c2′)
+c3′,_ = RBSteady.reduce_rank(RBSteady.absorb(c3,r2))
 
 Φs′ = cores2basis(c1′,c2′)
 Φs′'*kron(X)*Φs′
@@ -188,6 +189,8 @@ c3′ = RBSteady.absorb(c3,r2)
 
 s = flatten_snapshots(fesnaps)
 s - Φs′*Φs′'*kron(X)*s
+sst - Φst′*Φst′'*Xst*sst
+sst - Φst′*Φst′'*sst
 
 # XW = RBSteady._get_norm_matrix_from_weights(X,weights)
 # with ttsvd
@@ -234,9 +237,88 @@ absorb(mat,R)
 # weight = RBSteady._weight_array(weight,core′,Xd)
 
 cores = ttsvd(fesnaps,X)
-RBSteady.check_orthogonality(cores,kron(kron(X),I(10)))
 
-Xglobal = kron(I(10),kron(X)) #kron(I(10),kron(X))
-basis = dropdims(RBSteady._cores2basis(cores...);dims=1)
+Xglobal = kron(I(10),kron(X))
+basis = cores2basis(cores...)
 basis'*Xglobal*basis
-Φst′'*Xglobal*Φst′
+
+S = copy(fesnaps)
+SST = reshape(S,:,10)
+ee = SST - basis*basis'*Xst*SST
+
+bbasis = reduced_basis(fesnaps,X)
+# more tests
+function _orthogonalize!(cores,X::AbstractTProductTensor)
+  weight = ones(1,rank(X),1)
+  decomp = get_decomposition(X)
+  for d in eachindex(cores)
+    core = cores[d]
+    if d == length(cores)
+      core′,R = RBSteady.reduce_rank(core)
+      cores[d] = core′
+      return
+    end
+    next_core = cores[d+1]
+    Xd = getindex.(decomp,d)
+    if d == rank(X)
+      XW = RBSteady._get_norm_matrix_from_weight(X,weight)
+      core′,R = RBSteady.reduce_rank(core,XW)
+    else
+      core′,R = RBSteady.reduce_rank(core)
+      weight = RBSteady._weight_array(weight,core′,Xd)
+    end
+    cores[d] = core′
+    # ranks[d+1] = size(core′,3)
+    cores[d+1] = RBSteady.absorb(next_core,R)
+  end
+end
+
+function _orthogonalize!(cores)
+  for d in eachindex(cores)
+    core = cores[d]
+    if d == length(cores)
+      core′,R = RBSteady.reduce_rank(core)
+      cores[d] = core′
+      return
+    end
+    next_core = cores[d+1]
+    core′,R = RBSteady.reduce_rank(core)
+    cores[d] = core′
+    cores[d+1] = RBSteady.absorb(next_core,R)
+  end
+end
+
+mat = fesnaps
+cores1 = ttsvd(mat,X[1])
+cores2 = ttsvd(mat,X[2])
+
+core_block_1 = BlockCore([cores1[1],cores2[1]],[true,true])
+core_block_2 = BlockCore([cores1[2],cores2[2]],I(2))
+core_block_3 = BlockCore([cores1[3],cores2[3]],I(2))
+
+allcores = Array{Float64}.([core_block_1,core_block_2,core_block_3])
+_orthogonalize!(allcores,X)
+
+Xglobal = kron(I(10),kron(X))
+basis = cores2basis(allcores...)
+basis'*Xglobal*basis
+
+ee = SST - basis*basis'*Xglobal*SST
+
+allcores = Array{Float64}.([core_block_1,core_block_2,core_block_3])
+_orthogonalize!(allcores)
+
+basis = cores2basis(allcores...)
+basis'*basis
+eest = SST - basis*basis'*SST
+
+# basis = cores2basis(allcores[1:2]...)
+# basis'*basis
+# eest = s - basis*basis'*s
+
+basis_space = truncated_pod(s)
+compressed_s2 = compress(s,basis_space;swap_mode=true)
+basis_time = truncated_pod(compressed_s2)
+basis_spacetime = kron(basis_time,basis_space)
+
+SST - basis_spacetime*basis_spacetime'*SST
