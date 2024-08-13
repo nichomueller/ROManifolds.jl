@@ -197,6 +197,12 @@ struct SnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractSteadySnapshots{T,N,L,D,I,R},B<
   prange::B
 end
 
+function SnapshotsAtIndices(s::SnapshotsAtIndices,prange)
+  old_prange = s.prange
+  @check intersect(old_prange,prange) == prange
+  SnapshotsAtIndices(s.snaps,prange)
+end
+
 param_indices(s::SnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
 ParamDataStructures.param_data(s::SnapshotsAtIndices) = param_data(s.snaps)
@@ -238,8 +244,9 @@ Base.@propagate_inbounds function Base.setindex!(
 end
 
 format_range(a::AbstractUnitRange,l::Int) = a
-format_range(a::Number,l::Int) = Base.OneTo(a)
-format_range(a::Colon,l::Int) = Base.OneTo(l)
+format_range(a::Base.OneTo{Int},l::Int) = 1:a.stop
+format_range(a::Number,l::Int) = a:a
+format_range(a::Colon,l::Int) = 1:l
 
 """
     select_snapshots(s::AbstractSteadySnapshots,prange) -> SnapshotsAtIndices
@@ -250,12 +257,6 @@ the indices `trange` and `prange` in transient cases, while leaving the spatial
 entries intact. The restriction operation is lazy.
 
 """
-function select_snapshots(s::SnapshotsAtIndices,prange)
-  old_prange = s.prange
-  @check intersect(old_prange,prange) == prange
-  SnapshotsAtIndices(s.snaps,prange)
-end
-
 function select_snapshots(s::AbstractSteadySnapshots,prange)
   prange = format_range(prange,num_params(s))
   SnapshotsAtIndices(s,prange)

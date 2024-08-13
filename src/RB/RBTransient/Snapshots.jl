@@ -213,6 +213,13 @@ struct TransientSnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractTransientSnapshots{T,N
   prange::C
 end
 
+function TransientSnapshotsAtIndices(s::TransientSnapshotsAtIndices,trange,prange)
+  old_trange,old_prange = s.trange,s.prange
+  @check intersect(old_trange,trange) == trange
+  @check intersect(old_prange,prange) == prange
+  TransientSnapshotsAtIndices(s.snaps,trange,prange)
+end
+
 function RBSteady.Snapshots(s::TransientSnapshotsAtIndices,i::AbstractIndexMap,r::TransientParamRealization)
   snaps = Snapshots(s.snaps,i,r)
   TransientSnapshotsAtIndices(snaps,s.trange,s.prange)
@@ -321,20 +328,13 @@ function RBSteady.flatten_snapshots(s::Union{TransientSnapshots,TransientSnapsho
   flatten_snapshots(sbasic)
 end
 
-function RBSteady.select_snapshots(s::TransientSnapshotsAtIndices,trange,prange)
-  old_trange,old_prange = s.trange,s.prange
-  @check intersect(old_trange,trange) == trange
-  @check intersect(old_prange,prange) == prange
-  TransientSnapshotsAtIndices(s.snaps,trange,prange)
-end
-
 function RBSteady.select_snapshots(s::AbstractTransientSnapshots,trange,prange)
   trange = RBSteady.format_range(trange,num_times(s))
   prange = RBSteady.format_range(prange,num_params(s))
   TransientSnapshotsAtIndices(s,trange,prange)
 end
 
-function RBSteady.select_snapshots(s::AbstractTransientSnapshots,prange;trange=Base.OneTo(num_times(s)))
+function RBSteady.select_snapshots(s::AbstractTransientSnapshots,prange;trange=1:num_times(s))
   select_snapshots(s,trange,prange)
 end
 

@@ -30,9 +30,9 @@ function truncated_svd(mat::AbstractMatrix;randomized=false,kwargs...)
   select_modes(U,Σ,V;kwargs...)
 end
 
- _size_condition(mat::AbstractMatrix) = false #(
-#   length(mat) > 1e6 && (size(mat,1) > 1e2*size(mat,2) || size(mat,2) > 1e2*size(mat,1))
-#   )
+ _size_condition(mat::AbstractMatrix) = (
+    length(mat) > 1e6 && (size(mat,1) > 1e2*size(mat,2) || size(mat,2) > 1e2*size(mat,1))
+    )
 
 
 """
