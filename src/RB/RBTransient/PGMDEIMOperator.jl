@@ -134,25 +134,12 @@ function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientPGMDEIMOpe
   jacobian_and_residual(fesolver,op,r,(x,),odecache)
 end
 
-function _select_fe_space_at_time_locations(fs::FESpace,indices)
-  @notimplemented
-end
-
-function _select_fe_space_at_time_locations(fs::TrivialParamFESpace,indices)
-  TrivialParamFESpace(fs.space,Val(length(indices)))
-end
-
-function _select_fe_space_at_time_locations(fs::SingleFieldParamFESpace,indices)
-  dvi = ConsecutiveArrayOfArrays(fs.dirichlet_values.data[:,indices])
-  TrialParamFESpace(dvi,fs.space)
-end
-
-function _select_odecache_at_time_locations(us::Tuple{Vararg{ConsecutiveArrayOfArrays}},odeopcache,indices)
+function RBSteady.select_cache_at_indices(us::Tuple{Vararg{ConsecutiveArrayOfArrays}},odeopcache,indices)
   @unpack Us,Uts,tfeopcache,const_forms = odeopcache
   new_xhF = ()
   new_Us = ()
   for i = eachindex(us)
-    new_Us = (new_Us...,_select_fe_space_at_time_locations(Us[i],indices))
+    new_Us = (new_Us...,RBSteady.select_fe_space_at_indices(Us[i],indices))
     new_XhF_i = ConsecutiveArrayOfArrays(us[i].data[:,indices])
     new_xhF = (new_xhF...,new_XhF_i)
   end
@@ -160,7 +147,7 @@ function _select_odecache_at_time_locations(us::Tuple{Vararg{ConsecutiveArrayOfA
   return new_xhF,new_odeopcache
 end
 
-function _select_odecache_at_time_locations(us::Tuple{Vararg{BlockVectorOfVectors}},odeopcache,indices)
+function RBSteady.select_cache_at_indices(us::Tuple{Vararg{BlockVectorOfVectors}},odeopcache,indices)
   @unpack Us,Uts,tfeopcache,const_forms = odeopcache
   new_xhF = ()
   new_Us = ()
@@ -168,7 +155,7 @@ function _select_odecache_at_time_locations(us::Tuple{Vararg{BlockVectorOfVector
     spacei = Us[i]
     VT = spacei.vector_type
     style = spacei.multi_field_style
-    spacesi = [_select_fe_space_at_time_locations(spaceij,indices) for spaceij in spacei]
+    spacesi = [RBSteady.select_fe_space_at_indices(spaceij,indices) for spaceij in spacei]
     new_Us = (new_Us...,MultiFieldFESpace(VT,spacesi,style))
     new_XhF_i = mortar([ConsecutiveArrayOfArrays(us_i.data[:,indices]) for us_i in blocks(us[i])])
     new_xhF = (new_xhF...,new_XhF_i)
@@ -177,44 +164,25 @@ function _select_odecache_at_time_locations(us::Tuple{Vararg{BlockVectorOfVector
   return new_xhF,new_odeopcache
 end
 
-function _select_cache_at_time_locations(b::ConsecutiveArrayOfArrays,indices)
-  ConsecutiveArrayOfArrays(b.data[:,indices])
-end
-
-function _select_cache_at_time_locations(A::MatrixOfSparseMatricesCSC,indices)
-  MatrixOfSparseMatricesCSC(A.m,A.n,A.colptr,A.rowval,A.data[:,indices])
-end
-
-function _select_cache_at_time_locations(A::BlockArrayOfArrays,indices)
-  map(a -> _select_cache_at_time_locations(a,indices),blocks(A)) |> mortar
-end
-
-function _select_cache_at_time_locations(cache::ArrayContribution,indices)
-  contribution(cache.trians) do trian
-    _select_cache_at_time_locations(cache[trian],indices)
-  end
-end
-
-function _select_cache_at_time_locations(cache::TupOfArrayContribution,indices)
+function RBSteady.select_slvrcache_at_indices(cache::TupOfArrayContribution,indices)
   red_cache = ()
   for c in cache
-    red_cache = (red_cache...,_select_cache_at_time_locations(c,indices))
+    red_cache = (red_cache...,RBSteady.select_slvrcache_at_indices(c,indices))
   end
   return red_cache
 end
 
-function _select_fe_quantities_at_time_locations(cache,a,r,us,odeopcache)
+function RBSteady.select_fe_quantities_at_indices(cache,r,us,odeopcache,param_ids,time_ids)
   # common temporal reduced integration domain
-  red_times = union_reduced_times(a)
-  red_r = r[:,red_times]
+  red_r = r[:,time_ids]
   # indices corresponding to the newly found temporal reduced integration domain,
   # for every parameter
-  indices = _param_time_range(collect(1:num_params(r)),red_times,num_params(r))
+  indices = _param_time_range(param_ids,time_ids,num_params(r))
   # returns the cache in the appropriate time-parameter locations
-  red_cache = _select_cache_at_time_locations(cache,indices)
+  red_cache = RBSteady.select_slvrcache_at_indices(cache,indices)
   # does the same with the stage variable `us` and the ode cache `odeopcache`
-  red_us,red_odeopcache = _select_odecache_at_time_locations(us,odeopcache,indices)
-  return red_cache,red_r,red_times,red_us,red_odeopcache
+  red_us,red_odeopcache = RBSteady.select_cache_at_indices(us,odeopcache,indices)
+  return red_cache,red_r,red_us,red_odeopcache
 end
 
 # from `red_times`, i.e. the union of all the reduced time indices across every
@@ -224,13 +192,13 @@ _time_locations(a,red_times)::Vector{Int} = filter(!isnothing,indexin(get_indice
 
 # selects the entries of the snapshots relevant to the reduced integration domain
 # in `a`
-function _select_snapshots_at_space_time_locations(s::AbstractSnapshots,a,red_times)
+function RBSteady._select_snapshots_at_indices(s::AbstractSnapshots,a,red_times)
   ids_space = RBSteady.get_indices_space(a)
   ids_time::Vector{Int} = _time_locations(a,red_times)
   select_snapshots_entries(s,ids_space,ids_time)
 end
 
-function _select_snapshots_at_space_time_locations(s::BlockSnapshots,a,red_times)
+function RBSteady._select_snapshots_at_indices(s::BlockSnapshots,a,red_times)
   ids_space = RBSteady.get_indices_space(a)
   active_block_ids = get_touched_blocks(a)
   block_map = BlockMap(size(a),active_block_ids)
@@ -239,10 +207,10 @@ function _select_snapshots_at_space_time_locations(s::BlockSnapshots,a,red_times
   select_snapshots_entries(s,ids_space,ids_time)
 end
 
-function _select_snapshots_at_space_time_locations(
+function RBSteady._select_snapshots_at_indices(
   s::ArrayContribution,a::AffineContribution,red_times)
   contribution(s.trians) do trian
-    _select_snapshots_at_space_time_locations(s[trian],a[trian],red_times)
+    RBSteady._select_snapshots_at_indices(s[trian],a[trian],red_times)
   end
 end
 
@@ -254,11 +222,13 @@ function RBSteady.fe_jacobian!(
   ws::Tuple{Vararg{Real}},
   odeopcache)
 
-  red_cache,red_r,red_times,red_us,red_odeopcache = _select_fe_quantities_at_time_locations(
-    cache,op.lhs,r,us,odeopcache)
+  red_params = 1:num_params(r)
+  red_times = union_reduced_times(op.lhs)
+  red_cache,red_r,red_us,red_odeopcache = select_fe_quantities_at_indices(
+    cache,r,us,odeopcache,red_params,red_times)
   A = jacobian!(red_cache,op.op,red_r,red_us,ws,red_odeopcache)
   Ai = map(A,op.lhs) do A,lhs
-    _select_snapshots_at_space_time_locations(A,lhs,red_times)
+    RBSteady._select_snapshots_at_indices(A,lhs,red_times)
   end
   return Ai
 end
@@ -270,10 +240,12 @@ function RBSteady.fe_residual!(
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache)
 
-  red_cache,red_r,red_times,red_us,red_odeopcache = _select_fe_quantities_at_time_locations(
-    cache,op.rhs,r,us,odeopcache)
+  red_params = 1:num_params(r)
+  red_times = union_reduced_times(op.rhs)
+  red_cache,red_r,red_us,red_odeopcache = select_fe_quantities_at_indices(
+    cache,r,us,odeopcache,red_params,red_times)
   b = residual!(red_cache,op.op,red_r,red_us,red_odeopcache)
-  bi = _select_snapshots_at_space_time_locations(b,op.rhs,red_times)
+  bi = RBSteady._select_snapshots_at_indices(b,op.rhs,red_times)
   return bi
 end
 

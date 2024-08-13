@@ -106,6 +106,7 @@ export reduced_operator
 export get_fe_trial
 export get_fe_test
 export jacobian_and_residual
+export select_fe_quantities_at_indices
 include("PGOperator.jl")
 
 export ReducedAlgebraicOperator

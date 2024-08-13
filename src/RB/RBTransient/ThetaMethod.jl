@@ -1,5 +1,70 @@
 # general nonlinear case
 
+function Algebra.residual(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator,
+  r::TransientParamRealization,
+  state0::NTuple{1,AbstractVector})
+
+  u0 = state0[1]
+
+  x = copy(u0)
+  uθ = copy(u0)
+  fill!(x,zero(eltype(x)))
+
+  dt,θ = solver.dt,solver.θ
+
+  dtθ = θ*dt
+  shift!(r,dt*(θ-1))
+
+  function us(u)
+    copy!(uθ,u)
+    shift!(uθ,r,θ,1-θ)
+    axpy!(dtθ,x,uθ)
+    (uθ,x)
+  end
+
+  odeopcache = allocate_odeopcache(odeop,r,us)
+  update_odeopcache!(odeopcache,odeop,r)
+  b = residual(odeop,r,us,odeopcache)
+  shift!(r,dt*(1-θ))
+
+  return b
+end
+
+function Algebra.jacobian(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator,
+  r::TransientParamRealization,
+  state0::NTuple{1,AbstractVector})
+
+  u0 = state0[1]
+
+  x = copy(u0)
+  uθ = copy(u0)
+  fill!(x,zero(eltype(x)))
+
+  dt,θ = solver.dt,solver.θ
+
+  dtθ = θ*dt
+  shift!(r,dt*(θ-1))
+
+  function us(u)
+    copy!(uθ,u)
+    shift!(uθ,r,θ,1-θ)
+    axpy!(dtθ,x,uθ)
+    (uθ,x)
+  end
+  ws = (1,1/dtθ)
+
+  odeopcache = allocate_odeopcache(odeop,r,us)
+  update_odeopcache!(odeopcache,odeop,r)
+  A = jacobian(odeop,r,us,ws,odeopcache)
+  shift!(r,dt*(1-θ))
+
+  return A
+end
+
 function get_stage_operator(
   solver::ThetaMethod,
   odeop::ODEParamOperator,
@@ -70,6 +135,55 @@ function RBSteady.jacobian_and_residual(
 end
 
 # linear case
+
+function Algebra.residual(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator{LinearParamODE},
+  r::TransientParamRealization,
+  state0::NTuple{1,AbstractVector})
+
+  u0 = state0[1]
+
+  dt,θ = solver.dt,solver.θ
+
+  x = copy(u0)
+  fill!(x,zero(eltype(x)))
+  dtθ = θ*dt
+  shift!(r,dt*(θ-1))
+  us = (x,x)
+
+  odeopcache = allocate_odeopcache(odeop,r,us)
+  update_odeopcache!(odeopcache,odeop,r)
+  b = residual(odeop,r,us,odeopcache)
+  shift!(r,dt*(1-θ))
+
+  return b
+end
+
+function Algebra.jacobian(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator{LinearParamODE},
+  r::TransientParamRealization,
+  state0::NTuple{1,AbstractVector})
+
+  u0 = state0[1]
+
+  dt,θ = solver.dt,solver.θ
+
+  x = copy(u0)
+  fill!(x,zero(eltype(x)))
+  dtθ = θ*dt
+  shift!(r,dt*(θ-1))
+  us = (x,x)
+  ws = (1,1/dtθ)
+
+  odeopcache = allocate_odeopcache(odeop,r,us)
+  update_odeopcache!(odeopcache,odeop,r)
+  A = jacobian(odeop,r,us,ws,odeopcache)
+  shift!(r,dt*(1-θ))
+
+  return A
+end
 
 function get_stage_operator(
   solver::ThetaMethod,

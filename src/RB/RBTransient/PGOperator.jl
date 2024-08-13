@@ -152,18 +152,14 @@ function Algebra.jacobian!(
 end
 
 function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientRBOperator,s)
-  jac,res = jacobian_and_residual(get_fe_solver(solver),op.op,s)
-  jac′ = select_snapshots(jac,RBSteady.jac_params(solver))
-  res′ = select_snapshots(res,RBSteady.res_params(solver))
-  return jac′,res′
-end
-
-function RBSteady.jacobian_and_residual(fesolver::ODESolver,odeop::ODEParamOperator,s)
-  us = (get_values(s),)
-  r = get_realization(s)
-  odecache = allocate_odecache(fesolver,odeop,r,us)
-  A,b = jacobian_and_residual(fesolver,odeop,r,us,odecache)
-  iA = get_matrix_index_map(odeop)
-  ib = get_vector_index_map(odeop)
-  return Snapshots(A,iA,r),Snapshots(b,ib,r)
+  fesolver = get_fe_solver(solver)
+  sjac = select_snapshots(s,RBSteady.jac_params(solver))
+  sres = select_snapshots(s,RBSteady.res_params(solver))
+  us_jac,us_res = (get_values(sjac),),(get_values(sres),)
+  r_jac,r_res = get_realization(sjac),get_realization(sres)
+  A = jacobian(fesolver,op.op,r_jac,us_jac)
+  b = residual(fesolver,op.op,r_res,us_res)
+  iA = get_matrix_index_map(op.op)
+  ib = get_vector_index_map(op.op)
+  return Snapshots(A,iA,r_jac),Snapshots(b,ib,r_res)
 end
