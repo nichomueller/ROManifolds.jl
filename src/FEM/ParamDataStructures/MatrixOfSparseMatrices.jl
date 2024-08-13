@@ -105,6 +105,9 @@ function Base.copyto!(A::MatrixOfSparseMatricesCSC,B::MatrixOfSparseMatricesCSC)
   A
 end
 
+# small hack
+Base.iszero(A::MatrixOfSparseMatricesCSC) = (nnz(A) == 0)
+
 function LinearAlgebra.diag(A::MatrixOfSparseMatricesCSC{Tv,Ti},d::Integer=0) where {Tv,Ti}
   m,n = innersize(A)
   k = Int(d)

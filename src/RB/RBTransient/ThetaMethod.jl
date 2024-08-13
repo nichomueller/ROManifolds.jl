@@ -24,7 +24,7 @@ function Algebra.residual(
     (uθ,x)
   end
 
-  odeopcache = allocate_odeopcache(odeop,r,us)
+  odeopcache = allocate_ode_spaces(odeop,r,us)
   update_odeopcache!(odeopcache,odeop,r)
   b = residual(odeop,r,us,odeopcache)
   shift!(r,dt*(1-θ))
@@ -57,7 +57,7 @@ function Algebra.jacobian(
   end
   ws = (1,1/dtθ)
 
-  odeopcache = allocate_odeopcache(odeop,r,us)
+  odeopcache = allocate_ode_spaces(odeop,r,us)
   update_odeopcache!(odeopcache,odeop,r)
   A = jacobian(odeop,r,us,ws,odeopcache)
   shift!(r,dt*(1-θ))
@@ -152,7 +152,7 @@ function Algebra.residual(
   shift!(r,dt*(θ-1))
   us = (x,x)
 
-  odeopcache = allocate_odeopcache(odeop,r,us)
+  odeopcache = allocate_ode_spaces(odeop,r,us)
   update_odeopcache!(odeopcache,odeop,r)
   b = residual(odeop,r,us,odeopcache)
   shift!(r,dt*(1-θ))
@@ -177,7 +177,7 @@ function Algebra.jacobian(
   us = (x,x)
   ws = (1,1/dtθ)
 
-  odeopcache = allocate_odeopcache(odeop,r,us)
+  odeopcache = allocate_ode_spaces(odeop,r,us)
   update_odeopcache!(odeopcache,odeop,r)
   A = jacobian(odeop,r,us,ws,odeopcache)
   shift!(r,dt*(1-θ))

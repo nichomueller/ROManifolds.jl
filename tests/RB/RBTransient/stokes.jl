@@ -28,7 +28,7 @@ pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
-model_dir = datadir(joinpath("models","new_model_circle.json"))
+model_dir = datadir(joinpath("models","model_circle_short.json"))
 model = DiscreteModelFromFile(model_dir)
 labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet_noslip",["walls","walls_c","walls_p","cylinders","cylinders_c","cylinders_p"])
@@ -39,7 +39,7 @@ degree = 2*(order)+1
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
 
-a(x,μ,t) = μ[1]*exp((sin(9*π*t/(5*tf))+cos(9*π*t/(5*tf)))*x[1]/sum(μ))
+a(x,μ,t) = μ[1]*exp((sin(t)+cos(t))/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
@@ -98,18 +98,19 @@ odesolver = ThetaMethod(solver,dt,θ)
 lu_odesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(odesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-lu_rbsolver = RBSolver(lu_odesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","model_circle")))
+rbsolver = RBSolver(odesolver,ϵ;nsnaps_state=50,nsnaps_res=50,nsnaps_jac=20,nsnaps_test=10)
+lu_rbsolver = RBSolver(lu_odesolver,ϵ;nsnaps_state=50,nsnaps_res=50,nsnaps_jac=20,nsnaps_test=10)
+test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","model_circle_short")))
 
 # results = load_solve(rbsolver,feop,test_dir)
 
-fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
+# fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
+fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats,cache = solve(lu_rbsolver,rbop,fesnaps)
+festats = rbstats
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-save(test_dir,fesnaps)
 # save(test_dir,rbop)
 save(test_dir,results)
 
@@ -167,7 +168,7 @@ println(compute_speedup(results))
 #   end
 # end
 
-s1 = select_snapshots(results.sol[1],[51])
+s1 = select_snapshots(results.sol[1],51)
 sa1 = select_snapshots(results.sol_approx[1],1)
 e1 = s1 - sa1
 r1 = get_realization(s1)
@@ -185,7 +186,7 @@ createpvd(dir) do pvd
   end
 end
 
-s1 = select_snapshots(results.sol[2],[51])
+s1 = select_snapshots(results.sol[2],51)
 sa1 = select_snapshots(results.sol_approx[2],1)
 e1 = s1 - sa1
 r1 = get_realization(s1)
