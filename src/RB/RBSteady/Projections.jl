@@ -276,7 +276,7 @@ function add_space_supremizers(basis_space::ArrayBlock,norm_matrix::AbstractMatr
   return [basis_primal,basis_dual...]
 end
 
-function add_tt_supremizers(cores_space::ArrayBlock,norm_matrix::BlockTProductArray,supr_op::BlockTProductArray)
+function add_tt_supremizers(cores_space::ArrayBlock,norm_matrix::BlockGenericRankTensor,supr_op::BlockGenericRankTensor)
   pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
   cores_primal = map(ip -> cores_space[ip],pblocks)
   cores_dual = map(id -> cores_space[id],dblocks)

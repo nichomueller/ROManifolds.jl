@@ -231,14 +231,6 @@ function compute_error(
   return avg_error
 end
 
-function compute_error(
-  sol::AbstractSteadySnapshots,
-  sol_approx::AbstractSteadySnapshots,
-  norm_matrix::AbstractTProductArray)
-
-  compute_error(sol,sol_approx,tp_decomposition(norm_matrix))
-end
-
 function compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
   @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
   active_block_ids = get_touched_blocks(sol)

@@ -60,7 +60,8 @@ function TProduct.tproduct_array(
 
   TProduct.tp_sort!(arrays_1d,index_map)
   TProduct.tp_sort!(gradients_1d,index_map)
-  TProductPDerivativeArray{N}(arrays_1d,gradients_1d)
+  decompositions = TProduct._find_decompositions(nothing,arrays_1d,gradients_1d)
+  GenericRank1Tensor(decompositions)
 end
 
 function PartialDerivative{N}(f::Function,x::Point,fx) where N

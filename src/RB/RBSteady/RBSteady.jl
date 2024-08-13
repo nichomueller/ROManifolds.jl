@@ -55,6 +55,7 @@ include("Snapshots.jl")
 export AbstractTTCore
 export SparseCore
 export SparseCoreCSC
+export BlockCore
 export cat_cores
 include("TTCores.jl")
 

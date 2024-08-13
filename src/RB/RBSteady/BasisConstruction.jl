@@ -126,69 +126,116 @@ end
 # are not computing a cholesky decomposition numerous times
 function ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...) where {T,N}
   cores,ranks,sizes = cache
-  for k in ids_range
-    mat_k = reshape(mat,ranks[k]*sizes[k],:)
-    Ur,Σr,Vr = _tpod(mat_k,args...;kwargs...)
+  for d in ids_range
+    mat_d = reshape(mat,ranks[d]*sizes[d],:)
+    Ur,Σr,Vr = _tpod(mat_d,args...;kwargs...)
     rank = size(Ur,2)
-    ranks[k+1] = rank
-    mat = reshape(Σr.*Vr',rank,sizes[k+1],:)
-    cores[k] = reshape(Ur,ranks[k],sizes[k],rank)
+    ranks[d+1] = rank
+    mat = reshape(Σr.*Vr',rank,sizes[d+1],:)
+    cores[d] = reshape(Ur,ranks[d],sizes[d],rank)
   end
   return mat
 end
 
-function ttsvd_and_weights!(cache,mat::AbstractArray,X::AbstractTProductArray;ids_range=eachindex(X),kwargs...)
-  cores,weights,ranks,sizes = cache
-  for k in first(ids_range):last(ids_range)-1
-    mat_k = reshape(mat,ranks[k]*sizes[k],:)
-    Ur,Σr,Vr = _tpod(mat_k;kwargs...)
+function ttsvd!(cache,mat::AbstractArray{T,N},X::AbstractRank1Tensor;ids_range=1:N-1,kwargs...) where {T,N}
+  cores,ranks,sizes = cache
+  for d in ids_range
+    Xd = kron(X[d],I(ranks[d]))
+    mat_d = reshape(mat,ranks[d]*sizes[d],:)
+    Ur,Σr,Vr = _tpod(mat_d,Xd;kwargs...)
     rank = size(Ur,2)
-    ranks[k+1] = rank
-    mat = reshape(Σr.*Vr',rank,sizes[k+1],:)
-    cores[k] = reshape(Ur,ranks[k],sizes[k],rank)
-    _weight_array!(weights,cores,X,Val{k}())
+    ranks[d+1] = rank
+    mat = reshape(Σr.*Vr',rank,sizes[d+1],:)
+    cores[d] = reshape(Ur,ranks[d],sizes[d],rank)
   end
-  XW = _get_norm_matrix_from_weights(X,weights)
-  M = ttsvd!((cores,ranks,sizes),mat,XW;ids_range=last(ids_range),kwargs...)
-  return M
+  return mat
 end
 
-function _weight_array!(weights,cores,X,::Val{1})
-  X1 = tp_getindex(X,1)
-  K = length(X1)
-  core = cores[1]
-  rank = size(core,3)
-  W = zeros(rank,K,rank)
-  w = zeros(size(core,2))
-  @inbounds for k = 1:K
-    X1k = X1[k]
-    for i′ = 1:rank
-      mul!(w,X1k,core[1,:,i′])
-      for i = 1:rank
-        W[i,k,i′] = core[1,:,i]'*w
-      end
+function ttsvd!(cache,mat::AbstractArray{T,N},X::AbstractRankTensor;ids_range=1:N,kwargs...) where {T,N}
+  cores,ranks,sizes = cache
+  cores_k,mats = map(1:rank(X)) do k
+    cores_k = copy(cores[ids_range])
+    ranks_k = copy(ranks)
+    mat_k = ttsvd!((cores_k,ranks_k,sizes),mat,X[k];ids_range,kwargs...)
+    cores_k,mat_k
+  end |> tuple_of_arrays
+  for d in ids_range
+    touched = d == first(ids_range) ? fill(true,rank(X)) : I(rank(X))
+    cores_d = getindex.(cores_k,d)
+    cores[d] = BlockCore(cores_d,touched)
+  end
+  R = orthogonalize!(cores,ranks,X;ids_range)
+  mat = absorb(cat(mats...;dims=1),R)
+  return mat
+end
+
+function pivoted_qr(A;tol=1e-10)
+  C = qr(A,ColumnNorm())
+  r = findlast(abs.(diag(C.R)) .> tol)
+  Q = C.Q[:,1:r]
+  R = C.R[1:r,invperm(C.jpvt)]
+  return Q,R
+end
+
+function orthogonalize!(cores,ranks,X::AbstractTProductTensor;ids_range=eachindex(cores))
+  weight = ones(1,rank(X),1)
+  decomp = get_decomposition(X)
+  for d in ids_range
+    core = cores[d]
+    if d == last(ids_range)
+      XW = _get_norm_matrix_from_weight(X,weight)
+      core′,R = reduce_rank(core,XW)
+      cores[d] = core′
+      ranks[d+1] = size(core′,3)
+      return R
     end
+    next_core = cores[d+1]
+    Xd = getindex.(decomp,d)
+    core′,R = reduce_rank(core)
+    cores[d] = core′
+    ranks[d+1] = size(core′,3)
+    cores[d+1] = absorb(next_core,R)
+    weight = _weight_array(weight,core′,Xd)
   end
-  weights[1] = W
-  return
 end
 
-function _weight_array!(weights,cores,X,::Val{d}) where d
-  Xd = tp_getindex(X,d)
-  K = length(Xd)
-  W_prev = weights[d-1]
-  core = cores[d]
+function reduce_rank(core::AbstractArray{T,3},X::AbstractMatrix) where T
+  C = cholesky(X)
+  L,p = sparse(C.L),C.p
+  mat = reshape(core,:,size(core,3))
+  Xmat = L'*mat[p,:]
+  Q̃,R = pivoted_qr(Xmat)
+  Q = (L'\Q̃)[invperm(p),:]
+  core′ = reshape(Q,size(core,1),size(core,2),:)
+  return core′,R
+end
+
+function reduce_rank(core::AbstractArray{T,3}) where T
+  mat = reshape(core,:,size(core,3))
+  Q,R = pivoted_qr(mat)
+  core′ = reshape(Q,size(core,1),size(core,2),:)
+  return core′,R
+end
+
+function absorb(core::AbstractArray{T,3},R::AbstractMatrix) where T
+  Rcore = R*reshape(core,size(core,1),:)
+  return reshape(Rcore,size(Rcore,1),size(core,2),:)
+end
+
+function _weight_array(weight,core,X)
+  @check length(X) == size(weight,2)
+  K = size(weight,2)
   rank = size(core,3)
-  rank_prev = size(W_prev,3)
+  rank_prev = size(weight,3)
   W = zeros(rank,K,rank)
   w = zeros(size(core,2))
   @inbounds for k = 1:K
-    Xdk = Xd[k]
+    Xk = X[k]
     @views Wk = W[:,k,:]
-    @views Wk_prev = W_prev[:,k,:]
+    @views Wk_prev = weight[:,k,:]
     for i′_prev = 1:rank_prev
       for i′ = 1:rank
-        mul!(w,Xdk,core[i′_prev,:,i′])
+        mul!(w,Xk,core[i′_prev,:,i′])
         for i_prev = 1:rank_prev
           Wk_prev′ = Wk_prev[i_prev,i′_prev]
           for i = 1:rank
@@ -198,22 +245,15 @@ function _weight_array!(weights,cores,X,::Val{d}) where d
       end
     end
   end
-  weights[d] = W
-  return
+  return W
 end
 
-function _get_norm_matrix_from_weights(norms::AbstractTProductArray,weights)
-  N_space = tp_length(norms)
-  X = tp_getindex(norms,N_space)
-  W = weights[end]
-  @check length(X) == size(W,2)
-  iX = first(X)
-  Tx = eltype(iX)
-  Tw = eltype(W)
-  T = promote_type(Tx,Tw)
-  XW = zeros(T,size(iX,1)*size(W,1),size(iX,2)*size(W,3))
-  @inbounds for k = eachindex(X)
-    XW += kron(X[k],W[:,k,:])
+function _get_norm_matrix_from_weight(X::AbstractRankTensor,WD)
+  K = rank(X)
+  XD = map(k -> X[k][end],1:K)
+  XW = kron(XD[1],WD[:,1,:])
+  @inbounds for k = 2:K
+    XW += kron(XD[k],WD[:,k,:])
   end
   @. XW = (XW+XW')/2 # needed to eliminate roundoff errors
   return sparse(XW)
@@ -238,14 +278,13 @@ function ttsvd(mat::AbstractArray{T,N};kwargs...) where {T,N}
   return cores
 end
 
-function ttsvd(mat::AbstractArray{T,N},X::AbstractTProductArray;kwargs...) where {T,N}
+function ttsvd(mat::AbstractArray{T,N},X::AbstractTProductTensor;kwargs...) where {T,N}
   N_space = N-1
   cores = Vector{Array{T,3}}(undef,N-1)
-  weights = Vector{Array{T,3}}(undef,N_space-1)
   ranks = fill(1,N)
   sizes = size(mat)
   # routine on the spatial indices
-  ttsvd_and_weights!((cores,weights,ranks,sizes),mat,X;ids_range=1:N_space,kwargs...)
+  ttsvd!((cores,ranks,sizes),mat,X;ids_range=1:N_space,kwargs...)
   return cores
 end
 
@@ -294,27 +333,7 @@ end
 
 _norm(v::AbstractVector,args...) = norm(v)
 _norm(v::AbstractVector,X::AbstractMatrix) = sqrt(v'*X*v)
-
-function _norm(A::AbstractArray{T,3} where T,X::AbstractVector{<:AbstractMatrix})
-  @check length(X) == 3
-  X12,X3... = X
-  n2 = vec(A)*vec([_norm(M,X12)^2 for M in eachslice(A,dims=3,drop=true)]*X3)
-  return sqrt(n2)
-end
-
-function _norm(M::AbstractMatrix,X::AbstractVector{<:AbstractMatrix})
-  @check length(X) == 2
-  n2 = vec(M)'*vec(X[1]'*M*X[2])
-  return sqrt(n2)
-end
-
-function _norm(a::AbstractArray,X::AbstractVector{<:AbstractVector{<:AbstractMatrix}})
-  vXv = 0.0
-  for Xd in X
-    vXv += _norm(a,Xd)^2
-  end
-  return sqrt(vXv)
-end
+_norm(a::AbstractArray,X::AbstractTProductTensor) = sqrt(vec(a)'*vec(X*a))
 
 """
     gram_schmidt!(mat::AbstractMatrix, basis::AbstractMatrix, args...) -> AbstractMatrix
@@ -340,34 +359,9 @@ function gram_schmidt!(
   end
 end
 
-function pivoted_qr(A;tol=1e-10)
-  C = qr(A,ColumnNorm())
-  r = findlast(abs.(diag(C.R)) .> tol)
-  Q = C.Q[:,1:r]
-  R = C.R[1:r,invperm(C.jpvt)]
-  return Q,R
-end
-
-function orthogonalize!(core::AbstractArray{T,3},X::AbstractTProductArray,weights) where T
-  XW = _get_norm_matrix_from_weights(X,weights)
-  C = cholesky(XW)
-  L,p = sparse(C.L),C.p
-  mat = reshape(core,:,size(core,3))
-  XWmat = L'*mat[p,:]
-  Q̃,R = pivoted_qr(XWmat)
-  core .= reshape((L'\Q̃)[invperm(p),axes(XWmat,2)],size(core))
-  return R
-end
-
-function absorb!(core::AbstractArray{T,3},R::AbstractMatrix) where T
-  Rcore = R*reshape(core,size(core,1),:)
-  Q̃,_ = qr(reshape(Rcore,:,size(core,3)))
-  core .= reshape(Q̃[:,axes(core,3)],size(core))
-end
-
 # for testing purposes
 
-function check_orthogonality(cores::AbstractVector{<:AbstractArray{T,3}},X::AbstractTProductArray) where T
+function check_orthogonality(cores::AbstractVector{<:AbstractArray{T,3}},X::AbstractTProductTensor) where T
   Xglobal = kron(X)
   basis = dropdims(_cores2basis(cores...);dims=1)
   isorth = norm(basis'*Xglobal*basis - I) ≤ 1e-10

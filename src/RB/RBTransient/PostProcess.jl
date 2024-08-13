@@ -97,14 +97,6 @@ function RBSteady.compute_error(
   return avg_error
 end
 
-function RBSteady.compute_error(
-  sol::AbstractTransientSnapshots,
-  sol_approx::AbstractTransientSnapshots,
-  norm_matrix::AbstractTProductArray)
-
-  compute_error(sol,sol_approx,TProduct.tp_decomposition(norm_matrix))
-end
-
 function RBSteady.average_plot(
   trial::TrialParamFESpace,
   mat::AbstractMatrix;

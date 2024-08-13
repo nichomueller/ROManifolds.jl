@@ -235,8 +235,8 @@ end
 function RBSteady.add_tt_supremizers(
   cores_space::ArrayBlock,
   core_time::ArrayBlock,
-  norm_matrix::BlockTProductArray,
-  supr_op::BlockTProductArray)
+  norm_matrix::BlockGenericRankTensor,
+  supr_op::BlockGenericRankTensor)
 
   pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
   cores_primal_space = map(ip -> cores_space[ip],pblocks)
