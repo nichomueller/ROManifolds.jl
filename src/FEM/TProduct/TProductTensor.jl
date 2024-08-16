@@ -220,6 +220,8 @@ for T in (:AbstractMatrix,:AbstractArray)
   end
 end
 
+Utils.induced_norm(a::AbstractArray,X::AbstractTProductTensor) = sqrt(dot(vec(a),vec(X*a)))
+
 # to global array - should try avoiding using these functions
 
 function LinearAlgebra.kron(a::AbstractRank1Tensor)

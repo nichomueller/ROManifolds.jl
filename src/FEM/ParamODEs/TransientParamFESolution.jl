@@ -15,12 +15,13 @@ function TransientParamFESolution(
   solver::ODESolver,
   op::TransientParamFEOperator,
   r::TransientParamRealization,
-  uh0::Tuple{Vararg{Function}})
+  uh0::Tuple{Vararg{Function}},
+  tracker::CostTracker)
 
   params = get_params(r)
   odeop = get_algebraic_operator(op)
   u0 = get_free_dof_values.(map(uh0->uh0(params),uh0))
-  odesol = solve(solver,odeop,r,u0)
+  odesol = solve(solver,odeop,r,u0,tracker)
   trial = get_trial(op)
   TransientParamFESolution(odesol,trial)
 end
@@ -29,9 +30,10 @@ function TransientParamFESolution(
   solver::ODESolver,
   op::TransientParamFEOperator,
   r::TransientParamRealization,
-  uh0::Function)
+  uh0::Function,
+  tracker::CostTracker)
 
-  TransientParamFESolution(solver,op,r,(uh0,))
+  TransientParamFESolution(solver,op,r,(uh0,),tracker)
 end
 
 function Base.iterate(sol::TransientParamFESolution)
@@ -74,42 +76,47 @@ function Base.collect(sol::TransientParamFESolution{V}) where V
     free_values[k] = copy(ut)
   end
 
-  return free_values,odesol.tracker
+  return free_values
 end
 
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperator,
   r::TransientParamRealization,
-  uh0)
+  uh0,
+  tracker::CostTracker)
 
-  TransientParamFESolution(solver,op,r,uh0)
+  TransientParamFESolution(solver,op,r,uh0,tracker)
 end
 
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
-  uh0)
+  uh0,
+  tracker::CostTracker)
 
-  TransientParamFESolution(solver,op.op,r,uh0)
+  TransientParamFESolution(solver,op.op,r,uh0,tracker)
 end
 
 function Algebra.solve(
   solver::ODESolver,
   op::LinearNonlinearTransientParamFEOperator,
   r::TransientParamRealization,
-  uh0)
+  uh0,
+  tracker::CostTracker)
 
-  TransientParamFESolution(solver,join_operators(op),r,uh0)
+  TransientParamFESolution(solver,join_operators(op),r,uh0,tracker)
 end
 
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperator,
-  uh0;nparams=50,r=realization(op;nparams))
+  uh0,
+  tracker::CostTracker;
+  nparams=50,r=realization(op;nparams))
 
-  solve(solver,op,r,uh0)
+  solve(solver,op,r,uh0,tracker)
 end
 
 function test_transient_fe_solver(

@@ -249,6 +249,60 @@ function Arrays.evaluate!(_cache,k::Operation,α::GradientTProductCellField,β::
   return GenericTProductDiffCellField(gradient,αβ,dαβ)
 end
 
+# partial derivatives
+
+function Utils.PartialDerivative{N}(f::TProductCellField) where N
+  g = GenericTProductCellField(PartialDerivative{1}.(f.single_fields),f.trian)
+  return GenericTProductDiffCellField(PartialDerivative{N}(),f,g)
+end
+
+function Utils.PartialDerivative{N}(f::TProductFEBasis) where N
+  dbasis = PartialDerivative{1}.(f.basis)
+  g = GenericTProductCellField(dbasis,f.trian)
+  return GenericTProductDiffCellField(PartialDerivative{N}(),f,g)
+end
+
+const PartialDerivativeTProductCellField{N,A,B,C} = GenericTProductDiffCellField{PartialDerivative{N},A,B,C}
+
+function Arrays.return_cache(k::Operation{typeof(*)},α::TProductCellDatum,β::PartialDerivativeTProductCellField)
+  cache = return_cache(k,α,get_data(β))
+  diff_cache = return_cache(k,α,TProduct.get_diff_data(β))
+  return cache,diff_cache
+end
+
+function Arrays.return_cache(k::Operation{typeof(*)},α::PartialDerivativeTProductCellField,β::TProductCellDatum)
+  cache = return_cache(k,get_data(α),β)
+  diff_cache = return_cache(k,α,TProduct.get_diff_data(β),β)
+  return cache,diff_cache
+end
+
+function Arrays.evaluate!(_cache,k::Operation{typeof(*)},α::TProductCellDatum,β::PartialDerivativeTProductCellField{N}) where N
+  cache,diff_cache = _cache
+  αβ = evaluate!(cache,k,α,get_data(β))
+  dαβ = evaluate!(cache,k,α,TProduct.get_diff_data(β))
+  return GenericTProductDiffCellField(PartialDerivative{N},αβ,dαβ)
+end
+
+function Arrays.evaluate!(_cache,k::Operation{typeof(*)},α::PartialDerivativeTProductCellField{N},β::TProductCellDatum) where N
+  cache,diff_cache = _cache
+  αβ = evaluate!(cache,k,get_data(α),β)
+  dαβ = evaluate!(cache,k,TProduct.get_diff_data(α),β)
+  return GenericTProductDiffCellField(PartialDerivative{N},αβ,dαβ)
+end
+
+function TProduct.tproduct_array(
+  ::Type{<:PartialDerivative{N}},
+  arrays_1d::Vector{<:AbstractArray},
+  gradients_1d::Vector{<:AbstractArray},
+  index_map,
+  args...) where N
+
+  TProduct.tp_sort!(arrays_1d,index_map)
+  TProduct.tp_sort!(gradients_1d,index_map)
+  decompositions = TProduct._find_decompositions(nothing,arrays_1d,gradients_1d)
+  GenericRank1Tensor(decompositions)
+end
+
 # integration
 
 function CellData.integrate(f::TProductCellDatum,a::TProductMeasure)

@@ -21,6 +21,7 @@ using Gridap.TensorValues
 using Gridap.Helpers
 
 using Mabla.FEM
+using Mabla.FEM.Utils
 using Mabla.FEM.IndexMaps
 using Mabla.FEM.TProduct
 using Mabla.FEM.ParamDataStructures

@@ -12,6 +12,8 @@ using Gridap.Fields
 using Gridap.Geometry
 using Gridap.FESpaces
 using Gridap.MultiField
+using Gridap.ReferenceFEs
+using Gridap.TensorValues
 using Gridap.Helpers
 
 using Mabla.FEM.IndexMaps
@@ -48,5 +50,7 @@ export collect_cell_vector_for_trian
 include("ParamAssemblers.jl")
 
 include("ParamBlockAssemblers.jl")
+
+include("LagrangianDofBases.jl")
 
 end # module

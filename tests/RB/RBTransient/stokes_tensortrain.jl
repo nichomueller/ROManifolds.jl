@@ -10,7 +10,7 @@ using Mabla.FEM.ParamDataStructures
 using Mabla.FEM.ParamFESpaces
 using Mabla.FEM.ParamSteady
 using Mabla.FEM.ParamODEs
-using Mabla.FEM.ParamUtils
+using Mabla.FEM.Utils
 
 using Mabla.RB
 using Mabla.RB.RBSteady

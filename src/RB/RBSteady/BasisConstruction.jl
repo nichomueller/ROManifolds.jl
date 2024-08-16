@@ -331,10 +331,6 @@ function orth_complement!(
   v .= v-orth_projection(v,basis,args...)
 end
 
-_norm(v::AbstractVector,args...) = norm(v)
-_norm(v::AbstractVector,X::AbstractMatrix) = sqrt(v'*X*v)
-_norm(a::AbstractArray,X::AbstractTProductTensor) = sqrt(vec(a)'*vec(X*a))
-
 """
     gram_schmidt!(mat::AbstractMatrix, basis::AbstractMatrix, args...) -> AbstractMatrix
 
@@ -354,7 +350,7 @@ function gram_schmidt!(
     if i > 1
       orth_complement!(mat_i,mat[:,1:i-1],args...)
     end
-    mat_i /= _norm(mat_i,args...)
+    mat_i /= induced_norm(mat_i,args...)
     mat[:,i] .= mat_i
   end
 end

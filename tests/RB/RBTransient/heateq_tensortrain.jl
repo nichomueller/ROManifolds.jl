@@ -4,6 +4,7 @@ using DrWatson
 using Serialization
 
 using Mabla.FEM
+using Mabla.FEM.Utils
 using Mabla.FEM.TProduct
 using Mabla.FEM.ParamDataStructures
 using Mabla.FEM.ParamFESpaces
@@ -85,13 +86,14 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=5,nsnaps_res=30,nsnaps_jac=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
-fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
+fesnaps = fe_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+rbsnaps,cache = solve(rbsolver,rbop,fesnaps)
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)
 
 println(compute_error(results))
 println(compute_speedup(results))
 
 save(test_dir,fesnaps)
 save(test_dir,rbop)
+save(test_dir,results)
