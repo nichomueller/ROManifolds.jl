@@ -37,18 +37,27 @@ function TProductModel(args...;kwargs...)
 end
 
 function _axes_to_lower_dim_entities(coords::AbstractArray{VectorValue{D,T},D}) where {D,T}
-  function _lower_dim_entities_at_axis!(entities,coords::AbstractArray,ax::Integer)
+  entities = Vector{Array{VectorValue{D,T},D-1}}[]
+  for ax = 1:D
     range = axes(coords,ax)
     bottom = selectdim(coords,ax,first(range))
     top = selectdim(coords,ax,last(range))
     push!(entities,[bottom,top])
-    return
-  end
-  entities = Vector{Array{VectorValue{D,T},D-1}}[]
-  for ax = 1:D
-    _lower_dim_entities_at_axis!(entities,coords,ax)
   end
   return entities
+end
+
+_get_interior(entity::AbstractVector) = entity[2:end-1]
+_get_interior(entity::AbstractMatrix) = entity[2:end-1,2:end-1]
+
+function _tp_label_condition(intset,entity)
+  interior = _get_interior(entity)
+  for i in intset
+    if i ∈ interior
+      return false
+    end
+  end
+  return true
 end
 
 """
@@ -68,10 +77,14 @@ function entities_1d_in_tag(coords::AbstractArray{VectorValue{D,T},D},nodes_in_t
   for (axis,entities) in enumerate(ax_to_entities)
     for (loc,entity) in enumerate(entities)
       Iset = intersect(nodes_in_tag,entity)
-      #TODO check_tp_condition(Iset) here i should check that the tags are set correctly
-      Iset != entity && continue
-      push!(vec_of_tags,loc)
-      push!(vec_of_axes,axis)
+      if Iset == vec(entity)
+        push!(vec_of_tags,loc)
+        push!(vec_of_axes,axis)
+      else
+        msg = """The assigned boundary does not satisfy the tensor product condition:
+        it should occupy the whole side of the domain, rather than a side's portion"""
+        @check _tp_label_condition(Iset,entity) msg
+      end
     end
   end
   return vec_of_tags,vec_of_axes
@@ -85,7 +98,7 @@ encodes a set of tags on a D-dimensional TProductModel, to the vector of 1-D
 models
 
 """
-function add_1d_tags!(model::TProductModel,name)
+function add_1d_tags!(model::TProductModel{D},name) where D
   isempty(name) && return
   nodes = get_node_coordinates(model)
   labeling = get_face_labeling(model)
@@ -93,10 +106,14 @@ function add_1d_tags!(model::TProductModel,name)
 
   nodes_in_tag = nodes[findall(face_to_tag.==one(Int8))]
   tags_1d,axs = entities_1d_in_tag(nodes,nodes_in_tag)
-  for ax in unique(axs)
+  for ax in 1:D
     label1d = get_face_labeling(model.models_1d[ax])
     name in label1d.tag_to_name && continue
-    tags_at_ax = tags_1d[findall(axs.==ax)]
+    if ax in axs
+      tags_at_ax = tags_1d[findall(axs.==ax)]
+    else
+      tags_at_ax = Int[]
+    end
     add_tag_from_tags!(label1d,name,tags_at_ax)
   end
 end

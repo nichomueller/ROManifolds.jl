@@ -107,13 +107,25 @@ function _global_2_local(sparsity::TProductSparsityPattern,I,J,i,j)
   unrows = IndexMaps.univariate_num_rows(sparsity)
   uncols = IndexMaps.univariate_num_cols(sparsity)
   unnz = IndexMaps.univariate_nnz(sparsity)
-  g2l = zeros(eltype(IJ),unnz...)
 
+  tprows = CartesianIndices(unrows)
+  tpcols = CartesianIndices(uncols)
+
+  g2l = zeros(eltype(IJ),unnz...)
+  lid = zeros(Int,length(lids))
   @inbounds for (k,gid) = enumerate(IJ)
-    irows = Tuple(tensorize_indices(I[k],unrows))
-    icols = Tuple(tensorize_indices(J[k],uncols))
-    iaxes = CartesianIndex.(irows,icols)
-    lid = map((i,j) -> findfirst(i.==[j]),lids,iaxes)
+    irows = tprows[I[k]]
+    icols = tpcols[J[k]]
+    @inbounds for d in eachindex(lids)
+      lidd = lids[d]
+      indd = CartesianIndex((irows.I[d],icols.I[d]))
+      @inbounds for (l,liddl) in enumerate(lidd)
+        if liddl == indd
+          lid[d] = l
+          break
+        end
+      end
+    end
     g2l[lid...] = gid
   end
 
@@ -127,7 +139,7 @@ function _add_fixed_dofs(index_map::AbstractIndexMap)
   return index_map
 end
 
-function _add_fixed_dofs(index_map::AbstractMatrix)
+function _add_fixed_dofs(index_map::AbstractArray)
   _add_fixed_dofs(IndexMap(index_map))
 end
 
