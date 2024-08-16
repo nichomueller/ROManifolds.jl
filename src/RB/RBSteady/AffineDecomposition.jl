@@ -68,8 +68,8 @@ function _global_index(i,local_indices::Vector{Vector{Int32}})
   islow = slow_index(i,rankl)
   ifast = fast_index(i,rankl)
   iprev = Il[ifast]
-  gi = CartesianIndex((_global_index(iprev,Iprev)...,islow))
-  return gi
+  giprev = _global_index(iprev,Iprev)
+  return (giprev...,islow)
 end
 
 function _global_index(i,Il::Vector{Int32})
@@ -86,19 +86,19 @@ function _to_split_global_indices(local_indices::Vector{Vector{Int32}},index_map
   for (i,ii) in enumerate(Igt)
     ilsi,igti = _global_index(ii,last(Is))
     Igt[i] = igti
-    Igs[i] = index_map[_global_index(ilsi,Is)]
+    Igs[i] = index_map[CartesianIndex(_global_index(ilsi,Is))]
   end
   return Igs,Igt
 end
 
 function _to_global_indices(local_indices::Vector{Vector{Int32}},index_map::AbstractIndexMap)
-  if length(local_indices) != ndims(index_map)
+  if length(local_indices) != ndims(index_map) # this is the transient case
     @notimplementedif length(local_indices) != ndims(index_map)+1
     return _to_split_global_indices(local_indices,index_map)
   end
   Ig = local_indices[end]
   for (i,ii) in enumerate(Ig)
-    Ig[i] = index_map[_global_index(ii,local_indices)]
+    Ig[i] = index_map[CartesianIndex(_global_index(ii,local_indices))]
   end
   return Ig
 end

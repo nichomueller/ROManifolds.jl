@@ -90,15 +90,6 @@ function entities_1d_in_tag(coords::AbstractArray{VectorValue{D,T},D},nodes_in_t
   return vec_of_tags,vec_of_axes
 end
 
-# function entities_1d_in_tag(coords::AbstractArray{VectorValue{D,T},D},nodes_in_tag) where {D,T}
-#   vec_of_tags = Int[]
-#   vec_of_axes = Int[]
-#   for lower_dim_coords in eachslice(coords,dims=D)
-#     lower_dim_tags,lower_dim_axes = entities_1d_in_tag(lower_dim_coords,nodes_in_tag)
-
-#   end
-# end
-
 """
     add_1d_tags!(model::TProductModel,name) -> Nothing
 
@@ -117,7 +108,7 @@ function add_1d_tags!(model::TProductModel{D},name) where D
   tags_1d,axs = entities_1d_in_tag(nodes,nodes_in_tag)
   for ax in 1:D
     label1d = get_face_labeling(model.models_1d[ax])
-    #name in label1d.tag_to_name && continue
+    name in label1d.tag_to_name && continue
     if ax in axs
       tags_at_ax = tags_1d[findall(axs.==ax)]
     else
