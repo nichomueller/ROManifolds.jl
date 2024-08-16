@@ -22,7 +22,7 @@ function ParamSteady.get_nonlinear_operator(odeop::ODEParamOpFromTFEOp)
   ODEParamOpFromTFEOp(get_nonlinear_operator(odeop.op))
 end
 
-function ParamSteady.allocate_ode_spaces(
+function allocate_ode_spaces(
   odeop::ODEParamOpFromTFEOp,
   r::TransientParamRealization,
   us::Tuple{Vararg{AbstractVector}})
