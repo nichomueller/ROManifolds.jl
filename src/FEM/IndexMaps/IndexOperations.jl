@@ -70,28 +70,3 @@ RaRb × CaCb, can be indexed as AB[i,j] = A[slow_index(i,RbCb)] * B[fast_index(i
 @inline fast_index(i,nfast::Integer) = mod.(i .- 1,nfast) .+ 1
 @inline fast_index(i::Integer,nfast::Integer) = mod(i - 1,nfast) + 1
 @inline fast_index(i::Colon,::Integer) = i
-
-"""
-    tensorize_indices(i::Integer,s::NTuple{D,Integer}) where D -> CartesianIndex{D}
-
-Given the size s of a D-dimensional array, converts the index i from a IndexLinear
-style to a IndexCartesian style.
-
-"""
-function tensorize_indices(i::Integer,s::NTuple{D,Integer}) where D
-  cdofs = cumprod(s)
-  ic = ()
-  @inbounds for d = 1:D-1
-    ic = (ic...,fast_index(i,cdofs[d]))
-  end
-  ic = (ic...,slow_index(i,cdofs[D-1]))
-  return CartesianIndex(ic)
-end
-
-function tensorize_indices(indices::AbstractVector,s::NTuple{D,Integer}) where D
-  tindices = Vector{CartesianIndex{D}}(undef,length(indices))
-  @inbounds for (ii,i) in enumerate(indices)
-    tindices[ii] = tensorize_indices(i,s)
-  end
-  return tindices
-end

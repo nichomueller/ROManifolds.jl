@@ -16,7 +16,6 @@ import PartitionedArrays: tuple_of_arrays
 export recast_indices
 export sparsify_indices
 export get_nonzero_indices
-export tensorize_indices
 include("IndexOperations.jl")
 
 export SparsityPattern

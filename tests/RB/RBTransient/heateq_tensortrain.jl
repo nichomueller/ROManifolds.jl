@@ -28,12 +28,15 @@ ptspace = TransientParamSpace(pranges,tdomain)
 
 # geometry
 n = 5
-domain = (0,1,0,1)
-partition = (n,n)
+domain = (0,1,0,1,0,1)
+partition = (n,n,n)
 model = TProductModel(domain,partition)
 labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
-add_tag_from_tags!(labels,"neumann",[7])
+add_tag_from_tags!(labels,"top",[5,6,7,8,11,12,15,16,22])
+add_tag_from_tags!(labels,"bottom",[1,2,3,4,9,10,13,14,21])
+add_tag_from_tags!(labels,"walls",[17,18,23,25,26])
+add_tag_from_tags!(labels,"dirichlet",["top"])
+add_tag_from_tags!(labels,"neumann",["bottom"])
 
 order = 2
 degree = 2*order
