@@ -131,12 +131,34 @@ function RBSteady.compress_core(a::AbstractArray{T,3},btrial::AbstractArray{S,3}
   combine=(x,y)->x) where {T,S}
 
   TS = promote_type(T,S)
-  bab = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,3),size(btrial,3))
-  bab_shift = zeros(TS,size(btest,1),size(a,1),size(btrial,1),size(btest,3),size(a,3),size(btrial,3))
-  @inbounds for i = CartesianIndices(size(bab))
-    ibV1,ia1,ibU1,ibV3,ia3,ibU3 = Tuple(i)
-    bab[i] = sum(btest[ibV1,:,ibV3].*a[ia1,:,ia3].*btrial[ibU1,:,ibU3])
-    bab_shift[i] = sum(btest[ibV1,2:end,ibV3].*a[ia1,2:end,ia3].*btrial[ibU1,1:end-1,ibU3])
+  ra_prev,ra = size(a,1),size(a,3)
+  rU_prev,rU = size(btrial,1),size(btrial,3)
+  rV_prev,rV = size(btest,1),size(btest,3)
+  bab = zeros(TS,rV_prev,ra_prev,rU_prev,rV,ra,rU)
+  bab_shift = zeros(TS,rV_prev,ra_prev,rU_prev,rV,ra,rU)
+  w = zeros(TS,size(a,2))
+  w_shift = zeros(TS,size(a,2)-1)
+  for ibU1 = 1:rU_prev
+    @inbounds bU′ = btrial[ibU1,:,:]
+    for ia1 = 1:ra_prev
+      @inbounds a′ = a[ia1,:,:]
+      for ibU3 = 1:rU
+        @inbounds bU′′ = bU′[:,ibU3]
+        for ia3 = 1:ra
+          @inbounds a′′ = a′[:,ia3]
+          w .= a′′.*bU′′
+          w_shift .= a′′[2:end].*bU′′[1:end-1]
+          for ibV1 = 1:rV_prev
+            @inbounds bV′ = btest[ibV1,:,:]
+            for ibV3 = 1:rV
+              @inbounds bV′′ = bV′[:,ibV3]
+              @inbounds bab[ibV1,ia1,ibU1,ibV3,ia3,ibU3] = dot(bV′′,w)
+              @inbounds bab_shift[ibV1,ia1,ibU1,ibV3,ia3,ibU3] = dot(bV′′[2:end],w_shift)
+            end
+          end
+        end
+      end
+    end
   end
   return combine(bab,bab_shift)
 end

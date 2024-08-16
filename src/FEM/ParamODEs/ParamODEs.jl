@@ -13,6 +13,7 @@ using Gridap.ODEs
 using Gridap.ReferenceFEs
 using Gridap.Helpers
 
+using Mabla.FEM.Utils
 using Mabla.FEM.IndexMaps
 using Mabla.FEM.TProduct
 using Mabla.FEM.ParamDataStructures
@@ -88,9 +89,6 @@ include("ODEParamOpFromTFEOp.jl")
 include("ThetaMethod.jl")
 
 export ODEParamSolution
-export IterativeCostTracker
-export initialize_tracker
-export update_tracker!
 include("ODEParamSolution.jl")
 
 export TransientParamFESolution

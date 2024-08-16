@@ -377,9 +377,13 @@ function reduced_jacobian(solver::RBSolver,op,c::ArrayContribution;kwargs...)
 end
 
 function reduced_jacobian_residual(solver::RBSolver,op,s)
+  rb_stats = get_rb_offline_stats(solver)
   jac,res = jacobian_and_residual(solver,op,s)
-  red_jac = reduced_jacobian(solver,op,jac)
-  red_res = reduced_residual(solver,op,res)
+  stats = @timed begin
+    red_jac = reduced_jacobian(solver,op,jac)
+    red_res = reduced_residual(solver,op,res)
+  end
+  update_tracker!(rb_stats,stats;msg="Cost of mdeim approximation:")
   return red_jac,red_res
 end
 

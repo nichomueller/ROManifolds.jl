@@ -46,6 +46,8 @@ In particular:
 - nsnaps_jac: number of snapshots considered when running MDEIM for the jacobian
 - nsnaps_test:  number of snapshots considered when computing the error the RB
   method commits with respect to the FE procedure
+- fe_stats: cost tracker for the FE procedure
+- rb_stats: cost tracker for the RB procedure
 
 """
 struct RBSolver{S,M}
@@ -56,6 +58,9 @@ struct RBSolver{S,M}
   nsnaps_res::Int
   nsnaps_jac::Int
   nsnaps_test::Int
+  fe_stats::CostTracker
+  rb_offline_stats::CostTracker
+  rb_online_stats::CostTracker
 end
 
 function RBSolver(
@@ -65,9 +70,13 @@ function RBSolver(
   nsnaps_state=50,
   nsnaps_res=20,
   nsnaps_jac=20,
-  nsnaps_test=10)
+  nsnaps_test=10,
+  fe_stats=CostTracker(),
+  rb_offline_stats=CostTracker(),
+  rb_online_stats=CostTracker())
 
-  RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_res,nsnaps_jac,nsnaps_test)
+  RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_res,nsnaps_jac,nsnaps_test,
+    fe_stats,rb_offline_stats,rb_online_stats)
 end
 
 get_fe_solver(s::RBSolver) = s.fesolver
@@ -83,6 +92,9 @@ jac_params(solver::RBSolver) = 1:num_jac_params(solver)
 num_mdeim_params(solver::RBSolver) = max(num_res_params(solver),num_jac_params(solver))
 mdeim_params(solver::RBSolver) = 1:num_mdeim_params(solver)
 get_tol(solver::RBSolver) = solver.ϵ
+get_fe_stats(solver::RBSolver) = solver.fe_stats
+get_rb_offline_stats(solver::RBSolver) = solver.rb_offline_stats
+get_rb_online_stats(solver::RBSolver) = solver.rb_online_stats
 
 function get_test_directory(solver::RBSolver;dir=datadir())
   keyword = get_mdeim_style_filename(solver.mdeim_style)
@@ -92,28 +104,35 @@ function get_test_directory(solver::RBSolver;dir=datadir())
 end
 
 """
-    fe_solutions(solver::RBSolver,op::ParamFEOperator;kwargs...
-      ) -> (AbstractSteadySnapshots, ComputationalStats)
-    fe_solutions(solver::RBSolver,op::TransientParamFEOperator;kwargs...
-      ) -> (AbstractTransientSnapshots, ComputationalStats)
+    fe_solutions(solver::RBSolver,op::ParamFEOperator;kwargs...) -> AbstractSteadySnapshots
+    fe_solutions(solver::RBSolver,op::TransientParamFEOperator;kwargs...) -> AbstractTransientSnapshots
 
 The problem is solved several times, and the solution snapshots are returned along
 with the information related to the computational expense of the FE method
 
 """
-function fe_solutions(solver::RBSolver,op::ParamFEOperator;nparams=50,r=realization(op;nparams))
+function fe_solutions(
+  solver::RBSolver,
+  op::ParamFEOperator;
+  nparams=num_params(solver),
+  r=realization(op;nparams))
+
   fesolver = get_fe_solver(solver)
+  fe_stats = get_fe_stats(solver)
+  reset_tracker!(fe_stats)
+
   index_map = get_vector_index_map(op)
-  values,cost = solve(fesolver,op)
+  values = solve(fesolver,op,fe_stats;r)
   snaps = Snapshots(values,index_map,r)
+
   return snaps,cost
 end
 
 function Algebra.solve(rbsolver::RBSolver,feop,args...;kwargs...)
-  fesnaps,festats = fe_solutions(rbsolver,feop,args...)
+  fesnaps = fe_solutions(rbsolver,feop,args...)
   rbop = reduced_operator(rbsolver,feop,fesnaps)
-  rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-  results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+  rbsnaps = solve(rbsolver,rbop,fesnaps)
+  results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)
   return results
 end
 

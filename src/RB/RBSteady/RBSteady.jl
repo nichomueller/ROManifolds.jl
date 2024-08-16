@@ -22,6 +22,7 @@ using Gridap.TensorValues
 using Gridap.Helpers
 
 using Mabla.FEM
+using Mabla.FEM.Utils
 using Mabla.FEM.IndexMaps
 using Mabla.FEM.TProduct
 using Mabla.FEM.ParamDataStructures
@@ -62,9 +63,11 @@ include("TTCores.jl")
 export RBSolver
 export MDEIMStyle
 export SpaceMDEIM
-export get_stats
 export get_test_directory
 export get_fe_solver
+export get_fe_stats
+export get_rb_offline_stats
+export get_rb_online_stats
 export fe_solutions
 export nonlinear_rb_solve!
 include("RBSolver.jl")
@@ -142,13 +145,9 @@ export fe_residual!
 export pod_mdeim_error
 include("PGMDEIMOperator.jl")
 
-export ComputationalStats
 export RBResults
 export rb_results
 export load_solve
-export compute_speedup
-export compute_error
-export average_plot
 include("PostProcess.jl")
 
 end # module

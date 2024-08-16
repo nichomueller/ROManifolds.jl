@@ -2,6 +2,8 @@ module FEM
 
 using DocStringExtensions
 
+include("Utils/Utils.jl")
+
 include("IndexMaps/IndexMaps.jl")
 
 include("TProduct/TProduct.jl")
@@ -15,7 +17,5 @@ include("ParamFESpaces/ParamFESpaces.jl")
 include("ParamSteady/ParamSteady.jl")
 
 include("ParamODEs/ParamODEs.jl")
-
-include("ParamUtils/ParamUtils.jl")
 
 end # module

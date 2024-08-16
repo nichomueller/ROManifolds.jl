@@ -1,36 +1,3 @@
-"""
-    mutable struct IterativeCostTracker
-      time::Float64
-      nallocs::Float64
-      nruns::Int
-    end
-
-"""
-mutable struct IterativeCostTracker
-  time::Float64
-  nallocs::Float64
-  nruns::Int
-end
-
-function IterativeCostTracker(stats::NamedTuple)
-  time = stats[:time]
-  nallocs = stats[:bytes] / 1e6
-  nruns = 1
-  IterativeCostTracker(time,nallocs,nruns)
-end
-
-function initialize_tracker()
-  IterativeCostTracker(0.0,0.0,0)
-end
-
-function update_tracker!(t::IterativeCostTracker,stats::NamedTuple)
-  time = stats[:time]
-  nallocs = stats[:bytes] / 1e6
-  t.time += time
-  t.nallocs += nallocs
-  t.nruns += 1
-end
-
 function ODEs.ode_start(
   solver::ODESolver,
   odeop::ODEOperator,
@@ -66,17 +33,7 @@ struct ODEParamSolution{V} <: ODESolution
   odeop::ODEParamOperator
   r::TransientParamRealization
   us0::Tuple{Vararg{V}}
-  tracker::IterativeCostTracker
-
-  function ODEParamSolution(
-    solver::ODESolver,
-    odeop::ODEParamOperator,
-    r::TransientParamRealization,
-    us0::Tuple{Vararg{V}},
-    tracker = initialize_tracker()) where V
-
-    new{V}(solver,odeop,r,us0,tracker)
-  end
+  tracker::CostTracker
 end
 
 function Base.iterate(sol::ODEParamSolution)
@@ -120,16 +77,17 @@ function Base.collect(sol::ODEParamSolution{V}) where V
     free_values[k] = copy(ut)
   end
 
-  return free_values,sol.tracker
+  return free_values
 end
 
 function Algebra.solve(
   solver::ODESolver,
   odeop::ODEParamOperator,
   r::TransientParamRealization,
-  u0::T) where T
+  u0::T,
+  tracker::CostTracker) where T
 
-  ODEParamSolution(solver,odeop,r,u0)
+  ODEParamSolution(solver,odeop,r,u0,tracker)
 end
 
 # for testing purposes

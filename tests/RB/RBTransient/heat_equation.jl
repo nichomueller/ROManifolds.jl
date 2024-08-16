@@ -99,7 +99,6 @@ end
 # post process
 println(compute_error(results))
 println(compute_speedup(results))
-average_plot(rbop,results;dir=joinpath(test_dir,"plots"))
 
 fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)

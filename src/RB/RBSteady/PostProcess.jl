@@ -10,12 +10,15 @@ case has been run at least once!
 
 """
 function load_solve(solver,feop,dir;kwargs...)
-  snaps = deserialize(get_snapshots_filename(dir))
+  fe_sol = deserialize(get_snapshots_filename(dir))
   rbop = deserialize_operator(feop,dir)
-  rb_sol,rb_stats = solve(solver,rbop,snaps)
+  rb_sol,_ = solve(solver,rbop,fe_sol)
   old_results = deserialize(get_results_filename(dir))
-  old_fem_stats = old_results.fem_stats
-  results = rb_results(solver,rbop,snaps,rb_sol,old_fem_stats,rb_stats;kwargs...)
+  fe_stats = get_fe_stats(solver)
+  rb_offline_stats = get_rb_offline_stats(solver)
+  copyto!(fe_stats,old_results.fe_stats)
+  copyto!(rb_offline_stats,old_results.rb_offline_stats)
+  results = rb_results(solver,rbop,fe_sol,rb_sol;kwargs...)
   return results
 end
 
@@ -113,73 +116,32 @@ function DrWatson.save(dir,op::PGOperator;kwargs...)
 end
 
 """
-    struct ComputationalStats
-      avg_time::Float64
-      avg_nallocs::Float64
-    end
-
-"""
-struct ComputationalStats
-  avg_time::Float64
-  avg_nallocs::Float64
-end
-
-function ComputationalStats(stats::NamedTuple,nruns::Integer)
-  avg_time = stats[:time] / nruns
-  avg_nallocs = stats[:bytes] / (1e6*nruns)
-  ComputationalStats(avg_time,avg_nallocs)
-end
-
-get_avg_time(c::ComputationalStats) = c.avg_time
-get_avg_nallocs(c::ComputationalStats) = c.avg_nallocs
-
-function get_stats(t::IterativeCostTracker)
-  avg_time = t.time / t.nruns
-  avg_nallocs = t.nallocs / t.nruns
-  ComputationalStats(avg_time,avg_nallocs)
-end
-
-"""
-    struct RBResults{A,B,BA,C,D}
-      name::A
-      sol::B
-      sol_approx::BA
-      fem_stats::C
-      rb_stats::C
-      norm_matrix::D
+    struct RBResults
+      name::Union{String,Vector{String}}
+      fe_stats::CostTracker
+      rb_offline_stats::CostTracker
+      rb_online_stats::GenericPerformance
     end
 
 Allows to compute errors and computational speedups to compare the properties of
-the algorithm with the FE performance. In particular:
-
-- `sol`, `sol_approx` are the online FE solution and their RB approximations
-- `fem_stats`, `rb_stats` are the ComputationalStats relative to the FE and RB
-  algorithms
-- `norm_matrix` is the norm matrix with respect to which the errors are computed
-  (can also be of type Nothing, in which case a simple ℓ² error measure is used)
+the algorithm with the FE performance.
 
 """
-struct RBResults{A,B,BA,C,D}
-  name::A
-  sol::B
-  sol_approx::BA
-  fem_stats::C
-  rb_stats::C
-  norm_matrix::D
+struct RBResults
+  name::Union{String,Vector{String}}
+  fe_stats::CostTracker
+  rb_offline_stats::CostTracker
+  rb_online_stats::GenericPerformance
 end
 
-function rb_results(
-  solver::RBSolver,
-  feop,
-  s,
-  son_approx,
-  fem_stats,
-  rb_stats;
-  name="vel")
-
+function rb_results(solver::RBSolver,feop,s,son_approx;name="vel")
   X = assemble_norm_matrix(feop)
   son = select_snapshots(s,online_params(solver))
-  RBResults(name,son,son_approx,fem_stats,rb_stats,X)
+  error = compute_error(son,son_approx,X)
+  fe_stats = get_fe_stats(solver)
+  rb_offline_stats = get_rb_offline_stats(solver)
+  rb_online_stats = GenericPerformance(error,get_rb_online_stats(solver))
+  RBResults(name,fe_stats,rb_offline_stats,rb_online_stats)
 end
 
 function rb_results(solver::RBSolver,op::RBOperator,args...;kwargs...)
@@ -195,43 +157,17 @@ function DrWatson.save(dir,r::RBResults)
   serialize(get_results_filename(dir),r)
 end
 
-function compute_speedup(fem_stats::ComputationalStats,rb_stats::ComputationalStats)
-  speedup_time = get_avg_time(fem_stats) / get_avg_time(rb_stats)
-  speedup_memory = get_avg_nallocs(fem_stats) / get_avg_nallocs(rb_stats)
-  println("Speedup in time: $(speedup_time)")
-  println("Speedup in memory: $(speedup_memory)")
-  return speedup_time,speedup_memory
-end
-
 """
     compute_speedup(r::RBResults) -> (Number, Number)
 
 Computes the speedup in time and memory, where `speedup` = RB estimate / FE estimate
 
 """
-function compute_speedup(r::RBResults)
-  compute_speedup(r.fem_stats,r.rb_stats)
+function Utils.compute_speedup(r::RBResults)
+  compute_speedup(r.fe_stats,r.rb_online_stats.cost)
 end
 
-function compute_error(
-  sol::AbstractSteadySnapshots{T,N},
-  sol_approx::AbstractSteadySnapshots{T,N},
-  norm_matrix) where {T,N}
-
-  @check size(sol) == size(sol_approx)
-  space_norm = zeros(num_params(sol))
-  @inbounds for i = num_params(sol)
-    soli = selectdim(sol,N,i)
-    soli_approx = selectdim(sol_approx,N,i)
-    err_norm = _norm(soli-soli_approx,norm_matrix)
-    sol_norm = _norm(soli,norm_matrix)
-    space_norm[i] = err_norm / sol_norm
-  end
-  avg_error = sum(space_norm) / length(space_norm)
-  return avg_error
-end
-
-function compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
+function Utils.compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
   @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
   active_block_ids = get_touched_blocks(sol)
   block_map = BlockMap(size(sol),active_block_ids)
@@ -239,71 +175,6 @@ function compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matri
   return_cache(block_map,errors...)
 end
 
-"""
-    compute_error(r::RBResults) -> Number
-
-Computes the RB/FE error; in transient applications, the measure is a space-time
-norm. First, a spatial norm (computed according to the field `norm_matrix`) is
-computed at every time step; then, a ℓ² norm of the spatial norms is performed in
-time
-
-"""
-function compute_error(r::RBResults)
-  compute_error(r.sol,r.sol_approx,r.norm_matrix)
-end
-
-function average_plot(
-  trial::TrialParamFESpace,
-  v::AbstractVector;
-  name="vel",
-  dir=joinpath(pwd(),"plots"))
-
-  trian = get_triangulation(trial)
-  vh = FEFunction(param_getindex(trial,1),v)
-  vtk = createvtk(trian,dir,cellfields=[name=>vh])
-end
-
-function average_plot(
-  trial::FESpace,
-  sol::AbstractSnapshots,
-  sol_approx::AbstractSnapshots;
-  dir=joinpath(pwd(),"plots"),
-  kwargs...)
-
-  @check size(sol) == size(sol_approx)
-  param_mean(a::AbstractArray{T,N}) where {T,N} = dropdims(mean(a;dims=N);dims=N)
-
-  create_dir(dir)
-
-  r = get_realization(sol)
-  r̄ = mean(r)
-  r₀ = zero(r)
-
-  dir_average = joinpath(dir,"average")
-  average_plot(trial(r̄),param_mean(sol);dir=dir_average,kwargs...)
-
-  dir_error = joinpath(dir,"error")
-  average_plot(trial(r₀),param_mean(sol - sol_approx);dir=dir_error,kwargs...)
-end
-
-function average_plot(trial::FESpace,r::RBResults;kwargs...)
-  average_plot(trial,r.sol,r.sol_approx;name=r.name,kwargs...)
-end
-
-function average_plot(trial::MultiFieldFESpace,r::RBResults;kwargs...)
-  for (i,Ui) in trial
-    average_plot(Ui,r.sol[i],r.sol_approx[i];name=r.name[i],kwargs...)
-  end
-end
-
-"""
-    average_plot(op::RBOperator,r::RBResults;kwargs...)
-    average_plot(op::TransientRBOperator,r::RBResults;kwargs...)
-
-Computes the plot of the mean snapshot and the plof of the mean error. The mean
-is computed along the axis of parameters
-
-"""
-function average_plot(op::RBOperator,r::RBResults;kwargs...)
-  average_plot(get_fe_trial(op),r;kwargs...)
+function Utils.compute_error(r::RBResults)
+  mean(r.rb_online_stats.error)
 end

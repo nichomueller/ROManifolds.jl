@@ -424,14 +424,16 @@ function Algebra.solve!(
 
   x̂,y,odecache = cache
   fesolver = get_fe_solver(solver)
-  trial = get_trial(op)(r)
+  rb_stats = get_rb_online_stats(solver)
+  reset_tracker!(rb_stats)
 
   stats = @timed solve!((x̂,),fesolver,op,r,(y,),odecache)
+  update_tracker!(rb_stats,stats,num_params(r))
 
+  trial = get_trial(op)(r)
   x = recast(x̂,trial)
   i = get_vector_index_map(op)
   s = Snapshots(x,i,r)
-  cost = ComputationalStats(stats,num_params(r))
 
-  return s,cost,cache
+  return s,cache
 end

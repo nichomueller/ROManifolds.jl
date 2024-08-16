@@ -18,6 +18,7 @@ using Gridap.ReferenceFEs
 using Gridap.TensorValues
 using Gridap.Helpers
 
+using Mabla.FEM.Utils
 using Mabla.FEM.IndexMaps
 
 import Base:+,-
