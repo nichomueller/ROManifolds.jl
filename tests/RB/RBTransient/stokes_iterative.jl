@@ -111,7 +111,7 @@ save(test_dir,fesnaps)
 # save(test_dir,rbop)
 save(test_dir,results)
 
-println(compute_error(results))
+show(results.timer)
 println(compute_speedup(results))
 
 s1 = select_snapshots(results.sol[1],[51])

@@ -46,8 +46,7 @@ In particular:
 - nsnaps_jac: number of snapshots considered when running MDEIM for the jacobian
 - nsnaps_test:  number of snapshots considered when computing the error the RB
   method commits with respect to the FE procedure
-- fe_stats: cost tracker for the FE procedure
-- rb_stats: cost tracker for the RB procedure
+- timer: cost timer for the algorithm
 
 """
 struct RBSolver{S,M}
@@ -58,9 +57,7 @@ struct RBSolver{S,M}
   nsnaps_res::Int
   nsnaps_jac::Int
   nsnaps_test::Int
-  fe_stats::CostTracker
-  rb_offline_stats::CostTracker
-  rb_online_stats::CostTracker
+  timer::TimerOutput
 end
 
 function RBSolver(
@@ -71,12 +68,9 @@ function RBSolver(
   nsnaps_res=20,
   nsnaps_jac=20,
   nsnaps_test=10,
-  fe_stats=CostTracker(),
-  rb_offline_stats=CostTracker(),
-  rb_online_stats=CostTracker())
+  timer=TimerOutput())
 
-  RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_res,nsnaps_jac,nsnaps_test,
-    fe_stats,rb_offline_stats,rb_online_stats)
+  RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_res,nsnaps_jac,nsnaps_test,timer)
 end
 
 get_fe_solver(s::RBSolver) = s.fesolver
@@ -92,9 +86,7 @@ jac_params(solver::RBSolver) = 1:num_jac_params(solver)
 num_mdeim_params(solver::RBSolver) = max(num_res_params(solver),num_jac_params(solver))
 mdeim_params(solver::RBSolver) = 1:num_mdeim_params(solver)
 get_tol(solver::RBSolver) = solver.ϵ
-get_fe_stats(solver::RBSolver) = solver.fe_stats
-get_rb_offline_stats(solver::RBSolver) = solver.rb_offline_stats
-get_rb_online_stats(solver::RBSolver) = solver.rb_online_stats
+TimerOutputs.get_timer(solver::RBSolver) = solver.timer
 
 function get_test_directory(solver::RBSolver;dir=datadir())
   keyword = get_mdeim_style_filename(solver.mdeim_style)
@@ -118,14 +110,14 @@ function fe_solutions(
   r=realization(op;nparams))
 
   fesolver = get_fe_solver(solver)
-  fe_stats = get_fe_stats(solver)
-  reset_tracker!(fe_stats)
+  timer = get_timer(solver)
+  reset_timer!(timer)
 
   index_map = get_vector_index_map(op)
-  values = solve(fesolver,op,fe_stats;r)
+  values = solve(fesolver,op,timer;r)
   snaps = Snapshots(values,index_map,r)
 
-  return snaps,cost
+  return snaps
 end
 
 function Algebra.solve(rbsolver::RBSolver,feop,args...;kwargs...)

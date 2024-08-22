@@ -67,7 +67,7 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-println(compute_error(results))
+show(results.timer)
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)

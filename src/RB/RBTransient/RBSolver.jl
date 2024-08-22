@@ -12,12 +12,9 @@ function RBSteady.RBSolver(
   nsnaps_res=20,
   nsnaps_jac=20,
   nsnaps_test=10,
-  fe_stats=CostTracker(),
-  rb_offline_stats=CostTracker(),
-  rb_online_stats=CostTracker())
+  timer=TimerOutput())
 
-  RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_res,nsnaps_jac,nsnaps_test,
-    fe_stats,rb_offline_stats,rb_online_stats)
+  RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_res,nsnaps_jac,nsnaps_test,timer)
 end
 
 const ThetaMethodRBSolver = RBSolver{ThetaMethod}
@@ -30,10 +27,10 @@ function RBSteady.fe_solutions(
   r=realization(op;nparams))
 
   fesolver = get_fe_solver(solver)
-  fe_stats = get_fe_stats(solver)
-  reset_tracker!(fe_stats)
+  timer = get_timer(solver)
+  reset_timer!(timer)
 
-  sol = solve(fesolver,op,uh0,fe_stats;r)
+  sol = solve(fesolver,op,uh0,timer;r)
   odesol = sol.odesol
   r = odesol.r
 

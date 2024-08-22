@@ -6,6 +6,7 @@ using SparseArrays
 using DrWatson
 using Kronecker
 using Serialization
+using TimerOutputs
 
 using Gridap
 using Gridap.Algebra

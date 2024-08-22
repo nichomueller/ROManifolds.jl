@@ -136,3 +136,10 @@ function compute_relative_error(sol::AbstractArray,sol_approx::AbstractArray,arg
   rel_norm = err_norm / sol_norm
   return rel_norm
 end
+
+# when using TimerOutputs
+function set_nruns!(timer::TimerOutput,nruns::Int)
+  timer.accumulated_data.ncalls = nruns
+end
+
+reset_timer!(timer,name) = haskey(timer,name) && reset_timer!(timer[name])

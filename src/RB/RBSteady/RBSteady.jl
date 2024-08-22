@@ -7,6 +7,7 @@ using SparseArrays
 using DrWatson
 using Kronecker
 using Serialization
+using TimerOutputs
 
 using Gridap
 using Gridap.Algebra
@@ -65,9 +66,7 @@ export MDEIMStyle
 export SpaceMDEIM
 export get_test_directory
 export get_fe_solver
-export get_fe_stats
-export get_rb_offline_stats
-export get_rb_online_stats
+export get_timer
 export fe_solutions
 export nonlinear_rb_solve!
 include("RBSolver.jl")

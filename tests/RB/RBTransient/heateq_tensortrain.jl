@@ -2,6 +2,7 @@ using Gridap
 using Test
 using DrWatson
 using Serialization
+using TimerOutputs
 
 using Mabla.FEM
 using Mabla.FEM.Utils
@@ -92,7 +93,7 @@ rbsnaps,cache = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)
 
 println(compute_error(results))
-println(compute_speedup(results))
+println(get_timer(results))
 
 save(test_dir,fesnaps)
 save(test_dir,rbop)

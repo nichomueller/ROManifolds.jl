@@ -124,7 +124,7 @@ results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 # save(test_dir,rbop)
 save(test_dir,results)
 
-println(compute_error(results))
+show(results.timer)
 println(compute_speedup(results))
 
 # using Gridap.FESpaces
