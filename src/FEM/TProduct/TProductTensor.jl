@@ -92,13 +92,10 @@ end
 function _find_decompositions(summation,arrays_1d,gradients_1d)
   @check length(arrays_1d) == length(gradients_1d)
   inds = LinearIndices(arrays_1d)
-  d0 = GenericRank1Tensor(arrays_1d)
-  d = typeof(d0)[]
-  push!(d,d0)
-  map(inds) do i
+  d = map(inds) do i
     di = copy(arrays_1d)
-    di[i] = gradients_1d[i]
-    push!(d,GenericRank1Tensor(rank1))
+    di[i] += gradients_1d[i]
+    return GenericRank1Tensor(di)
   end
   return d
 end

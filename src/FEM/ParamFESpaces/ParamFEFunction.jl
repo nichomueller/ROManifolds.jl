@@ -116,18 +116,8 @@ end
 CellData.get_data(f::MultiFieldParamFEFunction) = get_data(f.multi_cell_field)
 FESpaces.get_triangulation(f::MultiFieldParamFEFunction) = get_triangulation(f.multi_cell_field)
 CellData.DomainStyle(::Type{MultiFieldParamFEFunction{T}}) where T = DomainStyle(T)
+FESpaces.get_free_dof_values(f::MultiFieldParamFEFunction) = f.free_values
 FESpaces.get_fe_space(f::MultiFieldParamFEFunction) = f.fe_space
-
-function FESpaces.get_free_dof_values(f::MultiFieldParamFEFunction)
-  fe = f.fe_space
-  free_values = similar(f.free_values)
-  for (field,fi) in enumerate(f)
-    fv_i = get_free_dof_values(fi)
-    free_values_i = restrict_to_field(fe,free_values,field)
-    free_values_i .= fv_i
-  end
-  return free_values
-end
 
 function FESpaces.get_cell_dof_values(f::MultiFieldParamFEFunction)
   msg = """\n
