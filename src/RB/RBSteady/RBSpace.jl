@@ -11,18 +11,16 @@ Computes the subspace of the test, trial FE spaces contained in the FE operator
 
 """
 function reduced_fe_space(solver,feop,s)
-  rb_stats = get_rb_offline_stats(solver)
-  reset_tracker!(rb_stats)
+  timer = get_timer(solver)
+  reset_timer!(timer)
 
   soff = select_snapshots(s,offline_params(solver))
-  stats = @timed begin
+  @timeit timer "RB" begin
     norm_matrix = assemble_norm_matrix(feop)
     basis = reduced_basis(feop,soff,norm_matrix;ϵ=get_tol(solver))
   end
   reduced_trial = fe_subspace(get_trial(feop),basis)
   reduced_test = fe_subspace(get_test(feop),basis)
-
-  update_tracker!(rb_stats,stats;msg="Cost of basis construction:")
 
   return reduced_trial,reduced_test
 end

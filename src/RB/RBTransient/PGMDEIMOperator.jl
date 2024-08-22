@@ -424,11 +424,11 @@ function Algebra.solve!(
 
   x̂,y,odecache = cache
   fesolver = get_fe_solver(solver)
-  rb_stats = get_rb_online_stats(solver)
-  reset_tracker!(rb_stats)
+  timer = get_timer(solver)
+  reset_timer!(timer,"TEST")
 
-  stats = @timed solve!((x̂,),fesolver,op,r,(y,),odecache)
-  update_tracker!(rb_stats,stats,num_params(r))
+  @timeit timer "TEST" solve!((x̂,),fesolver,op,r,(y,),odecache)
+  set_nruns!(timer["TEST"],num_params(r))
 
   trial = get_trial(op)(r)
   x = recast(x̂,trial)

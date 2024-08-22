@@ -97,7 +97,7 @@ catch
 end
 
 # post process
-println(compute_error(results))
+show(results.timer)
 println(compute_speedup(results))
 
 fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)

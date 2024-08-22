@@ -114,7 +114,7 @@ results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 # save(test_dir,rbop)
 save(test_dir,results)
 
-println(compute_error(results))
+show(results.timer)
 println(compute_speedup(results))
 # average_plot(rbop,results;dir=joinpath(test_dir,"plots"))
 
@@ -132,7 +132,7 @@ println(compute_speedup(results))
 # rbop_u = reduced_operator(rbsolver,feop_u,fesnaps_u)
 # rbsnaps_u,rbstats,cache = solve(lu_rbsolver,rbop_u,fesnaps_u)
 # results = rb_results(rbsolver,rbop_u,fesnaps_u,rbsnaps_u,festats,rbstats)
-# println(compute_error(results))
+# show(results.timer)
 # println(compute_speedup(results))
 
 # u1 = select_snapshots(fesnaps_u,1)

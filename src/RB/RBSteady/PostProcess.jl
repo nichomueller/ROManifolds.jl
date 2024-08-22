@@ -14,10 +14,8 @@ function load_solve(solver,feop,dir;kwargs...)
   rbop = deserialize_operator(feop,dir)
   rb_sol,_ = solve(solver,rbop,fe_sol)
   old_results = deserialize(get_results_filename(dir))
-  fe_stats = get_fe_stats(solver)
-  rb_offline_stats = get_rb_offline_stats(solver)
-  copyto!(fe_stats,old_results.fe_stats)
-  copyto!(rb_offline_stats,old_results.rb_offline_stats)
+  timer = get_timer(solver)
+  merge!(timer,old_results.timer)
   results = rb_results(solver,rbop,fe_sol,rb_sol;kwargs...)
   return results
 end
@@ -118,9 +116,8 @@ end
 """
     struct RBResults
       name::Union{String,Vector{String}}
-      fe_stats::CostTracker
-      rb_offline_stats::CostTracker
-      rb_online_stats::GenericPerformance
+      timer::TimerOutput
+      error::Vector{Float64}
     end
 
 Allows to compute errors and computational speedups to compare the properties of
@@ -129,19 +126,18 @@ the algorithm with the FE performance.
 """
 struct RBResults
   name::Union{String,Vector{String}}
-  fe_stats::CostTracker
-  rb_offline_stats::CostTracker
-  rb_online_stats::GenericPerformance
+  timer::TimerOutput
+  error::Vector{Float64}
 end
 
+TimerOutputs.get_timer(r::RBResults) = r.timer
+
 function rb_results(solver::RBSolver,feop,s,son_approx;name="vel")
+  timer = get_timer(solver)
   X = assemble_norm_matrix(feop)
   son = select_snapshots(s,online_params(solver))
   error = compute_error(son,son_approx,X)
-  fe_stats = get_fe_stats(solver)
-  rb_offline_stats = get_rb_offline_stats(solver)
-  rb_online_stats = GenericPerformance(error,get_rb_online_stats(solver))
-  RBResults(name,fe_stats,rb_offline_stats,rb_online_stats)
+  RBResults(name,timer,error)
 end
 
 function rb_results(solver::RBSolver,op::RBOperator,args...;kwargs...)
@@ -157,16 +153,6 @@ function DrWatson.save(dir,r::RBResults)
   serialize(get_results_filename(dir),r)
 end
 
-"""
-    compute_speedup(r::RBResults) -> (Number, Number)
-
-Computes the speedup in time and memory, where `speedup` = RB estimate / FE estimate
-
-"""
-function Utils.compute_speedup(r::RBResults)
-  compute_speedup(r.fe_stats,r.rb_online_stats.cost)
-end
-
 function Utils.compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
   @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
   active_block_ids = get_touched_blocks(sol)
@@ -176,5 +162,5 @@ function Utils.compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm
 end
 
 function Utils.compute_error(r::RBResults)
-  mean(r.rb_online_stats.error)
+  mean(r.error)
 end

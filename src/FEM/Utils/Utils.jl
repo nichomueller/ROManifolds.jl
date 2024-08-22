@@ -11,6 +11,8 @@ using Gridap.Geometry
 using Gridap.Helpers
 using Gridap.TensorValues
 
+import TimerOutputs: TimerOutput, reset_timer!
+
 export PerformanceTracker
 export CostTracker
 export GenericPerformance
@@ -20,6 +22,7 @@ export get_stats
 export compute_speedup
 export compute_error
 export induced_norm
+export set_nruns!
 include("PerformanceTrackers.jl")
 
 export PartialFunctions

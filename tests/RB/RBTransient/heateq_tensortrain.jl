@@ -2,6 +2,7 @@ using Gridap
 using Test
 using DrWatson
 using Serialization
+using TimerOutputs
 
 using Mabla.FEM
 using Mabla.FEM.Utils
@@ -32,8 +33,8 @@ domain = (0,1,0,1,0,1)
 partition = (n,n,n)
 model = TProductModel(domain,partition)
 labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet",collect(1:25))
-add_tag_from_tags!(labels,"neumann",[26])
+add_tag_from_tags!(labels,"neumann",[21,22])
+add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,23,24,25,26])
 
 order = 2
 degree = 2*order
@@ -72,7 +73,7 @@ trian_res = (Ω.trian,Γn)
 trian_stiffness = (Ω.trian,)
 trian_mass = (Ω.trian,)
 
-induced_norm(du,v) = ∫(∇(v)⋅∇(du))dΩ
+induced_norm(du,v) = ∫(v⋅du)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
@@ -92,7 +93,7 @@ rbsnaps,cache = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)
 
 println(compute_error(results))
-println(compute_speedup(results))
+println(get_timer(results))
 
 save(test_dir,fesnaps)
 save(test_dir,rbop)
