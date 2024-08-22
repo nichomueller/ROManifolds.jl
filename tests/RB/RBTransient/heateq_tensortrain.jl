@@ -97,3 +97,7 @@ println(compute_speedup(results))
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)
+
+using Mabla.FEM.IndexMaps
+fesnaps′ = change_index_map(TrivialIndexMap,fesnaps)
+reduced_operator(rbsolver,feop,fesnaps′)

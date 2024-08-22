@@ -1,24 +1,24 @@
 # tt-svd
 
-function RBSteady.ttsvd(mat::AbstractTransientSnapshots{T,N};kwargs...) where {T,N}
+function RBSteady.ttsvd(a::AbstractTransientSnapshots{T,N};kwargs...) where {T,N}
   cores = Vector{Array{T,3}}(undef,N-1)
   ranks = fill(1,N)
-  sizes = size(mat)
+  sizes = size(a)
   cache = cores,ranks,sizes
   # routine on the spatial and temporal indices
-  _ = RBSteady.ttsvd!(cache,mat;ids_range=1:N-1,kwargs...)
+  RBSteady.ttsvd!(cache,a;ids_range=1:N-1,kwargs...)
   return cores
 end
 
-function RBSteady.ttsvd(mat::AbstractTransientSnapshots{T,N},X::AbstractTProductTensor;kwargs...) where {T,N}
+function RBSteady.ttsvd(a::AbstractTransientSnapshots{T,N},X::AbstractTProductTensor;kwargs...) where {T,N}
   N_space = N-2
   cores = Vector{Array{T,3}}(undef,N-1)
   ranks = fill(1,N)
-  sizes = size(mat)
+  sizes = size(a)
   # routine on the spatial indices
-  M = RBSteady.ttsvd!((cores,ranks,sizes),mat,X;ids_range=1:N_space,kwargs...)
+  a′ = RBSteady.ttsvd!((cores,ranks,sizes),a,X;ids_range=1:N_space,kwargs...)
   # routine on the temporal index
-  _ = RBSteady.ttsvd!((cores,ranks,sizes),M;ids_range=N_space+1,kwargs...)
+  RBSteady.ttsvd!((cores,ranks,sizes),a′;ids_range=N_space+1,kwargs...)
   return cores
 end
 

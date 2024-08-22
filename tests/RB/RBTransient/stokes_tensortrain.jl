@@ -149,7 +149,7 @@ ranks = fill(1,N)
 
 k = 1
 mat_k = reshape(mat,ranks[k]*sizes[k],:)
-Ur,Σr,Vr = RBSteady._tpod(mat_k)
+Ur,Σr,Vr = RBSteady._truncated_pod(mat_k)
 rank = size(Ur,2)
 ranks[k+1] = rank
 mat = reshape(Σr.*Vr',rank,sizes[k+1],:)
@@ -204,7 +204,7 @@ _red_trial1,_red_test1 = _red_trial[1],_red_test[1]
 _proj_basis = reduce_operator(rbsolver.mdeim_style,_basis,_red_trial1,_red_test1)
 
 _mat = flatten_snapshots(_j1[1,1])
-_Ur,_Σr,_Vr = RBSteady._tpod(_mat;randomized=true)
+_Ur,_Σr,_Vr = RBSteady._truncated_pod(_mat;randomized=true)
 
 
 # projecting function
