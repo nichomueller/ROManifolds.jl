@@ -30,10 +30,9 @@ function truncated_svd(mat::AbstractMatrix;randomized=false,kwargs...)
   select_modes(U,Σ,V;kwargs...)
 end
 
- _size_condition(mat::AbstractMatrix) = (
-    length(mat) > 1e6 && (size(mat,1) > 1e2*size(mat,2) || size(mat,2) > 1e2*size(mat,1))
-    )
-
+_size_condition(mat::AbstractMatrix) = false #(
+    #length(mat) > 1e6 && (size(mat,1) > 1e2*size(mat,2) || size(mat,2) > 1e2*size(mat,1))
+    #)
 
 """
     truncated_pod(mat::AbstractMatrix,args...;kwargs...) -> AbstractMatrix
@@ -44,11 +43,11 @@ otherwise they are ℓ²-orthogonal
 
 """
 function truncated_pod(mat::AbstractMatrix,args...;kwargs...)
-  U,Σ,V = _tpod(mat,args...;kwargs...)
+  U,Σ,V = _truncated_pod(mat,args...;kwargs...)
   return U
 end
 
-function _tpod(mat::AbstractMatrix,args...;kwargs...)
+function _truncated_pod(mat::AbstractMatrix,args...;kwargs...)
   if _size_condition(mat)
     if size(mat,1) > size(mat,2)
       massive_rows_tpod(mat,args...;kwargs...)
@@ -64,7 +63,7 @@ function standard_tpod(mat::AbstractMatrix,args...;kwargs...)
   truncated_svd(mat;kwargs...)
 end
 
-function standard_tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
+function standard_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
   C = cholesky(X)
   L,p = sparse(C.L),C.p
   Xmat = L'*mat[p,:]
@@ -121,6 +120,57 @@ function massive_cols_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...
   return Ur,Σr,Vr'
 end
 
+# function _tt_truncated_pod(a::AbstractArray{T,3},args...;kwargs...) where T
+#   mat = reshape(a,size(a,1)*size(a,2),:)
+#   Ur,Σr,Vr = _truncated_pod(mat;kwargs...)
+#   core = reshape(Ur,size(a,1),size(a,2),:)
+#   remainder = Σr.*Vr'
+#   return core,remainder
+# end
+
+# function _tt_truncated_pod(a::AbstractArray{T,3},X::AbstractSparseMatrix;kwargs...) where T
+#   perm = (2,1,3)
+#   prev_rank = size(a,1)
+#   cur_size = size(a,2)
+
+#   C = cholesky(X)
+#   L,p = sparse(C.L),C.p
+
+#   Xa = _tt_mul(L,p,a)
+#   Xmat = reshape(Xa,:,size(Xa,3))
+#   Ũr,Σr,Vr = truncated_svd(Xmat;kwargs...)
+#   c̃ = reshape(Ũr,size(Xa,1),size(Xa,2),:)
+#   core = _tt_div(L,p,c̃)
+#   remainder = Σr.*Vr'
+
+#   return core,remainder
+# end
+
+# function _tt_mul(L::AbstractSparseMatrix{T},p::Vector{Int},a::AbstractArray{T,3}) where T
+#   @check size(L,2) == size(a,2)
+#   b = similar(a,T,(size(a,1),size(L,1),size(a,3)))
+#   ap = a[:,p,:]
+#   @inbounds for i1 in axes(b,1)
+#     ap1 = ap[i1,:,:]
+#     @inbounds for i3 in axes(b,3)
+#       b[i1,:,i3] = L'*ap1[:,i3]
+#     end
+#   end
+#   return b
+# end
+
+# function _tt_div(L::AbstractSparseMatrix{T},p::Vector{Int},a::AbstractArray{T,3}) where T
+#   @check size(L,1) == size(L,2) == size(a,2)
+#   b = similar(a)
+#   @inbounds for i1 in axes(b,1)
+#     a1 = a[i1,:,:]
+#     @inbounds for i3 in axes(b,3)
+#       b[i1,p,i3] = L'\a1[:,i3]
+#     end
+#   end
+#   return b
+# end
+
 # We are not interested in the last dimension (corresponds to the parameter).
 # Note: when X is provided as norm matrix, ids_range has length 1, so we actually
 # are not computing a cholesky decomposition numerous times
@@ -128,7 +178,7 @@ function ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...)
   cores,ranks,sizes = cache
   for d in ids_range
     mat_d = reshape(mat,ranks[d]*sizes[d],:)
-    Ur,Σr,Vr = _tpod(mat_d,args...;kwargs...)
+    Ur,Σr,Vr = _truncated_pod(mat_d,args...;kwargs...)
     rank = size(Ur,2)
     ranks[d+1] = rank
     mat = reshape(Σr.*Vr',rank,sizes[d+1],:)
@@ -136,13 +186,35 @@ function ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...)
   end
   return mat
 end
+
+# function ttsvd!(cache,a::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...) where {T,N}
+#   cores,ranks,sizes = cache
+#   d1 = ids_range[1]
+#   a_d = reshape(a,ranks[d1],sizes[d1],:)
+#   for d in ids_range
+#     core_d,remainder_d = _tt_truncated_pod(a_d,args...;kwargs...)
+#     rank = size(core_d,3)
+#     ranks[d+1] = rank
+#     cores[d] = core_d
+#     a_d = reshape(remainder_d,rank,sizes[d+1],:)
+#   end
+#   return a_d
+# end
+
+# function ttsvd!(cache,a::AbstractArray{T,N},X::AbstractRank1Tensor;ids_range=1:N-1,kwargs...) where {T,N}
+#   for d in ids_range
+#     # Xd = kron(X[d],I(ranks[d]))
+#     a = ttsvd!(cache,a,X[d];ids_range=d,kwargs...)
+#   end
+#   return a
+# end
 
 function ttsvd!(cache,mat::AbstractArray{T,N},X::AbstractRank1Tensor;ids_range=1:N-1,kwargs...) where {T,N}
   cores,ranks,sizes = cache
   for d in ids_range
     Xd = kron(X[d],I(ranks[d]))
     mat_d = reshape(mat,ranks[d]*sizes[d],:)
-    Ur,Σr,Vr = _tpod(mat_d,Xd;kwargs...)
+    Ur,Σr,Vr = _truncated_pod(mat_d,Xd;kwargs...)
     rank = size(Ur,2)
     ranks[d+1] = rank
     mat = reshape(Σr.*Vr',rank,sizes[d+1],:)
@@ -151,13 +223,13 @@ function ttsvd!(cache,mat::AbstractArray{T,N},X::AbstractRank1Tensor;ids_range=1
   return mat
 end
 
-function ttsvd!(cache,mat::AbstractArray{T,N},X::AbstractRankTensor;ids_range=1:N,kwargs...) where {T,N}
+function ttsvd!(cache,a::AbstractArray{T,N},X::AbstractRankTensor;ids_range=1:N,kwargs...) where {T,N}
   cores,ranks,sizes = cache
-  cores_k,mats = map(1:rank(X)) do k
+  cores_k,as = map(1:rank(X)) do k
     cores_k = copy(cores[ids_range])
     ranks_k = copy(ranks)
-    mat_k = ttsvd!((cores_k,ranks_k,sizes),mat,X[k];ids_range,kwargs...)
-    cores_k,mat_k
+    a_k = ttsvd!((cores_k,ranks_k,sizes),a,X[k];ids_range,kwargs...)
+    cores_k,a_k
   end |> tuple_of_arrays
   for d in ids_range
     touched = d == first(ids_range) ? fill(true,rank(X)) : I(rank(X))
@@ -165,8 +237,8 @@ function ttsvd!(cache,mat::AbstractArray{T,N},X::AbstractRankTensor;ids_range=1:
     cores[d] = BlockCore(cores_d,touched)
   end
   R = orthogonalize!(cores,ranks,X;ids_range)
-  mat = absorb(cat(mats...;dims=1),R)
-  return mat
+  a = absorb(cat(as...;dims=1),R)
+  return a
 end
 
 function pivoted_qr(A;tol=1e-10)
@@ -260,7 +332,7 @@ function _get_norm_matrix_from_weight(X::AbstractRankTensor,WD)
 end
 
 """
-    ttsvd(mat::AbstractMatrix,args...;kwargs...) -> Vector{<:AbstractArray}
+    ttsvd(a::AbstractArray,args...;kwargs...) -> Vector{<:AbstractArray}
 
 Tensor train singular value decomposition. When a symmetric, positive definite
 matrix `X` is provided as an argument, the columns of A₁ ⊗ ... ⊗ Aₙ, where
@@ -268,23 +340,23 @@ A₁, ..., Aₙ are the components of the outer vector, are `X`-orthogonal,
 otherwise they are ℓ²-orthogonal
 
 """
-function ttsvd(mat::AbstractArray{T,N};kwargs...) where {T,N}
+function ttsvd(a::AbstractArray{T,N};kwargs...) where {T,N}
   cores = Vector{Array{T,3}}(undef,N-1)
   ranks = fill(1,N)
-  sizes = size(mat)
+  sizes = size(a)
   cache = cores,ranks,sizes
   # routine on the spatial indices
-  ttsvd!(cache,mat;ids_range=1:N-1,kwargs...)
+  ttsvd!(cache,a;ids_range=1:N-1,kwargs...)
   return cores
 end
 
-function ttsvd(mat::AbstractArray{T,N},X::AbstractTProductTensor;kwargs...) where {T,N}
+function ttsvd(a::AbstractArray{T,N},X::AbstractTProductTensor;kwargs...) where {T,N}
   N_space = N-1
   cores = Vector{Array{T,3}}(undef,N-1)
   ranks = fill(1,N)
-  sizes = size(mat)
+  sizes = size(a)
   # routine on the spatial indices
-  ttsvd!((cores,ranks,sizes),mat,X;ids_range=1:N_space,kwargs...)
+  ttsvd!((cores,ranks,sizes),a,X;ids_range=1:N_space,kwargs...)
   return cores
 end
 
