@@ -17,9 +17,9 @@ using Mabla.RB.RBTransient
 
 # time marching
 θ = 0.5
-dt = 0.01
+dt = 0.0025
 t0 = 0.0
-tf = 0.1
+tf = 0.3
 
 # parametric space
 pranges = fill([1,10],3)
@@ -27,7 +27,7 @@ tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
 # geometry
-n = 5
+n = 10
 domain = (0,1,0,1,0,1)
 partition = (n,n,n)
 model = TProductModel(domain,partition)
@@ -35,7 +35,7 @@ labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet",collect(1:25))
 add_tag_from_tags!(labels,"neumann",[26])
 
-order = 1#2
+order = 2
 degree = 2*order
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
@@ -83,8 +83,8 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=5,nsnaps_res=30,nsnaps_jac=20)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_res=30,nsnaps_jac=20)
+test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","3dcube_tensor_train")))
 
 fesnaps = fe_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)

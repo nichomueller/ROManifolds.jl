@@ -82,7 +82,7 @@ end
 
 function Base.show(io::IO,k::MIME"text/plain",p::GenericPerformance)
   show(io,MIME"text/plain"(),p.cost)
-  println(io," > errors across $(t.nruns) runs: $(t.error)")
+  println(io," > errors across $(p.cost.nruns) runs: $(p.error)")
 end
 
 function Base.copyto!(p1::GenericPerformance,p2::GenericPerformance)
@@ -112,7 +112,7 @@ function compute_speedup(p1::GenericPerformance,p2::GenericPerformance;kwargs...
 end
 
 induced_norm(v::AbstractVector,args...) = norm(v)
-induced_norm(v::AbstractVector,norm_matrix::AbstractMatrix) = sqrt(v'*X*v)
+induced_norm(v::AbstractVector,norm_matrix::AbstractMatrix) = sqrt(v'*norm_matrix*v)
 
 function compute_error(
   sol::AbstractArray{T,N},
