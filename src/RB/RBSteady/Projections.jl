@@ -35,13 +35,13 @@ abstract type SteadyProjection <: Projection end
 num_fe_dofs(a::SteadyProjection) = num_space_dofs(a)
 num_reduced_dofs(a::SteadyProjection) = num_reduced_space_dofs(a)
 
-function Projection(s::UnfoldingSteadySnapshots,args...;kwargs...)
-  basis = truncated_pod(s,args...;kwargs...)
+function Projection(red::PODReduction,s::AbstractSteadySnapshots,args...)
+  basis = truncated_pod(s,args...)
   basis′ = recast(s,basis)
   PODBasis(basis′)
 end
 
-function Projection(s::AbstractSteadySnapshots,args...;kwargs...)
+function Projection(red::TTSVDReduction,s::AbstractSteadySnapshots,args...)
   cores = ttsvd(s,args...;kwargs...)
   cores′ = recast(s,cores)
   index_map = get_index_map(s)

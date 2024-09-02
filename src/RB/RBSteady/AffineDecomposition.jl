@@ -273,7 +273,7 @@ get_integration_domain(a::AffineDecomposition) = a.integration_domain
 get_interp_matrix(a::AffineDecomposition) = a.mdeim_interpolation
 get_indices_space(a::AffineDecomposition) = get_indices_space(get_integration_domain(a))
 
-function mdeim(mdeim_style::MDEIMStyle,b::SteadyProjection)
+function mdeim(b::SteadyProjection)
   basis_space = get_basis_space(b)
   indices_space,interp_basis_space = empirical_interpolation(basis_space)
   lu_interp = lu(interp_basis_space)
@@ -319,10 +319,9 @@ function reduced_form(
   args...;
   kwargs...)
 
-  mdeim_style = solver.mdeim_style
   basis = reduced_basis(s;ϵ=get_tol(solver))
-  lu_interp,integration_domain = mdeim(mdeim_style,basis)
-  proj_basis = reduce_operator(mdeim_style,basis,args...;kwargs...)
+  lu_interp,integration_domain = mdeim(basis)
+  proj_basis = reduce_operator(basis,args...;kwargs...)
   red_trian = reduce_triangulation(trian,integration_domain,args...)
   coefficient = allocate_coefficient(solver,basis)
   result = allocate_result(solver,args...)

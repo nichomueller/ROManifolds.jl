@@ -141,7 +141,7 @@ iA = get_matrix_index_map(feop)
 sA = Snapshots(A,iA,r)
 basis = reduced_basis(sA)
 
-lu_interp,integration_domain = mdeim(SpaceTimeMDEIM(),basis)
+lu_interp,integration_domain = mdeim(basis)
 
 # supremizer check
 

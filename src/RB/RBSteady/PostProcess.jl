@@ -114,20 +114,20 @@ function DrWatson.save(dir,op::PGOperator;kwargs...)
 end
 
 """
-    struct RBResults
+    struct RBResults{A}
       name::Union{String,Vector{String}}
       timer::TimerOutput
-      error::Vector{Float64}
+      error::A
     end
 
 Allows to compute errors and computational speedups to compare the properties of
 the algorithm with the FE performance.
 
 """
-struct RBResults
+struct RBResults{A}
   name::Union{String,Vector{String}}
   timer::TimerOutput
-  error::Vector{Float64}
+  error::A
 end
 
 TimerOutputs.get_timer(r::RBResults) = r.timer
@@ -161,6 +161,5 @@ function Utils.compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm
   return_cache(block_map,errors...)
 end
 
-function Utils.compute_error(r::RBResults)
-  mean(r.error)
-end
+Utils.compute_error(r::RBResults) = mean(r.error)
+Utils.compute_error(r::RBResults{<:BlockArray}) = map(mean,r.error.array)

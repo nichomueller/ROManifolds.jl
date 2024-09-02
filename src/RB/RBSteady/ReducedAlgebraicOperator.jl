@@ -20,25 +20,22 @@ Subtypes:
 - [`ReducedMatrixOperator`](@ref)
 
 """
-abstract type ReducedAlgebraicOperator{A} <: Projection end
+abstract type ReducedAlgebraicOperator <: Projection end
 
 """
 """
-struct ReducedVectorOperator{A,B} <: ReducedAlgebraicOperator{A}
-  mdeim_style::A
-  basis::B
+struct ReducedVectorOperator{A} <: ReducedAlgebraicOperator
+  basis::A
 end
 
 """
 """
-struct ReducedMatrixOperator{A,B} <: ReducedAlgebraicOperator{A}
-  mdeim_style::A
+struct ReducedMatrixOperator{A} <: ReducedAlgebraicOperator
   basis::B
 end
 
 """
-    reduce_operator(mdeim_style::MDEIMStyle,b::Projection,r::FESubspace...;kwargs...
-      ) -> ReducedAlgebraicOperator
+    reduce_operator(b::Projection,r::FESubspace...;kwargs...) -> ReducedAlgebraicOperator
 
 Computes a ReducedAlgebraicOperator from a Projection `b` and FESubspace(s) `r`.
 When `b` consists of compressed residual snapshots, `r` stands for the `test` FE
@@ -46,12 +43,11 @@ space; when it consists of compressed jacobian snapshots, `r` stands for the
 `trial` and `test` FE spaces
 
 """
-function reduce_operator(mdeim_style::MDEIMStyle,b::Projection,r::FESubspace...;kwargs...)
-  reduce_operator(mdeim_style,b,map(get_basis,r)...;kwargs...)
+function reduce_operator(b::Projection,r::FESubspace...;kwargs...)
+  reduce_operator(b,map(get_basis,r)...;kwargs...)
 end
 
 function reduce_operator(
-  mdeim_style,
   b::PODBasis,
   b_test::PODBasis;
   kwargs...)
@@ -59,16 +55,10 @@ function reduce_operator(
   bs = get_basis_space(b)
   bs_test = get_basis_space(b_test)
   b̂s = bs_test'*bs
-  return ReducedVectorOperator(mdeim_style,b̂s)
+  return ReducedVectorOperator(b̂s)
 end
 
-function reduce_operator(
-  mdeim_style,
-  b::PODBasis,
-  b_trial::PODBasis,
-  b_test::PODBasis;
-  kwargs...)
-
+function reduce_operator(b::PODBasis,b_trial::PODBasis,b_test::PODBasis;kwargs...)
   bs = get_basis_space(b)
   bs_trial = get_basis_space(b_trial)
   bs_test = get_basis_space(b_test)
@@ -81,30 +71,19 @@ function reduce_operator(
     b̂s[:,i,:] = bs_test'*param_getindex(bs,i)*bs_trial
   end
 
-  return ReducedMatrixOperator(mdeim_style,b̂s)
+  return ReducedMatrixOperator(b̂s)
 end
 
 # TT interface
 
-function reduce_operator(
-  mdeim_style,
-  b::TTSVDCores,
-  b_test::TTSVDCores;
-  kwargs...)
-
+function reduce_operator(b::TTSVDCores,b_test::TTSVDCores;kwargs...)
   b̂st = compress_cores(b,b_test)
-  return ReducedVectorOperator(mdeim_style,b̂st)
+  return ReducedVectorOperator(b̂st)
 end
 
-function reduce_operator(
-  mdeim_style,
-  b::TTSVDCores,
-  b_trial::TTSVDCores,
-  b_test::TTSVDCores;
-  kwargs...)
-
+function reduce_operator(b::TTSVDCores,b_trial::TTSVDCores,b_test::TTSVDCores;kwargs...)
   b̂st = compress_cores(b,b_trial,b_test;kwargs...)
-  return ReducedMatrixOperator(mdeim_style,b̂st)
+  return ReducedMatrixOperator(b̂st)
 end
 
 function Base.:*(a::ReducedVectorOperator,b::AbstractVector)

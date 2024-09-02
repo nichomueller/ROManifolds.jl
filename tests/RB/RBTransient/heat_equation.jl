@@ -105,31 +105,103 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-# using Gridap.FESpaces
-# red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-# op = get_algebraic_operator(feop)
-# pop = TransientPGOperator(op,red_trial,red_test)
-# smdeim = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
-# jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
+using Gridap
+using Test
+using DrWatson
+using Serialization
+using TimerOutputs
 
-# isa(jjac[1][1],
-#   RBTransient.TransientSnapshotsAtIndices{T,N,L,D,I,R,
-#   <:RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,<:MatrixOfSparseMatricesCSC},B,C
-#   } where {T,N,L,D,I,R,B,C})
-# isa(jjac[1][1],TransientSparseSnapshots)
+using Mabla.FEM
+using Mabla.FEM.Utils
+using Mabla.FEM.TProduct
+using Mabla.FEM.ParamDataStructures
+using Mabla.FEM.ParamFESpaces
+using Mabla.FEM.ParamSteady
+using Mabla.FEM.ParamODEs
 
-# const _TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC,B,C} = Union{
-#   RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,A},
-#   RBTransient.TransientSnapshotsAtIndices{T,N,L,D,I,R,
-#   RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,A},B,C}
-# }
-# isa(jjac[1][1],_TransientSparseSnapshots)
+using Mabla.RB
+using Mabla.RB.RBSteady
+using Mabla.RB.RBTransient
 
-# S1{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,A}
-# SSSS2{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
-#   S1{T,N,L,D,I,R,A},RBTransient.TransientSnapshotsAtIndices{T,N,L,D,I,R,<:S1{T,N,L,D,I,R,A}}
-# }
+# time marching
+θ = 0.5
+dt = 0.0025
+t0 = 0.0
+tf = 0.15
 
-# const S1{T,N,L,D,I,R} = RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,<:MatrixOfSparseMatricesCSC}
-# # const S2{T,N,L,D,I,R}
-# isa(jjac[1][1],SSSS2)
+# parametric space
+pranges = fill([1,10],3)
+tdomain = t0:dt:tf
+ptspace = TransientParamSpace(pranges,tdomain)
+
+# geometry
+n = 5
+domain = (0,1,0,1,0,1)
+partition = (n,n,n)
+model = CartesianDiscreteModel(domain,partition)#TProductModel(domain,partition)
+labels = get_face_labeling(model)
+add_tag_from_tags!(labels,"dirichlet","boundary")
+
+order = 2#2
+degree = 2*order
+Ω = Triangulation(model)
+dΩ = Measure(Ω,degree)
+
+# weak formulation
+a(x,μ,t) = 1+exp(-sin(t)^2*x[1]/sum(μ))
+a(μ,t) = x->a(x,μ,t)
+aμt(μ,t) = TransientParamFunction(a,μ,t)
+
+f(x,μ,t) = abs.(sin(9*pi*t/(5*μ[3])))
+f(μ,t) = x->f(x,μ,t)
+fμt(μ,t) = TransientParamFunction(f,μ,t)
+
+g(x,μ,t) = exp(-x[1]/μ[2])*abs(1-cos(9*pi*t/5)+sin(9*pi*t/(5*μ[3])))
+g(μ,t) = x->g(x,μ,t)
+gμt(μ,t) = TransientParamFunction(g,μ,t)
+
+u0(x,μ) = 0
+u0(μ) = x->u0(x,μ)
+u0μ(μ) = ParamFunction(u0,μ)
+
+stiffness(μ,t,u,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
+mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
+rhs(μ,t,v,dΩ) = ∫(fμt(μ,t)*v)dΩ
+res(μ,t,u,v,dΩ) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ)
+
+trian_res = (Ω,)
+trian_stiffness = (Ω,)
+trian_mass = (Ω,)
+
+induced_norm(du,v) = ∫(v⋅du)dΩ + ∫(∇(v)⋅∇(du))dΩ
+
+reffe = ReferenceFE(lagrangian,Float64,order)
+test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+trial = TransientTrialParamFESpace(test,gμt)
+feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
+  trial,test,trian_res,trian_stiffness,trian_mass)
+uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
+
+fesolver = ThetaMethod(LUSolver(),dt,θ)
+ϵ = 1e-4
+rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=5,nsnaps_res=30,nsnaps_jac=20)
+# test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
+
+fesnaps = fe_solutions(rbsolver,feop,uh0μ)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+rbsnaps,cache = solve(rbsolver,rbop,fesnaps)
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)
+
+println(compute_error(results))
+println(get_timer(results))
+
+using Gridap.FESpaces
+op = get_algebraic_operator(feop)
+pop = TransientPGOperator(op,red_test,red_test)
+# red_test = op.test
+jjac,rres = jacobian_and_residual(rbsolver,pop,fesnaps)
+
+basis = reduced_basis(jjac[1][1])#reduced_basis(rres[1])#reduced_basis(jjac[1][1])
+lu_interp,integration_domain = mdeim(basis)
+proj_basis = reduce_operator(basis,red_test,red_test)
+red_trian = reduce_triangulation(Ω,integration_domain,red_test)

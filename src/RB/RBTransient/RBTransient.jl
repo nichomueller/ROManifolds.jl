@@ -51,8 +51,6 @@ include("Snapshots.jl")
 export get_stage_operator
 include("ThetaMethod.jl")
 
-export SpaceOnlyMDEIM
-export SpaceTimeMDEIM
 export ThetaMethodRBSolver
 include("RBSolver.jl")
 

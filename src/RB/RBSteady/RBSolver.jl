@@ -13,10 +13,171 @@ function create_dir(dir::String)
   return
 end
 
-abstract type MDEIMStyle end
-struct SpaceMDEIM <: MDEIMStyle end
+struct TimerInfo
+  name::String
+  timer::TimerOutput
+end
 
-get_mdeim_style_filename(::SpaceMDEIM) = "space_mdeim"
+function TimerInfo(name)
+  timer = TimerOutput()
+  TimerInfo(name)
+end
+
+TimerOutputs.get_timer(t::TimerInfo) = t.timer
+TimerOutputs.reset_timer!(t::TimerInfo) = reset_timer!(t.timer[t.name])
+
+function set_nruns!(t::TimerInfo,nruns::Int)
+  t.timer.accumulated_data.ncalls = nruns
+end
+
+abstract type AbstractReduction end
+abstract type DirectReduction <: AbstractReduction end
+abstract type GreedyReduction <: AbstractReduction end
+
+TimerOutputs.get_timer(r::AbstractReduction) = @abstractmethod
+TimerOutputs.reset_timer!(r::AbstractReduction) = reset_timer!(get_timer(r))
+set_nruns!(r::AbstractReduction,nruns::Int) = set_nruns!(get_timer(r),nruns)
+get_name(r::AbstractReduction) = get_name(get_timer(r))
+
+get_reduction(r::AbstractReduction) = r
+get_style(r::AbstractReduction) = @abstractmethod
+num_snaps(r::AbstractReduction) = @abstractmethod
+
+abstract type ReductionStyle end
+
+struct SearchSVDRank{A} <: ReductionStyle
+  tol::A
+end
+
+struct FixedSVDRank{A} <: ReductionStyle
+  rank::A
+end
+
+struct PODReduction{A<:ReductionStyle} <: DirectReduction
+  style::A
+  nsnaps::Int
+  timer::TimerInfo
+end
+
+function PODReduction(style::ReductionStyle;nsnaps=50)
+  timer = TimerInfo("POD")
+  PODReduction(style,nsnaps,timer)
+end
+
+function PODReduction(;style=SearchSVDRank(1e-4),kwargs...)
+  PODReduction(style;kwargs...)
+end
+
+TimerOutputs.get_timer(r::PODReduction) = r.timer
+get_style(r::PODReduction) = r.style
+num_snaps(r::PODReduction) = r.nsnaps
+
+struct TTSVDReduction{A<:ReductionStyle,B} <: DirectReduction
+  style::A
+  nsnaps::Int
+  timer::TimerInfo
+end
+
+function TTSVDReduction(style::ReductionStyle;nsnaps=50)
+  timer = TimerInfo("TTSVD")
+  TTSVDReduction(style,nsnaps,timer)
+end
+
+function TTSVDReduction(;style=SearchSVDRank(1e-4),kwargs...)
+  TTSVDReduction(style;kwargs...)
+end
+
+TimerOutputs.get_timer(r::TTSVDReduction) = r.timer
+get_style(r::TTSVDReduction) = r.style
+num_snaps(r::TTSVDReduction) = r.nsnaps
+
+struct NormedReduction{A<:AbstractReduction} <: AbstractReduction
+  reduction::A
+  norm_op::Function
+end
+
+for f in (:PODReduction,:TTSVDReduction)
+  @eval begin
+    function $f(norm_op::Function,style::ReductionStyle;kwargs...)
+      reduction = $f(style;kwargs...)
+      NormedReduction(reduction,norm_op)
+    end
+
+    function $f(norm_op::Function;kwargs...)
+      reduction = $f(;kwargs...)
+      NormedReduction(reduction,norm_op)
+    end
+  end
+end
+
+get_norm(r::NormedReduction) = r.norm_op
+
+get_reduction(r::NormedReduction) = get_reduction(r.reduction)
+TimerOutputs.get_timer(r::NormedReduction) = get_timer(get_reduction(r))
+get_style(r::NormedReduction) = get_style(get_reduction(r))
+num_snaps(r::NormedReduction) = num_snaps(get_reduction(r))
+
+const NormedPODReduction{A<:ReductionStyle} = NormedReduction{PODReduction{A}}
+const NormedTTSVDReduction{A<:ReductionStyle} = NormedReduction{TTSVDReduction{A}}
+
+struct SupremizerReduction{A<:AbstractReduction} <: AbstractReduction
+  reduction::A
+  supr_op::Function
+  supr_tol::Float64
+end
+
+for f in (:PODReduction,:TTSVDReduction)
+  @eval begin
+    function $f(supr_op::Function,norm_op::Function,style::ReductionStyle;supr_tol=1e-2,kwargs...)
+      reduction = $f(norm_op,style;kwargs...)
+      SupremizerReduction(reduction,supr_op,supr_tol)
+    end
+
+    function $f(supr_op::Function,norm_op::Function;kwargs...)
+      reduction = $f(norm_op;kwargs...)
+      NormedReduction(reduction,supr_op,supr_tol)
+    end
+  end
+end
+
+const SupremizerPODReduction{A<:ReductionStyle} = SupremizerReduction{NormedPODReduction{A}}
+const SupremizerTTSVDReduction{A<:ReductionStyle} = SupremizerReduction{NormedTTSVDReduction{A}}
+
+get_supr(r::SupremizerReduction) = r.supr_op
+get_norm(r::SupremizerReduction) = get_norm(get_reduction(r))
+
+get_reduction(r::SupremizerReduction) = get_reduction(r.reduction)
+TimerOutputs.get_timer(r::SupremizerReduction) = get_timer(get_reduction(r))
+get_style(r::SupremizerReduction) = get_style(get_reduction(r))
+num_snaps(r::SupremizerReduction) = num_snaps(get_reduction(r))
+
+struct MDEIMReduction{A<:AbstractReduction} <: AbstractReduction
+  style::A
+  nsnaps::Int
+  timer::TimerInfo
+end
+
+function MDEIMReduction(;style=SearchSVDRank(1e-4),nsnaps=20)
+  timer = TimerInfo("MDEIM")
+  MDEIMReduction(style,nsnaps,timer)
+end
+
+TimerOutputs.get_timer(r::MDEIMReduction) = r.timer
+get_style(r::MDEIMReduction) = r.style
+num_snaps(r::MDEIMReduction) = r.nsnaps
+
+struct TestInfo
+  nsnaps::Int
+  timer::TimerInfo
+end
+
+function TestInfo(;nsnaps=10)
+  timer = TimerInfo("TEST")
+  TestInfo(nsnaps,timer)
+end
+
+TimerOutputs.get_timer(info::TestInfo) = info.timer
+num_snaps(info::TestInfo) = info.nsnaps
 
 """
     struct RBSolver{S,M} end
@@ -38,9 +199,7 @@ In particular:
 
 - ϵ: tolerance used in the projection-based truncated proper orthogonal
   decomposition (TPOD) or in the tensor train singular value decomposition (TT-SVD),
-  where a basis spanning the reduced subspace is computed.
-- mdeim_style: in transient applications, the user can choose to perform MDEIM in
-  space only or in space and time (default)
+  where a basis spanning the reduced subspace is computed
 - nsnaps_state: number of snapshots considered when running TPOD or TT-SVD
 - nsnaps_res: number of snapshots considered when running MDEIM for the residual
 - nsnaps_jac: number of snapshots considered when running MDEIM for the jacobian
@@ -49,48 +208,38 @@ In particular:
 - timer: cost timer for the algorithm
 
 """
-struct RBSolver{S,M}
+struct RBSolver{S,A,B}
   fesolver::S
-  ϵ::Float64
-  mdeim_style::M
-  nsnaps_state::Int
-  nsnaps_res::Int
-  nsnaps_jac::Int
-  nsnaps_test::Int
-  timer::TimerOutput
+  state_reduction::A
+  system_reduction::B
+  test_info::TestInfo
 end
 
 function RBSolver(
-  fesolver::FESolver,
-  ϵ::Float64;
-  mdeim_style=SpaceMDEIM(),
-  nsnaps_state=50,
-  nsnaps_res=20,
-  nsnaps_jac=20,
-  nsnaps_test=10,
-  timer=TimerOutput())
+  fesolver::FESolver;
+  state_reduction=TTSVDReduction(),
+  system_reduction=(MDEIMReduction(),MDEIMReduction()),
+  test_info=TestInfo())
 
-  RBSolver(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_res,nsnaps_jac,nsnaps_test,timer)
+  RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction,test_info)
 end
 
 get_fe_solver(s::RBSolver) = s.fesolver
-num_offline_params(solver::RBSolver) = max(solver.nsnaps_state,num_mdeim_params(solver))
-offline_params(solver::RBSolver) = 1:num_offline_params(solver)
-num_online_params(solver::RBSolver) = solver.nsnaps_test
-online_params(solver::RBSolver) = 1+num_offline_params(solver):num_online_params(solver)+num_offline_params(solver)
-ParamDataStructures.num_params(solver::RBSolver) = num_offline_params(solver) + num_online_params(solver)
-num_res_params(solver::RBSolver) = solver.nsnaps_res
-res_params(solver::RBSolver) = 1:num_res_params(solver)
-num_jac_params(solver::RBSolver) = solver.nsnaps_jac
-jac_params(solver::RBSolver) = 1:num_jac_params(solver)
-num_mdeim_params(solver::RBSolver) = max(num_res_params(solver),num_jac_params(solver))
-mdeim_params(solver::RBSolver) = 1:num_mdeim_params(solver)
-get_tol(solver::RBSolver) = solver.ϵ
-TimerOutputs.get_timer(solver::RBSolver) = solver.timer
+get_state_reduction(s::RBSolver) = s.state_reduction
+get_system_reduction(s::RBSolver) = s.system_reduction
+get_residual_reduction(s::RBSolver) = first(get_system_reduction(s))
+get_jacobian_reduction(s::RBSolver) = last(get_system_reduction(s))
+get_test_info(s::RBSolver) = s.test_info
 
-function get_test_directory(solver::RBSolver;dir=datadir())
-  keyword = get_mdeim_style_filename(solver.mdeim_style)
-  test_dir = joinpath(dir,keyword * "_$(solver.ϵ)")
+num_offline_params(s::RBSolver) = max(num_snaps(s.state_reduction),num_snaps(s.residual_reduction),num_snaps(s.jacobian_reduction))
+offline_params(s::RBSolver) = 1:num_offline_params(s)
+num_online_params(s::RBSolver) = num_snaps(s.test_info)
+online_params(s::RBSolver) = 1+num_offline_params(s):num_online_params(s)+num_offline_params(s)
+ParamDataStructures.num_params(s::RBSolver) = num_offline_params(s) + num_online_params(s)
+
+function get_test_directory(s::RBSolver;dir=datadir())
+  keyword = get_name(s.state_reduction) * "_$(get_style(s.state_reduction))"
+  test_dir = joinpath(dir,keyword)
   create_dir(test_dir)
   test_dir
 end

@@ -112,7 +112,7 @@ function compute_speedup(p1::GenericPerformance,p2::GenericPerformance;kwargs...
 end
 
 induced_norm(v::AbstractVector,args...) = norm(v)
-induced_norm(v::AbstractVector,norm_matrix::AbstractMatrix) = sqrt(v'*X*v)
+induced_norm(v::AbstractVector,norm_matrix::AbstractMatrix) = sqrt(v'*norm_matrix*v)
 
 function compute_error(
   sol::AbstractArray{T,N},
@@ -136,10 +136,3 @@ function compute_relative_error(sol::AbstractArray,sol_approx::AbstractArray,arg
   rel_norm = err_norm / sol_norm
   return rel_norm
 end
-
-# when using TimerOutputs
-function set_nruns!(timer::TimerOutput,nruns::Int)
-  timer.accumulated_data.ncalls = nruns
-end
-
-reset_timer!(timer,name) = haskey(timer,name) && reset_timer!(timer[name])

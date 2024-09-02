@@ -62,10 +62,9 @@ export cat_cores
 include("TTCores.jl")
 
 export RBSolver
-export MDEIMStyle
-export SpaceMDEIM
 export get_test_directory
 export get_fe_solver
+export set_nruns!
 export get_timer
 export fe_solutions
 export nonlinear_rb_solve!

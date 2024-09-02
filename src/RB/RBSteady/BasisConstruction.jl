@@ -120,57 +120,6 @@ function massive_cols_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...
   return Ur,Σr,Vr'
 end
 
-# function _tt_truncated_pod(a::AbstractArray{T,3},args...;kwargs...) where T
-#   mat = reshape(a,size(a,1)*size(a,2),:)
-#   Ur,Σr,Vr = _truncated_pod(mat;kwargs...)
-#   core = reshape(Ur,size(a,1),size(a,2),:)
-#   remainder = Σr.*Vr'
-#   return core,remainder
-# end
-
-# function _tt_truncated_pod(a::AbstractArray{T,3},X::AbstractSparseMatrix;kwargs...) where T
-#   perm = (2,1,3)
-#   prev_rank = size(a,1)
-#   cur_size = size(a,2)
-
-#   C = cholesky(X)
-#   L,p = sparse(C.L),C.p
-
-#   Xa = _tt_mul(L,p,a)
-#   Xmat = reshape(Xa,:,size(Xa,3))
-#   Ũr,Σr,Vr = truncated_svd(Xmat;kwargs...)
-#   c̃ = reshape(Ũr,size(Xa,1),size(Xa,2),:)
-#   core = _tt_div(L,p,c̃)
-#   remainder = Σr.*Vr'
-
-#   return core,remainder
-# end
-
-# function _tt_mul(L::AbstractSparseMatrix{T},p::Vector{Int},a::AbstractArray{T,3}) where T
-#   @check size(L,2) == size(a,2)
-#   b = similar(a,T,(size(a,1),size(L,1),size(a,3)))
-#   ap = a[:,p,:]
-#   @inbounds for i1 in axes(b,1)
-#     ap1 = ap[i1,:,:]
-#     @inbounds for i3 in axes(b,3)
-#       b[i1,:,i3] = L'*ap1[:,i3]
-#     end
-#   end
-#   return b
-# end
-
-# function _tt_div(L::AbstractSparseMatrix{T},p::Vector{Int},a::AbstractArray{T,3}) where T
-#   @check size(L,1) == size(L,2) == size(a,2)
-#   b = similar(a)
-#   @inbounds for i1 in axes(b,1)
-#     a1 = a[i1,:,:]
-#     @inbounds for i3 in axes(b,3)
-#       b[i1,p,i3] = L'\a1[:,i3]
-#     end
-#   end
-#   return b
-# end
-
 # We are not interested in the last dimension (corresponds to the parameter).
 # Note: when X is provided as norm matrix, ids_range has length 1, so we actually
 # are not computing a cholesky decomposition numerous times
@@ -186,28 +135,6 @@ function ttsvd!(cache,mat::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...)
   end
   return mat
 end
-
-# function ttsvd!(cache,a::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...) where {T,N}
-#   cores,ranks,sizes = cache
-#   d1 = ids_range[1]
-#   a_d = reshape(a,ranks[d1],sizes[d1],:)
-#   for d in ids_range
-#     core_d,remainder_d = _tt_truncated_pod(a_d,args...;kwargs...)
-#     rank = size(core_d,3)
-#     ranks[d+1] = rank
-#     cores[d] = core_d
-#     a_d = reshape(remainder_d,rank,sizes[d+1],:)
-#   end
-#   return a_d
-# end
-
-# function ttsvd!(cache,a::AbstractArray{T,N},X::AbstractRank1Tensor;ids_range=1:N-1,kwargs...) where {T,N}
-#   for d in ids_range
-#     # Xd = kron(X[d],I(ranks[d]))
-#     a = ttsvd!(cache,a,X[d];ids_range=d,kwargs...)
-#   end
-#   return a
-# end
 
 function ttsvd!(cache,mat::AbstractArray{T,N},X::AbstractRank1Tensor;ids_range=1:N-1,kwargs...) where {T,N}
   cores,ranks,sizes = cache

@@ -1,20 +1,3 @@
-function RBSteady.reduced_basis(feop::TransientParamFEOperator,s,norm_matrix;kwargs...)
-  reduced_basis(s,norm_matrix;kwargs...)
-end
-
-function RBSteady.reduced_basis(feop::TransientParamSaddlePointFEOp,s,norm_matrix;kwargs...)
-  bases = reduced_basis(feop.op,s,norm_matrix;kwargs...)
-  enrich_basis(feop,bases,norm_matrix)
-end
-
-function RBSteady.reduced_basis(feop::TransientParamFEOperatorWithTrian,s,norm_matrix;kwargs...)
-  reduced_basis(feop.op,s,norm_matrix;kwargs...)
-end
-
-function RBSteady.reduced_basis(feop::LinearNonlinearTransientParamFEOperator,s,norm_matrix;kwargs...)
-  reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
-end
-
 """
     TransientRBSpace{A<:SingleFieldFESpace,B<:TransientProjection} <: FESubspace
 

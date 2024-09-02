@@ -10,14 +10,19 @@ Computes the subspace of the test, trial FE spaces contained in the FE operator
 `feop` by compressing the snapshots `s`
 
 """
-function reduced_fe_space(solver,feop,s)
+function reduced_fe_space(solver::RBSolver,feop,s)
+  reduced_fe_space(get_state_reduction(solver),feop,s)
+end
+
+function reduced_fe_space(solver::AbstractReduction,feop,s)
+  state_reduction = get_state_reduction(solver)
   timer = get_timer(solver)
+  name = get_name(timer)
   reset_timer!(timer)
 
-  soff = select_snapshots(s,offline_params(solver))
-  @timeit timer "RB" begin
-    norm_matrix = assemble_norm_matrix(feop)
-    basis = reduced_basis(feop,soff,norm_matrix;ϵ=get_tol(solver))
+  soff = select_snapshots(s,num_snaps(state_reduction))
+  @timeit timer name begin
+    basis = reduced_basis(state_reduction,feop,soff,norm_matrix)
   end
   reduced_trial = fe_subspace(get_trial(feop),basis)
   reduced_test = fe_subspace(get_test(feop),basis)
@@ -26,36 +31,30 @@ function reduced_fe_space(solver,feop,s)
 end
 
 """
-    reduced_basis(s::AbstractSnapshots,args...;kwargs...) -> (Projection, Projection)
+    reduced_basis(red,s::AbstractSnapshots,args...) -> (Projection, Projection)
 
 Computes the bases spanning the subspace of test, trial FE spaces by compressing
 the snapshots `s`
 
 """
-function reduced_basis(s,args...;kwargs...)
-  Projection(s,args...;kwargs...)
+function reduced_basis(red::AbstractReduction,s::AbstractSnapshots,args...)
+  Projection(red,s,args...)
 end
 
-function reduced_basis(feop::ParamFEOperator,s,norm_matrix;kwargs...)
-  reduced_basis(s,norm_matrix;kwargs...)
+function reduced_basis(red::AbstractReduction,feop,s::AbstractSnapshots)
+  reduced_basis(s,norm_matrix)
 end
 
-function reduced_basis(feop::ParamSaddlePointFEOp,s,norm_matrix;kwargs...)
-  bases = reduced_basis(feop.op,s,norm_matrix;kwargs...)
-  enrich_basis(feop,bases,norm_matrix)
+function reduced_basis(red::NormedReduction,feop,s::AbstractSnapshots)
+  norm_matrix = assemble_from_form(feop,get_norm(red))
+  reduced_basis(s,norm_matrix)
 end
 
-function reduced_basis(feop::ParamFEOperatorWithTrian,s,norm_matrix;kwargs...)
-  reduced_basis(feop.op,s,norm_matrix;kwargs...)
-end
-
-function reduced_basis(feop::LinearNonlinearParamFEOperator,s,norm_matrix;kwargs...)
-  reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
-end
-
-function enrich_basis(feop,bases,norm_matrix)
-  supr_op = assemble_coupling_matrix(feop)
-  enrich_basis(bases,norm_matrix,supr_op)
+function reduced_basis(red::SupremizerReduction,feop,s::AbstractSnapshots)
+  supr_matrix = assemble_from_form(feop,get_supr(red))
+  norm_matrix = assemble_from_form(feop,get_norm(red))
+  basis = reduced_basis(s,norm_matrix)
+  enrich_basis(basis,norm_matrix)
 end
 
 function fe_subspace(space::FESpace,basis)
