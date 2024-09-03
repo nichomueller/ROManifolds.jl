@@ -219,23 +219,6 @@ function reduced_form(
   trian::Triangulation,
   args...)
 
-<<<<<<< HEAD
-  mdeim_style = solver.mdeim_style
-  timer = get_timer(solver)
-
-  @timeit timer "MDEIM" begin
-    basis = reduced_basis(s;ϵ=get_tol(solver))
-    lu_interp,integration_domain = mdeim(mdeim_style,basis)
-  end
-
-  @timeit timer "Galerkin" proj_basis = reduce_operator(mdeim_style,basis,args...;kwargs...)
-  red_trian = reduce_triangulation(trian,integration_domain,args...)
-
-  coefficient = allocate_coefficient(solver,basis)
-  result = allocate_result(solver,args...)
-  ad = AffineDecomposition(proj_basis,lu_interp,integration_domain,coefficient,result)
-
-=======
   t = @timed begin
     basis = reduced_basis(get_reduction(red),s)
     interpolation,integration_domain = mdeim(basis)
@@ -249,7 +232,6 @@ function reduced_form(
   println(CostTracker(t))
 
   ad = AffineDecomposition(proj_basis,interpolation,integration_domain,coefficient,result)
->>>>>>> 1a2f6680f631465c1adfc9b2099cf324aaede770
   return ad,red_trian
 end
 
