@@ -1,57 +1,13 @@
 function RBSteady.reduce_operator(
-  mdeim_style::SpaceOnlyMDEIM,
-  b::TransientPODBasis,
-  b_test::TransientPODBasis;
-  kwargs...)
+  red::TransientMDEIMReduction,
+  b::Projection,
+  b_trial::FESubspace,
+  b_test::FESubspace)
 
-  bs = get_basis_space(b)
-  bs_test = get_basis_space(b_test)
-  bt_test = get_basis_time(b_test)
-
-  T = eltype(bs_test)
-  b̂st = Vector{Vector{Vector{T}}}(undef,RBSteady.num_reduced_space_dofs(b))
-
-  b̂s = bs_test'*bs
-  @inbounds for i = eachindex(b̂st)
-    b̂si = b̂s[:,i]
-    b̂st[i] = eachcol(kron(bt_test',b̂si))
-  end
-
-  return ReducedVectorOperator(mdeim_style,b̂st)
+  reduce_operator(b,RBSteady.get_basis(b_trial),RBSteady.get_basis(b_test),red.combine)
 end
 
-function RBSteady.reduce_operator(
-  mdeim_style::SpaceOnlyMDEIM,
-  b::TransientPODBasis,
-  b_trial::TransientPODBasis,
-  b_test::TransientPODBasis;
-  kwargs...)
-
-  bs = get_basis_space(b)
-  bs_trial = get_basis_space(b_trial)
-  bt_trial = get_basis_time(b_trial)
-  bs_test = get_basis_space(b_test)
-  bt_test = get_basis_time(b_test)
-
-  T = promote_type(eltype(bs_trial),eltype(bs_test))
-  b̂st = Vector{Vector{Matrix{T}}}(undef,RBSteady.num_reduced_space_dofs(b))
-
-  b̂t = combine_basis_time(bt_trial,bt_test;kwargs...)
-
-  @inbounds for i = eachindex(b̂st)
-    b̂si = bs_test'*param_getindex(bs,i)*bs_trial
-    b̂st[i] = map(k->kron(b̂t[k,:,:],b̂si),axes(b̂t,1))
-  end
-
-  return ReducedMatrixOperator(mdeim_style,b̂st)
-end
-
-function RBSteady.reduce_operator(
-  mdeim_style::SpaceTimeMDEIM,
-  b::TransientPODBasis,
-  b_test::TransientPODBasis;
-  kwargs...)
-
+function RBSteady.reduce_operator(b::TransientPODBasis,b_test::TransientPODBasis)
   bs = get_basis_space(b)
   bt = get_basis_time(b)
   bs_test = get_basis_space(b_test)
@@ -65,15 +21,14 @@ function RBSteady.reduce_operator(
   b̂t = bt_test'*bt
   b̂st .= kron(b̂t,b̂s)
 
-  return ReducedVectorOperator(mdeim_style,b̂st)
+  return ReducedAlgebraicOperator(b̂st)
 end
 
 function RBSteady.reduce_operator(
-  mdeim_style::SpaceTimeMDEIM,
   b::TransientPODBasis,
   b_trial::TransientPODBasis,
-  b_test::TransientPODBasis;
-  kwargs...)
+  b_test::TransientPODBasis,
+  combine::Function)
 
   bs = get_basis_space(b)
   bt = get_basis_time(b)
@@ -86,7 +41,7 @@ function RBSteady.reduce_operator(
   s = num_reduced_dofs(b_test),num_reduced_dofs(b),num_reduced_dofs(b_trial)
   b̂st = Array{T,3}(undef,s)
 
-  b̂t = combine_basis_time(bt,bt_trial,bt_test;kwargs...)
+  b̂t = combine_basis_time(bt,bt_trial,bt_test,combine)
 
   cache = zeros(T,num_space_dofs(b_test),RBSteady.num_reduced_space_dofs(b_trial))
 
@@ -101,34 +56,31 @@ function RBSteady.reduce_operator(
     end
   end
 
-  return ReducedMatrixOperator(mdeim_style,b̂st)
+  return ReducedAlgebraicOperator(b̂st)
 end
 
 # TT interface
 
-function RBSteady.reduce_operator(
-  mdeim_style::SpaceTimeMDEIM,
-  b::TransientTTSVDCores,
-  b_test::TransientTTSVDCores;
-  kwargs...)
-
+function RBSteady.reduce_operator(b::TransientTTSVDCores,b_test::TransientTTSVDCores)
   b̂st = compress_cores(b,b_test)
-  return ReducedVectorOperator(mdeim_style,b̂st)
+  return ReducedAlgebraicOperator(b̂st)
 end
 
 function RBSteady.reduce_operator(
-  mdeim_style::SpaceTimeMDEIM,
   b::TransientTTSVDCores,
   b_trial::TransientTTSVDCores,
-  b_test::TransientTTSVDCores;
-  kwargs...)
+  b_test::TransientTTSVDCores,
+  combine::Function)
 
-  b̂st = compress_cores(b,b_trial,b_test;kwargs...)
-  return ReducedMatrixOperator(mdeim_style,b̂st)
+  b̂st = compress_cores(b,b_trial,b_test,combine)
+  return ReducedAlgebraicOperator(b̂st)
 end
 
-function RBSteady.compress_core(a::AbstractArray{T,3},btrial::AbstractArray{S,3},btest::AbstractArray{S,3};
-  combine=(x,y)->x) where {T,S}
+function RBSteady.compress_core(
+  a::AbstractArray{T,3},
+  btrial::AbstractArray{S,3},
+  btest::AbstractArray{S,3},
+  combine::Function) where {T,S}
 
   TS = promote_type(T,S)
   ra_prev,ra = size(a,1),size(a,3)
@@ -163,7 +115,7 @@ function RBSteady.compress_core(a::AbstractArray{T,3},btrial::AbstractArray{S,3}
   return combine(bab,bab_shift)
 end
 
-function combine_basis_time(B::AbstractMatrix,C::AbstractMatrix;combine=(x,y)->x)
+function combine_basis_time(B::AbstractMatrix,C::AbstractMatrix,combine::Function)
   time_ndofs = size(C,1)
   nt_row = size(C,2)
   nt_col = size(B,2)
@@ -179,7 +131,12 @@ function combine_basis_time(B::AbstractMatrix,C::AbstractMatrix;combine=(x,y)->x
   combine(bt_proj,bt_proj_shift)
 end
 
-function combine_basis_time(A::AbstractMatrix,B::AbstractMatrix,C::AbstractMatrix;combine=(x,y)->x)
+function combine_basis_time(
+  A::AbstractMatrix,
+  B::AbstractMatrix,
+  C::AbstractMatrix,
+  combine::Function)
+
   nt = size(A,2)
   nt_row = size(C,2)
   nt_col = size(B,2)
@@ -193,12 +150,4 @@ function combine_basis_time(A::AbstractMatrix,B::AbstractMatrix,C::AbstractMatri
   end
 
   combine(bt_proj,bt_proj_shift)
-end
-
-function Base.:*(a::ReducedVectorOperator{SpaceOnlyMDEIM,Vector{<:Vector}},b::AbstractMatrix)
-  return sum([a.basis[q]*b[q,:]' for q = eachindex(a.basis)])
-end
-
-function Base.:*(a::ReducedMatrixOperator{SpaceOnlyMDEIM,Vector{<:Vector}},b::AbstractMatrix)
-  return sum([a.basis[q][k]*b[q,k] for q = eachindex(a.basis) for k = eachindex(a.basis[q])])
 end

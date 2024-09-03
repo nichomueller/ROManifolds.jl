@@ -98,8 +98,8 @@ odesolver = ThetaMethod(solver,dt,θ)
 lu_odesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(odesolver,ϵ;nsnaps_state=50,nsnaps_res=50,nsnaps_jac=20,nsnaps_test=10)
-lu_rbsolver = RBSolver(lu_odesolver,ϵ;nsnaps_state=50,nsnaps_res=50,nsnaps_jac=20,nsnaps_test=10)
+rbsolver = RBSolver(odesolver,ϵ;nparams_state=50,nparams_res=50,nparams_jac=20,nparams_test=10)
+lu_rbsolver = RBSolver(lu_odesolver,ϵ;nparams_state=50,nparams_res=50,nparams_jac=20,nparams_test=10)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","model_circle_short")))
 
 # results = load_solve(rbsolver,feop,test_dir)

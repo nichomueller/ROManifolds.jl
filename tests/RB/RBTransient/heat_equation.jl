@@ -65,67 +65,30 @@ trian_res = (Ω,Γn)
 trian_stiffness = (Ω,)
 trian_mass = (Ω,)
 
-induced_norm(du,v) = ∫(du*v)dΩ + ∫(∇(v)⋅∇(du))dΩ
+energy(du,v) = ∫(du*v)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
-feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
+feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
   trial,test,trian_res,trian_stiffness,trian_mass)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 # solvers
 fesolver = ThetaMethod(LUSolver(),dt,θ)
-ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_res=20,nsnaps_jac=20)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
+
+tol = 1e-4
+state_reduction = TransientPODReduction(tol,energy;nparams=50)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_test=5,nparams_res=20,nparams_jac=20)
+
+test_dir = datadir(joinpath("heateq","elasticity_$(1e-4)"))
+create_dir(test_dir)
 
 # RB method
-# we can load & solve directly, if the offline structures have been previously saved to file
-try
-  results = load_solve(rbsolver,feop,test_dir)
-catch
-  @warn "Loading offline structures failed: running offline phase"
-  fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
-  rbop = reduced_operator(rbsolver,feop,fesnaps)
-  rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-  results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-  save(test_dir,fesnaps)
-  save(test_dir,rbop)
-  save(test_dir,results)
-end
-
-fesnaps = fe_solutions(rbsolver,feop,uh0μ)
+fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)
 
-# using Gridap.FESpaces
-# red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-# op = get_algebraic_operator(feop)
-# pop = TransientPGOperator(op,red_trial,red_test)
-# smdeim = select_snapshots(fesnaps,RBSteady.mdeim_params(rbsolver))
-# jjac,rres = jacobian_and_residual(rbsolver,pop,smdeim)
-
-# isa(jjac[1][1],
-#   RBTransient.TransientSnapshotsAtIndices{T,N,L,D,I,R,
-#   <:RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,<:MatrixOfSparseMatricesCSC},B,C
-#   } where {T,N,L,D,I,R,B,C})
-# isa(jjac[1][1],TransientSparseSnapshots)
-
-# const _TransientSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC,B,C} = Union{
-#   RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,A},
-#   RBTransient.TransientSnapshotsAtIndices{T,N,L,D,I,R,
-#   RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,A},B,C}
-# }
-# isa(jjac[1][1],_TransientSparseSnapshots)
-
-# S1{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,A}
-# SSSS2{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
-#   S1{T,N,L,D,I,R,A},RBTransient.TransientSnapshotsAtIndices{T,N,L,D,I,R,<:S1{T,N,L,D,I,R,A}}
-# }
-
-# const S1{T,N,L,D,I,R} = RBTransient.TransientStandardSparseSnapshots{T,N,L,D,I,R,<:MatrixOfSparseMatricesCSC}
-# # const S2{T,N,L,D,I,R}
-# isa(jjac[1][1],SSSS2)
+println(results)

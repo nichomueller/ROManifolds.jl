@@ -16,7 +16,6 @@ Subtypes:
 - [`TransientParamFEOpFromWeakForm`](@ref)
 - [`TransientParamSemilinearFEOpFromWeakForm`](@ref)
 - [`TransientParamLinearFEOpFromWeakForm`](@ref)
-- [`TransientParamSaddlePointFEOp`](@ref)
 - [`TransientParamFEOperatorWithTrian`](@ref)
 - [`GenericLinearNonlinearTransientParamFEOperator`](@ref)
 
@@ -53,22 +52,10 @@ IndexMaps.get_index_map(op::TransientParamFEOperator) = @abstractmethod
 ParamSteady.get_vector_index_map(op::TransientParamFEOperator) = get_vector_index_map(get_index_map(op))
 ParamSteady.get_matrix_index_map(op::TransientParamFEOperator) = get_matrix_index_map(get_index_map(op))
 
-ParamSteady.get_induced_norm(op::TransientParamFEOperator) = @abstractmethod
-
-function ParamSteady.assemble_norm_matrix(op::TransientParamFEOperator)
+function ParamSteady.assemble_matrix_from_form(op::TransientParamFEOperator,form::Function)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
-  inorm = get_induced_norm(op)
-  ParamSteady._assemble_matrix(inorm,trial,test)
-end
-
-ParamSteady.get_coupling(op::TransientParamFEOperator) = @abstractmethod
-
-function ParamSteady.assemble_coupling_matrix(op::TransientParamFEOperator)
-  test = get_test(op)
-  trial = evaluate(get_trial(op),nothing)
-  coupling = get_coupling(op)
-  ParamSteady._assemble_matrix(coupling,trial,test)
+  ParamSteady._assemble_matrix(form,trial,test)
 end
 
 ParamSteady.get_linear_operator(op::TransientParamFEOperator) = @abstractmethod
@@ -84,7 +71,6 @@ nonlinear
 struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParamODE}
   res::Function
   jacs::Tuple{Vararg{Function}}
-  induced_norm::Function
   tpspace::TransientParamSpace
   assem::Assembler
   index_map::FEOperatorIndexMap
@@ -94,29 +80,29 @@ struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParam
 end
 
 function TransientParamFEOperator(
-  res::Function,jacs::Tuple{Vararg{Function}},induced_norm::Function,tpspace,trial,test,args...)
+  res::Function,jacs::Tuple{Vararg{Function}},tpspace,trial,test,args...)
 
   order = length(jacs) - 1
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
   TransientParamFEOpFromWeakForm(
-    res,jacs,induced_norm,tpspace,assem,index_map,trial,test,order,args...)
+    res,jacs,tpspace,assem,index_map,trial,test,order,args...)
 end
 
 function TransientParamFEOperator(
-  res::Function,jac::Function,induced_norm::Function,tpspace,trial,test,args...)
+  res::Function,jac::Function,tpspace,trial,test,args...)
 
-  TransientParamFEOperator(res,(jac,),induced_norm,tpspace,trial,test,args...)
+  TransientParamFEOperator(res,(jac,),tpspace,trial,test,args...)
 end
 
 function TransientParamFEOperator(
-  res::Function,jac::Function,jac_t::Function,induced_norm::Function,tpspace,trial,test,args...)
+  res::Function,jac::Function,jac_t::Function,tpspace,trial,test,args...)
 
-  TransientParamFEOperator(res,(jac,jac_t),induced_norm,tpspace,trial,test,args...)
+  TransientParamFEOperator(res,(jac,jac_t),tpspace,trial,test,args...)
 end
 
 function TransientParamFEOperator(
-  res::Function,induced_norm::Function,tpspace,trial,test,args...;order::Integer=1)
+  res::Function,tpspace,trial,test,args...;order::Integer=1)
 
   function jac_0(μ,t,u,du,v,args...)
     function res_0(y)
@@ -139,7 +125,7 @@ function TransientParamFEOperator(
     jacs = (jacs...,jac_k)
   end
 
-  TransientParamFEOperator(res,jacs,induced_norm,tpspace,trial,test,args...)
+  TransientParamFEOperator(res,jacs,tpspace,trial,test,args...)
 end
 
 FESpaces.get_test(op::TransientParamFEOpFromWeakForm) = op.test
@@ -150,7 +136,6 @@ ODEs.get_jacs(op::TransientParamFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::TransientParamFEOpFromWeakForm) = op.index_map
 ParamDataStructures.realization(op::TransientParamFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
-ParamSteady.get_induced_norm(op::TransientParamFEOpFromWeakForm) = op.induced_norm
 
 """
     struct TransientParamSemilinearFEOpFromWeakForm <: TransientParamFEOperator{SemilinearParamODE} end
@@ -164,7 +149,6 @@ struct TransientParamSemilinearFEOpFromWeakForm <: TransientParamFEOperator{Semi
   res::Function
   jacs::Tuple{Vararg{Function}}
   constant_mass::Bool
-  induced_norm::Function
   tpspace::TransientParamSpace
   assem::Assembler
   index_map::FEOperatorIndexMap
@@ -175,8 +159,7 @@ end
 
 function TransientParamSemilinearFEOperator(
   mass::Function,res::Function,jacs::Tuple{Vararg{Function}},
-  induced_norm::Function,tpspace,trial,test,
-  args...;constant_mass::Bool=false)
+  tpspace,trial,test,args...;constant_mass::Bool=false)
 
   order = length(jacs)
   jac_N(μ,t,u,du,v,args...) = mass(μ,t,du,v,args...)
@@ -184,32 +167,31 @@ function TransientParamSemilinearFEOperator(
   if order == 0
     @warn ODEs.default_linear_msg
     return TransientParamLinearFEOperator(
-      (mass,),res,jacs,induced_norm,tpspace,trial,test;constant_forms=(constant_mass,))
+      (mass,),res,jacs,tpspace,trial,test;constant_forms=(constant_mass,))
   end
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
   TransientParamSemilinearFEOpFromWeakForm(
-    mass,res,jacs,constant_mass,induced_norm,tpspace,assem,index_map,trial,test,order,args...)
+    mass,res,jacs,constant_mass,tpspace,assem,index_map,trial,test,order,args...)
 end
 
 function TransientParamSemilinearFEOperator(
-  mass::Function,res::Function,jac::Function,
-  induced_norm::Function,tpspace,trial,test,args...;kwargs...)
+  mass::Function,res::Function,jac::Function,tpspace,trial,test,args...;kwargs...)
 
-  TransientParamSemilinearFEOperator(mass,res,(jac,),induced_norm,
+  TransientParamSemilinearFEOperator(mass,res,(jac,),
     tpspace,trial,test,args...;kwargs...)
 end
 
 function TransientParamSemilinearFEOperator(
   mass::Function,res::Function,jac::Function,jac_t::Function,
-  induced_norm::Function,tpspace,trial,test,args...;kwargs...)
+  tpspace,trial,test,args...;kwargs...)
 
-  TransientParamSemilinearFEOperator(mass,res,(jac,jac_t),induced_norm,
+  TransientParamSemilinearFEOperator(mass,res,(jac,jac_t),
     tpspace,trial,test,args...;kwargs...)
 end
 
 function TransientParamSemilinearFEOperator(
-  mass::Function,res::Function,induced_norm::Function,tpspace,trial,test,
+  mass::Function,res::Function,tpspace,trial,test,
   args...;order::Integer=1,kwargs...)
 
   if order == 0
@@ -241,7 +223,7 @@ function TransientParamSemilinearFEOperator(
     jacs = (jacs...,jac_k)
   end
 
-  TransientParamSemilinearFEOperator(mass,res,jacs,induced_norm,tpspace,trial,test,args...;kwargs...)
+  TransientParamSemilinearFEOperator(mass,res,jacs,tpspace,trial,test,args...;kwargs...)
 end
 
 FESpaces.get_test(op::TransientParamSemilinearFEOpFromWeakForm) = op.test
@@ -252,7 +234,6 @@ ODEs.get_jacs(op::TransientParamSemilinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamSemilinearFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::TransientParamSemilinearFEOpFromWeakForm) = op.index_map
 ParamDataStructures.realization(op::TransientParamSemilinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
-ParamSteady.get_induced_norm(op::TransientParamSemilinearFEOpFromWeakForm) = op.induced_norm
 
 function ODEs.is_form_constant(op::TransientParamSemilinearFEOpFromWeakForm,k::Integer)
   (k == get_order(op)+1) && op.constant_mass
@@ -270,7 +251,6 @@ struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearPa
   res::Function
   jacs::Tuple{Vararg{Function}}
   constant_forms::Tuple{Vararg{Bool}}
-  induced_norm::Function
   tpspace::TransientParamSpace
   assem::Assembler
   index_map::FEOperatorIndexMap
@@ -280,7 +260,7 @@ struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearPa
 end
 
 function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},res::Function,induced_norm::Function,tpspace,trial,test,
+  forms::Tuple{Vararg{Function}},res::Function,tpspace,trial,test,
   args...;constant_forms::Tuple{Vararg{Bool}}=ntuple(_ -> false,length(forms)))
 
   order = length(forms)-1
@@ -288,30 +268,26 @@ function TransientParamLinearFEOperator(
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
   TransientParamLinearFEOpFromWeakForm(
-    forms,res,jacs,constant_forms,induced_norm,tpspace,assem,index_map,trial,test,order,args...)
+    forms,res,jacs,constant_forms,tpspace,assem,index_map,trial,test,order,args...)
 end
 
 function TransientParamLinearFEOperator(
-  mass::Function,res::Function,induced_norm::Function,tpspace,trial,test,
-  args...;kwargs...)
+  mass::Function,res::Function,tpspace,trial,test,args...;kwargs...)
 
-  TransientParamLinearFEOperator((mass,),res,induced_norm,tpspace,trial,test;kwargs)
+  TransientParamLinearFEOperator((mass,),res,tpspace,trial,test;kwargs)
 end
 
 function TransientParamLinearFEOperator(
-  stiffness::Function,mass::Function,res::Function,induced_norm::Function,tpspace,trial,test,
-  args...;kwargs...)
+  stiffness::Function,mass::Function,res::Function,tpspace,trial,test,args...;kwargs...)
 
-  TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,tpspace,
-    trial,test,args...;kwargs...)
+  TransientParamLinearFEOperator((stiffness,mass),res,tpspace,trial,test,args...;kwargs...)
 end
 
 function TransientParamLinearFEOperator(
   stiffness::Function,damping::Function,mass::Function,res::Function,
-  induced_norm::Function,tpspace,trial,test,args...;kwargs...)
+  tpspace,trial,test,args...;kwargs...)
 
-  TransientParamLinearFEOperator((stiffness,damping,mass),res,induced_norm,tpspace,
-    trial,test,args...;kwargs...)
+  TransientParamLinearFEOperator((stiffness,damping,mass),res,tpspace,trial,test,args...;kwargs...)
 end
 
 FESpaces.get_test(op::TransientParamLinearFEOpFromWeakForm) = op.test
@@ -322,7 +298,6 @@ ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::TransientParamLinearFEOpFromWeakForm) = op.index_map
 ParamDataStructures.realization(op::TransientParamLinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
-ParamSteady.get_induced_norm(op::TransientParamLinearFEOpFromWeakForm) = op.induced_norm
 
 function ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer)
   op.constant_forms[k]

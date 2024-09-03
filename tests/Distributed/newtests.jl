@@ -75,7 +75,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 dir = datadir("distr_toy_heateq")
-info = RBInfo(dir;nsnaps_state=10,nsnaps_mdeim=5,nsnaps_test=5,save_structures=false)
+info = RBInfo(dir;nparams_state=10,nsnaps_mdeim=5,nparams_test=5,save_structures=false)
 
 rbsolver = RBSolver(info,fesolver)
 
@@ -122,8 +122,8 @@ c = distributed_array_contribution()
 trian,vals = get_domains(contribs_vec)[1],get_values(contribs_vec)[1]
 # RB.reduced_residual!(c,info,op,values,trian)
 basis_space,basis_time = reduced_basis(vals;ϵ=RB.get_tol(info))
-# lu_interp,red_trian,integration_domain = mdeim(info,fs,trian,basis_space,basis_time)
-lu_interp,red_trian,integration_domain = map(
+# interpolation,red_trian,integration_domain = mdeim(info,fs,trian,basis_space,basis_time)
+interpolation,red_trian,integration_domain = map(
     local_views(test),
     local_views(trian),
     local_views(basis_space),

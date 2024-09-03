@@ -35,14 +35,14 @@ abstract type SteadyProjection <: Projection end
 num_fe_dofs(a::SteadyProjection) = num_space_dofs(a)
 num_reduced_dofs(a::SteadyProjection) = num_reduced_space_dofs(a)
 
-function Projection(s::UnfoldingSteadySnapshots,args...;kwargs...)
-  basis = truncated_pod(s,args...;kwargs...)
+function Projection(red::PODReduction,s::AbstractSteadySnapshots,args...)
+  basis = projection(red,s,args...)
   basis′ = recast(s,basis)
   PODBasis(basis′)
 end
 
-function Projection(s::AbstractSteadySnapshots,args...;kwargs...)
-  cores = ttsvd(s,args...;kwargs...)
+function Projection(red::TTSVDReduction,s::AbstractSteadySnapshots,args...)
+  cores = projection(red,s,args...)
   cores′ = recast(s,cores)
   index_map = get_index_map(s)
   TTSVDCores(cores′,index_map)
@@ -88,8 +88,6 @@ struct TTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I} <: SteadyProjec
   index_map::I
 end
 
-const FixedDofsTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I<:FixedDofsIndexMap} = TTSVDCores{D,T,A,I}
-
 IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
 
 get_cores(a::TTSVDCores) = a.cores
@@ -97,9 +95,6 @@ get_cores_space(a::TTSVDCores) = a.cores
 
 get_basis_space(a::TTSVDCores) = cores2basis(get_index_map(a),get_cores_space(a)...)
 num_space_dofs(a::TTSVDCores) = prod(_num_tot_space_dofs(a))
-function num_space_dofs(a::FixedDofsTTSVDCores)
-  prod(_num_tot_space_dofs(a)) - length(get_fixed_dofs(get_index_map(a)))
-end
 num_reduced_space_dofs(a::TTSVDCores) = size(last(get_cores_space(a)),3)
 
 _num_tot_space_dofs(a::TTSVDCores{3}) = size.(get_cores_space(a),2)
@@ -113,8 +108,15 @@ function _num_tot_space_dofs(a::TTSVDCores{4})
   return tot_ndofs
 end
 
-function compress_cores(core::TTSVDCores,bases::TTSVDCores...;kwargs...)
-  ccores = map((a,b...)->compress_core(a,b...;kwargs...),get_cores(core),get_cores.(bases)...)
+function compress_cores(core::TTSVDCores,basis_test::TTSVDCores)
+  ccores = map((a,btest)->compress_core(a,btest),get_cores(core),get_cores(basis_test))
+  ccore = multiply_cores(ccores...)
+  _dropdims(ccore)
+end
+
+function compress_cores(core::TTSVDCores,basis_trial::TTSVDCores,bases::TTSVDCores)
+  ccores = map((a,btrial,btest)->compress_core(a,btrial,btest),get_cores(core),
+    get_cores(basis_trial),get_cores(basis_test))
   ccore = multiply_cores(ccores...)
   _dropdims(ccore)
 end
@@ -237,19 +239,19 @@ end
     enrich_basis(
       a::BlockProjection,
       norm_matrix::AbstractMatrix,
-      supr_op::AbstractMatrix) -> BlockProjection
+      supr_matrix::AbstractMatrix) -> BlockProjection
 
 Returns the supremizer-enriched BlockProjection. This function stabilizes Inf-Sup
 problems projected on a reduced vector space
 
 """
-function enrich_basis(a::BlockProjection{<:PODBasis},norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
-  bases = add_space_supremizers(get_basis_space(a),norm_matrix,supr_op)
+function enrich_basis(a::BlockProjection{<:PODBasis},norm_matrix::AbstractMatrix,supr_matrix::AbstractMatrix)
+  bases = add_space_supremizers(get_basis_space(a),norm_matrix,supr_matrix)
   return BlockProjection(map(PODBasis,bases),a.touched)
 end
 
-function enrich_basis(a::BlockProjection{<:TTSVDCores},norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
-  cores = add_tt_supremizers(get_cores_space(a),norm_matrix,supr_op)
+function enrich_basis(a::BlockProjection{<:TTSVDCores},norm_matrix::AbstractMatrix,supr_matrix::AbstractMatrix)
+  cores = add_tt_supremizers(get_cores_space(a),norm_matrix,supr_matrix)
   return BlockProjection(map(TTSVDCores,cores),a.touched)
 end
 
@@ -257,18 +259,18 @@ end
     add_space_supremizers(
       basis_space::ArrayBlock,
       norm_matrix::AbstractMatrix,
-      supr_op::AbstractMatrix) -> Vector{<:AbstractArray}
+      supr_matrix::AbstractMatrix) -> Vector{<:AbstractArray}
 
 Enriches the spatial basis with spatial supremizers computed from
-the action of the supremizing operator `supr_op` on the dual field(s)
+the action of the supremizing matrix `supr_matrix` on the dual field(s)
 
 """
-function add_space_supremizers(basis_space::ArrayBlock,norm_matrix::AbstractMatrix,supr_op::AbstractMatrix)
+function add_space_supremizers(basis_space::ArrayBlock,norm_matrix::AbstractMatrix,supr_matrix::AbstractMatrix)
   basis_primal,basis_dual... = basis_space.array
   A = norm_matrix[Block(1,1)]
   H = cholesky(A)
   for i = eachindex(basis_dual)
-    C = supr_op[Block(1,i+1)]
+    C = supr_matrix[Block(1,i+1)]
     supr_i = H \ C * basis_dual[i]
     gram_schmidt!(supr_i,basis_primal,A)
     basis_primal = hcat(basis_primal,supr_i)

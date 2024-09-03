@@ -86,16 +86,10 @@ function ParamDataStructures.realization(op::LinearNonlinearParamFEOperator;kwar
   realization(op.op_linear;kwargs...)
 end
 
-function assemble_norm_matrix(op::LinearNonlinearParamFEOperator)
+function assemble_matrix_from_form(op::LinearNonlinearParamFEOperator,form::Function)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
   @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
-  assemble_norm_matrix(op.op_linear)
-end
-
-function assemble_coupling_matrix(op::LinearNonlinearParamFEOperator)
-  @check get_test(op.op_linear) === get_test(op.op_nonlinear)
-  @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
-  assemble_coupling_matrix(op.op_linear)
+  assemble_matrix_from_form(op.op_linear,form)
 end
 
 function join_operators(
@@ -111,15 +105,7 @@ function join_operators(
 
   res(μ,u,v) = op_lin.res(μ,u,v) + op_nlin.res(μ,u,v)
   jac(μ,u,du,v) = op_lin.jac(μ,u,du,v) + op_nlin.jac(μ,u,du,v)
-  ParamFEOperator(res,jac,op_lin.induced_norm,op_lin.pspace,trial,test)
-end
-
-function join_operators(
-  op_lin::ParamSaddlePointFEOp,
-  op_nlin::ParamFEOperator)
-
-  jop = join_operators(op_lin.op,op_nlin)
-  ParamSaddlePointFEOp(jop,op_lin.coupling)
+  ParamFEOperator(res,jac,op_lin.pspace,trial,test)
 end
 
 function join_operators(

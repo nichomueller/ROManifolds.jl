@@ -20,24 +20,6 @@ function empirical_interpolation!(cache,A::AbstractMatrix)
   return I,Ai
 end
 
-function empirical_interpolation!(cache,C::AbstractArray{T,3}) where T
-  @check size(C,1) == 1
-  c...,Iv = cache
-  A = dropdims(C;dims=1)
-  I,Ai = empirical_interpolation!(c,A)
-  push!(Iv,copy(I))
-  return I,Ai
-end
-
-function empirical_interpolation!(cache,C::SparseCore)
-  @check size(C,1) == 1
-  c...,Iv = cache
-  A = dropdims(C.array;dims=1)
-  I,Ai = empirical_interpolation!(c,A)
-  push!(Iv,copy(I))
-  return I,Ai
-end
-
 """
     empirical_interpolation(A::AbstractMatrix) -> (Vector{Int}, AbstractMatrix)
 
@@ -57,85 +39,6 @@ function empirical_interpolation(A::ParamSparseMatrix)
   I,Ai = empirical_interpolation(A.data)
   I′ = recast_indices(I,param_getindex(A,1))
   return I′,Ai
-end
-
-function _global_index(i,local_indices::Vector{Vector{Int32}})
-  Iprev...,Ig = local_indices
-  if length(Iprev) == 0
-    return i
-  end
-  Il = last(Iprev)
-  rankl = length(Il)
-  islow = slow_index(i,rankl)
-  ifast = fast_index(i,rankl)
-  iprev = Il[ifast]
-  giprev = _global_index(iprev,Iprev)
-  return (giprev...,islow)
-end
-
-function _global_index(i,Il::Vector{Int32})
-  rankl = length(Il)
-  li = Il[fast_index(i,rankl)]
-  gi = slow_index(i,rankl)
-  return li,gi
-end
-
-function _to_split_global_indices(local_indices::Vector{Vector{Int32}},index_map::AbstractIndexMap)
-  Is...,It = local_indices
-  Igt = It
-  Igs = copy(It)
-  for (i,ii) in enumerate(Igt)
-    ilsi,igti = _global_index(ii,last(Is))
-    Igt[i] = igti
-    Igs[i] = index_map[CartesianIndex(_global_index(ilsi,Is))]
-  end
-  return Igs,Igt
-end
-
-function _to_global_indices(local_indices::Vector{Vector{Int32}},index_map::AbstractIndexMap)
-  if length(local_indices) != ndims(index_map) # this is the transient case
-    @notimplementedif length(local_indices) != ndims(index_map)+1
-    return _to_split_global_indices(local_indices,index_map)
-  end
-  Ig = local_indices[end]
-  for (i,ii) in enumerate(Ig)
-    Ig[i] = index_map[CartesianIndex(_global_index(ii,local_indices))]
-  end
-  return Ig
-end
-
-function _eim_cache(C::AbstractArray{T,3}) where T
-  m,n = size(C,2),size(C,1)
-  res = zeros(T,m)
-  I = zeros(Int32,n)
-  Iv = Vector{Int32}[]
-  return C,I,res,Iv
-end
-
-_eim_cache(C::SparseCore) = _eim_cache(C.array)
-
-function _next_core(Aprev::AbstractMatrix{T},Cnext::AbstractArray{T,3}) where T
-  Cprev = reshape(Aprev,1,size(Aprev)...)
-  _cores2basis(Cprev,Cnext)
-end
-
-_next_core(Aprev::AbstractMatrix{T},Cnext::SparseCore{T}) where T = _next_core(Aprev,Cnext.array)
-
-function empirical_interpolation(index_map::AbstractIndexMap,cores::AbstractArray...)
-  C,I,res,Iv = _eim_cache(first(cores))
-  for i = eachindex(cores)
-    _,Ai = empirical_interpolation!((I,res,Iv),C)
-    if i < length(cores)
-      C = _next_core(Ai,cores[i+1])
-    else
-      Ig = _to_global_indices(Iv,index_map)
-      return Ig,Ai
-    end
-  end
-end
-
-function empirical_interpolation(index_map::SparseIndexMap,cores::AbstractArray...)
-  empirical_interpolation(get_sparse_index_map(index_map),cores...)
 end
 
 """
@@ -217,30 +120,27 @@ function Algebra.allocate_matrix(::Type{M},m::Integer,n::Integer) where M
   zeros(T,m,n)
 end
 
-function allocate_coefficient(solver::RBSolver,b::Projection)
+function allocate_coefficient(red::AbstractReduction,b::Projection)
   n = num_reduced_dofs(b)
-  nparams = num_online_params(solver)
   coeffvec = allocate_vector(Vector{Float64},n)
-  coeff = array_of_consecutive_arrays(coeffvec,nparams)
+  coeff = array_of_consecutive_arrays(coeffvec,num_online_params(red))
   return coeff
 end
 
-function allocate_result(solver::RBSolver,test::FESubspace)
+function allocate_result(red::AbstractReduction,test::FESubspace)
   V = get_vector_type(test)
   nfree_test = num_free_dofs(test)
-  nparams = num_online_params(solver)
-  kronprod = allocate_vector(V,nfree_test)
-  result = array_of_consecutive_arrays(kronprod,nparams)
+  b = allocate_vector(V,nfree_test)
+  result = array_of_consecutive_arrays(b,num_online_params(red))
   return result
 end
 
-function allocate_result(solver::RBSolver,trial::FESubspace,test::FESubspace)
+function allocate_result(red::AbstractReduction,trial::FESubspace,test::FESubspace)
   T = get_dof_value_type(test)
   nfree_trial = num_free_dofs(trial)
   nfree_test = num_free_dofs(test)
-  nparams = num_online_params(solver)
-  kronprod = allocate_matrix(Matrix{T},nfree_test,nfree_trial)
-  result = array_of_consecutive_arrays(kronprod,nparams)
+  A = allocate_matrix(Matrix{T},nfree_test,nfree_trial)
+  result = array_of_consecutive_arrays(A,num_online_params(red))
   return result
 end
 
@@ -250,7 +150,7 @@ end
 Stores an affine decomposition of a (discrete) residual/jacobian obtained with
 and empirical interpolation method. Its fields are:
 - `basis`: the affine terms, it's a subtype of [`Projeciton`](@ref)
-- `mdeim_interpolation`: consists of a LU decomposition of the `basis` whose rows
+- `interpolation`: consists of a LU decomposition of the `basis` whose rows
   are restricted to the field `integration_domain`
 - `integration_domain`: computed by running the function [`empirical_interpolation`](@ref)
   on the basis, it's a subtype of [`AbstractIntegrationDomain`](@ref)
@@ -264,22 +164,22 @@ a basis for a residual/jacobian, rather it is its (Petrov-) Galerkin projection
 """
 struct AffineDecomposition{A,B,C,D,E}
   basis::A
-  mdeim_interpolation::B
+  interpolation::B
   integration_domain::C
   coefficient::D
   result::E
 end
 
 get_integration_domain(a::AffineDecomposition) = a.integration_domain
-get_interp_matrix(a::AffineDecomposition) = a.mdeim_interpolation
+get_interp_matrix(a::AffineDecomposition) = a.interpolation
 get_indices_space(a::AffineDecomposition) = get_indices_space(get_integration_domain(a))
 
-function mdeim(mdeim_style::MDEIMStyle,b::SteadyProjection)
+function mdeim(b::SteadyProjection)
   basis_space = get_basis_space(b)
   indices_space,interp_basis_space = empirical_interpolation(basis_space)
-  lu_interp = lu(interp_basis_space)
+  interpolation = lu(interp_basis_space)
   integration_domain = IntegrationDomain(indices_space)
-  return lu_interp,integration_domain
+  return interpolation,integration_domain
 end
 
 function ParamDataStructures.Contribution(v::Tuple{Vararg{AffineDecomposition}},t::Tuple{Vararg{Triangulation}})
@@ -307,19 +207,19 @@ struct AffineContribution{A,V,K} <: Contribution
 end
 
 """
-    reduced_form(solver::RBSolver, s::AbstractSnapshots, trian::Triangulation, args...; kwargs...
+    reduced_form(red::AbstractReduction, s::AbstractSnapshots, trian::Triangulation, args...; kwargs...
       ) -> AffineDecomposition, Triangulation
 
 Returns the AffineDecomposition corresponding to the couple (`s`, `trian`)
 
 """
 function reduced_form(
-  solver::RBSolver,
+  red::AbstractMDEIMReduction,
   s::AbstractSnapshots,
   trian::Triangulation,
-  args...;
-  kwargs...)
+  args...)
 
+<<<<<<< HEAD
   mdeim_style = solver.mdeim_style
   timer = get_timer(solver)
 
@@ -335,63 +235,74 @@ function reduced_form(
   result = allocate_result(solver,args...)
   ad = AffineDecomposition(proj_basis,lu_interp,integration_domain,coefficient,result)
 
+=======
+  t = @timed begin
+    basis = reduced_basis(get_reduction(red),s)
+    interpolation,integration_domain = mdeim(basis)
+    proj_basis = reduce_operator(red,basis,args...)
+    red_trian = reduce_triangulation(trian,integration_domain,args...)
+  end
+
+  coefficient = allocate_coefficient(red,basis)
+  result = allocate_result(red,args...)
+
+  println(CostTracker(t))
+
+  ad = AffineDecomposition(proj_basis,interpolation,integration_domain,coefficient,result)
+>>>>>>> 1a2f6680f631465c1adfc9b2099cf324aaede770
   return ad,red_trian
 end
 
-function reduced_residual(solver::RBSolver,op,s::AbstractSnapshots,trian::Triangulation)
+function reduced_residual(red::AbstractReduction,op,s::AbstractSnapshots,trian::Triangulation)
   test = get_test(op)
-  reduced_form(solver,s,trian,test)
+  reduced_form(red,s,trian,test)
 end
 
-function reduced_jacobian(solver::RBSolver,op,s::AbstractSnapshots,trian::Triangulation;kwargs...)
+function reduced_jacobian(red::AbstractReduction,op,s::AbstractSnapshots,trian::Triangulation)
   trial = get_trial(op)
   test = get_test(op)
-  reduced_form(solver,s,trian,trial,test;kwargs...)
+  reduced_form(red,s,trian,trial,test)
 end
 
 """
-    reduced_residual(solver::RBSolver,op::PGOperator,c::ArrayContribution)
+    reduced_residual(red::AbstractReduction,op::PGOperator,c::ArrayContribution)
       ) -> AffineContribution
-    reduced_residual(solver::RBSolver,op::TransientPGOperator,c::ArrayContribution)
+    reduced_residual(red::AbstractReduction,op::TransientPGOperator,c::ArrayContribution)
       ) -> AffineContribution
 
 Returns the AffineContribution corresponding to the residual snapshots stored
 in the [`ArrayContribution`](@ref) `c`
 
 """
-function reduced_residual(solver::RBSolver,op,c::ArrayContribution)
+function reduced_residual(red::AbstractReduction,op,c::ArrayContribution)
   a,trians = map(get_domains(c),get_values(c)) do trian,values
-    reduced_residual(solver,op,values,trian)
+    reduced_residual(red,op,values,trian)
   end |> tuple_of_arrays
   return Contribution(a,trians)
 end
 
 """
-    reduced_jacobian(solver::RBSolver,op::PGOperator,c::ArrayContribution);kwargs...
+    reduced_jacobian(red::AbstractReduction,op::PGOperator,c::ArrayContribution)
       ) -> AffineContribution
-    reduced_jacobian(solver::RBSolver,op::TransientPGOperator,c::TupOfArrayContribution);
-      kwargs...) -> AffineContribution
+    reduced_jacobian(red::AbstractReduction,op::TransientPGOperator,c::TupOfArrayContribution)
+      ) -> AffineContribution
 
 Returns the AffineContribution corresponding to the jacobian snapshots stored
 in the [`ArrayContribution`](@ref) `c`. In transient problems, this procedure is
 run for every order of the time derivative
 
 """
-function reduced_jacobian(solver::RBSolver,op,c::ArrayContribution;kwargs...)
+function reduced_jacobian(red::AbstractReduction,op,c::ArrayContribution)
   a,trians = map(get_domains(c),get_values(c)) do trian,values
-    reduced_jacobian(solver,op,values,trian;kwargs...)
+    reduced_jacobian(red,op,values,trian)
   end |> tuple_of_arrays
   return Contribution(a,trians)
 end
 
 function reduced_jacobian_residual(solver::RBSolver,op,s)
-  timer = get_timer(solver)
-  reset_timer!(timer,"MDEIM")
-  reset_timer!(timer,"Galerkin")
   jac,res = jacobian_and_residual(solver,op,s)
-  red_jac = reduced_jacobian(solver,op,jac)
-  red_res = reduced_residual(solver,op,res)
-  show(timer)
+  red_jac = reduced_jacobian(get_jacobian_reduction(solver),op,jac)
+  red_res = reduced_residual(get_residual_reduction(solver),op,res)
   return red_jac,red_res
 end
 
@@ -415,8 +326,8 @@ Computes the MDEIM coefficient corresponding to the interpolated basis stored in
 """
 function coefficient!(a::AffineDecomposition,b::AbstractParamArray)
   coefficient = a.coefficient
-  mdeim_interpolation = a.mdeim_interpolation
-  ldiv!(coefficient,mdeim_interpolation,b)
+  interpolation = a.interpolation
+  ldiv!(coefficient,interpolation,b)
 end
 
 """

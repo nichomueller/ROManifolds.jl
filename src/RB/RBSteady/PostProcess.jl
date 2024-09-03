@@ -9,14 +9,13 @@ saved quantities can be found. Note that this function must be used after the te
 case has been run at least once!
 
 """
-function load_solve(solver,feop,dir;kwargs...)
+function load_solve(solver,feop,dir)
   fe_sol = deserialize(get_snapshots_filename(dir))
+  fe_stats = deserialize(get_fe_stats_filename(dir))
   rbop = deserialize_operator(feop,dir)
-  rb_sol,_ = solve(solver,rbop,fe_sol)
+  rb_sol,rb_stats,_ = solve(solver,rbop,fe_sol)
   old_results = deserialize(get_results_filename(dir))
-  timer = get_timer(solver)
-  merge!(timer,old_results.timer)
-  results = rb_results(solver,rbop,fe_sol,rb_sol;kwargs...)
+  results = rb_results(solver,rbop,fe_sol,rb_sol,rb_stats,fe_stats)
   return results
 end
 
@@ -114,35 +113,46 @@ function DrWatson.save(dir,op::PGOperator;kwargs...)
 end
 
 """
-    struct RBResults
-      name::Union{String,Vector{String}}
-      timer::TimerOutput
-      error::Vector{Float64}
+    struct RBResults{E}
+      error::E
+      speedup::SU
     end
 
 Allows to compute errors and computational speedups to compare the properties of
 the algorithm with the FE performance.
 
 """
-struct RBResults
-  name::Union{String,Vector{String}}
-  timer::TimerOutput
-  error::Vector{Float64}
+struct RBResults{E}
+  error::E
+  speedup::SU
 end
 
-TimerOutputs.get_timer(r::RBResults) = r.timer
+function Base.show(io::IO,k::MIME"text/plain",r::RBResults)
+  println(io," ----------------------- RBResults ----------------------------")
+  println(io," > error: $(r.error)")
+  println(io," > speedup in time: $(r.speedup.speedup_time)")
+  println(io," > speedup in memory: $(r.speedup.speedup_memory)")
+  println(io," -------------------------------------------------------------")
+end
 
-function rb_results(solver::RBSolver,feop,s,son_approx;name="vel")
-  timer = get_timer(solver)
-  X = assemble_norm_matrix(feop)
+function Base.show(io::IO,r::RBResults)
+  show(io,MIME"text/plain"(),r)
+end
+
+function rb_results(solver::RBSolver,feop,s,son_approx)
+  son = select_snapshots(s,online_params(solver))
+  error = compute_error(son,son_approx)
+  speedup = compute_speedup(fe_stats,rb_stats)
+  RBResults(error,speedup)
+end
+
+function rb_results(solver::RBSolver,feop,s,son_approx,fe_stats,rb_stats)
+  state_red = get_state_reduction(solver)
+  X = assemble_matrix_from_form(feop,get_norm(state_red))
   son = select_snapshots(s,online_params(solver))
   error = compute_error(son,son_approx,X)
-  RBResults(name,timer,error)
-end
-
-function rb_results(solver::RBSolver,op::RBOperator,args...;kwargs...)
-  feop = ParamODEs.get_fe_operator(op)
-  rb_results(solver,feop,args...;kwargs...)
+  speedup = compute_speedup(fe_stats,rb_stats)
+  RBResults(error,speedup)
 end
 
 function get_results_filename(dir)
@@ -159,8 +169,4 @@ function Utils.compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm
   block_map = BlockMap(size(sol),active_block_ids)
   errors = [compute_error(sol[i],sol_approx[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
   return_cache(block_map,errors...)
-end
-
-function Utils.compute_error(r::RBResults)
-  mean(r.error)
 end

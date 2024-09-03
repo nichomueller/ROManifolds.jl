@@ -366,25 +366,25 @@ function Algebra.solve!(
 
   x̂,y = cache
   fesolver = get_fe_solver(solver)
-  timer = get_timer(solver)
-  reset_timer!(timer,"TEST")
 
-  @timeit timer "TEST" solve!((x̂,),fesolver,op,r,(y,))
-  set_nruns!(timer["TEST"],num_params(r))
+  t = @timed solve!((x̂,),fesolver,op,r,(y,))
+  stats = CostTracker(t,num_params(r))
 
   trial = get_trial(op)(r)
   x = recast(x̂,trial)
   i = get_vector_index_map(op)
   s = Snapshots(x,i,r)
 
-  return s,cache
+  return s,stats,cache
 end
 
 # for testing/visualization purposes
 
 function pod_mdeim_error(solver,feop,op,s)
+  state_red = get_state_reduction(solver)
+  X = assemble_matrix_from_form(feop,get_norm(state_red))
   s′ = flatten_partition(s)
-  pod_err = pod_error(get_trial(op),s′,assemble_norm_matrix(feop))
+  pod_err = pod_error(get_trial(op),s′,X)
   mdeim_err = mdeim_error(solver,feop,op,s′)
   return pod_err,mdeim_err
 end

@@ -13,53 +13,35 @@ end
 RBSteady.get_indices_space(i::TransientIntegrationDomain) = i.indices_space
 get_indices_time(i::TransientIntegrationDomain) = i.indices_time
 
-function RBSteady.allocate_coefficient(
-  solver::RBSolver{S,SpaceOnlyMDEIM} where S,
-  b::TransientProjection)
-
-  nspace = RBSteady.num_reduced_space_dofs(b)
-  ntime = num_times(b)
-  nparams = RBSteady.num_online_params(solver)
-  coeffmat = allocate_matrix(Vector{Float64},nspace,ntime)
-  coeff = array_of_consecutive_arrays(coeffmat,nparams)
-  return coeff
-end
-
 const TransientAffineDecomposition{A,B,C<:TransientIntegrationDomain,D,E} = AffineDecomposition{A,B,C,D,E}
 
 const TupOfAffineContribution = Tuple{Vararg{AffineContribution{T}}} where T
 
 get_indices_time(a::TransientAffineDecomposition) = get_indices_time(get_integration_domain(a))
 
-function _time_indices_and_interp_matrix(::SpaceTimeMDEIM,interp_basis_space,basis_time)
+function _time_indices_and_interp_matrix(interp_basis_space,basis_time)
   indices_time,interp_basis_time = empirical_interpolation(basis_time)
   interp_basis_space_time = kron(interp_basis_time,interp_basis_space)
-  lu_interp = lu(interp_basis_space_time)
-  return indices_time,lu_interp
+  interpolation = lu(interp_basis_space_time)
+  return indices_time,interpolation
 end
 
-function _time_indices_and_interp_matrix(::SpaceOnlyMDEIM,interp_basis_space,basis_time)
-  indices_time = axes(basis_time,1)
-  lu_interp = lu(interp_basis_space)
-  return indices_time,lu_interp
-end
-
-function RBSteady.mdeim(mdeim_style::MDEIMStyle,b::TransientPODBasis)
+function RBSteady.mdeim(b::TransientPODBasis)
   basis_space = get_basis_space(b)
   basis_time = get_basis_time(b)
   indices_space,interp_basis_space = empirical_interpolation(basis_space)
-  indices_time,lu_interp = _time_indices_and_interp_matrix(mdeim_style,interp_basis_space,basis_time)
+  indices_time,interpolation = _time_indices_and_interp_matrix(interp_basis_space,basis_time)
   integration_domain = TransientIntegrationDomain(indices_space,indices_time)
-  return lu_interp,integration_domain
+  return interpolation,integration_domain
 end
 
-function RBSteady.mdeim(mdeim_style::MDEIMStyle,b::TransientTTSVDCores)
+function RBSteady.mdeim(b::TransientTTSVDCores)
   index_map = get_index_map(b)
   cores = get_cores(b)
   (indices_space,indices_time),interp_basis_spacetime = empirical_interpolation(index_map,cores...)
-  lu_interp = lu(interp_basis_spacetime)
+  interpolation = lu(interp_basis_spacetime)
   integration_domain = TransientIntegrationDomain(indices_space,indices_time)
-  return lu_interp,integration_domain
+  return interpolation,integration_domain
 end
 
 function union_reduced_times(a::AffineContribution)
@@ -75,30 +57,24 @@ function union_reduced_times(a::TupOfAffineContribution)
 end
 
 function RBSteady.reduced_jacobian(
-  solver::ThetaMethodRBSolver,
+  red::Tuple{Vararg{AbstractReduction}},
   op::TransientRBOperator,
   contribs::Tuple{Vararg{Any}})
 
-  fesolver = get_fe_solver(solver)
-  θ = fesolver.θ
+  @check length(red) == length(contribs)
   a = ()
-  for (i,c) in enumerate(contribs)
-    combine = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*(x-y)
-    a = (a...,reduced_jacobian(solver,op,c;combine))
+  for i in eachindex(red)
+    a = (a...,reduced_jacobian(red[i],op,contribs[i]))
   end
   return a
 end
 
 # ONLINE PHASE
 
-function RBSteady.coefficient!(
-  a::TransientAffineDecomposition{<:ReducedAlgebraicOperator{T}},
-  b::AbstractParamArray
-  ) where T<:SpaceTimeMDEIM
-
+function RBSteady.coefficient!(a::TransientAffineDecomposition,b::AbstractParamArray)
   coefficient = a.coefficient
-  mdeim_interpolation = a.mdeim_interpolation
-  ldiv!(coefficient,mdeim_interpolation,vec(b))
+  interpolation = a.interpolation
+  ldiv!(coefficient,interpolation,vec(b))
 end
 
 function RBSteady.mdeim_result(a::TupOfAffineContribution,b::TupOfArrayContribution)

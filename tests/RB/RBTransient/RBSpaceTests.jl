@@ -119,7 +119,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+rbsolver = RBSolver(fesolver,ϵ;nparams_state=50,nparams_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
 fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
@@ -141,7 +141,7 @@ iA = get_matrix_index_map(feop)
 sA = Snapshots(A,iA,r)
 basis = reduced_basis(sA)
 
-lu_interp,integration_domain = mdeim(SpaceTimeMDEIM(),basis)
+interpolation,integration_domain = mdeim(basis)
 
 # supremizer check
 
@@ -199,7 +199,7 @@ xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 dir = datadir(joinpath("stokes","toy_mesh"))
-info = RBInfo(dir;norm_style=[:l2,:l2],nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20,
+info = RBInfo(dir;norm_style=[:l2,:l2],nparams_state=50,nparams_test=10,nsnaps_mdeim=20,
   st_mdeim=true,compute_supremizers=true)
 
 rbsolver = RBSolver(info,fesolver)

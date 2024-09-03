@@ -1,13 +1,12 @@
 module RBSteady
 
 using LinearAlgebra
-using RandomizedLinAlg
+using TSVD
 using BlockArrays
 using SparseArrays
 using DrWatson
 using Kronecker
 using Serialization
-using TimerOutputs
 
 using Gridap
 using Gridap.Algebra
@@ -61,16 +60,31 @@ export BlockCore
 export cat_cores
 include("TTCores.jl")
 
+export ReductionStyle
+export SearchSVDRank
+export FixedSVDRank
+export SearchTTSVDRanks
+export FixedTTSVDRanks
+export NormStyle
+export EuclideanNorm
+export EnergyNorm
+export AbstractReduction
+export DirectReduction
+export GreedyReduction
+export AbstractPODReduction
+export PODReduction
+export TTSVDReduction
+export SupremizerReduction
+export AbstractMDEIMReduction
+export MDEIMReduction
 export RBSolver
-export MDEIMStyle
-export SpaceMDEIM
-export get_test_directory
+export create_dir
 export get_fe_solver
-export get_timer
 export fe_solutions
 export nonlinear_rb_solve!
 include("RBSolver.jl")
 
+export projection
 export truncated_pod
 export ttsvd
 export gram_schmidt!
@@ -112,8 +126,6 @@ export select_fe_quantities_at_indices
 include("PGOperator.jl")
 
 export ReducedAlgebraicOperator
-export ReducedVectorOperator
-export ReducedMatrixOperator
 export reduce_operator
 export compress_cores
 export compress_core

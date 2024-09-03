@@ -1,94 +1,94 @@
-"""
-    truncation(s::AbstractVector;ϵ=1e-4,rank::Integer=length(s)) -> Integer
-
-Returns the minimum between `rank` and the first integer `tolrank` such that
-(`s`[1]² + ... + `s`[`tolrank`]²) / (`s`[1]² + ... + `s`[end]²) ≥ `ϵ`²,
-where `s` are the singular values of the SVD of a given matrix. The equation
-above is the so-called relative energy criterion
-
-"""
-function truncation(s::AbstractVector;ϵ=1e-4,rank::Integer=length(s),squares=false)
-  energies = squares ? cumsum(s;dims=1) : cumsum(s.^2;dims=1)
-  tolrank = findfirst(energies .>= (1-ϵ^2)*energies[end])
-  min(rank,tolrank)
+function projection(red::AbstractReduction,A::AbstractArray)
+  @abstractmethod
 end
 
-function select_modes(U::AbstractMatrix,Σ::AbstractVector,V::AbstractMatrix;squares=false,kwargs...)
-  Σ′ = squares ? sqrt.(Σ) : Σ
-  rank = truncation(Σ;squares,kwargs...)
-  return U[:,1:rank],Σ′[1:rank],V[:,1:rank]
-end
-
-function truncated_svd(mat::AbstractMatrix;randomized=false,kwargs...)
-  if randomized
-    smin = minimum(size(mat))
-    rank = cld(smin,2)
-    U,Σ,V = rsvd(mat,rank)
-  else
-    U,Σ,V = svd(mat)
-  end
-  select_modes(U,Σ,V;kwargs...)
-end
-
-_size_condition(mat::AbstractMatrix) = false #(
-    #length(mat) > 1e6 && (size(mat,1) > 1e2*size(mat,2) || size(mat,2) > 1e2*size(mat,1))
-    #)
-
-"""
-    truncated_pod(mat::AbstractMatrix,args...;kwargs...) -> AbstractMatrix
-
-Truncated proper orthogonal decomposition. When a symmetric, positive definite
-matrix `X` is provided as an argument, the output's columns are `X`-orthogonal,
-otherwise they are ℓ²-orthogonal
-
-"""
-function truncated_pod(mat::AbstractMatrix,args...;kwargs...)
-  U,Σ,V = _truncated_pod(mat,args...;kwargs...)
+function projection(red::PODReduction,A::AbstractArray,args...)
+  red_style = ReductionStyle(red)
+  U,Σ,V = tpod(red_style,A)
   return U
 end
 
-function _truncated_pod(mat::AbstractMatrix,args...;kwargs...)
-  if _size_condition(mat)
-    if size(mat,1) > size(mat,2)
-      massive_rows_tpod(mat,args...;kwargs...)
+function projection(red::TTSVDReduction,A::AbstractArray,args...)
+  red_style = ReductionStyle(red)
+  cores,remainder = ttsvd(red_style,A)
+  return cores
+end
+
+function _size_cond(M::AbstractMatrix)
+  length(M) > 1e6 && (size(M,1) > 1e2*size(M,2) || size(M,2) > 1e2*size(M,1))
+end
+
+function _cholesky_decomp(X::AbstractSparseMatrix)
+  C = cholesky(X)
+  L = sparse(C.L)
+  p = C.p
+  return L,p
+end
+
+function select_rank(red_style::ReductionStyle,args...)
+  @abstractmethod
+end
+
+function select_rank(red_style::SearchSVDRank,S::AbstractVector)
+  tol = red_style.tol
+  energies = cumsum(S.^2;dims=1)
+  rank = findfirst(energies .>= (1-tol^2)*energies[end])
+  return rank
+end
+
+function truncated_svd(red_style::SearchSVDRank,M::AbstractMatrix;issquare=false)
+  U,S,V = svd(M)
+  if issquare S = sqrt.(S) end
+  rank = select_rank(red_style,S)
+  return U[:,1:rank],S[1:rank],V[:,1:rank]
+end
+
+function truncated_svd(red_style::FixedSVDRank,M::AbstractMatrix;kwargs...)
+  rank = red_style.rank
+  return tsvd(M,rank)
+end
+
+function tpod(red_style::ReductionStyle,M::AbstractMatrix,args...)
+  if isa(red_style,SearchSVDRank) && _size_cond(M)
+    if size(M,1) > size(M,2)
+      massive_rows_tpod(red_style,M,args...)
     else
-      massive_cols_tpod(mat,args...;kwargs...)
+      massive_cols_tpod(red_style,M,args...)
     end
   else
-    standard_tpod(mat,args...;kwargs...)
+    standard_tpod(red_style,M,args...)
   end
 end
 
-function standard_tpod(mat::AbstractMatrix,args...;kwargs...)
-  truncated_svd(mat;kwargs...)
+function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix)
+  truncated_svd(red_style,M)
 end
 
-function standard_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
-  C = cholesky(X)
-  L,p = sparse(C.L),C.p
-  Xmat = L'*mat[p,:]
-  Ũr,Σr,Vr = truncated_svd(Xmat;kwargs...)
+function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
+  L,p = _cholesky_decomp(X)
+  XM = L'*M[p,:]
+  Ũr,Σr,Vr = truncated_svd(red_style,XM)
   Ur = (L'\Ũr)[invperm(p),:]
   return Ur,Σr,Vr
 end
 
-function massive_rows_tpod(mat::AbstractMatrix,args...;kwargs...)
-  mmat = mat'*mat
-  _,Σr,Vr = truncated_svd(mmat;squares=true,kwargs...)
-  Ur = mat*Vr
+function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix)
+  MM = M'*M
+  _,Σr,Vr = truncated_svd(red_style,MM;issquare=true)
+  Ur = M*Vr
   @inbounds for i = axes(Ur,2)
     Ur[:,i] /= Σr[i]+eps()
   end
   return Ur,Σr,Vr
 end
 
-function massive_rows_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
+function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
   C = cholesky(X)
   L,p = sparse(C.L),C.p
-  Xmat = L'*mat[p,:]
-  mXmat = Xmat'*Xmat
-  _,Σr,Vr = truncated_svd(mXmat;squares=true,kwargs...)
-  Ũr = Xmat*Vr
+  XM = L'*M[p,:]
+  MXM = XM'*XM
+  _,Σr,Vr = truncated_svd(red_style,MXM;issquare=true)
+  Ũr = XM*Vr
   @inbounds for i = axes(Ũr,2)
     Ũr[:,i] /= Σr[i]+eps()
   end
@@ -96,122 +96,141 @@ function massive_rows_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...
   return Ur,Σr,Vr
 end
 
-function massive_cols_tpod(mat::AbstractMatrix,args...;kwargs...)
-  mmat = mat*mat'
-  Ur,Σr,_ = truncated_svd(mmat;squares=true,kwargs...)
-  Vr = Ur'*mat
+function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix)
+  MM = M*M'
+  Ur,Σr,_ = truncated_svd(red_style,MM;issquare=true)
+  Vr = Ur'*M
   @inbounds for i = axes(Ur,2)
     Vr[:,i] /= Σr[i]+eps()
   end
   return Ur,Σr,Vr'
 end
 
-function massive_cols_tpod(mat::AbstractMatrix,X::AbstractSparseMatrix;kwargs...)
+function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
   C = cholesky(X)
   L,p = sparse(C.L),C.p
-  Xmat = L'*mat[p,:]
-  mXmat = Xmat*Xmat'
-  Ũr,Σr,_ = truncated_svd(mXmat;squares=true,kwargs...)
+  XM = L'*M[p,:]
+  MXM = XM*XM'
+  Ũr,Σr,_ = truncated_svd(red_style,MXM;issquare=true)
   Ur = (L'\Ũr)[invperm(p),:]
-  Vr = Ur'*Xmat
+  Vr = Ur'*XM
   @inbounds for i = axes(Ur,2)
     Vr[:,i] /= Σr[i]+eps()
   end
   return Ur,Σr,Vr'
 end
 
-function _tt_truncated_pod(a::AbstractArray{T,3},args...;kwargs...) where T
-  mat = reshape(a,size(a,1)*size(a,2),:)
-  Ur,Σr,Vr = _truncated_pod(mat;kwargs...)
-  core = reshape(Ur,size(a,1),size(a,2),:)
+function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3}) where T
+  M = reshape(A,size(A,1)*size(A,2),:)
+  Ur,Σr,Vr = truncated_svd(red_style,M)
+  core = reshape(Ur,size(A,1),size(A,2),:)
   remainder = Σr.*Vr'
   return core,remainder
 end
 
-function _tt_truncated_pod(a::AbstractArray{T,3},X::AbstractSparseMatrix;kwargs...) where T
-  perm = (2,1,3)
-  prev_rank = size(a,1)
-  cur_size = size(a,2)
+# function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
+#   perm = (2,1,3)
+#   prev_rank = size(A,1)
+#   cur_size = size(A,2)
 
-  C = cholesky(X)
-  L,p = sparse(C.L),C.p
+#   L,p = _cholesky_decomp(X)
 
-  Xa = _tt_mul(L,p,a)
-  Xmat = reshape(Xa,:,size(Xa,3))
-  Ũr,Σr,Vr = truncated_svd(Xmat;kwargs...)
-  c̃ = reshape(Ũr,size(Xa,1),size(Xa,2),:)
-  core = _tt_div(L,p,c̃)
+#   XA = _tt_mul(L,p,A)
+#   XM = reshape(XA,:,size(XA,3))
+#   Ũr,Σr,Vr = truncated_svd(red_style,XM)
+#   c̃ = reshape(Ũr,size(XA,1),size(XA,2),:)
+#   core = _tt_div(L,p,c̃)
+#   remainder = Σr.*Vr'
+
+#   return core,remainder
+# end
+
+function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
+  prev_rank = size(A,1)
+  cur_size = size(A,2)
+
+  L,p = _cholesky_decomp(X)
+  L′ = kron(I(prev_rank),L)
+  p′ = vec(((collect(1:prev_rank).-1)*cur_size .+ p')')
+
+  M = reshape(A,prev_rank*cur_size,:)
+  XM = L′'*M[p′,:]
+  Ũr,Σr,Vr = truncated_svd(red_style,XM)
+  Ur = (L′'\Ũr)[invperm(p′),:]
+
+  core = reshape(Ur,prev_rank,cur_size,:)
   remainder = Σr.*Vr'
-
   return core,remainder
 end
 
-function _tt_mul(L::AbstractSparseMatrix{T},p::Vector{Int},a::AbstractArray{T,3}) where T
-  @check size(L,2) == size(a,2)
-  b = similar(a,T,(size(a,1),size(L,1),size(a,3)))
-  ap = a[:,p,:]
-  @inbounds for i1 in axes(b,1)
-    ap1 = ap[i1,:,:]
-    @inbounds for i3 in axes(b,3)
-      b[i1,:,i3] = L'*ap1[:,i3]
-    end
+# function _tt_mul(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
+#   @check size(L,2) == size(A,2)
+#   B = similar(A,T,(size(A,1),size(L,1),size(A,3)))
+#   Ap = A[:,p,:]
+#   @inbounds for i1 in axes(B,1)
+#     Ap1 = Ap[i1,:,:]
+#     @inbounds for i3 in axes(B,3)
+#       B[i1,:,i3] = L'*Ap1[:,i3]
+#     end
+#   end
+#   return B
+# end
+
+# function _tt_div(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
+#   @check size(L,1) == size(L,2) == size(A,2)
+#   B = similar(A)
+#   @inbounds for i1 in axes(B,1)
+#     A1 = A[i1,:,:]
+#     @inbounds for i3 in axes(B,3)
+#       B[i1,p,i3] = L'\A1[:,i3]
+#     end
+#   end
+#   return B
+# end
+
+# We are not interested in the last dimension (corresponds to the parameter)
+
+function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N}) where {T,N}
+  cores = Array{T,3}[]
+  oldrank = 1
+  A_d = reshape(A,oldrank,size(A,1),:)
+  for d in 1:N-1
+    core_d,remainder_d = ttsvd_loop(red_style[d],A_d)
+    oldrank = size(core_d,3)
+    A_d = reshape(remainder_d,oldrank,size(A,d+1),:)
+    push!(cores,core_d)
   end
-  return b
+  return cores,A_d
 end
 
-function _tt_div(L::AbstractSparseMatrix{T},p::Vector{Int},a::AbstractArray{T,3}) where T
-  @check size(L,1) == size(L,2) == size(a,2)
-  b = similar(a)
-  @inbounds for i1 in axes(b,1)
-    a1 = a[i1,:,:]
-    @inbounds for i3 in axes(b,3)
-      b[i1,p,i3] = L'\a1[:,i3]
-    end
+function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRank1Tensor) where {T,N}
+  Nspace = length(get_factors(X))
+  @check Nspace ≤ N-1
+
+  cores = Array{T,3}[]
+  oldrank = 1
+  A_d = reshape(A,oldrank,size(A,1),:)
+  for d in 1:Nspace
+    core_d,remainder_d = ttsvd_loop(red_style[d],A_d)
+    oldrank = size(core_d,3)
+    A_d = reshape(remainder_d,oldrank,size(A,d+1),:)
+    push!(cores,core_d)
   end
-  return b
+
+  return cores,A_d
 end
 
-# We are not interested in the last dimension (corresponds to the parameter).
-# Note: when X is provided as norm matrix, ids_range has length 1, so we actually
-# are not computing a cholesky decomposition numerous times
-
-function ttsvd!(cache,a::AbstractArray{T,N},args...;ids_range=1:N-1,kwargs...) where {T,N}
-  cores,ranks,sizes = cache
-  d1 = ids_range[1]
-  a_d = reshape(a,ranks[d1],sizes[d1],:)
-  for d in ids_range
-    core_d,remainder_d = _tt_truncated_pod(a_d,args...;kwargs...)
-    rank = size(core_d,3)
-    ranks[d+1] = rank
-    cores[d] = core_d
-    a_d = reshape(remainder_d,rank,sizes[d+1],:)
-  end
-  return a_d
-end
-
-function ttsvd!(cache,a::AbstractArray{T,N},X::AbstractRank1Tensor;ids_range=1:N-1,kwargs...) where {T,N}
-  for d in ids_range
-    a = ttsvd!(cache,a,X[d];ids_range=d,kwargs...)
-  end
-  return a
-end
-
-function ttsvd!(cache,a::AbstractArray{T,N},X::AbstractRankTensor;ids_range=1:N,kwargs...) where {T,N}
-  cores,ranks,sizes = cache
-  cores_k,as = map(1:rank(X)) do k
-    cores_k = copy(cores[ids_range])
-    ranks_k = copy(ranks)
-    a_k = ttsvd!((cores_k,ranks_k,sizes),a,X[k];ids_range,kwargs...)
-    cores_k,a_k
-  end |> tuple_of_arrays
-  for d in ids_range
-    touched = d == first(ids_range) ? fill(true,rank(X)) : I(rank(X))
+function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRankTensor) where {T,N}
+  cores_k,remainders_k = map(k -> ttsvd(red_style,A,X[k]),1:rank(X)) |> tuple_of_arrays
+  cores = Array{T,3}[]
+  for d in eachindex(first(cores_k))
+    touched = d == 1 ? fill(true,rank(X)) : I(rank(X))
     cores_d = getindex.(cores_k,d)
-    cores[d] = BlockCore(cores_d,touched)
+    push!(cores,BlockCore(cores_d,touched))
   end
-  R = orthogonalize!(cores,ranks,X;ids_range)
-  a = absorb(cat(as...;dims=1),R)
-  return a
+  R = orthogonalize!(cores,X)
+  A_d = absorb(cat(remainders_k...;dims=1),R)
+  return cores,A_d
 end
 
 function pivoted_qr(A;tol=1e-10)
@@ -222,34 +241,31 @@ function pivoted_qr(A;tol=1e-10)
   return Q,R
 end
 
-function orthogonalize!(cores,ranks,X::AbstractTProductTensor;ids_range=eachindex(cores))
+function orthogonalize!(cores,X::AbstractTProductTensor)
   weight = ones(1,rank(X),1)
   decomp = get_decomposition(X)
-  for d in ids_range
-    core = cores[d]
-    if d == last(ids_range)
+  for d in eachindex(cores)
+    core_d = cores[d]
+    if d == length(cores)
       XW = _get_norm_matrix_from_weight(X,weight)
-      core′,R = reduce_rank(core,XW)
-      cores[d] = core′
-      ranks[d+1] = size(core′,3)
+      core_d′,R = reduce_rank(core_d,XW)
+      cores[d] = core_d′
       return R
     end
     next_core = cores[d+1]
-    Xd = getindex.(decomp,d)
-    core′,R = reduce_rank(core)
-    cores[d] = core′
-    ranks[d+1] = size(core′,3)
+    X_d = getindex.(decomp,d)
+    core_d′,R = reduce_rank(core_d)
+    cores[d] = core_d′
     cores[d+1] = absorb(next_core,R)
-    weight = _weight_array(weight,core′,Xd)
+    weight = _weight_array(weight,core_d′,X_d)
   end
 end
 
 function reduce_rank(core::AbstractArray{T,3},X::AbstractMatrix) where T
-  C = cholesky(X)
-  L,p = sparse(C.L),C.p
-  mat = reshape(core,:,size(core,3))
-  Xmat = L'*mat[p,:]
-  Q̃,R = pivoted_qr(Xmat)
+  L,p = _cholesky_decomp(X)
+  M = reshape(core,:,size(core,3))
+  XM = L'*M[p,:]
+  Q̃,R = pivoted_qr(XM)
   Q = (L'\Q̃)[invperm(p),:]
   core′ = reshape(Q,size(core,1),size(core,2),:)
   return core′,R
@@ -302,35 +318,6 @@ function _get_norm_matrix_from_weight(X::AbstractRankTensor,WD)
   end
   @. XW = (XW+XW')/2 # needed to eliminate roundoff errors
   return sparse(XW)
-end
-
-"""
-    ttsvd(a::AbstractArray,args...;kwargs...) -> Vector{<:AbstractArray}
-
-Tensor train singular value decomposition. When a symmetric, positive definite
-matrix `X` is provided as an argument, the columns of A₁ ⊗ ... ⊗ Aₙ, where
-A₁, ..., Aₙ are the components of the outer vector, are `X`-orthogonal,
-otherwise they are ℓ²-orthogonal
-
-"""
-function ttsvd(a::AbstractArray{T,N};kwargs...) where {T,N}
-  cores = Vector{Array{T,3}}(undef,N-1)
-  ranks = fill(1,N)
-  sizes = size(a)
-  cache = cores,ranks,sizes
-  # routine on the spatial indices
-  ttsvd!(cache,a;ids_range=1:N-1,kwargs...)
-  return cores
-end
-
-function ttsvd(a::AbstractArray{T,N},X::AbstractTProductTensor;kwargs...) where {T,N}
-  N_space = N-1
-  cores = Vector{Array{T,3}}(undef,N-1)
-  ranks = fill(1,N)
-  sizes = size(a)
-  # routine on the spatial indices
-  ttsvd!((cores,ranks,sizes),a,X;ids_range=1:N_space,kwargs...)
-  return cores
 end
 
 """

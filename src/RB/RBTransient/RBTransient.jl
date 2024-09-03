@@ -6,7 +6,6 @@ using SparseArrays
 using DrWatson
 using Kronecker
 using Serialization
-using TimerOutputs
 
 using Gridap
 using Gridap.Algebra
@@ -51,9 +50,8 @@ include("Snapshots.jl")
 export get_stage_operator
 include("ThetaMethod.jl")
 
-export SpaceOnlyMDEIM
-export SpaceTimeMDEIM
-export ThetaMethodRBSolver
+export TransientPODReduction
+export TransientMDEIMReduction
 include("RBSolver.jl")
 
 include("BasisConstruction.jl")
