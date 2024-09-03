@@ -20,15 +20,15 @@ RBSteady.num_reduced_dofs(a::TransientProjection) = RBSteady.num_reduced_space_d
 
 function RBSteady.Projection(red::PODReduction,s::AbstractTransientSnapshots,args...)
   s′ = flatten_snapshots(s)
-  basis_space = truncated_pod(red,s′,args...)
+  basis_space = projection(red,s′,args...)
   basis_space′ = recast(s,basis_space)
   compressed_s2 = compress(s′,basis_space,args...;swap_mode=true)
-  basis_time = truncated_pod(red,compressed_s2)
+  basis_time = projection(red,compressed_s2)
   TransientPODBasis(basis_space′,basis_time)
 end
 
 function RBSteady.Projection(red::TTSVDReduction,s::AbstractTransientSnapshots,args...)
-  cores_space...,core_time = ttsvd(red,s,args...)
+  cores_space...,core_time = projection(red,s,args...)
   cores_space′ = recast(s,cores_space)
   index_map = get_index_map(s)
   TransientTTSVDCores(cores_space′,core_time,index_map)
@@ -79,11 +79,6 @@ struct TransientTTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:Abstra
   index_map::I
 end
 
-const TransientFixedDofsTTSVDCores{
-  D,T,A<:AbstractVector{<:AbstractArray{T,D}},B<:AbstractArray{T,3},I<:FixedDofsIndexMap
-  } = TransientTTSVDCores{D,T,A,B,I}
-
-
 IndexMaps.get_index_map(a::TransientTTSVDCores) = a.index_map
 
 RBSteady.get_cores(a::TransientTTSVDCores) = [get_cores_space(a)...,get_core_time(a)]
@@ -92,9 +87,6 @@ get_core_time(a::TransientTTSVDCores) = a.core_time
 
 RBSteady.get_basis_space(a::TransientTTSVDCores) = cores2basis(get_index_map(a),get_cores_space(a)...)
 RBSteady.num_space_dofs(a::TransientTTSVDCores) = prod(_num_tot_space_dofs(a))
-function RBSteady.num_space_dofs(a::TransientFixedDofsTTSVDCores)
-  prod(_num_tot_space_dofs(a)) - length(get_fixed_dofs(get_index_map(a)))
-end
 get_basis_time(a::TransientTTSVDCores) = cores2basis(get_core_time(a))
 ParamDataStructures.num_times(a::TransientTTSVDCores) = size(get_core_time(a),2)
 num_reduced_times(a::TransientTTSVDCores) = size(get_core_time(a),3)
@@ -170,9 +162,9 @@ end
 function RBSteady.enrich_basis(
   a::BlockProjection{<:TransientPODBasis},
   norm_matrix::AbstractMatrix,
-  supr_op::AbstractMatrix)
+  supr_matrix::AbstractMatrix)
 
-  basis_space = add_space_supremizers(get_basis_space(a),norm_matrix,supr_op)
+  basis_space = add_space_supremizers(get_basis_space(a),norm_matrix,supr_matrix)
   basis_time = add_time_supremizers(get_basis_time(a))
   basis = BlockProjection(map(TransientPODBasis,basis_space,basis_time),a.touched)
   return basis
@@ -181,10 +173,10 @@ end
 function RBSteady.enrich_basis(
   a::BlockProjection{<:TransientTTSVDCores},
   norm_matrix::AbstractMatrix,
-  supr_op::AbstractMatrix)
+  supr_matrix::AbstractMatrix)
 
   cores_space,core_time = RBSteady.add_tt_supremizers(
-    get_cores_space(a),get_core_time(a),norm_matrix,supr_op)
+    get_cores_space(a),get_core_time(a),norm_matrix,supr_matrix)
   index_map = get_index_map(a)
   a′ = BlockProjection(map(TransientTTSVDCores,cores_space,core_time,index_map),a.touched)
   return a′

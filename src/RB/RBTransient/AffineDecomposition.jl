@@ -62,12 +62,14 @@ function RBSteady.reduced_jacobian(
   contribs::Tuple{Vararg{Any}})
 
   fesolver = get_fe_solver(solver)
-  θ = fesolver.θ
+  red = get_jacobian_reduction(solver)
+
   a = ()
   for (i,c) in enumerate(contribs)
-    combine = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*(x-y)
-    a = (a...,reduced_jacobian(solver,op,c;combine))
+    combine = (x,y) -> i == 1 ? fesolver.θ*x+(1-fesolver.θ)*y : fesolver.θ*(x-y)
+    a = (a...,reduced_jacobian(red[i],solver,op,c;combine))
   end
+
   return a
 end
 

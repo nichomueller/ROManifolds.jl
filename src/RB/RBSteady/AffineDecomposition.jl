@@ -228,8 +228,8 @@ function allocate_result(solver::RBSolver,test::FESubspace)
   V = get_vector_type(test)
   nfree_test = num_free_dofs(test)
   nparams = num_online_params(solver)
-  kronprod = allocate_vector(V,nfree_test)
-  result = array_of_consecutive_arrays(kronprod,nparams)
+  b = allocate_vector(V,nfree_test)
+  result = array_of_consecutive_arrays(b,nparams)
   return result
 end
 
@@ -238,8 +238,8 @@ function allocate_result(solver::RBSolver,trial::FESubspace,test::FESubspace)
   nfree_trial = num_free_dofs(trial)
   nfree_test = num_free_dofs(test)
   nparams = num_online_params(solver)
-  kronprod = allocate_matrix(Matrix{T},nfree_test,nfree_trial)
-  result = array_of_consecutive_arrays(kronprod,nparams)
+  A = allocate_matrix(Matrix{T},nfree_test,nfree_trial)
+  result = array_of_consecutive_arrays(A,nparams)
   return result
 end
 
@@ -376,13 +376,9 @@ function reduced_jacobian(solver::RBSolver,op,c::ArrayContribution;kwargs...)
 end
 
 function reduced_jacobian_residual(solver::RBSolver,op,s)
-  timer = get_timer(solver)
   jac,res = jacobian_and_residual(solver,op,s)
-  @timeit timer "MDEIM" begin
-    red_jac = reduced_jacobian(solver,op,jac)
-    red_res = reduced_residual(solver,op,res)
-  end
-  show(timer)
+  red_jac = reduced_jacobian(solver,op,jac)
+  red_res = reduced_residual(solver,op,res)
   return red_jac,red_res
 end
 

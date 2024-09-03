@@ -30,19 +30,6 @@ function set_nruns!(t::TimerInfo,nruns::Int)
   t.timer.accumulated_data.ncalls = nruns
 end
 
-abstract type AbstractReduction end
-abstract type DirectReduction <: AbstractReduction end
-abstract type GreedyReduction <: AbstractReduction end
-
-TimerOutputs.get_timer(r::AbstractReduction) = @abstractmethod
-TimerOutputs.reset_timer!(r::AbstractReduction) = reset_timer!(get_timer(r))
-set_nruns!(r::AbstractReduction,nruns::Int) = set_nruns!(get_timer(r),nruns)
-get_name(r::AbstractReduction) = get_name(get_timer(r))
-
-get_reduction(r::AbstractReduction) = r
-get_style(r::AbstractReduction) = @abstractmethod
-num_snaps(r::AbstractReduction) = @abstractmethod
-
 abstract type ReductionStyle end
 
 struct SearchSVDRank{A} <: ReductionStyle
@@ -53,118 +40,143 @@ struct FixedSVDRank{A} <: ReductionStyle
   rank::A
 end
 
-struct PODReduction{A<:ReductionStyle} <: DirectReduction
-  style::A
-  nsnaps::Int
-  timer::TimerInfo
-end
+abstract type NormStyle end
 
-function PODReduction(style::ReductionStyle;nsnaps=50)
-  timer = TimerInfo("POD")
-  PODReduction(style,nsnaps,timer)
-end
+get_norm(n::NormStyle) = @abstractmethod
 
-function PODReduction(;style=SearchSVDRank(1e-4),kwargs...)
-  PODReduction(style;kwargs...)
-end
+struct EuclideanNorm <: NormedStyle end
 
-TimerOutputs.get_timer(r::PODReduction) = r.timer
-get_style(r::PODReduction) = r.style
-num_snaps(r::PODReduction) = r.nsnaps
-
-struct TTSVDReduction{A<:ReductionStyle,B} <: DirectReduction
-  style::A
-  nsnaps::Int
-  timer::TimerInfo
-end
-
-function TTSVDReduction(style::ReductionStyle;nsnaps=50)
-  timer = TimerInfo("TTSVD")
-  TTSVDReduction(style,nsnaps,timer)
-end
-
-function TTSVDReduction(;style=SearchSVDRank(1e-4),kwargs...)
-  TTSVDReduction(style;kwargs...)
-end
-
-TimerOutputs.get_timer(r::TTSVDReduction) = r.timer
-get_style(r::TTSVDReduction) = r.style
-num_snaps(r::TTSVDReduction) = r.nsnaps
-
-struct NormedReduction{A<:AbstractReduction} <: AbstractReduction
-  reduction::A
+struct EnergyNorm <: NormedStyle
   norm_op::Function
 end
 
-for f in (:PODReduction,:TTSVDReduction)
-  @eval begin
-    function $f(norm_op::Function,style::ReductionStyle;kwargs...)
-      reduction = $f(style;kwargs...)
-      NormedReduction(reduction,norm_op)
-    end
+get_norm(n::EnergyNorm) = n.norm_op
 
-    function $f(norm_op::Function;kwargs...)
-      reduction = $f(;kwargs...)
-      NormedReduction(reduction,norm_op)
-    end
-  end
+abstract type AbstractReduction{A<:ReductionStyle,B<:NormStyle} end
+abstract type DirectReduction{A,B} <: AbstractReduction{A,B} end
+abstract type GreedyReduction{A,B} <: AbstractReduction{A,B} end
+
+get_reduction(r::AbstractReduction) = r
+ReductionStyle(r::AbstractReduction) = @abstractmethod
+NormStyle(r::AbstractReduction) = @abstractmethod
+num_snaps(r::AbstractReduction) = @abstractmethod
+get_norm(r::AbstractReduction) = get_norm(NormStyle(r))
+
+TimerOutputs.get_timer(r::AbstractReduction) = @abstractmethod
+TimerOutputs.reset_timer!(r::AbstractReduction) = reset_timer!(get_timer(r))
+set_nruns!(r::AbstractReduction,nruns::Int) = set_nruns!(get_timer(r),nruns)
+get_name(r::AbstractReduction) = get_name(get_timer(r))
+
+struct PODReduction{A,B} <: DirectReduction{A,B}
+  red_style::A
+  norm_style::B
+  nsnaps::Int
+  timer::TimerInfo
 end
 
-get_norm(r::NormedReduction) = r.norm_op
+function PODReduction(red_style::ReductionStyle,norm_style::NormStyle;nsnaps=50,name="POD")
+  timer = TimerInfo(name)
+  PODReduction(red_style,norm_style,nsnaps,timer)
+end
 
-get_reduction(r::NormedReduction) = get_reduction(r.reduction)
-TimerOutputs.get_timer(r::NormedReduction) = get_timer(get_reduction(r))
-get_style(r::NormedReduction) = get_style(get_reduction(r))
-num_snaps(r::NormedReduction) = num_snaps(get_reduction(r))
+function PODReduction(red_style::ReductionStyle,norm_op::Function;kwargs...)
+  norm_style = EnergyNorm(norm_op)
+  PODReduction(red_style,norm_style;kwargs...)
+end
 
-const NormedPODReduction{A<:ReductionStyle} = NormedReduction{PODReduction{A}}
-const NormedTTSVDReduction{A<:ReductionStyle} = NormedReduction{TTSVDReduction{A}}
+function PODReduction(norm_op::Function;red_style=SearchSVDRank(1e-4),kwargs...)
+  norm_style = EnergyNorm(norm_op)
+  PODReduction(red_style,norm_style;kwargs...)
+end
 
-struct SupremizerReduction{A<:AbstractReduction} <: AbstractReduction
-  reduction::A
+function PODReduction(;red_style=SearchSVDRank(1e-4),norm_style=EuclideanNormReduction(),kwargs...)
+  PODReduction(red_style,norm_style;kwargs...)
+end
+
+ReductionStyle(r::PODReduction) = r.red_style
+NormStyle(r::PODReduction) = r.norm_style
+num_snaps(r::PODReduction) = r.nsnaps
+TimerOutputs.get_timer(r::PODReduction) = r.timer
+
+struct TTSVDReduction{A<:ReductionStyle,B} <: DirectReduction
+  red_style::A
+  nsnaps::Int
+  timer::TimerInfo
+end
+
+function TTSVDReduction(red_style::ReductionStyle;nsnaps=50,name="TTSVD")
+  timer = TimerInfo(name)
+  TTSVDReduction(red_style,nsnaps,timer)
+end
+
+function TTSVDReduction(red_style::ReductionStyle,norm_op::Function;kwargs...)
+  norm_style = EnergyNorm(norm_op)
+  TTSVDReduction(red_style,norm_style;kwargs...)
+end
+
+function TTSVDReduction(norm_op::Function;red_style=SearchSVDRank(1e-4),kwargs...)
+  norm_style = EnergyNorm(norm_op)
+  TTSVDReduction(red_style,norm_style;kwargs...)
+end
+
+function TTSVDReduction(;red_style=SearchSVDRank(1e-4),norm_style=EuclideanNormReduction(),kwargs...)
+  TTSVDReduction(red_style,norm_style;kwargs...)
+end
+
+ReductionStyle(r::TTSVDReduction) = r.red_style
+NormStyle(r::TTSVDReduction) = r.norm_style
+num_snaps(r::TTSVDReduction) = r.nsnaps
+TimerOutputs.get_timer(r::TTSVDReduction) = r.timer
+
+struct SupremizerReduction{A,R<:AbstractReduction{A,EnergyNorm}} <: AbstractReduction{A,EnergyNorm}
+  reduction::R
   supr_op::Function
   supr_tol::Float64
 end
 
 for f in (:PODReduction,:TTSVDReduction)
   @eval begin
-    function $f(supr_op::Function,norm_op::Function,style::ReductionStyle;supr_tol=1e-2,kwargs...)
-      reduction = $f(norm_op,style;kwargs...)
+    function $f(supr_op::Function,norm_op::Function,red_style::ReductionStyle;supr_tol=1e-2,kwargs...)
+      reduction = $f(norm_op,red_style;kwargs...)
       SupremizerReduction(reduction,supr_op,supr_tol)
     end
 
     function $f(supr_op::Function,norm_op::Function;kwargs...)
       reduction = $f(norm_op;kwargs...)
-      NormedReduction(reduction,supr_op,supr_tol)
+      SupremizerReduction(reduction,supr_op,supr_tol)
     end
   end
 end
 
-const SupremizerPODReduction{A<:ReductionStyle} = SupremizerReduction{NormedPODReduction{A}}
-const SupremizerTTSVDReduction{A<:ReductionStyle} = SupremizerReduction{NormedTTSVDReduction{A}}
-
 get_supr(r::SupremizerReduction) = r.supr_op
-get_norm(r::SupremizerReduction) = get_norm(get_reduction(r))
+get_supr_tol(r::SupremizerReduction) = r.supr_tol
 
 get_reduction(r::SupremizerReduction) = get_reduction(r.reduction)
-TimerOutputs.get_timer(r::SupremizerReduction) = get_timer(get_reduction(r))
-get_style(r::SupremizerReduction) = get_style(get_reduction(r))
+ReductionStyle(r::SupremizerReduction) = ReductionStyle(get_reduction(r))
+NormStyle(r::SupremizerReduction) = NormStyle(get_reduction(r))
 num_snaps(r::SupremizerReduction) = num_snaps(get_reduction(r))
+TimerOutputs.get_timer(r::SupremizerReduction) = get_timer(get_reduction(r))
 
-struct MDEIMReduction{A<:AbstractReduction} <: AbstractReduction
-  style::A
-  nsnaps::Int
-  timer::TimerInfo
+struct MDEIMReduction{A,R<:AbstractReduction{A,EuclideanNorm},F} <: AbstractReduction{A,EuclideanNorm}
+  reduction::R
+  combine::F
+  online_nsnaps::Int
 end
 
-function MDEIMReduction(;style=SearchSVDRank(1e-4),nsnaps=20)
-  timer = TimerInfo("MDEIM")
-  MDEIMReduction(style,nsnaps,timer)
+function MDEIMReduction(;
+  reduction=PODReduction(;red_style=SearchSVDRank(1e-4),name="MDEIM"),
+  combine=nothing,
+  online_nsnaps=10)
+
+  MDEIMReduction(reduction,combine,online_nsnaps)
 end
 
-TimerOutputs.get_timer(r::MDEIMReduction) = r.timer
-get_style(r::MDEIMReduction) = r.style
-num_snaps(r::MDEIMReduction) = r.nsnaps
+get_reduction(r::MDEIMReduction) = get_reduction(r.reduction)
+ReductionStyle(r::MDEIMReduction) = ReductionStyle(get_reduction(r))
+NormStyle(r::MDEIMReduction) = NormStyle(get_reduction(r))
+num_snaps(r::MDEIMReduction) = num_snaps(get_reduction(r))
+num_online_snaps(r::MDEIMReduction) = r.online_nsnaps
+TimerOutputs.get_timer(r::MDEIMReduction) = get_timer(get_reduction(r))
 
 struct TestInfo
   nsnaps::Int
@@ -176,8 +188,8 @@ function TestInfo(;nsnaps=10)
   TestInfo(nsnaps,timer)
 end
 
-TimerOutputs.get_timer(info::TestInfo) = info.timer
 num_snaps(info::TestInfo) = info.nsnaps
+TimerOutputs.get_timer(info::TestInfo) = info.timer
 
 """
     struct RBSolver{S,M} end
@@ -235,10 +247,12 @@ num_offline_params(s::RBSolver) = max(num_snaps(s.state_reduction),num_snaps(s.r
 offline_params(s::RBSolver) = 1:num_offline_params(s)
 num_online_params(s::RBSolver) = num_snaps(s.test_info)
 online_params(s::RBSolver) = 1+num_offline_params(s):num_online_params(s)+num_offline_params(s)
+res_params(s::RBSolver) = 1:num_snaps(get_residual_reduction(s))
+jac_params(s::RBSolver) = 1:num_snaps(get_jacobian_reduction(s))
 ParamDataStructures.num_params(s::RBSolver) = num_offline_params(s) + num_online_params(s)
 
 function get_test_directory(s::RBSolver;dir=datadir())
-  keyword = get_name(s.state_reduction) * "_$(get_style(s.state_reduction))"
+  keyword = get_name(s.state_reduction) * "_$(ReductionStyle(s.state_reduction))"
   test_dir = joinpath(dir,keyword)
   create_dir(test_dir)
   test_dir

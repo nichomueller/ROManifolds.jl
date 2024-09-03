@@ -1,24 +1,14 @@
 # tt-svd
 
-function RBSteady.ttsvd(a::AbstractTransientSnapshots{T,N};kwargs...) where {T,N}
-  cores = Vector{Array{T,3}}(undef,N-1)
-  ranks = fill(1,N)
-  sizes = size(a)
-  cache = cores,ranks,sizes
-  # routine on the spatial and temporal indices
-  RBSteady.ttsvd!(cache,a;ids_range=1:N-1,kwargs...)
-  return cores
-end
+function RBSteady.projection(
+  red::TTSVDReduction,
+  A::AbstractTransientSnapshots{T,N},
+  X::AbstractRankTensor) where {T,N}
 
-function RBSteady.ttsvd(a::AbstractTransientSnapshots{T,N},X::AbstractTProductTensor;kwargs...) where {T,N}
-  N_space = N-2
-  cores = Vector{Array{T,3}}(undef,N-1)
-  ranks = fill(1,N)
-  sizes = size(a)
-  # routine on the spatial indices
-  a′ = RBSteady.ttsvd!((cores,ranks,sizes),a,X;ids_range=1:N_space,kwargs...)
-  # routine on the temporal index
-  RBSteady.ttsvd!((cores,ranks,sizes),a′;ids_range=N_space+1,kwargs...)
+  cores,remainder = ttsvd(red,A,X)
+  core_t,remainder_t = ttsvd_loop(red,remainder)
+  push!(cores,core_t)
+
   return cores
 end
 
