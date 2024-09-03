@@ -130,7 +130,7 @@ function TTSVDReduction(rank::Int,args...;D=3,kwargs...)
 end
 
 Base.size(r::TTSVDReduction) = (length(r.tols),)
-Base.getindex(r::TTSVDReduction,i::Integer) = FixedTTSVDRanks(r.ranks[i])
+Base.getindex(r::TTSVDReduction,i::Integer) = FixedSVDRank(r.ranks[i])
 
 ReductionStyle(r::TTSVDReduction) = r.red_style
 NormStyle(r::TTSVDReduction) = r.norm_style

@@ -4,13 +4,13 @@ end
 
 function projection(red::PODReduction,A::AbstractArray,args...)
   red_style = ReductionStyle(red)
-  U,Σ,V = tpod(red_style,A)
+  U,Σ,V = tpod(red_style,A,args...)
   return U
 end
 
 function projection(red::TTSVDReduction,A::AbstractArray,args...)
   red_style = ReductionStyle(red)
-  cores,remainder = ttsvd(red_style,A)
+  cores,remainder = ttsvd(red_style,A,args...)
   return cores
 end
 
@@ -128,65 +128,41 @@ function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3}) where T
   return core,remainder
 end
 
-# function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
-#   perm = (2,1,3)
-#   prev_rank = size(A,1)
-#   cur_size = size(A,2)
-
-#   L,p = _cholesky_decomp(X)
-
-#   XA = _tt_mul(L,p,A)
-#   XM = reshape(XA,:,size(XA,3))
-#   Ũr,Σr,Vr = truncated_svd(red_style,XM)
-#   c̃ = reshape(Ũr,size(XA,1),size(XA,2),:)
-#   core = _tt_div(L,p,c̃)
-#   remainder = Σr.*Vr'
-
-#   return core,remainder
-# end
-
 function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
+  perm = (2,1,3)
   prev_rank = size(A,1)
   cur_size = size(A,2)
 
   L,p = _cholesky_decomp(X)
-  L′ = kron(I(prev_rank),L)
-  p′ = vec(((collect(1:prev_rank).-1)*cur_size .+ p')')
 
-  M = reshape(A,prev_rank*cur_size,:)
-  XM = L′'*M[p′,:]
+  XA = _tt_mul(L,p,A)
+  XM = reshape(XA,:,size(XA,3))
   Ũr,Σr,Vr = truncated_svd(red_style,XM)
-  Ur = (L′'\Ũr)[invperm(p′),:]
-
-  core = reshape(Ur,prev_rank,cur_size,:)
+  c̃ = reshape(Ũr,size(XA,1),size(XA,2),:)
+  core = _tt_div(L,p,c̃)
   remainder = Σr.*Vr'
+
   return core,remainder
 end
 
-# function _tt_mul(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
-#   @check size(L,2) == size(A,2)
-#   B = similar(A,T,(size(A,1),size(L,1),size(A,3)))
-#   Ap = A[:,p,:]
-#   @inbounds for i1 in axes(B,1)
-#     Ap1 = Ap[i1,:,:]
-#     @inbounds for i3 in axes(B,3)
-#       B[i1,:,i3] = L'*Ap1[:,i3]
-#     end
-#   end
-#   return B
-# end
+function _tt_mul(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
+  @check size(L,2) == size(A,2)
+  B = similar(A,T,(size(A,1),size(L,1),size(A,3)))
+  Ap = A[:,p,:]
+  @inbounds for i1 in axes(B,1)
+    B[i1,:,:] = L'*Ap[i1,:,:]
+  end
+  return B
+end
 
-# function _tt_div(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
-#   @check size(L,1) == size(L,2) == size(A,2)
-#   B = similar(A)
-#   @inbounds for i1 in axes(B,1)
-#     A1 = A[i1,:,:]
-#     @inbounds for i3 in axes(B,3)
-#       B[i1,p,i3] = L'\A1[:,i3]
-#     end
-#   end
-#   return B
-# end
+function _tt_div(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
+  @check size(L,1) == size(L,2) == size(A,2)
+  B = similar(A)
+  @inbounds for i1 in axes(B,1)
+    B[i1,:,:] = L'\A[i1,:,:]
+  end
+  return B
+end
 
 # We are not interested in the last dimension (corresponds to the parameter)
 
@@ -211,7 +187,7 @@ function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRank1T
   oldrank = 1
   A_d = reshape(A,oldrank,size(A,1),:)
   for d in 1:Nspace
-    core_d,remainder_d = ttsvd_loop(red_style[d],A_d)
+    core_d,remainder_d = ttsvd_loop(red_style[d],A_d,X[d])
     oldrank = size(core_d,3)
     A_d = reshape(remainder_d,oldrank,size(A,d+1),:)
     push!(cores,core_d)

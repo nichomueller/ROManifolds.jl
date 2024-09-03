@@ -11,13 +11,14 @@ Computes the subspace of the test, trial FE spaces contained in the FE operator
 
 """
 function reduced_fe_space(solver::RBSolver,feop,s)
-  reduced_fe_space(get_state_reduction(solver),feop,s)
+  red = get_state_reduction(solver)
+  soff = select_snapshots(s,offline_params(solver))
+  reduced_fe_space(red,feop,soff)
 end
 
 function reduced_fe_space(red::AbstractReduction,feop,s)
-  soff = select_snapshots(s,num_params(red))
   t = @timed begin
-    basis = reduced_basis(red,feop,soff)
+    basis = reduced_basis(red,feop,s)
   end
   reduced_trial = fe_subspace(get_trial(feop),basis)
   reduced_test = fe_subspace(get_test(feop),basis)

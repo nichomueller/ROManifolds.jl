@@ -52,8 +52,8 @@ mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
 rhs(μ,t,v,dΩ) = ∫(fμt(μ,t)*v)dΩ
 res(μ,t,u,v,dΩ) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rhs(μ,t,v,dΩ)
 
-induced_norm(du,v,dΩ) = ∫(∇(v)⋅∇(du))dΩ
-induced_norm(dΩ) = (du,v) -> ∫(∇(v)⋅∇(du))dΩ
+energy(du,v,dΩ) = ∫(∇(v)⋅∇(du))dΩ
+energy(dΩ) = (du,v) -> ∫(∇(v)⋅∇(du))dΩ
 
 function _residual(solver::RBSolver,op,s)
   fesolver = get_fe_solver(solver)
@@ -80,7 +80,7 @@ degree = 2*order
 
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
-for n in (8,10,12,15) #8,10,12,
+for n in (8,10,12,15)
   # println("--------------------------------------------------------------------")
   # println("TT algorithm, n = $(n)")
   domain = (0,1,0,1,0,1)
@@ -99,18 +99,19 @@ for n in (8,10,12,15) #8,10,12,
   reffe = ReferenceFE(lagrangian,Float64,order)
   test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial = TransientTrialParamFESpace(test,gμt)
-  feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm(dΩ),ptspace,
+  feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
     trial,test,trian_res,trian_stiffness,trian_mass)
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
-  ϵ = 1e-4
-  rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_res=30,nsnaps_jac=20)
-  test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","3dcube_tensor_train_$(n)")))
+  tol = fill(1e-4,4)
+  state_reduction = TTSVDReduction(tol,energy(dΩ);nparams=50)
+  rbsolver = RBSolver(fesolver,state_reduction;nparams_test=10,nparams_res=30,nparams_jac=20)
+  test_dir = datadir(joinpath("heateq","3dcube_tensor_train_$(n)/space_time_mdeim_$(1e-4)"))
+
   fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
 
-  rbop = reduced_operator(rbsolver,feop,fesnaps)
-  save(test_dir,fesnaps)
-  save(test_dir,rbop)
+  # # rbop = reduced_operator(rbsolver,feop,fesnaps)
+  # reduced_fe_space(rbsolver,feop,fesnaps)
 
   # println(get_timer(rbsolver))
   # ress = _residual(rbsolver,get_algebraic_operator(feop),fesnaps)
@@ -123,21 +124,25 @@ for n in (8,10,12,15) #8,10,12,
   # println("--------------------------------------------------------------------")
   # println("Regular algorithm, n = $(n)")
 
-  # model = model.model
-  # Ω = Ω.trian
-  # dΩ = dΩ.measure
-  # test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-  # trial = TransientTrialParamFESpace(test,gμt)
-  # feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm(dΩ),ptspace,
-  #   trial,test,trian_res,trian_stiffness,trian_mass)
-  # uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
+  model = model.model
+  Ω = Ω.trian
+  dΩ = dΩ.measure
+  test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+  trial = TransientTrialParamFESpace(test,gμt)
+  feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
+    trial,test,trian_res,trian_stiffness,trian_mass)
+  uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
-  # test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","3dcube_$(n)")))
-  # fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
+  tol = 1e-4
+  state_reduction = TransientPODReduction(tol,energy(dΩ);nparams=50)
+  rbsolver = RBSolver(fesolver,state_reduction;nparams_test=10,nparams_res=30,nparams_jac=20)
+  test_dir = datadir(joinpath("heateq","3dcube_$(n)/space_time_mdeim_$(1e-4)"))
+
+  fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
+
+  reduced_fe_space(rbsolver,feop,fesnaps)
 
   # rbop = reduced_operator(rbsolver,feop,fesnaps)
   # save(test_dir,fesnaps)
   # save(test_dir,rbop)
-
-  println(get_timer(rbsolver))
 end
