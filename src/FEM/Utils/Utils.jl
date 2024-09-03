@@ -13,7 +13,7 @@ using Gridap.TensorValues
 
 export PerformanceTracker
 export CostTracker
-export GenericPerformance
+export SU
 export reset_tracker!
 export update_tracker!
 export get_stats

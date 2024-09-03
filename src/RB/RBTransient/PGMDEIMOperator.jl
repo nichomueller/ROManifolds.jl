@@ -424,16 +424,14 @@ function Algebra.solve!(
 
   x̂,y,odecache = cache
   fesolver = get_fe_solver(solver)
-  timer = get_timer(solver)
-  reset_timer!(timer,"TEST")
 
-  @timeit timer "TEST" solve!((x̂,),fesolver,op,r,(y,),odecache)
-  set_nruns!(timer["TEST"],num_params(r))
+  t = @timed solve!((x̂,),fesolver,op,r,(y,),odecache)
+  stats = CostTracker(t,num_params(r))
 
   trial = get_trial(op)(r)
   x = recast(x̂,trial)
   i = get_vector_index_map(op)
   s = Snapshots(x,i,r)
 
-  return s,cache
+  return s,stats,cache
 end

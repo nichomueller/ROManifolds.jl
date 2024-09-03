@@ -15,21 +15,39 @@ end
 
 abstract type ReductionStyle end
 
-struct SearchSVDRank{A} <: ReductionStyle
-  tol::A
+struct SearchSVDRank <: ReductionStyle
+  tol::Float64
 end
 
-struct FixedSVDRank{A} <: ReductionStyle
-  rank::A
+struct FixedSVDRank <: ReductionStyle
+  rank::Int
 end
+
+struct SearchTTSVDRanks <: ReductionStyle
+  tols::Vector{Float64}
+end
+
+SearchTTSVDRanks(tol::Float64,N=3) = SearchTTSVDRanks(fill(tol,N))
+
+Base.size(r::SearchTTSVDRanks) = (length(r.tols),)
+Base.getindex(r::SearchTTSVDRanks,i::Integer) = SearchSVDRank(r.tols[i])
+
+struct FixedTTSVDRanks <: ReductionStyle
+  ranks::Vector{Int}
+end
+
+FixedTTSVDRanks(rank::Float64,N=3) = FixedTTSVDRanks(fill(rank,N))
+
+Base.size(r::FixedTTSVDRanks) = (length(r.ranks),)
+Base.getindex(r::FixedTTSVDRanks,i::Integer) = FixedTTSVDRanks(r.ranks[i])
 
 abstract type NormStyle end
 
 get_norm(n::NormStyle) = @abstractmethod
 
-struct EuclideanNorm <: NormedStyle end
+struct EuclideanNorm <: NormStyle end
 
-struct EnergyNorm <: NormedStyle
+struct EnergyNorm <: NormStyle
   norm_op::Function
 end
 
@@ -42,17 +60,19 @@ abstract type GreedyReduction{A,B} <: AbstractReduction{A,B} end
 get_reduction(r::AbstractReduction) = r
 ReductionStyle(r::AbstractReduction) = @abstractmethod
 NormStyle(r::AbstractReduction) = @abstractmethod
-num_snaps(r::AbstractReduction) = @abstractmethod
+ParamDataStructures.num_params(r::AbstractReduction) = @abstractmethod
 get_norm(r::AbstractReduction) = get_norm(NormStyle(r))
 
-struct PODReduction{A,B} <: DirectReduction{A,B}
+abstract type AbstractPODReduction{A,B} <: DirectReduction{A,B} end
+
+struct PODReduction{A,B} <: AbstractPODReduction{A,B}
   red_style::A
   norm_style::B
-  nsnaps::Int
+  nparams::Int
 end
 
-function PODReduction(red_style::ReductionStyle,norm_style::NormStyle;nsnaps=50)
-  PODReduction(red_style,norm_style,nsnaps)
+function PODReduction(red_style::ReductionStyle,norm_style::NormStyle=EuclideanNorm();nparams=50)
+  PODReduction(red_style,norm_style,nparams)
 end
 
 function PODReduction(red_style::ReductionStyle,norm_op::Function;kwargs...)
@@ -60,26 +80,28 @@ function PODReduction(red_style::ReductionStyle,norm_op::Function;kwargs...)
   PODReduction(red_style,norm_style;kwargs...)
 end
 
-function PODReduction(norm_op::Function;red_style=SearchSVDRank(1e-4),kwargs...)
-  norm_style = EnergyNorm(norm_op)
-  PODReduction(red_style,norm_style;kwargs...)
+function PODReduction(tol::Float64,args...;kwargs...)
+  red_style = SearchSVDRank(tol)
+  PODReduction(red_style,args...;kwargs...)
 end
 
-function PODReduction(;red_style=SearchSVDRank(1e-4),norm_style=EuclideanNormReduction(),kwargs...)
-  PODReduction(red_style,norm_style;kwargs...)
+function PODReduction(rank::Int,args...;kwargs...)
+  red_style = FixedSVDRank(rank)
+  PODReduction(red_style,args...;kwargs...)
 end
 
 ReductionStyle(r::PODReduction) = r.red_style
 NormStyle(r::PODReduction) = r.norm_style
-num_snaps(r::PODReduction) = r.nsnaps
+ParamDataStructures.num_params(r::PODReduction) = r.nparams
 
-struct TTSVDReduction{A<:ReductionStyle,B} <: DirectReduction
+struct TTSVDReduction{A<:ReductionStyle,B} <: DirectReduction{A,B}
   red_style::A
-  nsnaps::Int
+  norm_style::B
+  nparams::Int
 end
 
-function TTSVDReduction(red_style::ReductionStyle;nsnaps=50,)
-  TTSVDReduction(red_style,nsnaps)
+function TTSVDReduction(red_style::ReductionStyle,norm_style::NormStyle=EuclideanNorm();nparams=50)
+  TTSVDReduction(red_style,norm_style,nparams)
 end
 
 function TTSVDReduction(red_style::ReductionStyle,norm_op::Function;kwargs...)
@@ -87,18 +109,32 @@ function TTSVDReduction(red_style::ReductionStyle,norm_op::Function;kwargs...)
   TTSVDReduction(red_style,norm_style;kwargs...)
 end
 
-function TTSVDReduction(norm_op::Function;red_style=SearchSVDRank(1e-4),kwargs...)
-  norm_style = EnergyNorm(norm_op)
-  TTSVDReduction(red_style,norm_style;kwargs...)
+function TTSVDReduction(tols::Vector{Float64},args...;kwargs...)
+  red_style = SearchTTSVDRanks(tols)
+  TTSVDReduction(red_style,args...;kwargs...)
 end
 
-function TTSVDReduction(;red_style=SearchSVDRank(1e-4),norm_style=EuclideanNormReduction(),kwargs...)
-  TTSVDReduction(red_style,norm_style;kwargs...)
+function TTSVDReduction(ranks::Vector{Int},args...;D=3,kwargs...)
+  red_style = FixedTTSVDRanks(ranks)
+  TTSVDReduction(red_style,args...;kwargs...)
 end
+
+function TTSVDReduction(tol::Float64,args...;D=3,kwargs...)
+  red_style = SearchTTSVDRanks(tol;D)
+  TTSVDReduction(red_style,args...;kwargs...)
+end
+
+function TTSVDReduction(rank::Int,args...;D=3,kwargs...)
+  red_style = FixedTTSVDRanks(rank;D)
+  TTSVDReduction(red_style,args...;kwargs...)
+end
+
+Base.size(r::TTSVDReduction) = (length(r.tols),)
+Base.getindex(r::TTSVDReduction,i::Integer) = FixedTTSVDRanks(r.ranks[i])
 
 ReductionStyle(r::TTSVDReduction) = r.red_style
 NormStyle(r::TTSVDReduction) = r.norm_style
-num_snaps(r::TTSVDReduction) = r.nsnaps
+ParamDataStructures.num_params(r::TTSVDReduction) = r.nparams
 
 struct SupremizerReduction{A,R<:AbstractReduction{A,EnergyNorm}} <: AbstractReduction{A,EnergyNorm}
   reduction::R
@@ -108,13 +144,13 @@ end
 
 for f in (:PODReduction,:TTSVDReduction)
   @eval begin
-    function $f(supr_op::Function,norm_op::Function,red_style::ReductionStyle;supr_tol=1e-2,kwargs...)
-      reduction = $f(norm_op,red_style;kwargs...)
+    function $f(red_style::ReductionStyle,norm_op::Function,supr_op::Function,args...;supr_tol=1e-2,kwargs...)
+      reduction = $f(red_style,norm_op,args...;kwargs...)
       SupremizerReduction(reduction,supr_op,supr_tol)
     end
 
-    function $f(supr_op::Function,norm_op::Function;kwargs...)
-      reduction = $f(norm_op;kwargs...)
+    function $f(norm_op::Function,supr_op::Function,args...;supr_tol=1e-2,kwargs...)
+      reduction = $f(norm_op,args...;kwargs...)
       SupremizerReduction(reduction,supr_op,supr_tol)
     end
   end
@@ -126,29 +162,35 @@ get_supr_tol(r::SupremizerReduction) = r.supr_tol
 get_reduction(r::SupremizerReduction) = get_reduction(r.reduction)
 ReductionStyle(r::SupremizerReduction) = ReductionStyle(get_reduction(r))
 NormStyle(r::SupremizerReduction) = NormStyle(get_reduction(r))
-num_snaps(r::SupremizerReduction) = num_snaps(get_reduction(r))
+ParamDataStructures.num_params(r::SupremizerReduction) = num_params(get_reduction(r))
+
+# generic constructor
+
+function Reduction(red_style::Union{SearchSVDRank,FixedSVDRank},args...;kwargs...)
+  PODReduction(red_style,args...;kwargs...)
+end
+
+function Reduction(red_style::Union{SearchTTSVDRanks,FixedTTSVDRanks},args...;kwargs...)
+  TTSVDReduction(red_style,args...;kwargs...)
+end
 
 abstract type AbstractMDEIMReduction{A} <: AbstractReduction{A,EuclideanNorm} end
 
 struct MDEIMReduction{A,R<:AbstractReduction{A,EuclideanNorm}} <: AbstractMDEIMReduction{A}
   reduction::R
-  online_nsnaps::Int
+  nparams_test::Int
 end
 
-function MDEIMReduction(;
-  red_style=SearchSVDRank(1e-4),
-  nsnaps=20,
-  online_nsnaps=10,
-  reduction=PODReduction(;red_style,nsnaps))
-
-  MDEIMReduction(reduction,online_nsnaps)
+function MDEIMReduction(args...;nparams_test=10,kwargs...)
+  reduction = Reduction(args...;kwargs...)
+  MDEIMReduction(reduction,nparams_test)
 end
 
 get_reduction(r::MDEIMReduction) = get_reduction(r.reduction)
 ReductionStyle(r::MDEIMReduction) = ReductionStyle(get_reduction(r))
 NormStyle(r::MDEIMReduction) = NormStyle(get_reduction(r))
-num_snaps(r::MDEIMReduction) = num_snaps(get_reduction(r))
-num_online_snaps(r::MDEIMReduction) = r.online_nsnaps
+ParamDataStructures.num_params(r::MDEIMReduction) = num_params(get_reduction(r))
+num_online_params(r::MDEIMReduction) = r.nparams_test
 
 """
     struct RBSolver{S,M} end
@@ -171,10 +213,10 @@ In particular:
 - ϵ: tolerance used in the projection-based truncated proper orthogonal
   decomposition (TPOD) or in the tensor train singular value decomposition (TT-SVD),
   where a basis spanning the reduced subspace is computed
-- nsnaps_state: number of snapshots considered when running TPOD or TT-SVD
-- nsnaps_res: number of snapshots considered when running MDEIM for the residual
-- nsnaps_jac: number of snapshots considered when running MDEIM for the jacobian
-- nsnaps_test:  number of snapshots considered when computing the error the RB
+- nparams_state: number of snapshots considered when running TPOD or TT-SVD
+- nparams_res: number of snapshots considered when running MDEIM for the residual
+- nparams_jac: number of snapshots considered when running MDEIM for the jacobian
+- nparams_test:  number of snapshots considered when computing the error the RB
   method commits with respect to the FE procedure
 
 """
@@ -189,9 +231,9 @@ struct RBSolver{A,B,C,D}
     state_reduction::B,
     residual_reduction::C,
     jacobian_reduction::D
-    ) where {A,B,C,D<:AbstractReduction}
+    ) where {A,B<:AbstractReduction,C<:AbstractReduction,D<:AbstractReduction}
 
-    @check num_online_snaps(residual_reduction) == num_online_snaps(jacobian_reduction)
+    @check num_online_params(residual_reduction) == num_online_params(jacobian_reduction)
     new{A,B,C,D}(fesolver,state_reduction,residual_reduction,jacobian_reduction)
   end
 
@@ -200,28 +242,31 @@ struct RBSolver{A,B,C,D}
     state_reduction::B,
     residual_reduction::C,
     jacobian_reduction::D
-    ) where {A,B,C,D<:Tuple{Vararg{AbstractReduction}}}
+    ) where {A,B<:AbstractReduction,C<:AbstractReduction,D<:Tuple{Vararg{AbstractReduction}}}
 
-    nsnaps = num_online_snaps(first(num_online_snaps))
-    @check all(num_online_snaps.(jacobian_reduction) .== nsnaps)
-    @check num_online_snaps(residual_reduction) == nsnaps
+    nparams = num_online_params(first(jacobian_reduction))
+    @check all(num_online_params.(jacobian_reduction) .== nparams)
+    @check num_online_params(residual_reduction) == nparams
     new{A,B,C,D}(fesolver,state_reduction,residual_reduction,jacobian_reduction)
   end
 end
 
-function PODRBSolver(
+function RBSolver(
   fesolver::FESolver,
-  red_style::ReductionStyle=SearchSVDRank(1e-4),
-  norm_style::NormStyle=EuclideanNorm();
-  nsnaps_state=50,
-  nsnaps_res=20,
-  snaps_jac=20,
-  nsnaps_test=10)
+  state_reduction::AbstractReduction;
+  nparams_res=20,
+  nparams_jac=20,
+  nparams_test=10)
 
-  state_reduction = PODReduction(red_style,norm_style,nsnaps_state)
-  residual_reduction = MDEIMReduction(PODReduction(red_style,nsnaps_res))
-  jacobian_reduction = MDEIMReduction(;red_style,nsnaps=jac_snaps)
+  red_style = ReductionStyle(state_reduction)
+  residual_reduction = MDEIMReduction(red_style;nparams=nparams_res,nparams_test=nparams_test)
+  jacobian_reduction = MDEIMReduction(red_style;nparams=nparams_jac,nparams_test=nparams_test)
   RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction)
+end
+
+function RBSolver(fesolver::FESolver,args...;nparams_state=50,kwargs...)
+  state_reduction = PODReduction(args...;nparams=nparams_state)
+  RBSolver(fesolver,state_reduction,kwargs...)
 end
 
 get_fe_solver(s::RBSolver) = s.fesolver
@@ -229,20 +274,17 @@ get_state_reduction(s::RBSolver) = s.state_reduction
 get_residual_reduction(s::RBSolver) = s.residual_reduction
 get_jacobian_reduction(s::RBSolver) = s.jacobian_reduction
 
-num_offline_params(s::RBSolver) = max(num_snaps(s.state_reduction),num_snaps(s.residual_reduction),num_snaps(s.jacobian_reduction))
-offline_params(s::RBSolver) = 1:num_offline_params(s)
-num_online_params(s::RBSolver) = num_online_snaps(s.residual_reduction)
-online_params(s::RBSolver) = 1+num_offline_params(s):num_online_params(s)+num_offline_params(s)
-res_params(s::RBSolver) = 1:num_snaps(get_residual_reduction(s))
-jac_params(s::RBSolver) = 1:num_snaps(get_jacobian_reduction(s))
-ParamDataStructures.num_params(s::RBSolver) = num_offline_params(s) + num_online_params(s)
+num_state_params(s::RBSolver) = num_params(s.state_reduction)
+num_res_params(s::RBSolver) = num_params(s.residual_reduction)
+num_jac_params(s::RBSolver) = num_params(s.jacobian_reduction)
 
-function get_test_directory(s::RBSolver;dir=datadir())
-  keyword = get_name(s.state_reduction) * "_$(ReductionStyle(s.state_reduction))"
-  test_dir = joinpath(dir,keyword)
-  create_dir(test_dir)
-  test_dir
-end
+num_offline_params(s::RBSolver) = max(num_state_params(s),num_res_params(s),num_jac_params(s))
+offline_params(s::RBSolver) = 1:num_offline_params(s)
+num_online_params(s::RBSolver) = num_online_params(s.residual_reduction)
+online_params(s::RBSolver) = 1+num_offline_params(s):num_online_params(s)+num_offline_params(s)
+res_params(s::RBSolver) = 1:num_res_params(s)
+jac_params(s::RBSolver) = 1:num_jac_params(s)
+ParamDataStructures.num_params(s::RBSolver) = num_offline_params(s) + num_online_params(s)
 
 """
     fe_solutions(solver::RBSolver,op::ParamFEOperator;kwargs...) -> AbstractSteadySnapshots

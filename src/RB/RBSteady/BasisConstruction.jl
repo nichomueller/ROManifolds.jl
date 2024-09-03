@@ -1,14 +1,16 @@
-function projection(red::AbstractReduction,s::AbstractSnapshots)
+function projection(red::AbstractReduction,A::AbstractArray)
   @abstractmethod
 end
 
-function projection(red::PODReduction,s::AbstractSnapshots,args...)
-  U,Σ,V = tpod(red,s)
+function projection(red::PODReduction,A::AbstractArray,args...)
+  red_style = ReductionStyle(red)
+  U,Σ,V = tpod(red_style,A)
   return U
 end
 
-function projection(red::TTSVDReduction,s::AbstractSnapshots,args...)
-  cores,remainder = ttsvd(red,s)
+function projection(red::TTSVDReduction,A::AbstractArray,args...)
+  red_style = ReductionStyle(red)
+  cores,remainder = ttsvd(red_style,A)
   return cores
 end
 
@@ -23,56 +25,56 @@ function _cholesky_decomp(X::AbstractSparseMatrix)
   return L,p
 end
 
-function select_rank(red::AbstractReduction,args...)
+function select_rank(red_style::ReductionStyle,args...)
   @abstractmethod
 end
 
-function select_rank(red::SearchSVDRank,S::AbstractVector)
-  tol = red.tol
+function select_rank(red_style::SearchSVDRank,S::AbstractVector)
+  tol = red_style.tol
   energies = cumsum(S.^2;dims=1)
   rank = findfirst(energies .>= (1-tol^2)*energies[end])
   return rank
 end
 
-function truncated_svd(red::AbstractReduction{SearchSVDRank},M::AbstractMatrix;issquare=false)
+function truncated_svd(red_style::SearchSVDRank,M::AbstractMatrix;issquare=false)
   U,S,V = svd(M)
   if issquare S = sqrt.(S) end
-  rank = select_rank(red,S)
+  rank = select_rank(red_style,S)
   return U[:,1:rank],S[1:rank],V[:,1:rank]
 end
 
-function truncated_svd(red::AbstractReduction{FixedSVDRank},M::AbstractMatrix;kwargs...)
-  rank = red.rank
+function truncated_svd(red_style::FixedSVDRank,M::AbstractMatrix;kwargs...)
+  rank = red_style.rank
   return tsvd(M,rank)
 end
 
-function tpod(red::PODReduction,M::AbstractMatrix,args...)
-  if ReductionStyle(red)==SearchSVDRank() && _size_cond(M)
+function tpod(red_style::ReductionStyle,M::AbstractMatrix,args...)
+  if isa(red_style,SearchSVDRank) && _size_cond(M)
     if size(M,1) > size(M,2)
-      massive_rows_tpod(red,M,args...)
+      massive_rows_tpod(red_style,M,args...)
     else
-      massive_cols_tpod(red,M,args...)
+      massive_cols_tpod(red_style,M,args...)
     end
   else
-    standard_tpod(M,args...)
+    standard_tpod(red_style,M,args...)
   end
 end
 
-function standard_tpod(red::AbstractReduction,M::AbstractMatrix)
-  truncated_svd(red,M)
+function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix)
+  truncated_svd(red_style,M)
 end
 
-function standard_tpod(red::AbstractReduction,M::AbstractMatrix,X::AbstractSparseMatrix)
+function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
   L,p = _cholesky_decomp(X)
   XM = L'*M[p,:]
-  Ũr,Σr,Vr = truncated_svd(XM)
+  Ũr,Σr,Vr = truncated_svd(red_style,XM)
   Ur = (L'\Ũr)[invperm(p),:]
   return Ur,Σr,Vr
 end
 
-function massive_rows_tpod(red::AbstractReduction,M::AbstractMatrix)
+function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix)
   MM = M'*M
-  _,Σr,Vr = truncated_svd(MM;issquare=true)
+  _,Σr,Vr = truncated_svd(red_style,MM;issquare=true)
   Ur = M*Vr
   @inbounds for i = axes(Ur,2)
     Ur[:,i] /= Σr[i]+eps()
@@ -80,12 +82,12 @@ function massive_rows_tpod(red::AbstractReduction,M::AbstractMatrix)
   return Ur,Σr,Vr
 end
 
-function massive_rows_tpod(red::AbstractReduction,M::AbstractMatrix,X::AbstractSparseMatrix)
+function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
   C = cholesky(X)
   L,p = sparse(C.L),C.p
   XM = L'*M[p,:]
   MXM = XM'*XM
-  _,Σr,Vr = truncated_svd(MXM;issquare=true)
+  _,Σr,Vr = truncated_svd(red_style,MXM;issquare=true)
   Ũr = XM*Vr
   @inbounds for i = axes(Ũr,2)
     Ũr[:,i] /= Σr[i]+eps()
@@ -94,9 +96,9 @@ function massive_rows_tpod(red::AbstractReduction,M::AbstractMatrix,X::AbstractS
   return Ur,Σr,Vr
 end
 
-function massive_cols_tpod(red::AbstractReduction,M::AbstractMatrix)
+function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix)
   MM = M*M'
-  Ur,Σr,_ = truncated_svd(MM;issquare=true)
+  Ur,Σr,_ = truncated_svd(red_style,MM;issquare=true)
   Vr = Ur'*M
   @inbounds for i = axes(Ur,2)
     Vr[:,i] /= Σr[i]+eps()
@@ -104,12 +106,12 @@ function massive_cols_tpod(red::AbstractReduction,M::AbstractMatrix)
   return Ur,Σr,Vr'
 end
 
-function massive_cols_tpod(red::AbstractReduction,M::AbstractMatrix,X::AbstractSparseMatrix)
+function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
   C = cholesky(X)
   L,p = sparse(C.L),C.p
   XM = L'*M[p,:]
   MXM = XM*XM'
-  Ũr,Σr,_ = truncated_svd(MXM;issquare=true)
+  Ũr,Σr,_ = truncated_svd(red_style,MXM;issquare=true)
   Ur = (L'\Ũr)[invperm(p),:]
   Vr = Ur'*XM
   @inbounds for i = axes(Ur,2)
@@ -118,64 +120,82 @@ function massive_cols_tpod(red::AbstractReduction,M::AbstractMatrix,X::AbstractS
   return Ur,Σr,Vr'
 end
 
-function ttsvd_loop(red::AbstractReduction,A::AbstractArray{T,3}) where T
+function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3}) where T
   M = reshape(A,size(A,1)*size(A,2),:)
-  Ur,Σr,Vr = truncated_svd(red,M)
+  Ur,Σr,Vr = truncated_svd(red_style,M)
   core = reshape(Ur,size(A,1),size(A,2),:)
   remainder = Σr.*Vr'
   return core,remainder
 end
 
-function ttsvd_loop(red::AbstractReduction,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
-  perm = (2,1,3)
+# function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
+#   perm = (2,1,3)
+#   prev_rank = size(A,1)
+#   cur_size = size(A,2)
+
+#   L,p = _cholesky_decomp(X)
+
+#   XA = _tt_mul(L,p,A)
+#   XM = reshape(XA,:,size(XA,3))
+#   Ũr,Σr,Vr = truncated_svd(red_style,XM)
+#   c̃ = reshape(Ũr,size(XA,1),size(XA,2),:)
+#   core = _tt_div(L,p,c̃)
+#   remainder = Σr.*Vr'
+
+#   return core,remainder
+# end
+
+function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
   prev_rank = size(A,1)
   cur_size = size(A,2)
 
   L,p = _cholesky_decomp(X)
+  L′ = kron(I(prev_rank),L)
+  p′ = vec(((collect(1:prev_rank).-1)*cur_size .+ p')')
 
-  XA = _tt_mul(L,p,A)
-  XM = reshape(XA,:,size(XA,3))
-  Ũr,Σr,Vr = truncated_svd(red,XM)
-  c̃ = reshape(Ũr,size(XA,1),size(XA,2),:)
-  core = _tt_div(L,p,c̃)
+  M = reshape(A,prev_rank*cur_size,:)
+  XM = L′'*M[p′,:]
+  Ũr,Σr,Vr = truncated_svd(red_style,XM)
+  Ur = (L′'\Ũr)[invperm(p′),:]
+
+  core = reshape(Ur,prev_rank,cur_size,:)
   remainder = Σr.*Vr'
-
   return core,remainder
 end
 
-function _tt_mul(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
-  @check size(L,2) == size(A,2)
-  B = similar(A,T,(size(A,1),size(L,1),size(A,3)))
-  Ap = A[:,p,:]
-  @inbounds for i1 in axes(B,1)
-    Ap1 = Ap[i1,:,:]
-    @inbounds for i3 in axes(B,3)
-      B[i1,:,i3] = L'*Ap1[:,i3]
-    end
-  end
-  return B
-end
+# function _tt_mul(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
+#   @check size(L,2) == size(A,2)
+#   B = similar(A,T,(size(A,1),size(L,1),size(A,3)))
+#   Ap = A[:,p,:]
+#   @inbounds for i1 in axes(B,1)
+#     Ap1 = Ap[i1,:,:]
+#     @inbounds for i3 in axes(B,3)
+#       B[i1,:,i3] = L'*Ap1[:,i3]
+#     end
+#   end
+#   return B
+# end
 
-function _tt_div(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
-  @check size(L,1) == size(L,2) == size(A,2)
-  B = similar(A)
-  @inbounds for i1 in axes(B,1)
-    A1 = A[i1,:,:]
-    @inbounds for i3 in axes(B,3)
-      B[i1,p,i3] = L'\A1[:,i3]
-    end
-  end
-  return B
-end
+# function _tt_div(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
+#   @check size(L,1) == size(L,2) == size(A,2)
+#   B = similar(A)
+#   @inbounds for i1 in axes(B,1)
+#     A1 = A[i1,:,:]
+#     @inbounds for i3 in axes(B,3)
+#       B[i1,p,i3] = L'\A1[:,i3]
+#     end
+#   end
+#   return B
+# end
 
 # We are not interested in the last dimension (corresponds to the parameter)
 
-function ttsvd(red::TTSVDReduction,A::AbstractArray{T,N}) where {T,N}
+function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N}) where {T,N}
   cores = Array{T,3}[]
   oldrank = 1
   A_d = reshape(A,oldrank,size(A,1),:)
   for d in 1:N-1
-    core_d,remainder_d = ttsvd_loop(red,A_d)
+    core_d,remainder_d = ttsvd_loop(red_style[d],A_d)
     oldrank = size(core_d,3)
     A_d = reshape(remainder_d,oldrank,size(A,d+1),:)
     push!(cores,core_d)
@@ -183,15 +203,15 @@ function ttsvd(red::TTSVDReduction,A::AbstractArray{T,N}) where {T,N}
   return cores,A_d
 end
 
-function ttsvd(red::TTSVDReduction,A::AbstractArray{T,N},X::AbstractRank1Tensor) where {T,N}
+function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRank1Tensor) where {T,N}
   Nspace = length(get_factors(X))
   @check Nspace ≤ N-1
 
   cores = Array{T,3}[]
   oldrank = 1
   A_d = reshape(A,oldrank,size(A,1),:)
-  for d in 1:Nspace-1
-    core_d,remainder_d = ttsvd_loop(red,A_d)
+  for d in 1:Nspace
+    core_d,remainder_d = ttsvd_loop(red_style[d],A_d)
     oldrank = size(core_d,3)
     A_d = reshape(remainder_d,oldrank,size(A,d+1),:)
     push!(cores,core_d)
@@ -200,8 +220,8 @@ function ttsvd(red::TTSVDReduction,A::AbstractArray{T,N},X::AbstractRank1Tensor)
   return cores,A_d
 end
 
-function ttsvd(red::TTSVDReduction,A::AbstractArray{T,N},X::AbstractRankTensor) where {T,N}
-  cores_k,remainders_k = map(k -> ttsvd(red,A,X[k]),rank(X)) |> tuple_of_arrays
+function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRankTensor) where {T,N}
+  cores_k,remainders_k = map(k -> ttsvd(red_style,A,X[k]),1:rank(X)) |> tuple_of_arrays
   cores = Array{T,3}[]
   for d in eachindex(first(cores_k))
     touched = d == 1 ? fill(true,rank(X)) : I(rank(X))
@@ -209,7 +229,7 @@ function ttsvd(red::TTSVDReduction,A::AbstractArray{T,N},X::AbstractRankTensor) 
     push!(cores,BlockCore(cores_d,touched))
   end
   R = orthogonalize!(cores,X)
-  A_d = absorb(cat(remainder...;dims=1),R)
+  A_d = absorb(cat(remainders_k...;dims=1),R)
   return cores,A_d
 end
 
@@ -226,7 +246,7 @@ function orthogonalize!(cores,X::AbstractTProductTensor)
   decomp = get_decomposition(X)
   for d in eachindex(cores)
     core_d = cores[d]
-    if d == last(ids_range)
+    if d == length(cores)
       XW = _get_norm_matrix_from_weight(X,weight)
       core_d′,R = reduce_rank(core_d,XW)
       cores[d] = core_d′
@@ -234,10 +254,10 @@ function orthogonalize!(cores,X::AbstractTProductTensor)
     end
     next_core = cores[d+1]
     X_d = getindex.(decomp,d)
-    core_d′,R = reduce_rank(core_d,XW)
+    core_d′,R = reduce_rank(core_d)
     cores[d] = core_d′
     cores[d+1] = absorb(next_core,R)
-    weight = _weight_array(weight,core′,X_d)
+    weight = _weight_array(weight,core_d′,X_d)
   end
 end
 

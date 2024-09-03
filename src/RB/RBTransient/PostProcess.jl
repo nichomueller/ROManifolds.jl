@@ -93,5 +93,5 @@ function Utils.compute_error(
     end
     errors[ip] = norm(err_norm) / norm(sol_norm)
   end
-  return errors
+  return mean(errors)
 end

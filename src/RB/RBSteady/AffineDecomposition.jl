@@ -122,7 +122,7 @@ end
 function allocate_coefficient(red::AbstractReduction,b::Projection)
   n = num_reduced_dofs(b)
   coeffvec = allocate_vector(Vector{Float64},n)
-  coeff = array_of_consecutive_arrays(coeffvec,num_snaps(red))
+  coeff = array_of_consecutive_arrays(coeffvec,num_online_params(red))
   return coeff
 end
 
@@ -130,7 +130,7 @@ function allocate_result(red::AbstractReduction,test::FESubspace)
   V = get_vector_type(test)
   nfree_test = num_free_dofs(test)
   b = allocate_vector(V,nfree_test)
-  result = array_of_consecutive_arrays(b,num_snaps(red))
+  result = array_of_consecutive_arrays(b,num_online_params(red))
   return result
 end
 
@@ -139,7 +139,7 @@ function allocate_result(red::AbstractReduction,trial::FESubspace,test::FESubspa
   nfree_trial = num_free_dofs(trial)
   nfree_test = num_free_dofs(test)
   A = allocate_matrix(Matrix{T},nfree_test,nfree_trial)
-  result = array_of_consecutive_arrays(A,num_snaps(red))
+  result = array_of_consecutive_arrays(A,num_online_params(red))
   return result
 end
 
@@ -218,12 +218,18 @@ function reduced_form(
   trian::Triangulation,
   args...)
 
-  basis = reduced_basis(red,s)
-  interpolation,integration_domain = mdeim(red,basis)
-  proj_basis = reduce_operator(red,basis,args...)
-  red_trian = reduce_triangulation(trian,integration_domain,args...)
+  t = @timed begin
+    basis = reduced_basis(get_reduction(red),s)
+    interpolation,integration_domain = mdeim(basis)
+    proj_basis = reduce_operator(red,basis,args...)
+    red_trian = reduce_triangulation(trian,integration_domain,args...)
+  end
+
   coefficient = allocate_coefficient(red,basis)
   result = allocate_result(red,args...)
+
+  println(CostTracker(t))
+
   ad = AffineDecomposition(proj_basis,interpolation,integration_domain,coefficient,result)
   return ad,red_trian
 end

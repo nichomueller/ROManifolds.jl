@@ -25,11 +25,11 @@ load_structures = false
 save_structures = false
 postprocess = false
 norm_style = :l2
-nsnaps_state = 10
+nparams_state = 10
 nsnaps_mdeim = 2
-nsnaps_test = 2
+nparams_test = 2
 st_mdeim = true
-info = RBInfo(test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
+info = RBInfo(test_path;ϵ,norm_style,nparams_state,nsnaps_mdeim,nparams_test,st_mdeim)
 
 domain = (0,1,0,1)
 mesh_partition = (2,2)
@@ -82,7 +82,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 # sols,params,stats = collect_solutions(info,fesolver,feop)
-params = realization(feop,nsnaps_state+nsnaps_test)
+params = realization(feop,nparams_state+nparams_test)
 w0 = get_free_dof_values(fesolver.uh0(params))
 time_ndofs = num_time_dofs(fesolver)
 uμt = ODEParamSolution(fesolver,feop,params,w0,fesolver.t0,fesolver.tf)

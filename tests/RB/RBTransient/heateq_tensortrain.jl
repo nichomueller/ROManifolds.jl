@@ -2,7 +2,6 @@ using Gridap
 using Test
 using DrWatson
 using Serialization
-using TimerOutputs
 
 using Mabla.FEM
 using Mabla.FEM.Utils
@@ -73,27 +72,29 @@ trian_res = (Ω.trian,Γn)
 trian_stiffness = (Ω.trian,)
 trian_mass = (Ω.trian,)
 
-induced_norm(du,v) = ∫(v⋅du)dΩ + ∫(∇(v)⋅∇(du))dΩ
+energy(du,v) = ∫(v⋅du)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
-feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
+feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
   trial,test,trian_res,trian_stiffness,trian_mass)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 fesolver = ThetaMethod(LUSolver(),dt,θ)
-ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=5,nsnaps_res=30,nsnaps_jac=20)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
-fesnaps = fe_solutions(rbsolver,feop,uh0μ)
+tol = fill(1e-4,4)
+state_reduction = TTSVDReduction(tol,energy;nparams=50)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_test=5,nparams_res=30,nparams_jac=20)
+test_dir = datadir(joinpath("heateq","test_tt_$(1e-4)"))
+create_dir(test_dir)
+
+fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,cache = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)
+rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps)
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-println(compute_error(results))
-println(get_timer(results))
+println(results)
 
 save(test_dir,fesnaps)
 save(test_dir,rbop)

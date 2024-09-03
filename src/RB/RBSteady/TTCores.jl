@@ -365,7 +365,7 @@ end
 
 # core compression
 
-function compress_core(a::AbstractArray{T,3},btest::AbstractArray{S,3};kwargs...) where {T,S}
+function compress_core(a::AbstractArray{T,3},btest::AbstractArray{S,3}) where {T,S}
   TS = promote_type(T,S)
   ra_prev,ra = size(a,1),size(a,3)
   rV_prev,rV = size(btest,1),size(btest,3)
@@ -386,9 +386,7 @@ function compress_core(a::AbstractArray{T,3},btest::AbstractArray{S,3};kwargs...
   return ab
 end
 
-function compress_core(a::SparseCore{T},btrial::AbstractArray{S,3},btest::AbstractArray{S,3};
-  kwargs...) where {T,S}
-
+function compress_core(a::SparseCore{T},btrial::AbstractArray{S,3},btest::AbstractArray{S,3},args...) where {T,S}
   TS = promote_type(T,S)
   ra_prev,ra = size(a,1),size(a,4)
   rU_prev,rU = size(btrial,1),size(btrial,3)

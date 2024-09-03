@@ -15,13 +15,12 @@ function TransientParamFESolution(
   solver::ODESolver,
   op::TransientParamFEOperator,
   r::TransientParamRealization,
-  uh0::Tuple{Vararg{Function}},
-  timer::TimerOutput)
+  uh0::Tuple{Vararg{Function}})
 
   params = get_params(r)
   odeop = get_algebraic_operator(op)
   u0 = get_free_dof_values.(map(uh0->uh0(params),uh0))
-  odesol = solve(solver,odeop,r,u0,timer)
+  odesol = solve(solver,odeop,r,u0)
   trial = get_trial(op)
   TransientParamFESolution(odesol,trial)
 end
@@ -30,10 +29,9 @@ function TransientParamFESolution(
   solver::ODESolver,
   op::TransientParamFEOperator,
   r::TransientParamRealization,
-  uh0::Function,
-  timer::TimerOutput)
+  uh0::Function)
 
-  TransientParamFESolution(solver,op,r,(uh0,),timer)
+  TransientParamFESolution(solver,op,r,(uh0,))
 end
 
 function Base.iterate(sol::TransientParamFESolution)
@@ -76,47 +74,43 @@ function Base.collect(sol::TransientParamFESolution{V}) where V
     free_values[k] = copy(ut)
   end
 
-  return free_values
+  return free_values,odesol.tracker
 end
 
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperator,
   r::TransientParamRealization,
-  uh0,
-  timer::TimerOutput)
+  uh0)
 
-  TransientParamFESolution(solver,op,r,uh0,timer)
+  TransientParamFESolution(solver,op,r,uh0)
 end
 
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
-  uh0,
-  timer::TimerOutput)
+  uh0)
 
-  TransientParamFESolution(solver,op.op,r,uh0,timer)
+  TransientParamFESolution(solver,op.op,r,uh0)
 end
 
 function Algebra.solve(
   solver::ODESolver,
   op::LinearNonlinearTransientParamFEOperator,
   r::TransientParamRealization,
-  uh0,
-  timer::TimerOutput)
+  uh0)
 
-  TransientParamFESolution(solver,join_operators(op),r,uh0,timer)
+  TransientParamFESolution(solver,join_operators(op),r,uh0)
 end
 
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperator,
-  uh0,
-  timer::TimerOutput;
+  uh0;
   nparams=50,r=realization(op;nparams))
 
-  solve(solver,op,r,uh0,timer)
+  solve(solver,op,r,uh0)
 end
 
 function test_transient_fe_solver(

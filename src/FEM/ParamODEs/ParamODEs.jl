@@ -13,6 +13,7 @@ using Gridap.ODEs
 using Gridap.ReferenceFEs
 using Gridap.Helpers
 
+using Mabla.FEM.Utils
 using Mabla.FEM.IndexMaps
 using Mabla.FEM.TProduct
 using Mabla.FEM.ParamDataStructures
@@ -20,7 +21,6 @@ using Mabla.FEM.ParamFESpaces
 using Mabla.FEM.ParamSteady
 
 import Test: @test
-import TimerOutputs: TimerOutput,@timeit
 import UnPack: @unpack
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction

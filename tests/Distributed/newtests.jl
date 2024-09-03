@@ -75,7 +75,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 dir = datadir("distr_toy_heateq")
-info = RBInfo(dir;nsnaps_state=10,nsnaps_mdeim=5,nsnaps_test=5,save_structures=false)
+info = RBInfo(dir;nparams_state=10,nsnaps_mdeim=5,nparams_test=5,save_structures=false)
 
 rbsolver = RBSolver(info,fesolver)
 

@@ -15,16 +15,14 @@ function reduced_fe_space(solver::RBSolver,feop,s)
 end
 
 function reduced_fe_space(red::AbstractReduction,feop,s)
-  timer = get_timer(solver)
-  name = get_name(timer)
-  reset_timer!(timer)
-
-  soff = select_snapshots(s,num_snaps(red))
-  @timeit timer name begin
+  soff = select_snapshots(s,num_params(red))
+  t = @timed begin
     basis = reduced_basis(red,feop,soff)
   end
   reduced_trial = fe_subspace(get_trial(feop),basis)
   reduced_test = fe_subspace(get_test(feop),basis)
+
+  println(CostTracker(t))
 
   return reduced_trial,reduced_test
 end
@@ -44,17 +42,17 @@ function reduced_basis(red::AbstractReduction,feop,s::AbstractSnapshots)
   reduced_basis(red,s)
 end
 
-function reduced_basis(red::NormedReduction{A,EnergyNorm} where A,feop,s::AbstractSnapshots)
-  norm_matrix = assemble_from_form(feop,get_norm(red))
-  reduced_basis(s,norm_matrix)
+function reduced_basis(red::AbstractReduction{<:ReductionStyle,EnergyNorm},feop,s::AbstractSnapshots)
+  norm_matrix = assemble_matrix_from_form(feop,get_norm(red))
+  reduced_basis(red,s,norm_matrix)
 end
 
 function reduced_basis(red::SupremizerReduction,feop,s::AbstractSnapshots)
-  norm_matrix = assemble_from_form(feop,get_norm(red))
-  supr_matrix = assemble_from_form(feop,get_supr(red))
+  norm_matrix = assemble_matrix_from_form(feop,get_norm(red))
+  supr_matrix = assemble_matrix_from_form(feop,get_supr(red))
   supr_tol = get_supr_tol(red)
 
-  basis = reduced_basis(s,norm_matrix)
+  basis = reduced_basis(get_reduction(red),s,norm_matrix)
   enrich_basis(basis,norm_matrix,supr_matrix;tol=supr_tol)
 end
 

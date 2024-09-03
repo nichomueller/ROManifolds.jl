@@ -81,7 +81,7 @@ xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=10)
+rbsolver = RBSolver(fesolver,ϵ;nparams_state=50,nparams_test=10,nsnaps_mdeim=10)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated_plate")))
 
 fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)

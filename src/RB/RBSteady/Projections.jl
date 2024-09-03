@@ -108,8 +108,15 @@ function _num_tot_space_dofs(a::TTSVDCores{4})
   return tot_ndofs
 end
 
-function compress_cores(core::TTSVDCores,bases::TTSVDCores...;kwargs...)
-  ccores = map((a,b...)->compress_core(a,b...;kwargs...),get_cores(core),get_cores.(bases)...)
+function compress_cores(core::TTSVDCores,basis_test::TTSVDCores)
+  ccores = map((a,btest)->compress_core(a,btest),get_cores(core),get_cores(basis_test))
+  ccore = multiply_cores(ccores...)
+  _dropdims(ccore)
+end
+
+function compress_cores(core::TTSVDCores,basis_trial::TTSVDCores,bases::TTSVDCores)
+  ccores = map((a,btrial,btest)->compress_core(a,btrial,btest),get_cores(core),
+    get_cores(basis_trial),get_cores(basis_test))
   ccore = multiply_cores(ccores...)
   _dropdims(ccore)
 end

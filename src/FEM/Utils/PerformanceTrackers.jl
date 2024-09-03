@@ -11,16 +11,21 @@ function CostTracker(;time=0.0,nallocs=0.0,nruns=0)
   CostTracker(time,nallocs,nruns)
 end
 
-function CostTracker(stats::NamedTuple)
+function CostTracker(stats::NamedTuple,nruns=1)
   time = stats[:time]
   nallocs = stats[:bytes] / 1e6
-  nruns = 1
   CostTracker(time,nallocs,nruns)
 end
 
 function Base.show(io::IO,k::MIME"text/plain",t::CostTracker)
+  println(io," ---------------------- CostTracker ----------------------------")
   println(io," > computational time (s) across $(t.nruns) runs: $(t.time)")
   println(io," > memory footprint (Mb) across $(t.nruns) runs: $(t.nallocs)")
+  println(io," -------------------------------------------------------------")
+end
+
+function Base.show(io::IO,t::CostTracker)
+  show(io,MIME"text/plain"(),t)
 end
 
 function Base.copyto!(t1::CostTracker,t2::CostTracker)
@@ -47,68 +52,40 @@ function update_tracker!(t::CostTracker,stats::NamedTuple,nruns=t.nruns+1;msg=""
   end
 end
 
-function get_stats(t::CostTracker;verbose=true)
+function get_stats(t::CostTracker)
   avg_time = t.time / t.nruns
   avg_nallocs = t.nallocs / t.nruns
-  if verbose
-    println("Average time (s): $avg_time")
-    println("Average number of allocations (Mb): $avg_nallocs")
-  end
   return avg_time,avg_nallocs
 end
 
+struct SU <: PerformanceTracker
+  speedup_time::Float64
+  speedup_memory::Float64
+end
+
+function Base.show(io::IO,k::MIME"text/plain",su::SU)
+  println(io," -------------------------- SU -------------------------------")
+  println(io," > speedup in time: $(su.speedup_time)")
+  println(io," > speedup in memory: $(su.speedup_memory)")
+  println(io," -------------------------------------------------------------")
+end
+
+function Base.show(io::IO,su::SU)
+  show(io,MIME"text/plain"(),su)
+end
+
 """
-    compute_speedup(t1::CostTracker,t2::CostTracker) -> (Float64,Float64)
+    compute_speedup(t1::CostTracker,t2::CostTracker) -> SU
 
 Computes the speedup the tracker `t2` achieves with respect to `t1`, in time and
 in memory footprint
 """
-function compute_speedup(t1::CostTracker,t2::CostTracker;verbose=true)
-  avg_time1,avg_nallocs1 = get_stats(t1;verbose=false)
-  avg_time2,avg_nallocs2 = get_stats(t2;verbose=false)
+function compute_speedup(t1::CostTracker,t2::CostTracker)
+  avg_time1,avg_nallocs1 = get_stats(t1)
+  avg_time2,avg_nallocs2 = get_stats(t2)
   speedup_time = avg_time1 / avg_time2
   speedup_memory = avg_nallocs1 / avg_nallocs2
-  if verbose
-    println("Speedup in time: $(speedup_time)")
-    println("Speedup in memory: $(speedup_memory)")
-  end
-  return speedup_time,speedup_memory
-end
-
-mutable struct GenericPerformance <: PerformanceTracker
-  error::Vector{Float64}
-  cost::CostTracker
-end
-
-function Base.show(io::IO,k::MIME"text/plain",p::GenericPerformance)
-  show(io,MIME"text/plain"(),p.cost)
-  println(io," > errors across $(t.nruns) runs: $(t.error)")
-end
-
-function Base.copyto!(p1::GenericPerformance,p2::GenericPerformance)
-  copyto!(p1.error,p2.error)
-  copyto!(p1.cost,p2.cost)
-end
-
-function reset_tracker!(p::GenericPerformance)
-  reset_tracker!(p.cost)
-end
-
-function update_tracker!(p::GenericPerformance,stats::NamedTuple,args...;kwargs...)
-  update_tracker!(p.cost,stats,args...;kwargs...)
-end
-
-function get_stats(p::GenericPerformance;verbose=true)
-  avg_time,avg_nallocs = get_stats(p.cost;verbose)
-  avg_error = mean(t.error)
-  if verbose
-    println("Average error: $avg_error")
-  end
-  return avg_time,avg_nallocs,avg_error
-end
-
-function compute_speedup(p1::GenericPerformance,p2::GenericPerformance;kwargs...)
-  compute_speedup(p1.cost,p2.cost;kwargs...)
+  return SU(speedup_time,speedup_memory)
 end
 
 induced_norm(v::AbstractVector,args...) = norm(v)
@@ -127,7 +104,7 @@ function compute_error(
     soli_approx = selectdim(sol_approx,N,i)
     errors[i] = compute_relative_error(soli,soli_approx,args...)
   end
-  return errors
+  return mean(errors)
 end
 
 function compute_relative_error(sol::AbstractArray,sol_approx::AbstractArray,args...)

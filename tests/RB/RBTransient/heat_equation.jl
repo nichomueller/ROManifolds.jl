@@ -65,143 +65,30 @@ trian_res = (Ω,Γn)
 trian_stiffness = (Ω,)
 trian_mass = (Ω,)
 
-induced_norm(du,v) = ∫(du*v)dΩ + ∫(∇(v)⋅∇(du))dΩ
+energy(du,v) = ∫(du*v)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
-feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
+feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
   trial,test,trian_res,trian_stiffness,trian_mass)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 # solvers
 fesolver = ThetaMethod(LUSolver(),dt,θ)
-ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_res=20,nsnaps_jac=20)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
+
+tol = 1e-4
+state_reduction = TransientPODReduction(tol,energy;nparams=50)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_test=5,nparams_res=20,nparams_jac=20)
+
+test_dir = datadir(joinpath("heateq","elasticity_$(1e-4)"))
+create_dir(test_dir)
 
 # RB method
-# we can load & solve directly, if the offline structures have been previously saved to file
-try
-  results = load_solve(rbsolver,feop,test_dir)
-catch
-  @warn "Loading offline structures failed: running offline phase"
-  fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
-  rbop = reduced_operator(rbsolver,feop,fesnaps)
-  rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-  results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
-
-  save(test_dir,fesnaps)
-  save(test_dir,rbop)
-  save(test_dir,results)
-end
-
-# post process
-show(results.timer)
-println(compute_speedup(results))
 
 fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
-using Gridap
-using Test
-using DrWatson
-using Serialization
-using TimerOutputs
-
-using Mabla.FEM
-using Mabla.FEM.Utils
-using Mabla.FEM.TProduct
-using Mabla.FEM.ParamDataStructures
-using Mabla.FEM.ParamFESpaces
-using Mabla.FEM.ParamSteady
-using Mabla.FEM.ParamODEs
-
-using Mabla.RB
-using Mabla.RB.RBSteady
-using Mabla.RB.RBTransient
-
-# time marching
-θ = 0.5
-dt = 0.0025
-t0 = 0.0
-tf = 0.15
-
-# parametric space
-pranges = fill([1,10],3)
-tdomain = t0:dt:tf
-ptspace = TransientParamSpace(pranges,tdomain)
-
-# geometry
-n = 5
-domain = (0,1,0,1,0,1)
-partition = (n,n,n)
-model = CartesianDiscreteModel(domain,partition)#TProductModel(domain,partition)
-labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet","boundary")
-
-order = 2#2
-degree = 2*order
-Ω = Triangulation(model)
-dΩ = Measure(Ω,degree)
-
-# weak formulation
-a(x,μ,t) = 1+exp(-sin(t)^2*x[1]/sum(μ))
-a(μ,t) = x->a(x,μ,t)
-aμt(μ,t) = TransientParamFunction(a,μ,t)
-
-f(x,μ,t) = abs.(sin(9*pi*t/(5*μ[3])))
-f(μ,t) = x->f(x,μ,t)
-fμt(μ,t) = TransientParamFunction(f,μ,t)
-
-g(x,μ,t) = exp(-x[1]/μ[2])*abs(1-cos(9*pi*t/5)+sin(9*pi*t/(5*μ[3])))
-g(μ,t) = x->g(x,μ,t)
-gμt(μ,t) = TransientParamFunction(g,μ,t)
-
-u0(x,μ) = 0
-u0(μ) = x->u0(x,μ)
-u0μ(μ) = ParamFunction(u0,μ)
-
-stiffness(μ,t,u,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
-mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
-rhs(μ,t,v,dΩ) = ∫(fμt(μ,t)*v)dΩ
-res(μ,t,u,v,dΩ) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ)
-
-trian_res = (Ω,)
-trian_stiffness = (Ω,)
-trian_mass = (Ω,)
-
-induced_norm(du,v) = ∫(v⋅du)dΩ + ∫(∇(v)⋅∇(du))dΩ
-
-reffe = ReferenceFE(lagrangian,Float64,order)
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial = TransientTrialParamFESpace(test,gμt)
-feop = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
-  trial,test,trian_res,trian_stiffness,trian_mass)
-uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
-
-fesolver = ThetaMethod(LUSolver(),dt,θ)
-ϵ = 1e-4
-rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=5,nsnaps_res=30,nsnaps_jac=20)
-# test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
-
-fesnaps = fe_solutions(rbsolver,feop,uh0μ)
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,cache = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)
-
-println(compute_error(results))
-println(get_timer(results))
-
-using Gridap.FESpaces
-op = get_algebraic_operator(feop)
-pop = TransientPGOperator(op,red_test,red_test)
-# red_test = op.test
-jjac,rres = jacobian_and_residual(rbsolver,pop,fesnaps)
-
-basis = reduced_basis(jjac[1][1])#reduced_basis(rres[1])#reduced_basis(jjac[1][1])
-interpolation,integration_domain = mdeim(basis)
-proj_basis = reduce_operator(basis,red_test,red_test)
-red_trian = reduce_triangulation(Ω,integration_domain,red_test)
+println(results)

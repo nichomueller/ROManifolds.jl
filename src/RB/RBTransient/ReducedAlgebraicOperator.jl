@@ -1,10 +1,10 @@
 function RBSteady.reduce_operator(
-  red::MDEIMCombineReduction,
+  red::TransientMDEIMReduction,
   b::Projection,
-  b_trial::Projection,
-  b_test::Projection)
+  b_trial::FESubspace,
+  b_test::FESubspace)
 
-  reduce_operator(b,get_basis(b),get_basis(b_trial),get_basis(b_test),red.combine)
+  reduce_operator(b,RBSteady.get_basis(b_trial),RBSteady.get_basis(b_test),red.combine)
 end
 
 function RBSteady.reduce_operator(b::TransientPODBasis,b_test::TransientPODBasis)
@@ -21,7 +21,7 @@ function RBSteady.reduce_operator(b::TransientPODBasis,b_test::TransientPODBasis
   b̂t = bt_test'*bt
   b̂st .= kron(b̂t,b̂s)
 
-  return ReducedVectorOperator(b̂st)
+  return ReducedAlgebraicOperator(b̂st)
 end
 
 function RBSteady.reduce_operator(
@@ -56,14 +56,14 @@ function RBSteady.reduce_operator(
     end
   end
 
-  return ReducedMatrixOperator(b̂st)
+  return ReducedAlgebraicOperator(b̂st)
 end
 
 # TT interface
 
 function RBSteady.reduce_operator(b::TransientTTSVDCores,b_test::TransientTTSVDCores)
   b̂st = compress_cores(b,b_test)
-  return ReducedVectorOperator(b̂st)
+  return ReducedAlgebraicOperator(b̂st)
 end
 
 function RBSteady.reduce_operator(
@@ -73,7 +73,7 @@ function RBSteady.reduce_operator(
   combine::Function)
 
   b̂st = compress_cores(b,b_trial,b_test,combine)
-  return ReducedMatrixOperator(b̂st)
+  return ReducedAlgebraicOperator(b̂st)
 end
 
 function RBSteady.compress_core(
