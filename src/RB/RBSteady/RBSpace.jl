@@ -12,7 +12,7 @@ Computes the subspace of the test, trial FE spaces contained in the FE operator
 """
 function reduced_fe_space(solver,feop,s)
   timer = get_timer(solver)
-  reset_timer!(timer)
+  reset_timer!(timer,"RB")
 
   soff = select_snapshots(s,offline_params(solver))
   @timeit timer "RB" begin

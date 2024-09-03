@@ -5,8 +5,12 @@ function RBSteady.ttsvd(a::AbstractTransientSnapshots{T,N};kwargs...) where {T,N
   ranks = fill(1,N)
   sizes = size(a)
   cache = cores,ranks,sizes
+  stats = @timed begin
+    aa = copy(a)
+  end
+  println("Quantities to subtract: ($(stats.time),$(stats.bytes / 1e6))")
   # routine on the spatial and temporal indices
-  RBSteady.ttsvd!(cache,a;ids_range=1:N-1,kwargs...)
+  RBSteady.ttsvd!(cache,aa;ids_range=1:N-1,kwargs...)
   return cores
 end
 
@@ -16,7 +20,11 @@ function RBSteady.ttsvd(a::AbstractTransientSnapshots{T,N},X::AbstractTProductTe
   ranks = fill(1,N)
   sizes = size(a)
   # routine on the spatial indices
-  a′ = RBSteady.ttsvd!((cores,ranks,sizes),a,X;ids_range=1:N_space,kwargs...)
+  stats = @timed begin
+    aa = copy(a)
+  end
+  println("Quantities to subtract: ($(stats.time),$(stats.bytes / 1e6))")
+  a′ = RBSteady.ttsvd!((cores,ranks,sizes),aa,X;ids_range=1:N_space,kwargs...)
   # routine on the temporal index
   RBSteady.ttsvd!((cores,ranks,sizes),a′;ids_range=N_space+1,kwargs...)
   return cores

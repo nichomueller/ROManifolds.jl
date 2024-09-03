@@ -28,7 +28,7 @@ function RBSteady.fe_solutions(
 
   fesolver = get_fe_solver(solver)
   timer = get_timer(solver)
-  reset_timer!(timer)
+  reset_timer!(timer,"FE")
 
   sol = solve(fesolver,op,uh0,timer;r)
   odesol = sol.odesol

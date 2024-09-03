@@ -16,6 +16,7 @@ function empirical_interpolation!(cache,A::AbstractMatrix)
     end
   end
   Ai = view(A,I,:)
+  println(norm(Ai))
   return I,Ai
 end
 
@@ -320,13 +321,20 @@ function reduced_form(
   kwargs...)
 
   mdeim_style = solver.mdeim_style
-  basis = reduced_basis(s;ϵ=get_tol(solver))
-  lu_interp,integration_domain = mdeim(mdeim_style,basis)
-  proj_basis = reduce_operator(mdeim_style,basis,args...;kwargs...)
+  timer = get_timer(solver)
+
+  @timeit timer "MDEIM" begin
+    basis = reduced_basis(s;ϵ=get_tol(solver))
+    lu_interp,integration_domain = mdeim(mdeim_style,basis)
+  end
+
+  @timeit timer "Galerkin" proj_basis = reduce_operator(mdeim_style,basis,args...;kwargs...)
   red_trian = reduce_triangulation(trian,integration_domain,args...)
+
   coefficient = allocate_coefficient(solver,basis)
   result = allocate_result(solver,args...)
   ad = AffineDecomposition(proj_basis,lu_interp,integration_domain,coefficient,result)
+
   return ad,red_trian
 end
 
@@ -378,11 +386,11 @@ end
 
 function reduced_jacobian_residual(solver::RBSolver,op,s)
   timer = get_timer(solver)
+  reset_timer!(timer,"MDEIM")
+  reset_timer!(timer,"Galerkin")
   jac,res = jacobian_and_residual(solver,op,s)
-  @timeit timer "MDEIM" begin
-    red_jac = reduced_jacobian(solver,op,jac)
-    red_res = reduced_residual(solver,op,res)
-  end
+  red_jac = reduced_jacobian(solver,op,jac)
+  red_res = reduced_residual(solver,op,res)
   show(timer)
   return red_jac,red_res
 end

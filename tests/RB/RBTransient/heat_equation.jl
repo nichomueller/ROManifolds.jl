@@ -96,14 +96,10 @@ catch
   save(test_dir,results)
 end
 
-# post process
-show(results.timer)
-println(compute_speedup(results))
-
-fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
+fesnaps = fe_solutions(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)
 
 # using Gridap.FESpaces
 # red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)

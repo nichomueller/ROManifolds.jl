@@ -111,7 +111,7 @@ function fe_solutions(
 
   fesolver = get_fe_solver(solver)
   timer = get_timer(solver)
-  reset_timer!(timer)
+  reset_timer!(timer,"FE")
 
   index_map = get_vector_index_map(op)
   values = solve(fesolver,op,timer;r)
