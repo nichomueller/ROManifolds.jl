@@ -50,14 +50,9 @@ include("ParamOperator.jl")
 
 export ParamFEOperator
 export LinearParamFEOperator
-export ParamSaddlePointFEOp
 export ParamFEOperatorWithTrian
 export ParamFEOpFromWeakFormWithTrian
-export ParamSaddlePointFEOpWithTrian
-export get_induced_norm
-export assemble_norm_matrix
-export get_coupling
-export assemble_coupling_matrix
+export assemble_matrix_from_form
 export set_triangulation
 export change_triangulation
 include("ParamFEOperator.jl")

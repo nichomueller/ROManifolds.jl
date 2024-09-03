@@ -35,7 +35,7 @@ struct ReducedMatrixOperator{A} <: ReducedAlgebraicOperator
 end
 
 """
-    reduce_operator(b::Projection,r::FESubspace...;kwargs...) -> ReducedAlgebraicOperator
+    reduce_operator(red::AbstractReduction,b::Projection,r::FESubspace...) -> ReducedAlgebraicOperator
 
 Computes a ReducedAlgebraicOperator from a Projection `b` and FESubspace(s) `r`.
 When `b` consists of compressed residual snapshots, `r` stands for the `test` FE
@@ -43,22 +43,18 @@ space; when it consists of compressed jacobian snapshots, `r` stands for the
 `trial` and `test` FE spaces
 
 """
-function reduce_operator(b::Projection,r::FESubspace...;kwargs...)
-  reduce_operator(b,map(get_basis,r)...;kwargs...)
+function reduce_operator(red::AbstractReduction,b::Projection,r::FESubspace...)
+  reduce_operator(b,map(get_basis,r)...)
 end
 
-function reduce_operator(
-  b::PODBasis,
-  b_test::PODBasis;
-  kwargs...)
-
+function reduce_operator(b::PODBasis,b_test::PODBasis)
   bs = get_basis_space(b)
   bs_test = get_basis_space(b_test)
   b̂s = bs_test'*bs
   return ReducedVectorOperator(b̂s)
 end
 
-function reduce_operator(b::PODBasis,b_trial::PODBasis,b_test::PODBasis;kwargs...)
+function reduce_operator(b::PODBasis,b_trial::PODBasis,b_test::PODBasis)
   bs = get_basis_space(b)
   bs_trial = get_basis_space(b_trial)
   bs_test = get_basis_space(b_test)
@@ -76,13 +72,13 @@ end
 
 # TT interface
 
-function reduce_operator(b::TTSVDCores,b_test::TTSVDCores;kwargs...)
+function reduce_operator(b::TTSVDCores,b_test::TTSVDCores)
   b̂st = compress_cores(b,b_test)
   return ReducedVectorOperator(b̂st)
 end
 
-function reduce_operator(b::TTSVDCores,b_trial::TTSVDCores,b_test::TTSVDCores;kwargs...)
-  b̂st = compress_cores(b,b_trial,b_test;kwargs...)
+function reduce_operator(b::TTSVDCores,b_trial::TTSVDCores,b_test::TTSVDCores)
+  b̂st = compress_cores(b,b_trial,b_test)
   return ReducedMatrixOperator(b̂st)
 end
 

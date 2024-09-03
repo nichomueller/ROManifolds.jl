@@ -22,26 +22,26 @@ get_indices_time(a::TransientAffineDecomposition) = get_indices_time(get_integra
 function _time_indices_and_interp_matrix(interp_basis_space,basis_time)
   indices_time,interp_basis_time = empirical_interpolation(basis_time)
   interp_basis_space_time = kron(interp_basis_time,interp_basis_space)
-  lu_interp = lu(interp_basis_space_time)
-  return indices_time,lu_interp
+  interpolation = lu(interp_basis_space_time)
+  return indices_time,interpolation
 end
 
 function RBSteady.mdeim(b::TransientPODBasis)
   basis_space = get_basis_space(b)
   basis_time = get_basis_time(b)
   indices_space,interp_basis_space = empirical_interpolation(basis_space)
-  indices_time,lu_interp = _time_indices_and_interp_matrix(interp_basis_space,basis_time)
+  indices_time,interpolation = _time_indices_and_interp_matrix(interp_basis_space,basis_time)
   integration_domain = TransientIntegrationDomain(indices_space,indices_time)
-  return lu_interp,integration_domain
+  return interpolation,integration_domain
 end
 
 function RBSteady.mdeim(b::TransientTTSVDCores)
   index_map = get_index_map(b)
   cores = get_cores(b)
   (indices_space,indices_time),interp_basis_spacetime = empirical_interpolation(index_map,cores...)
-  lu_interp = lu(interp_basis_spacetime)
+  interpolation = lu(interp_basis_spacetime)
   integration_domain = TransientIntegrationDomain(indices_space,indices_time)
-  return lu_interp,integration_domain
+  return interpolation,integration_domain
 end
 
 function union_reduced_times(a::AffineContribution)
@@ -57,19 +57,15 @@ function union_reduced_times(a::TupOfAffineContribution)
 end
 
 function RBSteady.reduced_jacobian(
-  solver::ThetaMethodRBSolver,
+  red::Tuple{Vararg{AbstractReduction}},
   op::TransientRBOperator,
   contribs::Tuple{Vararg{Any}})
 
-  fesolver = get_fe_solver(solver)
-  red = get_jacobian_reduction(solver)
-
+  @check length(red) == length(contribs)
   a = ()
-  for (i,c) in enumerate(contribs)
-    combine = (x,y) -> i == 1 ? fesolver.θ*x+(1-fesolver.θ)*y : fesolver.θ*(x-y)
-    a = (a...,reduced_jacobian(red[i],solver,op,c;combine))
+  for i in eachindex(red)
+    a = (a...,reduced_jacobian(red[i],op,contribs[i]))
   end
-
   return a
 end
 
@@ -77,8 +73,8 @@ end
 
 function RBSteady.coefficient!(a::TransientAffineDecomposition,b::AbstractParamArray)
   coefficient = a.coefficient
-  mdeim_interpolation = a.mdeim_interpolation
-  ldiv!(coefficient,mdeim_interpolation,vec(b))
+  interpolation = a.interpolation
+  ldiv!(coefficient,interpolation,vec(b))
 end
 
 function RBSteady.mdeim_result(a::TupOfAffineContribution,b::TupOfArrayContribution)

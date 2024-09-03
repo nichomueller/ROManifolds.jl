@@ -1,4 +1,13 @@
-function RBSteady.reduce_operator(b::TransientPODBasis,b_test::TransientPODBasis;kwargs...)
+function RBSteady.reduce_operator(
+  red::MDEIMCombineReduction,
+  b::Projection,
+  b_trial::Projection,
+  b_test::Projection)
+
+  reduce_operator(b,get_basis(b),get_basis(b_trial),get_basis(b_test),red.combine)
+end
+
+function RBSteady.reduce_operator(b::TransientPODBasis,b_test::TransientPODBasis)
   bs = get_basis_space(b)
   bt = get_basis_time(b)
   bs_test = get_basis_space(b_test)
@@ -18,8 +27,8 @@ end
 function RBSteady.reduce_operator(
   b::TransientPODBasis,
   b_trial::TransientPODBasis,
-  b_test::TransientPODBasis;
-  kwargs...)
+  b_test::TransientPODBasis,
+  combine::Function)
 
   bs = get_basis_space(b)
   bt = get_basis_time(b)
@@ -32,7 +41,7 @@ function RBSteady.reduce_operator(
   s = num_reduced_dofs(b_test),num_reduced_dofs(b),num_reduced_dofs(b_trial)
   b̂st = Array{T,3}(undef,s)
 
-  b̂t = combine_basis_time(bt,bt_trial,bt_test;kwargs...)
+  b̂t = combine_basis_time(bt,bt_trial,bt_test,combine)
 
   cache = zeros(T,num_space_dofs(b_test),RBSteady.num_reduced_space_dofs(b_trial))
 
@@ -52,7 +61,7 @@ end
 
 # TT interface
 
-function RBSteady.reduce_operator(b::TransientTTSVDCores,b_test::TransientTTSVDCores;kwargs...)
+function RBSteady.reduce_operator(b::TransientTTSVDCores,b_test::TransientTTSVDCores)
   b̂st = compress_cores(b,b_test)
   return ReducedVectorOperator(b̂st)
 end
@@ -60,15 +69,18 @@ end
 function RBSteady.reduce_operator(
   b::TransientTTSVDCores,
   b_trial::TransientTTSVDCores,
-  b_test::TransientTTSVDCores;
-  kwargs...)
+  b_test::TransientTTSVDCores,
+  combine::Function)
 
-  b̂st = compress_cores(b,b_trial,b_test;kwargs...)
+  b̂st = compress_cores(b,b_trial,b_test,combine)
   return ReducedMatrixOperator(b̂st)
 end
 
-function RBSteady.compress_core(a::AbstractArray{T,3},btrial::AbstractArray{S,3},btest::AbstractArray{S,3};
-  combine=(x,y)->x) where {T,S}
+function RBSteady.compress_core(
+  a::AbstractArray{T,3},
+  btrial::AbstractArray{S,3},
+  btest::AbstractArray{S,3},
+  combine::Function) where {T,S}
 
   TS = promote_type(T,S)
   ra_prev,ra = size(a,1),size(a,3)
@@ -103,7 +115,7 @@ function RBSteady.compress_core(a::AbstractArray{T,3},btrial::AbstractArray{S,3}
   return combine(bab,bab_shift)
 end
 
-function combine_basis_time(B::AbstractMatrix,C::AbstractMatrix;combine=(x,y)->x)
+function combine_basis_time(B::AbstractMatrix,C::AbstractMatrix,combine::Function)
   time_ndofs = size(C,1)
   nt_row = size(C,2)
   nt_col = size(B,2)
@@ -119,7 +131,12 @@ function combine_basis_time(B::AbstractMatrix,C::AbstractMatrix;combine=(x,y)->x
   combine(bt_proj,bt_proj_shift)
 end
 
-function combine_basis_time(A::AbstractMatrix,B::AbstractMatrix,C::AbstractMatrix;combine=(x,y)->x)
+function combine_basis_time(
+  A::AbstractMatrix,
+  B::AbstractMatrix,
+  C::AbstractMatrix,
+  combine::Function)
+
   nt = size(A,2)
   nt_row = size(C,2)
   nt_col = size(B,2)

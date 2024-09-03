@@ -1,7 +1,7 @@
 module RBSteady
 
 using LinearAlgebra
-using RandomizedLinAlg
+using TSVD
 using BlockArrays
 using SparseArrays
 using DrWatson

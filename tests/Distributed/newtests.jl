@@ -122,8 +122,8 @@ c = distributed_array_contribution()
 trian,vals = get_domains(contribs_vec)[1],get_values(contribs_vec)[1]
 # RB.reduced_residual!(c,info,op,values,trian)
 basis_space,basis_time = reduced_basis(vals;ϵ=RB.get_tol(info))
-# lu_interp,red_trian,integration_domain = mdeim(info,fs,trian,basis_space,basis_time)
-lu_interp,red_trian,integration_domain = map(
+# interpolation,red_trian,integration_domain = mdeim(info,fs,trian,basis_space,basis_time)
+interpolation,red_trian,integration_domain = map(
     local_views(test),
     local_views(trian),
     local_views(basis_space),

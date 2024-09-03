@@ -202,6 +202,6 @@ pop = TransientPGOperator(op,red_test,red_test)
 jjac,rres = jacobian_and_residual(rbsolver,pop,fesnaps)
 
 basis = reduced_basis(jjac[1][1])#reduced_basis(rres[1])#reduced_basis(jjac[1][1])
-lu_interp,integration_domain = mdeim(basis)
+interpolation,integration_domain = mdeim(basis)
 proj_basis = reduce_operator(basis,red_test,red_test)
 red_trian = reduce_triangulation(Ω,integration_domain,red_test)

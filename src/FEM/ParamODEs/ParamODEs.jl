@@ -61,13 +61,8 @@ export LinearTransientParamFEOperator
 export NonlinearTransientParamFEOperator
 include("TransientParamFEOperator.jl")
 
-export TransientParamSaddlePointFEOp
-export assemble_coupling_matrix
-include("TransientParamSaddlePointFEOperator.jl")
-
 export TransientParamFEOperatorWithTrian
 export TransientParamFEOpFromWeakFormWithTrian
-export TransientParamSaddlePointFEOpWithTrian
 export set_triangulation
 export change_triangulation
 include("TransientParamFEOperatorWithTrian.jl")

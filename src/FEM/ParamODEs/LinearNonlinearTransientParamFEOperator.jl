@@ -77,16 +77,10 @@ function ParamDataStructures.realization(op::LinearNonlinearTransientParamFEOper
   realization(op.op_linear;kwargs...)
 end
 
-function ParamSteady.assemble_norm_matrix(op::LinearNonlinearTransientParamFEOperator)
+function ParamSteady.assemble_matrix_from_form(op::LinearNonlinearTransientParamFEOperator,form::Function)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
   @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
-  assemble_norm_matrix(op.op_linear)
-end
-
-function ParamSteady.assemble_coupling_matrix(op::LinearNonlinearTransientParamFEOperator)
-  @check get_test(op.op_linear) === get_test(op.op_nonlinear)
-  @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
-  assemble_coupling_matrix(op.op_linear)
+  assemble_matrix_from_form(op.op_linear,form)
 end
 
 function ParamSteady.join_operators(
@@ -120,15 +114,7 @@ function ParamSteady.join_operators(
     jacs = (jacs...,jac_i)
   end
 
-  TransientParamFEOperator(res,jacs,op_lin.induced_norm,op_lin.tpspace,trial,test)
-end
-
-function ParamSteady.join_operators(
-  op_lin::TransientParamSaddlePointFEOp,
-  op_nlin::TransientParamFEOperator)
-
-  jop = join_operators(op_lin.op,op_nlin)
-  TransientParamSaddlePointFEOp(jop,op_lin.coupling)
+  TransientParamFEOperator(res,jacs,op_lin.tpspace,trial,test)
 end
 
 function ParamSteady.join_operators(

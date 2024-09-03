@@ -51,7 +51,6 @@ include("Snapshots.jl")
 export get_stage_operator
 include("ThetaMethod.jl")
 
-export ThetaMethodRBSolver
 include("RBSolver.jl")
 
 include("BasisConstruction.jl")

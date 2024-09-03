@@ -150,13 +150,13 @@ function RB.mdeim(
   basis_space::AbstractMatrix,
   basis_time::AbstractMatrix)
 
-  lu_interp,red_trian,integration_domain = map(
+  interpolation,red_trian,integration_domain = map(
     local_views(fs),local_views(trian),local_views(basis_space),local_views(basis_time)
     ) do fs,trian,basis_space,basis_time
     mdeim(solver,fs,trian,basis_space,basis_time)
   end |> tuple_of_arrays
   d_red_trian = DistributedTriangulation(red_trian)
-  return lu_interp,d_red_trian,integration_domain
+  return interpolation,d_red_trian,integration_domain
 end
 
 # function RB.reduced_residual(
