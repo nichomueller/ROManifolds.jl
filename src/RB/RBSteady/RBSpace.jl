@@ -11,13 +11,14 @@ Computes the subspace of the test, trial FE spaces contained in the FE operator
 
 """
 function reduced_fe_space(solver::RBSolver,feop,s)
-  reduced_fe_space(get_state_reduction(solver),feop,s)
+  red = get_state_reduction(solver)
+  soff = select_snapshots(s,offline_params(solver))
+  reduced_fe_space(red,feop,soff)
 end
 
-function reduced_fe_space(red::AbstractReduction,feop,s)
-  soff = select_snapshots(s,num_params(red))
+function reduced_fe_space(red,feop,s)
   t = @timed begin
-    basis = reduced_basis(red,feop,soff)
+    basis = reduced_basis(red,feop,s)
   end
   reduced_trial = fe_subspace(get_trial(feop),basis)
   reduced_test = fe_subspace(get_test(feop),basis)
@@ -34,26 +35,29 @@ Computes the bases spanning the subspace of test, trial FE spaces by compressing
 the snapshots `s`
 
 """
-function reduced_basis(red::AbstractReduction,s::AbstractSnapshots,args...)
+function reduced_basis(red::AbstractReduction,s::AbstractArray,args...)
   Projection(red,s,args...)
 end
 
-function reduced_basis(red::AbstractReduction,feop,s::AbstractSnapshots)
+function reduced_basis(red::AbstractReduction,feop::GridapType,s::AbstractArray)
   reduced_basis(red,s)
 end
 
-function reduced_basis(red::AbstractReduction{<:ReductionStyle,EnergyNorm},feop,s::AbstractSnapshots)
+function reduced_basis(red::AbstractReduction{<:ReductionStyle,EnergyNorm},feop::GridapType,s::AbstractArray)
   norm_matrix = assemble_matrix_from_form(feop,get_norm(red))
   reduced_basis(red,s,norm_matrix)
 end
 
-function reduced_basis(red::SupremizerReduction,feop,s::AbstractSnapshots)
+function reduced_basis(red::SupremizerReduction,feop::GridapType,s::AbstractArray)
   norm_matrix = assemble_matrix_from_form(feop,get_norm(red))
   supr_matrix = assemble_matrix_from_form(feop,get_supr(red))
+
+  primal_blocks = get_primal_blocks(red)
+  dual_blocks = get_dual_blocks(red)
   supr_tol = get_supr_tol(red)
 
   basis = reduced_basis(get_reduction(red),s,norm_matrix)
-  enrich_basis(basis,norm_matrix,supr_matrix;tol=supr_tol)
+  enrich_basis(basis,norm_matrix,supr_matrix,primal_blocks,dual_blocks,supr_tol)
 end
 
 function fe_subspace(space::FESpace,basis)

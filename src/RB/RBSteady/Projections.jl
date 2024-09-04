@@ -206,32 +206,34 @@ end
 function get_cores_space(a::BlockProjection)
   active_block_ids = get_touched_blocks(a)
   block_map = BlockMap(size(a),active_block_ids)
-  cores = [get_cores_space(a[i]) for i = get_touched_blocks(a)]
+  cores = [get_cores_space(a[i]) for i = active_block_ids]
   return return_cache(block_map,cores...)
 end
 
 function get_cores(a::BlockProjection)
   active_block_ids = get_touched_blocks(a)
   block_map = BlockMap(size(a),active_block_ids)
-  cores = [get_cores(a[i]) for i = get_touched_blocks(a)]
+  cores = [get_cores(a[i]) for i = active_block_ids]
   return return_cache(block_map,cores...)
 end
 
 function IndexMaps.get_index_map(a::BlockProjection)
   active_block_ids = get_touched_blocks(a)
-  index_map = [get_index_map(a[i]) for i = get_touched_blocks(a)]
+  index_map = [get_index_map(a[i]) for i = active_block_ids]
   return index_map
 end
 
-function Projection(s::BlockSnapshots;kwargs...)
-  norm_matrix = fill(nothing,size(s))
-  Projection(s,norm_matrix;kwargs...)
-end
-
-function Projection(s::BlockSnapshots,norm_matrix;kwargs...)
+function Projection(red::AbstractReduction,s::BlockSnapshots)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  bases = [Projection(s[i],norm_matrix[Block(i,i)];kwargs...) for i in active_block_ids]
+  bases = [Projection(red,s[i]) for i in active_block_ids]
+  BlockProjection(block_map,bases)
+end
+
+function Projection(red::AbstractReduction,s::BlockSnapshots,norm_matrix)
+  active_block_ids = get_touched_blocks(s)
+  block_map = BlockMap(size(s),active_block_ids)
+  bases = [Projection(red,s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
   BlockProjection(block_map,bases)
 end
 
@@ -239,19 +241,20 @@ end
     enrich_basis(
       a::BlockProjection,
       norm_matrix::AbstractMatrix,
-      supr_matrix::AbstractMatrix) -> BlockProjection
+      supr_matrix::AbstractMatrix,
+      args...) -> BlockProjection
 
 Returns the supremizer-enriched BlockProjection. This function stabilizes Inf-Sup
 problems projected on a reduced vector space
 
 """
-function enrich_basis(a::BlockProjection{<:PODBasis},norm_matrix::AbstractMatrix,supr_matrix::AbstractMatrix)
-  bases = add_space_supremizers(get_basis_space(a),norm_matrix,supr_matrix)
+function enrich_basis(a::BlockProjection{<:PODBasis},args...)
+  bases = add_space_supremizers(get_basis_space(a),args...)
   return BlockProjection(map(PODBasis,bases),a.touched)
 end
 
-function enrich_basis(a::BlockProjection{<:TTSVDCores},norm_matrix::AbstractMatrix,supr_matrix::AbstractMatrix)
-  cores = add_tt_supremizers(get_cores_space(a),norm_matrix,supr_matrix)
+function enrich_basis(a::BlockProjection{<:TTSVDCores},args...)
+  cores = add_tt_supremizers(get_cores_space(a),args...)
   return BlockProjection(map(TTSVDCores,cores),a.touched)
 end
 
@@ -267,12 +270,12 @@ the action of the supremizing matrix `supr_matrix` on the dual field(s)
 """
 function add_space_supremizers(basis_space::ArrayBlock,norm_matrix::AbstractMatrix,supr_matrix::AbstractMatrix)
   basis_primal,basis_dual... = basis_space.array
-  A = norm_matrix[Block(1,1)]
-  H = cholesky(A)
+  X_primal = norm_matrix[Block(1,1)]
+  H_primal = cholesky(X_primal)
   for i = eachindex(basis_dual)
-    C = supr_matrix[Block(1,i+1)]
-    supr_i = H \ C * basis_dual[i]
-    gram_schmidt!(supr_i,basis_primal,A)
+    C_primal_dual_i = supr_matrix[Block(1,i+1)]
+    supr_i = H_primal \ C_primal_dual_i * basis_dual[i]
+    gram_schmidt!(supr_i,basis_primal,X_primal)
     basis_primal = hcat(basis_primal,supr_i)
   end
   return [basis_primal,basis_dual...]

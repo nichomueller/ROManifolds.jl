@@ -226,6 +226,75 @@ function remove_fixed_dof(i::FixedDofsIndexMap)
   filter(x -> x != 0,i)
 end
 
+abstract type AbstractMultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti} end
+
+Base.view(i::AbstractMultiValueIndexMap,locations) = MultiValueIndexMapView(i,locations)
+
+function _to_scalar_values!(indices::AbstractArray,D::Integer,d::Integer)
+  indices .= (indices .- d) ./ D .+ 1
+end
+
+function get_component(i::AbstractMultiValueIndexMap{D},d;multivalue=true) where D
+  ncomps = num_components(i)
+  indices = collect(selectdim(i,D,d))
+  !multivalue && _to_scalar_values!(indices,ncomps,d)
+  IndexMap(indices)
+end
+
+function split_components(i::AbstractMultiValueIndexMap{D}) where D
+  indices = collect(eachslice(i;dims=D))
+  IndexMaps.(indices)
+end
+
+function merge_components(i::AbstractVector{<:AbstractArray{Ti}}) where Ti
+  sizes = map(size,i)
+  @check all(sizes .== [first(sizes)])
+  indices = stack(i)
+  return indices
+end
+
+function permute_sparsity(
+  a::SparsityPatternCSC,
+  i::AbstractMultiValueIndexMap{D},
+  j::AbstractMultiValueIndexMap{D}
+  ) where D
+
+  @check size(i,D) == size(j,D)
+  ncomps = size(i,D)
+  i1 = get_component(i,1)
+  j1 = get_component(j,1)
+  pa = permute_sparsity(a,j1,i1)
+  MultiValueSparsityPatternCSC(pa.matrix,ncomps)
+end
+
+struct MultiValueIndexMap{D,Ti,I} <: AbstractMultiValueIndexMap{D,Ti}
+  indices::I
+  function MultiValueIndexMap(indices::I) where {D,Ti,I<:AbstractArray{Ti,D}}
+    new{D,Ti,I}(indices)
+  end
+end
+
+function MultiValueIndexMap(indices::AbstractVector{<:AbstractArray})
+  mindices = merge_components(indices)
+  return MultiValueIndexMap(mindices)
+end
+
+Base.size(i::MultiValueIndexMap) = size(i.indices)
+Base.getindex(i::MultiValueIndexMap,j...) = getindex(i.indices,j...)
+TensorValues.num_components(i::MultiValueIndexMap{D}) where D = size(i.indices,D)
+
+struct MultiValueIndexMapView{D,Ti,I,L} <: AbstractMultiValueIndexMap{D,Ti}
+  indices::I
+  locations::L
+  function MultiValueIndexMapView(indices::I,locations::L) where {D,Ti,I<:AbstractMultiValueIndexMap{D,Ti},L}
+    new{D,Ti,I,L}(indices,locations)
+  end
+end
+
+Base.size(i::MultiValueIndexMapView) = _shape_per_dir(i.locations)
+Base.getindex(i::MultiValueIndexMapView,j::Integer) = i.indices[i.locations[j]]
+TensorValues.num_components(i::MultiValueIndexMapView{D}) where D = size(i,D)
+
 """
     TProductIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
 

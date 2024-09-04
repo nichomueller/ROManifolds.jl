@@ -43,9 +43,11 @@ function truncated_svd(red_style::SearchSVDRank,M::AbstractMatrix;issquare=false
   return U[:,1:rank],S[1:rank],V[:,1:rank]
 end
 
-function truncated_svd(red_style::FixedSVDRank,M::AbstractMatrix;kwargs...)
+function truncated_svd(red_style::FixedSVDRank,M::AbstractMatrix;issquare=false)
   rank = red_style.rank
-  return tsvd(M,rank)
+  Ur,Sr,Vr = tsvd(M,rank)
+  if issquare Sr = sqrt.(Sr) end
+  return Ur,Sr,Vr
 end
 
 function tpod(red_style::ReductionStyle,M::AbstractMatrix,args...)
@@ -211,7 +213,7 @@ function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRank1T
   oldrank = 1
   A_d = reshape(A,oldrank,size(A,1),:)
   for d in 1:Nspace
-    core_d,remainder_d = ttsvd_loop(red_style[d],A_d)
+    core_d,remainder_d = ttsvd_loop(red_style[d],A_d,X[d])
     oldrank = size(core_d,3)
     A_d = reshape(remainder_d,oldrank,size(A,d+1),:)
     push!(cores,core_d)

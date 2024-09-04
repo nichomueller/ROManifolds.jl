@@ -342,15 +342,15 @@ end
 
 # multi field interface
 
-function allocate_result(solver::RBSolver,test::MultiFieldRBSpace)
+function allocate_result(red::AbstractReduction,test::MultiFieldRBSpace)
   active_block_ids = get_touched_blocks(test)
-  block_result = [allocate_result(solver,test[i]) for i in active_block_ids]
+  block_result = [allocate_result(red,test[i]) for i in active_block_ids]
   return mortar(block_result)
 end
 
-function allocate_result(solver::RBSolver,trial::MultiFieldRBSpace,test::MultiFieldRBSpace)
+function allocate_result(red::AbstractReduction,trial::MultiFieldRBSpace,test::MultiFieldRBSpace)
   active_block_ids = Iterators.product(get_touched_blocks(test),get_touched_blocks(trial))
-  block_result = [allocate_result(solver,trial[j],test[i]) for (i,j) in active_block_ids]
+  block_result = [allocate_result(red,trial[j],test[i]) for (i,j) in active_block_ids]
   return mortar(block_result)
 end
 
@@ -434,7 +434,7 @@ function reduce_triangulation(trian::Triangulation,idom::MatrixBlock,trial::Mult
 end
 
 function reduced_residual(
-  solver::RBSolver,
+  red::AbstractReduction,
   op,
   s::BlockSnapshots,
   trian::Triangulation)
@@ -443,7 +443,7 @@ function reduced_residual(
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
   ads,red_trians = [
-    reduced_form(solver,s[i],trian,test[i]) for i in active_block_ids
+    reduced_form(red,s[i],trian,test[i]) for i in active_block_ids
     ] |> tuple_of_arrays
   red_trian = ParamDataStructures.merge_triangulations(red_trians)
   cache = allocate_result(solver,test)
@@ -452,17 +452,16 @@ function reduced_residual(
 end
 
 function reduced_jacobian(
-  solver::RBSolver,
+  red::AbstractReduction,
   op,
   s::BlockSnapshots,
-  trian::Triangulation;
-  kwargs...)
+  trian::Triangulation)
 
   trial = get_trial(op)
   test = get_test(op)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  ads,red_trians = [reduced_form(solver,s[i,j],trian,trial[j],test[i];kwargs...)
+  ads,red_trians = [reduced_form(red,s[i,j],trian,trial[j],test[i])
     for (i,j) in Tuple.(active_block_ids)] |> tuple_of_arrays
   red_trian = ParamDataStructures.merge_triangulations(red_trians)
   cache = allocate_result(solver,trial,test)

@@ -100,6 +100,12 @@ save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)
 
-using Mabla.FEM.IndexMaps
-fesnaps′ = change_index_map(TrivialIndexMap,fesnaps)
-reduced_operator(rbsolver,feop,fesnaps′)
+ranks = map(c -> size(c,3),RBSteady.get_cores(RBSteady.get_basis(rbop.op.test)))
+_state_reduction = TTSVDReduction(ranks,energy;nparams=50)
+_rbsolver = RBSolver(fesolver,state_reduction;nparams_test=5,nparams_res=30,nparams_jac=20)
+
+_rbop = reduced_operator(_rbsolver,feop,fesnaps)
+_rbsnaps,_rbstats,_cache = solve(_rbsolver,_rbop,fesnaps)
+_results = rb_results(_rbsolver,_rbop,fesnaps,_rbsnaps,festats,_rbstats)
+
+println(_results)
