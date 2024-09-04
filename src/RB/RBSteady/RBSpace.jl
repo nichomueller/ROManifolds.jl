@@ -16,7 +16,7 @@ function reduced_fe_space(solver::RBSolver,feop,s)
   reduced_fe_space(red,feop,soff)
 end
 
-function reduced_fe_space(red,feop,s)
+function reduced_fe_space(red::AbstractReduction,feop,s)
   t = @timed begin
     basis = reduced_basis(red,feop,s)
   end

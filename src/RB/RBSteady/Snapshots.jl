@@ -314,7 +314,8 @@ end
 
 function get_indexed_values(s::ReshapedSnapshots)
   v = get_indexed_values(s.snaps)
-  reshape(v.data,s.size)
+  vr = reshape(v.data,s.size)
+  ConsecutiveArrayOfArrays(vr)
 end
 
 const MultiValueGenericSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = GenericSnapshots{T,N,L,D,I,R,A}

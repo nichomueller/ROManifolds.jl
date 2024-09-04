@@ -61,7 +61,7 @@ function RBSteady.RBSolver(
   state_reduction::AbstractReduction;
   nparams_res=20,
   nparams_jac=20,
-  nsnaps_djac=nparams_jac,
+  nparams_djac=nparams_jac,
   nparams_test=10)
 
   θ = fesolver.θ
@@ -73,7 +73,7 @@ function RBSteady.RBSolver(
 
   residual_reduction = TransientMDEIMReduction(combine_res,red_style;nparams=nparams_res,nparams_test)
   jac_reduction = TransientMDEIMReduction(combine_jac,red_style;nparams=nparams_jac,nparams_test)
-  djac_reduction = TransientMDEIMReduction(combine_djac,red_style;nparams=nsnaps_djac,nparams_test)
+  djac_reduction = TransientMDEIMReduction(combine_djac,red_style;nparams=nparams_djac,nparams_test)
   jacobian_reduction = (jac_reduction,djac_reduction)
 
   RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction)
