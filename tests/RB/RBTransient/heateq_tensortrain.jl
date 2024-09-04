@@ -17,9 +17,9 @@ using Mabla.RB.RBTransient
 
 # time marching
 θ = 0.5
-dt = 0.01
+dt = 0.0025
 t0 = 0.0
-tf = 0.1
+tf = 0.3
 
 # parametric space
 pranges = fill([1,10],3)
@@ -27,7 +27,7 @@ tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
 # geometry
-n = 5
+n = 10
 domain = (0,1,0,1,0,1)
 partition = (n,n,n)
 model = TProductModel(domain,partition)
@@ -35,7 +35,7 @@ labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"neumann",[21,22])
 add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,23,24,25,26])
 
-order = 1#2
+order = 2
 degree = 2*order
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
