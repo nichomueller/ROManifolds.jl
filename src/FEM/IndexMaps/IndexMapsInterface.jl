@@ -230,6 +230,15 @@ abstract type AbstractMultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti} end
 
 Base.view(i::AbstractMultiValueIndexMap,locations) = MultiValueIndexMapView(i,locations)
 
+function compose_indices(index::AbstractArray{Ti,D},ncomps::Integer) where {Ti,D}
+  # indices = zeros(Ti,size(index)...,ncomps)
+  # @inbounds for comp = 1:ncomps
+  #   selectdim(indices,D+1,comp) .= (index.-1).*ncomps .+ comp
+  # end
+  indices = repeat(index;outer=(ntuple(_->1,Val{D}())...,ncomps))
+  return MultiValueIndexMap(indices)
+end
+
 function _to_scalar_values!(indices::AbstractArray,D::Integer,d::Integer)
   indices .= (indices .- d) ./ D .+ 1
 end
@@ -267,6 +276,16 @@ function permute_sparsity(
   MultiValueSparsityPatternCSC(pa.matrix,ncomps)
 end
 
+function permute_sparsity(a::SparsityPatternCSC,i::AbstractMultiValueIndexMap,j::AbstractIndexMap)
+  i1 = get_component(i,1)
+  permute_sparsity(a,i1,j)
+end
+
+function permute_sparsity(a::SparsityPatternCSC,i::AbstractIndexMap,j::AbstractMultiValueIndexMap)
+  j1 = get_component(j,1)
+  permute_sparsity(a,i,j1)
+end
+
 struct MultiValueIndexMap{D,Ti,I} <: AbstractMultiValueIndexMap{D,Ti}
   indices::I
   function MultiValueIndexMap(indices::I) where {D,Ti,I<:AbstractArray{Ti,D}}
@@ -280,7 +299,9 @@ function MultiValueIndexMap(indices::AbstractVector{<:AbstractArray})
 end
 
 Base.size(i::MultiValueIndexMap) = size(i.indices)
-Base.getindex(i::MultiValueIndexMap,j...) = getindex(i.indices,j...)
+Base.getindex(i::MultiValueIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
+Base.setindex!(i::MultiValueIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
+Base.copy(i::MultiValueIndexMap) = MultiValueIndexMap(copy(i.indices))
 TensorValues.num_components(i::MultiValueIndexMap{D}) where D = size(i.indices,D)
 
 struct MultiValueIndexMapView{D,Ti,I,L} <: AbstractMultiValueIndexMap{D,Ti}
@@ -291,8 +312,10 @@ struct MultiValueIndexMapView{D,Ti,I,L} <: AbstractMultiValueIndexMap{D,Ti}
   end
 end
 
-Base.size(i::MultiValueIndexMapView) = _shape_per_dir(i.locations)
-Base.getindex(i::MultiValueIndexMapView,j::Integer) = i.indices[i.locations[j]]
+Base.size(i::MultiValueIndexMapView) = size(i.locations)
+Base.getindex(i::MultiValueIndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.locations[j...]]
+Base.setindex!(i::MultiValueIndexMapView{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,i.locations[j...])
+Base.copy(i::MultiValueIndexMapView) = MultiValueIndexMap(copy(i.indices),i.locations)
 TensorValues.num_components(i::MultiValueIndexMapView{D}) where D = size(i,D)
 
 """

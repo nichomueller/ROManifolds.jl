@@ -9,7 +9,19 @@ function RBSteady.projection(
   cores,remainder = ttsvd(red_style,A,X)
   core_t,remainder_t = RBSteady.ttsvd_loop(red_style[N-1],remainder)
   push!(cores,core_t)
+  return cores
+end
 
+function RBSteady.projection(
+  red::TTSVDReduction,
+  A::TransientMultiValueSnapshots{T,N},
+  X::AbstractRankTensor) where {T,N}
+
+  red_style = ReductionStyle(red)
+  cores,remainder = ttsvd(red_style,A,X)
+  core_c,remainder_c = RBSteady.ttsvd_loop(red_style[N-2],remainder)
+  core_t,remainder_t = RBSteady.ttsvd_loop(red_style[N-1],remainder_c)
+  push!(cores,core_c)
   return cores
 end
 

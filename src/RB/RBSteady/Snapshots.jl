@@ -83,7 +83,7 @@ AbstractSteadySnapshots is equal to `D` + 1, where `D` represents the number of
 spatial axes, to which a parametric dimension is added.
 
 Subtypes:
-- [`BasicSnapshots`](@ref).
+- [`GenericSnapshots`](@ref).
 - [`SnapshotsAtIndices`](@ref).
 
 # Examples
@@ -106,7 +106,7 @@ ParamRealization{Vector{Vector{Float64}}}([
   [0.4021870679335007, 0.6585653527784044, 0.5110768420820191],
   [0.0950901750101361, 0.7049711670440882, 0.3490097863258958]])
 julia> s = Snapshots(ParamArray(data),i,r)
-2×2×2 BasicSnapshots{Float64, 3, 2, 2, IndexMap{2, Int64},
+2×2×2 GenericSnapshots{Float64, 3, 2, 2, IndexMap{2, Int64},
   ParamRealization{Vector{Vector{Float64}}}, VectorOfVectors{Float64, 2}}:
   [:, :, 1] =
   0.468445  0.115179
@@ -123,17 +123,17 @@ abstract type AbstractSteadySnapshots{T,N,L,D,I,R<:ParamRealization} <: Abstract
 Base.size(s::AbstractSteadySnapshots) = (num_space_dofs(s)...,num_params(s))
 
 """
-    struct BasicSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R} end
+    struct GenericSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R} end
 
 Most standard implementation of a AbstractSteadySnapshots
 
 """
-struct BasicSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R}
+struct GenericSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R}
   data::A
   index_map::I
   realization::R
 
-  function BasicSnapshots(
+  function GenericSnapshots(
     data::A,
     index_map::I,
     realization::R
@@ -144,22 +144,22 @@ struct BasicSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R}
 end
 
 function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::ParamRealization)
-  BasicSnapshots(s,i,r)
+  GenericSnapshots(s,i,r)
 end
 
-ParamDataStructures.param_data(s::BasicSnapshots) = s.data
-ParamDataStructures.get_values(s::BasicSnapshots) = s.data
-IndexMaps.get_index_map(s::BasicSnapshots) = s.index_map
-get_realization(s::BasicSnapshots) = s.realization
+ParamDataStructures.param_data(s::GenericSnapshots) = s.data
+ParamDataStructures.get_values(s::GenericSnapshots) = s.data
+IndexMaps.get_index_map(s::GenericSnapshots) = s.index_map
+get_realization(s::GenericSnapshots) = s.realization
 
-function get_indexed_values(s::BasicSnapshots)
+function get_indexed_values(s::GenericSnapshots)
   vi = vec(get_index_map(s))
   v = consecutive_getindex(s.data,vi,:)
   ConsecutiveArrayOfArrays(v)
 end
 
 Base.@propagate_inbounds function Base.getindex(
-  s::BasicSnapshots{T,N},
+  s::GenericSnapshots{T,N},
   i::Vararg{Integer,N}
   ) where {T,N}
 
@@ -170,7 +170,7 @@ Base.@propagate_inbounds function Base.getindex(
 end
 
 Base.@propagate_inbounds function Base.setindex!(
-  s::BasicSnapshots{T,N},
+  s::GenericSnapshots{T,N},
   v,
   i::Vararg{Integer,N}
   ) where {T,N}
@@ -317,10 +317,35 @@ function get_indexed_values(s::ReshapedSnapshots)
   reshape(v.data,s.size)
 end
 
-const StandardSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = BasicSnapshots{T,N,L,D,I,R,A}
+const MultiValueGenericSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = GenericSnapshots{T,N,L,D,I,R,A}
+const MultiValueSnapshotsAtIndices{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A,B} = SnapshotsAtIndices{T,N,L,D,I,R,A,B}
+const MultiValueSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = Union{
+  MultiValueGenericSnapshots{T,N,L,D,I,R,A},
+  MultiValueSnapshotsAtIndices{T,N,L,D,I,R,A}
+}
+
+TensorValues.num_components(s::MultiValueSnapshots) = num_components(get_index_map(i))
+
+function IndexMaps.get_component(s::MultiValueSnapshots,args...;kwargs...)
+  i′ = get_component(get_index_map(s),args...;kwargs...)
+  return Snapshots(get_values(s),i′,get_realization(s))
+end
+
+function IndexMaps.split_components(s::MultiValueSnapshots)
+  i′ = split_components(get_index_map(s))
+  return Snapshots(get_values(s),i′,get_realization(s))
+end
+
+function IndexMaps.merge_components(s::MultiValueSnapshots)
+  i′ = merge_components(get_index_map(s))
+  return Snapshots(get_values(s),i′,get_realization(s))
+end
+
 const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
-  StandardSparseSnapshots{T,N,L,D,I,R,A},
-  SnapshotsAtIndices{T,N,L,D,I,R,StandardSparseSnapshots{T,N,L,D,I,R,A}}
+  GenericSnapshots{T,N,L,D,I,R,A},
+  MultiValueSnapshots{T,N,L,D,I,R,A},
+  SnapshotsAtIndices{T,N,L,D,I,R,<:GenericSnapshots{T,N,L,D,I,R,A}},
+  SnapshotsAtIndices{T,N,L,D,I,R,<:MultiValueSnapshots{T,N,L,D,I,R,A}}
 }
 
 """

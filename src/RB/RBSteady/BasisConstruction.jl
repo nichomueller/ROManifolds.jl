@@ -235,6 +235,18 @@ function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRankTe
   return cores,A_d
 end
 
+function projection(
+  red::TTSVDReduction,
+  A::MultiValueSnapshots{T,N},
+  X::AbstractRankTensor) where {T,N}
+
+  red_style = ReductionStyle(red)
+  cores,remainder = ttsvd(red_style,A,X)
+  core_c,remainder_c = RBSteady.ttsvd_loop(red_style[N-1],remainder)
+  push!(cores,core_c)
+  return cores
+end
+
 function pivoted_qr(A;tol=1e-10)
   C = qr(A,ColumnNorm())
   r = findlast(abs.(diag(C.R)) .> tol)

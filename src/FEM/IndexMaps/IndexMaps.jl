@@ -20,6 +20,7 @@ include("IndexOperations.jl")
 
 export SparsityPattern
 export SparsityPatternCSC
+export MultiValueSparsityPatternCSC
 export TProductSparsityPattern
 export get_sparsity
 export permute_sparsity
@@ -33,6 +34,9 @@ export TrivialIndexMap
 export IndexMap
 export IndexMapView
 export FixedDofsIndexMap
+export AbstractMultiValueIndexMap
+export MultiValueIndexMap
+export MultiValueIndexMapView
 export TProductIndexMap
 export SparseIndexMap
 export FixedDofsSparseIndexMap
@@ -44,6 +48,10 @@ export get_sparse_index_map
 export recast
 export get_fixed_dofs
 export remove_fixed_dof
+export compose_indices
+export get_component
+export merge_components
+export split_components
 include("IndexMapsInterface.jl")
 
 end # module
