@@ -55,26 +55,6 @@ res(μ,t,u,v,dΩ) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rhs(μ,
 energy(du,v,dΩ) = ∫(∇(v)⋅∇(du))dΩ
 energy(dΩ) = (du,v) -> ∫(∇(v)⋅∇(du))dΩ
 
-function _residual(solver::RBSolver,op,s)
-  fesolver = get_fe_solver(solver)
-  sres = select_snapshots(s,RBSteady.res_params(solver))
-  us_res = (get_values(sres),)
-  r_res = get_realization(sres)
-  b = residual(fesolver,op,r_res,us_res)
-  ib = get_vector_index_map(op)
-  return Snapshots(b,ib,r_res)
-end
-
-function _jacobian(solver::RBSolver,op,s)
-  fesolver = get_fe_solver(solver)
-  sres = select_snapshots(s,RBSteady.jac_params(solver))
-  us_res = (get_values(sres),)
-  r_res = get_realization(sres)
-  b = jacobian(fesolver,op,r_res,us_res)
-  ib = get_vector_index_map(op)
-  return Snapshots(b,ib,r_res)
-end
-
 order = 2
 degree = 2*order
 
@@ -105,12 +85,12 @@ for n in (8,10,12,15)
 
   tol = fill(1e-4,4)
   state_reduction = TTSVDReduction(tol,energy(dΩ);nparams=50)
-  rbsolver = RBSolver(fesolver,state_reduction;nparams_test=10,nparams_res=30,nparams_jac=20)
-  test_dir = datadir(joinpath("heateq","3dcube_tensor_train_$(n)/space_time_mdeim_$(1e-4)"))
+  rbsolver = RBSolver(fesolver,state_reduction;nparams_test=10,nparams_res=30,nparams_jac=20,nparams_djac=1)
+  test_dir = datadir(joinpath("heateq","3dcube_tensor_train_$(n)"))
 
   fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
 
-  # # rbop = reduced_operator(rbsolver,feop,fesnaps)
+  rbop = reduced_operator(rbsolver,feop,fesnaps)
   # reduced_fe_space(rbsolver,feop,fesnaps)
 
   # println(get_timer(rbsolver))
@@ -121,8 +101,8 @@ for n in (8,10,12,15)
   # reduced_residual(rbsolver,op,ress)
   # reduced_jacobian(rbsolver,op,jacs)
 
-  # println("--------------------------------------------------------------------")
-  # println("Regular algorithm, n = $(n)")
+  println("--------------------------------------------------------------------")
+  println("Regular algorithm, n = $(n)")
 
   model = model.model
   Ω = Ω.trian
@@ -135,14 +115,15 @@ for n in (8,10,12,15)
 
   tol = 1e-4
   state_reduction = TransientPODReduction(tol,energy(dΩ);nparams=50)
-  rbsolver = RBSolver(fesolver,state_reduction;nparams_test=10,nparams_res=30,nparams_jac=20)
-  test_dir = datadir(joinpath("heateq","3dcube_$(n)/space_time_mdeim_$(1e-4)"))
+  rbsolver = RBSolver(fesolver,state_reduction;nparams_test=10,nparams_res=30,nparams_jac=20,nparams_djac=1)
+  test_dir = datadir(joinpath("heateq","3dcube_$(n)"))
 
-  fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
+  # fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
+  fesnaps = change_index_map(TrivialIndexMap,fesnaps)
 
-  reduced_fe_space(rbsolver,feop,fesnaps)
+  # reduced_fe_space(rbsolver,feop,fesnaps)
 
-  # rbop = reduced_operator(rbsolver,feop,fesnaps)
+  rbop = reduced_operator(rbsolver,feop,fesnaps)
   # save(test_dir,fesnaps)
   # save(test_dir,rbop)
 end

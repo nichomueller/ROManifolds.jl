@@ -16,7 +16,6 @@ function empirical_interpolation!(cache,A::AbstractMatrix)
     end
   end
   Ai = view(A,I,:)
-  println(norm(Ai))
   return I,Ai
 end
 

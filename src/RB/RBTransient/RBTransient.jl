@@ -40,7 +40,6 @@ import PartitionedArrays: tuple_of_arrays
 
 export AbstractTransientSnapshots
 export TransientBasicSnapshots
-export TransientSnapshots
 export TransientSparseSnapshots
 export UnfoldingTransientSnapshots
 export ModeTransientSnapshots

@@ -83,8 +83,7 @@ function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix)
 end
 
 function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
-  C = cholesky(X)
-  L,p = sparse(C.L),C.p
+  L,p = _cholesky_decomp(X)
   XM = L'*M[p,:]
   MXM = XM'*XM
   _,Σr,Vr = truncated_svd(red_style,MXM;issquare=true)
@@ -107,11 +106,10 @@ function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix)
 end
 
 function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
-  C = cholesky(X)
-  L,p = sparse(C.L),C.p
+  L,p = _cholesky_decomp(X)
   XM = L'*M[p,:]
-  MXM = XM*XM'
-  Ũr,Σr,_ = truncated_svd(red_style,MXM;issquare=true)
+  XMX = XM*XM'
+  Ũr,Σr,_ = truncated_svd(red_style,XMX;issquare=true)
   Ur = (L'\Ũr)[invperm(p),:]
   Vr = Ur'*XM
   @inbounds for i = axes(Ur,2)
@@ -122,14 +120,13 @@ end
 
 function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3}) where T
   M = reshape(A,size(A,1)*size(A,2),:)
-  Ur,Σr,Vr = truncated_svd(red_style,M)
+  Ur,Σr,Vr = tpod(red_style,M)
   core = reshape(Ur,size(A,1),size(A,2),:)
   remainder = Σr.*Vr'
   return core,remainder
 end
 
 function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
-  perm = (2,1,3)
   prev_rank = size(A,1)
   cur_size = size(A,2)
 
@@ -137,17 +134,32 @@ function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractS
 
   XA = _tt_mul(L,p,A)
   XM = reshape(XA,:,size(XA,3))
-  Ũr,Σr,Vr = truncated_svd(red_style,XM)
-  c̃ = reshape(Ũr,size(XA,1),size(XA,2),:)
-  core = _tt_div(L,p,c̃)
-  remainder = Σr.*Vr'
+
+  if _size_cond(XM)
+    @check size(XM,2) > size(XM,1)
+    XMX = XM*XM'
+    Ũr,Σr,_ = truncated_svd(red_style,XMX;issquare=true)
+    c̃ = reshape(Ũr,prev_rank,cur_size,:)
+    core = _tt_div(L,p,c̃)
+    Ur = reshape(core,:,size(core,3))
+    Vrt = Ur'*XM
+    @inbounds for i = axes(Ur,2)
+      Vrt[:,i] /= Σr[i]+eps()
+    end
+    remainder = Σr.*Vrt
+  else
+    Ũr,Σr,Vr = standard_tpod(red_style,XM)
+    c̃ = reshape(Ũr,prev_rank,cur_size,:)
+    core = _tt_div(L,p,c̃)
+    remainder = Σr.*Vr'
+  end
 
   return core,remainder
 end
 
 function _tt_mul(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
-  @check size(L,2) == size(A,2)
-  B = similar(A,T,(size(A,1),size(L,1),size(A,3)))
+  @check size(L,1) == size(L,2) == size(A,2)
+  B = similar(A)
   Ap = A[:,p,:]
   @inbounds for i1 in axes(B,1)
     B[i1,:,:] = L'*Ap[i1,:,:]
