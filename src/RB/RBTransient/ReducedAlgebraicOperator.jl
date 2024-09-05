@@ -77,6 +77,15 @@ function RBSteady.reduce_operator(
 end
 
 function RBSteady.compress_core(
+  a::SparseCore{T},
+  btrial::AbstractArray{S,3},
+  btest::AbstractArray{S,3},
+  combine::Function) where {T,S}
+
+  compress_core(a,btrial,btest)
+end
+
+function RBSteady.compress_core(
   a::AbstractArray{T,3},
   btrial::AbstractArray{S,3},
   btest::AbstractArray{S,3},

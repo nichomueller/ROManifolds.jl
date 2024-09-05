@@ -108,8 +108,8 @@ function compute_error(
 end
 
 function compute_relative_error(sol::AbstractArray,sol_approx::AbstractArray,args...)
-  err_norm = induced_norm(soli-soli_approx,args...)
-  sol_norm = induced_norm(soli,args...)
+  err_norm = induced_norm(sol-sol_approx,args...)
+  sol_norm = induced_norm(sol,args...)
   rel_norm = err_norm / sol_norm
   return rel_norm
 end

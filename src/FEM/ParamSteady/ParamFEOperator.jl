@@ -42,7 +42,7 @@ IndexMaps.get_index_map(op::ParamFEOperator) = @abstractmethod
 get_vector_index_map(op::ParamFEOperator) = get_vector_index_map(get_index_map(op))
 get_matrix_index_map(op::ParamFEOperator) = get_matrix_index_map(get_index_map(op))
 
-function assemble_matrix_from_form(op::ParamFEOperator,form::Function)
+function FESpaces.assemble_matrix(op::ParamFEOperator,form::Function)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
   _assemble_matrix(form,trial,test)

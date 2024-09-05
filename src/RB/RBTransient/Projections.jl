@@ -86,23 +86,14 @@ RBSteady.get_cores_space(a::TransientTTSVDCores) = a.cores_space
 get_core_time(a::TransientTTSVDCores) = a.core_time
 
 RBSteady.get_basis_space(a::TransientTTSVDCores) = cores2basis(get_index_map(a),get_cores_space(a)...)
-RBSteady.num_space_dofs(a::TransientTTSVDCores) = prod(_num_tot_space_dofs(a))
+RBSteady.num_space_dofs(a::TransientTTSVDCores) = prod(num_space_dofs.(get_cores_space(a)))
+RBSteady.num_reduced_space_dofs(a::TransientTTSVDCores) = size(last(get_cores_space(a)),3)
+
 get_basis_time(a::TransientTTSVDCores) = cores2basis(get_core_time(a))
 ParamDataStructures.num_times(a::TransientTTSVDCores) = size(get_core_time(a),2)
 num_reduced_times(a::TransientTTSVDCores) = size(get_core_time(a),3)
 
 RBSteady.num_reduced_dofs(a::TransientTTSVDCores) = num_reduced_times(a)
-
-_num_tot_space_dofs(a::TransientTTSVDCores{3}) = size.(get_cores_space(a),2)
-
-function _num_tot_space_dofs(a::TransientTTSVDCores{4})
-  scores = get_cores_space(a)
-  tot_ndofs = zeros(Int,2,length(scores))
-  @inbounds for i = eachindex(scores)
-    tot_ndofs[:,i] .= size(scores[i],2),size(scores[i],3)
-  end
-  return tot_ndofs
-end
 
 get_basis_spacetime(a::TransientTTSVDCores{3}) = get_basis_spacetime(get_index_map(a),get_cores(a)...)
 

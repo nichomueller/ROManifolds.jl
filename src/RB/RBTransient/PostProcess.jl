@@ -68,9 +68,9 @@ function RBSteady.deserialize_pg_operator(feop::TransientParamFEOperatorWithTria
   return TransientPGOperator(op,trial,test)
 end
 
-function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...;kwargs...)
+function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...)
   feop = ParamSteady.get_fe_operator(op)
-  rb_results(solver,feop,args...;kwargs...)
+  rb_results(solver,feop,args...)
 end
 
 function Utils.compute_error(

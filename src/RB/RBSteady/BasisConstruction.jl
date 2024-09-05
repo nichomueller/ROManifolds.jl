@@ -43,9 +43,11 @@ function truncated_svd(red_style::SearchSVDRank,M::AbstractMatrix;issquare=false
   return U[:,1:rank],S[1:rank],V[:,1:rank]
 end
 
-function truncated_svd(red_style::FixedSVDRank,M::AbstractMatrix;kwargs...)
+function truncated_svd(red_style::FixedSVDRank,M::AbstractMatrix;issquare=false)
   rank = red_style.rank
-  return tsvd(M,rank)
+  Ur,Sr,Vr = tsvd(M,rank)
+  if issquare Sr = sqrt.(Sr) end
+  return Ur,Sr,Vr
 end
 
 function tpod(red_style::ReductionStyle,M::AbstractMatrix,args...)
@@ -219,6 +221,18 @@ function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRankTe
   R = orthogonalize!(cores,X)
   A_d = absorb(cat(remainders_k...;dims=1),R)
   return cores,A_d
+end
+
+function projection(
+  red::TTSVDReduction,
+  A::MultiValueSnapshots{T,N},
+  X::AbstractRankTensor) where {T,N}
+
+  red_style = ReductionStyle(red)
+  cores,remainder = ttsvd(red_style,A,X)
+  core_c,remainder_c = RBSteady.ttsvd_loop(red_style[N-1],remainder)
+  push!(cores,core_c)
+  return cores
 end
 
 function pivoted_qr(A;tol=1e-10)

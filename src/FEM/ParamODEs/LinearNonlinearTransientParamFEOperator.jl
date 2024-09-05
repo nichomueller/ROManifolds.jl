@@ -77,10 +77,10 @@ function ParamDataStructures.realization(op::LinearNonlinearTransientParamFEOper
   realization(op.op_linear;kwargs...)
 end
 
-function ParamSteady.assemble_matrix_from_form(op::LinearNonlinearTransientParamFEOperator,form::Function)
+function FESpaces.assemble_matrix(op::LinearNonlinearTransientParamFEOperator,form::Function)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
   @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
-  assemble_matrix_from_form(op.op_linear,form)
+  assemble_matrix(op.op_linear,form)
 end
 
 function ParamSteady.join_operators(

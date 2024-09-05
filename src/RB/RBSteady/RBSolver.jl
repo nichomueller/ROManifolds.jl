@@ -39,7 +39,7 @@ end
 FixedTTSVDRanks(rank::Float64,N=3) = FixedTTSVDRanks(fill(rank,N))
 
 Base.size(r::FixedTTSVDRanks) = (length(r.ranks),)
-Base.getindex(r::FixedTTSVDRanks,i::Integer) = FixedTTSVDRanks(r.ranks[i])
+Base.getindex(r::FixedTTSVDRanks,i::Integer) = FixedSVDRank(r.ranks[i])
 
 abstract type NormStyle end
 
@@ -193,7 +193,7 @@ ParamDataStructures.num_params(r::MDEIMReduction) = num_params(get_reduction(r))
 num_online_params(r::MDEIMReduction) = r.nparams_test
 
 """
-    struct RBSolver{S,M} end
+    struct RBSolver{A,B,C,D} end
 
 Wrapper around a FE solver (e.g. [`FESolver`](@ref) or [`ODESolver`](@ref)) with
 additional information on the reduced basis (RB) method employed to solve a given
@@ -231,7 +231,7 @@ struct RBSolver{A,B,C,D}
     state_reduction::B,
     residual_reduction::C,
     jacobian_reduction::D
-    ) where {A,B<:AbstractReduction,C<:AbstractReduction,D<:AbstractReduction}
+    ) where {A,B,C,D}
 
     @check num_online_params(residual_reduction) == num_online_params(jacobian_reduction)
     new{A,B,C,D}(fesolver,state_reduction,residual_reduction,jacobian_reduction)
@@ -242,7 +242,7 @@ struct RBSolver{A,B,C,D}
     state_reduction::B,
     residual_reduction::C,
     jacobian_reduction::D
-    ) where {A,B<:AbstractReduction,C<:AbstractReduction,D<:Tuple{Vararg{AbstractReduction}}}
+    ) where {A,B,C,D<:Tuple}
 
     nparams = num_online_params(first(jacobian_reduction))
     @check all(num_online_params.(jacobian_reduction) .== nparams)

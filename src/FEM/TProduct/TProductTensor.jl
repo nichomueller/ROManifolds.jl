@@ -33,7 +33,7 @@ end
 get_decomposition(a::GenericRankTensor,k::Integer) = a.decompositions[k]
 get_factor(a::GenericRankTensor,d::Integer,k::Integer) = get_factor(get_decomposition(a,k),d)
 
-function _sort!(a::AbstractVector{<:AbstractVector},i::NTuple{1,<:TProductIndexMap})
+function _sort!(a::AbstractVector{<:AbstractVector},i::Tuple{<:TProductIndexMap})
   irow, = i
   irow1d = IndexMaps.get_univariate_indices(irow)
   for (i,(ai,irowi)) in enumerate(zip(a,irow1d))
@@ -41,7 +41,7 @@ function _sort!(a::AbstractVector{<:AbstractVector},i::NTuple{1,<:TProductIndexM
   end
 end
 
-function _sort!(a::AbstractVector{<:AbstractMatrix},i::NTuple{2,<:TProductIndexMap})
+function _sort!(a::AbstractVector{<:AbstractMatrix},i::Tuple{<:TProductIndexMap,<:TProductIndexMap})
   irow,icol = i
   irow1d = IndexMaps.get_univariate_indices(irow)
   icol1d = IndexMaps.get_univariate_indices(icol)

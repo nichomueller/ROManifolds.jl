@@ -318,10 +318,46 @@ function get_indexed_values(s::ReshapedSnapshots)
   ConsecutiveArrayOfArrays(vr)
 end
 
-const StandardSparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = GenericSnapshots{T,N,L,D,I,R,A}
-const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
-  StandardSparseSnapshots{T,N,L,D,I,R,A},
-  SnapshotsAtIndices{T,N,L,D,I,R,StandardSparseSnapshots{T,N,L,D,I,R,A}}
+const MultiValueGenericSnapshots{T,N,L,D,R,A} = Union{
+  GenericSnapshots{T,N,L,D,<:AbstractMultiValueIndexMap{D},R,A},
+  SnapshotsAtIndices{T,N,L,D,<:AbstractMultiValueIndexMap{D},R,A}
+}
+
+const MultiValueSparseSnapshots{T,N,L,D,R} = Union{
+  GenericSnapshots{T,N,L,D,<:MultiValueSparseIndexMap{D},R,<:ParamSparseMatrix},
+  SnapshotsAtIndices{T,N,L,D,<:MultiValueSparseIndexMap{D},R,<:ParamSparseMatrix}
+}
+
+const MultiValueSnapshots{T,N,L,D,R,A} = Union{
+  MultiValueGenericSnapshots{T,N,L,D,R,A},
+  MultiValueSparseSnapshots{T,N,L,D,R},
+}
+
+TensorValues.num_components(s::MultiValueSnapshots) = num_components(get_index_map(i))
+
+function IndexMaps.get_component(s::MultiValueSnapshots,args...;kwargs...)
+  i′ = get_component(get_index_map(s),args...;kwargs...)
+  return Snapshots(get_values(s),i′,get_realization(s))
+end
+
+function IndexMaps.split_components(s::MultiValueSnapshots)
+  i′ = split_components(get_index_map(s))
+  return Snapshots(get_values(s),i′,get_realization(s))
+end
+
+function IndexMaps.merge_components(s::MultiValueSnapshots)
+  i′ = merge_components(get_index_map(s))
+  return Snapshots(get_values(s),i′,get_realization(s))
+end
+
+const GenericSparseSnapshots{T,N,L,D,R} = Union{
+  GenericSnapshots{T,N,L,D,<:SparseIndexMap{D},R,<:ParamSparseMatrix},
+  SnapshotsAtIndices{T,N,L,D,<:SparseIndexMap{D},R,<:ParamSparseMatrix}
+}
+
+const SparseSnapshots{T,N,L,D,R} = Union{
+  GenericSparseSnapshots{T,N,L,D,R},
+  MultiValueSparseSnapshots{T,N,L,D,R}
 }
 
 """

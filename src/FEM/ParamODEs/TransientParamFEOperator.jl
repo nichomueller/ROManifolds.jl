@@ -52,7 +52,7 @@ IndexMaps.get_index_map(op::TransientParamFEOperator) = @abstractmethod
 ParamSteady.get_vector_index_map(op::TransientParamFEOperator) = get_vector_index_map(get_index_map(op))
 ParamSteady.get_matrix_index_map(op::TransientParamFEOperator) = get_matrix_index_map(get_index_map(op))
 
-function ParamSteady.assemble_matrix_from_form(op::TransientParamFEOperator,form::Function)
+function FESpaces.assemble_matrix(op::TransientParamFEOperator,form::Function)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
   ParamSteady._assemble_matrix(form,trial,test)

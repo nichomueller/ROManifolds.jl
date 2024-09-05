@@ -49,6 +49,19 @@ function permute_sparsity(a::SparsityPatternCSC,i::AbstractArray,j::AbstractArra
   permute_sparsity(a,vec(i),vec(j))
 end
 
+struct MultiValueSparsityPatternCSC{Tv,Ti} <: SparsityPattern
+  matrix::SparseMatrixCSC{Tv,Ti}
+  ncomps::Int
+end
+
+get_sparsity(a::MultiValueSparsityPatternCSC) = a
+num_rows(a::MultiValueSparsityPatternCSC) = size(a.matrix,1)
+num_cols(a::MultiValueSparsityPatternCSC) = size(a.matrix,2)
+SparseArrays.findnz(a::MultiValueSparsityPatternCSC) = findnz(a.matrix)
+SparseArrays.nnz(a::MultiValueSparsityPatternCSC) = nnz(a.matrix)
+get_nonzero_indices(a::MultiValueSparsityPatternCSC) = get_nonzero_indices(a.matrix)
+TensorValues.num_components(a::MultiValueSparsityPatternCSC) = a.ncomps
+
 """
 """
 struct TProductSparsityPattern{A,B} <: SparsityPattern
