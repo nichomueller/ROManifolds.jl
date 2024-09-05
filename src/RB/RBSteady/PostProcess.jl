@@ -139,20 +139,18 @@ function Base.show(io::IO,r::RBResults)
   show(io,MIME"text/plain"(),r)
 end
 
-function rb_results(solver::RBSolver,feop,s,son_approx)
+function rb_results(solver::RBSolver,feop,s,son_approx,fe_stats,rb_stats)
+  state_red = get_state_reduction(solver)
+  norm_style = NormStyle(state_red)
   son = select_snapshots(s,online_params(solver))
-  error = compute_error(son,son_approx)
+  error = compute_error(norm_style,feop,son,son_approx)
   speedup = compute_speedup(fe_stats,rb_stats)
   RBResults(error,speedup)
 end
 
-function rb_results(solver::RBSolver,feop,s,son_approx,fe_stats,rb_stats)
-  state_red = get_state_reduction(solver)
-  X = assemble_matrix_from_form(feop,get_norm(state_red))
-  son = select_snapshots(s,online_params(solver))
-  error = compute_error(son,son_approx,X)
-  speedup = compute_speedup(fe_stats,rb_stats)
-  RBResults(error,speedup)
+function rb_results(solver::RBSolver,op::RBOperator,args...)
+  feop = ParamSteady.get_fe_operator(op)
+  rb_results(solver,feop,args...)
 end
 
 function get_results_filename(dir)
@@ -161,6 +159,23 @@ end
 
 function DrWatson.save(dir,r::RBResults)
   serialize(get_results_filename(dir),r)
+end
+
+function Utils.compute_error(norm_style::EnergyNorm,feop,son,son_approx)
+  X = assemble_matrix_from_form(feop,get_norm(norm_style))
+  compute_error(son,son_approx,X)
+end
+
+function Utils.compute_error(norm_style::EuclideanNorm,feop,son,son_approxs)
+  compute_error(son,son_approx)
+end
+
+function Utils.compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots)
+  @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
+  active_block_ids = get_touched_blocks(sol)
+  block_map = BlockMap(size(sol),active_block_ids)
+  errors = [compute_error(sol[i],sol_approx[i]) for i in active_block_ids]
+  return_cache(block_map,errors...)
 end
 
 function Utils.compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)

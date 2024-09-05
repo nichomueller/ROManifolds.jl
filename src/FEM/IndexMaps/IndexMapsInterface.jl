@@ -356,9 +356,6 @@ struct SparseIndexMap{D,Ti,A<:AbstractIndexMap{D,Ti},B<:TProductSparsityPattern}
   sparsity::B
 end
 
-const FixedDofsSparseIndexMap{D,Ti,A<:FixedDofsIndexMap{D,Ti},B} = SparseIndexMap{D,Ti,A,B}
-get_fixed_dofs(i::FixedDofsSparseIndexMap) = get_fixed_dofs(i.indices)
-
 Base.size(i::SparseIndexMap) = size(i.indices)
 Base.getindex(i::SparseIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::SparseIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
@@ -373,4 +370,20 @@ function inv_index_map(i::SparseIndexMap)
   invi = IndexMap(reshape(sortperm(vec(i.indices)),size(i)))
   invi_sparse = IndexMap(reshape(sortperm(vec(i.indices_sparse)),size(i)))
   SparseIndexMap(invi,invi_sparse,i.sparsity)
+end
+
+const MultiValueSparseIndexMap{D,Ti,A<:AbstractMultiValueIndexMap{D,Ti},B} = SparseIndexMap{D,Ti,A,B}
+
+Base.view(i::MultiValueSparseIndexMap,locations) = MultiValueIndexMapView(i,locations)
+
+function get_component(i::MultiValueSparseIndexMap{D},d;multivalue=true) where D
+  ncomps = num_components(i)
+  indices = collect(selectdim(i,D,d))
+  !multivalue && _to_scalar_values!(indices,ncomps,d)
+  IndexMap(indices)
+end
+
+function split_components(i::MultiValueSparseIndexMap{D}) where D
+  indices = collect(eachslice(i;dims=D))
+  IndexMaps.(indices)
 end

@@ -39,7 +39,7 @@ export MultiValueIndexMap
 export MultiValueIndexMapView
 export TProductIndexMap
 export SparseIndexMap
-export FixedDofsSparseIndexMap
+export MultiValueSparseIndexMap
 export get_index_map
 export inv_index_map
 export free_dofs_map

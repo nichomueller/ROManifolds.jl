@@ -1,8 +1,13 @@
 function IndexMaps.recast(i::SparseIndexMap,a::AbstractVector{<:AbstractArray{T,3}}) where T
   us = IndexMaps.get_univariate_sparsity(i)
-  @check length(us) == length(a)
-  asparse = map(SparseCore,a,us)
-  return asparse
+  @check length(us) ≤ length(a)
+  if length(us) == length(a)
+    return map(SparseCore,a,us)
+  else
+    asparse = map(i ->SparseCore(a[i],us[i]),eachindex(us))
+    afull = a[length(us)+1:end]
+    return [asparse...,afull...]
+  end
 end
 
 """
@@ -19,9 +24,7 @@ abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
 """
     abstract type SparseCore{T,N} <: AbstractTTCore{T,N} end
 
-Tensor train cores for sparse matrices. In contrast with standard (3-D) tensor train
-cores, a SparseCore is a 4-D array. Information on the sparsity pattern of the matrices must
-be provided for indexing purposes.
+Tensor train cores for sparse matrices.
 
 Subtypes:
 - [`SparseCoreCSC`](@ref)
@@ -34,41 +37,24 @@ function _cores2basis(a::SparseCore{S},b::SparseCore{T}) where {S,T}
 end
 
 """
-    struct SparseCoreCSC{T,Ti} <: SparseCore{T,4} end
+    struct SparseCoreCSC{T,Ti} <: SparseCore{T,3} end
 
 Tensor train cores for sparse matrices in CSC format
 
 """
-struct SparseCoreCSC{T,Ti} <: SparseCore{T,4}
+struct SparseCoreCSC{T,Ti} <: SparseCore{T,3}
   array::Array{T,3}
   sparsity::SparsityPatternCSC{T,Ti}
-  sparse_indexes::Vector{CartesianIndex{2}}
 end
 
-function SparseCore(
-  array::AbstractArray{T},
-  sparsity::SparsityPatternCSC{T}) where T
-
-  irows,icols,_ = findnz(sparsity)
-  SparseCoreCSC(array,sparsity,CartesianIndex.(irows,icols))
+function SparseCore(array::Array{T,3},sparsity::SparsityPatternCSC{T}) where T
+  SparseCoreCSC(array,sparsity)
 end
 
-Base.size(a::SparseCoreCSC) = (size(a.array,1),IndexMaps.num_rows(a.sparsity),
-  IndexMaps.num_cols(a.sparsity),size(a.array,3))
+Base.size(a::SparseCoreCSC) = size(a.array)
+Base.getindex(a::SparseCoreCSC,i::Vararg{Integer,3}) = getindex(a.array,i...)
 
-function Base.getindex(a::SparseCoreCSC,i::Vararg{Integer,4})
-  if CartesianIndex(i[2:3]) ∈ a.sparse_indexes
-    core_getindex(a,i...)
-  else
-    zero(eltype(a))
-  end
-end
-
-function core_getindex(a::SparseCoreCSC{T},i::Vararg{Integer,4}) where T
-  i2 = findfirst(a.sparse_indexes .== [CartesianIndex(i[2:3])])
-  i1,i3 = i[1],i[4]
-  getindex(a.array,i1,i2,i3)
-end
+num_space_dofs(a::SparseCoreCSC) = IndexMaps.num_rows(a.sparsity)*IndexMaps.num_cols(a.sparsity)
 
 # block cores
 
@@ -224,11 +210,6 @@ function cores2basis(core::AbstractArray{T,3}) where T
   return reshape(pcore,size(pcore,1),:)
 end
 
-function cores2basis(core::SparseCoreCSC{T}) where T
-  pcore = permutedims(core,(2,3,1,4))
-  return reshape(pcore,size(pcore,1)*size(pcore,2),:)
-end
-
 function _cores2basis(a::AbstractArray{S,3},b::AbstractArray{T,3}) where {S,T}
   @check size(a,3) == size(b,1)
   TS = promote_type(T,S)
@@ -288,13 +269,12 @@ function _cores2basis(
   b::SparseCoreCSC{T}
   ) where {S,T}
 
-  @check size(a,4) == size(b,1)
+  @check size(a,3) == size(b,1)
   Is = get_sparse_index_map(I)
   TS = promote_type(T,S)
-  nrows = size(a,2)*size(b,2)
-  ncols = size(a,3)*size(b,3)
-  ab = zeros(TS,size(a,1),nrows*ncols,size(b,4))
-  _cores2basis!(ab,Is,a,b)
+  ndofs = num_space_dofs(a)*num_space_dofs(b)
+  ab = zeros(TS,size(a,1),ndofs,size(b,3))
+  _sparse_cores2basis!(ab,Is,a,b)
   return ab
 end
 
@@ -305,34 +285,33 @@ function _cores2basis(
   c::SparseCoreCSC{U}
   ) where {S,T,U}
 
-  @check size(a,4) == size(b,1) && size(b,4) == size(c,1)
+  @check size(a,3) == size(b,1) && size(b,3) == size(c,1)
   Is = get_sparse_index_map(I)
   TSU = promote_type(T,S,U)
-  nrows = size(a,2)*size(b,2)*size(c,2)
-  ncols = size(a,3)*size(b,3)*size(c,3)
-  abc = zeros(TSU,size(a,1),nrows*ncols,size(c,4))
-  _cores2basis!(abc,Is,a,b,c)
+  ndofs = num_space_dofs(a)*num_space_dofs(b)*num_space_dofs(c)
+  abc = zeros(TSU,size(a,1),ndofs,size(c,3))
+  _sparse_cores2basis!(abc,Is,a,b,c)
   return abc
 end
 
-function _cores2basis!(ab,I::AbstractIndexMap,a,b)
+function _sparse_cores2basis!(ab,I::AbstractIndexMap,a,b)
   vI = vec(I)
-  for i = axes(a,1), j = axes(b,4)
-    for α = axes(a,4)
+  for i = axes(a,1), j = axes(b,3)
+    for α = axes(a,3)
       @inbounds cache = ab[i,vI,j]
-      _kronadd!(cache,b.array[α,:,j],a.array[i,:,α])
+      _kronadd!(cache,b[α,:,j],a[i,:,α])
       @inbounds ab[i,vI,j] = cache
     end
   end
   return ab
 end
 
-function _cores2basis!(abc,I::AbstractIndexMap,a,b,c)
+function _sparse_cores2basis!(abc,I::AbstractIndexMap,a,b,c)
   vI = vec(I)
-  for i = axes(a,1), j = axes(c,4)
-    for α = axes(a,4), β = axes(b,4)
+  for i = axes(a,1), j = axes(c,3)
+    for α = axes(a,3), β = axes(b,3)
       @inbounds cache = ab[i,vI,j]
-      _kronadd!(cache,c.array[β,:,j],b.array[α,:,β],a.array[i,:,α])
+      _kronadd!(cache,c[β,:,j],b[α,:,β],a[i,:,α])
       @inbounds abc[i,vI,j] = cache
     end
   end
@@ -341,22 +320,22 @@ end
 
 # Fixed dofs
 
-function _cores2basis!(ab,I::FixedDofsIndexMap,a,b)
+function _sparse_cores2basis!(ab,I::FixedDofsIndexMap,a,b)
   nz_indices = findall(I[:].!=0)
-  for i = axes(a,1), j = axes(b,4)
-    for α = axes(a,4)
-      @inbounds @views ab[i,vec(I),j] += kron(b.array[α,:,j],a.array[i,:,α]
+  for i = axes(a,1), j = axes(b,3)
+    for α = axes(a,e)
+      @inbounds @views ab[i,vec(I),j] += kron(b[α,:,j],a[i,:,α]
         )[nz_indices]
     end
   end
   return ab
 end
 
-function _cores2basis!(abc,I::FixedDofsIndexMap,a,b,c)
+function _sparse_cores2basis!(abc,I::FixedDofsIndexMap,a,b,c)
   nz_indices = findall(I[:].!=0)
-  for i = axes(a,1), j = axes(c,4)
-    for α = axes(a,4), β = axes(b,4)
-      @inbounds @views abc[i,vec(I),j] += kron(c.array[β,:,j],b.array[α,:,β],a.array[i,:,α]
+  for i = axes(a,1), j = axes(c,3)
+    for α = axes(a,3), β = axes(b,3)
+      @inbounds @views abc[i,vec(I),j] += kron(c[β,:,j],b[α,:,β],a[i,:,α]
         )[nz_indices]
     end
   end
@@ -386,17 +365,17 @@ function compress_core(a::AbstractArray{T,3},btest::AbstractArray{S,3}) where {T
   return ab
 end
 
-function compress_core(a::SparseCore{T},btrial::AbstractArray{S,3},btest::AbstractArray{S,3},args...) where {T,S}
+function compress_core(a::SparseCore{T},btrial::AbstractArray{S,3},btest::AbstractArray{S,3}) where {T,S}
   TS = promote_type(T,S)
-  ra_prev,ra = size(a,1),size(a,4)
+  ra_prev,ra = size(a,1),size(a,3)
   rU_prev,rU = size(btrial,1),size(btrial,3)
   rV_prev,rV = size(btest,1),size(btest,3)
   bab = zeros(TS,rV_prev,ra_prev,rU_prev,rV,ra,rU)
-  w = zeros(TS,size(a,2))
+  w = zeros(TS,IndexMaps.num_rows(a.sparsity))
   for ibU1 = 1:rU_prev
     @inbounds bU′ = btrial[ibU1,:,:]
     for ia1 = 1:ra_prev
-      @inbounds a′ = a.array[ia1,:,:]
+      @inbounds a′ = a[ia1,:,:]
       for ibU3 = 1:rU
         @inbounds bU′′ = bU′[:,ibU3]
         for ia3 = 1:ra
@@ -548,15 +527,6 @@ function empirical_interpolation!(cache,C::AbstractArray{T,3}) where T
   return I,Ai
 end
 
-function empirical_interpolation!(cache,C::SparseCore)
-  @check size(C,1) == 1
-  c...,Iv = cache
-  A = dropdims(C.array;dims=1)
-  I,Ai = empirical_interpolation!(c,A)
-  push!(Iv,copy(I))
-  return I,Ai
-end
-
 function _global_index(i,local_indices::Vector{Vector{Int32}})
   Iprev...,Ig = local_indices
   if length(Iprev) == 0
@@ -610,14 +580,10 @@ function _eim_cache(C::AbstractArray{T,3}) where T
   return C,I,res,Iv
 end
 
-_eim_cache(C::SparseCore) = _eim_cache(C.array)
-
 function _next_core(Aprev::AbstractMatrix{T},Cnext::AbstractArray{T,3}) where T
   Cprev = reshape(Aprev,1,size(Aprev)...)
   _cores2basis(Cprev,Cnext)
 end
-
-_next_core(Aprev::AbstractMatrix{T},Cnext::SparseCore{T}) where T = _next_core(Aprev,Cnext.array)
 
 function empirical_interpolation(index_map::AbstractIndexMap,cores::AbstractArray...)
   C,I,res,Iv = _eim_cache(first(cores))

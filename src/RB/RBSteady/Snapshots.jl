@@ -318,11 +318,19 @@ function get_indexed_values(s::ReshapedSnapshots)
   ConsecutiveArrayOfArrays(vr)
 end
 
-const MultiValueGenericSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = GenericSnapshots{T,N,L,D,I,R,A}
-const MultiValueSnapshotsAtIndices{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A,B} = SnapshotsAtIndices{T,N,L,D,I,R,A,B}
-const MultiValueSnapshots{T,N,L,D,I<:AbstractMultiValueIndexMap{D},R,A} = Union{
-  MultiValueGenericSnapshots{T,N,L,D,I,R,A},
-  MultiValueSnapshotsAtIndices{T,N,L,D,I,R,A}
+const MultiValueGenericSnapshots{T,N,L,D,R,A} = Union{
+  GenericSnapshots{T,N,L,D,<:AbstractMultiValueIndexMap{D},R,A},
+  SnapshotsAtIndices{T,N,L,D,<:AbstractMultiValueIndexMap{D},R,A}
+}
+
+const MultiValueSparseSnapshots{T,N,L,D,R} = Union{
+  GenericSnapshots{T,N,L,D,<:MultiValueSparseIndexMap{D},R,<:ParamSparseMatrix},
+  SnapshotsAtIndices{T,N,L,D,<:MultiValueSparseIndexMap{D},R,<:ParamSparseMatrix}
+}
+
+const MultiValueSnapshots{T,N,L,D,R,A} = Union{
+  MultiValueGenericSnapshots{T,N,L,D,R,A},
+  MultiValueSparseSnapshots{T,N,L,D,R},
 }
 
 TensorValues.num_components(s::MultiValueSnapshots) = num_components(get_index_map(i))
@@ -342,11 +350,14 @@ function IndexMaps.merge_components(s::MultiValueSnapshots)
   return Snapshots(get_values(s),i′,get_realization(s))
 end
 
-const SparseSnapshots{T,N,L,D,I,R,A<:MatrixOfSparseMatricesCSC} = Union{
-  GenericSnapshots{T,N,L,D,I,R,A},
-  MultiValueSnapshots{T,N,L,D,I,R,A},
-  SnapshotsAtIndices{T,N,L,D,I,R,<:GenericSnapshots{T,N,L,D,I,R,A}},
-  SnapshotsAtIndices{T,N,L,D,I,R,<:MultiValueSnapshots{T,N,L,D,I,R,A}}
+const GenericSparseSnapshots{T,N,L,D,R} = Union{
+  GenericSnapshots{T,N,L,D,<:SparseIndexMap{D},R,<:ParamSparseMatrix},
+  SnapshotsAtIndices{T,N,L,D,<:SparseIndexMap{D},R,<:ParamSparseMatrix}
+}
+
+const SparseSnapshots{T,N,L,D,R} = Union{
+  GenericSparseSnapshots{T,N,L,D,R},
+  MultiValueSparseSnapshots{T,N,L,D,R}
 }
 
 """

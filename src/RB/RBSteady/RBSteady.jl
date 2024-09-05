@@ -40,6 +40,7 @@ import PartitionedArrays: tuple_of_arrays
 export AbstractSnapshots
 export GenericSnapshots
 export SnapshotsAtIndices
+export MultiValueSnapshots
 export SparseSnapshots
 export UnfoldingSteadySnapshots
 export BlockSnapshots

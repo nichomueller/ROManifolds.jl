@@ -19,9 +19,10 @@ function RBSteady.projection(
 
   red_style = ReductionStyle(red)
   cores,remainder = ttsvd(red_style,A,X)
-  core_c,remainder_c = RBSteady.ttsvd_loop(red_style[N-2],remainder)
-  core_t,remainder_t = RBSteady.ttsvd_loop(red_style[N-1],remainder_c)
+  core_c,rem_c = RBSteady.ttsvd_loop(red_style[N-2],remainder)
+  core_t,rem_t = RBSteady.ttsvd_loop(red_style[N-1],reshape(rem_c,:,num_times(A),num_params(A)))
   push!(cores,core_c)
+  push!(cores,core_t)
   return cores
 end
 

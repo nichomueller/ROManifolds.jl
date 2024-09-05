@@ -193,7 +193,7 @@ ParamDataStructures.num_params(r::MDEIMReduction) = num_params(get_reduction(r))
 num_online_params(r::MDEIMReduction) = r.nparams_test
 
 """
-    struct RBSolver{S,M} end
+    struct RBSolver{A,B,C,D} end
 
 Wrapper around a FE solver (e.g. [`FESolver`](@ref) or [`ODESolver`](@ref)) with
 additional information on the reduced basis (RB) method employed to solve a given

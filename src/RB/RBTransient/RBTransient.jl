@@ -39,7 +39,8 @@ import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
 
 export AbstractTransientSnapshots
-export TransientBasicSnapshots
+export TransientGenericSnapshots
+export TransientMultiValueSnapshots
 export TransientSparseSnapshots
 export UnfoldingTransientSnapshots
 export ModeTransientSnapshots

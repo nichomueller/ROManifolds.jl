@@ -94,19 +94,10 @@ get_cores(a::TTSVDCores) = a.cores
 get_cores_space(a::TTSVDCores) = a.cores
 
 get_basis_space(a::TTSVDCores) = cores2basis(get_index_map(a),get_cores_space(a)...)
-num_space_dofs(a::TTSVDCores) = prod(_num_tot_space_dofs(a))
+num_space_dofs(a::AbstractArray) = @notimplemented
+num_space_dofs(a::AbstractArray{T,3}) where T = size(a,2)
+num_space_dofs(a::TTSVDCores) = prod(num_space_dofs.(get_cores_space(a)))
 num_reduced_space_dofs(a::TTSVDCores) = size(last(get_cores_space(a)),3)
-
-_num_tot_space_dofs(a::TTSVDCores{3}) = size.(get_cores_space(a),2)
-
-function _num_tot_space_dofs(a::TTSVDCores{4})
-  scores = get_cores_space(a)
-  tot_ndofs = zeros(Int,2,length(scores))
-  @inbounds for i = eachindex(scores)
-    tot_ndofs[:,i] .= size(scores[i],2),size(scores[i],3)
-  end
-  return tot_ndofs
-end
 
 function compress_cores(core::TTSVDCores,basis_test::TTSVDCores)
   ccores = map((a,btest)->compress_core(a,btest),get_cores(core),get_cores(basis_test))
