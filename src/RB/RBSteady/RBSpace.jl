@@ -44,13 +44,13 @@ function reduced_basis(red::AbstractReduction,feop::GridapType,s::AbstractArray)
 end
 
 function reduced_basis(red::AbstractReduction{<:ReductionStyle,EnergyNorm},feop::GridapType,s::AbstractArray)
-  norm_matrix = assemble_matrix_from_form(feop,get_norm(red))
+  norm_matrix = assemble_matrix(feop,get_norm(red))
   reduced_basis(red,s,norm_matrix)
 end
 
 function reduced_basis(red::SupremizerReduction,feop::GridapType,s::AbstractArray)
-  norm_matrix = assemble_matrix_from_form(feop,get_norm(red))
-  supr_matrix = assemble_matrix_from_form(feop,get_supr(red))
+  norm_matrix = assemble_matrix(feop,get_norm(red))
+  supr_matrix = assemble_matrix(feop,get_supr(red))
 
   primal_blocks = get_primal_blocks(red)
   dual_blocks = get_dual_blocks(red)

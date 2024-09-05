@@ -162,7 +162,7 @@ function DrWatson.save(dir,r::RBResults)
 end
 
 function Utils.compute_error(norm_style::EnergyNorm,feop,son,son_approx)
-  X = assemble_matrix_from_form(feop,get_norm(norm_style))
+  X = assemble_matrix(feop,get_norm(norm_style))
   compute_error(son,son_approx,X)
 end
 

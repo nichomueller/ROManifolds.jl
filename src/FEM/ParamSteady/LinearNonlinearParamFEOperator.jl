@@ -86,10 +86,10 @@ function ParamDataStructures.realization(op::LinearNonlinearParamFEOperator;kwar
   realization(op.op_linear;kwargs...)
 end
 
-function assemble_matrix_from_form(op::LinearNonlinearParamFEOperator,form::Function)
+function FESpaces.assemble_matrix(op::LinearNonlinearParamFEOperator,form::Function)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
   @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
-  assemble_matrix_from_form(op.op_linear,form)
+  assemble_matrix(op.op_linear,form)
 end
 
 function join_operators(

@@ -52,7 +52,6 @@ export ParamFEOperator
 export LinearParamFEOperator
 export ParamFEOperatorWithTrian
 export ParamFEOpFromWeakFormWithTrian
-export assemble_matrix_from_form
 export set_triangulation
 export change_triangulation
 include("ParamFEOperator.jl")

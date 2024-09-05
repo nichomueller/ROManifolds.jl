@@ -382,7 +382,7 @@ end
 
 function pod_mdeim_error(solver,feop,op,s)
   state_red = get_state_reduction(solver)
-  X = assemble_matrix_from_form(feop,get_norm(state_red))
+  X = assemble_matrix(feop,get_norm(state_red))
   s′ = flatten_partition(s)
   pod_err = pod_error(get_trial(op),s′,X)
   mdeim_err = mdeim_error(solver,feop,op,s′)
