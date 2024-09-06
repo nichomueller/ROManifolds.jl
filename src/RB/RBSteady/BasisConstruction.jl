@@ -4,7 +4,7 @@ end
 
 function projection(red::PODReduction,A::AbstractArray,args...)
   red_style = ReductionStyle(red)
-  U,Σ,V = tpod(red_style,A,args...)
+  U,S,V = tpod(red_style,A,args...)
   return U
 end
 
@@ -50,6 +50,10 @@ function truncated_svd(red_style::FixedSVDRank,M::AbstractMatrix;issquare=false)
   return Ur,Sr,Vr
 end
 
+function tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
+  tpod(red_style,M,_cholesky_decomp(X)...)
+end
+
 function tpod(red_style::ReductionStyle,M::AbstractMatrix,args...)
   if isa(red_style,SearchSVDRank) && _size_cond(M)
     if size(M,1) > size(M,2)
@@ -66,117 +70,118 @@ function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix)
   truncated_svd(red_style,M)
 end
 
-function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
-  L,p = _cholesky_decomp(X)
+function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
   XM = L'*M[p,:]
-  Ũr,Σr,Vr = truncated_svd(red_style,XM)
+  Ũr,Sr,Vr = truncated_svd(red_style,XM)
   Ur = (L'\Ũr)[invperm(p),:]
-  return Ur,Σr,Vr
+  return Ur,Sr,Vr
 end
 
 function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix)
   MM = M'*M
-  _,Σr,Vr = truncated_svd(red_style,MM;issquare=true)
-  Ur = M*Vr
-  @inbounds for i = axes(Ur,2)
-    Ur[:,i] /= Σr[i]+eps()
-  end
-  return Ur,Σr,Vr
+  _,Sr,Vr = truncated_svd(red_style,MM;issquare=true)
+  Ur = (M*Vr)*inv(Diagonal(Sr).+eps())
+  return Ur,Sr,Vr
 end
 
-function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
-  L,p = _cholesky_decomp(X)
+function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
   XM = L'*M[p,:]
   MXM = XM'*XM
-  _,Σr,Vr = truncated_svd(red_style,MXM;issquare=true)
-  Ũr = XM*Vr
-  @inbounds for i = axes(Ũr,2)
-    Ũr[:,i] /= Σr[i]+eps()
-  end
+  _,Sr,Vr = truncated_svd(red_style,MXM;issquare=true)
+  Ũr = (XM*Vr)*inv(Diagonal(Sr).+eps())
   Ur = (L'\Ũr)[invperm(p),:]
-  return Ur,Σr,Vr
+  return Ur,Sr,Vr
 end
 
 function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix)
   MM = M*M'
-  Ur,Σr,_ = truncated_svd(red_style,MM;issquare=true)
-  Vr = Ur'*M
-  @inbounds for i = axes(Ur,2)
-    Vr[:,i] /= Σr[i]+eps()
-  end
-  return Ur,Σr,Vr'
+  Ur,Sr,_ = truncated_svd(red_style,MM;issquare=true)
+  Vr = inv(Diagonal(Sr).+eps())*(Ur'M)
+  return Ur,Sr,Vr'
 end
 
-function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
-  L,p = _cholesky_decomp(X)
+function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
   XM = L'*M[p,:]
-  XMX = XM*XM'
-  Ũr,Σr,_ = truncated_svd(red_style,XMX;issquare=true)
+  MXM = XM*XM'
+  Ũr,Sr,_ = truncated_svd(red_style,MXM;issquare=true)
+  Vr = inv(Diagonal(Sr).+eps())*(Ũr'XM)
   Ur = (L'\Ũr)[invperm(p),:]
-  Vr = Ur'*XM
-  @inbounds for i = axes(Ur,2)
-    Vr[:,i] /= Σr[i]+eps()
-  end
-  return Ur,Σr,Vr'
+  return Ur,Sr,Vr'
 end
 
 function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3}) where T
   M = reshape(A,size(A,1)*size(A,2),:)
-  Ur,Σr,Vr = tpod(red_style,M)
+  Ur,Sr,Vr = tpod(red_style,M)
   core = reshape(Ur,size(A,1),size(A,2),:)
-  remainder = Σr.*Vr'
+  remainder = Sr.*Vr'
   return core,remainder
 end
+
+# function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
+#   prev_rank = size(A,1)
+#   cur_size = size(A,2)
+
+#   L,p = _cholesky_decomp(X)
+
+#   XA = _tt_mul(L,p,A)
+#   XM = reshape(XA,:,size(XA,3))
+
+#   if _size_cond(XM)
+#     @check size(XM,2) > size(XM,1)
+#     XMX = XM*XM'
+#     Ũr,Sr,_ = truncated_svd(red_style,XMX;issquare=true)
+#     c̃ = reshape(Ũr,prev_rank,cur_size,:)
+#     core = _tt_div(L,p,c̃)
+#     Ur = reshape(core,:,size(core,3))
+#     Vrt = Ur'*XM
+#     @inbounds for i = axes(Ur,2)
+#       Vrt[:,i] /= Sr[i]+eps()
+#     end
+#     remainder = Sr.*Vrt
+#   else
+#     Ũr,Sr,Vr = standard_tpod(red_style,XM)
+#     c̃ = reshape(Ũr,prev_rank,cur_size,:)
+#     core = _tt_div(L,p,c̃)
+#     remainder = Sr.*Vr'
+#   end
+
+#   return core,remainder
+# end
 
 function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
   prev_rank = size(A,1)
   cur_size = size(A,2)
+  M = reshape(A,prev_rank*cur_size,:)
 
   L,p = _cholesky_decomp(X)
+  L′ = kron(I(prev_rank),L)
+  p′ = vec(((collect(1:prev_rank).-1)*cur_size .+ p')')
+  println(typeof(p′))
+  Ur,Sr,Vr = tpod(red_style,M,L′,p′)
 
-  XA = _tt_mul(L,p,A)
-  XM = reshape(XA,:,size(XA,3))
-
-  if _size_cond(XM)
-    @check size(XM,2) > size(XM,1)
-    XMX = XM*XM'
-    Ũr,Σr,_ = truncated_svd(red_style,XMX;issquare=true)
-    c̃ = reshape(Ũr,prev_rank,cur_size,:)
-    core = _tt_div(L,p,c̃)
-    Ur = reshape(core,:,size(core,3))
-    Vrt = Ur'*XM
-    @inbounds for i = axes(Ur,2)
-      Vrt[:,i] /= Σr[i]+eps()
-    end
-    remainder = Σr.*Vrt
-  else
-    Ũr,Σr,Vr = standard_tpod(red_style,XM)
-    c̃ = reshape(Ũr,prev_rank,cur_size,:)
-    core = _tt_div(L,p,c̃)
-    remainder = Σr.*Vr'
-  end
-
+  core = reshape(Ur,prev_rank,cur_size,:)
+  remainder = Sr.*Vr'
   return core,remainder
 end
 
-function _tt_mul(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
-  @check size(L,1) == size(L,2) == size(A,2)
-  B = similar(A)
-  Ap = A[:,p,:]
-  @inbounds for i1 in axes(B,1)
-    B[i1,:,:] = L'*Ap[i1,:,:]
-  end
-  return B
-end
+# function _tt_mul(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
+#   @check size(L,1) == size(L,2) == size(A,2)
+#   B = similar(A)
+#   Ap = A[:,p,:]
+#   @inbounds for i1 in axes(B,1)
+#     B[i1,:,:] = L'*Ap[i1,:,:]
+#   end
+#   return B
+# end
 
-function _tt_div(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
-  @check size(L,1) == size(L,2) == size(A,2)
-  B = similar(A)
-  @inbounds for i1 in axes(B,1)
-    B[i1,:,:] = L'\A[i1,:,:]
-  end
-  return B
-end
+# function _tt_div(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
+#   @check size(L,1) == size(L,2) == size(A,2)
+#   B = similar(A)
+#   @inbounds for i1 in axes(B,1)
+#     B[i1,:,:] = L'\A[i1,:,:]
+#   end
+#   return B
+# end
 
 # We are not interested in the last dimension (corresponds to the parameter)
 
