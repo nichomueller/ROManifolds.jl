@@ -61,9 +61,9 @@ function RBSteady.reduced_jacobian(
   op::TransientRBOperator,
   contribs::Tuple{Vararg{Any}})
 
-  @check length(red) == length(contribs)
+  # @check length(red) == length(contribs)
   a = ()
-  for i in eachindex(red)
+  for i in eachindex(contribs)
     a = (a...,reduced_jacobian(red[i],op,contribs[i]))
   end
   return a

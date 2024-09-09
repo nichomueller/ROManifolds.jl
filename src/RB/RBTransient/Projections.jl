@@ -114,9 +114,10 @@ function RBSteady.compress_cores(
   basis_test::TransientTTSVDCores,
   combine::Function)
 
-  ccores = map((a,btrial,btest)->compress_core(a,btrial,btest,combine),
-    get_cores(core),get_cores(basis_trial),get_cores(basis_test))
-  ccore = multiply_cores(ccores...)
+  scores = map((a,btrial,btest)->compress_core(a,btrial,btest),
+    get_cores_space(core),get_cores_space(basis_trial),get_cores_space(basis_test))
+  tcore = compress_core(get_core_time(core),get_core_time(basis_trial),get_core_time(basis_test),combine)
+  ccore = multiply_cores(scores...,tcore)
   RBSteady._dropdims(ccore)
 end
 

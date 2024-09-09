@@ -117,37 +117,6 @@ function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3}) where T
   return core,remainder
 end
 
-# function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
-#   prev_rank = size(A,1)
-#   cur_size = size(A,2)
-
-#   L,p = _cholesky_decomp(X)
-
-#   XA = _tt_mul(L,p,A)
-#   XM = reshape(XA,:,size(XA,3))
-
-#   if _size_cond(XM)
-#     @check size(XM,2) > size(XM,1)
-#     XMX = XM*XM'
-#     Ũr,Sr,_ = truncated_svd(red_style,XMX;issquare=true)
-#     c̃ = reshape(Ũr,prev_rank,cur_size,:)
-#     core = _tt_div(L,p,c̃)
-#     Ur = reshape(core,:,size(core,3))
-#     Vrt = Ur'*XM
-#     @inbounds for i = axes(Ur,2)
-#       Vrt[:,i] /= Sr[i]+eps()
-#     end
-#     remainder = Sr.*Vrt
-#   else
-#     Ũr,Sr,Vr = standard_tpod(red_style,XM)
-#     c̃ = reshape(Ũr,prev_rank,cur_size,:)
-#     core = _tt_div(L,p,c̃)
-#     remainder = Sr.*Vr'
-#   end
-
-#   return core,remainder
-# end
-
 function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
   prev_rank = size(A,1)
   cur_size = size(A,2)
@@ -156,32 +125,12 @@ function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractS
   L,p = _cholesky_decomp(X)
   L′ = kron(I(prev_rank),L)
   p′ = vec(((collect(1:prev_rank).-1)*cur_size .+ p')')
-  println(typeof(p′))
   Ur,Sr,Vr = tpod(red_style,M,L′,p′)
 
   core = reshape(Ur,prev_rank,cur_size,:)
   remainder = Sr.*Vr'
   return core,remainder
 end
-
-# function _tt_mul(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
-#   @check size(L,1) == size(L,2) == size(A,2)
-#   B = similar(A)
-#   Ap = A[:,p,:]
-#   @inbounds for i1 in axes(B,1)
-#     B[i1,:,:] = L'*Ap[i1,:,:]
-#   end
-#   return B
-# end
-
-# function _tt_div(L::AbstractSparseMatrix{T},p::Vector{Int},A::AbstractArray{T,3}) where T
-#   @check size(L,1) == size(L,2) == size(A,2)
-#   B = similar(A)
-#   @inbounds for i1 in axes(B,1)
-#     B[i1,:,:] = L'\A[i1,:,:]
-#   end
-#   return B
-# end
 
 # We are not interested in the last dimension (corresponds to the parameter)
 

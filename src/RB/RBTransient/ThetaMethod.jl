@@ -23,10 +23,11 @@ function Algebra.residual(
     axpy!(dtθ,x,uθ)
     (uθ,x)
   end
+  usx = us(x)
 
-  odeopcache = allocate_ode_spaces(odeop,r,us)
+  odeopcache = allocate_ode_spaces(odeop,r,usx)
   update_odeopcache!(odeopcache,odeop,r)
-  b = residual(odeop,r,us,odeopcache)
+  b = residual(odeop,r,usx,odeopcache)
   shift!(r,dt*(1-θ))
 
   return b
@@ -55,11 +56,12 @@ function Algebra.jacobian(
     axpy!(dtθ,x,uθ)
     (uθ,x)
   end
+  usx = us(x)
   ws = (1,1/dtθ)
 
-  odeopcache = allocate_ode_spaces(odeop,r,us)
+  odeopcache = allocate_ode_spaces(odeop,r,usx)
   update_odeopcache!(odeopcache,odeop,r)
-  A = jacobian(odeop,r,us,ws,odeopcache)
+  A = jacobian(odeop,r,usx,ws,odeopcache)
   shift!(r,dt*(1-θ))
 
   return A

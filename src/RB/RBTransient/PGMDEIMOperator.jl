@@ -138,7 +138,7 @@ function RBSteady.select_cache_at_indices(us::Tuple{Vararg{ConsecutiveArrayOfArr
   @unpack Us,Uts,tfeopcache,const_forms = odeopcache
   new_xhF = ()
   new_Us = ()
-  for i = eachindex(us)
+  for i = eachindex(Us)
     new_Us = (new_Us...,RBSteady.select_fe_space_at_indices(Us[i],indices))
     new_XhF_i = ConsecutiveArrayOfArrays(us[i].data[:,indices])
     new_xhF = (new_xhF...,new_XhF_i)

@@ -70,6 +70,7 @@ function Base.similar(A::ArrayOfArrays{T,N},::Type{<:AbstractArray{T′}}) where
   end
 end
 
+# we don't care about dims
 function Base.similar(A::ArrayOfArrays{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N}
   param_array(param_data(A)) do a
     similar(a,T′)
