@@ -62,8 +62,9 @@ function Base.similar(A::ConsecutiveArrayOfArrays{T,N},::Type{<:AbstractArray{T�
   ConsecutiveArrayOfArrays(similar(A.data,T′))
 end
 
+# we don't care about dims
 function Base.similar(A::ConsecutiveArrayOfArrays{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N}
-  ConsecutiveArrayOfArrays(similar(A.data,T′,dims...,param_length(A)))
+  ConsecutiveArrayOfArrays(similar(A.data,T′))
 end
 
 function Base.copyto!(A::ConsecutiveArrayOfArrays,B::ConsecutiveArrayOfArrays)

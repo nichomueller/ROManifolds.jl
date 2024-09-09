@@ -365,6 +365,41 @@ function compress_core(a::AbstractArray{T,3},btest::AbstractArray{S,3}) where {T
   return ab
 end
 
+function compress_core(
+  a::AbstractArray{T,3},
+  btrial::AbstractArray{S,3},
+  btest::AbstractArray{S,3}
+  ) where {T,S}
+
+  TS = promote_type(T,S)
+  ra_prev,ra = size(a,1),size(a,3)
+  rU_prev,rU = size(btrial,1),size(btrial,3)
+  rV_prev,rV = size(btest,1),size(btest,3)
+  bab = zeros(TS,rV_prev,ra_prev,rU_prev,rV,ra,rU)
+  w = zeros(TS,size(a,2))
+  for ibU1 = 1:rU_prev
+    @inbounds bU′ = btrial[ibU1,:,:]
+    for ia1 = 1:ra_prev
+      @inbounds a′ = a[ia1,:,:]
+      for ibU3 = 1:rU
+        @inbounds bU′′ = bU′[:,ibU3]
+        for ia3 = 1:ra
+          @inbounds a′′ = a′[:,ia3]
+          w .= a′′.*bU′′
+          for ibV1 = 1:rV_prev
+            @inbounds bV′ = btest[ibV1,:,:]
+            for ibV3 = 1:rV
+              @inbounds bV′′ = bV′[:,ibV3]
+              @inbounds bab[ibV1,ia1,ibU1,ibV3,ia3,ibU3] = dot(bV′′,w)
+            end
+          end
+        end
+      end
+    end
+  end
+  return bab
+end
+
 function compress_core(a::SparseCore{T},btrial::AbstractArray{S,3},btest::AbstractArray{S,3}) where {T,S}
   TS = promote_type(T,S)
   ra_prev,ra = size(a,1),size(a,3)

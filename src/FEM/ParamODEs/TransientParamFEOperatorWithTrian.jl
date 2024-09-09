@@ -127,7 +127,7 @@ end
 
 function _set_triangulation_jacs(
   jacs::NTuple{N,Function},
-  trians::NTuple{N,Tuple{Vararg{Triangulation}}},
+  trians::Tuple{Vararg{Tuple{Vararg{Triangulation}}}},
   order) where N
 
   newjacs = ()
