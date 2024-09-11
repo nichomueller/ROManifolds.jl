@@ -295,7 +295,7 @@ const TransientMultiValueSnapshots{T,N,L,D,R,A} = Union{
   TransientMultiValueSparseSnapshots{T,N,L,D,R},
 }
 
-TensorValues.num_components(s::TransientMultiValueSnapshots) = num_components(get_index_map(i))
+TensorValues.num_components(s::TransientMultiValueSnapshots) = num_components(get_index_map(s))
 
 function IndexMaps.get_component(s::TransientMultiValueSnapshots,args...;kwargs...)
   i′ = get_component(get_index_map(s),args...;kwargs...)

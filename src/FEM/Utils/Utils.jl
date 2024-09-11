@@ -19,6 +19,7 @@ export update_tracker!
 export get_stats
 export compute_speedup
 export compute_error
+export compute_relative_error
 export induced_norm
 include("PerformanceTrackers.jl")
 

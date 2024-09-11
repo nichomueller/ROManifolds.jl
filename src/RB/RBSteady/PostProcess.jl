@@ -143,7 +143,7 @@ function rb_results(solver::RBSolver,feop,s,son_approx,fe_stats,rb_stats)
   state_red = get_state_reduction(solver)
   norm_style = NormStyle(state_red)
   son = select_snapshots(s,online_params(solver))
-  error = compute_error(norm_style,feop,son,son_approx)
+  error = compute_relative_error(norm_style,feop,son,son_approx)
   speedup = compute_speedup(fe_stats,rb_stats)
   RBResults(error,speedup)
 end
@@ -161,27 +161,50 @@ function DrWatson.save(dir,r::RBResults)
   serialize(get_results_filename(dir),r)
 end
 
-function Utils.compute_error(norm_style::EnergyNorm,feop,son,son_approx)
+function Utils.compute_relative_error(norm_style::EnergyNorm,feop,son,son_approx)
   X = assemble_matrix(feop,get_norm(norm_style))
-  compute_error(son,son_approx,X)
+  compute_relative_error(son,son_approx,X)
 end
 
-function Utils.compute_error(norm_style::EuclideanNorm,feop,son,son_approxs)
-  compute_error(son,son_approx)
+function Utils.compute_relative_error(norm_style::EuclideanNorm,feop,son,son_approxs)
+  compute_relative_error(son,son_approx)
 end
 
-function Utils.compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots)
+function Utils.compute_relative_error(
+  sol::MultiValueSnapshots{T,N},
+  sol_approx::MultiValueSnapshots{T,N},
+  args...) where {T,N}
+
+  @check size(sol) == size(sol_approx)
+  errors = zeros(num_params(sol))
+  @inbounds for ip = 1:num_params(sol)
+    err_norm = 0.0
+    sol_norm = 0.0
+    solip = selectdim(sol,N,ip)
+    solip_approx = selectdim(sol_approx,N,ip)
+    for ic in 1:num_components(sol)
+      solipc = selectdim(solip,N-1,ic)
+      solipc_approx = selectdim(solip_approx,N-1,ic)
+      err_norm += induced_norm(solipc-solipc_approx,args...)^2
+      sol_norm += induced_norm(solipc,args...)^2
+    end
+    errors[ip] = sqrt(err_norm) / sqrt(sol_norm)
+  end
+  return mean(errors)
+end
+
+function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots)
   @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
   active_block_ids = get_touched_blocks(sol)
   block_map = BlockMap(size(sol),active_block_ids)
-  errors = [compute_error(sol[i],sol_approx[i]) for i in active_block_ids]
+  errors = [compute_relative_error(sol[i],sol_approx[i]) for i in active_block_ids]
   return_cache(block_map,errors...)
 end
 
-function Utils.compute_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
+function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
   @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
   active_block_ids = get_touched_blocks(sol)
   block_map = BlockMap(size(sol),active_block_ids)
-  errors = [compute_error(sol[i],sol_approx[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
+  errors = [compute_relative_error(sol[i],sol_approx[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
   return_cache(block_map,errors...)
 end

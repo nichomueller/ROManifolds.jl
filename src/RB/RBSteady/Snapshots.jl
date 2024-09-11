@@ -333,7 +333,7 @@ const MultiValueSnapshots{T,N,L,D,R,A} = Union{
   MultiValueSparseSnapshots{T,N,L,D,R},
 }
 
-TensorValues.num_components(s::MultiValueSnapshots) = num_components(get_index_map(i))
+TensorValues.num_components(s::MultiValueSnapshots) = num_components(get_index_map(s))
 
 function IndexMaps.get_component(s::MultiValueSnapshots,args...;kwargs...)
   i′ = get_component(get_index_map(s),args...;kwargs...)

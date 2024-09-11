@@ -73,10 +73,10 @@ function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...)
   rb_results(solver,feop,args...)
 end
 
-function Utils.compute_error(
+function Utils.compute_relative_error(
   sol::AbstractTransientSnapshots{T,N},
   sol_approx::AbstractTransientSnapshots{T,N},
-  norm_matrix) where {T,N}
+  args...) where {T,N}
 
   @check size(sol) == size(sol_approx)
   err_norm = zeros(num_times(sol))
@@ -88,8 +88,38 @@ function Utils.compute_error(
     for it in 1:num_times(sol)
       solitp = selectdim(solip,N-1,it)
       solitp_approx = selectdim(solip_approx,N-1,it)
-      err_norm[it] = induced_norm(solitp-solitp_approx,norm_matrix)
-      sol_norm[it] = induced_norm(solitp,norm_matrix)
+      err_norm[it] = induced_norm(solitp-solitp_approx,args...)
+      sol_norm[it] = induced_norm(solitp,args...)
+    end
+    errors[ip] = norm(err_norm) / norm(sol_norm)
+  end
+  return mean(errors)
+end
+
+function Utils.compute_relative_error(
+  sol::TransientMultiValueSnapshots{T,N},
+  sol_approx::TransientMultiValueSnapshots{T,N},
+  args...) where {T,N}
+
+  println("dio")
+  @check size(sol) == size(sol_approx)
+  err_norm = zeros(num_times(sol))
+  sol_norm = zeros(num_times(sol))
+  errors = zeros(num_params(sol))
+  @inbounds for ip = 1:num_params(sol)
+    solip = selectdim(sol,N,ip)
+    solip_approx = selectdim(sol_approx,N,ip)
+    for it in 1:num_times(sol)
+      solitp = selectdim(solip,N-1,it)
+      solitp_approx = selectdim(solip_approx,N-1,it)
+      for ic in 1:num_components(sol)
+        soliptc = selectdim(solitp,N-2,ic)
+        soliptc_approx = selectdim(solitp_approx,N-2,ic)
+        err_norm[it] += induced_norm(soliptc-soliptc_approx,args...)^2
+        sol_norm[it] += induced_norm(soliptc,args...)^2
+      end
+      err_norm[it] = sqrt(err_norm[it])
+      sol_norm[it] = sqrt(sol_norm[it])
     end
     errors[ip] = norm(err_norm) / norm(sol_norm)
   end

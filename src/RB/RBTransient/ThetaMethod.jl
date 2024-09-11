@@ -8,22 +8,15 @@ function Algebra.residual(
 
   u0 = state0[1]
 
-  x = copy(u0)
-  uθ = copy(u0)
-  fill!(x,zero(eltype(x)))
-
   dt,θ = solver.dt,solver.θ
-
   dtθ = θ*dt
   shift!(r,dt*(θ-1))
 
-  function us(u)
-    copy!(uθ,u)
-    shift!(uθ,r,θ,1-θ)
-    axpy!(dtθ,x,uθ)
-    (uθ,x)
-  end
-  usx = us(x)
+  x = copy(u0)
+  uθ = copy(u0)
+  shift!(uθ,r,θ,1-θ)
+  axpy!(dtθ,x,uθ)
+  usx = (uθ,x)
 
   odeopcache = allocate_ode_spaces(odeop,r,usx)
   update_odeopcache!(odeopcache,odeop,r)
@@ -41,22 +34,15 @@ function Algebra.jacobian(
 
   u0 = state0[1]
 
-  x = copy(u0)
-  uθ = copy(u0)
-  fill!(x,zero(eltype(x)))
-
   dt,θ = solver.dt,solver.θ
-
   dtθ = θ*dt
   shift!(r,dt*(θ-1))
 
-  function us(u)
-    copy!(uθ,u)
-    shift!(uθ,r,θ,1-θ)
-    axpy!(dtθ,x,uθ)
-    (uθ,x)
-  end
-  usx = us(x)
+  x = copy(u0)
+  uθ = copy(u0)
+  shift!(uθ,r,θ,1-θ)
+  axpy!(dtθ,x,uθ)
+  usx = (uθ,x)
   ws = (1,1/dtθ)
 
   odeopcache = allocate_ode_spaces(odeop,r,usx)

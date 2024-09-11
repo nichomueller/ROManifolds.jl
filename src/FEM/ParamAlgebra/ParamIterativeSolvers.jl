@@ -143,11 +143,11 @@ function LinearSolvers.get_solver_caches(solver::LinearSolvers.FGMRESSolver,A::A
 end
 
 function expand_param_krylov_caches!(ns::LinearSolvers.FGMRESNumericalSetup)
-  function _similar_fill!(a,s...)
-    a_new = similar(a,eltype(a),s)
-    fill!(a_new,zero(eltype(a)))
-    a_new.data[axes(a.data)...] .= a.data
-    return a_new
+  function _similar_fill!(a::ConsecutiveArrayOfArrays,s...)
+    a_new = similar(a.data,eltype(a.data),s...,param_length(a))
+    fill!(a_new,zero(eltype(a.data)))
+    a_new[axes(a.data)...] .= a.data
+    return ConsecutiveArrayOfArrays(a_new)
   end
 
   V,Z,zl,H,g,c,s = ns.caches
