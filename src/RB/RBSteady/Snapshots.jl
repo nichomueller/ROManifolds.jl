@@ -53,9 +53,13 @@ for I in (:AbstractIndexMap,:(AbstractArray{<:AbstractIndexMap}))
   end
 end
 
-function IndexMaps.change_index_map(f,s::AbstractSnapshots)
-  index_map′ = change_index_map(f,get_index_map(s))
-  Snapshots(param_data(s),index_map′,get_realization(s))
+function IndexMaps.change_index_map(s::AbstractSnapshots,i::AbstractIndexMap)
+  Snapshots(param_data(s),i,get_realization(s))
+end
+
+function IndexMaps.change_index_map(s::AbstractSnapshots,f)
+  i′ = change_index_map(get_index_map(s),f)
+  change_index_map(s,i′)
 end
 
 function IndexMaps.recast(s::AbstractSnapshots,a::AbstractArray)
@@ -71,7 +75,7 @@ The output snapshots are indexed according to a [`TrivialIndexMap`](@ref)
 
 """
 function flatten_snapshots(s::AbstractSnapshots)
-  change_index_map(TrivialIndexMap,s)
+  change_index_map(s,TrivialIndexMap)
 end
 
 """
@@ -508,10 +512,10 @@ function get_indexed_values(s::BlockSnapshots)
   map(get_indexed_values,s.array) |> mortar
 end
 
-function IndexMaps.change_index_map(f,s::BlockSnapshots{S,N}) where {S,N}
+function IndexMaps.change_index_map(s::BlockSnapshots{S,N},f) where {S,N}
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  active_block_snaps = [change_index_map(f,s[n]) for n in active_block_ids]
+  active_block_snaps = [change_index_map(s[n],f) for n in active_block_ids]
   BlockSnapshots(block_map,active_block_snaps)
 end
 

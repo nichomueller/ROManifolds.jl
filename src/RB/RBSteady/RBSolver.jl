@@ -181,8 +181,8 @@ struct MDEIMReduction{A,R<:AbstractReduction{A,EuclideanNorm}} <: AbstractMDEIMR
   nparams_test::Int
 end
 
-function MDEIMReduction(args...;nparams_test=10,kwargs...)
-  reduction = Reduction(args...;kwargs...)
+function MDEIMReduction(red_style::ReductionStyle,args...;nparams_test=10,kwargs...)
+  reduction = Reduction(red_style,args...;kwargs...)
   MDEIMReduction(reduction,nparams_test)
 end
 

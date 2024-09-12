@@ -101,7 +101,6 @@ function Utils.compute_relative_error(
   sol_approx::TransientMultiValueSnapshots{T,N},
   args...) where {T,N}
 
-  println("dio")
   @check size(sol) == size(sol_approx)
   err_norm = zeros(num_times(sol))
   sol_norm = zeros(num_times(sol))
@@ -112,6 +111,8 @@ function Utils.compute_relative_error(
     for it in 1:num_times(sol)
       solitp = selectdim(solip,N-1,it)
       solitp_approx = selectdim(solip_approx,N-1,it)
+      fill!(err_norm,0.0)
+      fill!(sol_norm,0.0)
       for ic in 1:num_components(sol)
         soliptc = selectdim(solitp,N-2,ic)
         soliptc_approx = selectdim(solitp_approx,N-2,ic)

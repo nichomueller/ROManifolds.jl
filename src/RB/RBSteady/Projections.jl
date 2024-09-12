@@ -105,7 +105,7 @@ function compress_cores(core::TTSVDCores,basis_test::TTSVDCores)
   _dropdims(ccore)
 end
 
-function compress_cores(core::TTSVDCores,basis_trial::TTSVDCores,bases::TTSVDCores)
+function compress_cores(core::TTSVDCores,basis_trial::TTSVDCores,basis_test::TTSVDCores)
   ccores = map((a,btrial,btest)->compress_core(a,btrial,btest),get_cores(core),
     get_cores(basis_trial),get_cores(basis_test))
   ccore = multiply_cores(ccores...)

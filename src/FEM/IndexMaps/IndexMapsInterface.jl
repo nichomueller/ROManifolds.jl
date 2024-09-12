@@ -92,12 +92,12 @@ function inv_index_map(i::AbstractIndexMap)
 end
 
 """
-    change_index_map(f,i::AbstractIndexMap) -> AbstractIndexMap
+    change_index_map(i::AbstractIndexMap,f) -> AbstractIndexMap
 
 Returns an index map given by `f`∘`i`, where f is a function encoding an index map.
 
 """
-function change_index_map(f,i::AbstractIndexMap)
+function change_index_map(i::AbstractIndexMap,f)
   i′::AbstractIndexMap = f(collect(vec(i)))
   i′
 end

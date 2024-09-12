@@ -32,10 +32,6 @@ Subtypes:
 """
 abstract type SparseCore{T,N} <: AbstractTTCore{T,N} end
 
-function _cores2basis(a::SparseCore{S},b::SparseCore{T}) where {S,T}
-  @notimplemented "Need to provide a sparse index map for the construction of the global basis"
-end
-
 """
     struct SparseCoreCSC{T,Ti} <: SparseCore{T,3} end
 

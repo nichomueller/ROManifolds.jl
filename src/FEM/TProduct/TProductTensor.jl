@@ -171,53 +171,25 @@ end
 
 # linear algebra
 
-for T in (:AbstractMatrix,:AbstractArray)
-  @eval begin
-    function Base.:*(a::AbstractRank1Tensor,b::$T)
-      N = ndims(b)
-      @check length(a) == N
-      @check all((size(a[i],2) == size(b,i)) for i = 1:N)
-      c = similar(b,ntuple(i->size(a[i],1),Val{N}()))
-      for i = 1:N
-        bi = eachslice(b,dims=i)
-        ci = eachslice(c,dims=i)
-        ci .= a[i]*bi
-      end
-      return c
-    end
-
-    function Base.:*(a::$T,b::AbstractRank1Tensor)
-      N = ndims(a)
-      @check length(b) == N
-      @check all((size(a,i) == size(b[i],1)) for i = 1:N)
-      c = similar(a,ntuple(i->size(b[i],2),Val{N}()))
-      for i = 1:N
-        ai = eachslice(a,dims=i)
-        ci = eachslice(c,dims=i)
-        ci .= ai*b[i]
-      end
-      return c
-    end
-
-    function Base.:*(a::AbstractRankTensor,b::$T)
-      c = get_decomposition(a,1)*b
-      for k = 2:rank(a)
-        c += get_decomposition(a,k)*b
-      end
-      return c
-    end
-
-    function Base.:*(a::$T,b::AbstractRankTensor)
-      c = a*get_decomposition(b,1)
-      for k = 2:rank(b)
-        c += a*get_decomposition(b,k)
-      end
-      return c
-    end
-  end
+function tpmul(a::AbstractRank1Tensor,b::AbstractMatrix)
+  @check length(a) == 2
+  return a[1]*b*a[2]'
 end
 
-Utils.induced_norm(a::AbstractArray,X::AbstractTProductTensor) = sqrt(dot(vec(a),vec(X*a)))
+function tpmul(a::AbstractRank1Tensor,b::AbstractArray{T,3} where T)
+  @check length(a) == 3
+  hcat([vec(a[1]*bi*a[2]') for bi in eachslice(b,dims=3)]...)*a[3]'
+end
+
+function tpmul(a::AbstractRankTensor,b::AbstractArray)
+  c = tpmul(get_decomposition(a,1),b)
+  for k = 2:rank(a)
+    c += tpmul(get_decomposition(a,k),b)
+  end
+  return c
+end
+
+Utils.induced_norm(a::AbstractArray,X::AbstractTProductTensor) = sqrt(dot(vec(a),tpmul(X,a)))
 
 # to global array - should try avoiding using these functions
 

@@ -119,7 +119,7 @@ for n in (8,10,12,15)
   test_dir = datadir(joinpath("heateq","3dcube_$(n)"))
 
   # fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
-  fesnaps = change_index_map(TrivialIndexMap,fesnaps)
+  fesnaps = change_index_map(fesnaps,TrivialIndexMap)
 
   # reduced_fe_space(rbsolver,feop,fesnaps)
 

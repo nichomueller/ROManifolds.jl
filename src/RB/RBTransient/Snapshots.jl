@@ -165,11 +165,14 @@ IndexMaps.get_index_map(s::TransientSnapshotsAtIndices) = get_index_map(s.snaps)
 RBSteady.get_realization(s::TransientSnapshotsAtIndices) = get_realization(s.snaps)[s.prange,s.trange]
 
 function ParamDataStructures.get_values(s::TransientSnapshotsAtIndices)
+  _num_all_params(s::AbstractSnapshots) = num_params(s)
+  _num_all_params(s::TransientSnapshotsAtIndices) = _num_all_params(s.snaps)
+
   prange = RBSteady.param_indices(s)
   trange = time_indices(s)
-  np = num_params(s)
+  np = _num_all_params(s)
   ptrange = _param_time_range(prange,trange,np)
-  v = consecutive_getindex(s.snaps.data,:,ptrange)
+  v = consecutive_getindex(param_data(s),:,ptrange)
   ConsecutiveArrayOfArrays(v)
 end
 
@@ -179,7 +182,7 @@ function RBSteady.get_indexed_values(s::TransientSnapshotsAtIndices)
   trange = time_indices(s)
   np = num_params(s)
   ptrange = _param_time_range(prange,trange,np)
-  v = consecutive_getindex(s.snaps.data,vi,ptrange)
+  v = consecutive_getindex(param_data(s),vi,ptrange)
   ConsecutiveArrayOfArrays(v)
 end
 
@@ -396,7 +399,7 @@ function ModeTransientSnapshots(s::AbstractTransientSnapshots)
 end
 
 function RBSteady.flatten_snapshots(s::AbstractTransientSnapshots)
-  s′ = change_index_map(TrivialIndexMap,s)
+  s′ = change_index_map(s,TrivialIndexMap)
   ModeTransientSnapshots(s′)
 end
 

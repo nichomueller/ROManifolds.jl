@@ -181,6 +181,15 @@ function mdeim(b::SteadyProjection)
   return interpolation,integration_domain
 end
 
+function mdeim(b::TTSVDCores)
+  index_map = get_index_map(b)
+  cores_space = get_cores(b)
+  indices_space,interp_basis_space = empirical_interpolation(index_map,cores_space...)
+  interpolation = lu(interp_basis_space)
+  integration_domain = IntegrationDomain(indices_space)
+  return interpolation,integration_domain
+end
+
 function ParamDataStructures.Contribution(v::Tuple{Vararg{AffineDecomposition}},t::Tuple{Vararg{Triangulation}})
   AffineContribution(v,t)
 end
