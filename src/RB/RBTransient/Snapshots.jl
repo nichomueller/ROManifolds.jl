@@ -159,15 +159,14 @@ ParamDataStructures.num_times(s::TransientSnapshotsAtIndices) = length(time_indi
 RBSteady.param_indices(s::TransientSnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::TransientSnapshotsAtIndices) = length(RBSteady.param_indices(s))
 _param_time_range(prange,trange,np) = vec(((trange.-1)*np .+ prange')')
+_num_all_params(s::AbstractSnapshots) = num_params(s)
+_num_all_params(s::TransientSnapshotsAtIndices) = _num_all_params(s.snaps)
 
 ParamDataStructures.param_data(s::TransientSnapshotsAtIndices) = param_data(s.snaps)
 IndexMaps.get_index_map(s::TransientSnapshotsAtIndices) = get_index_map(s.snaps)
 RBSteady.get_realization(s::TransientSnapshotsAtIndices) = get_realization(s.snaps)[s.prange,s.trange]
 
 function ParamDataStructures.get_values(s::TransientSnapshotsAtIndices)
-  _num_all_params(s::AbstractSnapshots) = num_params(s)
-  _num_all_params(s::TransientSnapshotsAtIndices) = _num_all_params(s.snaps)
-
   prange = RBSteady.param_indices(s)
   trange = time_indices(s)
   np = _num_all_params(s)
@@ -180,7 +179,7 @@ function RBSteady.get_indexed_values(s::TransientSnapshotsAtIndices)
   vi = vec(get_index_map(s))
   prange = RBSteady.param_indices(s)
   trange = time_indices(s)
-  np = num_params(s)
+  np = _num_all_params(s)
   ptrange = _param_time_range(prange,trange,np)
   v = consecutive_getindex(param_data(s),vi,ptrange)
   ConsecutiveArrayOfArrays(v)

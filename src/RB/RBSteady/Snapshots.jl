@@ -212,13 +212,13 @@ ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
 ParamDataStructures.param_data(s::SnapshotsAtIndices) = param_data(s.snaps)
 
 function ParamDataStructures.get_values(s::SnapshotsAtIndices)
-  v = consecutive_getindex(s.snaps.data,:,param_indices(s))
+  v = consecutive_getindex(param_data(s),:,param_indices(s))
   ConsecutiveArrayOfArrays(v)
 end
 
 function get_indexed_values(s::SnapshotsAtIndices)
   vi = vec(get_index_map(s))
-  v = consecutive_getindex(s.snaps.data,vi,param_indices(s))
+  v = consecutive_getindex(param_data(s),vi,param_indices(s))
   ConsecutiveArrayOfArrays(v)
 end
 

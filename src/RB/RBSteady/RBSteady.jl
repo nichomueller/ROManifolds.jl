@@ -1,7 +1,7 @@
 module RBSteady
 
 using LinearAlgebra
-using TSVD
+using LowRankApprox
 using BlockArrays
 using SparseArrays
 using DrWatson

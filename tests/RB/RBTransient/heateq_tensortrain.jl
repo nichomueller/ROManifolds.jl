@@ -147,7 +147,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
-tol = fill(1e-4,4)
+tol = fill(1e-5,4)
 reduction = TTSVDReduction(tol,energy;nparams=50)
 rbsolver = RBSolver(fesolver,reduction;nparams_test=5,nparams_res=30,nparams_jac=20)
 test_dir = datadir(joinpath("heateq","test_tt_$(1e-4)"))
@@ -159,3 +159,22 @@ rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 println(results)
+
+_model = model.model
+_Ω = Triangulation(_model)
+_dΩ = Measure(_Ω,degree)
+
+_test = TestFESpace(_model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+_trial = TransientTrialParamFESpace(_test,gμt)
+_feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
+_trial,_test,trian_res,trian_stiffness,trian_mass)
+
+_energy(du,v) = ∫(∇(v)⊙∇(du))_dΩ
+_tol = 1e-4
+_reduction = TransientPODReduction(_tol,_energy;nparams=50)
+_rbsolver = RBSolver(fesolver,_reduction;nparams_test=5,nparams_res=30,nparams_jac=20)
+
+_fesnaps = Snapshots(fesnaps.data,TrivialIndexMap(1:num_free_dofs(_test)),fesnaps.realization)
+_rbop = reduced_operator(_rbsolver,_feop,_fesnaps)
+_rbsnaps,rbstats,cache = solve(_rbsolver,_rbop,fesnaps)
+results = rb_results(_rbsolver,_rbop,_fesnaps,_rbsnaps,festats,rbstats)
