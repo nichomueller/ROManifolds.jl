@@ -14,6 +14,10 @@ function projection(red::TTSVDReduction,A::AbstractArray,args...)
   return cores
 end
 
+function _size_cond(M::AbstractMatrix)
+  length(M) > 1e6 && (size(M,1) > 1e2*size(M,2) || size(M,2) > 1e2*size(M,1))
+end
+
 function _cholesky_decomp(X::AbstractSparseMatrix)
   C = cholesky(X)
   L = sparse(C.L)
@@ -21,12 +25,29 @@ function _cholesky_decomp(X::AbstractSparseMatrix)
   return L,p
 end
 
-function _low_rank_options(red_style::SearchSVDRank)
-  LRAOptions(maxdet_tol=0.,sketch_randn_niter=1,sketch=:sub,rtol=red_style.tol)
+function select_rank(red_style::ReductionStyle,args...)
+  @abstractmethod
 end
 
-function _low_rank_options(red_style::FixedSVDRank)
-  LRAOptions(maxdet_tol=0.,sketch_randn_niter=1,sketch=:sub,rank=red_style.tol)
+function select_rank(red_style::SearchSVDRank,S::AbstractVector)
+  tol = red_style.tol
+  energies = cumsum(S.^2;dims=1)
+  rank = findfirst(energies .>= (1-tol^2)*energies[end])
+  return rank
+end
+
+function truncated_svd(red_style::SearchSVDRank,M::AbstractMatrix;issquare=false)
+  U,S,V = svd(M)
+  if issquare S = sqrt.(S) end
+  rank = select_rank(red_style,S)
+  return U[:,1:rank],S[1:rank],V[:,1:rank]
+end
+
+function truncated_svd(red_style::FixedSVDRank,M::AbstractMatrix;issquare=false)
+  rank = red_style.rank
+  Ur,Sr,Vr = tsvd(M,rank)
+  if issquare Sr = sqrt.(Sr) end
+  return Ur,Sr,Vr
 end
 
 function tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
@@ -34,19 +55,58 @@ function tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatri
 end
 
 function tpod(red_style::ReductionStyle,M::AbstractMatrix,args...)
-  opts = _low_rank_options(red_style)
-  standard_tpod(M,opts,args...)
+  if isa(red_style,SearchSVDRank) && _size_cond(M)
+    if size(M,1) > size(M,2)
+      massive_rows_tpod(red_style,M,args...)
+    else
+      massive_cols_tpod(red_style,M,args...)
+    end
+  else
+    standard_tpod(red_style,M,args...)
+  end
 end
 
-function standard_tpod(M::AbstractMatrix,opts::LRAOptions)
-  psvd(M,opts)
+function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix)
+  truncated_svd(red_style,M)
 end
 
-function standard_tpod(M::AbstractMatrix,opts::LRAOptions,L::AbstractSparseMatrix,p::AbstractVector{Int})
+function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
   XM = L'*M[p,:]
-  Ũr,Sr,Vr = psvd(XM,opts)
+  Ũr,Sr,Vr = truncated_svd(red_style,XM)
   Ur = (L'\Ũr)[invperm(p),:]
   return Ur,Sr,Vr
+end
+
+function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix)
+  MM = M'*M
+  _,Sr,Vr = truncated_svd(red_style,MM;issquare=true)
+  Ur = (M*Vr)*inv(Diagonal(Sr).+eps())
+  return Ur,Sr,Vr
+end
+
+function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
+  XM = L'*M[p,:]
+  MXM = XM'*XM
+  _,Sr,Vr = truncated_svd(red_style,MXM;issquare=true)
+  Ũr = (XM*Vr)*inv(Diagonal(Sr).+eps())
+  Ur = (L'\Ũr)[invperm(p),:]
+  return Ur,Sr,Vr
+end
+
+function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix)
+  MM = M*M'
+  Ur,Sr,_ = truncated_svd(red_style,MM;issquare=true)
+  Vr = inv(Diagonal(Sr).+eps())*(Ur'M)
+  return Ur,Sr,Vr'
+end
+
+function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
+  XM = L'*M[p,:]
+  MXM = XM*XM'
+  Ũr,Sr,_ = truncated_svd(red_style,MXM;issquare=true)
+  Vr = inv(Diagonal(Sr).+eps())*(Ũr'XM)
+  Ur = (L'\Ũr)[invperm(p),:]
+  return Ur,Sr,Vr'
 end
 
 function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3}) where T

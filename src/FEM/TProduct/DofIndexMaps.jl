@@ -42,7 +42,7 @@ function get_dof_index_map(model::CartesianDiscreteModel,space::UnconstrainedFES
   T = get_dof_type(dof)
   cell_dof_ids = get_cell_dof_ids(space)
   order = get_polynomial_order(space)
-  comp_to_dofs = get_comp_to_free_dofs(T,space,dof)
+  comp_to_dofs = get_comp_to_dofs(T,space,dof)
   get_dof_index_map(T,model,cell_dof_ids,order,comp_to_dofs)
 end
 
@@ -138,22 +138,18 @@ get_dof_type(b) = @abstractmethod
 get_dof_type(b::LagrangianDofBasis{P,V}) where {P,V} = change_eltype(V,Float64)
 get_dof_type(dof::CellDof) = get_dof_type(first(get_data(dof)))
 
-function get_comp_to_free_dofs(::Type{T},space::FESpace,dof::CellDof) where T
+function get_comp_to_dofs(::Type{T},space::FESpace,dof::CellDof) where T
   @abstractmethod
 end
 
-function get_comp_to_free_dofs(::Type{T},space::UnconstrainedFESpace,dof::CellDof) where T
+function get_comp_to_dofs(::Type{T},space::UnconstrainedFESpace,dof::CellDof) where T
   glue = space.metadata
   ncomps = num_components(T)
-  free_dof_to_comp = if isnothing(glue)
-    _get_free_dof_to_comp(space,dof)
+  dof2comp = if isnothing(glue)
+    _get_dofs_to_comp(space,dof)
   else
-    glue.free_dof_to_comp
+    vcat(glue.free_dof_to_comp...,glue.dirichlet_dof_to_comp...)
   end
-  get_comp_to_free_dofs(free_dof_to_comp,ncomps)
-end
-
-function get_comp_to_free_dofs(dof2comp,ncomps)
   comp2dof = Vector{typeof(dof2comp)}(undef,ncomps)
   for comp in 1:ncomps
     comp2dof[comp] = findall(dof2comp.==comp)
@@ -161,20 +157,22 @@ function get_comp_to_free_dofs(dof2comp,ncomps)
   return comp2dof
 end
 
-function _get_free_dof_to_comp(space,dof)
+function _get_dofs_to_comp(space,dof)
   b = first(get_data(dof))
-  ldof_to_comp = get_dof_to_comp(b)
+  ldof2comp = get_dof_to_comp(b)
   cell_dof_ids = get_cell_dof_ids(space)
-  nfree = num_free_dofs(space)
-  dof_to_comp = zeros(eltype(ldof_to_comp),nfree)
+  ndofs = num_free_dofs(space)+num_dirichlet_dofs(space)
+  dof2comp = zeros(eltype(ldof2comp),ndofs)
   @inbounds for dofs_cell in cell_dof_ids
     for (ldof,dof) in enumerate(dofs_cell)
       if dof > 0
-        dof_to_comp[dof] = ldof_to_comp[ldof]
+        dof2comp[dof] = ldof2comp[ldof]
+      else
+        dof2comp[-dof] = ldof2comp[ldof]
       end
     end
   end
-  return dof_to_comp
+  return dof2comp
 end
 
 function _get_terms(p::Polytope,orders)
