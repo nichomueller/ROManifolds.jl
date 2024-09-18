@@ -71,11 +71,18 @@ jac(μ,t,(u,p),(du,dp),(v,q),dΩ) = jac_lin(μ,t,(du,dp),(v,q),dΩ) + dc(u,du,v,
 djac(μ,t,(uₜ,pₜ),(duₜ,dpₜ),(v,q),dΩ) = mass(μ,t,(duₜ,dpₜ),(v,q),dΩ)
 res(μ,t,(u,p),(v,q),dΩ,dΓn) = res_lin(μ,t,(u,p),(v,q),dΩ,dΓn) + c(u,v,dΩ)
 
-for n in (8,10,12,15)
+energy_u(u,v,dΩ) = ∫(∇(v)⊙∇(u))dΩ
+energy_u(dΩ) = (u,v) -> energy_u(u,v,dΩ)
+
+stiffness_u(μ,t,u,v,dΩ) = ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ
+mass_u(μ,t,uₜ,v,dΩ) = ∫(v⋅uₜ)dΩ
+res_u(μ,t,u,v,dΩ,dΓn) = ∫(v⋅∂t(u))dΩ + stiffness_u(μ,t,u,v,dΩ) - ∫(v⋅hμt(μ,t))dΓn
+
+for n in (15,)#(8,10,12,15)
   println("--------------------------------------------------------------------")
   println("TT algorithm, n = $(n)")
-  domain = (0,1,0,1/3,0,1/6)
-  partition = (n,ceil(n/3),ceil(n/6))
+  domain = (0,1,0,2/3,0,2/3)
+  partition = (n,floor(2*n/3),floor(2*n/3))
   model = TProductModel(domain,partition)
   labels = get_face_labeling(model)
   add_tag_from_tags!(labels,"dirichlet0",setdiff(1:26,22))
@@ -103,27 +110,29 @@ for n in (8,10,12,15)
 
   xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 
-  # diag_blocks  = [LinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0*p*q)dΩ,test_p.space,test_p.space)]
-  # bblocks = map(CartesianIndices((2,2))) do I
-  #   (I[1] == I[2]) ? diag_blocks[I[1]] : LinearSystemBlock()
-  # end
-  # coeffs = [1.0 1.0;
-  #           0.0 1.0]
-  # solver_u = LUSolver()
-  # solver_p = LUSolver()
-  # P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
-  # solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-7,verbose=false)
-  nlsolver = NewtonRaphsonSolver(LUSolver(),1e-10,20)
+  diag_blocks  = [LinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0*p*q)dΩ,test_p.space,test_p.space)]
+  bblocks = map(CartesianIndices((2,2))) do I
+    (I[1] == I[2]) ? diag_blocks[I[1]] : LinearSystemBlock()
+  end
+  coeffs = [1.0 1.0;
+            0.0 1.0]
+  solver_u = LUSolver()
+  solver_p = LUSolver()
+  P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
+  solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-6,verbose=false)
+  # nlsolver = NewtonRaphsonSolver(LUSolver(),1e-10,20)
+  nlsolver = NewtonRaphsonSolver(solver,1e-10,20)
   odesolver = ThetaMethod(nlsolver,dt,θ)
 
-  tol = fill(1e-4,4)
-  reduction = TTSVDReduction(tol,energy(dΩ);nparams=50)
+  tol = fill(1e-4,5)
+  reduction = TTSVDReduction(tol,energy_u(dΩ);nparams=50)
   rbsolver = RBSolver(odesolver,reduction;nparams_test=10,nparams_res=30,nparams_jac=20)
   test_dir = datadir(joinpath("navier-stokes","3dcube_tensor_train_$(n)"))
   create_dir(test_dir)
 
   fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
   save(test_dir,fesnaps)
+  # fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
 
   println(festats)
 
@@ -153,6 +162,18 @@ for n in (8,10,12,15)
 
   # fesnaps = fe_solutions(rbsolver,feop,xh0μ)
   # save(test_dir,fesnaps)
+  # reffe_u = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
+  # test_u = TestFESpace(Ω,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0"])
+  # trial_u = TransientTrialParamFESpace(test_u,g0μt)
+
+  # feop_u = TransientParamLinearFEOperator((stiffness_u,mass_u),res_u,ptspace,
+  #     trial_u,test_u,trian_res,trian_jac,trian_djac)
+
+  # rbop = reduced_operator(rbsolver,feop_u,fesnaps[1])
+  # rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps)
+  # results = rb_results(rbsolver,rbop,fesnaps[1],rbsnaps,rbstats,rbstats)
+
+  # println(results)
 end
 
 # s1 = select_snapshots(fesnaps[1],1)

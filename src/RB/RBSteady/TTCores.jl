@@ -132,39 +132,6 @@ end
 
 # core operations
 
-function cat_cores(a::AbstractArray{T,3},b::AbstractArray{T,3}) where T
-  @check size(a,2) == size(b,2)
-  if size(a,1) == size(b,1)
-    ab = cat(a,b;dims=3)
-  else
-    ab = similar(a,size(a,1)+size(b,1),size(a,2),size(a,3)+size(b,3))
-    fill!(ab,zero(T))
-    @views ab[axes(a,1),:,axes(a,3)] = a
-    @views ab[size(a,1)+1:end,:,size(a,3)+1:end] = b
-  end
-  return ab
-end
-
-function cat_cores(a::AbstractArray{T,3},b::AbstractMatrix{T}) where T
-  @check size(a,2) == size(b,2)
-  ab = similar(a,size(a,1)+size(b,1),size(a,2),size(a,3)+1)
-  fill!(ab,zero(T))
-  @views ab[axes(a,1),:,axes(a,3)] = a
-  @views ab[size(a,1)+1:end,:,end] = b
-  return ab
-end
-
-function pushlast(a::AbstractArray{T,3},b::AbstractMatrix{T}) where T
-  @check size(a,2) == size(b,2)
-  s1,s2,s3 = size(a)
-  s1′ = size(b,1)
-  ab = similar(a,s1,s2,s3+1)
-  fill!(ab,zero(T))
-  @views ab[:,:,1:s3] = a
-  @views ab[s1-s1′+1:end,:,s3+1] = b
-  return ab
-end
-
 function Base.:*(a::AbstractMatrix{T},b::AbstractArray{S,3}) where {T,S}
   @check size(a,2) == size(b,2)
   TS = promote_type(T,S)

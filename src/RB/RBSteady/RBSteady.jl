@@ -58,8 +58,13 @@ export AbstractTTCore
 export SparseCore
 export SparseCoreCSC
 export BlockCore
-export cat_cores
 include("TTCores.jl")
+
+export TTContraction
+export contraction
+export sequential_product
+export reduced_cores
+include("TTLinearAlgebra.jl")
 
 export ReductionStyle
 export SearchSVDRank

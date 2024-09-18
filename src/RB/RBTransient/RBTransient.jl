@@ -54,6 +54,8 @@ export TransientPODReduction
 export TransientMDEIMReduction
 include("RBSolver.jl")
 
+include("TTLinearAlgebra.jl")
+
 include("BasisConstruction.jl")
 
 export TransientProjection

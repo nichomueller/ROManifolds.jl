@@ -15,7 +15,7 @@ function projection(red::TTSVDReduction,A::AbstractArray,args...)
 end
 
 function _size_cond(M::AbstractMatrix)
-  length(M) > 1e6 && (size(M,1) > 1e2*size(M,2) || size(M,2) > 1e2*size(M,1))
+ length(M) > 1e6 && (size(M,1) > 1e2*size(M,2) || size(M,2) > 1e2*size(M,1))
 end
 
 function _cholesky_decomp(X::AbstractSparseMatrix)
