@@ -1,4 +1,19 @@
 """
+    create_dir(dir::String) -> Nothing
+
+Recursive creation of a directory `dir`
+
+"""
+function create_dir(dir::String)
+  if !isdir(dir)
+    parent_dir, = splitdir(dir)
+    create_dir(parent_dir)
+    mkdir(dir)
+  end
+  return
+end
+
+"""
     load_solve(solver::RBSolver,feop::ParamFEOperator,dir::String;kwargs...) -> RBResults
     load_solve(solver::RBSolver,feop::TransientParamFEOperator,dir::String;kwargs...) -> RBResults
 
@@ -10,106 +25,142 @@ case has been run at least once!
 
 """
 function load_solve(solver,feop,dir)
-  fe_sol = deserialize(get_snapshots_filename(dir))
-  fe_stats = deserialize(get_fe_stats_filename(dir))
-  rbop = deserialize_operator(feop,dir)
+  fe_sol = load_snapshots(dir)
+  fe_stats = load_stats(dir)
+  rbop = load_operator(dir,feop)
   rb_sol,rb_stats,_ = solve(solver,rbop,fe_sol)
   old_results = deserialize(get_results_filename(dir))
   results = rb_results(solver,rbop,fe_sol,rb_sol,rb_stats,fe_stats)
   return results
 end
 
-function deserialize_operator(feop::ParamFEOperatorWithTrian,dir)
-  trian_res = feop.trian_res
-  trian_jac = feop.trian_jac
-
-  op = deserialize_pg_operator(feop,dir)
-  red_rhs = deserialize_contribution(dir,trian_res,get_test(op);label="res")
-  red_lhs = deserialize_contribution(dir,trian_jac,get_trial(op),get_test(op);label="jac")
-  trians_rhs = get_domains(red_rhs)
-  trians_lhs = get_domains(red_lhs)
-  new_op = change_triangulation(op,trians_rhs,trians_lhs)
-  rbop = PGMDEIMOperator(new_op,red_lhs,red_rhs)
-  return rbop
-end
-
-function deserialize_operator(
-  feop::LinearNonlinearParamFEOperatorWithTrian,
-  rbop::LinearNonlinearPGMDEIMOperator)
-
-  rbop_lin = deserialize_operator(get_linear_operator(feop),get_linear_operator(rbop))
-  rbop_nlin = deserialize_operator(get_nonlinear_operator(feop),get_nonlinear_operator(rbop))
-  return LinearNonlinearPGMDEIMOperator(rbop_lin,rbop_nlin)
-end
-
-function deserialize_pg_operator(feop::ParamFEOperatorWithTrian,dir)
-  op = get_algebraic_operator(feop)
-  fe_test = get_test(feop)
-  fe_trial = get_trial(feop)
-  basis_test = deserialize(get_projection_filename(dir;label="test"))
-  basis_trial = deserialize(get_projection_filename(dir;label="trial"))
-  test = fe_subspace(fe_test,basis_test)
-  trial = fe_subspace(fe_trial,basis_trial)
-  return PGOperator(op,trial,test)
-end
-
-function deserialize_contribution(dir,trian,args...;label="res")
-  ad,redt = (),()
-  for (i,t) in enumerate(trian)
-    adi = deserialize(get_decomposition_filename(dir;label=label*"_$i"))
-    redti = reduce_triangulation(t,get_integration_domain(adi),args...)
-    if isa(redti,AbstractArray)
-      redti = ParamDataStructures.merge_triangulations(redti)
-    end
-    ad = (ad...,adi)
-    redt = (redt...,redti)
-  end
-  return Contribution(ad,redt)
-end
-
 function DrWatson.save(dir,args::Tuple)
   map(a->save(dir,a),args)
 end
 
-function get_snapshots_filename(dir)
-  dir * "/snapshots.jld"
+_get_label(name::String,label) = @abstractmethod
+_get_label(name::String,label::Union{Number,Symbol}) = _get_label(name,string(label))
+_get_label(name::String,label::String) = name * "_" * label
+
+function _get_label(name,labels...)
+  first_lab,last_labs... = labels
+  _get_label(name,_get_label(first_lab,last_labs...))
 end
 
-function DrWatson.save(dir,s::Union{AbstractSnapshots,BlockSnapshots})
-  serialize(get_snapshots_filename(dir),s)
+function get_filename(dir::String,name::String,labels...;extension=".jld")
+  joinpath(dir,_get_label(name,labels...)*extension)
 end
 
-function get_projection_filename(dir;label="test")
-  dir * "/basis_$(label).jld"
+function DrWatson.save(dir,s::Union{AbstractSnapshots,BlockSnapshots};label="")
+  snaps_dir = get_filename(dir,"snapshots",label)
+  serialize(snaps_dir,s)
 end
 
-function DrWatson.save(dir,b::Projection;kwargs...)
-  serialize(get_projection_filename(dir;kwargs...),b)
+function load_snapshots(dir;label="")
+  snaps_dir = get_filename(dir,"snapshots",label)
+  deserialize(snaps_dir)
 end
 
-function get_decomposition_filename(dir;label="res")
-  dir * "/affdec_$(label).jld"
+function DrWatson.save(dir,stats::NamedTuple;label="")
+  stats_dir = get_filename(dir,"stats",label)
+  serialize(stats_dir,s)
 end
 
-function DrWatson.save(dir,ad::AffineDecomposition;kwargs...)
-  serialize(get_decomposition_filename(dir;kwargs...),ad)
+function load_stats(dir;label="")
+  stats_dir = get_filename(dir,"stats",label)
+  deserialize(stats_dir)
 end
 
-function DrWatson.save(dir,op::PGMDEIMOperator;kwargs...)
-  save(dir,op.op;kwargs...)
-  for (i,ad_res) in enumerate(op.rhs.values)
-    save(dir,ad_res;label="res_$i")
+function DrWatson.save(dir,b::Projection;label="")
+  proj_dir = get_filename(dir,"basis",label)
+  serialize(proj_dir,b)
+end
+
+function load_projection(dir;label="")
+  proj_dir = get_filename(dir,"basis",label)
+  deserialize(proj_dir)
+end
+
+function DrWatson.save(dir,r::FESubspace;label="")
+  save(dir,get_basis(r);label)
+end
+
+function load_fe_subspace(dir,f::FESpace;label="")
+  basis = load_projection(dir;label)
+  fe_subspace(f,basis)
+end
+
+function DrWatson.save(dir,ad::AffineDecomposition;label="")
+  ad_dir = get_filename(dir,"affdec",label)
+  serialize(ad_dir,ad)
+end
+
+function load_decomposition(dir;label="")
+  ad_dir = get_filename(dir,"affdec",label)
+  deserialize(ad_dir)
+end
+
+function DrWatson.save(dir,contrib::AffineContribution;label::String="")
+  for (i,c) in enumerate(get_values(contrib))
+    save(dir,c;label=_get_label(label,i))
   end
-  for (i,ad_jac) in enumerate(op.lhs.values)
-    save(dir,ad_jac;label="jac_$i")
-  end
 end
 
-function DrWatson.save(dir,op::PGOperator;kwargs...)
-  btest = get_basis(get_test(op))
-  btrial = get_basis(get_trial(op))
-  save(dir,btest;label="test")
-  save(dir,btest;label="trial")
+function load_contribution(dir,trian,args...;label::String="")
+  dec,redt = (),()
+  for (i,t) in enumerate(trian)
+    deci = load_decomposition(dir;label=_get_label(label,i))
+    redti = reduce_triangulation(t,get_integration_domain(adi),args...)
+    if isa(redti,AbstractArray)
+      redti = ParamDataStructures.merge_triangulations(redti)
+    end
+    dec = (dec...,deci)
+    redt = (redt...,redti)
+  end
+  return Contribution(dec,redt)
+end
+
+function DrWatson.save(dir,op::PGOperator;label="")
+  save(dir,get_test(op);label=_get_label(label,"test"))
+  save(dir,get_trial(op);label=_get_label(label,"trial"))
+end
+
+function load_pg_operator(dir,feop::ParamFEOperatorWithTrian;label="")
+  op = get_algebraic_operator(feop)
+  test = load_fe_subspace(dir,get_test(feop);label=_get_label(label,"test"))
+  trial = load_fe_subspace(dir,get_trial(feop);label=_get_label(label,"trial"))
+  return PGOperator(feop,trial,test)
+end
+
+function DrWatson.save(dir,op::PGMDEIMOperator;label="")
+  save(dir,op.op;label)
+  save(dir,op.rhs;label=_get_label(label,"rhs"))
+  save(dir,op.lhs;label=_get_label(label,"lhs"))
+end
+
+function load_operator(dir,feop::ParamFEOperatorWithTrian;label="")
+  trian_res = feop.trian_res
+  trian_jac = feop.trian_jac
+  pop = load_pg_operator(dir,feop)
+
+  red_rhs = load_contribution(dir,trian_res,get_test(op);label=_get_label(label,"rhs"))
+  red_lhs = load_contribution(dir,trian_jac,get_trial(op),get_test(op);label=_get_label(label,"lhs"))
+  trians_rhs = get_domains(red_rhs)
+  trians_lhs = get_domains(red_lhs)
+  new_op = change_triangulation(op,trians_rhs,trians_lhs)
+  op = PGMDEIMOperator(new_op,red_lhs,red_rhs)
+  return op
+end
+
+function DrWatson.save(dir,op::LinearNonlinearPGMDEIMOperator;label="")
+  save(dir,get_linear_operator(op);label=_get_label(label,"linear"))
+  save(dir,get_nonlinear_operator(op);label=_get_label(label,"nonlinear"))
+end
+
+function load_operator(dir,feop::LinearNonlinearParamFEOperatorWithTrian;label="")
+  op_lin = load_operator(dir,get_linear_operator(feop);label=_get_label(label,"linear"))
+  op_nlin = load_operator(dir,get_nonlinear_operator(feop);label=_get_label(label,"nonlinear"))
+  LinearNonlinearParamFEOperatorWithTrian(op_lin,op_nlin)
 end
 
 """
@@ -153,12 +204,14 @@ function rb_results(solver::RBSolver,op::RBOperator,args...)
   rb_results(solver,feop,args...)
 end
 
-function get_results_filename(dir)
-  dir * "/results.jld"
+function DrWatson.save(dir,r::RBResults;label="")
+  results_dir = get_filename(dir,"results",label)
+  serialize(results_dir,r)
 end
 
-function DrWatson.save(dir,r::RBResults)
-  serialize(get_results_filename(dir),r)
+function load_results(dir;label="")
+  results_dir = get_filename(dir,"results",label)
+  deserialize(results_dir,r)
 end
 
 function Utils.compute_relative_error(norm_style::EnergyNorm,feop,son,son_approx)

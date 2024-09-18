@@ -86,7 +86,7 @@ create_dir(test_dir)
 
 # RB method
 
-fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
+fesnaps,festats = fe_snapshots(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)

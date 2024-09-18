@@ -115,7 +115,7 @@ rbsolver = RBSolver(odesolver,ϵ;nparams_state=50,nparams_res=50,nparams_jac=30,
 lu_rbsolver = RBSolver(lu_odesolver,ϵ;nparams_state=50,nparams_res=50,nparams_jac=30,nparams_test=10)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","model_circle_2d")))
 
-fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
+fesnaps,festats = fe_snapshots(rbsolver,feop,xh0μ)
 save(test_dir,fesnaps)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats,cache = solve(lu_rbsolver,rbop,fesnaps)

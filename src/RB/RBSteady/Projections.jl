@@ -36,13 +36,13 @@ num_fe_dofs(a::SteadyProjection) = num_space_dofs(a)
 num_reduced_dofs(a::SteadyProjection) = num_reduced_space_dofs(a)
 
 function Projection(red::PODReduction,s::AbstractSteadySnapshots,args...)
-  basis = projection(red,s,args...)
+  basis = reduction(red,s,args...)
   basis′ = recast(s,basis)
   PODBasis(basis′)
 end
 
 function Projection(red::TTSVDReduction,s::AbstractSteadySnapshots,args...)
-  cores = projection(red,s,args...)
+  cores = reduction(red,s,args...)
   cores′ = recast(s,cores)
   index_map = get_index_map(s)
   TTSVDCores(cores′,index_map)
@@ -272,7 +272,7 @@ function add_space_supremizers(basis_space::ArrayBlock,norm_matrix::AbstractMatr
   return [basis_primal,basis_dual...]
 end
 
-function add_tt_supremizers(cores_space::ArrayBlock,norm_matrix::BlockGenericRankTensor,supr_op::BlockGenericRankTensor)
+function add_tt_supremizers(cores_space::ArrayBlock,norm_matrix::BlockRankTensor,supr_op::BlockRankTensor)
   pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
   cores_primal = map(ip -> cores_space[ip],pblocks)
   cores_dual = map(id -> cores_space[id],dblocks)

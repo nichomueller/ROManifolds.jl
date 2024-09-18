@@ -37,6 +37,27 @@ import ArraysOfArrays: innersize
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
 
+export ReductionStyle
+export SearchSVDRank
+export FixedSVDRank
+export LRApproxRank
+export TTSVDRanks
+export NormStyle
+export EuclideanNorm
+export EnergyNorm
+export AbstractReduction
+export DirectReduction
+export GreedyReduction
+export AffineStructure
+export AbstractPODReduction
+export PODReduction
+export TTSVDReduction
+export SupremizerReduction
+export AbstractMDEIMReduction
+export MDEIMReduction
+export AdaptiveReduction
+include("ReductionMethods.jl")
+
 export AbstractSnapshots
 export GenericSnapshots
 export SnapshotsAtIndices
@@ -61,31 +82,13 @@ export BlockCore
 export cat_cores
 include("TTCores.jl")
 
-export ReductionStyle
-export SearchSVDRank
-export FixedSVDRank
-export SearchTTSVDRanks
-export FixedTTSVDRanks
-export NormStyle
-export EuclideanNorm
-export EnergyNorm
-export AbstractReduction
-export DirectReduction
-export GreedyReduction
-export AbstractPODReduction
-export PODReduction
-export TTSVDReduction
-export SupremizerReduction
-export AbstractMDEIMReduction
-export MDEIMReduction
 export RBSolver
-export create_dir
 export get_fe_solver
-export fe_solutions
+export fe_snapshots
 export nonlinear_rb_solve!
 include("RBSolver.jl")
 
-export projection
+export reduction
 export truncated_pod
 export ttsvd
 export gram_schmidt!
@@ -159,7 +162,11 @@ include("PGMDEIMOperator.jl")
 
 export RBResults
 export rb_results
+export create_dir
 export load_solve
+export load_snapshots
+export load_operator
+export load_results
 include("PostProcess.jl")
 
 end # module

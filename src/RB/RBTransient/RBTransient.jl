@@ -38,6 +38,10 @@ import UnPack: @unpack
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
 
+export TransientPODReduction
+export TransientMDEIMReduction
+include("ReductionMethods.jl")
+
 export AbstractTransientSnapshots
 export TransientGenericSnapshots
 export TransientMultiValueSnapshots
@@ -50,8 +54,6 @@ include("Snapshots.jl")
 export get_stage_operator
 include("ThetaMethod.jl")
 
-export TransientPODReduction
-export TransientMDEIMReduction
 include("RBSolver.jl")
 
 include("BasisConstruction.jl")

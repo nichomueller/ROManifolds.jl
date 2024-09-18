@@ -1,198 +1,4 @@
 """
-    create_dir(dir::String) -> Nothing
-
-Recursive creation of a directory `dir`
-
-"""
-function create_dir(dir::String)
-  if !isdir(dir)
-    parent_dir, = splitdir(dir)
-    create_dir(parent_dir)
-    mkdir(dir)
-  end
-  return
-end
-
-abstract type ReductionStyle end
-
-struct SearchSVDRank <: ReductionStyle
-  tol::Float64
-end
-
-struct FixedSVDRank <: ReductionStyle
-  rank::Int
-end
-
-struct SearchTTSVDRanks <: ReductionStyle
-  tols::Vector{Float64}
-end
-
-SearchTTSVDRanks(tol::Float64,N=3) = SearchTTSVDRanks(fill(tol,N))
-
-Base.size(r::SearchTTSVDRanks) = (length(r.tols),)
-Base.getindex(r::SearchTTSVDRanks,i::Integer) = SearchSVDRank(r.tols[i])
-
-struct FixedTTSVDRanks <: ReductionStyle
-  ranks::Vector{Int}
-end
-
-FixedTTSVDRanks(rank::Float64,N=3) = FixedTTSVDRanks(fill(rank,N))
-
-Base.size(r::FixedTTSVDRanks) = (length(r.ranks),)
-Base.getindex(r::FixedTTSVDRanks,i::Integer) = FixedSVDRank(r.ranks[i])
-
-abstract type NormStyle end
-
-get_norm(n::NormStyle) = @abstractmethod
-
-struct EuclideanNorm <: NormStyle end
-
-struct EnergyNorm <: NormStyle
-  norm_op::Function
-end
-
-get_norm(n::EnergyNorm) = n.norm_op
-
-abstract type AbstractReduction{A<:ReductionStyle,B<:NormStyle} end
-abstract type DirectReduction{A,B} <: AbstractReduction{A,B} end
-abstract type GreedyReduction{A,B} <: AbstractReduction{A,B} end
-
-get_reduction(r::AbstractReduction) = r
-ReductionStyle(r::AbstractReduction) = @abstractmethod
-NormStyle(r::AbstractReduction) = @abstractmethod
-ParamDataStructures.num_params(r::AbstractReduction) = @abstractmethod
-get_norm(r::AbstractReduction) = get_norm(NormStyle(r))
-
-abstract type AbstractPODReduction{A,B} <: DirectReduction{A,B} end
-
-struct PODReduction{A,B} <: AbstractPODReduction{A,B}
-  red_style::A
-  norm_style::B
-  nparams::Int
-end
-
-function PODReduction(red_style::ReductionStyle,norm_style::NormStyle=EuclideanNorm();nparams=50)
-  PODReduction(red_style,norm_style,nparams)
-end
-
-function PODReduction(red_style::ReductionStyle,norm_op::Function;kwargs...)
-  norm_style = EnergyNorm(norm_op)
-  PODReduction(red_style,norm_style;kwargs...)
-end
-
-function PODReduction(tol::Float64,args...;kwargs...)
-  red_style = SearchSVDRank(tol)
-  PODReduction(red_style,args...;kwargs...)
-end
-
-function PODReduction(rank::Int,args...;kwargs...)
-  red_style = FixedSVDRank(rank)
-  PODReduction(red_style,args...;kwargs...)
-end
-
-ReductionStyle(r::PODReduction) = r.red_style
-NormStyle(r::PODReduction) = r.norm_style
-ParamDataStructures.num_params(r::PODReduction) = r.nparams
-
-struct TTSVDReduction{A<:ReductionStyle,B} <: DirectReduction{A,B}
-  red_style::A
-  norm_style::B
-  nparams::Int
-end
-
-function TTSVDReduction(red_style::ReductionStyle,norm_style::NormStyle=EuclideanNorm();nparams=50)
-  TTSVDReduction(red_style,norm_style,nparams)
-end
-
-function TTSVDReduction(red_style::ReductionStyle,norm_op::Function;kwargs...)
-  norm_style = EnergyNorm(norm_op)
-  TTSVDReduction(red_style,norm_style;kwargs...)
-end
-
-function TTSVDReduction(tols::Vector{Float64},args...;kwargs...)
-  red_style = SearchTTSVDRanks(tols)
-  TTSVDReduction(red_style,args...;kwargs...)
-end
-
-function TTSVDReduction(ranks::Vector{Int},args...;D=3,kwargs...)
-  red_style = FixedTTSVDRanks(ranks)
-  TTSVDReduction(red_style,args...;kwargs...)
-end
-
-function TTSVDReduction(tol::Float64,args...;D=3,kwargs...)
-  red_style = SearchTTSVDRanks(tol;D)
-  TTSVDReduction(red_style,args...;kwargs...)
-end
-
-function TTSVDReduction(rank::Int,args...;D=3,kwargs...)
-  red_style = FixedTTSVDRanks(rank;D)
-  TTSVDReduction(red_style,args...;kwargs...)
-end
-
-Base.size(r::TTSVDReduction) = (length(r.tols),)
-Base.getindex(r::TTSVDReduction,i::Integer) = FixedSVDRank(r.ranks[i])
-
-ReductionStyle(r::TTSVDReduction) = r.red_style
-NormStyle(r::TTSVDReduction) = r.norm_style
-ParamDataStructures.num_params(r::TTSVDReduction) = r.nparams
-
-struct SupremizerReduction{A,R<:AbstractReduction{A,EnergyNorm}} <: AbstractReduction{A,EnergyNorm}
-  reduction::R
-  supr_op::Function
-  supr_tol::Float64
-end
-
-for f in (:PODReduction,:TTSVDReduction)
-  @eval begin
-    function $f(red_style::ReductionStyle,norm_op::Function,supr_op::Function,args...;supr_tol=1e-2,kwargs...)
-      reduction = $f(red_style,norm_op,args...;kwargs...)
-      SupremizerReduction(reduction,supr_op,supr_tol)
-    end
-
-    function $f(norm_op::Function,supr_op::Function,args...;supr_tol=1e-2,kwargs...)
-      reduction = $f(norm_op,args...;kwargs...)
-      SupremizerReduction(reduction,supr_op,supr_tol)
-    end
-  end
-end
-
-get_supr(r::SupremizerReduction) = r.supr_op
-get_supr_tol(r::SupremizerReduction) = r.supr_tol
-
-get_reduction(r::SupremizerReduction) = get_reduction(r.reduction)
-ReductionStyle(r::SupremizerReduction) = ReductionStyle(get_reduction(r))
-NormStyle(r::SupremizerReduction) = NormStyle(get_reduction(r))
-ParamDataStructures.num_params(r::SupremizerReduction) = num_params(get_reduction(r))
-
-# generic constructor
-
-function Reduction(red_style::Union{SearchSVDRank,FixedSVDRank},args...;kwargs...)
-  PODReduction(red_style,args...;kwargs...)
-end
-
-function Reduction(red_style::Union{SearchTTSVDRanks,FixedTTSVDRanks},args...;kwargs...)
-  TTSVDReduction(red_style,args...;kwargs...)
-end
-
-abstract type AbstractMDEIMReduction{A} <: AbstractReduction{A,EuclideanNorm} end
-
-struct MDEIMReduction{A,R<:AbstractReduction{A,EuclideanNorm}} <: AbstractMDEIMReduction{A}
-  reduction::R
-  nparams_test::Int
-end
-
-function MDEIMReduction(red_style::ReductionStyle,args...;nparams_test=10,kwargs...)
-  reduction = Reduction(red_style,args...;kwargs...)
-  MDEIMReduction(reduction,nparams_test)
-end
-
-get_reduction(r::MDEIMReduction) = get_reduction(r.reduction)
-ReductionStyle(r::MDEIMReduction) = ReductionStyle(get_reduction(r))
-NormStyle(r::MDEIMReduction) = NormStyle(get_reduction(r))
-ParamDataStructures.num_params(r::MDEIMReduction) = num_params(get_reduction(r))
-num_online_params(r::MDEIMReduction) = r.nparams_test
-
-"""
     struct RBSolver{A,B,C,D} end
 
 Wrapper around a FE solver (e.g. [`FESolver`](@ref) or [`ODESolver`](@ref)) with
@@ -287,14 +93,14 @@ jac_params(s::RBSolver) = 1:num_jac_params(s)
 ParamDataStructures.num_params(s::RBSolver) = num_offline_params(s) + num_online_params(s)
 
 """
-    fe_solutions(solver::RBSolver,op::ParamFEOperator;kwargs...) -> AbstractSteadySnapshots
-    fe_solutions(solver::RBSolver,op::TransientParamFEOperator;kwargs...) -> AbstractTransientSnapshots
+    fe_snapshots(solver::RBSolver,op::ParamFEOperator;kwargs...) -> AbstractSteadySnapshots
+    fe_snapshots(solver::RBSolver,op::TransientParamFEOperator;kwargs...) -> AbstractTransientSnapshots
 
 The problem is solved several times, and the solution snapshots are returned along
 with the information related to the computational expense of the FE method
 
 """
-function fe_solutions(
+function fe_snapshots(
   solver::RBSolver,
   op::ParamFEOperator;
   nparams=num_params(solver),
@@ -309,7 +115,7 @@ function fe_solutions(
 end
 
 function Algebra.solve(rbsolver::RBSolver,feop,args...;kwargs...)
-  fesnaps = fe_solutions(rbsolver,feop,args...)
+  fesnaps = fe_snapshots(rbsolver,feop,args...)
   rbop = reduced_operator(rbsolver,feop,fesnaps)
   rbsnaps = solve(rbsolver,rbop,fesnaps)
   results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)

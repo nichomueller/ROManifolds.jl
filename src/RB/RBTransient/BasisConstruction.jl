@@ -1,6 +1,6 @@
 # tt-svd
 
-function RBSteady.projection(
+function RBSteady.reduction(
   red::TTSVDReduction,
   A::AbstractTransientSnapshots{T,N},
   X::AbstractRankTensor) where {T,N}
@@ -12,7 +12,7 @@ function RBSteady.projection(
   return cores
 end
 
-function RBSteady.projection(
+function RBSteady.reduction(
   red::TTSVDReduction,
   A::TransientMultiValueSnapshots{T,N},
   X::AbstractRankTensor) where {T,N}
@@ -26,7 +26,7 @@ function RBSteady.projection(
   return cores
 end
 
-function check_orthogonality(cores::AbstractVector{<:AbstractArray{T,3}},X::AbstractTProductTensor) where T
+function check_orthogonality(cores::AbstractVector{<:AbstractArray{T,3}},X::AbstractRankTensor) where T
   Xglobal_space = kron(X)
   cores_space...,core_time = cores
   basis_space = cores2basis(cores_space...)

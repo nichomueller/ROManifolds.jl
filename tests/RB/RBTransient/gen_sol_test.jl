@@ -88,7 +88,7 @@ for n in (8,10,12,15)
   rbsolver = RBSolver(fesolver,state_reduction;nparams_test=10,nparams_res=30,nparams_jac=20)
   test_dir = datadir(joinpath("heateq","3dcube_tensor_train_$(n)"))
 
-  fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
+  fesnaps,festats = fe_snapshots(rbsolver,feop,uh0μ)
   save(test_dir,fesnaps)
 
   println(festats)
@@ -110,6 +110,6 @@ for n in (8,10,12,15)
   # rbsolver = RBSolver(fesolver,state_reduction;nparams_test=10,nparams_res=30,nparams_jac=20)
   # test_dir = datadir(joinpath("heateq","3dcube_$(n)"))
 
-  # fesnaps = fe_solutions(rbsolver,feop,uh0μ)
+  # fesnaps = fe_snapshots(rbsolver,feop,uh0μ)
   # save(test_dir,fesnaps)
 end

@@ -122,7 +122,7 @@ for n in (8,10,12,15)
   test_dir = datadir(joinpath("navier-stokes","3dcube_tensor_train_$(n)"))
   create_dir(test_dir)
 
-  fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
+  fesnaps,festats = fe_snapshots(rbsolver,feop,xh0μ)
   save(test_dir,fesnaps)
 
   println(festats)
@@ -151,7 +151,7 @@ for n in (8,10,12,15)
   # test_dir = datadir(joinpath("navier-stokes","3dcube_$(n)"))
   # create_dir(test_dir)
 
-  # fesnaps = fe_solutions(rbsolver,feop,xh0μ)
+  # fesnaps = fe_snapshots(rbsolver,feop,xh0μ)
   # save(test_dir,fesnaps)
 end
 

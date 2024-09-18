@@ -122,7 +122,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = RBSolver(fesolver,ϵ;nparams_state=50,nparams_test=10,nsnaps_mdeim=20)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
-fesnaps,festats = fe_solutions(rbsolver,feop,uh0μ)
+fesnaps,festats = fe_snapshots(rbsolver,feop,uh0μ)
 X = assemble_norm_matrix(feop)
 
 red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
@@ -204,7 +204,7 @@ info = RBInfo(dir;norm_style=[:l2,:l2],nparams_state=50,nparams_test=10,nsnaps_m
 
 rbsolver = RBSolver(info,fesolver)
 
-snaps,comp = fe_solutions(rbsolver,feop,xh0μ)
+snaps,comp = fe_snapshots(rbsolver,feop,xh0μ)
 
 norm_matrix = RB.assemble_norm_matrix(feop)
 soff = select_snapshots(snaps,RB.offline_params(info))

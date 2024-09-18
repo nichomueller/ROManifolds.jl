@@ -1,14 +1,14 @@
-function projection(red::AbstractReduction,A::AbstractArray)
+function reduction(red::AbstractReduction,A::AbstractArray)
   @abstractmethod
 end
 
-function projection(red::PODReduction,A::AbstractArray,args...)
+function reduction(red::PODReduction,A::AbstractArray,args...)
   red_style = ReductionStyle(red)
   U,S,V = tpod(red_style,A,args...)
   return U
 end
 
-function projection(red::TTSVDReduction,A::AbstractArray,args...)
+function reduction(red::TTSVDReduction,A::AbstractArray,args...)
   red_style = ReductionStyle(red)
   cores,remainder = ttsvd(red_style,A,args...)
   return cores
@@ -50,12 +50,16 @@ function truncated_svd(red_style::FixedSVDRank,M::AbstractMatrix;issquare=false)
   return Ur,Sr,Vr
 end
 
+function truncated_svd(red_style::LRApproxRank,M::AbstractMatrix;kwargs...)
+  psvd(M,red_style.opts)
+end
+
 function tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
   tpod(red_style,M,_cholesky_decomp(X)...)
 end
 
 function tpod(red_style::ReductionStyle,M::AbstractMatrix,args...)
-  if isa(red_style,SearchSVDRank) && _size_cond(M)
+  if _size_cond(M) && red_style != LRApproxRank()
     if size(M,1) > size(M,2)
       massive_rows_tpod(red_style,M,args...)
     else
@@ -94,6 +98,7 @@ function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::Abstra
 end
 
 function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix)
+  @warn "possibly incorrect V matrix"
   MM = M*M'
   Ur,Sr,_ = truncated_svd(red_style,MM;issquare=true)
   Vr = inv(Diagonal(Sr).+eps())*(Ur'M)
@@ -101,6 +106,7 @@ function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix)
 end
 
 function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
+  @warn "possibly incorrect V matrix"
   XM = L'*M[p,:]
   MXM = XM*XM'
   Ũr,Sr,_ = truncated_svd(red_style,MXM;issquare=true)
@@ -147,8 +153,8 @@ function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N}) where {T,N}
   return cores,A_d
 end
 
-function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRank1Tensor) where {T,N}
-  Nspace = length(get_factors(X))
+function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRankTensor{D,1}) where {T,N,D}
+  Nspace = D
   @check Nspace ≤ N-1
 
   cores = Array{T,3}[]
@@ -164,10 +170,10 @@ function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRank1T
   return cores,A_d
 end
 
-function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRankTensor) where {T,N}
-  cores_k,remainders_k = map(k -> ttsvd(red_style,A,X[k]),1:rank(X)) |> tuple_of_arrays
+function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRankTensor{D,K}) where {T,N,D,K}
+  cores_k,remainders_k = map(k -> ttsvd(red_style,A,X[k]),1:K) |> tuple_of_arrays
   cores = Array{T,3}[]
-  for d in eachindex(first(cores_k))
+  for d in 1:D
     touched = d == 1 ? fill(true,rank(X)) : I(rank(X))
     cores_d = getindex.(cores_k,d)
     push!(cores,BlockCore(cores_d,touched))
@@ -177,7 +183,7 @@ function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRankTe
   return cores,A_d
 end
 
-function projection(
+function reduction(
   red::TTSVDReduction,
   A::MultiValueSnapshots{T,N},
   X::AbstractRankTensor) where {T,N}
@@ -197,7 +203,7 @@ function pivoted_qr(A;tol=1e-10)
   return Q,R
 end
 
-function orthogonalize!(cores,X::AbstractTProductTensor)
+function orthogonalize!(cores,X::AbstractRankTensor)
   weight = ones(1,rank(X),1)
   decomp = get_decomposition(X)
   for d in eachindex(cores)
@@ -345,7 +351,7 @@ end
 
 # for testing purposes
 
-function check_orthogonality(cores::AbstractVector{<:AbstractArray{T,3}},X::AbstractTProductTensor) where T
+function check_orthogonality(cores::AbstractVector{<:AbstractArray{T,3}},X::AbstractRankTensor) where T
   Xglobal = kron(X)
   basis = dropdims(_cores2basis(cores...);dims=1)
   isorth = norm(basis'*Xglobal*basis - I) ≤ 1e-10
