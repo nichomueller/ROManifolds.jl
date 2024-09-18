@@ -25,7 +25,7 @@ bu = [red_trial.basis.cores_space...,red_trial.basis.core_time]
 # cache = zeros(size(r12,3),size(r12,4))
 # _getindex(cache,r12,r3,1,1,1,1)
 
-# res_red = compress_cores(TransientTTSVD(b[1:4],b[5],rres.index_map),red_trial.basis)
+# res_red = reduced_cores(TransientTTSVD(b[1:4],b[5],rres.index_map),red_trial.basis)
 v1ok = compress_core(b[1],bu[1])
 v1 = RBSteady.contraction(bu[1],b[1])
 

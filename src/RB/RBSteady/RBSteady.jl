@@ -106,6 +106,7 @@ export SteadyProjection
 export PODBasis
 export TTSVDCores
 export BlockProjection
+export projection
 export get_basis_space
 export num_fe_dofs
 export num_reduced_dofs
@@ -136,7 +137,7 @@ include("PGOperator.jl")
 
 export ReducedAlgebraicOperator
 export reduce_operator
-export compress_cores
+export reduced_cores
 export compress_core
 export multiply_cores
 include("ReducedAlgebraicOperator.jl")

@@ -62,7 +62,7 @@ end
 # TT interface
 
 function RBSteady.reduce_operator(b::TransientTTSVDCores,b_test::TransientTTSVDCores)
-  b̂st = compress_cores(b,b_test)
+  b̂st = reduced_cores(b,b_test)
   return ReducedAlgebraicOperator(b̂st)
 end
 
@@ -72,7 +72,7 @@ function RBSteady.reduce_operator(
   b_test::TransientTTSVDCores,
   combine::Function)
 
-  b̂st = compress_cores(b,b_trial,b_test,combine)
+  b̂st = reduced_cores(b,b_trial,b_test,combine)
   return ReducedAlgebraicOperator(b̂st)
 end
 

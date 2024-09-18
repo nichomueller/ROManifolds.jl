@@ -56,12 +56,12 @@ end
 # TT interface
 
 function reduce_operator(b::TTSVDCores,b_test::TTSVDCores)
-  b̂st = compress_cores(b,b_test)
+  b̂st = reduced_cores(b,b_test)
   return ReducedAlgebraicOperator(b̂st)
 end
 
 function reduce_operator(b::TTSVDCores,b_trial::TTSVDCores,b_test::TTSVDCores)
-  b̂st = compress_cores(b,b_trial,b_test)
+  b̂st = reduced_cores(b,b_trial,b_test)
   return ReducedAlgebraicOperator(b̂st)
 end
 

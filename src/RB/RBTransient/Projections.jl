@@ -18,7 +18,7 @@ num_reduced_times(a::TransientProjection) = @abstractmethod
 RBSteady.num_fe_dofs(a::TransientProjection) = num_space_dofs(a)*num_times(a)
 RBSteady.num_reduced_dofs(a::TransientProjection) = RBSteady.num_reduced_space_dofs(a)*num_reduced_times(a)
 
-function RBSteady.Projection(red::TransientPODReduction,s::AbstractTransientSnapshots,args...)
+function RBSteady.projection(red::TransientPODReduction,s::AbstractTransientSnapshots,args...)
   s′ = flatten_snapshots(s)
   basis_space = reduction(get_reduction_space(red),s′,args...)
   basis_space′ = recast(s,basis_space)
@@ -27,7 +27,7 @@ function RBSteady.Projection(red::TransientPODReduction,s::AbstractTransientSnap
   TransientPODBasis(basis_space′,basis_time)
 end
 
-function RBSteady.Projection(red::TTSVDReduction,s::AbstractTransientSnapshots,args...)
+function RBSteady.projection(red::TTSVDReduction,s::AbstractTransientSnapshots,args...)
   cores_space...,core_time = reduction(red,s,args...)
   cores_space′ = recast(s,cores_space)
   index_map = get_index_map(s)
@@ -102,13 +102,13 @@ function get_basis_spacetime(index_map::AbstractIndexMap,cores...)
   cores2basis(RBSteady._cores2basis(index_map,cores_space...),core_time)
 end
 
-function RBSteady.compress_cores(core::TransientTTSVDCores,basis_test::TransientTTSVDCores)
+function RBSteady.reduced_cores(core::TransientTTSVDCores,basis_test::TransientTTSVDCores)
   ccores = map((a,btest)->compress_core(a,btest),get_cores(core),get_cores(basis_test))
   ccore = multiply_cores(ccores...)
   RBSteady._dropdims(ccore)
 end
 
-function RBSteady.compress_cores(
+function RBSteady.reduced_cores(
   cores::TransientTTSVDCores,
   basis_trial::TransientTTSVDCores,
   basis_test::TransientTTSVDCores,

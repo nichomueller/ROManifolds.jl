@@ -11,13 +11,38 @@ Subtypes:
 - [`ReducedAlgebraicOperator`](@ref)
 
 """
-abstract type Projection end
+abstract type Projection <: Map end
 
-get_basis_space(a::Projection) = @abstractmethod
-num_space_dofs(a::Projection) = @abstractmethod
-num_reduced_space_dofs(a::Projection) = @abstractmethod
+struct InvProjection{P} <: Projection
+  projection::P
+end
+
+Base.adjoint(a::Projection) = InvProjection(a)
+
+Base.:*(a::InvProjection,x::AbstractArray) = inv_project(a.projection,x)
+Base.:*(a::Projection,x::AbstractArray) = project(a,x)
+
+function project(a::Projection,x::AbstractArray)
+  basis = get_basis(a)
+  x̂ = basis'*x
+  return x̂
+end
+
+function inv_project(a::Projection,x̂::AbstractArray)
+  basis = get_basis(a)
+  x = basis*x̂
+  return x
+end
+
+get_basis(a::Projection) = @abstractmethod
 num_fe_dofs(a::Projection) = @abstractmethod
 num_reduced_dofs(a::Projection) = @abstractmethod
+
+function projection(red::AbstractReduction,s::AbstractSnapshots,args...)
+  basis = reduction(red,s,args...)
+  index_map = get_index_map(s)
+  projection(red,basis,index_map)
+end
 
 """
     abstract type SteadyProjection <: Projection end
@@ -27,38 +52,9 @@ the function Projection
 
 Subtypes:
 - [`PODBasis`](@ref)
-- [`TTSVDCores`](@ref)
 
 """
 abstract type SteadyProjection <: Projection end
-
-num_fe_dofs(a::SteadyProjection) = num_space_dofs(a)
-num_reduced_dofs(a::SteadyProjection) = num_reduced_space_dofs(a)
-
-function Projection(red::PODReduction,s::AbstractSteadySnapshots,args...)
-  basis = reduction(red,s,args...)
-  basis′ = recast(s,basis)
-  PODBasis(basis′)
-end
-
-function Projection(red::TTSVDReduction,s::AbstractSteadySnapshots,args...)
-  cores = reduction(red,s,args...)
-  cores′ = recast(s,cores)
-  index_map = get_index_map(s)
-  TTSVDCores(cores′,index_map)
-end
-
-"""
-    recast(x̂::AbstractVector,a::Projection) -> AbstractVector
-
-Returns the action of the transposed Projection operator `a` on `x̂`
-
-"""
-function IndexMaps.recast(x̂::AbstractVector,a::SteadyProjection)
-  basis = get_basis_space(a)
-  x = basis*x̂
-  return x
-end
 
 """
     struct PODBasis{A<:AbstractMatrix} <: SteadyProjection
@@ -66,53 +62,91 @@ end
 SteadyProjection stemming from a truncated proper orthogonal decomposition [`truncated_pod`](@ref)
 
 """
-struct PODBasis{A<:AbstractMatrix} <: SteadyProjection
+struct PODBasis{A<:AbstractMatrix,I<:AbstractIndexMap} <: SteadyProjection
   basis::A
+  index_map::I
 end
 
-get_basis_space(a::PODBasis) = a.basis
-num_space_dofs(a::PODBasis) = size(get_basis_space(a),1)
-num_reduced_space_dofs(a::PODBasis) = size(get_basis_space(a),2)
+function projection(::PODReduction,basis::AbstractMatrix,index_map::AbstractIndexMap)
+  PODBasis(basis,index_map)
+end
+
+get_basis(a::PODBasis) = a.basis
+num_fe_dofs(a::PODBasis) = size(get_basis(a),1)
+num_reduced_dofs(a::PODBasis) = size(get_basis(a),2)
+
+IndexMaps.get_index_map(a::PODBasis) = a.index_map
+IndexMaps.recast(a::PODBasis) = recast(get_basis(a),get_index_map(a))
 
 # TT interface
 
 """
-    TTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I} <: SteadyProjection
+    TTSVDCores{A<:AbstractVector{<:AbstractArray{T,D}},I} <: Projection
 
 SteadyProjection stemming from a tensor train singular value decomposition [`ttsvd`](@ref).
 An index map of type `I` is provided for indexing purposes
 
 """
-struct TTSVDCores{D,T,A<:AbstractVector{<:AbstractArray{T,D}},I} <: SteadyProjection
+struct TTSVDCores{D,A<:AbstractVector{<:AbstractArray{T,3} where T},I<:AbstractIndexMap{D}} <: Projection
   cores::A
   index_map::I
 end
 
-IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
+function projection(red::TTSVDReduction,s::AbstractSnapshots,args...)
+  cores = reduction(red,s,args...)
+  index_map = get_index_map(s)
+  TTSVDCores(cores,index_map)
+end
 
 get_cores(a::TTSVDCores) = a.cores
-get_cores_space(a::TTSVDCores) = a.cores
 
-get_basis_space(a::TTSVDCores) = cores2basis(get_index_map(a),get_cores_space(a)...)
-num_space_dofs(a::AbstractArray) = @notimplemented
-num_space_dofs(a::AbstractArray{T,3}) where T = size(a,2)
-num_space_dofs(a::TTSVDCores) = prod(num_space_dofs.(get_cores_space(a)))
-num_reduced_space_dofs(a::TTSVDCores) = size(last(get_cores_space(a)),3)
+get_basis(a::TTSVDCores) = cores2basis(get_cores(a)...)
+num_fe_dofs(a::TTSVDCores) = prod(map(c -> size(c,2),get_cores(a)))
+num_reduced_dofs(a::TTSVDCores) = size(last(get_cores(a)),3)
 
-function compress_cores(core::TTSVDCores,basis_test::TTSVDCores)
-  ccores = map((a,btest)->compress_core(a,btest),get_cores(core),get_cores(basis_test))
-  ccore = multiply_cores(ccores...)
-  _dropdims(ccore)
-end
-
-function compress_cores(core::TTSVDCores,basis_trial::TTSVDCores,basis_test::TTSVDCores)
-  ccores = map((a,btrial,btest)->compress_core(a,btrial,btest),get_cores(core),
-    get_cores(basis_trial),get_cores(basis_test))
-  ccore = multiply_cores(ccores...)
-  _dropdims(ccore)
-end
+IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
+IndexMaps.recast(a::TTSVDCores{D}) where D = recast(get_cores(a)[1:D],get_index_map(a))
 
 # multi field interface
+
+function Arrays.return_cache(::typeof(projection),::PODReduction,s::AbstractSnapshots)
+  b = testvalue(Matrix{eltype(s)})
+  i = get_index_map(s)
+  return PODBasis(b,i)
+end
+
+function Arrays.return_cache(::typeof(projection),::TTSVDReduction,s::AbstractSnapshots)
+  c = testvalue(Vector{Array{eltype(s),3}})
+  i = get_index_map(s)
+  return TTSVDCores(c,i)
+end
+
+function Arrays.return_cache(::typeof(projection),red::AbstractReduction,s::BlockSnapshots)
+  basis = return_cache(projection,red,blocks(s)[1])
+  touched = s.touched
+  block_basis = Array{typeof(basis),ndims(s)}(undef,size(s))
+  return BlockProjection(block_basis)
+end
+
+function projection(red::AbstractReduction,s::BlockSnapshots)
+  basis = return_cache(projection,red,s)
+  for i in eachindex(basis)
+    if basis.touched[i]
+      basis[i] = projection(red,s[i])
+    end
+  end
+  return basis
+end
+
+function projection(red::AbstractReduction,s::BlockSnapshots,norm_matrix)
+  basis = return_cache(projection,red,s)
+  for i in eachindex(basis)
+    if basis.touched[i]
+      basis[i] = projection(red,s[i],norm_matrix[i])
+    end
+  end
+  return basis
+end
 
 """
     struct BlockProjection{A,N} <: AbstractArray{Projection,N} end
@@ -163,69 +197,59 @@ function get_touched_blocks(a::BlockProjection)
   findall(a.touched)
 end
 
-function get_basis_space(a::BlockProjection{A,N}) where {A,N}
-  basis_space = Array{Matrix{Float64},N}(undef,size(a))
+function get_basis(a::BlockProjection{A,N}) where {A,N}
+  basis = Array{Matrix{Float64},N}(undef,size(a))
   touched = a.touched
   for i in eachindex(a)
     if touched[i]
-      basis_space[i] = get_basis_space(a[i])
+      basis[i] = get_basis(a[i])
     end
   end
-  return ArrayBlock(basis_space,a.touched)
+  return ArrayBlock(basis,a.touched)
 end
 
-function num_space_dofs(a::BlockProjection)
+function num_fe_dofs(a::BlockProjection)
   dofs = zeros(Int,length(a))
   for i in eachindex(a)
     if a.touched[i]
-      dofs[i] = num_space_dofs(a[i])
+      dofs[i] = num_fe_dofs(a[i])
     end
   end
   return dofs
 end
 
-function num_reduced_space_dofs(a::BlockProjection)
+function num_reduced_dofs(a::BlockProjection)
   dofs = zeros(Int,length(a))
   for i in eachindex(a)
     if a.touched[i]
-      dofs[i] = num_reduced_space_dofs(a[i])
+      dofs[i] = num_reduced_dofs(a[i])
     end
   end
   return dofs
 end
 
-function get_cores_space(a::BlockProjection)
-  active_block_ids = get_touched_blocks(a)
-  block_map = BlockMap(size(a),active_block_ids)
-  cores = [get_cores_space(a[i]) for i = active_block_ids]
-  return return_cache(block_map,cores...)
-end
-
-function get_cores(a::BlockProjection)
-  active_block_ids = get_touched_blocks(a)
-  block_map = BlockMap(size(a),active_block_ids)
-  cores = [get_cores(a[i]) for i = active_block_ids]
-  return return_cache(block_map,cores...)
-end
-
-function IndexMaps.get_index_map(a::BlockProjection)
-  active_block_ids = get_touched_blocks(a)
-  index_map = [get_index_map(a[i]) for i = active_block_ids]
+function IndexMaps.get_index_map(a::BlockProjection{A,N}) where {A,N}
+  T = typeof(get_index_map(first(a)))
+  index_map = Array{T,N}(undef,size(a))
+  touched = a.touched
+  for i in eachindex(a)
+    if touched[i]
+      index_map[i] = get_index_map(a[i])
+    end
+  end
   return index_map
 end
 
-function Projection(red::AbstractReduction,s::BlockSnapshots)
-  active_block_ids = get_touched_blocks(s)
-  block_map = BlockMap(size(s),active_block_ids)
-  bases = [Projection(red,s[i]) for i in active_block_ids]
-  BlockProjection(block_map,bases)
-end
-
-function Projection(red::AbstractReduction,s::BlockSnapshots,norm_matrix)
-  active_block_ids = get_touched_blocks(s)
-  block_map = BlockMap(size(s),active_block_ids)
-  bases = [Projection(red,s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
-  BlockProjection(block_map,bases)
+function get_cores(a::BlockProjection{A,N}) where {A,N}
+  T = typeof(get_cores(first(a)))
+  cores = Array{T,N}(undef,size(a))
+  touched = a.touched
+  for i in eachindex(a)
+    if touched[i]
+      cores[i] = get_cores(a[i])
+    end
+  end
+  return ArrayBlock(cores,a.touched)
 end
 
 """

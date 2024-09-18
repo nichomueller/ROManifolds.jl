@@ -170,3 +170,89 @@ function reduced_cores(
   rcore = sequential_product(rcores...)
   dropdims(rcore;dims=(1,2,3))
 end
+
+# empirical interpolation
+
+function empirical_interpolation!(cache,C::AbstractArray{T,3}) where T
+  @check size(C,1) == 1
+  c...,Iv = cache
+  A = dropdims(C;dims=1)
+  I,Ai = empirical_interpolation!(c,A)
+  push!(Iv,copy(I))
+  return I,Ai
+end
+
+function _global_index(i,local_indices::Vector{Vector{Int32}})
+  Iprev...,Ig = local_indices
+  if length(Iprev) == 0
+    return i
+  end
+  Il = last(Iprev)
+  rankl = length(Il)
+  islow = slow_index(i,rankl)
+  ifast = fast_index(i,rankl)
+  iprev = Il[ifast]
+  giprev = _global_index(iprev,Iprev)
+  return (giprev...,islow)
+end
+
+function _global_index(i,Il::Vector{Int32})
+  rankl = length(Il)
+  li = Il[fast_index(i,rankl)]
+  gi = slow_index(i,rankl)
+  return li,gi
+end
+
+function _to_split_global_indices(local_indices::Vector{Vector{Int32}},index_map::AbstractIndexMap)
+  Is...,It = local_indices
+  Igt = It
+  Igs = copy(It)
+  for (i,ii) in enumerate(Igt)
+    ilsi,igti = _global_index(ii,last(Is))
+    Igt[i] = igti
+    Igs[i] = index_map[CartesianIndex(_global_index(ilsi,Is))]
+  end
+  return Igs,Igt
+end
+
+function _to_global_indices(local_indices::Vector{Vector{Int32}},index_map::AbstractIndexMap)
+  if length(local_indices) != ndims(index_map) # this is the transient case
+    @notimplementedif length(local_indices) != ndims(index_map)+1
+    return _to_split_global_indices(local_indices,index_map)
+  end
+  Ig = local_indices[end]
+  for (i,ii) in enumerate(Ig)
+    Ig[i] = index_map[CartesianIndex(_global_index(ii,local_indices))]
+  end
+  return Ig
+end
+
+function _eim_cache(C::AbstractArray{T,3}) where T
+  m,n = size(C,2),size(C,1)
+  res = zeros(T,m)
+  I = zeros(Int32,n)
+  Iv = Vector{Int32}[]
+  return C,I,res,Iv
+end
+
+function _next_core(Aprev::AbstractMatrix{T},Cnext::AbstractArray{T,3}) where T
+  Cprev = reshape(Aprev,1,size(Aprev)...)
+  _cores2basis(Cprev,Cnext)
+end
+
+function empirical_interpolation(index_map::AbstractIndexMap,cores::AbstractArray...)
+  C,I,res,Iv = _eim_cache(first(cores))
+  for i = eachindex(cores)
+    _,Ai = empirical_interpolation!((I,res,Iv),C)
+    if i < length(cores)
+      C = _next_core(Ai,cores[i+1])
+    else
+      Ig = _to_global_indices(Iv,index_map)
+      return Ig,Ai
+    end
+  end
+end
+
+function empirical_interpolation(index_map::SparseIndexMap,cores::AbstractArray...)
+  empirical_interpolation(get_sparse_index_map(index_map),cores...)
+end

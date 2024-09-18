@@ -36,7 +36,7 @@ the snapshots `s`
 
 """
 function reduced_basis(red::AbstractReduction,s::AbstractArray,args...)
-  Projection(red,s,args...)
+  projection(red,s,args...)
 end
 
 function reduced_basis(red::AbstractReduction,feop::GridapType,s::AbstractArray)

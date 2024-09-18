@@ -37,7 +37,7 @@ X = X′'*X′ / norm(X′)^2
 # case 1
 i = TrivialIndexMap(LinearIndices((ns,)))
 s = Snapshots(v,i,r)
-basis = Projection(s,X)
+basis = projection(s,X)
 
 bs = get_basis_space(basis)
 bt = get_basis_time(basis)
@@ -53,7 +53,7 @@ s2 = RBTransient.change_mode(s1)
 nsx,nxy = 10,10
 i = IndexMap(collect(LinearIndices((nsx,nxy))))
 s = Snapshots(v,i,r)
-basis = Projection(s)
+basis = projection(s)
 
 bs = get_basis_space(basis)
 bt = get_basis_time(basis)
