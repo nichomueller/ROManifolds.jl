@@ -84,7 +84,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 rbsolver = RBSolver(fesolver,ϵ;nparams_state=50,nparams_test=10,nsnaps_mdeim=10)
 test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated_plate")))
 
-fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
+fesnaps,festats = fe_snapshots(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)

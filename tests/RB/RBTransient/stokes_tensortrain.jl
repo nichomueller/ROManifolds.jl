@@ -130,7 +130,7 @@ for n in (15,)#(8,10,12,15)
   test_dir = datadir(joinpath("navier-stokes","3dcube_tensor_train_$(n)"))
   create_dir(test_dir)
 
-  fesnaps,festats = fe_solutions(rbsolver,feop,xh0μ)
+  fesnaps,festats = fe_snapshots(rbsolver,feop,xh0μ)
   save(test_dir,fesnaps)
   # fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
 
@@ -160,7 +160,7 @@ for n in (15,)#(8,10,12,15)
   # test_dir = datadir(joinpath("navier-stokes","3dcube_$(n)"))
   # create_dir(test_dir)
 
-  # fesnaps = fe_solutions(rbsolver,feop,xh0μ)
+  # fesnaps = fe_snapshots(rbsolver,feop,xh0μ)
   # save(test_dir,fesnaps)
   # reffe_u = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
   # test_u = TestFESpace(Ω,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0"])

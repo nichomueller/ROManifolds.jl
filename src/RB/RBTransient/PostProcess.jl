@@ -1,71 +1,48 @@
-function RBSteady.deserialize_operator(feop::TransientParamFEOperatorWithTrian,dir;linearity="lin")
+function DrWatson.save(dir,op::TransientPGOperator;label="")
+  save(dir,get_test(op);label=RBSteady._get_label(label,"test"))
+  save(dir,get_trial(op);label=RBSteady._get_label(label,"trial"))
+end
+
+function RBSteady.load_pg_operator(dir,feop::TransientParamFEOperatorWithTrian;label="")
+  op = get_algebraic_operator(feop)
+  test = RBSteady.load_fe_subspace(dir,get_test(feop);label=RBSteady._get_label(label,"test"))
+  trial = RBSteady.load_fe_subspace(dir,get_trial(feop);label=RBSteady._get_label(label,"trial"))
+  return PGOperator(feop,trial,test)
+end
+
+function DrWatson.save(dir,op::TransientPGMDEIMOperator;label="")
+  save(dir,op.op;label)
+  save(dir,op.rhs;label=RBSteady._get_label(label,"rhs"))
+  save(dir,op.lhs;label=RBSteady._get_label(label,"lhs"))
+end
+
+function RBSteady.load_operator(dir,feop::TransientParamFEOperatorWithTrian;label="")
   trian_res = feop.trian_res
   trian_jacs = feop.trian_jacs
+  pop = RBSteady.load_pg_operator(dir,feop)
 
-  op = RBSteady.deserialize_pg_operator(feop,dir)
-  red_rhs = RBSteady.deserialize_contribution(dir,trian_res,get_test(op);label=linearity*"res")
+  red_rhs = RBSteady.load_contribution(dir,trian_res,get_test(op);label=_get_label(label,"rhs"))
   red_lhs = ()
   for (i,trian_jac) in enumerate(trian_jacs)
-    rlhsi = RBSteady.deserialize_contribution(dir,trian_jac,get_trial(op),get_test(op);label=linearity*"jac_$i")
+    rlhsi = RBSteady.load_contribution(dir,trian_jac,get_trial(op),get_test(op);label=_get_label(label,"lhs",i))
     red_lhs = (red_lhs...,rlhsi)
   end
-
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
   new_op = change_triangulation(op,trians_rhs,trians_lhs)
-  rbop = TransientPGMDEIMOperator(new_op,red_lhs,red_rhs)
-  return rbop
+  op = TransientPGMDEIMOperator(new_op,red_lhs,red_rhs)
+  return op
 end
 
-function DrWatson.save(dir,op::TransientPGMDEIMOperator;linearity="lin",kwargs...)
-  save(dir,op.op;kwargs...)
-  for (i,ad_res) in enumerate(op.rhs.values)
-    save(dir,ad_res;label=linearity*"res_$i")
-  end
-  for (ilhs,lhs) in enumerate(op.lhs)
-    for (i,ad_jac) in enumerate(lhs.values)
-      save(dir,ad_jac;label=linearity*"jac_$(ilhs)_$i")
-    end
-  end
+function DrWatson.save(dir,op::LinearNonlinearTransientPGMDEIMOperator;label="")
+  save(dir,get_linear_operator(op);label=RBSteady._get_label(label,"linear"))
+  save(dir,get_nonlinear_operator(op);label=RBSteady._get_label(label,"nonlinear"))
 end
 
-function RBSteady.deserialize_operator(feop::LinearNonlinearTransientParamFEOperatorWithTrian,dir)
-  op_lin = deserialize_operator(get_linear_operator(feop),dir;linearity="lin")
-  op_nlin = deserialize_operator(get_nonlinear_operator(feop),dir;linearity="nlin")
-  rbop = LinearNonlinearTransientPGMDEIMOperator(new_op,red_lhs,red_rhs)
-  return rbop
-end
-
-function DrWatson.save(dir,op::TransientPGOperator;kwargs...)
-  btest = RBSteady.get_basis(get_test(op))
-  btrial = RBSteady.get_basis(get_trial(op))
-  save(dir,btest;label="test")
-  save(dir,btrial;label="trial")
-end
-
-function DrWatson.save(dir,op::LinearNonlinearTransientPGMDEIMOperator)
-  save(dir,get_linear_operator(op);linearity="lin")
-  save(dir,get_nonlinear_operator(op);linearity="nlin")
-end
-
-function RBSteady.deserialize_operator(
-  feop::LinearNonlinearTransientParamFEOperatorWithTrian,
-  rbop::LinearNonlinearTransientPGMDEIMOperator)
-
-  rbop_lin = deserialize_operator(get_linear_operator(feop),get_linear_operator(rbop))
-  rbop_nlin = deserialize_operator(get_nonlinear_operator(feop),get_nonlinear_operator(rbop))
-  return LinearNonlinearTransientPGMDEIMOperator(rbop_lin,rbop_nlin)
-end
-
-function RBSteady.deserialize_pg_operator(feop::TransientParamFEOperatorWithTrian,dir)
-  op = get_algebraic_operator(feop)
-  fe_test = get_test(feop)
-  fe_trial = get_trial(feop)
-  basis_test = deserialize(RBSteady.get_projection_filename(dir;label="test"))
-  basis_trial = deserialize(RBSteady.get_projection_filename(dir;label="trial"))
-  test = fe_subspace(fe_test,basis_test)
-  trial = fe_subspace(fe_trial,basis_trial)
-  return TransientPGOperator(op,trial,test)
+function RBSteady.load_operator(dir,feop::LinearNonlinearTransientParamFEOperatorWithTrian;label="")
+  op_lin = load_operator(dir,get_linear_operator(feop);label=RBSteady._get_label(label,"linear"))
+  op_nlin = load_operator(dir,get_nonlinear_operator(feop);label=RBSteady._get_label(label,"nonlinear"))
+  LinearNonlinearParamFEOperatorWithTrian(op_lin,op_nlin)
 end
 
 function RBSteady.rb_results(solver::RBSolver,op::TransientRBOperator,args...)

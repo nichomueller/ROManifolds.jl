@@ -1,37 +1,35 @@
-abstract type AbstractTProductTensor{A} <: AbstractVector{A} end
+abstract type AbstractRankTensor{D,K} end
 
-get_decomposition(a::AbstractTProductTensor) = @abstractmethod
+dimension(a::AbstractRankTensor{D,K}) where {D,K} = D
+LinearAlgebra.rank(a::AbstractRankTensor{D,K}) where {D,K} = K
+get_decomposition(a::AbstractRankTensor) = @abstractmethod
 
-abstract type AbstractRank1Tensor{A} <: AbstractTProductTensor{A} end
-
-get_factors(a::AbstractRank1Tensor) = @abstractmethod
-get_decomposition(a::AbstractRank1Tensor) = get_factors(a)
-Base.size(a::AbstractRank1Tensor) = (length(get_factors(a)),)
-Base.getindex(a::AbstractRank1Tensor,d::Integer) = get_factors(a)[d]
-
-struct GenericRank1Tensor{A} <: AbstractRank1Tensor{A}
+struct Rank1Tensor{D,A<:AbstractArray} <: AbstractRankTensor{D,1}
   factors::Vector{A}
-end
-
-get_factors(a::GenericRank1Tensor) = a.factors
-
-abstract type AbstractRankTensor{A,K} <: AbstractTProductTensor{AbstractRank1Tensor{A}} end
-
-LinearAlgebra.rank(a::AbstractRankTensor{A,K} where A) where K = K
-Base.size(a::AbstractRankTensor) = (rank(a),)
-Base.getindex(a::AbstractRankTensor,k::Integer) = get_decomposition(a,k)
-get_decomposition(a::AbstractRankTensor) = ntuple(k -> getindex(a,k),Val{length(a)}())
-
-struct GenericRankTensor{A,K} <: AbstractRankTensor{A,K}
-  decompositions::Vector{GenericRank1Tensor{A}}
-  function GenericRankTensor(decompositions::Vector{GenericRank1Tensor{A}}) where A
-    K = length(decompositions)
-    new{A,K}(decompositions)
+  function Rank1Tensor(factors::Vector{A}) where A
+    D = length(factors)
+    new{D,A}(factors)
   end
 end
 
+get_factors(a::Rank1Tensor) = a.factors
+get_decomposition(a::Rank1Tensor) = get_factors(a)
+Base.size(a::Rank1Tensor) = (dimension(a),)
+Base.getindex(a::Rank1Tensor,d::Integer) = get_factors(a)[d]
+
+struct GenericRankTensor{D,K,A<:AbstractArray} <: AbstractRankTensor{D,K}
+  decompositions::Vector{Rank1Tensor{D,A}}
+  function GenericRankTensor(decompositions::Vector{Rank1Tensor{D,A}}) where {D,A}
+    K = length(decompositions)
+    new{D,K,A}(decompositions)
+  end
+end
+
+get_decomposition(a::GenericRankTensor) = ntuple(k -> getindex(a,k),Val{length(a)}())
 get_decomposition(a::GenericRankTensor,k::Integer) = a.decompositions[k]
 get_factor(a::GenericRankTensor,d::Integer,k::Integer) = get_factor(get_decomposition(a,k),d)
+Base.size(a::GenericRankTensor) = (rank(a),)
+Base.getindex(a::GenericRankTensor,k::Integer) = get_decomposition(a,k)
 
 function _sort!(a::AbstractVector{<:AbstractVector},i::Tuple{<:TProductIndexMap})
   irow, = i
@@ -52,7 +50,7 @@ end
 
 function tproduct_array(arrays_1d::Vector{<:AbstractArray},index_map)
   _sort!(arrays_1d,index_map)
-  GenericRank1Tensor(arrays_1d)
+  Rank1Tensor(arrays_1d)
 end
 
 function tproduct_array(
@@ -84,7 +82,7 @@ function _find_decompositions(::Nothing,arrays_1d,gradients_1d)
   d = map(inds) do i
     di = copy(arrays_1d)
     di[i] = gradients_1d[i]
-    return GenericRank1Tensor(di)
+    return Rank1Tensor(di)
   end
   return d
 end
@@ -95,13 +93,13 @@ function _find_decompositions(summation,arrays_1d,gradients_1d)
   d = map(inds) do i
     di = copy(arrays_1d)
     di[i] += gradients_1d[i]
-    return GenericRank1Tensor(di)
+    return Rank1Tensor(di)
   end
   return d
 end
 
 # MultiField interface
-struct BlockGenericRankTensor{A<:AbstractTProductTensor,N} <: AbstractArray{A,N}
+struct BlockRankTensor{A<:AbstractRankTensor,N} <: AbstractArray{A,N}
   array::Array{A,N}
 end
 
@@ -113,7 +111,7 @@ function tproduct_array(arrays_1d::Vector{<:BlockArray},index_map)
     index_map_i = getindex.(index_map,Tuple(i))
     tproduct_array(arrays_1d_i,index_map_i)
   end
-  BlockGenericRankTensor(arrays)
+  BlockRankTensor(arrays)
 end
 
 function tproduct_array(op::ArrayBlock,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},index_map,s::ArrayBlock)
@@ -127,13 +125,13 @@ function tproduct_array(op::ArrayBlock,arrays_1d::Vector{<:BlockArray},gradients
     s_i = s[Tuple(i)...]
     tproduct_array(op_i,arrays_1d_i,gradients_1d_i,index_map_i,s_i)
   end
-  BlockGenericRankTensor(arrays)
+  BlockRankTensor(arrays)
 end
 
-Base.size(a::BlockGenericRankTensor) = size(a.array)
+Base.size(a::BlockRankTensor) = size(a.array)
 
 function Base.getindex(
-  a::BlockGenericRankTensor{A,N},
+  a::BlockRankTensor{A,N},
   i::Vararg{Integer,N}
   ) where {A,N}
 
@@ -142,7 +140,7 @@ function Base.getindex(
 end
 
 function Base.setindex!(
-  a::BlockGenericRankTensor{A,N},
+  a::BlockRankTensor{A,N},
   v,i::Vararg{Integer,N}
   ) where {A,N}
 
@@ -150,11 +148,11 @@ function Base.setindex!(
   setindex!(a.array,v,i...)
 end
 
-function Base.getindex(a::BlockGenericRankTensor{A,N},i::Block{N}) where {A,N}
+function Base.getindex(a::BlockRankTensor{A,N},i::Block{N}) where {A,N}
   getindex(a.array,i.n...)
 end
 
-function primal_dual_blocks(a::BlockGenericRankTensor)
+function primal_dual_blocks(a::BlockRankTensor)
   primal_blocks = Int[]
   dual_blocks = Int[]
   for i in CartesianIndices(size(a))
@@ -171,32 +169,30 @@ end
 
 # linear algebra
 
-function tpmul(a::AbstractRank1Tensor,b::AbstractMatrix)
-  @check length(a) == 2
+function tpmul(a::AbstractRankTensor{2,1},b::AbstractMatrix)
   return a[1]*b*a[2]'
 end
 
-function tpmul(a::AbstractRank1Tensor,b::AbstractArray{T,3} where T)
-  @check length(a) == 3
+function tpmul(a::AbstractRankTensor{3,1},b::AbstractArray{T,3} where T)
   hcat([vec(a[1]*bi*a[2]') for bi in eachslice(b,dims=3)]...)*a[3]'
 end
 
-function tpmul(a::AbstractRankTensor,b::AbstractArray)
+function tpmul(a::AbstractRankTensor{D,K},b::AbstractArray) where {D,K}
   c = tpmul(get_decomposition(a,1),b)
-  for k = 2:rank(a)
+  for k = 2:K
     c += tpmul(get_decomposition(a,k),b)
   end
   return c
 end
 
-Utils.induced_norm(a::AbstractArray,X::AbstractTProductTensor) = sqrt(dot(vec(a),tpmul(X,a)))
+Utils.induced_norm(a::AbstractArray,X::AbstractRankTensor) = sqrt(dot(vec(a),tpmul(X,a)))
 
 # to global array - should try avoiding using these functions
 
-function LinearAlgebra.kron(a::AbstractRank1Tensor)
+function LinearAlgebra.kron(a::AbstractRankTensor{D,1}) where D
   kron(reverse(get_factors(a))...)
 end
 
-function LinearAlgebra.kron(a::AbstractRankTensor)
-  sum([kron(get_decomposition(a,k)) for k in eachindex(a)])
+function LinearAlgebra.kron(a::AbstractRankTensor{D,K}) where {D,K}
+  sum([kron(get_decomposition(a,k)) for k in 1:K])
 end

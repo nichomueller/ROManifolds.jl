@@ -20,15 +20,15 @@ RBSteady.num_reduced_dofs(a::TransientProjection) = RBSteady.num_reduced_space_d
 
 function RBSteady.Projection(red::TransientPODReduction,s::AbstractTransientSnapshots,args...)
   s′ = flatten_snapshots(s)
-  basis_space = projection(get_reduction_space(red),s′,args...)
+  basis_space = reduction(get_reduction_space(red),s′,args...)
   basis_space′ = recast(s,basis_space)
   compressed_s2 = compress(s′,basis_space,args...;swap_mode=true)
-  basis_time = projection(get_reduction_time(red),compressed_s2)
+  basis_time = reduction(get_reduction_time(red),compressed_s2)
   TransientPODBasis(basis_space′,basis_time)
 end
 
 function RBSteady.Projection(red::TTSVDReduction,s::AbstractTransientSnapshots,args...)
-  cores_space...,core_time = projection(red,s,args...)
+  cores_space...,core_time = reduction(red,s,args...)
   cores_space′ = recast(s,cores_space)
   index_map = get_index_map(s)
   TransientTTSVDCores(cores_space′,core_time,index_map)
@@ -231,8 +231,8 @@ end
 function RBSteady.add_tt_supremizers(
   cores_space::ArrayBlock,
   core_time::ArrayBlock,
-  norm_matrix::BlockGenericRankTensor,
-  supr_op::BlockGenericRankTensor)
+  norm_matrix::BlockRankTensor,
+  supr_op::BlockRankTensor)
 
   pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
   cores_primal_space = map(ip -> cores_space[ip],pblocks)

@@ -79,7 +79,7 @@ info = RBInfo(dir;nparams_state=10,nsnaps_mdeim=5,nparams_test=5,save_structures
 
 rbsolver = RBSolver(info,fesolver)
 
-# snaps,comp = fe_solutions(rbsolver,feop,uh0μ)
+# snaps,comp = fe_snapshots(rbsolver,feop,uh0μ)
 
 snaps = with_debug() do distribute
   load_distributed_snapshots(distribute,info)
