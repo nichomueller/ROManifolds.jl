@@ -210,7 +210,7 @@ norm_matrix = RB.assemble_norm_matrix(feop)
 soff = select_snapshots(snaps,RB.offline_params(info))
 bases = reduced_basis(soff,norm_matrix;ϵ=RB.get_tol(info))
 
-# RB.enrich_basis(feop,bases,norm_matrix)
+# RB.enrich(feop,bases,norm_matrix)
 _basis_space,_basis_time = bases
 supr_op = RB.assemble_coupling_matrix(feop)
 # basis_space = add_space_supremizers(_basis_space,supr_op,norm_matrix)

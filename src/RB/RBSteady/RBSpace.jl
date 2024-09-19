@@ -57,7 +57,7 @@ function reduced_basis(red::SupremizerReduction,feop::GridapType,s::AbstractArra
   supr_tol = get_supr_tol(red)
 
   basis = reduced_basis(get_reduction(red),s,norm_matrix)
-  enrich_basis(basis,norm_matrix,supr_matrix,primal_blocks,dual_blocks,supr_tol)
+  enrich(basis,norm_matrix,supr_matrix,primal_blocks,dual_blocks,supr_tol)
 end
 
 function fe_subspace(space::FESpace,basis)
@@ -130,12 +130,12 @@ function Arrays.return_cache(k::RecastMap,x::AbstractParamVector,r::FESubspace)
 end
 
 """
-    RBSpace{A<:SingleFieldFESpace,B<:SteadyProjection} <: FESubspace
+    RBSpace{A<:SingleFieldFESpace,B<:Projection} <: FESubspace
 
 Reduced basis subspace in a steady setting
 
 """
-struct RBSpace{A<:SingleFieldFESpace,B<:SteadyProjection} <: FESubspace
+struct RBSpace{A<:SingleFieldFESpace,B<:Projection} <: FESubspace
   space::A
   basis::B
 end

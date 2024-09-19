@@ -102,7 +102,6 @@ export orth_projection
 include("BasisConstruction.jl")
 
 export Projection
-export SteadyProjection
 export PODBasis
 export TTSVDCores
 export BlockProjection
@@ -113,7 +112,7 @@ export num_reduced_dofs
 export get_cores
 export get_cores_space
 export cores2basis
-export enrich_basis
+export enrich
 export add_space_supremizers
 include("Projections.jl")
 

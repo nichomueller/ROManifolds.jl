@@ -10,6 +10,19 @@ function contraction(::AbstractArray...)
 end
 
 function contraction(
+  basis::Array{T,3},
+  coefficient::Vector{S,3}
+  ) where {T,S}
+
+  @check size(basis,2) == length(coefficient)
+  A = reshape(permutedims(basis,(1,3,2)),:,size(basis,2))
+  v = A*coefficient
+  s1,s2 = size(basis,1),size(basis,3)
+  M = reshape(v,s1,s2)
+  return M
+end
+
+function contraction(
   factor1::Array{T,3},
   factor2::Array{S,3}
   ) where {T,S}
@@ -173,86 +186,35 @@ end
 
 # empirical interpolation
 
-function empirical_interpolation!(cache,C::AbstractArray{T,3}) where T
-  @check size(C,1) == 1
-  c...,Iv = cache
-  A = dropdims(C;dims=1)
-  I,Ai = empirical_interpolation!(c,A)
-  push!(Iv,copy(I))
-  return I,Ai
-end
-
-function _global_index(i,local_indices::Vector{Vector{Int32}})
-  Iprev...,Ig = local_indices
+function basis_index(i,cores_indices::Vector{Vector{Int32}})
+  Iprevs...,Icurr = cores_indices
   if length(Iprev) == 0
     return i
   end
-  Il = last(Iprev)
-  rankl = length(Il)
-  islow = slow_index(i,rankl)
-  ifast = fast_index(i,rankl)
-  iprev = Il[ifast]
-  giprev = _global_index(iprev,Iprev)
-  return (giprev...,islow)
+  Iprevprevs...,Iprev = Iprev
+  rankprev = length(Iprev)
+  icurr = slow_index(i,rankprev)
+  iprevs = basis_index(Iprev[fast_index(i,rankprev)],Iprevs)
+  return (giprev...,icurr)
 end
 
-function _global_index(i,Il::Vector{Int32})
-  rankl = length(Il)
-  li = Il[fast_index(i,rankl)]
-  gi = slow_index(i,rankl)
-  return li,gi
-end
+function basis_indices(cores_indices::Vector{Vector{Int32}},index_map::AbstractIndexMap{D}) where D
+  L = length(cores_indices)
+  ninds = L - D + 1
 
-function _to_split_global_indices(local_indices::Vector{Vector{Int32}},index_map::AbstractIndexMap)
-  Is...,It = local_indices
-  Igt = It
-  Igs = copy(It)
-  for (i,ii) in enumerate(Igt)
-    ilsi,igti = _global_index(ii,last(Is))
-    Igt[i] = igti
-    Igs[i] = index_map[CartesianIndex(_global_index(ilsi,Is))]
-  end
-  return Igs,Igt
-end
-
-function _to_global_indices(local_indices::Vector{Vector{Int32}},index_map::AbstractIndexMap)
-  if length(local_indices) != ndims(index_map) # this is the transient case
-    @notimplementedif length(local_indices) != ndims(index_map)+1
-    return _to_split_global_indices(local_indices,index_map)
-  end
-  Ig = local_indices[end]
-  for (i,ii) in enumerate(Ig)
-    Ig[i] = index_map[CartesianIndex(_global_index(ii,local_indices))]
-  end
-  return Ig
-end
-
-function _eim_cache(C::AbstractArray{T,3}) where T
-  m,n = size(C,2),size(C,1)
-  res = zeros(T,m)
-  I = zeros(Int32,n)
-  Iv = Vector{Int32}[]
-  return C,I,res,Iv
-end
-
-function _next_core(Aprev::AbstractMatrix{T},Cnext::AbstractArray{T,3}) where T
-  Cprev = reshape(Aprev,1,size(Aprev)...)
-  _cores2basis(Cprev,Cnext)
-end
-
-function empirical_interpolation(index_map::AbstractIndexMap,cores::AbstractArray...)
-  C,I,res,Iv = _eim_cache(first(cores))
-  for i = eachindex(cores)
-    _,Ai = empirical_interpolation!((I,res,Iv),C)
-    if i < length(cores)
-      C = _next_core(Ai,cores[i+1])
-    else
-      Ig = _to_global_indices(Iv,index_map)
-      return Ig,Ai
+  Iprev...,Icurr = cores_indices
+  basis_indices = fill(copy(Icurr),ninds)
+  for (k,ik) in enumerate(Icurr)
+    indices_k = basis_index(ik,Iprev)
+    basis_indices[1][k] = index_map[CartesianIndex(indices_k[1:D])]
+    for l = D+1:L
+      basis_indices[l][k] = indices_k[l]
     end
   end
+
+  return basis_indices
 end
 
-function empirical_interpolation(index_map::SparseIndexMap,cores::AbstractArray...)
-  empirical_interpolation(get_sparse_index_map(index_map),cores...)
+function basis_indices(cores_indices::Vector{Vector{Int32}},index_map::SparseIndexMap)
+  basis_indices(cores_indices,get_sparse_index_map(index_map))
 end

@@ -19,6 +19,31 @@ function empirical_interpolation!(cache,A::AbstractMatrix)
   return I,Ai
 end
 
+function empirical_interpolation!(cache,core::AbstractArray{T,3}) where T
+  @check size(C,1) == 1
+  _cache...,Iv = cache
+  A = dropdims(core;dims=1)
+  I,Ai = empirical_interpolation!(_cache,A)
+  push!(Iv,copy(I))
+  return I,Ai
+end
+
+function eim_cache(A::AbstractMatrix)
+  m,n = size(A)
+  res = zeros(eltype(A),m)
+  I = zeros(Int32,n)
+  return I,res
+end
+
+function eim_cache(cores::Vector{<:AbstractArray{T,3}}) where T
+  c = first(cores)
+  m,n = size(c,2),size(c,1)
+  res = zeros(T,m)
+  I = zeros(Int32,n)
+  Iv = Vector{Int32}[]
+  return I,res,Iv
+end
+
 """
     empirical_interpolation(A::AbstractMatrix) -> (Vector{Int}, AbstractMatrix)
 
@@ -173,7 +198,7 @@ get_integration_domain(a::AffineDecomposition) = a.integration_domain
 get_interp_matrix(a::AffineDecomposition) = a.interpolation
 get_indices_space(a::AffineDecomposition) = get_indices_space(get_integration_domain(a))
 
-function mdeim(b::SteadyProjection)
+function mdeim(b::Projection)
   basis_space = get_basis_space(b)
   indices_space,interp_basis_space = empirical_interpolation(basis_space)
   interpolation = lu(interp_basis_space)

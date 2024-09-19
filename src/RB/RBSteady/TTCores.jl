@@ -54,78 +54,33 @@ num_space_dofs(a::SparseCoreCSC) = IndexMaps.num_rows(a.sparsity)*IndexMaps.num_
 
 # block cores
 
-struct BlockCore{T,D,A<:AbstractArray{T,D},BS} <: AbstractArray{T,D}
-  array::Vector{A}
-  axes::BS
-  function BlockCore(array::Vector{A},axes::BS) where {T,D,A<:AbstractArray{T,D},BS<:NTuple}
-    @assert all((size(a,2)==size(first(array),2) for a in array))
-    new{T,D,A,BS}(array,axes)
-  end
+function first_block(a::AbstractArray{T,3},b::AbstractArray{S,3}) where {T,S}
+  @check size(a,1) == size(b,1) == 1
+  @check size(a,2) == size(b,2) "Cannot sum the two input cores"
+  TS = promote_type(T,S)
+  r2 = size(a,2)
+  r3 = size(a,3) + size(b,3)
+  ab = zeros(TS,1,r2,r3)
+  @views ab[:,:,1:size(a,3)] = a
+  @views ab[:,:,1+size(a,3):end] = b
+  return ab
 end
 
-function BlockCore(array::Vector{<:AbstractArray},touched::AbstractArray{Bool}=I(length(array)))
-  block_sizes = _sizes_from_blocks(array,touched)
-  axes = map(blockedrange,block_sizes)
-  BlockCore(array,axes)
+function block_core(a::AbstractArray{T,3},b::AbstractArray{S,3}) where {T,S}
+  @check size(a,2) == size(b,2) "Cannot sum the two input cores"
+  TS = promote_type(T,S)
+  r1 = size(a,1) + size(b,1)
+  r2 = size(a,2)
+  r3 = size(a,3) + size(b,3)
+  ab = zeros(TS,r1,r2,r3)
+  @views ab[1:size(a,1),:,1:size(a,3)] = a
+  @views ab[1+size(a,1):end,:,1+size(a,3):end] = b
+  return ab
 end
 
-function BlockCore(array::Vector{<:Vector{<:AbstractArray}})
-  N = length(array)
-  map(eachindex(first(array))) do n
-    touched = n == 1 ? fill(true,N) : I(N)
-    arrays_n = getindex.(array,n)
-    BlockCore(arrays_n,touched)
-  end
-end
-
-const BlockCore3D{T} = BlockCore{T,3,Array{T,3}}
-
-Base.size(a::BlockCore) = map(length,axes(a))
-Base.axes(a::BlockCore) = a.axes
-
-function Base.getindex(a::BlockCore3D,i::Vararg{Integer,3})
-  if size(a,1) == 1
-    _getindex_vector(a,i...)
-  else
-    _getindex_matrix(a,i...)
-  end
-end
-
-function _getindex_vector(a::BlockCore3D,i::Vararg{Integer,3})
-  i1,i2,i3 = i
-  @assert i1 == 1
-  b3 = BlockArrays.findblockindex(axes(a,3),i3)
-  a.array[b3.I...][i1,i2,b3.α...]
-end
-
-function _getindex_matrix(a::BlockCore3D,i::Vararg{Integer,3})
-  i1,i2,i3 = i
-  b1 = BlockArrays.findblockindex(axes(a,1),i1)
-  b3 = BlockArrays.findblockindex(axes(a,3),i3)
-  if b1.I == b3.I
-    a.array[b1.I...][b1.α...,i2,b3.α...]
-  else
-    zero(eltype(a))
-  end
-end
-
-function _sizes_from_blocks(a::Vector{<:AbstractArray},touched::AbstractVector{Bool})
-  s1 = fill(1,length(a))
-  s2 = fill(size(a[1],2),length(a))
-  s3 = map(a -> size(a,3),a)
-  for i in 1:length(a)-1
-    s1[i] = 0
-    s2[i] = 0
-  end
-  return (s1,s2,s3)
-end
-
-function _sizes_from_blocks(a::Vector{<:AbstractArray},touched::AbstractMatrix{Bool})
-  s1 = map(a -> size(a,1),a)
-  s2 = fill(size(a[1],2),length(a))
-  s3 = map(a -> size(a,3),a)
-  for i in 1:length(a)-1
-    s2[i] = 0
-  end
-  return (s1,s2,s3)
+function block_cores(a::AbstractVector{<:AbstractArray},b::AbstractVector{<:AbstractArray})
+  @check length(a) == length(b)
+  abfirst = first_block(a[1],b[1])
+  ablasts = block_core.(a[2:end],b[2:end])
+  return [abfirst,ablasts...]
 end

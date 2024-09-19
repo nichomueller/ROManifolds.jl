@@ -6,37 +6,60 @@ operator. In other words, Projection variables are operators from a high dimensi
 vector space to a low dimensional one
 
 Subtypes:
-- [`SteadyProjection`](@ref)
-- [`TransientProjection`](@ref)
+- [`PODProjection`](@ref)
+- [`TTSVDProjection`](@ref)
 - [`ReducedAlgebraicOperator`](@ref)
 
 """
 abstract type Projection <: Map end
 
-struct InvProjection{P} <: Projection
+get_basis(a::Projection) = @abstractmethod
+num_fe_dofs(a::Projection) = @abstractmethod
+num_reduced_dofs(a::Projection) = @abstractmethod
+project(a::Projection,x::AbstractArray) = @abstractmethod
+inv_project(a::Projection,x::AbstractArray) = @abstractmethod
+rescale(op::Function,x::AbstractArray,b::Projection) = @abstractmethod
+galerkin_projection(a::Projection,b::Projection) = @abstractmethod
+galerkin_projection(a::Projection,b::Projection,c::Projection,args...) = @abstractmethod
+empirical_interpolation(a::Projection) = @abstractmethod
+gram_schmidt!(a::Projection,b::Projection,args...) = gram_schmidt!(get_basis(a),get_basis(b),args...)
+
+Base.:+(a::Projection,b::Projection) = union(a,b)
+Base.:-(a::Projection,b::Projection) = union(a,b)
+Base.:*(a::Projection,b::Projection) = galerkin_projection(a,b)
+Base.:*(a::Projection,b::Projection,c::Projection) = galerkin_projection(a,b,c)
+Base.:*(a::Projection,x::AbstractArray) = project(a,x)
+Base.:*(x::AbstractArray,b::Projection) = rescale(*,x,b)
+Base.:\(x::AbstractArray,b::Projection) = rescale(\,x,b)
+Base.:*(a::InvProjection,x::AbstractArray) = inv_project(a.projection,x)
+
+struct InvProjection{P<:Projection} <: Projection
   projection::P
 end
 
 Base.adjoint(a::Projection) = InvProjection(a)
 
-Base.:*(a::InvProjection,x::AbstractArray) = inv_project(a.projection,x)
-Base.:*(a::Projection,x::AbstractArray) = project(a,x)
-
-function project(a::Projection,x::AbstractArray)
+function project(a::Projection,x::AbstractVector)
   basis = get_basis(a)
   x̂ = basis'*x
   return x̂
 end
 
-function inv_project(a::Projection,x̂::AbstractArray)
+function inv_project(a::Projection,x̂::AbstractVector)
   basis = get_basis(a)
   x = basis*x̂
   return x
 end
 
-get_basis(a::Projection) = @abstractmethod
-num_fe_dofs(a::Projection) = @abstractmethod
-num_reduced_dofs(a::Projection) = @abstractmethod
+function Arrays.return_cache(::typeof(project),a::Projection,x::AbstractVector)
+  x̂ = zeros(eltype(x),num_reduced_dofs(a))
+  return x̂
+end
+
+function Arrays.return_cache(::typeof(inv_project),a::Projection,x̂::AbstractVector)
+  x = zeros(eltype(x̂),num_fe_dofs(a))
+  return x
+end
 
 function projection(red::AbstractReduction,s::AbstractSnapshots,args...)
   basis = reduction(red,s,args...)
@@ -44,25 +67,30 @@ function projection(red::AbstractReduction,s::AbstractSnapshots,args...)
   projection(red,basis,index_map)
 end
 
+struct ReducedProjection{A<:AbstractArray} <: Projection
+  basis::A
+end
+
+get_basis(a::ReducedProjection) = a.basis
+num_reduced_dofs(a::ReducedProjection) = size(get_basis(a),2)
+
+function project(a::ReducedProjection,x::AbstractVector)
+  @notimplemented
+end
+
+function inv_project(a::ReducedProjection{<:AbstractArray{T,3}},x̂::AbstractVector) where T
+  basis = get_basis(a)
+  x̂ = contraction(basis,x̂)
+  return x
+end
+
 """
-    abstract type SteadyProjection <: Projection end
+    struct PODBasis{A<:AbstractMatrix} <: Projection
 
-Specialization for projections in steady problems. A constructor is given by
-the function Projection
-
-Subtypes:
-- [`PODBasis`](@ref)
+Projection stemming from a truncated proper orthogonal decomposition [`truncated_pod`](@ref)
 
 """
-abstract type SteadyProjection <: Projection end
-
-"""
-    struct PODBasis{A<:AbstractMatrix} <: SteadyProjection
-
-SteadyProjection stemming from a truncated proper orthogonal decomposition [`truncated_pod`](@ref)
-
-"""
-struct PODBasis{A<:AbstractMatrix,I<:AbstractIndexMap} <: SteadyProjection
+struct PODBasis{A<:AbstractMatrix,I<:AbstractIndexMap} <: Projection
   basis::A
   index_map::I
 end
@@ -78,12 +106,45 @@ num_reduced_dofs(a::PODBasis) = size(get_basis(a),2)
 IndexMaps.get_index_map(a::PODBasis) = a.index_map
 IndexMaps.recast(a::PODBasis) = recast(get_basis(a),get_index_map(a))
 
+function rescale(op::Function,x::AbstractArray,b::PODBasis)
+  PODBasis(op(x,get_basis(b)),get_index_map(b))
+end
+
+function Base.union(a::PODBasis,b::PODBasis,args...)
+  @check get_index_map(a) == get_index_map(b)
+  basis_a = get_basis(a)
+  basis_b = get_basis(b)
+  gram_schmidt!(basis_b,basis_a,args...)
+  basis_ab = hcat(basis_a,basis_b)
+  PODBasis(basis_ab,get_index_map(a))
+end
+
+function galerkin_projection(proj_left::PODBasis,a::PODBasis)
+  basis_left = get_basis(proj_left)
+  basis = get_basis(a)
+  proj_basis = galerkin_projection(basis_left,basis)
+  return ReducedProjection(proj_basis)
+end
+
+function galerkin_projection(proj_left::PODBasis,a::PODBasis,proj_right::PODBasis)
+  basis_left = get_basis(proj_left)
+  basis = recast(get_basis(a))
+  basis_right = get_basis(proj_right)
+  proj_basis = galerkin_projection(basis_left,basis,basis_right)
+  return ReducedProjection(proj_basis)
+end
+
+function empirical_interpolation(a::PODBasis)
+  cache = eim_cache(get_basis(a))
+  empirical_interpolation!(cache,get_basis(a))
+end
+
 # TT interface
 
 """
     TTSVDCores{A<:AbstractVector{<:AbstractArray{T,D}},I} <: Projection
 
-SteadyProjection stemming from a tensor train singular value decomposition [`ttsvd`](@ref).
+Projection stemming from a tensor train singular value decomposition [`ttsvd`](@ref).
 An index map of type `I` is provided for indexing purposes
 
 """
@@ -107,6 +168,56 @@ num_reduced_dofs(a::TTSVDCores) = size(last(get_cores(a)),3)
 IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
 IndexMaps.recast(a::TTSVDCores{D}) where D = recast(get_cores(a)[1:D],get_index_map(a))
 
+function rescale(op::Function,x::AbstractRankTensor{D1},b::TTSVDCores{D2}) where {D1,D2}
+  if D1 == D2
+    TTSVDCores(op(x,get_cores(b)),get_index_map(b))
+  else
+    c1 = op(x,get_cores(b)[1:D1])
+    c2 = get_cores(b)[D1+1:end]
+    TTSVDCores([c1...,c2...],get_index_map(b))
+  end
+end
+
+function Base.union(a::TTSVDCores,b::TTSVDCores,args...)
+  @check get_index_map(a) == get_index_map(b)
+  cores_a = get_cores(a)
+  cores_b = get_cores(b)
+  cores_ab = block_cores(cores_a,cores_b)
+  orthogonalize!(cores_ab,args...)
+  TTSVDCores(cores_ab,get_index_map(a))
+end
+
+function galerkin_projection(proj_left::TTSVDCores,a::TTSVDCores)
+  cores_left = get_cores(proj_left)
+  cores = get_cores(a)
+  proj_basis = galerkin_projection(cores_left,cores)
+  return ReducedProjection(proj_basis)
+end
+
+function galerkin_projection(proj_left::TTSVDCores,a::TTSVDCores,proj_right::TTSVDCores,args...)
+  cores_left = get_cores(proj_left)
+  cores = recast(get_cores(a))
+  cores_right = get_cores(proj_right)
+  proj_basis = galerkin_projection(cores_left,cores,cores_right)
+  return ReducedProjection(proj_basis)
+end
+
+function empirical_interpolation(a::TTSVDCores)
+  cores = get_cores(a)
+  index_map = get_index_map(a)
+  cache = eim_cache(cores)
+  c = first(cores)
+  for i = eachindex(cores)
+    _,Ai = empirical_interpolation!(cache,c)
+    if i < length(cores)
+      c = contraction(reshape(Ai,1,size(Ai)...),cores[i+1])
+    else
+      i = basis_indices(cache,index_map)
+      return i,Ai
+    end
+  end
+end
+
 # multi field interface
 
 function Arrays.return_cache(::typeof(projection),::PODReduction,s::AbstractSnapshots)
@@ -123,9 +234,9 @@ end
 
 function Arrays.return_cache(::typeof(projection),red::AbstractReduction,s::BlockSnapshots)
   basis = return_cache(projection,red,blocks(s)[1])
-  touched = s.touched
   block_basis = Array{typeof(basis),ndims(s)}(undef,size(s))
-  return BlockProjection(block_basis)
+  touched = s.touched
+  return BlockProjection(block_basis,touched)
 end
 
 function projection(red::AbstractReduction,s::BlockSnapshots)
@@ -149,13 +260,13 @@ function projection(red::AbstractReduction,s::BlockSnapshots,norm_matrix)
 end
 
 """
-    struct BlockProjection{A,N} <: AbstractArray{Projection,N} end
+    struct BlockProjection{A,N} <: Projection end
 
 Block container for Projection of type `A` in a MultiField setting. This
 type is conceived similarly to [`ArrayBlock`](@ref) in [`Gridap`](@ref)
 
 """
-struct BlockProjection{A,N} <: AbstractArray{Projection,N}
+struct BlockProjection{A<:Projection,N} <: Projection
   array::Array{A,N}
   touched::Array{Bool,N}
 
@@ -179,6 +290,16 @@ function BlockProjection(k::BlockMap{N},a::AbstractArray{A}) where {A<:Projectio
   BlockProjection(array,touched)
 end
 
+function BlockProjection(a::AbstractArray{A},touched::Array{Bool,N}) where {A<:Projection,N}
+  array = Array{A,N}(undef,k.size)
+  for i in touched
+    if touched[i]
+      array[i] = a[i]
+    end
+  end
+  BlockProjection(array,touched)
+end
+
 Base.size(a::BlockProjection,i...) = size(a.array,i...)
 
 function Base.getindex(a::BlockProjection,i...)
@@ -193,19 +314,16 @@ function Base.setindex!(a::BlockProjection,v,i...)
   a.array[i...] = v
 end
 
-function get_touched_blocks(a::BlockProjection)
-  findall(a.touched)
+function get_basis(a::BlockProjection{A,N}) where {A,N}
+  @notimplemented
 end
 
-function get_basis(a::BlockProjection{A,N}) where {A,N}
-  basis = Array{Matrix{Float64},N}(undef,size(a))
-  touched = a.touched
-  for i in eachindex(a)
-    if touched[i]
-      basis[i] = get_basis(a[i])
-    end
-  end
-  return ArrayBlock(basis,a.touched)
+function IndexMaps.get_index_map(a::BlockProjection{A,N}) where {A,N}
+  @notimplemented
+end
+
+function get_cores(a::BlockProjection{<:TTSVDCores,N}) where {A,N}
+  @notimplemented
 end
 
 function num_fe_dofs(a::BlockProjection)
@@ -228,32 +346,33 @@ function num_reduced_dofs(a::BlockProjection)
   return dofs
 end
 
-function IndexMaps.get_index_map(a::BlockProjection{A,N}) where {A,N}
-  T = typeof(get_index_map(first(a)))
-  index_map = Array{T,N}(undef,size(a))
-  touched = a.touched
-  for i in eachindex(a)
-    if touched[i]
-      index_map[i] = get_index_map(a[i])
-    end
-  end
-  return index_map
-end
+for f in (:project,:inv_project)
+  @eval begin
+    function Arrays.return_cache(
+      ::typeof($f),
+      a::BlockProjection,
+      x::Union{BlockVector,BlockVectorOfVectors})
 
-function get_cores(a::BlockProjection{A,N}) where {A,N}
-  T = typeof(get_cores(first(a)))
-  cores = Array{T,N}(undef,size(a))
-  touched = a.touched
-  for i in eachindex(a)
-    if touched[i]
-      cores[i] = get_cores(a[i])
+      @check length(findall(a.touched)) == length(a) == nblocks(x)
+      y = Vector{eltype(x)}(undef,length(a))
+      for i in eachindex(a)
+        y[Block(i)] = return_cache($f,a[i],blocks(x)[i])
+      end
+      return mortar(y)
+    end
+
+    function $f(a::BlockProjection,x::Union{BlockArray,BlockArrayOfArrays})
+      y = return_cache($f,a,x)
+      for i in eachindex(a)
+        y[Block(i)] = $f(a[i],blocks(x)[i])
+      end
+      return y
     end
   end
-  return ArrayBlock(cores,a.touched)
 end
 
 """
-    enrich_basis(
+    enrich(
       a::BlockProjection,
       norm_matrix::AbstractMatrix,
       supr_matrix::AbstractMatrix,
@@ -263,125 +382,19 @@ Returns the supremizer-enriched BlockProjection. This function stabilizes Inf-Su
 problems projected on a reduced vector space
 
 """
-function enrich_basis(a::BlockProjection{<:PODBasis},args...)
-  bases = add_space_supremizers(get_basis_space(a),args...)
-  return BlockProjection(map(PODBasis,bases),a.touched)
-end
+function enrich(
+  a::BlockProjection,
+  norm_matrix::BlockMatrix,
+  supr_matrix::BlockMatrix)
 
-function enrich_basis(a::BlockProjection{<:TTSVDCores},args...)
-  cores = add_tt_supremizers(get_cores_space(a),args...)
-  return BlockProjection(map(TTSVDCores,cores),a.touched)
-end
-
-"""
-    add_space_supremizers(
-      basis_space::ArrayBlock,
-      norm_matrix::AbstractMatrix,
-      supr_matrix::AbstractMatrix) -> Vector{<:AbstractArray}
-
-Enriches the spatial basis with spatial supremizers computed from
-the action of the supremizing matrix `supr_matrix` on the dual field(s)
-
-"""
-function add_space_supremizers(basis_space::ArrayBlock,norm_matrix::AbstractMatrix,supr_matrix::AbstractMatrix)
-  basis_primal,basis_dual... = basis_space.array
+  @check length(findall(a.touched)) == length(a)
+  a_primal,a_dual... = a.array
   X_primal = norm_matrix[Block(1,1)]
   H_primal = cholesky(X_primal)
-  for i = eachindex(basis_dual)
+  for i = eachindex(a_dual)
     C_primal_dual_i = supr_matrix[Block(1,i+1)]
-    supr_i = H_primal \ C_primal_dual_i * basis_dual[i]
-    gram_schmidt!(supr_i,basis_primal,X_primal)
-    basis_primal = hcat(basis_primal,supr_i)
+    supr_i = H_primal \ C_primal_dual_i * a_dual[i]
+    a_primal = union(a_primal,supr_i,X_primal)
   end
-  return [basis_primal,basis_dual...]
-end
-
-function add_tt_supremizers(cores_space::ArrayBlock,norm_matrix::BlockRankTensor,supr_op::BlockRankTensor)
-  pblocks,dblocks = TProduct.primal_dual_blocks(supr_op)
-  cores_primal = map(ip -> cores_space[ip],pblocks)
-  cores_dual = map(id -> cores_space[id],dblocks)
-  norms_primal = map(ip -> norm_matrix[Block(ip,ip)],pblocks)
-
-  for id in dblocks
-    rcores = Vector{Array{Float64,3}}[]
-    rcore = Matrix{Float64}[]
-    cores_dual_i = cores_space[id]
-    for ip in eachindex(pblocks)
-      A = norm_matrix[Block(ip,ip)]
-      C = supr_op[Block(ip,id)]
-      cores_primal_i = cores_space[ip]
-      reduced_coupling!((rcores,rcore),cores_primal_i,cores_dual_i,A,C)
-    end
-    enrich!(cores_primal,rcores,vcat(rcore...),norms_primal)
-  end
-
-  cores_primal,cores_dual
-end
-
-function reduced_coupling!(cache,cores_primal_i,cores_dual_i,norm_matrix_i,coupling_i)
-  rcores_dual,rcore = cache
-  # cores_norm_i = TProduct.tp_decomposition(norm_matrix_i) # add here the norm matrix
-  cores_coupling_i = TProduct.tp_decomposition(coupling_i)
-  rcores_dual_i,rcores_i = map(cores_primal_i,cores_dual_i,cores_coupling_i) do cp,cd,cc
-    rc = cc*cd
-    rc,compress_core(rc,cp)
-  end |> tuple_of_arrays
-  rcore_i = multiply_cores(rcores_i...) |> _dropdims
-  push!(rcores_dual,rcores_dual_i)
-  push!(rcore,rcore_i)
-end
-
-function enrich!(cores_primal,rcores,rcore,norms_primal;tol=1e-2)
-  @check length(cores_primal) == length(rcores)
-
-  flag = false
-  i = 1
-  while i ≤ size(rcore,2)
-    proj = i == 1 ? zeros(size(rcore,1)) : orth_projection(rcore[:,i],rcore[:,1:i-1])
-    dist = norm(rcore[:,i]-proj)
-    if dist ≤ tol
-      for ip in eachindex(cores_primal)
-        cp,rc,np = cores_primal[ip],rcores[ip],norms_primal[ip]
-        cores_primal[ip] = add_and_orthogonalize(cp,rc,np,i;flag)
-      end
-      rcore = _update_reduced_coupling(cores_primal,rcores,rcore)
-      flag = true
-    end
-    i += 1
-  end
-end
-
-function add_and_orthogonalize(cores_primal,rcores,norms_primal,i;flag=false)
-  D = length(cores_primal)
-  weights = Vector{Array{Float64,3}}(undef,D-1)
-
-  if !flag
-    for d in 1:D-1
-      push!(cores_primal[d],rcores[d])
-      _weight_array!(weights,cores_primal,norms_primal,Val{d}())
-    end
-    push!(cores_primal[D],rcores[D])
-    _ = orthogonalize!(cores_primal[D],norms_primal,weights)
-  else
-    cores_primal[D] = hcat(cores_primal[D],rcores[D][:,:,i])
-    _ = orthogonalize!(cores_primal[D],norms_primal,weights)
-  end
-end
-
-function _update_reduced_coupling(cores_primal,rcores,rcore)
-  offsets = size.(last.(cores_primal),3)
-  @check size(rcore,1) == sum(offsets)
-  enriched_offsets = offsets .+ 1
-  pushfirst!(0,offsets)
-  pushfirst!(0,enriched_offsets)
-  rcore_new = similar(rcore,sum(enriched_offsets),size(rcore,2))
-  for (ip,cores_primal_i) in enumerate(cores_primal)
-    range = offsets[ip]+1:offsets[ip+1]
-    enriched_range = enriched_offsets[ip]+1:enriched_offsets[ip+1]-1
-    @views rcore_new[enriched_range,:] = rcore[range,:]
-    rcores_i = compress_core.(rcores[ip],blocks(cores_primal_i)[end])
-    rcore_i = multiply_cores(rcores_i...) |> _dropdims
-    @views rcore_new[enriched_offsets[ip+1],:] = rcore_i
-  end
-  return rcore_new
+  return BlockProjection([a_primal,a_dual...],a.touched)
 end
