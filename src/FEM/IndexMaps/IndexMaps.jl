@@ -30,7 +30,9 @@ export FixedEntriesArray
 include("FixedEntriesArrays.jl")
 
 export AbstractIndexMap
+export AbstractTrivialIndexMap
 export TrivialIndexMap
+export TrivialSparseIndexMap
 export IndexMap
 export IndexMapView
 export FixedDofsIndexMap

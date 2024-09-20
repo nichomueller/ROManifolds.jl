@@ -34,6 +34,9 @@ SparseArrays.nzrange(a::SparsityPatternCSC,row::Integer) = nzrange(a.matrix,row)
 SparseArrays.rowvals(a::SparsityPatternCSC) = rowvals(a.matrix)
 get_nonzero_indices(a::SparsityPatternCSC) = get_nonzero_indices(a.matrix)
 
+recast(v::AbstractVector,A::SparseMatrixCSC) = SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,v)
+recast(A::AbstractArray,a::SparsityPatternCSC) = recast(A,a.matrix)
+
 """
     permute_sparsity(a::SparsityPattern,i,j) -> SparsityPattern
 

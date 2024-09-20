@@ -148,19 +148,14 @@ function LinearAlgebra.fillstored!(A::MatrixOfSparseMatricesCSC,z::AbstractMatri
   return A
 end
 
-function recast(A::AbstractArray,a::AbstractArray)
-  @abstractmethod
-end
-
-function recast(A::SparseMatrixCSC,v::AbstractVector)
-  SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,v)
-end
-
-function recast(A::MatrixOfSparseMatricesCSC,a::AbstractMatrix)
+function IndexMaps.recast(a::AbstractMatrix,A::SparseMatrixCSC)
   @check size(a,1) == size(A.data,1)
-  item = param_getindex(A,1)
-  B = map(v -> recast(item,v),collect.(eachcol(a)))
+  B = map(v -> recast(v,A),collect.(eachcol(a)))
   return MatrixOfSparseMatricesCSC(B)
+end
+
+function IndexMaps.recast(a::AbstractArray,A::ParamSparseMatrixCSC)
+  recast(a,param_getindex(A,1))
 end
 
 fast_issymmetric(A::SparseArrays.AbstractSparseMatrixCSC) = fast_is_hermsym(A, identity)

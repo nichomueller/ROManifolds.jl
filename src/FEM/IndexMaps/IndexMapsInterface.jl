@@ -92,12 +92,12 @@ function inv_index_map(i::AbstractIndexMap)
 end
 
 """
-    change_index_map(i::AbstractIndexMap,f) -> AbstractIndexMap
+    change_index_map(f,i::AbstractIndexMap) -> AbstractIndexMap
 
 Returns an index map given by `f`∘`i`, where f is a function encoding an index map.
 
 """
-function change_index_map(i::AbstractIndexMap,f)
+function change_index_map(f,i::AbstractIndexMap)
   i′::AbstractIndexMap = f(collect(vec(i)))
   i′
 end
@@ -110,35 +110,35 @@ function fix_dof_index_map(i::AbstractIndexMap,dofs_to_fix)
   FixedDofsIndexMap(i,dofs_to_fix)
 end
 
-"""
-    recast(i::AbstractIndexMap,a::AbstractArray) -> AbstractArray
+abstract type AbstractTrivialIndexMap <: AbstractIndexMap{1,Int} end
 
-Recasting operation of an array according to the index map `i`
-"""
-function recast(i::AbstractIndexMap,a::AbstractArray)
-  return a
-end
+Base.getindex(i::AbstractTrivialIndexMap,j::Integer) = j
+Base.setindex!(i::AbstractTrivialIndexMap,v::Integer,j::Integer) = nothing
+Base.copy(i::AbstractTrivialIndexMap) = i
 
 """
-    TrivialIndexMap{Ti,I<:AbstractVector{Ti}} <: AbstractIndexMap{1,Ti}
+    TrivialIndexMap <: AbstractTrivialIndexMap
 
 Represents an index map that does not change the indexing strategy of the FEM function.
 In other words, this is simply a wrapper for a LinearIndices list. In the case of sparse
 matrices, the indices in a TrivialIndexMap are those of the nonzero elements.
 
 """
-struct TrivialIndexMap{Ti,I<:AbstractVector{Ti}} <: AbstractIndexMap{1,Ti}
-  indices::I
+struct TrivialIndexMap <: AbstractTrivialIndexMap
+  length::Int
 end
 
-function TrivialIndexMap(i::AbstractIndexMap)
-  TrivialIndexMap(LinearIndices((length(i),)))
+TrivialIndexMap(i::AbstractArray) = TrivialIndexMap(length(i))
+Base.size(i::TrivialIndexMap) = (length(i.length),)
+
+struct TrivialSparseIndexMap{A<:SparsityPattern} <: AbstractTrivialIndexMap
+  sparsity::A
 end
 
-Base.size(i::TrivialIndexMap) = (length(i.indices),)
-Base.getindex(i::TrivialIndexMap,j::Integer) = getindex(i.indices,j)
-Base.setindex!(i::TrivialIndexMap,v::Integer,j::Integer) = setindex!(i.indices,v,j)
-Base.copy(i::TrivialIndexMap) = TrivialIndexMap(copy(i.indices))
+TrivialIndexMap(sparsity::SparsityPattern) = TrivialSparseIndexMap(sparsity)
+Base.size(i::TrivialSparseIndexMap) = (nnz(i.sparsity),)
+
+recast(a::AbstractArray,i::TrivialSparseIndexMap) = recast(a,i.sparsity)
 
 """
     IndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
@@ -231,10 +231,6 @@ abstract type AbstractMultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti} end
 Base.view(i::AbstractMultiValueIndexMap,locations) = MultiValueIndexMapView(i,locations)
 
 function compose_indices(index::AbstractArray{Ti,D},ncomps::Integer) where {Ti,D}
-  # indices = zeros(Ti,size(index)...,ncomps)
-  # @inbounds for comp = 1:ncomps
-  #   selectdim(indices,D+1,comp) .= (index.-1).*ncomps .+ comp
-  # end
   indices = repeat(index;outer=(ntuple(_->1,Val{D}())...,ncomps))
   return MultiValueIndexMap(indices)
 end
@@ -371,6 +367,8 @@ function inv_index_map(i::SparseIndexMap)
   invi_sparse = IndexMap(reshape(sortperm(vec(i.indices_sparse)),size(i)))
   SparseIndexMap(invi,invi_sparse,i.sparsity)
 end
+
+recast(a::AbstractArray,i::SparseIndexMap) = recast(a,i.sparsity)
 
 const MultiValueSparseIndexMap{D,Ti,A<:AbstractMultiValueIndexMap{D,Ti},B} = SparseIndexMap{D,Ti,A,B}
 

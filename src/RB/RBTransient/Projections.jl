@@ -1,15 +1,3 @@
-"""
-    abstract type TransientProjection <: Projection end
-
-Specialization for projections in transient problems. A constructor is given by
-the function Projection
-
-Subtypes:
-- [`TransientPODBasis`](@ref)
-- [`TransientTTSVDCores`](@ref)
-
-"""
-
 function RBSteady.projection(red::TransientPODReduction,s::AbstractTransientSnapshots,args...)
   s1 = flatten_snapshots(s)
   s2 = swap_mode(s1)

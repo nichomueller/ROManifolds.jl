@@ -30,7 +30,7 @@ function get_dof_index_map(space::FESpace)
 end
 
 function get_dof_index_map(model::DiscreteModel,space::FESpace)
-  TrivialIndexMap(LinearIndices((num_free_dofs(space),)))
+  TrivialIndexMap(num_free_dofs(space))
 end
 
 function get_dof_index_map(model::CartesianDiscreteModel,space::FESpace)

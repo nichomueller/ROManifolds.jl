@@ -67,7 +67,6 @@ export BlockSnapshots
 export Snapshots
 export flatten_snapshots
 export select_snapshots
-export select_snapshots_entries
 export get_touched_blocks
 export get_realization
 export get_indexed_values
@@ -93,7 +92,7 @@ export nonlinear_rb_solve!
 include("RBSolver.jl")
 
 export reduction
-export truncated_pod
+export tpod
 export ttsvd
 export gram_schmidt!
 export orth_complement!

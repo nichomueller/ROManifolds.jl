@@ -392,11 +392,9 @@ function Algebra.solve!(
   stats = CostTracker(t,num_params(r))
 
   trial = get_trial(op)(r)
-  x = recast(x̂,trial)
-  i = get_vector_index_map(op)
-  s = Snapshots(x,i,r)
+  x = inv_project(trial,x̂)
 
-  return s,stats,cache
+  return x,stats,cache
 end
 
 # for testing/visualization purposes

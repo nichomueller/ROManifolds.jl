@@ -113,16 +113,15 @@ num_fe_dofs(a::PODBasis) = size(get_basis(a),1)
 num_reduced_dofs(a::PODBasis) = size(get_basis(a),2)
 
 function rescale(op::Function,x::AbstractArray,b::PODBasis)
-  PODBasis(op(x,get_basis(b)),get_index_map(b))
+  PODBasis(op(x,get_basis(b)))
 end
 
 function Base.union(a::PODBasis,b::PODBasis,args...)
-  @check get_index_map(a) == get_index_map(b)
   basis_a = get_basis(a)
   basis_b = get_basis(b)
   gram_schmidt!(basis_b,basis_a,args...)
   basis_ab = hcat(basis_a,basis_b)
-  PODBasis(basis_ab,get_index_map(a))
+  PODBasis(basis_ab)
 end
 
 function galerkin_projection(proj_left::PODBasis,a::PODBasis)
@@ -169,7 +168,6 @@ num_fe_dofs(a::TTSVDCores) = prod(map(c -> size(c,2),get_cores(a)))
 num_reduced_dofs(a::TTSVDCores) = size(last(get_cores(a)),3)
 
 IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
-IndexMaps.recast(a::TTSVDCores{D}) where D = recast(get_cores(a)[1:D],get_index_map(a))
 
 function rescale(op::Function,x::AbstractRankTensor{D1},b::TTSVDCores{D2}) where {D1,D2}
   if D1 == D2
@@ -226,8 +224,7 @@ end
 
 function Arrays.return_cache(::typeof(projection),::PODReduction,s::AbstractSnapshots)
   b = testvalue(Matrix{eltype(s)})
-  i = get_index_map(s)
-  return PODBasis(b,i)
+  return PODBasis(b)
 end
 
 function Arrays.return_cache(::typeof(projection),::TTSVDReduction,s::AbstractSnapshots)

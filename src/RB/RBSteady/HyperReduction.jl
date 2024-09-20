@@ -47,6 +47,12 @@ function empirical_interpolation(a::AbstractArray)
   return i,ai
 end
 
+function empirical_interpolation(A::ParamSparseMatrix)
+  i,ai = empirical_interpolation(A.data)
+  i′ = recast_indices(I,param_getindex(A,1))
+  return i′,ai
+end
+
 abstract type AbstractIntegrationDomain <: AbstractVector{Int32} end
 
 struct IntegrationDomain <: AbstractIntegrationDomain
@@ -140,9 +146,8 @@ function HyperReduction(
   basis = projection(get_reduction(red),s)
   proj_basis = galerkin_projection(test,basis,trial)
   indices,factor = empirical_interpolation(basis)
-  sparse_indices = recast_indices(indices,recast(basis))
   factor = lu(interp)
-  integration_domain = IntegrationDomain(sparse_indices)
+  integration_domain = IntegrationDomain(indices)
   return MDEIM(proj_basis,factor,integration_domain)
 end
 

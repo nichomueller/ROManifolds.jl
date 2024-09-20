@@ -8,10 +8,22 @@ function reduction(red::PODReduction,A::AbstractArray,args...)
   return U
 end
 
+function reduction(red::PODReduction,A::SparseSnapshots,args...)
+  red_style = ReductionStyle(red)
+  U,S,V = tpod(red_style,A,args...)
+  return recast(U,A)
+end
+
 function reduction(red::TTSVDReduction,A::AbstractArray,args...)
   red_style = ReductionStyle(red)
   cores,remainder = ttsvd(red_style,A,args...)
   return cores
+end
+
+function reduction(red::TTSVDReduction,A::SparseSnapshots,args...)
+  red_style = ReductionStyle(red)
+  cores,remainder = ttsvd(red_style,A,args...)
+  return recast(cores,A)
 end
 
 function _size_cond(M::AbstractMatrix)

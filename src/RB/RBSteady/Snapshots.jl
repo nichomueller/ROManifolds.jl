@@ -39,13 +39,17 @@ function Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractRealization)
   @abstractmethod
 end
 
-function IndexMaps.change_index_map(s::AbstractSnapshots,i::AbstractIndexMap)
+function IndexMaps.change_index_map(i::AbstractIndexMap,s::AbstractSnapshots)
   Snapshots(param_data(s),i,get_realization(s))
 end
 
-function IndexMaps.change_index_map(s::AbstractSnapshots,f)
-  i′ = change_index_map(get_index_map(s),f)
-  change_index_map(s,i′)
+function IndexMaps.change_index_map(f,s::AbstractSnapshots)
+  i′ = change_index_map(f,get_index_map(s))
+  change_index_map(i′,s)
+end
+
+function IndexMaps.recast(a::AbstractArray,s::AbstractSnapshots)
+  return recast(a,get_index_map(s))
 end
 
 """
@@ -55,7 +59,7 @@ The output snapshots are indexed according to a [`TrivialIndexMap`](@ref)
 
 """
 function flatten_snapshots(s::AbstractSnapshots)
-  change_index_map(s,TrivialIndexMap)
+  change_index_map(TrivialIndexMap,s)
 end
 
 """
@@ -302,44 +306,10 @@ function get_indexed_values(s::ReshapedSnapshots)
   ConsecutiveArrayOfArrays(vr)
 end
 
-const SparseSnapshots{T,N,L,D,R} = Union{
-  GenericSnapshots{T,N,L,D,<:SparseIndexMap{D},R,<:ParamSparseMatrix},
-  SnapshotsAtIndices{T,N,L,D,<:SparseIndexMap{D},R,<:ParamSparseMatrix}
+const SparseSnapshots{T,N,L,D,I,R} = Union{
+  GenericSnapshots{T,N,L,D,I,R,<:ParamSparseMatrix},
+  SnapshotsAtIndices{T,N,L,D,I,R,<:ParamSparseMatrix}
 }
-
-"""
-    select_snapshots_entries(s::AbstractSteadySnapshots,srange) -> ArrayOfArrays
-    select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange) -> ArrayOfArrays
-
-Selects the snapshots' entries corresponding to the spatial range `srange` in
-steady cases, to the spatial-temporal ranges `srange` and `trange` in transient
-cases, for every parameter.
-
-"""
-function select_snapshots_entries(s::AbstractSteadySnapshots,srange)
-  _getindex(s::AbstractSteadySnapshots,is,it,ip) = consecutive_getindex(s.data,is,ip)
-  _getindex(s::SparseSnapshots,is,it,ip) = param_getindex(s.data,ip)[is]
-
-  T = eltype(s)
-  nval = length(srange)
-  np = num_params(s)
-  entries = array_of_consecutive_arrays(zeros(T,nval),np)
-
-  for ip = 1:np
-    for (i,is) in enumerate(srange)
-      v = _getindex(s.data,is,ip)
-      consecutive_setindex!(entries,v,i,ip)
-    end
-  end
-
-  return entries
-end
-
-const UnfoldingSteadySnapshots{T,L,I<:TrivialIndexMap,R} = AbstractSteadySnapshots{T,2,L,1,I,R}
-
-function IndexMaps.recast(s::UnfoldingSteadySnapshots,a::AbstractMatrix)
-  return recast(s.data,a)
-end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::AbstractSnapshots{S,2}) where {T,S}
   consecutive_mul(get_indexed_values(A),get_indexed_values(B))
@@ -458,7 +428,7 @@ end
 function IndexMaps.change_index_map(s::BlockSnapshots{S,N},f) where {S,N}
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  active_block_snaps = [change_index_map(s[n],f) for n in active_block_ids]
+  active_block_snaps = [change_index_map(f,s[n]) for n in active_block_ids]
   BlockSnapshots(block_map,active_block_snaps)
 end
 
@@ -474,13 +444,6 @@ function select_snapshots(s::BlockSnapshots{S,N},args...;kwargs...) where {S,N}
   block_map = BlockMap(size(s),active_block_ids)
   active_block_snaps = [select_snapshots(s[n],args...;kwargs...) for n in active_block_ids]
   BlockSnapshots(block_map,active_block_snaps)
-end
-
-function select_snapshots_entries(s::BlockSnapshots{S,N},srange::ArrayBlock{<:Any,N}) where {S,N}
-  active_block_ids = get_touched_blocks(s)
-  block_map = BlockMap(size(s),active_block_ids)
-  active_block_snaps = [select_snapshots_entries(s[n],srange[n]) for n in active_block_ids]
-  return_cache(block_map,active_block_snaps...)
 end
 
 # utils

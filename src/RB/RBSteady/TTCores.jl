@@ -1,4 +1,4 @@
-function IndexMaps.recast(i::SparseIndexMap,a::AbstractVector{<:AbstractArray{T,3}}) where T
+function IndexMaps.recast(a::AbstractVector{<:AbstractArray{T,3}},i::SparseIndexMap) where T
   us = IndexMaps.get_univariate_sparsity(i)
   @check length(us) ≤ length(a)
   if length(us) == length(a)

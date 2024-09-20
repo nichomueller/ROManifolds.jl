@@ -70,3 +70,6 @@ RaRb × CaCb, can be indexed as AB[i,j] = A[slow_index(i,RbCb)] * B[fast_index(i
 @inline fast_index(i,nfast::Integer) = mod.(i .- 1,nfast) .+ 1
 @inline fast_index(i::Integer,nfast::Integer) = mod(i - 1,nfast) + 1
 @inline fast_index(i::Colon,::Integer) = i
+
+recast(a::AbstractArray,i::AbstractArray) = @abstractmethod
+sparsify(a::AbstractArray,i::AbstractArray) = @abstractmethod

@@ -34,7 +34,7 @@ nontrivial index map is returned
 
 """
 function get_vector_index_map(test::FESpace)
-  TrivialIndexMap(LinearIndices((num_free_dofs(test),)))
+  TrivialIndexMap(num_free_dofs(test))
 end
 
 function get_vector_index_map(test::TProductFESpace)
@@ -64,7 +64,7 @@ a SparseIndexMap is returned
 """
 function get_matrix_index_map(trial::FESpace,test::FESpace)
   sparsity = get_sparsity(trial,test)
-  TrivialIndexMap(LinearIndices((nnz(sparsity),)))
+  TrivialIndexMap(sparsity)
 end
 
 function get_matrix_index_map(trial::TProductFESpace,test::TProductFESpace)
