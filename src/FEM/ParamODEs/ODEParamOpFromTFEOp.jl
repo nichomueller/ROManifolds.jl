@@ -24,7 +24,7 @@ end
 
 function allocate_ode_spaces(
   odeop::ODEParamOpFromTFEOp,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
 
   order = get_order(odeop)
@@ -44,7 +44,7 @@ end
 
 function ODEs.allocate_odeopcache(
   odeop::ODEParamOpFromTFEOp,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
 
   order = get_order(odeop)
@@ -96,7 +96,7 @@ function ODEs.allocate_odeopcache(
   ODEOpFromTFEOpCache(trials,pttrials,tfeopcache,const_forms)
 end
 
-function ODEs.update_odeopcache!(odeopcache,odeop::ODEParamOpFromTFEOp,r::TransientParamRealization)
+function ODEs.update_odeopcache!(odeopcache,odeop::ODEParamOpFromTFEOp,r::TransientRealization)
   trials = ()
   for k in 1:get_order(odeop)+1
     trials = (trials...,evaluate!(odeopcache.Us[k],odeopcache.Uts[k],r))
@@ -111,7 +111,7 @@ end
 
 function Algebra.allocate_residual(
   odeop::ODEParamOpFromTFEOp,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
 
@@ -130,7 +130,7 @@ end
 function Algebra.residual!(
   b::AbstractVector,
   odeop::ODEParamOpFromTFEOp,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache;
   add::Bool=false)
@@ -155,7 +155,7 @@ end
 function Algebra.residual!(
   b::AbstractVector,
   odeop::ODEParamOpFromTFEOp{SemilinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache;
   add::Bool=false)
@@ -181,7 +181,7 @@ end
 function Algebra.residual!(
   b::AbstractVector,
   odeop::ODEParamOpFromTFEOp{LinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache;
   add::Bool=false)
@@ -207,7 +207,7 @@ end
 
 function Algebra.allocate_jacobian(
   odeop::ODEParamOpFromTFEOp,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
 
@@ -233,7 +233,7 @@ end
 function ODEs.jacobian_add!(
   A::AbstractMatrix,
   odeop::ODEParamOpFromTFEOp,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)
@@ -267,7 +267,7 @@ end
 function ODEs.jacobian_add!(
   A::AbstractMatrix,
   odeop::ODEParamOpFromTFEOp{LinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)
@@ -336,7 +336,7 @@ end
 
 function allocate_ode_spaces(
   odeop::ODEParamOpFromTFEOpWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
 
   order = get_order(odeop)
@@ -356,7 +356,7 @@ end
 
 function ODEs.allocate_odeopcache(
   odeop::ODEParamOpFromTFEOpWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
 
   order = get_order(odeop)
@@ -411,7 +411,7 @@ end
 function ODEs.update_odeopcache!(
   odeopcache,
   odeop::ODEParamOpFromTFEOpWithTrian,
-  r::TransientParamRealization)
+  r::TransientRealization)
 
   trials = ()
   for k in 1:get_order(odeop)+1
@@ -427,7 +427,7 @@ end
 
 function Algebra.allocate_residual(
   odeop::ODEParamOpFromTFEOpWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
 
@@ -450,7 +450,7 @@ end
 function Algebra.residual!(
   b::Contribution,
   odeop::ODEParamOpFromTFEOpWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache;
   add::Bool=false)
@@ -477,7 +477,7 @@ end
 function Algebra.residual!(
   b::Contribution,
   odeop::ODEParamOpFromTFEOp{SemilinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache;
   add::Bool=false)
@@ -504,7 +504,7 @@ end
 function Algebra.residual!(
   b::Contribution,
   odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache;
   add::Bool=false)
@@ -531,7 +531,7 @@ end
 
 function Algebra.allocate_jacobian(
   odeop::ODEParamOpFromTFEOpWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
 
@@ -562,7 +562,7 @@ end
 function ODEs.jacobian_add!(
   As::TupOfArrayContribution,
   odeop::ODEParamOpFromTFEOpWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)
@@ -598,7 +598,7 @@ end
 function ODEs.jacobian_add!(
   As::TupOfArrayContribution,
   odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)

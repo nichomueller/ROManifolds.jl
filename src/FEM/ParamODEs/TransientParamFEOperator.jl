@@ -28,7 +28,7 @@ end
 
 function ODEs.allocate_tfeopcache(
   op::TransientParamFEOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
 
   nothing
@@ -37,14 +37,14 @@ end
 function ODEs.update_tfeopcache!(
   tfeopcache,
   op::TransientParamFEOperator,
-  r::TransientParamRealization)
+  r::TransientRealization)
 
   tfeopcache
 end
 
 ParamDataStructures.realization(op::TransientParamFEOperator;kwargs...) = @abstractmethod
 
-function ParamFESpaces.get_param_assembler(op::TransientParamFEOperator,r::TransientParamRealization)
+function ParamFESpaces.get_param_assembler(op::TransientParamFEOperator,r::TransientRealization)
   get_param_assembler(get_assembler(op),r)
 end
 

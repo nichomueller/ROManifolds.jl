@@ -23,6 +23,7 @@ galerkin_projection(a::Projection,b::Projection) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection,c::Projection,args...) = @abstractmethod
 empirical_interpolation(a::Projection) = @abstractmethod
 gram_schmidt!(a::Projection,b::Projection,args...) = gram_schmidt!(get_basis(a),get_basis(b),args...)
+MDEIM(a::Projection) = @abstractmethod
 
 Base.:+(a::Projection,b::Projection) = union(a,b)
 Base.:-(a::Projection,b::Projection) = union(a,b)
@@ -67,22 +68,31 @@ function projection(red::AbstractReduction,s::AbstractSnapshots,args...)
   projection(red,basis,index_map)
 end
 
-struct ReducedProjection{A<:AbstractArray} <: Projection
-  basis::A
-end
+abstract type ReducedProjection{A<:AbstractArray} <: Projection end
 
-get_basis(a::ReducedProjection) = a.basis
-num_reduced_dofs(a::ReducedProjection) = size(get_basis(a),2)
+const ReducedVecProjection = ReducedProjection{<:AbstractMatrix}
+const ReducedMatProjection = ReducedProjection{<:AbstractArray{T,3} where T}
 
 function project(a::ReducedProjection,x::AbstractVector)
   @notimplemented
 end
 
-function inv_project(a::ReducedProjection{<:AbstractArray{T,3}},x̂::AbstractVector) where T
+function inv_project(a::ReducedMatProjection,x̂::AbstractVector)
   basis = get_basis(a)
-  x̂ = contraction(basis,x̂)
+  x = contraction(basis,x̂)
   return x
 end
+
+struct ReducedAlgebraicProjection{A} <: ReducedProjection{A}
+  basis::A
+end
+
+ReducedProjection(basis::AbstractArray) = ReducedAlgebraicProjection(basis)
+
+get_basis(a::ReducedAlgebraicProjection) = a.basis
+num_reduced_dofs(a::ReducedAlgebraicProjection) = size(get_basis(a),2)
+num_reduced_dofs_left_projector(a::ReducedAlgebraicProjection) = size(get_basis(a),1)
+num_reduced_dofs_right_projector(a::ReducedMatProjection) = size(get_basis(a),3)
 
 """
     struct PODBasis{A<:AbstractMatrix} <: Projection
@@ -90,21 +100,17 @@ end
 Projection stemming from a truncated proper orthogonal decomposition [`truncated_pod`](@ref)
 
 """
-struct PODBasis{A<:AbstractMatrix,I<:AbstractIndexMap} <: Projection
+struct PODBasis{A<:AbstractMatrix} <: Projection
   basis::A
-  index_map::I
 end
 
-function projection(::PODReduction,basis::AbstractMatrix,index_map::AbstractIndexMap)
-  PODBasis(basis,index_map)
+function projection(::PODReduction,basis::AbstractMatrix,args...)
+  PODBasis(basis)
 end
 
 get_basis(a::PODBasis) = a.basis
 num_fe_dofs(a::PODBasis) = size(get_basis(a),1)
 num_reduced_dofs(a::PODBasis) = size(get_basis(a),2)
-
-IndexMaps.get_index_map(a::PODBasis) = a.index_map
-IndexMaps.recast(a::PODBasis) = recast(get_basis(a),get_index_map(a))
 
 function rescale(op::Function,x::AbstractArray,b::PODBasis)
   PODBasis(op(x,get_basis(b)),get_index_map(b))
@@ -128,15 +134,14 @@ end
 
 function galerkin_projection(proj_left::PODBasis,a::PODBasis,proj_right::PODBasis)
   basis_left = get_basis(proj_left)
-  basis = recast(get_basis(a))
+  basis = get_basis(a)
   basis_right = get_basis(proj_right)
   proj_basis = galerkin_projection(basis_left,basis,basis_right)
   return ReducedProjection(proj_basis)
 end
 
 function empirical_interpolation(a::PODBasis)
-  cache = eim_cache(get_basis(a))
-  empirical_interpolation!(cache,get_basis(a))
+  empirical_interpolation(get_basis(a))
 end
 
 # TT interface
@@ -153,9 +158,7 @@ struct TTSVDCores{D,A<:AbstractVector{<:AbstractArray{T,3} where T},I<:AbstractI
   index_map::I
 end
 
-function projection(red::TTSVDReduction,s::AbstractSnapshots,args...)
-  cores = reduction(red,s,args...)
-  index_map = get_index_map(s)
+function projection(::TTSVDReduction,cores::AbstractVector{<:AbstractArray},index_map::AbstractIndexMap)
   TTSVDCores(cores,index_map)
 end
 
@@ -196,7 +199,7 @@ end
 
 function galerkin_projection(proj_left::TTSVDCores,a::TTSVDCores,proj_right::TTSVDCores,args...)
   cores_left = get_cores(proj_left)
-  cores = recast(get_cores(a))
+  cores = get_cores(a)
   cores_right = get_cores(proj_right)
   proj_basis = galerkin_projection(cores_left,cores,cores_right)
   return ReducedProjection(proj_basis)
@@ -205,15 +208,16 @@ end
 function empirical_interpolation(a::TTSVDCores)
   cores = get_cores(a)
   index_map = get_index_map(a)
-  cache = eim_cache(cores)
   c = first(cores)
+  cache = eim_cache(c)
   for i = eachindex(cores)
-    _,Ai = empirical_interpolation!(cache,c)
+    _,interp = empirical_interpolation!(cache,c)
     if i < length(cores)
-      c = contraction(reshape(Ai,1,size(Ai)...),cores[i+1])
+      interp_core = reshape(interp,1,size(interp)...)
+      c = contraction(interp_core,cores[i+1])
     else
-      i = basis_indices(cache,index_map)
-      return i,Ai
+      indices = basis_indices(cache,index_map)
+      return indices,interp
     end
   end
 end
@@ -233,7 +237,9 @@ function Arrays.return_cache(::typeof(projection),::TTSVDReduction,s::AbstractSn
 end
 
 function Arrays.return_cache(::typeof(projection),red::AbstractReduction,s::BlockSnapshots)
-  basis = return_cache(projection,red,blocks(s)[1])
+  i = findfirst(s.touched)
+  @notimplementedif isempty(i)
+  basis = return_cache(projection,red,blocks(s)[i])
   block_basis = Array{typeof(basis),ndims(s)}(undef,size(s))
   touched = s.touched
   return BlockProjection(block_basis,touched)
@@ -318,10 +324,6 @@ function get_basis(a::BlockProjection{A,N}) where {A,N}
   @notimplemented
 end
 
-function IndexMaps.get_index_map(a::BlockProjection{A,N}) where {A,N}
-  @notimplemented
-end
-
 function get_cores(a::BlockProjection{<:TTSVDCores,N}) where {A,N}
   @notimplemented
 end
@@ -353,10 +355,14 @@ for f in (:project,:inv_project)
       a::BlockProjection,
       x::Union{BlockVector,BlockVectorOfVectors})
 
-      @check length(findall(a.touched)) == length(a) == nblocks(x)
+      @check size(a) == size(x)
       y = Vector{eltype(x)}(undef,length(a))
       for i in eachindex(a)
-        y[Block(i)] = return_cache($f,a[i],blocks(x)[i])
+        if a.touched[i]
+          y[Block(i)] = return_cache($f,a[i],blocks(x)[i])
+        else
+          y[Block(i)] = blocks(x)[i]
+        end
       end
       return mortar(y)
     end
@@ -364,7 +370,9 @@ for f in (:project,:inv_project)
     function $f(a::BlockProjection,x::Union{BlockArray,BlockArrayOfArrays})
       y = return_cache($f,a,x)
       for i in eachindex(a)
-        y[Block(i)] = $f(a[i],blocks(x)[i])
+        if a.touched[i]
+          y[Block(i)] = $f(a[i],blocks(x)[i])
+        end
       end
       return y
     end

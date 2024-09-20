@@ -140,59 +140,83 @@ end
 
 # We are not interested in the last dimension (corresponds to the parameter)
 
-function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N}) where {T,N}
+function ttsvd(
+  red_style::ReductionStyle,
+  A::AbstractArray{T,N}
+  ) where {T,N}
+
   cores = Array{T,3}[]
   oldrank = 1
-  A_d = reshape(A,oldrank,size(A,1),:)
+  remainder = reshape(A,oldrank,size(A,1),:)
   for d in 1:N-1
-    core_d,remainder_d = ttsvd_loop(red_style[d],A_d)
+    core_d,remainder_d = ttsvd_loop(red_style[d],remainder)
     oldrank = size(core_d,3)
-    A_d = reshape(remainder_d,oldrank,size(A,d+1),:)
+    remainder = reshape(remainder_d,oldrank,size(A,d+1),:)
     push!(cores,core_d)
   end
-  return cores,A_d
+  return cores,remainder
 end
 
-function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRankTensor{D,1}) where {T,N,D}
-  Nspace = D
-  @check Nspace ≤ N-1
+function ttsvd(
+  red_style::TTSVDReduction,
+  A::AbstractArray{T,N},
+  X::AbstractRankTensor{D}) where {T,N,D}
+
+  @check D ≤ N-1
+  if D == N - 1
+    steady_ttsvd(red_style,A,X)
+  else
+    generalized_ttsvd(red_style,A,X)
+  end
+end
+
+function steady_ttsvd(
+  red_style::ReductionStyle,
+  A::AbstractArray{T,N},
+  X::Rank1Tensor{D,1}
+  ) where {T,N,D}
 
   cores = Array{T,3}[]
   oldrank = 1
-  A_d = reshape(A,oldrank,size(A,1),:)
-  for d in 1:Nspace
-    core_d,remainder_d = ttsvd_loop(red_style[d],A_d,X[d])
+  remainder = reshape(A,oldrank,size(A,1),:)
+  for d in 1:D
+    core_d,remainder_d = ttsvd_loop(red_style[d],remainder,X[d])
     oldrank = size(core_d,3)
-    A_d = reshape(remainder_d,oldrank,size(A,d+1),:)
+    remainder = reshape(remainder_d,oldrank,size(A,d+1),:)
     push!(cores,core_d)
   end
 
-  return cores,A_d
+  return cores,remainder
 end
 
-function ttsvd(red_style::ReductionStyle,A::AbstractArray{T,N},X::AbstractRankTensor{D,K}) where {T,N,D,K}
-  cores_k,remainders_k = map(k -> ttsvd(red_style,A,X[k]),1:K) |> tuple_of_arrays
-  cores = Array{T,3}[]
-  for d in 1:D
-    touched = d == 1 ? fill(true,rank(X)) : I(rank(X))
-    cores_d = getindex.(cores_k,d)
-    push!(cores,BlockCore(cores_d,touched))
-  end
+function steady_ttsvd(
+  red_style::ReductionStyle,
+  A::AbstractArray{T,N},
+  X::GenericRankTensor{D,K}
+  ) where {T,N,D,K}
+
+  cores_k,remainders_k = map(k -> steady_ttsvd(red_style,A,X[k]),1:K) |> tuple_of_arrays
+  cores = block_cores(cores_k...)
+  remainders = cat(remainders_k...;dims=1)
   R = orthogonalize!(cores,X)
-  A_d = absorb(cat(remainders_k...;dims=1),R)
-  return cores,A_d
+  remainder = absorb(remainders,R)
+  return cores,remainder
 end
 
-function reduction(
-  red::TTSVDReduction,
-  A::MultiValueSnapshots{T,N},
-  X::AbstractRankTensor) where {T,N}
+function generalized_ttsvd(
+  red_style::ReductionStyle,
+  A::AbstractArray{T,N},
+  X::GenericRankTensor{D}
+  ) where {T,N,D}
 
-  red_style = ReductionStyle(red)
-  cores,remainder = ttsvd(red_style,A,X)
-  core_c,remainder_c = RBSteady.ttsvd_loop(red_style[N-1],remainder)
-  push!(cores,core_c)
-  return cores
+  cores,remainder = steady_ttsvd(red_style,A,X)
+  for d = D+1:N-1
+    core_d,remainder_d = RBSteady.ttsvd_loop(red_style[N-2],remainder)
+    remainder = reshape(remainder_d,size(core_d,3),size(A,d),:)
+    push!(cores,core_d)
+  end
+
+  return cores,remainder
 end
 
 function pivoted_qr(A;tol=1e-10)
@@ -245,28 +269,28 @@ function absorb(core::AbstractArray{T,3},R::AbstractMatrix) where T
   return reshape(Rcore,size(Rcore,1),size(core,2),:)
 end
 
-function _weight_array(weight,core,X)
+function _weight_array(prev_weight,core,X)
   @check length(X) == size(weight,2)
-  K = size(weight,2)
+  @check size(core,1) == size(weight,1) == size(weight,3)
+
+  K = length(X)
+  rank_prev = size(core,1)
   rank = size(core,3)
-  rank_prev = size(weight,3)
-  W = zeros(rank,K,rank)
-  w = zeros(size(core,2))
+  N = size(core,2)
+
+  cur_weight = zeros(rank,K,rank)
+  core2D = reshape(permutedims(core,(2,1,3)),N,rank_prev*rank)
+  cache_right = zeros(N,rank_prev*rank)
+  cache_left = zeros(rank_prev*rank,N)
+
   @inbounds for k = 1:K
     Xk = X[k]
-    @views Wk = W[:,k,:]
-    @views Wk_prev = weight[:,k,:]
-    for i′_prev = 1:rank_prev
-      for i′ = 1:rank
-        mul!(w,Xk,core[i′_prev,:,i′])
-        for i_prev = 1:rank_prev
-          Wk_prev′ = Wk_prev[i_prev,i′_prev]
-          for i = 1:rank
-            Wk[i,i′] += Wk_prev′*core[i_prev,:,i]'*w
-          end
-        end
-      end
-    end
+    Wk = W[:,k,:]
+    Wk_prev = weight[:,k,:]
+    mul!(cache_right,Xk,core2D)
+    mul!(cache_left,core2D',cache_right)
+    cur_weight = permutedims(reshape(cache_left,rank_prev,rank,rank_prev,rank),(1,3,2,4))
+    muladd!(Wk,Wk_prev,cur_weight)
   end
   return W
 end

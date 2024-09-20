@@ -223,29 +223,6 @@ function Utils.compute_relative_error(norm_style::EuclideanNorm,feop,son,son_app
   compute_relative_error(son,son_approx)
 end
 
-function Utils.compute_relative_error(
-  sol::MultiValueSnapshots{T,N},
-  sol_approx::MultiValueSnapshots{T,N},
-  args...) where {T,N}
-
-  @check size(sol) == size(sol_approx)
-  errors = zeros(num_params(sol))
-  @inbounds for ip = 1:num_params(sol)
-    err_norm = 0.0
-    sol_norm = 0.0
-    solip = selectdim(sol,N,ip)
-    solip_approx = selectdim(sol_approx,N,ip)
-    for ic in 1:num_components(sol)
-      solipc = selectdim(solip,N-1,ic)
-      solipc_approx = selectdim(solip_approx,N-1,ic)
-      err_norm += induced_norm(solipc-solipc_approx,args...)^2
-      sol_norm += induced_norm(solipc,args...)^2
-    end
-    errors[ip] = sqrt(err_norm) / sqrt(sol_norm)
-  end
-  return mean(errors)
-end
-
 function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots)
   @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
   active_block_ids = get_touched_blocks(sol)

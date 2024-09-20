@@ -4,7 +4,7 @@ Arrays.evaluate(U::DistributedSingleFieldFESpace,::Nothing,::Nothing) = U
 
 function Algebra.allocate_jacobian(
   op::TransientParamFEOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   duh::Union{GridapDistributed.DistributedCellField,GridapDistributed.DistributedMultiFieldFEFunction},
   cache)
 
@@ -17,7 +17,7 @@ end
 function ODEs.jacobians!(
   A::AbstractMatrix,
   op::TransientParamFEOpFromWeakForm,
-  r::TransientParamRealization,
+  r::TransientRealization,
   xh::TransientDistributedCellField,
   γ::Tuple{Vararg{Real}},
   cache)
@@ -31,7 +31,7 @@ end
 
 function Algebra.allocate_residual(
   op::TransientParamFEOperatorWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   duh::Union{GridapDistributed.DistributedCellField,GridapDistributed.DistributedMultiFieldFEFunction},
   cache)
 
@@ -40,7 +40,7 @@ end
 
 function Algebra.allocate_jacobian(
   op::TransientParamFEOperatorWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   duh::Union{GridapDistributed.DistributedCellField,GridapDistributed.DistributedMultiFieldFEFunction},
   cache)
 

@@ -19,18 +19,13 @@ const TupOfAffineContribution = Tuple{Vararg{AffineContribution{T}}} where T
 
 get_indices_time(a::TransientAffineDecomposition) = get_indices_time(get_integration_domain(a))
 
-function _time_indices_and_interp_matrix(interp_basis_space,basis_time)
-  indices_time,interp_basis_time = empirical_interpolation(basis_time)
-  interp_basis_space_time = kron(interp_basis_time,interp_basis_space)
-  interpolation = lu(interp_basis_space_time)
-  return indices_time,interpolation
-end
-
 function RBSteady.mdeim(b::TransientPODBasis)
   basis_space = get_basis_space(b)
   basis_time = get_basis_time(b)
   indices_space,interp_basis_space = empirical_interpolation(basis_space)
-  indices_time,interpolation = _time_indices_and_interp_matrix(interp_basis_space,basis_time)
+  indices_time,interp_basis_time = empirical_interpolation(basis_time)
+  interp_basis_space_time = kron(interp_basis_time,interp_basis_space)
+  interpolation = lu(interp_basis_space_time)
   integration_domain = TransientIntegrationDomain(indices_space,indices_time)
   return interpolation,integration_domain
 end

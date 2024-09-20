@@ -23,7 +23,7 @@ g(x,μ) = exp(-sum(x)/sum(μ))
 g(μ) = x->g(x,μ)
 
 params = [rand(3),rand(3),rand(3)]
-μ = ParamRealization(params)
+μ = Realization(params)
 gμ = 𝑓ₚ(g,μ)
 U = TrialParamFESpace(V,gμ)
 dirichlet_values = get_dirichlet_dof_values(U)

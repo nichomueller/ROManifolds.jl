@@ -61,7 +61,6 @@ include("ReductionMethods.jl")
 export AbstractSnapshots
 export GenericSnapshots
 export SnapshotsAtIndices
-export MultiValueSnapshots
 export SparseSnapshots
 export UnfoldingSteadySnapshots
 export BlockSnapshots
@@ -117,7 +116,7 @@ export add_space_supremizers
 include("Projections.jl")
 
 export FESubspace
-export RBSpace
+export SingleFieldRBSpace
 export MultiFieldRBSpace
 export fe_subspace
 export reduced_fe_space
@@ -131,7 +130,6 @@ export reduced_operator
 export get_fe_trial
 export get_fe_test
 export jacobian_and_residual
-export select_fe_quantities_at_indices
 include("PGOperator.jl")
 
 export ReducedAlgebraicOperator
@@ -141,22 +139,18 @@ export compress_core
 export multiply_cores
 include("ReducedAlgebraicOperator.jl")
 
-export AbstractIntegrationDomain
-export AffineDecomposition
+export IntegrationDomain
+export HyperReduction
+export MDEIM
 export AffineContribution
-export BlockAffineDecomposition
-export mdeim
 export empirical_interpolation
 export get_integration_domain
 export reduce_triangulation
 export reduced_jacobian
 export reduced_residual
 export reduced_jacobian_residual
-export allocate_coefficient
-export allocate_result
-export coefficient!
-export mdeim_result
-include("AffineDecomposition.jl")
+export project!
+include("HyperReduction.jl")
 
 export PGMDEIMOperator
 export LinearNonlinearPGMDEIMOperator

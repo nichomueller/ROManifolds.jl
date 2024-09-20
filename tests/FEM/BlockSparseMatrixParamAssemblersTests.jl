@@ -12,7 +12,7 @@ using Mabla.FEM.ParamFESpaces
 import ArraysOfArrays: innersize
 ############################################################################################
 parametric = true
-μ = ParamRealization([[1],[2],[3]])
+μ = Realization([[1],[2],[3]])
 sol(x,μ) = (1+sum(μ))*sum(x)
 sol(μ) = x -> sol(x,μ)
 solμ = 𝑓ₚ(sol,μ)

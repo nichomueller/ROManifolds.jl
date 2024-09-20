@@ -75,7 +75,7 @@ end
 function ODEs.allocate_odecache(
   fesolver::ThetaMethod,
   op::TransientPGOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 
   dt,θ = fesolver.dt,fesolver.θ
@@ -91,7 +91,7 @@ end
 
 function ODEs.allocate_odeopcache(
   op::TransientPGOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 
   allocate_odeopcache(op.op,r,us)
@@ -100,7 +100,7 @@ end
 function ODEs.update_odeopcache!(
   odeopcache,
   op::TransientPGOperator,
-  r::TransientParamRealization)
+  r::TransientRealization)
 
   @warn "For performance reasons, it would be best to update the cache at the very
     start, given that the online phase of a space-time ROM is time-independent"
@@ -109,7 +109,7 @@ end
 
 function Algebra.allocate_residual(
   op::TransientPGOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache)
 
@@ -118,7 +118,7 @@ end
 
 function Algebra.allocate_jacobian(
   op::TransientPGOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache)
 
@@ -128,27 +128,23 @@ end
 function Algebra.residual!(
   b::Contribution,
   op::TransientPGOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache;
   kwargs...)
 
   residual!(b,op.op,r,us,odeopcache;kwargs...)
-  i = get_vector_index_map(op)
-  return Snapshots(b,i,r)
 end
 
 function Algebra.jacobian!(
   A::TupOfArrayContribution,
   op::TransientPGOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)
 
   jacobian!(A,op.op,r,us,ws,odeopcache)
-  i = get_matrix_index_map(op)
-  return Snapshots(A,i,r)
 end
 
 function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientRBOperator,s)

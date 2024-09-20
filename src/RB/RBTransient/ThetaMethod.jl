@@ -3,7 +3,7 @@
 function Algebra.residual(
   solver::ThetaMethod,
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   state0::NTuple{1,AbstractVector})
 
   u0 = state0[1]
@@ -29,7 +29,7 @@ end
 function Algebra.jacobian(
   solver::ThetaMethod,
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   state0::NTuple{1,AbstractVector})
 
   u0 = state0[1]
@@ -56,7 +56,7 @@ end
 function get_stage_operator(
   solver::ThetaMethod,
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   state0::NTuple{1,AbstractVector},
   odecache;
   update_cache=true)
@@ -92,7 +92,7 @@ function Algebra.solve!(
   statef::NTuple{1,AbstractVector},
   solver::ThetaMethod,
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   state0::NTuple{1,AbstractVector},
   odecache)
 
@@ -109,7 +109,7 @@ end
 function RBSteady.jacobian_and_residual(
   solver::ThetaMethod,
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   state0::NTuple{1,AbstractVector},
   odecache;
   kwargs...)
@@ -127,7 +127,7 @@ end
 function Algebra.residual(
   solver::ThetaMethod,
   odeop::ODEParamOperator{LinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   state0::NTuple{1,AbstractVector})
 
   u0 = state0[1]
@@ -151,7 +151,7 @@ end
 function Algebra.jacobian(
   solver::ThetaMethod,
   odeop::ODEParamOperator{LinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   state0::NTuple{1,AbstractVector})
 
   u0 = state0[1]
@@ -176,7 +176,7 @@ end
 function get_stage_operator(
   solver::ThetaMethod,
   odeop::ODEParamOperator{LinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   state0::NTuple{1,AbstractVector},
   odecache;
   update_cache=true)
@@ -205,7 +205,7 @@ function Algebra.solve!(
   statef::NTuple{1,AbstractVector},
   solver::ThetaMethod,
   odeop::ODEParamOperator{LinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   state0::NTuple{1,AbstractVector},
   odecache)
 
@@ -222,7 +222,7 @@ end
 function RBSteady.jacobian_and_residual(
   solver::ThetaMethod,
   odeop::ODEParamOperator{LinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   state0::NTuple{1,AbstractVector},
   odecache;
   kwargs...)
@@ -237,7 +237,7 @@ function Algebra.solve!(
   staterb::NTuple{1,AbstractVector},
   solver::ThetaMethod,
   odeop::ODEParamOperator{LinearNonlinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   statefe::NTuple{1,AbstractVector},
   odecache)
 
@@ -282,7 +282,7 @@ function Algebra.solve!(
   nonlinear_rb_solve!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,stageop,trial)
 end
 
-function ParamDataStructures.shift!(a::AbstractParamArray,r::TransientParamRealization,α::Number,β::Number)
+function ParamDataStructures.shift!(a::AbstractParamArray,r::TransientRealization,α::Number,β::Number)
   b = copy(a)
   np = num_params(r)
   @assert param_length(a) == param_length(r)
@@ -294,7 +294,7 @@ function ParamDataStructures.shift!(a::AbstractParamArray,r::TransientParamReali
   end
 end
 
-function ParamDataStructures.shift!(a::BlockVectorOfVectors,r::TransientParamRealization,α::Number,β::Number)
+function ParamDataStructures.shift!(a::BlockVectorOfVectors,r::TransientRealization,α::Number,β::Number)
   @inbounds for ai in blocks(a)
     ParamDataStructures.shift!(ai,r,α,β)
   end

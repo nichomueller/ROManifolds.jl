@@ -35,29 +35,40 @@ Computes the bases spanning the subspace of test, trial FE spaces by compressing
 the snapshots `s`
 
 """
-function reduced_basis(red::AbstractReduction,s::AbstractArray,args...)
+function reduced_basis(
+  red::AbstractReduction,
+  s::AbstractArray,
+  args...)
+
   projection(red,s,args...)
 end
 
-function reduced_basis(red::AbstractReduction,feop::GridapType,s::AbstractArray)
+function reduced_basis(
+  red::AbstractReduction,
+  feop::GridapType,
+  s::AbstractArray)
+
   reduced_basis(red,s)
 end
 
-function reduced_basis(red::AbstractReduction{<:ReductionStyle,EnergyNorm},feop::GridapType,s::AbstractArray)
+function reduced_basis(
+  red::AbstractReduction{<:ReductionStyle,EnergyNorm},
+  feop::GridapType,
+  s::AbstractArray)
+
   norm_matrix = assemble_matrix(feop,get_norm(red))
   reduced_basis(red,s,norm_matrix)
 end
 
-function reduced_basis(red::SupremizerReduction,feop::GridapType,s::AbstractArray)
+function reduced_basis(
+  red::SupremizerReduction,
+  feop::GridapType,
+  s::AbstractArray)
+
   norm_matrix = assemble_matrix(feop,get_norm(red))
   supr_matrix = assemble_matrix(feop,get_supr(red))
-
-  primal_blocks = get_primal_blocks(red)
-  dual_blocks = get_dual_blocks(red)
-  supr_tol = get_supr_tol(red)
-
   basis = reduced_basis(get_reduction(red),s,norm_matrix)
-  enrich(basis,norm_matrix,supr_matrix,primal_blocks,dual_blocks,supr_tol)
+  enrich(red,basis,norm_matrix,supr_matrix)
 end
 
 function fe_subspace(space::FESpace,basis)
@@ -70,87 +81,92 @@ end
 Represents a vector subspace of a FE space.
 
 Subtypes:
-- [`RBSpace`](@ref)
+- [`SingleFieldRBSpace`](@ref)
 - [`MultiFieldRBSpace`](@ref)
-- [`BlockRBSpace`](@ref)
 
 """
 abstract type FESubspace <: FESpace end
 
 (U::FESubspace)(μ) = evaluate(U,μ)
 
-get_space(r::FESubspace) = r.space
-get_basis(r::FESubspace) = r.basis
+get_fe_space(r::FESubspace) = @abstractmethod
+get_reduced_subspace(r::FESubspace) = @abstractmethod
 
-get_basis_space(r::FESubspace) = get_basis_space(r.basis)
-num_space_dofs(r::FESubspace) = num_space_dofs(r.basis)
-num_reduced_space_dofs(r::FESubspace) = num_reduced_space_dofs(r.basis)
+get_basis(r::FESubspace) = get_basis(get_reduced_subspace(r))
+num_fe_dofs(r::FESubspace) = num_fe_dofs(get_fe_space(r))
 
-num_fe_free_dofs(r::FESubspace) = num_fe_dofs(r.basis)
+FESpaces.num_free_dofs(r::FESubspace) = num_reduced_dofs(get_reduced_subspace(r))
 
-FESpaces.num_free_dofs(r::FESubspace) = num_reduced_dofs(r.basis)
-
-FESpaces.get_free_dof_ids(r::FESubspace) = Base.OneTo(num_free_dofs(r))
-
-FESpaces.get_dirichlet_dof_ids(r::FESubspace) = get_dirichlet_dof_ids(r.space)
-
-FESpaces.num_dirichlet_dofs(r::FESubspace) = num_dirichlet_dofs(r.space)
-
-FESpaces.num_dirichlet_tags(r::FESubspace) = num_dirichlet_tags(r.space)
-
-FESpaces.get_dirichlet_dof_tag(r::FESubspace) = get_dirichlet_dof_tag(r.space)
-
-FESpaces.get_vector_type(r::FESubspace) = get_vector_type(r.space)
-
-FESpaces.get_dof_value_type(r::FESubspace) = get_dof_value_type(r.space)
+FESpaces.get_vector_type(r::FESubspace) = get_vector_type(get_fe_space(r))
 
 function Algebra.allocate_in_domain(r::FESubspace)
   zero_free_values(r)
 end
 
 function Algebra.allocate_in_range(r::FESubspace)
-  zero_free_values(r.space)
+  zero_free_values(get_fe_space(r))
 end
 
-function Arrays.evaluate(U::FESubspace,args...)
-  space = evaluate(U.space,args...)
-  fe_subspace(space,U.basis)
+function project(r::FESubspace,x::AbstractVector)
+  project(get_reduced_subspace(r),x)
 end
 
-struct RecastMap <: Map end
-
-function IndexMaps.recast(x::AbstractVector,r::FESubspace)
-  cache = return_cache(RecastMap(),x,r)
-  evaluate!(cache,RecastMap(),x,r)
-  return cache
+function project(r::FESubspace,x::AbstractParamVector)
+  x̂ = allocate_in_domain(r)
+  @inbounds for ip in eachindex(x)
+    x̂[ip] = project(get_reduced_subspace(r),x[ip])
+  end
+  return x̂
 end
 
-function Arrays.return_cache(k::RecastMap,x::AbstractParamVector,r::FESubspace)
-  allocate_in_range(r)
+function inv_project(r::FESubspace,x̂::AbstractVector)
+  inv_project(get_reduced_subspace(r),x̂)
+end
+
+function inv_project(r::FESubspace,x̂::AbstractParamVector)
+  x = allocate_in_range(r)
+  @inbounds for ip in eachindex(x̂)
+    x[ip] = inv_project(get_reduced_subspace(r),x̂[ip])
+  end
+  return x
+end
+
+function FESubspaceFunction(r::FESubspace,x::AbstractVector)
+  x̂ = project(get_reduced_subspace(r),x)
+  return FESubspaceFunction(x̂,r)
+end
+
+function FEFunction(r::FESubspace,x̂::AbstractVector)
+  x = inv_project(r,x̂)
+  fe = get_fe_space(r)
+  xdir = get_dirichlet_values(fe)
+  return FEFunction(fe,x,xdir)
+end
+
+abstract type FESubspaceFunction <: FEFunction end
+
+struct SingleFieldFESubspaceFunction <: FESubspaceFunction
+  reduced_free_values::AbstractVector
+  reduced_space::FESubspace
 end
 
 """
-    RBSpace{A<:SingleFieldFESpace,B<:Projection} <: FESubspace
+    SingleFieldRBSpace{A<:SingleFieldFESpace,B<:Projection} <: FESubspace
 
 Reduced basis subspace in a steady setting
 
 """
-struct RBSpace{A<:SingleFieldFESpace,B<:Projection} <: FESubspace
+struct SingleFieldRBSpace{A<:SingleFieldFESpace,B<:Projection} <: FESubspace
   space::A
-  basis::B
+  subspace::B
 end
 
 function fe_subspace(space::SingleFieldFESpace,basis::Projection)
-  RBSpace(space,basis)
+  SingleFieldRBSpace(space,basis)
 end
 
-function Arrays.evaluate!(cache,k::RecastMap,x::AbstractParamVector,r::RBSpace)
-  @inbounds for ip in eachindex(x)
-    cache[ip] = recast(x[ip],r.basis)
-  end
-end
-
-# multi field interface
+get_fe_space(r::SingleFieldRBSpace) = r.space
+get_reduced_subspace(r::SingleFieldRBSpace) = r.subspace
 
 """
     MultiFieldRBSpace{A<:MultiFieldFESpace,B<:BlockProjection} <: FESubspace
@@ -200,46 +216,18 @@ end
 
 MultiField.MultiFieldStyle(r::MultiFieldRBSpace) = MultiFieldStyle(r.space)
 
-function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace)
-  get_free_dof_ids(r,MultiFieldStyle(r))
+# dealing with the transient case here
+
+function Arrays.evaluate(r::FESubspace,args...)
+  space = evaluate(get_fe_space(r),args...)
+  subspace = fe_subspace(space,get_reduced_subspace(r))
+  EvalFESubspace(subspace,args...)
 end
 
-function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace,::ConsecutiveMultiFieldStyle)
-  @notimplemented
+struct EvalFESubspace{A<:FESubspace,B<:AbstractRealization} <: FESubspace
+  subspace::A
+  realization::B
 end
 
-function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace,::BlockMultiFieldStyle{NB}) where NB
-  block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
-  return BlockArrays.blockedrange(block_num_dofs)
-end
-
-function get_touched_blocks(r::MultiFieldRBSpace)
-  get_touched_blocks(r.basis)
-end
-
-function Arrays.return_cache(k::RecastMap,x::BlockVectorOfVectors,r::MultiFieldRBSpace)
-  block_cache = [return_cache(k,x[Block(i)],r[i]) for i = 1:blocklength(x)]
-  mortar(block_cache)
-end
-
-function Arrays.evaluate!(cache,k::RecastMap,x::BlockVectorOfVectors,r::MultiFieldRBSpace)
-  @inbounds for i = 1:blocklength(cache)
-    evaluate!(cache[Block(i)],k,x[Block(i)],r[i])
-  end
-  return cache
-end
-
-# for testing/visualization purposes
-
-function pod_error(r::RBSpace,s::AbstractSnapshots,norm_matrix::AbstractMatrix)
-  basis_space = get_basis_space(r)
-  err_space = norm(s - basis_space*basis_space'*norm_matrix*s) / norm(s)
-  Dict("err_space"=>err_space)
-end
-
-function pod_error(r::MultiFieldRBSpace,s::BlockSnapshots,norm_matrix::BlockMatrix)
-  active_block_ids = get_touched_blocks(s)
-  block_map = BlockMap(size(s),active_block_ids)
-  errors = [pod_error(r[i],s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
-  return_cache(block_map,errors...)
-end
+get_fe_space(r::EvalFESubspace) = get_fe_space(r.subspace)
+get_reduced_subspace(r::EvalFESubspace) = get_reduced_subspace(r.subspace)

@@ -1,5 +1,5 @@
 """
-    abstract type AbstractTransientSnapshots{T,N,L,D,I,R<:TransientParamRealization}
+    abstract type AbstractTransientSnapshots{T,N,L,D,I,R<:TransientRealization}
       <: AbstractSnapshots{T,N,L,D,I,R} end
 
 Transient specialization of an [`AbstractSnapshots`](@ref). The dimension `N` of a
@@ -28,7 +28,7 @@ julia> i = IndexMap(collect(LinearIndices((ns1,ns2))))
 julia> ptspace = TransientParamSpace(fill([0,1],3))
 Set of tuples (p,t) in [[0, 1], [0, 1], [0, 1]] × 0:1
 julia> r = realization(ptspace,nparams=np)
-GenericTransientParamRealization{ParamRealization{Vector{Vector{Float64}}},
+GenericTransientRealization{Realization{Vector{Vector{Float64}}},
   Int64, Vector{Int64}}([
   [0.4021870679335007, 0.6585653527784044, 0.5110768420820191],
   [0.0950901750101361, 0.7049711670440882, 0.3490097863258958]],
@@ -36,7 +36,7 @@ GenericTransientParamRealization{ParamRealization{Vector{Vector{Float64}}},
   0)
 julia> s = Snapshots(ParamArray(data),i,r)
 2×2×1×2 TransientGenericSnapshots{Float64, 4, 2, 2, IndexMap{2, Int64},
-  GenericTransientParamRealization{ParamRealization{Vector{Vector{Float64}}}, Int64, Vector{Int64}},
+  GenericTransientRealization{Realization{Vector{Vector{Float64}}}, Int64, Vector{Int64}},
   VectorOfVectors{Float64, 2}}:
   [:, :, 1, 1] =
   0.468445  0.115179
@@ -48,7 +48,7 @@ julia> s = Snapshots(ParamArray(data),i,r)
 ```
 
 """
-abstract type AbstractTransientSnapshots{T,N,L,D,I,R<:TransientParamRealization} <: AbstractSnapshots{T,N,L,D,I,R} end
+abstract type AbstractTransientSnapshots{T,N,L,D,I,R<:TransientRealization} <: AbstractSnapshots{T,N,L,D,I,R} end
 
 ParamDataStructures.num_times(s::AbstractTransientSnapshots) = num_times(get_realization(s))
 
@@ -73,7 +73,7 @@ struct TransientGenericSnapshots{T,N,L,D,I,R,A} <: AbstractTransientSnapshots{T,
   end
 end
 
-function RBSteady.Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::TransientParamRealization)
+function RBSteady.Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::TransientRealization)
   TransientGenericSnapshots(s,i,r)
 end
 
@@ -111,7 +111,7 @@ Base.@propagate_inbounds function Base.setindex!(
   ispace′ != 0 && consecutive_setindex!(s.data,v,ispace′,iparam+(itime-1)*num_params(s))
 end
 
-function RBSteady.Snapshots(s::Vector{<:AbstractParamArray},i::AbstractIndexMap,r::TransientParamRealization)
+function RBSteady.Snapshots(s::Vector{<:AbstractParamArray},i::AbstractIndexMap,r::TransientRealization)
   item = consecutive_getindex(first(s),:,1)
   sflat = array_of_consecutive_arrays(item,num_params(r)*num_times(r))
   @inbounds for it in 1:num_times(r)
@@ -149,16 +149,28 @@ function TransientSnapshotsAtIndices(s::TransientSnapshotsAtIndices,trange,prang
   TransientSnapshotsAtIndices(s.snaps,trange,prange)
 end
 
-function RBSteady.Snapshots(s::TransientSnapshotsAtIndices,i::AbstractIndexMap,r::TransientParamRealization)
+function RBSteady.Snapshots(s::TransientSnapshotsAtIndices,i::AbstractIndexMap,r::TransientRealization)
   snaps = Snapshots(s.snaps,i,r)
   TransientSnapshotsAtIndices(snaps,s.trange,s.prange)
 end
+
+struct Range2D{Ti<:Integer,I<:AbstractVector{Ti},J<:AbstractVector{Ti}} <: AbstractMatrix{Ti}
+  axis1::I
+  axis2::J
+  scale::Int
+end
+
+range_2d(i::AbstractVector,j::AbstractVector,nJ=length(j)) = Range2D(i,j,nJ)
+range_1d(i::AbstractVector,j::AbstractVector,args...) = vec(range_2d(i,j,args...))
+
+Base.size(r::Range2D) = (length(r.axis1),length(r.axis2))
+Base.getindex(r::Range2D,i::Integer,j::Integer) = r.axis1[i] + (r.axis1[j]-1)*r.scale
 
 time_indices(s::TransientSnapshotsAtIndices) = s.trange
 ParamDataStructures.num_times(s::TransientSnapshotsAtIndices) = length(time_indices(s))
 RBSteady.param_indices(s::TransientSnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::TransientSnapshotsAtIndices) = length(RBSteady.param_indices(s))
-_param_time_range(prange,trange,np) = vec(((trange.-1)*np .+ prange')')
+
 _num_all_params(s::AbstractSnapshots) = num_params(s)
 _num_all_params(s::TransientSnapshotsAtIndices) = _num_all_params(s.snaps)
 
@@ -170,7 +182,7 @@ function ParamDataStructures.get_values(s::TransientSnapshotsAtIndices)
   prange = RBSteady.param_indices(s)
   trange = time_indices(s)
   np = _num_all_params(s)
-  ptrange = _param_time_range(prange,trange,np)
+  ptrange = range_1d(prange,trange,np)
   v = consecutive_getindex(param_data(s),:,ptrange)
   ConsecutiveArrayOfArrays(v)
 end
@@ -180,7 +192,7 @@ function RBSteady.get_indexed_values(s::TransientSnapshotsAtIndices)
   prange = RBSteady.param_indices(s)
   trange = time_indices(s)
   np = _num_all_params(s)
-  ptrange = _param_time_range(prange,trange,np)
+  ptrange = range_1d(prange,trange,np)
   v = consecutive_getindex(param_data(s),vi,ptrange)
   ConsecutiveArrayOfArrays(v)
 end
@@ -282,46 +294,9 @@ function RBSteady.get_indexed_values(s::TransientReshapedSnapshots)
   ConsecutiveArrayOfArrays(vr)
 end
 
-const TransientMultiValueGenericSnapshots{T,N,L,D,R,A} = Union{
-  TransientGenericSnapshots{T,N,L,D,<:AbstractMultiValueIndexMap{D},R,A},
-  TransientSnapshotsAtIndices{T,N,L,D,<:AbstractMultiValueIndexMap{D},R,A}
-}
-
-const TransientMultiValueSparseSnapshots{T,N,L,D,R} = Union{
-  TransientGenericSnapshots{T,N,L,D,<:MultiValueSparseIndexMap{D},R,<:ParamSparseMatrix},
-  TransientSnapshotsAtIndices{T,N,L,D,<:MultiValueSparseIndexMap{D},R,<:ParamSparseMatrix}
-}
-
-const TransientMultiValueSnapshots{T,N,L,D,R,A} = Union{
-  TransientMultiValueGenericSnapshots{T,N,L,D,R,A},
-  TransientMultiValueSparseSnapshots{T,N,L,D,R},
-}
-
-TensorValues.num_components(s::TransientMultiValueSnapshots) = num_components(get_index_map(s))
-
-function IndexMaps.get_component(s::TransientMultiValueSnapshots,args...;kwargs...)
-  i′ = get_component(get_index_map(s),args...;kwargs...)
-  return Snapshots(get_values(s),i′,get_realization(s))
-end
-
-function IndexMaps.split_components(s::TransientMultiValueSnapshots)
-  i′ = split_components(get_index_map(s))
-  return Snapshots(get_values(s),i′,get_realization(s))
-end
-
-function IndexMaps.merge_components(s::TransientMultiValueSnapshots)
-  i′ = merge_components(get_index_map(s))
-  return Snapshots(get_values(s),i′,get_realization(s))
-end
-
-const TransientGenericSparseSnapshots{T,N,L,D,R} = Union{
+const TransientSparseSnapshots{T,N,L,D,R} = Union{
   TransientGenericSnapshots{T,N,L,D,<:SparseIndexMap{D},R,<:ParamSparseMatrix},
   TransientSnapshotsAtIndices{T,N,L,D,<:SparseIndexMap{D},R,<:ParamSparseMatrix}
-}
-
-const TransientSparseSnapshots{T,N,L,D,R} = Union{
-  TransientGenericSparseSnapshots{T,N,L,D,R},
-  TransientMultiValueSparseSnapshots{T,N,L,D,R}
 }
 
 function RBSteady.select_snapshots_entries(s::AbstractTransientSnapshots,srange,trange)
@@ -496,7 +471,7 @@ RBSteady.get_indexed_values(s::Mode2TransientSnapshots) = collect(s)
 function RBSteady.Snapshots(
   data::AbstractVector{<:BlockArrayOfArrays},
   i::AbstractArray{<:AbstractIndexMap},
-  r::AbstractParamRealization)
+  r::AbstractRealization)
 
   block_values = blocks.(data)
   nblocks = blocksize(first(data))

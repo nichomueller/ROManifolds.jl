@@ -23,7 +23,7 @@ dΩ = Measure(Ω,2)
 
 # pranges = fill([0,1],3)
 # pspace = ParamSpace(pranges)
-# μ = ParamRealization([[1.0],[1.0],[1.0]])
+# μ = Realization([[1.0],[1.0],[1.0]])
 
 # f(x,μ) = sum(μ)
 # f(μ) = x->f(x,μ)

@@ -28,7 +28,7 @@ abstract type ODEParamOperator{T<:ODEParamOperatorType} <: ODEOperator{T} end
 
 function ODEs.allocate_odeopcache(
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   args...)
 
@@ -38,7 +38,7 @@ end
 function ODEs.update_odeopcache!(
   odeopcache,
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   args...)
 
   odeopcache
@@ -46,7 +46,7 @@ end
 
 function Algebra.allocate_residual(
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
 
@@ -56,7 +56,7 @@ end
 function Algebra.residual!(
   b::AbstractVector,
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache;
   add::Bool=false)
@@ -66,7 +66,7 @@ end
 
 function Algebra.residual(
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
 
@@ -77,7 +77,7 @@ end
 
 function Algebra.allocate_jacobian(
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
 
@@ -87,7 +87,7 @@ end
 function ODEs.jacobian_add!(
   A::AbstractMatrix,
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)
@@ -98,7 +98,7 @@ end
 function Algebra.jacobian!(
   A::AbstractMatrix,
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)
@@ -110,7 +110,7 @@ end
 
 function Algebra.jacobian(
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)
@@ -142,7 +142,7 @@ abstract type ODEParamOperatorWithTrian{T<:ODEParamOperatorType} <: ODEParamOper
 function Algebra.residual!(
   b::Contribution,
   odeop::ODEParamOperatorWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache;
   add::Bool=false)
@@ -152,7 +152,7 @@ end
 
 function Algebra.residual(
   odeop::ODEParamOperatorWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
 
@@ -164,7 +164,7 @@ end
 function ODEs.jacobian_add!(
   A::TupOfArrayContribution,
   odeop::ODEParamOperatorWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)
@@ -175,7 +175,7 @@ end
 function Algebra.jacobian!(
   A::TupOfArrayContribution,
   odeop::ODEParamOperatorWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)

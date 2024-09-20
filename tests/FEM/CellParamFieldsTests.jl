@@ -22,7 +22,7 @@ trian_D =BoundaryTriangulation(model,tags="tag_8")
 trian_S =SkeletonTriangulation(model)
 trian_0 =Triangulation(model,Int32[])
 
-μ = ParamRealization([[1.0],[2.0],[3.0]])
+μ = Realization([[1.0],[2.0],[3.0]])
 x = get_cell_points(trian)
 
 fun(x,μ) = sum(μ)*2*x[1]

@@ -58,7 +58,7 @@ function my_test_fe_space(f::FESpace)
   @test CellField(f,get_cell_dof_ids(f,trian)) != nothing
 end
 
-μ = ParamRealization([[1],[2],[3]])
+μ = Realization([[1],[2],[3]])
 g(x,μ) = 1+sum(μ)
 g(μ) = x -> g(x,μ)
 gμ = 𝑓ₚ(g,μ)

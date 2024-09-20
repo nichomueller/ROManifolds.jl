@@ -24,9 +24,9 @@ import SparseArrays.getcolptr
 
 import Mabla.FEM.IndexMaps: fast_index,slow_index,recast
 
-export AbstractParamRealization
-export ParamRealization
-export TransientParamRealization
+export AbstractRealization
+export Realization
+export TransientRealization
 export UniformSampling
 export NormalSampling
 export ParamSpace

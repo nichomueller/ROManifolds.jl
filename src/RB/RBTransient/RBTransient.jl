@@ -44,7 +44,6 @@ include("ReductionMethods.jl")
 
 export AbstractTransientSnapshots
 export TransientGenericSnapshots
-export TransientMultiValueSnapshots
 export TransientSparseSnapshots
 export UnfoldingTransientSnapshots
 export ModeTransientSnapshots
@@ -57,8 +56,6 @@ include("ThetaMethod.jl")
 include("RBSolver.jl")
 
 include("TTLinearAlgebra.jl")
-
-include("BasisConstruction.jl")
 
 export TransientProjection
 export TransientPODBasis
@@ -77,9 +74,9 @@ include("PGOperator.jl")
 export combine_basis_time
 include("ReducedAlgebraicOperator.jl")
 
-export TransientIntegrationDomain
+export TransientMDEIM
 export TransientAffineDecomposition
-include("AffineDecomposition.jl")
+include("HyperReduction.jl")
 
 export TransientPGMDEIMOperator
 export LinearNonlinearTransientPGMDEIMOperator

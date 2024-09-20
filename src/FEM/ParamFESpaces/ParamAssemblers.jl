@@ -1,6 +1,6 @@
 function get_param_matrix_builder(
   a::SparseMatrixAssembler,
-  r::AbstractParamRealization)
+  r::AbstractRealization)
 
   mat = get_matrix_builder(a)
   M = get_array_type(mat)
@@ -12,7 +12,7 @@ end
 
 function get_param_vector_builder(
   a::SparseMatrixAssembler,
-  r::AbstractParamRealization)
+  r::AbstractRealization)
 
   vec = get_vector_builder(a)
   V = get_array_type(vec)
@@ -23,7 +23,7 @@ function get_param_vector_builder(
 end
 
 """
-    get_param_assembler(a::SparseMatrixAssembler,r::AbstractParamRealization) -> SparseMatrixAssembler
+    get_param_assembler(a::SparseMatrixAssembler,r::AbstractRealization) -> SparseMatrixAssembler
 
 Returns a parametric assembler, which assembles parametric residuals and jacobians.
 The consequent assembly routines remain the same as in [`Gridap`](@ref), i.e.
@@ -32,7 +32,7 @@ SparseMatrixBuilder -> ArrayCounter -> ArrayAllocator -> Array
 """
 function get_param_assembler(
   a::SparseMatrixAssembler,
-  r::AbstractParamRealization)
+  r::AbstractRealization)
 
   matrix_builder = get_param_matrix_builder(a,r)
   vector_builder = get_param_vector_builder(a,r)

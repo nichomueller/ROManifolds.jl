@@ -14,7 +14,7 @@ end
 function TransientParamFESolution(
   solver::ODESolver,
   op::TransientParamFEOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   uh0::Tuple{Vararg{Function}})
 
   params = get_params(r)
@@ -28,7 +28,7 @@ end
 function TransientParamFESolution(
   solver::ODESolver,
   op::TransientParamFEOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   uh0::Function)
 
   TransientParamFESolution(solver,op,r,(uh0,))
@@ -80,7 +80,7 @@ end
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   uh0)
 
   TransientParamFESolution(solver,op,r,uh0)
@@ -89,7 +89,7 @@ end
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperatorWithTrian,
-  r::TransientParamRealization,
+  r::TransientRealization,
   uh0)
 
   TransientParamFESolution(solver,op.op,r,uh0)
@@ -98,7 +98,7 @@ end
 function Algebra.solve(
   solver::ODESolver,
   op::LinearNonlinearTransientParamFEOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   uh0)
 
   TransientParamFESolution(solver,join_operators(op),r,uh0)
@@ -119,7 +119,7 @@ function test_transient_fe_solver(
   solution = solve(solver,op,r,u0)
   for (rn,uhn) in solution
     @test isa(uhn,FEFunction)
-    @test isa(rn,TransientParamRealization)
+    @test isa(rn,TransientRealization)
   end
   true
 end

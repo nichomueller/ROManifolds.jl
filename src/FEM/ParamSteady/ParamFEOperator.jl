@@ -24,17 +24,17 @@ function FESpaces.get_algebraic_operator(op::ParamFEOperator)
   ParamOpFromFEOp(op)
 end
 
-function allocate_pfeopcache(op::ParamFEOperator,r::ParamRealization,u::AbstractVector)
+function allocate_pfeopcache(op::ParamFEOperator,r::Realization,u::AbstractVector)
   nothing
 end
 
-function update_pfeopcache!(tfeopcache,op::ParamFEOperator,r::ParamRealization)
+function update_pfeopcache!(tfeopcache,op::ParamFEOperator,r::Realization)
   tfeopcache
 end
 
 ParamDataStructures.realization(op::ParamFEOperator;kwargs...) = @abstractmethod
 
-function ParamFESpaces.get_param_assembler(op::ParamFEOperator,r::ParamRealization)
+function ParamFESpaces.get_param_assembler(op::ParamFEOperator,r::Realization)
   get_param_assembler(get_assembler(op),r)
 end
 

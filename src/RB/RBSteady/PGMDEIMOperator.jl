@@ -23,7 +23,7 @@ function reduced_operator(
 
   red_lhs,red_rhs = reduced_jacobian_residual(solver,op,s)
   trians_rhs = get_domains(red_rhs)
-  trians_lhs = map(get_domains,red_lhs)
+  trians_lhs = get_domains(red_lhs)
   new_op = change_triangulation(op,trians_rhs,trians_lhs)
   PGMDEIMOperator(new_op,red_lhs,red_rhs)
 end
@@ -59,8 +59,8 @@ The same reasoning holds for the jacobian
 """
 struct PGMDEIMOperator{T} <: RBOperator{T}
   op::PGOperator{T}
-  lhs
-  rhs
+  lhs::AffineContribution
+  rhs::AffineContribution
 end
 
 FESpaces.get_trial(op::PGMDEIMOperator) = get_trial(op.op)
@@ -72,17 +72,17 @@ ParamSteady.get_matrix_index_map(op::PGMDEIMOperator) = get_matrix_index_map(op.
 get_fe_trial(op::PGMDEIMOperator) = get_fe_trial(op.op)
 get_fe_test(op::PGMDEIMOperator) = get_fe_test(op.op)
 
-function Algebra.allocate_residual(op::PGMDEIMOperator,r::AbstractParamRealization,u::AbstractParamVector)
+function Algebra.allocate_residual(op::PGMDEIMOperator,r::AbstractRealization,u::AbstractParamVector)
   allocate_residual(op.op,r,u)
 end
 
-function Algebra.allocate_jacobian(op::PGMDEIMOperator,r::AbstractParamRealization,u::AbstractParamVector)
+function Algebra.allocate_jacobian(op::PGMDEIMOperator,r::AbstractRealization,u::AbstractParamVector)
   allocate_jacobian(op.op,r,u)
 end
 
 function ParamSteady.allocate_paramcache(
   op::PGMDEIMOperator,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector)
 
   allocate_paramcache(op.op,r,u)
@@ -91,7 +91,7 @@ end
 function ParamSteady.update_paramcache!(
   paramcache,
   op::PGMDEIMOperator,
-  r::ParamRealization)
+  r::Realization)
 
   @warn "For performance reasons, it would be best to update the cache at the very
     start of the online phase"
@@ -99,26 +99,28 @@ function ParamSteady.update_paramcache!(
 end
 
 function Algebra.residual!(
-  b::Contribution,
+  cache,
   op::PGMDEIMOperator,
-  r::AbstractParamRealization,
+  r::AbstractRealization,
   u::AbstractParamVector,
   paramcache)
 
+  b,b̂ = cache
   fe_sb = fe_residual!(b,op,r,u,paramcache)
-  b̂ = mdeim_result(op.rhs,fe_sb)
+  project!(b̂,op.rhs,fe_sb)
   return b̂
 end
 
 function Algebra.jacobian!(
-  A::Contribution,
+  cache,
   op::PGMDEIMOperator,
-  r::AbstractParamRealization,
+  r::AbstractRealization,
   u::AbstractParamVector,
   paramcache)
 
+  A,Â = cache
   fe_sA = fe_jacobian!(A,op,r,u,paramcache)
-  Â = mdeim_result(op.lhs,fe_sA)
+  project!(Â,op.lhs,fe_sA)
   return Â
 end
 
@@ -142,7 +144,7 @@ function select_fe_space_at_indices(fs::SingleFieldParamFESpace,indices)
   TrialParamFESpace(dvi,fs.space)
 end
 
-function select_cache_at_indices(u::ConsecutiveArrayOfArrays,paramcache,indices)
+function select_evalcache_at_indices(u::ConsecutiveArrayOfArrays,paramcache,indices)
   @unpack Us,Ups,pfeopcache,form = paramcache
   new_Us = select_fe_space_at_indices(Us,indices)
   new_XhF = ConsecutiveArrayOfArrays(u.data[:,indices])
@@ -150,7 +152,7 @@ function select_cache_at_indices(u::ConsecutiveArrayOfArrays,paramcache,indices)
   return new_xhF,new_paramcache
 end
 
-function select_cache_at_indices(us::BlockVectorOfVectors,odeopcache,indices)
+function select_evalcache_at_indices(us::BlockVectorOfVectors,odeopcache,indices)
   @unpack Us,Ups,pfeopcache,form = paramcache
   VT = Us.vector_type
   style = Us.multi_field_style
@@ -179,49 +181,68 @@ function select_slvrcache_at_indices(cache::ArrayContribution,indices)
   end
 end
 
-function select_fe_quantities_at_indices(cache,r,u,param_indices)
-  slvrcache,paramcache = cache
-  red_r = r[param_indices]
-  red_cache = select_slvrcache_at_indices(cache,indices)
-  red_u,red_paramcache = select_cache_at_indices(u,paramcache,indices)
-  return red_cache,red_r,red_u,red_paramcache
-end
-
 # selects the entries of the snapshots relevant to the reduced integration domain
 # in `a`
-function _select_snapshots_at_indices(s,a)
-  ids_space = get_indices_space(a)
-  select_snapshots_entries(s,ids_space)
+function select_at_indices(s::AbstractArray,a::HyperReduction)
+  s[get_integration_domain(a)]
 end
 
-function _select_snapshots_at_indices(
-  s::ArrayContribution,a::AffineContribution)
+function Arrays.return_cache(::typeof(select_at_indices),s::AbstractArray,a::HyperReduction,args...)
+  testvalue(s)
+end
+
+function Arrays.return_cache(
+  ::typeof(select_at_indices),
+  s::Union{BlockArray,BlockArrayOfArrays},
+  a::BlockHyperReduction,
+  args...)
+
+  @check size(s) == size(a)
+  @check s.touched == a.touched
+  @notimplementedif isempty(findall(a.touched))
+  i = findfirst(a.touched)
+  cache = return_cache(blocks(s)[i],a[i],args...)
+  block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
+  ArrayBlock(block_cache,a.touched)
+end
+
+function select_at_indices(s::Union{BlockArray,BlockArrayOfArrays},a::BlockHyperReduction,args...)
+  s′ = return_cache(select_at_indices,s,a,args...)
+  for i = eachindex(a)
+    if a.touched[i]
+      s′[i] = RBSteady.select_at_indices(blocks(s)[i],a[i],args...)
+    end
+  end
+  return s′
+end
+
+function select_at_indices(s::ArrayContribution,a::AffineContribution)
   contribution(s.trians) do trian
-    _select_snapshots_at_indices(s[trian],a[trian])
+    select_at_indices(s[trian],a[trian])
   end
 end
 
 function fe_jacobian!(
-  cache,
+  A,
   op::PGMDEIMOperator,
-  r::AbstractParamRealization,
+  r::AbstractRealization,
   u::AbstractParamVector,
   paramcache)
 
-  A = jacobian!(cache,op.op,r,u,paramcache)
-  Ai = _select_snapshots_at_indices(A,op.lhs)
+  jacobian!(A,op.op,r,u,paramcache)
+  Ai = select_at_indices(A,op.lhs)
   return Ai
 end
 
 function fe_residual!(
-  cache,
+  b,
   op::PGMDEIMOperator,
-  r::AbstractParamRealization,
+  r::AbstractRealization,
   u::AbstractParamVector,
   paramcache)
 
-  b = residual!(cache,op.op,r,u,paramcache)
-  bi = _select_snapshots_at_indices(b,op.rhs)
+  residual!(b,op.op,r,u,paramcache)
+  bi = select_at_indices(b,op.rhs)
   return bi
 end
 
@@ -270,7 +291,7 @@ end
 
 function Algebra.allocate_residual(
   op::LinearNonlinearPGMDEIMOperator,
-  r::AbstractParamRealization,
+  r::AbstractRealization,
   u::AbstractParamVector)
 
   b_lin = allocate_residual(op.op_linear,r,u)
@@ -280,7 +301,7 @@ end
 
 function Algebra.allocate_jacobian(
   op::LinearNonlinearPGMDEIMOperator,
-  r::AbstractParamRealization,
+  r::AbstractRealization,
   u::AbstractParamVector)
 
   A_lin = allocate_jacobian(op.op_linear,r,u)
@@ -291,7 +312,7 @@ end
 function Algebra.residual!(
   b::Tuple,
   op::LinearNonlinearPGMDEIMOperator,
-  r::AbstractParamRealization,
+  r::AbstractRealization,
   u::AbstractParamVector)
 
   b̂_lin,b_nlin = b
@@ -304,7 +325,7 @@ end
 function Algebra.jacobian!(
   A::Tuple,
   op::LinearNonlinearPGMDEIMOperator,
-  r::AbstractParamRealization,
+  r::AbstractRealization,
   u::AbstractParamVector)
 
   Â_lin,A_nlin = A
@@ -331,7 +352,7 @@ end
 function Algebra.solve(
   solver::RBSolver,
   op::RBOperator{NonlinearParamEq},
-  r::AbstractParamRealization)
+  r::AbstractRealization)
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
 end
@@ -340,7 +361,7 @@ function Algebra.solve!(
   cache,
   solver::RBSolver,
   op::RBOperator{NonlinearParamEq},
-  r::AbstractParamRealization)
+  r::AbstractRealization)
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
 end
@@ -348,7 +369,7 @@ end
 function Algebra.solve(
   solver::RBSolver,
   op::RBOperator,
-  r::AbstractParamRealization)
+  r::AbstractRealization)
 
   trial = get_trial(op)(r)
   fe_trial = get_fe_trial(op)(r)
@@ -362,7 +383,7 @@ function Algebra.solve!(
   cache,
   solver::RBSolver,
   op::RBOperator,
-  r::AbstractParamRealization)
+  r::AbstractRealization)
 
   x̂,y = cache
   fesolver = get_fe_solver(solver)

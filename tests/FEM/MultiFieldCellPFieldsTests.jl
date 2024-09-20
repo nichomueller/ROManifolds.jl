@@ -14,7 +14,7 @@ using Random
 using StaticArrays
 using Test
 
-μ = ParamRealization([[1],[2],[3]])
+μ = Realization([[1],[2],[3]])
 
 domain = (0,1,0,1)
 cells = (2,2)

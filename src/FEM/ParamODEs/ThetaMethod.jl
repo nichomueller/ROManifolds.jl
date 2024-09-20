@@ -3,7 +3,7 @@
 function ODEs.allocate_odecache(
   ::ThetaMethod,
   odeop::ODEParamOperator,
-  r0::TransientParamRealization,
+  r0::TransientRealization,
   us0::NTuple{1,AbstractVector})
 
   u0 = us0[1]
@@ -22,7 +22,7 @@ function ODEs.ode_march!(
   statef::NTuple{1,AbstractVector},
   solver::ThetaMethod,
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   state0::NTuple{1,AbstractVector},
   odecache)
 
@@ -62,7 +62,7 @@ end
 function ODEs.allocate_odecache(
   ::ThetaMethod,
   odeop::ODEParamOperator{LinearParamODE},
-  r0::TransientParamRealization,
+  r0::TransientRealization,
   us0::NTuple{1,AbstractVector})
 
   u0 = us0[1]
@@ -86,7 +86,7 @@ function ODEs.ode_march!(
   statef::NTuple{1,AbstractVector},
   solver::ThetaMethod,
   odeop::ODEParamOperator{LinearParamODE},
-  r::TransientParamRealization,
+  r::TransientRealization,
   state0::NTuple{1,AbstractVector},
   odecache)
 
@@ -123,7 +123,7 @@ end
 function ODEs.allocate_odecache(
   solver::ThetaMethod,
   odeop::ODEParamOperator{LinearNonlinearParamODE},
-  r0::TransientParamRealization,
+  r0::TransientRealization,
   us0::NTuple{1,AbstractVector})
 
   odecache_lin = allocate_odecache(solver,get_linear_operator(odeop),r0,us0)

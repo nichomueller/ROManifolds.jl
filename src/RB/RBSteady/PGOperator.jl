@@ -83,17 +83,17 @@ function ParamSteady.change_triangulation(op::PGOperator,trians_rhs,trians_lhs)
   PGOperator(change_triangulation(op.op,trians_rhs,trians_lhs),op.trial,op.test)
 end
 
-function Algebra.allocate_residual(op::PGOperator,r::AbstractParamRealization,u::AbstractParamVector)
+function Algebra.allocate_residual(op::PGOperator,r::AbstractRealization,u::AbstractParamVector)
   allocate_residual(op.op,r,u)
 end
 
-function Algebra.allocate_jacobian(op::PGOperator,r::AbstractParamRealization,u::AbstractParamVector)
+function Algebra.allocate_jacobian(op::PGOperator,r::AbstractRealization,u::AbstractParamVector)
   allocate_jacobian(op.op,r,u)
 end
 
 function ParamSteady.allocate_paramcache(
   op::PGOperator,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector)
 
   allocate_paramcache(op.op,r,u)
@@ -102,7 +102,7 @@ end
 function ParamSteady.update_paramcache!(
   paramcache,
   op::PGOperator,
-  r::ParamRealization)
+  r::Realization)
 
   update_odeopcache!(paramcache,op.op,r)
 end
@@ -110,25 +110,21 @@ end
 function Algebra.residual!(
   b::Contribution,
   op::PGOperator,
-  r::AbstractParamRealization,
+  r::AbstractRealization,
   u::AbstractParamVector,
   paramcache)
 
   residual!(b,op.op,r,u,paramcache)
-  i = get_vector_index_map(op)
-  return Snapshots(b,i,r)
 end
 
 function Algebra.jacobian!(
   A::Contribution,
   op::PGOperator,
-  r::AbstractParamRealization,
+  r::AbstractRealization,
   u::AbstractParamVector,
   paramcache)
 
   jacobian!(A,op.op,r,u,paramcache)
-  i = get_matrix_index_map(op)
-  return Snapshots(A,i,r)
 end
 
 """

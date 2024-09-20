@@ -65,7 +65,7 @@ end
     struct ParamTrialFESpace{A,B} <: UnEvalParamSingleFieldFESpace end
 
 Structure used in steady applications. When a ParamTrialFESpace is evaluated in a
-[`ParamRealization`](@ref), a parametric trial FE space is returned
+[`Realization`](@ref), a parametric trial FE space is returned
 
 """
 struct ParamTrialFESpace{A,B} <: UnEvalParamSingleFieldFESpace
@@ -100,7 +100,7 @@ function Arrays.evaluate!(Upt::TrialParamFESpace,U::ParamTrialFESpace,params)
   Upt
 end
 
-function Arrays.evaluate!(Upt::TrialParamFESpace,U::ParamTrialFESpace,r::ParamRealization)
+function Arrays.evaluate!(Upt::TrialParamFESpace,U::ParamTrialFESpace,r::Realization)
   evaluate!(Upt,U,get_params(r))
 end
 
@@ -109,7 +109,7 @@ Arrays.evaluate(U::ParamTrialFESpace,r::Nothing) = U.space0
 # Define the ParamTrialFESpace interface for stationary spaces
 
 ODEs.allocate_space(U::FESpace,r) = U
-Arrays.evaluate!(Upt::FESpace,U::FESpace,r::AbstractParamRealization) = U
+Arrays.evaluate!(Upt::FESpace,U::FESpace,r::AbstractRealization) = U
 Arrays.evaluate(U::FESpace,r) = U
 
 # Define the interface for MultiField
@@ -120,7 +120,7 @@ function has_param(U::MultiFieldFESpace)
   any(space -> space isa ParamTrialFESpace,U.spaces)
 end
 
-function ODEs.allocate_space(U::MultiFieldFESpace,r::ParamRealization)
+function ODEs.allocate_space(U::MultiFieldFESpace,r::Realization)
   if !has_param(U)
     return U
   end
@@ -129,7 +129,7 @@ function ODEs.allocate_space(U::MultiFieldFESpace,r::ParamRealization)
   MultiFieldParamFESpace(spaces;style)
 end
 
-function Arrays.evaluate!(Upt::MultiFieldFESpace,U::MultiFieldFESpace,r::ParamRealization)
+function Arrays.evaluate!(Upt::MultiFieldFESpace,U::MultiFieldFESpace,r::Realization)
   if !has_param(U)
     return U
   end
@@ -139,7 +139,7 @@ function Arrays.evaluate!(Upt::MultiFieldFESpace,U::MultiFieldFESpace,r::ParamRe
   Upt
 end
 
-function Arrays.evaluate(U::MultiFieldFESpace,r::ParamRealization)
+function Arrays.evaluate(U::MultiFieldFESpace,r::Realization)
   if !has_param(U)
     return U
   end

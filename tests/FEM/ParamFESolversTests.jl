@@ -19,7 +19,7 @@ order = 2
 degree = 4
 quad = CellQuadrature(trian,degree)
 
-μ = ParamRealization([[1],[2],[3]])
+μ = Realization([[1],[2],[3]])
 f(x,μ) = sum(μ)*x[1]
 f(μ) = x -> f(x,μ)
 fμ = 𝑓ₚ(f,μ)

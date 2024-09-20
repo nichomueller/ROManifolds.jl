@@ -2,7 +2,7 @@
     struct TransientTrialParamFESpace{A,B} <: UnEvalParamSingleFieldFESpace end
 
 Structure used in transient applications. When a TransientTrialParamFESpace is
-evaluated in a [`TransientParamRealization`](@ref), a parametric trial FE space is returned
+evaluated in a [`TransientRealization`](@ref), a parametric trial FE space is returned
 
 """
 struct TransientTrialParamFESpace{A,B} <: UnEvalParamSingleFieldFESpace
@@ -30,7 +30,7 @@ function ODEs.allocate_space(U::TransientTrialParamFESpace,params,times)
   HomogeneousTrialParamFESpace(U.space,Val(length(params)*length(times)))
 end
 
-function ODEs.allocate_space(U::TransientTrialParamFESpace,r::TransientParamRealization)
+function ODEs.allocate_space(U::TransientTrialParamFESpace,r::TransientRealization)
   allocate_space(U,get_params(r),get_times(r))
 end
 
@@ -49,7 +49,7 @@ end
 function Arrays.evaluate!(
   Upt::TrialParamFESpace,
   U::TransientTrialParamFESpace,
-  r::TransientParamRealization)
+  r::TransientRealization)
 
   evaluate!(Upt,U,get_params(r),get_times(r))
 end
@@ -98,7 +98,7 @@ function ODEs.allocate_space(U::MultiFieldFESpace,μ,t)
   MultiFieldParamFESpace(spaces;style)
 end
 
-function ODEs.allocate_space(U::MultiFieldFESpace,r::TransientParamRealization)
+function ODEs.allocate_space(U::MultiFieldFESpace,r::TransientRealization)
   allocate_space(U,get_params(r),get_times(r))
 end
 
@@ -116,7 +116,7 @@ function Arrays.evaluate!(
   Upt
 end
 
-function ODEs.evaluate!(Upt::MultiFieldFESpace,U::MultiFieldFESpace,r::TransientParamRealization)
+function ODEs.evaluate!(Upt::MultiFieldFESpace,U::MultiFieldFESpace,r::TransientRealization)
   evaluate!(Upt,U,get_params(r),get_times(r))
 end
 
@@ -148,7 +148,7 @@ function Arrays.evaluate(U::MultiFieldFESpace,μ,t)
   Upt
 end
 
-function Arrays.evaluate(U::MultiFieldFESpace,r::TransientParamRealization)
+function Arrays.evaluate(U::MultiFieldFESpace,r::TransientRealization)
   evaluate(U,get_params(r),get_times(r))
 end
 

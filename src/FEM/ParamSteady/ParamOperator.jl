@@ -19,7 +19,7 @@ abstract type ParamOperator{T<:ParamOperatorType} <: NonlinearOperator end
 
 function allocate_paramcache(
   op::ParamOperator,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector)
 
   nothing
@@ -28,14 +28,14 @@ end
 function update_paramcache!(
   paramcache,
   op::ParamOperator,
-  r::ParamRealization)
+  r::Realization)
 
   paramcache
 end
 
 function Algebra.allocate_residual(
   op::ParamOperator,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   paramcache)
 
@@ -45,7 +45,7 @@ end
 function Algebra.residual!(
   b::AbstractParamVector,
   op::ParamOperator,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   paramcache)
 
@@ -54,7 +54,7 @@ end
 
 function Algebra.residual(
   op::ParamOperator,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   paramcache)
 
@@ -65,7 +65,7 @@ end
 
 function Algebra.allocate_jacobian(
   op::ParamOperator,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   paramcache)
 
@@ -75,7 +75,7 @@ end
 function Algebra.jacobian!(
   A::AbstractParamMatrix,
   op::ParamOperator,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   paramcache)
 
@@ -84,7 +84,7 @@ end
 
 function Algebra.jacobian(
   op::ParamOperator,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   paramcache)
 
@@ -114,7 +114,7 @@ abstract type ParamOperatorWithTrian{T<:ParamOperatorType} <: ParamOperator{T} e
 
 function Algebra.allocate_residual(
   op::ParamOperatorWithTrian,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   paramcache)
 
@@ -124,7 +124,7 @@ end
 function Algebra.residual!(
   b::Contribution,
   op::ParamOperatorWithTrian,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   paramcache)
 
@@ -133,7 +133,7 @@ end
 
 function Algebra.residual(
   op::ParamOperatorWithTrian,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   paramcache)
 
@@ -154,7 +154,7 @@ end
 function Algebra.jacobian!(
   A::Contribution,
   op::ParamOperatorWithTrian,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   paramcache)
 
@@ -163,7 +163,7 @@ end
 
 function Algebra.jacobian(
   op::ParamOperatorWithTrian,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   paramcache)
 

@@ -25,8 +25,8 @@ partition = (2,2)
 model = CartesianDiscreteModel(domain,partition)
 
 params = [1],[2],[3]
-μ = ParamRealization([[1],[2],[3]])
-μ₀ = ParamRealization([[0],[0],[0]])
+μ = Realization([[1],[2],[3]])
+μ₀ = Realization([[0],[0],[0]])
 f(x,μ) = sum(μ)
 f(μ) = x -> f(x,μ)
 fμ(μ) = 𝑓ₚ(f,μ)

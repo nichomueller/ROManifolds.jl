@@ -13,7 +13,7 @@ using Test
 
 # Parametric information
 
-μ = ParamRealization([[1.0],[2.0],[3.0]])
+μ = Realization([[1.0],[2.0],[3.0]])
 fun(x,μ) = sum(μ)
 fun(μ) = x -> fun(x,μ)
 funμ = 𝑓ₚ(fun,μ)

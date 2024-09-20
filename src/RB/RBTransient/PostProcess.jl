@@ -72,34 +72,3 @@ function Utils.compute_relative_error(
   end
   return mean(errors)
 end
-
-function Utils.compute_relative_error(
-  sol::TransientMultiValueSnapshots{T,N},
-  sol_approx::TransientMultiValueSnapshots{T,N},
-  args...) where {T,N}
-
-  @check size(sol) == size(sol_approx)
-  err_norm = zeros(num_times(sol))
-  sol_norm = zeros(num_times(sol))
-  errors = zeros(num_params(sol))
-  @inbounds for ip = 1:num_params(sol)
-    solip = selectdim(sol,N,ip)
-    solip_approx = selectdim(sol_approx,N,ip)
-    for it in 1:num_times(sol)
-      solitp = selectdim(solip,N-1,it)
-      solitp_approx = selectdim(solip_approx,N-1,it)
-      fill!(err_norm,0.0)
-      fill!(sol_norm,0.0)
-      for ic in 1:num_components(sol)
-        soliptc = selectdim(solitp,N-2,ic)
-        soliptc_approx = selectdim(solitp_approx,N-2,ic)
-        err_norm[it] += induced_norm(soliptc-soliptc_approx,args...)^2
-        sol_norm[it] += induced_norm(soliptc,args...)^2
-      end
-      err_norm[it] = sqrt(err_norm[it])
-      sol_norm[it] = sqrt(sol_norm[it])
-    end
-    errors[ip] = norm(err_norm) / norm(sol_norm)
-  end
-  return mean(errors)
-end

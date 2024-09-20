@@ -1,17 +1,17 @@
 """
-    AbstractParamRealization
+    AbstractRealization
 
 Type representing parametric realizations, i.e. samples extracted from a given
 parameter space. Two categories of such realizations are implemented:
-- [`ParamRealization`](@ref).
-- [`TransientParamRealization`](@ref).
+- [`Realization`](@ref).
+- [`TransientRealization`](@ref).
 
 """
 
-abstract type AbstractParamRealization end
+abstract type AbstractRealization end
 
 """
-    ParamRealization{P<:AbstractVector} <: AbstractParamRealization
+    Realization{P<:AbstractVector} <: AbstractRealization
 
 Represents standard parametric realizations, i.e. samples extracted from
 a given parameter space. The field `params` is most commonly a vector of vectors.
@@ -22,35 +22,35 @@ vector of numbers as the case in which `params` is a vector of one vector.
 # Examples
 
 ```jldoctest
-julia> r = ParamRealization([[1, 2],[3, 4]])
-ParamRealization{Vector{Vector{Int64}}}([[1, 2], [3, 4]])
+julia> r = Realization([[1, 2],[3, 4]])
+Realization{Vector{Vector{Int64}}}([[1, 2], [3, 4]])
 julia> μ = r[1]
-ParamRealization{Vector{Int64}}([1, 2])
-julia> r′ = ParamRealization([1, 2])
-ParamRealization{Vector{Int64}}([1, 2])
+Realization{Vector{Int64}}([1, 2])
+julia> r′ = Realization([1, 2])
+Realization{Vector{Int64}}([1, 2])
 julia> μ′ = r′[1]
-ParamRealization{Vector{Int64}}([1, 2])
+Realization{Vector{Int64}}([1, 2])
 ```
 
 """
 
-struct ParamRealization{P<:AbstractVector} <: AbstractParamRealization
+struct Realization{P<:AbstractVector} <: AbstractRealization
   params::P
 end
 
-const TrivialParamRealization = ParamRealization{<:AbstractVector{<:Real}}
+const TrivialRealization = Realization{<:AbstractVector{<:Real}}
 
-get_params(r::ParamRealization) = r # we only want to deal with a ParamRealization type
-_get_params(r::ParamRealization) = r.params # this function should stay local
-_get_params(r::TrivialParamRealization) = [r.params] # this function should stay local
-num_params(r::ParamRealization) = length(_get_params(r))
-Base.length(r::ParamRealization) = num_params(r)
-Base.getindex(r::ParamRealization,i) = ParamRealization(getindex(_get_params(r),i))
-Base.copy(r::ParamRealization) = ParamRealization(copy(_get_params(r)))
-Arrays.testitem(r::ParamRealization) = testitem(_get_params(r))
+get_params(r::Realization) = r # we only want to deal with a Realization type
+_get_params(r::Realization) = r.params # this function should stay local
+_get_params(r::TrivialRealization) = [r.params] # this function should stay local
+num_params(r::Realization) = length(_get_params(r))
+Base.length(r::Realization) = num_params(r)
+Base.getindex(r::Realization,i) = Realization(getindex(_get_params(r),i))
+Base.copy(r::Realization) = Realization(copy(_get_params(r)))
+Arrays.testitem(r::Realization) = testitem(_get_params(r))
 
-# when iterating over a ParamRealization{P}, we return eltype(P) ∀ index i
-function Base.iterate(r::ParamRealization,state=1)
+# when iterating over a Realization{P}, we return eltype(P) ∀ index i
+function Base.iterate(r::Realization,state=1)
   if state > length(r)
     return nothing
   end
@@ -58,17 +58,17 @@ function Base.iterate(r::ParamRealization,state=1)
   return rstate, state+1
 end
 
-function Base.zero(r::ParamRealization)
+function Base.zero(r::Realization)
   μ1 = first(_get_params(r))
-  ParamRealization(zeros(eltype(μ1),length(μ1)) .+ 1e-16)
+  Realization(zeros(eltype(μ1),length(μ1)) .+ 1e-16)
 end
 
-function mean(r::ParamRealization)
-  ParamRealization(mean(_get_params(r)))
+function mean(r::Realization)
+  Realization(mean(_get_params(r)))
 end
 
 """
-    TransientParamRealization{P<:ParamRealization,T<:Real} <: AbstractParamRealization
+    TransientRealization{P<:Realization,T<:Real} <: AbstractRealization
 
 Represents temporal parametric realizations, i.e. samples extracted from
 a given parameter space for every time step in a temporal range. The most obvious
@@ -78,78 +78,78 @@ other time steps.
 
 """
 
-abstract type TransientParamRealization{P<:ParamRealization,T<:Real} <: AbstractParamRealization end
+abstract type TransientRealization{P<:Realization,T<:Real} <: AbstractRealization end
 
-Base.length(r::TransientParamRealization) = num_params(r)*num_times(r)
-get_params(r::TransientParamRealization) = get_params(r.params)
-_get_params(r::TransientParamRealization) = _get_params(r.params)
-num_params(r::TransientParamRealization) = num_params(r.params)
-num_times(r::TransientParamRealization) = length(get_times(r))
+Base.length(r::TransientRealization) = num_params(r)*num_times(r)
+get_params(r::TransientRealization) = get_params(r.params)
+_get_params(r::TransientRealization) = _get_params(r.params)
+num_params(r::TransientRealization) = num_params(r.params)
+num_times(r::TransientRealization) = length(get_times(r))
 
 """
-    GenericTransientParamRealization{P,T,A} <: TransientParamRealization{P,T}
+    GenericTransientRealization{P,T,A} <: TransientRealization{P,T}
 
 Most standard implementation of an transient parametric realization.
 
 """
 
-struct GenericTransientParamRealization{P,T,A} <: TransientParamRealization{P,T}
+struct GenericTransientRealization{P,T,A} <: TransientRealization{P,T}
   params::P
   times::A
   t0::T
 end
 
-function TransientParamRealization(params::ParamRealization,times::AbstractVector{<:Real},t0::Real)
-  GenericTransientParamRealization(params,times,t0)
+function TransientRealization(params::Realization,times::AbstractVector{<:Real},t0::Real)
+  GenericTransientRealization(params,times,t0)
 end
 
-function TransientParamRealization(params::ParamRealization,time::Real,args...)
-  TransientParamRealizationAt(params,Ref(time))
+function TransientRealization(params::Realization,time::Real,args...)
+  TransientRealizationAt(params,Ref(time))
 end
 
-function TransientParamRealization(params::ParamRealization,times::AbstractVector{<:Real})
+function TransientRealization(params::Realization,times::AbstractVector{<:Real})
   t0,inner_times... = times
-  GenericTransientParamRealization(params,inner_times,t0)
+  GenericTransientRealization(params,inner_times,t0)
 end
 
-get_initial_time(r::GenericTransientParamRealization) = r.t0
-get_times(r::GenericTransientParamRealization) = r.times
-Base.copy(r::GenericTransientParamRealization) = GenericTransientParamRealization(copy(r.params),copy(r.times),copy(r.t0))
-Arrays.testitem(r::GenericTransientParamRealization) = testitem(get_params(r)),r.t0
+get_initial_time(r::GenericTransientRealization) = r.t0
+get_times(r::GenericTransientRealization) = r.times
+Base.copy(r::GenericTransientRealization) = GenericTransientRealization(copy(r.params),copy(r.times),copy(r.t0))
+Arrays.testitem(r::GenericTransientRealization) = testitem(get_params(r)),r.t0
 
-function Base.getindex(r::GenericTransientParamRealization,i,j)
-  TransientParamRealization(
+function Base.getindex(r::GenericTransientRealization,i,j)
+  TransientRealization(
     getindex(get_params(r),i),
     getindex(get_times(r),j),
     r.t0)
 end
 
-function Base.iterate(r::GenericTransientParamRealization,state...)
+function Base.iterate(r::GenericTransientRealization,state...)
   iterator = Iterators.product(_get_params(r),get_times(r))
   iterate(iterator,state...)
 end
 
-function Base.zero(r::GenericTransientParamRealization)
-  GenericTransientParamRealization(zero(get_params(r)),get_times(r),get_initial_time(r))
+function Base.zero(r::GenericTransientRealization)
+  GenericTransientRealization(zero(get_params(r)),get_times(r),get_initial_time(r))
 end
 
-function mean(r::GenericTransientParamRealization)
-  GenericTransientParamRealization(mean(get_params(r)),get_times(r),get_initial_time(r))
+function mean(r::GenericTransientRealization)
+  GenericTransientRealization(mean(get_params(r)),get_times(r),get_initial_time(r))
 end
 
-get_final_time(r::GenericTransientParamRealization) = last(get_times(r))
-get_midpoint_time(r::GenericTransientParamRealization) = (get_final_time(r) + get_initial_time(r)) / 2
-get_delta_time(r::GenericTransientParamRealization) = (get_final_time(r) - get_initial_time(r)) / num_times(r)
+get_final_time(r::GenericTransientRealization) = last(get_times(r))
+get_midpoint_time(r::GenericTransientRealization) = (get_final_time(r) + get_initial_time(r)) / 2
+get_delta_time(r::GenericTransientRealization) = (get_final_time(r) - get_initial_time(r)) / num_times(r)
 
-function change_time!(r::GenericTransientParamRealization{P,T} where P,time::T) where T
+function change_time!(r::GenericTransientRealization{P,T} where P,time::T) where T
   r.times .= time
 end
 
-function shift!(r::GenericTransientParamRealization,δ::Real)
+function shift!(r::GenericTransientRealization,δ::Real)
   r.times .+= δ
 end
 
-function get_at_time(r::GenericTransientParamRealization,time=:initial)
+function get_at_time(r::GenericTransientRealization,time=:initial)
   if time == :initial
     get_at_time(r,get_initial_time(r))
   elseif time == :midpoint
@@ -161,41 +161,41 @@ function get_at_time(r::GenericTransientParamRealization,time=:initial)
   end
 end
 
-function get_at_time(r::GenericTransientParamRealization{P,T} where P,time::T)  where T
-  TransientParamRealizationAt(get_params(r),Ref(time))
+function get_at_time(r::GenericTransientRealization{P,T} where P,time::T)  where T
+  TransientRealizationAt(get_params(r),Ref(time))
 end
 
 """
-    TransientParamRealizationAt{P,T} <: TransientParamRealization{P,T}
+    TransientRealizationAt{P,T} <: TransientRealization{P,T}
 
-Represents a GenericTransientParamRealization{P,T} at a certain time instant `t`.
+Represents a GenericTransientRealization{P,T} at a certain time instant `t`.
 For reusability purposes, the time instant `t` is stored as a Base.RefValue{T}.
 
 """
 
-struct TransientParamRealizationAt{P,T} <: TransientParamRealization{P,T}
+struct TransientRealizationAt{P,T} <: TransientRealization{P,T}
   params::P
   t::Base.RefValue{T}
 end
 
-get_initial_time(r::TransientParamRealizationAt) = @notimplemented
-get_times(r::TransientParamRealizationAt) = r.t[]
-Base.copy(r::TransientParamRealizationAt) = TransientParamRealizationAt(copy(r.params),Ref(copy(r.t)))
-Arrays.testitem(r::TransientParamRealizationAt) = testitem(get_params(r)),r.t[]
+get_initial_time(r::TransientRealizationAt) = @notimplemented
+get_times(r::TransientRealizationAt) = r.t[]
+Base.copy(r::TransientRealizationAt) = TransientRealizationAt(copy(r.params),Ref(copy(r.t)))
+Arrays.testitem(r::TransientRealizationAt) = testitem(get_params(r)),r.t[]
 
-function Base.getindex(r::TransientParamRealizationAt,i,j)
+function Base.getindex(r::TransientRealizationAt,i,j)
   @assert j == 1
   new_param = getindex(get_params(r),i)
-  TransientParamRealizationAt(new_param,r.t)
+  TransientRealizationAt(new_param,r.t)
 end
 
-Base.iterate(r::TransientParamRealizationAt,i...) = iterate(r.params,i...)
+Base.iterate(r::TransientRealizationAt,i...) = iterate(r.params,i...)
 
-function change_time!(r::TransientParamRealizationAt{P,T} where P,time::T) where T
+function change_time!(r::TransientRealizationAt{P,T} where P,time::T) where T
   r.t[] = time
 end
 
-function shift!(r::TransientParamRealizationAt,δ::Real)
+function shift!(r::TransientRealizationAt,δ::Real)
   r.t[] += δ
 end
 
@@ -204,13 +204,13 @@ struct UniformSampling <: SamplingStyle end
 struct NormalSampling <: SamplingStyle end
 
 """
-    ParamSpace{P,S} <: AbstractSet{ParamRealization}
+    ParamSpace{P,S} <: AbstractSet{Realization}
 
 Represents a standard set of parameters.
 
 """
 
-struct ParamSpace{P,S} <: AbstractSet{ParamRealization}
+struct ParamSpace{P,S} <: AbstractSet{Realization}
   param_domain::P
   sampling_style::S
   function ParamSpace(
@@ -234,24 +234,24 @@ function generate_param(p::ParamSpace)
 end
 
 """
-    realization(p::ParamSpace;nparams=1) -> ParamRealization
-    realization(p::TransientParamSpace;nparams=1) -> TransientParamRealization
+    realization(p::ParamSpace;nparams=1) -> Realization
+    realization(p::TransientParamSpace;nparams=1) -> TransientRealization
 
 Extraction of a set of parameters from a given parametric space
 """
 
 function realization(p::ParamSpace;nparams=1)
-  ParamRealization([generate_param(p) for i = 1:nparams])
+  Realization([generate_param(p) for i = 1:nparams])
 end
 
 """
-    TransientParamSpace{P,T} <: AbstractSet{TransientParamRealization}
+    TransientParamSpace{P,T} <: AbstractSet{TransientRealization}
 
 Represents a transient set of parameters.
 
 """
 
-struct TransientParamSpace{P,T} <: AbstractSet{TransientParamRealization}
+struct TransientParamSpace{P,T} <: AbstractSet{TransientRealization}
   parametric_space::P
   temporal_domain::T
 end
@@ -277,7 +277,7 @@ function realization(
 
   params = realization(p.parametric_space;nparams)
   times = p.temporal_domain[time_locations]
-  TransientParamRealization(params,times)
+  TransientRealization(params,times)
 end
 
 function shift!(p::TransientParamSpace,δ::Real)
@@ -285,7 +285,7 @@ function shift!(p::TransientParamSpace,δ::Real)
 end
 
 """
-    AbstractParamFunction{P<:ParamRealization} <: Function
+    AbstractParamFunction{P<:Realization} <: Function
 
 Representation of parametric functions with domain a parametric space.
 Two categories of such functions are implemented:
@@ -294,7 +294,7 @@ Two categories of such functions are implemented:
 
 """
 
-abstract type AbstractParamFunction{P<:ParamRealization} <: Function end
+abstract type AbstractParamFunction{P<:Realization} <: Function end
 
 """
     ParamFunction{F,P} <: AbstractParamFunction{P}
@@ -309,7 +309,7 @@ the evaluation of `f` in `μ ∈ U+1D4DF` returns the restriction of `f` to Ω�
 julia> U+1D4DF = ParamSpace([[0, 1],[0, 1]])
 Set of parameters in [[0, 1], [0, 1]], sampled with UniformSampling()
 julia> μ = realization(U+1D4DF; nparams = 2)
-ParamRealization{Vector{Vector{Float64}}}([...])
+Realization{Vector{Vector{Float64}}}([...])
 julia> a(x, μ) = sum(x) * sum(μ)
 a (generic function with 1 method)
 julia> a(μ) = x -> a(x, μ)
@@ -332,10 +332,10 @@ end
 const 𝑓ₚ = ParamFunction
 
 function ParamFunction(f::Function,p::AbstractArray)
-  @notimplemented "Use a ParamRealization as a parameter input"
+  @notimplemented "Use a Realization as a parameter input"
 end
 
-function ParamFunction(f::Function,r::TrivialParamRealization)
+function ParamFunction(f::Function,r::TrivialRealization)
   f(r.params)
 end
 
@@ -419,14 +419,14 @@ end
 const 𝑓ₚₜ = TransientParamFunction
 
 function TransientParamFunction(f::Function,p::AbstractArray,t)
-  @notimplemented "Use a ParamRealization as a parameter input"
+  @notimplemented "Use a Realization as a parameter input"
 end
 
-function TransientParamFunction(f::Function,r::TrivialParamRealization,t::Real)
+function TransientParamFunction(f::Function,r::TrivialRealization,t::Real)
   f(r.params,t)
 end
 
-function TransientParamFunction(f::Function,r::TransientParamRealization)
+function TransientParamFunction(f::Function,r::TransientRealization)
   TransientParamFunction(f,get_params(r),get_times(r))
 end
 
@@ -501,16 +501,16 @@ Arrays.evaluate!(cache,f::AbstractParamFunction,x) = pteval(f,x)
 (f::AbstractParamFunction)(x) = evaluate(f,x)
 
 function test_parametric_space()
-  α = ParamRealization(rand(10))
-  β = ParamRealization([rand(10)])
-  @test isa(α,TrivialParamRealization)
-  @test isa(α,ParamRealization{Vector{Float64}})
-  @test isa(β,ParamRealization{Vector{Vector{Float64}}})
-  γ = TransientParamRealization(α,1)
-  δ = TransientParamRealization(α,1:10)
-  ϵ = TransientParamRealization(β,1:10)
-  @test isa(δ,TransientParamRealization{<:TrivialParamRealization,UnitRange{Integer}})
-  @test isa(ϵ,TransientParamRealization{ParamRealization{Vector{Vector{Float64}}},UnitRange{Integer}})
+  α = Realization(rand(10))
+  β = Realization([rand(10)])
+  @test isa(α,TrivialRealization)
+  @test isa(α,Realization{Vector{Float64}})
+  @test isa(β,Realization{Vector{Vector{Float64}}})
+  γ = TransientRealization(α,1)
+  δ = TransientRealization(α,1:10)
+  ϵ = TransientRealization(β,1:10)
+  @test isa(δ,TransientRealization{<:TrivialRealization,UnitRange{Integer}})
+  @test isa(ϵ,TransientRealization{Realization{Vector{Vector{Float64}}},UnitRange{Integer}})
   @test length(γ) == 1 && length(δ) == 9 && length(ϵ) == 9
   change_time!(ϵ,11:20)
   @test get_times(get_at_time(ϵ,:final)) == 20
@@ -520,7 +520,7 @@ function test_parametric_space()
   pt = TransientParamSpace(param_domain,t)
   μ = realization(p)
   μt = realization(pt)
-  @test isa(μ,ParamRealization) && isa(μt,TransientParamRealization)
+  @test isa(μ,Realization) && isa(μt,TransientRealization)
   a(x,t) = sum(x)*t^2*sin(t)
   a(t) = x -> a(x,t)
   da = ∂t(a)

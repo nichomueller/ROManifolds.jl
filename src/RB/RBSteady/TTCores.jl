@@ -78,9 +78,18 @@ function block_core(a::AbstractArray{T,3},b::AbstractArray{S,3}) where {T,S}
   return ab
 end
 
-function block_cores(a::AbstractVector{<:AbstractArray},b::AbstractVector{<:AbstractArray})
-  @check length(a) == length(b)
-  abfirst = first_block(a[1],b[1])
-  ablasts = block_core.(a[2:end],b[2:end])
+for f in (:first_block,:block_core)
+  @eval begin
+    function $f(a::AbstractArray{T,3},b::AbstractArray...) where T
+      bfirst,blasts... = b
+      $f($f(a,bfirst),blasts...)
+    end
+  end
+end
+
+function block_cores(a::AbstractVector{<:AbstractArray}...)
+  D = length(a)
+  abfirst = first_block(getindex.(a,1)...)
+  ablasts = map(d -> block_core(getindex.(a,d)...))
   return [abfirst,ablasts...]
 end

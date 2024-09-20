@@ -1,7 +1,7 @@
 function ODEs.ode_start(
   solver::ODESolver,
   odeop::ODEOperator,
-  r0::TransientParamRealization,
+  r0::TransientRealization,
   us0::Tuple{Vararg{AbstractVector}},
   odecache)
 
@@ -13,8 +13,8 @@ function ODEs.ode_finish!(
   uF::AbstractVector,
   solver::ODESolver,
   odeop::ODEOperator,
-  r0::TransientParamRealization,
-  rf::TransientParamRealization,
+  r0::TransientRealization,
+  rf::TransientRealization,
   statef::Tuple{Vararg{AbstractVector}},
   odecache)
 
@@ -31,7 +31,7 @@ Generic wrapper for the evolution of an `ODEParamOperator` with an `ODESolver`.
 struct ODEParamSolution{V} <: ODESolution
   solver::ODESolver
   odeop::ODEParamOperator
-  r::TransientParamRealization
+  r::TransientRealization
   us0::Tuple{Vararg{V}}
   tracker::CostTracker
 end
@@ -39,7 +39,7 @@ end
 function ODEParamSolution(
   solver::ODESolver,
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   us0::Tuple{Vararg{V}}) where V
 
   tracker = CostTracker()
@@ -93,7 +93,7 @@ end
 function Algebra.solve(
   solver::ODESolver,
   odeop::ODEParamOperator,
-  r::TransientParamRealization,
+  r::TransientRealization,
   u0::T) where T
 
   ODEParamSolution(solver,odeop,r,u0)
@@ -103,7 +103,7 @@ end
 
 function ODEs.test_ode_solution(sol::ODEParamSolution)
   for (r_n,u_n) in sol
-    @test isa(r_n,TransientParamRealization)
+    @test isa(r_n,TransientRealization)
     @test isa(u_n,ParamVector)
   end
   true

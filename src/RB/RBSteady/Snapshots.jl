@@ -1,5 +1,5 @@
 """
-    abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractParamRealization}
+    abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractRealization}
       <: AbstractParamContainer{T,N,L} end
 
 Type representing a collection of parametric abstract arrays of eltype T and
@@ -12,7 +12,7 @@ Subtypes:
 - [`AbstractTransientSnapshots`](@ref)
 
 """
-abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractParamRealization} <: AbstractParamContainer{T,N,L} end
+abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractRealization} <: AbstractParamContainer{T,N,L} end
 
 ParamDataStructures.get_values(s::AbstractSnapshots) = @abstractmethod
 get_indexed_values(s::AbstractSnapshots) = @abstractmethod
@@ -29,28 +29,14 @@ num_space_dofs(s::AbstractSnapshots) = size(get_index_map(s))
 ParamDataStructures.num_params(s::AbstractSnapshots) = num_params(get_realization(s))
 
 """
-    Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractParamRealization
+    Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractRealization
       ) -> AbstractSnapshots
 
 Constructor of an instance of AbstractSnapshots
 
 """
-function Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractParamRealization)
+function Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractRealization)
   @abstractmethod
-end
-
-for I in (:AbstractIndexMap,:(AbstractArray{<:AbstractIndexMap}))
-  @eval begin
-    function Snapshots(a::ArrayContribution,i::$I,r::AbstractParamRealization)
-      contribution(a.trians) do trian
-        Snapshots(a[trian],i,r)
-      end
-    end
-
-    function Snapshots(a::TupOfArrayContribution,i::$I,r::AbstractParamRealization)
-      map(a->Snapshots(a,i,r),a)
-    end
-  end
 end
 
 function IndexMaps.change_index_map(s::AbstractSnapshots,i::AbstractIndexMap)
@@ -60,12 +46,6 @@ end
 function IndexMaps.change_index_map(s::AbstractSnapshots,f)
   i′ = change_index_map(get_index_map(s),f)
   change_index_map(s,i′)
-end
-
-function IndexMaps.recast(s::AbstractSnapshots,a::AbstractArray)
-  i = get_index_map(s)
-  a′ = recast(i,a)
-  return a′
 end
 
 """
@@ -79,7 +59,7 @@ function flatten_snapshots(s::AbstractSnapshots)
 end
 
 """
-    abstract type AbstractSteadySnapshots{T,N,L,D,I,R<:ParamRealization}
+    abstract type AbstractSteadySnapshots{T,N,L,D,I,R<:Realization}
       <: AbstractSnapshots{T,N,L,D,I,R} end
 
 Spatial specialization of an [`AbstractSnapshots`](@ref). The dimension `N` of a
@@ -106,12 +86,12 @@ julia> i = IndexMap(collect(LinearIndices((ns1,ns2))))
 julia> pspace = ParamSpace(fill([0,1],3))
 Set of parameters in [[0, 1], [0, 1], [0, 1]], sampled with UniformSampling()
 julia> r = realization(pspace,nparams=np)
-ParamRealization{Vector{Vector{Float64}}}([
+Realization{Vector{Vector{Float64}}}([
   [0.4021870679335007, 0.6585653527784044, 0.5110768420820191],
   [0.0950901750101361, 0.7049711670440882, 0.3490097863258958]])
 julia> s = Snapshots(ParamArray(data),i,r)
 2×2×2 GenericSnapshots{Float64, 3, 2, 2, IndexMap{2, Int64},
-  ParamRealization{Vector{Vector{Float64}}}, VectorOfVectors{Float64, 2}}:
+  Realization{Vector{Vector{Float64}}}, VectorOfVectors{Float64, 2}}:
   [:, :, 1] =
   0.468445  0.115179
   0.119589  0.0375576
@@ -122,7 +102,7 @@ julia> s = Snapshots(ParamArray(data),i,r)
 ```
 
 """
-abstract type AbstractSteadySnapshots{T,N,L,D,I,R<:ParamRealization} <: AbstractSnapshots{T,N,L,D,I,R} end
+abstract type AbstractSteadySnapshots{T,N,L,D,I,R<:Realization} <: AbstractSnapshots{T,N,L,D,I,R} end
 
 Base.size(s::AbstractSteadySnapshots) = (num_space_dofs(s)...,num_params(s))
 
@@ -147,7 +127,7 @@ struct GenericSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R}
   end
 end
 
-function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::ParamRealization)
+function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::Realization)
   GenericSnapshots(s,i,r)
 end
 
@@ -322,46 +302,9 @@ function get_indexed_values(s::ReshapedSnapshots)
   ConsecutiveArrayOfArrays(vr)
 end
 
-const MultiValueGenericSnapshots{T,N,L,D,R,A} = Union{
-  GenericSnapshots{T,N,L,D,<:AbstractMultiValueIndexMap{D},R,A},
-  SnapshotsAtIndices{T,N,L,D,<:AbstractMultiValueIndexMap{D},R,A}
-}
-
-const MultiValueSparseSnapshots{T,N,L,D,R} = Union{
-  GenericSnapshots{T,N,L,D,<:MultiValueSparseIndexMap{D},R,<:ParamSparseMatrix},
-  SnapshotsAtIndices{T,N,L,D,<:MultiValueSparseIndexMap{D},R,<:ParamSparseMatrix}
-}
-
-const MultiValueSnapshots{T,N,L,D,R,A} = Union{
-  MultiValueGenericSnapshots{T,N,L,D,R,A},
-  MultiValueSparseSnapshots{T,N,L,D,R},
-}
-
-TensorValues.num_components(s::MultiValueSnapshots) = num_components(get_index_map(s))
-
-function IndexMaps.get_component(s::MultiValueSnapshots,args...;kwargs...)
-  i′ = get_component(get_index_map(s),args...;kwargs...)
-  return Snapshots(get_values(s),i′,get_realization(s))
-end
-
-function IndexMaps.split_components(s::MultiValueSnapshots)
-  i′ = split_components(get_index_map(s))
-  return Snapshots(get_values(s),i′,get_realization(s))
-end
-
-function IndexMaps.merge_components(s::MultiValueSnapshots)
-  i′ = merge_components(get_index_map(s))
-  return Snapshots(get_values(s),i′,get_realization(s))
-end
-
-const GenericSparseSnapshots{T,N,L,D,R} = Union{
+const SparseSnapshots{T,N,L,D,R} = Union{
   GenericSnapshots{T,N,L,D,<:SparseIndexMap{D},R,<:ParamSparseMatrix},
   SnapshotsAtIndices{T,N,L,D,<:SparseIndexMap{D},R,<:ParamSparseMatrix}
-}
-
-const SparseSnapshots{T,N,L,D,R} = Union{
-  GenericSparseSnapshots{T,N,L,D,R},
-  MultiValueSparseSnapshots{T,N,L,D,R}
 }
 
 """
@@ -459,7 +402,7 @@ function Fields.BlockMap(s::NTuple,inds::AbstractVector{<:Integer})
   BlockMap(s,cis)
 end
 
-function Snapshots(data::BlockArrayOfArrays,i::AbstractArray{<:AbstractIndexMap},r::AbstractParamRealization)
+function Snapshots(data::BlockArrayOfArrays,i::AbstractArray{<:AbstractIndexMap},r::AbstractRealization)
   block_values = blocks(data)
   nblocks = blocksize(data)
   active_block_ids = findall(!iszero,block_values)
@@ -541,6 +484,16 @@ function select_snapshots_entries(s::BlockSnapshots{S,N},srange::ArrayBlock{<:An
 end
 
 # utils
+
+function Snapshots(a::ArrayContribution,i::AbstractIndexMap,r::AbstractRealization)
+  contribution(a.trians) do trian
+    Snapshots(a[trian],i,r)
+  end
+end
+
+function Snapshots(a::TupOfArrayContribution,i::AbstractIndexMap,r::AbstractRealization)
+  map(a->Snapshots(a,i,r),a)
+end
 
 function select_snapshots(a::ArrayContribution,args...;kwargs...)
   contribution(a.trians) do trian

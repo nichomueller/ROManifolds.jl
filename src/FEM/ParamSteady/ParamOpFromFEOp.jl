@@ -20,7 +20,7 @@ function get_nonlinear_operator(op::ParamOpFromFEOp)
 end
 
 """
-    allocate_paramcache(op::ParamOpFromFEOp,r::ParamRealization,u::AbstractParamVector
+    allocate_paramcache(op::ParamOpFromFEOp,r::Realization,u::AbstractParamVector
       ) -> CacheType
 
 Similar to [`allocate_odecache`](@ref) in [`Gridap`](@ref), when dealing with steady
@@ -29,7 +29,7 @@ parametric problems
 """
 function allocate_paramcache(
   op::ParamOpFromFEOp,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector)
 
   ptrial = get_trial(op.op)
@@ -53,14 +53,14 @@ function allocate_paramcache(
 end
 
 """
-    update_paramcache!(opcache, op::ParamOpFromFEOp, r::ParamRealization, u::AbstractParamVector
+    update_paramcache!(opcache, op::ParamOpFromFEOp, r::Realization, u::AbstractParamVector
       ) -> CacheType
 
 Similar to [`update_odeopcache!`](@ref) in [`Gridap`](@ref), when dealing with steady
 parametric problems
 
 """
-function update_paramcache!(opcache,op::ParamOpFromFEOp,r::ParamRealization)
+function update_paramcache!(opcache,op::ParamOpFromFEOp,r::Realization)
   opcache.Us = evaluate!(opcache.Us,opcache.Ups,r)
   pfeopcache,op = opcache.pfeopcache,op.op
   opcache.pfeopcache = update_pfeopcache!(pfeopcache,op,r)
@@ -69,7 +69,7 @@ end
 
 function Algebra.allocate_residual(
   op::ParamOpFromFEOp,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   opcache)
 
@@ -88,7 +88,7 @@ end
 function Algebra.residual!(
   b::AbstractVector,
   op::ParamOpFromFEOp,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   opcache)
 
@@ -108,7 +108,7 @@ end
 
 function Algebra.allocate_jacobian(
   op::ParamOpFromFEOp,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   opcache)
 
@@ -130,7 +130,7 @@ end
 function Algebra.jacobian!(
   A::AbstractMatrix,
   op::ParamOpFromFEOp,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   opcache)
 
@@ -179,7 +179,7 @@ end
 
 function allocate_paramcache(
   op::ParamOpFromFEOpWithTrian,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector)
 
   ptrial = get_trial(op.op)
@@ -206,7 +206,7 @@ end
 function update_paramcache!(
   opcache,
   op::ParamOpFromFEOpWithTrian,
-  r::ParamRealization)
+  r::Realization)
 
   opcache.Us = evaluate!(opcache.Us,opcache.Ups,r)
   pfeopcache,op = opcache.pfeopcache,op.op
@@ -216,7 +216,7 @@ end
 
 function Algebra.allocate_residual(
   op::ParamOpFromFEOpWithTrian,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   opcache)
 
@@ -239,7 +239,7 @@ end
 function Algebra.residual!(
   b::Contribution,
   op::ParamOpFromFEOpWithTrian,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   opcache)
 
@@ -260,7 +260,7 @@ end
 
 function Algebra.allocate_jacobian(
   op::ParamOpFromFEOpWithTrian,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   opcache)
 
@@ -283,7 +283,7 @@ end
 function Algebra.jacobian!(
   A::Contribution,
   op::ParamOpFromFEOpWithTrian,
-  r::ParamRealization,
+  r::Realization,
   u::AbstractParamVector,
   opcache)
 

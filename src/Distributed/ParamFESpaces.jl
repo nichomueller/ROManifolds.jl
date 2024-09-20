@@ -109,7 +109,7 @@ end
 
 function FEM.get_param_vector_builder(
   a::DistributedSparseMatrixAssembler,
-  r::FEM.AbstractParamRealization)
+  r::FEM.AbstractRealization)
 
   L = length(r)
   vec = get_vector_builder(a)
@@ -121,7 +121,7 @@ end
 
 function FEM.get_param_assembler(
   a::DistributedSparseMatrixAssembler,
-  r::FEM.AbstractParamRealization)
+  r::FEM.AbstractRealization)
 
   rows = FESpaces.get_rows(a)
   cols = FESpaces.get_cols(a)

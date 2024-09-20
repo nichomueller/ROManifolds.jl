@@ -45,27 +45,6 @@ function eim_cache(cores::Vector{<:AbstractArray{T,3}}) where T
 end
 
 """
-    empirical_interpolation(A::AbstractMatrix) -> (Vector{Int}, AbstractMatrix)
-
-Returns a list of indices U+1D4D8 corresponding to the rows of `A` selected by the
-discrete empirical interpolation method, and `A[U+1D4D8, :]`
-
-"""
-function empirical_interpolation(A::AbstractMatrix)
-  m,n = size(A)
-  res = zeros(eltype(A),m)
-  I = zeros(Int32,n)
-  I,Ai = empirical_interpolation!((I,res),A)
-  return I,Ai
-end
-
-function empirical_interpolation(A::ParamSparseMatrix)
-  I,Ai = empirical_interpolation(A.data)
-  I′ = recast_indices(I,param_getindex(A,1))
-  return I′,Ai
-end
-
-"""
     abstract type AbstractIntegrationDomain end
 
 Type representing the full order dofs selected by an empirical interpolation method.
@@ -323,13 +302,19 @@ end
 
 # ONLINE PHASE
 
-function expand_cache!(a::AffineDecomposition,b::AbstractParamArray)
+function expand_caches!(a::AffineDecomposition,b::AbstractParamArray)
   coeff = a.coefficient
   result = a.result
   @check param_length(coeff) == param_length(result)
   param_length(coeff) == param_length(b) && return
-  a.coefficient.data .= similar(coeff,eltype(coeff),innersize(coeff)...,param_length(b))
-  a.result.data .= similar(coeff,eltype(result),innersize(result)...,param_length(b))
+  expand_cache!(coeff,param_length(b))
+  expand_cache!(result,param_length(b))
+  return
+end
+
+function expand_cache!(cache,plength)
+  cache .= similar(coeff,eltype(cache),innersize(cache)...,plength)
+  return
 end
 
 """
@@ -352,7 +337,7 @@ Returns the linear combination of the affine basis by the interpolated coefficie
 
 """
 function mdeim_result(a::AffineDecomposition,b::AbstractParamArray)
-  expand_cache!(a,b)
+  expand_caches!(a,b)
   coefficient!(a,b)
 
   basis = a.basis
@@ -510,149 +495,4 @@ function mdeim_result(a::BlockAffineDecomposition,b::ArrayBlock)
     a.cache[Block(i)] = mdeim_result(a[i...],b[i...])
   end
   return a.cache
-end
-
-# for testing/visualization purposes
-
-struct InterpolationError{A,B}
-  name::String
-  err_matrix::A
-  err_vector::B
-  function InterpolationError(err_matrix::A,err_vector::B;name="linear") where {A,B}
-    new{A,B}(name,err_matrix,err_vector)
-  end
-end
-
-function Base.show(io::IO,k::MIME"text/plain",err::InterpolationError)
-  print(io,"Interpolation error $(err.name) (matrix,vector): ($(err.err_matrix),$(err.err_vector))")
-end
-
-struct LincombError{A,B}
-  name::String
-  err_matrix::A
-  err_vector::B
-  function LincombError(err_matrix::A,err_vector::B;name="linear") where {A,B}
-    new{A,B}(name,err_matrix,err_vector)
-  end
-end
-
-function Base.show(io::IO,k::MIME"text/plain",err::LincombError)
-  print(io,"Projection error $(err.name) (matrix,vector): ($(err.err_matrix),$(err.err_vector))")
-end
-
-function project(A::AbstractMatrix,r::RBSpace)
-  basis_space = get_basis_space(r)
-  a = basis_space'*A
-  v = vec(a)
-  return v
-end
-
-function project(A::ParamSparseMatrix,trial::RBSpace,test::RBSpace)
-  basis_space_test = get_basis_space(test)
-  basis_space_trial = get_basis_space(trial)
-  s_proj_a = basis_space_test'*param_getindex(A,1)*basis_space_trial
-  return s_proj_a
-end
-
-function project(fesolver,fes::ArrayContribution,args::RBSpace...;kwargs...)
-  sum(map(i->project(fes[i],args...;kwargs...),eachindex(fes)))
-end
-
-function project(fesolver,fes::ArrayContribution,test::MultiFieldRBSpace;kwargs...)
-  active_block_ids = get_touched_blocks(fes[1])
-  block_map = BlockMap(size(fes[1]),active_block_ids)
-  rb_blocks = map(active_block_ids) do i
-    fesi = contribution(fes.trians) do trian
-      val = fes[trian]
-      val[i]
-    end
-    testi = test[i]
-    project(fesolver,fesi,testi;kwargs...)
-  end
-  return_cache(block_map,rb_blocks...)
-end
-
-function project(fesolver,fes::ArrayContribution,trial::MultiFieldRBSpace,test::MultiFieldRBSpace;kwargs...)
-  active_block_ids = get_touched_blocks(fes[1])
-  block_map = BlockMap(size(fes[1]),active_block_ids)
-  rb_blocks = map(Tuple.(active_block_ids)) do (i,j)
-    fesij = contribution(fes.trians) do trian
-      val = fes[trian]
-      val[i,j]
-    end
-    trialj = trial[j]
-    testi = test[i]
-    project(fesolver,fesij,trialj,testi;kwargs...)
-  end
-  return_cache(block_map,rb_blocks...)
-end
-
-function interpolation_error(a::AffineDecomposition,fes::AbstractSteadySnapshots,rbs::AbstractSteadySnapshots)
-  ids_space = get_indices_space(a)
-  fes_ids = select_snapshots_entries(fes,ids_space)
-  rbs_ids = select_snapshots_entries(rbs,ids_space)
-  norm(fes_ids - rbs_ids)
-end
-
-function interpolation_error(a::BlockAffineDecomposition,fes::BlockSnapshots,rbs::BlockSnapshots)
-  active_block_ids = get_touched_blocks(a)
-  block_map = BlockMap(size(a),active_block_ids)
-  errors = [interpolation_error(a[i],fes[i],rbs[i]) for i = get_touched_blocks(a)]
-  return_cache(block_map,errors...)
-end
-
-function interpolation_error(a::AffineContribution,fes::ArrayContribution,rbs::ArrayContribution)
-  sum([interpolation_error(a[i],fes[i],rbs[i]) for i in eachindex(a)])
-end
-
-function interpolation_error(solver,feop,rbop,s;kwargs...)
-  odeop = get_algebraic_operator(feop)
-  feA,feb = jacobian_and_residual(get_fe_solver(solver),odeop,s)
-  rbA,rbb = jacobian_and_residual(solver,rbop.op,s)
-  errA = interpolation_error(rbop.lhs,feA,rbA)
-  errb = interpolation_error(rbop.rhs,feb,rbb)
-  return InterpolationError(errA,errb;kwargs...)
-end
-
-function interpolation_error(solver,feop::LinearNonlinearParamFEOperator,rbop,s)
-  err_lin = interpolation_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
-  err_nlin = interpolation_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
-  return err_lin,err_nlin
-end
-
-function linear_combination_error(solver,feop,rbop,s;kwargs...)
-  odeop = get_algebraic_operator(feop)
-  fesolver = get_fe_solver(solver)
-  feA,feb = jacobian_and_residual(fesolver,odeop,s)
-  feA_comp = project(fesolver,feA,get_trial(rbop),get_test(rbop))
-  feb_comp = project(fesolver,feb,get_test(rbop))
-  rbA,rbb = jacobian_and_residual(solver,rbop,s)
-  errA = rel_norm(feA_comp,rbA)
-  errb = rel_norm(feb_comp,rbb)
-  return LincombError(errA,errb;kwargs...)
-end
-
-function linear_combination_error(solver,feop::LinearNonlinearParamFEOperator,rbop,s)
-  err_lin = linear_combination_error(solver,feop.op_linear,rbop.op_linear,s;name="linear")
-  err_nlin = linear_combination_error(solver,feop.op_nonlinear,rbop.op_nonlinear,s;name="non linear")
-  return err_lin,err_nlin
-end
-
-function rel_norm(fe,rb)
-  norm(fe - rb) / norm(fe)
-end
-
-function rel_norm(fea::ArrayBlock,rba::BlockArrayOfArrays)
-  active_block_ids = get_touched_blocks(fea)
-  block_map = BlockMap(size(fea),active_block_ids)
-  rb_array = get_array(rba)
-  norms = [rel_norm(fea[i],rb_array[i]) for i in active_block_ids]
-  return_cache(block_map,norms...)
-end
-
-function mdeim_error(solver,feop,rbop,s)
-  s1 = select_snapshots(s,1)
-  intp_err = interpolation_error(solver,feop,rbop,s1)
-  proj_err = linear_combination_error(solver,feop,rbop,s1)
-  return intp_err,proj_err
 end

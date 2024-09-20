@@ -16,19 +16,18 @@ function RBSteady.projection(red::TransientPODReduction,s::AbstractTransientSnap
   basis_space = projection(get_reduction_space(red),s1,args...)
   proj_s2 = galerkin_projection(get_basis(basis_space),s2,args...)
   basis_time = reduction(get_reduction_time(red),compressed_s2)
-  TransientPODBasis(basis_space,basis_time,index_map)
+  TransientPODBasis(basis_space,basis_time)
 end
 
 """
-    TransientPODBasis{A<:AbstractMatrix,B<:AbstractMatrix,I<:AbstractIndexMap} <: Projection
+    TransientPODBasis{A<:AbstractMatrix,B<:AbstractMatrix} <: Projection
 
 TransientProjection stemming from a truncated proper orthogonal decomposition [`truncated_pod`](@ref)
 
 """
-struct TransientPODBasis{A<:PODBasis,B<:PODBasis,I<:AbstractIndexMap} <: Projection
+struct TransientPODBasis{A<:PODBasis,B<:PODBasis} <: Projection
   basis_space::A
   basis_time::B
-  index_map::I
 end
 
 get_basis_space(a::TransientPODBasis) = get_basis(a.basis_space)
@@ -37,9 +36,6 @@ get_basis_time(a::TransientPODBasis) = get_basis(a.basis_time)
 RBSteady.get_basis(a::TransientPODBasis) = kron(get_basis_time(a),get_basis_space(a))
 RBSteady.num_fe_dofs(a::TransientPODBasis) = num_fe_dofs(a.basis_space)*num_fe_dofs(a.basis_time)
 RBSteady.num_reduced_dofs(a::TransientProjection) = num_reduced_dofs(a.basis_space)*num_reduced_dofs(a.basis_time)
-
-IndexMaps.get_index_map(a::TransientPODBasis) = a.index_map
-IndexMaps.recast(a::TransientPODBasis) = recast(get_basis_space(a),get_index_map(a))
 
 function RBSteady.project(a::TransientPODBasis,X::AbstractMatrix)
   basis_space = get_basis(a.basis_space)
@@ -111,10 +107,11 @@ function RBSteady.galerkin_projection(
   return ReducedProjection(proj_basis)
 end
 
-function empirical_interpolation(a::TransientPODBasis)
-  eim_space = empirical_interpolation(a.basis_space)
-  eim_time = empirical_interpolation(a.basis_time)
-  return eim_space,eim_time
+function RBSteady.empirical_interpolation(a::TransientPODBasis)
+  indices_space,interp_space = empirical_interpolation(get_basis_space(a))
+  indices_time,interp_time = empirical_interpolation(get_basis_time(a))
+  interp = kron(interp_time,interp_space)
+  return (indices_time,interp_time),interp
 end
 
 # multfield interface

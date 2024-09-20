@@ -33,9 +33,9 @@ g(μ,t) = x->g(x,μ,t)
 gμt(μ,t) = 𝑓ₚₜ(g,μ,t)
 
 params = [rand(3),rand(3),rand(3)]
-μ = ParamRealization(params)
+μ = Realization(params)
 t = 0:3
-μt = TransientParamRealization(μ,t)
+μt = TransientRealization(μ,t)
 Uμt = TransientTrialParamFESpace(V,gμt)
 U = Uμt(μt)
 dirichlet_values = get_dirichlet_dof_values(U)

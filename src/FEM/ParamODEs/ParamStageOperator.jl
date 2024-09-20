@@ -29,7 +29,7 @@ end
 struct NonlinearParamStageOperator <: ParamStageOperator
   odeop::ODEOperator
   odeopcache
-  rx::TransientParamRealization
+  rx::TransientRealization
   usx::Function
   ws::Tuple{Vararg{Real}}
 end
@@ -82,7 +82,7 @@ end
 
 function LinearParamStageOperator(
   odeop::ODEOperator,odeopcache,
-  rx::TransientParamRealization,
+  rx::TransientRealization,
   usx::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   matcache,veccache,reuse::Bool,sysslvrcache)

@@ -6,7 +6,7 @@ Returns the parametric length of `a`
 """
 param_length(a) = @abstractmethod
 param_length(a::Union{Nothing,Function,Map,Field,AbstractArray{<:Field}}) = 0
-param_length(a::Union{AbstractParamRealization,AbstractParamFunction}) = length(a)
+param_length(a::Union{AbstractRealization,AbstractParamFunction}) = length(a)
 param_length(a::Union{Number,AbstractArray{<:Number}}) = 0
 param_length(a::CellField) = param_length(testitem(get_data(a)))
 
