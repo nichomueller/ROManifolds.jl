@@ -54,11 +54,10 @@ function get_stage_operator(
   odeop::ODEParamOperator,
   r::TransientRealization,
   state0::NTuple{1,AbstractVector},
-  odecache;
-  update_cache=true)
+  cache)
 
   u0 = state0[1]
-  odeslvrcache,odeopcache = odecache
+  odeslvrcache,odeopcache = cache
   uθ,= odeslvrcache
 
   x = copy(u0)
@@ -77,7 +76,6 @@ function get_stage_operator(
   end
   ws = (1,1/dtθ)
 
-  update_cache && update_odeopcache!(odeopcache,odeop,r)
   stageop = NonlinearParamStageOperator(odeop,odeopcache,r,us,ws)
   shift!(r,dt*(1-θ))
 
@@ -90,14 +88,14 @@ function Algebra.solve!(
   odeop::ODEParamOperator,
   r::TransientRealization,
   state0::NTuple{1,AbstractVector},
-  odecache)
+  cache)
 
   x = statef[1]
   sysslvr = solver.sysslvr
-  odeslvrcache,odeopcache = odecache
+  odeslvrcache,odeopcache,rbcache = cache
   uθ,sysslvrcache = odeslvrcache
 
-  stageop = get_stage_operator(solver,odeop,r,state0,odecache;update_cache=false)
+  stageop = get_stage_operator(solver,odeop,r,state0,cache)
   solve!(x,sysslvr,stageop,sysslvrcache)
   return x
 end
@@ -154,12 +152,12 @@ function get_stage_operator(
   odeop::ODEParamOperator{LinearParamODE},
   r::TransientRealization,
   state0::NTuple{1,AbstractVector},
-  odecache;
-  update_cache=true)
+  cache)
 
   u0 = state0[1]
-  odeslvrcache,odeopcache = odecache
+  odeslvrcache,odeopcache,rbcache = cache
   reuse,A,b,sysslvrcache = odeslvrcache
+  Â,b̂ = rbcache
 
   dt,θ = solver.dt,solver.θ
 
@@ -170,8 +168,7 @@ function get_stage_operator(
   us = (x,x)
   ws = (1,1/dtθ)
 
-  update_cache && update_odeopcache!(odeopcache,odeop,r)
-  stageop = LinearParamStageOperator(odeop,odeopcache,r,us,ws,A,b,reuse,sysslvrcache)
+  stageop = LinearParamStageOperator(odeop,odeopcache,r,us,ws,(A,Â),(b,b̂),reuse,sysslvrcache)
   shift!(r,dt*(1-θ))
 
   return stageop
@@ -183,14 +180,14 @@ function Algebra.solve!(
   odeop::ODEParamOperator{LinearParamODE},
   r::TransientRealization,
   state0::NTuple{1,AbstractVector},
-  odecache)
+  cache)
 
   x = statef[1]
   sysslvr = solver.sysslvr
-  odeslvrcache,odeopcache = odecache
+  odeslvrcache,odeopcache,rbcache = cache
   reuse,A,b,sysslvrcache = odeslvrcache
 
-  stageop = get_stage_operator(solver,odeop,r,state0,odecache;update_cache=false)
+  stageop = get_stage_operator(solver,odeop,r,state0,cache)
   solve!(x,sysslvr,stageop,sysslvrcache)
   return x
 end
@@ -213,13 +210,13 @@ function Algebra.solve!(
   lop = get_linear_operator(odeop)
   nlop = get_nonlinear_operator(odeop)
 
-  stageop_lin = get_stage_operator(solver,lop,r,x,odecache_lin;update_cache=false)
+  stageop_lin = get_stage_operator(solver,lop,r,x,odecache_lin)
   A_lin = jacobian(stageop_lin,x)
   b_lin = residual(stageop_lin,x)
   sysslvrcache = ((A_lin,A_nlin),(b_lin,b_nlin))
   sysslvr = solver.sysslvr
 
-  stageop = get_stage_operator(solver,odeop,r,statefe,odecache_nlin;update_cache=false)
+  stageop = get_stage_operator(solver,odeop,r,statefe,odecache_nlin)
   solve!(x̂,x,sysslvr,stageop,sysslvrcache)
   return x̂
 end

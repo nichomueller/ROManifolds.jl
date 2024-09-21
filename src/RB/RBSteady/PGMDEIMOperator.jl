@@ -250,6 +250,12 @@ function fe_residual!(
   return bi
 end
 
+function allocate_rbcache(op::PGMDEIMOperator,r::Realization)
+  lhs_cache = allocate_hypred_cache(op.lhs,r)
+  rhs_cache = allocate_hypred_cache(op.rhs,r)
+  return lhs_cache,rhs_cache
+end
+
 """
     struct LinearNonlinearPGMDEIMOperator <: RBOperator{LinearNonlinearParamEq} end
 
@@ -339,7 +345,30 @@ function Algebra.jacobian!(
   return Â_nlin
 end
 
+function allocate_rbcache(op::LinearNonlinearPGMDEIMOperator,r::Realization)
+  lhs_cache = allocate_hypred_cache(op.lhs,r)
+  rhs_cache = allocate_hypred_cache(op.rhs,r)
+  return lhs_cache,rhs_cache
+end
+
 # Solve a POD-MDEIM problem
+
+function init_online_cache!(solver::RBSolver,op::RBOperator,r::Realization,y::AbstractParamVector)
+  fesolver = get_fe_solver(solver)
+  paramcache = allocate_paramcache(fesolver,op,r)
+  rbcache = allocate_rbcache(op,r)
+
+  cache = solver.cache
+  cache.fecache = (y,paramcache)
+  cache.rbcache = rbcache
+  return
+end
+
+function online_cache!(solver::RBSolver,op::RBOperator,r::Realization)
+  (y,paramcache) = cache.fecache
+  param_length(r) != param_length(y) && init_online_cache!(solver,op,r,y)
+  return
+end
 
 function Algebra.solve(
   solver::RBSolver,

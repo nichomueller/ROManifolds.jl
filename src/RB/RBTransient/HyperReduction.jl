@@ -100,6 +100,14 @@ function RBSteady.project!(cache,a::TransientHyperReduction,b::AbstractParamArra
   return b̂
 end
 
+function RBSteady.allocate_coefficient(a::TransientHyperReduction,r::TransientRealization)
+  RBSteady.allocate_coefficient(a,param_length(r))
+end
+
+function RBSteady.allocate_hyper_reduction(a::TransientHyperReduction,r::TransientRealization)
+  RBSteady.allocate_hyper_reduction(a,param_length(r))
+end
+
 const TupOfAffineContribution = Tuple{Vararg{AffineContribution}}
 
 function RBSteady.allocate_coefficient(a::TupOfAffineContribution,b::TupOfArrayContribution)

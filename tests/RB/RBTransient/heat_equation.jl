@@ -86,7 +86,8 @@ create_dir(test_dir)
 
 # RB method
 
-fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
+# fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
+fesnaps = load_snapshots(test_dir)
 # rbop = reduced_operator(rbsolver,feop,fesnaps)
 
 # ronline = realization(feop;nparams=10)
@@ -101,7 +102,7 @@ fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
 # TESTS
 
 # rbop = reduced_operator(rbsolver,feop,fesnaps)
-red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+# red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
 
 # red = RBSteady.get_state_reduction(rbsolver)
 # basis = reduced_basis(red,feop,fesnaps)
@@ -128,9 +129,9 @@ red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
 # X = assemble_matrix(feop,energy)
 # bbs = union(bs,PODBasis(U),X)
 
-using Gridap.FESpaces
-op = get_algebraic_operator(feop)
-pop = TransientPGOperator(op,red_trial,red_test)
+# using Gridap.FESpaces
+# op = get_algebraic_operator(feop)
+# pop = TransientPGOperator(op,red_trial,red_test)
 
 # r = realization(feop)
 # Û = red_trial(r)
@@ -144,4 +145,23 @@ pop = TransientPGOperator(op,red_trial,red_test)
 # red_jac = reduced_jacobian(rbsolver.jacobian_reduction,pop,jacs)
 # red_res = reduced_residual(rbsolver.residual_reduction,pop,ress)
 
-rbop = reduced_operator(rbsolver,pop,fesnaps)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+
+r = realization(feop;nparams=10)
+# rbsnaps,rbstats = solve(rbsolver,rbop,r)
+using Gridap.ODEs
+using Gridap.FESpaces
+op = rbop
+x̂ = zero_free_values(get_trial(op)(r))
+y = zero_free_values(get_fe_trial(op)(r))
+odecache = allocate_odecache(fesolver,op,r,(y,))
+rbcache = RBSteady.allocate_rbcache(op,r)
+
+RBSteady.init_online_cache!(rbsolver,op,r,y)
+RBSteady.online_cache!(rbsolver,op,r)
+
+# solve!(x̂,solver,op,r)
+cache = rbsolver.cache
+y,odecache = cache.fecache
+rbcache = cache.rbcache
+solve!((x̂,),fesolver,op,r,(y,),(odecache...,rbcache))

@@ -73,13 +73,11 @@ function ODEs.allocate_odeopcache(
 end
 
 function ODEs.update_odeopcache!(
-  ode_cache,
+  odeopcache,
   op::TransientPGMDEIMOperator,
   r::TransientRealization)
 
-  @warn "For performance reasons, it would be best to update the cache at the very
-    start, given that the online phase of a space-time ROM is time-independent"
-  update_odeopcache!(ode_cache,op.op,r)
+  update_odeopcache!(odeopcache,op.op,r)
 end
 
 function Algebra.allocate_residual(
@@ -101,29 +99,30 @@ function Algebra.allocate_jacobian(
 end
 
 function Algebra.residual!(
-  b::Contribution,
+  cache,
   op::TransientPGMDEIMOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   odeopcache;
   kwargs...)
 
+  b,b̂ = cache
   fe_sb = fe_residual!(b,op,r,us,odeopcache)
-  b̂ = mdeim_result(op.rhs,fe_sb)
+  project!(b̂,op.rhs,fe_sb)
   return b̂
 end
 
 function Algebra.jacobian!(
-  A::TupOfArrayContribution,
+  cache,
   op::TransientPGMDEIMOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   ws::Tuple{Vararg{Real}},
   odeopcache)
 
+  A,Â = cache
   fe_sA = fe_jacobian!(A,op,r,us,ws,odeopcache)
-  Â = mdeim_result(op.lhs,fe_sA)
-  return Â
+  project!(Â,op.lhs,fe_sA)
 end
 
 for f in (:(RBSteady.residual_snapshots),:(RBSteady.jacobian_snapshots))
@@ -236,6 +235,18 @@ function RBSteady.fe_residual!(
   red_b,red_us,red_odeopcache = select_fe_quantities_at_indices(b,us,odeopcache,vec(red_pt_indices))
   residual!(red_b,op.op,red_r,red_us,red_odeopcache)
   RBSteady.select_at_indices(b,op.rhs,red_pt_indices)
+end
+
+function RBSteady.allocate_rbcache(
+  op::TransientPGMDEIMOperator,
+  r::TransientRealization)
+
+  rhs_cache = RBSteady.allocate_hypred_cache(op.rhs,r)
+  lhs_cache = ()
+  for lhs in op.lhs
+    lhs_cache = (lhs_cache...,RBSteady.allocate_hypred_cache(lhs,r))
+  end
+  return lhs_cache,rhs_cache
 end
 
 """
@@ -359,7 +370,43 @@ function Algebra.jacobian!(
   return Â_nlin
 end
 
+function RBSteady.allocate_rbcache(
+  op::LinearNonlinearTransientPGMDEIMOperator,
+  r::TransientRealization)
+
+  cache_lin = RBSteady.allocate_rbcache(get_linear_operator(op),r)
+  cache_nlin = RBSteady.allocate_rbcache(get_nonlinear_operator(op),r)
+  return (cache_lin,cache_nlin)
+end
+
 # Solve a POD-MDEIM problem
+
+function RBSteady.init_online_cache!(
+  solver::RBSolver,
+  op::TransientRBOperator,
+  r::TransientRealization,
+  y::AbstractParamVector)
+
+  fesolver = get_fe_solver(solver)
+  odecache = allocate_odecache(fesolver,op,r,(y,))
+  rbcache = RBSteady.allocate_rbcache(op,r)
+
+  cache = solver.cache
+  cache.fecache = (y,odecache)
+  cache.rbcache = rbcache
+  return
+end
+
+function RBSteady.online_cache!(
+  solver::RBSolver,
+  op::TransientRBOperator,
+  r::TransientRealization)
+
+  cache = solver.cache
+  (y,odecache) = cache.fecache
+  param_length(r) != param_length(y) && RBSteady.init_online_cache!(solver,op,r,y)
+  return
+end
 
 function Algebra.solve(
   solver::RBSolver,
@@ -379,21 +426,24 @@ function Algebra.solve(
   fe_trial = get_fe_trial(op)(r)
   x̂ = zero_free_values(trial)
   y = zero_free_values(fe_trial)
-  odecache = allocate_odecache(fesolver,op,r,(y,))
-  cache = x̂,y,odecache
-  solve!(cache,solver,op,r)
+  RBSteady.init_online_cache!(solver,op,r,y)
+  solve!(x̂,solver,op,r)
 end
 
 function Algebra.solve!(
-  cache,
+  x̂,
   solver::RBSolver,
   op::TransientRBOperator,
   r::TransientRealization)
 
-  x̂,y,odecache = cache
+  RBSteady.online_cache!(solver,op,r)
+  cache = solver.cache
+  y,odecache = cache.fecache
+  rbcache = cache.rbcache
+
   fesolver = get_fe_solver(solver)
 
-  t = @timed solve!((x̂,),fesolver,op,r,(y,),odecache)
+  t = @timed solve!((x̂,),fesolver,op,r,(y,),(odecache...,rbcache))
   stats = CostTracker(t,num_params(r))
 
   trial = get_trial(op)(r)

@@ -1,3 +1,8 @@
+mutable struct RBOnlineCache
+  fecache
+  rbcache
+end
+
 """
     struct RBSolver{A,B,C,D} end
 
@@ -26,11 +31,22 @@ In particular:
   method commits with respect to the FE procedure
 
 """
-struct RBSolver{A,B,C,D}
+struct RBSolver{A<:GridapType,B}
   fesolver::A
-  state_reduction::B
-  residual_reduction::C
-  jacobian_reduction::D
+  state_reduction::AbstractReduction
+  residual_reduction::AbstractReduction
+  jacobian_reduction::B
+  cache::RBOnlineCache
+end
+
+function RBSolver(
+  fesolver::GridapType,
+  state_reduction::AbstractReduction,
+  residual_reduction::AbstractReduction,
+  jacobian_reduction)
+
+  cache = RBOnlineCache(nothing,nothing)
+  RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction,cache)
 end
 
 function RBSolver(

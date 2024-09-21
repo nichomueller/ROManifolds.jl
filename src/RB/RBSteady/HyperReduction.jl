@@ -210,32 +210,34 @@ function Algebra.allocate_matrix(::Type{M},m::Integer,n::Integer) where M
 end
 
 function allocate_coefficient(a::HyperReduction,nparams::Int)
-  n = num_reduced_dofs(b)
+  n = num_reduced_dofs(a)
   coeffvec = allocate_vector(Vector{Float64},n)
   coeff = array_of_consecutive_arrays(coeffvec,nparams)
   return coeff
 end
 
-allocate_coefficient(a::Projection,r::AbstractRealization) = allocate_coefficient(a,num_params(r))
-allocate_coefficient(a::Projection,b::AbstractParamArray) = allocate_coefficient(a,param_length(b))
+function allocate_coefficient(a::HyperReduction,r::AbstractRealization)
+  allocate_coefficient(a,num_params(r))
+end
 
-function allocate_hyper_reduction(b::HyperReduction{<:ReducedVecProjection},nparams::Int)
-  nrows = num_reduced_dofs_left_projector(b)
+function allocate_hyper_reduction(a::ReducedVecProjection,nparams::Int)
+  nrows = num_reduced_dofs_left_projector(a)
   b = allocate_vector(Vector{Float64},nrows)
   hypred = array_of_consecutive_arrays(b,nparams)
   return hypred
 end
 
-function allocate_hyper_reduction(b::HyperReduction{<:ReducedMatProjection},nparams::Int)
-  nrows = num_reduced_dofs_left_projector(b)
-  ncols = num_reduced_dofs_right_projector(b)
+function allocate_hyper_reduction(a::ReducedMatProjection,nparams::Int)
+  nrows = num_reduced_dofs_left_projector(a)
+  ncols = num_reduced_dofs_right_projector(a)
   A = allocate_matrix(Matrix{Float64},nrows,ncols)
   hypred = array_of_consecutive_arrays(A,nparams)
   return hypred
 end
 
-allocate_hyper_reduction(a::Projection,r::AbstractRealization) = allocate_hyper_reduction(a,num_params(r))
-allocate_hyper_reduction(a::Projection,b::AbstractParamArray) = allocate_hyper_reduction(a,param_length(b))
+function allocate_hyper_reduction(a::HyperReduction,r::AbstractRealization)
+  allocate_hyper_reduction(a,num_params(r))
+end
 
 function ParamDataStructures.Contribution(v::Tuple{Vararg{HyperReduction}},t::Tuple{Vararg{Triangulation}})
   AffineContribution(v,t)
@@ -261,15 +263,20 @@ struct AffineContribution{A<:Projection,V,K} <: Contribution
   end
 end
 
-function allocate_coefficient(a::AffineContribution,b::ArrayContribution)
-  @check all(get_domains(a) .== get_domains(b))
+function allocate_coefficient(a::AffineContribution,r::AbstractRealization)
   contribution(get_domains(a)) do trian
-    allocate_coefficient(a[trian],b[trian])
+    allocate_coefficient(a[trian],r)
   end
 end
 
-function allocate_hyper_reduction(a::AffineContribution,b::ArrayContribution)
-  allocate_hyper_reduction(first(get_values(a)),first(get_values(b)))
+function allocate_hyper_reduction(a::AffineContribution,r::AbstractRealization)
+  allocate_hyper_reduction(first(get_values(a)),r)
+end
+
+function allocate_hypred_cache(a::AffineContribution,r::AbstractRealization)
+  coeffs = allocate_coefficient(a,r)
+  hypred = allocate_hyper_reduction(a,r)
+  return coeffs,hypred
 end
 
 function project!(cache,a::AffineContribution,b::ArrayContribution)
@@ -413,12 +420,12 @@ function allocate_coefficient(a::BlockHyperReduction,nparams::Int)
   return coeff
 end
 
-function Arrays.return_cache(::typeof(allocate_hyper_reduction),a::HyperReduction{<:ReducedVecProjection},nparams::Int)
+function Arrays.return_cache(::typeof(allocate_hyper_reduction),a::ReducedVecProjection,nparams::Int)
   hypvec = testvalue(Vector{Float64})
   array_of_consecutive_arrays(hypvec,nparams)
 end
 
-function Arrays.return_cache(::typeof(allocate_hyper_reduction),a::HyperReduction{<:ReducedMatProjection},nparams::Int)
+function Arrays.return_cache(::typeof(allocate_hyper_reduction),a::ReducedMatProjection,nparams::Int)
   hypvec = testvalue(Matrix{Float64})
   array_of_consecutive_arrays(hypvec,nparams)
 end

@@ -319,7 +319,44 @@ function ODEs.allocate_odeopcache(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
 
-  @notimplemented
+  odeopcache = _define_odeopcache(odeop,r,us)
+
+  uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
+  test = get_test(odeop.op)
+  v = get_fe_basis(test)
+  trial = evaluate(get_trial(odeop.op),nothing)
+  du = get_trial_fe_basis(trial)
+  assem = get_param_assembler(odeop.op,r)
+
+  const_forms = ()
+  num_forms = get_num_forms(odeop.op)
+  jacs = get_jacs(odeop.op)
+
+  μ,t = get_params(r),get_times(r)
+
+  dc = DomainContribution()
+  for k in 1:get_order(odeop)+1
+    jac = jacs[k]
+    dc = dc + jac(μ,t,uh,du,v)
+  end
+  matdata = collect_cell_matrix(trial,test,dc)
+  A_full = allocate_matrix(assem,matdata)
+
+  for k in 1:num_forms
+    const_form = nothing
+    if is_form_constant(odeop,k)
+      jac = jacs[k]
+      dc = jac(μ,t,uh,du,v)
+      matdata = collect_cell_matrix(trial,test,dc)
+      const_form = copy(A_full)
+      fillstored!(const_form,zero(eltype(const_form)))
+      assemble_matrix_add!(const_form,assem,matdata)
+    end
+    const_forms = (const_forms...,const_form)
+  end
+
+  odeopcache.const_forms = const_forms
+  return odeopcache
 end
 
 function ODEs.update_odeopcache!(
@@ -327,7 +364,16 @@ function ODEs.update_odeopcache!(
   odeop::ODEParamOpFromTFEOpWithTrian,
   r::TransientRealization)
 
-  @notimplemented
+  trials = ()
+  for k in 1:get_order(odeop)+1
+    trials = (trials...,evaluate!(odeopcache.Us[k],odeopcache.Uts[k],r))
+  end
+  odeopcache.Us = trials
+
+  tfeopcache,op = odeopcache.tfeopcache,odeop.op
+  odeopcache.tfeopcache = update_tfeopcache!(tfeopcache,op,r)
+
+  odeopcache
 end
 
 function _define_odeopcache(
@@ -356,7 +402,20 @@ function Algebra.allocate_residual(
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
 
-  @notimplemented
+  uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
+  test = get_test(odeop.op)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(odeop.op,r)
+
+  μ,t = get_params(r),get_times(r)
+  res = get_res(odeop.op)
+  dc = res(μ,t,uh,v)
+
+  b = contribution(odeop.op.trian_res) do trian
+    vecdata = collect_cell_vector_for_trian(test,dc,trian)
+    allocate_vector(assem,vecdata)
+  end
+  b
 end
 
 function Algebra.residual!(
@@ -367,7 +426,23 @@ function Algebra.residual!(
   odeopcache;
   kwargs...)
 
-  @notimplemented
+  uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
+  test = get_test(odeop.op)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(odeop.op,r)
+
+  !add && fill!(b,zero(eltype(b)))
+
+  μ,t = get_params(r),get_times(r)
+
+  res = get_res(odeop.op)
+  dc = res(μ,t,uh,v)
+
+  map(b.values,odeop.op.trian_res) do values,trian
+    vecdata = collect_cell_vector_for_trian(test,dc,trian)
+    assemble_vector_add!(values,assem,vecdata)
+  end
+  b
 end
 
 function Algebra.residual(
@@ -399,7 +474,28 @@ function Algebra.allocate_jacobian(
   us::Tuple{Vararg{AbstractVector}},
   odeopcache)
 
-  @notimplemented
+  uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
+  trial = evaluate(get_trial(odeop.op),nothing)
+  du = get_trial_fe_basis(trial)
+  test = get_test(odeop.op)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(odeop.op,r)
+
+  μ,t = get_params(r),get_times(r)
+
+  jacs = get_jacs(odeop.op)
+  As = ()
+  for k in 1:get_order(odeop.op)+1
+    jac = jacs[k]
+    trian_jac = odeop.op.trian_jacs[k]
+    dc = jac(μ,t,uh,du,v)
+    A = contribution(trian_jac) do trian
+      matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
+      allocate_matrix(assem,matdata)
+    end
+    As = (As...,A)
+  end
+  As
 end
 
 function ODEs.jacobian_add!(
@@ -410,7 +506,32 @@ function ODEs.jacobian_add!(
   ws::Tuple{Vararg{Real}},
   odeopcache)
 
-  @notimplemented
+  uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
+  trial = evaluate(get_trial(odeop.op),nothing)
+  du = get_trial_fe_basis(trial)
+  test = get_test(odeop.op)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(odeop.op,r)
+
+  μ,t = get_params(r),get_times(r)
+
+  jacs = get_jacs(odeop.op)
+  for k in 1:get_order(odeop)+1
+    A = As[k]
+    w = ws[k]
+    iszero(w) && continue
+    jac = jacs[k]
+    trian_jac = odeop.op.trian_jacs[k]
+    dc = w * jac(μ,t,uh,du,v)
+    if num_domains(dc) > 0
+      map(A.values,trian_jac) do values,trian
+        matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
+        assemble_matrix_add!(values,assem,matdata)
+      end
+    end
+  end
+
+  As
 end
 
 function Algebra.jacobian(
@@ -442,6 +563,46 @@ function Algebra.jacobian(
       assemble_matrix(assem,matdata)
     end
     As = (As...,A)
+  end
+
+  As
+end
+
+function ODEs.jacobian_add!(
+  As::TupOfArrayContribution,
+  odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}},
+  odeopcache)
+
+  uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
+  trial = evaluate(get_trial(odeop.op),nothing)
+  du = get_trial_fe_basis(trial)
+  test = get_test(odeop.op)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(odeop.op,r)
+
+  μ,t = get_params(r),get_times(r)
+
+  jacs = get_jacs(odeop.op)
+  for k in 1:get_order(odeop)+1
+    A = As[k]
+    w = ws[k]
+    iszero(w) && continue
+    jac = jacs[k]
+    if is_form_constant(odeop,k)
+      axpy_entries!(w,odeopcache.const_forms[k],A)
+    else
+      trian_jac = odeop.op.trian_jacs[k]
+      dc = w * jac(μ,t,uh,du,v)
+      if num_domains(dc) > 0
+        map(A.values,trian_jac) do values,trian
+          matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
+          assemble_matrix_add!(values,assem,matdata)
+        end
+      end
+    end
   end
 
   As

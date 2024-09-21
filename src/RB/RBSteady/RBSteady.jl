@@ -87,6 +87,7 @@ export cores2basis
 include("TTLinearAlgebra.jl")
 
 export RBSolver
+export RBOnlineCache
 export get_fe_solver
 export solution_snapshots
 export nonlinear_rb_solve!
