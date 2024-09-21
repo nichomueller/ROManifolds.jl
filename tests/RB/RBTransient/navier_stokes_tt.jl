@@ -121,7 +121,7 @@ feop_u = LinNonlinTransientParamFEOperator(feop_lin_u,feop_nlin_u)
 tol = fill(1e-4,5)
 reduction = TTSVDReduction(tol,energy_u;nparams=50)
 rbsolver = RBSolver(fesolver,reduction;nparams_test=10,nparams_res=30,nparams_jac=20)
-fesnaps,festats = fe_snapshots(rbsolver,feop,xh0μ)
+fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 
 rbop = reduced_operator(rbsolver,feop_u,fesnaps[1])
 rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps[1])

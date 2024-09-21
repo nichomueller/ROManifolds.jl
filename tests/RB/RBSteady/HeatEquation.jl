@@ -62,7 +62,7 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity
 # we can load & solve directly, if the offline structures have been previously saved to file
 # load_solve(rbsolver,dir=test_dir)
 
-fesnaps,festats = fe_snapshots(rbsolver,feop)
+fesnaps,festats = solution_snapshots(rbsolver,feop)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)

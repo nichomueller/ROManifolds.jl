@@ -31,42 +31,17 @@ struct RBSolver{A,B,C,D}
   state_reduction::B
   residual_reduction::C
   jacobian_reduction::D
-
-  function RBSolver(
-    fesolver::A,
-    state_reduction::B,
-    residual_reduction::C,
-    jacobian_reduction::D
-    ) where {A,B,C,D}
-
-    @check num_online_params(residual_reduction) == num_online_params(jacobian_reduction)
-    new{A,B,C,D}(fesolver,state_reduction,residual_reduction,jacobian_reduction)
-  end
-
-  function RBSolver(
-    fesolver::A,
-    state_reduction::B,
-    residual_reduction::C,
-    jacobian_reduction::D
-    ) where {A,B,C,D<:Tuple}
-
-    nparams = num_online_params(first(jacobian_reduction))
-    @check all(num_online_params.(jacobian_reduction) .== nparams)
-    @check num_online_params(residual_reduction) == nparams
-    new{A,B,C,D}(fesolver,state_reduction,residual_reduction,jacobian_reduction)
-  end
 end
 
 function RBSolver(
   fesolver::FESolver,
   state_reduction::AbstractReduction;
   nparams_res=20,
-  nparams_jac=20,
-  nparams_test=10)
+  nparams_jac=20)
 
   red_style = ReductionStyle(state_reduction)
-  residual_reduction = MDEIMReduction(red_style;nparams=nparams_res,nparams_test=nparams_test)
-  jacobian_reduction = MDEIMReduction(red_style;nparams=nparams_jac,nparams_test=nparams_test)
+  residual_reduction = MDEIMReduction(red_style;nparams=nparams_res)
+  jacobian_reduction = MDEIMReduction(red_style;nparams=nparams_jac)
   RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction)
 end
 
@@ -86,24 +61,21 @@ num_jac_params(s::RBSolver) = num_params(s.jacobian_reduction)
 
 num_offline_params(s::RBSolver) = max(num_state_params(s),num_res_params(s),num_jac_params(s))
 offline_params(s::RBSolver) = 1:num_offline_params(s)
-num_online_params(s::RBSolver) = num_online_params(s.residual_reduction)
-online_params(s::RBSolver) = 1+num_offline_params(s):num_online_params(s)+num_offline_params(s)
 res_params(s::RBSolver) = 1:num_res_params(s)
 jac_params(s::RBSolver) = 1:num_jac_params(s)
-ParamDataStructures.num_params(s::RBSolver) = num_offline_params(s) + num_online_params(s)
 
 """
-    fe_snapshots(solver::RBSolver,op::ParamFEOperator;kwargs...) -> AbstractSteadySnapshots
-    fe_snapshots(solver::RBSolver,op::TransientParamFEOperator;kwargs...) -> AbstractTransientSnapshots
+    solution_snapshots(solver::RBSolver,op::ParamFEOperator;kwargs...) -> AbstractSteadySnapshots
+    solution_snapshots(solver::RBSolver,op::TransientParamFEOperator;kwargs...) -> AbstractTransientSnapshots
 
 The problem is solved several times, and the solution snapshots are returned along
 with the information related to the computational expense of the FE method
 
 """
-function fe_snapshots(
+function solution_snapshots(
   solver::RBSolver,
   op::ParamFEOperator;
-  nparams=num_params(solver),
+  nparams=num_offline_params(solver),
   r=realization(op;nparams))
 
   fesolver = get_fe_solver(solver)
@@ -115,7 +87,7 @@ function fe_snapshots(
 end
 
 function Algebra.solve(rbsolver::RBSolver,feop,args...;kwargs...)
-  fesnaps = fe_snapshots(rbsolver,feop,args...)
+  fesnaps = solution_snapshots(rbsolver,feop,args...)
   rbop = reduced_operator(rbsolver,feop,fesnaps)
   rbsnaps = solve(rbsolver,rbop,fesnaps)
   results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)

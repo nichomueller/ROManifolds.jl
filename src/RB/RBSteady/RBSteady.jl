@@ -76,47 +76,50 @@ include("Snapshots.jl")
 export AbstractTTCore
 export SparseCore
 export SparseCoreCSC
-export BlockCore
 include("TTCores.jl")
 
 export TTContraction
 export contraction
 export sequential_product
 export reduced_cores
+export cores2basis
 include("TTLinearAlgebra.jl")
 
 export RBSolver
 export get_fe_solver
-export fe_snapshots
+export solution_snapshots
 export nonlinear_rb_solve!
 include("RBSolver.jl")
 
 export reduction
 export tpod
 export ttsvd
-export gram_schmidt!
+export gram_schmidt
 export orth_complement!
 export orth_projection
 include("BasisConstruction.jl")
+
+export galerkin_projection
+include("GalerkinProjections.jl")
 
 export Projection
 export PODBasis
 export TTSVDCores
 export BlockProjection
 export projection
-export get_basis_space
+export get_basis
 export num_fe_dofs
 export num_reduced_dofs
 export get_cores
-export get_cores_space
-export cores2basis
+export project
+export inv_project
 export enrich
-export add_space_supremizers
 include("Projections.jl")
 
 export FESubspace
 export SingleFieldRBSpace
 export MultiFieldRBSpace
+export EvalFESubspace
 export fe_subspace
 export reduced_fe_space
 export reduced_basis
@@ -128,16 +131,11 @@ export PGOperator
 export reduced_operator
 export get_fe_trial
 export get_fe_test
-export jacobian_and_residual
+export residual_snapshots
+export jacobian_snapshots
 include("PGOperator.jl")
 
-export ReducedAlgebraicOperator
-export reduce_operator
-export reduced_cores
-export compress_core
-export multiply_cores
-include("ReducedAlgebraicOperator.jl")
-
+export AbstractIntegrationDomain
 export IntegrationDomain
 export HyperReduction
 export MDEIM
@@ -147,7 +145,7 @@ export get_integration_domain
 export reduce_triangulation
 export reduced_jacobian
 export reduced_residual
-export reduced_jacobian_residual
+export reduced_weak_form
 export project!
 include("HyperReduction.jl")
 
@@ -155,7 +153,6 @@ export PGMDEIMOperator
 export LinearNonlinearPGMDEIMOperator
 export fe_jacobian!
 export fe_residual!
-export pod_mdeim_error
 include("PGMDEIMOperator.jl")
 
 export RBResults

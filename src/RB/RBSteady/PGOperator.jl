@@ -127,30 +127,22 @@ function Algebra.jacobian!(
   jacobian!(A,op.op,r,u,paramcache)
 end
 
-"""
-    jacobian_and_residual(solver::RBSolver, op::RBOperator, s::AbstractSteadySnapshots
-      ) -> (AbstractSteadySnapshots, AbstractSteadySnapshots)
-    jacobian_and_residual(solver::RBSolver, op::TransientRBOperator, s::AbstractTransientSnapshots
-      ) -> (NTuple{N,AbstractTransientSnapshots}, AbstractTransientSnapshots)
-    jacobian_and_residual(solver::RBSolver, op::RBOperator, s::BlockSnapshots
-      ) -> (BlockSnapshots, BlockSnapshots)
-    jacobian_and_residual(solver::RBSolver, op::TransientRBOperator, s::BlockSnapshots
-      ) -> (NTuple{N,BlockSnapshots}, BlockSnapshots)
+function residual_snapshots(solver::RBSolver,op::RBOperator,s)
+  fesolver = get_fe_solver(solver)
+  sres = select_snapshots(s,res_params(solver))
+  us_res = get_values(sres)
+  r_res = get_realization(sres)
+  b = residual(fesolver,op.op,r_res,us_res)
+  ib = get_vector_index_map(op.op)
+  return Snapshots(b,ib,r_res)
+end
 
-Returns the jacobians/residuals evaluated in the input snapshots `s`. In transient
-settings, the jacobians are ntuples of order `N`, with `N` equal to the order of
-the time derivative
-
-"""
-function jacobian_and_residual(solver::RBSolver,op::RBOperator,s)
+function jacobian_snapshots(solver::RBSolver,op::RBOperator,s)
   fesolver = get_fe_solver(solver)
   sjac = select_snapshots(s,jac_params(solver))
-  sres = select_snapshots(s,res_params(solver))
-  us_jac,us_res = get_values(sjac),get_values(sres)
-  r_jac,r_res = get_realization(sjac),get_realization(sres)
+  us_jac = get_values(sjac)
+  r_jac = get_realization(sjac)
   A = jacobian(fesolver,op.op,r_jac,us_jac)
-  b = residual(fesolver,op.op,r_res,us_res)
   iA = get_matrix_index_map(op.op)
-  ib = get_vector_index_map(op.op)
-  return Snapshots(A,iA,r_jac),Snapshots(b,ib,r_res)
+  return Snapshots(A,iA,r_jac)
 end

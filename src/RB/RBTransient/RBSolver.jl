@@ -7,8 +7,7 @@ function RBSteady.RBSolver(
   state_reduction::AbstractReduction;
   nparams_res=20,
   nparams_jac=20,
-  nparams_djac=nparams_jac,
-  nparams_test=10)
+  nparams_djac=nparams_jac)
 
   θ = fesolver.θ
   combine_res = (x) -> x
@@ -17,9 +16,9 @@ function RBSteady.RBSolver(
 
   red_style = ReductionStyle(state_reduction)
 
-  residual_reduction = TransientMDEIMReduction(combine_res,red_style;nparams=nparams_res,nparams_test)
-  jac_reduction = TransientMDEIMReduction(combine_jac,red_style;nparams=nparams_jac,nparams_test)
-  djac_reduction = TransientMDEIMReduction(combine_djac,red_style;nparams=nparams_djac,nparams_test)
+  residual_reduction = TransientMDEIMReduction(combine_res,red_style;nparams=nparams_res)
+  jac_reduction = TransientMDEIMReduction(combine_jac,red_style;nparams=nparams_jac)
+  djac_reduction = TransientMDEIMReduction(combine_djac,red_style;nparams=nparams_djac)
   jacobian_reduction = (jac_reduction,djac_reduction)
 
   RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction)
@@ -27,11 +26,11 @@ end
 
 RBSteady.num_jac_params(s::RBSolver{<:ODESolver}) = num_params(first(s.jacobian_reduction))
 
-function RBSteady.fe_snapshots(
+function RBSteady.solution_snapshots(
   solver::RBSolver,
   op::TransientParamFEOperator,
   uh0::Function;
-  nparams=num_params(solver),
+  nparams=RBSteady.num_offline_params(solver),
   r=realization(op;nparams))
 
   fesolver = get_fe_solver(solver)

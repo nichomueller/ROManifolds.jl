@@ -97,6 +97,8 @@ num_fe_dofs(r::FESubspace) = num_fe_dofs(get_fe_space(r))
 
 FESpaces.num_free_dofs(r::FESubspace) = num_reduced_dofs(get_reduced_subspace(r))
 
+FESpaces.get_free_dof_ids(r::FESubspace) = Base.OneTo(num_free_dofs(r))
+
 FESpaces.get_vector_type(r::FESubspace) = get_vector_type(get_fe_space(r))
 
 function Algebra.allocate_in_domain(r::FESubspace)
@@ -131,19 +133,19 @@ function inv_project(r::FESubspace,x̂::AbstractParamVector)
   return x
 end
 
+abstract type FESubspaceFunction <: FEFunction end
+
 function FESubspaceFunction(r::FESubspace,x::AbstractVector)
   x̂ = project(get_reduced_subspace(r),x)
   return FESubspaceFunction(x̂,r)
 end
 
-function FEFunction(r::FESubspace,x̂::AbstractVector)
+function FESpaces.FEFunction(r::FESubspace,x̂::AbstractVector)
   x = inv_project(r,x̂)
   fe = get_fe_space(r)
   xdir = get_dirichlet_values(fe)
   return FEFunction(fe,x,xdir)
 end
-
-abstract type FESubspaceFunction <: FEFunction end
 
 struct SingleFieldFESubspaceFunction <: FESubspaceFunction
   reduced_free_values::AbstractVector

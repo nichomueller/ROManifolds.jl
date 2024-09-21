@@ -18,9 +18,7 @@ function Algebra.residual(
   axpy!(dtθ,x,uθ)
   usx = (uθ,x)
 
-  odeopcache = allocate_ode_spaces(odeop,r,usx)
-  update_odeopcache!(odeopcache,odeop,r)
-  b = residual(odeop,r,usx,odeopcache)
+  b = residual(odeop,r,usx)
   shift!(r,dt*(1-θ))
 
   return b
@@ -45,9 +43,7 @@ function Algebra.jacobian(
   usx = (uθ,x)
   ws = (1,1/dtθ)
 
-  odeopcache = allocate_ode_spaces(odeop,r,usx)
-  update_odeopcache!(odeopcache,odeop,r)
-  A = jacobian(odeop,r,usx,ws,odeopcache)
+  A = jacobian(odeop,r,usx,ws)
   shift!(r,dt*(1-θ))
 
   return A
@@ -106,22 +102,6 @@ function Algebra.solve!(
   return x
 end
 
-function RBSteady.jacobian_and_residual(
-  solver::ThetaMethod,
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  state0::NTuple{1,AbstractVector},
-  odecache;
-  kwargs...)
-
-  x = state0[1]
-
-  stageop = get_stage_operator(solver,odeop,r,state0,odecache;kwargs...)
-  A = jacobian(stageop,x)
-  b = residual(stageop,x)
-  return A,b
-end
-
 # linear case
 
 function Algebra.residual(
@@ -140,9 +120,7 @@ function Algebra.residual(
   shift!(r,dt*(θ-1))
   us = (x,x)
 
-  odeopcache = allocate_ode_spaces(odeop,r,us)
-  update_odeopcache!(odeopcache,odeop,r)
-  b = residual(odeop,r,us,odeopcache)
+  b = residual(odeop,r,us)
   shift!(r,dt*(1-θ))
 
   return b
@@ -165,9 +143,7 @@ function Algebra.jacobian(
   us = (x,x)
   ws = (1,1/dtθ)
 
-  odeopcache = allocate_ode_spaces(odeop,r,us)
-  update_odeopcache!(odeopcache,odeop,r)
-  A = jacobian(odeop,r,us,ws,odeopcache)
+  A = jacobian(odeop,r,us,ws)
   shift!(r,dt*(1-θ))
 
   return A
@@ -219,18 +195,6 @@ function Algebra.solve!(
   return x
 end
 
-function RBSteady.jacobian_and_residual(
-  solver::ThetaMethod,
-  odeop::ODEParamOperator{LinearParamODE},
-  r::TransientRealization,
-  state0::NTuple{1,AbstractVector},
-  odecache;
-  kwargs...)
-
-  stageop = get_stage_operator(solver,odeop,r,state0,odecache;kwargs...)
-  return stageop.A,stageop.b
-end
-
 # linear-nonlinear case
 
 function Algebra.solve!(
@@ -249,9 +213,9 @@ function Algebra.solve!(
   lop = get_linear_operator(odeop)
   nlop = get_nonlinear_operator(odeop)
 
-  A_lin,b_lin = jacobian_and_residual(solver,lop,r,statefe,odecache_lin;update_cache=false)
-  A_nlin = allocate_jacobian(nlop,r,statefe,odeopcache_nlin)
-  b_nlin = allocate_residual(nlop,r,statefe,odeopcache_nlin)
+  stageop_lin = get_stage_operator(solver,lop,r,x,odecache_lin;update_cache=false)
+  A_lin = jacobian(stageop_lin,x)
+  b_lin = residual(stageop_lin,x)
   sysslvrcache = ((A_lin,A_nlin),(b_lin,b_nlin))
   sysslvr = solver.sysslvr
 

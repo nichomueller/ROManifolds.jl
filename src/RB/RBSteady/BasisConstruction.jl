@@ -185,7 +185,7 @@ end
 function steady_ttsvd(
   red_style::ReductionStyle,
   A::AbstractArray{T,N},
-  X::Rank1Tensor{D,1}
+  X::Rank1Tensor{D}
   ) where {T,N,D}
 
   cores = Array{T,3}[]
@@ -259,19 +259,9 @@ function orthogonalize!(cores,X::AbstractRankTensor)
   end
 end
 
-function reduce_rank(core::AbstractArray{T,3},X::AbstractMatrix) where T
-  L,p = _cholesky_decomp(X)
-  M = reshape(core,:,size(core,3))
-  XM = L'*M[p,:]
-  Q̃,R = pivoted_qr(XM)
-  Q = (L'\Q̃)[invperm(p),:]
-  core′ = reshape(Q,size(core,1),size(core,2),:)
-  return core′,R
-end
-
-function reduce_rank(core::AbstractArray{T,3}) where T
+function reduce_rank(core::AbstractArray{T,3},args...) where T
   mat = reshape(core,:,size(core,3))
-  Q,R = pivoted_qr(mat)
+  Q,R = gram_schmidt(mat,args...)
   core′ = reshape(Q,size(core,1),size(core,2),:)
   return core′,R
 end
@@ -362,27 +352,29 @@ function orth_complement!(
 end
 
 """
-    gram_schmidt!(mat::AbstractMatrix, basis::AbstractMatrix, args...) -> AbstractMatrix
+    gram_schmidt(mat::AbstractMatrix, basis::AbstractMatrix, args...) -> AbstractMatrix
 
 Gram-Schmidt algorithm for an abstract matrix `mat` with respect to the column
 space of `basis`. When a symmetric, positive definite matrix `X` is provided as
 an argument, the output is `X`-orthogonal, otherwise it is ℓ²-orthogonal
 
 """
-function gram_schmidt!(
-  mat::AbstractMatrix,
-  basis::AbstractMatrix,
-  args...)
+function gram_schmidt(M::AbstractMatrix)
+  Q,R = pivoted_qr(M)
+  return Q,R
+end
 
-  @inbounds for i = axes(mat,2)
-    mat_i = mat[:,i]
-    orth_complement!(mat_i,basis,args...)
-    if i > 1
-      orth_complement!(mat_i,mat[:,1:i-1],args...)
-    end
-    mat_i /= induced_norm(mat_i,args...)
-    mat[:,i] .= mat_i
-  end
+function gram_schmidt(M::AbstractMatrix,X::AbstractSparseMatrix)
+  L,p = _cholesky_decomp(X)
+  XM = L'*M[p,:]
+  Q̃,R = pivoted_qr(XM)
+  Q = (L'\Q̃)[invperm(p),:]
+  return Q,R
+end
+
+function gram_schmidt(M::AbstractMatrix,basis::AbstractMatrix,args...)
+  Q,R = gram_schmidt(hcat(basis,M),args...)
+  return Q,R
 end
 
 # for testing purposes

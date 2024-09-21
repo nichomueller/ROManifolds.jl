@@ -38,16 +38,14 @@ end
 struct TransientMDEIMReduction{A,R<:AbstractReduction{A,EuclideanNorm}} <: AbstractMDEIMReduction{A}
   reduction::R
   combine::Function
-  nparams_test::Int
 end
 
-function TransientMDEIMReduction(combine::Function,args...;nparams_test=10,kwargs...)
+function TransientMDEIMReduction(combine::Function,args...;kwargs...)
   reduction = TransientReduction(args...;kwargs...)
-  TransientMDEIMReduction(reduction,combine,nparams_test)
+  TransientMDEIMReduction(reduction,combine)
 end
 
 RBSteady.get_reduction(r::TransientMDEIMReduction) = RBSteady.get_reduction(r.reduction)
 RBSteady.ReductionStyle(r::TransientMDEIMReduction) = ReductionStyle(RBSteady.get_reduction(r))
 RBSteady.NormStyle(r::TransientMDEIMReduction) = NormStyle(RBSteady.get_reduction(r))
 ParamDataStructures.num_params(r::TransientMDEIMReduction) = num_params(RBSteady.get_reduction(r))
-RBSteady.num_online_params(r::TransientMDEIMReduction) = r.nparams_test

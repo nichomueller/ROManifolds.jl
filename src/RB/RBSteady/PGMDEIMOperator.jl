@@ -21,7 +21,7 @@ function reduced_operator(
   op::PGOperator,
   s)
 
-  red_lhs,red_rhs = reduced_jacobian_residual(solver,op,s)
+  red_lhs,red_rhs = reduced_weak_form(solver,op,s)
   trians_rhs = get_domains(red_rhs)
   trians_lhs = get_domains(red_lhs)
   new_op = change_triangulation(op,trians_rhs,trians_lhs)
@@ -124,11 +124,15 @@ function Algebra.jacobian!(
   return Â
 end
 
-function jacobian_and_residual(solver::RBSolver,op::PGMDEIMOperator,s)
-  x = get_values(s)
-  r = get_realization(s)
-  fesolver = get_fe_solver(solver)
-  jacobian_and_residual(fesolver,op,r,x)
+for f in (:residual_snapshots,:jacobian_snapshots)
+  @eval begin
+    function $f(solver::RBSolver,op::PGMDEIMOperator,s)
+      x = get_values(s)
+      r = get_realization(s)
+      fesolver = get_fe_solver(solver)
+      $f(fesolver,op,r,x)
+    end
+  end
 end
 
 function select_fe_space_at_indices(fs::FESpace,indices)
@@ -337,28 +341,7 @@ end
 
 # Solve a POD-MDEIM problem
 
-function Algebra.solve(solver::RBSolver,op::RBOperator,s)
-  son = select_snapshots(s,online_params(solver))
-  ron = get_realization(son)
-  solve(solver,op,ron)
-end
-
-function Algebra.solve!(cache,solver::RBSolver,op::RBOperator,s)
-  son = select_snapshots(s,online_params(solver))
-  ron = get_realization(son)
-  solve!(cache,solver,op,ron)
-end
-
 function Algebra.solve(
-  solver::RBSolver,
-  op::RBOperator{NonlinearParamEq},
-  r::AbstractRealization)
-
-  @notimplemented "Split affine from nonlinear operator when running the RB solve"
-end
-
-function Algebra.solve!(
-  cache,
   solver::RBSolver,
   op::RBOperator{NonlinearParamEq},
   r::AbstractRealization)
@@ -395,15 +378,4 @@ function Algebra.solve!(
   x = inv_project(trial,x̂)
 
   return x,stats,cache
-end
-
-# for testing/visualization purposes
-
-function pod_mdeim_error(solver,feop,op,s)
-  state_red = get_state_reduction(solver)
-  X = assemble_matrix(feop,get_norm(state_red))
-  s′ = flatten_partition(s)
-  pod_err = pod_error(get_trial(op),s′,X)
-  mdeim_err = mdeim_error(solver,feop,op,s′)
-  return pod_err,mdeim_err
 end

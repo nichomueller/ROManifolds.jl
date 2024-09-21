@@ -79,7 +79,7 @@ info = RBInfo(dir;nparams_state=10,nsnaps_mdeim=5,nparams_test=5,save_structures
 
 rbsolver = RBSolver(info,fesolver)
 
-# snaps,comp = fe_snapshots(rbsolver,feop,uh0μ)
+# snaps,comp = solution_snapshots(rbsolver,feop,uh0μ)
 
 snaps = with_debug() do distribute
   load_distributed_snapshots(distribute,info)
@@ -100,7 +100,7 @@ norm(pk_rec - pk) / norm(pk)
 
 odeop = get_algebraic_operator(feop)
 op = RBOperator(odeop,red_trial,red_test)
-# red_lhs,red_rhs = reduced_jacobian_residual(rbsolver,op,snaps)
+# red_lhs,red_rhs = reduced_weak_form(rbsolver,op,snaps)
 
 θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 smdeim = select_snapshots(snaps,RB.mdeim_params(info))

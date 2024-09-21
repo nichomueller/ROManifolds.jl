@@ -95,7 +95,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 # tol = fill(1e-4,4)
 # reduction = TTSVDReduction(tol,energy_u;nparams=20)
 # rbsolver = RBSolver(fesolver,reduction;nparams_test=2,nparams_res=10,nparams_jac=10)
-# fesnaps,festats = fe_snapshots(rbsolver,feop,xh0μ)
+# fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 
 # X = assemble_matrix(feop,energy)
 # X1 = X[1]
@@ -139,7 +139,7 @@ feop_u = TransientParamLinearFEOperator((stiffness_u,mass_u),res_u,ptspace,
 tol = fill(1e-4,5)
 reduction = TTSVDReduction(tol,energy_u;nparams=50)
 rbsolver = RBSolver(fesolver,reduction;nparams_test=10,nparams_res=30,nparams_jac=20)
-fesnaps,festats = fe_snapshots(rbsolver,feop,xh0μ)
+fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 
 rbop = reduced_operator(rbsolver,feop_u,fesnaps[1])
 rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps)
@@ -192,7 +192,7 @@ reduction_u = TransientPODReduction(tol,energy_u;nparams=50)
 # rbsolver = RBSolver(fesolver,reduction;nparams_test=10,nparams_res=50,nparams_jac=50)
 rbsolver_u = RBSolver(fesolver,reduction_u;nparams_test=10,nparams_res=50,nparams_jac=50)
 
-_fesnaps,_festats = fe_snapshots(rbsolver,feop,xh0μ;r=get_realization(fesnaps))
+_fesnaps,_festats = solution_snapshots(rbsolver,feop,xh0μ;r=get_realization(fesnaps))
 
 # rbop = reduced_operator(rbsolver,feop,fesnaps)
 # rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps)

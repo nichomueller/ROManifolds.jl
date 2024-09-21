@@ -86,7 +86,7 @@ rbsolver = RBSolver(fesolver,reduction;nparams_test=5,nparams_res=30,nparams_jac
 test_dir = datadir(joinpath("heateq","test_tt_$(1e-4)"))
 create_dir(test_dir)
 
-fesnaps,festats = fe_snapshots(rbsolver,feop,uh0μ)
+fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps)
 results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)

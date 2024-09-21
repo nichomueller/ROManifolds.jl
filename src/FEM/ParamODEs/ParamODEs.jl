@@ -78,7 +78,6 @@ include("LinearNonlinearTransientParamFEOperator.jl")
 
 export ODEParamOpFromTFEOp
 export ODEParamOpFromTFEOpWithTrian
-export allocate_ode_spaces
 include("ODEParamOpFromTFEOp.jl")
 
 include("ThetaMethod.jl")

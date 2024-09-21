@@ -129,7 +129,7 @@ struct TrivialIndexMap <: AbstractTrivialIndexMap
 end
 
 TrivialIndexMap(i::AbstractArray) = TrivialIndexMap(length(i))
-Base.size(i::TrivialIndexMap) = (length(i.length),)
+Base.size(i::TrivialIndexMap) = (i.length,)
 
 struct TrivialSparseIndexMap{A<:SparsityPattern} <: AbstractTrivialIndexMap
   sparsity::A

@@ -11,7 +11,7 @@ struct FixedSVDRank <: ReductionStyle
 end
 
 struct LRApproxRank <: ReductionStyle
-  const opts::LRAOptions
+  opts::LRAOptions
 end
 
 function LRApproxRank(tol::Float64;maxdet_tol=0.,sketch_randn_niter=1,sketch=:sprn,kwargs...)
@@ -29,7 +29,7 @@ struct TTSVDRanks{A<:ReductionStyle} <: ReductionStyle
 end
 
 TTSVDRanks(tols::Vector{Float64}) = TTSVDRanks(SearchSVDRank.(tols))
-TTSVDRanks(ranks::Vector{Float64}) = TTSVDRanks(FixedSVDRank.(ranks))
+TTSVDRanks(ranks::Vector{Int}) = TTSVDRanks(FixedSVDRank.(ranks))
 
 TTSVDRanks(tol::Float64,N=3) = TTSVDRanks(fill(tol,N))
 TTSVDRanks(rank::Int,N=3) = TTSVDRanks(fill(rank,N))
@@ -166,19 +166,17 @@ abstract type AbstractMDEIMReduction{A} <: AbstractReduction{A,EuclideanNorm} en
 
 struct MDEIMReduction{A,R<:AbstractReduction{A,EuclideanNorm}} <: AbstractMDEIMReduction{A}
   reduction::R
-  nparams_test::Int
 end
 
-function MDEIMReduction(red_style::ReductionStyle,args...;nparams_test=10,kwargs...)
+function MDEIMReduction(red_style::ReductionStyle,args...;kwargs...)
   reduction = Reduction(red_style,args...;kwargs...)
-  MDEIMReduction(reduction,nparams_test)
+  MDEIMReduction(reduction)
 end
 
 get_reduction(r::MDEIMReduction) = get_reduction(r.reduction)
 ReductionStyle(r::MDEIMReduction) = ReductionStyle(get_reduction(r))
 NormStyle(r::MDEIMReduction) = NormStyle(get_reduction(r))
 ParamDataStructures.num_params(r::MDEIMReduction) = num_params(get_reduction(r))
-num_online_params(r::MDEIMReduction) = r.nparams_test
 
 struct AdaptiveReduction{A,B,R<:DirectReduction{A,B}} <: GreedyReduction{A,B}
   reduction::R

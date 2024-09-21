@@ -11,7 +11,7 @@ end
 
 function contraction(
   basis::Array{T,3},
-  coefficient::Vector{S,3}
+  coefficient::Vector{S}
   ) where {T,S}
 
   @check size(basis,2) == length(coefficient)

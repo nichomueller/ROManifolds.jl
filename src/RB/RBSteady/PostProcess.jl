@@ -90,13 +90,13 @@ function load_fe_subspace(dir,f::FESpace;label="")
   fe_subspace(f,basis)
 end
 
-function DrWatson.save(dir,ad::AffineDecomposition;label="")
-  ad_dir = get_filename(dir,"affdec",label)
-  serialize(ad_dir,ad)
+function DrWatson.save(dir,hp::HyperReduction;label="")
+  ad_dir = get_filename(dir,"hypred",label)
+  serialize(ad_dir,hp)
 end
 
 function load_decomposition(dir;label="")
-  ad_dir = get_filename(dir,"affdec",label)
+  ad_dir = get_filename(dir,"hypred",label)
   deserialize(ad_dir)
 end
 

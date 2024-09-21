@@ -79,16 +79,61 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 tol = 1e-4
 state_reduction = TransientPODReduction(tol,energy;nparams=50)
-rbsolver = RBSolver(fesolver,state_reduction;nparams_test=5,nparams_res=20,nparams_jac=20)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20)
 
 test_dir = datadir(joinpath("heateq","elasticity_$(1e-4)"))
 create_dir(test_dir)
 
 # RB method
 
-fesnaps,festats = fe_snapshots(rbsolver,feop,uh0μ)
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
+# rbop = reduced_operator(rbsolver,feop,fesnaps)
 
-println(results)
+# ronline = realization(feop;nparams=10)
+# rbsnaps,rbstats = solve(rbsolver,rbop,ronline)
+
+# fesnaps_test,_ = solution_snapshots(rbsolver,feop,uh0μ;r=ronline)
+
+# results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+
+# println(results)
+
+# TESTS
+
+# rbop = reduced_operator(rbsolver,feop,fesnaps)
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+
+red = RBSteady.get_state_reduction(rbsolver)
+basis = reduced_basis(red,feop,fesnaps)
+
+bs = basis.basis_space
+
+B = get_basis(bs)
+nfe = num_fe_dofs(bs)
+nrb = num_reduced_dofs(bs)
+x = rand(nfe)
+xrb = rand(nrb)
+project(bs,x) ≈ B'*x
+inv_project(bs,xrb) ≈ B*xrb
+
+galerkin_projection(bs,bs)
+empirical_interpolation(bs)
+
+using LinearAlgebra
+A = rand(nfe,nfe)
+U,S,V = svd(A)
+r = rank(A)
+U = U[:,1:r]
+
+X = assemble_matrix(feop,energy)
+bbs = union(bs,PODBasis(U),X)
+
+using Gridap.FESpaces
+op = get_algebraic_operator(feop)
+pop = TransientPGOperator(op,red_trial,red_test)
+
+r = realization(feop)
+Û = red_trial(r)
+get_vector_type(Û)
+
+cache = zero_free_values(Û)

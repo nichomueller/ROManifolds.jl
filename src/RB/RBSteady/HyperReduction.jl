@@ -53,9 +53,9 @@ function empirical_interpolation(A::ParamSparseMatrix)
   return i′,ai
 end
 
-abstract type AbstractIntegrationDomain <: AbstractVector{Int32} end
+abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
 
-struct IntegrationDomain <: AbstractIntegrationDomain
+struct IntegrationDomain <: AbstractIntegrationDomain{Int32}
   indices::Vector{Int32}
 end
 
@@ -335,8 +335,9 @@ function reduced_jacobian(red::AbstractReduction,op,c::ArrayContribution)
   return Contribution(a,trians)
 end
 
-function reduced_jacobian_residual(solver::RBSolver,op,s)
-  jac,res = jacobian_and_residual(solver,op,s)
+function reduced_weak_form(solver::RBSolver,op,s)
+  jac = jacobian_snapshots(solver,op,s)
+  res = residual_snapshots(solver,op,s)
   red_jac = reduced_jacobian(get_jacobian_reduction(solver),op,jac)
   red_res = reduced_residual(get_residual_reduction(solver),op,res)
   return red_jac,red_res
@@ -352,10 +353,6 @@ function ParamDataStructures.Contribution(
 
   AffineContribution(v,t)
 end
-
-get_basis(a::MDEIM) = a.basis
-get_interpolation(a::MDEIM) = a.interpolation
-get_integration_domain(a::MDEIM) = a.integration_domain
 
 for f in (:get_basis,:get_interpolation,:get_integration_domain)
   @eval begin
@@ -493,20 +490,20 @@ function reduced_residual(
 
   test = get_test(op)
 
-  ads = HyperReduction[]
+  hps = HyperReduction[]
   red_trians = Triangulation[]
   for i in eachindex(s)
     if s.touched[i]
-      ad,red_trian = reduced_form(red,s[i],trian,test[i])
-      push!(ads,ad)
+      hr,red_trian = reduced_form(red,s[i],trian,test[i])
+      push!(hps,hr)
       push!(red_trians,red_trian)
     end
   end
 
   red_trian = ParamDataStructures.merge_triangulations(red_trians)
-  ad = BlockProjection(ads,s.touched)
+  hr = BlockProjection(hps,s.touched)
 
-  return ad,red_trian
+  return hr,red_trian
 end
 
 function reduced_jacobian(
@@ -518,20 +515,20 @@ function reduced_jacobian(
   trial = get_trial(op)
   test = get_test(op)
 
-  ads = HyperReduction[]
+  hps = HyperReduction[]
   red_trians = Triangulation[]
   for (i,j) in Iterators.product(size(s)...)
     if s.touched[i]
-      ad,red_trian = reduced_form(red,s[i,j],trian,trial[j],test[i])
-      push!(ads,ad)
+      hr,red_trian = reduced_form(red,s[i,j],trian,trial[j],test[i])
+      push!(hps,hr)
       push!(red_trians,red_trian)
     end
   end
 
   red_trian = ParamDataStructures.merge_triangulations(red_trians)
-  ad = BlockProjection(reshape(ads,size(s.touched)),s.touched)
+  hr = BlockProjection(reshape(hps,size(s.touched)),s.touched)
 
-  return ad,red_trian
+  return hr,red_trian
 end
 
 function project!(cache,a::BlockHyperReduction,b::ArrayBlock)

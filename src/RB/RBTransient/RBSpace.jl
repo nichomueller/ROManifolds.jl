@@ -4,12 +4,12 @@ function ODEs.time_derivative(r::FESubspace)
   fe_subspace(fet,rb)
 end
 
-const TransientEvalFESubspace{A<:FESubspace} = EvalFESubspace{A,TransientRealization}
+const TransientEvalFESubspace{A<:FESubspace} = EvalFESubspace{A,<:TransientRealization}
 
 _change_length(::Type{T},r::TransientRealization) where T = T
 
 function _change_length(
-  ::Type{ConsecutiveVectorOfVectors{T,L}},
+  ::Type{<:ConsecutiveVectorOfVectors{T,L}},
   r::TransientRealization
   ) where {T,L}
 
@@ -17,14 +17,14 @@ function _change_length(
 end
 
 function _change_length(
-  ::Type{BlockVectorOfVectors{T,L}},
+  ::Type{<:BlockVectorOfVectors{T,L}},
   r::TransientRealization
   ) where {T,L}
 
   BlockVectorOfVectors{T,Int(L/num_times(r))}
 end
 
-function FESpaces.get_vector_type(r::AbstractTransientRBSpace)
+function FESpaces.get_vector_type(r::TransientEvalFESubspace)
   V = get_vector_type(r.subspace)
-  return _change_length(V)
+  return _change_length(V,r.realization)
 end

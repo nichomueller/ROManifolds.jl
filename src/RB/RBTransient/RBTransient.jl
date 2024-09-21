@@ -59,11 +59,9 @@ include("TTLinearAlgebra.jl")
 
 include("BasisConstruction.jl")
 
-export TransientProjection
+include("GalerkinProjections.jl")
+
 export TransientPODBasis
-export TransientTTSVDCores
-export get_basis_time
-export add_time_supremizers
 include("Projections.jl")
 
 export TransientRBSpace
@@ -72,9 +70,6 @@ include("RBSpace.jl")
 export TransientRBOperator
 export TransientPGOperator
 include("PGOperator.jl")
-
-export combine_basis_time
-include("ReducedAlgebraicOperator.jl")
 
 export TransientMDEIM
 export TransientAffineDecomposition

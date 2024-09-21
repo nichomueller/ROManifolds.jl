@@ -3,7 +3,7 @@ function RBSteady.reduced_operator(
   op::TransientPGOperator,
   s)
 
-  red_lhs,red_rhs = reduced_jacobian_residual(solver,op,s)
+  red_lhs,red_rhs = reduced_weak_form(solver,op,s)
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
   new_op = change_triangulation(op,trians_rhs,trians_lhs)
@@ -126,12 +126,16 @@ function Algebra.jacobian!(
   return Â
 end
 
-function RBSteady.jacobian_and_residual(solver::RBSolver,op::TransientPGMDEIMOperator,s)
-  x = get_values(s)
-  r = get_realization(s)
-  fesolver = get_fe_solver(solver)
-  odecache = allocate_odecache(fesolver,op,r,(x,))
-  jacobian_and_residual(fesolver,op,r,(x,),odecache)
+for f in (:(RBSteady.residual_snapshots),:(RBSteady.jacobian_snapshots))
+  @eval begin
+    function $f(solver::RBSolver,op::PGMDEIMOperator,s)
+      x = get_values(s)
+      r = get_realization(s)
+      fesolver = get_fe_solver(solver)
+      odecache = allocate_odecache(fesolver,op,r,(x,))
+      $f(fesolver,op,r,(x,),odecache)
+    end
+  end
 end
 
 function RBSteady.select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveArrayOfArrays}},odeopcache,indices)
@@ -357,28 +361,7 @@ end
 
 # Solve a POD-MDEIM problem
 
-function Algebra.solve(solver::RBSolver,op::TransientRBOperator,s)
-  son = select_snapshots(s,RBSteady.online_params(solver))
-  ron = get_realization(son)
-  solve(solver,op,ron)
-end
-
-function Algebra.solve!(cache,solver::RBSolver,op::TransientRBOperator,s)
-  son = select_snapshots(s,online_params(solver))
-  ron = get_realization(son)
-  solve!(cache,solver,op,ron)
-end
-
 function Algebra.solve(
-  solver::RBSolver,
-  op::TransientRBOperator{NonlinearParamODE},
-  r::AbstractRealization)
-
-  @notimplemented "Split affine from nonlinear operator when running the RB solve"
-end
-
-function Algebra.solve!(
-  cache,
   solver::RBSolver,
   op::TransientRBOperator{NonlinearParamODE},
   r::AbstractRealization)

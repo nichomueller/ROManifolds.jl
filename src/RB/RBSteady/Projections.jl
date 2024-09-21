@@ -22,8 +22,7 @@ rescale(op::Function,x::AbstractArray,b::Projection) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection,c::Projection,args...) = @abstractmethod
 empirical_interpolation(a::Projection) = @abstractmethod
-gram_schmidt!(a::Projection,b::Projection,args...) = gram_schmidt!(get_basis(a),get_basis(b),args...)
-MDEIM(a::Projection) = @abstractmethod
+gram_schmidt(a::Projection,b::Projection,args...) = gram_schmidt(get_basis(a),get_basis(b),args...)
 
 Base.:+(a::Projection,b::Projection) = union(a,b)
 Base.:-(a::Projection,b::Projection) = union(a,b)
@@ -32,13 +31,6 @@ Base.:*(a::Projection,b::Projection,c::Projection) = galerkin_projection(a,b,c)
 Base.:*(a::Projection,x::AbstractArray) = project(a,x)
 Base.:*(x::AbstractArray,b::Projection) = rescale(*,x,b)
 Base.:\(x::AbstractArray,b::Projection) = rescale(\,x,b)
-Base.:*(a::InvProjection,x::AbstractArray) = inv_project(a.projection,x)
-
-struct InvProjection{P<:Projection} <: Projection
-  projection::P
-end
-
-Base.adjoint(a::Projection) = InvProjection(a)
 
 function project(a::Projection,x::AbstractVector)
   basis = get_basis(a)
@@ -62,11 +54,17 @@ function Arrays.return_cache(::typeof(inv_project),a::Projection,x̂::AbstractVe
   return x
 end
 
-function projection(red::AbstractReduction,s::AbstractSnapshots,args...)
-  basis = reduction(red,s,args...)
-  index_map = get_index_map(s)
-  projection(red,basis,index_map)
+struct InvProjection{P<:Projection} <: Projection
+  projection::P
 end
+
+Base.adjoint(a::Projection) = InvProjection(a)
+
+get_basis(a::InvProjection) = get_basis(a)
+num_fe_dofs(a::InvProjection) = num_fe_dofs(a)
+num_reduced_dofs(a::InvProjection) = num_reduced_dofs(a)
+project(a::InvProjection,x::AbstractArray) = inv_project(a.projection,x)
+inv_project(a::InvProjection,x::AbstractArray) = project(a.projection,x)
 
 abstract type ReducedProjection{A<:AbstractArray} <: Projection end
 
@@ -104,7 +102,8 @@ struct PODBasis{A<:AbstractMatrix} <: Projection
   basis::A
 end
 
-function projection(::PODReduction,basis::AbstractMatrix,args...)
+function projection(red::PODReduction,s::AbstractArray,args...)
+  basis = reduction(red,s,args...)
   PODBasis(basis)
 end
 
@@ -119,8 +118,7 @@ end
 function Base.union(a::PODBasis,b::PODBasis,args...)
   basis_a = get_basis(a)
   basis_b = get_basis(b)
-  gram_schmidt!(basis_b,basis_a,args...)
-  basis_ab = hcat(basis_a,basis_b)
+  basis_ab, = gram_schmidt(basis_b,basis_a,args...)
   PODBasis(basis_ab)
 end
 
@@ -157,7 +155,9 @@ struct TTSVDCores{D,A<:AbstractVector{<:AbstractArray{T,3} where T},I<:AbstractI
   index_map::I
 end
 
-function projection(::TTSVDReduction,cores::AbstractVector{<:AbstractArray},index_map::AbstractIndexMap)
+function projection(red::TTSVDReduction,s::AbstractSnapshots,args...)
+  cores = reduction(red,s,args...)
+  index_map = get_index_map(s)
   TTSVDCores(cores,index_map)
 end
 
@@ -321,7 +321,7 @@ function get_basis(a::BlockProjection{A,N}) where {A,N}
   @notimplemented
 end
 
-function get_cores(a::BlockProjection{<:TTSVDCores,N}) where {A,N}
+function get_cores(a::BlockProjection{<:TTSVDCores,N}) where N
   @notimplemented
 end
 

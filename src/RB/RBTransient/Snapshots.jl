@@ -322,7 +322,7 @@ Mode2Axes:
  u(x1,tT,μ1) ⋯ u(x1,tT,μP) u(x2,tT,μ1) ⋯ u(x2,tT,μP) u(x3,tT,μ1) ⋯ ⋯ u(xN,tT,μ1) ⋯ u(xN,tT,μP)]
 
 """
-struct ModeTransientSnapshots{M<:ModeAxes,T,L,R,A<:UnfoldingTransientSnapshots{T,L,R}} <: AbstractTransientSnapshots{T,2,L,1,TrivialIndexMap,R}
+struct ModeTransientSnapshots{M<:ModeAxes,T,L,R,A<:UnfoldingTransientSnapshots{T,L,R}} <: AbstractTransientSnapshots{T,2,L,1,AbstractTrivialIndexMap,R}
   snaps::A
   mode::M
 end
@@ -340,7 +340,6 @@ ParamDataStructures.param_data(s::ModeTransientSnapshots) = param_data(s.snaps)
 RBSteady.num_space_dofs(s::ModeTransientSnapshots) = prod(num_space_dofs(s.snaps))
 ParamDataStructures.get_values(s::ModeTransientSnapshots) = get_values(s.snaps)
 RBSteady.get_realization(s::ModeTransientSnapshots) = get_realization(s.snaps)
-RBSteady.get_indexed_values(s::ModeTransientSnapshots) = get_indexed_values(s.snaps)
 
 change_mode(s::UnfoldingTransientSnapshots) = ModeTransientSnapshots(s,change_mode(get_mode(s)))
 change_mode(s::ModeTransientSnapshots) = ModeTransientSnapshots(s.snaps,change_mode(get_mode(s)))
@@ -392,6 +391,7 @@ function change_mode(a::AbstractMatrix,np::Integer)
   return a′
 end
 
+RBSteady.get_indexed_values(s::Mode1TransientSnapshots) = get_indexed_values(s.snaps)
 RBSteady.get_indexed_values(s::Mode2TransientSnapshots) = collect(s)
 
 # block snapshots

@@ -1,17 +1,13 @@
 function RBSteady.projection(red::TransientPODReduction,s::AbstractTransientSnapshots,args...)
   s1 = flatten_snapshots(s)
-  s2 = swap_mode(s1)
   basis_space = projection(get_reduction_space(red),s1,args...)
-  proj_s2 = galerkin_projection(get_basis(basis_space),s2,args...)
-  basis_time = reduction(get_reduction_time(red),compressed_s2)
+  proj_s1 = galerkin_projection(get_basis(basis_space),s1,args...)
+  proj_s2 = change_mode(proj_s1,num_params(s))
+  basis_time = projection(get_reduction_time(red),proj_s2)
   TransientPODBasis(basis_space,basis_time)
 end
 
 """
-    TransientPODBasis{A<:AbstractMatrix,B<:AbstractMatrix} <: Projection
-
-TransientProjection stemming from a truncated proper orthogonal decomposition [`truncated_pod`](@ref)
-
 """
 struct TransientPODBasis{A<:PODBasis,B<:PODBasis} <: Projection
   basis_space::A
@@ -23,7 +19,7 @@ get_basis_time(a::TransientPODBasis) = get_basis(a.basis_time)
 
 RBSteady.get_basis(a::TransientPODBasis) = kron(get_basis_time(a),get_basis_space(a))
 RBSteady.num_fe_dofs(a::TransientPODBasis) = num_fe_dofs(a.basis_space)*num_fe_dofs(a.basis_time)
-RBSteady.num_reduced_dofs(a::TransientProjection) = num_reduced_dofs(a.basis_space)*num_reduced_dofs(a.basis_time)
+RBSteady.num_reduced_dofs(a::TransientPODBasis) = num_reduced_dofs(a.basis_space)*num_reduced_dofs(a.basis_time)
 
 function RBSteady.project(a::TransientPODBasis,X::AbstractMatrix)
   basis_space = get_basis(a.basis_space)
@@ -39,9 +35,9 @@ function RBSteady.inv_project(a::TransientPODBasis,X̂::AbstractMatrix)
   return X
 end
 
-for f in (:project,:inv_project)
+for f in (:(RBSteady.project),:(RBSteady.inv_project))
   @eval begin
-    function RBSteady.:($f)(a::TransientPODBasis,y::AbstractVector)
+    function $f(a::TransientPODBasis,y::AbstractVector)
       ns = num_reduced_dofs(a.basis_space)
       nt = num_reduced_times(a.basis_time)
       Y = reshape(y,ns,nt)
