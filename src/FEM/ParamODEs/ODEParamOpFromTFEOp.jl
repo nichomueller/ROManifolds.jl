@@ -387,7 +387,7 @@ function Algebra.residual(
   res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
-  map(odeop.op.trian_res) do trian
+  contribution(odeop.op.trian_res) do trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     assemble_vector(assem,vecdata)
   end
@@ -425,8 +425,8 @@ function Algebra.jacobian(
   du = get_trial_fe_basis(trial)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
-  assem = get_param_assembler(odeop.op,r)
 
+  assem = get_param_assembler(odeop.op,r)
   μ,t = get_params(r),get_times(r)
 
   jacs = get_jacs(odeop.op)
@@ -436,11 +436,41 @@ function Algebra.jacobian(
     iszero(w) && continue
     jac = jacs[k]
     trian_jac = odeop.op.trian_jacs[k]
-    try is_const = is_form_constant(odeop,k)
-      dc = is_const ? w * jac(first(μ),first(t),uh,du,v) : w * jac(μ,t,uh,du,v)
-    catch
-      jac(μ,t,uh,du,v)
+    dc = jac(μ,t,uh,du,v)
+    A = contribution(trian_jac) do trian
+      matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
+      assemble_matrix(assem,matdata)
     end
+    As = (As...,A)
+  end
+
+  As
+end
+
+function Algebra.jacobian(
+  odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}},
+  odeopcache=_define_odeopcache(odeop,r,us))
+
+  uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
+  trial = evaluate(get_trial(odeop.op),nothing)
+  du = get_trial_fe_basis(trial)
+  test = get_test(odeop.op)
+  v = get_fe_basis(test)
+
+  assem = get_param_assembler(odeop.op,r)
+  μ,t = get_params(r),get_times(r)
+
+  jacs = get_jacs(odeop.op)
+  As = ()
+  for k in 1:get_order(odeop.op)+1
+    w = ws[k]
+    iszero(w) && continue
+    jac = jacs[k]
+    trian_jac = odeop.op.trian_jacs[k]
+    dc = jac(μ,t,uh,du,v)
     A = contribution(trian_jac) do trian
       matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
       assemble_matrix(assem,matdata)

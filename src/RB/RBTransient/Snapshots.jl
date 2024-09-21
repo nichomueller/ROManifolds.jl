@@ -1,6 +1,6 @@
 """
-    abstract type AbstractTransientSnapshots{T,N,L,D,I,R<:TransientRealization}
-      <: AbstractSnapshots{T,N,L,D,I,R} end
+    abstract type AbstractTransientSnapshots{T,N,L,D,I,R<:TransientRealization,A}
+      <: AbstractSnapshots{T,N,L,D,I,R,A} end
 
 Transient specialization of an [`AbstractSnapshots`](@ref). The dimension `N` of a
 AbstractSteadySnapshots is equal to `D` + 2, where `D` represents the number of
@@ -48,19 +48,19 @@ julia> s = Snapshots(ParamArray(data),i,r)
 ```
 
 """
-abstract type AbstractTransientSnapshots{T,N,L,D,I,R<:TransientRealization} <: AbstractSnapshots{T,N,L,D,I,R} end
+abstract type AbstractTransientSnapshots{T,N,L,D,I,R<:TransientRealization,A} <: AbstractSnapshots{T,N,L,D,I,R,A} end
 
 ParamDataStructures.num_times(s::AbstractTransientSnapshots) = num_times(get_realization(s))
 
 Base.size(s::AbstractTransientSnapshots) = (num_space_dofs(s)...,num_times(s),num_params(s))
 
 """
-    struct TransientGenericSnapshots{T,N,L,D,I,R,A} <: AbstractTransientSnapshots{T,N,L,D,I,R} end
+    struct TransientGenericSnapshots{T,N,L,D,I,R,A} <: AbstractTransientSnapshots{T,N,L,D,I,R,A} end
 
 Most standard implementation of a AbstractTransientSnapshots
 
 """
-struct TransientGenericSnapshots{T,N,L,D,I,R,A} <: AbstractTransientSnapshots{T,N,L,D,I,R}
+struct TransientGenericSnapshots{T,N,L,D,I,R,A} <: AbstractTransientSnapshots{T,N,L,D,I,R,A}
   data::A
   index_map::I
   realization::R
@@ -127,7 +127,7 @@ end
 
 """
     struct TransientSnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractTransientSnapshots{T,N,L,D,I,R},B,C
-      } <: AbstractTransientSnapshots{T,N,L,D,I,R}
+      } <: AbstractTransientSnapshots{T,N,L,D,I,R,A}
 
 Represents a AbstractTransientSnapshots `snaps` whose parametric and temporal ranges
 are restricted to the indices in `prange` and `trange`. This type essentially acts
@@ -136,7 +136,7 @@ a selected number of parameter/time indices. An instance of TransientSnapshotsAt
 is created by calling the function [`select_snapshots`](@ref)
 
 """
-struct TransientSnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractTransientSnapshots{T,N,L,D,I,R},B,C} <: AbstractTransientSnapshots{T,N,L,D,I,R}
+struct TransientSnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractTransientSnapshots{T,N,L,D,I,R},B,C} <: AbstractTransientSnapshots{T,N,L,D,I,R,A}
   snaps::A
   trange::B
   prange::C
@@ -172,7 +172,7 @@ function ParamDataStructures.get_values(s::TransientSnapshotsAtIndices)
   np = _num_all_params(s)
   ptrange = range_1d(prange,trange,np)
   v = consecutive_getindex(param_data(s),:,ptrange)
-  ConsecutiveArrayOfArrays(v)
+  isa(s,SparseSnapshots) ? recast(v,s) : ConsecutiveArrayOfArrays(v)
 end
 
 function RBSteady.get_indexed_values(s::TransientSnapshotsAtIndices)
@@ -226,7 +226,7 @@ function RBSteady.select_snapshots(s::AbstractTransientSnapshots,prange;trange=1
   select_snapshots(s,trange,prange)
 end
 
-struct TransientReshapedSnapshots{T,N,N′,L,D,I,R,A<:AbstractTransientSnapshots{T,N′,L,D,I,R},B} <: AbstractTransientSnapshots{T,N,L,D,I,R}
+struct TransientReshapedSnapshots{T,N,N′,L,D,I,R,A<:AbstractTransientSnapshots{T,N′,L,D,I,R},B} <: AbstractTransientSnapshots{T,N,L,D,I,R,A}
   snaps::A
   size::NTuple{N,Int}
   mi::B
@@ -288,11 +288,11 @@ const TransientSparseSnapshots{T,N,L,D,I,R} = Union{
 }
 
 """
-    const UnfoldingTransientSnapshots{T,L,R}
-      = AbstractTransientSnapshots{T,3,L,1,<:AbstractTrivialIndexMap,R}
+    const UnfoldingTransientSnapshots{T,L,R,A}
+      = AbstractTransientSnapshots{T,3,L,1,<:AbstractTrivialIndexMap,R,A}
 
 """
-const UnfoldingTransientSnapshots{T,L,R} = AbstractTransientSnapshots{T,3,L,1,<:AbstractTrivialIndexMap,R}
+const UnfoldingTransientSnapshots{T,L,R,A} = AbstractTransientSnapshots{T,3,L,1,<:AbstractTrivialIndexMap,R,A}
 
 abstract type ModeAxes end
 struct Mode1Axes <: ModeAxes end
@@ -303,7 +303,7 @@ change_mode(::Mode2Axes) = Mode1Axes()
 
 """
     struct ModeTransientSnapshots{M<:ModeAxes,T,L,I,R,A<:UnfoldingTransientSnapshots{T,L,I,R}}
-      <: AbstractTransientSnapshots{T,2,L,1,I,R}
+      <: AbstractTransientSnapshots{T,2,L,1,I,R,A}
 
 Represents a AbstractTransientSnapshots with a TrivialIndexMap indexing strategy
 as an AbstractMatrix with a system of mode-unfolding representations. Only two
@@ -322,7 +322,7 @@ Mode2Axes:
  u(x1,tT,μ1) ⋯ u(x1,tT,μP) u(x2,tT,μ1) ⋯ u(x2,tT,μP) u(x3,tT,μ1) ⋯ ⋯ u(xN,tT,μ1) ⋯ u(xN,tT,μP)]
 
 """
-struct ModeTransientSnapshots{M<:ModeAxes,T,L,R,A<:UnfoldingTransientSnapshots{T,L,R}} <: AbstractTransientSnapshots{T,2,L,1,AbstractTrivialIndexMap,R}
+struct ModeTransientSnapshots{M<:ModeAxes,T,L,R,A<:UnfoldingTransientSnapshots{T,L,R}} <: AbstractTransientSnapshots{T,2,L,1,AbstractTrivialIndexMap,R,A}
   snaps::A
   mode::M
 end
@@ -340,6 +340,7 @@ ParamDataStructures.param_data(s::ModeTransientSnapshots) = param_data(s.snaps)
 RBSteady.num_space_dofs(s::ModeTransientSnapshots) = prod(num_space_dofs(s.snaps))
 ParamDataStructures.get_values(s::ModeTransientSnapshots) = get_values(s.snaps)
 RBSteady.get_realization(s::ModeTransientSnapshots) = get_realization(s.snaps)
+IndexMaps.get_index_map(s::ModeTransientSnapshots) = get_index_map(s.snaps)
 
 change_mode(s::UnfoldingTransientSnapshots) = ModeTransientSnapshots(s,change_mode(get_mode(s)))
 change_mode(s::ModeTransientSnapshots) = ModeTransientSnapshots(s.snaps,change_mode(get_mode(s)))
@@ -422,3 +423,13 @@ range_1d(i::AbstractVector,j::AbstractVector,args...) = vec(range_2d(i,j,args...
 
 Base.size(r::Range2D) = (length(r.axis1),length(r.axis2))
 Base.getindex(r::Range2D,i::Integer,j::Integer) = r.axis1[i] + (r.axis1[j]-1)*r.scale
+
+# utils
+
+function RBSteady.Snapshots(a::TupOfArrayContribution,i::AbstractIndexMap,r::AbstractRealization)
+  map(a->Snapshots(a,i,r),a)
+end
+
+function RBSteady.select_snapshots(a::TupOfArrayContribution,args...;kwargs...)
+  map(a->select_snapshots(a,args...;kwargs...),a)
+end

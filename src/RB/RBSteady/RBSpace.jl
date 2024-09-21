@@ -133,6 +133,14 @@ function inv_project(r::FESubspace,x̂::AbstractParamVector)
   return x
 end
 
+function project(r::FESubspace,x::Projection)
+  galerkin_projection(get_reduced_subspace(r),x)
+end
+
+function project(r1::FESubspace,x::Projection,r2::FESubspace)
+  galerkin_projection(get_reduced_subspace(r1),x,get_reduced_subspace(r2))
+end
+
 abstract type FESubspaceFunction <: FEFunction end
 
 function FESubspaceFunction(r::FESubspace,x::AbstractVector)

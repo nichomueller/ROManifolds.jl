@@ -49,20 +49,24 @@ end
 
 function empirical_interpolation(A::ParamSparseMatrix)
   i,ai = empirical_interpolation(A.data)
-  i′ = recast_indices(I,param_getindex(A,1))
+  i′ = recast_indices(i,param_getindex(A,1))
   return i′,ai
 end
 
 abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
 
+integration_domain(i::AbstractArray) = @abstractmethod
+
 struct IntegrationDomain <: AbstractIntegrationDomain{Int32}
   indices::Vector{Int32}
 end
 
+integration_domain(i::Vector) = IntegrationDomain(i)
+
 Base.size(i::IntegrationDomain) = size(i.indices)
 Base.getindex(i::IntegrationDomain,j::Integer) = getindex(i.indices,j)
 
-get_indices(i::IntegrationDomain) = i.indices_space
+get_indices(i::IntegrationDomain) = i.indices
 union_indices(i::IntegrationDomain...) = union(get_indices.(i)...)
 function ordered_common_locations(i::IntegrationDomain,union_indices::AbstractVector)
   filter(!isnothing,indexin(i,union_indices))::Vector{<:Integer}
@@ -117,12 +121,12 @@ end
 struct MDEIM{A<:AbstractArray,I<:AbstractIntegrationDomain} <: HyperReduction{A,I}
   basis::ReducedProjection{A}
   interpolation::Factorization
-  integration_domain::I
+  domain::I
 end
 
 get_basis(a::MDEIM) = a.basis
 get_interpolation(a::MDEIM) = a.interpolation
-get_integration_domain(a::MDEIM) = a.integration_domain
+get_integration_domain(a::MDEIM) = a.domain
 
 function HyperReduction(
   red::AbstractMDEIMReduction,
@@ -130,11 +134,11 @@ function HyperReduction(
   test::FESubspace)
 
   basis = projection(get_reduction(red),s)
-  proj_basis = galerkin_projection(test,basis)
+  proj_basis = project(test,basis)
   indices,interp = empirical_interpolation(basis)
   factor = lu(interp)
-  integration_domain = IntegrationDomain(indices)
-  return MDEIM(proj_basis,factor,integration_domain)
+  domain = integration_domain(indices)
+  return MDEIM(proj_basis,factor,domain)
 end
 
 function HyperReduction(
@@ -144,11 +148,11 @@ function HyperReduction(
   test::FESubspace)
 
   basis = projection(get_reduction(red),s)
-  proj_basis = galerkin_projection(test,basis,trial)
-  indices,factor = empirical_interpolation(basis)
+  proj_basis = project(test,basis,trial)
+  indices,interp = empirical_interpolation(basis)
   factor = lu(interp)
-  integration_domain = IntegrationDomain(indices)
-  return MDEIM(proj_basis,factor,integration_domain)
+  domain = integration_domain(indices)
+  return MDEIM(proj_basis,factor,domain)
 end
 
 function get_reduced_cells(cell_dof_ids,dofs::AbstractVector)
@@ -188,12 +192,16 @@ function get_reduced_cells(
   return red_integr_cells
 end
 
-function reduced_triangulation(trian::Triangulation,b::HyperReduction,r::FESubspace...)
-  f = map(get_space,r)
-  indices = get_integration_domain(b)
-  red_integr_cells = get_reduced_cells(trian,indices,f...)
+function reduced_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,r::FESubspace...)
+  f = map(get_fe_space,r)
+  red_integr_cells = get_reduced_cells(trian,i,f...)
   red_trian = view(trian,red_integr_cells)
   return red_trian
+end
+
+function reduced_triangulation(trian::Triangulation,b::HyperReduction,r::FESubspace...)
+  indices = get_integration_domain(b)
+  reduced_triangulation(trian,indices,r...)
 end
 
 function Algebra.allocate_matrix(::Type{M},m::Integer,n::Integer) where M

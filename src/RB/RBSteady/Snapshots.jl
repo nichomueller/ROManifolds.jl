@@ -1,5 +1,5 @@
 """
-    abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractRealization}
+    abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractRealization,A}
       <: AbstractParamContainer{T,N,L} end
 
 Type representing a collection of parametric abstract arrays of eltype T and
@@ -12,7 +12,7 @@ Subtypes:
 - [`AbstractTransientSnapshots`](@ref)
 
 """
-abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractRealization} <: AbstractParamContainer{T,N,L} end
+abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractRealization,A} <: AbstractParamContainer{T,N,L} end
 
 ParamDataStructures.get_values(s::AbstractSnapshots) = @abstractmethod
 get_indexed_values(s::AbstractSnapshots) = @abstractmethod
@@ -63,8 +63,8 @@ function flatten_snapshots(s::AbstractSnapshots)
 end
 
 """
-    abstract type AbstractSteadySnapshots{T,N,L,D,I,R<:Realization}
-      <: AbstractSnapshots{T,N,L,D,I,R} end
+    abstract type AbstractSteadySnapshots{T,N,L,D,I,A}
+      <: AbstractSnapshots{T,N,L,D,I,<:Realization,A} end
 
 Spatial specialization of an [`AbstractSnapshots`](@ref). The dimension `N` of a
 AbstractSteadySnapshots is equal to `D` + 1, where `D` represents the number of
@@ -106,17 +106,17 @@ julia> s = Snapshots(ParamArray(data),i,r)
 ```
 
 """
-abstract type AbstractSteadySnapshots{T,N,L,D,I,R<:Realization} <: AbstractSnapshots{T,N,L,D,I,R} end
+abstract type AbstractSteadySnapshots{T,N,L,D,I,R<:Realization,A} <: AbstractSnapshots{T,N,L,D,I,R,A} end
 
 Base.size(s::AbstractSteadySnapshots) = (num_space_dofs(s)...,num_params(s))
 
 """
-    struct GenericSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R} end
+    struct GenericSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R,A} end
 
 Most standard implementation of a AbstractSteadySnapshots
 
 """
-struct GenericSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R}
+struct GenericSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R,A}
   data::A
   index_map::I
   realization::R
@@ -171,7 +171,7 @@ end
 
 """
     struct SnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractSteadySnapshots{T,N,L,D,I,R},B<:AbstractUnitRange{Int}}
-      <: AbstractSteadySnapshots{T,N,L,D,I,R} end
+      <: AbstractSteadySnapshots{T,N,L,D,I,R,A} end
 
 Represents a AbstractSteadySnapshots `snaps` whose parametric range is restricted
 to the indices in `prange`. This type essentially acts as a view for suptypes of
@@ -180,7 +180,7 @@ parameter indices. An instance of SnapshotsAtIndices is created by calling the
 function [`select_snapshots`](@ref)
 
 """
-struct SnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractSteadySnapshots{T,N,L,D,I,R},B<:AbstractUnitRange{Int}} <: AbstractSteadySnapshots{T,N,L,D,I,R}
+struct SnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractSteadySnapshots{T,N,L,D,I,R},B<:AbstractUnitRange{Int}} <: AbstractSteadySnapshots{T,N,L,D,I,R,A}
   snaps::A
   prange::B
 end
@@ -250,7 +250,7 @@ function select_snapshots(s::AbstractSteadySnapshots,prange)
   SnapshotsAtIndices(s,prange)
 end
 
-struct ReshapedSnapshots{T,N,N′,L,D,I,R,A<:AbstractSteadySnapshots{T,N′,L,D,I,R},B} <: AbstractSteadySnapshots{T,N′,L,D,I,R}
+struct ReshapedSnapshots{T,N,N′,L,D,I,R,A<:AbstractSteadySnapshots{T,N′,L,D,I,R},B} <: AbstractSteadySnapshots{T,N′,L,D,I,R,A}
   snaps::A
   size::NTuple{N,Int}
   mi::B
@@ -306,11 +306,6 @@ function get_indexed_values(s::ReshapedSnapshots)
   ConsecutiveArrayOfArrays(vr)
 end
 
-const SparseSnapshots{T,N,L,D,I,R} = Union{
-  GenericSnapshots{T,N,L,D,I,R,<:ParamSparseMatrix},
-  SnapshotsAtIndices{T,N,L,D,I,R,<:ParamSparseMatrix}
-}
-
 function Base.:*(A::AbstractSnapshots{T,2},B::AbstractSnapshots{S,2}) where {T,S}
   consecutive_mul(get_indexed_values(A),get_indexed_values(B))
 end
@@ -338,6 +333,19 @@ end
 function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::AbstractSnapshots{S,2}) where {T,S}
   consecutive_mul(A,get_indexed_values(B))
 end
+
+# sparse interface
+
+const SimpleSparseSnapshots{T,N,L,D,I,R,A<:ParamSparseMatrix} = AbstractSnapshots{T,N,L,D,I,R,A}
+const CompositeSparseSnapshots{T,N,L,D,I,R,A<:SimpleSparseSnapshots} = AbstractSnapshots{T,N,L,D,I,R,A}
+const GenericSparseSnapshots{T,N,L,D,I,R,A<:CompositeSparseSnapshots} = AbstractSnapshots{T,N,L,D,I,R,A}
+const SparseSnapshots{T,N,L,D,I,R} = Union{
+  SimpleSparseSnapshots{T,N,L,D,I,R},
+  CompositeSparseSnapshots{T,N,L,D,I,R},
+  GenericSparseSnapshots{T,N,L,D,I,R}
+}
+
+# multi field interface
 
 """
     struct BlockSnapshots{S,N,L} <: AbstractParamContainer{S,N,L}
@@ -454,16 +462,8 @@ function Snapshots(a::ArrayContribution,i::AbstractIndexMap,r::AbstractRealizati
   end
 end
 
-function Snapshots(a::TupOfArrayContribution,i::AbstractIndexMap,r::AbstractRealization)
-  map(a->Snapshots(a,i,r),a)
-end
-
 function select_snapshots(a::ArrayContribution,args...;kwargs...)
   contribution(a.trians) do trian
     select_snapshots(a[trian],args...;kwargs...)
   end
-end
-
-function select_snapshots(a::TupOfArrayContribution,args...;kwargs...)
-  map(a->select_snapshots(a,args...;kwargs...),a)
 end

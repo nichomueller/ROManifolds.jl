@@ -43,8 +43,6 @@ function univariate_spaces(
     model.models_1d,cell_reffes)
 end
 
-get_space(f::TProductFESpace) = f.space
-
 FESpaces.get_triangulation(f::TProductFESpace) = get_triangulation(f.space)
 
 FESpaces.get_free_dof_ids(f::TProductFESpace) = get_free_dof_ids(f.space)

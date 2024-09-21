@@ -92,6 +92,11 @@ num_reduced_dofs(a::ReducedAlgebraicProjection) = size(get_basis(a),2)
 num_reduced_dofs_left_projector(a::ReducedAlgebraicProjection) = size(get_basis(a),1)
 num_reduced_dofs_right_projector(a::ReducedMatProjection) = size(get_basis(a),3)
 
+function projection(red::AffineReduction,s::AbstractMatrix,args...)
+  podred = PODReduction(ReductionStyle(red),NormStyle(red))
+  projection(podred,s,args...)
+end
+
 """
     struct PODBasis{A<:AbstractMatrix} <: Projection
 

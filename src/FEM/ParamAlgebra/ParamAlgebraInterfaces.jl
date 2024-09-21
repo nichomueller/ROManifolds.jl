@@ -290,7 +290,7 @@ end
 
 @noinline function Algebra.add_entry!(
   ::typeof(+),a::ParamInserterCSC{Tv},v::Number,i,j) where Tv
-  @notimplemented
+  add_entry!(+,a,fill(v,param_length(a.nzval)),i,j)
 end
 
 @noinline function Algebra.add_entry!(

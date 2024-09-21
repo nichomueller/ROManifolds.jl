@@ -9,7 +9,7 @@ function TransientIntegrationDomain(ispace::AbstractVector,itime::AbstractVector
   TransientIntegrationDomain(indices_space,indices_time)
 end
 
-function RBSteady.IntegrationDomain(indices::Tuple{Vararg{AbstractVector}})
+function RBSteady.integration_domain(indices::Tuple{Vararg{AbstractVector}})
   @check length(indices) == 2
   TransientIntegrationDomain(indices...)
 end
@@ -51,15 +51,34 @@ end
 
 const TransientHyperReduction{A} = HyperReduction{A,TransientIntegrationDomain}
 
-get_indices_space(a::TransientHyperReduction) = get_indices(get_integration_domain_space(a))
-union_indices_space(a::TransientHyperReduction...) = union_indices(get_integration_domain_space.(a)...)
-get_indices_time(a::TransientHyperReduction) = get_indices(get_integration_domain_time(a))
-union_indices_time(a::TransientHyperReduction...) = union_indices(get_integration_domain_time.(a)...)
+get_indices_space(a::TransientHyperReduction) = RBSteady.get_indices(get_integration_domain_space(a))
+union_indices_space(a::TransientHyperReduction...) = RBSteady.union_indices(get_integration_domain_space.(a)...)
+get_indices_time(a::TransientHyperReduction) = RBSteady.get_indices(get_integration_domain_time(a))
+union_indices_time(a::TransientHyperReduction...) = RBSteady.union_indices(get_integration_domain_time.(a)...)
+
+function RBSteady.reduced_triangulation(trian::Triangulation,b::TransientHyperReduction,r::FESubspace...)
+  indices = get_integration_domain_space(b)
+  RBSteady.reduced_triangulation(trian,indices,r...)
+end
+
+function RBSteady.HyperReduction(
+  red::TransientMDEIMReduction,
+  s::AbstractSnapshots,
+  trial::FESubspace,
+  test::FESubspace)
+
+  basis = projection(get_reduction(red),s)
+  proj_basis = project(test,basis,trial,get_combine(red))
+  indices,interp = empirical_interpolation(basis)
+  factor = lu(interp)
+  domain = integration_domain(indices)
+  return MDEIM(proj_basis,factor,domain)
+end
 
 const TransientMDEIM{A} = MDEIM{A,TransientIntegrationDomain}
 
-get_integration_domain_space(a::TransientMDEIM) = a.domain_space
-get_integration_domain_time(a::TransientMDEIM) = a.domain_time
+get_integration_domain_space(a::TransientMDEIM) = get_integration_domain(a).indices_space
+get_integration_domain_time(a::TransientMDEIM) = get_integration_domain(a).indices_time
 
 function RBSteady.reduced_jacobian(
   red::Tuple{Vararg{AbstractReduction}},
@@ -81,7 +100,7 @@ function RBSteady.project!(cache,a::TransientHyperReduction,b::AbstractParamArra
   return b̂
 end
 
-const TupOfAffineContribution = Tuple{Vararg{AffineContribution{T}}} where T
+const TupOfAffineContribution = Tuple{Vararg{AffineContribution}}
 
 function RBSteady.allocate_coefficient(a::TupOfAffineContribution,b::TupOfArrayContribution)
   @check length(a) == length(b)

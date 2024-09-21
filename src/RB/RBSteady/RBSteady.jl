@@ -48,14 +48,15 @@ export EnergyNorm
 export AbstractReduction
 export DirectReduction
 export GreedyReduction
-export AffineStructure
-export AbstractPODReduction
+export AbstractAffineReduction
+export AffineReduction
 export PODReduction
 export TTSVDReduction
 export SupremizerReduction
 export AbstractMDEIMReduction
 export MDEIMReduction
 export AdaptiveReduction
+export get_reduction
 include("ReductionMethods.jl")
 
 export AbstractSnapshots
@@ -106,6 +107,7 @@ export Projection
 export PODBasis
 export TTSVDCores
 export BlockProjection
+export ReducedProjection
 export projection
 export get_basis
 export num_fe_dofs
@@ -141,6 +143,7 @@ export HyperReduction
 export MDEIM
 export AffineContribution
 export empirical_interpolation
+export integration_domain
 export get_integration_domain
 export reduce_triangulation
 export reduced_jacobian

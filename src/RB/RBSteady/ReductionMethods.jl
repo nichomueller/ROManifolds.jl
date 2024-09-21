@@ -1,7 +1,5 @@
 abstract type ReductionStyle end
 
-struct ReductionNotNeeded <: ReductionStyle end
-
 struct SearchSVDRank <: ReductionStyle
   tol::Float64
 end
@@ -59,17 +57,41 @@ NormStyle(r::AbstractReduction) = @abstractmethod
 ParamDataStructures.num_params(r::AbstractReduction) = @abstractmethod
 get_norm(r::AbstractReduction) = get_norm(NormStyle(r))
 
-struct AffineStructure <: AbstractReduction{ReductionNotNeeded,EuclideanNorm} end
+abstract type AbstractAffineReduction{A,B} <: DirectReduction{A,B} end
 
-abstract type AbstractPODReduction{A,B} <: DirectReduction{A,B} end
+ParamDataStructures.num_params(r::AbstractAffineReduction) = 1
 
-struct PODReduction{A,B} <: AbstractPODReduction{A,B}
+struct AffineReduction{A,B} <: AbstractAffineReduction{A,B}
+  red_style::A
+  norm_style::B
+end
+
+function AffineReduction(red_style::ReductionStyle,norm_op::Function)
+  norm_style = EnergyNorm(norm_op)
+  AffineReduction(red_style,norm_style)
+end
+
+function AffineReduction(tol::Float64,norm_style=EuclideanNorm())
+  red_style = SearchSVDRank(tol)
+  AffineReduction(red_style,norm_style)
+end
+
+function AffineReduction(rank::Int,norm_style=EuclideanNorm())
+  red_style = FixedSVDRank(rank)
+  AffineReduction(red_style,norm_style)
+end
+
+ReductionStyle(r::AffineReduction) = r.red_style
+NormStyle(r::AffineReduction) = r.norm_style
+
+struct PODReduction{A,B} <: DirectReduction{A,B}
   red_style::A
   norm_style::B
   nparams::Int
 end
 
 function PODReduction(red_style::ReductionStyle,norm_style::NormStyle=EuclideanNorm();nparams=50)
+  iszero(nparams) && return AffineReduction(red_style,norm_style)
   PODReduction(red_style,norm_style,nparams)
 end
 

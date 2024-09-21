@@ -149,7 +149,7 @@ function LinearAlgebra.fillstored!(A::MatrixOfSparseMatricesCSC,z::AbstractMatri
 end
 
 function recast(a::AbstractMatrix,A::SparseMatrixCSC)
-  @check size(a,1) == size(A.data,1)
+  @check size(a,1) == nnz(A)
   B = map(v -> recast(v,A),collect.(eachcol(a)))
   return MatrixOfSparseMatricesCSC(B)
 end

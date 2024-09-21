@@ -1,7 +1,11 @@
 function ODEs.time_derivative(r::FESubspace)
-  fet = time_derivative(get_space(r))
+  fet = time_derivative(get_fe_space(r))
   rb = get_reduced_subspace(r)
   fe_subspace(fet,rb)
+end
+
+function RBSteady.project(r1::FESubspace,x::Projection,r2::FESubspace,combine::Function)
+  galerkin_projection(RBSteady.get_reduced_subspace(r1),x,RBSteady.get_reduced_subspace(r2),combine)
 end
 
 const TransientEvalFESubspace{A<:FESubspace} = EvalFESubspace{A,<:TransientRealization}

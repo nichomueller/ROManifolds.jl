@@ -42,8 +42,8 @@ of the temporal derivative
 """
 struct TransientPGMDEIMOperator{T} <: TransientRBOperator{T}
   op::TransientPGOperator{T}
-  lhs
-  rhs
+  lhs::TupOfAffineContribution
+  rhs::AffineContribution
 end
 
 FESpaces.get_trial(op::TransientPGMDEIMOperator) = get_trial(op.op)
@@ -128,7 +128,7 @@ end
 
 for f in (:(RBSteady.residual_snapshots),:(RBSteady.jacobian_snapshots))
   @eval begin
-    function $f(solver::RBSolver,op::PGMDEIMOperator,s)
+    function $f(solver::RBSolver,op::TransientPGMDEIMOperator,s)
       x = get_values(s)
       r = get_realization(s)
       fesolver = get_fe_solver(solver)

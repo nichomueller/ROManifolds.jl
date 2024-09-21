@@ -38,7 +38,7 @@ import UnPack: @unpack
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
 
-export TransientPODReduction
+export TransientReduction
 export TransientMDEIMReduction
 include("ReductionMethods.jl")
 

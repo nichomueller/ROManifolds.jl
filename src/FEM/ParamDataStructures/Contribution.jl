@@ -157,7 +157,7 @@ function Base.materialize!(a::ArrayContribution,c::ContributionBroadcast)
 end
 
 # small hack, it allows to efficiently deal with jacobians in an unsteady setting
-const TupOfArrayContribution = Tuple{Vararg{ArrayContribution{T}}} where T
+const TupOfArrayContribution{T} = Tuple{Vararg{ArrayContribution{T}}}
 
 Base.eltype(::TupOfArrayContribution{T}) where T = T
 Base.eltype(::Type{<:TupOfArrayContribution{T}}) where T = T

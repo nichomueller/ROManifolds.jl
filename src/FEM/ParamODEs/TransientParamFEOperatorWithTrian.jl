@@ -111,6 +111,10 @@ ODEs.get_assembler(op::TransientParamFEOpFromWeakFormWithTrian) = get_assembler(
 IndexMaps.get_index_map(op::TransientParamFEOpFromWeakFormWithTrian) = get_index_map(op.op)
 ParamDataStructures.realization(op::TransientParamFEOpFromWeakFormWithTrian;kwargs...) = realization(op.op;kwargs...)
 
+function ODEs.is_form_constant(op::TransientParamFEOpFromWeakFormWithTrian,k::Integer)
+  is_form_constant(op.op,k)
+end
+
 # utils
 
 function _set_triangulation_jac(

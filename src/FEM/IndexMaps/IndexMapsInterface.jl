@@ -115,6 +115,7 @@ abstract type AbstractTrivialIndexMap <: AbstractIndexMap{1,Int} end
 Base.getindex(i::AbstractTrivialIndexMap,j::Integer) = j
 Base.setindex!(i::AbstractTrivialIndexMap,v::Integer,j::Integer) = nothing
 Base.copy(i::AbstractTrivialIndexMap) = i
+Base.collect(i::AbstractTrivialIndexMap) = i
 
 """
     TrivialIndexMap <: AbstractTrivialIndexMap
@@ -136,6 +137,7 @@ struct TrivialSparseIndexMap{A<:SparsityPattern} <: AbstractTrivialIndexMap
 end
 
 TrivialIndexMap(sparsity::SparsityPattern) = TrivialSparseIndexMap(sparsity)
+TrivialIndexMap(i::TrivialSparseIndexMap) = i
 Base.size(i::TrivialSparseIndexMap) = (nnz(i.sparsity),)
 
 recast(a::AbstractArray,i::TrivialSparseIndexMap) = recast(a,i.sparsity)

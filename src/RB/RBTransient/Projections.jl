@@ -1,3 +1,10 @@
+function RBSteady.projection(red::TransientAffineReduction,s::AbstractTransientSnapshots,args...)
+  s1 = flatten_snapshots(select_snapshots(s,1,1))
+  basis_space = projection(get_reduction_space(red),s1,args...)
+  basis_time = PODBasis(I[1:num_times(s),1:1])
+  TransientPODBasis(basis_space,basis_time)
+end
+
 function RBSteady.projection(red::TransientPODReduction,s::AbstractTransientSnapshots,args...)
   s1 = flatten_snapshots(s)
   basis_space = projection(get_reduction_space(red),s1,args...)
@@ -81,8 +88,13 @@ function RBSteady.galerkin_projection(
     get_basis_time(proj_right),
     combine)
 
+  nleft = num_reduced_dofs(proj_left)
   ns = num_reduced_dofs(a.basis_space)
   nt = num_reduced_dofs(a.basis_time)
+  n = num_reduced_dofs(a)
+  nright = num_reduced_dofs(proj_right)
+
+  proj_basis = zeros(nleft,n,nright)
   @inbounds for is = 1:ns, it = 1:nt
     ist = (it-1)*ns+is
     proj_basis[:,ist,:] = kron(proj_basis_time[:,it,:],proj_basis_space[:,is,:])
@@ -95,7 +107,7 @@ function RBSteady.empirical_interpolation(a::TransientPODBasis)
   indices_space,interp_space = empirical_interpolation(get_basis_space(a))
   indices_time,interp_time = empirical_interpolation(get_basis_time(a))
   interp = kron(interp_time,interp_space)
-  return (indices_time,interp_time),interp
+  return (indices_time,indices_time),interp
 end
 
 # multfield interface

@@ -78,8 +78,8 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 tol = 1e-4
-state_reduction = TransientPODReduction(tol,energy;nparams=50)
-rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20)
+state_reduction = TransientReduction(tol,energy;nparams=50)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,nparams_djac=0)
 
 test_dir = datadir(joinpath("heateq","elasticity_$(1e-4)"))
 create_dir(test_dir)
@@ -103,37 +103,45 @@ fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
 # rbop = reduced_operator(rbsolver,feop,fesnaps)
 red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
 
-red = RBSteady.get_state_reduction(rbsolver)
-basis = reduced_basis(red,feop,fesnaps)
+# red = RBSteady.get_state_reduction(rbsolver)
+# basis = reduced_basis(red,feop,fesnaps)
 
-bs = basis.basis_space
+# bs = basis.basis_space
 
-B = get_basis(bs)
-nfe = num_fe_dofs(bs)
-nrb = num_reduced_dofs(bs)
-x = rand(nfe)
-xrb = rand(nrb)
-project(bs,x) ≈ B'*x
-inv_project(bs,xrb) ≈ B*xrb
+# B = get_basis(bs)
+# nfe = num_fe_dofs(bs)
+# nrb = num_reduced_dofs(bs)
+# x = rand(nfe)
+# xrb = rand(nrb)
+# project(bs,x) ≈ B'*x
+# inv_project(bs,xrb) ≈ B*xrb
 
-galerkin_projection(bs,bs)
-empirical_interpolation(bs)
+# galerkin_projection(bs,bs)
+# empirical_interpolation(bs)
 
-using LinearAlgebra
-A = rand(nfe,nfe)
-U,S,V = svd(A)
-r = rank(A)
-U = U[:,1:r]
+# using LinearAlgebra
+# A = rand(nfe,nfe)
+# U,S,V = svd(A)
+# r = rank(A)
+# U = U[:,1:r]
 
-X = assemble_matrix(feop,energy)
-bbs = union(bs,PODBasis(U),X)
+# X = assemble_matrix(feop,energy)
+# bbs = union(bs,PODBasis(U),X)
 
 using Gridap.FESpaces
 op = get_algebraic_operator(feop)
 pop = TransientPGOperator(op,red_trial,red_test)
 
-r = realization(feop)
-Û = red_trial(r)
-get_vector_type(Û)
+# r = realization(feop)
+# Û = red_trial(r)
+# get_vector_type(Û)
 
-cache = zero_free_values(Û)
+# cache = zero_free_values(Û)
+
+# jacs = jacobian_snapshots(rbsolver,pop,fesnaps)
+# ress = residual_snapshots(rbsolver,pop,fesnaps)
+
+# red_jac = reduced_jacobian(rbsolver.jacobian_reduction,pop,jacs)
+# red_res = reduced_residual(rbsolver.residual_reduction,pop,ress)
+
+rbop = reduced_operator(rbsolver,pop,fesnaps)
