@@ -184,38 +184,49 @@ function select_fe_quantities_at_indices(cache,us,odeopcache,indices)
   return red_cache,red_us,red_odeopcache
 end
 
-function RBSteady.select_at_indices(a::AbstractParamArray,ids_space,ids_time,ids_param)
+get_entry(s::AbstractParamArray,is,it,ip) = consecutive_getindex(s,is,ip+(it-1)*num_params(s))
+get_entry(s::ParamSparseMatrix,is,it,ip) = param_getindex(s,ip+(it-1)*num_params(s))[is]
+
+function RBSteady.select_at_indices(
+  ::TransientHyperReduction,
+  s::AbstractParamArray,
+  ids_space,ids_time,ids_param)
+
   @check length(ids_space) == length(ids_time)
-  entry = zeros(eltype2(a),length(ids_param))
+  entry = zeros(eltype2(a),length(ids_space))
   entries = array_of_consecutive_arrays(entry,length(ids_param))
-  for ip = param_eachindex(entries)
-    for (i,is) in enumerate(indices)
-      v = consecutive_getindex(a,is,ip)
+  @inbounds for ip = param_eachindex(entries)
+    for (i,(is,it)) in enumerate(zip(ids_space,ids_time))
+      v = get_entry(a,is,it,ip)
       consecutive_setindex!(entries,v,i,ip)
     end
   end
   return entries
 end
 
-function RBSteady.select_at_indices(a::ParamSparseMatrix,ids_space,ids_time,ids_param)
-  entry = zeros(eltype2(a),length(ispace),length(itime))
-  entries = array_of_consecutive_arrays(entry,param_length(a))
-  for ip = param_eachindex(entries), (i,it) in enumerate(itime)
-    for (i,is) in enumerate(indices)
-      v = param_getindex(s,ip)[is]
+function RBSteady.select_at_indices(
+  ::TransientHyperReduction{<:TransientReduction},
+  a::AbstractParamArray,
+  ids_space,ids_time,ids_param)
+
+  entry = zeros(eltype2(a),length(ids_space),length(ids_time))
+  entries = array_of_consecutive_arrays(entry,length(ids_param))
+  @inbounds for ip = param_eachindex(entries)
+    for (i,it) in enumerate(ids_time)
+      v = get_entry(a,ids_space,it,ip)
       consecutive_setindex!(entries,v,i,ip)
     end
   end
   return entries
 end
 
-function RBSteady.select_at_indices(s::AbstractArray,a::HyperReduction,indices::_Range2D)
+function RBSteady.select_at_indices(s::AbstractArray,a::TransientHyperReduction,indices::Range2D)
   ids_space = get_indices_space(a)
   ids_param = indices.axis1
   common_ids_time = indices.axis2
   domain_time = get_integration_domain_time(a)
   ids_time = RBSteady.ordered_common_locations(domain_time,common_ids_time)
-  select_at_indices(s,ids_space,ids_time,ids_param)
+  select_at_indices(a,s,ids_space,ids_time,ids_param)
 end
 
 function RBSteady.select_at_indices(

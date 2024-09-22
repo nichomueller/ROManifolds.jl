@@ -102,7 +102,7 @@ fesnaps = load_snapshots(test_dir)
 # TESTS
 
 # rbop = reduced_operator(rbsolver,feop,fesnaps)
-# red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
 
 # red = RBSteady.get_state_reduction(rbsolver)
 # basis = reduced_basis(red,feop,fesnaps)
@@ -129,9 +129,9 @@ fesnaps = load_snapshots(test_dir)
 # X = assemble_matrix(feop,energy)
 # bbs = union(bs,PODBasis(U),X)
 
-# using Gridap.FESpaces
-# op = get_algebraic_operator(feop)
-# pop = TransientPGOperator(op,red_trial,red_test)
+using Gridap.FESpaces
+op = get_algebraic_operator(feop)
+pop = TransientPGOperator(op,red_trial,red_test)
 
 # r = realization(feop)
 # Û = red_trial(r)

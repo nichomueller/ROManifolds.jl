@@ -73,30 +73,22 @@ function ordered_common_locations(i::IntegrationDomain,union_indices::AbstractVe
 end
 
 function Base.getindex(a::AbstractParamArray,i::IntegrationDomain)
-  entry = zeros(eltype2(a),length(i))
-  entries = array_of_consecutive_arrays(entry,param_length(a))
-  for ip = param_eachindex(entries)
-    for (i,is) in enumerate(indices)
-      v = consecutive_getindex(a,is,ip)
-      consecutive_setindex!(entries,v,i,ip)
-    end
-  end
-  return entries
+  consecutive_getindex(a,i,:)
 end
 
 function Base.getindex(a::ParamSparseMatrix,i::IntegrationDomain)
   entry = zeros(eltype2(a),length(i))
   entries = array_of_consecutive_arrays(entry,param_length(a))
-  for ip = param_eachindex(entries)
-    for (i,is) in enumerate(indices)
+  @inbounds for ip = param_eachindex(entries)
+    for (ii,is) in enumerate(indices)
       v = param_getindex(s,ip)[is]
-      consecutive_setindex!(entries,v,i,ip)
+      consecutive_setindex!(entries,v,ii,ip)
     end
   end
   return entries
 end
 
-abstract type HyperReduction{A,I} <: ReducedProjection{A} end
+abstract type HyperReduction{A<:AbstractReduction,B<:ReducedProjection,C<:AbstractIntegrationDomain} <: ReducedProjection end
 
 HyperReduction(::AbstractReduction,args...) = @abstractmethod
 
@@ -121,10 +113,11 @@ function project!(cache,a::HyperReduction,b::AbstractParamArray)
   return b̂
 end
 
-struct MDEIM{A<:AbstractArray,I<:AbstractIntegrationDomain} <: HyperReduction{A,I}
-  basis::ReducedProjection{A}
+struct MDEIM{A,B,C} <: HyperReduction{A,B,C}
+  reduction::A
+  basis::B
   interpolation::Factorization
-  domain::I
+  domain::C
 end
 
 get_basis(a::MDEIM) = a.basis
@@ -136,12 +129,13 @@ function HyperReduction(
   s::AbstractSnapshots,
   test::FESubspace)
 
-  basis = projection(get_reduction(red),s)
+  red = get_reduction(red)
+  basis = projection(red,s)
   proj_basis = project(test,basis)
   indices,interp = empirical_interpolation(basis)
   factor = lu(interp)
   domain = integration_domain(indices)
-  return MDEIM(proj_basis,factor,domain)
+  return MDEIM(red,proj_basis,factor,domain)
 end
 
 function HyperReduction(
@@ -150,12 +144,13 @@ function HyperReduction(
   trial::FESubspace,
   test::FESubspace)
 
-  basis = projection(get_reduction(red),s)
+  red = get_reduction(red)
+  basis = projection(red,s)
   proj_basis = project(test,basis,trial)
   indices,interp = empirical_interpolation(basis)
   factor = lu(interp)
   domain = integration_domain(indices)
-  return MDEIM(proj_basis,factor,domain)
+  return MDEIM(red,proj_basis,factor,domain)
 end
 
 function get_reduced_cells(cell_dof_ids,dofs::AbstractVector)
@@ -223,18 +218,18 @@ function allocate_coefficient(a::HyperReduction,r::AbstractRealization)
   allocate_coefficient(a,num_params(r))
 end
 
-function allocate_hyper_reduction(a::ReducedVecProjection,nparams::Int)
+function allocate_hyper_reduction(a::HyperReduction{A,<:ReducedVecProjection},nparams::Int) where A
   nrows = num_reduced_dofs_left_projector(a)
   b = allocate_vector(Vector{Float64},nrows)
   hypred = array_of_consecutive_arrays(b,nparams)
   return hypred
 end
 
-function allocate_hyper_reduction(a::ReducedMatProjection,nparams::Int)
+function allocate_hyper_reduction(a::HyperReduction{A,<:ReducedMatProjection},nparams::Int) where A
   nrows = num_reduced_dofs_left_projector(a)
   ncols = num_reduced_dofs_right_projector(a)
-  A = allocate_matrix(Matrix{Float64},nrows,ncols)
-  hypred = array_of_consecutive_arrays(A,nparams)
+  M = allocate_matrix(Matrix{Float64},nrows,ncols)
+  hypred = array_of_consecutive_arrays(M,nparams)
   return hypred
 end
 

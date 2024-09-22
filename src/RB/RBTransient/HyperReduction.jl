@@ -26,7 +26,11 @@ union_indices_space(i::TransientIntegrationDomain...) = RBSteady.union_indices(g
 get_indices_time(i::TransientIntegrationDomain) = RBSteady.get_indices(i[2])
 union_indices_time(i::TransientIntegrationDomain...) = RBSteady.union_indices(getindex.(i,2)...)
 
-const TransientHyperReduction{A} = HyperReduction{A,TransientIntegrationDomain}
+function Base.getindex(a::AbstractParamArray,i::TransientIntegrationDomain)
+  @notimplemented
+end
+
+const TransientHyperReduction{A<:AbstractReduction,B<:ReducedProjection} = HyperReduction{A,B,TransientIntegrationDomain}
 
 get_integration_domain_space(a::TransientHyperReduction) = @abstractmethod
 get_integration_domain_time(a::TransientHyperReduction) = @abstractmethod
@@ -50,18 +54,19 @@ function RBSteady.HyperReduction(
   trial::FESubspace,
   test::FESubspace)
 
-  basis = projection(get_reduction(red),s)
+  reduction = get_reduction(red)
+  basis = projection(reduction,s)
   proj_basis = project(test,basis,trial,get_combine(red))
   indices,interp = empirical_interpolation(basis)
   factor = lu(interp)
   domain = integration_domain(indices)
-  return MDEIM(proj_basis,factor,domain)
+  return MDEIM(reduction,proj_basis,factor,domain)
 end
 
-const TransientMDEIM{A} = MDEIM{A,TransientIntegrationDomain}
+const TransientMDEIM{A,B} = MDEIM{A,B,TransientIntegrationDomain}
 
-get_integration_domain_space(a::TransientMDEIM) = get_integration_domain_space(a.integration_domain)
-get_integration_domain_time(a::TransientMDEIM) = get_integration_domain_time(a.integration_domain)
+get_integration_domain_space(a::TransientMDEIM) = get_integration_domain_space(a.domain)
+get_integration_domain_time(a::TransientMDEIM) = get_integration_domain_time(a.domain)
 
 function RBSteady.reduced_jacobian(
   red::Tuple{Vararg{AbstractReduction}},
