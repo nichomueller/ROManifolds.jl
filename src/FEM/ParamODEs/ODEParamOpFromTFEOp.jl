@@ -420,11 +420,11 @@ end
 
 function Algebra.residual!(
   b::Contribution,
-  odeop::ODEParamOpFromTFEOp,
+  odeop::ODEParamOpFromTFEOpWithTrian,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   odeopcache;
-  kwargs...)
+  add::Bool=false)
 
   uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
   test = get_test(odeop.op)

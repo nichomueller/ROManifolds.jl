@@ -412,17 +412,17 @@ end
 
 # utils
 
-struct Range2D{Ti<:Integer,I<:AbstractVector{Ti},J<:AbstractVector{Ti}} <: AbstractMatrix{Ti}
+struct _Range2D{I<:AbstractVector,J<:AbstractVector} <: AbstractMatrix{Int32}
   axis1::I
   axis2::J
   scale::Int
 end
 
-range_2d(i::AbstractVector,j::AbstractVector,nJ=length(j)) = Range2D(i,j,nJ)
+range_2d(i::AbstractVector,j::AbstractVector,nJ=length(j)) = _Range2D(i,j,nJ)
 range_1d(i::AbstractVector,j::AbstractVector,args...) = vec(range_2d(i,j,args...))
 
-Base.size(r::Range2D) = (length(r.axis1),length(r.axis2))
-Base.getindex(r::Range2D,i::Integer,j::Integer) = r.axis1[i] + (r.axis1[j]-1)*r.scale
+Base.size(r::_Range2D) = (length(r.axis1),length(r.axis2))
+Base.getindex(r::_Range2D,i::Integer,j::Integer) = r.axis1[i] + (r.axis1[j]-1)*r.scale
 
 # utils
 

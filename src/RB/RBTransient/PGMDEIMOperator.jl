@@ -184,13 +184,38 @@ function select_fe_quantities_at_indices(cache,us,odeopcache,indices)
   return red_cache,red_us,red_odeopcache
 end
 
-function RBSteady.select_at_indices(s::AbstractArray,a::HyperReduction,indices::Range2D)
-  ids_space = RBSteady.get_indices_space(a)
+function RBSteady.select_at_indices(a::AbstractParamArray,ids_space,ids_time,ids_param)
+  @check length(ids_space) == length(ids_time)
+  entry = zeros(eltype2(a),length(ids_param))
+  entries = array_of_consecutive_arrays(entry,length(ids_param))
+  for ip = param_eachindex(entries)
+    for (i,is) in enumerate(indices)
+      v = consecutive_getindex(a,is,ip)
+      consecutive_setindex!(entries,v,i,ip)
+    end
+  end
+  return entries
+end
+
+function RBSteady.select_at_indices(a::ParamSparseMatrix,ids_space,ids_time,ids_param)
+  entry = zeros(eltype2(a),length(ispace),length(itime))
+  entries = array_of_consecutive_arrays(entry,param_length(a))
+  for ip = param_eachindex(entries), (i,it) in enumerate(itime)
+    for (i,is) in enumerate(indices)
+      v = param_getindex(s,ip)[is]
+      consecutive_setindex!(entries,v,i,ip)
+    end
+  end
+  return entries
+end
+
+function RBSteady.select_at_indices(s::AbstractArray,a::HyperReduction,indices::_Range2D)
+  ids_space = get_indices_space(a)
   ids_param = indices.axis1
   common_ids_time = indices.axis2
-  ids_time = RBSteady.ordered_common_locations(a,common_ids_time)
-  ids = TransientIntegrationDomain(ids_space,ids_time)
-  s[ids,ids_param]
+  domain_time = get_integration_domain_time(a)
+  ids_time = RBSteady.ordered_common_locations(domain_time,common_ids_time)
+  select_at_indices(s,ids_space,ids_time,ids_param)
 end
 
 function RBSteady.select_at_indices(
@@ -210,7 +235,7 @@ function RBSteady.fe_jacobian!(
 
   red_params = 1:num_params(r)
   red_times = union_indices_time(op.lhs)
-  red_pt_indices = range_2d(red_params,time_ids,num_params(r))
+  red_pt_indices = range_2d(red_params,red_times,num_params(r))
   red_r = r[red_params,red_times]
 
   red_A,red_us,red_odeopcache = select_fe_quantities_at_indices(A,us,odeopcache,vec(red_pt_indices))
@@ -229,7 +254,7 @@ function RBSteady.fe_residual!(
 
   red_params = 1:num_params(r)
   red_times = union_indices_time(op.rhs)
-  red_pt_indices = range_2d(red_params,time_ids,num_params(r))
+  red_pt_indices = range_2d(red_params,red_times,num_params(r))
   red_r = r[red_params,red_times]
 
   red_b,red_us,red_odeopcache = select_fe_quantities_at_indices(b,us,odeopcache,vec(red_pt_indices))
@@ -443,7 +468,7 @@ function Algebra.solve!(
 
   fesolver = get_fe_solver(solver)
 
-  t = @timed solve!((x̂,),fesolver,op,r,(y,),(odecache...,rbcache))
+  t = @timed solve!((x̂,),fesolver,op,r,(y,),(odecache,rbcache))
   stats = CostTracker(t,num_params(r))
 
   trial = get_trial(op)(r)

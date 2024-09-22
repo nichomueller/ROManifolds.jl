@@ -151,17 +151,38 @@ r = realization(feop;nparams=10)
 # rbsnaps,rbstats = solve(rbsolver,rbop,r)
 using Gridap.ODEs
 using Gridap.FESpaces
+using Gridap.Algebra
+
 op = rbop
 x̂ = zero_free_values(get_trial(op)(r))
 y = zero_free_values(get_fe_trial(op)(r))
-odecache = allocate_odecache(fesolver,op,r,(y,))
-rbcache = RBSteady.allocate_rbcache(op,r)
-
 RBSteady.init_online_cache!(rbsolver,op,r,y)
-RBSteady.online_cache!(rbsolver,op,r)
 
-# solve!(x̂,solver,op,r)
+# solve!(x̂,rbsolver,op,r)
 cache = rbsolver.cache
 y,odecache = cache.fecache
 rbcache = cache.rbcache
-solve!((x̂,),fesolver,op,r,(y,),(odecache...,rbcache))
+# solve!((x̂,),fesolver,op,r,(y,),(odecache,rbcache))
+odeslvrcache,odeopcache = odecache
+reuse,A,b,sysslvrcache = odeslvrcache
+Â,b̂ = rbcache
+us = (y,y)
+ws = (1,1/(dt*θ))
+# stageop = LinearParamStageOperator(op,odeopcache,r,us,ws,(A,Â),(b,b̂),reuse,sysslvrcache)
+# b = residual!((b,b̂),op,r,us,odeopcache)
+# fe_sb = fe_residual!(b,op,r,us,odeopcache)
+red_params = 1:num_params(r)
+red_times = RBTransient.union_indices_time(op.rhs)
+red_pt_indices = RBTransient.range_2d(red_params,red_times,num_params(r))
+red_r = r[red_params,red_times]
+
+red_b,red_us,red_odeopcache = RBTransient.select_fe_quantities_at_indices(b,us,odeopcache,vec(red_pt_indices))
+residual!(red_b,op.op,red_r,red_us,red_odeopcache)
+# RBSteady.select_at_indices(b,op.rhs,red_pt_indices)
+ids_space = RBTransient.get_indices_space(op.rhs[1])
+ids_param = red_pt_indices.axis1
+common_ids_time = red_pt_indices.axis2
+domain_time = RBTransient.get_integration_domain_time(op.rhs[1])
+ids_time = RBSteady.ordered_common_locations(domain_time,common_ids_time)
+ids = TransientIntegrationDomain(ids_space,ids_time)
+s[ids,ids_param]

@@ -19,42 +19,25 @@ function Base.getindex(i::TransientIntegrationDomain,j::Integer)
   j == 1 ? i.indices_space : i.indices_time
 end
 
+get_integration_domain_space(i::TransientIntegrationDomain) = i.indices_space
+get_integration_domain_time(i::TransientIntegrationDomain) = i.indices_time
 get_indices_space(i::TransientIntegrationDomain) = RBSteady.get_indices(i[1])
 union_indices_space(i::TransientIntegrationDomain...) = RBSteady.union_indices(getindex.(i,1)...)
 get_indices_time(i::TransientIntegrationDomain) = RBSteady.get_indices(i[2])
 union_indices_time(i::TransientIntegrationDomain...) = RBSteady.union_indices(getindex.(i,2)...)
 
-function Base.getindex(a::AbstractParamArray,i::TransientIntegrationDomain,range::Range2D)
-  entry = zeros(eltype2(a),length(i))
-  entries = array_of_consecutive_arrays(entry,param_length(a))
-  for ip = param_eachindex(entries)
-    for (i,is) in enumerate(indices)
-      v = consecutive_getindex(a,is,ip)
-      consecutive_setindex!(entries,v,i,ip)
-    end
-  end
-  return entries
-end
-
-function Base.getindex(a::ParamSparseMatrix,i::TransientIntegrationDomain,range::Range2D)
-  ispace,itime = i.indices_space,i.indices_time
-  entry = zeros(eltype2(a),length(ispace),length(itime))
-  entries = array_of_consecutive_arrays(entry,param_length(a))
-  for ip = param_eachindex(entries), (i,it) in enumerate(itime)
-    for (i,is) in enumerate(indices)
-      v = param_getindex(s,ip)[is]
-      consecutive_setindex!(entries,v,i,ip)
-    end
-  end
-  return entries
-end
-
 const TransientHyperReduction{A} = HyperReduction{A,TransientIntegrationDomain}
+
+get_integration_domain_space(a::TransientHyperReduction) = @abstractmethod
+get_integration_domain_time(a::TransientHyperReduction) = @abstractmethod
 
 get_indices_space(a::TransientHyperReduction) = RBSteady.get_indices(get_integration_domain_space(a))
 union_indices_space(a::TransientHyperReduction...) = RBSteady.union_indices(get_integration_domain_space.(a)...)
 get_indices_time(a::TransientHyperReduction) = RBSteady.get_indices(get_integration_domain_time(a))
 union_indices_time(a::TransientHyperReduction...) = RBSteady.union_indices(get_integration_domain_time.(a)...)
+
+union_indices_space(a::AffineContribution) = union_indices_space(get_values(a)...)
+union_indices_time(a::AffineContribution) = union_indices_time(get_values(a)...)
 
 function RBSteady.reduced_triangulation(trian::Triangulation,b::TransientHyperReduction,r::FESubspace...)
   indices = get_integration_domain_space(b)
@@ -77,8 +60,8 @@ end
 
 const TransientMDEIM{A} = MDEIM{A,TransientIntegrationDomain}
 
-get_integration_domain_space(a::TransientMDEIM) = get_integration_domain(a).indices_space
-get_integration_domain_time(a::TransientMDEIM) = get_integration_domain(a).indices_time
+get_integration_domain_space(a::TransientMDEIM) = get_integration_domain_space(a.integration_domain)
+get_integration_domain_time(a::TransientMDEIM) = get_integration_domain_time(a.integration_domain)
 
 function RBSteady.reduced_jacobian(
   red::Tuple{Vararg{AbstractReduction}},

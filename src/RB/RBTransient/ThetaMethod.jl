@@ -92,7 +92,7 @@ function Algebra.solve!(
 
   x = statef[1]
   sysslvr = solver.sysslvr
-  odeslvrcache,odeopcache,rbcache = cache
+  (odeslvrcache,odeopcache),rbcache = cache
   uθ,sysslvrcache = odeslvrcache
 
   stageop = get_stage_operator(solver,odeop,r,state0,cache)
@@ -155,7 +155,7 @@ function get_stage_operator(
   cache)
 
   u0 = state0[1]
-  odeslvrcache,odeopcache,rbcache = cache
+  (odeslvrcache,odeopcache),rbcache = cache
   reuse,A,b,sysslvrcache = odeslvrcache
   Â,b̂ = rbcache
 
@@ -184,7 +184,7 @@ function Algebra.solve!(
 
   x = statef[1]
   sysslvr = solver.sysslvr
-  odeslvrcache,odeopcache,rbcache = cache
+  (odeslvrcache,odeopcache),rbcache = cache
   reuse,A,b,sysslvrcache = odeslvrcache
 
   stageop = get_stage_operator(solver,odeop,r,state0,cache)

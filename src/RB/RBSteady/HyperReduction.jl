@@ -68,8 +68,8 @@ Base.getindex(i::IntegrationDomain,j::Integer) = getindex(i.indices,j)
 
 get_indices(i::IntegrationDomain) = i.indices
 union_indices(i::IntegrationDomain...) = union(get_indices.(i)...)
-function ordered_common_locations(i::IntegrationDomain,union_indices::AbstractVector)
-  filter(!isnothing,indexin(i,union_indices))::Vector{<:Integer}
+function ordered_common_locations(i::IntegrationDomain,union_indices::AbstractVector)::Vector{Int}
+  filter(!isnothing,indexin(i,union_indices))
 end
 
 function Base.getindex(a::AbstractParamArray,i::IntegrationDomain)
@@ -109,6 +109,9 @@ num_reduced_dofs_right_projector(a::HyperReduction) = num_reduced_dofs_right_pro
 
 get_indices(a::HyperReduction) = get_indices(get_integration_domain(a))
 union_indices(a::HyperReduction...) = union_indices(get_integration_domain.(a)...)
+function ordered_common_locations(a::HyperReduction,args...)
+  ordered_common_locations(get_integration_domain(a),args...)
+end
 
 function project!(cache,a::HyperReduction,b::AbstractParamArray)
   cache = coeff,b̂
@@ -262,6 +265,8 @@ struct AffineContribution{A<:Projection,V,K} <: Contribution
     new{A,V,K}(values,trians)
   end
 end
+
+union_indices(a::AffineContribution) = union_indices(get_values(a)...)
 
 function allocate_coefficient(a::AffineContribution,r::AbstractRealization)
   contribution(get_domains(a)) do trian
