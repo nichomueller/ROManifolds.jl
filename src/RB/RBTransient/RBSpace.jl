@@ -32,3 +32,29 @@ function FESpaces.get_vector_type(r::TransientEvalFESubspace)
   V = get_vector_type(r.subspace)
   return _change_length(V,r.realization)
 end
+
+function RBSteady.project(r::TransientEvalFESubspace,x::AbstractParamVector)
+  x̂ = allocate_in_domain(r)
+  np = num_params(r.realization)
+  nt = num_times(r.realization)
+  rsub = RBSteady.get_reduced_subspace(r)
+  @inbounds for ip in eachindex(x)
+    ipt = ip:nt:np*nt
+    x̂[ip] = project(rsub,x[ipt])
+  end
+  return x̂
+end
+
+function RBSteady.inv_project(r::TransientEvalFESubspace,x̂::AbstractParamVector)
+  x = allocate_in_range(r)
+  np = num_params(r.realization)
+  nt = num_times(r.realization)
+  rsub = RBSteady.get_reduced_subspace(r)
+  @inbounds for ip in eachindex(x̂)
+    Xip = inv_project(rsub,x̂[ip])
+    for it in 1:nt
+      x[ip+(it-1)*np] = Xip[:,it]
+    end
+  end
+  return x
+end

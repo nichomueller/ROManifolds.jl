@@ -46,7 +46,7 @@ for f in (:(RBSteady.project),:(RBSteady.inv_project))
   @eval begin
     function $f(a::TransientPODBasis,y::AbstractVector)
       ns = num_reduced_dofs(a.basis_space)
-      nt = num_reduced_times(a.basis_time)
+      nt = num_reduced_dofs(a.basis_time)
       Y = reshape(y,ns,nt)
       $f(a,Y)
     end
@@ -107,7 +107,7 @@ function RBSteady.empirical_interpolation(a::TransientPODBasis)
   indices_space,interp_space = empirical_interpolation(get_basis_space(a))
   indices_time,interp_time = empirical_interpolation(get_basis_time(a))
   interp = kron(interp_time,interp_space)
-  return (indices_time,indices_time),interp
+  return (indices_space,indices_time),interp
 end
 
 # multfield interface

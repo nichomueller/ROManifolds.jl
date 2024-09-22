@@ -68,7 +68,6 @@ export BlockSnapshots
 export Snapshots
 export flatten_snapshots
 export select_snapshots
-export get_touched_blocks
 export get_realization
 export get_indexed_values
 export num_space_dofs
@@ -150,7 +149,7 @@ export reduce_triangulation
 export reduced_jacobian
 export reduced_residual
 export reduced_weak_form
-export project!
+export inv_project!
 include("HyperReduction.jl")
 
 export PGMDEIMOperator

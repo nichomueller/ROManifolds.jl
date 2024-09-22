@@ -88,7 +88,7 @@ function Base.getindex(a::ParamSparseMatrix,i::IntegrationDomain)
   return entries
 end
 
-abstract type HyperReduction{A<:AbstractReduction,B<:ReducedProjection,C<:AbstractIntegrationDomain} <: ReducedProjection end
+abstract type HyperReduction{A<:AbstractReduction,B<:ReducedProjection,C<:AbstractIntegrationDomain} <: Projection end
 
 HyperReduction(::AbstractReduction,args...) = @abstractmethod
 
@@ -105,11 +105,11 @@ function ordered_common_locations(a::HyperReduction,args...)
   ordered_common_locations(get_integration_domain(a),args...)
 end
 
-function project!(cache,a::HyperReduction,b::AbstractParamArray)
-  cache = coeff,b̂
+function inv_project!(cache,a::HyperReduction,b::AbstractParamArray)
+  coeff,b̂ = cache
   interp = get_interpolation(a)
   ldiv!(coeff,interp,b)
-  b̂ .+= a*coeff
+  muladd!(b̂,a,coeff)
   return b̂
 end
 
@@ -123,6 +123,12 @@ end
 get_basis(a::MDEIM) = a.basis
 get_interpolation(a::MDEIM) = a.interpolation
 get_integration_domain(a::MDEIM) = a.domain
+
+function inv_project!(y,a::HyperReduction{A,<:ReducedMatProjection},x̂::AbstractVector) where A
+  basis = get_basis(a)
+  contraction!(y,basis,x̂)
+  return y
+end
 
 function HyperReduction(
   red::AbstractMDEIMReduction,
@@ -279,11 +285,11 @@ function allocate_hypred_cache(a::AffineContribution,r::AbstractRealization)
   return coeffs,hypred
 end
 
-function project!(cache,a::AffineContribution,b::ArrayContribution)
+function inv_project!(cache,a::AffineContribution,b::ArrayContribution)
   @check length(a) == length(b)
-  cache = coeff,b̂
+  coeff,b̂ = cache
   for (aval,bval,cval) in zip(get_values(a),get_values(b),get_values(coeff))
-    project!((cval,b̂),aval,bval)
+    inv_project!((cval,b̂),aval,bval)
   end
   return b̂
 end
@@ -546,11 +552,11 @@ function reduced_jacobian(
   return hr,red_trian
 end
 
-function project!(cache,a::BlockHyperReduction,b::ArrayBlock)
+function inv_project!(cache,a::BlockHyperReduction,b::ArrayBlock)
   coeff,hypred = cache
   for i in eachindex(a)
     if a.touched[i]
-      project!((coeff[i],blocks(hypred)[i]),a[i],b[i])
+      inv_project!((coeff[i],blocks(hypred)[i]),a[i],b[i])
     end
   end
   return hypred
@@ -559,10 +565,8 @@ end
 for (T,S) in zip((:HyperReduction,:BlockHyperReduction,:AffineContribution),
                  (:AbstractParamArray,:ArrayBlock,:ArrayContribution))
   @eval begin
-    function project(a::$T,b::$S)
-      coeff = allocate_coefficient(a,b)
-      b̂ = allocate_hyper_reduction(a,b)
-      project!((coeff,b̂),a,b)
+    function inv_project(a::$T,b::$S)
+      @notimplemented "Must provide cache in advance"
     end
   end
 end

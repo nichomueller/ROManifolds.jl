@@ -42,6 +42,8 @@ union_indices_time(a::TransientHyperReduction...) = RBSteady.union_indices(get_i
 
 union_indices_space(a::AffineContribution) = union_indices_space(get_values(a)...)
 union_indices_time(a::AffineContribution) = union_indices_time(get_values(a)...)
+union_indices_space(a::TupOfAffineContribution) = union(union_indices_space.(a)...)
+union_indices_time(a::TupOfAffineContribution) = union(union_indices_time.(a)...)
 
 function RBSteady.reduced_triangulation(trian::Triangulation,b::TransientHyperReduction,r::FESubspace...)
   indices = get_integration_domain_space(b)
@@ -80,20 +82,12 @@ function RBSteady.reduced_jacobian(
   return a
 end
 
-function RBSteady.project!(cache,a::TransientHyperReduction,b::AbstractParamArray)
-  cache = coeff,b̂
-  interp = get_interpolation(a)
+function RBSteady.inv_project!(cache,a::TransientHyperReduction{<:TransientReduction},b::AbstractParamArray)
+  coeff,b̂ = cache
+  interp = RBSteady.get_interpolation(a)
   ldiv!(coeff,interp,vec(b))
-  mul!(b̂,a,coeff)
+  muladd!(b̂,a,coeff)
   return b̂
-end
-
-function RBSteady.allocate_coefficient(a::TransientHyperReduction,r::TransientRealization)
-  RBSteady.allocate_coefficient(a,param_length(r))
-end
-
-function RBSteady.allocate_hyper_reduction(a::TransientHyperReduction,r::TransientRealization)
-  RBSteady.allocate_hyper_reduction(a,param_length(r))
 end
 
 const TupOfAffineContribution = Tuple{Vararg{AffineContribution}}
@@ -102,7 +96,7 @@ function RBSteady.allocate_coefficient(a::TupOfAffineContribution,b::TupOfArrayC
   @check length(a) == length(b)
   coeffs = ()
   for (a,b) in zip(a,b)
-    coeffs = (coeffs...,allocate_coefficient(a,b))
+    coeffs = (coeffs...,RBSteady.allocate_coefficient(a,b))
   end
   return coeffs
 end
@@ -111,11 +105,11 @@ function RBSteady.allocate_hyper_reduction(a::TupOfAffineContribution,b::TupOfAr
   RBSteady.allocate_hyper_reduction(first(a),first(b))
 end
 
-function RBSteady.project!(cache,a::TupOfAffineContribution,b::TupOfArrayContribution)
+function RBSteady.inv_project!(cache,a::TupOfAffineContribution,b::TupOfArrayContribution)
   @check length(a) == length(b)
-  cache = coeff,b̂
-  for (a,b,c) in zip(a,b,c)
-    project!((c,b̂),a,b)
+  coeff,b̂ = cache
+  for (ai,bi,ci) in zip(a,b,coeff)
+    inv_project!((ci,b̂),ai,bi)
   end
   return b̂
 end

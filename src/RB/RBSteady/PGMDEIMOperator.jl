@@ -107,8 +107,7 @@ function Algebra.residual!(
 
   b,b̂ = cache
   fe_sb = fe_residual!(b,op,r,u,paramcache)
-  project!(b̂,op.rhs,fe_sb)
-  return b̂
+  inv_project!(b̂,op.rhs,fe_sb)
 end
 
 function Algebra.jacobian!(
@@ -120,8 +119,7 @@ function Algebra.jacobian!(
 
   A,Â = cache
   fe_sA = fe_jacobian!(A,op,r,u,paramcache)
-  project!(Â,op.lhs,fe_sA)
-  return Â
+  inv_project!(Â,op.lhs,fe_sA)
 end
 
 for f in (:residual_snapshots,:jacobian_snapshots)
@@ -406,5 +404,5 @@ function Algebra.solve!(
   trial = get_trial(op)(r)
   x = inv_project(trial,x̂)
 
-  return x,stats,cache
+  return x,stats
 end

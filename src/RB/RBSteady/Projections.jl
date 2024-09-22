@@ -28,16 +28,32 @@ Base.:+(a::Projection,b::Projection) = union(a,b)
 Base.:-(a::Projection,b::Projection) = union(a,b)
 Base.:*(a::Projection,b::Projection) = galerkin_projection(a,b)
 Base.:*(a::Projection,b::Projection,c::Projection) = galerkin_projection(a,b,c)
-Base.:*(a::Projection,x::AbstractArray) = project(a,x)
+Base.:*(a::Projection,x::AbstractArray) = inv_project(a,x)
 Base.:*(x::AbstractArray,b::Projection) = rescale(*,x,b)
-Base.:\(x::AbstractArray,b::Projection) = rescale(\,x,b)
 
+function Base.:*(b::Projection,y::ConsecutiveArrayOfArrays)
+  item = zeros(num_reduced_dofs(b))
+  plength = param_length(y)
+  x = array_of_consecutive_arrays(item,plength)
+  mul!(x,b,y)
+end
+
+function LinearAlgebra.mul!(x::AbstractArray,b::Projection,y::AbstractArray,α::Number,β::Number)
+  mul!(x,get_basis(b),y,α,β)
+end
+
+function LinearAlgebra.mul!(x::ConsecutiveArrayOfArrays,b::Projection,y::ConsecutiveArrayOfArrays,α::Number,β::Number)
+  mul!(x.data,get_basis(b),y.data,α,β)
+end
+
+# row space to column space
 function project(a::Projection,x::AbstractVector)
   basis = get_basis(a)
   x̂ = basis'*x
   return x̂
 end
 
+# column space to row space
 function inv_project(a::Projection,x̂::AbstractVector)
   basis = get_basis(a)
   x = basis*x̂
@@ -79,6 +95,24 @@ function inv_project(a::ReducedMatProjection,x̂::AbstractVector)
   basis = get_basis(a)
   x = contraction(basis,x̂)
   return x
+end
+
+function LinearAlgebra.mul!(
+  x::AbstractArray,
+  b::ReducedMatProjection,
+  y::AbstractArray,
+  α::Number,β::Number)
+
+  contraction!(x,get_basis(b),y,α,β)
+end
+
+function LinearAlgebra.mul!(
+  x::ConsecutiveArrayOfArrays,
+  b::ReducedMatProjection,
+  y::ConsecutiveArrayOfArrays,
+  α::Number,β::Number)
+
+  contraction!(x.data,get_basis(b),y.data,α,β)
 end
 
 struct ReducedAlgebraicProjection{A} <: ReducedProjection{A}

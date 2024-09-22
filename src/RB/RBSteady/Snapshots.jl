@@ -412,16 +412,6 @@ function Arrays.testitem(s::BlockSnapshots)
   end
 end
 
-"""
-    get_touched_blocks(a::AbstractArray{T,N}) where {T,N} -> Array{Bool,N}
-
-Returns the indices corresponding to the touched entries of a block object
-
-"""
-get_touched_blocks(s) = @abstractmethod
-get_touched_blocks(s::ArrayBlock) = findall(s.touched)
-get_touched_blocks(s::BlockSnapshots) = findall(s.touched)
-
 IndexMaps.get_index_map(s::BlockSnapshots) = get_index_map(testitem(s))
 get_realization(s::BlockSnapshots) = get_realization(testitem(s))
 
@@ -433,25 +423,46 @@ function get_indexed_values(s::BlockSnapshots)
   map(get_indexed_values,s.array) |> mortar
 end
 
-function IndexMaps.change_index_map(s::BlockSnapshots{S,N},f) where {S,N}
-  active_block_ids = get_touched_blocks(s)
-  block_map = BlockMap(size(s),active_block_ids)
-  active_block_snaps = [change_index_map(f,s[n]) for n in active_block_ids]
-  BlockSnapshots(block_map,active_block_snaps)
+function Arrays.return_cache(::typeof(change_index_map),f,s::AbstractSnapshots)
+  change_index_map(f,s)
 end
 
-function flatten_snapshots(s::BlockSnapshots{S,N}) where {S,N}
-  active_block_ids = get_touched_blocks(s)
-  block_map = BlockMap(size(s),active_block_ids)
-  active_block_snaps = [flatten_snapshots(s[n]) for n in active_block_ids]
-  BlockSnapshots(block_map,active_block_snaps)
+function Arrays.return_cache(::typeof(change_index_map),s::BlockSnapshots)
+  i = findfirst(s.touched)
+  @notimplementedif isempty(i)
+  cache = return_cache(change_index_map,f,s[i])
+  block_cache = Array{typeof(cache),ndims(s)}(undef,size(s))
+  return block_cache
 end
 
-function select_snapshots(s::BlockSnapshots{S,N},args...;kwargs...) where {S,N}
-  active_block_ids = get_touched_blocks(s)
-  block_map = BlockMap(size(s),active_block_ids)
-  active_block_snaps = [select_snapshots(s[n],args...;kwargs...) for n in active_block_ids]
-  BlockSnapshots(block_map,active_block_snaps)
+for f in (:flatten_snapshots,:select_snapshots)
+  @eval begin
+    function Arrays.return_cache(::typeof($f),s::AbstractSnapshots,args...;kwargs...)
+      $f(s,args...;kwargs...)
+    end
+
+    function Arrays.return_cache(::typeof($f),s::BlockSnapshots,args...;kwargs...)
+      i = findfirst(s.touched)
+      @notimplementedif isempty(i)
+      cache = return_cache($f,s[i],args...;kwargs...)
+      block_cache = Array{typeof(cache),ndims(s)}(undef,size(s))
+      return block_cache
+    end
+  end
+end
+
+for f in (:(IndexMaps.change_index_map),:flatten_snapshots,:select_snapshots)
+  @eval begin
+    function $f(s::BlockSnapshots,args...;kwargs...)
+      cache = return_cache($f,s,args...;kwargs...)
+      for i in eachindex(cache)
+        if cache.touched[i]
+          cache[i] = $f(s[i],args...;kwargs...)
+        end
+      end
+      return cache
+    end
+  end
 end
 
 # utils

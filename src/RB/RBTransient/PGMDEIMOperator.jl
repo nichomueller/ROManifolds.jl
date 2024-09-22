@@ -108,8 +108,7 @@ function Algebra.residual!(
 
   b,b̂ = cache
   fe_sb = fe_residual!(b,op,r,us,odeopcache)
-  project!(b̂,op.rhs,fe_sb)
-  return b̂
+  inv_project!(b̂,op.rhs,fe_sb)
 end
 
 function Algebra.jacobian!(
@@ -122,7 +121,7 @@ function Algebra.jacobian!(
 
   A,Â = cache
   fe_sA = fe_jacobian!(A,op,r,us,ws,odeopcache)
-  project!(Â,op.lhs,fe_sA)
+  inv_project!(Â,op.lhs,fe_sA)
 end
 
 for f in (:(RBSteady.residual_snapshots),:(RBSteady.jacobian_snapshots))
@@ -184,8 +183,8 @@ function select_fe_quantities_at_indices(cache,us,odeopcache,indices)
   return red_cache,red_us,red_odeopcache
 end
 
-get_entry(s::AbstractParamArray,is,it,ip) = consecutive_getindex(s,is,ip+(it-1)*num_params(s))
-get_entry(s::ParamSparseMatrix,is,it,ip) = param_getindex(s,ip+(it-1)*num_params(s))[is]
+get_entry(s::AbstractParamArray,is,ipt) = consecutive_getindex(s,is,ipt)
+get_entry(s::ParamSparseMatrix,is,ipt) = param_getindex(s,ipt)[is]
 
 function RBSteady.select_at_indices(
   ::TransientHyperReduction,
@@ -197,7 +196,8 @@ function RBSteady.select_at_indices(
   entries = array_of_consecutive_arrays(entry,length(ids_param))
   @inbounds for ip = param_eachindex(entries)
     for (i,(is,it)) in enumerate(zip(ids_space,ids_time))
-      v = get_entry(a,is,it,ip)
+      ipt = ip+(it-1)*length(ids_param)
+      v = get_entry(a,is,ipt)
       consecutive_setindex!(entries,v,i,ip)
     end
   end
@@ -213,8 +213,9 @@ function RBSteady.select_at_indices(
   entries = array_of_consecutive_arrays(entry,length(ids_param))
   @inbounds for ip = param_eachindex(entries)
     for (i,it) in enumerate(ids_time)
-      v = get_entry(a,ids_space,it,ip)
-      consecutive_setindex!(entries,v,i,ip)
+      ipt = ip+(it-1)*length(ids_param)
+      v = get_entry(a,ids_space,ipt)
+      consecutive_setindex!(entries,v,:,i,ip)
     end
   end
   return entries
@@ -226,7 +227,7 @@ function RBSteady.select_at_indices(s::AbstractArray,a::TransientHyperReduction,
   common_ids_time = indices.axis2
   domain_time = get_integration_domain_time(a)
   ids_time = RBSteady.ordered_common_locations(domain_time,common_ids_time)
-  select_at_indices(a,s,ids_space,ids_time,ids_param)
+  RBSteady.select_at_indices(a,s,ids_space,ids_time,ids_param)
 end
 
 function RBSteady.select_at_indices(
@@ -270,7 +271,7 @@ function RBSteady.fe_residual!(
 
   red_b,red_us,red_odeopcache = select_fe_quantities_at_indices(b,us,odeopcache,vec(red_pt_indices))
   residual!(red_b,op.op,red_r,red_us,red_odeopcache)
-  RBSteady.select_at_indices(b,op.rhs,red_pt_indices)
+  RBSteady.select_at_indices(red_b,op.rhs,red_pt_indices)
 end
 
 function RBSteady.allocate_rbcache(
@@ -278,10 +279,9 @@ function RBSteady.allocate_rbcache(
   r::TransientRealization)
 
   rhs_cache = RBSteady.allocate_hypred_cache(op.rhs,r)
-  lhs_cache = ()
-  for lhs in op.lhs
-    lhs_cache = (lhs_cache...,RBSteady.allocate_hypred_cache(lhs,r))
-  end
+  lhs_coeff = map(lhs -> RBSteady.allocate_coefficient(lhs,r),op.lhs)
+  lhs_hypred = RBSteady.allocate_hyper_reduction(first(op.lhs),r)
+  lhs_cache = (lhs_coeff,lhs_hypred)
   return lhs_cache,rhs_cache
 end
 
@@ -483,7 +483,7 @@ function Algebra.solve!(
   stats = CostTracker(t,num_params(r))
 
   trial = get_trial(op)(r)
-  x = inv_project(x̂,trial)
+  x = inv_project(trial,x̂)
 
-  return x,stats,cache
+  return x,stats
 end

@@ -9,6 +9,10 @@ function contraction(::AbstractArray...)
   @abstractmethod
 end
 
+function contraction!(::Union{AbstractArray,Number}...)
+  @abstractmethod
+end
+
 function contraction(
   basis::Array{T,3},
   coefficient::Vector{S}
@@ -20,6 +24,35 @@ function contraction(
   s1,s2 = size(basis,1),size(basis,3)
   M = reshape(v,s1,s2)
   return M
+end
+
+function contraction!(
+  cache::AbstractMatrix,
+  basis::AbstractArray{T,3} where T,
+  coefficient::AbstractVector,
+  α::Number=1,β::Number=0
+  )
+
+  @check size(cache) == (size(basis,1),size(basis,3))
+  @check size(basis,2) == length(coefficient)
+  v = view(cache,:)
+  A = reshape(permutedims(basis,(1,3,2)),:,size(basis,2))
+  mul!(v,A,coefficient,α,β)
+  return
+end
+
+function contraction!(
+  cache::AbstractArray{U,3} where U,
+  basis::AbstractArray{T,3} where T,
+  coefficient::AbstractMatrix,
+  α::Number=1,β::Number=0
+  )
+
+  @check size(cache,3) == size(coefficient,2)
+  for (i,c) in enumerate(eachslice(cache,dims=3))
+    @views coeff = coefficient[:,i]
+    contraction!(c,basis,coeff)
+  end
 end
 
 function contraction(

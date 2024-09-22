@@ -26,6 +26,7 @@ import PartitionedArrays: tuple_of_arrays
 export ParamCounter
 export ParamInserterCSC
 export ParamCSSR
+export eltype2
 include("ParamAlgebraInterfaces.jl")
 
 export FastLinearSolver

@@ -140,10 +140,17 @@ pop = TransientPGOperator(op,red_trial,red_test)
 # cache = zero_free_values(Û)
 
 # jacs = jacobian_snapshots(rbsolver,pop,fesnaps)
-# ress = residual_snapshots(rbsolver,pop,fesnaps)
+ress = residual_snapshots(rbsolver,pop,fesnaps)
 
 # red_jac = reduced_jacobian(rbsolver.jacobian_reduction,pop,jacs)
-# red_res = reduced_residual(rbsolver.residual_reduction,pop,ress)
+red_res = reduced_residual(rbsolver.residual_reduction,pop,ress)
+
+reduction = get_reduction(rbsolver.residual_reduction)
+basis = projection(reduction,ress[2])
+proj_basis = project(red_test,basis)
+indices,interp = empirical_interpolation(basis)
+factor = lu(interp)
+domain = integration_domain(indices)
 
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 
@@ -169,20 +176,26 @@ Â,b̂ = rbcache
 us = (y,y)
 ws = (1,1/(dt*θ))
 # stageop = LinearParamStageOperator(op,odeopcache,r,us,ws,(A,Â),(b,b̂),reuse,sysslvrcache)
-# b = residual!((b,b̂),op,r,us,odeopcache)
-# fe_sb = fe_residual!(b,op,r,us,odeopcache)
-red_params = 1:num_params(r)
-red_times = RBTransient.union_indices_time(op.rhs)
-red_pt_indices = RBTransient.range_2d(red_params,red_times,num_params(r))
-red_r = r[red_params,red_times]
+residual!((b,b̂),op,r,us,odeopcache)
+jacobian!((A,Â),op,r,us,ws,odeopcache)
 
-red_b,red_us,red_odeopcache = RBTransient.select_fe_quantities_at_indices(b,us,odeopcache,vec(red_pt_indices))
-residual!(red_b,op.op,red_r,red_us,red_odeopcache)
-# RBSteady.select_at_indices(b,op.rhs,red_pt_indices)
-ids_space = RBTransient.get_indices_space(op.rhs[1])
-ids_param = red_pt_indices.axis1
-common_ids_time = red_pt_indices.axis2
-domain_time = RBTransient.get_integration_domain_time(op.rhs[1])
-ids_time = RBSteady.ordered_common_locations(domain_time,common_ids_time)
-ids = TransientIntegrationDomain(ids_space,ids_time)
-s[ids,ids_param]
+
+
+fe_sb = fe_residual!(b,op,r,us,odeopcache)
+inv_project!(b̂,op.rhs,fe_sb)
+
+coeff,result = b̂[1][2],b̂[2]
+b = fe_sb[2]
+hyp = op.rhs[2]
+
+interp = RBSteady.get_interpolation(hyp)
+ldiv!(coeff,interp,vec(b))
+muladd!(result,hyp,coeff)
+
+lhs1 = RBSteady.allocate_coefficient(op.lhs[1][1],r)
+lhs2 = RBSteady.allocate_hyper_reduction(op.lhs[1][1],r)
+
+rhs1 = RBSteady.allocate_coefficient(op.rhs[1],r)
+rhs2 = RBSteady.allocate_hyper_reduction(op.rhs[1],r)
+
+x = inv_project(get_trial(op)(r),x̂)

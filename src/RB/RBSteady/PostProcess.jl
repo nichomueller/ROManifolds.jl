@@ -224,17 +224,23 @@ function Utils.compute_relative_error(norm_style::EuclideanNorm,feop,son,son_app
 end
 
 function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots)
-  @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
-  active_block_ids = get_touched_blocks(sol)
-  block_map = BlockMap(size(sol),active_block_ids)
-  errors = [compute_relative_error(sol[i],sol_approx[i]) for i in active_block_ids]
-  return_cache(block_map,errors...)
+  @check sol.touched == sol_approx.touched
+  error = Array{Float64,ndims(sol)}(size(sol))
+  for i in eachindex(sol)
+    if sol.touched[i]
+      error[i] = compute_relative_error(sol[i],sol_approx[i])
+    end
+  end
+  error
 end
 
 function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
-  @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
-  active_block_ids = get_touched_blocks(sol)
-  block_map = BlockMap(size(sol),active_block_ids)
-  errors = [compute_relative_error(sol[i],sol_approx[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
-  return_cache(block_map,errors...)
+  @check sol.touched == sol_approx.touched
+  error = Array{Float64,ndims(sol)}(size(sol))
+  for i in eachindex(sol)
+    if sol.touched[i]
+      error[i] = compute_relative_error(sol[i],sol_approx[i],norm_matrix[Block(i,i)])
+    end
+  end
+  error
 end
