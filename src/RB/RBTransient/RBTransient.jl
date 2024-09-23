@@ -67,17 +67,14 @@ include("Projections.jl")
 export TransientRBSpace
 include("RBSpace.jl")
 
-export TransientRBOperator
-export TransientPGOperator
-include("PGOperator.jl")
-
 export TransientMDEIM
 export TransientAffineDecomposition
 include("HyperReduction.jl")
 
-export TransientPGMDEIMOperator
-export LinearNonlinearTransientPGMDEIMOperator
-include("PGMDEIMOperator.jl")
+export TransientRBOperator
+export GenericTransientRBOperator
+export LinearNonlinearTransientRBOperator
+include("ReducedOperators.jl")
 
 include("PostProcess.jl")
 

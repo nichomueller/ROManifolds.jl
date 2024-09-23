@@ -313,57 +313,27 @@ function reduced_form(
   return hyper_red,red_trian
 end
 
-function reduced_residual(red::AbstractReduction,op,s::AbstractSnapshots,trian::Triangulation)
-  test = get_test(op)
-  reduced_form(red,s,trian,test)
-end
-
-function reduced_jacobian(red::AbstractReduction,op,s::AbstractSnapshots,trian::Triangulation)
-  trial = get_trial(op)
-  test = get_test(op)
-  reduced_form(red,s,trian,trial,test)
-end
-
-"""
-    reduced_residual(red::AbstractReduction,op::PGOperator,c::ArrayContribution)
-      ) -> AffineContribution
-    reduced_residual(red::AbstractReduction,op::TransientPGOperator,c::ArrayContribution)
-      ) -> AffineContribution
-
-Returns the AffineContribution corresponding to the residual snapshots stored
-in the [`ArrayContribution`](@ref) `c`
-
-"""
-function reduced_residual(red::AbstractReduction,op,c::ArrayContribution)
+function reduced_residual(red::AbstractReduction,test::FESubspace,c::ArrayContribution)
   a,trians = map(get_domains(c),get_values(c)) do trian,values
-    reduced_residual(red,op,values,trian)
+    reduced_form(red,values,trian,test)
   end |> tuple_of_arrays
   return Contribution(a,trians)
 end
 
-"""
-    reduced_jacobian(red::AbstractReduction,op::PGOperator,c::ArrayContribution)
-      ) -> AffineContribution
-    reduced_jacobian(red::AbstractReduction,op::TransientPGOperator,c::TupOfArrayContribution)
-      ) -> AffineContribution
-
-Returns the AffineContribution corresponding to the jacobian snapshots stored
-in the [`ArrayContribution`](@ref) `c`. In transient problems, this procedure is
-run for every order of the time derivative
-
-"""
-function reduced_jacobian(red::AbstractReduction,op,c::ArrayContribution)
+function reduced_jacobian(red::AbstractReduction,trial::FESubspace,test::FESubspace,c::ArrayContribution)
   a,trians = map(get_domains(c),get_values(c)) do trian,values
-    reduced_jacobian(red,op,values,trian)
+    reduced_form(red,values,trian,trial,test)
   end |> tuple_of_arrays
   return Contribution(a,trians)
 end
 
-function reduced_weak_form(solver::RBSolver,op,s)
+function reduced_weak_form(solver::RBSolver,op,red_trial::FESubspace,red_test::FESubspace,s::AbstractArray)
   jac = jacobian_snapshots(solver,op,s)
   res = residual_snapshots(solver,op,s)
-  red_jac = reduced_jacobian(get_jacobian_reduction(solver),op,jac)
-  red_res = reduced_residual(get_residual_reduction(solver),op,res)
+  jac_red = get_jacobian_reduction(solver)
+  res_red = get_residual_reduction(solver)
+  red_jac = reduced_jacobian(jac_red,red_trial,red_test,jac)
+  red_res = reduced_residual(res_red,red_test,res)
   return red_jac,red_res
 end
 
@@ -508,11 +478,9 @@ end
 
 function reduced_residual(
   red::AbstractReduction,
-  op,
+  test::MultiFieldRBSpace,
   s::BlockSnapshots,
   trian::Triangulation)
-
-  test = get_test(op)
 
   hps = HyperReduction[]
   red_trians = Triangulation[]
@@ -532,12 +500,10 @@ end
 
 function reduced_jacobian(
   red::AbstractReduction,
-  op,
+  trial::MultiFieldRBSpace,
+  test::MultiFieldRBSpace,
   s::BlockSnapshots,
   trian::Triangulation)
-
-  trial = get_trial(op)
-  test = get_test(op)
 
   hps = HyperReduction[]
   red_trians = Triangulation[]

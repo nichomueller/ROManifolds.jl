@@ -89,6 +89,8 @@ export RBSolver
 export RBOnlineCache
 export get_fe_solver
 export solution_snapshots
+export residual_snapshots
+export jacobian_snapshots
 export nonlinear_rb_solve!
 include("RBSolver.jl")
 
@@ -128,15 +130,6 @@ export reduced_basis
 export pod_error
 include("RBSpace.jl")
 
-export RBOperator
-export PGOperator
-export reduced_operator
-export get_fe_trial
-export get_fe_test
-export residual_snapshots
-export jacobian_snapshots
-include("PGOperator.jl")
-
 export AbstractIntegrationDomain
 export IntegrationDomain
 export HyperReduction
@@ -152,14 +145,18 @@ export reduced_weak_form
 export inv_project!
 include("HyperReduction.jl")
 
-export PGMDEIMOperator
-export LinearNonlinearPGMDEIMOperator
+export RBOperator
+export GenericRBOperator
+export LinearNonlinearRBOperator
+export reduced_operator
+export get_fe_trial
+export get_fe_test
 export fe_jacobian!
 export fe_residual!
-include("PGMDEIMOperator.jl")
+include("ReducedOperators.jl")
 
-export RBResults
-export rb_results
+export RBPerformance
+export rb_performance
 export create_dir
 export load_solve
 export load_snapshots

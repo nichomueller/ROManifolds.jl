@@ -22,7 +22,6 @@ Base.eachindex(a::Contribution) = eachindex(a.values)
 # Allow do-block syntax
 @inline function contribution(f,trians)
   values = map(f,trians)
-  @check typeof(trians) <: Tuple{Vararg{Triangulation}}  "$(typeof(trians))"
   Contribution(values,trians)
 end
 

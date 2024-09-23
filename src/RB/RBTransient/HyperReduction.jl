@@ -70,12 +70,13 @@ get_integration_domain_time(a::TransientMDEIM) = get_integration_domain_time(a.d
 
 function RBSteady.reduced_jacobian(
   red::Tuple{Vararg{AbstractReduction}},
-  op::TransientRBOperator,
+  trial::FESubspace,
+  test::FESubspace,
   contribs::Tuple{Vararg{Any}})
 
   a = ()
   for i in eachindex(contribs)
-    a = (a...,reduced_jacobian(red[i],op,contribs[i]))
+    a = (a...,reduced_jacobian(red[i],trial,test,contribs[i]))
   end
   return a
 end

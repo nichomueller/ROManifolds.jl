@@ -171,7 +171,7 @@ for n in (15,)#(8,10,12,15)
 
   # rbop = reduced_operator(rbsolver,feop_u,fesnaps[1])
   # rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps)
-  # results = rb_results(rbsolver,rbop,fesnaps[1],rbsnaps,rbstats,rbstats)
+  # results = rb_performance(rbsolver,rbop,fesnaps[1],rbsnaps,rbstats,rbstats)
 
   # println(results)
 end

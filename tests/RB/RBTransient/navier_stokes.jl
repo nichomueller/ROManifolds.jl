@@ -119,7 +119,7 @@ fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 save(test_dir,fesnaps)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats,cache = solve(lu_rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+results = rb_performance(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 # save(test_dir,rbop)
 save(test_dir,results)

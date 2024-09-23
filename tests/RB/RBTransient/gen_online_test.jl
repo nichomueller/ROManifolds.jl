@@ -113,7 +113,7 @@ for n in (15,)#(8,10,12,15)
     new_op = change_triangulation(op,trians_rhs,trians_lhs)
     rbop = TransientPGMDEIMOperator(new_op,red_lhs,red_rhs)
     rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-    results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)
+    results = rb_performance(rbsolver,rbop,fesnaps,rbsnaps)
 
     save(test_dir,rbop)
     save(test_dir,results)

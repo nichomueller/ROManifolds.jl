@@ -65,7 +65,7 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity
 fesnaps,festats = solution_snapshots(rbsolver,feop)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+results = rb_performance(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 show(results.timer)
 save(test_dir,fesnaps)
@@ -84,7 +84,7 @@ test_dir_space = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elas
 
 rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
 rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
-results_space = rb_results(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbstats_space)
+results_space = rb_performance(rbsolver_space,feop,fesnaps,rbsnaps_space,festats,rbstats_space)
 
 println(RB.compute_error(results_space))
 save(test_dir,rbop_space)

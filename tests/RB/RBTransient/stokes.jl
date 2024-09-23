@@ -109,7 +109,7 @@ fesnaps = deserialize(RBSteady.get_snapshots_filename(test_dir))
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats,cache = solve(lu_rbsolver,rbop,fesnaps)
 festats = rbstats
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+results = rb_performance(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 # save(test_dir,rbop)
 save(test_dir,results)
@@ -131,7 +131,7 @@ println(compute_speedup(results))
 # fesnaps_u = fesnaps[1]
 # rbop_u = reduced_operator(rbsolver,feop_u,fesnaps_u)
 # rbsnaps_u,rbstats,cache = solve(lu_rbsolver,rbop_u,fesnaps_u)
-# results = rb_results(rbsolver,rbop_u,fesnaps_u,rbsnaps_u,festats,rbstats)
+# results = rb_performance(rbsolver,rbop_u,fesnaps_u,rbsnaps_u,festats,rbstats)
 # show(results.timer)
 # println(compute_speedup(results))
 

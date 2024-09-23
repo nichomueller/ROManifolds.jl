@@ -125,7 +125,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 # rbop = TransientPGMDEIMOperator(new_op,red_jac,red_res)
 
 # rbsnaps,stats,cache = solve(rbsolver,rbop,fesnaps[1])
-# results = rb_results(rbsolver,rbop,fesnaps[1],rbsnaps,festats,stats)
+# results = rb_performance(rbsolver,rbop,fesnaps[1],rbsnaps,festats,stats)
 
 energy_u(u,v) = ∫(v⋅u)dΩ + ∫(∇(v)⊙∇(u))dΩ
 
@@ -143,7 +143,7 @@ fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 
 rbop = reduced_operator(rbsolver,feop_u,fesnaps[1])
 rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,get_component(fesnaps[1],1),get_component(rbsnaps,1),festats,rbstats)
+results = rb_performance(rbsolver,rbop,get_component(fesnaps[1],1),get_component(rbsnaps,1),festats,rbstats)
 
 println(results)
 
@@ -196,11 +196,11 @@ _fesnaps,_festats = solution_snapshots(rbsolver,feop,xh0μ;r=get_realization(fes
 
 # rbop = reduced_operator(rbsolver,feop,fesnaps)
 # rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps)
-# results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+# results = rb_performance(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 rbop_u = reduced_operator(rbsolver_u,feop_u,_fesnaps[1])
 rbsnaps_u,rbstats_u,_ = solve(rbsolver,rbop_u,_fesnaps[1])
-results_u = rb_results(rbsolver_u,rbop_u,_fesnaps[1],rbsnaps_u,_festats,rbstats_u)
+results_u = rb_performance(rbsolver_u,rbop_u,_fesnaps[1],rbsnaps_u,_festats,rbstats_u)
 
 println(results_u)
 

@@ -105,7 +105,7 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","model_circ
 fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats,cache = solve(lu_rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+results = rb_performance(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 save(test_dir,fesnaps)
 # save(test_dir,rbop)

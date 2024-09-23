@@ -104,15 +104,6 @@ function Algebra.solve(
   TransientParamFESolution(solver,join_operators(op),r,uh0)
 end
 
-function Algebra.solve(
-  solver::ODESolver,
-  op::TransientParamFEOperator,
-  uh0;
-  nparams=50,r=realization(op;nparams))
-
-  solve(solver,op,r,uh0)
-end
-
 function test_transient_fe_solver(
   solver::ODESolver,op::TransientParamFEOperator,r,u0)
 

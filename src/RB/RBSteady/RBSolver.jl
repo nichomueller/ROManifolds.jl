@@ -90,7 +90,7 @@ with the information related to the computational expense of the FE method
 """
 function solution_snapshots(
   solver::RBSolver,
-  op::ParamFEOperator;
+  op::Union{ParamFEOperator,ParamOperator};
   nparams=num_offline_params(solver),
   r=realization(op;nparams))
 
@@ -98,16 +98,27 @@ function solution_snapshots(
   index_map = get_vector_index_map(op)
   values,stats = solve(fesolver,op;r)
   snaps = Snapshots(values,index_map,r)
-
   return snaps,stats
 end
 
-function Algebra.solve(rbsolver::RBSolver,feop,args...;kwargs...)
-  fesnaps = solution_snapshots(rbsolver,feop,args...)
-  rbop = reduced_operator(rbsolver,feop,fesnaps)
-  rbsnaps = solve(rbsolver,rbop,fesnaps)
-  results = rb_results(rbsolver,rbop,fesnaps,rbsnaps)
-  return results
+function residual_snapshots(solver::RBSolver,op::ParamOperator,s)
+  fesolver = get_fe_solver(solver)
+  sres = select_snapshots(s,res_params(solver))
+  us_res = get_values(sres)
+  r_res = get_realization(sres)
+  b = residual(fesolver,op,r_res,us_res)
+  ib = get_vector_index_map(op)
+  return Snapshots(b,ib,r_res)
+end
+
+function jacobian_snapshots(solver::RBSolver,op::ParamOperator,s)
+  fesolver = get_fe_solver(solver)
+  sjac = select_snapshots(s,jac_params(solver))
+  us_jac = get_values(sjac)
+  r_jac = get_realization(sjac)
+  A = jacobian(fesolver,op,r_jac,us_jac)
+  iA = get_matrix_index_map(op)
+  return Snapshots(A,iA,r_jac)
 end
 
 """

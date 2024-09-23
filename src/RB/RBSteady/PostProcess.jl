@@ -14,8 +14,8 @@ function create_dir(dir::String)
 end
 
 """
-    load_solve(solver::RBSolver,feop::ParamFEOperator,dir::String;kwargs...) -> RBResults
-    load_solve(solver::RBSolver,feop::TransientParamFEOperator,dir::String;kwargs...) -> RBResults
+    load_solve(solver::RBSolver,feop::ParamFEOperator,dir::String;kwargs...) -> RBPerformance
+    load_solve(solver::RBSolver,feop::TransientParamFEOperator,dir::String;kwargs...) -> RBPerformance
 
 Loads the snapshots previously saved to file, loads the reduced operator
 previously saved to file, and returns the results. This function allows to entirely
@@ -30,7 +30,7 @@ function load_solve(solver,feop,dir)
   rbop = load_operator(dir,feop)
   rb_sol,rb_stats,_ = solve(solver,rbop,fe_sol)
   old_results = deserialize(get_results_filename(dir))
-  results = rb_results(solver,rbop,fe_sol,rb_sol,rb_stats,fe_stats)
+  results = rb_performance(solver,rbop,fe_sol,rb_sol,rb_stats,fe_stats)
   return results
 end
 
@@ -120,20 +120,9 @@ function load_contribution(dir,trian,args...;label::String="")
   return Contribution(dec,redt)
 end
 
-function DrWatson.save(dir,op::PGOperator;label="")
+function DrWatson.save(dir,op::GenericRBOperator;label="")
   save(dir,get_test(op);label=_get_label(label,"test"))
   save(dir,get_trial(op);label=_get_label(label,"trial"))
-end
-
-function load_pg_operator(dir,feop::ParamFEOperatorWithTrian;label="")
-  op = get_algebraic_operator(feop)
-  test = load_fe_subspace(dir,get_test(feop);label=_get_label(label,"test"))
-  trial = load_fe_subspace(dir,get_trial(feop);label=_get_label(label,"trial"))
-  return PGOperator(feop,trial,test)
-end
-
-function DrWatson.save(dir,op::PGMDEIMOperator;label="")
-  save(dir,op.op;label)
   save(dir,op.rhs;label=_get_label(label,"rhs"))
   save(dir,op.lhs;label=_get_label(label,"lhs"))
 end
@@ -141,18 +130,21 @@ end
 function load_operator(dir,feop::ParamFEOperatorWithTrian;label="")
   trian_res = feop.trian_res
   trian_jac = feop.trian_jac
-  pop = load_pg_operator(dir,feop)
+  pop = get_algebraic_operator(feop)
 
+  test = load_fe_subspace(dir,get_test(feop);label=_get_label(label,"test"))
+  trial = load_fe_subspace(dir,get_trial(feop);label=_get_label(label,"trial"))
   red_rhs = load_contribution(dir,trian_res,get_test(op);label=_get_label(label,"rhs"))
   red_lhs = load_contribution(dir,trian_jac,get_trial(op),get_test(op);label=_get_label(label,"lhs"))
   trians_rhs = get_domains(red_rhs)
   trians_lhs = get_domains(red_lhs)
-  new_op = change_triangulation(op,trians_rhs,trians_lhs)
-  op = PGMDEIMOperator(new_op,red_lhs,red_rhs)
+  new_pop = change_triangulation(pop,trians_rhs,trians_lhs)
+  op = GenericRBOperator(new_pop,trial,test,red_lhs,red_rhs)
+
   return op
 end
 
-function DrWatson.save(dir,op::LinearNonlinearPGMDEIMOperator;label="")
+function DrWatson.save(dir,op::LinearNonlinearRBOperator;label="")
   save(dir,get_linear_operator(op);label=_get_label(label,"linear"))
   save(dir,get_nonlinear_operator(op);label=_get_label(label,"nonlinear"))
 end
@@ -164,7 +156,7 @@ function load_operator(dir,feop::LinearNonlinearParamFEOperatorWithTrian;label="
 end
 
 """
-    struct RBResults{E}
+    struct RBPerformance{E}
       error::E
       speedup::SU
     end
@@ -173,45 +165,61 @@ Allows to compute errors and computational speedups to compare the properties of
 the algorithm with the FE performance.
 
 """
-struct RBResults{E}
-  error::E
-  speedup::SU
+struct RBPerformance
+  error
+  speedup
 end
 
-function Base.show(io::IO,k::MIME"text/plain",r::RBResults)
-  println(io," ----------------------- RBResults ----------------------------")
-  println(io," > error: $(r.error)")
-  println(io," > speedup in time: $(r.speedup.speedup_time)")
-  println(io," > speedup in memory: $(r.speedup.speedup_memory)")
+function Base.show(io::IO,k::MIME"text/plain",perf::RBPerformance)
+  println(io," ----------------------- RBPerformance ----------------------------")
+  println(io," > error: $(perf.error)")
+  println(io," > speedup in time: $(perf.speedup.speedup_time)")
+  println(io," > speedup in memory: $(perf.speedup.speedup_memory)")
   println(io," -------------------------------------------------------------")
 end
 
-function Base.show(io::IO,r::RBResults)
-  show(io,MIME"text/plain"(),r)
+function Base.show(io::IO,perf::RBPerformance)
+  show(io,MIME"text/plain"(),perf)
 end
 
-function rb_results(solver::RBSolver,feop,s,son_approx,fe_stats,rb_stats)
+function rb_performance(
+  solver::RBSolver,
+  feop,
+  fesnaps::AbstractSnapshots,
+  rbsnaps::AbstractSnapshots,
+  festats::CostTracker,
+  rbstats::CostTracker)
+
   state_red = get_state_reduction(solver)
   norm_style = NormStyle(state_red)
-  son = select_snapshots(s,online_params(solver))
-  error = compute_relative_error(norm_style,feop,son,son_approx)
-  speedup = compute_speedup(fe_stats,rb_stats)
-  RBResults(error,speedup)
+  error = compute_relative_error(norm_style,feop,fesnaps,rbsnaps)
+  speedup = compute_speedup(festats,rbstats)
+  RBPerformance(error,speedup)
 end
 
-function rb_results(solver::RBSolver,op::RBOperator,args...)
-  feop = ParamSteady.get_fe_operator(op)
-  rb_results(solver,feop,args...)
+function rb_performance(
+  solver::RBSolver,
+  rbop,
+  fesnaps::AbstractSnapshots,
+  x̂::AbstractParamVector,
+  festats::CostTracker,
+  rbstats::CostTracker,
+  r::AbstractRealization)
+
+  feop = ParamSteady.get_fe_operator(rbop)
+  x = inv_project(get_trial(rbop)(r),x̂)
+  rbsnaps = Snapshots(x,get_vector_index_map(rbop),r)
+  rb_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats)
 end
 
-function DrWatson.save(dir,r::RBResults;label="")
+function DrWatson.save(dir,perf::RBPerformance;label="")
   results_dir = get_filename(dir,"results",label)
-  serialize(results_dir,r)
+  serialize(results_dir,perf)
 end
 
 function load_results(dir;label="")
   results_dir = get_filename(dir,"results",label)
-  deserialize(results_dir,r)
+  deserialize(results_dir,perf)
 end
 
 function Utils.compute_relative_error(norm_style::EnergyNorm,feop,son,son_approx)

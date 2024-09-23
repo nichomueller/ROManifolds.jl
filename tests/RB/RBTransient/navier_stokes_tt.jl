@@ -125,6 +125,6 @@ fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 
 rbop = reduced_operator(rbsolver,feop_u,fesnaps[1])
 rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps[1])
-results = rb_results(rbsolver,rbop,get_component(fesnaps[1],1),get_component(rbsnaps,1),festats,rbstats)
+results = rb_performance(rbsolver,rbop,get_component(fesnaps[1],1),get_component(rbsnaps,1),festats,rbstats)
 
 println(results)

@@ -135,11 +135,11 @@ for n in (8,10,12,15)
       trians_rhs = get_domains(red_rhs)
       trians_lhs = map(get_domains,red_lhs)
       new_op = change_triangulation(op,trians_rhs,trians_lhs)
-      TransientPGMDEIMOperator(new_op,red_lhs,red_rhs)
+      TransientRBOperator(new_op,red_lhs,red_rhs)
     end
-    rbop = LinearNonlinearTransientPGMDEIMOperator(rbops...)
+    rbop = LinearNonlinearTransientRBOperator(rbops...)
     rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps[1])
-    results = rb_results(rbsolver,rbop,fesnaps[1],rbsnaps,rbstats,rbstats)
+    results = rb_performance(rbsolver,rbop,fesnaps[1],rbsnaps,rbstats,rbstats)
 
     save(test_dir,rbop)
     save(test_dir,results)
@@ -203,7 +203,7 @@ rbops = map(zip((jacs_lin_u,jacs_nlin_u),(ress_lin_u,ress_nlin_u),(op_lin,op_nli
 end
 rbop = LinearNonlinearTransientPGMDEIMOperator(rbops...)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps[1])
-results = rb_results(rbsolver,rbop,fesnaps[1],rbsnaps,rbstats,rbstats)
+results = rb_performance(rbsolver,rbop,fesnaps[1],rbsnaps,rbstats,rbstats)
 
 rbc1 = get_component(rbsnaps,1)
 fec1 = get_component(son,1)

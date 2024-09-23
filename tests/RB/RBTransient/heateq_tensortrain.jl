@@ -89,7 +89,7 @@ create_dir(test_dir)
 fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+results = rb_performance(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 
 println(results)
 

@@ -86,7 +86,7 @@ function _load_solve(solver,feop,fe_sol,dir;kwargs...)
   rbop = RBSteady.deserialize_operator(feop,dir)
   rb_sol,_ = solve(solver,rbop,fe_sol)
   old_results = deserialize(get_results_filename(dir))
-  results = rb_results(solver,rbop,fe_sol,rb_sol;kwargs...)
+  results = rb_performance(solver,rbop,fe_sol,rb_sol;kwargs...)
   return results
 end
 

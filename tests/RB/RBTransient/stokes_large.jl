@@ -87,7 +87,7 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated
 fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
-results = rb_results(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+results = rb_performance(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
 h1_l2_err = compute_error(results)
 
 println(h1_l2_err)

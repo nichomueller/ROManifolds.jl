@@ -93,12 +93,12 @@ r = TransientRealization(μ,ptspace.temporal_domain)
 fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ;r)
 # fesnaps = load_snapshots(test_dir)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-ronline = get_realization(fesnaps)[6,:] #realization(feop;nparams=10)
-rbsnaps,rbstats = solve(rbsolver,rbop,ronline)
+ronline = r[:,6]
+x̂,rbstats = solve(rbsolver,rbop,ronline)
 
-snap_ok = get_values(fesnaps).data[:,6:6:60]
-snap_ok - rbsnaps.data
-
+x,festats = solution_snapshots(rbsolver,feop,uh0μ;r=ronline)
+perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,ronline)
+CAIO
 # r = ronline
 # x̂ = zero_free_values(get_trial(op)(r))
 # y = zero_free_values(get_fe_trial(op)(r))

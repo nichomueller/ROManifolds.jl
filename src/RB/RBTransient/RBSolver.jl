@@ -28,20 +28,53 @@ RBSteady.num_jac_params(s::RBSolver{<:ODESolver}) = num_params(first(s.jacobian_
 
 function RBSteady.solution_snapshots(
   solver::RBSolver,
-  op::TransientParamFEOperator,
-  uh0::Function;
+  feop::TransientParamFEOperator,
+  args...;
   nparams=RBSteady.num_offline_params(solver),
-  r=realization(op;nparams))
+  r=realization(feop;nparams))
+
+  solution_snapshots(solver,feop,r,args...)
+end
+
+function RBSteady.solution_snapshots(
+  solver::RBSolver,
+  feop::TransientParamFEOperator,
+  r::TransientRealization,
+  args...)
 
   fesolver = get_fe_solver(solver)
-
-  sol = solve(fesolver,op,uh0;r)
+  sol = solve(fesolver,feop,r,args...)
   odesol = sol.odesol
-  r = odesol.r
-
   values,stats = collect(sol)
-
-  i = get_vector_index_map(op)
+  i = get_vector_index_map(feop)
   snaps = Snapshots(values,i,r)
   return snaps,stats
+end
+
+function RBSteady.residual_snapshots(
+  solver::RBSolver,
+  odeop::ODEParamOperator,
+  snaps)
+
+  fesolver = get_fe_solver(solver)
+  sres = select_snapshots(snaps,RBSteady.res_params(solver))
+  us_res = (get_values(sres),)
+  r_res = get_realization(sres)
+  b = residual(fesolver,odeop,r_res,us_res)
+  ib = get_vector_index_map(odeop)
+  return Snapshots(b,ib,r_res)
+end
+
+function RBSteady.jacobian_snapshots(
+  solver::RBSolver,
+  odeop::ODEParamOperator,
+  snaps)
+
+  fesolver = get_fe_solver(solver)
+  sjac = select_snapshots(snaps,RBSteady.jac_params(solver))
+  us_jac = (get_values(sjac),)
+  r_jac = get_realization(sjac)
+  A = jacobian(fesolver,odeop,r_jac,us_jac)
+  iA = get_matrix_index_map(odeop)
+  return Snapshots(A,iA,r_jac)
 end
