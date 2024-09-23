@@ -352,6 +352,8 @@ end
 # Solve a POD-MDEIM problem
 
 function init_online_cache!(solver::RBSolver,op::RBOperator,r::Realization,y::AbstractParamVector)
+  @check param_length(r) == param_length(y)
+
   fesolver = get_fe_solver(solver)
   paramcache = allocate_paramcache(fesolver,op,r)
   rbcache = allocate_rbcache(op,r)
@@ -363,8 +365,12 @@ function init_online_cache!(solver::RBSolver,op::RBOperator,r::Realization,y::Ab
 end
 
 function online_cache!(solver::RBSolver,op::RBOperator,r::Realization)
+  cache = solver.cache
   (y,paramcache) = cache.fecache
-  param_length(r) != param_length(y) && init_online_cache!(solver,op,r,y)
+  if param_length(r) != param_length(y)
+    y′ = array_of_consecutive_arrays(testitem(y),param_length(r))
+    init_online_cache!(solver,op,r,y′)
+  end
   return
 end
 

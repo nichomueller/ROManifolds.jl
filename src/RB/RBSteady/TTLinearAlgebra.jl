@@ -51,7 +51,7 @@ function contraction!(
   @check size(cache,3) == size(coefficient,2)
   for (i,c) in enumerate(eachslice(cache,dims=3))
     @views coeff = coefficient[:,i]
-    contraction!(c,basis,coeff)
+    contraction!(c,basis,coeff,α,β)
   end
 end
 

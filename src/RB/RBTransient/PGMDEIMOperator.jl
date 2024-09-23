@@ -423,6 +423,8 @@ function RBSteady.init_online_cache!(
   r::TransientRealization,
   y::AbstractParamVector)
 
+  @check param_length(r) == param_length(y)
+
   fesolver = get_fe_solver(solver)
   odecache = allocate_odecache(fesolver,op,r,(y,))
   rbcache = RBSteady.allocate_rbcache(op,r)
@@ -440,7 +442,10 @@ function RBSteady.online_cache!(
 
   cache = solver.cache
   (y,odecache) = cache.fecache
-  param_length(r) != param_length(y) && RBSteady.init_online_cache!(solver,op,r,y)
+  if param_length(r) != param_length(y)
+    y′ = array_of_consecutive_arrays(testitem(y),param_length(r))
+    RBSteady.init_online_cache!(solver,op,r,y′)
+  end
   return
 end
 

@@ -228,6 +228,7 @@ function allocate_hyper_reduction(a::HyperReduction{A,<:ReducedVecProjection},np
   nrows = num_reduced_dofs_left_projector(a)
   b = allocate_vector(Vector{Float64},nrows)
   hypred = array_of_consecutive_arrays(b,nparams)
+  fill!(hypred,zero(eltype(hypred)))
   return hypred
 end
 
@@ -236,6 +237,7 @@ function allocate_hyper_reduction(a::HyperReduction{A,<:ReducedMatProjection},np
   ncols = num_reduced_dofs_right_projector(a)
   M = allocate_matrix(Matrix{Float64},nrows,ncols)
   hypred = array_of_consecutive_arrays(M,nparams)
+  fill!(hypred,zero(eltype(hypred)))
   return hypred
 end
 
@@ -288,6 +290,7 @@ end
 function inv_project!(cache,a::AffineContribution,b::ArrayContribution)
   @check length(a) == length(b)
   coeff,b̂ = cache
+  fill!(b̂,zero(eltype(b̂)))
   for (aval,bval,cval) in zip(get_values(a),get_values(b),get_values(coeff))
     inv_project!((cval,b̂),aval,bval)
   end

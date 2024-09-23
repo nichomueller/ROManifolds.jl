@@ -42,8 +42,6 @@ union_indices_time(a::TransientHyperReduction...) = RBSteady.union_indices(get_i
 
 union_indices_space(a::AffineContribution) = union_indices_space(get_values(a)...)
 union_indices_time(a::AffineContribution) = union_indices_time(get_values(a)...)
-union_indices_space(a::TupOfAffineContribution) = union(union_indices_space.(a)...)
-union_indices_time(a::TupOfAffineContribution) = union(union_indices_time.(a)...)
 
 function RBSteady.reduced_triangulation(trian::Triangulation,b::TransientHyperReduction,r::FESubspace...)
   indices = get_integration_domain_space(b)
@@ -92,6 +90,9 @@ end
 
 const TupOfAffineContribution = Tuple{Vararg{AffineContribution}}
 
+union_indices_space(a::TupOfAffineContribution) = union(union_indices_space.(a)...)
+union_indices_time(a::TupOfAffineContribution) = union(union_indices_time.(a)...)
+
 function RBSteady.allocate_coefficient(a::TupOfAffineContribution,b::TupOfArrayContribution)
   @check length(a) == length(b)
   coeffs = ()
@@ -108,8 +109,11 @@ end
 function RBSteady.inv_project!(cache,a::TupOfAffineContribution,b::TupOfArrayContribution)
   @check length(a) == length(b)
   coeff,b̂ = cache
+  fill!(b̂,zero(eltype(b̂)))
   for (ai,bi,ci) in zip(a,b,coeff)
-    inv_project!((ci,b̂),ai,bi)
+    for (aval,bval,cval) in zip(get_values(ai),get_values(bi),get_values(ci))
+      inv_project!((cval,b̂),aval,bval)
+    end
   end
   return b̂
 end
