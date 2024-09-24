@@ -122,7 +122,8 @@ include("Projections.jl")
 export FESubspace
 export SingleFieldRBSpace
 export MultiFieldRBSpace
-export EvalFESubspace
+export EvalRBSpace
+export EvalMultiFieldRBSpace
 export fe_subspace
 export reduced_fe_space
 export reduced_basis

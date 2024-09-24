@@ -93,21 +93,5 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 ronline = realization(feop;nparams=10)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 
-using Gridap.FESpaces
-using Gridap.ODEs
-
-red_test,red_trial = reduced_fe_space(rbsolver,feop,fesnaps)
-odeop = get_algebraic_operator(feop)
-rbop = reduced_operator(rbsolver,odeop,red_test,red_trial,fesnaps)
-
-using BlockArrays
-using Gridap.Arrays
-ad = rbop.lhs[1][1]
-hypred = return_cache(RBSteady.allocate_hyper_reduction,ad,ronline)
-for i in eachindex(ad)
-  if ad.touched[i]
-    hypred[i] = RBSteady.allocate_hyper_reduction(ad[i],ronline)
-  end
-end
-RBSteady.fill_missing_blocks!(hypred)
-bhyp = mortar(hypred)
+x,festats = solution_snapshots(rbsolver,feop,ronline,xh0μ)
+perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,ronline)

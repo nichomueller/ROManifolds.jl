@@ -324,7 +324,7 @@ function Algebra.solve!(
   fesolver = get_fe_solver(solver)
 
   t = @timed solve!((x̂,),fesolver,op,r,(y,))
-  stats = CostTracker(t,num_params(r))
+  stats = CostTracker(t,nruns=num_params(r))
 
   trial = get_trial(op)(r)
   x = inv_project(trial,x̂)
@@ -391,7 +391,7 @@ function select_at_indices(s::AbstractArray,a::HyperReduction)
 end
 
 function Arrays.return_cache(::typeof(select_at_indices),s::AbstractArray,a::HyperReduction,args...)
-  testvalue(s)
+  select_at_indices(s,a,args...)
 end
 
 function Arrays.return_cache(
@@ -400,13 +400,12 @@ function Arrays.return_cache(
   a::BlockHyperReduction,
   args...)
 
-  @check size(s) == size(a)
-  @check s.touched == a.touched
+  @check size(blocks(s)) == size(a)
   @notimplementedif isempty(findall(a.touched))
   i = findfirst(a.touched)
-  cache = return_cache(blocks(s)[i],a[i],args...)
+  cache = return_cache(select_at_indices,blocks(s)[i],a[i],args...)
   block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
-  ArrayBlock(block_cache,a.touched)
+  return block_cache
 end
 
 function select_at_indices(s::Union{BlockArray,BlockArrayOfArrays},a::BlockHyperReduction,args...)
@@ -416,7 +415,7 @@ function select_at_indices(s::Union{BlockArray,BlockArrayOfArrays},a::BlockHyper
       s′[i] = select_at_indices(blocks(s)[i],a[i],args...)
     end
   end
-  return s′
+  return ArrayBlock(s′,a.touched)
 end
 
 function select_at_indices(s::ArrayContribution,a::AffineContribution)

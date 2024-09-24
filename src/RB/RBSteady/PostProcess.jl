@@ -185,8 +185,8 @@ end
 function rb_performance(
   solver::RBSolver,
   feop,
-  fesnaps::AbstractSnapshots,
-  rbsnaps::AbstractSnapshots,
+  fesnaps::AbstractArray,
+  rbsnaps::AbstractArray,
   festats::CostTracker,
   rbstats::CostTracker)
 
@@ -200,7 +200,7 @@ end
 function rb_performance(
   solver::RBSolver,
   rbop,
-  fesnaps::AbstractSnapshots,
+  fesnaps::AbstractArray,
   x̂::AbstractParamVector,
   festats::CostTracker,
   rbstats::CostTracker,
@@ -233,7 +233,7 @@ end
 
 function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots)
   @check sol.touched == sol_approx.touched
-  error = Array{Float64,ndims(sol)}(size(sol))
+  error = Array{Float64,ndims(sol)}(undef,size(sol))
   for i in eachindex(sol)
     if sol.touched[i]
       error[i] = compute_relative_error(sol[i],sol_approx[i])
@@ -244,7 +244,7 @@ end
 
 function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
   @check sol.touched == sol_approx.touched
-  error = Array{Float64,ndims(sol)}(size(sol))
+  error = Array{Float64,ndims(sol)}(undef,size(sol))
   for i in eachindex(sol)
     if sol.touched[i]
       error[i] = compute_relative_error(sol[i],sol_approx[i],norm_matrix[Block(i,i)])

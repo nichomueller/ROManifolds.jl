@@ -8,7 +8,7 @@ function RBSteady.project(r1::FESubspace,x::Projection,r2::FESubspace,combine::F
   galerkin_projection(RBSteady.get_reduced_subspace(r1),x,RBSteady.get_reduced_subspace(r2),combine)
 end
 
-const TransientEvalFESubspace{A<:FESubspace} = EvalFESubspace{A,<:TransientRealization}
+const TransientEvalRBSpace{A<:FESubspace} = EvalRBSpace{A,<:TransientRealization}
 
 _change_length(::Type{T},r::TransientRealization) where T = T
 
@@ -28,12 +28,12 @@ function _change_length(
   BlockVectorOfVectors{T,Int(L/num_times(r))}
 end
 
-function FESpaces.get_vector_type(r::TransientEvalFESubspace)
+function FESpaces.get_vector_type(r::TransientEvalRBSpace)
   V = get_vector_type(r.subspace)
   return _change_length(V,r.realization)
 end
 
-function RBSteady.project(r::TransientEvalFESubspace,x::AbstractParamVector)
+function RBSteady.project(r::TransientEvalRBSpace,x::AbstractParamVector)
   x̂ = allocate_in_domain(r)
   np = num_params(r.realization)
   nt = num_times(r.realization)
@@ -45,7 +45,7 @@ function RBSteady.project(r::TransientEvalFESubspace,x::AbstractParamVector)
   return x̂
 end
 
-function RBSteady.inv_project(r::TransientEvalFESubspace,x̂::AbstractParamVector)
+function RBSteady.inv_project(r::TransientEvalRBSpace,x̂::AbstractParamVector)
   x = allocate_in_range(r)
   np = num_params(r.realization)
   nt = num_times(r.realization)
@@ -57,4 +57,18 @@ function RBSteady.inv_project(r::TransientEvalFESubspace,x̂::AbstractParamVecto
     end
   end
   return x
+end
+
+const TransientEvalMultiFieldRBSpace = EvalMultiFieldRBSpace{<:TransientRealization}
+
+for f in (:(RBSteady.project),:(RBSteady.inv_project))
+  @eval begin
+    function $f(r::TransientEvalMultiFieldRBSpace,x::Union{BlockVector,BlockVectorOfVectors})
+      cache = return_cache($f,r,x)
+      for i in 1:blocklength(x)
+        cache[i] = $f(r[i],x[Block(i)])
+      end
+      return mortar(cache)
+    end
+  end
 end

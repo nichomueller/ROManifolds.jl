@@ -20,7 +20,7 @@ function reduced_fe_space(red::Reduction,feop,s)
   t = @timed begin
     basis = reduced_basis(red,feop,s)
   end
-  println(CostTracker(t,"Basis construction"))
+  println(CostTracker(t,name="Basis construction"))
 
   reduced_trial = fe_subspace(get_trial(feop),basis)
   reduced_test = fe_subspace(get_test(feop),basis)
@@ -196,66 +196,96 @@ end
 get_fe_space(r::MultiFieldRBSpace) = r.space
 get_reduced_subspace(r::MultiFieldRBSpace) = r.subspace
 
-function Base.getindex(r::MultiFieldRBSpace,i...)
-  if isa(r.space,MultiFieldFESpace)
-    fs = r.space
-  else
-    fs = evaluate(r.space,nothing)
+function Base.getindex(r::MultiFieldRBSpace,i::Integer)
+  return fe_subspace(r.space.spaces[i],r.subspace[i])
+end
+
+function Base.iterate(r::MultiFieldRBSpace,i)
+  space = iterate(r.space.spaces,i)
+  if isnothing(space)
+    return
   end
-  return fe_subspace(fs.spaces[i...],r.subspace[i...])
+  ri = fe_subspace(space,r.subspace[i])
+  return ri,i+1
 end
-
-function Base.iterate(r::MultiFieldRBSpace)
-  if isa(r.space,MultiFieldFESpace)
-    fs = r.space
-  else
-    fs = evaluate(r.space,nothing)
-  end
-  i = 1
-  ri = fe_subspace(fs.spaces[i],r.subspace[i])
-  state = i+1,fs
-  return ri,state
-end
-
-function Base.iterate(r::MultiFieldRBSpace,state)
-  i,fs = state
-  if i > length(fs.spaces)
-    return nothing
-  end
-  ri = fe_subspace(fs.spaces[i],r.subspace[i])
-  state = i+1,fs
-  return ri,state
-end
-
-function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace)
-  get_free_dof_ids(r,MultiFieldStyle(r))
-end
-
-function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace,::ConsecutiveMultiFieldStyle)
-  @notimplemented
-end
-
-function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace,::BlockMultiFieldStyle{NB}) where NB
-  block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
-  return BlockArrays.blockedrange(block_num_dofs)
-end
-
-MultiField.MultiFieldStyle(r::MultiFieldRBSpace) = MultiFieldStyle(r.space)
 
 # dealing with the transient case here
 
 function Arrays.evaluate(r::FESubspace,args...)
   space = evaluate(get_fe_space(r),args...)
   subspace = fe_subspace(space,get_reduced_subspace(r))
-  EvalFESubspace(subspace,args...)
+  EvalRBSpace(subspace,args...)
 end
 
-struct EvalFESubspace{A<:FESubspace,B<:AbstractRealization} <: FESubspace
+struct EvalRBSpace{A<:FESubspace,B<:AbstractRealization} <: FESubspace
   subspace::A
   realization::B
 end
 
-get_fe_space(r::EvalFESubspace) = get_fe_space(r.subspace)
-get_reduced_subspace(r::EvalFESubspace) = get_reduced_subspace(r.subspace)
+get_fe_space(r::EvalRBSpace) = get_fe_space(r.subspace)
+get_reduced_subspace(r::EvalRBSpace) = get_reduced_subspace(r.subspace)
 
-FESpaces.get_free_dof_ids(r::EvalFESubspace) = get_free_dof_ids(r.subspace)
+FESpaces.get_free_dof_ids(r::EvalRBSpace) = get_free_dof_ids(r.subspace)
+
+const EvalMultiFieldRBSpace{B<:AbstractRealization} = EvalRBSpace{<:MultiFieldRBSpace,B}
+
+function Base.getindex(r::EvalMultiFieldRBSpace,i)
+  spacei = getindex(r.subspace,i)
+  EvalRBSpace(spacei,r.realization)
+end
+
+function Base.iterate(r::EvalMultiFieldRBSpace,i)
+  subspace = iterate(r.subspace,i)
+  if isnothing(subspace)
+    return
+  end
+  ri = EvalRBSpace(subspace,r.realization)
+  return ri,i+1
+end
+
+function Arrays.return_cache(::typeof(project),r::FESubspace,x::AbstractVector)
+  allocate_in_domain(r)
+end
+
+function Arrays.return_cache(::typeof(inv_project),r::FESubspace,x::AbstractVector)
+  allocate_in_range(r)
+end
+
+for T in (:MultiFieldRBSpace,:EvalMultiFieldRBSpace)
+  @eval begin
+
+    MultiField.MultiFieldStyle(r::$T) = MultiFieldStyle(get_fe_space(r))
+    MultiField.num_fields(r::$T) = num_fields(get_fe_space(r))
+
+    function FESpaces.get_free_dof_ids(r::$T)
+      get_free_dof_ids(r,MultiFieldStyle(r))
+    end
+
+    function FESpaces.get_free_dof_ids(r::$T,::ConsecutiveMultiFieldStyle)
+      @notimplemented
+    end
+
+    function FESpaces.get_free_dof_ids(r::$T,::BlockMultiFieldStyle{NB}) where NB
+      block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
+      return BlockArrays.blockedrange(block_num_dofs)
+    end
+  end
+
+  for f in (:project,:inv_project)
+    @eval begin
+      function Arrays.return_cache(::typeof($f),r::$T,x::Union{BlockVector,BlockVectorOfVectors})
+        cache = return_cache($f,r[1],x[Block(1)])
+        block_cache = Vector{typeof(cache)}(undef,num_fields(r))
+        return block_cache
+      end
+
+      function $f(r::$T,x::Union{BlockVector,BlockVectorOfVectors})
+        cache = return_cache($f,r,x)
+        for i in 1:blocklength(x)
+          cache[i] = $f(r[i],x[Block(i)])
+        end
+        return mortar(cache)
+      end
+    end
+  end
+end

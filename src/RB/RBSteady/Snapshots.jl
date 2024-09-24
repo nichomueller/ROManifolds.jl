@@ -434,7 +434,7 @@ function Arrays.return_cache(::typeof(change_index_map),s::BlockSnapshots)
   @notimplementedif isnothing(i)
   cache = return_cache(change_index_map,f,s[i])
   block_cache = Array{typeof(cache),ndims(s)}(undef,size(s))
-  return ArrayBlock(block_cache,s.touched)
+  return block_cache
 end
 
 for f in (:flatten_snapshots,:select_snapshots)

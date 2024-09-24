@@ -47,7 +47,6 @@ export TransientGenericSnapshots
 export TransientSparseSnapshots
 export UnfoldingTransientSnapshots
 export ModeTransientSnapshots
-export compress
 include("Snapshots.jl")
 
 export get_stage_operator
@@ -65,6 +64,7 @@ export TransientBasis
 include("Projections.jl")
 
 export TransientRBSpace
+export TransientEvalMultiFieldRBSpace
 include("RBSpace.jl")
 
 export TransientMDEIM

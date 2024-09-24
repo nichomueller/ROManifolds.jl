@@ -124,17 +124,56 @@ end
 
 for f in (:get_indices_space,:get_indices_time)
   @eval begin
+    function Arrays.return_cache(::typeof($f),a::HyperReduction)
+      cache = $f(a)
+      return cache
+    end
+
+    function Arrays.return_cache(::typeof($f),a::BlockHyperReduction)
+      i = findfirst(a.touched)
+      @notimplementedif isnothing(i)
+      cache = return_cache($f,a[i])
+      block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
+      return block_cache
+    end
+
     function $f(a::BlockHyperReduction)
-      cache = return_cache(RBSteady.get_indices,a)
+      cache = return_cache($f,a)
       for i in eachindex(a)
-        if cache.touched[i]
+        if a.touched[i]
           cache[i] = $f(a[i])
         end
       end
-      return cache
+      return ArrayBlock(cache,a.touched)
     end
   end
 end
 
-union_indices_space(a::BlockHyperReduction...) = union(get_indices_space.(a)...)
-union_indices_time(a::BlockHyperReduction...) = union(union_indices_time.(a)...)
+function union_indices_space(a::BlockHyperReduction...)
+  @check all(ai.touched == a[1].touched for ai in a)
+  cache = return_cache(get_indices_space,first(a))
+  for ai in a
+    for i in eachindex(ai)
+      if ai.touched[i]
+        if isassigned(cache,i)
+          cache[i] = union(cache[i],get_indices_space(ai[i]))
+        else
+          cache[i] = get_indices_space(ai[i])
+        end
+      end
+    end
+  end
+  ArrayBlock(cache,a[1].touched)
+end
+
+function union_indices_time(a::BlockHyperReduction...)
+  cache = Vector{Int32}[]
+  for ai in a
+    for i in eachindex(ai)
+      if ai.touched[i]
+        push!(cache,get_indices_time(ai[i]))
+      end
+    end
+  end
+  union(cache...)
+end

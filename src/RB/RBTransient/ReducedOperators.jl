@@ -382,7 +382,7 @@ function Algebra.solve!(
   x̂,rbcache = cache.rbcache
 
   t = @timed solve!(x̂,solver,op,r,(y,),(odecache,rbcache))
-  stats = CostTracker(t,num_params(r))
+  stats = CostTracker(t,nruns=num_params(r))
 
   return x̂,stats
 end

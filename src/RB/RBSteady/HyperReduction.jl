@@ -319,7 +319,7 @@ function reduced_residual(red::Reduction,test::FESubspace,c::ArrayContribution)
       reduced_form(red,values,trian,test)
     end |> tuple_of_arrays
   end
-  println(CostTracker(t,"Residual hyper-reduction"))
+  println(CostTracker(t,name="Residual hyper-reduction"))
   return Contribution(a,trians)
 end
 
@@ -329,7 +329,7 @@ function reduced_jacobian(red::Reduction,trial::FESubspace,test::FESubspace,c::A
       reduced_form(red,values,trian,trial,test)
     end |> tuple_of_arrays
   end
-  println(CostTracker(t,"Jacobian hyper-reduction"))
+  println(CostTracker(t,name="Jacobian hyper-reduction"))
   return Contribution(a,trians)
 end
 
@@ -366,23 +366,37 @@ for f in (:get_basis,:get_interpolation,:get_integration_domain,:get_indices)
       @notimplementedif isnothing(i)
       cache = return_cache($f,a[i])
       block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
-      touched = a.touched
-      return ArrayBlock(block_cache,touched)
+      return block_cache
     end
 
     function $f(a::BlockHyperReduction)
       cache = return_cache($f,a)
       for i in eachindex(a)
-        if cache.touched[i]
+        if a.touched[i]
           cache[i] = $f(a[i])
         end
       end
-      return cache
+      return ArrayBlock(cache,a.touched)
     end
   end
 end
 
-union_indices(a::BlockHyperReduction...) = union_indices(get_indices.(a)...)
+function union_indices(a::BlockHyperReduction...)
+  @check all(ai.touched == a[1].touched for ai in a)
+  cache = return_cache(get_indices,first(a))
+  for ai in a
+    for i in eachindex(ai)
+      if ai.touched[i]
+        if isassigned(cache,i)
+          cache[i] = union(cache[i],get_indices(ai[i]))
+        else
+          cache[i] = get_indices(ai[i])
+        end
+      end
+    end
+  end
+  ArrayBlock(cache,a[1].touched)
+end
 
 function Arrays.return_cache(
   ::typeof(allocate_coefficient),
@@ -402,7 +416,7 @@ function Arrays.return_cache(
   @notimplementedif isnothing(i)
   coeff = return_cache(allocate_coefficient,a[i],r)
   block_coeff = Array{typeof(coeff),ndims(a)}(undef,size(a))
-  return ArrayBlock(block_coeff,a.touched)
+  return block_coeff
 end
 
 function allocate_coefficient(a::BlockHyperReduction,r::AbstractRealization)
@@ -412,7 +426,7 @@ function allocate_coefficient(a::BlockHyperReduction,r::AbstractRealization)
       coeff[i] = allocate_coefficient(a[i],r)
     end
   end
-  return coeff
+  return ArrayBlock(coeff,a.touched)
 end
 
 function Arrays.return_cache(
@@ -467,11 +481,14 @@ function fill_missing_blocks!(a::AbstractMatrix{<:AbstractParamMatrix{T}}) where
       col_block = findfirst(i -> isassigned(a,i,j),axes(a,1))
       @check !isnothing(row_block) "The system is ill posed"
       @check !isnothing(col_block) "The system is ill posed"
-      nrows = size(row_block,1)
-      ncols = size(col_block,2)
-      item = zeros(T,nrows,ncols)
-      plength = param_length(a[row_block,col_block])
-      a[i,j] = array_of_consecutive_arrays(item,plength)
+      item_rows = a[row_block,j]
+      item_cols = a[i,col_block]
+      @check param_length(item_rows) == param_length(item_cols)
+      ncols = size(param_getindex(item_rows,1),2)
+      nrows = size(param_getindex(item_cols,1),1)
+      plength = param_length(item_rows)
+      cache = zeros(T,nrows,ncols)
+      a[i,j] = array_of_consecutive_arrays(cache,plength)
     end
   end
 end
