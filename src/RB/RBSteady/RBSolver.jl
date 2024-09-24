@@ -33,16 +33,16 @@ In particular:
 """
 struct RBSolver{A<:GridapType,B}
   fesolver::A
-  state_reduction::AbstractReduction
-  residual_reduction::AbstractReduction
+  state_reduction::Reduction
+  residual_reduction::Reduction
   jacobian_reduction::B
   cache::RBOnlineCache
 end
 
 function RBSolver(
   fesolver::GridapType,
-  state_reduction::AbstractReduction,
-  residual_reduction::AbstractReduction,
+  state_reduction::Reduction,
+  residual_reduction::Reduction,
   jacobian_reduction)
 
   cache = RBOnlineCache(nothing,nothing)
@@ -51,7 +51,7 @@ end
 
 function RBSolver(
   fesolver::FESolver,
-  state_reduction::AbstractReduction;
+  state_reduction::Reduction;
   nparams_res=20,
   nparams_jac=20)
 

@@ -141,7 +141,7 @@ struct PODBasis{A<:AbstractMatrix} <: Projection
   basis::A
 end
 
-function projection(red::PODReduction,s::AbstractArray,args...)
+function projection(red::PODReduction,s::AbstractArray{<:Number},args...)
   basis = reduction(red,s,args...)
   PODBasis(basis)
 end
@@ -154,9 +154,10 @@ function rescale(op::Function,x::AbstractArray,b::PODBasis)
   PODBasis(op(x,get_basis(b)))
 end
 
-function Base.union(a::PODBasis,b::PODBasis,args...)
+Base.union(a::PODBasis,b::PODBasis,args...) = union(a,get_basis(b),args...)
+
+function Base.union(a::PODBasis,basis_b::AbstractMatrix,args...)
   basis_a = get_basis(a)
-  basis_b = get_basis(b)
   basis_ab, = gram_schmidt(basis_b,basis_a,args...)
   PODBasis(basis_ab)
 end
@@ -220,8 +221,11 @@ end
 
 function Base.union(a::TTSVDCores,b::TTSVDCores,args...)
   @check get_index_map(a) == get_index_map(b)
+  union(a,get_cores(b),args...)
+end
+
+function Base.union(a::TTSVDCores,cores_b::AbstractVector{<:AbstractArray},args...)
   cores_a = get_cores(a)
-  cores_b = get_cores(b)
   cores_ab = block_cores(cores_a,cores_b)
   orthogonalize!(cores_ab,args...)
   TTSVDCores(cores_ab,get_index_map(a))
@@ -272,16 +276,16 @@ function Arrays.return_cache(::typeof(projection),::TTSVDReduction,s::AbstractSn
   return TTSVDCores(c,i)
 end
 
-function Arrays.return_cache(::typeof(projection),red::AbstractReduction,s::BlockSnapshots)
+function Arrays.return_cache(::typeof(projection),red::Reduction,s::BlockSnapshots)
   i = findfirst(s.touched)
-  @notimplementedif isempty(i)
+  @notimplementedif isnothing(i)
   basis = return_cache(projection,red,blocks(s)[i])
   block_basis = Array{typeof(basis),ndims(s)}(undef,size(s))
   touched = s.touched
   return BlockProjection(block_basis,touched)
 end
 
-function projection(red::AbstractReduction,s::BlockSnapshots)
+function projection(red::Reduction,s::BlockSnapshots)
   basis = return_cache(projection,red,s)
   for i in eachindex(basis)
     if basis.touched[i]
@@ -291,11 +295,11 @@ function projection(red::AbstractReduction,s::BlockSnapshots)
   return basis
 end
 
-function projection(red::AbstractReduction,s::BlockSnapshots,norm_matrix)
+function projection(red::Reduction,s::BlockSnapshots,norm_matrix)
   basis = return_cache(projection,red,s)
   for i in eachindex(basis)
     if basis.touched[i]
-      basis[i] = projection(red,s[i],norm_matrix[i])
+      basis[i] = projection(red,s[i],norm_matrix[Block(i,i)])
     end
   end
   return basis
@@ -342,7 +346,10 @@ function BlockProjection(a::AbstractArray{A},touched::Array{Bool,N}) where {A<:P
   BlockProjection(array,touched)
 end
 
-Base.size(a::BlockProjection,i...) = size(a.array,i...)
+Base.ndims(a::BlockProjection) = ndims(a.touched)
+Base.size(a::BlockProjection) = size(a.touched)
+Base.axes(a::BlockProjection) = axes(a.touched)
+Base.eachindex(a::BlockProjection) = eachindex(a.touched)
 
 function Base.getindex(a::BlockProjection,i...)
   if !a.touched[i...]
@@ -375,7 +382,7 @@ function num_fe_dofs(a::BlockProjection)
 end
 
 function num_reduced_dofs(a::BlockProjection)
-  dofs = zeros(Int,length(a))
+  dofs = zeros(Int,size(a))
   for i in eachindex(a)
     if a.touched[i]
       dofs[i] = num_reduced_dofs(a[i])
@@ -391,8 +398,8 @@ for f in (:project,:inv_project)
       a::BlockProjection,
       x::Union{BlockVector,BlockVectorOfVectors})
 
-      @check size(a) == size(x)
-      y = Vector{eltype(x)}(undef,length(a))
+      @check size(a) == nblocks(x)
+      y = Vector{eltype(x)}(undef,nblocks(a))
       for i in eachindex(a)
         if a.touched[i]
           y[Block(i)] = return_cache($f,a[i],blocks(x)[i])
@@ -416,7 +423,7 @@ for f in (:project,:inv_project)
 end
 
 """
-    enrich(
+    enrich!(
       a::BlockProjection,
       norm_matrix::AbstractMatrix,
       supr_matrix::AbstractMatrix,
@@ -426,19 +433,22 @@ Returns the supremizer-enriched BlockProjection. This function stabilizes Inf-Su
 problems projected on a reduced vector space
 
 """
-function enrich(
+function enrich!(
+  ::SupremizerReduction,
   a::BlockProjection,
   norm_matrix::BlockMatrix,
   supr_matrix::BlockMatrix)
 
-  @check length(findall(a.touched)) == length(a)
+  @check a.touched[1] "Primal field not defined"
   a_primal,a_dual... = a.array
   X_primal = norm_matrix[Block(1,1)]
   H_primal = cholesky(X_primal)
   for i = eachindex(a_dual)
+    dual_i = get_basis_space(a_dual[i])
     C_primal_dual_i = supr_matrix[Block(1,i+1)]
-    supr_i = H_primal \ C_primal_dual_i * a_dual[i]
+    supr_i = H_primal \ C_primal_dual_i * dual_i
     a_primal = union(a_primal,supr_i,X_primal)
   end
-  return BlockProjection([a_primal,a_dual...],a.touched)
+  a[1] = a_primal
+  return
 end

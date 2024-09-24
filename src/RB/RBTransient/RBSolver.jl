@@ -1,24 +1,26 @@
-function RBSteady.RBSolver(fesolver::ODESolver,state_reduction::AbstractReduction;kwargs...)
-  @notimplemented
+time_combinations(fesolver::ODESolver) = @notimplemented
+
+function time_combinations(fesolver::ThetaMethod)
+  θ = fesolver.θ
+  combine_res(x) = x
+  combine_jac(x,y) = θ*x+(1-θ)*y
+  combine_djac(x,y) = θ*(x-y)
+  return combine_res,combine_jac,combine_djac
 end
 
 function RBSteady.RBSolver(
-  fesolver::ThetaMethod,
-  state_reduction::AbstractReduction;
+  fesolver::ODESolver,
+  state_reduction::Reduction;
   nparams_res=20,
   nparams_jac=20,
   nparams_djac=nparams_jac)
 
-  θ = fesolver.θ
-  combine_res = (x) -> x
-  combine_jac = (x,y) -> θ*x+(1-θ)*y
-  combine_djac = (x,y) -> θ*(x-y)
-
   red_style = ReductionStyle(state_reduction)
+  cres,cjac,cdjac = time_combinations(fesolver)
 
-  residual_reduction = TransientMDEIMReduction(combine_res,red_style;nparams=nparams_res)
-  jac_reduction = TransientMDEIMReduction(combine_jac,red_style;nparams=nparams_jac)
-  djac_reduction = TransientMDEIMReduction(combine_djac,red_style;nparams=nparams_djac)
+  residual_reduction = TransientMDEIMReduction(cres,red_style;nparams=nparams_res)
+  jac_reduction = TransientMDEIMReduction(cjac,red_style;nparams=nparams_jac)
+  djac_reduction = TransientMDEIMReduction(cdjac,red_style;nparams=nparams_djac)
   jacobian_reduction = (jac_reduction,djac_reduction)
 
   RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction)

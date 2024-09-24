@@ -30,15 +30,16 @@ function Base.getindex(a::AbstractParamArray,i::TransientIntegrationDomain)
   @notimplemented
 end
 
-const TransientHyperReduction{A<:AbstractReduction,B<:ReducedProjection} = HyperReduction{A,B,TransientIntegrationDomain}
+const TransientHyperReduction{A<:Reduction,B<:ReducedProjection} = HyperReduction{A,B,TransientIntegrationDomain}
 
 get_integration_domain_space(a::TransientHyperReduction) = @abstractmethod
 get_integration_domain_time(a::TransientHyperReduction) = @abstractmethod
 
 get_indices_space(a::TransientHyperReduction) = RBSteady.get_indices(get_integration_domain_space(a))
-union_indices_space(a::TransientHyperReduction...) = RBSteady.union_indices(get_integration_domain_space.(a)...)
 get_indices_time(a::TransientHyperReduction) = RBSteady.get_indices(get_integration_domain_time(a))
-union_indices_time(a::TransientHyperReduction...) = RBSteady.union_indices(get_integration_domain_time.(a)...)
+
+union_indices_space(a::TransientHyperReduction...) = union(get_indices_space.(a)...)
+union_indices_time(a::TransientHyperReduction...) = union(get_indices_time.(a)...)
 
 union_indices_space(a::AffineContribution) = union_indices_space(get_values(a)...)
 union_indices_time(a::AffineContribution) = union_indices_time(get_values(a)...)
@@ -69,7 +70,7 @@ get_integration_domain_space(a::TransientMDEIM) = get_integration_domain_space(a
 get_integration_domain_time(a::TransientMDEIM) = get_integration_domain_time(a.domain)
 
 function RBSteady.reduced_jacobian(
-  red::Tuple{Vararg{AbstractReduction}},
+  red::Tuple{Vararg{Reduction}},
   trial::FESubspace,
   test::FESubspace,
   contribs::Tuple{Vararg{Any}})
@@ -118,3 +119,22 @@ function RBSteady.inv_project!(cache,a::TupOfAffineContribution,b::TupOfArrayCon
   end
   return b̂
 end
+
+# multi field interface
+
+for f in (:get_indices_space,:get_indices_time)
+  @eval begin
+    function $f(a::BlockHyperReduction)
+      cache = return_cache(RBSteady.get_indices,a)
+      for i in eachindex(a)
+        if cache.touched[i]
+          cache[i] = $f(a[i])
+        end
+      end
+      return cache
+    end
+  end
+end
+
+union_indices_space(a::BlockHyperReduction...) = union(get_indices_space.(a)...)
+union_indices_time(a::BlockHyperReduction...) = union(union_indices_time.(a)...)

@@ -61,7 +61,7 @@ include("BasisConstruction.jl")
 
 include("GalerkinProjections.jl")
 
-export TransientPODBasis
+export TransientBasis
 include("Projections.jl")
 
 export TransientRBSpace

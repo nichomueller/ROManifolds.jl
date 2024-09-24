@@ -2,36 +2,32 @@
 abstract type PerformanceTracker end
 
 mutable struct CostTracker <: PerformanceTracker
+  name::String
   time::Float64
   nallocs::Float64
   nruns::Int
 end
 
-function CostTracker(;time=0.0,nallocs=0.0,nruns=0)
-  CostTracker(time,nallocs,nruns)
+function CostTracker(;name="",time=0.0,nallocs=0.0,nruns=0)
+  CostTracker(name,time,nallocs,nruns)
 end
 
-function CostTracker(stats::NamedTuple,nruns=1)
+function CostTracker(stats::NamedTuple,name="",nruns=1)
   time = stats[:time]
   nallocs = stats[:bytes] / 1e6
-  CostTracker(time,nallocs,nruns)
+  CostTracker(name,time,nallocs,nruns)
 end
 
 function Base.show(io::IO,k::MIME"text/plain",t::CostTracker)
-  println(io," ---------------------- CostTracker ----------------------------")
-  println(io," > computational time (s) across $(t.nruns) runs: $(t.time)")
-  println(io," > memory footprint (Mb) across $(t.nruns) runs: $(t.nallocs)")
+  println(io," -------------------------------------------------------------")
+  println(io," > CostTracker($(t.name)) across $(t.nruns) runs:")
+  println(io," > computational time (s): $(t.time)")
+  println(io," > memory footprint (Mb): $(t.nallocs)")
   println(io," -------------------------------------------------------------")
 end
 
 function Base.show(io::IO,t::CostTracker)
   show(io,MIME"text/plain"(),t)
-end
-
-function Base.copyto!(t1::CostTracker,t2::CostTracker)
-  t1.time = t2.time
-  t1.nallocs = t2.nallocs
-  t1.nruns = t2.nruns
 end
 
 function reset_tracker!(t::CostTracker)
@@ -59,12 +55,13 @@ function get_stats(t::CostTracker)
 end
 
 struct SU <: PerformanceTracker
+  name::String
   speedup_time::Float64
   speedup_memory::Float64
 end
 
 function Base.show(io::IO,k::MIME"text/plain",su::SU)
-  println(io," -------------------------- SU -------------------------------")
+  println(io," -------------------- SU($(su.name)) -------------------------")
   println(io," > speedup in time: $(su.speedup_time)")
   println(io," > speedup in memory: $(su.speedup_memory)")
   println(io," -------------------------------------------------------------")
@@ -81,11 +78,12 @@ Computes the speedup the tracker `t2` achieves with respect to `t1`, in time and
 in memory footprint
 """
 function compute_speedup(t1::CostTracker,t2::CostTracker)
+  @check t1.name == t2.name
   avg_time1,avg_nallocs1 = get_stats(t1)
   avg_time2,avg_nallocs2 = get_stats(t2)
   speedup_time = avg_time1 / avg_time2
   speedup_memory = avg_nallocs1 / avg_nallocs2
-  return SU(speedup_time,speedup_memory)
+  return SU(t1.name,speedup_time,speedup_memory)
 end
 
 induced_norm(v::AbstractVector,args...) = norm(v)

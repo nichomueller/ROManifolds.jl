@@ -1,4 +1,4 @@
-function reduction(red::AbstractReduction,A::AbstractArray)
+function reduction(red::Reduction,A::AbstractArray)
   @abstractmethod
 end
 
@@ -71,7 +71,7 @@ function tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatri
 end
 
 function tpod(red_style::ReductionStyle,M::AbstractMatrix,args...)
-  if _size_cond(M) && red_style != LRApproxRank()
+  if _size_cond(M) && !isa(red_style,LRApproxRank)
     if size(M,1) > size(M,2)
       massive_rows_tpod(red_style,M,args...)
     else

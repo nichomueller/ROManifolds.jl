@@ -1,5 +1,7 @@
 abstract type ReductionStyle end
 
+ReductionStyle(args...;kwargs...) = @abstractmethod
+
 struct SearchSVDRank <: ReductionStyle
   tol::Float64
 end
@@ -22,15 +24,29 @@ function LRApproxRank(rank::Int;maxdet_tol=0.,sketch_randn_niter=1,sketch=:sprn,
   return LRApproxRank(opts)
 end
 
+function ReductionStyle(tol::Float64;sketch=nothing,kwargs...)
+  isa(sketch,Symbol) ? LRApproxRank(tol;sketch,kwargs...) : SearchSVDRank(tol)
+end
+
+function ReductionStyle(rank::Int;sketch=nothing,kwargs...)
+  isa(sketch,Symbol) ? LRApproxRank(rank;sketch,kwargs...) : FixedSVDRank(rank)
+end
+
 struct TTSVDRanks{A<:ReductionStyle} <: ReductionStyle
   style::Vector{A}
 end
 
-TTSVDRanks(tols::Vector{Float64}) = TTSVDRanks(SearchSVDRank.(tols))
-TTSVDRanks(ranks::Vector{Int}) = TTSVDRanks(FixedSVDRank.(ranks))
+function TTSVDRanks(tolranks::Vector{<:Union{Float64,Int}},args...;kwargs...)
+  style = map(tolrank -> ReductionStyle(tolrank,args...;kwargs...))
+  TTSVDRanks(style)
+end
 
-TTSVDRanks(tol::Float64,N=3) = TTSVDRanks(fill(tol,N))
-TTSVDRanks(rank::Int,N=3) = TTSVDRanks(fill(rank,N))
+function TTSVDRanks(tolrank::Union{Float64,Int},D=3,args...;kwargs...)
+  TTSVDRanks(fill(tolrank,D),args...;kwargs...)
+end
+
+ReductionStyle(tolrank::Union{Float64,Int};kwargs...) = TTSVDRanks(tolrank;kwargs...)
+ReductionStyle(tolrank::Vector{<:Union{Float64,Int}};kwargs...) = TTSVDRanks(tolrank;kwargs...)
 
 Base.size(r::TTSVDRanks) = (length(r.style),)
 Base.getindex(r::TTSVDRanks,i::Integer) = getindex(r.style,i)
@@ -47,21 +63,17 @@ end
 
 get_norm(n::EnergyNorm) = n.norm_op
 
-abstract type AbstractReduction{A<:ReductionStyle,B<:NormStyle} end
-abstract type DirectReduction{A,B} <: AbstractReduction{A,B} end
-abstract type GreedyReduction{A,B} <: AbstractReduction{A,B} end
+abstract type Reduction{A<:ReductionStyle,B<:NormStyle} end
+abstract type DirectReduction{A,B} <: Reduction{A,B} end
+abstract type GreedyReduction{A,B} <: Reduction{A,B} end
 
-get_reduction(r::AbstractReduction) = r
-ReductionStyle(r::AbstractReduction) = @abstractmethod
-NormStyle(r::AbstractReduction) = @abstractmethod
-ParamDataStructures.num_params(r::AbstractReduction) = @abstractmethod
-get_norm(r::AbstractReduction) = get_norm(NormStyle(r))
+get_reduction(r::Reduction) = r
+ReductionStyle(r::Reduction) = @abstractmethod
+NormStyle(r::Reduction) = @abstractmethod
+ParamDataStructures.num_params(r::Reduction) = @abstractmethod
+get_norm(r::Reduction) = get_norm(NormStyle(r))
 
-abstract type AbstractAffineReduction{A,B} <: DirectReduction{A,B} end
-
-ParamDataStructures.num_params(r::AbstractAffineReduction) = 1
-
-struct AffineReduction{A,B} <: AbstractAffineReduction{A,B}
+struct AffineReduction{A,B} <: DirectReduction{A,B}
   red_style::A
   norm_style::B
 end
@@ -83,6 +95,7 @@ end
 
 ReductionStyle(r::AffineReduction) = r.red_style
 NormStyle(r::AffineReduction) = r.norm_style
+ParamDataStructures.num_params(r::AffineReduction) = 1
 
 struct PODReduction{A,B} <: DirectReduction{A,B}
   red_style::A
@@ -146,24 +159,15 @@ ReductionStyle(r::TTSVDReduction) = r.red_style
 NormStyle(r::TTSVDReduction) = r.norm_style
 ParamDataStructures.num_params(r::TTSVDReduction) = r.nparams
 
-struct SupremizerReduction{A,R<:AbstractReduction{A,EnergyNorm}} <: AbstractReduction{A,EnergyNorm}
+struct SupremizerReduction{A,R<:Reduction{A,EnergyNorm}} <: Reduction{A,EnergyNorm}
   reduction::R
   supr_op::Function
   supr_tol::Float64
 end
 
-for f in (:PODReduction,:TTSVDReduction)
-  @eval begin
-    function $f(red_style::ReductionStyle,norm_op::Function,supr_op::Function,args...;supr_tol=1e-2,kwargs...)
-      reduction = $f(red_style,norm_op,args...;kwargs...)
-      SupremizerReduction(reduction,supr_op,supr_tol)
-    end
-
-    function $f(norm_op::Function,supr_op::Function,args...;supr_tol=1e-2,kwargs...)
-      reduction = $f(norm_op,args...;kwargs...)
-      SupremizerReduction(reduction,supr_op,supr_tol)
-    end
-  end
+function SupremizerReduction(supr_op::Function,args...;supr_tol=1e-2,kwargs...)
+  reduction = Reduction(args...;kwargs...)
+  SupremizerReduction(reduction,supr_op,supr_tol)
 end
 
 get_supr(r::SupremizerReduction) = r.supr_op
@@ -176,17 +180,26 @@ ParamDataStructures.num_params(r::SupremizerReduction) = num_params(get_reductio
 
 # generic constructor
 
-function Reduction(red_style::Union{SearchSVDRank,FixedSVDRank},args...;kwargs...)
-  PODReduction(red_style,args...;kwargs...)
+function Reduction(red_style::ReductionStyle,args...;nparams=50,kwargs...)
+  PODReduction(red_style,args...;nparams,kwargs...)
 end
 
-function Reduction(red_style::TTSVDRanks,args...;kwargs...)
-  TTSVDReduction(red_style,args...;kwargs...)
+function Reduction(red_style::TTSVDRanks,args...;nparams=50,kwargs...)
+  TTSVDReduction(red_style,args...;nparams,kwargs...)
 end
 
-abstract type AbstractMDEIMReduction{A} <: AbstractReduction{A,EuclideanNorm} end
+function Reduction(tolrank,args...;kwargs...)
+  red_style = ReductionStyle(tolrank;kwargs...)
+  Reduction(red_style,args...;kwargs...)
+end
 
-struct MDEIMReduction{A,R<:AbstractReduction{A,EuclideanNorm}} <: AbstractMDEIMReduction{A}
+function Reduction(supr_op::Function,args...;kwargs...)
+  SupremizerReduction(supr_op,args...;kwargs...)
+end
+
+abstract type AbstractMDEIMReduction{A} <: Reduction{A,EuclideanNorm} end
+
+struct MDEIMReduction{A,R<:Reduction{A,EuclideanNorm}} <: AbstractMDEIMReduction{A}
   reduction::R
 end
 

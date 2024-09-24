@@ -426,8 +426,12 @@ Base.getindex(r::Range2D,i::Integer,j::Integer) = r.axis1[i] + (r.axis2[j]-1)*r.
 
 # utils
 
-function RBSteady.Snapshots(a::TupOfArrayContribution,i::AbstractIndexMap,r::AbstractRealization)
-  map(a->Snapshots(a,i,r),a)
+for I in (:AbstractIndexMap,:(AbstractArray{<:AbstractIndexMap}))
+  @eval begin
+    function RBSteady.Snapshots(a::TupOfArrayContribution,i::$I,r::AbstractRealization)
+      map(a->Snapshots(a,i,r),a)
+    end
+  end
 end
 
 function RBSteady.select_snapshots(a::TupOfArrayContribution,args...;kwargs...)

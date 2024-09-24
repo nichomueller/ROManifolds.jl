@@ -389,6 +389,8 @@ function Snapshots(data::BlockArrayOfArrays,i::AbstractArray{<:AbstractIndexMap}
   BlockSnapshots(block_map,active_block_snaps)
 end
 
+BlockArrays.blocks(s::BlockSnapshots) = s.array
+
 Base.size(s::BlockSnapshots) = size(s.array)
 
 function Base.getindex(s::BlockSnapshots,i...)
@@ -429,10 +431,10 @@ end
 
 function Arrays.return_cache(::typeof(change_index_map),s::BlockSnapshots)
   i = findfirst(s.touched)
-  @notimplementedif isempty(i)
+  @notimplementedif isnothing(i)
   cache = return_cache(change_index_map,f,s[i])
   block_cache = Array{typeof(cache),ndims(s)}(undef,size(s))
-  return block_cache
+  return ArrayBlock(block_cache,s.touched)
 end
 
 for f in (:flatten_snapshots,:select_snapshots)
@@ -443,7 +445,7 @@ for f in (:flatten_snapshots,:select_snapshots)
 
     function Arrays.return_cache(::typeof($f),s::BlockSnapshots,args...;kwargs...)
       i = findfirst(s.touched)
-      @notimplementedif isempty(i)
+      @notimplementedif isnothing(i)
       cache = return_cache($f,s[i],args...;kwargs...)
       block_cache = Array{typeof(cache),ndims(s)}(undef,size(s))
       return block_cache
@@ -454,22 +456,27 @@ end
 for f in (:(IndexMaps.change_index_map),:flatten_snapshots,:select_snapshots)
   @eval begin
     function $f(s::BlockSnapshots,args...;kwargs...)
-      cache = return_cache($f,s,args...;kwargs...)
-      for i in eachindex(cache)
-        if cache.touched[i]
-          cache[i] = $f(s[i],args...;kwargs...)
+      array = return_cache($f,s,args...;kwargs...)
+      touched = s.touched
+      for i in eachindex(touched)
+        if touched[i]
+          array[i] = $f(s[i],args...;kwargs...)
         end
       end
-      return cache
+      return BlockSnapshots(array,touched)
     end
   end
 end
 
 # utils
 
-function Snapshots(a::ArrayContribution,i::AbstractIndexMap,r::AbstractRealization)
-  contribution(a.trians) do trian
-    Snapshots(a[trian],i,r)
+for I in (:AbstractIndexMap,:(AbstractArray{<:AbstractIndexMap}))
+  @eval begin
+    function Snapshots(a::ArrayContribution,i::$I,r::AbstractRealization)
+      contribution(a.trians) do trian
+        Snapshots(a[trian],i,r)
+      end
+    end
   end
 end
 

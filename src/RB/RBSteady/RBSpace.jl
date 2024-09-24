@@ -16,15 +16,14 @@ function reduced_fe_space(solver::RBSolver,feop,s)
   reduced_fe_space(red,feop,soff)
 end
 
-function reduced_fe_space(red::AbstractReduction,feop,s)
+function reduced_fe_space(red::Reduction,feop,s)
   t = @timed begin
     basis = reduced_basis(red,feop,s)
   end
+  println(CostTracker(t,"Basis construction"))
+
   reduced_trial = fe_subspace(get_trial(feop),basis)
   reduced_test = fe_subspace(get_test(feop),basis)
-
-  println(CostTracker(t))
-
   return reduced_trial,reduced_test
 end
 
@@ -36,7 +35,7 @@ the snapshots `s`
 
 """
 function reduced_basis(
-  red::AbstractReduction,
+  red::Reduction,
   s::AbstractArray,
   args...)
 
@@ -44,7 +43,7 @@ function reduced_basis(
 end
 
 function reduced_basis(
-  red::AbstractReduction,
+  red::Reduction,
   feop::GridapType,
   s::AbstractArray)
 
@@ -52,7 +51,7 @@ function reduced_basis(
 end
 
 function reduced_basis(
-  red::AbstractReduction{<:ReductionStyle,EnergyNorm},
+  red::Reduction{<:ReductionStyle,EnergyNorm},
   feop::GridapType,
   s::AbstractArray)
 
@@ -68,7 +67,8 @@ function reduced_basis(
   norm_matrix = assemble_matrix(feop,get_norm(red))
   supr_matrix = assemble_matrix(feop,get_supr(red))
   basis = reduced_basis(get_reduction(red),s,norm_matrix)
-  enrich(red,basis,norm_matrix,supr_matrix)
+  enrich!(red,basis,norm_matrix,supr_matrix)
+  return basis
 end
 
 function fe_subspace(space::FESpace,basis)
@@ -186,12 +186,15 @@ Reduced basis subspace in a MultiField setting
 """
 struct MultiFieldRBSpace{A<:MultiFieldFESpace,B<:BlockProjection} <: FESubspace
   space::A
-  basis::B
+  subspace::B
 end
 
-function fe_subspace(space::MultiFieldFESpace,basis::BlockProjection)
-  MultiFieldRBSpace(space,basis)
+function fe_subspace(space::MultiFieldFESpace,subspace::BlockProjection)
+  MultiFieldRBSpace(space,subspace)
 end
+
+get_fe_space(r::MultiFieldRBSpace) = r.space
+get_reduced_subspace(r::MultiFieldRBSpace) = r.subspace
 
 function Base.getindex(r::MultiFieldRBSpace,i...)
   if isa(r.space,MultiFieldFESpace)
@@ -199,7 +202,7 @@ function Base.getindex(r::MultiFieldRBSpace,i...)
   else
     fs = evaluate(r.space,nothing)
   end
-  return fe_subspace(fs.spaces[i...],r.basis[i...])
+  return fe_subspace(fs.spaces[i...],r.subspace[i...])
 end
 
 function Base.iterate(r::MultiFieldRBSpace)
@@ -209,7 +212,7 @@ function Base.iterate(r::MultiFieldRBSpace)
     fs = evaluate(r.space,nothing)
   end
   i = 1
-  ri = fe_subspace(fs.spaces[i],r.basis[i])
+  ri = fe_subspace(fs.spaces[i],r.subspace[i])
   state = i+1,fs
   return ri,state
 end
@@ -219,9 +222,22 @@ function Base.iterate(r::MultiFieldRBSpace,state)
   if i > length(fs.spaces)
     return nothing
   end
-  ri = fe_subspace(fs.spaces[i],r.basis[i])
+  ri = fe_subspace(fs.spaces[i],r.subspace[i])
   state = i+1,fs
   return ri,state
+end
+
+function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace)
+  get_free_dof_ids(r,MultiFieldStyle(r))
+end
+
+function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace,::ConsecutiveMultiFieldStyle)
+  @notimplemented
+end
+
+function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace,::BlockMultiFieldStyle{NB}) where NB
+  block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
+  return BlockArrays.blockedrange(block_num_dofs)
 end
 
 MultiField.MultiFieldStyle(r::MultiFieldRBSpace) = MultiFieldStyle(r.space)
@@ -241,3 +257,5 @@ end
 
 get_fe_space(r::EvalFESubspace) = get_fe_space(r.subspace)
 get_reduced_subspace(r::EvalFESubspace) = get_reduced_subspace(r.subspace)
+
+FESpaces.get_free_dof_ids(r::EvalFESubspace) = get_free_dof_ids(r.subspace)

@@ -88,9 +88,9 @@ function Base.getindex(a::ParamSparseMatrix,i::IntegrationDomain)
   return entries
 end
 
-abstract type HyperReduction{A<:AbstractReduction,B<:ReducedProjection,C<:AbstractIntegrationDomain} <: Projection end
+abstract type HyperReduction{A<:Reduction,B<:ReducedProjection,C<:AbstractIntegrationDomain} <: Projection end
 
-HyperReduction(::AbstractReduction,args...) = @abstractmethod
+HyperReduction(::Reduction,args...) = @abstractmethod
 
 get_interpolation(a::HyperReduction) = @abstractmethod
 get_integration_domain(a::HyperReduction) = @abstractmethod
@@ -100,7 +100,7 @@ num_reduced_dofs_left_projector(a::HyperReduction) = num_reduced_dofs_left_proje
 num_reduced_dofs_right_projector(a::HyperReduction) = num_reduced_dofs_right_projector(get_basis(a))
 
 get_indices(a::HyperReduction) = get_indices(get_integration_domain(a))
-union_indices(a::HyperReduction...) = union_indices(get_integration_domain.(a)...)
+union_indices(a::HyperReduction...) = union(get_indices.(a)...)
 function ordered_common_locations(a::HyperReduction,args...)
   ordered_common_locations(get_integration_domain(a),args...)
 end
@@ -213,30 +213,35 @@ function Algebra.allocate_matrix(::Type{M},m::Integer,n::Integer) where M
   zeros(T,m,n)
 end
 
-function allocate_coefficient(a::HyperReduction,nparams::Int)
+function allocate_coefficient(a::HyperReduction,r::AbstractRealization)
   n = num_reduced_dofs(a)
+  np = num_params(r)
   coeffvec = allocate_vector(Vector{Float64},n)
-  coeff = array_of_consecutive_arrays(coeffvec,nparams)
+  coeff = array_of_consecutive_arrays(coeffvec,np)
   return coeff
 end
 
-function allocate_coefficient(a::HyperReduction,r::AbstractRealization)
-  allocate_coefficient(a,num_params(r))
-end
+function allocate_hyper_reduction(
+  a::HyperReduction{<:Reduction,<:ReducedVecProjection},
+  r::AbstractRealization)
 
-function allocate_hyper_reduction(a::HyperReduction{A,<:ReducedVecProjection},nparams::Int) where A
   nrows = num_reduced_dofs_left_projector(a)
+  np = num_params(r)
   b = allocate_vector(Vector{Float64},nrows)
-  hypred = array_of_consecutive_arrays(b,nparams)
+  hypred = array_of_consecutive_arrays(b,np)
   fill!(hypred,zero(eltype(hypred)))
   return hypred
 end
 
-function allocate_hyper_reduction(a::HyperReduction{A,<:ReducedMatProjection},nparams::Int) where A
+function allocate_hyper_reduction(
+  a::HyperReduction{<:Reduction,<:ReducedMatProjection},
+  r::AbstractRealization)
+
   nrows = num_reduced_dofs_left_projector(a)
   ncols = num_reduced_dofs_right_projector(a)
+  np = num_params(r)
   M = allocate_matrix(Matrix{Float64},nrows,ncols)
-  hypred = array_of_consecutive_arrays(M,nparams)
+  hypred = array_of_consecutive_arrays(M,np)
   fill!(hypred,zero(eltype(hypred)))
   return hypred
 end
@@ -298,32 +303,33 @@ function inv_project!(cache,a::AffineContribution,b::ArrayContribution)
 end
 
 function reduced_form(
-  red::AbstractReduction,
+  red::Reduction,
   s::AbstractSnapshots,
   trian::Triangulation,
   args...)
 
-  t = @timed begin
-    hyper_red = HyperReduction(red,s,args...)
-    red_trian = reduced_triangulation(trian,hyper_red,args...)
-  end
-
-  println(CostTracker(t))
-
+  hyper_red = HyperReduction(red,s,args...)
+  red_trian = reduced_triangulation(trian,hyper_red,args...)
   return hyper_red,red_trian
 end
 
-function reduced_residual(red::AbstractReduction,test::FESubspace,c::ArrayContribution)
-  a,trians = map(get_domains(c),get_values(c)) do trian,values
-    reduced_form(red,values,trian,test)
-  end |> tuple_of_arrays
+function reduced_residual(red::Reduction,test::FESubspace,c::ArrayContribution)
+  t = @timed begin
+    a,trians = map(get_domains(c),get_values(c)) do trian,values
+      reduced_form(red,values,trian,test)
+    end |> tuple_of_arrays
+  end
+  println(CostTracker(t,"Residual hyper-reduction"))
   return Contribution(a,trians)
 end
 
-function reduced_jacobian(red::AbstractReduction,trial::FESubspace,test::FESubspace,c::ArrayContribution)
-  a,trians = map(get_domains(c),get_values(c)) do trian,values
-    reduced_form(red,values,trian,trial,test)
-  end |> tuple_of_arrays
+function reduced_jacobian(red::Reduction,trial::FESubspace,test::FESubspace,c::ArrayContribution)
+  t = @timed begin
+    a,trians = map(get_domains(c),get_values(c)) do trian,values
+      reduced_form(red,values,trian,trial,test)
+    end |> tuple_of_arrays
+  end
+  println(CostTracker(t,"Jacobian hyper-reduction"))
   return Contribution(a,trians)
 end
 
@@ -348,16 +354,16 @@ function ParamDataStructures.Contribution(
   AffineContribution(v,t)
 end
 
-for f in (:get_basis,:get_interpolation,:get_integration_domain)
+for f in (:get_basis,:get_interpolation,:get_integration_domain,:get_indices)
   @eval begin
     function Arrays.return_cache(::typeof($f),a::HyperReduction)
-      cache = testvalue(typeof($f(a)))
+      cache = $f(a)
       return cache
     end
 
     function Arrays.return_cache(::typeof($f),a::BlockHyperReduction)
       i = findfirst(a.touched)
-      @notimplementedif isempty(i)
+      @notimplementedif isnothing(i)
       cache = return_cache($f,a[i])
       block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
       touched = a.touched
@@ -366,7 +372,7 @@ for f in (:get_basis,:get_interpolation,:get_integration_domain)
 
     function $f(a::BlockHyperReduction)
       cache = return_cache($f,a)
-      for i in eachindex(basis)
+      for i in eachindex(a)
         if cache.touched[i]
           cache[i] = $f(a[i])
         end
@@ -376,52 +382,74 @@ for f in (:get_basis,:get_interpolation,:get_integration_domain)
   end
 end
 
-function Arrays.return_cache(::typeof(allocate_coefficient),a::HyperReduction,nparams::Int)
+union_indices(a::BlockHyperReduction...) = union_indices(get_indices.(a)...)
+
+function Arrays.return_cache(
+  ::typeof(allocate_coefficient),
+  a::HyperReduction,
+  r::AbstractRealization)
+
   coeffvec = testvalue(Vector{Float64})
-  array_of_consecutive_arrays(coeffvec,nparams)
+  array_of_consecutive_arrays(coeffvec,num_params(r))
 end
 
-function Arrays.return_cache(::typeof(allocate_coefficient),a::BlockHyperReduction,nparams::Int)
+function Arrays.return_cache(
+  ::typeof(allocate_coefficient),
+  a::BlockHyperReduction,
+  r::AbstractRealization)
+
   i = findfirst(a.touched)
-  @notimplementedif isempty(i)
-  coeff = return_cache(allocate_coefficient,a[i],nparams)
+  @notimplementedif isnothing(i)
+  coeff = return_cache(allocate_coefficient,a[i],r)
   block_coeff = Array{typeof(coeff),ndims(a)}(undef,size(a))
   return ArrayBlock(block_coeff,a.touched)
 end
 
-function allocate_coefficient(a::BlockHyperReduction,nparams::Int)
-  coeff = return_cache(allocate_coefficient,a,nparams)
+function allocate_coefficient(a::BlockHyperReduction,r::AbstractRealization)
+  coeff = return_cache(allocate_coefficient,a,r)
   for i in eachindex(a)
     if a.touched[i]
-      coeff[i] = allocate_coefficient(a[i],nparams)
+      coeff[i] = allocate_coefficient(a[i],r)
     end
   end
   return coeff
 end
 
-function Arrays.return_cache(::typeof(allocate_hyper_reduction),a::ReducedVecProjection,nparams::Int)
+function Arrays.return_cache(
+  ::typeof(allocate_hyper_reduction),
+  a::HyperReduction{<:Reduction,<:ReducedVecProjection},
+  r::AbstractRealization)
+
   hypvec = testvalue(Vector{Float64})
-  array_of_consecutive_arrays(hypvec,nparams)
+  array_of_consecutive_arrays(hypvec,num_params(r))
 end
 
-function Arrays.return_cache(::typeof(allocate_hyper_reduction),a::ReducedMatProjection,nparams::Int)
+function Arrays.return_cache(
+  ::typeof(allocate_hyper_reduction),
+  a::HyperReduction{<:Reduction,<:ReducedMatProjection},
+  r::AbstractRealization)
+
   hypvec = testvalue(Matrix{Float64})
-  array_of_consecutive_arrays(hypvec,nparams)
+  array_of_consecutive_arrays(hypvec,num_params(r))
 end
 
-function Arrays.return_cache(::typeof(allocate_hyper_reduction),a::BlockHyperReduction,nparams::Int)
+function Arrays.return_cache(
+  ::typeof(allocate_hyper_reduction),
+  a::BlockHyperReduction,
+  r::AbstractRealization)
+
   i = findfirst(a.touched)
-  @notimplementedif isempty(i)
-  hypred = return_cache(allocate_hyper_reduction,a[i],nparams)
+  @notimplementedif isnothing(i)
+  hypred = return_cache(allocate_hyper_reduction,a[i],r)
   block_hypred = Array{typeof(hypred),ndims(a)}(undef,size(a))
   return block_hypred
 end
 
-function allocate_hyper_reduction(b::BlockHyperReduction,nparams::Int)
-  hypred = return_cache(allocate_hyper_reduction,a,nparams)
+function allocate_hyper_reduction(a::BlockHyperReduction,r::AbstractRealization)
+  hypred = return_cache(allocate_hyper_reduction,a,r)
   for i in eachindex(a)
     if a.touched[i]
-      hypred[i] = allocate_hyper_reduction(a[i],nparams)
+      hypred[i] = allocate_hyper_reduction(a[i],r)
     end
   end
   fill_missing_blocks!(hypred)
@@ -430,16 +458,20 @@ end
 
 fill_missing_blocks!(a::AbstractArray) = @notimplemented
 
-function fill_missing_blocks!(a::AbstractMatrix{<:AbstractMatrix{T}}) where T
-  for (i,j) in Iterators.product(size(a)...)
-    if isempty(a[i,j])
-      row_block = findfirst(!isempty.(a[i,:]))
-      col_block = findfirst(!isempty.(a[:,j]))
+fill_missing_blocks!(a::AbstractVector{<:AbstractParamVector{T}}) where T = a
+
+function fill_missing_blocks!(a::AbstractMatrix{<:AbstractParamMatrix{T}}) where T
+  for (i,j) in Iterators.product(axes(a)...)
+    if !isassigned(a,i,j)
+      row_block = findfirst(j -> isassigned(a,i,j),axes(a,2))
+      col_block = findfirst(i -> isassigned(a,i,j),axes(a,1))
       @check !isnothing(row_block) "The system is ill posed"
       @check !isnothing(col_block) "The system is ill posed"
       nrows = size(row_block,1)
       ncols = size(col_block,2)
-      a[i,j] = zeros(T,nrows,ncols)
+      item = zeros(T,nrows,ncols)
+      plength = param_length(a[row_block,col_block])
+      a[i,j] = array_of_consecutive_arrays(item,plength)
     end
   end
 end
@@ -468,7 +500,7 @@ function reduced_triangulation(
   @check size(b,1) == num_fields(test)
   @check size(b,2) == num_fields(trial)
   red_trian = Triangulation[]
-  for (i,j) in Iterators.product(size(b)...)
+  for (i,j) in Iterators.product(axes(b)...)
     if b.touched[i,j]
       push!(red_trian,reduced_triangulation(trian,b[i,j],trial[j],test[i]))
     end
@@ -476,49 +508,49 @@ function reduced_triangulation(
   return red_trian
 end
 
-function reduced_residual(
-  red::AbstractReduction,
-  test::MultiFieldRBSpace,
+function reduced_form(
+  red::Reduction,
   s::BlockSnapshots,
-  trian::Triangulation)
+  trian::Triangulation,
+  test::MultiFieldRBSpace)
 
-  hps = HyperReduction[]
+  hyper_reds = Vector{HyperReduction}(undef,size(s))
   red_trians = Triangulation[]
   for i in eachindex(s)
     if s.touched[i]
-      hr,red_trian = reduced_form(red,s[i],trian,test[i])
-      push!(hps,hr)
+      hyper_red,red_trian = reduced_form(red,s[i],trian,test[i])
+      hyper_reds[i] = hyper_red
       push!(red_trians,red_trian)
     end
   end
 
+  hyper_red = BlockProjection(hyper_reds,s.touched)
   red_trian = ParamDataStructures.merge_triangulations(red_trians)
-  hr = BlockProjection(hps,s.touched)
 
-  return hr,red_trian
+  return hyper_red,red_trian
 end
 
-function reduced_jacobian(
-  red::AbstractReduction,
-  trial::MultiFieldRBSpace,
-  test::MultiFieldRBSpace,
+function reduced_form(
+  red::Reduction,
   s::BlockSnapshots,
-  trian::Triangulation)
+  trian::Triangulation,
+  trial::MultiFieldRBSpace,
+  test::MultiFieldRBSpace)
 
-  hps = HyperReduction[]
+  hyper_reds = Matrix{HyperReduction}(undef,size(s))
   red_trians = Triangulation[]
-  for (i,j) in Iterators.product(size(s)...)
-    if s.touched[i]
-      hr,red_trian = reduced_form(red,s[i,j],trian,trial[j],test[i])
-      push!(hps,hr)
+  for (i,j) in Iterators.product(axes(s)...)
+    if s.touched[i,j]
+      hyper_red,red_trian = reduced_form(red,s[i,j],trian,trial[j],test[i])
+      hyper_reds[i,j] = hyper_red
       push!(red_trians,red_trian)
     end
   end
 
+  hyper_red = BlockProjection(hyper_reds,s.touched)
   red_trian = ParamDataStructures.merge_triangulations(red_trians)
-  hr = BlockProjection(reshape(hps,size(s.touched)),s.touched)
 
-  return hr,red_trian
+  return hyper_red,red_trian
 end
 
 function inv_project!(cache,a::BlockHyperReduction,b::ArrayBlock)

@@ -260,7 +260,7 @@ function ODEs.allocate_odeopcache(
 end
 
 function RBSteady.allocate_rbcache(
-  op::GenericTransientRBOperator,
+  op::LinearNonlinearTransientRBOperator,
   r::TransientRealization)
 
   cache_lin = RBSteady.allocate_rbcache(get_linear_operator(op),r)
@@ -381,7 +381,7 @@ function Algebra.solve!(
   y,odecache = cache.fecache
   x̂,rbcache = cache.rbcache
 
-  t = @timed solve!((x̂,),fesolver,op,r,(y,),(odecache,rbcache))
+  t = @timed solve!(x̂,solver,op,r,(y,),(odecache,rbcache))
   stats = CostTracker(t,num_params(r))
 
   return x̂,stats
@@ -401,7 +401,7 @@ function Algebra.solve!(
   (odeslvrcache,odeopcache),rbcache = cache
   _...,sysslvrcache = odeslvrcache
 
-  stageop = get_stage_operator(fesolver,op.op,r,statefe,cache)
+  stageop = get_stage_operator(fesolver,op,r,statefe,cache)
   solve!(x̂,sysslvr,stageop,sysslvrcache)
   return x̂
 end

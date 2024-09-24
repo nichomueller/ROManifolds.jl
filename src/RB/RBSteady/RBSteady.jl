@@ -45,10 +45,9 @@ export TTSVDRanks
 export NormStyle
 export EuclideanNorm
 export EnergyNorm
-export AbstractReduction
+export Reduction
 export DirectReduction
 export GreedyReduction
-export AbstractAffineReduction
 export AffineReduction
 export PODReduction
 export TTSVDReduction
@@ -117,7 +116,7 @@ export num_reduced_dofs
 export get_cores
 export project
 export inv_project
-export enrich
+export enrich!
 include("Projections.jl")
 
 export FESubspace
@@ -135,6 +134,7 @@ export IntegrationDomain
 export HyperReduction
 export MDEIM
 export AffineContribution
+export BlockHyperReduction
 export empirical_interpolation
 export integration_domain
 export get_integration_domain
