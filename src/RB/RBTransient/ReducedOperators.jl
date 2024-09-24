@@ -49,14 +49,7 @@ end
 
 abstract type TransientRBOperator{T} <: ODEParamOperatorWithTrian{T} end
 
-function RBSteady.allocate_rbcache(
-  op::TransientRBOperator,
-  r::TransientRealization)
-
-  rb_lhs_cache = allocate_jacobian(op,r)
-  rb_rhs_cache = allocate_residual(op,r)
-  return rb_lhs_cache,rb_rhs_cache
-end
+RBSteady.allocate_rbcache(op::TransientRBOperator,r::TransientRealization) = @abstractmethod
 
 function ODEs.update_odeopcache!(
   odeopcache,
@@ -91,7 +84,14 @@ function ODEs.allocate_odecache(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 
-  allocate_odecache(fesolver,op.op,r,us)
+  dt,θ = fesolver.dt,fesolver.θ
+  dtθ = θ*dt
+  shift!(r,dt*(θ-1))
+
+  (odeslvrcache,odeopcache) = allocate_odecache(fesolver,op.op,r,us)
+  shift!(r,dt*(1-θ))
+
+  return (odeslvrcache,odeopcache)
 end
 
 function ODEs.allocate_odeopcache(
@@ -100,6 +100,15 @@ function ODEs.allocate_odeopcache(
   us::Tuple{Vararg{AbstractParamVector}})
 
   allocate_odeopcache(op.op,r,us)
+end
+
+function RBSteady.allocate_rbcache(
+  op::GenericTransientRBOperator,
+  r::TransientRealization)
+
+  rb_lhs_cache = allocate_jacobian(op,r)
+  rb_rhs_cache = allocate_residual(op,r)
+  return rb_lhs_cache,rb_rhs_cache
 end
 
 function Algebra.allocate_residual(
@@ -231,12 +240,32 @@ function RBSteady.get_fe_test(op::LinearNonlinearTransientRBOperator)
   RBSteady.get_fe_test(op.op_nonlinear)
 end
 
+function ODEs.allocate_odecache(
+  fesolver::ThetaMethod,
+  op::LinearNonlinearTransientRBOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractParamVector}})
+
+  cache_lin = allocate_odecache(fesolver,get_linear_operator(op),r,us)
+  cache_nlin = allocate_odecache(fesolver,get_nonlinear_operator(op),r,us)
+  return (cache_lin,cache_nlin)
+end
+
 function ODEs.allocate_odeopcache(
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 
-  allocate_odeopcache(op.op_nonlinear,r,us)
+  @notimplemented
+end
+
+function RBSteady.allocate_rbcache(
+  op::GenericTransientRBOperator,
+  r::TransientRealization)
+
+  cache_lin = RBSteady.allocate_rbcache(get_linear_operator(op),r)
+  cache_nlin = RBSteady.allocate_rbcache(get_nonlinear_operator(op),r)
+  return (cache_lin,cache_nlin)
 end
 
 function Algebra.allocate_residual(
@@ -244,10 +273,7 @@ function Algebra.allocate_residual(
   r::TransientRealization,
   args...)
 
-  _,rhs_hypred_lin = allocate_residual(op.op_linear,r,us,odeopcache)
-  _,rhs_hypred_nlin = allocate_residual(op.op_nonlinear,r,us,odeopcache)
-  rhs_hypred_lin_nlin = rhs_hypred_lin + rhs_hypred_nlin
-  return rhs_rb_lin,rhs_rb_nlin,rhs_hypred_lin_nlin
+  @notimplemented
 end
 
 function Algebra.allocate_jacobian(
@@ -255,10 +281,7 @@ function Algebra.allocate_jacobian(
   r::TransientRealization,
   args...)
 
-  _,lhs_hypred_lin = allocate_residual(op.op_linear,r,us,odeopcache)
-  _,lhs_hypred_nlin = allocate_residual(op.op_nonlinear,r,us,odeopcache)
-  lhs_hypred_lin_nlin = lhs_hypred_lin + lhs_hypred_nlin
-  return lhs_rb_lin,lhs_rb_nlin,lhs_hypred_lin_nlin
+  @notimplemented
 end
 
 function Algebra.residual!(
@@ -269,11 +292,11 @@ function Algebra.residual!(
   odeopcache;
   kwargs...)
 
-  (_,b̂_lin),(b_nlin,b̂_nlin),b̂_lin_nlin = cache
+  b̂_lin,(b_nlin,b̂_nlin) = cache
   feb_nlin = fe_residual!(b_nlin,op.op_nonlinear,r,us,odeopcache)
   b̂_nlin = inv_project!(op.op_nonlinear.rhs,feb_nlin)
-  @. b̂_lin_nlin = b̂_nlin + b̂_lin
-  return b̂_lin_nlin
+  @. b̂_nlin = b̂_nlin + b̂_lin
+  return b̂_nlin
 end
 
 function Algebra.jacobian!(
@@ -284,11 +307,11 @@ function Algebra.jacobian!(
   ws::Tuple{Vararg{Real}},
   odeopcache)
 
-  (_,Â_lin),(A_nlin,Â_nlin),Â_lin_nlin = cache
+  Â_lin,(A_nlin,Â_nlin) = cache
   feA_nlin = fe_jacobian!(A_nlin,op.op_nonlinear,r,us,ws,odeopcache)
   Â_nlin = inv_project!(op.op_nonlinear.lhs,feA_nlin)
-  @. Â_lin_nlin = Â_nlin + Â_lin
-  return Â_lin_nlin
+  @. Â_nlin = Â_nlin + Â_lin
+  return Â_nlin
 end
 
 # Solve a POD-MDEIM problem
@@ -358,12 +381,99 @@ function Algebra.solve!(
   y,odecache = cache.fecache
   x̂,rbcache = cache.rbcache
 
-  fesolver = get_fe_solver(solver)
-
   t = @timed solve!((x̂,),fesolver,op,r,(y,),(odecache,rbcache))
   stats = CostTracker(t,num_params(r))
 
   return x̂,stats
+end
+
+function Algebra.solve!(
+  x̂::AbstractVector,
+  solver::RBSolver,
+  op::TransientRBOperator,
+  r::TransientRealization,
+  statefe::Tuple{Vararg{AbstractVector}},
+  cache)
+
+  fesolver = get_fe_solver(solver)
+
+  sysslvr = fesolver.sysslvr
+  (odeslvrcache,odeopcache),rbcache = cache
+  _...,sysslvrcache = odeslvrcache
+
+  stageop = get_stage_operator(fesolver,op.op,r,statefe,cache)
+  solve!(x̂,sysslvr,stageop,sysslvrcache)
+  return x̂
+end
+
+function Algebra.solve!(
+  x̂::AbstractVector,
+  solver::RBSolver,
+  op::TransientRBOperator{LinearNonlinearParamODE},
+  r::TransientRealization,
+  statefe::Tuple{Vararg{AbstractVector}},
+  cache)
+
+  fesolver = get_fe_solver(solver)
+  cache_lin,cache_nlin = cache
+  (odeslvrcache_lin,odeopcache_lin),(_,b̂_lin) = cache_lin
+  (odeslvrcache_nlin,odeopcache_nlin),(_,b̂_nlin) = cache_nlin
+
+  # linear quantities
+  lop = get_linear_operator(odeop)
+  lstageop = get_stage_operator(fesolver,lop,r,statefe,cache_lin)
+  Â_lin = lstageop.A
+  b̂_lin = lstageop.b
+
+  # linear + nonlinear quantities
+  nlop = get_nonlinear_operator(odeop)
+  # reorganize cache
+  Â_cache = (Â_lin,Â_nlin)
+  b̂_cache = (b̂_lin,b̂_nlin)
+  new_cache_nlin = (odeslvrcache_nlin,odeopcache_nlin),(Â_cache,b̂_cache)
+  nlstageop = get_stage_operator(fesolver,nlop,r,statefe,new_cache_nlin)
+
+  Â = jacobian!(Â_cache,nlstageop,statefe)
+  b̂ = residual!(b̂_cache,nlstageop,statefe)
+  @. b̂ = b̂ + Â_lin*x̂
+
+  nls = fesolver.sysslvr
+  ss = symbolic_setup(nls.ls,Â)
+  ns = numerical_setup(ss,Â)
+
+  rb_solve!(x̂,nls,nlstageop,r,statefe,Â,b̂,Â_cache,b̂_cache,ns)
+end
+
+function rb_solve!(x̂,nls,nlstageop,r,statefe,Â,b̂,Â_cache,b̂_cache,ns;verbose=true)
+  trial = get_trial(nlstageop.odeop)(r)
+  Â_lin, = Â_cache
+  x = similar(statefe[1])
+  dx̂ = similar(x̂)
+  max0 = maximum(abs,b̂)
+  tol = 1e-6*max0
+
+  for k in 1:nls.max_nliters
+    rmul!(b̂,-1)
+    solve!(dx̂,ns,b̂)
+    @. x̂ = x̂ + dx̂
+    inv_project!(x,trial,x̂)
+
+    b̂ = residual!(b̂_cache,nlstageop,x)
+    Â = jacobian!(Â_cache,nlstageop,x)
+    numerical_setup!(ns,Â)
+
+    @. b̂ = b̂ + Â_lin*x̂
+    maxk = maximum(abs,b̂)
+    if verbose
+      println("Newton-Raphson residual in the L∞ norm at iteration $(k) is $(maxk)")
+    end
+
+    maxk < tol && return
+
+    if k == nls.max_nliters
+      @unreachable "Newton-Raphson failed to converge: did not reach tolerance $tol"
+    end
+  end
 end
 
 # cache utils

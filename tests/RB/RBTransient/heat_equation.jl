@@ -93,20 +93,21 @@ r = TransientRealization(μ,ptspace.temporal_domain)
 fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ;r)
 # fesnaps = load_snapshots(test_dir)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-ronline = r[:,6]
+ronline = r[6,:]
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 
 x,festats = solution_snapshots(rbsolver,feop,uh0μ;r=ronline)
 perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,ronline)
 CAIO
-# r = ronline
-# x̂ = zero_free_values(get_trial(op)(r))
-# y = zero_free_values(get_fe_trial(op)(r))
+
+op = rbop
+r = ronline
+RBSteady.init_online_cache!(rbsolver,op,r)
 # RBSteady.init_online_cache!(rbsolver,op,r,y)
 
-# cache = rbsolver.cache
-# y,odecache = cache.fecache
-# rbcache = cache.rbcache
+cache = rbsolver.cache
+y,odecache = cache.fecache
+x̂,rbcache = cache.rbcache
 # solve!((x̂,),fesolver,op,r,(y,),(odecache,rbcache))
 
 # Arb,brb = rbcache
@@ -114,11 +115,11 @@ CAIO
 # coeffb,bred = brb
 
 # # solve!((x̂,),fesolver,op,r,(y,),(odecache,rbcache))
-# odeslvrcache,odeopcache = odecache
-# reuse,A,b,sysslvrcache = odeslvrcache
-# Â,b̂ = rbcache
-# us = (y,y)
-# ws = (1,1/(dt*θ))
+odeslvrcache,odeopcache = odecache
+reuse,A,b,sysslvrcache = odeslvrcache
+Â,b̂ = rbcache
+us = (y,y)
+ws = (1,1/(dt*θ))
 # # stageop = LinearParamStageOperator(op,odeopcache,r,us,ws,(A,Â),(b,b̂),reuse,sysslvrcache)
 # residual!((b,b̂),op,r,us,odeopcache)
 # jacobian!((A,Â),op,r,us,ws,odeopcache)

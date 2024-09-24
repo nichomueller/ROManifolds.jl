@@ -10,16 +10,6 @@ Subtypes:
 """
 abstract type ParamStageOperator <: NonlinearOperator end
 
-# function Algebra.residual(op::ParamStageOperator,x::AbstractVector)
-#   b = allocate_residual(op,x)
-#   return residual!(b,op,x)
-# end
-
-# function Algebra.jacobian(op::ParamStageOperator,x::AbstractVector)
-#   A = allocate_jacobian(op,x)
-#   return jacobian!(A,op,x)
-# end
-
 """
 """
 struct NonlinearParamStageOperator <: ParamStageOperator

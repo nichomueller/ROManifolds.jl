@@ -120,36 +120,3 @@ function jacobian_snapshots(solver::RBSolver,op::ParamOperator,s)
   iA = get_matrix_index_map(op)
   return Snapshots(A,iA,r_jac)
 end
-
-"""
-    nonlinear_rb_solve!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,op,trial) -> x̂
-
-Newton - Raphson for a RB problem
-
-"""
-function nonlinear_rb_solve!(x̂,x,A,b,A_cache,b_cache,dx̂,ns,nls,op,trial)
-  A_lin, = A_cache
-  max0 = maximum(abs,b)
-
-  for k in 1:nls.max_nliters
-    rmul!(b,-1)
-    solve!(dx̂,ns,b)
-    x̂ .+= dx̂
-    x .= recast(x̂,trial)
-
-    b = residual!(b_cache,op,x)
-
-    A = jacobian!(A_cache,op,x)
-    numerical_setup!(ns,A)
-
-    b .+= A_lin*x̂
-    maxk = maximum(abs,b)
-    println(maxk)
-
-    maxk < 1e-6*max0 && return
-
-    if k == nls.max_nliters
-      @unreachable
-    end
-  end
-end

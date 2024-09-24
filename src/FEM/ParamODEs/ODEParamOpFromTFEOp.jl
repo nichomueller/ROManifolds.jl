@@ -319,19 +319,9 @@ function ODEs.allocate_odeopcache(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
 
-  order = get_order(odeop)
-  pttrial = get_trial(odeop.op)
-  trial = allocate_space(pttrial,r)
-  pttrials = (pttrial,)
-  trials = (trial,)
-  for k in 1:order
-    pttrials = (pttrials...,∂t(pttrials[k]))
-    trials = (trials...,allocate_space(pttrials[k+1],r))
-  end
+  odeopcache = _define_odeopcache(odeop,r,us)
 
-  tfeopcache = allocate_tfeopcache(odeop.op,r,us)
-
-  uh = ODEs._make_uh_from_us(odeop,us,trials)
+  uh = ODEs._make_uh_from_us(odeop,us,odeopcache.Us)
   test = get_test(odeop.op)
   v = get_fe_basis(test)
   trial = evaluate(get_trial(odeop.op),nothing)
@@ -365,7 +355,7 @@ function ODEs.allocate_odeopcache(
     const_forms = (const_forms...,const_form)
   end
 
-  odeopcache = ODEOpFromTFEOpCache(trials,pttrials,tfeopcache,const_forms)
+  odeopcache.const_forms = const_forms
   return odeopcache
 end
 

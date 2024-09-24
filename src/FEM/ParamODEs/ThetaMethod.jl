@@ -57,6 +57,55 @@ function ODEs.ode_march!(
   (r,statef,odecache)
 end
 
+function Algebra.residual(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator,
+  r::TransientRealization,
+  state0::NTuple{1,AbstractVector})
+
+  u0 = state0[1]
+
+  dt,θ = solver.dt,solver.θ
+  dtθ = θ*dt
+  shift!(r,dt*(θ-1))
+
+  x = copy(u0)
+  uθ = copy(u0)
+  shift!(uθ,r,θ,1-θ)
+  axpy!(dtθ,x,uθ)
+  usx = (uθ,x)
+
+  b = residual(odeop,r,usx)
+  shift!(r,dt*(1-θ))
+
+  return b
+end
+
+function Algebra.jacobian(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator,
+  r::TransientRealization,
+  state0::NTuple{1,AbstractVector})
+
+  u0 = state0[1]
+
+  dt,θ = solver.dt,solver.θ
+  dtθ = θ*dt
+  shift!(r,dt*(θ-1))
+
+  x = copy(u0)
+  uθ = copy(u0)
+  shift!(uθ,r,θ,1-θ)
+  axpy!(dtθ,x,uθ)
+  usx = (uθ,x)
+  ws = (1,1/dtθ)
+
+  A = jacobian(odeop,r,usx,ws)
+  shift!(r,dt*(1-θ))
+
+  return A
+end
+
 # linear case
 
 function ODEs.allocate_odecache(
@@ -116,6 +165,51 @@ function ODEs.ode_march!(
   odeslvrcache = (reuse,A,b,sysslvrcache)
   odecache = (odeslvrcache,odeopcache)
   (r,statef,odecache)
+end
+
+function Algebra.residual(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator{LinearParamODE},
+  r::TransientRealization,
+  state0::NTuple{1,AbstractVector})
+
+  u0 = state0[1]
+
+  dt,θ = solver.dt,solver.θ
+
+  x = copy(u0)
+  fill!(x,zero(eltype(x)))
+  dtθ = θ*dt
+  shift!(r,dt*(θ-1))
+  us = (x,x)
+
+  b = residual(odeop,r,us)
+  shift!(r,dt*(1-θ))
+
+  return b
+end
+
+function Algebra.jacobian(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator{LinearParamODE},
+  r::TransientRealization,
+  state0::NTuple{1,AbstractVector})
+
+  u0 = state0[1]
+
+  dt,θ = solver.dt,solver.θ
+
+  x = copy(u0)
+  fill!(x,zero(eltype(x)))
+  dtθ = θ*dt
+  shift!(r,dt*(θ-1))
+  us = (x,x)
+  ws = (1,1/dtθ)
+
+  A = jacobian(odeop,r,us,ws)
+  shift!(r,dt*(1-θ))
+
+  return A
 end
 
 # linear-nonlinear case
