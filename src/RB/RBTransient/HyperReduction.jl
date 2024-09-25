@@ -104,10 +104,6 @@ function RBSteady.allocate_coefficient(a::TupOfAffineContribution,b::TupOfArrayC
   return coeffs
 end
 
-function RBSteady.allocate_hyper_reduction(a::TupOfAffineContribution,b::TupOfArrayContribution)
-  RBSteady.allocate_hyper_reduction(first(a),first(b))
-end
-
 function RBSteady.inv_project!(cache,a::TupOfAffineContribution,b::TupOfArrayContribution)
   @check length(a) == length(b)
   coeff,b̂ = cache

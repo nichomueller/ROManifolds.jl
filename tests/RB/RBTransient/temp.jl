@@ -15,7 +15,7 @@ using Mabla.RB
 using Mabla.RB.RBSteady
 using Mabla.RB.RBTransient
 
-θ = 0.5
+θ = 1#0.5
 dt = 0.01
 t0 = 0.0
 tf = 0.1
@@ -88,10 +88,103 @@ tol = 1e-4
 state_reduction = TransientReduction(supr_operator,tol,energy;nparams=50)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,nparams_djac=20)
 
+# fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
+# rbop = reduced_operator(rbsolver,feop,fesnaps)
+# ronline = realization(feop;nparams=10)
+# x̂,rbstats = solve(rbsolver,rbop,ronline)
+
+# x,festats = solution_snapshots(rbsolver,feop,ronline,xh0μ)
+# perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,ronline)
+
+################################################################################
+
+using Gridap.Algebra
+
+const Re = 100.0
+conv(u,∇u) = Re*(∇u')⋅u
+dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
+c(u,v,dΩ) = ∫( v⊙(conv∘(u,∇(u))) )dΩ
+dc(u,du,v,dΩ) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )dΩ
+
+res_nlin(μ,t,(u,p),(v,q),dΩ) = c(u,v,dΩ)
+jac_nlin(μ,t,(u,p),(du,dp),(v,q),dΩ) = dc(u,du,v,dΩ)
+
+feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
+  trial,test,trian_res,trian_stiffness,trian_mass)
+feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,
+  trial,test,trian_res,trian_stiffness)
+feop = LinNonlinTransientParamFEOperator(feop_lin,feop_nlin)
+
+nlsolver = NewtonRaphsonSolver(LUSolver(),1e-5,40)
+fesolver = ThetaMethod(nlsolver,dt,θ)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,nparams_djac=20)
+
 fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 ronline = realization(feop;nparams=10)
-x̂,rbstats = solve(rbsolver,rbop,ronline)
+x̂,rbstats = solve(rbsolver,rbop,ronline;verbose=true)
 
 x,festats = solution_snapshots(rbsolver,feop,ronline,xh0μ)
 perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,ronline)
+
+using Gridap.FESpaces
+using Gridap.ODEs
+
+op = rbop
+solver = rbsolver
+r = ronline
+
+# RBSteady.init_online_cache!(solver,op,r)
+y = zero_free_values(get_fe_trial(op)(r))
+x̂ = zero_free_values(get_trial(op)(r))
+
+odecache = allocate_odecache(fesolver,op,r,(y,))
+rbcache = RBSteady.allocate_rbcache(op,r)
+
+nls = fesolver.sysslvr
+
+stageop = get_stage_operator(fesolver,op,r,(y,),odecache,rbcache)
+x = y
+# solve!(x̂,nls,stageop,r,x)
+
+Â_lin = stageop.lop.A
+syscache,U = stageop.cache
+Â_cache,b̂_cache = syscache
+
+dx̂ = similar(x̂)
+Â = jacobian!(Â_cache,stageop,x)
+b̂ = residual!(b̂_cache,stageop,x)
+b̂ .+= Â_lin*x̂
+
+inv_project!(x,U,x̂)
+
+Âlin = stageop.lop.A
+(Alin,_),_... = stageop.linear_caches
+
+odeop,odeopcache = stageop.odeop,stageop.odeopcache
+rx = stageop.rx
+usx = stageop.usx(x)
+ws = stageop.ws
+# Ânlin = jacobian!((Alin,Â_nlin),odeop,rx,usx,ws,odeopcache)
+# fe_jacobian!(Alin,odeop,rx,usx,ws,odeopcache)
+
+# b̂ = residual!(b̂_nlin,stageop,x)
+# @. b̂ = b̂ + Â_lin*x̂
+
+# ss = symbolic_setup(nls.ls,Â)
+# ns = numerical_setup(ss,Â)
+
+# max0 = maximum(abs,b̂)
+# tol = 1e-6*max0
+
+# k = 1
+# rmul!(b̂,-1)
+# solve!(dx̂,ns,b̂)
+# @. x̂ = x̂ + dx̂
+# inv_project!(x,U,x̂)
+
+# b̂ = residual!(b̂_nlin,stageop,x)
+# Â = jacobian!(Â_nlin,stageop,x)
+# numerical_setup!(ns,Â)
+
+# @. b̂ = b̂ + Â_lin*x̂

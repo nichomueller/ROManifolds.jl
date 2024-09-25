@@ -109,28 +109,34 @@ function Algebra.allocate_in_range(r::FESubspace)
   zero_free_values(get_fe_space(r))
 end
 
-function project(r::FESubspace,x::AbstractVector)
-  project(get_reduced_subspace(r),x)
+function Arrays.return_cache(::typeof(project),r::FESubspace,x::AbstractVector)
+  allocate_in_domain(r)
 end
 
-function project(r::FESubspace,x::AbstractParamVector)
-  x̂ = allocate_in_domain(r)
-  @inbounds for ip in eachindex(x)
-    x̂[ip] = project(get_reduced_subspace(r),x[ip])
+function Arrays.return_cache(::typeof(inv_project),r::FESubspace,x::AbstractVector)
+  allocate_in_range(r)
+end
+
+for (f,f!) in zip((:project,:inv_project),(:project!,:inv_project!))
+  @eval begin
+    function $f(r::FESubspace,x::AbstractVector)
+      y = return_cache($f,r,x)
+      $f!(y,r,x)
+      return y
+    end
+
+    function $f!(y,r::FESubspace,x::AbstractVector)
+      y .= $f(get_reduced_subspace(r),x)
+      return y
+    end
+
+    function $f!(y,r::FESubspace,x::AbstractParamVector)
+      @inbounds for ip in eachindex(x)
+        y[ip] = $f(get_reduced_subspace(r),x[ip])
+      end
+      return y
+    end
   end
-  return x̂
-end
-
-function inv_project(r::FESubspace,x̂::AbstractVector)
-  inv_project(get_reduced_subspace(r),x̂)
-end
-
-function inv_project(r::FESubspace,x̂::AbstractParamVector)
-  x = allocate_in_range(r)
-  @inbounds for ip in eachindex(x̂)
-    x[ip] = inv_project(get_reduced_subspace(r),x̂[ip])
-  end
-  return x
 end
 
 function project(r::FESubspace,x::Projection)
@@ -209,6 +215,31 @@ function Base.iterate(r::MultiFieldRBSpace,i)
   return ri,i+1
 end
 
+for f in (:project,:inv_project)
+  @eval begin
+    function Arrays.return_cache(::typeof($f),r::MultiFieldRBSpace,x::Union{BlockVector,BlockVectorOfVectors})
+      cache = return_cache($f,r[1],x[Block(1)])
+      block_cache = Vector{typeof(cache)}(undef,num_fields(r))
+      return mortar(block_cache)
+    end
+  end
+end
+
+for f! in (:project!,:inv_project!)
+  @eval begin
+    function $f!(
+      y::Union{BlockVector,BlockVectorOfVectors},
+      r::MultiFieldRBSpace,
+      x::Union{BlockVector,BlockVectorOfVectors})
+
+      for i in 1:blocklength(x)
+        $f!(y[Block(i)],r[i],x[Block(i)])
+      end
+      return y
+    end
+  end
+end
+
 # dealing with the transient case here
 
 function Arrays.evaluate(r::FESubspace,args...)
@@ -243,14 +274,6 @@ function Base.iterate(r::EvalMultiFieldRBSpace,i)
   return ri,i+1
 end
 
-function Arrays.return_cache(::typeof(project),r::FESubspace,x::AbstractVector)
-  allocate_in_domain(r)
-end
-
-function Arrays.return_cache(::typeof(inv_project),r::FESubspace,x::AbstractVector)
-  allocate_in_range(r)
-end
-
 for T in (:MultiFieldRBSpace,:EvalMultiFieldRBSpace)
   @eval begin
 
@@ -270,22 +293,12 @@ for T in (:MultiFieldRBSpace,:EvalMultiFieldRBSpace)
       return BlockArrays.blockedrange(block_num_dofs)
     end
   end
+end
 
-  for f in (:project,:inv_project)
-    @eval begin
-      function Arrays.return_cache(::typeof($f),r::$T,x::Union{BlockVector,BlockVectorOfVectors})
-        cache = return_cache($f,r[1],x[Block(1)])
-        block_cache = Vector{typeof(cache)}(undef,num_fields(r))
-        return block_cache
-      end
-
-      function $f(r::$T,x::Union{BlockVector,BlockVectorOfVectors})
-        cache = return_cache($f,r,x)
-        for i in 1:blocklength(x)
-          cache[i] = $f(r[i],x[Block(i)])
-        end
-        return mortar(cache)
-      end
+for f! in (:project!,:inv_project!)
+  @eval begin
+    function $f!(y,r::EvalRBSpace,x::AbstractVector)
+      $f!(y,r.subspace,x)
     end
   end
 end

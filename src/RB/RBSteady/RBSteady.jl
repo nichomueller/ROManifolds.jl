@@ -133,6 +133,7 @@ include("RBSpace.jl")
 export AbstractIntegrationDomain
 export IntegrationDomain
 export HyperReduction
+export EmptyHyperReduction
 export MDEIM
 export AffineContribution
 export BlockHyperReduction

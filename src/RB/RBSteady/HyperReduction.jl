@@ -113,6 +113,37 @@ function inv_project!(cache,a::HyperReduction,b::AbstractParamArray)
   return b̂
 end
 
+struct EmptyHyperReduction{A,B} <: HyperReduction{A,B,IntegrationDomain}
+  reduction::A
+  basis::B
+end
+
+get_basis(a::EmptyHyperReduction) = a.basis
+get_interpolation(a::EmptyHyperReduction) = @notimplemented
+get_integration_domain(a::EmptyHyperReduction) = @notimplemented
+
+function HyperReduction(
+  red::Reduction,
+  test::FESubspace)
+
+  red = get_reduction(red)
+  nrows = num_free_dofs(test)
+  basis = ReducedProjection(zeros(nrows,1))
+  return EmptyHyperReduction(red,basis)
+end
+
+function HyperReduction(
+  red::Reduction,
+  trial::FESubspace,
+  test::FESubspace)
+
+  red = get_reduction(red)
+  nrows = num_free_dofs(test)
+  ncols = num_free_dofs(trial)
+  basis = ReducedProjection(zeros(nrows,1,ncols))
+  return EmptyHyperReduction(red,basis)
+end
+
 struct MDEIM{A,B,C} <: HyperReduction{A,B,C}
   reduction::A
   basis::B
@@ -304,6 +335,13 @@ end
 
 function reduced_form(
   red::Reduction,
+  args...)
+
+  HyperReduction(red,args...)
+end
+
+function reduced_form(
+  red::Reduction,
   s::AbstractSnapshots,
   trian::Triangulation,
   args...)
@@ -462,35 +500,9 @@ end
 function allocate_hyper_reduction(a::BlockHyperReduction,r::AbstractRealization)
   hypred = return_cache(allocate_hyper_reduction,a,r)
   for i in eachindex(a)
-    if a.touched[i]
-      hypred[i] = allocate_hyper_reduction(a[i],r)
-    end
+    hypred[i] = allocate_hyper_reduction(a.array[i],r)
   end
-  fill_missing_blocks!(hypred)
   return mortar(hypred)
-end
-
-fill_missing_blocks!(a::AbstractArray) = @notimplemented
-
-fill_missing_blocks!(a::AbstractVector{<:AbstractParamVector{T}}) where T = a
-
-function fill_missing_blocks!(a::AbstractMatrix{<:AbstractParamMatrix{T}}) where T
-  for (i,j) in Iterators.product(axes(a)...)
-    if !isassigned(a,i,j)
-      row_block = findfirst(j -> isassigned(a,i,j),axes(a,2))
-      col_block = findfirst(i -> isassigned(a,i,j),axes(a,1))
-      @check !isnothing(row_block) "The system is ill posed"
-      @check !isnothing(col_block) "The system is ill posed"
-      item_rows = a[row_block,j]
-      item_cols = a[i,col_block]
-      @check param_length(item_rows) == param_length(item_cols)
-      ncols = size(param_getindex(item_rows,1),2)
-      nrows = size(param_getindex(item_cols,1),1)
-      plength = param_length(item_rows)
-      cache = zeros(T,nrows,ncols)
-      a[i,j] = array_of_consecutive_arrays(cache,plength)
-    end
-  end
 end
 
 function reduced_triangulation(
@@ -538,6 +550,8 @@ function reduced_form(
       hyper_red,red_trian = reduced_form(red,s[i],trian,test[i])
       hyper_reds[i] = hyper_red
       push!(red_trians,red_trian)
+    else
+      hyper_reds[i] = reduced_form(red,test[i])
     end
   end
 
@@ -561,6 +575,8 @@ function reduced_form(
       hyper_red,red_trian = reduced_form(red,s[i,j],trian,trial[j],test[i])
       hyper_reds[i,j] = hyper_red
       push!(red_trians,red_trian)
+    else
+      hyper_reds[i,j] = reduced_form(red,trial[j],test[i])
     end
   end
 

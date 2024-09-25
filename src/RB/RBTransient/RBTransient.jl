@@ -49,9 +49,6 @@ export UnfoldingTransientSnapshots
 export ModeTransientSnapshots
 include("Snapshots.jl")
 
-export get_stage_operator
-include("ThetaMethod.jl")
-
 include("RBSolver.jl")
 
 include("TTLinearAlgebra.jl")
@@ -75,6 +72,12 @@ export TransientRBOperator
 export GenericTransientRBOperator
 export LinearNonlinearTransientRBOperator
 include("ReducedOperators.jl")
+
+export LinearNonlinearRBSolver
+include("LinearNonlinearRBSolvers.jl")
+
+export get_stage_operator
+include("ThetaMethod.jl")
 
 include("PostProcess.jl")
 

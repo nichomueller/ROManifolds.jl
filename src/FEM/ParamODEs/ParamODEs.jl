@@ -49,6 +49,7 @@ include("ODEParamOperator.jl")
 export ParamStageOperator
 export NonlinearParamStageOperator
 export LinearParamStageOperator
+export LinearNonlinearRBSolver
 include("ParamStageOperator.jl")
 
 export TransientParamFEOperator

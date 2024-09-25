@@ -169,19 +169,6 @@ function Algebra.jacobian!(
   jacobian!(A,odeop,rx,usx,ws,odeopcache)
 end
 
-function Algebra.allocate_residual(
-  lop::LinearParamStageOperator{<:TupOfArrayContribution,<:VectorContribution{T,V}},
-  x::AbstractVector) where {T,V}
-
-  trians = lop.b.trians
-  A = first(lop.A)[1]
-  contribution(trians) do trian
-    b = allocate_in_range(eltype(V),A)
-    fill!(b,zero(eltype(b)))
-    b
-  end
-end
-
 function Algebra.residual!(
   b::ArrayContribution,
   lop::LinearParamStageOperator,
@@ -201,29 +188,4 @@ function Algebra.jacobian!(
 
   copy_entries!(A,lop.A)
   A
-end
-
-# linear-nonlinear interface
-
-function Algebra.residual!(
-  b::Tuple,
-  nlop::NonlinearParamStageOperator,
-  x::AbstractVector)
-
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
-  rx = nlop.rx
-  usx = nlop.usx(x)
-  residual!(b,odeop,rx,usx,odeopcache)
-end
-
-function Algebra.jacobian!(
-  A::Tuple,
-  nlop::NonlinearParamStageOperator,
-  x::AbstractVector)
-
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
-  rx = nlop.rx
-  usx = nlop.usx(x)
-  ws = nlop.ws
-  jacobian!(A,odeop,rx,usx,ws,odeopcache)
 end
