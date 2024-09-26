@@ -1,13 +1,12 @@
 function IndexMaps.recast(a::AbstractVector{<:AbstractArray{T,3}},i::SparseIndexMap) where T
+  N = length(a)
   us = IndexMaps.get_univariate_sparsity(i)
-  @check length(us) ≤ length(a)
-  if length(us) == length(a)
-    return map(SparseCore,a,us)
-  else
-    asparse = map(i ->SparseCore(a[i],us[i]),eachindex(us))
-    afull = a[length(us)+1:end]
-    return [asparse...,afull...]
+  @check length(us) ≤ N
+  a′ = Vector{AbstractArray{T,3}}(undef,N)
+  for n in eachindex(a)
+    a′[n] = n ≤ length(us) ? SparseCore(a[n],us[n]) : a[n]
   end
+  return a′
 end
 
 """

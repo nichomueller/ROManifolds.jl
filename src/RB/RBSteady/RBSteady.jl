@@ -72,6 +72,9 @@ export get_indexed_values
 export num_space_dofs
 include("Snapshots.jl")
 
+export galerkin_projection
+include("GalerkinProjections.jl")
+
 export AbstractTTCore
 export SparseCore
 export SparseCoreCSC
@@ -80,7 +83,6 @@ include("TTCores.jl")
 export TTContraction
 export contraction
 export sequential_product
-export reduced_cores
 export cores2basis
 include("TTLinearAlgebra.jl")
 
@@ -100,9 +102,6 @@ export gram_schmidt
 export orth_complement!
 export orth_projection
 include("BasisConstruction.jl")
-
-export galerkin_projection
-include("GalerkinProjections.jl")
 
 export Projection
 export PODBasis

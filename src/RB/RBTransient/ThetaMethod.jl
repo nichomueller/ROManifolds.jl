@@ -1,7 +1,7 @@
 #
 
 function RBSteady.allocate_rbcache(
-  fesolver::ThetaMethod,
+  solver::ThetaMethod,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}})
@@ -21,13 +21,13 @@ end
 # general nonlinear case
 
 function ODEs.allocate_odecache(
-  fesolver::ThetaMethod,
+  solver::ThetaMethod,
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 
-  odecache_lin = allocate_odecache(fesolver,get_linear_operator(op),r,us)
-  odecache_nlin = allocate_odecache(fesolver,get_nonlinear_operator(op),r,us)
+  odecache_lin = allocate_odecache(solver,get_linear_operator(op),r,us)
+  odecache_nlin = allocate_odecache(solver,get_nonlinear_operator(op),r,us)
   odeslvrcache_nlin,odeopcache = odecache_nlin
   uθ, = odeslvrcache_nlin
   nlop = get_nonlinear_operator(op).op
@@ -97,16 +97,16 @@ end
 # linear case
 
 function ODEs.allocate_odecache(
-  fesolver::ThetaMethod,
+  solver::ThetaMethod,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 
-  dt,θ = fesolver.dt,fesolver.θ
+  dt,θ = solver.dt,solver.θ
   dtθ = θ*dt
   shift!(r,dt*(θ-1))
 
-  (odeslvrcache,odeopcache) = allocate_odecache(fesolver,op.op,r,us)
+  (odeslvrcache,odeopcache) = allocate_odecache(solver,op.op,r,us)
   shift!(r,dt*(1-θ))
 
   return (odeslvrcache,odeopcache)

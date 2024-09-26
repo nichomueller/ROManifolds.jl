@@ -203,7 +203,7 @@ end
 
 get_cores(a::TTSVDCores) = a.cores
 
-get_basis(a::TTSVDCores) = cores2basis(get_cores(a)...)
+get_basis(a::TTSVDCores) = cores2basis(get_index_map(a),get_cores(a)...)
 num_fe_dofs(a::TTSVDCores) = prod(map(c -> size(c,2),get_cores(a)))
 num_reduced_dofs(a::TTSVDCores) = size(last(get_cores(a)),3)
 
@@ -238,7 +238,7 @@ function galerkin_projection(proj_left::TTSVDCores,a::TTSVDCores)
   return ReducedProjection(proj_basis)
 end
 
-function galerkin_projection(proj_left::TTSVDCores,a::TTSVDCores,proj_right::TTSVDCores,args...)
+function galerkin_projection(proj_left::TTSVDCores,a::TTSVDCores,proj_right::TTSVDCores)
   cores_left = get_cores(proj_left)
   cores = get_cores(a)
   cores_right = get_cores(proj_right)
@@ -249,15 +249,17 @@ end
 function empirical_interpolation(a::TTSVDCores)
   cores = get_cores(a)
   index_map = get_index_map(a)
-  c = first(cores)
+  c = cores2basis(first(cores))
   cache = eim_cache(c)
+  vinds = Vector{Int32}[]
   for i = eachindex(cores)
-    _,interp = empirical_interpolation!(cache,c)
+    inds,interp = empirical_interpolation!(cache,c)
+    push!(vinds,copy(inds))
     if i < length(cores)
       interp_core = reshape(interp,1,size(interp)...)
-      c = contraction(interp_core,cores[i+1])
+      c = cores2basis(interp_core,cores[i+1])
     else
-      indices = basis_indices(cache,index_map)
+      indices = basis_indices(vinds,index_map)
       return indices,interp
     end
   end

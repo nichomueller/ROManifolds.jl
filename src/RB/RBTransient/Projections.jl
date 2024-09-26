@@ -110,6 +110,35 @@ function RBSteady.empirical_interpolation(a::TransientBasis)
   return (indices_space,indices_time),interp
 end
 
+# tt interface
+
+get_cores_space(a::TTSVDCores) = get_cores(a)[1:end-1]
+get_core_time(a::TTSVDCores) = get_cores(a)[end]
+
+function RBSteady.galerkin_projection(
+  proj_left::TTSVDCores,
+  a::TTSVDCores,
+  proj_right::TTSVDCores,
+  combine)
+
+  # space
+  pl_space = get_cores_space(proj_left)
+  a_space = get_cores_space(a)
+  pr_space = get_cores_space(proj_right)
+  p_space = contraction.(pl_space,a_space,pr_space)
+
+  # time
+  pl_time = get_core_time(proj_left)
+  a_time = get_core_time(a)
+  pr_time = get_core_time(proj_right)
+  p_time = contraction(pl_time,a_time,pr_time,combine)
+
+  p = sequential_product(p_space...,p_time)
+  proj_cores = dropdims(p;dims=(1,2,3))
+
+  return ReducedProjection(proj_cores)
+end
+
 # multfield interface
 
 function Arrays.return_cache(::typeof(projection),red::TransientReduction,s::AbstractSnapshots)

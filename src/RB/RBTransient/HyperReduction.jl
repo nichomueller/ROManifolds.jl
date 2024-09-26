@@ -9,7 +9,7 @@ function TransientIntegrationDomain(ispace::AbstractVector,itime::AbstractVector
   TransientIntegrationDomain(indices_space,indices_time)
 end
 
-function RBSteady.integration_domain(indices::Tuple{Vararg{AbstractVector}})
+function RBSteady.integration_domain(indices::Union{Tuple,AbstractVector{<:AbstractVector}})
   @check length(indices) == 2
   TransientIntegrationDomain(indices...)
 end
@@ -82,7 +82,11 @@ function RBSteady.reduced_jacobian(
   return a
 end
 
-function RBSteady.inv_project!(cache,a::TransientHyperReduction{<:TransientReduction},b::AbstractParamArray)
+function RBSteady.inv_project!(
+  cache,
+  a::TransientHyperReduction{<:TransientReduction},
+  b::AbstractParamArray)
+
   coeff,b̂ = cache
   interp = RBSteady.get_interpolation(a)
   ldiv!(coeff,interp,vec(b))

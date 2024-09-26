@@ -17,15 +17,6 @@ function empirical_interpolation!(cache,A::AbstractMatrix)
   return I,Ai
 end
 
-function empirical_interpolation!(cache,core::AbstractArray{T,3}) where T
-  @check size(C,1) == 1
-  _cache...,Iv = cache
-  A = dropdims(core;dims=1)
-  I,Ai = empirical_interpolation!(_cache,A)
-  push!(Iv,copy(I))
-  return I,Ai
-end
-
 function eim_cache(A::AbstractMatrix)
   m,n = size(A)
   res = zeros(eltype(A),m)
@@ -33,24 +24,16 @@ function eim_cache(A::AbstractMatrix)
   return I,res
 end
 
-function eim_cache(core::AbstractArray{T,3}) where T
-  m,n = size(core,2),size(core,1)
-  res = zeros(T,m)
-  I = zeros(Int32,n)
-  Iv = Vector{Int32}[]
-  return I,res,Iv
-end
-
-function empirical_interpolation(a::AbstractArray)
-  cache = eim_cache(a)
-  i,ai = empirical_interpolation!(cache,a)
-  return i,ai
+function empirical_interpolation(A::AbstractArray)
+  cache = eim_cache(A)
+  I,AI = empirical_interpolation!(cache,A)
+  return i,AI
 end
 
 function empirical_interpolation(A::ParamSparseMatrix)
-  i,ai = empirical_interpolation(A.data)
-  i′ = recast_indices(i,param_getindex(A,1))
-  return i′,ai
+  I,AI = empirical_interpolation(A.data)
+  I′ = recast_indices(I,param_getindex(A,1))
+  return I′,AI
 end
 
 abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
@@ -61,7 +44,7 @@ struct IntegrationDomain <: AbstractIntegrationDomain{Int32}
   indices::Vector{Int32}
 end
 
-integration_domain(i::Vector) = IntegrationDomain(i)
+integration_domain(i::AbstractVector{<:Number}) = IntegrationDomain(i)
 
 Base.size(i::IntegrationDomain) = size(i.indices)
 Base.getindex(i::IntegrationDomain,j::Integer) = getindex(i.indices,j)
@@ -155,11 +138,11 @@ get_basis(a::MDEIM) = a.basis
 get_interpolation(a::MDEIM) = a.interpolation
 get_integration_domain(a::MDEIM) = a.domain
 
-function inv_project!(y,a::HyperReduction{A,<:ReducedMatProjection},x̂::AbstractVector) where A
-  basis = get_basis(a)
-  contraction!(y,basis,x̂)
-  return y
-end
+# function inv_project!(y,a::HyperReduction{A,<:ReducedMatProjection},x̂::AbstractVector) where A
+#   basis = get_basis(a)
+#   contraction!(y,basis,x̂)
+#   return y
+# end
 
 function HyperReduction(
   red::AbstractMDEIMReduction,

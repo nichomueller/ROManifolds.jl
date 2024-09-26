@@ -468,7 +468,7 @@ get_entry(s::ParamSparseMatrix,is,ipt) = param_getindex(s,ipt)[is]
 
 function RBSteady.select_at_indices(
   ::TransientHyperReduction,
-  s::AbstractParamArray,
+  a::AbstractParamArray,
   ids_space,ids_time,ids_param)
 
   @check length(ids_space) == length(ids_time)

@@ -100,3 +100,40 @@ println(results)
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)
+
+using Gridap.FESpaces
+
+solver = rbsolver
+s = fesnaps
+
+red_test,red_trial = reduced_fe_space(solver,feop,s)
+odeop = get_algebraic_operator(feop)
+
+# red_lhs,red_rhs = reduced_weak_form(solver,odeop,red_test,red_trial,s)
+op = odeop
+jacs = jacobian_snapshots(solver,op,s)
+ress = residual_snapshots(solver,op,s)
+jac_red = RBSteady.get_jacobian_reduction(solver)
+res_red = RBSteady.get_residual_reduction(solver)
+
+red_jac = reduced_jacobian(jac_red,red_trial,red_test,jacs)
+red_res = reduced_residual(res_red,red_test,ress)
+
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+ronline = r[6:6,:]
+x̂,rbstats = solve(rbsolver,rbop,ronline)
+
+x,festats = solution_snapshots(rbsolver,feop,ronline,uh0μ)
+perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,ronline)
+
+using Gridap.Algebra
+using Gridap.Arrays
+using Gridap.FESpaces
+
+ad = rbop.lhs[1][1]
+norm(ad.basis.basis,1)
+
+ad = rbop.rhs[1]
+norm(ad.basis.basis,1)
+
+xrec = inv_project(rbop.trial(ronline),x̂)

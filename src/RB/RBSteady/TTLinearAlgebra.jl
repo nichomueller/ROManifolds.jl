@@ -14,8 +14,8 @@ function contraction!(::Union{AbstractArray,Number}...)
 end
 
 function contraction(
-  basis::Array{T,3},
-  coefficient::Vector{S}
+  basis::AbstractArray{T,3},
+  coefficient::AbstractVector{S}
   ) where {T,S}
 
   @check size(basis,2) == length(coefficient)
@@ -56,8 +56,8 @@ function contraction!(
 end
 
 function contraction(
-  factor1::Array{T,3},
-  factor2::Array{S,3}
+  factor1::AbstractArray{T,3},
+  factor2::AbstractArray{S,3}
   ) where {T,S}
 
   @check size(factor1,2) == size(factor2,2)
@@ -70,9 +70,9 @@ function contraction(
 end
 
 function contraction(
-  factor1::Array{T,3},
-  factor2::Array{S,3},
-  factor3::Array{U,3}
+  factor1::AbstractArray{T,3},
+  factor2::AbstractArray{S,3},
+  factor3::AbstractArray{U,3}
   ) where {T,S,U}
 
   @check size(factor1,2) == size(factor2,2) == size(factor3,2)
@@ -95,9 +95,9 @@ function contraction(
 end
 
 function contraction(
-  factor1::Array{T,3},
+  factor1::AbstractArray{T,3},
   factor2::SparseCore{S,3},
-  factor3::Array{U,3}
+  factor3::AbstractArray{U,3}
   ) where {T,S,U}
 
   sparsity = factor2.sparsity
@@ -105,17 +105,10 @@ function contraction(
   @check IndexMaps.num_cols(sparsity) == size(factor3,2)
 
   A = reshape(permutedims(factor1,(1,3,2)),:,size(factor1,2))
-  B = reshape(permutedims(factor2,(2,1,3)),size(factor2,2),:)
+  B = reshape(permutedims(factor2,(1,3,2)),:,size(factor2,2))
   C = reshape(permutedims(factor3,(2,1,3)),size(factor3,2),:)
-  AB = _sparsemul(A,B,sparsity)
-  ABC = zeros(size(A,2),size(B,2),size(C,2))
-  @inbounds for (iA,a) = enumerate(eachcol(A))
-    for (iB,b) = enumerate(eachcol(B))
-      for (iC,c) = enumerate(eachcol(C))
-        ABC[iA,iB,iC] = sum(a .* b .* c)
-      end
-    end
-  end
+  BC = _sparsemul(B,C,sparsity)
+  ABC = A*BC
   s1,s2 = size(factor1,1),size(factor1,3)
   s3,s4 = size(factor2,1),size(factor2,3)
   s5,s6 = size(factor3,1),size(factor3,3)
@@ -123,19 +116,19 @@ function contraction(
   return TTContraction(ABCp)
 end
 
-function _sparsemul(A,B,sparsity::SparsityPatternCSC)
-  AB = zeros(size(A,1),size(B,2),size(A,2))
+function _sparsemul(B,C,sparsity::SparsityPatternCSC)
+  BC = zeros(size(B,1),IndexMaps.num_rows(sparsity),size(C,2))
   rv = rowvals(sparsity)
-  for (iB,b) in enumerate(eachcol(B))
-    for (iA,a) in enumerate(eachrow(A))
-      for (irow,ai) in enumerate(a)
+  for (iB,b) in enumerate(eachrow(B))
+    for (iC,c) in enumerate(eachcol(C))
+      for (irow,ci) in enumerate(c)
         for nzi in nzrange(sparsity,irow)
-          AB[iA,rv[nzi],iB] += ai*b[nzi]
+          BC[iB,rv[nzi],iC] += b[nzi]*ci
         end
       end
     end
   end
-  return AB
+  return reshape(permutedims(BC,(2,1,3)),size(BC,2),:)
 end
 
 function sequential_product(::AbstractArray...)
@@ -143,8 +136,8 @@ function sequential_product(::AbstractArray...)
 end
 
 function sequential_product(
-  factor1::Array{T,3},
-  factor2::Array{S,3}
+  factor1::AbstractArray{T,3},
+  factor2::AbstractArray{S,3}
   ) where {T,S}
 
   @check size(factor1,3) == size(factor2,1)
@@ -189,16 +182,32 @@ function sequential_product(
 end
 
 function sequential_product(factor1::AbstractArray,factors::AbstractArray...)
-  factor2,last_factors... = b
+  factor2,last_factors... = factors
   sequential_product(sequential_product(factor1,factor2),last_factors...)
 end
 
-function cores2basis(cores::Vector{<:AbstractArray{Float64,3}})
+function cores2basis(core::AbstractArray{Float64,3})
+  reshape(core,:,size(core,3))
+end
+
+function cores2basis(cores::AbstractArray{Float64,3}...)
   core = sequential_product(cores...)
   dropdims(core;dims=1)
 end
 
-function reduced_cores(
+function cores2basis(index_map::AbstractIndexMap{D},cores::AbstractArray{Float64,3}...) where D
+  @check length(cores) ≥ D
+  coresD = sequential_product(cores[1:D]...)
+  invmap = inv_index_map(index_map)
+  coresD′ = view(coresD,:,vec(invmap),:)
+  if length(cores) == D
+    dropdims(coresD′;dims=1)
+  else
+    cores2basis(coresD′,cores[D+1:end]...)
+  end
+end
+
+function galerkin_projection(
   cores_test::Vector{<:AbstractArray{Float64,3}},
   cores::Vector{<:AbstractArray{Float64,3}})
 
@@ -207,7 +216,7 @@ function reduced_cores(
   dropdims(rcore;dims=(1,2))
 end
 
-function reduced_cores(
+function galerkin_projection(
   cores_test::Vector{<:AbstractArray{Float64,3}},
   cores::Vector{<:AbstractArray{Float64,3}},
   cores_trial::Vector{<:AbstractArray{Float64,3}})
@@ -221,14 +230,14 @@ end
 
 function basis_index(i,cores_indices::Vector{Vector{Int32}})
   Iprevs...,Icurr = cores_indices
-  if length(Iprev) == 0
+  if length(Iprevs) == 0
     return i
   end
-  Iprevprevs...,Iprev = Iprev
+  Iprevprevs...,Iprev = Iprevs
   rankprev = length(Iprev)
   icurr = slow_index(i,rankprev)
   iprevs = basis_index(Iprev[fast_index(i,rankprev)],Iprevs)
-  return (giprev...,icurr)
+  return (iprevs...,icurr)
 end
 
 function basis_indices(cores_indices::Vector{Vector{Int32}},index_map::AbstractIndexMap{D}) where D
@@ -236,16 +245,16 @@ function basis_indices(cores_indices::Vector{Vector{Int32}},index_map::AbstractI
   ninds = L - D + 1
 
   Iprev...,Icurr = cores_indices
-  basis_indices = fill(copy(Icurr),ninds)
+  basis_indices = zeros(Int32,length(Icurr),ninds)
   for (k,ik) in enumerate(Icurr)
-    indices_k = basis_index(ik,Iprev)
-    basis_indices[1][k] = index_map[CartesianIndex(indices_k[1:D])]
-    for l = D+1:L
-      basis_indices[l][k] = indices_k[l]
+    indices_k = basis_index(ik,cores_indices)
+    basis_indices[k,1] = index_map[CartesianIndex(indices_k[1:D])]
+    for (il,l) in enumerate(D+1:L)
+      basis_indices[k,1+il] = indices_k[l]
     end
   end
 
-  return basis_indices
+  return collect.(eachcol(basis_indices))
 end
 
 function basis_indices(cores_indices::Vector{Vector{Int32}},index_map::SparseIndexMap)

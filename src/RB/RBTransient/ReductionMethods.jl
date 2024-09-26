@@ -30,6 +30,10 @@ function TransientReduction(red_style::ReductionStyle,args...;kwargs...)
   TransientReduction(red_style,red_style,args...;kwargs...)
 end
 
+function TransientReduction(red_style::TTSVDRanks,args...;kwargs...)
+  TTSVDReduction(red_style,args...;kwargs...)
+end
+
 function TransientReduction(
   tolrank_space::Union{Int,Float64},
   tolrank_time::Union{Int,Float64},

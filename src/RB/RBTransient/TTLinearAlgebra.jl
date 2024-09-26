@@ -6,16 +6,20 @@ function RBSteady.contraction(
   ) where {T,S,U}
 
   @check size(factor1,2) == size(factor2,2) == size(factor3,2)
-  A = reshape(permutedims(factor1,(1,3,2)),:,size(factor1,2))
-  B = reshape(permutedims(factor2,(1,3,2)),:,size(factor2,2))
-  C = reshape(permutedims(factor3,(1,3,2)),:,size(factor3,2))
+  A = reshape(permutedims(factor1,(2,1,3)),size(factor1,2),:)
+  B = reshape(permutedims(factor2,(2,1,3)),size(factor2,2),:)
+  C = reshape(permutedims(factor3,(2,1,3)),size(factor3,2),:)
   ABC = zeros(size(A,2),size(B,2),size(C,2))
   ABC′ = zeros(size(A,2),size(B,2),size(C,2))
+  cache = zeros(size(factor1,2))
+  cache′ = zeros(size(factor1,2)-1)
   @inbounds for (iA,a) = enumerate(eachcol(A))
     for (iB,b) = enumerate(eachcol(B))
+      cache .= a .* b
+      cache′ .= a[2:end] .* b[2:end]
       for (iC,c) = enumerate(eachcol(C))
-        ABC[iA,iB,iC] = sum(a .* b .* c)
-        ABC′[iA,iB,iC] = sum(a[2:end] .* b[2:end] .* c[1:end-1])
+        ABC[iA,iB,iC] = sum(cache .* c)
+        ABC′[iA,iB,iC] = sum(cache′ .* c[1:end-1])
       end
     end
   end
