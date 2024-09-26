@@ -25,7 +25,7 @@ struct GenericRankTensor{D,K,A<:AbstractArray} <: AbstractRankTensor{D,K}
   end
 end
 
-get_decomposition(a::GenericRankTensor) = ntuple(k -> getindex(a,k),Val{length(a)}())
+get_decomposition(a::GenericRankTensor) = ntuple(k -> getindex(a,k),Val{rank(a)}())
 get_decomposition(a::GenericRankTensor,k::Integer) = a.decompositions[k]
 get_factor(a::GenericRankTensor,d::Integer,k::Integer) = get_factor(get_decomposition(a,k),d)
 Base.size(a::GenericRankTensor) = (rank(a),)

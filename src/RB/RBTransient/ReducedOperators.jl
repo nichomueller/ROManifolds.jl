@@ -96,14 +96,12 @@ function ODEs.allocate_odeopcache(
 end
 
 function RBSteady.allocate_rbcache(
+  fesolver,
   op::GenericTransientRBOperator,
-  r::TransientRealization)
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractParamVector}})
 
-  rb_lhs_cache = allocate_jacobian(op,r)
-  rb_rhs_cache = allocate_residual(op,r)
-  syscache = (rb_lhs_cache,rb_rhs_cache)
-  rbopcache = get_trial(op)(r)
-  return syscache,rbopcache
+  @abstractmethod
 end
 
 function Algebra.allocate_residual(
@@ -253,11 +251,13 @@ function ODEs.allocate_odeopcache(
 end
 
 function RBSteady.allocate_rbcache(
+  fesolver,
   op::LinearNonlinearTransientRBOperator,
-  r::TransientRealization)
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractParamVector}})
 
-  cache_lin = RBSteady.allocate_rbcache(get_linear_operator(op),r)
-  cache_nlin = RBSteady.allocate_rbcache(get_nonlinear_operator(op),r)
+  cache_lin = RBSteady.allocate_rbcache(fesolver,get_linear_operator(op),r,us)
+  cache_nlin = RBSteady.allocate_rbcache(fesolver,get_nonlinear_operator(op),r,us)
   return (cache_lin,cache_nlin)
 end
 
@@ -313,7 +313,7 @@ function RBSteady.init_online_cache!(
 
   fesolver = get_fe_solver(solver)
   odecache = allocate_odecache(fesolver,op,r,(y,))
-  rbcache = RBSteady.allocate_rbcache(op,r)
+  rbcache = RBSteady.allocate_rbcache(fesolver,op,r,(y,))
 
   cache = solver.cache
   cache.fecache = (y,odecache)

@@ -90,6 +90,6 @@ end
 function block_cores(a::AbstractVector{<:AbstractArray}...)
   D = length(a)
   abfirst = first_block(getindex.(a,1)...)
-  ablasts = map(d -> block_core(getindex.(a,d)...))
+  ablasts = map(d -> block_core(getindex.(a,d)...),2:D)
   return [abfirst,ablasts...]
 end

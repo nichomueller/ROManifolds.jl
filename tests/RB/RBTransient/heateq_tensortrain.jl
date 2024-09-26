@@ -17,9 +17,9 @@ using Mabla.RB.RBTransient
 
 # time marching
 θ = 0.5
-dt = 0.0025
+dt = 0.01
 t0 = 0.0
-tf = 0.15
+tf = 0.1
 
 # parametric space
 pranges = fill([1,10],3)
@@ -27,7 +27,7 @@ tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
 # geometry
-n = 5
+n = 10
 domain = (0,1,0,1)
 partition = (n,n)
 model = TProductModel(domain,partition)
@@ -81,12 +81,16 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 tol = fill(1e-4,4)
-reduction = TTSVDReduction(tol,energy;nparams=50)
-rbsolver = RBSolver(fesolver,reduction;nparams_test=5,nparams_res=30,nparams_jac=20)
+reduction = TTSVDReduction(tol,energy;nparams=5)
+rbsolver = RBSolver(fesolver,reduction;nparams_res=5,nparams_jac=5,nparams_djac=5)
 test_dir = datadir(joinpath("heateq","test_tt_$(1e-4)"))
 create_dir(test_dir)
 
-fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
+μ = Realization([[0.2,0.3,0.4],[0.4,0.5,0.6],[0.1,0.6,0.9],
+  [0.9,0.8,0.6],[0.3,0.4,0.1],[0.2,0.6,0.8]])
+r = TransientRealization(μ,ptspace.temporal_domain)
+
+fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ;r)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps)
 results = rb_performance(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)

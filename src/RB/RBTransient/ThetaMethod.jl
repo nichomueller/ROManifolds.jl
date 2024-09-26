@@ -1,3 +1,23 @@
+#
+
+function RBSteady.allocate_rbcache(
+  fesolver::ThetaMethod,
+  op::GenericTransientRBOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractParamVector}})
+
+  rb_lhs_cache = allocate_jacobian(op,r)
+  rb_rhs_cache = allocate_residual(op,r)
+  syscache = (rb_lhs_cache,rb_rhs_cache)
+
+  dt,θ = solver.dt,solver.θ
+  shift!(r,dt*(θ-1))
+  rbopcache = get_trial(op)(r)
+  shift!(r,dt*(1-θ))
+
+  return syscache,rbopcache
+end
+
 # general nonlinear case
 
 function ODEs.allocate_odecache(

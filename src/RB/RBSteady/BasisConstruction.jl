@@ -27,7 +27,7 @@ function reduction(red::TTSVDReduction,A::SparseSnapshots,args...)
 end
 
 function _size_cond(M::AbstractMatrix)
- length(M) > 1e6 && (size(M,1) > 1e2*size(M,2) || size(M,2) > 1e2*size(M,1))
+  false # length(M) > 1e6 && (size(M,1) > 1e2*size(M,2) || size(M,2) > 1e2*size(M,1))
 end
 
 function _cholesky_decomp(X::AbstractSparseMatrix)
@@ -153,7 +153,7 @@ end
 # We are not interested in the last dimension (corresponds to the parameter)
 
 function ttsvd(
-  red_style::ReductionStyle,
+  red_style::TTSVDRanks,
   A::AbstractArray{T,N}
   ) where {T,N}
 
@@ -170,7 +170,7 @@ function ttsvd(
 end
 
 function ttsvd(
-  red_style::TTSVDReduction,
+  red_style::TTSVDRanks,
   A::AbstractArray{T,N},
   X::AbstractRankTensor{D}) where {T,N,D}
 
@@ -183,7 +183,7 @@ function ttsvd(
 end
 
 function steady_ttsvd(
-  red_style::ReductionStyle,
+  red_style::TTSVDRanks,
   A::AbstractArray{T,N},
   X::Rank1Tensor{D}
   ) where {T,N,D}
@@ -202,109 +202,205 @@ function steady_ttsvd(
 end
 
 function steady_ttsvd(
-  red_style::ReductionStyle,
+  red_style::TTSVDRanks,
   A::AbstractArray{T,N},
   X::GenericRankTensor{D,K}
   ) where {T,N,D,K}
 
+  # compute initial tt decompositions
   cores_k,remainders_k = map(k -> steady_ttsvd(red_style,A,X[k]),1:K) |> tuple_of_arrays
+
+  # tt decomposition of the sum
   cores = block_cores(cores_k...)
-  remainders = cat(remainders_k...;dims=1)
-  R = orthogonalize!(cores,X)
-  remainder = absorb(remainders,R)
-  return cores,remainder
+  remainder = cat(remainders_k...;dims=1)
+
+  # tt orthogonality
+  cores′,remainder′ = orthogonalize(cores,remainder,X)
+
+  return cores′,remainder′
 end
 
 function generalized_ttsvd(
-  red_style::ReductionStyle,
+  red_style::TTSVDRanks,
   A::AbstractArray{T,N},
   X::GenericRankTensor{D}
   ) where {T,N,D}
 
   cores,remainder = steady_ttsvd(red_style,A,X)
   for d = D+1:N-1
-    core_d,remainder_d = RBSteady.ttsvd_loop(red_style[N-2],remainder)
-    remainder = reshape(remainder_d,size(core_d,3),size(A,d),:)
+    core_d,remainder_d = RBSteady.ttsvd_loop(red_style[d],remainder)
+    remainder = reshape(remainder_d,size(core_d,3),size(A,d+1),:)
     push!(cores,core_d)
   end
 
   return cores,remainder
 end
 
-function pivoted_qr(A;tol=1e-10)
-  C = qr(A,ColumnNorm())
-  r = findlast(abs.(diag(C.R)) .> tol)
-  Q = C.Q[:,1:r]
-  R = C.R[1:r,invperm(C.jpvt)]
-  return Q,R
+function orthogonalize(cores,remainder,args...)
+  cache = return_cache(orthogonalize,cores,args...)
+  orthogonalize!(cache,cores,remainder,args...)
 end
 
-function orthogonalize!(cores,X::AbstractRankTensor)
-  weight = ones(1,rank(X),1)
+function Arrays.return_cache(::typeof(orthogonalize),cores)
+  core = first(cores)
+  acache = return_cache(absorb,core)
+  return acache
+end
+
+function Arrays.return_cache(::typeof(orthogonalize),cores,X::AbstractRankTensor)
+  core = first(cores)
+  acache = return_cache(orthogonalize,cores)
+  wcache = return_cache(weight_array,core,X)
+  return acache,wcache
+end
+
+function orthogonalize!(cache,cores,remainder,X::AbstractRankTensor)
+  acache,wcache = cache
+  weight_cache, = wcache
+  weight = weight_cache.array
+
   decomp = get_decomposition(X)
+
   for d in eachindex(cores)
-    core_d = cores[d]
+    cur_core = cores[d]
     if d == length(cores)
-      XW = _get_norm_matrix_from_weight(X,weight)
-      core_d′,R = reduce_rank(core_d,XW)
-      cores[d] = core_d′
-      return R
+      weighted_norm = ttnorm_array(X,weight)
+      cur_core′,R = reduce_rank!(cur_core,weighted_norm)
+      cores[d] = cur_core′
+      remainder′ = absorb!(acache,remainder,R)
+      return cores,remainder′
     end
     next_core = cores[d+1]
     X_d = getindex.(decomp,d)
-    core_d′,R = reduce_rank(core_d)
-    cores[d] = core_d′
-    cores[d+1] = absorb(next_core,R)
-    weight = _weight_array(weight,core_d′,X_d)
+    cur_core′,R = reduce_rank!(cur_core)
+    next_core′ = absorb!(acache,next_core,R)
+    cores[d] = cur_core′
+    cores[d+1] = next_core′
+    weight = weight_array!(wcache,cur_core′,X_d)
   end
 end
 
-function reduce_rank(core::AbstractArray{T,3},args...) where T
-  mat = reshape(core,:,size(core,3))
-  Q,R = gram_schmidt(mat,args...)
-  core′ = reshape(Q,size(core,1),size(core,2),:)
-  return core′,R
+function orthogonalize!(cache,remainder,cores)
+  for d in eachindex(cores)
+    if d == length(cores)
+      remainder′ = absorb!(acache,remainder,R)
+      return cores,remainder′
+    end
+    cur_core = cores[d]
+    next_core = cores[d+1]
+    cur_core′,R = reduce_rank!(cur_core)
+    next_core′ = absorb!(acache,next_core,R)
+    cores[d] = cur_core′
+    cores[d+1] = next_core′
+  end
+end
+
+for (f,g) in zip((:reduce_rank,:reduce_rank!),(:gram_schmidt,:gram_schmidt!))
+  @eval begin
+    function $f(core::AbstractArray{T,3},args...) where T
+      mat = reshape(core,:,size(core,3))
+      Q,R = $g(mat,args...)
+      core′ = reshape(Q,size(core,1),size(core,2),:)
+      return core′,R
+    end
+  end
 end
 
 function absorb(core::AbstractArray{T,3},R::AbstractMatrix) where T
-  Rcore = R*reshape(core,size(core,1),:)
-  return reshape(Rcore,size(Rcore,1),size(core,2),:)
+  cache = return_cache(absorb,core,R)
+  absorb!(cache,core,R)
 end
 
-function _weight_array(prev_weight,core,X)
-  @check length(X) == size(weight,2)
-  @check size(core,1) == size(weight,1) == size(weight,3)
+function Arrays.return_cache(::typeof(absorb),core::AbstractArray{T,3}) where T
+  s = size(core,1)*size(core,2),size(core,3)
+  a = zeros(s)
+  CachedArray(a)
+end
+
+function absorb!(cache,core::AbstractArray{T,3},R::AbstractMatrix) where T
+  mat = reshape(core,size(core,1),:)
+  setsize!(cache,(size(R,1),size(mat,2)))
+  mul!(cache.array,R,mat)
+  core′ = reshape(cache.array,size(R,1),size(core,2),:)
+  return core′
+end
+
+function weight_array(core::AbstractArray{T,3},X::AbstractRankTensor) where T
+  cache = return_cache(weight_array,core,X)
+  weight_array!(cache,core,X)
+end
+
+function Arrays.return_cache(
+  ::typeof(weight_array),
+  core::AbstractArray{T,3},
+  X::AbstractRankTensor
+  ) where T
+
+  K = rank(X)
+  rprev = size(core,1)
+  r = size(core,3)
+  rrprev = rprev*r
+  N = size(core,2)
+
+  a1 = zeros(r,K,r)
+  a2 = ones(rprev,K,rprev)
+  a3 = zeros(N,rrprev)
+  a4 = zeros(rrprev,rrprev)
+
+  c1 = CachedArray(a1)
+  c2 = CachedArray(a2)
+  c3 = CachedArray(a3)
+  c4 = CachedArray(a4)
+
+  return c1,c2,c3,c4
+end
+
+function weight_array!(cache,core,X)
+  cur_weight_cache,prev_weight_cache,cache_left,cache_right = cache
 
   K = length(X)
   rank_prev = size(core,1)
   rank = size(core,3)
+  rrprev = rank_prev*rank
   N = size(core,2)
 
-  cur_weight = zeros(rank,K,rank)
-  core2D = reshape(permutedims(core,(2,1,3)),N,rank_prev*rank)
-  cache_right = zeros(N,rank_prev*rank)
-  cache_left = zeros(rank_prev*rank,N)
+  setsize!(cache_right,(N,rrprev))
+  setsize!(cache_left,(rrprev,rrprev))
+  setsize!(cur_weight_cache,(rank,K,rank))
+  cur_weight = cur_weight_cache.array
+  prev_weight = prev_weight_cache.array
+
+  core2D = reshape(permutedims(core,(2,1,3)),N,rrprev)
 
   @inbounds for k = 1:K
-    Xk = X[k]
-    Wk = W[:,k,:]
-    Wk_prev = weight[:,k,:]
-    mul!(cache_right,Xk,core2D)
-    mul!(cache_left,core2D',cache_right)
-    cur_weight = permutedims(reshape(cache_left,rank_prev,rank,rank_prev,rank),(1,3,2,4))
-    muladd!(Wk,Wk_prev,cur_weight)
+    mul!(cache_right.array,X[k],core2D)
+    mul!(cache_left.array,core2D',cache_right.array)
+    resh_weight = reshape(permutedims(reshape(cache_left.array,rank_prev,rank,rank_prev,rank),(2,4,1,3)),rank^2,:)
+    cur_weight[:,k,:] = reshape(resh_weight*vec(prev_weight[:,k,:]),rank,rank)
   end
-  return W
+
+  setsize!(prev_weight_cache,size(cur_weight))
+  copyto!(prev_weight_cache.array,cur_weight)
+
+  return cur_weight
 end
 
-function _get_norm_matrix_from_weight(X::AbstractRankTensor,WD)
-  K = rank(X)
-  XD = map(k -> X[k][end],1:K)
-  XW = kron(XD[1],WD[:,1,:])
-  @inbounds for k = 2:K
-    XW += kron(XD[k],WD[:,k,:])
+function ttnorm_array(X::AbstractRankTensor{D,K},WD) where {D,K}
+  @check size(WD,1) == size(WD,3)
+  @check size(WD,2) == K
+  @check all(size(X[1][D]) == size(X[k][D]) for k = 2:K)
+
+  s1 = size(WD,1)*size(X[1][D],1)
+  s2 = size(WD,3)*size(X[1][D],2)
+  XW = zeros(s1,s2)
+  cache = zeros(s1,s2)
+
+  for k = 1:rank(X)
+    kron!(cache,X[k][D],WD[:,k,:])
+    @. XW = XW + cache
   end
   @. XW = (XW+XW')/2 # needed to eliminate roundoff errors
+
   return sparse(XW)
 end
 
@@ -351,30 +447,42 @@ function orth_complement!(
   v .= v-orth_projection(v,basis,args...)
 end
 
-"""
-    gram_schmidt(mat::AbstractMatrix, basis::AbstractMatrix, args...) -> AbstractMatrix
-
-Gram-Schmidt algorithm for an abstract matrix `mat` with respect to the column
-space of `basis`. When a symmetric, positive definite matrix `X` is provided as
-an argument, the output is `X`-orthogonal, otherwise it is ℓ²-orthogonal
-
-"""
-function gram_schmidt(M::AbstractMatrix)
-  Q,R = pivoted_qr(M)
-  return Q,R
+for (f,g) in zip((:pivoted_qr,:pivoted_qr!),(:qr,:qr!))
+  @eval begin
+    function $f(A;tol=1e-10)
+      C = $g(A,ColumnNorm())
+      r = findlast(abs.(diag(C.R)) .> tol)
+      Q = C.Q[:,1:r]
+      R = C.R[1:r,invperm(C.jpvt)]
+      return Q,R
+    end
+  end
 end
 
-function gram_schmidt(M::AbstractMatrix,X::AbstractSparseMatrix)
-  L,p = _cholesky_decomp(X)
-  XM = L'*M[p,:]
-  Q̃,R = pivoted_qr(XM)
-  Q = (L'\Q̃)[invperm(p),:]
-  return Q,R
+for (f,g) in zip((:gram_schmidt,:gram_schmidt!),(:pivoted_qr,:pivoted_qr!))
+  @eval begin
+    function $f(M::AbstractMatrix)
+      Q,R = $g(M)
+      return Q,R
+    end
+
+    function $f(M::AbstractMatrix,X::AbstractSparseMatrix)
+      L,p = _cholesky_decomp(X)
+      XM = L'*M[p,:]
+      Q̃,R = $g(XM)
+      Q = (L'\Q̃)[invperm(p),:]
+      return Q,R
+    end
+  end
 end
 
-function gram_schmidt(M::AbstractMatrix,basis::AbstractMatrix,args...)
-  Q,R = gram_schmidt(hcat(basis,M),args...)
-  return Q,R
+for f in (:gram_schmidt,:gram_schmidt!)
+  @eval begin
+    function $f(M::AbstractMatrix,basis::AbstractMatrix,args...)
+      Q,R = $f(hcat(basis,M),args...)
+      return Q,R
+    end
+  end
 end
 
 # for testing purposes

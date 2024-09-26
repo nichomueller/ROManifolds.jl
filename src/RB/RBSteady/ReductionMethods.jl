@@ -37,7 +37,7 @@ struct TTSVDRanks{A<:ReductionStyle} <: ReductionStyle
 end
 
 function TTSVDRanks(tolranks::Vector{<:Union{Float64,Int}},args...;kwargs...)
-  style = map(tolrank -> ReductionStyle(tolrank,args...;kwargs...))
+  style = map(tolrank -> ReductionStyle(tolrank,args...;kwargs...),tolranks)
   TTSVDRanks(style)
 end
 
