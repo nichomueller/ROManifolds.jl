@@ -97,7 +97,7 @@ function Algebra.solve!(
   ns = numerical_setup(ss,Â)
 
   max0 = maximum(abs,b̂)
-  tol = 1e-6*max0
+  tol = max(1e-6*max0,eps())
 
   for k in 1:nls.max_nliters
     rmul!(b̂,-1)

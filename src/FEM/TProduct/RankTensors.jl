@@ -2,7 +2,8 @@ abstract type AbstractRankTensor{D,K} end
 
 dimension(a::AbstractRankTensor{D,K}) where {D,K} = D
 LinearAlgebra.rank(a::AbstractRankTensor{D,K}) where {D,K} = K
-get_decomposition(a::AbstractRankTensor) = @abstractmethod
+get_decomposition(a::AbstractRankTensor) = ntuple(k -> get_decomposition(a,k),Val{rank(a)}())
+get_decomposition(a::AbstractRankTensor,k::Integer) = @abstractmethod
 
 struct Rank1Tensor{D,A<:AbstractArray} <: AbstractRankTensor{D,1}
   factors::Vector{A}
@@ -13,7 +14,7 @@ struct Rank1Tensor{D,A<:AbstractArray} <: AbstractRankTensor{D,1}
 end
 
 get_factors(a::Rank1Tensor) = a.factors
-get_decomposition(a::Rank1Tensor) = get_factors(a)
+get_decomposition(a::Rank1Tensor,k::Integer) = k == 1 ? a : error("Exceeded rank 1 with rank $k")
 Base.size(a::Rank1Tensor) = (dimension(a),)
 Base.getindex(a::Rank1Tensor,d::Integer) = get_factors(a)[d]
 
@@ -25,7 +26,6 @@ struct GenericRankTensor{D,K,A<:AbstractArray} <: AbstractRankTensor{D,K}
   end
 end
 
-get_decomposition(a::GenericRankTensor) = ntuple(k -> getindex(a,k),Val{rank(a)}())
 get_decomposition(a::GenericRankTensor,k::Integer) = a.decompositions[k]
 get_factor(a::GenericRankTensor,d::Integer,k::Integer) = get_factor(get_decomposition(a,k),d)
 Base.size(a::GenericRankTensor) = (rank(a),)
@@ -169,11 +169,11 @@ end
 
 # linear algebra
 
-function tpmul(a::AbstractRankTensor{2,1},b::AbstractMatrix)
+function tpmul(a::Rank1Tensor{2},b::AbstractMatrix)
   return a[1]*b*a[2]'
 end
 
-function tpmul(a::AbstractRankTensor{3,1},b::AbstractArray{T,3} where T)
+function tpmul(a::Rank1Tensor{3},b::AbstractArray{T,3} where T)
   hcat([vec(a[1]*bi*a[2]') for bi in eachslice(b,dims=3)]...)*a[3]'
 end
 
@@ -185,7 +185,14 @@ function tpmul(a::AbstractRankTensor{D,K},b::AbstractArray) where {D,K}
   return c
 end
 
-Utils.induced_norm(a::AbstractArray,X::AbstractRankTensor) = sqrt(dot(vec(a),tpmul(X,a)))
+function Utils.induced_norm(a::AbstractArray{T,D},X::AbstractRankTensor{D}) where {T,D}
+  sqrt(dot(vec(a),tpmul(X,a)))
+end
+
+function Utils.induced_norm(a::AbstractArray{T,D′},X::AbstractRankTensor{D}) where {T,D,D′}
+  D ≥ D′ && @notimplemented
+  sqrt(sum(induced_norm(ai,X)^2 for ai in eachslice(a,dims=D′)))
+end
 
 # to global array - should try avoiding using these functions
 

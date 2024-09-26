@@ -27,7 +27,7 @@ end
 function empirical_interpolation(A::AbstractArray)
   cache = eim_cache(A)
   I,AI = empirical_interpolation!(cache,A)
-  return i,AI
+  return I,AI
 end
 
 function empirical_interpolation(A::ParamSparseMatrix)

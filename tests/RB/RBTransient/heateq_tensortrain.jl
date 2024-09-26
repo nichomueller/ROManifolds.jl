@@ -81,59 +81,15 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 tol = fill(1e-4,4)
-reduction = TTSVDReduction(tol,energy;nparams=5)
-rbsolver = RBSolver(fesolver,reduction;nparams_res=5,nparams_jac=5,nparams_djac=5)
+reduction = TTSVDReduction(tol,energy;nparams=50)
+rbsolver = RBSolver(fesolver,reduction;nparams_res=20,nparams_jac=20,nparams_djac=0)
 test_dir = datadir(joinpath("heateq","test_tt_$(1e-4)"))
 create_dir(test_dir)
 
-μ = Realization([[0.2,0.3,0.4],[0.4,0.5,0.6],[0.1,0.6,0.9],
-  [0.9,0.8,0.6],[0.3,0.4,0.1],[0.2,0.6,0.8]])
-r = TransientRealization(μ,ptspace.temporal_domain)
-
-fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ;r)
+fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,rbstats,cache = solve(rbsolver,rbop,fesnaps)
-results = rb_performance(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
-
-println(results)
-
-save(test_dir,fesnaps)
-save(test_dir,rbop)
-save(test_dir,results)
-
-using Gridap.FESpaces
-
-solver = rbsolver
-s = fesnaps
-
-red_test,red_trial = reduced_fe_space(solver,feop,s)
-odeop = get_algebraic_operator(feop)
-
-# red_lhs,red_rhs = reduced_weak_form(solver,odeop,red_test,red_trial,s)
-op = odeop
-jacs = jacobian_snapshots(solver,op,s)
-ress = residual_snapshots(solver,op,s)
-jac_red = RBSteady.get_jacobian_reduction(solver)
-res_red = RBSteady.get_residual_reduction(solver)
-
-red_jac = reduced_jacobian(jac_red,red_trial,red_test,jacs)
-red_res = reduced_residual(res_red,red_test,ress)
-
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-ronline = r[6:6,:]
+ronline = realization(feop;nparams=10)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 
 x,festats = solution_snapshots(rbsolver,feop,ronline,uh0μ)
 perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,ronline)
-
-using Gridap.Algebra
-using Gridap.Arrays
-using Gridap.FESpaces
-
-ad = rbop.lhs[1][1]
-norm(ad.basis.basis,1)
-
-ad = rbop.rhs[1]
-norm(ad.basis.basis,1)
-
-xrec = inv_project(rbop.trial(ronline),x̂)

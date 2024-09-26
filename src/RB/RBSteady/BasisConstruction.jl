@@ -223,7 +223,7 @@ end
 function generalized_ttsvd(
   red_style::TTSVDRanks,
   A::AbstractArray{T,N},
-  X::GenericRankTensor{D}
+  X::AbstractRankTensor{D}
   ) where {T,N,D}
 
   cores,remainder = steady_ttsvd(red_style,A,X)
