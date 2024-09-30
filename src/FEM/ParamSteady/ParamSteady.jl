@@ -26,6 +26,7 @@ import UnPack: @unpack
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ReferenceFEs: get_order
+import Mabla.FEM.Utils: CostTracker
 
 export FEOperatorIndexMap
 export get_vector_index_map
@@ -43,7 +44,7 @@ export LinearParamEq
 export LinearNonlinearParamEq
 export ParamOperator
 export ParamOperatorWithTrian
-export ParamOpFromFEOpCache
+export ParamCache
 export allocate_paramcache
 export update_paramcache!
 include("ParamOperator.jl")
@@ -68,5 +69,7 @@ include("LinearNonlinearParamFEOperator.jl")
 export ParamOpFromFEOp
 export ParamOpFromFEOpWithTrian
 include("ParamOpFromFEOp.jl")
+
+include("ParamSolutions.jl")
 
 end # module

@@ -20,7 +20,7 @@ function get_nonlinear_operator(op::ParamOpFromFEOp)
 end
 
 """
-    allocate_paramcache(op::ParamOpFromFEOp,r::Realization,u::AbstractParamVector
+    allocate_paramcache(op::ParamOpFromFEOp,μ::Realization,u::AbstractVector
       ) -> CacheType
 
 Similar to [`allocate_odecache`](@ref) in [`Gridap`](@ref), when dealing with steady
@@ -29,75 +29,64 @@ parametric problems
 """
 function allocate_paramcache(
   op::ParamOpFromFEOp,
-  r::Realization,
-  u::AbstractParamVector)
+  μ::Realization,
+  u::AbstractVector)
 
   ptrial = get_trial(op.op)
-  trial = allocate_space(ptrial,r)
-
-  pfeopcache = allocate_pfeopcache(op.op,r,u)
+  trial = allocate_space(ptrial,μ)
 
   uh = EvaluationFunction(trial,u)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  trial = evaluate(get_trial(op.op),nothing)
   du = get_trial_fe_basis(trial)
-  assem = get_param_assembler(op.op,r)
+  assem = get_param_assembler(op.op,μ)
 
   jac = get_jac(op.op)
-  μ = get_params(r)
   matdata = collect_cell_matrix(trial,test,jac(μ,uh,du,v))
   A = allocate_matrix(assem,matdata)
 
-  OpFromFEOpCache(trial,ptrial,pfeopcache,A)
+  res = get_res(op.op)
+  vecdata = collect_cell_vector(test,res(μ,uh,v))
+  b = allocate_vector(assem,vecdata)
+
+  ParamCache(trial,ptrial,A,b)
 end
 
 """
-    update_paramcache!(opcache, op::ParamOpFromFEOp, r::Realization, u::AbstractParamVector
+    update_paramcache!(paramcache, op::ParamOpFromFEOp, μ::Realization, u::AbstractVector
       ) -> CacheType
 
-Similar to [`update_odeopcache!`](@ref) in [`Gridap`](@ref), when dealing with steady
+Similar to [`update_odeparamcache!`](@ref) in [`Gridap`](@ref), when dealing with steady
 parametric problems
 
 """
-function update_paramcache!(opcache,op::ParamOpFromFEOp,r::Realization)
-  opcache.Us = evaluate!(opcache.Us,opcache.Ups,r)
-  pfeopcache,op = opcache.pfeopcache,op.op
-  opcache.pfeopcache = update_pfeopcache!(pfeopcache,op,r)
-  opcache
+function update_paramcache!(paramcache,op::ParamOpFromFEOp,μ::Realization)
+  paramcache.trial = evaluate!(paramcache.trial,paramcache.ptrial,μ)
+  pfeparamcache,op = paramcache.pfeparamcache,op.op
+  paramcache
 end
 
 function Algebra.allocate_residual(
   op::ParamOpFromFEOp,
-  r::Realization,
-  u::AbstractParamVector,
-  opcache)
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
 
-  uh = EvaluationFunction(opcache.Us,u)
-  test = get_test(op.op)
-  v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,r)
-
-  μ = get_params(r)
-
-  res = get_res(op.op)
-  vecdata = collect_cell_vector(test,res(μ,uh,v))
-  allocate_vector(assem,vecdata)
+  paramcache.b
 end
 
 function Algebra.residual!(
   b::AbstractVector,
   op::ParamOpFromFEOp,
-  r::Realization,
-  u::AbstractParamVector,
-  opcache)
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
 
-  uh = EvaluationFunction(opcache.Us,u)
+  uh = EvaluationFunction(paramcache.trial,u)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,r)
+  assem = get_param_assembler(op.op,μ)
 
-  μ = get_params(r)
   res = get_res(op.op)
   dc = res(μ,uh,v)
   vecdata = collect_cell_vector(test,dc)
@@ -108,40 +97,27 @@ end
 
 function Algebra.allocate_jacobian(
   op::ParamOpFromFEOp,
-  r::Realization,
-  u::AbstractParamVector,
-  opcache)
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
 
-  uh = EvaluationFunction(opcache.Us,u)
-  trial = evaluate(get_trial(op.op),nothing)
-  du = get_trial_fe_basis(trial)
-  test = get_test(op.op)
-  v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,r)
-
-  μ = get_params(r)
-  jac = get_jac(op.op)
-  dc = jac(μ,uh,du,v)
-
-  matdata = collect_cell_matrix(trial,test,dc)
-  allocate_matrix(assem,matdata)
+  paramcache.A
 end
 
 function Algebra.jacobian!(
   A::AbstractMatrix,
   op::ParamOpFromFEOp,
-  r::Realization,
-  u::AbstractParamVector,
-  opcache)
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
 
-  uh = EvaluationFunction(opcache.Us,u)
+  uh = EvaluationFunction(paramcache.trial,u)
   trial = evaluate(get_trial(op.op),nothing)
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,r)
+  assem = get_param_assembler(op.op,μ)
 
-  μ = get_params(r)
   jac = get_jac(op.op)
   dc = jac(μ,uh,du,v)
   matdata = collect_cell_matrix(trial,test,dc)
@@ -160,6 +136,8 @@ FESpaces.get_test(op::ParamOpFromFEOpWithTrian) = get_test(op.op)
 FESpaces.get_trial(op::ParamOpFromFEOpWithTrian) = get_trial(op.op)
 ParamDataStructures.realization(op::ParamOpFromFEOpWithTrian;kwargs...) = realization(op.op;kwargs...)
 get_fe_operator(op::ParamOpFromFEOpWithTrian) = op.op
+get_vector_index_map(op::ParamOpFromFEOpWithTrian) = get_vector_index_map(op.op)
+get_matrix_index_map(op::ParamOpFromFEOpWithTrian) = get_matrix_index_map(op.op)
 
 function get_linear_operator(op::ParamOpFromFEOpWithTrian)
   ParamOpFromFEOpWithTrian(get_linear_operator(op.op))
@@ -179,76 +157,65 @@ end
 
 function allocate_paramcache(
   op::ParamOpFromFEOpWithTrian,
-  r::Realization,
-  u::AbstractParamVector)
+  μ::Realization,
+  u::AbstractVector)
 
   ptrial = get_trial(op.op)
-  trial = allocate_space(ptrial,r)
-
-  pfeopcache = allocate_pfeopcache(op.op,r,u)
+  trial = allocate_space(ptrial,μ)
 
   uh = EvaluationFunction(trial,u)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  trial = evaluate(get_trial(op.op),nothing)
   du = get_trial_fe_basis(trial)
-  assem = get_param_assembler(op.op,r)
+  assem = get_param_assembler(op.op,μ)
 
   jac = get_jac(op.op)
-  μ = get_params(r)
   dc = jac(μ,uh,du,v)
-  matdata = collect_cell_matrix(trial,test,dc)
-  A = allocate_matrix(assem,matdata)
+  A = contribution(op.op.trian_jac) do trian
+    matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
+    allocate_matrix(assem,matdata)
+  end
 
-  OpFromFEOpCache(trial,ptrial,pfeopcache,A)
-end
-
-function update_paramcache!(
-  opcache,
-  op::ParamOpFromFEOpWithTrian,
-  r::Realization)
-
-  opcache.Us = evaluate!(opcache.Us,opcache.Ups,r)
-  pfeopcache,op = opcache.pfeopcache,op.op
-  opcache.pfeopcache = update_pfeopcache!(pfeopcache,op,r)
-  opcache
-end
-
-function Algebra.allocate_residual(
-  op::ParamOpFromFEOpWithTrian,
-  r::Realization,
-  u::AbstractParamVector,
-  opcache)
-
-  uh = EvaluationFunction(opcache.Us,u)
-  test = get_test(op.op)
-  v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,r)
-
-  μ = get_params(r)
   res = get_res(op.op)
   dc = res(μ,uh,v)
-
   b = contribution(op.op.trian_res) do trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     allocate_vector(assem,vecdata)
   end
-  b
+
+  ParamCache(trial,ptrial,A,b)
+end
+
+function update_paramcache!(
+  paramcache,
+  op::ParamOpFromFEOpWithTrian,
+  μ::Realization)
+
+  paramcache.trial = evaluate!(paramcache.trial,paramcache.ptrial,μ)
+  paramcache
+end
+
+function Algebra.allocate_residual(
+  op::ParamOpFromFEOpWithTrian,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  paramcache.b
 end
 
 function Algebra.residual!(
   b::Contribution,
   op::ParamOpFromFEOpWithTrian,
-  r::Realization,
-  u::AbstractParamVector,
-  opcache)
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
 
-  uh = EvaluationFunction(opcache.Us,u)
+  uh = EvaluationFunction(paramcache.trial,u)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,r)
+  assem = get_param_assembler(op.op,μ)
 
-  μ = get_params(r)
   res = get_res(op.op)
   dc = res(μ,uh,v)
 
@@ -260,41 +227,27 @@ end
 
 function Algebra.allocate_jacobian(
   op::ParamOpFromFEOpWithTrian,
-  r::Realization,
-  u::AbstractParamVector,
-  opcache)
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
 
-  uh = EvaluationFunction(opcache.Us,u)
-  trial = evaluate(get_trial(op.op),nothing)
-  du = get_trial_fe_basis(trial)
-  test = get_test(op.op)
-  v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,r)
-
-  μ = get_params(r)
-  jac = get_jac(op.op)
-  dc = jac(μ,uh,du,v)
-  contribution(op.op.trian_res) do trian
-    matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
-    allocate_matrix(assem,matdata)
-  end
+  paramcache.A
 end
 
 function Algebra.jacobian!(
   A::Contribution,
   op::ParamOpFromFEOpWithTrian,
-  r::Realization,
-  u::AbstractParamVector,
-  opcache)
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
 
-  uh = EvaluationFunction(opcache.Us,u)
+  uh = EvaluationFunction(paramcache.trial,u)
   trial = evaluate(get_trial(op.op),nothing)
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,r)
+  assem = get_param_assembler(op.op,μ)
 
-  μ = get_params(r)
   jac = get_jac(op.op)
   dc = jac(μ,uh,du,v)
   map(A.values,op.op.trian_jac) do values,trian

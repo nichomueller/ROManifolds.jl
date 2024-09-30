@@ -18,7 +18,7 @@ function reduced_operator(
 
   red_test,red_trial = reduced_fe_space(solver,feop,s)
   op = get_algebraic_operator(feop)
-  reduced_operator(solver,feop,red_test,red_trial,s)
+  reduced_operator(solver,op,red_test,red_trial,s)
 end
 
 function reduced_operator(
@@ -59,7 +59,7 @@ function allocate_rbcache(
 end
 
 function ParamSteady.update_paramcache!(
-  opcache,
+  paramcache,
   op::RBOperator,
   r::Realization)
 
@@ -304,32 +304,32 @@ end
 function Algebra.solve(
   solver::RBSolver,
   op::RBOperator,
-  r::AbstractRealization)
+  r::AbstractRealization;
+  kwargs...)
 
-  trial = get_trial(op)(r)
-  fe_trial = get_fe_trial(op)(r)
-  x̂ = zero_free_values(trial)
-  y = zero_free_values(fe_trial)
-  cache = x̂,y
-  solve!(cache,solver,op,r)
+  cache = solver.cache
+  if isnothing(cache.fecache) || isnothing(cache.rbcache)
+    RBSteady.init_online_cache!(solver,op,r)
+  else
+    RBSteady.online_cache!(solver,op,r)
+  end
+  solve!(cache,solver,op,r;kwargs...)
 end
 
 function Algebra.solve!(
   cache,
   solver::RBSolver,
   op::RBOperator,
-  r::AbstractRealization)
+  r::AbstractRealization;
+  kwargs...)
 
-  x̂,y = cache
-  fesolver = get_fe_solver(solver)
+  y,paramcache = cache.fecache
+  x̂,rbcache = cache.rbcache
 
-  t = @timed solve!((x̂,),fesolver,op,r,(y,))
+  t = @timed solve!(x̂,solver,op,r,y,paramcache,rbcache)
   stats = CostTracker(t,nruns=num_params(r))
 
-  trial = get_trial(op)(r)
-  x = inv_project(trial,x̂)
-
-  return x,stats
+  return x̂,stats
 end
 
 # cache utils
@@ -351,7 +351,7 @@ function select_evalcache_at_indices(u::ConsecutiveArrayOfArrays,paramcache,indi
   @unpack Us,Ups,pfeopcache,form = paramcache
   new_Us = select_fe_space_at_indices(Us,indices)
   new_XhF = ConsecutiveArrayOfArrays(u.data[:,indices])
-  new_paramcache = ParamOpFromFEOpCache(new_Us,Uts,tfeopcache,const_forms)
+  new_paramcache = ParamCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_paramcache
 end
 
@@ -362,7 +362,7 @@ function select_evalcache_at_indices(u::BlockVectorOfVectors,paramcache,indices)
   spaces = select_fe_space_at_indices(Us,indices)
   new_Us = MultiFieldFESpace(VT,spaces,style)
   new_XhF = mortar([ConsecutiveArrayOfArrays(b.data[:,indices]) for b in blocks(u)])
-  new_paramcache = ParamOpFromFEOpCache(new_Us,Uts,tfeopcache,const_forms)
+  new_paramcache = ParamCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_paramcache
 end
 

@@ -194,6 +194,7 @@ end
 param_indices(s::SnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
 ParamDataStructures.param_data(s::SnapshotsAtIndices) = param_data(s.snaps)
+IndexMaps.get_index_map(s::SnapshotsAtIndices) = get_index_map(s.snaps)
 
 function ParamDataStructures.get_values(s::SnapshotsAtIndices)
   v = consecutive_getindex(param_data(s),:,param_indices(s))
