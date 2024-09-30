@@ -1,4 +1,4 @@
-function RBSteady.contraction(
+Base.@propagate_inbounds function RBSteady.contraction(
   factor1::Array{T,3},
   factor2::Array{S,3},
   factor3::Array{U,3},
@@ -11,15 +11,17 @@ function RBSteady.contraction(
   C = reshape(permutedims(factor3,(2,1,3)),size(factor3,2),:)
   ABC = zeros(size(A,2),size(B,2),size(C,2))
   ABC′ = zeros(size(A,2),size(B,2),size(C,2))
-  cache = zeros(size(factor1,2))
-  cache′ = zeros(size(factor1,2)-1)
-  @inbounds for (iA,a) = enumerate(eachcol(A))
+  for (iA,a) = enumerate(eachcol(A))
     for (iB,b) = enumerate(eachcol(B))
-      cache .= a .* b
-      cache′ .= a[2:end] .* b[2:end]
       for (iC,c) = enumerate(eachcol(C))
-        ABC[iA,iB,iC] = sum(cache .* c)
-        ABC′[iA,iB,iC] = sum(cache′ .* c[1:end-1])
+        for n in axes(factor1,2)
+          RBSteady._entry!(+,ABC,a[n]*b[n]*c[n],iA,iB,iC)
+          # ABC[iA,iB,iC] += a[n]*b[n]*c[n]
+          if n < size(factor1,2)
+            RBSteady._entry!(+,ABC′,a[n+1]*b[n+1]*c[n],iA,iB,iC)
+            # ABC′[iA,iB,iC] += a[n+1]*b[n+1]*c[n]
+          end
+        end
       end
     end
   end
@@ -29,4 +31,31 @@ function RBSteady.contraction(
   ABCp = permutedims(reshape(ABC,s1,s2,s3,s4,s5,s6),(1,3,5,2,4,6))
   ABCp′ = permutedims(reshape(ABC′,s1,s2,s3,s4,s5,s6),(1,3,5,2,4,6))
   return TTContraction(combine(ABCp,ABCp′))
+end
+
+Base.@propagate_inbounds function new_contraction(
+  factor1::Array{T,3},
+  factor2::Array{S,3},
+  factor3::Array{U,3}
+  ) where {T,S,U}
+
+  @check size(factor1,2) == size(factor2,2) == size(factor3,2)
+  A = reshape(permutedims(factor1,(2,1,3)),size(factor1,2),:)
+  B = reshape(permutedims(factor2,(2,1,3)),size(factor2,2),:)
+  C = reshape(permutedims(factor3,(2,1,3)),size(factor3,2),:)
+  ABC = zeros(size(A,2),size(B,2),size(C,2))
+  for (iA,a) = enumerate(eachcol(A))
+    for (iB,b) = enumerate(eachcol(B))
+      for (iC,c) = enumerate(eachcol(C))
+        for n in axes(factor1,2)
+          ABC[iA,iB,iC] += a[n]*b[n]*c[n]
+        end
+      end
+    end
+  end
+  s1,s2 = size(factor1,1),size(factor1,3)
+  s3,s4 = size(factor2,1),size(factor2,3)
+  s5,s6 = size(factor3,1),size(factor3,3)
+  ABCp = permutedims(reshape(ABC,s1,s2,s3,s4,s5,s6),(1,3,5,2,4,6))
+  return TTContraction(ABCp)
 end

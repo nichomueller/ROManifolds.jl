@@ -215,7 +215,7 @@ function steady_ttsvd(
   remainder = cat(remainders_k...;dims=1)
 
   # tt orthogonality
-  cores′,remainder′ = orthogonalize(cores,remainder,X)
+  cores′,remainder′ = orthogonalize(red_style,cores,remainder,X)
 
   return cores′,remainder′
 end
@@ -236,9 +236,9 @@ function generalized_ttsvd(
   return cores,remainder
 end
 
-function orthogonalize(cores,remainder,args...)
+function orthogonalize(red_style,cores,remainder,args...)
   cache = return_cache(orthogonalize,cores,args...)
-  orthogonalize!(cache,cores,remainder,args...)
+  orthogonalize!(cache,red_style,cores,remainder,args...)
 end
 
 function Arrays.return_cache(::typeof(orthogonalize),cores)
@@ -254,7 +254,7 @@ function Arrays.return_cache(::typeof(orthogonalize),cores,X::AbstractRankTensor
   return acache,wcache
 end
 
-function orthogonalize!(cache,cores,remainder,X::AbstractRankTensor)
+function orthogonalize!(cache,red_style,cores,remainder,X::AbstractRankTensor)
   acache,wcache = cache
   weight_cache, = wcache
   weight = weight_cache.array
@@ -265,14 +265,14 @@ function orthogonalize!(cache,cores,remainder,X::AbstractRankTensor)
     cur_core = cores[d]
     if d == length(cores)
       weighted_norm = ttnorm_array(X,weight)
-      cur_core′,R = reduce_rank!(cur_core,weighted_norm)
+      cur_core′,R = reduce_rank!(red_style[d],cur_core,weighted_norm)
       cores[d] = cur_core′
       remainder′ = absorb!(acache,remainder,R)
       return cores,remainder′
     end
     next_core = cores[d+1]
     X_d = getindex.(decomp,d)
-    cur_core′,R = reduce_rank!(cur_core)
+    cur_core′,R = reduce_rank!(red_style[d],cur_core)
     next_core′ = absorb!(acache,next_core,R)
     cores[d] = cur_core′
     cores[d+1] = next_core′
@@ -280,7 +280,7 @@ function orthogonalize!(cache,cores,remainder,X::AbstractRankTensor)
   end
 end
 
-function orthogonalize!(cache,remainder,cores)
+function orthogonalize!(cache,red_style,remainder,cores)
   for d in eachindex(cores)
     if d == length(cores)
       remainder′ = absorb!(acache,remainder,R)
@@ -288,7 +288,7 @@ function orthogonalize!(cache,remainder,cores)
     end
     cur_core = cores[d]
     next_core = cores[d+1]
-    cur_core′,R = reduce_rank!(cur_core)
+    cur_core′,R = reduce_rank!(red_style[d],cur_core)
     next_core′ = absorb!(acache,next_core,R)
     cores[d] = cur_core′
     cores[d+1] = next_core′
@@ -297,9 +297,9 @@ end
 
 for (f,g) in zip((:reduce_rank,:reduce_rank!),(:gram_schmidt,:gram_schmidt!))
   @eval begin
-    function $f(core::AbstractArray{T,3},args...) where T
+    function $f(red_style,core::AbstractArray{T,3},args...) where T
       mat = reshape(core,:,size(core,3))
-      Q,R = $g(mat,args...)
+      Q,R = $g(red_style,mat,args...)
       core′ = reshape(Q,size(core,1),size(core,2),:)
       return core′,R
     end
@@ -311,8 +311,8 @@ function absorb(core::AbstractArray{T,3},R::AbstractMatrix) where T
   absorb!(cache,core,R)
 end
 
-function Arrays.return_cache(::typeof(absorb),core::AbstractArray{T,3}) where T
-  s = size(core,1)*size(core,2),size(core,3)
+function Arrays.return_cache(::typeof(absorb),core::AbstractArray{T,3},R::AbstractMatrix=zeros(1,1)) where T
+  s = size(R,1),size(core,2)*size(core,3)
   a = zeros(s)
   CachedArray(a)
 end
@@ -449,27 +449,25 @@ end
 
 for (f,g) in zip((:pivoted_qr,:pivoted_qr!),(:qr,:qr!))
   @eval begin
-    function $f(A;tol=1e-10)
+    function $f(red_style,A)
       C = $g(A,ColumnNorm())
-      r = findlast(abs.(diag(C.R)) .> tol)
-      Q = C.Q[:,1:r]
-      R = C.R[1:r,invperm(C.jpvt)]
-      return Q,R
+      rank = select_rank(red_style,diag(C.R))
+      return C.Q[:,1:rank],C.R[1:rank,invperm(C.jpvt)]
     end
   end
 end
 
 for (f,g) in zip((:gram_schmidt,:gram_schmidt!),(:pivoted_qr,:pivoted_qr!))
   @eval begin
-    function $f(M::AbstractMatrix)
-      Q,R = $g(M)
+    function $f(red_style,M::AbstractMatrix)
+      Q,R = $g(red_style,M)
       return Q,R
     end
 
-    function $f(M::AbstractMatrix,X::AbstractSparseMatrix)
+    function $f(red_style,M::AbstractMatrix,X::AbstractSparseMatrix)
       L,p = _cholesky_decomp(X)
       XM = L'*M[p,:]
-      Q̃,R = $g(XM)
+      Q̃,R = $g(red_style,XM)
       Q = (L'\Q̃)[invperm(p),:]
       return Q,R
     end
@@ -478,8 +476,8 @@ end
 
 for f in (:gram_schmidt,:gram_schmidt!)
   @eval begin
-    function $f(M::AbstractMatrix,basis::AbstractMatrix,args...)
-      Q,R = $f(hcat(basis,M),args...)
+    function $f(red_style,M::AbstractMatrix,basis::AbstractMatrix,args...)
+      Q,R = $f(red_style,hcat(basis,M),args...)
       return Q,R
     end
   end

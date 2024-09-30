@@ -139,7 +139,7 @@ export BlockHyperReduction
 export empirical_interpolation
 export integration_domain
 export get_integration_domain
-export reduce_triangulation
+export reduced_triangulation
 export reduced_jacobian
 export reduced_residual
 export reduced_weak_form

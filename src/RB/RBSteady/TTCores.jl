@@ -65,6 +65,18 @@ function first_block(a::AbstractArray{T,3},b::AbstractArray{S,3}) where {T,S}
   return ab
 end
 
+function last_block(a::AbstractArray{T,3},b::AbstractArray{S,3}) where {T,S}
+  @check size(a,3) == size(b,3) == 1
+  @check size(a,2) == size(b,2) "Cannot sum the two input cores"
+  TS = promote_type(T,S)
+  r1 = size(a,1) + size(b,1)
+  r2 = size(a,2)
+  ab = zeros(TS,r1,r2,1)
+  @views ab[1:size(a,1),:,:] = a
+  @views ab[1+size(a,1):end,:,:] = b
+  return ab
+end
+
 function block_core(a::AbstractArray{T,3},b::AbstractArray{S,3}) where {T,S}
   @check size(a,2) == size(b,2) "Cannot sum the two input cores"
   TS = promote_type(T,S)
@@ -87,7 +99,8 @@ for f in (:first_block,:block_core)
 end
 
 function block_cores(a::AbstractVector{<:AbstractArray}...)
-  D = length(a)
+  D = length(first(a))
+  @check all(length(ai)==D for ai in a)
   abfirst = first_block(getindex.(a,1)...)
   ablasts = map(d -> block_core(getindex.(a,d)...),2:D)
   return [abfirst,ablasts...]

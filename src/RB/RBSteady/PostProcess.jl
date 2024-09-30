@@ -40,7 +40,17 @@ end
 
 _get_label(name::String,label) = @abstractmethod
 _get_label(name::String,label::Union{Number,Symbol}) = _get_label(name,string(label))
-_get_label(name::String,label::String) = name * "_" * label
+function _get_label(name::String,label::String)
+  if label==""
+    name
+  else
+    if name==""
+      label
+    else
+      name * "_" * label
+    end
+  end
+end
 
 function _get_label(name,labels...)
   first_lab,last_labs... = labels
@@ -82,7 +92,7 @@ function load_projection(dir;label="")
 end
 
 function DrWatson.save(dir,r::FESubspace;label="")
-  save(dir,get_basis(r);label)
+  save(dir,get_reduced_subspace(r);label)
 end
 
 function load_fe_subspace(dir,f::FESpace;label="")
@@ -110,7 +120,7 @@ function load_contribution(dir,trian,args...;label::String="")
   dec,redt = (),()
   for (i,t) in enumerate(trian)
     deci = load_decomposition(dir;label=_get_label(label,i))
-    redti = reduce_triangulation(t,get_integration_domain(adi),args...)
+    redti = reduced_triangulation(t,deci,args...)
     if isa(redti,AbstractArray)
       redti = ParamDataStructures.merge_triangulations(redti)
     end
@@ -120,39 +130,61 @@ function load_contribution(dir,trian,args...;label::String="")
   return Contribution(dec,redt)
 end
 
-function DrWatson.save(dir,op::GenericRBOperator;label="")
+function _save_fixed_operator_parts(dir,op;label="")
   save(dir,get_test(op);label=_get_label(label,"test"))
   save(dir,get_trial(op);label=_get_label(label,"trial"))
+end
+
+function _save_trian_operator_parts(dir,op::GenericRBOperator;label="")
   save(dir,op.rhs;label=_get_label(label,"rhs"))
   save(dir,op.lhs;label=_get_label(label,"lhs"))
 end
 
-function load_operator(dir,feop::ParamFEOperatorWithTrian;label="")
+function DrWatson.save(dir,op::GenericRBOperator;kwargs...)
+  _save_fixed_operator_parts(dir,op;kwargs...)
+  _save_trian_operator_parts(dir,op;kwargs...)
+end
+
+function _load_fixed_operator_parts(dir,feop;label="")
+  test = load_fe_subspace(dir,get_test(feop);label=_get_label(label,"test"))
+  trial = load_fe_subspace(dir,get_trial(feop);label=_get_label(label,"trial"))
+  return trial,test
+end
+
+function _load_trian_operator_parts(dir,feop::ParamFEOperatorWithTrian,trial,test;label="")
   trian_res = feop.trian_res
   trian_jac = feop.trian_jac
   pop = get_algebraic_operator(feop)
-
-  test = load_fe_subspace(dir,get_test(feop);label=_get_label(label,"test"))
-  trial = load_fe_subspace(dir,get_trial(feop);label=_get_label(label,"trial"))
-  red_rhs = load_contribution(dir,trian_res,get_test(op);label=_get_label(label,"rhs"))
-  red_lhs = load_contribution(dir,trian_jac,get_trial(op),get_test(op);label=_get_label(label,"lhs"))
+  red_rhs = load_contribution(dir,trian_res,test;label=_get_label(label,"rhs"))
+  red_lhs = load_contribution(dir,trian_jac,trial,test;label=_get_label(label,"lhs"))
   trians_rhs = get_domains(red_rhs)
   trians_lhs = get_domains(red_lhs)
   new_pop = change_triangulation(pop,trians_rhs,trians_lhs)
-  op = GenericRBOperator(new_pop,trial,test,red_lhs,red_rhs)
+  return new_pop,red_lhs,red_rhs
+end
 
+function load_operator(dir,feop::ParamFEOperatorWithTrian;kwargs...)
+  trial,test = _load_fixed_operator_parts(dir,feop;kwargs...)
+  pop,red_lhs,red_rhs = _load_trian_operator_parts(dir,feop,trial,test;kwargs...)
+  op = GenericRBOperator(pop,trial,test,red_lhs,red_rhs)
   return op
 end
 
 function DrWatson.save(dir,op::LinearNonlinearRBOperator;label="")
-  save(dir,get_linear_operator(op);label=_get_label(label,"linear"))
-  save(dir,get_nonlinear_operator(op);label=_get_label(label,"nonlinear"))
+  _save_fixed_operator_parts(dir,op.op_linear;label)
+  _save_trian_operator_parts(dir,op.op_linear;label=_get_label(label,"linear"))
+  _save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nonlinear"))
 end
 
 function load_operator(dir,feop::LinearNonlinearParamFEOperatorWithTrian;label="")
-  op_lin = load_operator(dir,get_linear_operator(feop);label=_get_label(label,"linear"))
-  op_nlin = load_operator(dir,get_nonlinear_operator(feop);label=_get_label(label,"nonlinear"))
-  LinearNonlinearParamFEOperatorWithTrian(op_lin,op_nlin)
+  trial,test = _fixed_operator_parts(dir,feop.op_linear;label)
+  pop_lin,red_lhs_lin,red_rhs_lin = _load_trian_operator_parts(
+    dir,feop.op_linear,trial,test;label=_get_label("linear",label))
+  pop_nlin,red_lhs_nlin,red_rhs_nlin = _load_trian_operator_parts(
+    dir,feop.op_nonlinear,trial,test;label=_get_label("nonlinear",label))
+  op_lin = GenericRBOperator(pop_lin,trial,test,red_lhs_lin,red_rhs_lin)
+  op_nlin = GenericRBOperator(pop_nlin,trial,test,red_lhs_nlin,red_rhs_nlin)
+  return LinearNonlinearRBOperator(op_lin,op_nlin)
 end
 
 """

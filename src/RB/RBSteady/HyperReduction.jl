@@ -138,12 +138,6 @@ get_basis(a::MDEIM) = a.basis
 get_interpolation(a::MDEIM) = a.interpolation
 get_integration_domain(a::MDEIM) = a.domain
 
-# function inv_project!(y,a::HyperReduction{A,<:ReducedMatProjection},x̂::AbstractVector) where A
-#   basis = get_basis(a)
-#   contraction!(y,basis,x̂)
-#   return y
-# end
-
 function HyperReduction(
   red::AbstractMDEIMReduction,
   s::AbstractSnapshots,

@@ -155,6 +155,7 @@ function RBSteady.enrich!(
   kwargs...)
 
   @check a.touched[1] "Primal field not defined"
+  red_style = ReductionStyle(red)
   a_primal,a_dual... = a.array
   a_primal_space = a_primal.basis_space
   a_primal_time = a_primal.basis_time
@@ -165,7 +166,7 @@ function RBSteady.enrich!(
       dual_i_space = get_basis_space(a_dual[i])
       C_primal_dual_i = supr_matrix[Block(1,i+1)]
       supr_space_i = H_primal \ C_primal_dual_i * dual_i_space
-      a_primal_space = union(a_primal_space,supr_space_i,X_primal)
+      a_primal_space = union_bases(red_style,a_primal_space,supr_space_i,X_primal)
 
       dual_i_time = get_basis_time(a_dual[i])
       a_primal_time = time_enrichment(red,a_primal_time,dual_i_time;kwargs...)

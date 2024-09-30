@@ -55,7 +55,7 @@ function contraction!(
   end
 end
 
-function contraction(
+Base.@propagate_inbounds function contraction(
   factor1::AbstractArray{T,3},
   factor2::AbstractArray{S,3}
   ) where {T,S}
@@ -69,7 +69,7 @@ function contraction(
   return TTContraction(ABp)
 end
 
-function contraction(
+Base.@propagate_inbounds function contraction(
   factor1::AbstractArray{T,3},
   factor2::AbstractArray{S,3},
   factor3::AbstractArray{U,3}
@@ -80,12 +80,12 @@ function contraction(
   B = reshape(permutedims(factor2,(2,1,3)),size(factor2,2),:)
   C = reshape(permutedims(factor3,(2,1,3)),size(factor3,2),:)
   ABC = zeros(size(A,2),size(B,2),size(C,2))
-  cache = zeros(size(factor1,2))
-  @inbounds for (iA,a) = enumerate(eachcol(A))
+  for (iA,a) = enumerate(eachcol(A))
     for (iB,b) = enumerate(eachcol(B))
-      cache .= a .* b
       for (iC,c) = enumerate(eachcol(C))
-        ABC[iA,iB,iC] = sum(cache .* c)
+        for n in axes(factor1,2)
+          _entry!(+,ABC,a[n]*b[n]*c[n],iA,iB,iC)
+        end
       end
     end
   end
@@ -118,26 +118,11 @@ function contraction(
   return TTContraction(ABCp)
 end
 
-function _sparsemul(B,C,sparsity::SparsityPatternCSC)
-  BC = zeros(size(B,1),IndexMaps.num_rows(sparsity),size(C,2))
-  rv = rowvals(sparsity)
-  for (iB,b) in enumerate(eachrow(B))
-    for (iC,c) in enumerate(eachcol(C))
-      for (irow,ci) in enumerate(c)
-        for nzi in nzrange(sparsity,irow)
-          BC[iB,rv[nzi],iC] += b[nzi]*ci
-        end
-      end
-    end
-  end
-  return reshape(permutedims(BC,(2,1,3)),size(BC,2),:)
-end
-
 function sequential_product(::AbstractArray...)
   @abstractmethod
 end
 
-function sequential_product(
+Base.@propagate_inbounds function sequential_product(
   factor1::AbstractArray{T,3},
   factor2::AbstractArray{S,3}
   ) where {T,S}
@@ -150,7 +135,7 @@ function sequential_product(
   reshape(AB,s1,s2*s3,s4)
 end
 
-function sequential_product(
+Base.@propagate_inbounds function sequential_product(
   factor1::AbstractArray{T,4},
   factor2::TTContraction{S,4}
   ) where {T,S}
@@ -166,7 +151,7 @@ function sequential_product(
   reshape(aB,s1,s2,s3,s4)
 end
 
-function sequential_product(
+Base.@propagate_inbounds function sequential_product(
   factor1::AbstractArray{T,6},
   factor2::TTContraction{S,6}
   ) where {T,S}
@@ -226,6 +211,29 @@ function galerkin_projection(
   rcores = contraction.(cores_test,cores,cores_trial)
   rcore = sequential_product(rcores...)
   dropdims(rcore;dims=(1,2,3))
+end
+
+# utils
+
+Base.@propagate_inbounds function _sparsemul(B,C,sparsity::SparsityPatternCSC)
+  BC = zeros(size(B,1),IndexMaps.num_rows(sparsity),size(C,2))
+  rv = rowvals(sparsity)
+  for (iB,b) in enumerate(eachrow(B))
+    for (iC,c) in enumerate(eachcol(C))
+      for (irow,ci) in enumerate(c)
+        for nzi in nzrange(sparsity,irow)
+          _entry!(+,BC,b[nzi]*ci,iB,rv[nzi],iC)
+        end
+      end
+    end
+  end
+  return reshape(permutedims(BC,(2,1,3)),size(BC,2),:)
+end
+
+@inline function _entry!(combine::Function,A::AbstractArray{T,3},v,i,j,k) where T
+  aijk = A[i,j,k]
+  A[i,j,k] = combine(aijk,v)
+  A
 end
 
 # empirical interpolation

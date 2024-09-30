@@ -131,6 +131,24 @@ rbop = reduced_operator(rbsolver,feop_u,fesnaps_u)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 perf = rb_performance(rbsolver,rbop,x[1],x̂,festats,rbstats,ronline)
 
+test_dir = datadir("temp_folder")
+create_dir(test_dir)
+
+save(test_dir,fesnaps_u)
+save(test_dir,rbop)
+
+fesnaps_u = load_snapshots(test_dir)
+rbop = load_operator(test_dir,feop_u)
+
+ronline = realization(feop_u;nparams=10)
+x̂,rbstats = solve(rbsolver,rbop,ronline)
+perf = rb_performance(rbsolver,rbop,x[1],x̂,festats,rbstats,ronline)
+
+load_operator(test_dir,feop_u.op_linear)
+
+################################################################################
+
+
 ################################################################################
 using Gridap.FESpaces
 using LinearAlgebra
@@ -143,17 +161,69 @@ X = assemble_matrix(feop_u,energy_u)
 
 K = rank(X)
 cores_k,remainders_k = map(k -> RBSteady.steady_ttsvd(red_style,A,X[k]),1:K) |> tuple_of_arrays
-cores = RBSteady.block_cores(cores_k...)
-remainder = cat(remainders_k...;dims=1)
-c1,R1 = RBSteady.reduce_rank(cores[1])
-newcore2 = reshape(R1*reshape(cores[2],size(cores[2],1),:),:,size(cores[2],2),size(cores[2],3))
-c2,R2 = RBSteady.reduce_rank(newcore2)
 
-core = newcore2
-mat = reshape(core,:,size(core,3))
-Q,R = gram_schmidt(mat)
-core′ = reshape(Q,size(core,1),size(core,2),:)
-################################################################################
+# ##############
+# U1 = select_snapshots(A,1:25)
+# U2 = select_snapshots(A,26:50)
+
+# c1,r1 = ttsvd(red_style,U1)
+# l2cores1 = [c1...,r1]
+# c2,r2 = ttsvd(red_style,U2)
+# l2cores2 = [c2...,r2]
+
+# c2b1 = cores2basis(l2cores1...)
+# c2b2 = cores2basis(l2cores2...)
+
+# maximum(abs.(c2b1 - U1[:]))
+# maximum(abs.(c2b2 - U2[:]))
+
+# l2cores = RBSteady.block_cores(l2cores1,l2cores2)
+# l2cores[end] = RBSteady.last_block(l2cores1[end],l2cores2[end])
+# c2b = cores2basis(l2cores...)
+# U = U1+U2
+
+# maximum(abs.(c2b - U[:]))
+
+# l2c1,r1 = RBSteady.reduce_rank(l2cores[1])
+# l2cores[2] = RBSteady.absorb(l2cores[2],r1)
+# l2c2,r2 = RBSteady.reduce_rank(l2cores[2])
+# ##############
+
+# # TRIAL 1
+# cores = RBSteady.block_cores(cores_k...)
+# remainder = cat(remainders_k...;dims=1)
+# c1,R1 = RBSteady.reduce_rank(red_style[1],cores[1])
+# newcore2 = reshape(R1*reshape(cores[2],size(cores[2],1),:),:,size(cores[2],2),size(cores[2],3))
+# c2,R2 = RBSteady.reduce_rank(red_style[2],newcore2)
+
+# # TRIAL 2
+# cores_11 = cores_k[1][1]
+# cores_21 = cores_k[2][1]
+# L11,p11 = RBSteady._cholesky_decomp(X[1][1])
+# L21,p21 = RBSteady._cholesky_decomp(X[2][1])
+# cores_11′ = reshape(L11'*reshape(cores_11,:,size(cores_11,3))[p11,:],size(cores_11))
+# cores_21′ = reshape(L21'*reshape(cores_21,:,size(cores_21,3))[p21,:],size(cores_21))
+# cores1 = RBSteady.first_block(cores_11′,cores_21′)
+# c1_new,R1_new = RBSteady.reduce_rank(red_style[1],cores1)
+
+# cores_12 = cores_k[1][2]
+# cores_22 = cores_k[2][2]
+# L12,p12 = RBSteady._cholesky_decomp(X[1][2])
+# L12′ = kron(I(size(cores_12,1)),L12)
+# p12′ = vec(((collect(1:size(cores_12,1)).-1)*size(cores_12,2) .+ p12')')
+# L22,p22 = RBSteady._cholesky_decomp(X[2][2])
+# L22′ = kron(I(size(cores_22,1)),L22)
+# p22′ = vec(((collect(1:size(cores_22,1)).-1)*size(cores_22,2) .+ p22')')
+# cores_12′ = reshape(L12′'*reshape(cores_12,:,size(cores_12,3))[p12′,:],size(cores_12))
+# cores_22′ = reshape(L22′'*reshape(cores_22,:,size(cores_22,3))[p22′,:],size(cores_22))
+# cores2 = RBSteady.block_core(cores_12′,cores_22′)
+# cores2′ = reshape(R1_new*reshape(cores2,size(cores2,1),:),:,size(cores2,2),size(cores2,3))
+# c2_new,R2_new = RBSteady.reduce_rank(red_style[2],cores2′)
+
+# ####
+# L1,p1 = RBSteady._cholesky_decomp(X[1][1])
+# U1,S1,V1 = RBSteady.tpod(red_style[1],reshape(A,size(A,1),:),L1,p1)
+# ################################################################################
 
 tol4 = fill(1e-4,5)
 reduction4 = TTSVDReduction(tol4,energy_u;nparams=50)

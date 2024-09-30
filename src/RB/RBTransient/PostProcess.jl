@@ -1,39 +1,53 @@
-function DrWatson.save(dir,op::GenericTransientRBOperator;label="")
-  save(dir,get_test(op);label=RBSteady._get_label(label,"test"))
-  save(dir,get_trial(op);label=RBSteady._get_label(label,"trial"))
+function RBSteady._save_trian_operator_parts(dir,op::GenericTransientRBOperator;label="")
   save(dir,op.rhs;label=RBSteady._get_label(label,"rhs"))
-  save(dir,op.lhs;label=RBSteady._get_label(label,"lhs"))
+  for (i,lhsi) in enumerate(op.lhs)
+    save(dir,lhsi;label=RBSteady._get_label(label,"lhs_$i"))
+  end
 end
 
-function RBSteady.load_operator(dir,feop::TransientParamFEOperatorWithTrian;label="")
+function DrWatson.save(dir,op::GenericTransientRBOperator;label="")
+  _save_fixed_operator_parts(dir,op;kwargs...)
+  _save_trian_operator_parts(dir,op;kwargs...)
+end
+
+function RBSteady._load_trian_operator_parts(dir,feop::TransientParamFEOperatorWithTrian,trial,test;label="")
   trian_res = feop.trian_res
   trian_jacs = feop.trian_jacs
   odeop = get_algebraic_operator(feop)
-
-  test = RBSteady.load_fe_subspace(dir,get_test(feop);label=RBSteady._get_label(label,"test"))
-  trial = RBSteady.load_fe_subspace(dir,get_trial(feop);label=RBSteady._get_label(label,"trial"))
-  red_rhs = RBSteady.load_contribution(dir,trian_res,get_test(op);label=_get_label(label,"rhs"))
+  red_rhs = RBSteady.load_contribution(dir,trian_res,test;label=RBSteady._get_label(label,"rhs"))
   red_lhs = ()
   for (i,trian_jac) in enumerate(trian_jacs)
-    rlhsi = RBSteady.load_contribution(dir,trian_jac,get_trial(op),get_test(op);label=_get_label(label,"lhs",i))
+    rlhsi = RBSteady.load_contribution(dir,trian_jac,trial,test;label=RBSteady._get_label(label,"lhs",i))
     red_lhs = (red_lhs...,rlhsi)
   end
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
   new_odeop = change_triangulation(odeop,trians_rhs,trians_lhs)
-  op = GenericTransientRBOperator(new_odeop,trial,test,red_lhs,red_rhs)
+  return new_odeop,red_lhs,red_rhs
+end
+
+function RBSteady.load_operator(dir,feop::TransientParamFEOperatorWithTrian;label="")
+  trial,test = RBSteady._load_fixed_operator_parts(dir,feop;kwargs...)
+  odeop,red_lhs,red_rhs = RBSteady._load_trian_operator_parts(dir,feop,trial,test;kwargs...)
+  op = GenericTransientRBOperator(odeop,trial,test,red_lhs,red_rhs)
   return op
 end
 
 function DrWatson.save(dir,op::LinearNonlinearTransientRBOperator;label="")
-  save(dir,get_linear_operator(op);label=RBSteady._get_label(label,"linear"))
-  save(dir,get_nonlinear_operator(op);label=RBSteady._get_label(label,"nonlinear"))
+  RBSteady._save_fixed_operator_parts(dir,op.op_linear;label)
+  RBSteady._save_trian_operator_parts(dir,op.op_linear;label=RBSteady._get_label(label,"linear"))
+  RBSteady._save_trian_operator_parts(dir,op.op_nonlinear;label=RBSteady._get_label(label,"nonlinear"))
 end
 
 function RBSteady.load_operator(dir,feop::LinearNonlinearTransientParamFEOperatorWithTrian;label="")
-  op_lin = load_operator(dir,get_linear_operator(feop);label=RBSteady._get_label(label,"linear"))
-  op_nlin = load_operator(dir,get_nonlinear_operator(feop);label=RBSteady._get_label(label,"nonlinear"))
-  LinearNonlinearParamFEOperatorWithTrian(op_lin,op_nlin)
+  trial,test = RBSteady._load_fixed_operator_parts(dir,feop.op_linear;label)
+  odeop_lin,red_lhs_lin,red_rhs_lin = RBSteady._load_trian_operator_parts(
+    dir,feop.op_linear,trial,test;label=RBSteady._get_label("linear",label))
+  odeop_nlin,red_lhs_nlin,red_rhs_nlin = RBSteady._load_trian_operator_parts(
+    dir,feop.op_nonlinear,trial,test;label=RBSteady._get_label("nonlinear",label))
+  op_lin = GenericTransientRBOperator(odeop_lin,trial,test,red_lhs_lin,red_rhs_lin)
+  op_nlin = GenericTransientRBOperator(odeop_nlin,trial,test,red_lhs_nlin,red_rhs_nlin)
+  return LinearNonlinearTransientRBOperator(op_lin,op_nlin)
 end
 
 function Utils.compute_relative_error(
