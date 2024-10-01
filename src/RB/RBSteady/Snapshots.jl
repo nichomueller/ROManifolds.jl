@@ -429,7 +429,7 @@ function Arrays.return_cache(::typeof(change_index_map),f,s::AbstractSnapshots)
   change_index_map(f,s)
 end
 
-function Arrays.return_cache(::typeof(change_index_map),s::BlockSnapshots)
+function Arrays.return_cache(::typeof(change_index_map),f,s::BlockSnapshots)
   i = findfirst(s.touched)
   @notimplementedif isnothing(i)
   cache = return_cache(change_index_map,f,s[i])
@@ -453,7 +453,18 @@ for f in (:flatten_snapshots,:select_snapshots)
   end
 end
 
-for f in (:(IndexMaps.change_index_map),:flatten_snapshots,:select_snapshots)
+function IndexMaps.change_index_map(f,s::BlockSnapshots)
+  array = return_cache(change_index_map,f,s)
+  touched = s.touched
+  for i in eachindex(touched)
+    if touched[i]
+      array[i] = change_index_map(f,s[i])
+    end
+  end
+  return BlockSnapshots(array,touched)
+end
+
+for f in (:flatten_snapshots,:select_snapshots)
   @eval begin
     function $f(s::BlockSnapshots,args...;kwargs...)
       array = return_cache($f,s,args...;kwargs...)

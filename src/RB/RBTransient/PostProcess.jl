@@ -5,9 +5,9 @@ function RBSteady._save_trian_operator_parts(dir,op::GenericTransientRBOperator;
   end
 end
 
-function DrWatson.save(dir,op::GenericTransientRBOperator;label="")
-  _save_fixed_operator_parts(dir,op;kwargs...)
-  _save_trian_operator_parts(dir,op;kwargs...)
+function DrWatson.save(dir,op::GenericTransientRBOperator;kwargs...)
+  RBSteady._save_fixed_operator_parts(dir,op;kwargs...)
+  RBSteady._save_trian_operator_parts(dir,op;kwargs...)
 end
 
 function RBSteady._load_trian_operator_parts(dir,feop::TransientParamFEOperatorWithTrian,trial,test;label="")
@@ -26,7 +26,7 @@ function RBSteady._load_trian_operator_parts(dir,feop::TransientParamFEOperatorW
   return new_odeop,red_lhs,red_rhs
 end
 
-function RBSteady.load_operator(dir,feop::TransientParamFEOperatorWithTrian;label="")
+function RBSteady.load_operator(dir,feop::TransientParamFEOperatorWithTrian;kwargs...)
   trial,test = RBSteady._load_fixed_operator_parts(dir,feop;kwargs...)
   odeop,red_lhs,red_rhs = RBSteady._load_trian_operator_parts(dir,feop,trial,test;kwargs...)
   op = GenericTransientRBOperator(odeop,trial,test,red_lhs,red_rhs)
