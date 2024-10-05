@@ -98,7 +98,7 @@ for f in (:first_block,:block_core)
   end
 end
 
-function block_cores(a::AbstractVector{<:AbstractArray}...)
+function block_cores(a::AbstractVector{<:AbstractArray{T}}...)::Vector{Array{T,3}} where T
   D = length(first(a))
   @check all(length(ai)==D for ai in a)
   abfirst = first_block(getindex.(a,1)...)

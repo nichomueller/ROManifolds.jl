@@ -186,7 +186,7 @@ function tpmul(a::AbstractRankTensor{D,K},b::AbstractArray) where {D,K}
 end
 
 function Utils.induced_norm(a::AbstractArray{T,D},X::AbstractRankTensor{D}) where {T,D}
-  sqrt(dot(vec(a),tpmul(X,a)))
+  sqrt(dot(vec(a),vec(tpmul(X,a))))
 end
 
 function Utils.induced_norm(a::AbstractArray{T,D′},X::AbstractRankTensor{D}) where {T,D,D′}

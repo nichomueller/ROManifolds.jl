@@ -78,5 +78,11 @@ function RBSteady.jacobian_snapshots(
   r_jac = get_realization(sjac)
   A = jacobian(fesolver,odeop,r_jac,us_jac)
   iA = get_matrix_index_map(odeop)
-  return Snapshots(A,iA,r_jac)
+  jac_reduction = RBSteady.get_jacobian_reduction(solver)
+  sA = ()
+  for (reda,a) in zip(jac_reduction,A)
+    sa = Snapshots(a,iA,r_jac)
+    sA = (sA...,select_snapshots(sa,1:num_params(reda)))
+  end
+  return sA
 end

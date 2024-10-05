@@ -346,6 +346,14 @@ Base.length(f::ParamFunction) = num_params(f)
 Arrays.testitem(f::ParamFunction) = f.fun(testitem(f.params))
 Base.getindex(f::ParamFunction,i::Integer) = f.fun(_get_params(f)[i])
 
+function Base.:*(f::ParamFunction,α::Number)
+  _fun(x,μ) = α*f.fun(x,μ)
+  _fun(μ) = x -> _fun(x,μ)
+  ParamFunction(_fun,f.params)
+end
+
+Base.:*(α::Number,f::ParamFunction) = f*α
+
 function Fields.gradient(f::ParamFunction)
   function _gradient(x,μ)
     gradient(f.fun(μ))(x)
@@ -443,6 +451,14 @@ function Base.getindex(f::TransientParamFunction,i::Integer)
   t = get_times(f)[slow_index(i,np)]
   f.fun(p,t)
 end
+
+function Base.:*(f::TransientParamFunction,α::Number)
+  _fun(x,μ,t) = α*f.fun(x,μ,t)
+  _fun(μ,t) = x -> _fun(x,μ,t)
+  TransientParamFunction(_fun,f.params,f.times)
+end
+
+Base.:*(α::Number,f::TransientParamFunction) = f*α
 
 function Fields.gradient(f::TransientParamFunction)
   function _gradient(x,μ,t)

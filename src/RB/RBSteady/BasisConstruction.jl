@@ -27,7 +27,7 @@ function reduction(red::TTSVDReduction,A::SparseSnapshots,args...)
 end
 
 function _size_cond(M::AbstractMatrix)
-  false # length(M) > 1e6 && (size(M,1) > 1e2*size(M,2) || size(M,2) > 1e2*size(M,1))
+  length(M) > 1e6 && (size(M,1) > 1e1*size(M,2) || size(M,2) > 1e2*size(M,1)) #false #
 end
 
 function _cholesky_decomp(X::AbstractSparseMatrix)
@@ -163,7 +163,7 @@ function ttsvd(
   for d in 1:N-1
     core_d,remainder_d = ttsvd_loop(red_style[d],remainder)
     oldrank = size(core_d,3)
-    remainder = reshape(remainder_d,oldrank,size(A,d+1),:)
+    remainder::Array{T,3} = reshape(remainder_d,oldrank,size(A,d+1),:)
     push!(cores,core_d)
   end
   return cores,remainder
@@ -194,7 +194,7 @@ function steady_ttsvd(
   for d in 1:D
     core_d,remainder_d = ttsvd_loop(red_style[d],remainder,X[d])
     oldrank = size(core_d,3)
-    remainder = reshape(remainder_d,oldrank,size(A,d+1),:)
+    remainder::Array{T,3} = reshape(remainder_d,oldrank,size(A,d+1),:)
     push!(cores,core_d)
   end
 
@@ -212,12 +212,12 @@ function steady_ttsvd(
 
   # tt decomposition of the sum
   cores = block_cores(cores_k...)
-  remainder = cat(remainders_k...;dims=1)
+  remainder::Array{T,3} = cat(remainders_k...;dims=1)
 
   # tt orthogonality
-  cores′,remainder′ = orthogonalize(red_style,cores,remainder,X)
+  remainder′ = orthogonalize!(red_style,cores,remainder,X)
 
-  return cores′,remainder′
+  return cores,remainder′
 end
 
 function generalized_ttsvd(
@@ -236,63 +236,42 @@ function generalized_ttsvd(
   return cores,remainder
 end
 
-function orthogonalize(red_style,cores,remainder,args...)
-  cache = return_cache(orthogonalize,cores,args...)
-  orthogonalize!(cache,red_style,cores,remainder,args...)
-end
-
-function Arrays.return_cache(::typeof(orthogonalize),cores)
-  core = first(cores)
-  acache = return_cache(absorb,core)
-  return acache
-end
-
-function Arrays.return_cache(::typeof(orthogonalize),cores,X::AbstractRankTensor)
-  core = first(cores)
-  acache = return_cache(orthogonalize,cores)
-  wcache = return_cache(weight_array,core,X)
-  return acache,wcache
-end
-
-function orthogonalize!(cache,red_style,cores,remainder,X::AbstractRankTensor)
-  acache,wcache = cache
-  weight_cache, = wcache
-  weight = weight_cache.array
-
+function orthogonalize!(red_style,cores,remainder,X::AbstractRankTensor)
+  weight = ones(1,rank(X),1)
   decomp = get_decomposition(X)
-
   for d in eachindex(cores)
-    cur_core = cores[d]
+    core_d = cores[d]
     if d == length(cores)
-      weighted_norm = ttnorm_array(X,weight)
-      cur_core′,R = reduce_rank(red_style[d],cur_core,weighted_norm)
-      cores[d] = cur_core′
-      remainder′ = absorb!(acache,remainder,R)
-      return cores,remainder′
+      XW = ttnorm_array(X,weight)
+      core_d′,R = reduce_rank(red_style[d],core_d,XW)
+      cores[d] = core_d′
+      remainder = absorb(remainder,R)
+    else
+      next_core = cores[d+1]
+      X_d = getindex.(decomp,d)
+      core_d′,R = reduce_rank(red_style[d],core_d)
+      cores[d] = core_d′
+      cores[d+1] = absorb(next_core,R)
+      weight = weight_array(weight,core_d′,X_d)
     end
-    next_core = cores[d+1]
-    X_d = getindex.(decomp,d)
-    cur_core′,R = reduce_rank(red_style[d],cur_core)
-    next_core′ = absorb!(acache,next_core,R)
-    cores[d] = cur_core′
-    cores[d+1] = next_core′
-    weight = weight_array!(wcache,cur_core′,X_d)
   end
+  return remainder
 end
 
-function orthogonalize!(cache,red_style,remainder,cores)
+function orthogonalize!(red_style,cores,remainder)
   for d in eachindex(cores)
     if d == length(cores)
-      remainder′ = absorb!(acache,remainder,R)
-      return cores,remainder′
+      remainder = absorb(remainder,R)
+    else
+      cur_core = cores[d]
+      next_core = cores[d+1]
+      cur_core′,R = reduce_rank(red_style[d],cur_core)
+      next_core′ = absorb(next_core,R)
+      cores[d] = cur_core′
+      cores[d+1] = next_core′
     end
-    cur_core = cores[d]
-    next_core = cores[d+1]
-    cur_core′,R = reduce_rank(red_style[d],cur_core)
-    next_core′ = absorb!(acache,next_core,R)
-    cores[d] = cur_core′
-    cores[d+1] = next_core′
   end
+  return remainder
 end
 
 function reduce_rank(red_style,core::AbstractArray{T,3},args...) where T
@@ -304,56 +283,13 @@ function reduce_rank(red_style,core::AbstractArray{T,3},args...) where T
 end
 
 function absorb(core::AbstractArray{T,3},R::AbstractMatrix) where T
-  cache = return_cache(absorb,core,R)
-  absorb!(cache,core,R)
+  Rcore = R*reshape(core,size(core,1),:)
+  return reshape(Rcore,size(Rcore,1),size(core,2),:)
 end
 
-function Arrays.return_cache(::typeof(absorb),core::AbstractArray{T,3},R::AbstractMatrix=zeros(1,1)) where T
-  s = size(R,1),size(core,2)*size(core,3)
-  a = zeros(s)
-  CachedArray(a)
-end
-
-function absorb!(cache,core::AbstractArray{T,3},R::AbstractMatrix) where T
-  mat = reshape(core,size(core,1),:)
-  setsize!(cache,(size(R,1),size(mat,2)))
-  mul!(cache.array,R,mat)
-  core′ = reshape(cache.array,size(R,1),size(core,2),:)
-  return core′
-end
-
-function weight_array(core::AbstractArray{T,3},X::AbstractRankTensor) where T
-  cache = return_cache(weight_array,core,X)
-  weight_array!(cache,core,X)
-end
-
-function Arrays.return_cache(
-  ::typeof(weight_array),
-  core::AbstractArray{T,3},
-  X::AbstractRankTensor
-  ) where T
-
-  K = rank(X)
-  rprev = size(core,1)
-  r = size(core,3)
-  rrprev = rprev*r
-  N = size(core,2)
-
-  a1 = zeros(r,K,r)
-  a2 = ones(rprev,K,rprev)
-  a3 = zeros(N,rrprev)
-  a4 = zeros(rrprev,rrprev)
-
-  c1 = CachedArray(a1)
-  c2 = CachedArray(a2)
-  c3 = CachedArray(a3)
-  c4 = CachedArray(a4)
-
-  return c1,c2,c3,c4
-end
-
-function weight_array!(cache,core,X)
-  cur_weight_cache,prev_weight_cache,cache_left,cache_right = cache
+function weight_array(prev_weight,core,X)
+  @check length(X) == size(prev_weight,2)
+  @check size(core,1) == size(prev_weight,1) == size(prev_weight,3)
 
   K = length(X)
   rank_prev = size(core,1)
@@ -361,24 +297,20 @@ function weight_array!(cache,core,X)
   rrprev = rank_prev*rank
   N = size(core,2)
 
-  setsize!(cache_right,(N,rrprev))
-  setsize!(cache_left,(rrprev,rrprev))
-  setsize!(cur_weight_cache,(rank,K,rank))
-  cur_weight = cur_weight_cache.array
-  prev_weight = prev_weight_cache.array
-
+  cur_weight = zeros(rank,K,rank)
   core2D = reshape(permutedims(core,(2,1,3)),N,rrprev)
+  cache_right = zeros(N,rrprev)
+  cache_left = zeros(rrprev,rrprev)
 
   @inbounds for k = 1:K
-    mul!(cache_right.array,X[k],core2D)
-    mul!(cache_left.array,core2D',cache_right.array)
-    resh_weight = reshape(permutedims(reshape(cache_left.array,rank_prev,rank,rank_prev,rank),(2,4,1,3)),rank^2,:)
-    cur_weight[:,k,:] = reshape(resh_weight*vec(prev_weight[:,k,:]),rank,rank)
+    Xk = X[k]
+    Wk = cur_weight[:,k,:]
+    Wk_prev = prev_weight[:,k,:]
+    mul!(cache_right,Xk,core2D)
+    mul!(cache_left,core2D',cache_right)
+    resh_weight = reshape(permutedims(reshape(cache_left,rank_prev,rank,rank_prev,rank),(2,4,1,3)),rank^2,:)
+    cur_weight[:,k,:] = reshape(resh_weight*vec(Wk_prev),rank,rank)
   end
-
-  setsize!(prev_weight_cache,size(cur_weight))
-  copyto!(prev_weight_cache.array,cur_weight)
-
   return cur_weight
 end
 

@@ -213,6 +213,19 @@ function galerkin_projection(
   dropdims(rcore;dims=(1,2,3))
 end
 
+function reduced_coupling(
+  cores_p::Vector{<:AbstractArray{Float64,3}},
+  B::Rank1Tensor,
+  cores_d::Vector{<:AbstractArray{Float64,3}})
+
+  factors = get_factors(B)
+  @check length(cores_p)-1 == length(factors) == length(cores_d)
+  @check all(size(f,2) == size(c,2) for (f,c) in zip(factors,cores))
+  rcores = contraction.(cores_p,factors,cores_d)
+  rcore = sequential_product(rcores...)
+  dropdims(rcore;dims=(1,2,3))
+end
+
 # utils
 
 Base.@propagate_inbounds function _sparsemul(B,C,sparsity::SparsityPatternCSC)
