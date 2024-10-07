@@ -65,6 +65,8 @@ SparseArrays.nnz(a::MultiValueSparsityPatternCSC) = nnz(a.matrix)
 get_nonzero_indices(a::MultiValueSparsityPatternCSC) = get_nonzero_indices(a.matrix)
 TensorValues.num_components(a::MultiValueSparsityPatternCSC) = a.ncomps
 
+recast(A::AbstractArray,a::MultiValueSparsityPatternCSC) = @notimplemented
+
 """
 """
 struct TProductSparsityPattern{A,B} <: SparsityPattern

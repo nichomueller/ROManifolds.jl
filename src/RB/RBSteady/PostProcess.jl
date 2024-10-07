@@ -254,13 +254,13 @@ function load_results(dir;label="")
   deserialize(results_dir,perf)
 end
 
-function Utils.compute_relative_error(norm_style::EnergyNorm,feop,son,son_approx)
+function Utils.compute_relative_error(norm_style::EnergyNorm,feop,sol,sol_approx)
   X = assemble_matrix(feop,get_norm(norm_style))
-  compute_relative_error(son,son_approx,X)
+  compute_relative_error(sol,sol_approx,X)
 end
 
-function Utils.compute_relative_error(norm_style::EuclideanNorm,feop,son,son_approxs)
-  compute_relative_error(son,son_approx)
+function Utils.compute_relative_error(norm_style::EuclideanNorm,feop,sol,sol_approx)
+  compute_relative_error(sol,sol_approx)
 end
 
 function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots)

@@ -48,8 +48,35 @@ end
 
 Base.size(a::SparseCoreCSC) = size(a.array)
 Base.getindex(a::SparseCoreCSC,i::Vararg{Integer,3}) = getindex(a.array,i...)
+IndexMaps.get_sparsity(a::SparseCoreCSC) = get_sparsity(a.sparsity)
 
 num_space_dofs(a::SparseCoreCSC) = IndexMaps.num_rows(a.sparsity)*IndexMaps.num_cols(a.sparsity)
+
+to_4d_core(a::SparseCoreCSC) = SparseCoreCSC4D(a)
+
+struct SparseCoreCSC4D{T,Ti} <: SparseCore{T,4}
+  core::SparseCoreCSC{T,Ti}
+  sparse_indexes::Vector{CartesianIndex{2}}
+end
+
+function SparseCoreCSC4D(core::SparseCoreCSC)
+  sparsity = get_sparsity(core)
+  irows,icols,_ = findnz(sparsity)
+  SparseCoreCSC4D(core,CartesianIndex.(irows,icols))
+end
+
+Base.size(a::SparseCoreCSC4D) = (size(a.core.array,1),IndexMaps.num_rows(a.core.sparsity),
+  IndexMaps.num_cols(a.core.sparsity),size(a.core.array,3))
+
+function Base.getindex(a::SparseCoreCSC4D,i::Vararg{Integer,4})
+  if CartesianIndex(i[2:3]) ∈ a.sparse_indexes
+    i2 = findfirst(a.sparse_indexes .== [CartesianIndex(i[2:3])])
+    i1,i3 = i[1],i[4]
+    getindex(a.core.array,i1,i2,i3)
+  else
+    zero(eltype(a))
+  end
+end
 
 # block cores
 

@@ -247,6 +247,7 @@ function galerkin_projection(proj_left::TTSVDCores,a::TTSVDCores,proj_right::TTS
 end
 
 function empirical_interpolation(a::TTSVDCores)
+  local indices,interp
   cores = get_cores(a)
   index_map = get_index_map(a)
   c = cores2basis(first(cores))
@@ -260,9 +261,9 @@ function empirical_interpolation(a::TTSVDCores)
       c = cores2basis(interp_core,cores[i+1])
     else
       indices = basis_indices(vinds,index_map)
-      return indices,interp
     end
   end
+  return indices,interp
 end
 
 # multi field interface

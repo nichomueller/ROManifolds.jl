@@ -155,14 +155,14 @@ function _permute_index_map(index_map,I,J,nrows)
 end
 
 function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractMultiValueIndexMap,nrows)
-  function _to_component_indices(i,ncomps,icomp,nrows)
+  function _to_component_indices(i,ncomps,icomp_I,icomp_J,nrows)
     ic = copy(i)
     @inbounds for (j,IJ) in enumerate(i)
       IJ == 0 && continue
       I = fast_index(IJ,nrows)
       J = slow_index(IJ,nrows)
-      I′ = (I-1)*ncomps + icomp
-      J′ = (J-1)*ncomps + icomp
+      I′ = (I-1)*ncomps + icomp_I
+      J′ = (J-1)*ncomps + icomp_J
       ic[j] = (J′-1)*nrows*ncomps + I′
     end
     return _add_fixed_dofs(ic)
@@ -178,7 +178,9 @@ function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractM
   J1 = get_component(J,1;multivalue=false)
   index_map′ = _permute_index_map(index_map,I1,J1,nrows_per_comp)
 
-  index_map′′ = map(icomp->_to_component_indices(index_map′,ncomps,icomp,nrows_per_comp),1:ncomps)
+  index_map′′ = map(CartesianIndices((ncomps,ncomps))) do icomp
+    _to_component_indices(index_map′,ncomps,icomp.I[1],icomp.I[2],nrows_per_comp)
+  end
   return MultiValueIndexMap(index_map′′)
 end
 

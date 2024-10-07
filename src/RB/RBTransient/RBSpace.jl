@@ -37,9 +37,10 @@ function RBSteady.project!(x̂,r::TransientEvalRBSpace,x::AbstractParamVector)
   np = num_params(r.realization)
   nt = num_times(r.realization)
   rsub = RBSteady.get_reduced_subspace(r)
-  @inbounds for ip in eachindex(x)
-    ipt = ip:nt:np*nt
-    x̂[ip] = project(rsub,x[ipt])
+  @inbounds for ip in eachindex(x̂)
+    ipt = ip:np:np*nt
+    xpt = vec(x.data[:,ipt])
+    x̂[ip] = project(rsub,xpt)
   end
   return x̂
 end

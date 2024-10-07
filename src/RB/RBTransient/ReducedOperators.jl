@@ -16,34 +16,34 @@ function RBSteady.reduced_operator(
   feop::TransientParamFEOperator,
   s::AbstractArray)
 
-  red_test,red_trial = reduced_fe_space(solver,feop,s)
+  red_trial,red_test = reduced_fe_space(solver,feop,s)
   odeop = get_algebraic_operator(feop)
-  reduced_operator(solver,odeop,red_test,red_trial,s)
+  reduced_operator(solver,odeop,red_trial,red_test,s)
 end
 
 function RBSteady.reduced_operator(
   solver::RBSolver,
   odeop::ODEParamOperator,
-  red_test::FESubspace,
   red_trial::FESubspace,
+  red_test::FESubspace,
   s::AbstractArray)
 
-  red_lhs,red_rhs = reduced_weak_form(solver,odeop,red_test,red_trial,s)
+  red_lhs,red_rhs = reduced_weak_form(solver,odeop,red_trial,red_test,s)
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
   new_odeop = change_triangulation(odeop,trians_rhs,trians_lhs)
-  GenericTransientRBOperator(new_odeop,red_test,red_trial,red_lhs,red_rhs)
+  GenericTransientRBOperator(new_odeop,red_trial,red_test,red_lhs,red_rhs)
 end
 
 function RBSteady.reduced_operator(
   solver::RBSolver,
   odeop::ODEParamOperator{LinearNonlinearParamODE},
-  red_test::FESubspace,
   red_trial::FESubspace,
+  red_test::FESubspace,
   s::AbstractArray)
 
-  red_op_lin = reduced_operator(solver,get_linear_operator(odeop),red_test,red_trial,s)
-  red_op_nlin = reduced_operator(solver,get_nonlinear_operator(odeop),red_test,red_trial,s)
+  red_op_lin = reduced_operator(solver,get_linear_operator(odeop),red_trial,red_test,s)
+  red_op_nlin = reduced_operator(solver,get_nonlinear_operator(odeop),red_trial,red_test,s)
   LinearNonlinearTransientRBOperator(red_op_lin,red_op_nlin)
 end
 

@@ -110,7 +110,7 @@ function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::Abstra
 end
 
 function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix)
-  @warn "possibly incorrect V matrix"
+  # @warn "possibly incorrect V matrix"
   MM = M*M'
   Ur,Sr,_ = truncated_svd(red_style,MM;issquare=true)
   Vr = inv(Diagonal(Sr).+eps())*(Ur'M)
@@ -118,7 +118,7 @@ function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix)
 end
 
 function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
-  @warn "possibly incorrect V matrix"
+  # @warn "possibly incorrect V matrix"
   XM = L'*M[p,:]
   MXM = XM*XM'
   Ũr,Sr,_ = truncated_svd(red_style,MXM;issquare=true)

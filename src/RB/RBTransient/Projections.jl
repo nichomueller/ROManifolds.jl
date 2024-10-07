@@ -31,8 +31,8 @@ RBSteady.num_reduced_dofs(a::TransientBasis) = num_reduced_dofs(a.basis_space)*n
 function RBSteady.project(a::TransientBasis,X::AbstractMatrix)
   basis_space = get_basis(a.basis_space)
   basis_time = get_basis(a.basis_time)
-  X̂ = basis_space'*X̂*basis_time
-  return x̂
+  X̂ = basis_space'*X*basis_time
+  return X̂
 end
 
 function RBSteady.inv_project(a::TransientBasis,X̂::AbstractMatrix)

@@ -1,5 +1,20 @@
 time_combinations(fesolver::ODESolver) = @notimplemented
 
+function time_combinations(fesolver::GeneralizedAlpha1)
+  combine_res(x) = nothing
+  combine_jac(x,y) = nothing
+  combine_djac(x,y) = nothing
+  return combine_res,combine_jac,combine_djac
+end
+
+function time_combinations(fesolver::GeneralizedAlpha2)
+  combine_res(x) = nothing
+  combine_jac(x,y) = nothing
+  combine_djac(x,y) = nothing
+  combine_ddjac(x,y) = nothing
+  return combine_res,combine_jac,combine_djac,combine_ddjac
+end
+
 function time_combinations(fesolver::ThetaMethod)
   θ = fesolver.θ
   combine_res(x) = x
