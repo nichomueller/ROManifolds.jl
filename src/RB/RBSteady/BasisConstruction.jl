@@ -81,8 +81,6 @@ function tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatri
   return Ur,Sr,Vr
 end
 
-<<<<<<< HEAD
-=======
 function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix)
   MM = M'*M
   _,Sr,Vr = truncated_svd(red_style,MM;issquare=true)
@@ -117,7 +115,6 @@ function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::Abstra
   return Ur,Sr,Vr'
 end
 
->>>>>>> 5517082a8ae19d9a3d8d2b57de86d0202cad14d5
 function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3}) where T
   M = reshape(A,size(A,1)*size(A,2),:)
   Ur,Sr,Vr = tpod(red_style,M)
