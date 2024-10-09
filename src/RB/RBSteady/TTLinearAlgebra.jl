@@ -69,13 +69,17 @@ Base.@propagate_inbounds function contraction(
   return TTContraction(ABp)
 end
 
+# product of cores on the component axis, for multivariate problems
 Base.@propagate_inbounds function contraction(
   factor1::AbstractArray{T,3},
   factor2::AbstractArray{S,3},
   factor3::AbstractArray{U,3}
   ) where {T,S,U}
 
-  @check size(factor1,2) == size(factor2,2) == size(factor3,2)
+  ncomps1 = size(factor1,2)
+  ncomps3 = size(factor3,2)
+  cinds = CartesianIndices((ncomps1,ncomps3))
+  @check size(factor2,2) == ncomps1*ncomps3
   A = reshape(permutedims(factor1,(2,1,3)),size(factor1,2),:)
   B = reshape(permutedims(factor2,(2,1,3)),size(factor2,2),:)
   C = reshape(permutedims(factor3,(2,1,3)),size(factor3,2),:)
@@ -83,8 +87,9 @@ Base.@propagate_inbounds function contraction(
   for (iA,a) = enumerate(eachcol(A))
     for (iB,b) = enumerate(eachcol(B))
       for (iC,c) = enumerate(eachcol(C))
-        for n in axes(factor1,2)
-          _entry!(+,ABC,a[n]*b[n]*c[n],iA,iB,iC)
+        for (in,n) in enumerate(cinds)
+          v = @views a[n.I[1]]*b[in]*c[n.I[2]]
+          _entry!(+,ABC,v,iA,iB,iC)
         end
       end
     end
@@ -209,6 +214,19 @@ function galerkin_projection(
   cores_trial::Vector{<:AbstractArray{Float64,3}})
 
   rcores = contraction.(cores_test,cores,cores_trial)
+  rcore = sequential_product(rcores...)
+  dropdims(rcore;dims=(1,2,3))
+end
+
+function reduced_coupling(
+  cores_p::Vector{<:AbstractArray{Float64,3}},
+  B::Rank1Tensor,
+  cores_d::Vector{<:AbstractArray{Float64,3}})
+
+  factors = get_factors(B)
+  @check length(cores_p)-1 == length(factors) == length(cores_d)
+  @check all(size(f,2) == size(c,2) for (f,c) in zip(factors,cores))
+  rcores = contraction.(cores_p,factors,cores_d)
   rcore = sequential_product(rcores...)
   dropdims(rcore;dims=(1,2,3))
 end

@@ -101,13 +101,13 @@ function load_fe_subspace(dir,f::FESpace;label="")
 end
 
 function DrWatson.save(dir,hp::HyperReduction;label="")
-  ad_dir = get_filename(dir,"hypred",label)
-  serialize(ad_dir,hp)
+  hr_dir = get_filename(dir,"hypred",label)
+  serialize(hr_dir,hp)
 end
 
 function load_decomposition(dir;label="")
-  ad_dir = get_filename(dir,"hypred",label)
-  deserialize(ad_dir)
+  hr_dir = get_filename(dir,"hypred",label)
+  deserialize(hr_dir)
 end
 
 function DrWatson.save(dir,contrib::AffineContribution;label::String="")
@@ -254,13 +254,13 @@ function load_results(dir;label="")
   deserialize(results_dir,perf)
 end
 
-function Utils.compute_relative_error(norm_style::EnergyNorm,feop,son,son_approx)
+function Utils.compute_relative_error(norm_style::EnergyNorm,feop,sol,sol_approx)
   X = assemble_matrix(feop,get_norm(norm_style))
-  compute_relative_error(son,son_approx,X)
+  compute_relative_error(sol,sol_approx,X)
 end
 
-function Utils.compute_relative_error(norm_style::EuclideanNorm,feop,son,son_approxs)
-  compute_relative_error(son,son_approx)
+function Utils.compute_relative_error(norm_style::EuclideanNorm,feop,sol,sol_approx)
+  compute_relative_error(sol,sol_approx)
 end
 
 function Utils.compute_relative_error(

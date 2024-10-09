@@ -65,6 +65,8 @@ SparseArrays.nnz(a::MultiValueSparsityPatternCSC) = nnz(a.matrix)
 get_nonzero_indices(a::MultiValueSparsityPatternCSC) = get_nonzero_indices(a.matrix)
 TensorValues.num_components(a::MultiValueSparsityPatternCSC) = a.ncomps
 
+recast(A::AbstractArray,a::MultiValueSparsityPatternCSC) = @notimplemented
+
 """
 """
 struct TProductSparsityPattern{A,B} <: SparsityPattern
@@ -84,6 +86,8 @@ univariate_num_cols(a::TProductSparsityPattern) = Tuple(num_cols.(a.sparsities_1
 univariate_findnz(a::TProductSparsityPattern) = tuple_of_arrays(findnz.(a.sparsities_1d))
 univariate_nnz(a::TProductSparsityPattern) = Tuple(nnz.(a.sparsities_1d))
 univariate_nonzero_indices(a::TProductSparsityPattern) = Tuple(get_nonzero_indices.(a.sparsities_1d))
+
+recast(A::AbstractArray,a::TProductSparsityPattern) = recast(A,a.sparsity)
 
 function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
   m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))

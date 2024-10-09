@@ -22,8 +22,10 @@ rescale(op::Function,x::AbstractArray,b::Projection) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection,c::Projection,args...) = @abstractmethod
 empirical_interpolation(a::Projection) = @abstractmethod
-union_bases(red_style,a::Projection,b::Projection,args...) = @abstractmethod
+gram_schmidt(a::Projection,b::Projection,args...) = gram_schmidt(get_basis(a),get_basis(b),args...)
 
+Base.:+(a::Projection,b::Projection) = union(a,b)
+Base.:-(a::Projection,b::Projection) = union(a,b)
 Base.:*(a::Projection,b::Projection) = galerkin_projection(a,b)
 Base.:*(a::Projection,b::Projection,c::Projection) = galerkin_projection(a,b,c)
 Base.:*(a::Projection,x::AbstractArray) = inv_project(a,x)
@@ -152,11 +154,11 @@ function rescale(op::Function,x::AbstractArray,b::PODBasis)
   PODBasis(op(x,get_basis(b)))
 end
 
-union_bases(red_style,a::PODBasis,b::PODBasis,args...) = union_bases(red_style,a,get_basis(b),args...)
+Base.union(a::PODBasis,b::PODBasis,args...) = union(a,get_basis(b),args...)
 
-function union_bases(red_style,a::PODBasis,basis_b::AbstractMatrix,args...)
+function Base.union(a::PODBasis,basis_b::AbstractMatrix,args...)
   basis_a = get_basis(a)
-  basis_ab, = gram_schmidt(red_style,basis_b,basis_a,args...)
+  basis_ab, = gram_schmidt(basis_b,basis_a,args...)
   PODBasis(basis_ab)
 end
 
@@ -217,15 +219,15 @@ function rescale(op::Function,x::AbstractRankTensor{D1},b::TTSVDCores{D2}) where
   end
 end
 
-function union_bases(red_style,a::TTSVDCores,b::TTSVDCores,args...)
+function Base.union(a::TTSVDCores,b::TTSVDCores,args...)
   @check get_index_map(a) == get_index_map(b)
-  union_bases(red_style,a,get_cores(b),args...)
+  union(a,get_cores(b),args...)
 end
 
-function union_bases(red_style,a::TTSVDCores,cores_b::AbstractVector{<:AbstractArray},args...)
+function Base.union(a::TTSVDCores,cores_b::AbstractVector{<:AbstractArray},args...)
   cores_a = get_cores(a)
   cores_ab = block_cores(cores_a,cores_b)
-  orthogonalize!(red_style,cores_ab,args...)
+  orthogonalize!(cores_ab,args...)
   TTSVDCores(cores_ab,get_index_map(a))
 end
 
@@ -245,6 +247,7 @@ function galerkin_projection(proj_left::TTSVDCores,a::TTSVDCores,proj_right::TTS
 end
 
 function empirical_interpolation(a::TTSVDCores)
+  local indices,interp
   cores = get_cores(a)
   index_map = get_index_map(a)
   c = cores2basis(first(cores))
@@ -258,9 +261,9 @@ function empirical_interpolation(a::TTSVDCores)
       c = cores2basis(interp_core,cores[i+1])
     else
       indices = basis_indices(vinds,index_map)
-      return indices,interp
     end
   end
+  return indices,interp
 end
 
 # multi field interface
@@ -440,7 +443,6 @@ function enrich!(
   supr_matrix::BlockMatrix)
 
   @check a.touched[1] "Primal field not defined"
-  red_style = ReductionStyle(red)
   a_primal,a_dual... = a.array
   X_primal = norm_matrix[Block(1,1)]
   H_primal = cholesky(X_primal)
@@ -448,7 +450,7 @@ function enrich!(
     dual_i = get_basis(a_dual[i])
     C_primal_dual_i = supr_matrix[Block(1,i+1)]
     supr_i = H_primal \ C_primal_dual_i * dual_i
-    a_primal = union_bases(red_style,a_primal,supr_i,X_primal)
+    a_primal = union(a_primal,supr_i,X_primal)
   end
   a[1] = a_primal
   return

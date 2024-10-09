@@ -16,34 +16,34 @@ function reduced_operator(
   feop::ParamFEOperator,
   s)
 
-  red_test,red_trial = reduced_fe_space(solver,feop,s)
+  red_trial,red_test = reduced_fe_space(solver,feop,s)
   op = get_algebraic_operator(feop)
-  reduced_operator(solver,op,red_test,red_trial,s)
+  reduced_operator(solver,feop,red_trial,red_test,s)
 end
 
 function reduced_operator(
   solver::RBSolver,
   op::ParamOperator,
-  red_test::FESubspace,
   red_trial::FESubspace,
+  red_test::FESubspace,
   s)
 
-  red_lhs,red_rhs = reduced_weak_form(solver,op,red_test,red_trial,s)
+  red_lhs,red_rhs = reduced_weak_form(solver,op,red_trial,red_test,s)
   trians_rhs = get_domains(red_rhs)
   trians_lhs = get_domains(red_lhs)
   new_op = change_triangulation(op,trians_rhs,trians_lhs)
-  GenericRBOperator(new_op,red_test,red_trial,red_lhs,red_rhs)
+  GenericRBOperator(new_op,red_trial,red_test,red_lhs,red_rhs)
 end
 
 function reduced_operator(
   solver::RBSolver,
   op::ParamOperator{LinearNonlinearParamEq},
-  red_test::FESubspace,
   red_trial::FESubspace,
+  red_test::FESubspace,
   s)
 
-  red_op_lin = reduced_operator(solver,get_linear_operator(op),red_test,red_trial,s)
-  red_op_nlin = reduced_operator(solver,get_nonlinear_operator(op),red_test,red_trial,s)
+  red_op_lin = reduced_operator(solver,get_linear_operator(op),red_trial,red_test,s)
+  red_op_nlin = reduced_operator(solver,get_nonlinear_operator(op),red_trial,red_test,s)
   LinearNonlinearRBOperator(red_op_lin,red_op_nlin)
 end
 

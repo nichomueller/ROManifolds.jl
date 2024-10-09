@@ -561,6 +561,71 @@ for op in (:+,:-,:*)
 
 end
 
+function Arrays.return_cache(
+  f::BroadcastingFieldOpMap{<:AbstractParamFunction},
+  x::Union{Number,AbstractArray{<:Number}}...)
+
+  g = BroadcastingFieldOpMap(testitem(f.op))
+  c = return_cache(g,x...)
+  d = evaluate!(c,g,x...)
+  cache = Vector{typeof(c)}(undef,param_length(f.op))
+  data = array_of_similar_arrays(d,param_length(f.op))
+  @inbounds for i in param_eachindex(f.op)
+    g = BroadcastingFieldOpMap(getindex(f.op,i))
+    cache[i] = return_cache(g,x...)
+  end
+  return cache,data
+end
+
+function Arrays.evaluate!(
+  C,
+  f::BroadcastingFieldOpMap{<:AbstractParamFunction},
+  x::Union{Number,AbstractArray{<:Number}}...)
+
+  cache,data = C
+  @inbounds for i in param_eachindex(data)
+    g = BroadcastingFieldOpMap(getindex(f.op,i))
+    vi = evaluate!(cache[i],g,x...)
+    param_setindex!(data,vi,i)
+  end
+  data
+end
+
+function Arrays.return_cache(
+  f::BroadcastingFieldOpMap{<:AbstractParamFunction},
+  A::AbstractParamArray,
+  b::Union{AbstractParamArray,AbstractArray{<:Number}}...)
+
+  plength = param_length(f.op)
+  g = BroadcastingFieldOpMap(testitem(f.op))
+  B = to_param_quantities(b...;plength)
+  c = return_cache(g,testitem(A),testitem.(B)...)
+  d = evaluate!(c,g,testitem(A),testitem.(B)...)
+  cache = Vector{typeof(c)}(undef,plength)
+  data = array_of_similar_arrays(d,plength)
+  @inbounds for i in 1:plength
+    g = BroadcastingFieldOpMap(getindex(f.op,i))
+    cache[i] = return_cache(g,param_getindex(A,i),param_getindex.(B,i)...)
+  end
+  return cache,data
+end
+
+function Arrays.evaluate!(
+  C,
+  f::BroadcastingFieldOpMap{<:AbstractParamFunction},
+  A::AbstractParamArray,
+  b::Union{AbstractParamArray,AbstractArray{<:Number}}...)
+
+  cache,data = C
+  B = to_param_quantities(b...;plength=param_length(f.op))
+  @inbounds for i in param_eachindex(f.op)
+    g = BroadcastingFieldOpMap(getindex(f.op,i))
+    vi = evaluate!(cache[i],g,param_getindex(A,i),param_getindex.(B,i)...)
+    param_setindex!(data,vi,i)
+  end
+  data
+end
+
 function Arrays.return_value(::typeof(*),A::AbstractParamArray,B::AbstractParamArray)
   param_return_value(*,A,B)
 end

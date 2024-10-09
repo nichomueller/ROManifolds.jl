@@ -52,20 +52,34 @@ mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
 rhs(μ,t,v,dΩ) = ∫(fμt(μ,t)*v)dΩ
 res(μ,t,u,v,dΩ) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rhs(μ,t,v,dΩ)
 
-energy(du,v,dΩ) = ∫(∇(v)⋅∇(du))dΩ
-energy(dΩ) = (du,v) -> ∫(∇(v)⋅∇(du))dΩ
+energy(du,v,dΩ) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
+energy(dΩ) = (du,v) -> energy(du,v,dΩ)
 
 order = 2
 degree = 2*order
 
-for n in (8,10,12,15)
+function newsave(dir,contrib::ArrayContribution;label::String="")
+  for (i,c) in enumerate(get_values(contrib))
+    l = RBSteady._get_label(label,i)
+    save(dir,c;label=l)
+  end
+end
+
+function newsave(dir,contrib::TupOfArrayContribution;label::String="")
+  for (i,c) in enumerate(contrib)
+    l = RBSteady._get_label(label,i)
+    newsave(dir,c;label=l)
+  end
+end
+
+for n in (12,)#(8,10,12)
   println("--------------------------------------------------------------------")
   println("TT algorithm, n = $(n)")
   domain = (0,1,0,1,0,1)
   partition = (n,n,n)
   model = TProductModel(domain,partition)
   labels = get_face_labeling(model)
-  add_tag_from_tags!(labels,"dirichlet","boundary")
+  add_tag_from_tags!(labels,"dirichlet",setdiff(1:26,[23,24]))
 
   Ω = Triangulation(model)
   dΩ = Measure(Ω,degree)
@@ -85,31 +99,21 @@ for n in (8,10,12,15)
 
   tol = fill(1e-4,4)
   state_reduction = TTSVDReduction(tol,energy(dΩ);nparams=50)
-  rbsolver = RBSolver(fesolver,state_reduction;nparams_test=10,nparams_res=30,nparams_jac=20)
-  test_dir = datadir(joinpath("heateq","3dcube_tensor_train_$(n)"))
+  rbsolver = RBSolver(fesolver,state_reduction;nparams_res=30,nparams_jac=20,nparams_djac=1)
+  test_dir = datadir(joinpath("test-heateq","tt_$(n)"))
+  create_dir(test_dir)
 
-  fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
-  save(test_dir,fesnaps)
-
-  println(festats)
-
-  # println("--------------------------------------------------------------------")
-  # println("Regular algorithm, n = $(n)")
-
-  # model = model.model
-  # Ω = Ω.trian
-  # dΩ = dΩ.measure
-  # test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-  # trial = TransientTrialParamFESpace(test,gμt)
-  # feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
-  #   trial,test,trian_res,trian_stiffness,trian_mass)
-  # uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
-
-  # tol = 1e-4
-  # state_reduction = TransientPODReduction(tol,energy(dΩ);nparams=50)
-  # rbsolver = RBSolver(fesolver,state_reduction;nparams_test=10,nparams_res=30,nparams_jac=20)
-  # test_dir = datadir(joinpath("heateq","3dcube_$(n)"))
-
-  # fesnaps = solution_snapshots(rbsolver,feop,uh0μ)
+  # r = realization(feop;nparams=60)
+  # fesnaps,festats = solution_snapshots(rbsolver,feop,r,uh0μ)
   # save(test_dir,fesnaps)
+  fesnaps = load_snapshots(test_dir)
+
+  # println(festats)
+
+  op = get_algebraic_operator(feop)
+  jacs = jacobian_snapshots(rbsolver,op,fesnaps)
+  # ress = residual_snapshots(rbsolver,op,fesnaps)
+
+  newsave(test_dir,jacs;label="jac")
+  # newsave(test_dir,ress;label="res")
 end

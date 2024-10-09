@@ -253,10 +253,9 @@ function split_components(i::AbstractMultiValueIndexMap{D}) where D
   IndexMaps.(indices)
 end
 
-function merge_components(i::AbstractVector{<:AbstractArray{Ti}}) where Ti
-  sizes = map(size,i)
-  @check all(sizes .== [first(sizes)])
-  indices = stack(i)
+function merge_components(i::AbstractArray{<:AbstractArray{Ti,D}}) where {Ti,D}
+  @check all(size(j) == size(first(i)) for j in i)
+  indices = stack(i;dims=D+1)
   return indices
 end
 
@@ -291,7 +290,7 @@ struct MultiValueIndexMap{D,Ti,I} <: AbstractMultiValueIndexMap{D,Ti}
   end
 end
 
-function MultiValueIndexMap(indices::AbstractVector{<:AbstractArray})
+function MultiValueIndexMap(indices::AbstractArray{<:AbstractArray})
   mindices = merge_components(indices)
   return MultiValueIndexMap(mindices)
 end
