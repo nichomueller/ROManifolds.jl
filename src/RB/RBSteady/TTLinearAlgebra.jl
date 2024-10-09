@@ -78,6 +78,7 @@ Base.@propagate_inbounds function contraction(
 
   ncomps1 = size(factor1,2)
   ncomps3 = size(factor3,2)
+  cinds = CartesianIndices((ncomps1,ncomps3))
   @check size(factor2,2) == ncomps1*ncomps3
   A = reshape(permutedims(factor1,(2,1,3)),size(factor1,2),:)
   B = reshape(permutedims(factor2,(2,1,3)),size(factor2,2),:)
@@ -86,8 +87,9 @@ Base.@propagate_inbounds function contraction(
   for (iA,a) = enumerate(eachcol(A))
     for (iB,b) = enumerate(eachcol(B))
       for (iC,c) = enumerate(eachcol(C))
-        for (in,n) in enumerate(CartesianIndices((ncomps1,ncomps3)))
-          _entry!(+,ABC,a[n.I[1]]*b[in]*c[n.I[2]],iA,iB,iC)
+        for (in,n) in enumerate(cinds)
+          v = @views a[n.I[1]]*b[in]*c[n.I[2]]
+          _entry!(+,ABC,v,iA,iB,iC)
         end
       end
     end

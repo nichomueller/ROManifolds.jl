@@ -27,7 +27,7 @@ function reduction(red::TTSVDReduction,A::SparseSnapshots,args...)
 end
 
 function _size_cond(M::AbstractMatrix)
-  length(M) > 1e6 && (size(M,1) > 1e1*size(M,2) || size(M,2) > 1e2*size(M,1)) #false #
+  length(M) > 1e6 && (size(M,1) > 1e2*size(M,2) || size(M,2) > 1e2*size(M,1)) #false #
 end
 
 function _cholesky_decomp(X::AbstractSparseMatrix)
@@ -56,10 +56,10 @@ function truncated_svd(red_style::SearchSVDRank,M::AbstractMatrix;issquare=false
 end
 
 function truncated_svd(red_style::FixedSVDRank,M::AbstractMatrix;issquare=false)
+  U,S,V = svd(M)
+  if issquare S = sqrt.(S) end
   rank = red_style.rank
-  Ur,Sr,Vr = tsvd(M,rank)
-  if issquare Sr = sqrt.(Sr) end
-  return Ur,Sr,Vr
+  return U[:,1:rank],S[1:rank],V[:,1:rank]
 end
 
 function truncated_svd(red_style::LRApproxRank,M::AbstractMatrix;kwargs...)
