@@ -33,7 +33,7 @@ function allocate_paramcache(
   u::AbstractVector)
 
   ptrial = get_trial(op.op)
-  trial = allocate_space(ptrial,μ)
+  trial = evaluate(ptrial,μ)
 
   uh = EvaluationFunction(trial,u)
   test = get_test(op.op)
@@ -161,7 +161,7 @@ function allocate_paramcache(
   u::AbstractVector)
 
   ptrial = get_trial(op.op)
-  trial = allocate_space(ptrial,μ)
+  trial = evaluate(ptrial,μ)
 
   uh = EvaluationFunction(trial,u)
   test = get_test(op.op)

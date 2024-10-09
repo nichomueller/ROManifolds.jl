@@ -56,9 +56,7 @@ function ODEs.update_odeopcache!(
   op::TransientRBOperator,
   r::TransientRealization)
 
-  msg = "A space-time ROM is time-independent, thus the cache can be correctly
-    initialized before the call to solve!"
-  @notimplemented msg
+  update_odeopcache!(odeopcache,op.op,r)
 end
 
 struct GenericTransientRBOperator{T} <: TransientRBOperator{T}
@@ -327,10 +325,13 @@ function RBSteady.online_cache!(
   r::TransientRealization)
 
   cache = solver.cache
-  y, = cache.fecache
-  x̂, = cache.rbcache
+  y,odecache = cache.fecache
   if param_length(r) != param_length(y)
     RBSteady.init_online_cache!(solver,op,r)
+  else
+    odeslvrcache,odeopcache = odecache
+    odeopcache = update_odeopcache!(odeopcache,op,r)
+    cache.fecache = y,(odeslvrcache,odeopcache)
   end
   return
 end

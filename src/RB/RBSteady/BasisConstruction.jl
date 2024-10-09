@@ -26,10 +26,6 @@ function reduction(red::TTSVDReduction,A::SparseSnapshots,args...)
   return recast(cores,A)
 end
 
-function _size_cond(M::AbstractMatrix)
-  false # length(M) > 1e6 && (size(M,1) > 1e2*size(M,2) || size(M,2) > 1e2*size(M,1))
-end
-
 function _cholesky_decomp(X::AbstractSparseMatrix)
   C = cholesky(X)
   L = sparse(C.L)
@@ -70,61 +66,15 @@ function tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatri
   tpod(red_style,M,_cholesky_decomp(X)...)
 end
 
-function tpod(red_style::ReductionStyle,M::AbstractMatrix,args...)
-  if _size_cond(M) && !isa(red_style,LRApproxRank)
-    if size(M,1) > size(M,2)
-      massive_rows_tpod(red_style,M,args...)
-    else
-      massive_cols_tpod(red_style,M,args...)
-    end
-  else
-    standard_tpod(red_style,M,args...)
-  end
-end
-
-function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix)
+function tpod(red_style::ReductionStyle,M::AbstractMatrix)
   truncated_svd(red_style,M)
 end
 
-function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
+function tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
   XM = L'*M[p,:]
   Ũr,Sr,Vr = truncated_svd(red_style,XM)
   Ur = (L'\Ũr)[invperm(p),:]
   return Ur,Sr,Vr
-end
-
-function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix)
-  MM = M'*M
-  _,Sr,Vr = truncated_svd(red_style,MM;issquare=true)
-  Ur = (M*Vr)*inv(Diagonal(Sr).+eps())
-  return Ur,Sr,Vr
-end
-
-function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
-  XM = L'*M[p,:]
-  MXM = XM'*XM
-  _,Sr,Vr = truncated_svd(red_style,MXM;issquare=true)
-  Ũr = (XM*Vr)*inv(Diagonal(Sr).+eps())
-  Ur = (L'\Ũr)[invperm(p),:]
-  return Ur,Sr,Vr
-end
-
-function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix)
-  @warn "possibly incorrect V matrix"
-  MM = M*M'
-  Ur,Sr,_ = truncated_svd(red_style,MM;issquare=true)
-  Vr = inv(Diagonal(Sr).+eps())*(Ur'M)
-  return Ur,Sr,Vr'
-end
-
-function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
-  @warn "possibly incorrect V matrix"
-  XM = L'*M[p,:]
-  MXM = XM*XM'
-  Ũr,Sr,_ = truncated_svd(red_style,MXM;issquare=true)
-  Vr = inv(Diagonal(Sr).+eps())*(Ũr'XM)
-  Ur = (L'\Ũr)[invperm(p),:]
-  return Ur,Sr,Vr'
 end
 
 function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3}) where T

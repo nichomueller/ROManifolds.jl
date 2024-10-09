@@ -63,8 +63,7 @@ function ParamSteady.update_paramcache!(
   op::RBOperator,
   r::Realization)
 
-  msg = "The cache can be correctly initialized before the call to solve!"
-  @notimplemented msg
+  update_paramcache!(paramcache,op.op,r)
 end
 
 struct GenericRBOperator{T} <: RBOperator{T}
@@ -115,25 +114,25 @@ function Algebra.allocate_jacobian(
 end
 
 function Algebra.residual!(
-  cache,
+  b̂,
   op::GenericRBOperator,
   r::AbstractRealization,
   u::AbstractParamVector,
   paramcache)
 
-  b,b̂ = cache
+  b = paramcache.b
   fe_sb = fe_residual!(b,op,r,u,paramcache)
   inv_project!(b̂,op.rhs,fe_sb)
 end
 
 function Algebra.jacobian!(
-  cache,
+  Â,
   op::GenericRBOperator,
   r::AbstractRealization,
   u::AbstractParamVector,
   paramcache)
 
-  A,Â = cache
+  A = paramcache.A
   fe_sA = fe_jacobian!(A,op,r,u,paramcache)
   inv_project!(Â,op.lhs,fe_sA)
 end
@@ -270,25 +269,29 @@ end
 
 # Solve a POD-MDEIM problem
 
-function init_online_cache!(solver::RBSolver,op::RBOperator,r::Realization,y::AbstractParamVector)
-  @check param_length(r) == param_length(y)
+function init_online_cache!(solver::RBSolver,op::RBOperator,r::Realization)
+  fe_trial = get_fe_trial(op)(r)
+  trial = get_trial(op)(r)
+  y = zero_free_values(fe_trial)
+  x̂ = zero_free_values(trial)
 
-  fesolver = get_fe_solver(solver)
-  paramcache = allocate_paramcache(fesolver,op,r)
+  paramcache = allocate_paramcache(op,r,y)
   rbcache = allocate_rbcache(op,r)
 
   cache = solver.cache
   cache.fecache = (y,paramcache)
-  cache.rbcache = rbcache
+  cache.rbcache = (x̂,rbcache)
   return
 end
 
 function online_cache!(solver::RBSolver,op::RBOperator,r::Realization)
   cache = solver.cache
-  (y,paramcache) = cache.fecache
+  y,paramcache = cache.fecache
   if param_length(r) != param_length(y)
-    y′ = array_of_consecutive_arrays(testitem(y),param_length(r))
-    init_online_cache!(solver,op,r,y′)
+    init_online_cache!(solver,op,r)
+  else
+    paramcache = update_paramcache!(paramcache,op,r)
+    cache.fecache = y,paramcache
   end
   return
 end
@@ -330,6 +333,24 @@ function Algebra.solve!(
   stats = CostTracker(t,nruns=num_params(r))
 
   return x̂,stats
+end
+
+function Algebra.solve!(
+  x̂::AbstractVector,
+  solver::RBSolver,
+  op::RBOperator,
+  r::Realization,
+  x::AbstractVector,
+  paramcache,
+  rbcache;
+  kwargs...)
+
+  fesolver = get_fe_solver(solver)
+  Âcache,b̂cache = rbcache
+  Â = jacobian!(Âcache,op,r,x,paramcache)
+  b̂ = residual!(b̂cache,op,r,x,paramcache)
+  solve!(x̂,fesolver.ls,Â,b̂)
+  return x̂
 end
 
 # cache utils

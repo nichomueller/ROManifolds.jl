@@ -225,21 +225,6 @@ for f in (:project,:inv_project)
   end
 end
 
-for f! in (:project!,:inv_project!)
-  @eval begin
-    function $f!(
-      y::Union{BlockVector,BlockVectorOfVectors},
-      r::MultiFieldRBSpace,
-      x::Union{BlockVector,BlockVectorOfVectors})
-
-      for i in 1:blocklength(x)
-        $f!(y[Block(i)],r[i],x[Block(i)])
-      end
-      return y
-    end
-  end
-end
-
 # dealing with the transient case here
 
 function Arrays.evaluate(r::FESubspace,args...)
@@ -295,10 +280,17 @@ for T in (:MultiFieldRBSpace,:EvalMultiFieldRBSpace)
   end
 end
 
-for f! in (:project!,:inv_project!)
+for T in (:MultiFieldRBSpace,:EvalMultiFieldRBSpace), f! in (:project!,:inv_project!)
   @eval begin
-    function $f!(y,r::EvalRBSpace,x::AbstractVector)
-      $f!(y,r.subspace,x)
+    function $f!(
+      y::Union{BlockVector,BlockVectorOfVectors},
+      r::$T,
+      x::Union{BlockVector,BlockVectorOfVectors})
+
+      for i in 1:blocklength(x)
+        $f!(y[Block(i)],r[i],x[Block(i)])
+      end
+      return y
     end
   end
 end

@@ -85,9 +85,17 @@ with the information related to the computational expense of the FE method
 """
 function solution_snapshots(
   solver::RBSolver,
-  op::Union{ParamFEOperator,ParamOperator};
+  op::ParamFEOperator;
   nparams=num_offline_params(solver),
   r=realization(op;nparams))
+
+  solution_snapshots(solver,op,r)
+end
+
+function solution_snapshots(
+  solver::RBSolver,
+  op::ParamFEOperator,
+  r::Realization)
 
   fesolver = get_fe_solver(solver)
   index_map = get_vector_index_map(op)
