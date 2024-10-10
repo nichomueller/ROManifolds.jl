@@ -34,7 +34,7 @@ function Algebra.solve!(
     dx = similar(b)
     ss = symbolic_setup(nls.ls,A)
     ns = numerical_setup(ss,A)
-    Algebra._solve_nr!(x,A,b,dx,ns,nls,op)
+    solve_param_nr!(x,A,b,dx,r,ns,nls,op,paramcache)
   end
   stats = CostTracker(t,name="FEM")
 
@@ -72,4 +72,25 @@ end
 
 function Algebra.solve(solver::FESolver,op::LinearNonlinearParamFEOperator,r::Realization)
   solve(solver,join_operators(op),r)
+end
+
+# utils
+
+function solve_param_nr!(x,A,b,dx,r,ns,nls,op,paramcache)
+  max0 = maximum(abs,b)
+  for nliter in 1:nls.max_nliters
+    rmul!(b,-1)
+    solve!(dx,ns,b)
+    x .+= dx
+
+    residual!(b,op,r,x,paramcache)
+    maxk = maximum(abs,b)
+    maxk < nls.tol && return
+    if nliter == nls.max_nliters
+      @unreachable
+    end
+
+    jacobian!(A,op,r,x,paramcache)
+    numerical_setup!(ns,A)
+  end
 end

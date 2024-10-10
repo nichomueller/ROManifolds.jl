@@ -56,36 +56,18 @@ feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,trian_res,trian_sti
 fesolver = LinearFESolver(LUSolver())
 
 tol = 1e-4
-state_reduction = Reduction(tol,energy;nparams=100)
+state_reduction = Reduction(tol,energy;nparams=100,sketch=:sprn)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=80,nparams_jac=80)
 
-# we can load & solve directly, if the offline structures have been previously saved to file
-# load_solve(rbsolver,dir=test_dir)
+test_dir = datadir("poisson")
+create_dir(test_dir)
 
 fesnaps,festats = solution_snapshots(rbsolver,feop)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
+save(test_dir,rbop)
+
 μon = realization(feop;nparams=10)
 x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,μon)
-
-using Gridap.FESpaces
-xrb = inv_project(get_trial(rbop)(μon),x̂)
-
-# GRIDAP
-
-μ = get_realization(fesnaps)[1].params
-a′(x) = 1+exp(-x[1]/sum(μ))
-f′(x) = 1.
-g′(x) = μ[1]*exp(-x[1]/μ[2])*abs(sin(μ[3]))
-h′(x) = abs(cos(μ[3]))
-
-stiffness′(u,v) = ∫(a′*∇(v)⋅∇(u))dΩ
-res′(v) = ∫(f′*v)dΩ + ∫(h′*v)dΓn
-
-U = TrialFESpace(test,g′)
-feop′ = AffineFEOperator(stiffness′,res′,U,test)
-
-uh = solve(feop′)
-u = get_free_dof_values(uh)

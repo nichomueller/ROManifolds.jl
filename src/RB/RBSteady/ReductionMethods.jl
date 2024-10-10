@@ -15,7 +15,7 @@ struct LRApproxRank <: ReductionStyle
 end
 
 function LRApproxRank(tol::Float64;maxdet_tol=0.,sketch_randn_niter=1,sketch=:sprn,kwargs...)
-  opts = LRAOptions(;tol=tol,maxdet_tol,sketch_randn_niter,sketch,kwargs...)
+  opts = LRAOptions(;rtol=tol,maxdet_tol,sketch_randn_niter,sketch,kwargs...)
   return LRApproxRank(opts)
 end
 
@@ -180,17 +180,17 @@ ParamDataStructures.num_params(r::SupremizerReduction) = num_params(get_reductio
 
 # generic constructor
 
-function Reduction(red_style::ReductionStyle,args...;nparams=50,kwargs...)
-  PODReduction(red_style,args...;nparams,kwargs...)
+function Reduction(red_style::ReductionStyle,args...;kwargs...)
+  PODReduction(red_style,args...;kwargs...)
 end
 
-function Reduction(red_style::TTSVDRanks,args...;nparams=50,kwargs...)
-  TTSVDReduction(red_style,args...;nparams,kwargs...)
+function Reduction(red_style::TTSVDRanks,args...;kwargs...)
+  TTSVDReduction(red_style,args...;kwargs...)
 end
 
-function Reduction(tolrank,args...;kwargs...)
+function Reduction(tolrank,args...;nparams=50,kwargs...)
   red_style = ReductionStyle(tolrank;kwargs...)
-  Reduction(red_style,args...;kwargs...)
+  Reduction(red_style,args...;nparams)
 end
 
 function Reduction(supr_op::Function,args...;kwargs...)

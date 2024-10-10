@@ -115,10 +115,32 @@ function residual_snapshots(solver::RBSolver,op::ParamOperator,s)
   return Snapshots(b,ib,r_res)
 end
 
+function residual_snapshots(solver::RBSolver,op::ParamOperator{<:LinearParamEq},s)
+  fesolver = get_fe_solver(solver)
+  sres = select_snapshots(s,res_params(solver))
+  us_res = get_values(sres) |> copy
+  fill!(us_res,zero(eltype2(us_res)))
+  r_res = get_realization(sres)
+  b = residual(op,r_res,us_res)
+  ib = get_vector_index_map(op)
+  return Snapshots(b,ib,r_res)
+end
+
 function jacobian_snapshots(solver::RBSolver,op::ParamOperator,s)
   fesolver = get_fe_solver(solver)
   sjac = select_snapshots(s,jac_params(solver))
   us_jac = get_values(sjac)
+  r_jac = get_realization(sjac)
+  A = jacobian(op,r_jac,us_jac)
+  iA = get_matrix_index_map(op)
+  return Snapshots(A,iA,r_jac)
+end
+
+function jacobian_snapshots(solver::RBSolver,op::ParamOperator{<:LinearParamEq},s)
+  fesolver = get_fe_solver(solver)
+  sjac = select_snapshots(s,jac_params(solver))
+  us_jac = get_values(sjac) |> copy
+  fill!(us_jac,zero(eltype2(us_jac)))
   r_jac = get_realization(sjac)
   A = jacobian(op,r_jac,us_jac)
   iA = get_matrix_index_map(op)

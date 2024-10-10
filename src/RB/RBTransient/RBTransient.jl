@@ -73,8 +73,8 @@ export GenericTransientRBOperator
 export LinearNonlinearTransientRBOperator
 include("ReducedOperators.jl")
 
-export LinearNonlinearRBSolver
-include("LinearNonlinearRBSolvers.jl")
+export TransientRBNewtonRaphsonOp
+include("RBNewtonRaphsonOperator.jl")
 
 export get_stage_operator
 include("ThetaMethod.jl")

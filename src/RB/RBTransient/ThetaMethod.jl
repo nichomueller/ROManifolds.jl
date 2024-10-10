@@ -88,7 +88,7 @@ function get_stage_operator(
 
   ws = (1,1/dtθ)
   rbop_nlin = get_nonlinear_operator(rbop)
-  stageop = LinearNonlinearRBSolver(rbop_nlin,lop,odeopcache,r,us,ws,cache_lin_nlin)
+  stageop = RBNewtonRaphsonOperator(rbop_nlin,lop,odeopcache,r,us,ws,cache_lin_nlin)
   shift!(r,dt*(1-θ))
 
   return stageop
