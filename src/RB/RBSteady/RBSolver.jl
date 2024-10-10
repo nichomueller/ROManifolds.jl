@@ -61,11 +61,6 @@ function RBSolver(
   RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction)
 end
 
-function RBSolver(fesolver::FESolver,args...;nparams_state=50,kwargs...)
-  state_reduction = PODReduction(args...;nparams=nparams_state)
-  RBSolver(fesolver,state_reduction,kwargs...)
-end
-
 get_fe_solver(s::RBSolver) = s.fesolver
 get_state_reduction(s::RBSolver) = s.state_reduction
 get_residual_reduction(s::RBSolver) = s.residual_reduction
@@ -90,13 +85,22 @@ with the information related to the computational expense of the FE method
 """
 function solution_snapshots(
   solver::RBSolver,
-  op::Union{ParamFEOperator,ParamOperator};
+  op::ParamFEOperator;
   nparams=num_offline_params(solver),
   r=realization(op;nparams))
 
+  solution_snapshots(solver,op,r)
+end
+
+function solution_snapshots(
+  solver::RBSolver,
+  op::ParamFEOperator,
+  r::Realization)
+
   fesolver = get_fe_solver(solver)
   index_map = get_vector_index_map(op)
-  values,stats = solve(fesolver,op;r)
+  uh,stats = solve(fesolver,op,r)
+  values = get_free_dof_values(uh)
   snaps = Snapshots(values,index_map,r)
   return snaps,stats
 end
@@ -106,7 +110,18 @@ function residual_snapshots(solver::RBSolver,op::ParamOperator,s)
   sres = select_snapshots(s,res_params(solver))
   us_res = get_values(sres)
   r_res = get_realization(sres)
-  b = residual(fesolver,op,r_res,us_res)
+  b = residual(op,r_res,us_res)
+  ib = get_vector_index_map(op)
+  return Snapshots(b,ib,r_res)
+end
+
+function residual_snapshots(solver::RBSolver,op::ParamOperator{<:LinearParamEq},s)
+  fesolver = get_fe_solver(solver)
+  sres = select_snapshots(s,res_params(solver))
+  us_res = get_values(sres) |> copy
+  fill!(us_res,zero(eltype2(us_res)))
+  r_res = get_realization(sres)
+  b = residual(op,r_res,us_res)
   ib = get_vector_index_map(op)
   return Snapshots(b,ib,r_res)
 end
@@ -116,7 +131,18 @@ function jacobian_snapshots(solver::RBSolver,op::ParamOperator,s)
   sjac = select_snapshots(s,jac_params(solver))
   us_jac = get_values(sjac)
   r_jac = get_realization(sjac)
-  A = jacobian(fesolver,op,r_jac,us_jac)
+  A = jacobian(op,r_jac,us_jac)
+  iA = get_matrix_index_map(op)
+  return Snapshots(A,iA,r_jac)
+end
+
+function jacobian_snapshots(solver::RBSolver,op::ParamOperator{<:LinearParamEq},s)
+  fesolver = get_fe_solver(solver)
+  sjac = select_snapshots(s,jac_params(solver))
+  us_jac = get_values(sjac) |> copy
+  fill!(us_jac,zero(eltype2(us_jac)))
+  r_jac = get_realization(sjac)
+  A = jacobian(op,r_jac,us_jac)
   iA = get_matrix_index_map(op)
   return Snapshots(A,iA,r_jac)
 end

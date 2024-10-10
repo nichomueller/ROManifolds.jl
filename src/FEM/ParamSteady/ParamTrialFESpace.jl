@@ -89,19 +89,15 @@ end
 
 FESpaces.ConstraintStyle(::Type{<:ParamTrialFESpace{A}}) where A = ConstraintStyle(A)
 
-function ODEs.allocate_space(U::ParamTrialFESpace,params)
-  HomogeneousTrialParamFESpace(U.space,Val(length(params)))
-end
-
-function Arrays.evaluate!(Upt::TrialParamFESpace,U::ParamTrialFESpace,params)
-  dir(f) = f(params)
-  dir(f::Vector) = dir.(f)
-  TrialParamFESpace!(Upt,dir(U.dirichlet))
-  Upt
+function ODEs.allocate_space(U::ParamTrialFESpace,r::Realization)
+  HomogeneousTrialParamFESpace(U.space,Val(length(r)))
 end
 
 function Arrays.evaluate!(Upt::TrialParamFESpace,U::ParamTrialFESpace,r::Realization)
-  evaluate!(Upt,U,get_params(r))
+  dir(f) = f(r)
+  dir(f::Vector) = dir.(f)
+  TrialParamFESpace!(Upt,dir(U.dirichlet))
+  Upt
 end
 
 Arrays.evaluate(U::ParamTrialFESpace,r::Nothing) = U.space0

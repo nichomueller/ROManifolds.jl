@@ -18,7 +18,7 @@ function reduced_operator(
 
   red_trial,red_test = reduced_fe_space(solver,feop,s)
   op = get_algebraic_operator(feop)
-  reduced_operator(solver,feop,red_trial,red_test,s)
+  reduced_operator(solver,op,red_trial,red_test,s)
 end
 
 function reduced_operator(
@@ -59,12 +59,11 @@ function allocate_rbcache(
 end
 
 function ParamSteady.update_paramcache!(
-  opcache,
+  paramcache,
   op::RBOperator,
   r::Realization)
 
-  msg = "The cache can be correctly initialized before the call to solve!"
-  @notimplemented msg
+  update_paramcache!(paramcache,op.op,r)
 end
 
 struct GenericRBOperator{T} <: RBOperator{T}
@@ -115,27 +114,27 @@ function Algebra.allocate_jacobian(
 end
 
 function Algebra.residual!(
-  cache,
+  b̂,
   op::GenericRBOperator,
   r::AbstractRealization,
   u::AbstractParamVector,
   paramcache)
 
-  b,b̂ = cache
-  fe_sb = fe_residual!(b,op,r,u,paramcache)
-  inv_project!(b̂,op.rhs,fe_sb)
+  b = paramcache.b
+  feb = fe_residual!(b,op,r,u,paramcache)
+  inv_project!(b̂,op.rhs,feb)
 end
 
 function Algebra.jacobian!(
-  cache,
+  Â,
   op::GenericRBOperator,
   r::AbstractRealization,
   u::AbstractParamVector,
   paramcache)
 
-  A,Â = cache
-  fe_sA = fe_jacobian!(A,op,r,u,paramcache)
-  inv_project!(Â,op.lhs,fe_sA)
+  A = paramcache.A
+  feA = fe_jacobian!(A,op,r,u,paramcache)
+  inv_project!(Â,op.lhs,feA)
 end
 
 function fe_jacobian!(
@@ -198,7 +197,17 @@ function ParamDataStructures.realization(op::LinearNonlinearRBOperator;kwargs...
 end
 
 function ParamSteady.get_fe_operator(op::LinearNonlinearRBOperator)
-  join_operators(get_fe_operator(op.op_linear),get_fe_operator(op.op_nonlinear))
+  join_operators(ParamSteady.get_fe_operator(op.op_linear),ParamSteady.get_fe_operator(op.op_nonlinear))
+end
+
+function ParamSteady.get_vector_index_map(op::LinearNonlinearRBOperator)
+  @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
+  get_vector_index_map(op.op_linear)
+end
+
+function ParamSteady.get_matrix_index_map(op::LinearNonlinearRBOperator)
+  @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))
+  get_matrix_index_map(op.op_linear)
 end
 
 function get_fe_trial(op::LinearNonlinearRBOperator)
@@ -217,12 +226,7 @@ function Algebra.allocate_residual(
   u::AbstractParamVector,
   paramcache)
 
-  (rhs_fe_lin,rhs_rb_lin) = allocate_residual(op.op_linear,r,u,paramcache)
-  (rhs_fe_nlin,rhs_rb_nlin) = allocate_residual(op.op_nonlinear,r,u,paramcache)
-  _,rhs_hypred_lin = rhs_rb_lin
-  _,rhs_hypred_nlin = rhs_rb_nlin
-  rhs_hypred_lin_nlin = rhs_hypred_lin + rhs_hypred_nlin
-  return (rhs_fe_lin,rhs_rb_lin),(rhs_fe_nlin,rhs_rb_nlin),rhs_hypred_lin_nlin
+  @notimplemented
 end
 
 function Algebra.allocate_jacobian(
@@ -231,12 +235,7 @@ function Algebra.allocate_jacobian(
   u::AbstractParamVector,
   paramcache)
 
-  (lhs_fe_lin,lhs_rb_lin) = allocate_residual(op.op_linear,r,u,paramcache)
-  (lhs_fe_nlin,lhs_rb_nlin) = allocate_residual(op.op_nonlinear,r,u,paramcache)
-  _,lhs_hypred_lin = lhs_rb_lin
-  _,lhs_hypred_nlin = lhs_rb_nlin
-  lhs_hypred_lin_nlin = lhs_hypred_lin + lhs_hypred_nlin
-  return (lhs_fe_lin,lhs_rb_lin),(lhs_fe_nlin,lhs_rb_nlin),lhs_hypred_lin_nlin
+  @notimplemented
 end
 
 function Algebra.residual!(
@@ -247,11 +246,7 @@ function Algebra.residual!(
   paramcache;
   kwargs...)
 
-  (_,b̂_lin),(b_nlin,b̂_nlin),b̂_lin_nlin = cache
-  feb_nlin = fe_residual!(b_nlin,op.op_nonlinear,r,u,paramcache)
-  b̂_nlin = inv_project!(op.op_nonlinear.rhs,feb_nlin)
-  @. b̂_lin_nlin = b̂_nlin + b̂_lin
-  return b̂_lin_nlin
+  @notimplemented
 end
 
 function Algebra.jacobian!(
@@ -261,34 +256,48 @@ function Algebra.jacobian!(
   u::AbstractParamVector,
   paramcache)
 
-  (_,Â_lin),(A_nlin,Â_nlin),Â_lin_nlin = cache
-  feA_nlin = fe_jacobian!(A_nlin,op.op_nonlinear,r,u,paramcache)
-  Â_nlin = inv_project!(op.op_nonlinear.lhs,feA_nlin)
-  @. Â_lin_nlin = Â_nlin + Â_lin
-  return Â_lin_nlin
+  @notimplemented
+end
+
+function ParamSteady.allocate_paramcache(
+  op::LinearNonlinearRBOperator,
+  r::Realization,
+  u::AbstractParamVector)
+
+  paramcache_lin = allocate_paramcache(get_linear_operator(op),r,u)
+  paramcache_nlin = allocate_paramcache(get_nonlinear_operator(op),r,u)
+  return (paramcache_lin,paramcache_nlin)
+end
+
+function allocate_rbcache(op::LinearNonlinearRBOperator,r::Realization)
+  cache_lin = allocate_rbcache(get_linear_operator(op),r)
+  cache_nlin = allocate_rbcache(get_nonlinear_operator(op),r)
+  return (cache_lin,cache_nlin)
 end
 
 # Solve a POD-MDEIM problem
 
-function init_online_cache!(solver::RBSolver,op::RBOperator,r::Realization,y::AbstractParamVector)
-  @check param_length(r) == param_length(y)
+function init_online_cache!(solver::RBSolver,op::RBOperator,r::Realization)
+  fe_trial = get_fe_trial(op)(r)
+  trial = get_trial(op)(r)
+  y = zero_free_values(fe_trial)
+  x̂ = zero_free_values(trial)
 
-  fesolver = get_fe_solver(solver)
-  paramcache = allocate_paramcache(fesolver,op,r)
+  paramcache = allocate_paramcache(op,r,y)
   rbcache = allocate_rbcache(op,r)
 
   cache = solver.cache
   cache.fecache = (y,paramcache)
-  cache.rbcache = rbcache
+  cache.rbcache = (x̂,rbcache)
   return
 end
 
 function online_cache!(solver::RBSolver,op::RBOperator,r::Realization)
   cache = solver.cache
-  (y,paramcache) = cache.fecache
+  y, = cache.fecache
+  x̂, = cache.rbcache
   if param_length(r) != param_length(y)
-    y′ = array_of_consecutive_arrays(testitem(y),param_length(r))
-    init_online_cache!(solver,op,r,y′)
+    init_online_cache!(solver,op,r)
   end
   return
 end
@@ -304,32 +313,84 @@ end
 function Algebra.solve(
   solver::RBSolver,
   op::RBOperator,
-  r::AbstractRealization)
+  r::AbstractRealization;
+  kwargs...)
 
-  trial = get_trial(op)(r)
-  fe_trial = get_fe_trial(op)(r)
-  x̂ = zero_free_values(trial)
-  y = zero_free_values(fe_trial)
-  cache = x̂,y
-  solve!(cache,solver,op,r)
+  cache = solver.cache
+  if isnothing(cache.fecache) || isnothing(cache.rbcache)
+    RBSteady.init_online_cache!(solver,op,r)
+  else
+    RBSteady.online_cache!(solver,op,r)
+  end
+  solve!(cache,solver,op,r;kwargs...)
 end
 
 function Algebra.solve!(
   cache,
   solver::RBSolver,
   op::RBOperator,
-  r::AbstractRealization)
+  r::AbstractRealization;
+  kwargs...)
 
-  x̂,y = cache
-  fesolver = get_fe_solver(solver)
+  y,paramcache = cache.fecache
+  x̂,rbcache = cache.rbcache
 
-  t = @timed solve!((x̂,),fesolver,op,r,(y,))
+  t = @timed solve!(x̂,solver,op,r,y,paramcache,rbcache)
   stats = CostTracker(t,nruns=num_params(r))
 
-  trial = get_trial(op)(r)
-  x = inv_project(trial,x̂)
+  return x̂,stats
+end
 
-  return x,stats
+function Algebra.solve!(
+  x̂::AbstractVector,
+  solver::RBSolver,
+  op::RBOperator,
+  r::Realization,
+  x::AbstractVector,
+  paramcache,
+  rbcache;
+  kwargs...)
+
+  fesolver = get_fe_solver(solver)
+  Âcache,b̂cache = rbcache
+  Â = jacobian!(Âcache,op,r,x,paramcache)
+  b̂ = residual!(b̂cache,op,r,x,paramcache)
+  solve!(x̂,fesolver.ls,Â,b̂)
+  return x̂
+end
+
+function Algebra.solve!(
+  x̂::AbstractVector,
+  solver::RBSolver,
+  op::RBOperator{LinearNonlinearParamEq},
+  r::Realization,
+  x::AbstractVector,
+  paramcache,
+  rbcache;
+  kwargs...)
+
+  fesolver = get_fe_solver(solver)
+
+  # linear + nonlinear cache
+  paramcache_lin,paramcache_nlin = paramcache
+  rbcache_lin,rbcache_nlin = rbcache
+
+  # linear cache
+  Âcache_lin,b̂cache_lin = rbcache_lin
+  op_lin = get_linear_operator(op)
+  op_nlin = get_nonlinear_operator(op)
+  Â_lin = jacobian!(Âcache_lin,op_lin,r,x,paramcache_lin)
+  b̂_lin = residual!(b̂cache_lin,op_lin,r,x,paramcache_lin)
+
+  # nonlinear cache
+  syscache_nlin = rbcache_nlin
+  trial = get_trial(op)(r)
+  cache = syscache_nlin,trial
+
+  nlop = RBNewtonRaphsonOperator(op_nlin,paramcache_nlin,r,Â_lin,b̂_lin,cache)
+  solve!(x̂,fesolver.nls,nlop,r,x;kwargs...)
+
+  return x̂
 end
 
 # cache utils
@@ -351,7 +412,7 @@ function select_evalcache_at_indices(u::ConsecutiveArrayOfArrays,paramcache,indi
   @unpack Us,Ups,pfeopcache,form = paramcache
   new_Us = select_fe_space_at_indices(Us,indices)
   new_XhF = ConsecutiveArrayOfArrays(u.data[:,indices])
-  new_paramcache = ParamOpFromFEOpCache(new_Us,Uts,tfeopcache,const_forms)
+  new_paramcache = ParamCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_paramcache
 end
 
@@ -362,7 +423,7 @@ function select_evalcache_at_indices(u::BlockVectorOfVectors,paramcache,indices)
   spaces = select_fe_space_at_indices(Us,indices)
   new_Us = MultiFieldFESpace(VT,spaces,style)
   new_XhF = mortar([ConsecutiveArrayOfArrays(b.data[:,indices]) for b in blocks(u)])
-  new_paramcache = ParamOpFromFEOpCache(new_Us,Uts,tfeopcache,const_forms)
+  new_paramcache = ParamCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_paramcache
 end
 

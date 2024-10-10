@@ -263,6 +263,23 @@ function Utils.compute_relative_error(norm_style::EuclideanNorm,feop,sol,sol_app
   compute_relative_error(sol,sol_approx)
 end
 
+function Utils.compute_relative_error(
+  sol::AbstractSteadySnapshots{T,N},
+  sol_approx::AbstractSteadySnapshots{T,N},
+  args...) where {T,N}
+
+  @check size(sol) == size(sol_approx)
+  errors = zeros(num_params(sol))
+  @inbounds for ip = 1:num_params(sol)
+    solip = selectdim(sol,N,ip)
+    solip_approx = selectdim(sol_approx,N,ip)
+    err_norm = induced_norm(solip-solip_approx,args...)
+    sol_norm = induced_norm(solip,args...)
+    errors[ip] = err_norm / sol_norm
+  end
+  return mean(errors)
+end
+
 function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots)
   @check sol.touched == sol_approx.touched
   error = Array{Float64,ndims(sol)}(undef,size(sol))

@@ -56,15 +56,16 @@ function ordered_common_locations(i::IntegrationDomain,union_indices::AbstractVe
 end
 
 function Base.getindex(a::AbstractParamArray,i::IntegrationDomain)
-  consecutive_getindex(a,i,:)
+  entries = consecutive_getindex(a,i,:)
+  ConsecutiveArrayOfArrays(entries)
 end
 
 function Base.getindex(a::ParamSparseMatrix,i::IntegrationDomain)
   entry = zeros(eltype2(a),length(i))
   entries = array_of_consecutive_arrays(entry,param_length(a))
   @inbounds for ip = param_eachindex(entries)
-    for (ii,is) in enumerate(indices)
-      v = param_getindex(s,ip)[is]
+    for (ii,is) in enumerate(i)
+      v = param_getindex(a,ip)[is]
       consecutive_setindex!(entries,v,ii,ip)
     end
   end

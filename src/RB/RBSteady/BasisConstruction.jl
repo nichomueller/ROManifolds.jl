@@ -70,23 +70,11 @@ function tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatri
   tpod(red_style,M,_cholesky_decomp(X)...)
 end
 
-function tpod(red_style::ReductionStyle,M::AbstractMatrix,args...)
-  if _size_cond(M) && !isa(red_style,LRApproxRank)
-    if size(M,1) > size(M,2)
-      massive_rows_tpod(red_style,M,args...)
-    else
-      massive_cols_tpod(red_style,M,args...)
-    end
-  else
-    standard_tpod(red_style,M,args...)
-  end
-end
-
-function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix)
+function tpod(red_style::ReductionStyle,M::AbstractMatrix)
   truncated_svd(red_style,M)
 end
 
-function standard_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
+function tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
   XM = L'*M[p,:]
   Ũr,Sr,Vr = truncated_svd(red_style,XM)
   Ur = (L'\Ũr)[invperm(p),:]

@@ -24,14 +24,6 @@ function FESpaces.get_algebraic_operator(op::ParamFEOperator)
   ParamOpFromFEOp(op)
 end
 
-function allocate_pfeopcache(op::ParamFEOperator,r::Realization,u::AbstractVector)
-  nothing
-end
-
-function update_pfeopcache!(tfeopcache,op::ParamFEOperator,r::Realization)
-  tfeopcache
-end
-
 ParamDataStructures.realization(op::ParamFEOperator;kwargs...) = @abstractmethod
 
 function ParamFESpaces.get_param_assembler(op::ParamFEOperator,r::Realization)
@@ -94,21 +86,22 @@ struct ParamFEOpFromWeakForm{T} <: ParamFEOperator{T}
 end
 
 function ParamFEOperator(
-  res::Function,jac::Function,pspace,trial,test,args...)
+  res::Function,jac::Function,pspace,trial,test)
 
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
   ParamFEOpFromWeakForm{NonlinearParamEq}(
-    res,jac,pspace,assem,index_map,trial,test,args...)
+    res,jac,pspace,assem,index_map,trial,test)
 end
 
 function LinearParamFEOperator(
-  res::Function,jac::Function,pspace,trial,test,args...)
+  res::Function,jac::Function,pspace,trial,test)
 
+  jac′(μ,u,du,v,args...) = jac(μ,du,v,args...)
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
   ParamFEOpFromWeakForm{LinearParamEq}(
-    res,jac,pspace,assem,index_map,trial,test,args...)
+    res,jac′,pspace,assem,index_map,trial,test)
 end
 
 FESpaces.get_test(op::ParamFEOpFromWeakForm) = op.test
@@ -167,20 +160,22 @@ struct ParamFEOpFromWeakFormWithTrian{T} <: ParamFEOperatorWithTrian{T}
   end
 end
 
-function ParamFEOpFromWeakForm(
-  res::Function,
-  jac::Function,
-  pspace::ParamSpace,
-  index_map::FEOperatorIndexMap,
-  assem::Assembler,
-  trial::FESpace,
-  test::FESpace,
-  trian_res,
-  trian_jac)
+for f in (:ParamFEOperator,:LinearParamFEOperator)
+  @eval begin
+    function $f(
+      res::Function,
+      jac::Function,
+      pspace::ParamSpace,
+      trial::FESpace,
+      test::FESpace,
+      trian_res,
+      trian_jac)
 
-  op = ParamFEOpFromWeakForm(res,jac,pspace,assem,index_map,trial,test)
-  op_trian = ParamFEOpFromWeakFormWithTrian(op,trian_res,trian_jac)
-  return op_trian
+      op = $f(res,jac,pspace,trial,test)
+      op_trian = ParamFEOpFromWeakFormWithTrian(op,trian_res,trian_jac)
+      return op_trian
+    end
+  end
 end
 
 FESpaces.get_test(op::ParamFEOpFromWeakFormWithTrian) = get_test(op.op)
@@ -189,7 +184,7 @@ ParamDataStructures.realization(op::ParamFEOpFromWeakFormWithTrian;kwargs...) = 
 ODEs.get_res(op::ParamFEOpFromWeakFormWithTrian) = get_res(op.op)
 get_jac(op::ParamFEOpFromWeakFormWithTrian) = get_jac(op.op)
 ODEs.get_assembler(op::ParamFEOpFromWeakFormWithTrian) = get_assembler(op.op)
-IndexMaps.get_index_map(op::ParamFEOpFromWeakFormWithTrian) = get_index_map(op)
+IndexMaps.get_index_map(op::ParamFEOpFromWeakFormWithTrian) = get_index_map(op.op)
 
 # utils
 
@@ -217,11 +212,11 @@ function _set_triangulation_res(
   return newres
 end
 
-function set_triangulation(op::ParamFEOpFromWeakForm,trian_res,trian_jac)
+function set_triangulation(op::ParamFEOpFromWeakForm{T},trian_res,trian_jac) where T
   polyn_order = get_polynomial_order(op.test)
-  newres = _set_triangulation_form(op.res,trian_res,polyn_order)
+  newres = _set_triangulation_res(op.res,trian_res,polyn_order)
   newjac = _set_triangulation_jac(op.jac,trian_jac,polyn_order)
-  ParamFEOpFromWeakForm(newres,newjac,op.pspace,op.assem,op.index_map,op.trial,op.test)
+  ParamFEOpFromWeakForm{T}(newres,newjac,op.pspace,op.assem,op.index_map,op.trial,op.test)
 end
 
 """

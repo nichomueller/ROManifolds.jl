@@ -447,7 +447,7 @@ function enrich!(
   X_primal = norm_matrix[Block(1,1)]
   H_primal = cholesky(X_primal)
   for i = eachindex(a_dual)
-    dual_i = get_basis_space(a_dual[i])
+    dual_i = get_basis(a_dual[i])
     C_primal_dual_i = supr_matrix[Block(1,i+1)]
     supr_i = H_primal \ C_primal_dual_i * dual_i
     a_primal = union(a_primal,supr_i,X_primal)
