@@ -472,7 +472,7 @@ function flatten_snapshots(s::BlockSnapshots)
 end
 
 function select_snapshots(s::BlockSnapshots,args...;kwargs...)
-  active_block_ids = findall(!iszero,blocks(s))
+  active_block_ids = findall(s.touched)
   block_map = BlockMap(size(s),active_block_ids)
   active_block_snaps = [select_snapshots(s[n],args...;kwargs...) for n in active_block_ids]
   BlockSnapshots(block_map,active_block_snaps)
