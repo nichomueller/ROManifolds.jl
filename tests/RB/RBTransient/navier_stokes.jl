@@ -7,7 +7,7 @@ using Serialization
 
 using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools
-using GridapSolvers.BlockSolvers: LinearSystemBlock, BiformBlock, BlockTriangularSolver
+using GridapSolvers.BlockSolvers: LinearSystemBlock, NonlinearSystemBlock, BiformBlock, BlockTriangularSolver
 
 using Mabla.FEM
 using Mabla.FEM.TProduct
@@ -77,7 +77,7 @@ trian_jac = (Ω,)
 trian_jac_t = (Ω,)
 
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
-induced_norm((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
+energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","dirichlet_noslip"])
@@ -88,9 +88,9 @@ test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,induced_norm,ptspace,
-  trial,test,coupling,trian_res,trian_jac,trian_jac_t)
-feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,induced_norm,ptspace,
+feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
+  trial,test,trian_res,trian_jac,trian_jac_t)
+feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,
   trial,test,trian_res,trian_jac)
 feop = LinNonlinTransientParamFEOperator(feop_lin,feop_nlin)
 
@@ -110,10 +110,14 @@ odesolver = ThetaMethod(solver,dt,θ)
 lu_nlsolver = NewtonRaphsonSolver(LUSolver(),1e-10,20)
 lu_odesolver = ThetaMethod(lu_nlsolver,dt,θ)
 
-ϵ = 1e-4
-rbsolver = RBSolver(odesolver,ϵ;nparams_state=50,nparams_res=50,nparams_jac=30,nparams_test=10)
-lu_rbsolver = RBSolver(lu_odesolver,ϵ;nparams_state=50,nparams_res=50,nparams_jac=30,nparams_test=10)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","model_circle_2d")))
+tol = 1e-4
+state_reduction = TransientReduction(coupling,tol,energy;nparams=2,sketch=:sprn)
+rbsolver = RBSolver(odesolver,state_reduction;nparams_res=2,nparams_jac=2,nparams_djac=1)
+lu_rbsolver = RBSolver(lu_odesolver,state_reduction;nparams_res=2,nparams_jac=2,nparams_djac=1)
+# ϵ = 1e-4
+# rbsolver = RBSolver(odesolver,ϵ;nparams_state=50,nparams_res=50,nparams_jac=30,nparams_test=10)
+# lu_rbsolver = RBSolver(lu_odesolver,ϵ;nparams_state=50,nparams_res=50,nparams_jac=30,nparams_test=10)
+# test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","model_circle_2d")))
 
 fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 save(test_dir,fesnaps)

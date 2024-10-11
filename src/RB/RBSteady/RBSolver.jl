@@ -50,7 +50,7 @@ function RBSolver(
 end
 
 function RBSolver(
-  fesolver::FESolver,
+  fesolver::GridapType,
   state_reduction::Reduction;
   nparams_res=20,
   nparams_jac=20)

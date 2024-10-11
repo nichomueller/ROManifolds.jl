@@ -226,3 +226,9 @@ end
   @inbounds bl.data[A.index][i.α...] = v
   return A
 end
+
+const BlockConsecutiveArrayOfArrays{T,N,L,B} = BlockArrayOfArrays{T,N,L,<:AbstractArray{<:ConsecutiveArrayOfArrays{T,N,L},N},B}
+
+function consecutive_getindex(A::BlockConsecutiveArrayOfArrays,i...)
+  mortar(map(a->consecutive_getindex(a,i...),A.data))
+end

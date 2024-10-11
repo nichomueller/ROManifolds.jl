@@ -15,6 +15,11 @@ using Gridap.MultiField
 using Gridap.ODEs
 using Gridap.Helpers
 
+using GridapSolvers
+using GridapSolvers.LinearSolvers
+using GridapSolvers.BlockSolvers
+using GridapSolvers.MultilevelTools
+
 using Mabla.FEM.IndexMaps
 using Mabla.FEM.TProduct
 using Mabla.FEM.ParamDataStructures

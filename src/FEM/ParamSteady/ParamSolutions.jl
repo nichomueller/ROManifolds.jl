@@ -20,7 +20,7 @@ end
 
 function Algebra.solve!(
   x::AbstractParamVector,
-  nls::NewtonRaphsonSolver,
+  nls::NonlinearSolver,
   op::ParamOpFromFEOp,
   r::Realization)
 
@@ -31,10 +31,7 @@ function Algebra.solve!(
   t = @timed begin
     jacobian!(A,op,r,x,paramcache)
     residual!(b,op,r,x,paramcache)
-    dx = similar(b)
-    ss = symbolic_setup(nls.ls,A)
-    ns = numerical_setup(ss,A)
-    solve_param_nr!(x,A,b,dx,r,ns,nls,op,paramcache)
+    solve_param_nr!(x,A,b,r,op,paramcache)
   end
   stats = CostTracker(t,name="FEM")
 
@@ -76,7 +73,11 @@ end
 
 # utils
 
-function solve_param_nr!(x,A,b,dx,r,ns,nls,op,paramcache)
+function solve_param_nr!(x,A,b,dx,r,ns,nls::NewtonRaphsonSolver,op,paramcache)
+  dx = allocate_in_domain(A)
+  ss = symbolic_setup(nls.ls,A)
+  ns = numerical_setup(ss,A)
+
   max0 = maximum(abs,b)
   for nliter in 1:nls.max_nliters
     rmul!(b,-1)
@@ -92,5 +93,29 @@ function solve_param_nr!(x,A,b,dx,r,ns,nls,op,paramcache)
 
     jacobian!(A,op,r,x,paramcache)
     numerical_setup!(ns,A)
+  end
+end
+
+function solve_param_nr!(x,A,b,r,nls::GridapSolvers.NewtonSolver,op,paramcache)
+  dx = allocate_in_domain(A)
+  ss = symbolic_setup(nls.ls,A)
+  ns = numerical_setup(ss,A,x)
+  log = nls.log
+
+  res = maximum(norm(b))
+  done = LinearSolvers.init!(log,res)
+  while !done
+    rmul!(b,-1)
+    solve!(dx,ns,b)
+    x .+= dx
+
+    residual!(b,op,r,x,paramcache)
+    res  = maximum(norm(b))
+    done = LinearSolvers.update!(log,res)
+
+    if !done
+      jacobian!(A,op,r,x,paramcache)
+      numerical_setup!(ns,A,x)
+    end
   end
 end
