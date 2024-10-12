@@ -102,7 +102,7 @@ function solve_param_nr!(x,A,b,r,nls::GridapSolvers.NewtonSolver,op,paramcache)
   ns = numerical_setup(ss,A,x)
   log = nls.log
 
-  res = maximum(norm(b))
+  res = norm(b)
   done = LinearSolvers.init!(log,res)
   while !done
     rmul!(b,-1)
@@ -110,7 +110,7 @@ function solve_param_nr!(x,A,b,r,nls::GridapSolvers.NewtonSolver,op,paramcache)
     x .+= dx
 
     residual!(b,op,r,x,paramcache)
-    res  = maximum(norm(b))
+    res  = norm(b)
     done = LinearSolvers.update!(log,res)
 
     if !done

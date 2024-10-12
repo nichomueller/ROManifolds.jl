@@ -1,35 +1,25 @@
-function GridapSolvers.MultilevelTools._return_cache(k::LocalProjectionMap,f::ParamField)
-  q = get_shapefuns(k.reffe)
-  pq = get_coordinates(k.quad)
-  wq = get_weights(k.quad)
-
-  lq = ParamDataStructures.BroadcastOpParamFieldArray(⋅,q,f)
-  eval_cache = return_cache(lq,pq)
-  lqx = evaluate!(eval_cache,lq,pq)
-  integration_cache = return_cache(Fields.IntegrationMap(),lqx,wq)
-  return eval_cache,integration_cache
-end
-
-function GridapSolvers.MultilevelTools._evaluate!(cache,k::LocalProjectionMap,f::ParamField)
-  eval_cache,integration_cache = cache
-  q = get_shapefuns(k.reffe)
-
-  lq = ParamDataStructures.BroadcastOpParamFieldArray(⋅,q,f)
-  lqx = evaluate!(eval_cache,lq,get_coordinates(k.quad))
-  bq = evaluate!(integration_cache,Fields.IntegrationMap(),lqx,get_weights(k.quad))
-
-  λ = ldiv!(k.Mq,bq)
-  return linear_combination(λ,q)
+for f in (:(GridapSolvers.init!),:(GridapSolvers.update!),:(GridapSolvers.finalize!))
+  @eval begin
+    function $f(log::GridapSolvers.ConvergenceLog{T},r0::Vector{T}) where T
+      $f(log,maximum(r0))
+    end
+  end
 end
 
 function Algebra.symbolic_setup(
   solver::GridapSolvers.BlockTriangularSolver,
   mat::BlockMatrixOfMatrices)
 
-  mat_blocks   = blocks(mat)
-  block_caches = map(BlockSolvers.instantiate_block_cache,solver.blocks,mat_blocks)
-  block_ss     = map(symbolic_setup,solver.solvers,diag(block_caches))
-  return BlockSolvers.BlockTriangularSolverSS(solver,block_ss,block_caches)
+  mat_blocks = blocks(mat)
+  block_ss   = map(BlockSolvers.block_symbolic_setup,diag(solver.blocks),solver.solvers,diag(mat_blocks))
+  block_off  = map(CartesianIndices(mat_blocks)) do I
+    if I[1] != I[2]
+      BlockSolvers.block_offdiagonal_setup(solver.blocks[I],mat_blocks[I])
+    else
+      mat_blocks[I]
+    end
+  end
+  return BlockSolvers.BlockTriangularSolverSS(solver,block_ss,block_off)
 end
 
 function Algebra.symbolic_setup(
@@ -37,26 +27,29 @@ function Algebra.symbolic_setup(
   mat::BlockMatrixOfMatrices,
   x::BlockVectorOfVectors) where {T,N}
 
-  mat_blocks   = blocks(mat)
-  vec_blocks   = blocks(x)
-  block_caches = map(CartesianIndices(solver.blocks)) do I
-    BlockSolvers.instantiate_block_cache(solver.blocks[I],mat_blocks[I],vec_blocks[I[2]])
+  mat_blocks = blocks(mat)
+  block_ss   = map((b,s,m) -> BlockSolvers.block_symbolic_setup(b,s,m,x),diag(solver.blocks),solver.solvers,diag(mat_blocks))
+  block_off  = map(CartesianIndices(mat_blocks)) do I
+    if I[1] != I[2]
+      BlockSolvers.block_offdiagonal_setup(solver.blocks[I],mat_blocks[I],x)
+    else
+      mat_blocks[I]
+    end
   end
-  block_ss     = map(symbolic_setup,solver.solvers,diag(block_caches),vec_blocks)
-  return BlockSolvers.BlockTriangularSolverSS(solver,block_ss,block_caches)
+  return BlockSolvers.BlockTriangularSolverSS(solver,block_ss,block_off)
 end
 
 function Algebra.numerical_setup(
   ss::BlockSolvers.BlockTriangularSolverSS,
   mat::BlockMatrixOfMatrices)
 
-  solver      = ss.solver
-  block_ns    = map(numerical_setup,ss.block_ss,diag(ss.block_caches))
+  solver   = ss.solver
+  block_ns = map(BlockSolvers.block_numerical_setup,ss.block_ss,diag(blocks(mat)))
 
-  y = mortar(map(allocate_in_domain,diag(ss.block_caches))); fill!(y,0.0)
+  y = mortar(map(allocate_in_domain,block_ns)); fill!(y,0.0) # This should be removed with PA 0.4
   w = allocate_in_range(mat); fill!(w,0.0)
-  work_caches = w,y
-  return BlockSolvers.BlockTriangularSolverNS(solver,block_ns,ss.block_caches,work_caches)
+  work_caches = w, y
+  return BlockSolvers.BlockTriangularSolverNS(solver,block_ns,ss.block_off,work_caches)
 end
 
 function Algebra.numerical_setup(
@@ -64,13 +57,14 @@ function Algebra.numerical_setup(
   mat::BlockMatrixOfMatrices,
   x::BlockVectorOfVectors)
 
-  solver      = ss.solver
-  block_ns    = map(numerical_setup,ss.block_ss,diag(ss.block_caches),blocks(x))
+  solver     = ss.solver
+  mat_blocks = blocks(mat)
+  block_ns   = map((b,m) -> BlockSolvers.block_numerical_setup(b,m,x),ss.block_ss,diag(mat_blocks))
 
-  y = mortar(map(allocate_in_domain,diag(ss.block_caches))); fill!(y,0.0)
+  y = mortar(map(allocate_in_domain,block_ns)); fill!(y,0.0)
   w = allocate_in_range(mat); fill!(w,0.0)
-  work_caches = w,y
-  return BlockSolvers.BlockTriangularSolverNS(solver,block_ns,ss.block_caches,work_caches)
+  work_caches = w, y
+  return BlockSolvers.BlockTriangularSolverNS(solver,block_ns,ss.block_off,work_caches)
 end
 
 function Algebra.numerical_setup!(
@@ -79,10 +73,14 @@ function Algebra.numerical_setup!(
 
   solver       = ns.solver
   mat_blocks   = blocks(mat)
-  block_caches = map(BlockSolvers.update_block_cache!,ns.block_caches,solver.blocks,mat_blocks)
-  map(diag(solver.blocks),ns.block_ns,diag(block_caches)) do bi,nsi,ci
-    if BlockSolvers.is_nonlinear(bi)
-      numerical_setup!(nsi,ci)
+  map(ns.block_ns,diag(mat_blocks)) do nsi, mi
+    if BlockSolvers.is_nonlinear(nsi)
+      BlockSolvers.block_numerical_setup!(nsi,mi)
+    end
+  end
+  map(CartesianIndices(mat_blocks)) do I
+    if (I[1] != I[2]) && BlockSolvers.is_nonlinear(solver.blocks[I])
+      BlockSolvers.block_offdiagonal_setup!(ns.block_off[I],solver.blocks[I],mat_blocks[I])
     end
   end
   return ns
@@ -95,36 +93,42 @@ function Algebra.numerical_setup!(
 
   solver       = ns.solver
   mat_blocks   = blocks(mat)
-  vec_blocks   = blocks(x)
-  block_caches = map(CartesianIndices(solver.blocks)) do I
-    BlockSolvers.update_block_cache!(ns.block_caches[I],solver.blocks[I],mat_blocks[I],vec_blocks[I[2]])
+  map(ns.block_ns,diag(mat_blocks)) do nsi, mi
+    if BlockSolvers.is_nonlinear(nsi)
+      BlockSolvers.block_numerical_setup!(nsi,mi,x)
+    end
   end
-  map(diag(solver.blocks),ns.block_ns,diag(block_caches),vec_blocks) do bi,nsi,ci,xi
-    if BlockSolvers.is_nonlinear(bi)
-      numerical_setup!(nsi,ci,xi)
+  map(CartesianIndices(mat_blocks)) do I
+    if (I[1] != I[2]) && BlockSolvers.is_nonlinear(solver.blocks[I])
+      BlockSolvers.block_offdiagonal_setup!(ns.block_off[I],solver.blocks[I],mat_blocks[I],x)
     end
   end
   return ns
 end
 
-function BlockSolvers.instantiate_block_cache(
-  block::BlockSolvers.BiformBlock,
+function BlockSolvers.block_symbolic_setup(
+  block::BiformBlock,
+  solver::LinearSolver,
   mat::MatrixOfSparseMatricesCSC)
 
-  cache = assemble_matrix(block.f,block.assem,block.trial,block.test)
-  return ParamDataStructures.array_of_copy_arrays(cache,param_length(mat))
+  A = assemble_matrix(block.f,block.assem,block.trial,block.test)
+  param_A = ParamDataStructures.array_of_copy_arrays(A,param_length(mat))
+  return BlockSolvers.BlockSS(block,symbolic_setup(solver,param_A),param_A)
 end
 
-function BlockSolvers.instantiate_block_cache(
+function BlockSolvers.block_symbolic_setup(
   block::TriformBlock,
+  solver::LinearSolver,
   mat::MatrixOfSparseMatricesCSC,
   x::ConsecutiveVectorOfVectors)
 
-  @check param_length(mat) == param_length(vec)
-  uh = FEFunction(block.trial,x)
+  @check param_length(mat) == param_length(x)
+  y  = BlockSolvers.restrict_blocks(x,block.ids)
+  uh = FEFunction(block.param,y)
   f(u,v) = block.f(uh,u,v)
-  cache = assemble_matrix(f,block.assem,block.trial,block.test)
-  return ParamDataStructures.array_of_copy_arrays(cache,param_length(mat))
+  A = assemble_matrix(f,block.assem,block.trial,block.test)
+  param_A = ParamDataStructures.array_of_copy_arrays(A,param_length(mat))
+  return BlockSolvers.BlockSS(block,symbolic_setup(solver,param_A,y),param_A)
 end
 
 function LinearSolvers.get_solver_caches(solver::LinearSolvers.FGMRESSolver,A::AbstractParamMatrix)
@@ -201,6 +205,38 @@ function Algebra.solve!(
   return x
 end
 
+function Gridap.Algebra.solve!(
+  x::BlockVectorOfVectors,
+  ns::BlockSolvers.BlockTriangularSolverNS{Val{:upper}},
+  b::BlockVectorOfVectors)
+
+  @check blocklength(x) == blocklength(b) == length(ns.block_ns)
+  NB = length(ns.block_ns)
+  c = ns.solver.coeffs
+  w, y = ns.work_caches
+  mats = ns.block_off
+  for iB in 1:NB
+    # Add lower off-diagonal contributions
+    wi  = blocks(w)[iB]
+    copy!(wi,blocks(b)[iB])
+    for jB in 1:iB-1
+      cij = c[iB,jB]
+      if abs(cij) > eps(cij)
+        xj = blocks(x)[jB]
+        mul!(wi,mats[iB,jB],xj,-cij,1.0)
+      end
+    end
+
+    # Solve diagonal block
+    nsi = ns.block_ns[iB].ns
+    xi  = blocks(x)[iB]
+    yi  = blocks(y)[iB]
+    solve!(yi,nsi,wi)
+    copy!(xi,yi)
+  end
+  return x
+end
+
 function Algebra.solve!(
   x::BlockVectorOfVectors,
   ns::BlockSolvers.BlockTriangularSolverNS{Val{:upper}},
@@ -209,24 +245,24 @@ function Algebra.solve!(
   @check blocklength(x) == blocklength(b) == length(ns.block_ns)
   NB = length(ns.block_ns)
   c = ns.solver.coeffs
-  w,y = ns.work_caches
-  mats = ns.block_caches
+  w, y = ns.work_caches
+  mats = ns.block_off
   for iB in NB:-1:1
     # Add upper off-diagonal contributions
-    wi  = w[Block(iB)]
-    copy!(wi,b[Block(iB)])
+    wi  = blocks(w)[iB]
+    copy!(wi,blocks(b)[iB])
     for jB in iB+1:NB
       cij = c[iB,jB]
       if abs(cij) > eps(cij)
-        xj = x[Block(jB)]
+        xj = blocks(x)[jB]
         mul!(wi,mats[iB,jB],xj,-cij,1.0)
       end
     end
 
     # Solve diagonal block
-    nsi = ns.block_ns[iB]
-    xi  = x[Block(iB)]
-    yi  = y[Block(iB)]
+    nsi = ns.block_ns[iB].ns
+    xi  = blocks(x)[iB]
+    yi  = blocks(y)[iB]
     solve!(yi,nsi,wi)
     copy!(xi,yi) # Remove this with PA 0.4
   end
@@ -251,7 +287,7 @@ function Algebra.solve!(
   # Initial residual
   LinearSolvers.krylov_residual!(V[1],x,A,b,Pl,zl)
   β    = norm(V[1])
-  done = LinearSolvers.init!(log,maximum(β))
+  done = LinearSolvers.init!(log,β)
   while !done
     # Arnoldi process
     j = 1
@@ -335,7 +371,7 @@ function Algebra.solve!(
   # Initial residual
   LinearSolvers.krylov_residual!(V[1],x,A,b,Pl,zl)
   β    = norm(V[1])
-  done = LinearSolvers.init!(log,maximum(β))
+  done = LinearSolvers.init!(log,β)
   while !done
     # Arnoldi process
     j = 1
@@ -372,7 +408,9 @@ function Algebra.solve!(
           Vnorm += norm(V[j+1].data[n].data[:,k])^2
         end
         H.data[j+1,j,k] = sqrt(Vnorm)
-        V[j+1].data[:,k] ./= H.data[j+1,j,k]
+        for n in 1:nb
+          V[j+1].data[n].data[:,k] ./= H.data[j+1,j,k]
+        end
 
         # Update QR
         for i in 1:j-1
@@ -425,7 +463,7 @@ function Algebra.solve!(x::AbstractParamVector,ns::LinearSolvers.CGNumericalSetu
   γ = ones(eltype2(p),param_length(x))
 
   res  = norm(r)
-  done = LinearSolvers.init!(log,maximum(res))
+  done = LinearSolvers.init!(log,res)
   while !done
 
     if !flexible # β = (zₖ₊₁ ⋅ rₖ₊₁)/(zₖ ⋅ rₖ)

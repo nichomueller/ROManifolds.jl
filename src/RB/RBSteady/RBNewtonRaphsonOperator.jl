@@ -2,7 +2,7 @@ abstract type RBNewtonRaphsonOperator <: NonlinearOperator end
 
 function Algebra.solve!(
   x̂,
-  nls::NewtonRaphsonSolver,
+  nls,
   op::RBNewtonRaphsonOperator,
   r,
   x;

@@ -84,7 +84,6 @@ test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","diric
 trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_0])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 test_p = TestFESpace(model,reffe_p;conformity=:C0)
-# test_p = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -105,9 +104,9 @@ solver_u = LUSolver()
 solver_p = LUSolver()
 P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
 solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-7,verbose=true)
-nlsolver = NewtonRaphsonSolver(solver,1e-10,20)
-odesolver = ThetaMethod(solver,dt,θ)
-lu_nlsolver = NewtonRaphsonSolver(LUSolver(),1e-10,20)
+nlsolver = GridapSolvers.NewtonSolver(solver;rtol=1e-10,maxiter=20)
+odesolver = ThetaMethod(nlsolver,dt,θ)
+lu_nlsolver = GridapSolvers.NewtonSolver(LUSolver();rtol=1e-10,maxiter=20)
 lu_odesolver = ThetaMethod(lu_nlsolver,dt,θ)
 
 tol = 1e-4
@@ -122,11 +121,17 @@ lu_rbsolver = RBSolver(lu_odesolver,state_reduction;nparams_res=2,nparams_jac=2,
 fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 save(test_dir,fesnaps)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-rbsnaps,rbstats,cache = solve(lu_rbsolver,rbop,fesnaps)
-results = rb_performance(rbsolver,rbop,fesnaps,rbsnaps,festats,rbstats)
+
+μon = realization(feop;nparams=10)
+x̂,rbstats = solve(lu_rbsolver,rbop,μon)
+
+x,festats = solution_snapshots(rbsolver,feop,μon,xh0μ)
+perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,μon)
 
 # save(test_dir,rbop)
 save(test_dir,results)
 
 show(results.timer)
 println(compute_speedup(results))
+
+solution_snapshots(rbsolver,feop,xh0μ)
