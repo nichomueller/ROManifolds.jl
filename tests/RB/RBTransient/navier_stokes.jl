@@ -9,16 +9,7 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools
 using GridapSolvers.BlockSolvers: LinearSystemBlock, NonlinearSystemBlock, BiformBlock, BlockTriangularSolver
 
-using Mabla.FEM
-using Mabla.FEM.TProduct
-using Mabla.FEM.ParamDataStructures
-using Mabla.FEM.ParamFESpaces
-using Mabla.FEM.ParamSteady
-using Mabla.FEM.ParamODEs
-
-using Mabla.RB
-using Mabla.RB.RBSteady
-using Mabla.RB.RBTransient
+using Mabla
 
 θ = 1.0
 dt = 0.0025

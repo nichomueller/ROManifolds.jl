@@ -2,11 +2,10 @@ abstract type RBNewtonRaphsonOperator <: NonlinearOperator end
 
 function Algebra.solve!(
   x̂,
-  nls,
+  nls::NonlinearSolvers.NewtonSolver,
   op::RBNewtonRaphsonOperator,
   r,
-  x;
-  verbose=true)
+  x)
 
   Â_lin,b̂_lin = get_linear_resjac(op)
   syscache,trial = op.cache
@@ -20,31 +19,28 @@ function Algebra.solve!(
   ss = symbolic_setup(nls.ls,Â)
   ns = numerical_setup(ss,Â)
 
-  max0 = maximum(abs,b̂)
-  tol = max(1e-6*max0,eps())
+  res = norm(b̂)
+  done = LinearSolvers.init!(nls.log,res)
 
-  for k in 1:nls.max_nliters
+  while !done
     rmul!(b̂,-1)
     solve!(dx̂,ns,b̂)
     x̂ .+= dx̂
-    inv_project!(x,trial,x̂)
 
     b̂ = residual!(b̂_cache,op,x)
-    Â = jacobian!(Â_cache,op,x)
-    numerical_setup!(ns,Â)
-
     b̂ .+= Â_lin*x̂
-    maxk = maximum(abs,b̂)
-    if verbose
-      println("Newton-Raphson residual in the L∞ norm at iteration $(k) is $(maxk)")
-    end
+    res  = norm(b̂)
+    done = LinearSolvers.update!(nls.log,res)
 
-    maxk < tol && return
-
-    if k == nls.max_nliters
-      @unreachable "Newton-Raphson failed to converge: did not reach tolerance $tol"
+    if !done
+      inv_project!(x,trial,x̂)
+      Â = jacobian!(Â_cache,op,x)
+      numerical_setup!(ns,Â)
     end
   end
+
+  LinearSolvers.finalize!(nls.log,res)
+  return x̂
 end
 
 get_linear_resjac(op::RBNewtonRaphsonOperator) = @abstractmethod

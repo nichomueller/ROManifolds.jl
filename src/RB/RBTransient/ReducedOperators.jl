@@ -51,14 +51,6 @@ abstract type TransientRBOperator{T} <: ODEParamOperatorWithTrian{T} end
 
 RBSteady.allocate_rbcache(op::TransientRBOperator,r::TransientRealization) = @abstractmethod
 
-function ODEs.update_odeopcache!(
-  odeopcache,
-  op::TransientRBOperator,
-  r::TransientRealization)
-
-  update_odeopcache!(odeopcache,op.op,r)
-end
-
 struct GenericTransientRBOperator{T} <: TransientRBOperator{T}
   op::ODEParamOperatorWithTrian{T}
   trial::FESubspace
@@ -71,8 +63,8 @@ FESpaces.get_trial(op::GenericTransientRBOperator) = op.trial
 FESpaces.get_test(op::GenericTransientRBOperator) = op.test
 ParamDataStructures.realization(op::GenericTransientRBOperator;kwargs...) = realization(op.op;kwargs...)
 ParamSteady.get_fe_operator(op::GenericTransientRBOperator) = ParamSteady.get_fe_operator(op.op)
-ParamSteady.get_vector_index_map(op::GenericTransientRBOperator) = get_vector_index_map(op.op)
-ParamSteady.get_matrix_index_map(op::GenericTransientRBOperator) = get_matrix_index_map(op.op)
+IndexMaps.get_vector_index_map(op::GenericTransientRBOperator) = get_vector_index_map(op.op)
+IndexMaps.get_matrix_index_map(op::GenericTransientRBOperator) = get_matrix_index_map(op.op)
 RBSteady.get_fe_trial(op::GenericTransientRBOperator) = get_trial(op.op)
 RBSteady.get_fe_test(op::GenericTransientRBOperator) = get_test(op.op)
 
@@ -100,6 +92,16 @@ function RBSteady.allocate_rbcache(
   us::Tuple{Vararg{AbstractParamVector}})
 
   @abstractmethod
+end
+
+function update_odecache!(
+  odecache,
+  op::GenericTransientRBOperator,
+  r::TransientRealization)
+
+  odeslvrcache,odeopcache = odecache
+  odeopcache = update_odeopcache!(odeopcache,op,r)
+  (odeslvrcache,odeopcache)
 end
 
 function Algebra.allocate_residual(
@@ -211,12 +213,12 @@ function ParamSteady.get_fe_operator(op::LinearNonlinearTransientRBOperator)
   join_operators(ParamSteady.get_fe_operator(op.op_linear),ParamSteady.get_fe_operator(op.op_nonlinear))
 end
 
-function ParamSteady.get_vector_index_map(op::LinearNonlinearTransientRBOperator)
+function IndexMaps.get_vector_index_map(op::LinearNonlinearTransientRBOperator)
   @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
   get_vector_index_map(op.op_linear)
 end
 
-function ParamSteady.get_matrix_index_map(op::LinearNonlinearTransientRBOperator)
+function IndexMaps.get_matrix_index_map(op::LinearNonlinearTransientRBOperator)
   @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))
   get_matrix_index_map(op.op_linear)
 end
@@ -246,6 +248,17 @@ function ODEs.allocate_odeopcache(
   us::Tuple{Vararg{AbstractParamVector}})
 
   @notimplemented
+end
+
+function update_odecache!(
+  odecache,
+  op::LinearNonlinearTransientRBOperator,
+  r::TransientRealization)
+
+  odecache_lin,odecache_nlin = odecache
+  odecache_lin = update_odecache!(odecache_lin,get_linear_operator(op),r)
+  odecache_nlin = update_odecache!(odecache_nlin,get_nonlinear_operator(op),r)
+  (odecache_lin,odecache_nlin)
 end
 
 function RBSteady.allocate_rbcache(
@@ -329,9 +342,8 @@ function RBSteady.online_cache!(
   if param_length(r) != param_length(y)
     RBSteady.init_online_cache!(solver,op,r)
   else
-    odeslvrcache,odeopcache = odecache
-    odeopcache = update_odeopcache!(odeopcache,op,r)
-    cache.fecache = y,(odeslvrcache,odeopcache)
+    odecache = update_odecache!(odecache,op,r)
+    cache.fecache = y,odecache
   end
   return
 end

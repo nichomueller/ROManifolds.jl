@@ -14,7 +14,6 @@ import SparseArrays: AbstractSparseMatrix
 import PartitionedArrays: tuple_of_arrays
 
 export recast_indices
-export sparsify_indices
 export get_nonzero_indices
 include("IndexOperations.jl")
 
@@ -55,5 +54,10 @@ export get_component
 export merge_components
 export split_components
 include("IndexMapsInterface.jl")
+
+export FEOperatorIndexMap
+export get_vector_index_map
+export get_matrix_index_map
+include("FEIndexMaps.jl")
 
 end # module

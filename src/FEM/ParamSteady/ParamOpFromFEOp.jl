@@ -8,8 +8,8 @@ FESpaces.get_test(op::ParamOpFromFEOp) = get_test(op.op)
 FESpaces.get_trial(op::ParamOpFromFEOp) = get_trial(op.op)
 ParamDataStructures.realization(op::ParamOpFromFEOp;kwargs...) = realization(op.op;kwargs...)
 get_fe_operator(op::ParamOpFromFEOp) = op.op
-get_vector_index_map(op::ParamOpFromFEOp) = get_vector_index_map(op.op)
-get_matrix_index_map(op::ParamOpFromFEOp) = get_matrix_index_map(op.op)
+IndexMaps.get_vector_index_map(op::ParamOpFromFEOp) = get_vector_index_map(op.op)
+IndexMaps.get_matrix_index_map(op::ParamOpFromFEOp) = get_matrix_index_map(op.op)
 
 function get_linear_operator(op::ParamOpFromFEOp)
   ParamOpFromFEOp(get_linear_operator(op.op))
@@ -136,8 +136,8 @@ FESpaces.get_test(op::ParamOpFromFEOpWithTrian) = get_test(op.op)
 FESpaces.get_trial(op::ParamOpFromFEOpWithTrian) = get_trial(op.op)
 ParamDataStructures.realization(op::ParamOpFromFEOpWithTrian;kwargs...) = realization(op.op;kwargs...)
 get_fe_operator(op::ParamOpFromFEOpWithTrian) = op.op
-get_vector_index_map(op::ParamOpFromFEOpWithTrian) = get_vector_index_map(op.op)
-get_matrix_index_map(op::ParamOpFromFEOpWithTrian) = get_matrix_index_map(op.op)
+IndexMaps.get_vector_index_map(op::ParamOpFromFEOpWithTrian) = get_vector_index_map(op.op)
+IndexMaps.get_matrix_index_map(op::ParamOpFromFEOpWithTrian) = get_matrix_index_map(op.op)
 
 function get_linear_operator(op::ParamOpFromFEOpWithTrian)
   ParamOpFromFEOpWithTrian(get_linear_operator(op.op))

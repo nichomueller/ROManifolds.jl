@@ -33,11 +33,6 @@ import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ReferenceFEs: get_order
 import Mabla.FEM.Utils: CostTracker
 
-export FEOperatorIndexMap
-export get_vector_index_map
-export get_matrix_index_map
-include("FEOperatorIndexMaps.jl")
-
 export UnEvalParamSingleFieldFESpace
 export ParamTrialFESpace
 export ParamMultiFieldFESpace

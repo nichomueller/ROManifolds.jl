@@ -58,14 +58,6 @@ function allocate_rbcache(
   return lhs_cache,rhs_cache
 end
 
-function ParamSteady.update_paramcache!(
-  paramcache,
-  op::RBOperator,
-  r::Realization)
-
-  update_paramcache!(paramcache,op.op,r)
-end
-
 struct GenericRBOperator{T} <: RBOperator{T}
   op::ParamOperatorWithTrian{T}
   trial::FESubspace
@@ -78,8 +70,8 @@ FESpaces.get_trial(op::GenericRBOperator) = op.trial
 FESpaces.get_test(op::GenericRBOperator) = op.test
 ParamDataStructures.realization(op::GenericRBOperator;kwargs...) = realization(op.op;kwargs...)
 ParamSteady.get_fe_operator(op::GenericRBOperator) = ParamSteady.get_fe_operator(op.op)
-ParamSteady.get_vector_index_map(op::GenericRBOperator) = get_vector_index_map(op.op)
-ParamSteady.get_matrix_index_map(op::GenericRBOperator) = get_matrix_index_map(op.op)
+IndexMaps.get_vector_index_map(op::GenericRBOperator) = get_vector_index_map(op.op)
+IndexMaps.get_matrix_index_map(op::GenericRBOperator) = get_matrix_index_map(op.op)
 get_fe_trial(op::GenericRBOperator) = get_trial(op.op)
 get_fe_test(op::GenericRBOperator) = get_test(op.op)
 
@@ -89,6 +81,14 @@ function ParamSteady.allocate_paramcache(
   u::AbstractParamVector)
 
   allocate_paramcache(op.op,r,u)
+end
+
+function ParamSteady.update_paramcache!(
+  paramcache,
+  op::GenericRBOperator,
+  r::Realization)
+
+  update_paramcache!(paramcache,op.op,r)
 end
 
 function Algebra.allocate_residual(
@@ -200,12 +200,12 @@ function ParamSteady.get_fe_operator(op::LinearNonlinearRBOperator)
   join_operators(ParamSteady.get_fe_operator(op.op_linear),ParamSteady.get_fe_operator(op.op_nonlinear))
 end
 
-function ParamSteady.get_vector_index_map(op::LinearNonlinearRBOperator)
+function IndexMaps.get_vector_index_map(op::LinearNonlinearRBOperator)
   @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
   get_vector_index_map(op.op_linear)
 end
 
-function ParamSteady.get_matrix_index_map(op::LinearNonlinearRBOperator)
+function IndexMaps.get_matrix_index_map(op::LinearNonlinearRBOperator)
   @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))
   get_matrix_index_map(op.op_linear)
 end
@@ -269,6 +269,17 @@ function ParamSteady.allocate_paramcache(
   return (paramcache_lin,paramcache_nlin)
 end
 
+function ParamSteady.update_paramcache!(
+  paramcache,
+  op::LinearNonlinearRBOperator,
+  r::Realization)
+
+  paramcache_lin,paramcache_nlin = paramcache
+  paramcache_lin = ParamSteady.update_paramcache!(paramcache_lin,get_linear_operator(op),r)
+  paramcache_nlin = ParamSteady.update_paramcache!(paramcache_nlin,get_nonlinear_operator(op),r)
+  return (paramcache_lin,paramcache_nlin)
+end
+
 function allocate_rbcache(op::LinearNonlinearRBOperator,r::Realization)
   cache_lin = allocate_rbcache(get_linear_operator(op),r)
   cache_nlin = allocate_rbcache(get_nonlinear_operator(op),r)
@@ -294,10 +305,12 @@ end
 
 function online_cache!(solver::RBSolver,op::RBOperator,r::Realization)
   cache = solver.cache
-  y, = cache.fecache
-  x̂, = cache.rbcache
+  y,paramcache = cache.fecache
   if param_length(r) != param_length(y)
     init_online_cache!(solver,op,r)
+  else
+    paramcache = update_paramcache!(paramcache,op,r)
+    cache.fecache = y,paramcache
   end
   return
 end

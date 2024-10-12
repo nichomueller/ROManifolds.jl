@@ -31,8 +31,8 @@ function ParamFESpaces.get_param_assembler(op::ParamFEOperator,r::Realization)
 end
 
 IndexMaps.get_index_map(op::ParamFEOperator) = @abstractmethod
-get_vector_index_map(op::ParamFEOperator) = get_vector_index_map(get_index_map(op))
-get_matrix_index_map(op::ParamFEOperator) = get_matrix_index_map(get_index_map(op))
+IndexMaps.get_vector_index_map(op::ParamFEOperator) = get_vector_index_map(get_index_map(op))
+IndexMaps.get_matrix_index_map(op::ParamFEOperator) = get_matrix_index_map(get_index_map(op))
 
 function FESpaces.assemble_matrix(op::ParamFEOperator,form::Function)
   test = get_test(op)

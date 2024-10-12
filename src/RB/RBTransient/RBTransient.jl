@@ -76,7 +76,6 @@ include("ReducedOperators.jl")
 export TransientRBNewtonRaphsonOp
 include("RBNewtonRaphsonOperator.jl")
 
-export get_stage_operator
 include("ThetaMethod.jl")
 
 include("PostProcess.jl")

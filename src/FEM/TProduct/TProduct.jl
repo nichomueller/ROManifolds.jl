@@ -46,6 +46,11 @@ export get_tp_fe_basis
 export get_tp_trial_fe_basis
 include("TProductFESpaces.jl")
 
+export FEOperatorIndexMap
+export get_vector_index_map
+export get_matrix_index_map
+include("TProductFEIndexMaps.jl")
+
 export AbstractRankTensor
 export Rank1Tensor
 export GenericRankTensor

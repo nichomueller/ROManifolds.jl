@@ -127,6 +127,4 @@ export order_triangulations
 export find_closest_view
 include("Contribution.jl")
 
-# include("LazyMaps.jl")
-
 end # module

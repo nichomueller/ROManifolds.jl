@@ -16,7 +16,6 @@ export CostTracker
 export SU
 export reset_tracker!
 export update_tracker!
-export get_stats
 export compute_speedup
 export compute_error
 export compute_relative_error

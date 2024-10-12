@@ -11,8 +11,8 @@ ParamDataStructures.realization(odeop::ODEParamOpFromTFEOp;kwargs...) = realizat
 ParamSteady.get_fe_operator(odeop::ODEParamOpFromTFEOp) = odeop.op
 ODEs.get_num_forms(odeop::ODEParamOpFromTFEOp) = get_num_forms(odeop.op)
 ODEs.is_form_constant(odeop::ODEParamOpFromTFEOp,k::Integer) = is_form_constant(odeop.op,k)
-ParamSteady.get_vector_index_map(odeop::ODEParamOpFromTFEOp) = get_vector_index_map(odeop.op)
-ParamSteady.get_matrix_index_map(odeop::ODEParamOpFromTFEOp) = get_matrix_index_map(odeop.op)
+IndexMaps.get_vector_index_map(odeop::ODEParamOpFromTFEOp) = get_vector_index_map(odeop.op)
+IndexMaps.get_matrix_index_map(odeop::ODEParamOpFromTFEOp) = get_matrix_index_map(odeop.op)
 
 function ParamSteady.get_linear_operator(odeop::ODEParamOpFromTFEOp)
   ODEParamOpFromTFEOp(get_linear_operator(odeop.op))
@@ -295,8 +295,8 @@ ParamDataStructures.realization(odeop::ODEParamOpFromTFEOpWithTrian;kwargs...) =
 ParamSteady.get_fe_operator(odeop::ODEParamOpFromTFEOpWithTrian) = odeop.op
 ODEs.get_num_forms(odeop::ODEParamOpFromTFEOpWithTrian) = get_num_forms(odeop.op)
 ODEs.is_form_constant(odeop::ODEParamOpFromTFEOpWithTrian,k::Integer) = is_form_constant(odeop.op,k)
-ParamSteady.get_vector_index_map(odeop::ODEParamOpFromTFEOpWithTrian) = get_vector_index_map(odeop.op)
-ParamSteady.get_matrix_index_map(odeop::ODEParamOpFromTFEOpWithTrian) = get_matrix_index_map(odeop.op)
+IndexMaps.get_vector_index_map(odeop::ODEParamOpFromTFEOpWithTrian) = get_vector_index_map(odeop.op)
+IndexMaps.get_matrix_index_map(odeop::ODEParamOpFromTFEOpWithTrian) = get_matrix_index_map(odeop.op)
 
 function ParamSteady.get_linear_operator(odeop::ODEParamOpFromTFEOpWithTrian)
   ODEParamOpFromTFEOpWithTrian(get_linear_operator(odeop.op))

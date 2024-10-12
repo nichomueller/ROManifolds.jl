@@ -21,6 +21,10 @@ using Gridap.ODEs
 using Gridap.TensorValues
 using Gridap.Helpers
 
+using GridapSolvers
+using GridapSolvers.LinearSolvers
+using GridapSolvers.NonlinearSolvers
+
 using Mabla.FEM
 using Mabla.FEM.Utils
 using Mabla.FEM.IndexMaps
@@ -126,7 +130,6 @@ export EvalMultiFieldRBSpace
 export fe_subspace
 export reduced_fe_space
 export reduced_basis
-export pod_error
 include("RBSpace.jl")
 
 export AbstractIntegrationDomain

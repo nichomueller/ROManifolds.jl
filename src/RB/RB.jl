@@ -2,8 +2,151 @@ module RB
 
 using DocStringExtensions
 
+export ReductionStyle
+export SearchSVDRank
+export FixedSVDRank
+export LRApproxRank
+export TTSVDRanks
+export NormStyle
+export EuclideanNorm
+export EnergyNorm
+export Reduction
+export DirectReduction
+export GreedyReduction
+export AffineReduction
+export PODReduction
+export TTSVDReduction
+export SupremizerReduction
+export AbstractMDEIMReduction
+export MDEIMReduction
+export AdaptiveReduction
+export get_reduction
+
+export AbstractSnapshots
+export GenericSnapshots
+export SnapshotsAtIndices
+export SparseSnapshots
+export UnfoldingSteadySnapshots
+export BlockSnapshots
+export Snapshots
+export flatten_snapshots
+export select_snapshots
+export get_realization
+export get_indexed_values
+export num_space_dofs
+
+export galerkin_projection
+
+export AbstractTTCore
+export SparseCore
+export SparseCoreCSC
+
+export TTContraction
+export contraction
+export sequential_product
+export cores2basis
+
+export RBSolver
+export RBOnlineCache
+export get_fe_solver
+export solution_snapshots
+export residual_snapshots
+export jacobian_snapshots
+export nonlinear_rb_solve!
+
+export reduction
+export tpod
+export ttsvd
+export gram_schmidt
+export orth_complement!
+export orth_projection
+
+export Projection
+export PODBasis
+export TTSVDCores
+export BlockProjection
+export ReducedProjection
+export projection
+export get_basis
+export num_fe_dofs
+export num_reduced_dofs
+export get_cores
+export project
+export inv_project
+export enrich!
+
+export FESubspace
+export SingleFieldRBSpace
+export MultiFieldRBSpace
+export EvalRBSpace
+export EvalMultiFieldRBSpace
+export fe_subspace
+export reduced_fe_space
+export reduced_basis
+
+export AbstractIntegrationDomain
+export IntegrationDomain
+export HyperReduction
+export EmptyHyperReduction
+export MDEIM
+export AffineContribution
+export BlockHyperReduction
+export empirical_interpolation
+export integration_domain
+export get_integration_domain
+export reduced_triangulation
+export reduced_jacobian
+export reduced_residual
+export reduced_weak_form
+export inv_project!
+
+export RBOperator
+export GenericRBOperator
+export LinearNonlinearRBOperator
+export reduced_operator
+export get_fe_trial
+export get_fe_test
+export fe_jacobian!
+export fe_residual!
+
+export RBNewtonRaphsonOperator
+export RBNewtonRaphsonOp
+
+export RBPerformance
+export rb_performance
+export create_dir
+export load_solve
+export load_snapshots
+export load_operator
+export load_results
+
+using RBSteady.RBSteady
 include("RBSteady/RBSteady.jl")
 
+export TransientReduction
+export TransientMDEIMReduction
+
+export AbstractTransientSnapshots
+export TransientGenericSnapshots
+export TransientSparseSnapshots
+export UnfoldingTransientSnapshots
+export ModeTransientSnapshots
+
+export TransientBasis
+
+export TransientRBSpace
+export TransientEvalMultiFieldRBSpace
+
+export TransientMDEIM
+export TransientAffineDecomposition
+
+export TransientRBOperator
+export GenericTransientRBOperator
+export LinearNonlinearTransientRBOperator
+
+export TransientRBNewtonRaphsonOp
+
+using RBTransient.RBTransient
 include("RBTransient/RBTransient.jl")
 
 end # module

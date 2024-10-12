@@ -74,26 +74,7 @@ end
 # utils
 
 function solve_param_nr!(x,A,b,dx,r,ns,nls::NewtonRaphsonSolver,op,paramcache)
-  dx = allocate_in_domain(A)
-  ss = symbolic_setup(nls.ls,A)
-  ns = numerical_setup(ss,A)
-
-  max0 = maximum(abs,b)
-  for nliter in 1:nls.max_nliters
-    rmul!(b,-1)
-    solve!(dx,ns,b)
-    x .+= dx
-
-    residual!(b,op,r,x,paramcache)
-    maxk = maximum(abs,b)
-    maxk < nls.tol && return
-    if nliter == nls.max_nliters
-      @unreachable
-    end
-
-    jacobian!(A,op,r,x,paramcache)
-    numerical_setup!(ns,A)
-  end
+  @notimplemented "Use NewtonSolver instead"
 end
 
 function solve_param_nr!(x,A,b,r,nls::GridapSolvers.NewtonSolver,op,paramcache)
@@ -118,4 +99,7 @@ function solve_param_nr!(x,A,b,r,nls::GridapSolvers.NewtonSolver,op,paramcache)
       numerical_setup!(ns,A,x)
     end
   end
+
+  LinearSolvers.finalize!(log,res)
+  return x
 end

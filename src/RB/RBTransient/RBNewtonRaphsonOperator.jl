@@ -9,7 +9,7 @@ struct TransientRBNewtonRaphsonOp <: RBNewtonRaphsonOperator
 end
 
 function RBSteady.RBNewtonRaphsonOperator(
-  op::TransientRBOperator{<:LinearNonlinearParamODE},
+  nlop::TransientRBOperator{<:NonlinearParamODE},
   lop::LinearParamStageOperator,
   odeopcache,
   rx::TransientRealization,
@@ -17,7 +17,6 @@ function RBSteady.RBNewtonRaphsonOperator(
   ws::Tuple{Vararg{Real}},
   cache)
 
-  nlop = get_nonlinear_operator(op)
   TransientRBNewtonRaphsonOp(nlop,lop,odeopcache,rx,usx,ws,cache)
 end
 

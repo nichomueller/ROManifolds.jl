@@ -13,9 +13,8 @@ using Gridap.Helpers
 using Gridap.ReferenceFEs
 
 using GridapSolvers
-using GridapSolvers.LinearSolvers
-using GridapSolvers.BlockSolvers
-using GridapSolvers.MultilevelTools
+using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.MultilevelTools
+using GridapSolvers.BlockSolvers: LinearSystemBlock, NonlinearSystemBlock, BiformBlock, BlockTriangularSolver
 
 using Mabla.FEM.ParamDataStructures
 
@@ -25,14 +24,8 @@ import PartitionedArrays: tuple_of_arrays
 
 export ParamCounter
 export ParamInserterCSC
-export ParamCSSR
 export eltype2
 include("ParamAlgebraInterfaces.jl")
-
-export FastLinearSolver
-export FastLUSolver
-export CholeskySolver
-include("FastLinearSolvers.jl")
 
 include("ParamIterativeSolvers.jl")
 
