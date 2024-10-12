@@ -9,17 +9,17 @@ function PartitionedArrays.ghost_values(values::ParamArray,indices)
 end
 
 function PartitionedArrays.assembly_buffers(
-  values::ParamArray{T,N,A,L},
+  values::ParamArray{T,N,L,A},
   local_indices_snd,
-  local_indices_rcv) where {T,N,A,L}
+  local_indices_rcv) where {T,N,L,A}
 
   ptrs = local_indices_snd.ptrs
   data = zeros(T,ptrs[end]-1)
-  ptdata = allocate_param_array(data,L)
+  ptdata = array_of_similar_arrays(data,L)
   buffer_snd = JaggedArray(ptdata,ptrs)
   ptrs = local_indices_rcv.ptrs
   data = zeros(T,ptrs[end]-1)
-  ptdata = allocate_param_array(data,L)
+  ptdata = array_of_similar_arrays(data,L)
   buffer_rcv = JaggedArray(ptdata,ptrs)
   buffer_snd,buffer_rcv
 end

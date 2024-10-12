@@ -1,23 +1,12 @@
-# struct ParamJaggedArray{T,Ti,A,L} <: AbstractParamContainer{JaggedArray{T,Ti},1}
-#   data::ParamVector{T,A,L}
-#   ptrs::Vector{Ti}
-
-#   function ParamJaggedArray(data::ParamVector{T,A,L},ptrs::Vector{Ti}) where {T,Ti,A,L}
-#     new{T,Ti,A,L}(data,ptrs)
-#   end
-#   function ParamJaggedArray{T,Ti}(data::ParamVector{T,A,L},ptrs::Vector) where {T,Ti,A,L}
-#     new{T,Ti,A,L}(data,convert(Vector{Ti},ptrs))
-#   end
-# end
-struct ParamJaggedArray{T,Ti,A<:ParamVector{T}} <: AbstractParamContainer{T,1}
+struct ParamJaggedArray{T,Ti,A<:AbstractParamVector{T}} <: AbstractParamContainer{T,1}
   data::A
   ptrs::Vector{Ti}
 
-  function ParamJaggedArray(data::A,ptrs::Vector{Ti}) where {Ti,A<:ParamVector}
+  function ParamJaggedArray(data::A,ptrs::Vector{Ti}) where {Ti,A<:AbstractParamVector}
     T = eltype(data)
     new{T,Ti,A}(data,ptrs)
   end
-  function ParamJaggedArray{T,Ti}(data::A,ptrs::Vector) where {T,Ti,A<:ParamVector}
+  function ParamJaggedArray{T,Ti}(data::A,ptrs::Vector) where {T,Ti,A<:AbstractParamVector}
     new{T,Ti,A}(data,convert(Vector{Ti},ptrs))
   end
 end
@@ -44,7 +33,7 @@ end
 
 PartitionedArrays.jagged_array(data::ParamArray,ptrs::Vector) = ParamJaggedArray(data,ptrs)
 
-struct ParamVectorAssemblyCache{T}
+struct AbstractParamVectorAssemblyCache{T}
   neighbors_snd::Vector{Int32}
   neighbors_rcv::Vector{Int32}
   local_indices_snd::JaggedArray{Int32,Int32}
@@ -61,7 +50,7 @@ function PartitionedArrays.VectorAssemblyCache(
   buffer_snd::ParamJaggedArray{T,Int32},
   buffer_rcv::ParamJaggedArray{T,Int32}) where T
 
-  ParamVectorAssemblyCache(
+  AbstractParamVectorAssemblyCache(
     neighbors_snd,
     neighbors_rcv,
     local_indices_snd,
@@ -70,7 +59,7 @@ function PartitionedArrays.VectorAssemblyCache(
     buffer_rcv)
 end
 
-function Base.reverse(a::ParamVectorAssemblyCache)
+function Base.reverse(a::AbstractParamVectorAssemblyCache)
   VectorAssemblyCache(
     a.neighbors_rcv,
     a.neighbors_snd,
@@ -80,7 +69,7 @@ function Base.reverse(a::ParamVectorAssemblyCache)
     a.buffer_snd)
 end
 
-function PartitionedArrays.copy_cache(a::ParamVectorAssemblyCache)
+function PartitionedArrays.copy_cache(a::AbstractParamVectorAssemblyCache)
   buffer_snd = JaggedArray(copy(a.buffer_snd.data),a.buffer_snd.ptrs)
   buffer_rcv = JaggedArray(copy(a.buffer_rcv.data),a.buffer_rcv.ptrs)
   VectorAssemblyCache(
@@ -93,9 +82,9 @@ function PartitionedArrays.copy_cache(a::ParamVectorAssemblyCache)
 end
 
 struct ParamJaggedArrayAssemblyCache{T}
-  cache::ParamVectorAssemblyCache{T}
+  cache::AbstractParamVectorAssemblyCache{T}
 end
 
-function PartitionedArrays.JaggedArrayAssemblyCache(cache::ParamVectorAssemblyCache{T}) where T
+function PartitionedArrays.JaggedArrayAssemblyCache(cache::AbstractParamVectorAssemblyCache{T}) where T
   ParamJaggedArrayAssemblyCache(cache)
 end

@@ -80,7 +80,7 @@ function PartitionedArrays.assemble_coo!(I,J,V::AbstractArray{<:AbstractParamCon
     gi_snd_data = zeros(eltype(k_gi),ptrs[end]-1)
     gj_snd_data = zeros(eltype(k_gj),ptrs[end]-1)
     v_snd_data = zeros(eltype(k_v),ptrs[end]-1)
-    pv_snd_data = allocate_param_array(v_snd_data,length(k_v))
+    pv_snd_data = array_of_similar_arrays(v_snd_data,length(k_v))
     for k in 1:length(k_gi)
       gi = k_gi[k]
       li = global_to_local_row[gi]
@@ -169,7 +169,7 @@ function GridapDistributed.assemble_coo_with_column_owner!(
     gj_snd_data = zeros(eltype(k_gj),ptrs[end]-1)
     jo_snd_data = zeros(eltype(k_jo),ptrs[end]-1)
     v_snd_data = zeros(eltype(k_v),ptrs[end]-1)
-    pv_snd_data = allocate_param_array(v_snd_data,length(k_v))
+    pv_snd_data = array_of_similar_arrays(v_snd_data,length(k_v))
     for k in 1:length(k_gi)
       gi = k_gi[k]
       li = global_to_local_row[gi]

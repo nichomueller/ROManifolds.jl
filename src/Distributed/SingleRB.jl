@@ -12,7 +12,7 @@ function RB.num_reduced_space_dofs(r::DistributedRBSpace)
   PartitionedArrays.getany(ns)
 end
 
-function FEM.num_times(r::DistributedRBSpace)
+function ParamDataStructures.num_times(r::DistributedRBSpace)
   Nt = map(num_times,local_views(r))
   PartitionedArrays.getany(Nt)
 end
@@ -72,7 +72,7 @@ end
 
 function FESpaces.get_vector_type(r::DistributedRBSpace)
   change_length(x) = x
-  function change_length(::Type{<:PVector{<:ParamVector{T,A,L},B,C,D}}) where {T,A,L,B,C,D}
+  function change_length(::Type{<:PVector{<:ParamVector{T,L,A},B,C,D}}) where {T,A,L,B,C,D}
     PVector{ParamVector{T,A,Int(L/num_times(r))},B,C,D,T}
   end
   V = get_vector_type(r.space)
@@ -150,16 +150,16 @@ function RB.mdeim(
   basis_space::AbstractMatrix,
   basis_time::AbstractMatrix)
 
-  lu_interp,red_trian,integration_domain = map(
+  interpolation,red_trian,integration_domain = map(
     local_views(fs),local_views(trian),local_views(basis_space),local_views(basis_time)
     ) do fs,trian,basis_space,basis_time
     mdeim(solver,fs,trian,basis_space,basis_time)
   end |> tuple_of_arrays
   d_red_trian = DistributedTriangulation(red_trian)
-  return lu_interp,d_red_trian,integration_domain
+  return interpolation,d_red_trian,integration_domain
 end
 
-# function RB.reduced_vector_form(
+# function RB.reduced_residual(
 #   solver::RBSolver,
 #   op::RBOperator,
 #   c::Contribution{DistributedTriangulation})
@@ -167,12 +167,12 @@ end
 #   info = RB.get_info(solver)
 #   a = distributed_array_contribution()
 #   for (trian,values) in c.dict
-#     RB.reduced_vector_form!(a,info,op,values,trian)
+#     RB.reduced_residual!(a,info,op,values,trian)
 #   end
 #   return a
 # end
 
-# function RB.reduced_matrix_form(
+# function RB.reduced_jacobian(
 #   solver::RBSolver,
 #   op::RBOperator,
 #   c::Contribution{DistributedTriangulation};
@@ -181,7 +181,7 @@ end
 #   info = RB.get_info(solver)
 #   a = distributed_array_contribution()
 #   for (trian,values) in c.dict
-#     RB.reduced_matrix_form!(a,info,op,values,trian;kwargs...)
+#     RB.reduced_jacobian!(a,info,op,values,trian;kwargs...)
 #   end
 #   return a
 # end

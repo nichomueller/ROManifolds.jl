@@ -51,16 +51,12 @@ function FEM.HomogeneousTrialParamFESpace(f::DistributedSingleFieldFESpace,args.
   DistributedSingleFieldFESpace(spaces,f.gids,vector_types)
 end
 
-function FEM.FESpaceToParamFESpace(f::DistributedSingleFieldFESpace,args...)
+function FEM.TrivialParamFESpace(f::DistributedSingleFieldFESpace,args...)
   spaces = map(f.spaces) do s
-    FESpaceToParamFESpace(s,args...)
+    TrivialParamFESpace(s,args...)
   end
   vector_types = GridapDistributed._find_vector_type(spaces,f.gids)
   DistributedSingleFieldFESpace(spaces,f.gids,vector_types)
-end
-
-function FEM.length_dirichlet_values(f::DistributedSingleFieldFESpace)
-  length_dirichlet_values(PartitionedArrays.getany(local_views(f)))
 end
 
 function FEM.get_polynomial_order(f::DistributedFESpace)
@@ -69,7 +65,7 @@ end
 
 function _to_distributed_fe_space(trial::TransientTrialParamFESpace{<:DistributedSingleFieldFESpace})
   map(local_views(trial.space)) do space
-    TransientTrialParamFESpace(space,trial.dirichlet_pt)
+    TransientTrialParamFESpace(space,trial.dirichlet)
   end
 end
 
@@ -107,13 +103,13 @@ function FESpaces.SparseMatrixAssembler(
   Tpv = PartitionedArrays.getany(map(get_vector_type,local_views(trial)))
   T  = eltype(Tpv)
   Tm = SparseMatrixCSC{T,Int}
-  Tpm = typeof(ParamMatrix{Tm}(undef,length_free_values(trial)))
+  Tpm = typeof(ParamMatrix{Tm}(undef,param_length(trial)))
   SparseMatrixAssembler(Tpm,Tpv,trial,test,par_strategy)
 end
 
 function FEM.get_param_vector_builder(
   a::DistributedSparseMatrixAssembler,
-  r::FEM.AbstractParamRealization)
+  r::FEM.AbstractRealization)
 
   L = length(r)
   vec = get_vector_builder(a)
@@ -125,7 +121,7 @@ end
 
 function FEM.get_param_assembler(
   a::DistributedSparseMatrixAssembler,
-  r::FEM.AbstractParamRealization)
+  r::FEM.AbstractRealization)
 
   rows = FESpaces.get_rows(a)
   cols = FESpaces.get_cols(a)

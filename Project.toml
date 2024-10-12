@@ -4,23 +4,30 @@ authors = ["Nicholas Mueller"]
 version = "1.0.0-DEV"
 
 [deps]
+ArraysOfArrays = "65a8f2f4-9b39-5baf-92e2-a9cc46fdf018"
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DrWatson = "634d3b9d-ee7a-5ddf-bec9-22491ea816e1"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
-Kronecker = "2c470bb0-bcc8-11e8-3dad-c9649493f05e"
+GridapSolvers = "6d3209ee-5e3c-4db7-a716-942eb12ed534"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LowRankApprox = "898213cb-b102-5a47-900c-97e73b919f73"
 PartitionedArrays = "5a9dfac6-5c52-46f7-8278-5e2210713be9"
 Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
-WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [compat]
+ArraysOfArrays = "0.6.5"
+GridapSolvers = "0.4.1"
+LowRankApprox = "0.5.5"
+SparseMatricesCSR = "0.6.7"
+Statistics = "1.11.1"
 julia = "1"
 
 [extras]
