@@ -1,22 +1,19 @@
-const PVectorParamCounter = GridapDistributed.PVectorCounter{A,B,C} where {
-  A,B<:AbstractVector{<:Algebra.ArrayCounter{<:AbstractParamContainer}},C}
+function GridapDistributed._setup_touched_and_allocations_arrays(
+  values::AbstractVector{<:AbstractParamVector})
 
-function Arrays.nz_allocation(a::PVectorParamCounter{<:SubAssembledRows})
-  dofs = a.test_dofs_gids_prange
-  values = map(nz_allocation,a.counters)
   touched = map(values) do values
     fill!(Vector{Bool}(undef,length(first(values))),false)
   end
   allocations = map(values,touched) do values,touched
-    GridapDistributed.ArrayAllocationTrackTouchedAndValues(touched,values)
+    ArrayAllocationTrackTouchedAndValues(touched,values)
   end
-  return GridapDistributed.PVectorAllocationTrackTouchedAndValues(allocations,values,dofs)
+  touched,allocations
 end
 
 const DistributedParamAllocationVector = Union{
   PVectorAllocationTrackOnlyValues{A,B,C},
   PVectorAllocationTrackTouchedAndValues{A,B,C}
-} where {A,B<:AbstractVector{<:AbstractParamContainer},C}
+} where {A,B<:AbstractVector{<:AbstractParamVector},C}
 
 function GridapDistributed._rhs_callback(
   row_partitioned_vector_partition::DistributedParamAllocationVector,
@@ -42,8 +39,8 @@ function GridapDistributed._rhs_callback(
       lid_vec     = gho_to_loc_vec[ghost_lid_vec]
       gid         = loc_to_glo_vec[lid_vec]
       lid_fespace = gid_to_lid_fe[gid]
-      for i = eachindex(b)
-        b[i][lid_vec] = b_fespace[i][lid_fespace]
+      for i = param_eachindex(b)
+        b.data[lid_vec,i] = b_fespace[i][lid_fespace]
       end
     end
   end
@@ -57,7 +54,8 @@ function GridapDistributed._rhs_callback(
   return b
 end
 
-function PartitionedArrays.assemble_coo!(I,J,V::AbstractArray{<:AbstractParamContainer},row_partition)
+function PartitionedArrays.assemble_coo!(
+  I,J,V::AbstractArray{<:AbstractParamVector},row_partition)
   """
     Returns three JaggedArrays with the coo triplets
     to be sent to the corresponding owner parts in parts_snd
@@ -67,7 +65,7 @@ function PartitionedArrays.assemble_coo!(I,J,V::AbstractArray{<:AbstractParamCon
     local_row_to_owner = local_to_owner(row_lids)
     owner_to_i = Dict(( owner=>i for (i,owner) in enumerate(parts_snd) ))
     ptrs = zeros(Int32,length(parts_snd)+1)
-    k_gi, k_gj, k_v = coo_values
+    k_gi,k_gj,k_v = coo_values
     for k in 1:length(k_gi)
       gi = k_gi[k]
       li = global_to_local_row[gi]
@@ -80,7 +78,7 @@ function PartitionedArrays.assemble_coo!(I,J,V::AbstractArray{<:AbstractParamCon
     gi_snd_data = zeros(eltype(k_gi),ptrs[end]-1)
     gj_snd_data = zeros(eltype(k_gj),ptrs[end]-1)
     v_snd_data = zeros(eltype(k_v),ptrs[end]-1)
-    pv_snd_data = array_of_similar_arrays(v_snd_data,length(k_v))
+    pv_snd_data = array_of_consecutive_arrays(v_snd_data,param_length(k_v))
     for k in 1:length(k_gi)
       gi = k_gi[k]
       li = global_to_local_row[gi]
@@ -90,10 +88,10 @@ function PartitionedArrays.assemble_coo!(I,J,V::AbstractArray{<:AbstractParamCon
         p = ptrs[owner_to_i[owner]]
         gi_snd_data[p] = gi
         gj_snd_data[p] = gj
-        for i = eachindex(pv_snd_data)
-          v = k_v[i][k]
-          pv_snd_data[i][p]  = v
-          k_v[i][k] = zero(v)
+        for i = param_eachindex(pv_snd_data)
+          v = k_v.data[k,i]
+          pv_snd_data.data[p,i] = v
+          k_v.data[k,i] = zero(v)
         end
         ptrs[owner_to_i[owner]] += 1
       end
@@ -102,14 +100,14 @@ function PartitionedArrays.assemble_coo!(I,J,V::AbstractArray{<:AbstractParamCon
     gi_snd = JaggedArray(gi_snd_data,ptrs)
     gj_snd = JaggedArray(gj_snd_data,ptrs)
     v_snd = JaggedArray(pv_snd_data,ptrs)
-    gi_snd, gj_snd, v_snd
+    gi_snd,gj_snd,v_snd
   end
   """
     Pushes to coo_values the triplets gi_rcv,gj_rcv,v_rcv
     received from remote processes
   """
   function setup_rcv!(coo_values,gi_rcv,gj_rcv,v_rcv)
-    k_gi, k_gj, k_v = coo_values
+    k_gi,k_gj,k_v = coo_values
     current_n = length(k_gi)
     new_n = current_n + length(gi_rcv.data)
     resize!(k_gi,new_n)
@@ -118,15 +116,15 @@ function PartitionedArrays.assemble_coo!(I,J,V::AbstractArray{<:AbstractParamCon
     for p in 1:length(gi_rcv.data)
       k_gi[current_n+p] = gi_rcv.data[p]
       k_gj[current_n+p] = gj_rcv.data[p]
-      for i = eachindex(k_v)
-        k_v[i][current_n+p] = v_rcv.data[i][p]
+      for i = param_eachindex(k_v)
+        k_v.data[current_n+p,i] = v_rcv.data[p,i]
       end
     end
   end
   part = linear_indices(row_partition)
-  parts_snd, parts_rcv = assembly_neighbors(row_partition)
+  parts_snd,parts_rcv = assembly_neighbors(row_partition)
   coo_values = map(tuple,I,J,V)
-  gi_snd, gj_snd, v_snd = map(setup_snd,part,parts_snd,row_partition,coo_values) |> tuple_of_arrays
+  gi_snd,gj_snd,v_snd = map(setup_snd,part,parts_snd,row_partition,coo_values) |> tuple_of_arrays
   graph = ExchangeGraph(parts_snd,parts_rcv)
   t1 = exchange(gi_snd,graph)
   t2 = exchange(gj_snd,graph)
@@ -141,11 +139,8 @@ function PartitionedArrays.assemble_coo!(I,J,V::AbstractArray{<:AbstractParamCon
 end
 
 function GridapDistributed.assemble_coo_with_column_owner!(
-  I,
-  J,
-  V::AbstractArray{<:AbstractParamContainer},
-  row_partition,
-  Jown)
+  I,J,V::AbstractArray{<:AbstractParamVector},row_partition,Jown)
+
   """
     Returns three (Param)JaggedArrays with the coo triplets
     to be sent to the corresponding owner parts in parts_snd
@@ -155,7 +150,7 @@ function GridapDistributed.assemble_coo_with_column_owner!(
     local_row_to_owner = local_to_owner(row_lids)
     owner_to_i = Dict(( owner=>i for (i,owner) in enumerate(parts_snd) ))
     ptrs = zeros(Int32,length(parts_snd)+1)
-    k_gi, k_gj, k_jo, k_v = coo_entries_with_column_owner
+    k_gi,k_gj,k_jo,k_v = coo_entries_with_column_owner
     for k in 1:length(k_gi)
       gi = k_gi[k]
       li = global_to_local_row[gi]
@@ -169,7 +164,7 @@ function GridapDistributed.assemble_coo_with_column_owner!(
     gj_snd_data = zeros(eltype(k_gj),ptrs[end]-1)
     jo_snd_data = zeros(eltype(k_jo),ptrs[end]-1)
     v_snd_data = zeros(eltype(k_v),ptrs[end]-1)
-    pv_snd_data = array_of_similar_arrays(v_snd_data,length(k_v))
+    pv_snd_data = array_of_consecutive_arrays(v_snd_data,param_length(k_v))
     for k in 1:length(k_gi)
       gi = k_gi[k]
       li = global_to_local_row[gi]
@@ -180,10 +175,10 @@ function GridapDistributed.assemble_coo_with_column_owner!(
         gi_snd_data[p] = gi
         gj_snd_data[p] = gj
         jo_snd_data[p] = k_jo[k]
-        for i = eachindex(pv_snd_data)
-          v = k_v[i][k]
-          pv_snd_data[i][p]  = v
-          k_v[i][k] = zero(v)
+        for i = param_eachindex(pv_snd_data)
+          v = k_v.data[k,i]
+          pv_snd_data.data[p,i] = v
+          k_v.data[k,i] = zero(v)
         end
         ptrs[owner_to_i[owner]] += 1
       end
@@ -193,14 +188,14 @@ function GridapDistributed.assemble_coo_with_column_owner!(
     gj_snd = JaggedArray(gj_snd_data,ptrs)
     jo_snd = JaggedArray(jo_snd_data,ptrs)
     v_snd = JaggedArray(pv_snd_data,ptrs)
-    gi_snd, gj_snd, jo_snd, v_snd
+    gi_snd,gj_snd,jo_snd,v_snd
   end
   """
     Pushes to coo_entries_with_column_owner the tuples
     gi_rcv,gj_rcv,jo_rcv,v_rcv received from remote processes
   """
   function setup_rcv!(coo_entries_with_column_owner,gi_rcv,gj_rcv,jo_rcv,v_rcv)
-    k_gi, k_gj, k_jo, k_v = coo_entries_with_column_owner
+    k_gi,k_gj,k_jo,k_v = coo_entries_with_column_owner
     current_n = length(k_gi)
     new_n = current_n + length(gi_rcv.data)
     resize!(k_gi,new_n)
@@ -211,15 +206,15 @@ function GridapDistributed.assemble_coo_with_column_owner!(
       k_gi[current_n+p] = gi_rcv.data[p]
       k_gj[current_n+p] = gj_rcv.data[p]
       k_jo[current_n+p] = jo_rcv.data[p]
-      for i = eachindex(k_v)
-        k_v[i][current_n+p] = v_rcv.data[i][p]
+      for i = param_eachindex(k_v)
+        k_v.data[current_n+p,i] = v_rcv.data[p,i]
       end
     end
   end
   part = linear_indices(row_partition)
-  parts_snd, parts_rcv = assembly_neighbors(row_partition)
+  parts_snd,parts_rcv = assembly_neighbors(row_partition)
   coo_entries_with_column_owner = map(tuple,I,J,Jown,V)
-  gi_snd, gj_snd, jo_snd, v_snd = map(setup_snd,part,parts_snd,row_partition,coo_entries_with_column_owner) |> tuple_of_arrays
+  gi_snd,gj_snd,jo_snd,v_snd = map(setup_snd,part,parts_snd,row_partition,coo_entries_with_column_owner) |> tuple_of_arrays
   graph = ExchangeGraph(parts_snd,parts_rcv)
   t1 = exchange(gi_snd,graph)
   t2 = exchange(gj_snd,graph)
@@ -233,4 +228,25 @@ function GridapDistributed.assemble_coo_with_column_owner!(
       map(setup_rcv!,coo_entries_with_column_owner,gi_rcv,gj_rcv,jo_rcv,v_rcv)
       I,J,Jown,V
   end
+end
+
+@inline function Algebra.add_entry!(
+  combine::Function,
+  A::GridapDistributed.LocalView{T,2,<:ParamSparseMatrix},
+  v::Number,
+  i,j)
+
+  error("what type is A? $(typeof(A))")
+end
+
+@inline function Algebra.add_entry!(
+  combine::Function,
+  A::GridapDistributed.LocalView{T,1,<:ConsecutiveVectorOfVectors},
+  v::AbstractArray,
+  i)
+
+  @inbounds for k = param_eachindex(A)
+    A.data[i,k] = combine(A.data[i,k],v[k])
+  end
+  A
 end

@@ -113,20 +113,6 @@ end
   A
 end
 
-@inline function Algebra.add_entry!(combine::Function,A::ConsecutiveMatrixOfMatrices,v::Number,i,j)
-  @inbounds for k = param_eachindex(A)
-    A.data[i,j,k] = combine(A.data[i,j,k],v)
-  end
-  A
-end
-
-@inline function Algebra.add_entry!(combine::Function,A::ConsecutiveMatrixOfMatrices,v::AbstractArray,i,j)
-  @inbounds for k = param_eachindex(A)
-    A.data[i,j,k] = combine(A.data[i,j,k],v[k])
-  end
-  A
-end
-
 function Algebra.add_entry!(combine::Function,A::MatrixOfSparseMatricesCSC,v::Number,i,j)
   k = nz_index(A,i,j)
   nz = nonzeros(A)

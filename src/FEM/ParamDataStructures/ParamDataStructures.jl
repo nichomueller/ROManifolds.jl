@@ -73,6 +73,7 @@ export array_of_similar_arrays
 export array_of_zero_arrays
 export array_of_consecutive_arrays
 export array_of_consecutive_zero_arrays
+export innerlength
 include("ParamArraysInterface.jl")
 
 export ArrayOfArrays

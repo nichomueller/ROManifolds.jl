@@ -30,7 +30,27 @@ SparseArrays.getcolptr(A::MatrixOfSparseMatricesCSC) = A.colptr
 SparseArrays.rowvals(A::MatrixOfSparseMatricesCSC) = A.rowval
 SparseArrays.nonzeros(A::MatrixOfSparseMatricesCSC) = A.data
 SparseArrays.nnz(A::MatrixOfSparseMatricesCSC) = Int(getcolptr(A)[innersize(A,2)+1])-1
+SparseArrays.nonzeros(A::MatrixOfSparseMatricesCSC) = ConsecutiveArrayOfArrays(A.data)
 _nonzeros(A::MatrixOfSparseMatricesCSC,iblock::Integer...) = @inbounds getindex(A.data,:,iblock...)
+
+function SparseArrays.findnz(A::MatrixOfSparseMatricesCSC{Tv,Ti,L}) where {Tv,Ti,L}
+  numnz = nnz(A)
+  nz = nonzeros(A)
+  I = Vector{Ti}(undef,numnz)
+  J = Vector{Ti}(undef,numnz)
+  V = Vector{Tv}(undef,numnz)
+  pV = array_of_consecutive_arrays(V,L)
+
+  count = 1
+  @inbounds for col = 1 : innersize(A,2),k = getcolptr(A)[col] : (getcolptr(A)[col+1]-1)
+    I[count] = rowvals(S)[k]
+    J[count] = col
+    @views pV.data[count,:] = nz.data[k,:]
+    count += 1
+  end
+
+  return (I,J,pV)
+end
 
 function MatrixOfSparseMatricesCSC(A::AbstractVector{SparseMatrixCSC{Tv,Ti}}) where {Tv,Ti}
   m,n = innersize(A)

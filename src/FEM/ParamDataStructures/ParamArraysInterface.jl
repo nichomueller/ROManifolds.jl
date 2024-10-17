@@ -78,6 +78,8 @@ end
 
 to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
 
+innerlength(A::AbstractParamArray) = prod(innersize(A))
+
 Base.:(==)(A::AbstractParamArray,B::AbstractParamArray) = all(param_data(A) .== param_data(B))
 Base.:(≈)(A::AbstractParamArray,B::AbstractParamArray) = all(param_data(A) .≈ param_data(B))
 

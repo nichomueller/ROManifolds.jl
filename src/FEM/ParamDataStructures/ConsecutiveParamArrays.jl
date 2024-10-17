@@ -33,3 +33,14 @@ end
 function consecutive_mul(A::Union{<:AbstractArray{T},Adjoint{T,<:AbstractArray}},B::ConsecutiveParamArrays{S}) where {T,S}
   A*B.data
 end
+
+# hacky
+function Base.setindex!(
+  A::ConsecutiveParamArrays{T,N,L},
+  v::ConsecutiveParamArrays{T′,N,L},
+  i::Vararg{Integer}
+  ) where{T,T′,N,L}
+
+  A.data[i...,:] = v.data
+  v
+end

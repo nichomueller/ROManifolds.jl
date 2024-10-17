@@ -82,51 +82,17 @@ const OPTIONS_MINRES = "-ksp_type minres -ksp_converged_reason -ksp_rtol 1.0e-10
 
 export OPTIONS_CG_JACOBI,OPTIONS_CG_AMG,OPTIONS_MUMPS,OPTIONS_NEUTON_MUMPS,OPTIONS_MINRES
 export ParamJaggedArray
-export ParamVectorAssemblyCache
 export DistributedSnapshots
 export DistributedRBSpace
 export project_recast
 
-include("DistributedUtils.jl")
+include("ParamAlgebra.jl")
 
-export PMatrix
-export MatrixAssemblyCache
-include("PMatrix.jl")
-
-export PVectorParamCounter
-export DistributedParamAllocationVector
-include("Algebra.jl")
-
-export ParamJaggedArray
-export ParamVectorAssemblyCache
-export ParamJaggedArrayAssemblyCache
-include("ParamJaggedArray.jl")
-
-export ParamSubSparseMatrix
-export AdjointPVector
-export AdjointSubSparseMatrix
 include("ParamSparseUtils.jl")
+
+include("ParamArrays.jl")
 
 include("Primitives.jl")
 
-export DistributedSingleFieldParamFESpace
-export DistributedSingleFieldParamFEFunction
 include("ParamFESpaces.jl")
-
-include("TransientParamFESpaces.jl")
-
-export DistributedMultiFieldParamFESpace
-export DistributedMultiFieldParamFEFunction
-export DistributedParamFESpace
-include("MultiField.jl")
-
-export DistributedTransientSnapshots
-export DistributedSnapshots
-include("DistributedSnapshots.jl")
-
-export DistributedRBSpace
-include("SingleRB.jl")
-
-export load_distributed_snapshots
-include("DistributedPostProcess.jl")
 end
