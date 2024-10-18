@@ -62,7 +62,7 @@ end
 
 function Base.getindex(a::ParamSparseMatrix,i::IntegrationDomain)
   entry = zeros(eltype2(a),length(i))
-  entries = array_of_consecutive_arrays(entry,param_length(a))
+  entries = param_array(entry,param_length(a))
   @inbounds for ip = param_eachindex(entries)
     for (ii,is) in enumerate(i)
       v = param_getindex(a,ip)[is]
@@ -226,7 +226,7 @@ function allocate_coefficient(a::HyperReduction,r::AbstractRealization)
   n = num_reduced_dofs(a)
   np = num_params(r)
   coeffvec = allocate_vector(Vector{Float64},n)
-  coeff = array_of_consecutive_arrays(coeffvec,np)
+  coeff = param_array(coeffvec,np)
   return coeff
 end
 
@@ -237,7 +237,7 @@ function allocate_hyper_reduction(
   nrows = num_reduced_dofs_left_projector(a)
   np = num_params(r)
   b = allocate_vector(Vector{Float64},nrows)
-  hypred = array_of_consecutive_arrays(b,np)
+  hypred = param_array(b,np)
   fill!(hypred,zero(eltype(hypred)))
   return hypred
 end
@@ -250,7 +250,7 @@ function allocate_hyper_reduction(
   ncols = num_reduced_dofs_right_projector(a)
   np = num_params(r)
   M = allocate_matrix(Matrix{Float64},nrows,ncols)
-  hypred = array_of_consecutive_arrays(M,np)
+  hypred = param_array(M,np)
   fill!(hypred,zero(eltype(hypred)))
   return hypred
 end
@@ -420,7 +420,7 @@ function Arrays.return_cache(
   r::AbstractRealization)
 
   coeffvec = testvalue(Vector{Float64})
-  array_of_consecutive_arrays(coeffvec,num_params(r))
+  param_array(coeffvec,num_params(r))
 end
 
 function Arrays.return_cache(
@@ -451,7 +451,7 @@ function Arrays.return_cache(
   r::AbstractRealization)
 
   hypvec = testvalue(Vector{Float64})
-  array_of_consecutive_arrays(hypvec,num_params(r))
+  param_array(hypvec,num_params(r))
 end
 
 function Arrays.return_cache(
@@ -460,7 +460,7 @@ function Arrays.return_cache(
   r::AbstractRealization)
 
   hypvec = testvalue(Matrix{Float64})
-  array_of_consecutive_arrays(hypvec,num_params(r))
+  param_array(hypvec,num_params(r))
 end
 
 function Arrays.return_cache(

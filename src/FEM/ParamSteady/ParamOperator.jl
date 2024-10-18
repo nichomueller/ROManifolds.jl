@@ -15,7 +15,7 @@ Subtypes:
 - [`ParamOpFromFEOp`](@ref)
 
 """
-abstract type ParamOperator{T<:ParamOperatorType} <: NonlinearOperator end
+abstract type ParamOperator{T<:ParamOperatorType} <: GridapType end
 
 function allocate_paramcache(
   op::ParamOperator,
@@ -166,4 +166,47 @@ function Algebra.jacobian!(
   paramcache)
 
   @abstractmethod
+end
+
+abstract type ParamNonlinearOperator <: NonlinearOperator end
+
+struct GenericParamNonlinearOperator <: ParamNonlinearOperator
+  op::ParamOperator
+  r::Realization
+  paramcache::ParamCache
+end
+
+function GenericParamNonlinearOperator(op::ParamOperator,r::Realization,u::AbstractVector)
+  paramcache = allocate_paramcache(op,r,u)
+  GenericParamNonlinearOperator(op,r,paramcache)
+end
+
+function Algebra.allocate_residual(
+  nlop::GenericParamNonlinearOperator,
+  x::AbstractVector)
+
+  allocate_residual(nlop.op,nlop.r,x,nlop.paramcache)
+end
+
+function Algebra.residual!(
+  b::AbstractVector,
+  nlop::GenericParamNonlinearOperator,
+  x::AbstractVector)
+
+  residual!(b,nlop.op,nlop.r,x,nlop.paramcache)
+end
+
+function Algebra.allocate_jacobian(
+  nlop::GenericParamNonlinearOperator,
+  x::AbstractVector)
+
+  allocate_jacobian(nlop.op,nlop.r,x,nlop.paramcache)
+end
+
+function Algebra.jacobian!(
+  A::AbstractMatrix,
+  nlop::GenericParamNonlinearOperator,
+  x::AbstractVector)
+
+  jacobian!(A,nlop.op,nlop.r,x,nlop.paramcache)
 end

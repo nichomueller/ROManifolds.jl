@@ -514,6 +514,8 @@ Arrays.return_value(f::TransientParamFunction,x) = f.fun(x,testitem(_get_params(
 
 Arrays.evaluate!(cache,f::AbstractParamFunction,x) = pteval(f,x)
 
+Arrays.evaluate!(cache,f::AbstractParamFunction,x::CellPoint) = CellField(f,get_triangulation(x))(x)
+
 (f::AbstractParamFunction)(x) = evaluate(f,x)
 
 function test_parametric_space()

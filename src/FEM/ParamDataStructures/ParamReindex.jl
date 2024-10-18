@@ -39,7 +39,7 @@ function Arrays.return_cache(
   c = return_cache(Broadcasting(testitem(f.f)),x...)
   a = evaluate!(c,Broadcasting(testitem(f.f)),x...)
   cache = Vector{typeof(c)}(undef,param_length(f.f))
-  data = array_of_similar_arrays(a,param_length(f.f))
+  data = param_array(a,param_length(f.f))
   @inbounds for i = param_eachindex(f.f)
     cache[i] = return_cache(Broadcasting(param_getindex(f.f,i)),x...)
   end
@@ -97,7 +97,7 @@ for T in (:ParamReindex,:PosNegParamReindex)
       c = return_cache(testitem(k),j)
       a = evaluate!(c,testitem(k),j)
       cache = Vector{typeof(c)}(undef,param_length(k))
-      data = array_of_similar_arrays(a,param_length(k))
+      data = param_array(a,param_length(k))
       for i = param_eachindex(k)
         cache[i] = return_cache(param_getindex(k,i),j)
       end

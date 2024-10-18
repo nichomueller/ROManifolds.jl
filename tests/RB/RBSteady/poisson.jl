@@ -2,14 +2,7 @@ using Gridap
 using Test
 using DrWatson
 
-using ReducedOrderModels.FEM
-using ReducedOrderModels.ParamDataStructures
-using ReducedOrderModels.ParamFESpaces
-using ReducedOrderModels.ParamSteady
-using ReducedOrderModels.ParamODEs
-
-using ReducedOrderModels.RB
-using ReducedOrderModels.RB.RBSteady
+using ReducedOrderModels
 
 pranges = fill([1,10],3)
 pspace = ParamSpace(pranges)
@@ -41,7 +34,7 @@ gμ(μ) = ParamFunction(g,μ)
 
 stiffness(μ,u,v,dΩ) = ∫(aμ(μ)*∇(v)⋅∇(u))dΩ
 rhs(μ,v,dΩ,dΓn) = ∫(fμ(μ)*v)dΩ + ∫(hμ(μ)*v)dΓn
-res(μ,u,v,dΩ,dΓn) = rhs(μ,v,dΩ,dΓn) - stiffness(μ,u,v,dΩ)
+res(μ,u,v,dΩ,dΓn) = stiffness(μ,u,v,dΩ) - rhs(μ,v,dΩ,dΓn)
 
 trian_res = (Ω,Γn)
 trian_stiffness = (Ω,)

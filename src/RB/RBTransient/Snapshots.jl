@@ -113,7 +113,7 @@ end
 
 function RBSteady.Snapshots(s::Vector{<:AbstractParamArray},i::AbstractIndexMap,r::TransientRealization)
   item = consecutive_getindex(first(s),:,1)
-  sflat = array_of_consecutive_arrays(item,num_params(r)*num_times(r))
+  sflat = param_array(item,num_params(r)*num_times(r))
   @inbounds for it in 1:num_times(r)
     dit = s[it]
     @inbounds for ip in 1:num_params(r)

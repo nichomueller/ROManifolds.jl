@@ -486,7 +486,7 @@ function RBSteady.select_at_indices(
 
   @check length(ids_space) == length(ids_time)
   entry = zeros(eltype2(a),length(ids_space))
-  entries = array_of_consecutive_arrays(entry,length(ids_param))
+  entries = param_array(entry,length(ids_param))
   @inbounds for ip = param_eachindex(entries)
     for (i,(is,it)) in enumerate(zip(ids_space,ids_time))
       ipt = ip+(it-1)*length(ids_param)
@@ -503,7 +503,7 @@ function RBSteady.select_at_indices(
   ids_space,ids_time,ids_param)
 
   entry = zeros(eltype2(a),length(ids_space),length(ids_time))
-  entries = array_of_consecutive_arrays(entry,length(ids_param))
+  entries = param_array(entry,length(ids_param))
   @inbounds for ip = param_eachindex(entries)
     for (i,it) in enumerate(ids_time)
       ipt = ip+(it-1)*length(ids_param)

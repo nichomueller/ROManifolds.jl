@@ -11,7 +11,7 @@ param_length(a::Union{Number,AbstractArray{<:Number}}) = 0
 param_length(a::CellField) = param_length(testitem(get_data(a)))
 
 """
-    param_data(a) -> Int
+    param_data(a) -> Any
 
 Returns the parametric data of `a`
 
@@ -40,38 +40,6 @@ result is an abstract vector of length `param_length`(`a`). It often outputs a
 param_entry(a,i::Integer...) = @abstractmethod
 
 param_eachindex(a) = Base.OneTo(param_length(a))
-
-"""
-    array_of_similar_arrays(a,plength::Integer) -> AbstractArray{typeof(a),ndims(a)}
-
-Creates an instance of `AbstractArray`{typeof(`a`),ndims(`a`)} of parametric
-length `plength` from `a`.
-
-"""
-array_of_similar_arrays(a,plength::Integer) = @abstractmethod
-
-array_of_copy_arrays(a,plength::Integer) = @abstractmethod
-
-function array_of_zero_arrays(a,plength::Integer)
-  A = array_of_similar_arrays(a,plength)
-  fill!(A,zero(eltype(a)))
-  return A
-end
-
-"""
-    array_of_consecutive_arrays(a,plength::Integer) -> AbstractArray{typeof(a),ndims(a)}
-
-Like [`array_of_similar_arrays`](@ref), but the result has entries stored in
-consecutive memory cells
-
-"""
-array_of_consecutive_arrays(a,plength::Integer) = @abstractmethod
-
-function array_of_consecutive_zero_arrays(a,plength::Integer)
-  A = array_of_consecutive_arrays(a,plength)
-  fill!(A,zero(eltype(a)))
-  return A
-end
 
 """
     to_param_quantity(a,plength::Integer) -> Any
@@ -173,14 +141,6 @@ to_param_quantity(a::Number,plength::Integer) = ParamNumber(fill(a,plength))
 Base.size(a::ParamNumber) = (param_length(a),)
 Base.getindex(a::ParamNumber,i::Integer) = getindex(a.data,i)
 Base.setindex!(a::ParamNumber,v,i::Integer) = setindex!(a.data,v,i)
-
-function array_of_similar_arrays(a::Union{Number,AbstractArray{<:Number,0}},l::Integer)
-  ParamNumber(fill(zero(eltype(a)),l))
-end
-
-function array_of_consecutive_arrays(a::Union{Number,AbstractArray{<:Number,0}},l::Integer)
-  ParamNumber(fill(zero(eltype(a)),l))
-end
 
 for op in (:+,:-)
   @eval begin

@@ -9,39 +9,8 @@ Subtypes:
 """
 abstract type AbstractParamArray{T,N,L,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N,L} end
 
-"""
-    abstract type ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}} end
-
-Type representing parametric arrays of type A. L encodes the parametric length.
-Subtypes:
-- [`ArrayOfArrays`](@ref).
-- [`ConsecutiveArrayOfArrays`](@ref).
-- [`ArrayOfTrivialArrays`](@ref).
-- [`BlockArrayOfArrays`](@ref).
-
-"""
-abstract type ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}} end
-
-"""
-    abstract type ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}
-      } <: AbstractParamArray{Tv,2,L,A} end
-
-Type representing parametric abstract sparse matrices of type A. L encodes the parametric length.
-Subtypes:
-- [`ParamSparseMatrixCSC`](@ref).
-
-"""
-abstract type ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,L,A} end
-
-"""
-    abstract type ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSC{Tv,Ti}} end
-
-Type representing parametric sparse matrices in CSC format. L encodes the parametric length.
-Subtypes:
-- [`MatrixOfSparseMatricesCSC`](@ref).
-
-"""
-abstract type ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSC{Tv,Ti}} end
+const AbstractParamVector{T,L} = AbstractParamArray{T,1,L,<:AbstractVector{T}}
+const AbstractParamMatrix{T,L} = AbstractParamArray{T,2,L,<:AbstractMatrix{T}}
 
 """
     ParamArray(A::AbstractVector{<:AbstractArray}) -> ArrayOfArrays
@@ -53,33 +22,26 @@ abstract type ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseM
 Generic constructor of a AbstractParamArray
 
 """
-ParamArray(A::AbstractVector{<:AbstractArray}) = ArrayOfArrays(A)
-ParamArray(A::AbstractVector{<:SparseMatrixCSC}) = MatrixOfSparseMatricesCSC(A)
-ParamArray(A::AbstractArray{<:Number},plength::Int) = ArrayOfTrivialArrays(A,plength)
+ParamArray(A) = @abstractmethod
+param_array(A,args...;kwargs...) = @abstractmethod
+
+# Numbers interface
 ParamArray(A::AbstractArray{<:Number}) = ParamNumber(A)
-ParamArray(A::AbstractArray{<:ParamArray}) = mortar(A)
 
-# Allow do-block syntax
-function param_array(f,A::AbstractArray{<:AbstractArray}...)
-  ParamArray(map(f,A...))
+function param_array(a::Union{Number,AbstractArray{<:Number,0}},l::Integer)
+  ParamNumber(fill(a,l))
 end
 
-function array_of_similar_arrays(a::AbstractArray{<:Number},l::Integer)
-  ParamArray([similar(a) for _ = 1:l])
-end
-
-function array_of_copy_arrays(a::AbstractArray{<:Number},l::Integer)
-  ParamArray([copy(a) for _ = 1:l])
-end
-
-function array_of_consecutive_arrays(a::AbstractArray{<:Number},l::Integer)
-  ConsecutiveArrayOfArrays(similar(a,eltype(a),size(a)...,l))
-end
-
+param_getindex(A::AbstractParamArray{T,N},i::Integer) where {T,N} = getindex(A,tfill(i,Val{N}())...)
+param_setindex!(A::AbstractParamArray{T,N},v,i::Integer) where {T,N} = setindex!(A,v,tfill(i,Val{N}())...)
 to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
 
-Base.:(==)(A::AbstractParamArray,B::AbstractParamArray) = all(param_data(A) .== param_data(B))
-Base.:(≈)(A::AbstractParamArray,B::AbstractParamArray) = all(param_data(A) .≈ param_data(B))
+# we don't care about dims
+function Base.similar(A::AbstractParamArray{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N}
+  @notimplemented
+end
+
+inneraxes(A::AbstractParamArray) = Base.OneTo.(innersize(A))
 
 for op in (:+,:-)
   @eval begin
@@ -92,29 +54,6 @@ for op in (:+,:-)
       A = ParamArray(a,param_length(B))
       ($op)(A,B)
     end
-  end
-end
-
-const AbstractParamVector{T,L} = AbstractParamArray{T,1,L}
-const AbstractParamMatrix{T,L} = AbstractParamArray{T,2,L}
-const AbstractParamTensor3D{T,L} = AbstractParamArray{T,3,L}
-
-for f in (:(Base.maximum),:(Base.minimum))
-  @eval begin
-    $f(A::AbstractParamArray) = $f(map($f,param_data(A)))
-    $f(g,A::AbstractParamArray) = $f(map(a -> $f(g,a),param_data(A)))
-  end
-end
-
-function Base.transpose(A::AbstractParamArray)
-  param_array(param_data(A)) do v
-    transpose(v)
-  end
-end
-
-function Base.vec(A::AbstractParamArray)
-  param_array(param_data(A)) do v
-    vec(v)
   end
 end
 
@@ -228,7 +167,7 @@ function LinearAlgebra.ldiv!(A::AbstractParamArray,B::ParamContainer,C::Abstract
 end
 
 function LinearAlgebra.lu(A::AbstractParamArray;kwargs...)
-  ParamContainer(lu.(param_data(A);kwargs...))
+  @notimplemented
 end
 
 function LinearAlgebra.lu!(A::AbstractParamArray,B::AbstractParamArray;kwargs...)
@@ -247,20 +186,15 @@ Arrays.testitem(A::AbstractParamArray) = param_getindex(A,1)
 
 function Arrays.testvalue(::Type{<:AbstractParamArray{T,N,L}}) where {T,N,L}
   tv = testvalue(Array{T,N})
-  array_of_similar_arrays(tv,L)
+  param_array(tv,L)
 end
 
 function Arrays.CachedArray(A::AbstractParamArray)
-  param_array(param_data(A)) do a
-    CachedArray(a)
-  end
+  @notimplemented
 end
 
 function Arrays.setsize!(A::AbstractParamArray{T,N},s::NTuple{N,Integer}) where {T,N}
-  @inbounds for i in param_eachindex(A)
-    setsize!(param_getindex(A,i),s)
-  end
-  return A
+  @notimplemented
 end
 
 """
@@ -272,7 +206,7 @@ Generalization of [`return_value`](@ref) to the parametric case
 function param_return_value(f::Union{Function,Map},A...)
   pA = to_param_quantities(A...)
   c = return_value(f,testitem.(pA)...)
-  data = array_of_similar_arrays(c,param_length(first(pA)))
+  data = param_array(c,param_length(first(pA)))
   return data
 end
 
@@ -287,7 +221,7 @@ function param_return_cache(f::Union{Function,Map},A...)
   c = return_cache(f,testitem.(pA)...)
   d = evaluate!(c,f,testitem.(pA)...)
   cache = Vector{typeof(c)}(undef,param_length(first(pA)))
-  data = array_of_similar_arrays(d,param_length(first(pA)))
+  data = param_array(d,param_length(first(pA)))
   @inbounds for i in param_eachindex(first(pA))
     cache[i] = return_cache(f,param_getindex.(pA,i)...)
   end
@@ -569,7 +503,7 @@ function Arrays.return_cache(
   c = return_cache(g,x...)
   d = evaluate!(c,g,x...)
   cache = Vector{typeof(c)}(undef,param_length(f.op))
-  data = array_of_similar_arrays(d,param_length(f.op))
+  data = param_array(d,param_length(f.op))
   @inbounds for i in param_eachindex(f.op)
     g = BroadcastingFieldOpMap(getindex(f.op,i))
     cache[i] = return_cache(g,x...)
@@ -602,7 +536,7 @@ function Arrays.return_cache(
   c = return_cache(g,testitem(A),testitem.(B)...)
   d = evaluate!(c,g,testitem(A),testitem.(B)...)
   cache = Vector{typeof(c)}(undef,plength)
-  data = array_of_similar_arrays(d,plength)
+  data = param_array(d,plength)
   @inbounds for i in 1:plength
     g = BroadcastingFieldOpMap(getindex(f.op,i))
     cache[i] = return_cache(g,param_getindex(A,i),param_getindex.(B,i)...)
@@ -757,26 +691,32 @@ for T in (:AbstractParamArray,:AbstractArray,:Nothing), S in (:AbstractParamArra
   (T∈(:AbstractArray,:Nothing) && S==:AbstractArray) && continue
   @eval begin
     function Arrays.return_cache(f::Fields.ZeroBlockMap,A::$T,B::$S)
-      pA,pB = to_param_quantities(A,B)
-      param_array(param_data(pA),param_data(pB)) do a,b
-        CachedArray(similar(a,eltype(a),size(b)))
-      end
+      # pA,pB = to_param_quantities(A,B)
+      # map(param_data(pA),param_data(pB)) do a,b
+      #   CachedArray(similar(a,eltype(a),size(b)))
+      # end |> ParamArray
+      @error "stop here"
+      param_return_cache(f,A,B)
     end
   end
 end
 
 function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,A::AbstractArray,B::AbstractArray)
-  _,pA,pB = to_param_quantities(C,A,B)
-  param_array(param_data(C),param_data(pA),param_data(pB)) do c,a,b
-    evaluate!(c,f,collect(a),collect(b))
-  end
+  # _,pA,pB = to_param_quantities(C,A,B)
+  # map(param_data(C),param_data(pA),param_data(pB)) do c,a,b
+  #   evaluate!(c,f,collect(a),collect(b))
+  # end |> ParamArray
+  @error "stop here"
+  param_evaluate!(C,f,A,B)
 end
 
 function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,a::Nothing,B::AbstractArray)
-  _,pB = to_param_quantities(C,B)
-  param_array(param_data(C),param_data(pB)) do c,b
-    evaluate!(c,f,a,collect(b))
-  end
+  # _,pB = to_param_quantities(C,B)
+  # map(param_data(C),param_data(pB)) do c,b
+  #   evaluate!(c,f,a,collect(b))
+  # end
+  @error "stop here"
+  param_evaluate!(C,f,a,B)
 end
 
 function Fields.unwrap_cached_array(A::AbstractParamArray)
@@ -855,7 +795,7 @@ for T in (:(ForwardDiff.GradientConfig),:(ForwardDiff.JacobianConfig))
 
       @check length(ydual) == param_length(x)
       vi = return_value(f,testitem(ydual),testitem(x),cfg)
-      A = array_of_similar_arrays(vi,length(ydual))
+      A = param_array(vi,length(ydual))
       return A
     end
 
@@ -867,7 +807,7 @@ for T in (:(ForwardDiff.GradientConfig),:(ForwardDiff.JacobianConfig))
 
       @check length(ydual) == param_length(x)
       ci = return_cache(f,testitem(ydual),testitem(x),cfg)
-      A = array_of_similar_arrays(ci,length(ydual))
+      A = param_array(ci,length(ydual))
       return A
     end
 

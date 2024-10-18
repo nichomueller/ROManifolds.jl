@@ -69,10 +69,6 @@ export AbstractParamMatrix
 export ParamSparseMatrix
 export ParamArray
 export param_array
-export array_of_similar_arrays
-export array_of_zero_arrays
-export array_of_consecutive_arrays
-export array_of_consecutive_zero_arrays
 include("ParamArraysInterface.jl")
 
 export ArrayOfArrays
@@ -92,12 +88,6 @@ include("MatrixOfSparseMatrices.jl")
 
 export VectorOfSparseVectors
 include("VectorOfSparseVectors.jl")
-
-export ConsecutiveParamArrays
-export consecutive_getindex
-export consecutive_setindex!
-export consecutive_mul
-include("ConsecutiveParamArrays.jl")
 
 export ArrayOfTrivialArrays
 include("ArrayOfTrivialArrays.jl")

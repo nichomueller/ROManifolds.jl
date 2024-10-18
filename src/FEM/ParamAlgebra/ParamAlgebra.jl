@@ -29,6 +29,8 @@ export ParamInserterCSC
 export eltype2
 include("ParamAlgebraInterfaces.jl")
 
+include("ParamSolvers.jl")
+
 include("ParamIterativeSolvers.jl")
 
 end # module

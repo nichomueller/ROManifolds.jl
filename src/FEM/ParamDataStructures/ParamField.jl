@@ -218,7 +218,7 @@ function Arrays.return_cache(f::Union{ParamField,BroadcastOpParamFieldArray},x::
   li = return_cache(fi,x)
   fix = evaluate!(li,fi,x)
   l = Vector{typeof(li)}(undef,param_length(f))
-  g = array_of_similar_arrays(fix,param_length(f))
+  g = param_array(fix,param_length(f))
   for i in param_eachindex(f)
     l[i] = return_cache(param_getindex(f,i),x)
   end

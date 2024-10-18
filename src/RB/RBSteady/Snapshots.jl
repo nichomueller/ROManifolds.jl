@@ -308,31 +308,31 @@ function get_indexed_values(s::ReshapedSnapshots)
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::AbstractSnapshots{S,2}) where {T,S}
-  consecutive_mul(get_indexed_values(A),get_indexed_values(B))
+  get_indexed_values(A)*get_indexed_values(B)
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::Adjoint{S,<:AbstractSnapshots}) where {T,S}
-  consecutive_mul(get_indexed_values(A),adjoint(get_indexed_values(B.parent)))
+  get_indexed_values(A)*adjoint(get_indexed_values(B.parent))
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::AbstractMatrix{S}) where {T,S}
-  consecutive_mul(get_indexed_values(A),B)
+  get_indexed_values(A)*B
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::Adjoint{T,<:AbstractMatrix{S}}) where {T,S}
-  consecutive_mul(get_indexed_values(A),B)
+  get_indexed_values(A)*B
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractSnapshots{T,2}},B::AbstractSnapshots{S,2}) where {T,S}
-  consecutive_mul(adjoint(get_indexed_values(A.parent)),get_indexed_values(B))
+  adjoint(get_indexed_values(A.parent))*get_indexed_values(B)
 end
 
 function Base.:*(A::AbstractMatrix{T},B::AbstractSnapshots{S,2}) where {T,S}
-  consecutive_mul(A,get_indexed_values(B))
+  A*get_indexed_values(B)
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::AbstractSnapshots{S,2}) where {T,S}
-  consecutive_mul(A,get_indexed_values(B))
+  A*get_indexed_values(B)
 end
 
 # sparse interface

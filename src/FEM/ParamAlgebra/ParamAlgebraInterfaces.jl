@@ -2,7 +2,7 @@ eltype2(x) = eltype(eltype(x))
 
 function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamContainer
   vector = allocate_vector(eltype(V),n)
-  array_of_consecutive_zero_arrays(vector,param_length(V))
+  param_array(vector,param_length(V))
 end
 
 function Algebra.allocate_vector(::Type{<:BlockVectorOfVectors{T,L}},indices::BlockedUnitRange) where {T,L}
@@ -175,7 +175,7 @@ function Algebra.allocate_coo_vectors(::Type{T},n::Integer) where {Tv,Ti,T<:Matr
   I = zeros(Ti,n)
   J = zeros(Ti,n)
   V = zeros(Tv,n)
-  PV = array_of_consecutive_zero_arrays(V,param_length(T))
+  PV = param_array(V,param_length(T))
   I,J,PV
 end
 
@@ -229,7 +229,7 @@ end
 function Algebra.nz_allocation(a::Algebra.ArrayCounter{T}) where T<:AbstractParamVector
   S = eltype(T)
   v = similar(S,map(length,a.axes))
-  array_of_consecutive_zero_arrays(v,param_length(T))
+  param_array(v,param_length(T))
 end
 
 function Algebra.nz_allocation(a::ParamCounter)
@@ -243,7 +243,7 @@ end
 
 function ParamInserter(inserter::Algebra.InserterCSC,plength::Integer)
   @unpack nrows,ncols,colptr,colnnz,rowval,nzval = inserter
-  pnzval = array_of_consecutive_zero_arrays(nzval,plength)
+  pnzval = param_array(nzval,plength)
   ParamInserterCSC(nrows,ncols,colptr,colnnz,rowval,pnzval)
 end
 

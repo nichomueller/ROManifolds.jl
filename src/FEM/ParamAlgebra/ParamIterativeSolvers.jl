@@ -106,6 +106,16 @@ function Algebra.numerical_setup!(
   return ns
 end
 
+function BlockSolvers.restrict_blocks(x::BlockVectorOfVectors,ids::Vector{Int8})
+  if isempty(ids)
+    return x
+  elseif length(ids) == 1
+    return blocks(x)[ids[1]]
+  else
+    return mortar(blocks(x)[ids])
+  end
+end
+
 function BlockSolvers.block_symbolic_setup(
   block::BiformBlock,
   solver::LinearSolver,
@@ -139,10 +149,10 @@ function LinearSolvers.get_solver_caches(solver::LinearSolvers.FGMRESSolver,A::A
   Z  = [allocate_in_domain(A) for i in 1:m]
   zl = allocate_in_domain(A)
 
-  H = array_of_consecutive_zero_arrays(zeros(m+1,m),plength)  # Hessenberg matrix
-  g = array_of_consecutive_zero_arrays(zeros(m+1),plength)    # Residual vector
-  c = array_of_consecutive_zero_arrays(zeros(m),plength)      # Givens rotation cosines
-  s = array_of_consecutive_zero_arrays(zeros(m),plength)      # Givens rotation sines
+  H = param_array(zeros(m+1,m),plength)  # Hessenberg matrix
+  g = param_array(zeros(m+1),plength)    # Residual vector
+  c = param_array(zeros(m),plength)      # Givens rotation cosines
+  s = param_array(zeros(m),plength)      # Givens rotation sines
   return (V,Z,zl,H,g,c,s)
 end
 

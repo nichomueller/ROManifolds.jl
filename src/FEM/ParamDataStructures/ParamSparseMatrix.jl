@@ -1,0 +1,390 @@
+"""
+    abstract type ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}
+      } <: AbstractParamArray{Tv,2,L,A} end
+
+Type representing parametric abstract sparse matrices of type A. L encodes the parametric length.
+Subtypes:
+- [`ParamSparseMatrixCSC`](@ref).
+
+"""
+abstract type ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,L,A} end
+
+ParamArray(A::AbstractVector{<:SparseMatrixCSC}) = ConsecutiveParamSparseMatrixCSC(A)
+ParamArray(A::AbstractVector{<:SparseMatrixCSR}) = ConsecutiveParamSparseMatrixCSR(A)
+
+Base.size(A::ParamSparseMatrix) = (param_length(A),param_length(A))
+
+Base.@propagate_inbounds function Base.setindex!(A::ParamSparseMatrix,v,i::Integer,j::Integer)
+  @notimplemented
+end
+
+get_all_data(A::ParamSparseMatrix) = @abstractmethod
+
+function LinearAlgebra.fillstored!(A::ParamSparseMatrix,z::Number)
+  fill!(get_all_data(A),z)
+  return A
+end
+
+# small hack, we shouldn't be able to fill an abstract array with a non-scalar
+function LinearAlgebra.fillstored!(A::ParamSparseMatrix,z::AbstractMatrix{<:Number})
+  @check all(z.==first(z))
+  LinearAlgebra.fillstored!(A,first(z))
+  return A
+end
+
+# small hack
+Base.iszero(A::ParamSparseMatrix) = (nnz(A) == 0)
+
+function recast(a::AbstractVector,A::AbstractSparseMatrix)
+  @abstractmethod
+end
+
+function recast(a::AbstractMatrix,A::AbstractSparseMatrix)
+  @check size(a,1) == nnz(A)
+  B = map(v -> recast(v,A),collect.(eachcol(a)))
+  return ParamArray(B)
+end
+
+function recast(a::AbstractArray,A::ParamSparseMatrix)
+  recast(a,param_getindex(A,1))
+end
+
+"""
+    abstract type ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSC{Tv,Ti}} end
+
+Type representing parametric sparse matrices in CSC format. L encodes the parametric length.
+Subtypes:
+- [`MatrixOfSparseMatricesCSC`](@ref).
+
+"""
+abstract type ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSC{Tv,Ti}} end
+
+"""
+    struct MatrixOfSparseMatricesCSC{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSC{Tv,Ti,L} end
+
+Represents a vector of sparse matrices in CSC format. For sake of coherence, an
+instance of `MatrixOfSparseMatricesCSC` inherits from AbstractMatrix{<:SparseMatrixCSC{Tv,Ti}
+rather than AbstractVector{<:SparseMatrixCSC{Tv,Ti}, but should conceptually be
+thought as an AbstractVector{<:SparseMatrixCSC{Tv,Ti}.
+
+"""
+struct ConsecutiveParamSparseMatrixCSC{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSC{Tv,Ti,L}
+  m::Int64
+  n::Int64
+  colptr::Vector{Ti}
+  rowval::Vector{Ti}
+  data::Matrix{Tv}
+  function ConsecutiveParamSparseMatrixCSC(
+    m::Int64,
+    n::Int64,
+    colptr::Vector{Ti},
+    rowval::Vector{Ti},
+    data::Matrix{Tv}
+    ) where {Tv,Ti}
+
+    L = size(data,2)
+    new{Tv,Ti,L}(m,n,colptr,rowval,data)
+  end
+end
+
+get_all_data(A::ConsecutiveParamSparseMatrixCSC) = A.data
+
+SparseArrays.getcolptr(A::ConsecutiveParamSparseMatrixCSC) = A.colptr
+SparseArrays.rowvals(A::ConsecutiveParamSparseMatrixCSC) = A.rowval
+SparseArrays.nonzeros(A::ConsecutiveParamSparseMatrixCSC) = ConsecutiveParamArray(A.data)
+SparseArrays.nnz(A::ConsecutiveParamSparseMatrixCSC) = Int(getcolptr(A)[innersize(A,2)+1])-1
+
+function ConsecutiveParamSparseMatrixCSC(a::AbstractVector{<:SparseMatrixCSC})
+  item = testitem(a)
+  m,n = size(item)
+  colptr = getcolptr(item)
+  rowval = rowvals(item)
+
+  @notimplementedif (any(a->size(a) != (m,n)))
+
+  if (any(a->getcolptr(a) != colptr, a) || any(a->rowvals(a) != rowval, a))
+    GenericParamSparseMatrixCSC(a)
+  end
+
+  ndata = nnz(item)
+  plength = length(a)
+  data = Matrix{Tv}(undef,ndata,plength)
+  p = 1
+  @inbounds for i in 1:plength
+    ai = a[i]
+    for j in 1:ndata
+      aij = nonzeros(ai)[j]
+      data[p] = aij
+      p += 1
+    end
+  end
+
+  ConsecutiveParamSparseMatrixCSC(m,n,colptr,rowval,data)
+end
+
+function param_array(a::SparseMatrixCSC,l::Integer;copy=false) where N
+  outer = (tfill(1,Val{N}())...,l)
+  data = repeat(nonzeros(a);outer)
+  !copy && LinearAlgebra.fillstored!(data,zero(eltype(a)))
+  m,n = size(a)
+  colptr = getcolptr(a)
+  rowval = rowvals(a)
+  ConsecutiveParamSparseMatrixCSC(m,n,colptr,rowval,data)
+end
+
+ArraysOfArrays.innersize(A::ConsecutiveParamSparseMatrixCSC) = (A.m,A.n)
+
+Base.@propagate_inbounds function Base.getindex(A::ConsecutiveParamSparseMatrixCSC,i::Integer,j::Integer)
+  @boundscheck checkbounds(A,i,j)
+  if i == j
+    SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,getindex(A.data,:,i))
+  else
+    spzeros(innersize(A))
+  end
+end
+
+struct GenericParamSparseMatrixCSC{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSC{Tv,Ti,L}
+  m::Int64
+  n::Int64
+  colptr::Vector{Ti}
+  rowval::Vector{Ti}
+  data::Vector{Tv}
+  ptrs::Vector{Ti}
+  function GenericParamSparseMatrixCSC(
+    m::Int64,
+    n::Int64,
+    colptr::Vector{Ti},
+    rowval::Vector{Ti},
+    data::Matrix{Tv},
+    ptrs::Vector{Ti}
+    ) where {Tv,Ti}
+
+    L = length(ptrs)
+    new{Tv,Ti,L}(m,n,colptr,rowval,data)
+  end
+end
+
+get_all_data(A::GenericParamSparseMatrixCSC) = A.data
+
+function GenericParamSparseMatrixCSC(a::AbstractVector{<:SparseMatrixCSC{Tv}}) where Tv
+  item = testitem(a)
+  m,n = size(item)
+  plength = length(a)
+  ptrs = _vec_of_pointers(a)
+  Ti = eltype(ptrs)
+  u = one(Ti)
+  ndata = ptrs[end]-u
+  colptr = Vector{Ti}(undef,ndata)
+  rowval = Vector{Ti}(undef,ndata)
+  data = Vector{Tv}(undef,ndata)
+  p = 1
+  @inbounds for i in 1:plength
+    ai = a[i]
+    for j in nnz(ai)
+      colptr[p] = getcolptr(ai)[j]
+      rowval[p] = rowvals(ai)[j]
+      data[p] = nonzeros(ai)[j]
+      p += 1
+    end
+  end
+  GenericParamSparseMatrixCSC(m,n,colptr,rowval,data)
+end
+
+ArraysOfArrays.innersize(A::GenericParamSparseMatrixCSC) = (A.m,A.n)
+
+Base.@propagate_inbounds function Base.getindex(A::GenericParamSparseMatrixCSC,i::Integer,j::Integer)
+  @boundscheck checkbounds(A,i,j)
+  u = one(eltype(A.ptrs))
+  pini = A.ptrs[i]
+  pend = A.ptrs[i+1]-u
+  nrow = A.nrows[i]
+  if i == j
+    SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,getindex(A.data,:,i))
+  else
+    spzeros(innersize(A))
+  end
+end
+
+function Base.getindex(A::GenericParamSparseMatrixCSC{Tv},i::Integer,j::Integer) where Tv
+  @boundscheck checkbounds(A,i,j)
+  if i == j
+    u = one(eltype(A.ptrs))
+    pini = A.ptrs[i]
+    pend = A.ptrs[i+1]-u
+    colptr = A.colptr[pini:pend]
+    rowval = A.rowval[pini:pend]
+    data = A.data[pini:pend]
+    SparseMatrixCSC(A.m,A.n,colptr,rowval,data)
+  else
+    fill(zero(Tv),nrow,ncol)
+  end
+end
+
+# CSR FORMAT
+
+abstract type ParamSparseMatrixCSR{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSR{Tv,Ti}} end
+
+struct ConsecutiveParamSparseMatrixCSR{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSR{Tv,Ti,L}
+  m::Int64
+  n::Int64
+  rowptr::Vector{Ti}
+  colval::Vector{Ti}
+  data::Matrix{Tv}
+  function ConsecutiveParamSparseMatrixCSR(
+    m::Int64,
+    n::Int64,
+    rowptr::Vector{Ti},
+    colval::Vector{Ti},
+    data::Matrix{Tv}
+    ) where {Tv,Ti}
+
+    L = size(data,2)
+    new{Tv,Ti,L}(m,n,rowptr,colval,data)
+  end
+end
+
+get_all_data(A::ConsecutiveParamSparseMatrixCSR) = A.data
+
+SparseMatrixCSR.getrowptr(A::ConsecutiveParamSparseMatrixCSR) = A.rowptr
+SparseMatrixCSR.colvals(A::ConsecutiveParamSparseMatrixCSR) = A.colval
+SparseArrays.nonzeros(A::ConsecutiveParamSparseMatrixCSR) = ConsecutiveParamArray(A.data)
+SparseArrays.nnz(A::ConsecutiveParamSparseMatrixCSR) = size(A.data,1)
+
+function ConsecutiveParamSparseMatrixCSR(a::AbstractVector{<:SparseMatrixCSR})
+  item = testitem(a)
+  m,n = size(item)
+  rowptr = getrowptr(item)
+  colval = colvals(item)
+
+  @notimplementedif (any(a->size(a) != (m,n)))
+
+  if (any(a->getrowptr(a) != rowptr, a) || any(a->colvals(a) != colval, a))
+    GenericParamSparseMatrixCSR(a)
+  end
+
+  ndata = nnz(item)
+  plength = length(a)
+  data = Matrix{Tv}(undef,ndata,plength)
+  p = 1
+  @inbounds for i in 1:plength
+    ai = a[i]
+    for j in 1:ndata
+      aij = nonzeros(ai)[j]
+      data[p] = aij
+      p += 1
+    end
+  end
+
+  ConsecutiveParamSparseMatrixCSR(m,n,rowptr,colval,data)
+end
+
+function param_array(a::SparseMatrixCSR,l::Integer;copy=false) where N
+  outer = (tfill(1,Val{N}())...,l)
+  data = repeat(nonzeros(a);outer)
+  !copy && LinearAlgebra.fillstored!(data,zero(eltype(a)))
+  m,n = size(a)
+  rowptr = getrowptr(a)
+  colval = colvals(a)
+  ConsecutiveParamSparseMatrixCSR(m,n,rowptr,colval,data)
+end
+
+ArraysOfArrays.innersize(A::ConsecutiveParamSparseMatrixCSR) = (A.m,A.n)
+
+Base.@propagate_inbounds function Base.getindex(A::ConsecutiveParamSparseMatrixCSR,i::Integer,j::Integer)
+  @boundscheck checkbounds(A,i,j)
+  if i == j
+    SparseMatrixCSR(A.m,A.n,A.rowptr,A.colval,getindex(A.data,:,i))
+  else
+    spzeros(innersize(A))
+  end
+end
+
+struct GenericParamSparseMatrixCSR{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSR{Tv,Ti,L}
+  m::Int64
+  n::Int64
+  rowptr::Vector{Ti}
+  colval::Vector{Ti}
+  data::Vector{Tv}
+  ptrs::Vector{Ti}
+  function GenericParamSparseMatrixCSR(
+    m::Int64,
+    n::Int64,
+    rowptr::Vector{Ti},
+    colval::Vector{Ti},
+    data::Matrix{Tv},
+    ptrs::Vector{Ti}
+    ) where {Tv,Ti}
+
+    L = length(ptrs)
+    new{Tv,Ti,L}(m,n,rowptr,colval,data)
+  end
+end
+
+get_all_data(A::GenericParamSparseMatrixCSR) = A.data
+
+function GenericParamSparseMatrixCSR(a::AbstractVector{<:SparseMatrixCSR{Tv}}) where Tv
+  item = testitem(a)
+  m,n = size(item)
+  plength = length(a)
+  ptrs = _vec_of_pointers(a)
+  Ti = eltype(ptrs)
+  u = one(Ti)
+  ndata = ptrs[end]-u
+  rowptr = Vector{Ti}(undef,ndata)
+  colval = Vector{Ti}(undef,ndata)
+  data = Vector{Tv}(undef,ndata)
+  p = 1
+  @inbounds for i in 1:plength
+    ai = a[i]
+    for j in nnz(ai)
+      rowptr[p] = getrowptr(ai)[j]
+      colval[p] = colvals(ai)[j]
+      data[p] = nonzeros(ai)[j]
+      p += 1
+    end
+  end
+  GenericParamSparseMatrixCSR(m,n,rowptr,colval,data)
+end
+
+ArraysOfArrays.innersize(A::GenericParamSparseMatrixCSR) = (A.m,A.n)
+
+Base.@propagate_inbounds function Base.getindex(A::GenericParamSparseMatrixCSR,i::Integer,j::Integer)
+  @boundscheck checkbounds(A,i,j)
+  u = one(eltype(A.ptrs))
+  pini = A.ptrs[i]
+  pend = A.ptrs[i+1]-u
+  nrow = A.nrows[i]
+  if i == j
+    SparseMatrixCSR(A.m,A.n,A.rowptr,A.colval,getindex(A.data,:,i))
+  else
+    spzeros(innersize(A))
+  end
+end
+
+function Base.getindex(A::GenericParamSparseMatrixCSR{Tv},i::Integer,j::Integer) where Tv
+  @boundscheck checkbounds(A,i,j)
+  if i == j
+    u = one(eltype(A.ptrs))
+    pini = A.ptrs[i]
+    pend = A.ptrs[i+1]-u
+    rowptr = A.rowptr[pini:pend]
+    colval = A.colval[pini:pend]
+    data = A.data[pini:pend]
+    SparseMatrixCSR(A.m,A.n,rowptr,colval,data)
+  else
+    fill(zero(Tv),nrow,ncol)
+  end
+end
+
+# utils
+
+function _vec_of_pointers(a::AbstractVector{<:AbstractSparseMatrix})
+  n = length(a)
+  ptrs = Vector{Int}(undef,n+1)
+  @inbounds for i in 1:n
+    ai = a[i]
+    ptrs[i+1] = nnz(ai)
+  end
+  length_to_ptrs!(ptrs)
+  ptrs
+end
