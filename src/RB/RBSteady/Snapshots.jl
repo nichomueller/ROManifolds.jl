@@ -40,7 +40,7 @@ function Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractRealization)
 end
 
 function IndexMaps.change_index_map(i::AbstractIndexMap,s::AbstractSnapshots)
-  Snapshots(param_data(s),i,get_realization(s))
+  Snapshots(get_all_data(s),i,get_realization(s))
 end
 
 function IndexMaps.change_index_map(f,s::AbstractSnapshots)
@@ -135,7 +135,7 @@ function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::Realization)
   GenericSnapshots(s,i,r)
 end
 
-ParamDataStructures.param_data(s::GenericSnapshots) = s.data
+ParamDataStructures.get_all_data(s::GenericSnapshots) = s.data
 ParamDataStructures.get_values(s::GenericSnapshots) = s.data
 IndexMaps.get_index_map(s::GenericSnapshots) = s.index_map
 get_realization(s::GenericSnapshots) = s.realization
@@ -143,7 +143,7 @@ get_realization(s::GenericSnapshots) = s.realization
 function get_indexed_values(s::GenericSnapshots)
   vi = vec(get_index_map(s))
   v = consecutive_getindex(s.data,vi,:)
-  ConsecutiveArrayOfArrays(v)
+  ConsecutiveParamArray(v)
 end
 
 Base.@propagate_inbounds function Base.getindex(
@@ -193,18 +193,18 @@ end
 
 param_indices(s::SnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
-ParamDataStructures.param_data(s::SnapshotsAtIndices) = param_data(s.snaps)
+ParamDataStructures.get_all_data(s::SnapshotsAtIndices) = get_all_data(s.snaps)
 IndexMaps.get_index_map(s::SnapshotsAtIndices) = get_index_map(s.snaps)
 
 function ParamDataStructures.get_values(s::SnapshotsAtIndices)
-  v = consecutive_getindex(param_data(s),:,param_indices(s))
-  ConsecutiveArrayOfArrays(v)
+  v = consecutive_getindex(get_all_data(s),:,param_indices(s))
+  ConsecutiveParamArray(v)
 end
 
 function get_indexed_values(s::SnapshotsAtIndices)
   vi = vec(get_index_map(s))
-  v = consecutive_getindex(param_data(s),vi,param_indices(s))
-  ConsecutiveArrayOfArrays(v)
+  v = consecutive_getindex(get_all_data(s),vi,param_indices(s))
+  ConsecutiveParamArray(v)
 end
 
 get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
@@ -304,7 +304,7 @@ end
 function get_indexed_values(s::ReshapedSnapshots)
   v = get_indexed_values(s.snaps)
   vr = reshape(v.data,s.size)
-  ConsecutiveArrayOfArrays(vr)
+  ConsecutiveParamArray(vr)
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::AbstractSnapshots{S,2}) where {T,S}
@@ -381,7 +381,7 @@ function Fields.BlockMap(s::NTuple,inds::AbstractVector{<:Integer})
   BlockMap(s,cis)
 end
 
-function Snapshots(data::BlockArrayOfArrays,i::AbstractArray{<:AbstractIndexMap},r::AbstractRealization)
+function Snapshots(data::BlockParamArray,i::AbstractArray{<:AbstractIndexMap},r::AbstractRealization)
   block_values = blocks(data)
   nblocks = blocksize(data)
   active_block_ids = findall(!iszero,block_values)

@@ -429,20 +429,20 @@ end
 
 # cache utils
 
-function RBSteady.select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveArrayOfArrays}},odeopcache,indices)
+function RBSteady.select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveParamVector}},odeopcache,indices)
   @unpack Us,Uts,tfeopcache,const_forms = odeopcache
   new_xhF = ()
   new_Us = ()
   for i = eachindex(Us)
     new_Us = (new_Us...,RBSteady.select_fe_space_at_indices(Us[i],indices))
-    new_XhF_i = ConsecutiveArrayOfArrays(us[i].data[:,indices])
+    new_XhF_i = ConsecutiveParamArray(us[i].data[:,indices])
     new_xhF = (new_xhF...,new_XhF_i)
   end
   new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_odeopcache
 end
 
-function RBSteady.select_evalcache_at_indices(us::Tuple{Vararg{BlockVectorOfVectors}},odeopcache,indices)
+function RBSteady.select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveBlockParamVector}},odeopcache,indices)
   @unpack Us,Uts,tfeopcache,const_forms = odeopcache
   new_xhF = ()
   new_Us = ()
@@ -452,7 +452,7 @@ function RBSteady.select_evalcache_at_indices(us::Tuple{Vararg{BlockVectorOfVect
     style = spacei.multi_field_style
     spacesi = [RBSteady.select_fe_space_at_indices(spaceij,indices) for spaceij in spacei]
     new_Us = (new_Us...,MultiFieldFESpace(VT,spacesi,style))
-    new_XhF_i = mortar([ConsecutiveArrayOfArrays(us_i.data[:,indices]) for us_i in blocks(us[i])])
+    new_XhF_i = mortar([ConsecutiveParamArray(us_i.data[:,indices]) for us_i in blocks(us[i])])
     new_xhF = (new_xhF...,new_XhF_i)
   end
   new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)

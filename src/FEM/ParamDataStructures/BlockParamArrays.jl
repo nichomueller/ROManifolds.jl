@@ -18,8 +18,11 @@ struct BlockParamArray{T,N,L,A<:AbstractArray{<:AbstractParamArray{T,N,L},N},B<:
   axes::B
 end
 
-const BlockVectorOfVectors{T,L,A} = BlockParamArray{T,1,L,A}
-const BlockMatrixOfMatrices{T,L,A} = BlockParamArray{T,2,L,A}
+const BlockParamVector{T,L} = BlockParamArray{T,1,L,<:AbstractVector{<:AbstractParamVector{T,L}}}
+const BlockParamMatrix{T,L} = BlockParamArray{T,2,L,<:AbstractMatrix{<:AbstractParamMatrix{T,L}}}
+
+const BlockConsecutiveParamVector{T,L} = BlockParamArray{T,1,L,<:AbstractVector{<:ConsecutiveParamVector{T,L}}}
+const BlockConsecutiveParamMatrix{T,L} = BlockParamArray{T,2,L,<:AbstractMatrix{<:ConsecutiveParamMatrix{T,L}}}
 
 function BlockArrays._BlockArray(data::AbstractArray{<:AbstractParamArray,N},axes::NTuple{N,AbstractUnitRange{Int}}) where N
   BlockParamArray(data,axes)
@@ -65,7 +68,7 @@ Base.@propagate_inbounds function Base.getindex(A::BlockParamArray{T,N},i::Block
   BlockArrays._blockindex_getindex(A,i)
 end
 
-Base.@propagate_inbounds function Base.getindex(A::BlockVectorOfVectors{T},i::BlockIndex{1}) where {T}
+Base.@propagate_inbounds function Base.getindex(A::BlockParamVector{T},i::BlockIndex{1}) where {T}
   BlockArrays._blockindex_getindex(A,i)
 end
 
@@ -93,7 +96,7 @@ Base.@propagate_inbounds function Base.setindex!(A::BlockParamArray{T,N},v,i::Bl
   A
 end
 
-Base.@propagate_inbounds function Base.setindex!(A::BlockVectorOfVectors{T},v,i::BlockIndex{1}) where {T}
+Base.@propagate_inbounds function Base.setindex!(A::BlockParamVector{T},v,i::BlockIndex{1}) where {T}
   _blockindex_setindex!(A,v,i)
   A
 end
@@ -106,7 +109,7 @@ end
   return A
 end
 
-Base.@propagate_inbounds function Base.getindex(A::BlockVectorOfVectors{T},i::Block{1}) where T
+Base.@propagate_inbounds function Base.getindex(A::BlockParamVector{T},i::Block{1}) where T
   @boundscheck blockcheckbounds(A,i)
   getindex(A.data,i.n...)
 end
@@ -116,7 +119,7 @@ Base.@propagate_inbounds function Base.getindex(A::BlockParamArray{T,N},i::Block
   getindex(A.data,i.n...)
 end
 
-Base.@propagate_inbounds function Base.setindex!(A::BlockVectorOfVectors{T},v,i::Block{1}) where T
+Base.@propagate_inbounds function Base.setindex!(A::BlockParamVector{T},v,i::Block{1}) where T
   @boundscheck blockcheckbounds(A,i)
   setindex!(A.data,v,i.n...)
 end
@@ -127,11 +130,11 @@ Base.@propagate_inbounds function Base.setindex!(A::BlockParamArray{T,N},v,i::Bl
 end
 
 function Base.similar(A::BlockParamArray{T,N},::Type{<:AbstractArray{T′,N}}) where {T,T′,N}
-  BlockParamArray(map(a->similar(a,Array{T′,N}),A.data),A.axes)
+  BlockParamArray(map(a->similar(a,Array{T′,N}),blocks(A)),A.axes)
 end
 
 function Base.similar(A::BlockParamArray{T,N},::Type{<:AbstractArray{T′,N}},axes::BlockedUnitRange) where {T,T′,N}
-  BlockParamArray(map(a->similar(a,Array{T′,N}),A.data),A.axes)
+  BlockParamArray(map((a,ax)->similar(a,Array{T′,N},ax),blocks(A),blocks(axes)),A.axes)
 end
 
 function Base.copyto!(A::BlockParamArray,B::BlockParamArray)
@@ -155,4 +158,14 @@ function LinearAlgebra.norm(A::BlockParamArray)
     n += norm(b)^2
   end
   return sqrt(n)
+end
+
+function param_entry(A::BlockParamArray{T,N},i::Vararg{Integer}) where {T,N}
+  n = length(blocks(A))
+  L = param_length(A)
+  entries = Vector{Vector{T}}(undef,n)
+  @inbounds for (k,Ak) in enumerate(blocks(A))
+    entries[k] = param_entry(Ak,i...)
+  end
+  mortar(entries)
 end

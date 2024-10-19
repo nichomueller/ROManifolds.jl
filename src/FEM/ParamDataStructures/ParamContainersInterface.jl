@@ -11,12 +11,12 @@ param_length(a::Union{Number,AbstractArray{<:Number}}) = 0
 param_length(a::CellField) = param_length(testitem(get_data(a)))
 
 """
-    param_data(a) -> Any
+    get_param_data(a) -> Any
 
 Returns the parametric data of `a`
 
 """
-param_data(a) = @abstractmethod
+get_param_data(a) = @abstractmethod
 
 """
     param_getindex(a,i::Integer) -> Any
@@ -28,16 +28,6 @@ param_getindex(a,i::Integer) = @abstractmethod
 param_getindex(a::Union{Nothing,Function,Map},i::Integer) = a
 
 param_setindex!(a,v,i::Integer) = @abstractmethod
-
-"""
-    param_entry(a,i::Integer...) -> AbstractVector{eltype(a)}
-
-Same as getindex(a,i::Integer...), but across every parameter defining `a`. The
-result is an abstract vector of length `param_length`(`a`). It often outputs a
-[`ParamNumber`]
-
-"""
-param_entry(a,i::Integer...) = @abstractmethod
 
 param_eachindex(a) = Base.OneTo(param_length(a))
 
@@ -92,7 +82,7 @@ abstract type AbstractParamContainer{T,N,L} <: AbstractArray{T,N} end
 param_length(::Type{<:AbstractParamContainer{T,N,L}}) where {T,N,L} = L
 param_length(::T) where {T<:AbstractParamContainer} = param_length(T)
 
-param_data(A::AbstractParamContainer) = map(i->param_getindex(A,i),param_eachindex(A))
+get_param_data(A::AbstractParamContainer) = (param_getindex(A,i) for i in param_eachindex(A))
 
 function to_param_quantity(a::AbstractParamContainer,plength::Integer)
   @check param_length(a) == plength
@@ -134,7 +124,6 @@ end
 
 param_getindex(a::ParamNumber,i::Integer) = getindex(a,i)
 param_setindex!(a::ParamNumber,v,i::Integer) = setindex!(a,v,i)
-param_entry(a::ParamNumber,i::Integer) = getindex(a,i)
 
 to_param_quantity(a::Number,plength::Integer) = ParamNumber(fill(a,plength))
 

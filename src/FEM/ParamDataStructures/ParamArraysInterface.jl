@@ -13,11 +13,11 @@ const AbstractParamVector{T,L} = AbstractParamArray{T,1,L,<:AbstractVector{T}}
 const AbstractParamMatrix{T,L} = AbstractParamArray{T,2,L,<:AbstractMatrix{T}}
 
 """
-    ParamArray(A::AbstractVector{<:AbstractArray}) -> ArrayOfArrays
-    ParamArray(A::AbstractVector{<:SparseMatrixCSC}) -> MatrixOfSparseMatricesCSC
-    ParamArray(A::AbstractArray{<:Number},plength::Int) -> ArrayOfTrivialArrays
     ParamArray(A::AbstractArray{<:Number}) -> ParamNumber
-    ParamArray(A::AbstractArray{<:ParamArray}) -> BlockArrayOfArrays
+    ParamArray(A::AbstractArray{<:Number},plength::Int) -> TrivialParamArray
+    ParamArray(A::AbstractVector{<:AbstractArray}) -> ParamArray
+    ParamArray(A::AbstractVector{<:AbstractSparseMatrix}) -> ParamSparseMatrix
+    ParamArray(A::AbstractArray{<:ParamArray}) -> BlockParamArray
 
 Generic constructor of a AbstractParamArray
 
@@ -34,13 +34,10 @@ end
 
 param_getindex(A::AbstractParamArray{T,N},i::Integer) where {T,N} = getindex(A,tfill(i,Val{N}())...)
 param_setindex!(A::AbstractParamArray{T,N},v,i::Integer) where {T,N} = setindex!(A,v,tfill(i,Val{N}())...)
+get_param_entry(A::AbstractParamArray,i::Vararg{Integer}) = @abstractmethod
 to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
 
-# we don't care about dims
-function Base.similar(A::AbstractParamArray{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N}
-  @notimplemented
-end
-
+innerlength(A::AbstractParamArray) = prod(innersize(A))
 inneraxes(A::AbstractParamArray) = Base.OneTo.(innersize(A))
 
 for op in (:+,:-)
@@ -126,11 +123,11 @@ end
 
 function LinearAlgebra.dot(A::AbstractParamArray,B::AbstractParamArray)
   @check size(A) == size(B)
-  return map(dot,param_data(A),param_data(B))
+  return map(dot,get_param_data(A),get_param_data(B))
 end
 
 function LinearAlgebra.norm(A::AbstractParamArray)
-  return map(norm,param_data(A))
+  return map(norm,get_param_data(A))
 end
 
 for factorization in (:LU,:Cholesky)
@@ -345,7 +342,7 @@ function param_evaluate!(
 
   cache,data = C
   @inbounds for i = param_eachindex(A)
-    data.data[i] = evaluate!(cache[i],f,param_getindex(A,i),b...)
+    data[i] = evaluate!(cache[i],f,param_getindex(A,i),b...)
   end
   return data
 end
@@ -359,7 +356,7 @@ function param_evaluate!(
 
   cache,data = C
   @inbounds for i = param_eachindex(B)
-    data.data[i] = evaluate!(cache[i],f,a,param_getindex(B,i),c...)
+    data[i] = evaluate!(cache[i],f,a,param_getindex(B,i),c...)
   end
   return data
 end
@@ -374,7 +371,7 @@ function param_evaluate!(
 
   cache,data = C′
   @inbounds for i = param_eachindex(C)
-    data.data[i] = evaluate!(cache[i],f,a,b,param_getindex(C,i),d...)
+    data[i] = evaluate!(cache[i],f,a,b,param_getindex(C,i),d...)
   end
   return data
 end
@@ -692,7 +689,7 @@ for T in (:AbstractParamArray,:AbstractArray,:Nothing), S in (:AbstractParamArra
   @eval begin
     function Arrays.return_cache(f::Fields.ZeroBlockMap,A::$T,B::$S)
       # pA,pB = to_param_quantities(A,B)
-      # map(param_data(pA),param_data(pB)) do a,b
+      # map(get_param_data(pA),get_param_data(pB)) do a,b
       #   CachedArray(similar(a,eltype(a),size(b)))
       # end |> ParamArray
       @error "stop here"
@@ -703,7 +700,7 @@ end
 
 function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,A::AbstractArray,B::AbstractArray)
   # _,pA,pB = to_param_quantities(C,A,B)
-  # map(param_data(C),param_data(pA),param_data(pB)) do c,a,b
+  # map(get_param_data(C),get_param_data(pA),get_param_data(pB)) do c,a,b
   #   evaluate!(c,f,collect(a),collect(b))
   # end |> ParamArray
   @error "stop here"
@@ -712,7 +709,7 @@ end
 
 function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,a::Nothing,B::AbstractArray)
   # _,pB = to_param_quantities(C,B)
-  # map(param_data(C),param_data(pB)) do c,b
+  # map(get_param_data(C),get_param_data(pB)) do c,b
   #   evaluate!(c,f,a,collect(b))
   # end
   @error "stop here"

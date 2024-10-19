@@ -6,7 +6,7 @@ function get_param_matrix_builder(
   M = get_array_type(mat)
   T = eltype(M)
   L = length(r)
-  pmatrix_type = MatrixOfSparseMatricesCSC{T,Int,L}
+  pmatrix_type = ConsecutiveParamSparseMatrixCSC{T,Int,L}
   SparseMatrixBuilder(pmatrix_type)
 end
 
@@ -18,7 +18,7 @@ function get_param_vector_builder(
   V = get_array_type(vec)
   T = eltype(V)
   L = length(r)
-  pvector_type = ConsecutiveVectorOfVectors{T,L}
+  pvector_type = ConsecutiveParamVector{T,L}
   ArrayBuilder(pvector_type)
 end
 

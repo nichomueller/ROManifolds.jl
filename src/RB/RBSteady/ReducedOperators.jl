@@ -417,38 +417,38 @@ function select_fe_space_at_indices(fs::TrivialParamFESpace,indices)
 end
 
 function select_fe_space_at_indices(fs::SingleFieldParamFESpace,indices)
-  dvi = ConsecutiveArrayOfArrays(fs.dirichlet_values.data[:,indices])
+  dvi = ConsecutiveParamArray(fs.dirichlet_values.data[:,indices])
   TrialParamFESpace(dvi,fs.space)
 end
 
-function select_evalcache_at_indices(u::ConsecutiveArrayOfArrays,paramcache,indices)
+function select_evalcache_at_indices(u::ConsecutiveParamArray,paramcache,indices)
   @unpack Us,Ups,pfeopcache,form = paramcache
   new_Us = select_fe_space_at_indices(Us,indices)
-  new_XhF = ConsecutiveArrayOfArrays(u.data[:,indices])
+  new_XhF = ConsecutiveParamArray(u.data[:,indices])
   new_paramcache = ParamCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_paramcache
 end
 
-function select_evalcache_at_indices(u::BlockVectorOfVectors,paramcache,indices)
+function select_evalcache_at_indices(u::ConsecutiveBlockParamVector,paramcache,indices)
   @unpack Us,Ups,pfeopcache,form = paramcache
   VT = Us.vector_type
   style = Us.multi_field_style
   spaces = select_fe_space_at_indices(Us,indices)
   new_Us = MultiFieldFESpace(VT,spaces,style)
-  new_XhF = mortar([ConsecutiveArrayOfArrays(b.data[:,indices]) for b in blocks(u)])
+  new_XhF = mortar([ConsecutiveParamArray(b.data[:,indices]) for b in blocks(u)])
   new_paramcache = ParamCache(new_Us,Uts,tfeopcache,const_forms)
   return new_xhF,new_paramcache
 end
 
-function select_slvrcache_at_indices(b::ConsecutiveArrayOfArrays,indices)
-  ConsecutiveArrayOfArrays(b.data[:,indices])
+function select_slvrcache_at_indices(b::ConsecutiveParamArray,indices)
+  ConsecutiveParamArray(b.data[:,indices])
 end
 
-function select_slvrcache_at_indices(A::MatrixOfSparseMatricesCSC,indices)
-  MatrixOfSparseMatricesCSC(A.m,A.n,A.colptr,A.rowval,A.data[:,indices])
+function select_slvrcache_at_indices(A::ConsecutiveParamSparseMatrixCSC,indices)
+  ConsecutiveParamSparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,A.data[:,indices])
 end
 
-function select_slvrcache_at_indices(A::BlockArrayOfArrays,indices)
+function select_slvrcache_at_indices(A::BlockParamArray,indices)
   map(a -> select_slvrcache_at_indices(a,indices),blocks(A)) |> mortar
 end
 
@@ -470,7 +470,7 @@ end
 
 function Arrays.return_cache(
   ::typeof(select_at_indices),
-  s::Union{BlockArray,BlockArrayOfArrays},
+  s::Union{BlockArray,BlockParamArray},
   a::BlockHyperReduction,
   args...)
 
@@ -482,7 +482,7 @@ function Arrays.return_cache(
   return block_cache
 end
 
-function select_at_indices(s::Union{BlockArray,BlockArrayOfArrays},a::BlockHyperReduction,args...)
+function select_at_indices(s::Union{BlockArray,BlockParamArray},a::BlockHyperReduction,args...)
   s′ = return_cache(select_at_indices,s,a,args...)
   for i = eachindex(a)
     if a.touched[i]

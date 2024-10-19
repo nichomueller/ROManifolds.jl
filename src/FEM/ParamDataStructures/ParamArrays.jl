@@ -4,9 +4,9 @@
 Type representing parametric arrays of type A. L encodes the parametric length.
 Subtypes:
 - [`ParamArray`](@ref).
-- [`ConsecutiveArrayOfArrays`](@ref).
-- [`ArrayOfTrivialArrays`](@ref).
-- [`BlockArrayOfArrays`](@ref).
+- [`ConsecutiveParamArray`](@ref).
+- [`TrivialParamArray`](@ref).
+- [`BlockParamArray`](@ref).
 
 """
 abstract type ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}} end
@@ -85,11 +85,6 @@ function (*)(A::ParamArray,B::ParamArray)
   @notimplemented
 end
 
-function param_entry(A::ParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
-  @deprecate
-  # get_all_data(A)[i...,:]
-end
-
 function param_view(A::ParamArray,i::Union{Integer,AbstractVector,Colon}...)
   @deprecate
   # ParamArray(view(get_all_data(A),i...,:))
@@ -149,6 +144,11 @@ function Base.similar(A::TrivialParamArray{T,N},::Type{<:AbstractArray{T′}}) w
   TrivialParamArray(data′,param_length(A))
 end
 
+function Base.similar(A::TrivialParamArray{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N,N}
+  data′ = similar(get_all_data(A),T′,dims...)
+  TrivialParamArray(data′,param_length(A))
+end
+
 function Base.copyto!(A::TrivialParamArray,B::TrivialParamArray)
   @check size(A) == size(B)
   copyto!(get_all_data(A),get_all_data(B))
@@ -158,6 +158,11 @@ end
 function Arrays.CachedArray(A::TrivialParamArray)
   data′ = CachedArray(get_all_data(A))
   TrivialParamArray(data′,param_length(A))
+end
+
+function get_param_entry(A::TrivialParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
+  entry = getindex(get_all_data(A),i...)
+  fill(entry,param_length(A))
 end
 
 struct ConsecutiveParamArray{T,N,L,M} <: ParamArray{T,N,L}
@@ -224,6 +229,12 @@ function Base.similar(A::ConsecutiveParamArray{T,N},::Type{<:AbstractArray{T′,
   ConsecutiveParamArray(data′)
 end
 
+function Base.similar(A::ConsecutiveParamArray{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N,N}
+  pdims = (dims...,param_length(A))
+  data′ = similar(get_all_data(A),T′,pdims...)
+  ConsecutiveParamArray(data′)
+end
+
 function Base.copyto!(A::ConsecutiveParamArray,B::ConsecutiveParamArray)
   copyto!(get_all_data(A),get_all_data(B))
   A
@@ -260,6 +271,10 @@ end
 function Arrays.CachedArray(A::ConsecutiveParamArray)
   data′ = CachedArray(get_all_data(A))
   ConsecutiveParamArray(data′)
+end
+
+function get_param_entry(A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
+  getindex(get_all_data(A),i...,:)
 end
 
 """
@@ -330,7 +345,7 @@ function Base.copy(A::GenericParamVector)
   GenericParamVector(data′,ptrs)
 end
 
-function Base.similar(A::GenericParamVector{T,N},::Type{<:AbstractVector{T′}}) where {T,T′,N}
+function Base.similar(A::GenericParamVector{T},::Type{<:AbstractVector{T′}}) where {T,T′}
   data′ = similar(get_all_data(A),T′)
   ptrs = get_ptrs(A)
   GenericParamVector(data′,ptrs)
@@ -381,6 +396,14 @@ function Arrays.CachedArray(A::GenericParamVector)
   data′ = CachedArray(get_all_data(A))
   ptrs = get_ptrs(A)
   GenericParamVector(data′,ptrs)
+end
+
+function get_param_entry(A::GenericParamVector{T,L},i::Integer) where {T,L}
+  entries = Vector{T}(undef,L)
+  @inbounds for k in param_eachindex(A)
+    entries[k] = A[k][i]
+  end
+  entries
 end
 
 struct GenericParamMatrix{Tv,Ti} <: AbstractMatrix{Tv}
@@ -491,6 +514,14 @@ function Arrays.CachedArray(A::GenericParamMatrix)
   ptrs = get_ptrs(A)
   nrows = get_nrows(A)
   GenericParamMatrix(data′,ptrs,nrows)
+end
+
+function get_param_entry(A::GenericParamMatrix{T,L},i::Integer,j::Integer) where {T,L}
+  entries = Vector{T}(undef,L)
+  @inbounds for k in param_eachindex(A)
+    entries[k] = A[k][i,j]
+  end
+  entries
 end
 
 # utils

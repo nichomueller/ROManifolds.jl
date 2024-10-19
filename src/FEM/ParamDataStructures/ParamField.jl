@@ -228,7 +228,7 @@ end
 function Arrays.evaluate!(cache,f::Union{ParamField,BroadcastOpParamFieldArray},x::AbstractArray{<:Point})
   l,g = cache
   @inbounds for i in param_eachindex(f)
-    g.data[i] = evaluate!(l[i],param_getindex(f,i),x)
+    g[i] = evaluate!(l[i],param_getindex(f,i),x)
   end
   g
 end
@@ -247,7 +247,7 @@ end
 function Arrays.evaluate!(cache,f::Broadcasting{typeof(∇)},a::BroadcastOpParamFieldArray)
   cx,array = cache
   @inbounds for i = param_eachindex(array)
-    array.data[i] = evaluate!(cx[i],f,param_getindex(a,i))
+    array[i] = evaluate!(cx[i],f,param_getindex(a,i))
   end
   array
 end

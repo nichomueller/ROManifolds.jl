@@ -13,19 +13,19 @@ const TransientEvalRBSpace{A<:FESubspace} = EvalRBSpace{A,<:TransientRealization
 _change_length(::Type{T},r::TransientRealization) where T = T
 
 function _change_length(
-  ::Type{<:ConsecutiveVectorOfVectors{T,L}},
+  ::Type{ConsecutiveParamVector{T,L}},
   r::TransientRealization
   ) where {T,L}
 
-  ConsecutiveVectorOfVectors{T,Int(L/num_times(r))}
+  ConsecutiveParamVector{T,Int(L/num_times(r))}
 end
 
 function _change_length(
-  ::Type{<:BlockVectorOfVectors{T,L}},
+  ::Type{<:BlockParamVector{T,L}},
   r::TransientRealization
   ) where {T,L}
 
-  BlockVectorOfVectors{T,Int(L/num_times(r))}
+  BlockParamVector{T,Int(L/num_times(r))}
 end
 
 function FESpaces.get_vector_type(r::TransientEvalRBSpace)
@@ -33,7 +33,7 @@ function FESpaces.get_vector_type(r::TransientEvalRBSpace)
   return _change_length(V,r.realization)
 end
 
-function RBSteady.project!(x̂,r::TransientEvalRBSpace,x::AbstractParamVector)
+function RBSteady.project!(x̂,r::TransientEvalRBSpace,x::ConsecutiveParamVector)
   np = num_params(r.realization)
   nt = num_times(r.realization)
   rsub = RBSteady.get_reduced_subspace(r)
@@ -65,7 +65,7 @@ const TransientEvalMultiFieldRBSpace = EvalMultiFieldRBSpace{<:TransientRealizat
 
 for f! in (:(RBSteady.project!),:(RBSteady.inv_project!))
   @eval begin
-    function $f!(y,r::TransientEvalMultiFieldRBSpace,x::Union{BlockVector,BlockVectorOfVectors})
+    function $f!(y,r::TransientEvalMultiFieldRBSpace,x::Union{BlockVector,BlockParamVector})
       for i in 1:blocklength(x)
         $f!(y[Block(i)],r[i],x[Block(i)])
       end

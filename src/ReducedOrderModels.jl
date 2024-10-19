@@ -119,12 +119,12 @@ export shift!
 export AbstractParamContainer
 export ParamContainer
 export ParamNumber
-export param_data
+export get_param_data
 export param_length
 export param_eachindex
 export param_getindex
 export param_setindex!
-export param_entry
+export get_param_entry
 
 export ParamField
 export ParamFieldGradient
@@ -135,28 +135,29 @@ export AbstractParamArray
 export AbstractParamVector
 export AbstractParamMatrix
 export ParamSparseMatrix
-export ParamArray
 export param_array
 
-export ArrayOfArrays
-export VectorOfVectors
-export MatrixOfMatrices
+export ParamArray
+export ParamVector
+export ParamMatrix
+export TrivialParamArray
 
-export ConsecutiveArrayOfArrays
-export ConsecutiveVectorOfVectors
-export ConsecutiveMatrixOfMatrices
-export AbstractConsecutiveParamVector
-export AbstractConsecutiveParamMatrix
+export ConsecutiveParamVector
+export ConsecutiveParamMatrix
 
-export MatrixOfSparseMatricesCSC
-export VectorOfSparseVectors
+export ParamSparseMatrix
+export ParamSparseMatrixCSC
+export ParamSparseMatrixCSR
+export ConsecutiveParamSparseMatrixCSC
+export GenericParamSparseMatrixCSC
+export ConsecutiveParamSparseMatrixCSR
+export GenericParamSparseMatrixCSR
 
-export ArrayOfTrivialArrays
-
-export BlockArrayOfArrays
-export BlockVectorOfVectors
-export BlockMatrixOfMatrices
-export BlockParamView
+export BlockParamArray
+export BlockParamVector
+export BlockParamMatrix
+export BlockConsecutiveParamVector
+export BlockConsecutiveParamMatrix
 
 export Contribution
 export ArrayContribution

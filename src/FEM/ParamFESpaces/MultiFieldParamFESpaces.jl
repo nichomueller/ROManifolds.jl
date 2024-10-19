@@ -49,7 +49,7 @@ end
 function MultiField._restrict_to_field(
   f,
   mfs::BlockMultiFieldStyle{NB,SB,P},
-  free_values::BlockVectorOfVectors,
+  free_values::BlockParamVector,
   field
   ) where {NB,SB,P}
 

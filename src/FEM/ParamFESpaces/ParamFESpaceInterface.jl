@@ -121,47 +121,25 @@ function FESpaces._fill_dirichlet_values_for_tag!(
   dv::AbstractParamVector,
   tag,
   dirichlet_dof_to_tag)
-  @notimplemented
-end
-
-function FESpaces._fill_dirichlet_values_for_tag!(
-  dirichlet_values::ConsecutiveParamVector,
-  dv::ConsecutiveParamVector,
-  tag,
-  dirichlet_dof_to_tag)
 
   @check param_length(dirichlet_values) == param_length(dv)
-  for dof in 1:_innerlength(dv)
+  for dof in 1:innerlength(dv)
     if dirichlet_dof_to_tag[dof] == tag
       @inbounds for k in param_eachindex(dirichlet_values)
-        dirichlet_values.data[dof,k] = dv.data[dof,k]
+        dirichlet_values[k][dof] = dv[k][dof]
       end
     end
   end
 end
 
 function FESpaces._free_and_dirichlet_values_fill!(
-  dirichlet_values::AbstractParamVector,
-  dv::AbstractParamVector,
+  free_vals::AbstractParamVector,
+  dirichlet_vals::AbstractParamVector,
   cache_vals,
   cache_dofs,
   cell_vals,
   cell_dofs,
   cells)
-  @notimplemented
-end
-
-function FESpaces._free_and_dirichlet_values_fill!(
-  free_vals::ConsecutiveParamVector,
-  dirichlet_vals::ConsecutiveParamVector,
-  cache_vals,
-  cache_dofs,
-  cell_vals,
-  cell_dofs,
-  cells)
-
-  _get(v::ConsecutiveParamVector,i,k) = v.data[i,k]
-  _get(v::AbstractParamVector,i,k) = param_getindex(v,k)[i]
 
   @check param_length(free_vals) == param_length(dirichlet_vals)
   for cell in cells
@@ -169,11 +147,11 @@ function FESpaces._free_and_dirichlet_values_fill!(
     dofs = getindex!(cache_dofs,cell_dofs,cell)
     for (i,dof) in enumerate(dofs)
       @inbounds for k in param_eachindex(dirichlet_vals)
-        val = _get(vals,i,k)
+        val = vals[k][i]
         if dof > 0
-          free_vals.data[dof,k] = val
+          free_vals[k][dofs] = val
         elseif dof < 0
-          dirichlet_vals.data[-dof,k] = val
+          dirichlet_vals[k][-dof] = val
         else
           @unreachable "dof ids either positive or negative, not zero"
         end
@@ -206,8 +184,8 @@ FESpaces.ConstraintStyle(::Type{<:TrivialParamFESpace{S}}) where S = ConstraintS
 # Extend some of Gridap's functions when needed
 function FESpaces.FEFunction(
   f::TrivialParamFESpace{<:ZeroMeanFESpace},
-  free_values::ParamVector,
-  dirichlet_values::ParamVector)
+  free_values::AbstractParamVector,
+  dirichlet_values::AbstractParamVector)
 
   zf = f.space
   c = FESpaces._compute_new_fixedval(
@@ -222,16 +200,22 @@ function FESpaces.FEFunction(
   FEFunction(f.space,fv,dv)
 end
 
-function FESpaces._compute_new_fixedval(fv::ParamVector,dv::ParamVector,vol_i,vol,fixed_dof)
-  @assert length(testitem(fv)) + 1 == length(vol_i)
-  @assert length(testitem(dv)) == 1
+function FESpaces._compute_new_fixedval(
+  fv::AbstractParamVector,
+  dv::AbstractParamVector,
+  vol_i,
+  vol,
+  fixed_dof)
+
+  @assert innerlength(fv) + 1 == length(vol_i)
+  @assert innerlength(dv) == 1
   @assert param_length(fv) == param_length(dv)
 
   c = zero(eltype(vol_i),param_length(fv))
   @inbounds for k in param_eachindex(fv)
     ck = c[k]
-    fvk = param_eachindex(fv,k)
-    dvk = param_eachindex(dv,k)
+    fvk = fv[k]
+    dvk = dv[k]
     for i=1:fixed_dof-1
       ck += fvk[i]*vol_i[i]
     end
@@ -259,67 +243,220 @@ function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:TrialFESpace{<:Zer
 end
 
 function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:TrivialParamFESpace{<:ZeroMeanFESpace}},free_values)
-  zf = f.space
-  f′ = TrivialParamFESpace(zf.space,param_length(f))
-  FEFunction(f′,free_values)
+  @error "do i need this?"
+end
+
+for T in (:TrialFESpace,:TProductFESpace,:ZeroMeanFESpace)
+  @eval begin
+    function FESpaces.scatter_free_and_dirichlet_values(
+      tf::TrivialParamFESpace{<:$T},
+      fv::AbstractParamVector,
+      dv::AbstractParamVector)
+
+      f = tf.space
+      tf′ = TrivialParamFESpace(f.space,param_length(tf))
+      scatter_free_and_dirichlet_values(tf′,fv,dv)
+    end
+  end
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::TrivialParamFESpace{<:TrialFESpace},
+  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
   fv::AbstractParamVector,
-  dv::AbstractParamVector)
-
-  tf = f.space
-  f′ = TrivialParamFESpace(tf.space,param_length(f))
-  scatter_free_and_dirichlet_values(f′,fv,dv)
-end
-
-function FESpaces.scatter_free_and_dirichlet_values(
-  f::TrivialParamFESpace{<:TProductFESpace},
-  fv::AbstractParamVector,
-  dv::AbstractParamVector)
-
-  tf = f.space
-  f′ = TrivialParamFESpace(tf.space,param_length(f))
-  scatter_free_and_dirichlet_values(f′,fv,dv)
-end
-
-function FESpaces.scatter_free_and_dirichlet_values(
-  f::TrivialParamFESpace{<:ZeroMeanFESpace},
-  fv::AbstractParamVector,
-  dv::AbstractParamVector)
-
-  zf = f.space
-  f′ = TrivialParamFESpace(zf.space,param_length(f))
-  scatter_free_and_dirichlet_values(f′,fv,dv)
-end
-
-function FESpaces.scatter_free_and_dirichlet_values(
-  f::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
-  free_values::AbstractParamVector,
-  dirichlet_values::AbstractParamVector
+  dv::AbstractParamVector
   ) where T<:FESpaces.FixConstant
 
-  ff = f.space
-  @check param_length(free_values) == param_length(dirichlet_values)
-  fv,dv = map(param_data(free_values),param_data(dirichlet_values)) do fv,dv
-    _fv = FESpaces.VectorWithEntryInserted(fv,ff.dof_to_fix,dv[1])
-    _dv = similar(dv,eltype(dv),0)
-    return _fv,_dv
-  end |> tuple_of_arrays
-  f′ = TrivialParamFESpace(ff.space,param_length(f))
-  scatter_free_and_dirichlet_values(f′,ConsecutiveArrayOfArrays(fv),ConsecutiveArrayOfArrays(dv))
+  @assert innerlength(dv) == 1
+  f = tf.space
+  tf′ = TrivialParamFESpace(f.space,param_length(f))
+  _dv = similar(dv,eltype(dv),0)
+  _fv = VectorWithEntryInserted(fv,f.dof_to_fix,get_param_entry(dv,1))
+  scatter_free_and_dirichlet_values(tf′,_fv,_dv)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
-  free_values::AbstractParamVector,
-  dirichlet_values::AbstractParamVector
+  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
+  fv::AbstractParamVector,
+  dv::AbstractParamVector
   ) where T<:FESpaces.DoNotFixConstant
 
-  ff = f.space
-  @check all(length.(dirichlet_values) .== 0)
-  scatter_free_and_dirichlet_values(ff.space,free_values,dirichlet_values)
+  @assert innerlength(dv) == 0
+  f = tf.space
+  tf′ = TrivialParamFESpace(f.space,param_length(f))
+  scatter_free_and_dirichlet_values(tf′,fv,dv)
+end
+
+function FESpaces.gather_free_and_dirichlet_values(
+  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{FixConstant}},
+  cv)
+
+  f = tf.space
+  tf′ = TrivialParamFESpace(f.space,param_length(f))
+  _fv,_dv = gather_free_and_dirichlet_values(tf′,cv)
+  @assert innerlength(_dv) == 0
+  fv = ParamVectorWithEntryRemoved(_fv,f.dof_to_fix)
+  dv = get_param_entry(_fv,f.dof_to_fix:f.dof_to_fix)
+  (fv,dv)
+end
+
+function FESpaces.gather_free_and_dirichlet_values(
+  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{DoNotFixConstant}},
+  cv)
+
+  f = tf.space
+  tf′ = TrivialParamFESpace(f.space,param_length(f))
+  gather_free_and_dirichlet_values(tf′,cv)
+end
+
+function FESpaces.gather_free_and_dirichlet_values!(
+  fv,
+  dv,
+  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{FixConstant}},
+  cv)
+
+  @assert innerlength(dv) == 1
+  f = tf.space
+  tf′ = TrivialParamFESpace(f.space,param_length(f))
+  _dv = similar(dv,eltype(dv),0)
+  _fv = VectorWithEntryInserted(fv,f.dof_to_fix,zero(eltype(fv)))
+  gather_free_and_dirichlet_values!(_fv,_dv,tf′,cv)
+  dv[1] = _fv.value
+  (fv,dv)
+end
+
+function FESpaces.gather_free_and_dirichlet_values!(
+  fv,
+  dv,
+  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{DoNotFixConstant}},
+  cv)
+
+  f = tf.space
+  tf′ = TrivialParamFESpace(f.space,param_length(f))
+  gather_free_and_dirichlet_values!(fv,dv,tf′,cv)
+end
+
+function FESpaces.TrialFESpace(
+  f::TrivialParamFESpace{<:FESpaceWithConstantFixed{CA}}
+  ) where CA
+
+  f = tf.space
+  U = TrialFESpace(f)
+  TrivialParamFESpace(U,param_length(f))
+end
+
+# utils
+
+struct ParamVectorWithEntryRemoved{T,L,A} <: ParamVector{T,L}
+  a::A
+  index::Int
+  function ParamVectorWithEntryRemoved(a::A,index::Integer) where {T,L,A<:AbstractParamVector{T,L}}
+    @assert 1 <= index <= innerlength(a)
+    new{T,L,A}(a,index)
+  end
+end
+
+function Arrays.VectorWithEntryRemoved(a::AbstractParamVector,index::Int)
+  ParamVectorWithEntryRemoved(a,index)
+end
+
+const ConsecPVWithEntryRemoved{T,L} = ParamVectorWithEntryRemoved{T,L,ConsecutiveParamVector{T,L}}
+
+Base.size(v::ParamVectorWithEntryRemoved) = size(v.a)
+
+function Base.getindex(v::ParamVectorWithEntryRemoved,i::Integer)
+  i < v.index ? get_param_entry(v.a,i) : get_param_entry(v.a,i+1)
+end
+
+function Base.setindex!(a::ConsecPVWithEntryRemoved,v,i::Integer)
+  i < a.index ? (get_all_data(a.a)[i,:] = v) : (get_all_data(a.a)[i+1,:] = v)
+end
+
+function Base.setindex!(a::ParamVectorWithEntryRemoved,v,i::Integer)
+  @inbounds for k in param_eachindex(a.a)
+    if i < a.index
+      a.a[k][i] = v
+    else
+      a.a[k][i+1] = v
+    end
+  end
+end
+
+function Base.sum(v::ConsecPVWithEntryRemoved)
+  data = get_all_data(v.a)
+  sum(data,dims=1) - data[v.index,:]
+end
+
+function Base.sum(v::ParamVectorWithEntryRemoved{T,L})
+  s = zeros(T,L)
+  @inbounds for k in param_eachindex(v)
+    ak = v.a[k]
+    for i in 1:innerlength(v)
+      if i < v.index
+        s[i] += ak[i]
+      else
+        s[i] += ak[i+1]
+      end
+    end
+  end
+end
+
+struct ParamVectorWithEntryInserted{T,L,A} <: ParamVector{T,L}
+  a::A
+  index::Int
+  value::Vector{T}
+  function ParamVectorWithEntryInserted(a::A,index::Integer,value::Vector{T}) where {T,L,A<:AbstractParamVector{T,L}}
+    @assert 1 <= index <= innerlength(a)
+    new{T,L,A}(a,index,value)
+  end
+end
+
+function Arrays.VectorWithEntryInserted(a::AbstractParamVector,index::Int,value::AbstractVector)
+  ParamVectorWithEntryInserted(a,index,value)
+end
+
+const ConsecPVWithEntryInserted{T,L} = ParamVectorWithEntryInserted{T,L,ConsecutiveParamVector{T,L}}
+
+Base.size(v::ParamVectorWithEntryInserted) = size(v.a)
+
+function Base.getindex(v::ParamVectorWithEntryInserted,i::Integer)
+  i < v.index ? get_param_entry(v.a,i) : (i == v.index ? v.value : get_param_entry(v.a,i-1))
+end
+
+function Base.setindex!(a::ConsecPVWithEntryInserted,v,i::Integer)
+  i < a.index ? (get_all_data(a)[i,:] = v) : (i == a.index ? a.value : get_all_data(a)[i-1,:] = v)
+end
+
+function Base.setindex!(a::ParamVectorWithEntryInserted,v,i::Integer)
+  @inbounds for k in param_eachindex(a.a)
+    if i < a.index
+      a.a[k][i] = v
+    elseif i == a.index
+      a.value
+    else
+      a.a[k][i+1] = v
+    end
+  end
+end
+
+function Base.sum(v::ConsecPVWithEntryInserted)
+  data = get_all_data(v.a)
+  sum(data,dims=1) + v.value
+end
+
+function Base.sum(v::ParamVectorWithEntryInserted{T,L})
+  s = zeros(T,L)
+  @inbounds for k in param_eachindex(v.a)
+    ak = v.a[k]
+    for i in 1:innerlength(v.a)
+      if i < v.index
+        s[i] += ak[i]
+      elseif i == v.index
+        s[i] += v.value[i]
+      else
+        s[i] += ak[i+1]
+      end
+    end
+  end
 end
 
 # for testing purposes

@@ -22,7 +22,7 @@ end
 
 function TrialParamFESpace(space::SingleFieldFESpace,objects)
   dirichlet_values = [compute_dirichlet_values_for_tags(space,objects[i]) for i = param_eachindex(objects)]
-  TrialParamFESpace(ConsecutiveArrayOfArrays(dirichlet_values),space)
+  TrialParamFESpace(ConsecutiveParamArray(dirichlet_values),space)
 end
 
 function TrialParamFESpace!(dir_values::AbstractParamVector,space::SingleFieldFESpace,objects)

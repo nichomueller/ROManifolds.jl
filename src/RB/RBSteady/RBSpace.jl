@@ -217,7 +217,7 @@ end
 
 for f in (:project,:inv_project)
   @eval begin
-    function Arrays.return_cache(::typeof($f),r::MultiFieldRBSpace,x::Union{BlockVector,BlockVectorOfVectors})
+    function Arrays.return_cache(::typeof($f),r::MultiFieldRBSpace,x::Union{BlockVector,BlockParamVector})
       cache = return_cache($f,r[1],x[Block(1)])
       block_cache = Vector{typeof(cache)}(undef,num_fields(r))
       return mortar(block_cache)
@@ -283,9 +283,9 @@ end
 for T in (:MultiFieldRBSpace,:EvalMultiFieldRBSpace), f! in (:project!,:inv_project!)
   @eval begin
     function $f!(
-      y::Union{BlockVector,BlockVectorOfVectors},
+      y::Union{BlockVector,BlockParamVector},
       r::$T,
-      x::Union{BlockVector,BlockVectorOfVectors})
+      x::Union{BlockVector,BlockParamVector})
 
       for i in 1:blocklength(x)
         $f!(y[Block(i)],r[i],x[Block(i)])

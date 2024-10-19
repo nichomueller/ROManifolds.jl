@@ -57,7 +57,7 @@ end
 
 function Base.getindex(a::AbstractParamArray,i::IntegrationDomain)
   entries = consecutive_getindex(a,i,:)
-  ConsecutiveArrayOfArrays(entries)
+  ConsecutiveParamArray(entries)
 end
 
 function Base.getindex(a::ParamSparseMatrix,i::IntegrationDomain)

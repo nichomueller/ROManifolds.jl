@@ -155,7 +155,7 @@ function ParamDataStructures.shift!(a::AbstractParamArray,r::TransientRealizatio
   end
 end
 
-function ParamDataStructures.shift!(a::BlockVectorOfVectors,r::TransientRealization,α::Number,β::Number)
+function ParamDataStructures.shift!(a::BlockParamVector,r::TransientRealization,α::Number,β::Number)
   @inbounds for ai in blocks(a)
     ParamDataStructures.shift!(ai,r,α,β)
   end

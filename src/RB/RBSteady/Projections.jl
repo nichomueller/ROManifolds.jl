@@ -31,7 +31,7 @@ Base.:*(a::Projection,b::Projection,c::Projection) = galerkin_projection(a,b,c)
 Base.:*(a::Projection,x::AbstractArray) = inv_project(a,x)
 Base.:*(x::AbstractArray,b::Projection) = rescale(*,x,b)
 
-function Base.:*(b::Projection,y::ConsecutiveArrayOfArrays)
+function Base.:*(b::Projection,y::ConsecutiveParamArray)
   item = zeros(num_reduced_dofs(b))
   plength = param_length(y)
   x = param_array(item,plength)
@@ -42,7 +42,7 @@ function LinearAlgebra.mul!(x::AbstractArray,b::Projection,y::AbstractArray,α::
   mul!(x,get_basis(b),y,α,β)
 end
 
-function LinearAlgebra.mul!(x::ConsecutiveArrayOfArrays,b::Projection,y::ConsecutiveArrayOfArrays,α::Number,β::Number)
+function LinearAlgebra.mul!(x::ConsecutiveParamArray,b::Projection,y::ConsecutiveParamArray,α::Number,β::Number)
   mul!(x.data,get_basis(b),y.data,α,β)
 end
 
@@ -107,9 +107,9 @@ function LinearAlgebra.mul!(
 end
 
 function LinearAlgebra.mul!(
-  x::ConsecutiveArrayOfArrays,
+  x::ConsecutiveParamArray,
   b::ReducedMatProjection,
-  y::ConsecutiveArrayOfArrays,
+  y::ConsecutiveParamArray,
   α::Number,β::Number)
 
   contraction!(x.data,get_basis(b),y.data,α,β)
@@ -399,7 +399,7 @@ for f in (:project,:inv_project)
     function Arrays.return_cache(
       ::typeof($f),
       a::BlockProjection,
-      x::Union{BlockVector,BlockVectorOfVectors})
+      x::Union{BlockVector,BlockParamVector})
 
       @check size(a) == nblocks(x)
       y = Vector{eltype(x)}(undef,nblocks(a))
@@ -413,7 +413,7 @@ for f in (:project,:inv_project)
       return mortar(y)
     end
 
-    function $f(a::BlockProjection,x::Union{BlockArray,BlockArrayOfArrays})
+    function $f(a::BlockProjection,x::Union{BlockArray,BlockParamArray})
       y = return_cache($f,a,x)
       for i in eachindex(a)
         if a.touched[i]

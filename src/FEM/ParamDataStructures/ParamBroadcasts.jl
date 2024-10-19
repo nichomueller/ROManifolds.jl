@@ -85,7 +85,7 @@ end
 
 # param_materialize(A) = A
 # param_materialize(A::AbstractArray{<:AbstractArray{<:Number}}) = ArrayOfArrays(A)
-# param_materialize(A::AbstractArray{<:SparseMatrixCSC}) = MatrixOfSparseMatricesCSC(A)
+# param_materialize(A::AbstractArray{<:SparseMatrixCSC}) = ConsecutiveParamSparseMatrixCSC(A)
 
 function Base.materialize!(A::AbstractParamArray,B::ParamBroadcast)
   Base.materialize!(get_all_data(A),get_all_data(B))
@@ -102,23 +102,23 @@ Base.getindex(A::BlockParamBroadcast{B,N},i::Vararg{Integer,N}) where {B,N} = ge
 param_length(A::BlockParamBroadcast) = testitem(A.data)
 BlockArrays.blocks(A::BlockParamBroadcast) = A.data
 
-function Base.broadcasted(f,A::Union{BlockArrayOfArrays,BlockParamBroadcast}...)
+function Base.broadcasted(f,A::Union{BlockParamArray,BlockParamBroadcast}...)
   bc = map((x...)->Base.broadcasted(f,x...),map(blocks,A)...)
   BlockParamBroadcast(bc)
 end
 
-function Base.broadcasted(f,A::Union{BlockArrayOfArrays,BlockParamBroadcast},b::Number)
+function Base.broadcasted(f,A::Union{BlockParamArray,BlockParamBroadcast},b::Number)
   bc = map(a->Base.broadcasted(f,a,b),blocks(A))
   BlockParamBroadcast(bc)
 end
 
-function Base.broadcasted(f,a::Number,B::Union{BlockArrayOfArrays,BlockParamBroadcast})
+function Base.broadcasted(f,a::Number,B::Union{BlockParamArray,BlockParamBroadcast})
   bc = map(b->Base.broadcasted(f,a,b),blocks(B))
   BlockParamBroadcast(bc)
 end
 
 function Base.broadcasted(f,
-  A::Union{BlockArrayOfArrays,BlockParamBroadcast},
+  A::Union{BlockParamArray,BlockParamBroadcast},
   b::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}})
   Base.broadcasted(f,A,Base.materialize(b))
 end
@@ -126,7 +126,7 @@ end
 function Base.broadcasted(
   f,
   a::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}},
-  B::Union{BlockArrayOfArrays,BlockParamBroadcast})
+  B::Union{BlockParamArray,BlockParamBroadcast})
   Base.broadcasted(f,Base.materialize(a),B)
 end
 
@@ -134,12 +134,12 @@ function Base.materialize(B::BlockParamBroadcast)
   mortar(map(Base.materialize,blocks(B)))
 end
 
-function Base.materialize!(A::BlockArrayOfArrays,b::Broadcast.Broadcasted)
+function Base.materialize!(A::BlockParamArray,b::Broadcast.Broadcasted)
   map(a -> Base.materialize!(a,b),blocks(A))
   A
 end
 
-function Base.materialize!(A::BlockArrayOfArrays,B::BlockParamBroadcast)
+function Base.materialize!(A::BlockParamArray,B::BlockParamBroadcast)
   map(Base.materialize!,blocks(A),blocks(B))
   A
 end
