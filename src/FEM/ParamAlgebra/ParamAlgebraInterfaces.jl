@@ -7,7 +7,7 @@ end
 
 function Algebra.allocate_vector(::Type{<:BlockParamVector{T,L}},indices::BlockedUnitRange) where {T,L}
   V = ConsecutiveParamVector{T,L}
-  mortar(map(ids -> allocate_vector(VV,ids),blocks(indices)))
+  mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
 end
 
 function Algebra.allocate_in_range(::Type{V},matrix) where V<:AbstractParamVector

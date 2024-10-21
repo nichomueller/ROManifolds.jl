@@ -3,22 +3,14 @@
 ParamArray(A::AbstractArray{<:Number},plength::Integer) = TrivialParamArray(A,plength)
 ParamArray(a::AbstractVector{<:AbstractArray}) = ConsecutiveParamArray(a)
 
+get_all_data(A::ParamArray) = @abstractmethod
+
 function Base.setindex!(
   A::ParamArray{T,N,L},
   v::ParamArray{T′,N,L},
   i::Vararg{Integer,N}) where {T,T′,N,L}
 
   setindex!(get_all_data(A),get_all_data(v),i...,:)
-end
-
-get_all_data(A::ParamArray) = @abstractmethod
-
-function (+)(b::AbstractArray{<:Number},A::ParamArray)
-  (+)(A,b)
-end
-
-function (-)(b::AbstractArray{<:Number},A::ParamArray)
-  (-)((-)(A,b))
 end
 
 for f in (:(Base.maximum),:(Base.minimum))
@@ -35,11 +27,19 @@ for op in (:+,:-,:*,:/)
       B = copy(A)
       @inbounds for i in eachindex(B)
         bi = B[i]
-        B[i] = $op(bi,b[i])
+        B[i] = $op(bi,fill(b[i],size(bi)))
       end
       return B
     end
   end
+end
+
+function (+)(b::AbstractArray{<:Number},A::ParamArray)
+  (+)(A,b)
+end
+
+function (-)(b::AbstractArray{<:Number},A::ParamArray)
+  (-)((-)(A,b))
 end
 
 function Base.fill!(A::ParamArray,z::Number)
@@ -53,7 +53,6 @@ function LinearAlgebra.rmul!(A::ParamArray,b::Number)
 end
 
 function LinearAlgebra.axpy!(α::Number,A::ParamArray,B::ParamArray)
-  @check size(A) == size(B)
   axpy!(α,get_all_data(A),get_all_data(B))
   return B
 end
@@ -248,7 +247,7 @@ for op in (:*,:/)
   @eval begin
     function ($op)(A::ConsecutiveParamArray,b::Number)
       Ab = ($op)(get_all_data(A),b)
-      ConsecutiveParamArray(AB)
+      ConsecutiveParamArray(Ab)
     end
   end
 end
@@ -264,6 +263,11 @@ end
 
 function get_param_entry(A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
   getindex(get_all_data(A),i...,:)
+end
+
+function get_param_entry(A::ConsecutiveParamArray,i...)
+  data′ = getindex(get_all_data(A),i...,:)
+  ConsecutiveParamArray(data′)
 end
 
 """

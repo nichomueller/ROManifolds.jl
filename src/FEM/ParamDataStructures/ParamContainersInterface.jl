@@ -39,7 +39,7 @@ possesses a parametric length, i.e. it is a parametrized quantity, it returns `a
 
 """
 to_param_quantity(a,plength::Integer) = @abstractmethod
-to_param_quantity(a::Union{Nothing,Function,Map},plength::Integer) = a
+to_param_quantity(a::Union{Function,Map},plength::Integer) = a
 
 """
     find_param_length(a...) -> Int
@@ -105,6 +105,8 @@ ParamContainer(a::AbstractArray{<:AbstractArray}) = ParamArray(a)
 
 param_getindex(a::ParamContainer,i::Integer) = getindex(a,i)
 param_getindex(a::ParamContainer,v,i::Integer) = setindex!(a,v,i)
+
+to_param_quantity(a::Nothing,plength::Integer) = ParamContainer(fill(a,plength))
 
 Base.size(a::ParamContainer) = (param_length(a),)
 Base.getindex(a::ParamContainer,i::Integer) = getindex(a.data,i)

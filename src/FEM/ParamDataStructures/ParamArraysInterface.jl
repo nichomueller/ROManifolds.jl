@@ -51,7 +51,7 @@ Generic constructor of a AbstractParamArray
 
 """
 ParamArray(A) = @abstractmethod
-param_array(A,args...;kwargs...) = @abstractmethod
+param_array(A,args...) = @abstractmethod
 
 # Numbers interface
 ParamArray(A::AbstractArray{<:Number}) = ParamNumber(A)
@@ -62,7 +62,7 @@ end
 
 param_getindex(A::AbstractParamArray{T,N},i::Integer) where {T,N} = getindex(A,tfill(i,Val{N}())...)
 param_setindex!(A::AbstractParamArray{T,N},v,i::Integer) where {T,N} = setindex!(A,v,tfill(i,Val{N}())...)
-get_param_entry(A::AbstractParamArray,i::Vararg{Integer}) = @abstractmethod
+get_param_entry(A::AbstractParamArray,i...) = @abstractmethod
 to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
 
 innerlength(A::AbstractParamArray) = prod(innersize(A))
@@ -710,24 +710,43 @@ for T in (:AbstractParamArray,:AbstractArray,:Nothing), S in (:AbstractParamArra
       pA,pB = to_param_quantities(A,B)
       map(get_param_data(pA),get_param_data(pB)) do a,b
         CachedArray(similar(a,eltype(a),size(b)))
-      end |> ParamArray
+      end |> ParamContainer
     end
   end
 end
 
-function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,A::AbstractArray,B::AbstractArray)
-  _,pA,pB = to_param_quantities(C,A,B)
-  map(get_param_data(C),get_param_data(pA),get_param_data(pB)) do c,a,b
-    evaluate!(c,f,collect(a),collect(b))
+function Arrays.evaluate!(C::ParamContainer,f::Fields.ZeroBlockMap,A,B::AbstractArray)
+  pA,pB = to_param_quantities(A,B;plength=param_length(C))
+  map(C,get_param_data(pA),get_param_data(pB)) do c,a,b
+    evaluate!(c,f,a,b)
   end |> ParamArray
 end
 
-function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,a::Nothing,B::AbstractArray)
-  _,pB = to_param_quantities(C,B)
-  map(get_param_data(C),get_param_data(pB)) do c,b
-    evaluate!(c,f,a,collect(b))
-  end |> ParamArray
-end
+# for T in (:AbstractParamArray,:AbstractArray,:Nothing), S in (:AbstractParamArray,:AbstractArray)
+#   (T∈(:AbstractArray,:Nothing) && S==:AbstractArray) && continue
+#   @eval begin
+#     function Arrays.return_cache(f::Fields.ZeroBlockMap,A::$T,B::$S)
+#       pA,pB = to_param_quantities(A,B)
+#       c = return_cache(f,testitem(pA),testitem(pB))
+#       cache = Vector{typeof(c)}(undef,param_length(pA))
+#       @inbounds for i in param_eachindex(pA)
+#         cache[i] = return_cache(f,param_getindex(pA,i),param_getindex(pB,i))
+#       end
+#       return ParamArray(cache)
+#     end
+#   end
+# end
+
+# for T in (:AbstractArray,:ArrayBlock)
+#   @eval begin
+#     function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,A,B::AbstractParamArray)
+#       setsize!(C,size(B))
+#       r = C.array
+#       fill!(r,zero(eltype(r)))
+#       ConsecutiveParamArray(r)
+#     end
+#   end
+# end
 
 function Fields.unwrap_cached_array(A::AbstractParamArray)
   C = param_return_cache(unwrap_cached_array,A)

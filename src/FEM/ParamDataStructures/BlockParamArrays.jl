@@ -54,7 +54,6 @@ end
 BlockArrays.blocks(A::BlockParamArray) = A.data
 
 function param_getindex(A::BlockParamArray,i::Integer)
-  @warn "Should avoid using this function for performance reasons"
   mortar(map(a->param_getindex(a,i),blocks(A)))
 end
 
@@ -152,6 +151,16 @@ for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
   end
 end
 
+function LinearAlgebra.rmul!(A::BlockParamArray,b::Number)
+  map(rmul!,blocks(A),b)
+  return A
+end
+
+function LinearAlgebra.axpy!(α::Number,A::BlockParamArray,B::BlockParamArray)
+  axpy!(α,blocks(A),blocks(B))
+  return B
+end
+
 function LinearAlgebra.norm(A::BlockParamArray)
   n = 0.0
   for b in blocks(A)
@@ -160,12 +169,7 @@ function LinearAlgebra.norm(A::BlockParamArray)
   return sqrt(n)
 end
 
-function get_param_entry(A::BlockParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
-  n = length(blocks(A))
-  L = param_length(A)
-  entries = Vector{Vector{T}}(undef,n)
-  @inbounds for (k,Ak) in enumerate(blocks(A))
-    entries[k] = get_param_entry(Ak,i...)
-  end
+function get_param_entry(A::BlockParamArray{T},i...) where T
+  entries = map(a -> get_param_entry(a,i...),blocks(A))
   mortar(entries)
 end

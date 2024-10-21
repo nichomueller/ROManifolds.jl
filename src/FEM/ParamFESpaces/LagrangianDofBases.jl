@@ -1,7 +1,7 @@
 ReferenceFEs.num_components(::Type{<:AbstractArray{T}}) where T = num_components(T)
 
 function ReferenceFEs._lagr_dof_cache(node_comp_to_val::AbstractParamVector,ndofs)
-  T = eltype(node_comp_to_val)
+  T = eltype2(node_comp_to_val)
   L = param_length(node_comp_to_val)
   r = zeros(eltype(T),ndofs,L)
   ConsecutiveParamArray(r)
@@ -9,7 +9,7 @@ end
 
 function ReferenceFEs._lagr_dof_cache(node_pdof_comp_to_val::AbstractParamMatrix,ndofs)
   _,npdofs = size(node_pdof_comp_to_val)
-  T = eltype(node_pdof_comp_to_val)
+  T = eltype2(node_pdof_comp_to_val)
   L = param_length(node_pdof_comp_to_val)
   r = zeros(eltype(T),ndofs,npdofs,L)
   ConsecutiveParamArray(r)
