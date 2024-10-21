@@ -55,21 +55,20 @@ function ordered_common_locations(i::IntegrationDomain,union_indices::AbstractVe
   filter(!isnothing,indexin(i,union_indices))
 end
 
-function Base.getindex(a::AbstractParamArray,i::IntegrationDomain)
-  entries = consecutive_getindex(a,i,:)
-  ConsecutiveParamArray(entries)
+function Base.getindex(a::ConsecutiveParamVector,i::IntegrationDomain)
+  data = get_all_data(a)
+  ConsecutiveParamArray(data[i,:])
 end
 
 function Base.getindex(a::ParamSparseMatrix,i::IntegrationDomain)
-  entry = zeros(eltype2(a),length(i))
-  entries = param_array(entry,param_length(a))
-  @inbounds for ip = param_eachindex(entries)
+  entries = zeros(eltype2(a),length(i),param_length(a))
+  @inbounds for ip = 1:param_length(a)
     for (ii,is) in enumerate(i)
       v = param_getindex(a,ip)[is]
-      consecutive_setindex!(entries,v,ii,ip)
+      entries[ii,ip] = v
     end
   end
-  return entries
+  return ConsecutiveParamArray(entries)
 end
 
 abstract type HyperReduction{A<:Reduction,B<:ReducedProjection,C<:AbstractIntegrationDomain} <: Projection end

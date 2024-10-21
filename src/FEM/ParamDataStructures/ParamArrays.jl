@@ -1,18 +1,3 @@
-"""
-    abstract type ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}} end
-
-Type representing parametric arrays of type A. L encodes the parametric length.
-Subtypes:
-- [`ParamArray`](@ref).
-- [`ConsecutiveParamArray`](@ref).
-- [`TrivialParamArray`](@ref).
-- [`BlockParamArray`](@ref).
-
-"""
-abstract type ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}} end
-const ParamVector{T,L} = ParamArray{T,1,L}
-const ParamMatrix{T,L} = ParamArray{T,2,L}
-
 # generic constructors
 
 ParamArray(A::AbstractArray{<:Number},plength::Integer) = TrivialParamArray(A,plength)
@@ -21,7 +6,7 @@ ParamArray(a::AbstractVector{<:AbstractArray}) = ConsecutiveParamArray(a)
 function Base.setindex!(
   A::ParamArray{T,N,L},
   v::ParamArray{T′,N,L},
-  i::Vararg{Integer}) where {T,T′,N,L}
+  i::Vararg{Integer,N}) where {T,T′,N,L}
 
   setindex!(get_all_data(A),get_all_data(v),i...,:)
 end
@@ -41,14 +26,6 @@ for f in (:(Base.maximum),:(Base.minimum))
     $f(A::ParamArray) = $f(get_all_data(A))
     $f(g,A::ParamArray) = $f(g,get_all_data(A))
   end
-end
-
-function Base.transpose(A::AbstractParamArray)
-  @notimplemented "do I need this?"
-end
-
-function Base.vec(A::AbstractParamArray)
-  @notimplemented "do I need this?"
 end
 
 for op in (:+,:-,:*,:/)
@@ -85,13 +62,17 @@ function (*)(A::ParamArray,B::ParamArray)
   @notimplemented
 end
 
-function param_view(A::ParamArray,i::Union{Integer,AbstractVector,Colon}...)
-  @deprecate
-  # ParamArray(view(get_all_data(A),i...,:))
+function Arrays.setsize!(A::ParamArray{T,N,L},s::NTuple{N,Integer}) where {T,N,L}
+  setsize!(get_all_data(A),(s...,L))
+  A
 end
 
-function Arrays.setsize!(A::ParamArray{T,N},s::NTuple{N,Integer}) where {T,N}
-  setsize!(get_all_data(A))
+function Base.getproperty(A::ParamArray,sym::Symbol)
+  if sym == :array
+    getfield(get_all_data(A),sym)
+  else
+    getfield(A,sym)
+  end
 end
 
 """
@@ -100,11 +81,12 @@ end
 Wrapper for nonparametric arrays that we wish assumed a parametric length.
 
 """
-struct TrivialParamArray{T<:Number,N,L} <: ParamArray{T,N,L}
-  data::Array{T,N}
+struct TrivialParamArray{T<:Number,N,L,A<:AbstractArray{T,N}} <: ParamArray{T,N,L}
+  data::A
   plength::Int
-  function TrivialParamArray(data::Array{T,N},plength::Int=1) where {T<:Number,N}
-    new{T,N,plength}(data,plength)
+  function TrivialParamArray(data::AbstractArray{T,N},plength::Int=1) where {T<:Number,N}
+    A = typeof(data)
+    new{T,N,plength,A}(data,plength)
   end
 end
 
@@ -144,7 +126,7 @@ function Base.similar(A::TrivialParamArray{T,N},::Type{<:AbstractArray{T′}}) w
   TrivialParamArray(data′,param_length(A))
 end
 
-function Base.similar(A::TrivialParamArray{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N,N}
+function Base.similar(A::TrivialParamArray{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N}
   data′ = similar(get_all_data(A),T′,dims...)
   TrivialParamArray(data′,param_length(A))
 end
@@ -153,6 +135,11 @@ function Base.copyto!(A::TrivialParamArray,B::TrivialParamArray)
   @check size(A) == size(B)
   copyto!(get_all_data(A),get_all_data(B))
   A
+end
+
+function Base.vec(A::TrivialParamArray)
+  data′ = vec(get_all_data(A))
+  TrivialParamArray(data′,param_length(A))
 end
 
 function Arrays.CachedArray(A::TrivialParamArray)
@@ -165,22 +152,23 @@ function get_param_entry(A::TrivialParamArray{T,N},i::Vararg{Integer,N}) where {
   fill(entry,param_length(A))
 end
 
-struct ConsecutiveParamArray{T,N,L,M} <: ParamArray{T,N,L}
-  data::Array{T,M}
-  function ConsecutiveParamArray(data::Array{T,M}) where {T,M}
+struct ConsecutiveParamArray{T,N,L,M,A<:AbstractArray{T,M}} <: ParamArray{T,N,L}
+  data::A
+  function ConsecutiveParamArray(data::AbstractArray{T,M}) where {T<:Number,M}
     N = M - 1
     L = size(data,M)
-    new{T,N,L,M}(data)
+    A = typeof(data)
+    new{T,N,L,M,A}(data)
   end
 end
 
-const ConsecutiveParamVector{T,L} = ConsecutiveParamArray{T,1,L,2}
-const ConsecutiveParamMatrix{T,L} = ConsecutiveParamArray{T,2,L,3}
+const ConsecutiveParamVector{T,L} = ConsecutiveParamArray{T,1,L,2,Array{T,2}}
+const ConsecutiveParamMatrix{T,L} = ConsecutiveParamArray{T,2,L,3,Array{T,3}}
 
 get_all_data(A::ConsecutiveParamArray) = A.data
 
-function ConsecutiveParamArray(a::AbstractVector{<:AbstractArray})
-  if all(size(ai)==size(first(a)))
+function ConsecutiveParamArray(a::AbstractVector{<:AbstractArray{T,N}}) where {T,N}
+  if all(size(ai)==size(first(a)) for ai in a)
     ConsecutiveParamArray(stack(a))
   else
     if N==1
@@ -201,21 +189,23 @@ end
 
 Base.size(A::ConsecutiveParamArray{T,N}) where {T,N} = tfill(param_length(A),Val{N}())
 
-ArraysOfArrays.innersize(A::ConsecutiveParamArray) = ArraysOfArrays.front_tuple(get_all_data(A),Val{N}())
+ArraysOfArrays.innersize(A::ConsecutiveParamArray{T,N}) where {T,N} = ArraysOfArrays.front_tuple(size(get_all_data(A)),Val{N}())
 
-function Base.getindex(A::ConsecutiveParamArray{T},i::Integer,j::Integer) where T
-  @boundscheck checkbounds(A,i,j)
-  if i == j
-    A.data[ArraysOfArrays._ncolons(Val{N}())...,i]
+function Base.getindex(A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
+  @boundscheck checkbounds(A,i...)
+  iblock = first(i)
+  if all(i.==iblock)
+    A.data[ArraysOfArrays._ncolons(Val{N}())...,iblock]
   else
     fill(zero(T),innersize(A))
   end
 end
 
-function Base.setindex!(A::ConsecutiveParamArray,v,i::Integer,j::Integer)
-  @boundscheck checkbounds(A,i,j)
-  if i == j
-    A.data[ArraysOfArrays._ncolons(Val{N}())...,i] = v
+function Base.setindex!(A::ConsecutiveParamArray{T,N},v,i::Vararg{Integer,N}) where {T,N}
+  @boundscheck checkbounds(A,i...)
+  iblock = first(i)
+  if all(i.==iblock)
+    A.data[ArraysOfArrays._ncolons(Val{N}())...,iblock] = v
   end
 end
 
@@ -229,7 +219,7 @@ function Base.similar(A::ConsecutiveParamArray{T,N},::Type{<:AbstractArray{T′,
   ConsecutiveParamArray(data′)
 end
 
-function Base.similar(A::ConsecutiveParamArray{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N,N}
+function Base.similar(A::ConsecutiveParamArray{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N}
   pdims = (dims...,param_length(A))
   data′ = similar(get_all_data(A),T′,pdims...)
   ConsecutiveParamArray(data′)
@@ -238,6 +228,11 @@ end
 function Base.copyto!(A::ConsecutiveParamArray,B::ConsecutiveParamArray)
   copyto!(get_all_data(A),get_all_data(B))
   A
+end
+
+function Base.vec(A::ConsecutiveParamArray)
+  data′ = reshape(get_all_data(A),:,param_length(A))
+  ConsecutiveParamArray(data′)
 end
 
 for op in (:+,:-)
@@ -258,19 +253,13 @@ for op in (:*,:/)
   end
 end
 
-function (*)(A::ConsecutiveParamArray,B::ConsecutiveParamArray)
-  get_all_data(A)*get_all_data(B)
-end
-function (*)(A::ConsecutiveParamArray,B::AbstractArray)
-  get_all_data(A)*B
-end
-function (*)(A::AbstractArray,B::ConsecutiveParamArray)
-  A*get_all_data(B)
-end
-
 function Arrays.CachedArray(A::ConsecutiveParamArray)
   data′ = CachedArray(get_all_data(A))
   ConsecutiveParamArray(data′)
+end
+
+function param_getindex(A::ConsecutiveParamArray{T,N},i::Integer) where {T,N}
+  view(A.data,ArraysOfArrays._ncolons(Val{N}())...,i)
 end
 
 function get_param_entry(A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
@@ -300,7 +289,7 @@ get_ptrs(A::GenericParamVector) = A.ptrs
 function GenericParamVector(a::AbstractVector{<:AbstractVector{Tv}}) where Tv
   ptrs = _vec_of_pointers(a)
   n = length(a)
-  u = one(Ti)
+  u = one(eltype(ptrs))
   ndata = ptrs[end]-u
   data = Vector{Tv}(undef,ndata)
   p = 1
@@ -357,6 +346,10 @@ function Base.copyto!(A::GenericParamVector,B::GenericParamVector)
   A
 end
 
+function Base.vec(A::GenericParamVector)
+  A
+end
+
 for op in (:+,:-)
   @eval begin
     function ($op)(A::GenericParamVector,B::GenericParamVector)
@@ -406,27 +399,28 @@ function get_param_entry(A::GenericParamVector{T,L},i::Integer) where {T,L}
   entries
 end
 
-struct GenericParamMatrix{Tv,Ti} <: AbstractMatrix{Tv}
+struct GenericParamMatrix{Tv,L,Ti} <: ParamArray{Tv,2,L}
   data::Vector{Tv}
   ptrs::Vector{Ti}
   nrows::Vector{Ti}
+  function GenericParamVector(data::Vector{Tv},ptrs::Vector{Ti}) where {Tv,Ti}
+    L = length(ptrs)-1
+    new{Tv,L,Ti}(data,ptrs)
+  end
 end
 
 get_all_data(A::GenericParamMatrix) = A.data
 get_ptrs(A::GenericParamMatrix) = A.data
 get_nrows(A::GenericParamMatrix) = A.nrows
 
-function GenericParamMatrix(
-  a::AbstractVector{<:AbstractMatrix{Tv}},
-  ptrs::Vector{Ti},
-  nrows::Vector{Ti}) where {Tv,Ti}
-
-  n = length(a)
-  u = one(Ti)
+function GenericParamMatrix(a::AbstractVector{<:AbstractMatrix{Tv}}) where Tv
   ptrs = _vec_of_pointers(a)
+  n = length(a)
+  Ti = eltype(ptrs)
+  u = one(Ti)
   ndata = ptrs[end]-u
   data = Vector{Tv}(undef,ndata)
-  nrows = Vector{Int}(undef,n)
+  nrows = Vector{Ti}(undef,n)
   p = 1
   @inbounds for i in 1:n
     ai = a[i]
@@ -487,6 +481,12 @@ function Base.copyto!(A::GenericParamMatrix,B::GenericParamMatrix)
   @check get_nrows(A) == get_nrows(B)
   copyto!(get_all_data(A),get_all_data(B))
   A
+end
+
+function Base.vec(A::GenericParamMatrix)
+  data = get_all_data(A)
+  ptrs = get_ptrs(A)
+  GenericParamVector(data,ptrs)
 end
 
 for op in (:+,:-)

@@ -18,7 +18,6 @@ num_fe_dofs(a::Projection) = @abstractmethod
 num_reduced_dofs(a::Projection) = @abstractmethod
 project(a::Projection,x::AbstractArray) = @abstractmethod
 inv_project(a::Projection,x::AbstractArray) = @abstractmethod
-rescale(op::Function,x::AbstractArray,b::Projection) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection,c::Projection,args...) = @abstractmethod
 empirical_interpolation(a::Projection) = @abstractmethod
@@ -29,7 +28,6 @@ Base.:-(a::Projection,b::Projection) = union(a,b)
 Base.:*(a::Projection,b::Projection) = galerkin_projection(a,b)
 Base.:*(a::Projection,b::Projection,c::Projection) = galerkin_projection(a,b,c)
 Base.:*(a::Projection,x::AbstractArray) = inv_project(a,x)
-Base.:*(x::AbstractArray,b::Projection) = rescale(*,x,b)
 
 function Base.:*(b::Projection,y::ConsecutiveParamArray)
   item = zeros(num_reduced_dofs(b))
@@ -141,18 +139,20 @@ struct PODBasis{A<:AbstractMatrix} <: Projection
   basis::A
 end
 
-function projection(red::PODReduction,s::AbstractArray{<:Number},args...)
+function projection(red::PODReduction,s::AbstractArray,args...)
   basis = reduction(red,s,args...)
   PODBasis(basis)
+end
+
+function projection(red::PODReduction,s::SparseSnapshots,args...)
+  basis = reduction(red,s,args...)
+  basis′ = recast(basis,s)
+  PODBasis(basis′)
 end
 
 get_basis(a::PODBasis) = a.basis
 num_fe_dofs(a::PODBasis) = size(get_basis(a),1)
 num_reduced_dofs(a::PODBasis) = size(get_basis(a),2)
-
-function rescale(op::Function,x::AbstractArray,b::PODBasis)
-  PODBasis(op(x,get_basis(b)))
-end
 
 Base.union(a::PODBasis,b::PODBasis,args...) = union(a,get_basis(b),args...)
 
@@ -201,6 +201,13 @@ function projection(red::TTSVDReduction,s::AbstractSnapshots,args...)
   TTSVDCores(cores,index_map)
 end
 
+function projection(red::TTSVDReduction,s::SparseSnapshots,args...)
+  cores = reduction(red,s,args...)
+  cores′ = recast(cores,s)
+  index_map = get_index_map(s)
+  TTSVDCores(cores′,index_map)
+end
+
 get_cores(a::TTSVDCores) = a.cores
 
 get_basis(a::TTSVDCores) = cores2basis(get_index_map(a),get_cores(a)...)
@@ -208,16 +215,6 @@ num_fe_dofs(a::TTSVDCores) = prod(map(c -> size(c,2),get_cores(a)))
 num_reduced_dofs(a::TTSVDCores) = size(last(get_cores(a)),3)
 
 IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
-
-function rescale(op::Function,x::AbstractRankTensor{D1},b::TTSVDCores{D2}) where {D1,D2}
-  if D1 == D2
-    TTSVDCores(op(x,get_cores(b)),get_index_map(b))
-  else
-    c1 = op(x,get_cores(b)[1:D1])
-    c2 = get_cores(b)[D1+1:end]
-    TTSVDCores([c1...,c2...],get_index_map(b))
-  end
-end
 
 function Base.union(a::TTSVDCores,b::TTSVDCores,args...)
   @check get_index_map(a) == get_index_map(b)

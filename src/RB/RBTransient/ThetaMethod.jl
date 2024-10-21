@@ -122,7 +122,7 @@ function get_stage_operator(
 
   u0 = state0[1]
   odeslvrcache,odeopcache = odecache
-  reuse,A,b,sysslvrcache = odeslvrcache
+  A,b,sysslvrcache = odeslvrcache
   rbsyscache,_ = rbcache
   Â,b̂ = rbsyscache
 
@@ -135,7 +135,7 @@ function get_stage_operator(
   us = (x,x)
   ws = (1,1/dtθ)
 
-  stageop = LinearParamStageOperator(rbop,odeopcache,r,us,ws,(A,Â),(b,b̂),reuse,sysslvrcache)
+  stageop = LinearParamStageOperator(rbop,odeopcache,r,us,ws,(A,Â),(b,b̂),sysslvrcache)
   shift!(r,dt*(1-θ))
 
   return stageop

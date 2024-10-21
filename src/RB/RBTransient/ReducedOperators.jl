@@ -442,7 +442,7 @@ function RBSteady.select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveParamV
   return new_xhF,new_odeopcache
 end
 
-function RBSteady.select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveBlockParamVector}},odeopcache,indices)
+function RBSteady.select_evalcache_at_indices(us::Tuple{Vararg{BlockConsecutiveParamVector}},odeopcache,indices)
   @unpack Us,Uts,tfeopcache,const_forms = odeopcache
   new_xhF = ()
   new_Us = ()
@@ -476,7 +476,7 @@ function select_fe_quantities_at_indices(cache,us,odeopcache,indices)
   return red_cache,red_us,red_odeopcache
 end
 
-get_entry(s::AbstractParamArray,is,ipt) = consecutive_getindex(s,is,ipt)
+get_entry(s::ConsecutiveParamVector,is,ipt) = get_all_data(s)[is,ipt]
 get_entry(s::ParamSparseMatrix,is,ipt) = param_getindex(s,ipt)[is]
 
 function RBSteady.select_at_indices(
@@ -485,16 +485,15 @@ function RBSteady.select_at_indices(
   ids_space,ids_time,ids_param)
 
   @check length(ids_space) == length(ids_time)
-  entry = zeros(eltype2(a),length(ids_space))
-  entries = param_array(entry,length(ids_param))
-  @inbounds for ip = param_eachindex(entries)
+  entries = zeros(eltype2(a),length(ids_space),length(ids_param))
+  @inbounds for ip = 1:length(ids_param)
     for (i,(is,it)) in enumerate(zip(ids_space,ids_time))
       ipt = ip+(it-1)*length(ids_param)
       v = get_entry(a,is,ipt)
-      consecutive_setindex!(entries,v,i,ip)
+      entries[i,ip] = v
     end
   end
-  return entries
+  return ConsecutiveParamArray(entries)
 end
 
 function RBSteady.select_at_indices(
@@ -502,16 +501,15 @@ function RBSteady.select_at_indices(
   a::AbstractParamArray,
   ids_space,ids_time,ids_param)
 
-  entry = zeros(eltype2(a),length(ids_space),length(ids_time))
-  entries = param_array(entry,length(ids_param))
-  @inbounds for ip = param_eachindex(entries)
+  entries = zeros(eltype2(a),length(ids_space),length(ids_time),length(ids_param))
+  @inbounds for ip = 1:length(ids_param)
     for (i,it) in enumerate(ids_time)
       ipt = ip+(it-1)*length(ids_param)
       v = get_entry(a,ids_space,ipt)
-      consecutive_setindex!(entries,v,:,i,ip)
+      entries[:,i,ip] = v
     end
   end
-  return entries
+  return ConsecutiveParamArray(entries)
 end
 
 function RBSteady.select_at_indices(s::AbstractArray,a::TransientHyperReduction,indices::Range2D)

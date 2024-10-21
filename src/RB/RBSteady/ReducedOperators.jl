@@ -429,7 +429,7 @@ function select_evalcache_at_indices(u::ConsecutiveParamArray,paramcache,indices
   return new_xhF,new_paramcache
 end
 
-function select_evalcache_at_indices(u::ConsecutiveBlockParamVector,paramcache,indices)
+function select_evalcache_at_indices(u::BlockConsecutiveParamVector,paramcache,indices)
   @unpack Us,Ups,pfeopcache,form = paramcache
   VT = Us.vector_type
   style = Us.multi_field_style

@@ -134,13 +134,17 @@ export OperationParamField
 export AbstractParamArray
 export AbstractParamVector
 export AbstractParamMatrix
-export ParamSparseMatrix
-export param_array
-
 export ParamArray
 export ParamVector
 export ParamMatrix
+export param_array
+
 export TrivialParamArray
+export ConsecutiveParamArray
+export ConsecutiveParamVector
+export ConsecutiveParamMatrix
+export GenericParamVector
+export GenericParamMatrix
 
 export ConsecutiveParamVector
 export ConsecutiveParamMatrix

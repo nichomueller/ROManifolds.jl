@@ -11,6 +11,34 @@ abstract type AbstractParamArray{T,N,L,A<:AbstractArray{T,N}} <: AbstractParamCo
 
 const AbstractParamVector{T,L} = AbstractParamArray{T,1,L,<:AbstractVector{T}}
 const AbstractParamMatrix{T,L} = AbstractParamArray{T,2,L,<:AbstractMatrix{T}}
+const AbstractParamArray3D{T,L} = AbstractParamArray{T,3,L,<:AbstractArray{T,3}}
+
+"""
+    abstract type ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}} end
+
+Type representing parametric arrays of type A. L encodes the parametric length.
+Subtypes:
+- [`ParamArray`](@ref).
+- [`ConsecutiveParamArray`](@ref).
+- [`TrivialParamArray`](@ref).
+- [`BlockParamArray`](@ref).
+
+"""
+abstract type ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}} end
+const ParamVector{T,L} = ParamArray{T,1,L}
+const ParamMatrix{T,L} = ParamArray{T,2,L}
+
+"""
+    abstract type ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}
+      } <: AbstractParamArray{Tv,2,L,A} end
+
+Type representing parametric abstract sparse matrices of type A. L encodes the parametric length.
+Subtypes:
+- [`ParamSparseMatrixCSC`](@ref).
+
+"""
+abstract type ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,L,A} end
+
 
 """
     ParamArray(A::AbstractArray{<:Number}) -> ParamNumber
@@ -250,11 +278,7 @@ function param_return_value(
   b::Union{Field,AbstractArray{<:Number}}...)
 
   v = return_value(f,testitem(A),b...)
-  data = Vector{typeof(v)}(undef,param_length(A))
-  @inbounds for i = param_eachindex(A)
-    data[i] = return_value(f,param_getindex(A,i),b...)
-  end
-  return ParamArray(data)
+  return param_array(v,param_length(A))
 end
 
 function param_return_value(
@@ -264,11 +288,7 @@ function param_return_value(
   c::Union{Field,AbstractArray{<:Number}}...)
 
   v = return_value(f,a,testitem(B),c...)
-  data = Vector{typeof(v)}(undef,param_length(B))
-  @inbounds for i = param_eachindex(B)
-    data[i] = return_value(f,a,param_getindex(B,i),c...)
-  end
-  return ParamArray(data)
+  return param_array(v,param_length(B))
 end
 
 function param_return_value(
@@ -279,11 +299,7 @@ function param_return_value(
   d::Union{Field,AbstractArray{<:Number}}...)
 
   v = return_value(f,a,b,testitem(C),d...)
-  data = Vector{typeof(v)}(undef,param_length(C))
-  @inbounds for i = param_eachindex(C)
-    data[i] = return_value(f,a,b,param_getindex(C,i),d...)
-  end
-  return ParamArray(data)
+  return param_array(v,param_length(C))
 end
 
 function param_return_cache(
@@ -294,11 +310,11 @@ function param_return_cache(
   c = return_cache(f,testitem(A),b...)
   cx = evaluate!(c,f,testitem(A),b...)
   cache = Vector{typeof(c)}(undef,param_length(A))
-  data = Vector{typeof(cx)}(undef,param_length(A))
+  data = param_array(cx,param_length(A))
   @inbounds for i = param_eachindex(A)
     cache[i] = return_cache(f,param_getindex(A,i),b...)
   end
-  return cache,ParamArray(data)
+  return cache,data
 end
 
 function param_return_cache(
@@ -310,11 +326,11 @@ function param_return_cache(
   c′ = return_cache(f,a,testitem(B),c...)
   cx = evaluate!(c′,f,a,testitem(B),c...)
   cache = Vector{typeof(c′)}(undef,param_length(B))
-  data = Vector{typeof(cx)}(undef,param_length(B))
+  data = param_array(cx,param_length(B))
   @inbounds for i = param_eachindex(B)
     cache[i] = return_cache(f,a,param_getindex(B,i),c...)
   end
-  return cache,ParamArray(data)
+  return cache,data
 end
 
 function param_return_cache(
@@ -327,11 +343,11 @@ function param_return_cache(
   c′ = return_cache(f,a,b,testitem(C),d...)
   cx = evaluate!(c′,f,a,b,testitem(C),d...)
   cache = Vector{typeof(c′)}(undef,param_length(C))
-  data = Vector{typeof(cx)}(undef,param_length(C))
+  data = param_array(cx,param_length(C))
   @inbounds for i = param_eachindex(C)
     cache[i] = return_cache(f,a,b,param_getindex(C,i),d...)
   end
-  return cache,ParamArray(data)
+  return cache,data
 end
 
 function param_evaluate!(
@@ -342,7 +358,8 @@ function param_evaluate!(
 
   cache,data = C
   @inbounds for i = param_eachindex(A)
-    data[i] = evaluate!(cache[i],f,param_getindex(A,i),b...)
+    vi = evaluate!(cache[i],f,param_getindex(A,i),b...)
+    param_setindex!(data,vi,i)
   end
   return data
 end
@@ -356,7 +373,8 @@ function param_evaluate!(
 
   cache,data = C
   @inbounds for i = param_eachindex(B)
-    data[i] = evaluate!(cache[i],f,a,param_getindex(B,i),c...)
+    vi = evaluate!(cache[i],f,a,param_getindex(B,i),c...)
+    param_setindex!(data,vi,i)
   end
   return data
 end
@@ -371,13 +389,14 @@ function param_evaluate!(
 
   cache,data = C′
   @inbounds for i = param_eachindex(C)
-    data[i] = evaluate!(cache[i],f,a,b,param_getindex(C,i),d...)
+    vi = evaluate!(cache[i],f,a,b,param_getindex(C,i),d...)
+    param_setindex!(data,vi,i)
   end
   return data
 end
 
-for T in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamTensor3D)
-  for S in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamTensor3D)
+for T in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamArray3D)
+  for S in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamArray3D)
     @eval begin
       function Arrays.return_value(f::BroadcastingFieldOpMap,A::$T,B::$S)
         param_return_value(f,A,B)
@@ -688,32 +707,26 @@ for T in (:AbstractParamArray,:AbstractArray,:Nothing), S in (:AbstractParamArra
   (T∈(:AbstractArray,:Nothing) && S==:AbstractArray) && continue
   @eval begin
     function Arrays.return_cache(f::Fields.ZeroBlockMap,A::$T,B::$S)
-      # pA,pB = to_param_quantities(A,B)
-      # map(get_param_data(pA),get_param_data(pB)) do a,b
-      #   CachedArray(similar(a,eltype(a),size(b)))
-      # end |> ParamArray
-      @error "stop here"
-      param_return_cache(f,A,B)
+      pA,pB = to_param_quantities(A,B)
+      map(get_param_data(pA),get_param_data(pB)) do a,b
+        CachedArray(similar(a,eltype(a),size(b)))
+      end |> ParamArray
     end
   end
 end
 
 function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,A::AbstractArray,B::AbstractArray)
-  # _,pA,pB = to_param_quantities(C,A,B)
-  # map(get_param_data(C),get_param_data(pA),get_param_data(pB)) do c,a,b
-  #   evaluate!(c,f,collect(a),collect(b))
-  # end |> ParamArray
-  @error "stop here"
-  param_evaluate!(C,f,A,B)
+  _,pA,pB = to_param_quantities(C,A,B)
+  map(get_param_data(C),get_param_data(pA),get_param_data(pB)) do c,a,b
+    evaluate!(c,f,collect(a),collect(b))
+  end |> ParamArray
 end
 
 function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,a::Nothing,B::AbstractArray)
-  # _,pB = to_param_quantities(C,B)
-  # map(get_param_data(C),get_param_data(pB)) do c,b
-  #   evaluate!(c,f,a,collect(b))
-  # end
-  @error "stop here"
-  param_evaluate!(C,f,a,B)
+  _,pB = to_param_quantities(C,B)
+  map(get_param_data(C),get_param_data(pB)) do c,b
+    evaluate!(c,f,a,collect(b))
+  end |> ParamArray
 end
 
 function Fields.unwrap_cached_array(A::AbstractParamArray)

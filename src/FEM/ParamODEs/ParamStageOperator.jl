@@ -63,7 +63,6 @@ end
 struct LinearParamStageOperator{Ta,Tb} <: ParamStageOperator
   A::Ta
   b::Tb
-  reuse::Bool
 end
 
 function LinearParamStageOperator(
@@ -71,13 +70,11 @@ function LinearParamStageOperator(
   rx::TransientRealization,
   usx::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
-  matcache,veccache,reuse::Bool,sysslvrcache)
+  matcache,veccache,sysslvrcache)
 
   b = residual!(veccache,odeop,rx,usx,odeopcache)
-  if isnothing(sysslvrcache) || !reuse
-    A = jacobian!(matcache,odeop,rx,usx,ws,odeopcache)
-  end
-  LinearParamStageOperator(A,b,reuse)
+  A = jacobian!(matcache,odeop,rx,usx,ws,odeopcache)
+  LinearParamStageOperator(A,b)
 end
 
 function Algebra.allocate_residual(lop::LinearParamStageOperator,x::AbstractVector)
@@ -110,37 +107,49 @@ function Algebra.jacobian!(
 end
 
 function Algebra.solve!(
-  x::AbstractVector,
+  x::AbstractParamVector,
   ls::LinearSolver,
   lop::LinearParamStageOperator,
   ns::Nothing)
 
   A = lop.A
-  ss = symbolic_setup(ls,A)
-  ns = numerical_setup(ss,A)
+  A_item = testitem(A)
+  ss = symbolic_setup(ls,A_item)
+  ns = numerical_setup(ss,A_item)
 
   b = lop.b
   rmul!(b,-1)
 
-  solve!(x,ns,b)
+  @inbounds for i in param_eachindex(x)
+    xi = param_getindex(x,i)
+    bi = param_getindex(b,i)
+    solve!(xi,ns,bi)
+    i == param_length(x) && continue
+    Ai = param_getindex(A,i+1)
+    numerical_setup!(ns,Ai)
+  end
+
   ns
 end
 
 function Algebra.solve!(
-  x::AbstractVector,
+  x::AbstractParamVector,
   ls::LinearSolver,
   lop::LinearParamStageOperator,
   ns)
 
-  if !lop.reuse
-    A = lop.A
-    numerical_setup!(ns,A)
-  end
-
+  A = lop.A
   b = lop.b
   rmul!(b,-1)
 
-  solve!(x,ns,b)
+  @inbounds for i in param_eachindex(x)
+    xi = param_getindex(x,i)
+    Ai = param_getindex(A,i)
+    bi = param_getindex(b,i)
+    numerical_setup!(ns,Ai)
+    solve!(xi,ns,bi)
+  end
+
   ns
 end
 

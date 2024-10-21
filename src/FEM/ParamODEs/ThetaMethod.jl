@@ -120,13 +120,12 @@ function ODEs.allocate_odecache(
 
   constant_stiffness = is_form_constant(odeop,1)
   constant_mass = is_form_constant(odeop,2)
-  reuse = (constant_stiffness && constant_mass)
 
   A = allocate_jacobian(odeop,r0,us0N,odeopcache)
   b = allocate_residual(odeop,r0,us0N,odeopcache)
 
   sysslvrcache = nothing
-  odeslvrcache = (reuse,A,b,sysslvrcache)
+  odeslvrcache = (A,b,sysslvrcache)
 
   (odeslvrcache,odeopcache)
 end
@@ -141,7 +140,7 @@ function ODEs.ode_march!(
 
   u0 = state0[1]
   odeslvrcache,odeopcache = odecache
-  reuse,A,b,sysslvrcache = odeslvrcache
+  A,b,sysslvrcache = odeslvrcache
 
   sysslvr = solver.sysslvr
   dt,θ = solver.dt,solver.θ
@@ -155,14 +154,14 @@ function ODEs.ode_march!(
 
   update_odeopcache!(odeopcache,odeop,r)
 
-  stageop = LinearParamStageOperator(odeop,odeopcache,r,usx,ws,A,b,reuse,sysslvrcache)
+  stageop = LinearParamStageOperator(odeop,odeopcache,r,usx,ws,A,b,sysslvrcache)
 
   sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
 
   shift!(r,dt*(1-θ))
   statef = ODEs._udate_theta!(statef,state0,dt,x)
 
-  odeslvrcache = (reuse,A,b,sysslvrcache)
+  odeslvrcache = (A,b,sysslvrcache)
   odecache = (odeslvrcache,odeopcache)
   (r,statef,odecache)
 end

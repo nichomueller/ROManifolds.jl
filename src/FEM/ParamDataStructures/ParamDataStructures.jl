@@ -70,6 +70,9 @@ export ParamArray
 export ParamVector
 export ParamMatrix
 export param_array
+export innersize
+export innerlength
+export inneraxes
 include("ParamArraysInterface.jl")
 
 export TrivialParamArray
@@ -79,7 +82,7 @@ export ConsecutiveParamMatrix
 export GenericParamVector
 export GenericParamMatrix
 export get_all_data
-include("ParamArray.jl")
+include("ParamArrays.jl")
 
 export ParamSparseMatrix
 export ParamSparseMatrixCSC
@@ -88,6 +91,7 @@ export ConsecutiveParamSparseMatrixCSC
 export GenericParamSparseMatrixCSC
 export ConsecutiveParamSparseMatrixCSR
 export GenericParamSparseMatrixCSR
+export ConsecutiveParamSparseMatrix
 include("ParamSparseMatrices.jl")
 
 export BlockParamArray

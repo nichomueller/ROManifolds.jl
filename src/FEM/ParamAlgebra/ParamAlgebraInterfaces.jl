@@ -5,9 +5,9 @@ function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamVec
   param_array(vector,param_length(V))
 end
 
-function Algebra.allocate_vector(::Type{V},indices::BlockedUnitRange) where V<:BlockParamVector
+function Algebra.allocate_vector(::Type{<:BlockParamVector{T,L}},indices::BlockedUnitRange) where {T,L}
   V = ConsecutiveParamVector{T,L}
-  mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
+  mortar(map(ids -> allocate_vector(VV,ids),blocks(indices)))
 end
 
 function Algebra.allocate_in_range(::Type{V},matrix) where V<:AbstractParamVector
@@ -40,32 +40,33 @@ function Algebra.allocate_in_domain(matrix::BlockParamMatrix{T,L}) where {T,L}
   allocate_in_domain(V,matrix)
 end
 
-# @inline function Algebra._add_entries!(
-#   combine::Function,A,vs::AbstractParamMatrix,is,js)
+@inline function Algebra._add_entries!(
+  combine::Function,A,vs::AbstractParamMatrix,is,js)
 
-#   for (lj,j) in enumerate(js)
-#     if j>0
-#       for (li,i) in enumerate(is)
-#         if i>0
-#           vij = param_entry(vs,li,lj)
-#           add_entry!(combine,A,vij,i,j)
-#         end
-#       end
-#     end
-#   end
-#   A
-# end
+  for (lj,j) in enumerate(js)
+    if j>0
+      for (li,i) in enumerate(is)
+        if i>0
+          vij = get_param_entry(vs,li,lj)
+          add_entry!(combine,A,vij,i,j)
+        end
+      end
+    end
+  end
+  A
+end
 
-# @inline function Algebra._add_entries!(
-#   combine::Function,A,vs::AbstractParamVector,is)
-#   for (li,i) in enumerate(is)
-#     if i>0
-#       vi = get_param_entry(vs,li)
-#       add_entry!(combine,A,vi,i)
-#     end
-#   end
-#   A
-# end
+@inline function Algebra._add_entries!(
+  combine::Function,A,vs::AbstractParamVector,is)
+
+  for (li,i) in enumerate(is)
+    if i>0
+      vi = get_param_entry(vs,li)
+      add_entry!(combine,A,vi,i)
+    end
+  end
+  A
+end
 
 @inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::Number,i)
   @inbounds for k = param_eachindex(A)
@@ -85,7 +86,7 @@ end
 end
 
 @inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamVector,v::Number,i)
-  data = all_data(A)
+  data = get_all_data(A)
   @inbounds for k = param_eachindex(A)
     aik = data[i,k]
     data[i,k] = combine(aik,v)
@@ -94,7 +95,7 @@ end
 end
 
 @inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamVector,v::AbstractVector,i)
-  data = all_data(A)
+  data = get_all_data(A)
   @inbounds for k = param_eachindex(A)
     aik = data[i,k]
     vk = v[k]
@@ -120,23 +121,29 @@ end
   A
 end
 
-@inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamMatrix,v::Number,i,j)
-  data = all_data(A)
-  @inbounds for k = param_eachindex(A)
-    aijk = data[i,j,k]
-    data[i,j,k] = combine(aijk,v)
-  end
-  A
-end
+for T in (:ConsecutiveParamSparseMatrixCSC,:ConsecutiveParamSparseMatrixCSC)
+  @eval begin
+    @inline function Algebra.add_entry!(combine::Function,A::$T,v::Number,i,j)
+      l = nz_index(A,i,j)
+      nz = get_all_data(nonzeros(A))
+      @inbounds for k = param_eachindex(A)
+        aijk = nz[l,k]
+        nz[l,k] = combine(aijk,v)
+      end
+      A
+    end
 
-@inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamMatrix,v::AbstractVector,i,j)
-  data = all_data(A)
-  @inbounds for k = param_eachindex(A)
-    aijk = data[i,j,k]
-    vk = v[k]
-    data[i,j,k] = combine(aijk,vk)
+    @inline function Algebra.add_entry!(combine::Function,A::$T,v::AbstractVector,i,j)
+      l = nz_index(A,i,j)
+      nz = get_all_data(nonzeros(A))
+      @inbounds for k = param_eachindex(A)
+        aijk = nz[l,k]
+        vk = v[k]
+        nz[l,k] = combine(aijk,vk)
+      end
+      A
+    end
   end
-  A
 end
 
 # @inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::AbstractArray,i)
@@ -258,12 +265,12 @@ Extends the concept of `counter` in Gridap to accommodate a parametric setting.
 """
 struct ParamCounter{C,L}
   counter::C
-  ParamCounter{L}(counter::C) where {T,L} = new{T,L}(counter)
+  ParamCounter{L}(counter::C) where {C,L} = new{C,L}(counter)
 end
 
-ParamDataStructures.param_length(::ParamCounter{C,L}) where {T,L} = L
+ParamDataStructures.param_length(::ParamCounter{C,L}) where {C,L} = L
 
-Algebra.LoopStyle(::Type{ParamCounter{C}}) where C = LoopStyle(C)
+Algebra.LoopStyle(::Type{<:ParamCounter{C}}) where C = LoopStyle(C)
 
 @inline function Algebra.add_entry!(::typeof(+),a::ParamCounter,v,i,j)
   add_entry!(+,a.counter,v,i,j)
@@ -284,10 +291,10 @@ end
 
 function Algebra.nz_allocation(a::ParamCounter{C,L}) where {C,L}
   inserter = nz_allocation(a.counter)
-  ParamInserter{L}(inserter)
+  ParamInserter(inserter,L)
 end
 
-function ParamInserter{L}(inserter) where L
+function ParamInserter(inserter,L)
   @abstractmethod
 end
 
@@ -315,7 +322,7 @@ Base.@propagate_inbounds function Algebra.nz_index(A::ParamSparseMatrixCSC,i0::I
   ((r1 > r2) || (rowvals(A)[r1] != i0)) ? -1 : r1
 end
 
-function ParamInserter{L}(inserter::Algebra.InserterCSC) where L
+function ParamInserter(inserter::Algebra.InserterCSC,L)
   @unpack nrows,ncols,colptr,colnnz,rowval,nzval = inserter
   pnzval = param_array(nzval,L)
   ParamInserterCSC(nrows,ncols,colptr,colnnz,rowval,pnzval)
@@ -364,14 +371,11 @@ Algebra.LoopStyle(::Type{<:ParamInserterCSC}) = Loop()
   nothing
 end
 
-@noinline function Algebra.add_entry!(
-  ::typeof(+),a::ParamInserterCSC{Tv,Ti,L},v::Number,i,j) where Tv
-
+@noinline function Algebra.add_entry!(::typeof(+),a::ParamInserterCSC,v::Number,i,j)
   add_entry!(+,a,fill(v,param_length(a)),i,j)
 end
 
-@noinline function Algebra.add_entry!(
-  ::typeof(+),a::ParamInserterCSC,v::AbstractArray,i,j)
+@noinline function Algebra.add_entry!(::typeof(+),a::ParamInserterCSC,v::AbstractArray,i,j)
   pini = Int(a.colptr[j])
   pend = pini + Int(a.colnnz[j]) - 1
   p = searchsortedfirst(a.rowval,i,pini,pend,Base.Order.Forward)

@@ -331,9 +331,9 @@ function Algebra.solve!(
 end
 
 function Algebra.solve!(
-  x::ConsecutiveBlockParamVector,
+  x::BlockConsecutiveParamVector,
   ns::LinearSolvers.FGMRESNumericalSetup,
-  b::ConsecutiveBlockParamVector)
+  b::BlockConsecutiveParamVector)
 
   solver,A,Pl,Pr,caches = ns.solver,ns.A,ns.Pl_ns,ns.Pr_ns,ns.caches
   V,Z,zl,H,g,c,s = caches

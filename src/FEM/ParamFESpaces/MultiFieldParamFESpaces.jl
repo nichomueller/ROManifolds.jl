@@ -43,7 +43,7 @@ function MultiField._restrict_to_field(
   offsets = MultiField._compute_field_offsets(U)
   pini = offsets[field] + 1
   pend = offsets[field] + num_free_dofs(U[field])
-  ParamDataStructures.param_view(free_values,pini:pend)
+  get_param_entry(free_values,pini:pend)
 end
 
 function MultiField._restrict_to_field(
@@ -65,7 +65,7 @@ function MultiField._restrict_to_field(
   offsets = compute_field_offsets(f,mfs)
   pini = offsets[field] + 1
   pend = offsets[field] + num_free_dofs(U[field])
-  return ParamDataStructures.param_view(block_free_values,pini:pend)
+  return get_param_entry(block_free_values,pini:pend)
 end
 
 function FESpaces.interpolate!(objects,free_values::AbstractParamVector,fe::MultiFieldFESpace)

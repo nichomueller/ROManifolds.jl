@@ -11,7 +11,6 @@ parameter space. Two categories of such realizations are implemented:
 abstract type AbstractRealization end
 
 param_length(r::AbstractRealization) = length(r)
-param_getindex(r::AbstractRealization,i::Vararg{Integer}) = getindex(r,i...)
 
 """
     Realization{P<:AbstractVector} <: AbstractRealization
@@ -206,7 +205,7 @@ end
 
 function ParamSpace(param_domain::AbstractVector{<:AbstractVector})
   sampling_style = UniformSampling()
-  ParamSpace(param_domain,sampling)
+  ParamSpace(param_domain,sampling_style)
 end
 
 function Base.show(io::IO,::MIME"text/plain",p::ParamSpace)

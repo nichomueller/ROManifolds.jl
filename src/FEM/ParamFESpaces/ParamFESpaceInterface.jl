@@ -149,7 +149,7 @@ function FESpaces._free_and_dirichlet_values_fill!(
       @inbounds for k in param_eachindex(dirichlet_vals)
         val = vals[k][i]
         if dof > 0
-          free_vals[k][dofs] = val
+          free_vals[k][dof] = val
         elseif dof < 0
           dirichlet_vals[k][-dof] = val
         else
@@ -287,8 +287,8 @@ function FESpaces.scatter_free_and_dirichlet_values(
 end
 
 function FESpaces.gather_free_and_dirichlet_values(
-  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{FixConstant}},
-  cv)
+  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
+  cv) where T<:FESpaces.FixConstant
 
   f = tf.space
   tf′ = TrivialParamFESpace(f.space,param_length(f))
@@ -300,8 +300,8 @@ function FESpaces.gather_free_and_dirichlet_values(
 end
 
 function FESpaces.gather_free_and_dirichlet_values(
-  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{DoNotFixConstant}},
-  cv)
+  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
+  cv) where T<:FESpaces.DoNotFixConstant
 
   f = tf.space
   tf′ = TrivialParamFESpace(f.space,param_length(f))
@@ -311,8 +311,8 @@ end
 function FESpaces.gather_free_and_dirichlet_values!(
   fv,
   dv,
-  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{FixConstant}},
-  cv)
+  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
+  cv) where T<:FESpaces.FixConstant
 
   @assert innerlength(dv) == 1
   f = tf.space
@@ -327,18 +327,15 @@ end
 function FESpaces.gather_free_and_dirichlet_values!(
   fv,
   dv,
-  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{DoNotFixConstant}},
-  cv)
+  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
+  cv) where T<:FESpaces.DoNotFixConstant
 
   f = tf.space
   tf′ = TrivialParamFESpace(f.space,param_length(f))
   gather_free_and_dirichlet_values!(fv,dv,tf′,cv)
 end
 
-function FESpaces.TrialFESpace(
-  f::TrivialParamFESpace{<:FESpaceWithConstantFixed{CA}}
-  ) where CA
-
+function FESpaces.TrialFESpace(f::TrivialParamFESpace{<:FESpaceWithConstantFixed})
   f = tf.space
   U = TrialFESpace(f)
   TrivialParamFESpace(U,param_length(f))
@@ -386,7 +383,7 @@ function Base.sum(v::ConsecPVWithEntryRemoved)
   sum(data,dims=1) - data[v.index,:]
 end
 
-function Base.sum(v::ParamVectorWithEntryRemoved{T,L})
+function Base.sum(v::ParamVectorWithEntryRemoved{T,L}) where {T,L}
   s = zeros(T,L)
   @inbounds for k in param_eachindex(v)
     ak = v.a[k]
@@ -443,7 +440,7 @@ function Base.sum(v::ConsecPVWithEntryInserted)
   sum(data,dims=1) + v.value
 end
 
-function Base.sum(v::ParamVectorWithEntryInserted{T,L})
+function Base.sum(v::ParamVectorWithEntryInserted{T,L}) where {T,L}
   s = zeros(T,L)
   @inbounds for k in param_eachindex(v.a)
     ak = v.a[k]

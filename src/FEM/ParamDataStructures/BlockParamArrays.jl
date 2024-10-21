@@ -1,6 +1,6 @@
 ParamArray(A::AbstractArray{<:ParamArray}) = mortar(A)
 
-function param_array(a::BlockArray,l::Integer) where N
+function param_array(a::BlockArray,l::Integer)
   mortar(b -> param_array(b,l),blocks(a))
 end
 
@@ -160,12 +160,12 @@ function LinearAlgebra.norm(A::BlockParamArray)
   return sqrt(n)
 end
 
-function param_entry(A::BlockParamArray{T,N},i::Vararg{Integer}) where {T,N}
+function get_param_entry(A::BlockParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
   n = length(blocks(A))
   L = param_length(A)
   entries = Vector{Vector{T}}(undef,n)
   @inbounds for (k,Ak) in enumerate(blocks(A))
-    entries[k] = param_entry(Ak,i...)
+    entries[k] = get_param_entry(Ak,i...)
   end
   mortar(entries)
 end
