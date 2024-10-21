@@ -121,29 +121,25 @@ end
   A
 end
 
-for T in (:ConsecutiveParamSparseMatrixCSC,:ConsecutiveParamSparseMatrixCSC)
-  @eval begin
-    @inline function Algebra.add_entry!(combine::Function,A::$T,v::Number,i,j)
-      l = nz_index(A,i,j)
-      nz = get_all_data(nonzeros(A))
-      @inbounds for k = param_eachindex(A)
-        aijk = nz[l,k]
-        nz[l,k] = combine(aijk,v)
-      end
-      A
-    end
-
-    @inline function Algebra.add_entry!(combine::Function,A::$T,v::AbstractVector,i,j)
-      l = nz_index(A,i,j)
-      nz = get_all_data(nonzeros(A))
-      @inbounds for k = param_eachindex(A)
-        aijk = nz[l,k]
-        vk = v[k]
-        nz[l,k] = combine(aijk,vk)
-      end
-      A
-    end
+@inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamSparseMatrix,v::Number,i,j)
+  l = nz_index(A,i,j)
+  nz = get_all_data(nonzeros(A))
+  @inbounds for k = param_eachindex(A)
+    aijk = nz[l,k]
+    nz[l,k] = combine(aijk,v)
   end
+  A
+end
+
+@inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamSparseMatrix,v::AbstractVector,i,j)
+  l = nz_index(A,i,j)
+  nz = get_all_data(nonzeros(A))
+  @inbounds for k = param_eachindex(A)
+    aijk = nz[l,k]
+    vk = v[k]
+    nz[l,k] = combine(aijk,vk)
+  end
+  A
 end
 
 # @inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::AbstractArray,i)

@@ -117,24 +117,26 @@ function FESpaces.gather_dirichlet_values!(
 end
 
 function FESpaces._fill_dirichlet_values_for_tag!(
-  dirichlet_values::AbstractParamVector,
-  dv::AbstractParamVector,
+  dirichlet_values::ConsecutiveParamVector,
+  dv::ConsecutiveParamVector,
   tag,
   dirichlet_dof_to_tag)
 
   @check param_length(dirichlet_values) == param_length(dv)
+  diri_data = get_all_data(dirichlet_values)
+  dv_data = get_all_data(dv)
   for dof in 1:innerlength(dv)
     if dirichlet_dof_to_tag[dof] == tag
-      @inbounds for k in param_eachindex(dirichlet_values)
-        dirichlet_values[k][dof] = dv[k][dof]
+      @inbounds for k in param_eachindex(dv)
+        diri_data[dof,k] = dv_data[dof,k]
       end
     end
   end
 end
 
 function FESpaces._free_and_dirichlet_values_fill!(
-  free_vals::AbstractParamVector,
-  dirichlet_vals::AbstractParamVector,
+  free_vals::ConsecutiveParamVector,
+  dirichlet_vals::ConsecutiveParamVector,
   cache_vals,
   cache_dofs,
   cell_vals,
@@ -142,16 +144,18 @@ function FESpaces._free_and_dirichlet_values_fill!(
   cells)
 
   @check param_length(free_vals) == param_length(dirichlet_vals)
+  free_data = get_all_data(free_vals)
+  diri_data = get_all_data(dirichlet_vals)
   for cell in cells
     vals = getindex!(cache_vals,cell_vals,cell)
     dofs = getindex!(cache_dofs,cell_dofs,cell)
     for (i,dof) in enumerate(dofs)
-      @inbounds for k in param_eachindex(dirichlet_vals)
+      @inbounds for k in param_eachindex(free_vals)
         val = vals[k][i]
         if dof > 0
-          free_vals[k][dof] = val
+          free_data[dof,k] = val
         elseif dof < 0
-          dirichlet_vals[k][-dof] = val
+          diri_data[-dof,k] = val
         else
           @unreachable "dof ids either positive or negative, not zero"
         end
