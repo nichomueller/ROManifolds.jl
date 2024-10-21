@@ -280,17 +280,19 @@ for T in (:MultiFieldRBSpace,:EvalMultiFieldRBSpace)
   end
 end
 
-for T in (:MultiFieldRBSpace,:EvalMultiFieldRBSpace), f! in (:project!,:inv_project!)
-  @eval begin
-    function $f!(
-      y::Union{BlockVector,BlockParamVector},
-      r::$T,
-      x::Union{BlockVector,BlockParamVector})
+for (S,T) in zip((:BlockVector,:BlockParamVector),(:MultiFieldRBSpace,:EvalMultiFieldRBSpace))
+  for f! in (:project!,:inv_project!)
+    @eval begin
+      function $f!(
+        y::$S,
+        r::$T,
+        x::$S)
 
-      for i in 1:blocklength(x)
-        $f!(y[Block(i)],r[i],x[Block(i)])
+        for i in 1:blocklength(x)
+          $f!(y[Block(i)],r[i],x[Block(i)])
+        end
+        return y
       end
-      return y
     end
   end
 end

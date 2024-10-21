@@ -152,12 +152,12 @@ for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
 end
 
 function LinearAlgebra.rmul!(A::BlockParamArray,b::Number)
-  map(rmul!,blocks(A),b)
+  map(a -> rmul!(a,b),blocks(A))
   return A
 end
 
 function LinearAlgebra.axpy!(α::Number,A::BlockParamArray,B::BlockParamArray)
-  axpy!(α,blocks(A),blocks(B))
+  map((a,b) -> axpy!(α,a,b),blocks(A),blocks(B))
   return B
 end
 

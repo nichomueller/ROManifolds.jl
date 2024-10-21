@@ -63,9 +63,9 @@ end
 
 const TransientEvalMultiFieldRBSpace = EvalMultiFieldRBSpace{<:TransientRealization}
 
-for f! in (:(RBSteady.project!),:(RBSteady.inv_project!))
+for S in (:BlockVector,:BlockParamVector), f! in (:(RBSteady.project!),:(RBSteady.inv_project!))
   @eval begin
-    function $f!(y,r::TransientEvalMultiFieldRBSpace,x::Union{BlockVector,BlockParamVector})
+    function $f!(y::$S,r::TransientEvalMultiFieldRBSpace,x::$S)
       for i in 1:blocklength(x)
         $f!(y[Block(i)],r[i],x[Block(i)])
       end
