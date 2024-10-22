@@ -17,10 +17,11 @@ Subtypes:
 """
 abstract type ParamOperator{T<:UnEvalOperatorType} <: NonlinearOperator end
 
-get_realization(op::ParamOperator) = @abstractmethod
+get_fe_operator(op::ParamOperator) = @abstractmethod
 
 function allocate_paramcache(
   op::ParamOperator,
+  μ::Realization,
   u::AbstractVector)
 
   nothing
@@ -29,6 +30,7 @@ end
 function update_paramcache!(
   paramcache,
   op::ParamOperator,
+  μ::Realization,
   u::AbstractVector)
 
   paramcache
@@ -36,6 +38,7 @@ end
 
 function Algebra.allocate_residual(
   op::ParamOperator,
+  μ::Realization,
   u::AbstractVector,
   paramcache)
 
@@ -43,8 +46,9 @@ function Algebra.allocate_residual(
 end
 
 function Algebra.residual!(
-  b::AbstractVector,
+  b,
   op::ParamOperator,
+  μ::Realization,
   u::AbstractVector,
   paramcache)
 
@@ -53,16 +57,18 @@ end
 
 function Algebra.residual(
   op::ParamOperator,
+  μ::Realization,
   u::AbstractVector)
 
-  paramcache = allocate_paramcache(op,u)
-  b = allocate_residual(op,u,paramcache)
-  residual!(b,op,u,paramcache)
+  paramcache = allocate_paramcache(op,μ,u)
+  b = allocate_residual(op,μ,u,paramcache)
+  residual!(b,op,μ,u,paramcache)
   b
 end
 
 function Algebra.allocate_jacobian(
   op::ParamOperator,
+  μ::Realization,
   u::AbstractVector,
   paramcache)
 
@@ -70,23 +76,25 @@ function Algebra.allocate_jacobian(
 end
 
 function Algebra.jacobian!(
-  A::AbstractMatrix,
+  A,
   op::ParamOperator,
+  μ::Realization,
   u::AbstractVector,
   paramcache)
 
   LinearAlgebra.fillstored!(A,zero(eltype(A)))
-  jacobian_add!(A,op,u,paramcache)
+  jacobian_add!(A,op,μ,u,paramcache)
   A
 end
 
 function Algebra.jacobian(
   op::ParamOperator,
+  μ::Realization,
   u::AbstractVector)
 
-  paramcache = allocate_paramcache(op,u)
-  A = allocate_jacobian(op,u,paramcache)
-  jacobian!(A,op,u,paramcache)
+  paramcache = allocate_paramcache(op,μ,u)
+  A = allocate_jacobian(op,μ,u,paramcache)
+  jacobian!(A,op,μ,u,paramcache)
   A
 end
 
@@ -102,50 +110,8 @@ mutable struct ParamCache <: GridapType
   const_forms
 end
 
-"""
-    abstract type ParamOperatorWithTrian{T<:UnEvalOperatorType} <: ParamOperator{T} end
-
-Is to a ParamOperator as a ParamFEOperatorWithTrian is to a ParamFEOperator.
-
-Suptypes:
-- [`ParamOpFromFEOpWithTrian`](@ref)
-- [`RBOperator`](@ref)
-
-"""
-abstract type ParamOperatorWithTrian{T<:UnEvalOperatorType} <: ParamOperator{T} end
-
-function Algebra.allocate_residual(
-  op::ParamOperatorWithTrian,
-  u::AbstractVector,
-  paramcache)
-
-  @abstractmethod
-end
-
-function Algebra.residual!(
-  b::Contribution,
-  op::ParamOperatorWithTrian,
-  u::AbstractVector,
-  paramcache)
-
-  @abstractmethod
-end
-
-function Algebra.allocate_jacobian(
-  op::ParamOperator,
-  u::AbstractVector,
-  paramcache)
-
-  @abstractmethod
-end
-
-function Algebra.jacobian!(
-  A::Contribution,
-  op::ParamOperatorWithTrian,
-  u::AbstractVector,
-  paramcache)
-
-  LinearAlgebra.fillstored!(A,zero(eltype(A)))
-  jacobian_add!(A,op,u,paramcache)
-  A
+struct LinNonlinParamCache{A,B} <: GridapType
+  paramcache::ParamCache
+  A_lin::A
+  b_lin::B
 end

@@ -14,26 +14,24 @@ a standard FEOperator, there are the following novelties:
 Subtypes:
 
 - [`ParamFEOpFromWeakForm`](@ref)
-- [`ParamFEOperatorWithTrian`](@ref)
-- [`GenericLinearNonlinearParamFEOperator`](@ref)
 
 """
 abstract type ParamFEOperator{T<:UnEvalOperatorType} <: FEOperator end
 
-function FESpaces.get_test(tfeop::ParamFEOperator)
+function FESpaces.get_test(feop::ParamFEOperator)
   @abstractmethod
 end
 
-function FESpaces.get_trial(tfeop::ParamFEOperator)
+function FESpaces.get_trial(feop::ParamFEOperator)
+  @abstractmethod
+end
+
+function get_param_space(feop::ParamFEOperator)
   @abstractmethod
 end
 
 function FESpaces.get_algebraic_operator(op::ParamFEOperator)
-  @notimplemented "Must provide a realization to obtain an algebraic operator"
-end
-
-function FESpaces.get_algebraic_operator(op::ParamFEOperator,r::Realization)
-  ParamOpFromFEOp(op,r)
+  ParamOpFromFEOp(op)
 end
 
 function allocate_feopcache(op::ParamFEOperator,r::Realization,u::AbstractVector)
@@ -44,7 +42,7 @@ function update_feopcache!(feop_cache,op::ParamFEOperator,u::AbstractVector)
   feop_cache
 end
 
-ParamDataStructures.realization(op::ParamFEOperator;kwargs...) = @abstractmethod
+ParamDataStructures.realization(op::ParamFEOperator;kwargs...) = realization(get_param_space(feop);kwargs...)
 
 function ParamFESpaces.get_param_assembler(op::ParamFEOperator,r::AbstractRealization)
   get_param_assembler(get_assembler(op),r)
@@ -114,7 +112,7 @@ end
 
 FESpaces.get_test(op::ParamFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::ParamFEOpFromWeakForm) = op.trial
-ParamDataStructures.realization(op::ParamFEOpFromWeakForm;kwargs...) = realization(op.pspace;kwargs...)
+get_param_space(op::ParamFEOpFromWeakForm) = op.pspace
 ODEs.get_res(op::ParamFEOpFromWeakForm) = op.res
 get_jac(op::ParamFEOpFromWeakForm) = op.jac
 ODEs.get_assembler(op::ParamFEOpFromWeakForm) = op.assem
@@ -143,7 +141,7 @@ end
 
 FESpaces.get_test(op::LinearParamFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::LinearParamFEOpFromWeakForm) = op.trial
-ParamDataStructures.realization(op::LinearParamFEOpFromWeakForm;kwargs...) = realization(op.pspace;kwargs...)
+get_param_space(op::LinearParamFEOpFromWeakForm) = op.pspace
 ODEs.get_res(op::LinearParamFEOpFromWeakForm) = op.res
 get_jac(op::LinearParamFEOpFromWeakForm) = op.jac
 ODEs.get_assembler(op::LinearParamFEOpFromWeakForm) = op.assem

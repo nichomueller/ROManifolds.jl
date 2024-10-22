@@ -41,7 +41,6 @@ export AbstractLinearParamODE
 export SemilinearParamODE
 export LinearParamODE
 export ODEParamOperator
-export ODEParamOperatorWithTrian
 include("ODEParamOperator.jl")
 
 export ParamStageOperator
@@ -60,7 +59,7 @@ export NonlinearTransientParamFEOperator
 include("TransientParamFEOperator.jl")
 
 export TransientParamFEOperatorWithTrian
-export TransientParamFEOpFromWeakFormWithTrian
+export TransientParamFEOperatorWithTrian
 export set_triangulation
 export change_triangulation
 include("TransientParamFEOperatorWithTrian.jl")

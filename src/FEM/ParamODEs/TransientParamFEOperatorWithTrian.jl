@@ -1,43 +1,17 @@
 """
-    abstract type TransientParamFEOperatorWithTrian{T<:ODEParamOperatorType} <:
-      TransientParamFEOperator{T} end
-
-Interface to accommodate the separation of terms in the problem's weak formulation
-depending on the triangulation on which the integration occurs. When employing
-a TransientParamFEOperatorWithTrian, the residual and jacobian are returned as
-[`Contribution`](@ref) objects, instead of standard arrays. To correctly define
-an instance of TransientParamFEOperatorWithTrian, one needs to:
-- provide the integration domains of the residual and jacobian, i.e. their
-  respective triangulations
-- define the residual and jacobian as functions of the Measure objects corresponding
-  to the aforementioned triangulations
-
-Subtypes:
-
-- [`TransientParamFEOpFromWeakFormWithTrian`](@ref)
-- [`LinearNonlinearTransientParamFEOperatorWithTrian`](@ref)
-
-"""
-abstract type TransientParamFEOperatorWithTrian{T<:ODEParamOperatorType} <: TransientParamFEOperator{T} end
-
-function FESpaces.get_algebraic_operator(feop::TransientParamFEOperatorWithTrian)
-  ODEParamOpFromTFEOpWithTrian(feop)
-end
-
-"""
-    struct TransientParamFEOpFromWeakFormWithTrian{T,N} <: TransientParamFEOperatorWithTrian{T} end
+    struct TransientParamFEOperatorWithTrian{T,N} <: TransientParamFEOperator{T} end
 
 Corresponds to a [`TransientParamFEOpFromWeakForm`](@ref) object, but in a triangulation
 separation setting. `N` corresponds to the length of the jacobians in the transient
 problem, i.e. the order of the time derivative
 
 """
-struct TransientParamFEOpFromWeakFormWithTrian{T,N} <: TransientParamFEOperatorWithTrian{T}
+struct TransientParamFEOperatorWithTrian{T,N} <: TransientParamFEOperator{T}
   op::TransientParamFEOperator{T}
   trian_res::Tuple{Vararg{Triangulation}}
   trian_jacs::NTuple{N,Tuple{Vararg{Triangulation}}}
 
-  function TransientParamFEOpFromWeakFormWithTrian(
+  function TransientParamFEOperatorWithTrian(
     op::TransientParamFEOperator{T},
     trian_res::Tuple{Vararg{Triangulation}},
     trian_jacs::NTuple{N,Tuple{Vararg{Triangulation}}}) where {T,N}
@@ -60,7 +34,7 @@ function TransientParamFEOpFromWeakForm(
   trian_jacs...)
 
   op = TransientParamFEOpFromWeakForm(res,jacs,tpspace,assem,index_map,trial,test,order)
-  op_trian = TransientParamFEOpFromWeakFormWithTrian(op,trian_res,trian_jacs)
+  op_trian = TransientParamFEOperatorWithTrian(op,trian_res,trian_jacs)
   return op_trian
 end
 
@@ -79,7 +53,7 @@ function TransientParamSemilinearFEOpFromWeakForm(
   trian_jacs...)
 
   op = TransientParamSemilinearFEOpFromWeakForm(mass,res,jacs,constant_mass,tpspace,assem,index_map,trial,test,order)
-  op_trian = TransientParamFEOpFromWeakFormWithTrian(op,trian_res,trian_jacs)
+  op_trian = TransientParamFEOperatorWithTrian(op,trian_res,trian_jacs)
   return op_trian
 end
 
@@ -98,20 +72,24 @@ function TransientParamLinearFEOpFromWeakForm(
   trian_jacs...)
 
   op = TransientParamLinearFEOpFromWeakForm(forms,res,jacs,constant_forms,tpspace,assem,index_map,trial,test,order)
-  op_trian = TransientParamFEOpFromWeakFormWithTrian(op,trian_res,trian_jacs)
+  op_trian = TransientParamFEOperatorWithTrian(op,trian_res,trian_jacs)
   return op_trian
 end
 
-FESpaces.get_test(op::TransientParamFEOpFromWeakFormWithTrian) = get_test(op.op)
-FESpaces.get_trial(op::TransientParamFEOpFromWeakFormWithTrian) = get_trial(op.op)
-Polynomials.get_order(op::TransientParamFEOpFromWeakFormWithTrian) = get_order(op.op)
-ODEs.get_res(op::TransientParamFEOpFromWeakFormWithTrian) = get_res(op.op)
-ODEs.get_jacs(op::TransientParamFEOpFromWeakFormWithTrian) = get_jacs(op.op)
-ODEs.get_assembler(op::TransientParamFEOpFromWeakFormWithTrian) = get_assembler(op.op)
-IndexMaps.get_index_map(op::TransientParamFEOpFromWeakFormWithTrian) = get_index_map(op.op)
-ParamDataStructures.realization(op::TransientParamFEOpFromWeakFormWithTrian;kwargs...) = realization(op.op;kwargs...)
+function FESpaces.get_algebraic_operator(feop::TransientParamFEOperatorWithTrian)
+  ODEParamOpFromTFEOpWithTrian(feop)
+end
 
-function ODEs.is_form_constant(op::TransientParamFEOpFromWeakFormWithTrian,k::Integer)
+FESpaces.get_test(op::TransientParamFEOperatorWithTrian) = get_test(op.op)
+FESpaces.get_trial(op::TransientParamFEOperatorWithTrian) = get_trial(op.op)
+Polynomials.get_order(op::TransientParamFEOperatorWithTrian) = get_order(op.op)
+ODEs.get_res(op::TransientParamFEOperatorWithTrian) = get_res(op.op)
+ODEs.get_jacs(op::TransientParamFEOperatorWithTrian) = get_jacs(op.op)
+ODEs.get_assembler(op::TransientParamFEOperatorWithTrian) = get_assembler(op.op)
+IndexMaps.get_index_map(op::TransientParamFEOperatorWithTrian) = get_index_map(op.op)
+ParamDataStructures.realization(op::TransientParamFEOperatorWithTrian;kwargs...) = realization(op.op;kwargs...)
+
+function ODEs.is_form_constant(op::TransientParamFEOperatorWithTrian,k::Integer)
   is_form_constant(op.op,k)
 end
 
@@ -201,9 +179,9 @@ function ParamSteady.set_triangulation(
   set_triangulation(op.op,trian_res,trian_jacs)
 end
 
-function ParamSteady.change_triangulation(op::TransientParamFEOpFromWeakFormWithTrian,trian_res,trian_jacs)
+function ParamSteady.change_triangulation(op::TransientParamFEOperatorWithTrian,trian_res,trian_jacs)
   newtrian_res = order_triangulations(op.trian_res,trian_res)
   newtrian_jacs = order_triangulations.(op.trian_jacs,trian_jacs)
   newop = set_triangulation(op,newtrian_res,newtrian_jacs)
-  TransientParamFEOpFromWeakFormWithTrian(newop,newtrian_res,newtrian_jacs)
+  TransientParamFEOperatorWithTrian(newop,newtrian_res,newtrian_jacs)
 end

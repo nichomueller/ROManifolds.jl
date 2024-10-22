@@ -213,9 +213,7 @@ export NonlinearParamEq
 export LinearParamEq
 export LinearNonlinearParamEq
 export ParamOperator
-export ParamOperatorWithTrian
 export LinearNonlinearParamOpFromFEOp
-export ParamCache
 export allocate_paramcache
 export update_paramcache!
 export get_realization
@@ -223,7 +221,6 @@ export get_realization
 export ParamFEOperator
 export LinearParamFEOperator
 export ParamFEOperatorWithTrian
-export ParamFEOpFromWeakFormWithTrian
 export set_triangulation
 export change_triangulation
 
@@ -250,7 +247,6 @@ export AbstractLinearParamODE
 export SemilinearParamODE
 export LinearParamODE
 export ODEParamOperator
-export ODEParamOperatorWithTrian
 
 export ParamStageOperator
 export NonlinearParamStageOperator
@@ -266,7 +262,7 @@ export LinearTransientParamFEOperator
 export NonlinearTransientParamFEOperator
 
 export TransientParamFEOperatorWithTrian
-export TransientParamFEOpFromWeakFormWithTrian
+export TransientParamFEOperatorWithTrian
 export set_triangulation
 export change_triangulation
 

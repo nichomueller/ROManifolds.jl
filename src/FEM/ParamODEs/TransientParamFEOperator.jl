@@ -17,13 +17,12 @@ Subtypes:
 - [`TransientParamSemilinearFEOpFromWeakForm`](@ref)
 - [`TransientParamLinearFEOpFromWeakForm`](@ref)
 - [`TransientParamFEOperatorWithTrian`](@ref)
-- [`GenericLinearNonlinearTransientParamFEOperator`](@ref)
 
 """
 abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: ParamFEOperator{T} end
 
-function FESpaces.get_algebraic_operator(op::TransientParamFEOperator,r::TransientRealization)
-  ODEParamOpFromTFEOp(op,r)
+function FESpaces.get_algebraic_operator(op::TransientParamFEOperator)
+  ODEParamOpFromTFEOp(op)
 end
 
 function ParamSteady.allocate_feopcache(

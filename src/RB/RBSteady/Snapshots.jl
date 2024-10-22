@@ -17,7 +17,7 @@ abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractRealiz
 ParamDataStructures.get_values(s::AbstractSnapshots) = @abstractmethod
 get_indexed_values(s::AbstractSnapshots) = @abstractmethod
 IndexMaps.get_index_map(s::AbstractSnapshots) = @abstractmethod
-ParamSteady.get_realization(s::AbstractSnapshots) = @abstractmethod
+get_realization(s::AbstractSnapshots) = @abstractmethod
 
 """
     num_space_dofs(s::AbstractSnapshots{T,N,L,D}) where {T,N,L,D} -> NTuple{D,Integer}
@@ -138,7 +138,7 @@ end
 ParamDataStructures.get_all_data(s::GenericSnapshots) = s.data
 ParamDataStructures.get_values(s::GenericSnapshots) = s.data
 IndexMaps.get_index_map(s::GenericSnapshots) = s.index_map
-ParamSteady.get_realization(s::GenericSnapshots) = s.realization
+get_realization(s::GenericSnapshots) = s.realization
 
 function get_indexed_values(s::GenericSnapshots)
   vi = vec(get_index_map(s))
@@ -208,7 +208,7 @@ function get_indexed_values(s::SnapshotsAtIndices)
   ConsecutiveParamArray(data[:,param_indices(s)])
 end
 
-ParamSteady.get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
+get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
 
 Base.@propagate_inbounds function Base.getindex(
   s::SnapshotsAtIndices{T,N},
@@ -294,7 +294,7 @@ function Base.setindex!(
   v
 end
 
-ParamSteady.get_realization(s::ReshapedSnapshots) = get_realization(s.snaps)
+get_realization(s::ReshapedSnapshots) = get_realization(s.snaps)
 IndexMaps.get_index_map(s::ReshapedSnapshots) = get_index_map(s.snaps)
 
 function ParamDataStructures.get_values(s::ReshapedSnapshots)
@@ -433,7 +433,7 @@ function Arrays.testitem(s::BlockSnapshots)
 end
 
 IndexMaps.get_index_map(s::BlockSnapshots) = get_index_map(testitem(s))
-ParamSteady.get_realization(s::BlockSnapshots) = get_realization(testitem(s))
+get_realization(s::BlockSnapshots) = get_realization(testitem(s))
 
 function ParamDataStructures.get_values(s::BlockSnapshots)
   map(get_values,s.array) |> mortar

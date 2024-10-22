@@ -1,5 +1,5 @@
 """
-    struct GenericLinearNonlinearTransientParamFEOperator <:
+    struct LinearNonlinearTransientParamFEOperator <:
       TransientParamFEOperator{LinearNonlinearParamODE} end
 
 Interface to accommodate the separation of terms depending on their linearity in
@@ -8,50 +8,17 @@ residuals/jacobians, and in the Newton-like iterations only evaluate and assembl
 only the nonlinear components
 
 """
-struct GenericLinearNonlinearTransientParamFEOperator <: TransientParamFEOperator{LinearNonlinearParamODE}
+struct LinearNonlinearTransientParamFEOperator <: TransientParamFEOperator{LinearNonlinearParamODE}
   op_linear::TransientParamFEOperator{LinearParamODE}
   op_nonlinear::TransientParamFEOperator
 end
 
-"""
-    structLinearNonlinearTransientParamFEOperatorWithTrian <:
-      TransientParamFEOperatorWithTrian{LinearNonlinearParamODE} end
-
-Is to a TransientParamFEOperatorWithTrian as a GenericLinearNonlinearTransientParamFEOperator is to
-a TransientParamFEOperator
-
-"""
-struct LinearNonlinearTransientParamFEOperatorWithTrian <: TransientParamFEOperatorWithTrian{LinearNonlinearParamODE}
-  op_linear::TransientParamFEOperatorWithTrian{LinearParamODE}
-  op_nonlinear::TransientParamFEOperatorWithTrian
-end
-
-function LinNonlinTransientParamFEOperator(
-  op_linear::TransientParamFEOperator,
-  op_nonlinear::TransientParamFEOperator)
-  GenericLinearNonlinearTransientParamFEOperator(op_linear,op_nonlinear)
-end
-
-function LinNonlinTransientParamFEOperator(
-  op_linear::TransientParamFEOperatorWithTrian,
-  op_nonlinear::TransientParamFEOperatorWithTrian)
-  LinearNonlinearTransientParamFEOperatorWithTrian(op_linear,op_nonlinear)
-end
-
-"""
-    const LinearNonlinearTransientParamFEOperator = Union{
-      GenericLinearNonlinearTransientParamFEOperator,
-      LinearNonlinearTransientParamFEOperatorWithTrian
-    }
-
-"""
-const LinearNonlinearTransientParamFEOperator = Union{
-  GenericLinearNonlinearTransientParamFEOperator,
-  LinearNonlinearTransientParamFEOperatorWithTrian
-}
-
 ParamSteady.get_linear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_linear
 ParamSteady.get_nonlinear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_nonlinear
+
+function FESpaces.get_algebraic_operator(feop::LinearNonlinearTransientParamFEOperator)
+  ODEParamOpFromTFEOpWithTrian(feop)
+end
 
 function FESpaces.get_test(op::LinearNonlinearTransientParamFEOperator)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)

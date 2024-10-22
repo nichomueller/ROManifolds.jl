@@ -2,17 +2,14 @@
 """
 struct ODEParamOpFromTFEOp{T} <: ODEParamOperator{T}
   op::TransientParamFEOperator{T}
-  r::TransientRealization
 end
 
-ParamSteady.get_realization(op::ODEParamOpFromTFEOp) = op.r
 ParamSteady.get_fe_operator(op::ODEParamOpFromTFEOp) = op.op
 
 function ParamSteady.allocate_paramcache(
   odeop::ODEParamOpFromTFEOp,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
-
-  r = get_realization(odeop)
 
   order = get_order(odeop)
   pttrial = get_trial(odeop.op)
@@ -63,9 +60,7 @@ function ParamSteady.allocate_paramcache(
   ParamCache(trials,pttrials,tfeopcache,const_forms)
 end
 
-function ParamSteady.update_paramcache!(paramcache,odeop::ODEParamOpFromTFEOp)
-  r = get_realization(odeop)
-
+function ParamSteady.update_paramcache!(paramcache,odeop::ODEParamOpFromTFEOp,r::TransientRealization)
   trials = ()
   for k in 1:get_order(odeop)+1
     trials = (trials...,evaluate!(paramcache.trial[k],paramcache.ptrial[k],r))
@@ -80,10 +75,9 @@ end
 
 function Algebra.allocate_residual(
   odeop::ODEParamOpFromTFEOp,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache)
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   test = get_test(odeop.op)
@@ -100,11 +94,10 @@ end
 function Algebra.residual!(
   b::AbstractVector,
   odeop::ODEParamOpFromTFEOp,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache;
   add::Bool=false)
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   test = get_test(odeop.op)
@@ -126,11 +119,10 @@ end
 function Algebra.residual!(
   b::AbstractVector,
   odeop::ODEParamOpFromTFEOp{SemilinearParamODE},
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache;
   add::Bool=false)
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   test = get_test(odeop.op)
@@ -153,11 +145,10 @@ end
 function Algebra.residual!(
   b::AbstractVector,
   odeop::ODEParamOpFromTFEOp{LinearParamODE},
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache;
   add::Bool=false)
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   test = get_test(odeop.op)
@@ -180,10 +171,9 @@ end
 
 function Algebra.allocate_jacobian(
   odeop::ODEParamOpFromTFEOp,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache)
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   trial = evaluate(get_trial(odeop.op),nothing)
@@ -207,11 +197,10 @@ end
 function ODEs.jacobian_add!(
   A::AbstractMatrix,
   odeop::ODEParamOpFromTFEOp,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   paramcache)
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   trial = evaluate(get_trial(odeop.op),nothing)
@@ -242,11 +231,10 @@ end
 function ODEs.jacobian_add!(
   A::AbstractMatrix,
   odeop::ODEParamOpFromTFEOp{LinearParamODE},
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   paramcache)
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   trial = evaluate(get_trial(odeop.op),nothing)
@@ -280,12 +268,10 @@ end
 
 """
 """
-struct ODEParamOpFromTFEOpWithTrian{T} <: ODEParamOperatorWithTrian{T}
+struct ODEParamOpFromTFEOpWithTrian{T} <: ODEParamOperator{T}
   op::TransientParamFEOperatorWithTrian{T}
-  r::TransientRealization
 end
 
-ParamSteady.get_realization(op::ODEParamOpFromTFEOpWithTrian) = op.r
 ParamSteady.get_fe_operator(op::ODEParamOpFromTFEOpWithTrian) = op.op
 
 function ParamSteady.set_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
@@ -298,10 +284,10 @@ end
 
 function ParamSteady.allocate_paramcache(
   odeop::ODEParamOpFromTFEOpWithTrian,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
 
-  r = get_realization(odeop)
-  paramcache = _define_odeopcache(odeop,us)
+  paramcache = _define_odeopcache(odeop,r,us)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   test = get_test(odeop.op)
@@ -343,9 +329,8 @@ end
 
 function ParamSteady.update_paramcache!(
   paramcache,
+  r::TransientRealization,
   odeop::ODEParamOpFromTFEOpWithTrian)
-
-  r = get_realization(odeop)
 
   trials = ()
   for k in 1:get_order(odeop)+1
@@ -361,9 +346,9 @@ end
 
 function _define_odeopcache(
   odeop::ODEParamOpFromTFEOpWithTrian,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
 
-  r = get_realization(odeop)
   order = get_order(odeop)
   pttrial = get_trial(odeop.op)
   trial = evaluate(pttrial,r)
@@ -381,10 +366,9 @@ end
 
 function Algebra.allocate_residual(
   odeop::ODEParamOpFromTFEOpWithTrian,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache)
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   test = get_test(odeop.op)
@@ -405,11 +389,10 @@ end
 function Algebra.residual!(
   b::Contribution,
   odeop::ODEParamOpFromTFEOpWithTrian,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache;
   add::Bool=false)
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   test = get_test(odeop.op)
@@ -432,10 +415,9 @@ end
 
 function Algebra.residual(
   odeop::ODEParamOpFromTFEOpWithTrian,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
-  paramcache=_define_odeopcache(odeop,us))
-
-  r = get_realization(odeop)
+  paramcache=_define_odeopcache(odeop,r,us))
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   test = get_test(odeop.op)
@@ -456,10 +438,9 @@ end
 
 function Algebra.allocate_jacobian(
   odeop::ODEParamOpFromTFEOpWithTrian,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache)
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   trial = evaluate(get_trial(odeop.op),nothing)
@@ -488,11 +469,10 @@ end
 function ODEs.jacobian_add!(
   As::TupOfArrayContribution,
   odeop::ODEParamOpFromTFEOpWithTrian,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   paramcache)
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   trial = evaluate(get_trial(odeop.op),nothing)
@@ -524,11 +504,10 @@ end
 
 function Algebra.jacobian(
   odeop::ODEParamOpFromTFEOpWithTrian,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
-  paramcache=_define_odeopcache(odeop,us))
-
-  r = get_realization(odeop)
+  paramcache=_define_odeopcache(odeop,r,us))
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   trial = evaluate(get_trial(odeop.op),nothing)
@@ -560,11 +539,10 @@ end
 function ODEs.jacobian_add!(
   As::TupOfArrayContribution,
   odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   paramcache)
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   trial = evaluate(get_trial(odeop.op),nothing)
@@ -600,11 +578,10 @@ end
 
 function Algebra.jacobian(
   odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   paramcache=_define_odeopcache(odeop,r,us))
-
-  r = get_realization(odeop)
 
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
   trial = evaluate(get_trial(odeop.op),nothing)
@@ -631,4 +608,83 @@ function Algebra.jacobian(
   end
 
   As
+end
+
+struct LinearNonlinearParamOpFromTFEOp <: ParamOperator{LinearNonlinearParamEq}
+  op::LinearNonlinearTransientParamFEOperator
+end
+
+ParamSteady.get_fe_operator(op::LinearNonlinearParamOpFromTFEOp) = op.op
+
+function ParamSteady.get_linear_operator(op::LinearNonlinearParamOpFromTFEOp)
+  get_algebraic_operator(get_linear_operator(op.op))
+end
+
+function ParamSteady.get_nonlinear_operator(op::LinearNonlinearParamOpFromTFEOp)
+  get_algebraic_operator(get_nonlinear_operator(op.op))
+end
+
+function ParamSteady.allocate_paramcache(
+  op::LinearNonlinearParamOpFromTFEOp,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}})
+
+  paramcache = allocate_paramcache(get_nonlinear_operator(op.op),r,us)
+  op_lin = get_linear_operator(op)
+  A_lin = allocate_jacobian(op_lin,r,us,paramcache)
+  b_lin = allocate_residual(op_lin,r,us,paramcache)
+  return LinNonlinParamCache(paramcache,A_lin,b_lin)
+end
+
+function update_paramcache!(
+  cache,
+  r::TransientRealization,
+  op::LinearNonlinearParamOpFromTFEOp)
+
+  update_paramcache!(cache.paramcache,get_nonlinear_operator(op.op),r)
+end
+
+function Algebra.allocate_residual(
+  op::LinearNonlinearParamOpFromTFEOp,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  cache)
+
+  b_lin = cache.b_lin
+  copy(b_lin)
+end
+
+function Algebra.allocate_jacobian(
+  op::LinearNonlinearParamOpFromTFEOp,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  cache)
+
+  A_lin = cache.A_lin
+  copy(A_lin)
+end
+
+function Algebra.residual!(
+  b,
+  op::LinearNonlinearParamOpFromTFEOp,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  cache)
+
+  b_lin = cache.b_lin
+  copy_entries!(b,b_lin)
+  residual!(b,get_nonlinear_operator(op.op),r,us,paramcache;add=true)
+end
+
+function ODEs.jacobian_add!(
+  A,
+  op::LinearNonlinearParamOpFromTFEOp,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}},
+  paramcache)
+
+  A_lin = cache.A_lin
+  copy_entries!(A,A_lin)
+  jacobian_add!(A,get_nonlinear_operator(op.op),r,us,ws,paramcache)
 end

@@ -47,7 +47,7 @@ function reduced_operator(
   LinearNonlinearRBOperator(red_op_lin,red_op_nlin)
 end
 
-abstract type RBOperator{T} <: ParamOperatorWithTrian{T} end
+abstract type RBOperator{T} <: ParamOperator{T} end
 
 function allocate_rbcache(
   op::RBOperator,
@@ -59,7 +59,7 @@ function allocate_rbcache(
 end
 
 struct GenericRBOperator{T} <: RBOperator{T}
-  op::ParamOperatorWithTrian{T}
+  op::ParamOperator{T}
   trial::FESubspace
   test::FESubspace
   lhs::AffineContribution

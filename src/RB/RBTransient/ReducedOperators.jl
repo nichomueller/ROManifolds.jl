@@ -47,12 +47,12 @@ function RBSteady.reduced_operator(
   LinearNonlinearTransientRBOperator(red_op_lin,red_op_nlin)
 end
 
-abstract type TransientRBOperator{T} <: ODEParamOperatorWithTrian{T} end
+abstract type TransientRBOperator{T} <: ODEParamOperator{T} end
 
 RBSteady.allocate_rbcache(op::TransientRBOperator,r::TransientRealization) = @abstractmethod
 
 struct GenericTransientRBOperator{T} <: TransientRBOperator{T}
-  op::ODEParamOperatorWithTrian{T}
+  op::ODEParamOperator{T}
   trial::FESubspace
   test::FESubspace
   lhs::TupOfAffineContribution
