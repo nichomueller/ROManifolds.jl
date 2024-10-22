@@ -341,7 +341,7 @@ function Algebra.solve!(
   log = solver.log
 
   plength = param_length(x)
-  nb = length(blocks(x))
+  nb = nblocks(x)
 
   fill!(V[1],zero(eltype(V[1])))
   fill!(zl,zero(eltype(zl)))

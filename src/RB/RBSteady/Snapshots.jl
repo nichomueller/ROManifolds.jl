@@ -455,45 +455,35 @@ function Arrays.return_cache(::typeof(change_index_map),f,s::BlockSnapshots)
   return block_cache
 end
 
-function IndexMaps.change_index_map(f,s::BlockSnapshots)
-  array = return_cache(change_index_map,f,s)
-  touched = s.touched
-  for i in eachindex(touched)
-    if touched[i]
-      array[i] = change_index_map(f,s[i])
+for f in (:flatten_snapshots,:select_snapshots)
+  @eval begin
+    function Arrays.return_cache(::typeof($f),s::AbstractSnapshots,args...;kwargs...)
+      $f(s,args...;kwargs...)
+    end
+
+    function Arrays.return_cache(::typeof($f),s::BlockSnapshots,args...;kwargs...)
+      i = findfirst(s.touched)
+      @notimplementedif isnothing(i)
+      cache = return_cache($f,s[i],args...;kwargs...)
+      block_cache = Array{typeof(cache),ndims(s)}(undef,size(s))
+      return block_cache
     end
   end
-  return BlockSnapshots(array,touched)
 end
 
-function Arrays.return_cache(::typeof(flatten_snapshots),s::AbstractSnapshots)
-  flatten_snapshots(s)
-end
-
-function Arrays.return_cache(::typeof(flatten_snapshots),s::BlockSnapshots)
-  i = findfirst(s.touched)
-  @notimplementedif isnothing(i)
-  cache = return_cache(flatten_snapshots,s[i])
-  block_cache = Array{typeof(cache),ndims(s)}(undef,size(s))
-  return block_cache
-end
-
-function flatten_snapshots(s::BlockSnapshots)
-  array = return_cache(flatten_snapshots,s)
-  touched = s.touched
-  for i in eachindex(touched)
-    if touched[i]
-      array[i] = flatten_snapshots(s[i])
+for f in (:(IndexMaps.change_index_map),:flatten_snapshots,:select_snapshots)
+  @eval begin
+    function $f(s::BlockSnapshots,args...;kwargs...)
+      array = return_cache($f,s,args...;kwargs...)
+      touched = s.touched
+      for i in eachindex(touched)
+        if touched[i]
+          array[i] = $f(s[i],args...;kwargs...)
+        end
+      end
+      return BlockSnapshots(array,touched)
     end
   end
-  return BlockSnapshots(array,touched)
-end
-
-function select_snapshots(s::BlockSnapshots,args...;kwargs...)
-  active_block_ids = findall(s.touched)
-  block_map = BlockMap(size(s),active_block_ids)
-  active_block_snaps = [select_snapshots(s[n],args...;kwargs...) for n in active_block_ids]
-  BlockSnapshots(block_map,active_block_snaps)
 end
 
 # utils

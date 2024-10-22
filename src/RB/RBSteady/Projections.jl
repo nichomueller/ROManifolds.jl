@@ -139,7 +139,7 @@ struct PODBasis{A<:AbstractMatrix} <: Projection
   basis::A
 end
 
-function projection(red::PODReduction,s::AbstractArray,args...)
+function projection(red::PODReduction,s::AbstractArray{<:Number},args...)
   basis = reduction(red,s,args...)
   PODBasis(basis)
 end

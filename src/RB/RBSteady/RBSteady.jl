@@ -157,9 +157,9 @@ export fe_jacobian!
 export fe_residual!
 include("ReducedOperators.jl")
 
-export RBNewtonRaphsonOperator
-export RBNewtonRaphsonOp
-include("RBNewtonRaphsonOperator.jl")
+export RBNewtonOperator
+export RBNewtonOp
+include("RBNewtonOperator.jl")
 
 export RBPerformance
 export rb_performance

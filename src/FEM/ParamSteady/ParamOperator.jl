@@ -58,15 +58,6 @@ function Algebra.residual(
   u::AbstractVector)
 
   paramcache = allocate_paramcache(op,r,u)
-  residual(op,r,u,paramcache)
-end
-
-function Algebra.residual(
-  op::ParamOperator,
-  r::Realization,
-  u::AbstractVector,
-  paramcache)
-
   b = allocate_residual(op,r,u,paramcache)
   residual!(b,op,r,u,paramcache)
   b
@@ -97,15 +88,6 @@ function Algebra.jacobian(
   u::AbstractVector)
 
   paramcache = allocate_paramcache(op,r,u)
-  jacobian(op,r,u,paramcache)
-end
-
-function Algebra.jacobian(
-  op::ParamOperator,
-  r::Realization,
-  u::AbstractVector,
-  paramcache)
-
   A = allocate_jacobian(op,r,u,paramcache)
   jacobian!(A,op,r,u,paramcache)
   A

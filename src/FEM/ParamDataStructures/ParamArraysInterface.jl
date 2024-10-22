@@ -109,6 +109,16 @@ for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
   end
 end
 
+function (*)(A::AbstractParamMatrix,x::AbstractParamVector)
+  TS = LinearAlgebra.promote_op(LinearAlgebra.matprod,eltype(A),eltype(x))
+  mul!(similar(x,TS,inneraxes(A)[1]),A,x)
+end
+
+function (*)(A::AbstractParamMatrix,B::AbstractParamMatrix)
+  TS = LinearAlgebra.promote_op(LinearAlgebra.matprod,eltype(A),eltype(B))
+  mul!(similar(B,TS,(innersize(A)[1],innersize(B)[2])),A,B)
+end
+
 function LinearAlgebra.mul!(
   C::AbstractParamArray,
   A::AbstractParamArray,

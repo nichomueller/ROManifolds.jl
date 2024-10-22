@@ -395,8 +395,8 @@ export get_fe_test
 export fe_jacobian!
 export fe_residual!
 
-export RBNewtonRaphsonOperator
-export RBNewtonRaphsonOp
+export RBNewtonOperator
+export RBNewtonOp
 
 export RBPerformance
 export rb_performance
@@ -430,7 +430,7 @@ export TransientRBOperator
 export GenericTransientRBOperator
 export LinearNonlinearTransientRBOperator
 
-export TransientRBNewtonRaphsonOp
+export TransientRBNewtonOp
 
 include("RB/RBTransient/RBTransient.jl")
 using ReducedOrderModels.RBTransient

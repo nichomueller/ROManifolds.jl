@@ -1,18 +1,9 @@
 using Gridap
 using Gridap.MultiField
-using Test
 using DrWatson
 using Serialization
 
-using ReducedOrderModels.FEM
-using ReducedOrderModels.TProduct
-using ReducedOrderModels.ParamDataStructures
-using ReducedOrderModels.ParamFESpaces
-using ReducedOrderModels.ParamSteady
-using ReducedOrderModels.ParamODEs
-
-using ReducedOrderModels.RB
-using ReducedOrderModels.RB.RBSteady
+using ReducedOrderModels
 
 pranges = fill([1,10],3)
 pspace = ParamSpace(pranges)

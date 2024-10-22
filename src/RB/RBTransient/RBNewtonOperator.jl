@@ -1,4 +1,4 @@
-struct TransientRBNewtonRaphsonOp <: RBNewtonRaphsonOperator
+struct TransientRBNewtonOp <: RBNewtonOperator
   nlop::TransientRBOperator{NonlinearParamODE}
   lop::LinearParamStageOperator
   odeopcache
@@ -8,7 +8,7 @@ struct TransientRBNewtonRaphsonOp <: RBNewtonRaphsonOperator
   cache
 end
 
-function RBSteady.RBNewtonRaphsonOperator(
+function RBSteady.RBNewtonOperator(
   nlop::TransientRBOperator{<:NonlinearParamODE},
   lop::LinearParamStageOperator,
   odeopcache,
@@ -17,13 +17,13 @@ function RBSteady.RBNewtonRaphsonOperator(
   ws::Tuple{Vararg{Real}},
   cache)
 
-  TransientRBNewtonRaphsonOp(nlop,lop,odeopcache,rx,usx,ws,cache)
+  TransientRBNewtonOp(nlop,lop,odeopcache,rx,usx,ws,cache)
 end
 
-RBSteady.get_linear_resjac(op::TransientRBNewtonRaphsonOp) = (op.lop.A,op.lop.b)
+RBSteady.get_linear_resjac(op::TransientRBNewtonOp) = (op.lop.A,op.lop.b)
 
 function Algebra.allocate_residual(
-  op::TransientRBNewtonRaphsonOp,
+  op::TransientRBNewtonOp,
   x::AbstractVector)
 
   nlop,odeopcache = op.nlop,op.odeopcache
@@ -34,7 +34,7 @@ end
 
 function Algebra.residual!(
   nlb::Tuple,
-  op::TransientRBNewtonRaphsonOp,
+  op::TransientRBNewtonOp,
   x::AbstractVector)
 
   b̂lin = op.lop.b
@@ -49,7 +49,7 @@ function Algebra.residual!(
 end
 
 function Algebra.allocate_jacobian(
-  op::TransientRBNewtonRaphsonOp,
+  op::TransientRBNewtonOp,
   x::AbstractVector)
 
   nlop,odeopcache = op.nlop,op.odeopcache
@@ -60,7 +60,7 @@ end
 
 function Algebra.jacobian!(
   nlA::Tuple,
-  op::TransientRBNewtonRaphsonOp,
+  op::TransientRBNewtonOp,
   x::AbstractVector)
 
   Âlin = op.lop.A

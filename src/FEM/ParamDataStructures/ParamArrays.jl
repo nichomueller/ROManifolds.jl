@@ -1,7 +1,7 @@
 # generic constructors
 
 ParamArray(A::AbstractArray{<:Number},plength::Integer) = TrivialParamArray(A,plength)
-ParamArray(a::AbstractVector{<:AbstractArray}) = ConsecutiveParamArray(a)
+ParamArray(a::AbstractArray{<:AbstractArray}) = ConsecutiveParamArray(a)
 
 get_all_data(A::ParamArray) = @abstractmethod
 
@@ -55,10 +55,6 @@ end
 function LinearAlgebra.axpy!(α::Number,A::ParamArray,B::ParamArray)
   axpy!(α,get_all_data(A),get_all_data(B))
   return B
-end
-
-function (*)(A::ParamArray,B::ParamArray)
-  @notimplemented
 end
 
 function Arrays.setsize!(A::ParamArray{T,N,L},s::NTuple{N,Integer}) where {T,N,L}

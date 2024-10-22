@@ -54,7 +54,7 @@ function get_stage_operator(
 
   # linear cache
   odeslvrcache_lin,odeopcache = odecache_lin
-  reuse_lin,A_lin,b_lin,sysslvrcache_lin = odeslvrcache_lin
+  A_lin,b_lin,sysslvrcache_lin = odeslvrcache_lin
   rbsyscache_lin,rbopcache = rbcache_lin
   Â_lin,b̂_lin = rbsyscache_lin
 
@@ -88,7 +88,7 @@ function get_stage_operator(
 
   ws = (1,1/dtθ)
   rbop_nlin = get_nonlinear_operator(rbop)
-  stageop = RBNewtonRaphsonOperator(rbop_nlin,lop,odeopcache,r,us,ws,cache_lin_nlin)
+  stageop = RBNewtonOperator(rbop_nlin,lop,odeopcache,r,us,ws,cache_lin_nlin)
   shift!(r,dt*(1-θ))
 
   return stageop

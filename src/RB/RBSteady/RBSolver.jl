@@ -12,7 +12,7 @@ problem dependent on a set of parameters. A RB method is a projection-based
 reduced order model where
 
 1) a suitable subspace of a FESpace is sought, of dimension n ≪ Nₕ
-2) a matrix-based discrete empirical interpolation method (MDEEIM) is performed
+2) a matrix-based discrete empirical interpolation method (MDEIM) is performed
   to approximate the manifold of the parametric residuals and jacobians
 3) the EIM approximations are compressed with (Petrov-)Galerkin projections
   onto the subspace
@@ -118,7 +118,7 @@ end
 function residual_snapshots(solver::RBSolver,op::ParamOperator{<:LinearParamEq},s)
   fesolver = get_fe_solver(solver)
   sres = select_snapshots(s,res_params(solver))
-  us_res = get_values(sres) |> copy
+  us_res = get_values(sres) |> similar
   fill!(us_res,zero(eltype2(us_res)))
   r_res = get_realization(sres)
   b = residual(op,r_res,us_res)
@@ -139,7 +139,7 @@ end
 function jacobian_snapshots(solver::RBSolver,op::ParamOperator{<:LinearParamEq},s)
   fesolver = get_fe_solver(solver)
   sjac = select_snapshots(s,jac_params(solver))
-  us_jac = get_values(sjac) |> copy
+  us_jac = get_values(sjac) |> similar
   fill!(us_jac,zero(eltype2(us_jac)))
   r_jac = get_realization(sjac)
   A = jacobian(op,r_jac,us_jac)

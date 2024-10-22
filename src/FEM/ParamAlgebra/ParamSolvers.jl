@@ -133,11 +133,11 @@ function Algebra._solve_nr!(
     jacobian!(A,op,x)
 
     @inbounds for i in param_eachindex(x)
-      xi = param_getindex(x,i)
+      dxi = param_getindex(dx,i)
       Ai = param_getindex(A,i)
       bi = param_getindex(b,i)
       numerical_setup!(ns,Ai)
-      solve!(xi,ns,bi)
+      solve!(dxi,ns,bi)
     end
 
     x .+= dx

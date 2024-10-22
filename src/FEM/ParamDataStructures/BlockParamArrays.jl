@@ -28,6 +28,11 @@ function BlockArrays._BlockArray(data::AbstractArray{<:AbstractParamArray,N},axe
   BlockParamArray(data,axes)
 end
 
+nblocks(A) = @abstractmethod
+nblocks(A::Union{BlockedUnitRange,BlockArray,BlockParamArray}) = length(blocks(A))
+
+eachnblock(A) = Base.OneTo(nblocks(A))
+
 @inline Base.size(A::BlockParamArray) = map(length,axes(A))
 Base.axes(A::BlockParamArray) = A.axes
 
@@ -132,8 +137,14 @@ function Base.similar(A::BlockParamArray{T,N},::Type{<:AbstractArray{T′,N}}) w
   BlockParamArray(map(a->similar(a,Array{T′,N}),blocks(A)),A.axes)
 end
 
-function Base.similar(A::BlockParamArray{T,N},::Type{<:AbstractArray{T′,N}},axes::BlockedUnitRange) where {T,T′,N}
-  BlockParamArray(map((a,ax)->similar(a,Array{T′,N},ax),blocks(A),blocks(axes)),A.axes)
+function Base.similar(A::BlockParamArray{T,N},::Type{S},axes::Vararg{BlockedUnitRange}) where {T,T′,N,S<:AbstractArray{T′,N}}
+  A′ = map(eachnblock(A)) do i
+    ai = blocks(A)[i]
+    axi = map(ax -> blocks(ax)[i],axes)
+    si = length.(axi)
+    similar(ai,S,si)
+  end
+  BlockParamArray(A′,A.axes)
 end
 
 function Base.copyto!(A::BlockParamArray,B::BlockParamArray)
@@ -162,11 +173,11 @@ function LinearAlgebra.axpy!(α::Number,A::BlockParamArray,B::BlockParamArray)
 end
 
 function LinearAlgebra.norm(A::BlockParamArray)
-  n = 0.0
+  n = zeros(param_length(A))
   for b in blocks(A)
-    n += norm(b)^2
+    n .+= norm(b).^2
   end
-  return sqrt(n)
+  return sqrt.(n)
 end
 
 function get_param_entry(A::BlockParamArray{T},i...) where T

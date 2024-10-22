@@ -1,9 +1,9 @@
-abstract type RBNewtonRaphsonOperator <: NonlinearOperator end
+abstract type RBNewtonOperator <: NonlinearOperator end
 
 function Algebra.solve!(
   x̂,
   nls::NonlinearSolvers.NewtonSolver,
-  op::RBNewtonRaphsonOperator,
+  op::RBNewtonOperator,
   r,
   x)
 
@@ -43,9 +43,9 @@ function Algebra.solve!(
   return x̂
 end
 
-get_linear_resjac(op::RBNewtonRaphsonOperator) = @abstractmethod
+get_linear_resjac(op::RBNewtonOperator) = @abstractmethod
 
-struct RBNewtonRaphsonOp <: RBNewtonRaphsonOperator
+struct RBNewtonOp <: RBNewtonOperator
   op::ParamOperator{NonlinearParamEq}
   paramcache::ParamCache
   r::Realization
@@ -54,7 +54,7 @@ struct RBNewtonRaphsonOp <: RBNewtonRaphsonOperator
   cache
 end
 
-function RBNewtonRaphsonOperator(
+function RBNewtonOperator(
   op::ParamOperator{NonlinearParamEq},
   paramcache::ParamCache,
   r::Realization,
@@ -62,13 +62,13 @@ function RBNewtonRaphsonOperator(
   b̂_lin::AbstractVector,
   cache)
 
-  RBNewtonRaphsonOp(op,paramcache,r,Â_lin,b̂_lin,cache)
+  RBNewtonOp(op,paramcache,r,Â_lin,b̂_lin,cache)
 end
 
-get_linear_resjac(op::RBNewtonRaphsonOp) = (op.Â_lin,op.b̂_lin)
+get_linear_resjac(op::RBNewtonOp) = (op.Â_lin,op.b̂_lin)
 
 function Algebra.allocate_residual(
-  op::RBNewtonRaphsonOp,
+  op::RBNewtonOp,
   u::AbstractVector)
 
   paramcache = op.paramcache
@@ -77,7 +77,7 @@ end
 
 function Algebra.residual!(
   nlb::Tuple,
-  op::RBNewtonRaphsonOp,
+  op::RBNewtonOp,
   x::AbstractVector)
 
   b̂lin = op.b̂_lin
@@ -90,7 +90,7 @@ function Algebra.residual!(
 end
 
 function Algebra.allocate_jacobian(
-  op::RBNewtonRaphsonOp,
+  op::RBNewtonOp,
   x::AbstractVector)
 
   paramcache = op.paramcache
@@ -99,7 +99,7 @@ end
 
 function Algebra.jacobian!(
   nlA::Tuple,
-  op::RBNewtonRaphsonOp,
+  op::RBNewtonOp,
   x::AbstractVector)
 
   Âlin = op.Â_lin

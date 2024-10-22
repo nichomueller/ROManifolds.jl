@@ -389,18 +389,20 @@ function Algebra.solve!(
   rbcache_lin,rbcache_nlin = rbcache
 
   # linear cache
-  Âcache_lin,b̂cache_lin = rbcache_lin
   op_lin = get_linear_operator(op)
-  op_nlin = get_nonlinear_operator(op)
+
+  Âcache_lin,b̂cache_lin = rbcache_lin
   Â_lin = jacobian!(Âcache_lin,op_lin,r,x,paramcache_lin)
   b̂_lin = residual!(b̂cache_lin,op_lin,r,x,paramcache_lin)
 
   # nonlinear cache
+  op_nlin = get_nonlinear_operator(op)
+
   syscache_nlin = rbcache_nlin
-  trial = get_trial(op)(r)
+  trial = paramcache_lin.trial#get_trial(op)(r)
   cache = syscache_nlin,trial
 
-  nlop = RBNewtonRaphsonOperator(op_nlin,paramcache_nlin,r,Â_lin,b̂_lin,cache)
+  nlop = RBNewtonOperator(op_nlin,paramcache_nlin,r,Â_lin,b̂_lin,cache)
   solve!(x̂,fesolver.nls,nlop,r,x;kwargs...)
 
   return x̂
