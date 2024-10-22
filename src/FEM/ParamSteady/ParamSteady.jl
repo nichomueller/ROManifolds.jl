@@ -38,24 +38,29 @@ export ParamTrialFESpace
 export ParamMultiFieldFESpace
 include("ParamTrialFESpace.jl")
 
-export ParamOperatorType
+export UnEvalOperatorType
 export NonlinearParamEq
 export LinearParamEq
 export LinearNonlinearParamEq
 export ParamOperator
 export ParamOperatorWithTrian
+export LinearNonlinearParamOpFromFEOp
 export ParamCache
 export allocate_paramcache
 export update_paramcache!
+export get_realization
+export get_fe_operator
 include("ParamOperator.jl")
 
 export ParamFEOperator
 export LinearParamFEOperator
+include("ParamFEOperator.jl")
+
 export ParamFEOperatorWithTrian
 export ParamFEOpFromWeakFormWithTrian
 export set_triangulation
 export change_triangulation
-include("ParamFEOperator.jl")
+include("ParamFEOperatorWithTrian.jl")
 
 export LinearNonlinearParamODE
 export LinNonlinParamFEOperator

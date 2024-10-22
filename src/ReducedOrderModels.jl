@@ -208,15 +208,17 @@ export UnEvalParamSingleFieldFESpace
 export ParamTrialFESpace
 export ParamMultiFieldFESpace
 
-export ParamOperatorType
+export UnEvalOperatorType
 export NonlinearParamEq
 export LinearParamEq
 export LinearNonlinearParamEq
 export ParamOperator
 export ParamOperatorWithTrian
+export LinearNonlinearParamOpFromFEOp
 export ParamCache
 export allocate_paramcache
 export update_paramcache!
+export get_realization
 
 export ParamFEOperator
 export LinearParamFEOperator
@@ -245,12 +247,10 @@ export TransientMultiFieldParamFESpace
 export ODEParamOperatorType
 export NonlinearParamODE
 export AbstractLinearParamODE
-export QuasilinearParamODE
 export SemilinearParamODE
 export LinearParamODE
 export ODEParamOperator
 export ODEParamOperatorWithTrian
-export ParamODEOpFromTFEOpCache
 
 export ParamStageOperator
 export NonlinearParamStageOperator
@@ -317,7 +317,6 @@ export BlockSnapshots
 export Snapshots
 export flatten_snapshots
 export select_snapshots
-export get_realization
 export get_indexed_values
 export num_space_dofs
 

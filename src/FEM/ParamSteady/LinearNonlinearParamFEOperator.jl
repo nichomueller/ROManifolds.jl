@@ -66,6 +66,10 @@ an error if the input is not defined as a linear-nonlinear FE operator
 """
 get_nonlinear_operator(op::LinearNonlinearParamFEOperator) = op.op_nonlinear
 
+function FESpaces.get_algebraic_operator(op::LinearNonlinearParamFEOperator,r::Realization)
+  LinearNonlinearParamOpFromFEOp(op,r)
+end
+
 function FESpaces.get_test(op::LinearNonlinearParamFEOperator)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
   get_test(op.op_linear)

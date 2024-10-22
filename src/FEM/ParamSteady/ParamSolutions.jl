@@ -1,19 +1,8 @@
-function Algebra.solve!(
-  x::AbstractParamVector,
-  nls::NonlinearSolver,
-  op::ParamOpFromFEOp,
-  r::Realization)
-
-  nlop = GenericParamNonlinearOperator(op,r,x)
-  t = @timed solve!(x,nls,nlop)
-  stats = CostTracker(t,name="FEM")
-  stats
-end
-
 function Algebra.solve!(u,solver::NonlinearFESolver,feop::ParamFEOperator,r::Realization)
   x = get_free_dof_values(u)
-  op = get_algebraic_operator(feop)
-  stats = solve!(x,solver.nls,op,r)
+  op = get_algebraic_operator(feop,r)
+  t = @timed solve!(x,solver.nls,op)
+  stats = CostTracker(t,name="FEM")
   trial = get_trial(feop)(r)
   uh = FEFunction(trial,x)
   uh,stats
@@ -21,8 +10,9 @@ end
 
 function Algebra.solve!(u,solver::LinearFESolver,feop::ParamFEOperator,r::Realization)
   x = get_free_dof_values(u)
-  op = get_algebraic_operator(feop)
-  stats = solve!(x,solver.ls,op,r)
+  op = get_algebraic_operator(feop,r)
+  t = @timed solve!(x,solver.ls,op,r)
+  stats = CostTracker(t,name="FEM")
   trial = get_trial(feop)(r)
   uh = FEFunction(trial,x)
   uh,stats
@@ -38,6 +28,8 @@ end
 function Algebra.solve(solver::FESolver,op::ParamFEOperatorWithTrian,r::Realization)
   solve(solver,op.op,r)
 end
+
+# linear - nonlinear interface
 
 function Algebra.solve(solver::FESolver,op::LinearNonlinearParamFEOperator,r::Realization)
   solve(solver,join_operators(op),r)

@@ -69,7 +69,6 @@ export BlockSnapshots
 export Snapshots
 export flatten_snapshots
 export select_snapshots
-export get_realization
 export get_indexed_values
 export num_space_dofs
 include("Snapshots.jl")

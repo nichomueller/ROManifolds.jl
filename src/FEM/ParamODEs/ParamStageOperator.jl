@@ -14,17 +14,17 @@ abstract type ParamStageOperator <: NonlinearOperator end
 """
 struct NonlinearParamStageOperator <: ParamStageOperator
   odeop::ODEOperator
-  odeopcache
+  paramcache
   rx::TransientRealization
   usx::Function
   ws::Tuple{Vararg{Real}}
 end
 
 function Algebra.allocate_residual(nlop::NonlinearParamStageOperator,x::AbstractVector)
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
+  odeop,paramcache = nlop.odeop,nlop.paramcache
   rx = nlop.rx
   usx = nlop.usx(x)
-  allocate_residual(odeop,rx,usx,odeopcache)
+  allocate_residual(odeop,rx,usx,paramcache)
 end
 
 function Algebra.residual!(
@@ -32,17 +32,17 @@ function Algebra.residual!(
   nlop::NonlinearParamStageOperator,
   x::AbstractVector)
 
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
+  odeop,paramcache = nlop.odeop,nlop.paramcache
   rx = nlop.rx
   usx = nlop.usx(x)
-  residual!(b,odeop,rx,usx,odeopcache)
+  residual!(b,odeop,rx,usx,paramcache)
 end
 
 function Algebra.allocate_jacobian(nlop::NonlinearParamStageOperator,x::AbstractVector)
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
+  odeop,paramcache = nlop.odeop,nlop.paramcache
   rx = nlop.rx
   usx = nlop.usx(x)
-  allocate_jacobian(odeop,rx,usx,odeopcache)
+  allocate_jacobian(odeop,rx,usx,paramcache)
 end
 
 function Algebra.jacobian!(
@@ -50,11 +50,11 @@ function Algebra.jacobian!(
   nlop::NonlinearParamStageOperator,
   x::AbstractVector)
 
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
+  odeop,paramcache = nlop.odeop,nlop.paramcache
   rx = nlop.rx
   usx = nlop.usx(x)
   ws = nlop.ws
-  jacobian!(A,odeop,rx,usx,ws,odeopcache)
+  jacobian!(A,odeop,rx,usx,ws,paramcache)
   A
 end
 
@@ -66,14 +66,14 @@ struct LinearParamStageOperator{Ta,Tb} <: ParamStageOperator
 end
 
 function LinearParamStageOperator(
-  odeop::ODEOperator,odeopcache,
+  odeop::ODEOperator,paramcache,
   rx::TransientRealization,
   usx::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   matcache,veccache,sysslvrcache)
 
-  b = residual!(veccache,odeop,rx,usx,odeopcache)
-  A = jacobian!(matcache,odeop,rx,usx,ws,odeopcache)
+  b = residual!(veccache,odeop,rx,usx,paramcache)
+  A = jacobian!(matcache,odeop,rx,usx,ws,paramcache)
   LinearParamStageOperator(A,b)
 end
 
@@ -160,10 +160,10 @@ function Algebra.residual!(
   nlop::NonlinearParamStageOperator,
   x::AbstractVector)
 
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
+  odeop,paramcache = nlop.odeop,nlop.paramcache
   rx = nlop.rx
   usx = nlop.usx(x)
-  residual!(b,odeop,rx,usx,odeopcache)
+  residual!(b,odeop,rx,usx,paramcache)
 end
 
 function Algebra.jacobian!(
@@ -171,11 +171,11 @@ function Algebra.jacobian!(
   nlop::NonlinearParamStageOperator,
   x::AbstractVector)
 
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
+  odeop,paramcache = nlop.odeop,nlop.paramcache
   rx = nlop.rx
   usx = nlop.usx(x)
   ws = nlop.ws
-  jacobian!(A,odeop,rx,usx,ws,odeopcache)
+  jacobian!(A,odeop,rx,usx,ws,paramcache)
 end
 
 function Algebra.residual!(

@@ -69,7 +69,7 @@ function IndexMaps.get_index_map(op::LinearNonlinearTransientParamFEOperator)
   get_index_map(op.op_linear)
 end
 
-function ReferenceFEs.get_order(op::LinearNonlinearTransientParamFEOperator)
+function Polynomials.get_order(op::LinearNonlinearTransientParamFEOperator)
   return max(get_order(op.op_linear),get_order(op.op_nonlinear))
 end
 

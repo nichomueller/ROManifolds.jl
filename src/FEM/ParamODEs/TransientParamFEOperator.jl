@@ -20,13 +20,13 @@ Subtypes:
 - [`GenericLinearNonlinearTransientParamFEOperator`](@ref)
 
 """
-abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: TransientFEOperator{T} end
+abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: ParamFEOperator{T} end
 
-function FESpaces.get_algebraic_operator(op::TransientParamFEOperator)
-  ODEParamOpFromTFEOp(op)
+function FESpaces.get_algebraic_operator(op::TransientParamFEOperator,r::TransientRealization)
+  ODEParamOpFromTFEOp(op,r)
 end
 
-function ODEs.allocate_tfeopcache(
+function ParamSteady.allocate_feopcache(
   op::TransientParamFEOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
@@ -34,32 +34,37 @@ function ODEs.allocate_tfeopcache(
   nothing
 end
 
-function ODEs.update_tfeopcache!(
-  tfeopcache,
+function ParamSteady.update_feopcache!(
+  feop_cache,
   op::TransientParamFEOperator,
-  r::TransientRealization)
+  us::Tuple{Vararg{AbstractVector}})
 
-  tfeopcache
+  feop_cache
 end
 
-ParamDataStructures.realization(op::TransientParamFEOperator;kwargs...) = @abstractmethod
-
-function ParamFESpaces.get_param_assembler(op::TransientParamFEOperator,r::TransientRealization)
-  get_param_assembler(get_assembler(op),r)
+function ODEs.get_num_forms(feop::TransientParamFEOperator)
+  0
 end
 
-IndexMaps.get_index_map(op::TransientParamFEOperator) = @abstractmethod
-IndexMaps.get_vector_index_map(op::TransientParamFEOperator) = get_vector_index_map(get_index_map(op))
-IndexMaps.get_matrix_index_map(op::TransientParamFEOperator) = get_matrix_index_map(get_index_map(op))
-
-function FESpaces.assemble_matrix(op::TransientParamFEOperator,form::Function)
-  test = get_test(op)
-  trial = evaluate(get_trial(op),nothing)
-  ParamSteady._assemble_matrix(form,trial,test)
+function ODEs.get_num_forms(feop::TransientParamFEOperator{<:AbstractLinearParamODE})
+  ODEs.get_order(feop) + 1
 end
 
-ParamSteady.get_linear_operator(op::TransientParamFEOperator) = @abstractmethod
-ParamSteady.get_nonlinear_operator(op::TransientParamFEOperator) = @abstractmethod
+function ODEs.get_forms(feop::TransientParamFEOperator)
+  ()
+end
+
+ODEs.get_res(op::TransientFEOperator) = @abstractmethod
+
+ODEs.get_jacs(op::TransientFEOperator) = @abstractmethod
+
+function ODEs.is_form_constant(feop::TransientParamFEOperator,k::Integer)
+  false
+end
+
+function Polynomials.get_order(feop::TransientParamFEOperator)
+  @abstractmethod
+end
 
 """
     struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParamODE} end
@@ -130,7 +135,7 @@ end
 
 FESpaces.get_test(op::TransientParamFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamFEOpFromWeakForm) = op.trial
-ReferenceFEs.get_order(op::TransientParamFEOpFromWeakForm) = op.order
+Polynomials.get_order(op::TransientParamFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamFEOpFromWeakForm) = op.assem
@@ -228,7 +233,7 @@ end
 
 FESpaces.get_test(op::TransientParamSemilinearFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamSemilinearFEOpFromWeakForm) = op.trial
-ReferenceFEs.get_order(op::TransientParamSemilinearFEOpFromWeakForm) = op.order
+Polynomials.get_order(op::TransientParamSemilinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamSemilinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamSemilinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamSemilinearFEOpFromWeakForm) = op.assem
@@ -292,7 +297,7 @@ end
 
 FESpaces.get_test(op::TransientParamLinearFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamLinearFEOpFromWeakForm) = op.trial
-ReferenceFEs.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
+Polynomials.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem

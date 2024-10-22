@@ -93,8 +93,8 @@ dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 #     U = trial(r)
 #     x = get_free_dof_values(zero(U))
 
-#     odeopcache = allocate_odeopcache(odeop,r,(x,x))
-#     stageop = NonlinearParamStageOperator(odeop,odeopcache,r,us,ws)
+#     paramcache = allocate_paramcache(odeop,r,(x,x))
+#     stageop = NonlinearParamStageOperator(odeop,paramcache,r,us,ws)
 
 #     println("Residual time with h = $h, nparams = $nparams:")
 #     @btime residual!(allocate_residual($stageop,$x),$stageop,$x)
@@ -153,8 +153,8 @@ dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 #   U = trial(t0)
 #   x = get_free_dof_values(zero(U))
 
-#   odeopcache = allocate_odeopcache(odeop,t0,(x,x))
-#   stageop = NonlinearStageOperator(odeop,odeopcache,t0,us,ws)
+#   paramcache = allocate_paramcache(odeop,t0,(x,x))
+#   stageop = NonlinearStageOperator(odeop,paramcache,t0,us,ws)
 
 #   println("Residual time with h = $h:")
 #   @btime residual!(allocate_residual($stageop,$x),$stageop,$x)
@@ -209,15 +209,15 @@ r = realization(ptspace;nparams)
 U = trial(r)
 x = get_free_dof_values(zero(U))
 
-odeopcache = allocate_odeopcache(odeop,r,(x,x))
-stageop = NonlinearParamStageOperator(odeop,odeopcache,r,us,ws)
+paramcache = allocate_paramcache(odeop,r,(x,x))
+stageop = NonlinearParamStageOperator(odeop,paramcache,r,us,ws)
 
 # A = allocate_jacobian(stageop,x)
-odeop,odeopcache = stageop.odeop,stageop.odeopcache
+odeop,paramcache = stageop.odeop,stageop.paramcache
 rx = stageop.rx
 usx = stageop.usx(x)
-# allocate_jacobian(odeop,rx,usx,odeopcache)
-uh = ODEs._make_uh_from_us(odeop,usx,odeopcache.Us)
+# allocate_jacobian(odeop,rx,usx,paramcache)
+uh = ODEs._make_uh_from_us(odeop,usx,paramcache.trial)
 trial = evaluate(get_trial(odeop.op),nothing)
 du = get_trial_fe_basis(trial)
 test = get_test(odeop.op)
@@ -311,13 +311,13 @@ us(x) = (x,x)
 U = trial(t0)
 x = get_free_dof_values(zero(U))
 
-odeopcache = allocate_odeopcache(odeop,t0,(x,x))
-stageop = NonlinearStageOperator(odeop,odeopcache,t0,us,ws)
+paramcache = allocate_paramcache(odeop,t0,(x,x))
+stageop = NonlinearStageOperator(odeop,paramcache,t0,us,ws)
 
 usx = stageop.usx(x)
-A = allocate_jacobian(odeop,t0,usx,odeopcache)
+A = allocate_jacobian(odeop,t0,usx,paramcache)
 
-uh = ODEs._make_uh_from_us(odeop,usx,odeopcache.Us)
+uh = ODEs._make_uh_from_us(odeop,usx,paramcache.trial)
 trial = evaluate(trial,nothing)
 du = get_trial_fe_basis(trial)
 v = get_fe_basis(test)

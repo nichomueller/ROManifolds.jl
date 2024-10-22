@@ -104,7 +104,7 @@ end
 
 FESpaces.get_test(op::TransientParamFEOpFromWeakFormWithTrian) = get_test(op.op)
 FESpaces.get_trial(op::TransientParamFEOpFromWeakFormWithTrian) = get_trial(op.op)
-ReferenceFEs.get_order(op::TransientParamFEOpFromWeakFormWithTrian) = get_order(op.op)
+Polynomials.get_order(op::TransientParamFEOpFromWeakFormWithTrian) = get_order(op.op)
 ODEs.get_res(op::TransientParamFEOpFromWeakFormWithTrian) = get_res(op.op)
 ODEs.get_jacs(op::TransientParamFEOpFromWeakFormWithTrian) = get_jacs(op.op)
 ODEs.get_assembler(op::TransientParamFEOpFromWeakFormWithTrian) = get_assembler(op.op)

@@ -20,21 +20,21 @@ end
 
 # general nonlinear case
 
-function ODEs.allocate_odecache(
+function allocate_odeparamcache(
   solver::ThetaMethod,
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 
-  odecache_lin = allocate_odecache(solver,get_linear_operator(op),r,us)
-  odecache_nlin = allocate_odecache(solver,get_nonlinear_operator(op),r,us)
-  odeslvrcache_nlin,odeopcache = odecache_nlin
+  odecache_lin = allocate_odeparamcache(solver,get_linear_operator(op),r,us)
+  odecache_nlin = allocate_odeparamcache(solver,get_nonlinear_operator(op),r,us)
+  odeslvrcache_nlin,paramcache = odecache_nlin
   uθ, = odeslvrcache_nlin
   nlop = get_nonlinear_operator(op).op
-  A_nlin = allocate_jacobian(nlop,r,us,odeopcache)
-  b_nlin = allocate_residual(nlop,r,us,odeopcache)
+  A_nlin = allocate_jacobian(nlop,r,us,paramcache)
+  b_nlin = allocate_residual(nlop,r,us,paramcache)
   odeslvrcache_nlin = uθ,A_nlin,b_nlin
-  odecache_nlin = odeslvrcache_nlin,odeopcache
+  odecache_nlin = odeslvrcache_nlin,paramcache
   return (odecache_lin,odecache_nlin)
 end
 
@@ -43,17 +43,17 @@ function get_stage_operator(
   rbop::TransientRBOperator{LinearNonlinearParamODE},
   r::TransientRealization,
   state0::NTuple{1,AbstractVector},
-  odecache,
+  odeparamcache,
   rbcache)
 
   u0 = state0[1]
 
   # linear + nonlinear cache
-  odecache_lin,odecache_nlin = odecache
+  odecache_lin,odecache_nlin = odeparamcache
   rbcache_lin,rbcache_nlin = rbcache
 
   # linear cache
-  odeslvrcache_lin,odeopcache = odecache_lin
+  odeslvrcache_lin,paramcache = odecache_lin
   A_lin,b_lin,sysslvrcache_lin = odeslvrcache_lin
   rbsyscache_lin,rbopcache = rbcache_lin
   Â_lin,b̂_lin = rbsyscache_lin
@@ -88,7 +88,7 @@ function get_stage_operator(
 
   ws = (1,1/dtθ)
   rbop_nlin = get_nonlinear_operator(rbop)
-  stageop = RBNewtonOperator(rbop_nlin,lop,odeopcache,r,us,ws,cache_lin_nlin)
+  stageop = RBNewtonOperator(rbop_nlin,lop,paramcache,r,us,ws,cache_lin_nlin)
   shift!(r,dt*(1-θ))
 
   return stageop
@@ -96,7 +96,7 @@ end
 
 # linear case
 
-function ODEs.allocate_odecache(
+function allocate_odeparamcache(
   solver::ThetaMethod,
   op::GenericTransientRBOperator,
   r::TransientRealization,
@@ -106,10 +106,10 @@ function ODEs.allocate_odecache(
   dtθ = θ*dt
   shift!(r,dt*(θ-1))
 
-  (odeslvrcache,odeopcache) = allocate_odecache(solver,op.op,r,us)
+  (odeslvrcache,paramcache) = allocate_odeparamcache(solver,op.op,r,us)
   shift!(r,dt*(1-θ))
 
-  return (odeslvrcache,odeopcache)
+  return (odeslvrcache,paramcache)
 end
 
 function get_stage_operator(
@@ -117,11 +117,11 @@ function get_stage_operator(
   rbop::TransientRBOperator{LinearParamODE},
   r::TransientRealization,
   state0::NTuple{1,AbstractVector},
-  odecache,
+  odeparamcache,
   rbcache)
 
   u0 = state0[1]
-  odeslvrcache,odeopcache = odecache
+  odeslvrcache,paramcache = odeparamcache
   A,b,sysslvrcache = odeslvrcache
   rbsyscache,_ = rbcache
   Â,b̂ = rbsyscache
@@ -135,7 +135,7 @@ function get_stage_operator(
   us = (x,x)
   ws = (1,1/dtθ)
 
-  stageop = LinearParamStageOperator(rbop,odeopcache,r,us,ws,(A,Â),(b,b̂),sysslvrcache)
+  stageop = LinearParamStageOperator(rbop,paramcache,r,us,ws,(A,Â),(b,b̂),sysslvrcache)
   shift!(r,dt*(1-θ))
 
   return stageop

@@ -80,7 +80,7 @@ end
 ParamDataStructures.get_all_data(s::TransientGenericSnapshots) = s.data
 ParamDataStructures.get_values(s::TransientGenericSnapshots) = s.data
 IndexMaps.get_index_map(s::TransientGenericSnapshots) = s.index_map
-RBSteady.get_realization(s::TransientGenericSnapshots) = s.realization
+ParamSteady.get_realization(s::TransientGenericSnapshots) = s.realization
 
 function RBSteady.get_indexed_values(s::TransientGenericSnapshots)
   vi = vec(get_index_map(s))
@@ -168,7 +168,7 @@ _num_all_params(s::TransientSnapshotsAtIndices) = _num_all_params(s.snaps)
 
 ParamDataStructures.get_all_data(s::TransientSnapshotsAtIndices) = get_all_data(s.snaps)
 IndexMaps.get_index_map(s::TransientSnapshotsAtIndices) = get_index_map(s.snaps)
-RBSteady.get_realization(s::TransientSnapshotsAtIndices) = get_realization(s.snaps)[s.prange,s.trange]
+ParamSteady.get_realization(s::TransientSnapshotsAtIndices) = get_realization(s.snaps)[s.prange,s.trange]
 
 function ParamDataStructures.get_values(s::TransientSnapshotsAtIndices)
   prange = RBSteady.param_indices(s)
@@ -274,7 +274,7 @@ function Base.setindex!(
   v
 end
 
-RBSteady.get_realization(s::TransientReshapedSnapshots) = get_realization(s.snaps)
+ParamSteady.get_realization(s::TransientReshapedSnapshots) = get_realization(s.snaps)
 IndexMaps.get_index_map(s::TransientReshapedSnapshots) = get_index_map(s.snaps)
 
 function ParamDataStructures.get_values(s::TransientReshapedSnapshots)
@@ -345,7 +345,7 @@ end
 ParamDataStructures.get_all_data(s::ModeTransientSnapshots) = get_all_data(s.snaps)
 RBSteady.num_space_dofs(s::ModeTransientSnapshots) = prod(num_space_dofs(s.snaps))
 ParamDataStructures.get_values(s::ModeTransientSnapshots) = get_values(s.snaps)
-RBSteady.get_realization(s::ModeTransientSnapshots) = get_realization(s.snaps)
+ParamSteady.get_realization(s::ModeTransientSnapshots) = get_realization(s.snaps)
 IndexMaps.get_index_map(s::ModeTransientSnapshots) = get_index_map(s.snaps)
 
 change_mode(s::UnfoldingTransientSnapshots) = ModeTransientSnapshots(s,change_mode(get_mode(s)))

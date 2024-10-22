@@ -3,10 +3,10 @@ function ODEs.ode_start(
   odeop::ODEOperator,
   r0::TransientRealization,
   us0::Tuple{Vararg{AbstractVector}},
-  odecache)
+  odeparamcache)
 
   state0 = copy.(us0)
-  (state0,odecache)
+  (state0,odeparamcache)
 end
 
 function ODEs.ode_finish!(
@@ -16,10 +16,10 @@ function ODEs.ode_finish!(
   r0::TransientRealization,
   rf::TransientRealization,
   statef::Tuple{Vararg{AbstractVector}},
-  odecache)
+  odeparamcache)
 
   copy!(uF,first(statef))
-  (uF,odecache)
+  (uF,odeparamcache)
 end
 
 """
@@ -48,7 +48,7 @@ end
 
 function Base.iterate(sol::ODEParamSolution)
   r0 = ParamDataStructures.get_at_time(sol.r,:initial)
-  cache = allocate_odecache(sol.solver,sol.odeop,r0,sol.us0)
+  cache = allocate_odeparamcache(sol.solver,sol.odeop,r0,sol.us0)
 
   state0,cache = ode_start(sol.solver,sol.odeop,r0,sol.us0,cache)
 

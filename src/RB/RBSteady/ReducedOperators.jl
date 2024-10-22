@@ -68,10 +68,6 @@ end
 
 FESpaces.get_trial(op::GenericRBOperator) = op.trial
 FESpaces.get_test(op::GenericRBOperator) = op.test
-ParamDataStructures.realization(op::GenericRBOperator;kwargs...) = realization(op.op;kwargs...)
-ParamSteady.get_fe_operator(op::GenericRBOperator) = ParamSteady.get_fe_operator(op.op)
-IndexMaps.get_vector_index_map(op::GenericRBOperator) = get_vector_index_map(op.op)
-IndexMaps.get_matrix_index_map(op::GenericRBOperator) = get_matrix_index_map(op.op)
 get_fe_trial(op::GenericRBOperator) = get_trial(op.op)
 get_fe_test(op::GenericRBOperator) = get_test(op.op)
 
@@ -190,24 +186,6 @@ end
 function FESpaces.get_trial(op::LinearNonlinearRBOperator)
   @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
   get_trial(op.op_nonlinear)
-end
-
-function ParamDataStructures.realization(op::LinearNonlinearRBOperator;kwargs...)
-  realization(op.op_nonlinear;kwargs...)
-end
-
-function ParamSteady.get_fe_operator(op::LinearNonlinearRBOperator)
-  join_operators(ParamSteady.get_fe_operator(op.op_linear),ParamSteady.get_fe_operator(op.op_nonlinear))
-end
-
-function IndexMaps.get_vector_index_map(op::LinearNonlinearRBOperator)
-  @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
-  get_vector_index_map(op.op_linear)
-end
-
-function IndexMaps.get_matrix_index_map(op::LinearNonlinearRBOperator)
-  @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))
-  get_matrix_index_map(op.op_linear)
 end
 
 function get_fe_trial(op::LinearNonlinearRBOperator)
@@ -409,56 +387,6 @@ function Algebra.solve!(
 end
 
 # cache utils
-
-function select_fe_space_at_indices(fs::FESpace,indices)
-  @notimplemented
-end
-
-function select_fe_space_at_indices(fs::TrivialParamFESpace,indices)
-  TrivialParamFESpace(fs.space,Val(length(indices)))
-end
-
-function select_fe_space_at_indices(fs::SingleFieldParamFESpace,indices)
-  dvi = ConsecutiveParamArray(fs.dirichlet_values.data[:,indices])
-  TrialParamFESpace(dvi,fs.space)
-end
-
-function select_evalcache_at_indices(u::ConsecutiveParamArray,paramcache,indices)
-  @unpack Us,Ups,pfeopcache,form = paramcache
-  new_Us = select_fe_space_at_indices(Us,indices)
-  new_XhF = ConsecutiveParamArray(u.data[:,indices])
-  new_paramcache = ParamCache(new_Us,Uts,tfeopcache,const_forms)
-  return new_xhF,new_paramcache
-end
-
-function select_evalcache_at_indices(u::BlockConsecutiveParamVector,paramcache,indices)
-  @unpack Us,Ups,pfeopcache,form = paramcache
-  VT = Us.vector_type
-  style = Us.multi_field_style
-  spaces = select_fe_space_at_indices(Us,indices)
-  new_Us = MultiFieldFESpace(VT,spaces,style)
-  new_XhF = mortar([ConsecutiveParamArray(b.data[:,indices]) for b in blocks(u)])
-  new_paramcache = ParamCache(new_Us,Uts,tfeopcache,const_forms)
-  return new_xhF,new_paramcache
-end
-
-function select_slvrcache_at_indices(b::ConsecutiveParamArray,indices)
-  ConsecutiveParamArray(b.data[:,indices])
-end
-
-function select_slvrcache_at_indices(A::ConsecutiveParamSparseMatrixCSC,indices)
-  ConsecutiveParamSparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,A.data[:,indices])
-end
-
-function select_slvrcache_at_indices(A::BlockParamArray,indices)
-  map(a -> select_slvrcache_at_indices(a,indices),blocks(A)) |> mortar
-end
-
-function select_slvrcache_at_indices(cache::ArrayContribution,indices)
-  contribution(cache.trians) do trian
-    select_slvrcache_at_indices(cache[trian],indices)
-  end
-end
 
 # selects the entries of the snapshots relevant to the reduced integration domain
 # in `a`

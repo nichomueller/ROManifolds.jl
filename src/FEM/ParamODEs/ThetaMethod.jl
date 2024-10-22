@@ -1,6 +1,6 @@
 # general nonlinear case
 
-function ODEs.allocate_odecache(
+function allocate_odeparamcache(
   ::ThetaMethod,
   odeop::ODEParamOperator,
   r0::TransientRealization,
@@ -8,14 +8,14 @@ function ODEs.allocate_odecache(
 
   u0 = us0[1]
   us0N = (u0,u0)
-  odeopcache = allocate_odeopcache(odeop,r0,us0N)
+  paramcache = allocate_paramcache(odeop,r0,us0N)
 
   uθ = copy(u0)
 
   sysslvrcache = nothing
   odeslvrcache = (uθ,sysslvrcache)
 
-  (odeslvrcache,odeopcache)
+  (odeslvrcache,paramcache)
 end
 
 function ODEs.ode_march!(
@@ -24,10 +24,10 @@ function ODEs.ode_march!(
   odeop::ODEParamOperator,
   r::TransientRealization,
   state0::NTuple{1,AbstractVector},
-  odecache)
+  odeparamcache)
 
   u0 = state0[1]
-  odeslvrcache,odeopcache = odecache
+  odeslvrcache,paramcache = odeparamcache
   uθ,sysslvrcache = odeslvrcache
 
   sysslvr = solver.sysslvr
@@ -43,9 +43,9 @@ function ODEs.ode_march!(
   end
   ws = (dtθ,1)
 
-  update_odeopcache!(odeopcache,odeop,r)
+  update_paramcache!(paramcache,odeop,r)
 
-  stageop = NonlinearParamStageOperator(odeop,odeopcache,r,usx,ws)
+  stageop = NonlinearParamStageOperator(odeop,paramcache,r,usx,ws)
 
   sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
 
@@ -53,8 +53,8 @@ function ODEs.ode_march!(
   statef = ODEs._udate_theta!(statef,state0,dt,x)
 
   odeslvrcache = (uθ,sysslvrcache)
-  odecache = (odeslvrcache,odeopcache)
-  (r,statef,odecache)
+  odeparamcache = (odeslvrcache,paramcache)
+  (r,statef,odeparamcache)
 end
 
 function Algebra.residual(
@@ -108,7 +108,7 @@ end
 
 # linear case
 
-function ODEs.allocate_odecache(
+function allocate_odeparamcache(
   ::ThetaMethod,
   odeop::ODEParamOperator{LinearParamODE},
   r0::TransientRealization,
@@ -116,18 +116,18 @@ function ODEs.allocate_odecache(
 
   u0 = us0[1]
   us0N = (u0,u0)
-  odeopcache = allocate_odeopcache(odeop,r0,us0N)
+  paramcache = allocate_paramcache(odeop,r0,us0N)
 
   constant_stiffness = is_form_constant(odeop,1)
   constant_mass = is_form_constant(odeop,2)
 
-  A = allocate_jacobian(odeop,r0,us0N,odeopcache)
-  b = allocate_residual(odeop,r0,us0N,odeopcache)
+  A = allocate_jacobian(odeop,r0,us0N,paramcache)
+  b = allocate_residual(odeop,r0,us0N,paramcache)
 
   sysslvrcache = nothing
   odeslvrcache = (A,b,sysslvrcache)
 
-  (odeslvrcache,odeopcache)
+  (odeslvrcache,paramcache)
 end
 
 function ODEs.ode_march!(
@@ -136,10 +136,10 @@ function ODEs.ode_march!(
   odeop::ODEParamOperator{LinearParamODE},
   r::TransientRealization,
   state0::NTuple{1,AbstractVector},
-  odecache)
+  odeparamcache)
 
   u0 = state0[1]
-  odeslvrcache,odeopcache = odecache
+  odeslvrcache,paramcache = odeparamcache
   A,b,sysslvrcache = odeslvrcache
 
   sysslvr = solver.sysslvr
@@ -152,9 +152,9 @@ function ODEs.ode_march!(
   usx = (u0,x)
   ws = (dtθ,1)
 
-  update_odeopcache!(odeopcache,odeop,r)
+  update_paramcache!(paramcache,odeop,r)
 
-  stageop = LinearParamStageOperator(odeop,odeopcache,r,usx,ws,A,b,sysslvrcache)
+  stageop = LinearParamStageOperator(odeop,paramcache,r,usx,ws,A,b,sysslvrcache)
 
   sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
 
@@ -162,8 +162,8 @@ function ODEs.ode_march!(
   statef = ODEs._udate_theta!(statef,state0,dt,x)
 
   odeslvrcache = (A,b,sysslvrcache)
-  odecache = (odeslvrcache,odeopcache)
-  (r,statef,odecache)
+  odeparamcache = (odeslvrcache,paramcache)
+  (r,statef,odeparamcache)
 end
 
 function Algebra.residual(
@@ -213,13 +213,13 @@ end
 
 # linear-nonlinear case
 
-function ODEs.allocate_odecache(
+function allocate_odeparamcache(
   solver::ThetaMethod,
   odeop::ODEParamOperator{LinearNonlinearParamODE},
   r0::TransientRealization,
   us0::NTuple{1,AbstractVector})
 
-  odecache_lin = allocate_odecache(solver,get_linear_operator(odeop),r0,us0)
-  odecache_nlin = allocate_odecache(solver,get_nonlinear_operator(odeop),r0,us0)
+  odecache_lin = allocate_odeparamcache(solver,get_linear_operator(odeop),r0,us0)
+  odecache_nlin = allocate_odeparamcache(solver,get_nonlinear_operator(odeop),r0,us0)
   return odecache_lin,odecache_nlin
 end
