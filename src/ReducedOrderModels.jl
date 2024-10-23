@@ -225,9 +225,7 @@ export set_triangulation
 export change_triangulation
 
 export LinearNonlinearParamODE
-export LinNonlinParamFEOperator
 export LinearNonlinearParamFEOperator
-export LinearNonlinearParamFEOperatorWithTrian
 export get_linear_operator
 export get_nonlinear_operator
 export join_operators
@@ -267,9 +265,7 @@ export set_triangulation
 export change_triangulation
 
 export LinearNonlinearParamODE
-export LinNonlinTransientParamFEOperator
 export LinearNonlinearTransientParamFEOperator
-export LinearNonlinearTransientParamFEOperatorWithTrian
 export get_linear_operator
 export get_nonlinear_operator
 export join_operators
@@ -356,7 +352,7 @@ export project
 export inv_project
 export enrich!
 
-export FESubspace
+export RBSpace
 export SingleFieldRBSpace
 export MultiFieldRBSpace
 export EvalRBSpace

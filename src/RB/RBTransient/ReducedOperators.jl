@@ -24,8 +24,8 @@ end
 function RBSteady.reduced_operator(
   solver::RBSolver,
   odeop::ODEParamOperator,
-  red_trial::FESubspace,
-  red_test::FESubspace,
+  red_trial::RBSpace,
+  red_test::RBSpace,
   s::AbstractArray)
 
   red_lhs,red_rhs = reduced_weak_form(solver,odeop,red_trial,red_test,s)
@@ -38,8 +38,8 @@ end
 function RBSteady.reduced_operator(
   solver::RBSolver,
   odeop::ODEParamOperator{LinearNonlinearParamODE},
-  red_trial::FESubspace,
-  red_test::FESubspace,
+  red_trial::RBSpace,
+  red_test::RBSpace,
   s::AbstractArray)
 
   red_op_lin = reduced_operator(solver,get_linear_operator(odeop),red_trial,red_test,s)
@@ -47,14 +47,12 @@ function RBSteady.reduced_operator(
   LinearNonlinearTransientRBOperator(red_op_lin,red_op_nlin)
 end
 
-abstract type TransientRBOperator{T} <: ODEParamOperator{T} end
-
-RBSteady.allocate_rbcache(op::TransientRBOperator,r::TransientRealization) = @abstractmethod
+abstract type TransientRBOperator{T} <: RBOperator{T} end
 
 struct GenericTransientRBOperator{T} <: TransientRBOperator{T}
   op::ODEParamOperator{T}
-  trial::FESubspace
-  test::FESubspace
+  trial::RBSpace
+  test::RBSpace
   lhs::TupOfAffineContribution
   rhs::AffineContribution
 end
@@ -114,9 +112,7 @@ function Algebra.allocate_jacobian(
   r::TransientRealization,
   args...)
 
-  lhs_coeff = map(lhs -> RBSteady.allocate_coefficient(lhs,r),op.lhs)
-  lhs_hypred = RBSteady.allocate_hyper_reduction(first(op.lhs),r)
-  lhs_rb = (lhs_coeff,lhs_hypred)
+  lhs_rb = RBSteady.allocate_hypred_cache(op.lhs,r)
   return lhs_rb
 end
 

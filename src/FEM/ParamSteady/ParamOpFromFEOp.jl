@@ -304,9 +304,9 @@ function allocate_paramcache(
 
   paramcache = allocate_paramcache(get_nonlinear_operator(op.op),μ,u)
   op_lin = get_linear_operator(op)
-  A_lin = allocate_jacobian(op_lin,μ,u,paramcache)
-  b_lin = allocate_residual(op_lin,μ,u,paramcache)
-  return LinNonlinParamCache(paramcache,A_lin,b_lin)
+  A_lin = assemble_jacobian(op_lin,μ,u,paramcache)
+  b_lin = assemble_residual(op_lin,μ,u,paramcache)
+  return LinearNonlinearParamCache(paramcache,A_lin,b_lin)
 end
 
 function update_paramcache!(
@@ -344,9 +344,11 @@ function Algebra.residual!(
   u::AbstractVector,
   cache)
 
+  A_lin = cache.A_lin
   b_lin = cache.b_lin
   copy_entries!(b,b_lin)
   residual!(b,get_nonlinear_operator(op.op),μ,u,paramcache;add=true)
+  mul!(b,A_lin,u,true,false)
 end
 
 function ODEs.jacobian_add!(

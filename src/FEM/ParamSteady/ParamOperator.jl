@@ -103,15 +103,60 @@ FESpaces.get_trial(op::ParamOperator) = get_trial(get_fe_operator(op))
 IndexMaps.get_vector_index_map(op::ParamOperator) = get_vector_index_map(get_fe_operator(op))
 IndexMaps.get_matrix_index_map(op::ParamOperator) = get_matrix_index_map(get_fe_operator(op))
 
-mutable struct ParamCache <: GridapType
+abstract type AbstractParamCache <: GridapType end
+
+mutable struct ParamCache <: AbstractParamCache
   trial
   ptrial
   feop_cache
   const_forms
 end
 
-struct LinNonlinParamCache{A,B} <: GridapType
+struct LinearNonlinearParamCache{A,B} <: AbstractParamCache
   paramcache::ParamCache
   A_lin::A
   b_lin::B
+end
+
+struct ParamNonlinearOperator <: NonlinearOperator
+  op::ParamOperator
+  r::Realization
+  paramcache
+end
+
+function ParamNonlinearOperator(op::ParamOperator,μ::Realization)
+  trial = get_trial(op)(r)
+  u = zero_free_values(trial)
+  paramcache = allocate_paramcache(op,μ,u)
+  ParamNonlinearOperator(op,μ,paramcache)
+end
+
+function Algebra.allocate_residual(
+  nlop::ParamNonlinearOperator,
+  x::AbstractVector)
+
+  allocate_residual(nlop.op,nlop.r,x,nlop.paramcache)
+end
+
+function Algebra.residual!(
+  b::AbstractVector,
+  nlop::ParamNonlinearOperator,
+  x::AbstractVector)
+
+  residual!(b,nlop.op,nlop.r,x,nlop.paramcache)
+end
+
+function Algebra.allocate_jacobian(
+  nlop::ParamNonlinearOperator,
+  x::AbstractVector)
+
+  allocate_jacobian(nlop.op,nlop.r,x,nlop.paramcache)
+end
+
+function Algebra.jacobian!(
+  A::AbstractMatrix,
+  nlop::ParamNonlinearOperator,
+  x::AbstractVector)
+
+  jacobian!(A,nlop.op,nlop.r,x,nlop.paramcache)
 end

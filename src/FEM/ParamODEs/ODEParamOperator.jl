@@ -93,7 +93,7 @@ function ODEs.jacobian_add!(
 end
 
 function Algebra.jacobian!(
-  A::AbstractMatrix,
+  A,
   odeop::ODEParamOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},

@@ -91,7 +91,7 @@ function load_projection(dir;label="")
   deserialize(proj_dir)
 end
 
-function DrWatson.save(dir,r::FESubspace;label="")
+function DrWatson.save(dir,r::RBSpace;label="")
   save(dir,get_reduced_subspace(r);label)
 end
 

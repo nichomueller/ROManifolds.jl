@@ -120,7 +120,7 @@ export inv_project
 export enrich!
 include("Projections.jl")
 
-export FESubspace
+export RBSpace
 export SingleFieldRBSpace
 export MultiFieldRBSpace
 export EvalRBSpace
@@ -137,6 +137,7 @@ export EmptyHyperReduction
 export MDEIM
 export AffineContribution
 export BlockHyperReduction
+export HypRedCache
 export empirical_interpolation
 export integration_domain
 export get_integration_domain

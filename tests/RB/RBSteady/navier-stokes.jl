@@ -63,7 +63,7 @@ test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 feop_lin = LinearParamFEOperator(res_lin,jac_lin,pspace,trial,test,trian_res,trian_jac)
 feop_nlin = ParamFEOperator(res_nlin,jac_nlin,pspace,trial,test,trian_res,trian_jac)
-feop = LinNonlinParamFEOperator(feop_lin,feop_nlin)
+feop = LinearNonlinearParamFEOperator(feop_lin,feop_nlin)
 
 fesolver = NonlinearFESolver(NonlinearSolvers.NewtonSolver(LUSolver();rtol=1e-10,maxiter=20))
 

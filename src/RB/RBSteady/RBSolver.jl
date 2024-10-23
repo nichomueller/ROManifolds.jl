@@ -1,8 +1,3 @@
-mutable struct RBOnlineCache
-  fecache
-  rbcache
-end
-
 """
     struct RBSolver{A,B,C,D} end
 
@@ -36,17 +31,6 @@ struct RBSolver{A<:GridapType,B}
   state_reduction::Reduction
   residual_reduction::Reduction
   jacobian_reduction::B
-  cache::RBOnlineCache
-end
-
-function RBSolver(
-  fesolver::GridapType,
-  state_reduction::Reduction,
-  residual_reduction::Reduction,
-  jacobian_reduction)
-
-  cache = RBOnlineCache(nothing,nothing)
-  RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction,cache)
 end
 
 function RBSolver(

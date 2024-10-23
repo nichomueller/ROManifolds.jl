@@ -633,7 +633,7 @@ function ParamSteady.allocate_paramcache(
   op_lin = get_linear_operator(op)
   A_lin = allocate_jacobian(op_lin,r,us,paramcache)
   b_lin = allocate_residual(op_lin,r,us,paramcache)
-  return LinNonlinParamCache(paramcache,A_lin,b_lin)
+  return LinearNonlinearParamCache(paramcache,A_lin,b_lin)
 end
 
 function update_paramcache!(

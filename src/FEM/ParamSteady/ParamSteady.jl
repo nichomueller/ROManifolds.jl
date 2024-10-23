@@ -44,8 +44,9 @@ export LinearParamEq
 export LinearNonlinearParamEq
 export ParamOperator
 export LinearNonlinearParamOpFromFEOp
+export AbstractParamCache
 export ParamCache
-export LinNonlinParamCache
+export LinearNonlinearParamCache
 export allocate_paramcache
 export update_paramcache!
 export get_realization
@@ -61,10 +62,7 @@ export set_triangulation
 export change_triangulation
 include("ParamFEOperatorWithTrian.jl")
 
-export LinearNonlinearParamODE
-export LinNonlinParamFEOperator
 export LinearNonlinearParamFEOperator
-export LinearNonlinearParamFEOperatorWithTrian
 export get_linear_operator
 export get_nonlinear_operator
 export join_operators

@@ -101,7 +101,15 @@ function Algebra.solve(
   r::TransientRealization,
   uh0)
 
-  TransientParamFESolution(solver,join_operators(op),r,uh0)
+  lop = get_linear_operator(op)
+  nlop = get_nonlinear_operator(op)
+  if isa(lop,TransientParamFEOperatorWithTrian) || isa(nlop,TransientParamFEOperatorWithTrian)
+    @assert isa(lop,TransientParamFEOperatorWithTrian) && isa(nlop,TransientParamFEOperatorWithTrian)
+    op′ = LinearNonlinearTransientParamFEOperator(lop.op,nlop.op)
+  else
+    op′ = op
+  end
+  solve(solver,op′,r,uh0)
 end
 
 function test_transient_fe_solver(

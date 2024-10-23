@@ -122,7 +122,7 @@ feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
   trial,test,trian_res,trian_jac,trian_jac_t)
 feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,
   trial,test,trian_res,trian_jac)
-feop = LinNonlinTransientParamFEOperator(feop_lin,feop_nlin)
+feop = LinearNonlinearTransientParamFEOperator(feop_lin,feop_nlin)
 
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 diag_blocks  = [NonlinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0*p*q)dΩ,test_p,test_p)]

@@ -21,58 +21,12 @@ struct TransientParamFEOperatorWithTrian{T,N} <: TransientParamFEOperator{T}
   end
 end
 
-function TransientParamFEOpFromWeakForm(
-  res::Function,
-  jacs::Tuple{Vararg{Function}},
-  tpspace::TransientParamSpace,
-  assem::Assembler,
-  index_map::FEOperatorIndexMap,
-  trial::FESpace,
-  test::FESpace,
-  order::Integer,
-  trian_res,
-  trian_jacs...)
-
-  op = TransientParamFEOpFromWeakForm(res,jacs,tpspace,assem,index_map,trial,test,order)
-  op_trian = TransientParamFEOperatorWithTrian(op,trian_res,trian_jacs)
-  return op_trian
-end
-
-function TransientParamSemilinearFEOpFromWeakForm(
-  mass::Function,
-  res::Function,
-  jacs::Tuple{Vararg{Function}},
-  constant_mass::Bool,
-  tpspace::TransientParamSpace,
-  assem::Assembler,
-  index_map::FEOperatorIndexMap,
-  trial::FESpace,
-  test::FESpace,
-  order::Integer,
-  trian_res,
-  trian_jacs...)
-
-  op = TransientParamSemilinearFEOpFromWeakForm(mass,res,jacs,constant_mass,tpspace,assem,index_map,trial,test,order)
-  op_trian = TransientParamFEOperatorWithTrian(op,trian_res,trian_jacs)
-  return op_trian
-end
-
-function TransientParamLinearFEOpFromWeakForm(
-  forms::Tuple{Vararg{Function}},
-  res::Function,
-  jacs::Tuple{Vararg{Function}},
-  constant_forms::Tuple{Vararg{Bool}},
-  tpspace::TransientParamSpace,
-  assem::Assembler,
-  index_map::FEOperatorIndexMap,
-  trial::FESpace,
-  test::FESpace,
-  order::Integer,
-  trian_res,
-  trian_jacs...)
-
-  op = TransientParamLinearFEOpFromWeakForm(forms,res,jacs,constant_forms,tpspace,assem,index_map,trial,test,order)
-  op_trian = TransientParamFEOperatorWithTrian(op,trian_res,trian_jacs)
+function TransientParamFEOpFromWeakForm(args...)
+  args1...,trian_djac = args...
+  args2...,trian_jac = args1...
+  args3...,trian_res = args2...
+  op = TransientParamFEOpFromWeakForm(args3...)
+  op_trian = TransientParamFEOperatorWithTrian(op,trian_res,(trian_jac,trian_djac))
   return op_trian
 end
 

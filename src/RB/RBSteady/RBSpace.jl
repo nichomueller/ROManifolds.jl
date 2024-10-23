@@ -1,10 +1,10 @@
 """
     reduced_fe_space(solver::RBSolver,feop::ParamFEOperator,s::AbstractSteadySnapshots
-      ) -> (FESubspace, FESubspace)
+      ) -> (RBSpace, RBSpace)
     reduced_fe_space(solver::RBSolver,feop::TransientParamFEOperator,s::AbstractTransientSnapshots
-      ) -> (FESubspace, FESubspace)
+      ) -> (RBSpace, RBSpace)
     reduced_fe_space(solver::RBSolver,feop::TransientParamFEOperator,s::BlockSnapshots
-      ) -> (FESubspace, FESubspace)
+      ) -> (RBSpace, RBSpace)
 
 Computes the subspace of the test, trial FE spaces contained in the FE operator
 `feop` by compressing the snapshots `s`
@@ -76,7 +76,7 @@ function fe_subspace(space::FESpace,basis)
 end
 
 """
-    abstract type FESubspace <: FESpace end
+    abstract type RBSpace <: FESpace end
 
 Represents a vector subspace of a FE space.
 
@@ -85,52 +85,52 @@ Subtypes:
 - [`MultiFieldRBSpace`](@ref)
 
 """
-abstract type FESubspace <: FESpace end
+abstract type RBSpace <: FESpace end
 
-(U::FESubspace)(μ) = evaluate(U,μ)
+(U::RBSpace)(μ) = evaluate(U,μ)
 
-get_fe_space(r::FESubspace) = @abstractmethod
-get_reduced_subspace(r::FESubspace) = @abstractmethod
+get_fe_space(r::RBSpace) = @abstractmethod
+get_reduced_subspace(r::RBSpace) = @abstractmethod
 
-get_basis(r::FESubspace) = get_basis(get_reduced_subspace(r))
-num_fe_dofs(r::FESubspace) = num_fe_dofs(get_fe_space(r))
+get_basis(r::RBSpace) = get_basis(get_reduced_subspace(r))
+num_fe_dofs(r::RBSpace) = num_fe_dofs(get_fe_space(r))
 
-FESpaces.num_free_dofs(r::FESubspace) = num_reduced_dofs(get_reduced_subspace(r))
+FESpaces.num_free_dofs(r::RBSpace) = num_reduced_dofs(get_reduced_subspace(r))
 
-FESpaces.get_free_dof_ids(r::FESubspace) = Base.OneTo(num_free_dofs(r))
+FESpaces.get_free_dof_ids(r::RBSpace) = Base.OneTo(num_free_dofs(r))
 
-FESpaces.get_vector_type(r::FESubspace) = get_vector_type(get_fe_space(r))
+FESpaces.get_vector_type(r::RBSpace) = get_vector_type(get_fe_space(r))
 
-function Algebra.allocate_in_domain(r::FESubspace)
+function Algebra.allocate_in_domain(r::RBSpace)
   zero_free_values(r)
 end
 
-function Algebra.allocate_in_range(r::FESubspace)
+function Algebra.allocate_in_range(r::RBSpace)
   zero_free_values(get_fe_space(r))
 end
 
-function Arrays.return_cache(::typeof(project),r::FESubspace,x::AbstractVector)
+function Arrays.return_cache(::typeof(project),r::RBSpace,x::AbstractVector)
   allocate_in_domain(r)
 end
 
-function Arrays.return_cache(::typeof(inv_project),r::FESubspace,x::AbstractVector)
+function Arrays.return_cache(::typeof(inv_project),r::RBSpace,x::AbstractVector)
   allocate_in_range(r)
 end
 
 for (f,f!) in zip((:project,:inv_project),(:project!,:inv_project!))
   @eval begin
-    function $f(r::FESubspace,x::AbstractVector)
+    function $f(r::RBSpace,x::AbstractVector)
       y = return_cache($f,r,x)
       $f!(y,r,x)
       return y
     end
 
-    function $f!(y,r::FESubspace,x::AbstractVector)
+    function $f!(y,r::RBSpace,x::AbstractVector)
       y .= $f(get_reduced_subspace(r),x)
       return y
     end
 
-    function $f!(y,r::FESubspace,x::AbstractParamVector)
+    function $f!(y,r::RBSpace,x::AbstractParamVector)
       @inbounds for ip in eachindex(x)
         y[ip] = $f(get_reduced_subspace(r),x[ip])
       end
@@ -139,40 +139,38 @@ for (f,f!) in zip((:project,:inv_project),(:project!,:inv_project!))
   end
 end
 
-function project(r::FESubspace,x::Projection)
+function project(r::RBSpace,x::Projection)
   galerkin_projection(get_reduced_subspace(r),x)
 end
 
-function project(r1::FESubspace,x::Projection,r2::FESubspace)
+function project(r1::RBSpace,x::Projection,r2::RBSpace)
   galerkin_projection(get_reduced_subspace(r1),x,get_reduced_subspace(r2))
 end
 
-abstract type FESubspaceFunction <: FEFunction end
-
-function FESubspaceFunction(r::FESubspace,x::AbstractVector)
-  x̂ = project(get_reduced_subspace(r),x)
-  return FESubspaceFunction(x̂,r)
-end
-
-function FESpaces.FEFunction(r::FESubspace,x̂::AbstractVector)
+function FESpaces.FEFunction(r::RBSpace,x̂::AbstractVector)
   x = inv_project(r,x̂)
   fe = get_fe_space(r)
   xdir = get_dirichlet_values(fe)
   return FEFunction(fe,x,xdir)
 end
 
-struct SingleFieldFESubspaceFunction <: FESubspaceFunction
+struct RBFunction <: FEFunction
   reduced_free_values::AbstractVector
-  reduced_space::FESubspace
+  reduced_space::RBSpace
+end
+
+function RBFunction(r::RBSpace,x::AbstractVector)
+  x̂ = project(get_reduced_subspace(r),x)
+  return RBFunction(x̂,r)
 end
 
 """
-    SingleFieldRBSpace{A<:SingleFieldFESpace,B<:Projection} <: FESubspace
+    SingleFieldRBSpace{A<:SingleFieldFESpace,B<:Projection} <: RBSpace
 
 Reduced basis subspace in a steady setting
 
 """
-struct SingleFieldRBSpace{A<:SingleFieldFESpace,B<:Projection} <: FESubspace
+struct SingleFieldRBSpace{A<:SingleFieldFESpace,B<:Projection} <: RBSpace
   space::A
   subspace::B
 end
@@ -185,12 +183,12 @@ get_fe_space(r::SingleFieldRBSpace) = r.space
 get_reduced_subspace(r::SingleFieldRBSpace) = r.subspace
 
 """
-    MultiFieldRBSpace{A<:MultiFieldFESpace,B<:BlockProjection} <: FESubspace
+    MultiFieldRBSpace{A<:MultiFieldFESpace,B<:BlockProjection} <: RBSpace
 
 Reduced basis subspace in a MultiField setting
 
 """
-struct MultiFieldRBSpace{A<:MultiFieldFESpace,B<:BlockProjection} <: FESubspace
+struct MultiFieldRBSpace{A<:MultiFieldFESpace,B<:BlockProjection} <: RBSpace
   space::A
   subspace::B
 end
@@ -227,13 +225,13 @@ end
 
 # dealing with the transient case here
 
-function Arrays.evaluate(r::FESubspace,args...)
+function Arrays.evaluate(r::RBSpace,args...)
   space = evaluate(get_fe_space(r),args...)
   subspace = fe_subspace(space,get_reduced_subspace(r))
   EvalRBSpace(subspace,args...)
 end
 
-struct EvalRBSpace{A<:FESubspace,B<:AbstractRealization} <: FESubspace
+struct EvalRBSpace{A<:RBSpace,B<:AbstractRealization} <: RBSpace
   subspace::A
   realization::B
 end

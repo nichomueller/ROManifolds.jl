@@ -107,7 +107,7 @@ get_integration_domain(a::EmptyHyperReduction) = @notimplemented
 
 function HyperReduction(
   red::Reduction,
-  test::FESubspace)
+  test::RBSpace)
 
   red = get_reduction(red)
   nrows = num_free_dofs(test)
@@ -117,8 +117,8 @@ end
 
 function HyperReduction(
   red::Reduction,
-  trial::FESubspace,
-  test::FESubspace)
+  trial::RBSpace,
+  test::RBSpace)
 
   red = get_reduction(red)
   nrows = num_free_dofs(test)
@@ -141,7 +141,7 @@ get_integration_domain(a::MDEIM) = a.domain
 function HyperReduction(
   red::AbstractMDEIMReduction,
   s::AbstractSnapshots,
-  test::FESubspace)
+  test::RBSpace)
 
   red = get_reduction(red)
   basis = projection(red,s)
@@ -155,8 +155,8 @@ end
 function HyperReduction(
   red::AbstractMDEIMReduction,
   s::AbstractSnapshots,
-  trial::FESubspace,
-  test::FESubspace)
+  trial::RBSpace,
+  test::RBSpace)
 
   red = get_reduction(red)
   basis = projection(red,s)
@@ -204,14 +204,14 @@ function get_reduced_cells(
   return red_integr_cells
 end
 
-function reduced_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,r::FESubspace...)
+function reduced_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,r::RBSpace...)
   f = map(get_fe_space,r)
   red_integr_cells = get_reduced_cells(trian,i,f...)
   red_trian = view(trian,red_integr_cells)
   return red_trian
 end
 
-function reduced_triangulation(trian::Triangulation,b::HyperReduction,r::FESubspace...)
+function reduced_triangulation(trian::Triangulation,b::HyperReduction,r::RBSpace...)
   indices = get_integration_domain(b)
   reduced_triangulation(trian,indices,r...)
 end
@@ -252,10 +252,6 @@ function allocate_hyper_reduction(
   hypred = param_array(M,np)
   fill!(hypred,zero(eltype(hypred)))
   return hypred
-end
-
-function allocate_hyper_reduction(a::HyperReduction,r::AbstractRealization)
-  allocate_hyper_reduction(a,num_params(r))
 end
 
 function ParamDataStructures.Contribution(v::Tuple{Vararg{HyperReduction}},t::Tuple{Vararg{Triangulation}})
@@ -302,12 +298,12 @@ end
 
 function inv_project!(cache,a::AffineContribution,b::ArrayContribution)
   @check length(a) == length(b)
-  coeff,b̂ = cache
-  fill!(b̂,zero(eltype(b̂)))
+  coeff,hypred = cache
+  fill!(hypred,zero(eltype(hypred)))
   for (aval,bval,cval) in zip(get_values(a),get_values(b),get_values(coeff))
-    inv_project!((cval,b̂),aval,bval)
+    inv_project!((cval,hypred),aval,bval)
   end
-  return b̂
+  return hypred
 end
 
 function reduced_form(
@@ -328,7 +324,7 @@ function reduced_form(
   return hyper_red,red_trian
 end
 
-function reduced_residual(red::Reduction,test::FESubspace,c::ArrayContribution)
+function reduced_residual(red::Reduction,test::RBSpace,c::ArrayContribution)
   t = @timed begin
     a,trians = map(get_domains(c),get_values(c)) do trian,values
       reduced_form(red,values,trian,test)
@@ -338,7 +334,7 @@ function reduced_residual(red::Reduction,test::FESubspace,c::ArrayContribution)
   return Contribution(a,trians)
 end
 
-function reduced_jacobian(red::Reduction,trial::FESubspace,test::FESubspace,c::ArrayContribution)
+function reduced_jacobian(red::Reduction,trial::RBSpace,test::RBSpace,c::ArrayContribution)
   t = @timed begin
     a,trians = map(get_domains(c),get_values(c)) do trian,values
       reduced_form(red,values,trian,trial,test)
@@ -348,7 +344,7 @@ function reduced_jacobian(red::Reduction,trial::FESubspace,test::FESubspace,c::A
   return Contribution(a,trians)
 end
 
-function reduced_weak_form(solver::RBSolver,op,red_trial::FESubspace,red_test::FESubspace,s::AbstractArray)
+function reduced_weak_form(solver::RBSolver,op,red_trial::RBSpace,red_test::RBSpace,s::AbstractArray)
   jac = jacobian_snapshots(solver,op,s)
   res = residual_snapshots(solver,op,s)
   jac_red = get_jacobian_reduction(solver)
@@ -573,11 +569,29 @@ function inv_project!(cache,a::BlockHyperReduction,b::ArrayBlock)
   return hypred
 end
 
+# cache object
+
+struct HypRedCache
+  fe_quantity
+  coeff
+  hypred
+end
+
 for (T,S) in zip((:HyperReduction,:BlockHyperReduction,:AffineContribution),
                  (:AbstractParamArray,:ArrayBlock,:ArrayContribution))
   @eval begin
     function inv_project(a::$T,b::$S)
       @notimplemented "Must provide cache in advance"
+    end
+  end
+end
+
+for (T,S) in zip((:AffineContribution,:BlockHyperReduction),(:ArrayContribution,:ArrayBlock))
+  @eval begin
+    function inv_project!(cache::HypRedCache,a::$T,b::$S)
+      coeff = cache.coeff
+      hypred = cache.hypred
+      inv_project!((coeff,hypred),a,b)
     end
   end
 end
