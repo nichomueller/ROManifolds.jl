@@ -61,9 +61,17 @@ function Algebra.residual(
   u::AbstractVector)
 
   paramcache = allocate_paramcache(op,μ,u)
+  residual(op,μ,u,paramcache)
+end
+
+function Algebra.residual(
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
   b = allocate_residual(op,μ,u,paramcache)
   residual!(b,op,μ,u,paramcache)
-  b
 end
 
 function Algebra.allocate_jacobian(
@@ -93,9 +101,17 @@ function Algebra.jacobian(
   u::AbstractVector)
 
   paramcache = allocate_paramcache(op,μ,u)
+  jacobian(op,μ,u,paramcache)
+end
+
+function Algebra.jacobian(
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
   A = allocate_jacobian(op,μ,u,paramcache)
   jacobian!(A,op,μ,u,paramcache)
-  A
 end
 
 FESpaces.get_test(op::ParamOperator) = get_test(get_fe_operator(op))
@@ -120,12 +136,12 @@ end
 
 struct ParamNonlinearOperator <: NonlinearOperator
   op::ParamOperator
-  r::Realization
-  paramcache
+  μ::Realization
+  paramcache::AbstractParamCache
 end
 
 function ParamNonlinearOperator(op::ParamOperator,μ::Realization)
-  trial = get_trial(op)(r)
+  trial = get_trial(op)(μ)
   u = zero_free_values(trial)
   paramcache = allocate_paramcache(op,μ,u)
   ParamNonlinearOperator(op,μ,paramcache)
@@ -135,7 +151,7 @@ function Algebra.allocate_residual(
   nlop::ParamNonlinearOperator,
   x::AbstractVector)
 
-  allocate_residual(nlop.op,nlop.r,x,nlop.paramcache)
+  allocate_residual(nlop.op,nlop.μ,x,nlop.paramcache)
 end
 
 function Algebra.residual!(
@@ -143,14 +159,14 @@ function Algebra.residual!(
   nlop::ParamNonlinearOperator,
   x::AbstractVector)
 
-  residual!(b,nlop.op,nlop.r,x,nlop.paramcache)
+  residual!(b,nlop.op,nlop.μ,x,nlop.paramcache)
 end
 
 function Algebra.allocate_jacobian(
   nlop::ParamNonlinearOperator,
   x::AbstractVector)
 
-  allocate_jacobian(nlop.op,nlop.r,x,nlop.paramcache)
+  allocate_jacobian(nlop.op,nlop.μ,x,nlop.paramcache)
 end
 
 function Algebra.jacobian!(
@@ -158,5 +174,5 @@ function Algebra.jacobian!(
   nlop::ParamNonlinearOperator,
   x::AbstractVector)
 
-  jacobian!(A,nlop.op,nlop.r,x,nlop.paramcache)
+  jacobian!(A,nlop.op,nlop.μ,x,nlop.paramcache)
 end

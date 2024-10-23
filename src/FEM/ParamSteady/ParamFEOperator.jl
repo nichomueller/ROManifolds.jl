@@ -42,11 +42,13 @@ function update_feopcache!(feop_cache,op::ParamFEOperator,u::AbstractVector)
   feop_cache
 end
 
-ParamDataStructures.realization(op::ParamFEOperator;kwargs...) = realization(get_param_space(feop);kwargs...)
+ParamDataStructures.realization(op::ParamFEOperator;kwargs...) = realization(get_param_space(op);kwargs...)
 
 function ParamFESpaces.get_param_assembler(op::ParamFEOperator,r::AbstractRealization)
   get_param_assembler(get_assembler(op),r)
 end
+
+is_jac_constant(op::ParamFEOperator) = false
 
 IndexMaps.get_index_map(op::ParamFEOperator) = @abstractmethod
 IndexMaps.get_vector_index_map(op::ParamFEOperator) = get_vector_index_map(get_index_map(op))
@@ -83,8 +85,6 @@ function _assemble_matrix(f,U::MultiFieldFESpace,V::MultiFieldFESpace)
     assemble_matrix(f,U,V)
   end
 end
-
-is_constant_jac(op::ParamFEOperator) = false
 
 """
     struct ParamFEOpFromWeakForm{T} <: ParamFEOperator{T} end
@@ -135,8 +135,8 @@ function LinearParamFEOperator(
   jac′(μ,u,du,v,args...) = jac(μ,du,v,args...)
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
-  ParamFEOpFromWeakForm(
-    res,jac′,constant_jac,pspace,assem,index_map,trial,test)
+  LinearParamFEOpFromWeakForm(
+    res,jac′,pspace,constant_jac,assem,index_map,trial,test)
 end
 
 FESpaces.get_test(op::LinearParamFEOpFromWeakForm) = op.test
@@ -146,4 +146,4 @@ ODEs.get_res(op::LinearParamFEOpFromWeakForm) = op.res
 get_jac(op::LinearParamFEOpFromWeakForm) = op.jac
 ODEs.get_assembler(op::LinearParamFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::LinearParamFEOpFromWeakForm) = op.index_map
-is_constant_jac(op::LinearParamFEOpFromWeakForm) = op.constant_jac
+is_jac_constant(op::LinearParamFEOpFromWeakForm) = op.constant_jac

@@ -47,14 +47,15 @@ export LinearNonlinearParamOpFromFEOp
 export AbstractParamCache
 export ParamCache
 export LinearNonlinearParamCache
+export ParamNonlinearOperator
 export allocate_paramcache
 export update_paramcache!
-export get_realization
 export get_fe_operator
 include("ParamOperator.jl")
 
 export ParamFEOperator
 export LinearParamFEOperator
+export get_param_space
 include("ParamFEOperator.jl")
 
 export ParamFEOperatorWithTrian

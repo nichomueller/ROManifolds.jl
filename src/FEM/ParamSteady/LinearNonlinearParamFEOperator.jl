@@ -76,6 +76,15 @@ function join_operators(
   ParamFEOperator(res,jac,op_lin.pspace,trial,test)
 end
 
+function join_operators(
+  op_lin::ParamFEOperatorWithTrian,
+  op_nlin::ParamFEOperatorWithTrian)
+
+  set_op_lin = set_triangulation(op_lin)
+  set_op_nlin = set_triangulation(op_nlin)
+  join_operators(set_op_lin,set_op_nlin)
+end
+
 """
     join_operators(op::LinearNonlinearParamFEOperator) -> ParamFEOperator
 

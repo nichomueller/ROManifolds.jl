@@ -577,6 +577,10 @@ struct HypRedCache
   hypred
 end
 
+LinearAlgebra.norm(cache::HypRedCache) = norm(cache.hypred)
+LinearAlgebra.rmul!(cache::HypRedCache,v::Number) = rmul!(cache.hypred,v)
+ParamDataStructures.param_getindex(cache::HypRedCache,i::Integer) = param_getindex(cache.hypred,i)
+
 for (T,S) in zip((:HyperReduction,:BlockHyperReduction,:AffineContribution),
                  (:AbstractParamArray,:ArrayBlock,:ArrayContribution))
   @eval begin

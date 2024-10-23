@@ -18,7 +18,6 @@ function Algebra.solve!(
   A_item = testitem(A)
   ss = symbolic_setup(ls,A_item)
   ns = numerical_setup(ss,A_item)
-  rmul!(b,-1)
 
   @inbounds for i in param_eachindex(x)
     xi = param_getindex(x,i)
@@ -29,7 +28,7 @@ function Algebra.solve!(
     numerical_setup!(ns,Ai)
   end
 
-  x
+  ns
 end
 
 function Algebra.solve!(
@@ -42,18 +41,7 @@ function Algebra.solve!(
   b = residual(op,x)
   rmul!(b,-1)
   A = jacobian(op,x)
-  A_item = testitem(A)
-  ss = symbolic_setup(ls,A_item)
-  ns = numerical_setup(ss,A_item)
-
-  @inbounds for i in param_eachindex(x)
-    xi = param_getindex(x,i)
-    bi = param_getindex(b,i)
-    solve!(xi,ns,bi)
-    i == param_length(x) && continue
-    Ai = param_getindex(A,i+1)
-    numerical_setup!(ns,Ai)
-  end
+  ns = solve!(x,ls,A,b)
 
   Algebra.LinearSolverCache(A,b,ns)
 end
@@ -70,16 +58,7 @@ function Algebra.solve!(
   ns = cache.ns
   residual!(b,op,x)
   rmul!(b,-1)
-
-  @inbounds for i in param_eachindex(x)
-    xi = param_getindex(x,i)
-    bi = param_getindex(b,i)
-    solve!(xi,ns,bi)
-    i == param_length(x) && continue
-    Ai = param_getindex(A,i+1)
-    numerical_setup!(ns,Ai)
-  end
-
+  ns = solve!(x,ls,A,b)
   cache
 end
 
@@ -93,10 +72,10 @@ function Algebra.solve!(
 
   b = residual(op,x)
   A = jacobian(op,x)
-  dx = allocate_in_domain(A)
-  fill!(dx,zero(eltype(dx)))
   A_item = testitem(A)
   x_item = testitem(x)
+  dx = allocate_in_domain(A_item)
+  fill!(dx,zero(eltype(dx)))
   ss = symbolic_setup(nls.ls,A_item)
   ns = numerical_setup(ss,A_item,x_item)
   Algebra._solve_nr!(x,A,b,dx,ns,nls,op)
@@ -116,13 +95,7 @@ function Algebra.solve!(
   return cache
 end
 
-function Algebra._solve_nr!(
-  x::AbstractParamVector,
-  A::AbstractParamMatrix,
-  b::AbstractParamVector,
-  dx::AbstractParamVector,
-  ns,nls,op)
-
+function Algebra._solve_nr!(x::AbstractParamVector,A,b,dx,ns,nls,op)
   log = nls.log
 
   res = norm(b)
@@ -133,14 +106,14 @@ function Algebra._solve_nr!(
     jacobian!(A,op,x)
 
     @inbounds for i in param_eachindex(x)
-      dxi = param_getindex(dx,i)
+      xi = param_getindex(x,i)
       Ai = param_getindex(A,i)
       bi = param_getindex(b,i)
       numerical_setup!(ns,Ai)
-      solve!(dxi,ns,bi)
+      solve!(dx,ns,bi)
+      xi .+= dx
     end
 
-    x .+= dx
     residual!(b,op,x)
     res  = norm(b)
     done = LinearSolvers.update!(log,res)

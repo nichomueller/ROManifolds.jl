@@ -176,7 +176,10 @@ function DrWatson.save(dir,op::LinearNonlinearRBOperator;label="")
   _save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nonlinear"))
 end
 
-function load_operator(dir,feop::LinearNonlinearParamFEOperatorWithTrian;label="")
+function load_operator(dir,feop::LinearNonlinearParamFEOperator;label="")
+  @assert isa(feop.op_linear,ParamFEOperatorWithTrian)
+  @assert isa(feop.op_nonlinear,ParamFEOperatorWithTrian)
+
   trial,test = _fixed_operator_parts(dir,feop.op_linear;label)
   pop_lin,red_lhs_lin,red_rhs_lin = _load_trian_operator_parts(
     dir,feop.op_linear,trial,test;label=_get_label("linear",label))

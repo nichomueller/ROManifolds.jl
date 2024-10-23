@@ -282,6 +282,7 @@ end
 function Algebra.nz_allocation(a::Algebra.ArrayCounter{T}) where T<:AbstractParamVector
   S = eltype(T)
   v = similar(S,map(length,a.axes))
+  fill!(v,zero(eltype(v)))
   param_array(v,param_length(T))
 end
 

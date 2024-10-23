@@ -88,16 +88,6 @@ function RBSteady.allocate_rbcache(
   @abstractmethod
 end
 
-function update_odecache!(
-  odeparamcache,
-  op::GenericTransientRBOperator,
-  r::TransientRealization)
-
-  odeslvrcache,paramcache = odeparamcache
-  paramcache = update_paramcache!(paramcache,op,r)
-  (odeslvrcache,paramcache)
-end
-
 function Algebra.allocate_residual(
   op::GenericTransientRBOperator,
   r::TransientRealization,
@@ -224,17 +214,6 @@ function ParamSteady.allocate_paramcache(
   @notimplemented
 end
 
-function update_odecache!(
-  odeparamcache,
-  op::LinearNonlinearTransientRBOperator,
-  r::TransientRealization)
-
-  odecache_lin,odecache_nlin = odeparamcache
-  odecache_lin = update_odecache!(odecache_lin,get_linear_operator(op),r)
-  odecache_nlin = update_odecache!(odecache_nlin,get_nonlinear_operator(op),r)
-  (odecache_lin,odecache_nlin)
-end
-
 function RBSteady.allocate_rbcache(
   fesolver,
   op::LinearNonlinearTransientRBOperator,
@@ -285,42 +264,6 @@ function Algebra.jacobian!(
 end
 
 # Solve a POD-MDEIM problem
-
-function RBSteady.init_online_cache!(
-  solver::RBSolver,
-  op::TransientRBOperator,
-  r::TransientRealization)
-
-  fe_trial = get_fe_trial(op)(r)
-  trial = get_trial(op)(r)
-  y = zero_free_values(fe_trial)
-  x̂ = zero_free_values(trial)
-
-  fesolver = get_fe_solver(solver)
-  odeparamcache = allocate_odeparamcache(fesolver,op,r,(y,))
-  rbcache = RBSteady.allocate_rbcache(fesolver,op,r,(y,))
-
-  cache = solver.cache
-  cache.fecache = (y,odeparamcache)
-  cache.rbcache = (x̂,rbcache)
-  return
-end
-
-function RBSteady.online_cache!(
-  solver::RBSolver,
-  op::TransientRBOperator,
-  r::TransientRealization)
-
-  cache = solver.cache
-  y,odeparamcache = cache.fecache
-  if param_length(r) != param_length(y)
-    RBSteady.init_online_cache!(solver,op,r)
-  else
-    odeparamcache = update_odecache!(odeparamcache,op,r)
-    cache.fecache = y,odeparamcache
-  end
-  return
-end
 
 function Algebra.solve(
   solver::RBSolver,

@@ -21,7 +21,7 @@ function allocate_paramcache(
 
   ptrial = get_trial(op.op)
   trial = evaluate(ptrial,μ)
-  fe_cache = allocate_feopcache(op.feop,μ,u)
+  fe_cache = allocate_feopcache(op.op,μ,u)
 
   if is_jac_constant(op.op)
     uh = EvaluationFunction(trial,u)
@@ -72,6 +72,9 @@ function Algebra.allocate_residual(
   b
 end
 
+fill_dvalues!(uh::SingleFieldParamFEFunction,z) = fill!(uh.dirichlet_values,z)
+fill_dvalues!(uh::MultiFieldParamFEFunction,z) = map(uhi->fill_dvalues!(uhi,z),uh.single_fe_functions)
+
 function Algebra.residual!(
   b::AbstractVector,
   op::ParamOpFromFEOp,
@@ -100,6 +103,10 @@ function Algebra.allocate_jacobian(
   μ::Realization,
   u::AbstractVector,
   paramcache)
+
+  if is_jac_constant(op.op)
+    return copy(paramcache.const_forms)
+  end
 
   uh = EvaluationFunction(paramcache.trial,u)
   trial = evaluate(get_trial(op.op),nothing)
@@ -164,7 +171,7 @@ function allocate_paramcache(
 
   ptrial = get_trial(op.op)
   trial = evaluate(ptrial,μ)
-  fe_cache = allocate_feopcache(op.feop,μ,u)
+  fe_cache = allocate_feopcache(op.op,μ,u)
 
   if is_jac_constant(op.op)
     uh = EvaluationFunction(trial,u)
@@ -201,13 +208,17 @@ function Algebra.allocate_residual(
   u::AbstractVector,
   paramcache)
 
+  uh = EvaluationFunction(paramcache.trial,u)
+  test = get_test(op.op)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(op.op,μ)
+
   res = get_res(op.op)
   dc = res(μ,uh,v)
-  b = contribution(op.op.trian_res) do trian
+  contribution(op.op.trian_res) do trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     allocate_vector(assem,vecdata)
   end
-  b
 end
 
 function Algebra.residual!(
@@ -232,13 +243,19 @@ function Algebra.residual!(
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     assemble_vector_add!(values,assem,vecdata)
   end
+
+  b
 end
 
 function Algebra.allocate_jacobian(
   op::ParamOpFromFEOpWithTrian,
-  u::AbstractVector,
   μ::Realization,
+  u::AbstractVector,
   paramcache)
+
+  if is_jac_constant(op.op)
+    return copy(paramcache.const_forms)
+  end
 
   uh = EvaluationFunction(paramcache.trial,u)
   trial = evaluate(get_trial(op.op),nothing)
@@ -249,7 +266,7 @@ function Algebra.allocate_jacobian(
 
   jac = get_jac(op.op)
   dc = jac(μ,uh,du,v)
-  const_jac = contribution(op.op.trian_jac) do trian
+  contribution(op.op.trian_jac) do trian
     matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
     allocate_matrix(assem,matdata)
   end
@@ -302,10 +319,10 @@ function allocate_paramcache(
   μ::Realization,
   u::AbstractVector)
 
-  paramcache = allocate_paramcache(get_nonlinear_operator(op.op),μ,u)
+  paramcache = allocate_paramcache(get_nonlinear_operator(op),μ,u)
   op_lin = get_linear_operator(op)
-  A_lin = assemble_jacobian(op_lin,μ,u,paramcache)
-  b_lin = assemble_residual(op_lin,μ,u,paramcache)
+  A_lin = jacobian(op_lin,μ,u,paramcache)
+  b_lin = residual(op_lin,μ,u,paramcache)
   return LinearNonlinearParamCache(paramcache,A_lin,b_lin)
 end
 
@@ -314,7 +331,7 @@ function update_paramcache!(
   μ::Realization,
   op::LinearNonlinearParamOpFromFEOp)
 
-  update_paramcache!(cache.paramcache,get_nonlinear_operator(op.op),μ)
+  update_paramcache!(cache.paramcache,get_nonlinear_operator(op),μ)
 end
 
 function Algebra.allocate_residual(
@@ -344,11 +361,10 @@ function Algebra.residual!(
   u::AbstractVector,
   cache)
 
-  A_lin = cache.A_lin
   b_lin = cache.b_lin
-  copy_entries!(b,b_lin)
-  residual!(b,get_nonlinear_operator(op.op),μ,u,paramcache;add=true)
-  mul!(b,A_lin,u,true,false)
+  paramcache = cache.paramcache
+  residual!(b,get_nonlinear_operator(op),μ,u,paramcache;add=true)
+  b
 end
 
 function ODEs.jacobian_add!(
@@ -356,9 +372,11 @@ function ODEs.jacobian_add!(
   op::LinearNonlinearParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
-  paramcache)
+  cache)
 
   A_lin = cache.A_lin
-  copy_entries!(A,A_lin)
-  jacobian_add!(A,get_nonlinear_operator(op.op),μ,u,paramcache)
+  paramcache = cache.paramcache
+  jacobian_add!(A,get_nonlinear_operator(op),μ,u,paramcache)
+  axpy!(1.0,A_lin,A)
+  A
 end

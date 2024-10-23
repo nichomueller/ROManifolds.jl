@@ -125,6 +125,7 @@ export SingleFieldRBSpace
 export MultiFieldRBSpace
 export EvalRBSpace
 export EvalMultiFieldRBSpace
+export RBParamVector
 export fe_subspace
 export reduced_fe_space
 export reduced_basis

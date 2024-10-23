@@ -68,20 +68,6 @@ to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
 innerlength(A::AbstractParamArray) = prod(innersize(A))
 inneraxes(A::AbstractParamArray) = Base.OneTo.(innersize(A))
 
-for op in (:+,:-)
-  @eval begin
-    function ($op)(A::AbstractParamArray,b::AbstractArray{<:Number})
-      B = ParamArray(b,param_length(A))
-      ($op)(A,B)
-    end
-
-    function ($op)(a::AbstractArray{<:Number},B::AbstractParamArray)
-      A = ParamArray(a,param_length(B))
-      ($op)(A,B)
-    end
-  end
-end
-
 # small hack, zero(::Type{<:AbstractArray}) is not implemented in Base
 function Base.zero(::Type{<:AbstractArray{T,N}}) where {T<:Number,N}
   zeros(T,tfill(1,Val{N}()))
@@ -89,13 +75,6 @@ end
 # small hack, one(::Type{<:AbstractArray}) is not implemented in Base
 function Base.one(::Type{<:AbstractArray{T,N}}) where {T<:Number,N}
   ones(T,tfill(1,Val{N}()))
-end
-
-function Base.fill!(A::AbstractParamArray,z::Number)
-  for a in A.data
-    fill!(a,z)
-  end
-  return A
 end
 
 # small hack, we shouldn't be able to fill an abstract array with a non-scalar
@@ -135,13 +114,6 @@ function LinearAlgebra.mul!(
   return C
 end
 
-function LinearAlgebra.rmul!(A::AbstractParamArray,b::Number)
-  @inbounds for i in param_eachindex(A)
-    rmul!(param_getindex(A,i),b)
-  end
-  return A
-end
-
 function (\)(A::AbstractParamMatrix,B::AbstractParamVector)
   TS = LinearAlgebra.promote_op(LinearAlgebra.matprod,eltype(A),eltype(B))
   C = similar(B,TS,axes(A,1))
@@ -149,14 +121,6 @@ function (\)(A::AbstractParamMatrix,B::AbstractParamVector)
     param_getindex(C,i) .= param_getindex(A,i)\param_getindex(B,i)
   end
   return C
-end
-
-function LinearAlgebra.axpy!(α::Number,A::AbstractParamArray,B::AbstractParamArray)
-  @check param_length(A) == param_length(B)
-  @inbounds for i in param_eachindex(A)
-    axpy!(α,param_getindex(A,i),param_getindex(B,i))
-  end
-  return B
 end
 
 function LinearAlgebra.dot(A::AbstractParamArray,B::AbstractParamArray)

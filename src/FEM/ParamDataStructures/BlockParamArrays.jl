@@ -31,8 +31,6 @@ end
 nblocks(A) = @abstractmethod
 nblocks(A::Union{BlockedUnitRange,BlockArray,BlockParamArray}) = length(blocks(A))
 
-eachnblock(A) = Base.OneTo(nblocks(A))
-
 @inline Base.size(A::BlockParamArray) = map(length,axes(A))
 Base.axes(A::BlockParamArray) = A.axes
 
@@ -138,12 +136,17 @@ function Base.similar(A::BlockParamArray{T,N},::Type{<:AbstractArray{T′,N}}) w
 end
 
 function Base.similar(A::BlockParamArray{T,N},::Type{S},axes::Vararg{BlockedUnitRange}) where {T,T′,N,S<:AbstractArray{T′,N}}
-  A′ = map(eachnblock(A)) do i
+  A′ = map(eachindex(blocks(A))) do i
     ai = blocks(A)[i]
     axi = map(ax -> blocks(ax)[i],axes)
     si = length.(axi)
     similar(ai,S,si)
   end
+  BlockParamArray(A′,A.axes)
+end
+
+function Base.copy(A::BlockParamArray)
+  A′ = map(copy,blocks(A))
   BlockParamArray(A′,A.axes)
 end
 

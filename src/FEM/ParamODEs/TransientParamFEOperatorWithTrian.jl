@@ -22,9 +22,9 @@ struct TransientParamFEOperatorWithTrian{T,N} <: TransientParamFEOperator{T}
 end
 
 function TransientParamFEOpFromWeakForm(args...)
-  args1...,trian_djac = args...
-  args2...,trian_jac = args1...
-  args3...,trian_res = args2...
+  args1...,trian_djac = args
+  args2...,trian_jac = args1
+  args3...,trian_res = args2
   op = TransientParamFEOpFromWeakForm(args3...)
   op_trian = TransientParamFEOperatorWithTrian(op,trian_res,(trian_jac,trian_djac))
   return op_trian
@@ -36,12 +36,12 @@ end
 
 FESpaces.get_test(op::TransientParamFEOperatorWithTrian) = get_test(op.op)
 FESpaces.get_trial(op::TransientParamFEOperatorWithTrian) = get_trial(op.op)
+ParamSteady.get_param_space(op::TransientParamFEOperatorWithTrian) = get_param_space(op.op)
 Polynomials.get_order(op::TransientParamFEOperatorWithTrian) = get_order(op.op)
 ODEs.get_res(op::TransientParamFEOperatorWithTrian) = get_res(op.op)
 ODEs.get_jacs(op::TransientParamFEOperatorWithTrian) = get_jacs(op.op)
 ODEs.get_assembler(op::TransientParamFEOperatorWithTrian) = get_assembler(op.op)
 IndexMaps.get_index_map(op::TransientParamFEOperatorWithTrian) = get_index_map(op.op)
-ParamDataStructures.realization(op::TransientParamFEOperatorWithTrian;kwargs...) = realization(op.op;kwargs...)
 
 function ODEs.is_form_constant(op::TransientParamFEOperatorWithTrian,k::Integer)
   is_form_constant(op.op,k)

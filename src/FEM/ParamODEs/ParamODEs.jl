@@ -10,7 +10,7 @@ using Gridap.CellData
 using Gridap.FESpaces
 using Gridap.MultiField
 using Gridap.ODEs
-using Gridap.ReferenceFEs
+using Gridap.Polynomials
 using Gridap.Helpers
 
 using ReducedOrderModels.Utils

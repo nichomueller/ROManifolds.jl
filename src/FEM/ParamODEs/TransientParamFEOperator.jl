@@ -53,9 +53,9 @@ function ODEs.get_forms(feop::TransientParamFEOperator)
   ()
 end
 
-ODEs.get_res(op::TransientFEOperator) = @abstractmethod
+ODEs.get_res(op::TransientParamFEOperator) = @abstractmethod
 
-ODEs.get_jacs(op::TransientFEOperator) = @abstractmethod
+ODEs.get_jacs(op::TransientParamFEOperator) = @abstractmethod
 
 function ODEs.is_form_constant(feop::TransientParamFEOperator,k::Integer)
   false
@@ -134,12 +134,12 @@ end
 
 FESpaces.get_test(op::TransientParamFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamFEOpFromWeakForm) = op.trial
+ParamSteady.get_param_space(op::TransientParamFEOpFromWeakForm) = op.tpspace
 Polynomials.get_order(op::TransientParamFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::TransientParamFEOpFromWeakForm) = op.index_map
-ParamDataStructures.realization(op::TransientParamFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 
 """
     struct TransientParamSemilinearFEOpFromWeakForm <: TransientParamFEOperator{SemilinearParamODE} end
@@ -232,12 +232,12 @@ end
 
 FESpaces.get_test(op::TransientParamSemilinearFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamSemilinearFEOpFromWeakForm) = op.trial
+ParamSteady.get_param_space(op::TransientParamSemilinearFEOpFromWeakForm) = op.tpspace
 Polynomials.get_order(op::TransientParamSemilinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamSemilinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamSemilinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamSemilinearFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::TransientParamSemilinearFEOpFromWeakForm) = op.index_map
-ParamDataStructures.realization(op::TransientParamSemilinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 
 function ODEs.is_form_constant(op::TransientParamSemilinearFEOpFromWeakForm,k::Integer)
   (k == get_order(op)+1) && op.constant_mass
@@ -296,12 +296,12 @@ end
 
 FESpaces.get_test(op::TransientParamLinearFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamLinearFEOpFromWeakForm) = op.trial
+ParamSteady.get_param_space(op::TransientParamLinearFEOpFromWeakForm) = op.tpspace
 Polynomials.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::TransientParamLinearFEOpFromWeakForm) = op.index_map
-ParamDataStructures.realization(op::TransientParamLinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 
 function ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer)
   op.constant_forms[k]

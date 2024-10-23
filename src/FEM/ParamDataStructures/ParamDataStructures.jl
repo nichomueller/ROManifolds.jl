@@ -100,7 +100,6 @@ export BlockParamMatrix
 export BlockConsecutiveParamVector
 export BlockConsecutiveParamMatrix
 export nblocks
-export eachnblock
 include("BlockParamArrays.jl")
 
 include("ParamBroadcasts.jl")

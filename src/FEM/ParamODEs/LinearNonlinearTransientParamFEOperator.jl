@@ -30,6 +30,11 @@ function FESpaces.get_trial(op::LinearNonlinearTransientParamFEOperator)
   get_trial(op.op_linear)
 end
 
+function ParamSteady.get_param_space(op::LinearNonlinearTransientParamFEOperator)
+  @check get_param_space(op.op_linear) === get_param_space(op.op_nonlinear)
+  get_param_space(op.op_linear)
+end
+
 function IndexMaps.get_index_map(op::LinearNonlinearTransientParamFEOperator)
   @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
   @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))

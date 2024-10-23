@@ -34,7 +34,7 @@ g_0(μ) = x->g_0(x,μ)
 gμ_0(μ) = ParamFunction(g_0,μ)
 
 stiffness(μ,(u,p),(v,q),dΩ) = ∫(aμ(μ)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
-res(μ,(u,p),(v,q),dΩ) = (-1)*stiffness(μ,(u,p),(v,q),dΩ)
+res(μ,(u,p),(v,q),dΩ) = stiffness(μ,(u,p),(v,q),dΩ)
 
 trian_res = (Ω,)
 trian_stiffness = (Ω,)
@@ -66,7 +66,7 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon)
-perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,μon)
+perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 
 # GRIDAP
 
@@ -86,3 +86,6 @@ feop′ = AffineFEOperator(stiffness′,res′,X,Y)
 uh,ph = solve(feop′)
 u = get_free_dof_values(uh)
 p = get_free_dof_values(ph)
+
+u ≈ fesnaps[1][:,1]
+p ≈ fesnaps[2][:,1]

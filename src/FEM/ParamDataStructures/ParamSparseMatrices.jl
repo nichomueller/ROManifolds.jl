@@ -46,6 +46,21 @@ function LinearAlgebra.fillstored!(A::ParamSparseMatrix,z::AbstractMatrix{<:Numb
   return A
 end
 
+function Base.fill!(A::ParamSparseMatrix,z::Number)
+  fill!(get_all_data(A),z)
+  return A
+end
+
+function LinearAlgebra.rmul!(A::ParamSparseMatrix,b::Number)
+  rmul!(get_all_data(A),b)
+  return A
+end
+
+function LinearAlgebra.axpy!(α::Number,A::ParamSparseMatrix,B::ParamSparseMatrix)
+  axpy!(α,get_all_data(A),get_all_data(B))
+  return B
+end
+
 # small hack
 Base.iszero(A::ParamSparseMatrix) = (nnz(A) == 0)
 
@@ -136,7 +151,7 @@ function ConsecutiveParamSparseMatrixCSC(a::AbstractVector{<:SparseMatrixCSC{Tv}
   ConsecutiveParamSparseMatrixCSC(m,n,colptr,rowval,data)
 end
 
-function param_array(a::SparseMatrixCSC,l::Integer;copy=false)
+function param_array(a::SparseMatrixCSC,l::Integer)
   outer = (1,1,l)
   data = repeat(nonzeros(a);outer)
   !copy && LinearAlgebra.fillstored!(data,zero(eltype(a)))
@@ -155,6 +170,21 @@ Base.@propagate_inbounds function Base.getindex(A::ConsecutiveParamSparseMatrixC
   else
     spzeros(innersize(A))
   end
+end
+
+function Base.similar(A::ConsecutiveParamSparseMatrixCSC)
+  ConsecutiveParamSparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,similar(A.data))
+end
+
+function Base.copy(A::ConsecutiveParamSparseMatrixCSC)
+  ConsecutiveParamSparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,copy(A.data))
+end
+
+function Base.copyto!(A::ConsecutiveParamSparseMatrixCSC,B::ConsecutiveParamSparseMatrixCSC)
+  @check size(A)==size(B)
+  copyto!(A.colptr,B.colptr)
+  copyto!(A.rowval,B.rowval)
+  copyto!(A.data,B.data)
 end
 
 struct GenericParamSparseMatrixCSC{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSC{Tv,Ti,L}
@@ -221,6 +251,22 @@ function Base.getindex(A::GenericParamSparseMatrixCSC{Tv},i::Integer,j::Integer)
   end
 end
 
+function Base.similar(A::GenericParamSparseMatrixCSC)
+  GenericParamSparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,similar(A.data),A.ptrs)
+end
+
+function Base.copy(A::GenericParamSparseMatrixCSC)
+  GenericParamSparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,copy(A.data),A.ptrs)
+end
+
+function Base.copyto!(A::GenericParamSparseMatrixCSC,B::GenericParamSparseMatrixCSC)
+  @check size(A)==size(B)
+  copyto!(A.colptr,B.colptr)
+  copyto!(A.rowval,B.rowval)
+  copyto!(A.data,B.data)
+  copyto!(A.ptrs,B.ptrs)
+end
+
 # CSR FORMAT
 
 abstract type ParamSparseMatrixCSR{Bi,Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSR{Bi,Tv,Ti}} end
@@ -279,7 +325,7 @@ function ConsecutiveParamSparseMatrixCSR(a::AbstractVector{<:SparseMatrixCSR{Bi,
   ConsecutiveParamSparseMatrixCSR{1}(m,n,rowptr,colval,data)
 end
 
-function param_array(a::SparseMatrixCSR,l::Integer;copy=false)
+function param_array(a::SparseMatrixCSR,l::Integer)
   outer = (1,1,l)
   data = repeat(nonzeros(a);outer)
   !copy && LinearAlgebra.fillstored!(data,zero(eltype(a)))
@@ -291,13 +337,28 @@ end
 
 ArraysOfArrays.innersize(A::ConsecutiveParamSparseMatrixCSR) = (A.m,A.n)
 
-Base.@propagate_inbounds function Base.getindex(A::ConsecutiveParamSparseMatrixCSR,i::Integer,j::Integer)
+Base.@propagate_inbounds function Base.getindex(A::ConsecutiveParamSparseMatrixCSR{Bi},i::Integer,j::Integer) where Bi
   @boundscheck checkbounds(A,i,j)
   if i == j
-    SparseMatrixCSR(A.m,A.n,A.rowptr,A.colval,getindex(A.data,:,i))
+    SparseMatrixCSR{Bi}(A.m,A.n,A.rowptr,A.colval,getindex(A.data,:,i))
   else
     spzeros(innersize(A))
   end
+end
+
+function Base.similar(A::ConsecutiveParamSparseMatrixCSR{Bi}) where Bi
+  ConsecutiveParamSparseMatrixCSR{Bi}(A.m,A.n,A.rowptr,A.colval,similar(A.data))
+end
+
+function Base.copy(A::ConsecutiveParamSparseMatrixCSR{Bi}) where Bi
+  ConsecutiveParamSparseMatrixCSR{Bi}(A.m,A.n,A.rowptr,A.colval,copy(A.data))
+end
+
+function Base.copyto!(A::ConsecutiveParamSparseMatrixCSR,B::ConsecutiveParamSparseMatrixCSR)
+  @check size(A)==size(B)
+  copyto!(A.rowptr,B.rowptr)
+  copyto!(A.colval,B.colval)
+  copyto!(A.data,B.data)
 end
 
 struct GenericParamSparseMatrixCSR{Bi,Tv,Ti<:Integer,L} <: ParamSparseMatrixCSR{Bi,Tv,Ti,L}
@@ -349,7 +410,7 @@ end
 
 ArraysOfArrays.innersize(A::GenericParamSparseMatrixCSR) = (A.m,A.n)
 
-function Base.getindex(A::GenericParamSparseMatrixCSR{Tv},i::Integer,j::Integer) where Tv
+function Base.getindex(A::GenericParamSparseMatrixCSR{Bi,Tv},i::Integer,j::Integer) where {Bi,Tv}
   @boundscheck checkbounds(A,i,j)
   if i == j
     u = one(eltype(A.ptrs))
@@ -358,10 +419,26 @@ function Base.getindex(A::GenericParamSparseMatrixCSR{Tv},i::Integer,j::Integer)
     rowptr = A.rowptr[pini:pend]
     colval = A.colval[pini:pend]
     data = A.data[pini:pend]
-    SparseMatrixCSR(A.m,A.n,rowptr,colval,data)
+    SparseMatrixCSR{Bi}(A.m,A.n,rowptr,colval,data)
   else
     fill(zero(Tv),nrow,ncol)
   end
+end
+
+function Base.similar(A::GenericParamSparseMatrixCSR{Bi}) where Bi
+  GenericParamSparseMatrixCSC{Bi}(A.m,A.n,A.rowptr,A.colval,similar(A.data),A.ptrs)
+end
+
+function Base.copy(A::GenericParamSparseMatrixCSR{Bi}) where Bi
+  GenericParamSparseMatrixCSC{Bi}(A.m,A.n,A.rowptr,A.colval,copy(A.data),A.ptrs)
+end
+
+function Base.copyto!(A::GenericParamSparseMatrixCSR,B::GenericParamSparseMatrixCSR)
+  @check size(A)==size(B)
+  copyto!(A.rowptr,B.rowptr)
+  copyto!(A.colval,B.colval)
+  copyto!(A.data,B.data)
+  copyto!(A.ptrs,B.ptrs)
 end
 
 # utils
