@@ -124,6 +124,7 @@ r0 = ParamDataStructures.get_at_time(r,:initial)
 
 U = trial(r0)
 u = zero_free_values(U)
+# fill!(u,1.0)
 us0 = (u,)
 
 cache = ParamODEs.allocate_odeparamcache(solver,odeop,r0,us0)
@@ -142,10 +143,54 @@ fill!(x,zero(eltype(x)))
 ws = (dtθ,1)
 
 # update
-shift!(r,dtθ)
+shift!(r0,dtθ)
+using ReducedOrderModels.ParamSteady
 us(x) = (w0,x)
-update_paramcache!(paramcache,odeop,r)
-stageop = ParamStageOperator(odeop,odeparamcache,r,us,ws)
-# sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
-A = jacobian(stageop,x)
-b = residual(stageop,x)
+update_paramcache!(paramcache,odeop,r0)
+stageop = ParamStageOperator(odeop,odeparamcache,r0,us,ws)
+sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
+# A = jacobian(stageop,x)
+# b = residual(stageop,x)
+statef = ODEs._udate_theta!(statef,state0,dt,x)
+shift!(r0,dt*(1-θ))
+
+shift!(r0,dtθ)
+cache = stageop.cache.paramcache
+usx = stageop.us(w0)
+residual!(b,stageop.op,r0,usx,cache)
+
+
+
+
+
+
+
+
+# gridap
+
+μ1 = μ[1].params
+
+a′(x,t) = a(x,μ1,t)
+a′(t) = x -> a′(x,t)
+f′(x,t) = f(x,μ1,t)
+f′(t) = x -> f′(x,t)
+g′(x,t) = g(x,μ1,t)
+g′(t) = x -> g′(x,t)
+h′(x,t) = h(x,μ1,t)
+h′(t) = x -> h′(x,t)
+
+stiffness′(t,u,v) = ∫(a′(t)*∇(v)⋅∇(u))dΩ
+mass′(t,uₜ,v) = ∫(v*uₜ)dΩ
+rhs′(t,v) = ∫(f′(t)*v)dΩ + ∫(h′(t)*v)dΓn
+
+trial′ = TransientTrialFESpace(test,g′)
+feop′ = TransientLinearFEOperator((stiffness′,mass′),rhs′,trial′,test)
+
+uh0′ = interpolate_everywhere(x -> u0(x,μ1),trial′)
+
+uh = solve(fesolver,feop′,t0,tf,uh0′)
+
+S = Vector{Float64}[]
+for (tn,un) in uh
+  push!(S,copy(get_free_dof_values(un)))
+end

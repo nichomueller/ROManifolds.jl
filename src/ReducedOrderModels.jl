@@ -297,6 +297,7 @@ export SparseSnapshots
 export UnfoldingSteadySnapshots
 export BlockSnapshots
 export Snapshots
+export get_realization
 export flatten_snapshots
 export select_snapshots
 export get_indexed_values

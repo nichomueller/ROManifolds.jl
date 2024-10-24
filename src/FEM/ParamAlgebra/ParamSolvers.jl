@@ -50,7 +50,7 @@ function Algebra.solve!(
   x::AbstractParamVector,
   ls::LinearSolver,
   op::NonlinearOperator,
-  cache)
+  cache::Algebra.LinearSolverCache)
 
   fill!(x,zero(eltype(x)))
   b = cache.b

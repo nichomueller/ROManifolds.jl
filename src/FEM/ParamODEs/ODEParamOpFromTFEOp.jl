@@ -135,6 +135,45 @@ function ODEs.jacobian_add!(
   A
 end
 
+function ODEs.jacobian_add!(
+  A::AbstractMatrix,
+  odeop::ODEParamOpFromTFEOp{LinearParamODE},
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}},
+  cache::ParamOpSysCache)
+
+  paramcache = cache.paramcache
+  uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
+  trial = evaluate(get_trial(odeop.op),nothing)
+  du = get_trial_fe_basis(trial)
+  test = get_test(odeop.op)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(odeop.op,r)
+
+  μ,t = get_params(r),get_times(r)
+
+  jacs = get_jacs(odeop.op)
+  dc = DomainContribution()
+  for k in 1:get_order(odeop)+1
+    w = ws[k]
+    iszero(w) && continue
+    if is_form_constant(odeop,k)
+      axpy_entries!(w,cache.A[k],A)
+    else
+      jac = jacs[k]
+      dc = dc + w * jac(μ,t,uh,du,v)
+    end
+  end
+
+  if num_domains(dc) > 0
+    matdata = collect_cell_matrix(trial,test,dc)
+    assemble_matrix_add!(A,assem,matdata)
+  end
+
+  A
+end
+
 function ParamSteady.allocate_systemcache(
   odeop::ODEParamOperator{LinearParamODE},
   r::TransientRealization,
@@ -321,6 +360,47 @@ function ODEs.jacobian_add!(
       map(A.values,trian_jac) do values,trian
         matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
         assemble_matrix_add!(values,assem,matdata)
+      end
+    end
+  end
+
+  As
+end
+
+function ODEs.jacobian_add!(
+  As::TupOfArrayContribution,
+  odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}},
+  cache::ParamOpSysCache)
+
+  paramcache = cache.paramcache
+  uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
+  trial = evaluate(get_trial(odeop.op),nothing)
+  du = get_trial_fe_basis(trial)
+  test = get_test(odeop.op)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(odeop.op,r)
+
+  μ,t = get_params(r),get_times(r)
+
+  jacs = get_jacs(odeop.op)
+  for k in 1:get_order(odeop)+1
+    A = As[k]
+    w = ws[k]
+    iszero(w) && continue
+    if is_form_constant(odeop,k)
+      axpy_entries!(w,cache.A[k],A)
+    else
+      jac = jacs[k]
+      trian_jac = odeop.op.trian_jacs[k]
+      dc = w * jac(μ,t,uh,du,v)
+      if num_domains(dc) > 0
+        map(A.values,trian_jac) do values,trian
+          matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
+          assemble_matrix_add!(values,assem,matdata)
+        end
       end
     end
   end

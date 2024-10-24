@@ -65,13 +65,11 @@ function Algebra.residual!(
   lop::ParamStageOperator{LinearParamODE},
   x::AbstractParamVector)
 
-  cache = lop.cache
+  op = lop.op
+  cache = lop.cache.paramcache
+  r = lop.r
   usx = lop.us(x)
-  for k in 1:get_order(lop.op)+1
-    mul!(b,cache.A[k],usx[k],1,1)
-  end
-  axpy!(1,cache.b,b)
-  b
+  residual!(b,op,r,usx,cache)
 end
 
 function Algebra.allocate_jacobian(
@@ -80,7 +78,6 @@ function Algebra.allocate_jacobian(
 
   cache = lop.cache
   A = copy(first(cache.A))
-  LinearAlgebra.fillstored!(A,zero(eltype(A)))
   A
 end
 
@@ -89,9 +86,27 @@ function Algebra.jacobian!(
   lop::ParamStageOperator{LinearParamODE},
   x::AbstractParamVector)
 
+  op = lop.op
   cache = lop.cache
-  for k in 1:get_order(lop.op)+1
-    axpy!(1,cache.A[k],A)
-  end
-  A
+  r = lop.r
+  usx = lop.us(x)
+  ws = lop.ws
+  jacobian!(A,op,r,usx,ws,cache)
+end
+
+function Algebra.solve!(
+  x::AbstractParamVector,
+  ls::LinearSolver,
+  lop::ParamStageOperator{LinearParamODE},
+  cache::Algebra.LinearSolverCache)
+
+  fill!(x,zero(eltype(x)))
+  b = cache.b
+  A = cache.A
+  ns = cache.ns
+  residual!(b,lop,x)
+  rmul!(b,-1)
+  jacobian!(A,lop,x)
+  ns = solve!(x,ls,A,b)
+  cache
 end

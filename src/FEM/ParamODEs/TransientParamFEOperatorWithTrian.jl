@@ -45,6 +45,7 @@ Polynomials.get_order(op::TransientParamFEOperatorWithTrian) = get_order(op.op)
 ODEs.get_res(op::TransientParamFEOperatorWithTrian) = get_res(op.op)
 ODEs.get_jacs(op::TransientParamFEOperatorWithTrian) = get_jacs(op.op)
 ODEs.get_assembler(op::TransientParamFEOperatorWithTrian) = get_assembler(op.op)
+ODEs.is_form_constant(op::TransientParamFEOperatorWithTrian,k::Integer) = is_form_constant(op.op,k)
 IndexMaps.get_index_map(op::TransientParamFEOperatorWithTrian) = get_index_map(op.op)
 
 # utils

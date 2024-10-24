@@ -182,6 +182,7 @@ Polynomials.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
+ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer) = op.constant_forms[k]
 IndexMaps.get_index_map(op::TransientParamLinearFEOpFromWeakForm) = op.index_map
 
 function test_transient_fe_operator(op::TransientParamFEOperator,uh,μt)
