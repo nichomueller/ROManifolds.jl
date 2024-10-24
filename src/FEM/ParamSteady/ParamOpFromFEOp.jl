@@ -6,53 +6,6 @@ end
 
 get_fe_operator(op::ParamOpFromFEOp) = op.op
 
-"""
-    allocate_paramcache(op::ParamOpFromFEOp,μ::Realization,u::AbstractVector
-      ) -> CacheType
-
-Similar to [`allocate_odeparamcache`](@ref) in [`Gridap`](@ref), when dealing with steady
-parametric problems
-
-"""
-function allocate_paramcache(
-  op::ParamOpFromFEOp,
-  μ::Realization,
-  u::AbstractVector)
-
-  ptrial = get_trial(op.op)
-  trial = evaluate(ptrial,μ)
-  fe_cache = allocate_feopcache(op.op,μ,u)
-
-  if is_jac_constant(op.op)
-    uh = EvaluationFunction(trial,u)
-    test = get_test(op.op)
-    v = get_fe_basis(test)
-    du = get_trial_fe_basis(trial)
-    assem = get_param_assembler(op.op,μ)
-
-    jac = get_jac(op.op)
-    matdata = collect_cell_matrix(trial,test,jac(μ,uh,du,v))
-    const_jac = assemble_matrix(assem,matdata)
-  else
-    const_jac = nothing
-  end
-
-  ParamCache(trial,ptrial,fe_cache,const_jac)
-end
-
-"""
-    update_paramcache!(paramcache, op::ParamOpFromFEOp, μ::Realization, u::AbstractVector
-      ) -> CacheType
-
-Similar to [`update_odeparamcache!`](@ref) in [`Gridap`](@ref), when dealing with steady
-parametric problems
-
-"""
-function update_paramcache!(paramcache,μ::Realization,op::ParamOpFromFEOp)
-  paramcache.trial = evaluate!(paramcache.trial,paramcache.ptrial,μ)
-  paramcache
-end
-
 function Algebra.allocate_residual(
   op::ParamOpFromFEOp,
   μ::Realization,
@@ -71,9 +24,6 @@ function Algebra.allocate_residual(
 
   b
 end
-
-fill_dvalues!(uh::SingleFieldParamFEFunction,z) = fill!(uh.dirichlet_values,z)
-fill_dvalues!(uh::MultiFieldParamFEFunction,z) = map(uhi->fill_dvalues!(uhi,z),uh.single_fe_functions)
 
 function Algebra.residual!(
   b::AbstractVector,
@@ -104,10 +54,6 @@ function Algebra.allocate_jacobian(
   u::AbstractVector,
   paramcache)
 
-  if is_jac_constant(op.op)
-    return copy(paramcache.const_forms)
-  end
-
   uh = EvaluationFunction(paramcache.trial,u)
   trial = evaluate(get_trial(op.op),nothing)
   du = get_trial_fe_basis(trial)
@@ -128,10 +74,6 @@ function ODEs.jacobian_add!(
   μ::Realization,
   u::AbstractVector,
   paramcache)
-
-  if is_jac_constant(op.op)
-    return paramcache.const_forms
-  end
 
   uh = EvaluationFunction(paramcache.trial,u)
   trial = evaluate(get_trial(op.op),nothing)
@@ -162,44 +104,6 @@ end
 
 function change_triangulation(op::ParamOpFromFEOpWithTrian,trians_rhs,trians_lhs)
   ParamOpFromFEOpWithTrian(change_triangulation(op.op,trians_rhs,trians_lhs))
-end
-
-function allocate_paramcache(
-  op::ParamOpFromFEOpWithTrian,
-  μ::Realization,
-  u::AbstractVector)
-
-  ptrial = get_trial(op.op)
-  trial = evaluate(ptrial,μ)
-  fe_cache = allocate_feopcache(op.op,μ,u)
-
-  if is_jac_constant(op.op)
-    uh = EvaluationFunction(trial,u)
-    test = get_test(op.op)
-    v = get_fe_basis(test)
-    du = get_trial_fe_basis(trial)
-    assem = get_param_assembler(op.op,μ)
-
-    jac = get_jac(op.op)
-    dc = jac(μ,uh,du,v)
-    const_jac = contribution(op.op.trian_jac) do trian
-      matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
-      assemble_matrix(assem,matdata)
-    end
-  else
-    const_jac = nothing
-  end
-
-  ParamCache(trial,ptrial,fe_cache,const_jac)
-end
-
-function update_paramcache!(
-  paramcache,
-  μ::Realization,
-  op::ParamOpFromFEOpWithTrian)
-
-  paramcache.trial = evaluate!(paramcache.trial,paramcache.ptrial,μ)
-  paramcache
 end
 
 function Algebra.allocate_residual(
@@ -253,10 +157,6 @@ function Algebra.allocate_jacobian(
   u::AbstractVector,
   paramcache)
 
-  if is_jac_constant(op.op)
-    return copy(paramcache.const_forms)
-  end
-
   uh = EvaluationFunction(paramcache.trial,u)
   trial = evaluate(get_trial(op.op),nothing)
   du = get_trial_fe_basis(trial)
@@ -278,10 +178,6 @@ function ODEs.jacobian_add!(
   μ::Realization,
   u::AbstractVector,
   paramcache)
-
-  if is_jac_constant(op.op)
-    return paramcache.const_forms
-  end
 
   uh = EvaluationFunction(paramcache.trial,u)
   trial = evaluate(get_trial(op.op),nothing)
@@ -319,17 +215,19 @@ function allocate_paramcache(
   μ::Realization,
   u::AbstractVector)
 
-  paramcache = allocate_paramcache(get_nonlinear_operator(op),μ,u)
   op_lin = get_linear_operator(op)
-  A_lin = jacobian(op_lin,μ,u,paramcache)
-  b_lin = residual(op_lin,μ,u,paramcache)
-  return ParamSystemCache(paramcache,A_lin,b_lin)
+  op_nlin = get_nonlinear_operator(op)
+
+  paramcache = allocate_paramcache(op_nlin,μ,u)
+  A_lin,b_lin = allocate_systemcache(op_lin,μ,u,paramcache)
+
+  return ParamOpSysCache(paramcache,A_lin,b_lin)
 end
 
 function update_paramcache!(
   cache,
-  μ::Realization,
-  op::LinearNonlinearParamOpFromFEOp)
+  op::LinearNonlinearParamOpFromFEOp,
+  μ::Realization)
 
   update_paramcache!(cache.paramcache,get_nonlinear_operator(op),μ)
 end

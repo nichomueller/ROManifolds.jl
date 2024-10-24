@@ -21,23 +21,19 @@ struct ParamFEOperatorWithTrian{T} <: ParamFEOperator{T}
   end
 end
 
-for f in (:ParamFEOperator,:LinearParamFEOperator)
-  @eval begin
-    function $f(
-      res::Function,
-      jac::Function,
-      pspace::ParamSpace,
-      trial::FESpace,
-      test::FESpace,
-      trian_res,
-      trian_jac;
-      kwargs...)
+function ParamFEOperator(
+  res::Function,
+  jac::Function,
+  pspace::ParamSpace,
+  trial::FESpace,
+  test::FESpace,
+  trian_res,
+  trian_jac;
+  kwargs...)
 
-      op = $f(res,jac,pspace,trial,test;kwargs...)
-      op_trian = ParamFEOperatorWithTrian(op,trian_res,trian_jac)
-      return op_trian
-    end
-  end
+  op = ParamFEOperator(res,jac,pspace,trial,test;kwargs...)
+  op_trian = ParamFEOperatorWithTrian(op,trian_res,trian_jac)
+  return op_trian
 end
 
 FESpaces.get_test(op::ParamFEOperatorWithTrian) = get_test(op.op)
@@ -47,7 +43,6 @@ ODEs.get_res(op::ParamFEOperatorWithTrian) = get_res(op.op)
 get_jac(op::ParamFEOperatorWithTrian) = get_jac(op.op)
 ODEs.get_assembler(op::ParamFEOperatorWithTrian) = get_assembler(op.op)
 IndexMaps.get_index_map(op::ParamFEOperatorWithTrian) = get_index_map(op.op)
-is_jac_constant(op::ParamFEOperatorWithTrian) = is_jac_constant(op.op)
 
 function FESpaces.get_algebraic_operator(op::ParamFEOperatorWithTrian)
   ParamOpFromFEOpWithTrian(op)
@@ -79,18 +74,11 @@ function _set_triangulation_res(
   return newres
 end
 
-function set_triangulation(op::ParamFEOpFromWeakForm,trian_res,trian_jac)
+function set_triangulation(op::ParamFEOpFromWeakForm{T},trian_res,trian_jac) where T
   polyn_order = get_polynomial_order(op.test)
   newres = _set_triangulation_res(op.res,trian_res,polyn_order)
   newjac = _set_triangulation_jac(op.jac,trian_jac,polyn_order)
-  ParamFEOpFromWeakForm(newres,newjac,op.pspace,op.assem,op.index_map,op.trial,op.test)
-end
-
-function set_triangulation(op::LinearParamFEOpFromWeakForm,trian_res,trian_jac)
-  polyn_order = get_polynomial_order(op.test)
-  newres = _set_triangulation_res(op.res,trian_res,polyn_order)
-  newjac = _set_triangulation_jac(op.jac,trian_jac,polyn_order)
-  LinearParamFEOpFromWeakForm(newres,newjac,op.pspace,op.constant_jac,op.assem,op.index_map,op.trial,op.test)
+  ParamFEOpFromWeakForm{T}(newres,newjac,op.pspace,op.assem,op.index_map,op.trial,op.test)
 end
 
 """

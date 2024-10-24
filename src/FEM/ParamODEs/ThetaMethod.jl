@@ -8,9 +8,10 @@ function allocate_odeparamcache(
 
   u0 = us0[1]
   us0N = (u0,u0)
-  paramcache = allocate_paramcache(odeop,r0,us0N)
   uθ = copy(u0)
-  (uθ,paramcache)
+  paramcache = allocate_paramcache(odeop,r0,us0N)
+  sysslvrcache = nothing
+  (uθ,paramcache,sysslvrcache)
 end
 
 function ODEs.ode_march!(
@@ -19,10 +20,10 @@ function ODEs.ode_march!(
   odeop::ODEParamOperator,
   r::TransientRealization,
   state0::NTuple{1,AbstractVector},
-  odeparamcache)
+  cache)
 
   u0 = state0[1]
-  uθ,paramcache = odeparamcache
+  uθ,paramcache,sysslvrcache = cache
   sysslvr = solver.sysslvr
   dt,θ = solver.dt,solver.θ
   dtθ = θ*dt
@@ -37,13 +38,13 @@ function ODEs.ode_march!(
     (uθ,x)
   end
   update_paramcache!(paramcache,odeop,r)
-  stageop = NonlinearParamStageOperator(odeop,paramcache,r,us,ws)
+  stageop = ParamStageOperator(odeop,paramcache,r,us,ws)
   sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
   statef = ODEs._udate_theta!(statef,state0,dt,x)
   shift!(r,dt*(1-θ))
 
-  odeparamcache = (uθ,paramcache)
-  (r,statef,odeparamcache)
+  cache = (uθ,paramcache,sysslvrcache)
+  (r,statef,cache)
 end
 
 function Algebra.residual(
@@ -103,12 +104,16 @@ function allocate_odeparamcache(
   u0 = us0[1]
   us0N = (u0,u0)
 
-  paramcache = allocate_paramcache(odeop,r0,us0N)
-  A = allocate_jacobian(odeop,r0,us0N,paramcache)
-  b = allocate_residual(odeop,r0,us0N,paramcache)
-  odeparamcache = ParamSystemCache(paramcache,A,b)
+  dt,θ = solver.dt,solver.θ
+  dtθ = θ*dt
+  ws = (dtθ,1)
 
-  odeparamcache
+  paramcache = allocate_paramcache(odeop,r0,us0N)
+  A,b = allocate_systemcache(odeop,r0,us0N,ws,paramcache)
+  odeparamcache = ParamOpSysCache(paramcache,A,b)
+  sysslvrcache = nothing
+
+  (odeparamcache,sysslvrcache)
 end
 
 function ODEs.ode_march!(
@@ -117,9 +122,10 @@ function ODEs.ode_march!(
   odeop::ODEParamOperator{LinearParamODE},
   r::TransientRealization,
   state0::NTuple{1,AbstractVector},
-  odeparamcache::ParamSystemCache)
+  cache)
 
   u0 = state0[1]
+  odeparamcache,sysslvrcache = cache
   paramcache = odeparamcache.paramcache
 
   sysslvr = solver.sysslvr
@@ -138,7 +144,8 @@ function ODEs.ode_march!(
   statef = ODEs._udate_theta!(statef,state0,dt,x)
   shift!(r,dt*(1-θ))
 
-  (r,statef,odeparamcache)
+  cache = (odeparamcache,sysslvrcache)
+  (r,statef,cache)
 end
 
 function Algebra.residual(
@@ -195,9 +202,9 @@ function allocate_odeparamcache(
   uθ = copy(u0)
 
   lop = get_linear_operator(odeop)
-  odeparamcache = allocate_odeparamcache(solver,lop,r0,us0)
+  odeparamcache,sysslvrcache = allocate_odeparamcache(solver,lop,r0,us0)
 
-  (uθ,odeparamcache)
+  (uθ,odeparamcache,sysslvrcache)
 end
 
 function ODEs.ode_march!(
@@ -209,7 +216,7 @@ function ODEs.ode_march!(
   cache)
 
   u0 = state0[1]
-  uθ,odeparamcache = cache
+  uθ,odeparamcache,sysslvrcache = cache
   paramcache = odeparamcache.paramcache
 
   sysslvr = solver.sysslvr
@@ -232,5 +239,6 @@ function ODEs.ode_march!(
   statef = ODEs._udate_theta!(statef,state0,dt,x)
   shift!(r,dt*(1-θ))
 
+  cache = (uθ,odeparamcache,sysslvrcache)
   (r,statef,cache)
 end

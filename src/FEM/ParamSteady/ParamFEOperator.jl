@@ -48,8 +48,6 @@ function ParamFESpaces.get_param_assembler(op::ParamFEOperator,r::AbstractRealiz
   get_param_assembler(get_assembler(op),r)
 end
 
-is_jac_constant(op::ParamFEOperator) = false
-
 IndexMaps.get_index_map(op::ParamFEOperator) = @abstractmethod
 IndexMaps.get_vector_index_map(op::ParamFEOperator) = get_vector_index_map(get_index_map(op))
 IndexMaps.get_matrix_index_map(op::ParamFEOperator) = get_matrix_index_map(get_index_map(op))
@@ -92,7 +90,7 @@ end
 Most standard instance of ParamFEOperator{T}
 
 """
-struct ParamFEOpFromWeakForm <: ParamFEOperator{NonlinearParamEq}
+struct ParamFEOpFromWeakForm{T} <: ParamFEOperator{T}
   res::Function
   jac::Function
   pspace::ParamSpace
@@ -107,7 +105,16 @@ function ParamFEOperator(
 
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
-  ParamFEOpFromWeakForm(res,jac,pspace,assem,index_map,trial,test)
+  ParamFEOpFromWeakForm{NonlinearParamEq}(res,jac,pspace,assem,index_map,trial,test)
+end
+
+function LinearParamFEOperator(
+  res::Function,jac::Function,pspace,trial,test)
+
+  jac′(μ,u,du,v,args...) = jac(μ,du,v,args...)
+  assem = SparseMatrixAssembler(trial,test)
+  index_map = FEOperatorIndexMap(trial,test)
+  ParamFEOpFromWeakForm{LinearParamEq}(res,jac′,pspace,constant_jac,assem,index_map,trial,test)
 end
 
 FESpaces.get_test(op::ParamFEOpFromWeakForm) = op.test
@@ -117,33 +124,3 @@ ODEs.get_res(op::ParamFEOpFromWeakForm) = op.res
 get_jac(op::ParamFEOpFromWeakForm) = op.jac
 ODEs.get_assembler(op::ParamFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::ParamFEOpFromWeakForm) = op.index_map
-
-struct LinearParamFEOpFromWeakForm <: ParamFEOperator{LinearParamEq}
-  res::Function
-  jac::Function
-  pspace::ParamSpace
-  constant_jac::Bool
-  assem::Assembler
-  index_map::FEOperatorIndexMap
-  trial::FESpace
-  test::FESpace
-end
-
-function LinearParamFEOperator(
-  res::Function,jac::Function,pspace,trial,test;constant_jac=false)
-
-  jac′(μ,u,du,v,args...) = jac(μ,du,v,args...)
-  assem = SparseMatrixAssembler(trial,test)
-  index_map = FEOperatorIndexMap(trial,test)
-  LinearParamFEOpFromWeakForm(
-    res,jac′,pspace,constant_jac,assem,index_map,trial,test)
-end
-
-FESpaces.get_test(op::LinearParamFEOpFromWeakForm) = op.test
-FESpaces.get_trial(op::LinearParamFEOpFromWeakForm) = op.trial
-get_param_space(op::LinearParamFEOpFromWeakForm) = op.pspace
-ODEs.get_res(op::LinearParamFEOpFromWeakForm) = op.res
-get_jac(op::LinearParamFEOpFromWeakForm) = op.jac
-ODEs.get_assembler(op::LinearParamFEOpFromWeakForm) = op.assem
-IndexMaps.get_index_map(op::LinearParamFEOpFromWeakForm) = op.index_map
-is_jac_constant(op::LinearParamFEOpFromWeakForm) = op.constant_jac

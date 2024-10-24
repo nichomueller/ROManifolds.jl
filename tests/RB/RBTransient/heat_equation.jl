@@ -9,7 +9,7 @@ using ReducedOrderModels
 θ = 0.5
 dt = 0.01
 t0 = 0.0
-tf = 60*dt
+tf = 10*dt
 
 # parametric space
 pranges = fill([1,10],3)
@@ -77,7 +77,7 @@ create_dir(test_dir)
 
 # RB method
 
-fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
+fesnaps,festats = solution_snapshots(rbsolver,feop,r,uh0μ)
 # fesnaps = load_snapshots(test_dir)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 ronline = realization(feop;nparams=10)
@@ -85,3 +85,67 @@ x̂,rbstats = solve(rbsolver,rbop,ronline)
 
 x,festats = solution_snapshots(rbsolver,feop,ronline,uh0μ)
 perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)
+
+μ = Realization([
+  [0.1,0.2,0.3],
+  [0.3,0.6,0.7],
+  [0.1,0.2,0.5],
+  [0.1,0.8,0.4],
+  [0.9,0.7,0.3],
+  [0.1,0.2,0.2],
+  [0.2,0.5,0.1],
+  [0.1,0.2,0.6],
+  [0.1,0.1,0.7],
+  [0.4,0.5,0.8],
+  [0.1,0.2,0.9],
+  [0.7,0.4,0.4],
+  [0.9,0.2,0.1],
+  [0.3,0.2,0.2],
+  [0.1,0.4,0.8],
+  [0.2,0.2,0.9],
+  [0.8,0.2,0.5],
+  [0.2,0.5,0.5],
+  [0.1,0.2,0.2],
+  [0.7,0.4,0.1]
+])
+
+r = TransientRealization(μ,tdomain)
+
+using Gridap.ODEs
+using Gridap.Algebra
+using Gridap.FESpaces
+using ReducedOrderModels.ParamDataStructures
+using ReducedOrderModels.ParamODEs
+
+solver = fesolver
+odeop = get_algebraic_operator(feop.op)
+
+r0 = ParamDataStructures.get_at_time(r,:initial)
+
+U = trial(r0)
+u = zero_free_values(U)
+us0 = (u,)
+
+cache = ParamODEs.allocate_odeparamcache(solver,odeop,r0,us0)
+state0,cache = ode_start(solver,odeop,r0,us0,cache)
+statef = copy.(state0)
+
+w0 = state0[1]
+odeparamcache,sysslvrcache = cache
+paramcache = odeparamcache.paramcache
+
+sysslvr = solver.sysslvr
+dt,θ = solver.dt,solver.θ
+dtθ = θ*dt
+x = statef[1]
+fill!(x,zero(eltype(x)))
+ws = (dtθ,1)
+
+# update
+shift!(r,dtθ)
+us(x) = (w0,x)
+update_paramcache!(paramcache,odeop,r)
+stageop = ParamStageOperator(odeop,odeparamcache,r,us,ws)
+# sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
+A = jacobian(stageop,x)
+b = residual(stageop,x)

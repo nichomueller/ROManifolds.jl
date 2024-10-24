@@ -21,9 +21,7 @@ struct TransientParamFEOperatorWithTrian{T,N} <: TransientParamFEOperator{T}
   end
 end
 
-for f in (:TransientParamFEOpFromWeakForm,
-          :TransientParamSemilinearFEOpFromWeakForm,
-          :TransientParamLinearFEOpFromWeakForm)
+for f in (:TransientParamFEOpFromWeakForm,:TransientParamLinearFEOpFromWeakForm)
   @eval begin
     function $f(args...)
       args1...,trian_djac = args
@@ -48,10 +46,6 @@ ODEs.get_res(op::TransientParamFEOperatorWithTrian) = get_res(op.op)
 ODEs.get_jacs(op::TransientParamFEOperatorWithTrian) = get_jacs(op.op)
 ODEs.get_assembler(op::TransientParamFEOperatorWithTrian) = get_assembler(op.op)
 IndexMaps.get_index_map(op::TransientParamFEOperatorWithTrian) = get_index_map(op.op)
-
-function ODEs.is_form_constant(op::TransientParamFEOperatorWithTrian,k::Integer)
-  is_form_constant(op.op,k)
-end
 
 # utils
 
@@ -109,16 +103,6 @@ function ParamSteady.set_triangulation(op::TransientParamFEOpFromWeakForm,trian_
   newjacs = _set_triangulation_jacs(op.jacs,trian_jacs,polyn_order)
   TransientParamFEOpFromWeakForm(
     newres,newjacs,op.tpspace,op.assem,op.index_map,op.trial,op.test,op.order)
-end
-
-function ParamSteady.set_triangulation(op::TransientParamSemilinearFEOpFromWeakForm,trian_res,trian_jacs)
-  polyn_order = get_polynomial_order(op.test)
-  newres = _set_triangulation_form(op.res,trian_res,polyn_order)
-  newmass = _set_triangulation_form(op.mass,trian_jacs[end],polyn_order)
-  newjacs = _set_triangulation_jacs(op.jacs,trian_jacs,polyn_order)
-  TransientParamSemilinearFEOpFromWeakForm(
-    newmass,newres,newjacs,op.constant_mass,op.tpspace,op.assem,
-    op.index_map,op.trial,op.test,op.order)
 end
 
 function ParamSteady.set_triangulation(op::TransientParamLinearFEOpFromWeakForm,trian_res,trian_jacs)

@@ -37,21 +37,15 @@ include("TransientTrialParamFESpace.jl")
 
 export ODEParamOperatorType
 export NonlinearParamODE
-export AbstractLinearParamODE
-export SemilinearParamODE
 export LinearParamODE
 export ODEParamOperator
 include("ODEParamOperator.jl")
 
 export ParamStageOperator
-export NonlinearParamStageOperator
-export LinearParamStageOperator
 include("ParamStageOperator.jl")
 
 export TransientParamFEOperator
 export TransientParamFEOpFromWeakForm
-export TransientParamSemilinearFEOperator
-export TransientParamSemilinearFEOpFromWeakForm
 export TransientParamLinearFEOperator
 export TransientParamLinearFEOpFromWeakForm
 export LinearTransientParamFEOperator

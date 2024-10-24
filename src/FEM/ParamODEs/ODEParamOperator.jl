@@ -7,10 +7,7 @@ Parametric extension of the type [`UnEvalOperatorType`](@ref) in [`Gridap`](@ref
 abstract type ODEParamOperatorType <: UnEvalOperatorType end
 
 struct NonlinearParamODE <: ODEParamOperatorType end
-
-abstract type AbstractLinearParamODE <: ODEParamOperatorType end
-struct SemilinearParamODE <: AbstractLinearParamODE end
-struct LinearParamODE <: AbstractLinearParamODE end
+struct LinearParamODE <: ODEParamOperatorType end
 struct LinearNonlinearParamODE <: ODEParamOperatorType end
 
 """
@@ -24,22 +21,7 @@ Subtypes:
 """
 abstract type ODEParamOperator{T<:ODEParamOperatorType} <: ParamOperator{T} end
 
-function ParamSteady.allocate_paramcache(
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}})
-
-  nothing
-end
-
-function ParamSteady.update_paramcache!(
-  paramcache,
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}})
-
-  paramcache
-end
+Polynomials.get_order(odeop::ODEParamOperator) = get_order(get_fe_operator(odeop))
 
 function Algebra.allocate_residual(
   odeop::ODEParamOperator,
@@ -64,10 +46,19 @@ end
 function Algebra.residual(
   odeop::ODEParamOperator,
   r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}})
+
+  paramcache = allocate_paramcache(op,r,us)
+  residual(b,odeop,r,us,paramcache)
+end
+
+function Algebra.residual(
+  odeop::ODEParamOperator,
+  r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache)
 
-  b = allocate_residual(odeop,us,r,paramcache)
+  b = allocate_residual(odeop,r,us,paramcache)
   residual!(b,odeop,r,us,paramcache)
   b
 end
@@ -109,6 +100,16 @@ function Algebra.jacobian(
   odeop::ODEParamOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}})
+
+  paramcache = allocate_paramcache(op,r,us)
+  jacobian(b,odeop,r,us,ws,paramcache)
+end
+
+function Algebra.jacobian(
+  odeop::ODEParamOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
   paramcache)
 
@@ -117,50 +118,34 @@ function Algebra.jacobian(
   A
 end
 
-# optimizations
-
-function Algebra.allocate_residual(
+function ParamSteady.allocate_paramcache(
   odeop::ODEParamOperator,
   r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  paramcache::ParamSystemCache)
+  us::Tuple{Vararg{AbstractVector}})
 
-  copy(paramcache.b)
+  feop = get_fe_operator(odeop)
+  order = get_order(odeop)
+  pttrial = get_trial(feop)
+  trial = allocate_space(pttrial,r)
+  pttrials = (pttrial,)
+  trials = (trial,)
+  for k in 1:order
+    pttrials = (pttrials...,∂t(pttrials[k]))
+    trials = (trials...,allocate_space(pttrials[k+1],r))
+  end
+  feop_cache = allocate_feopcache(feop,r,us)
+  ParamOpCache(trials,pttrials,feop_cache)
 end
 
-function Algebra.residual!(
-  b,
+function ParamSteady.update_paramcache!(
+  paramcache,
   odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  paramcache::ParamSystemCache)
+  r::TransientRealization)
 
-  mul!(b,paramcache.A,x)
-  axpy!(1,paramcache.b,b)
-  b
+  trials = ()
+  for k in 1:get_order(odeop)+1
+    trials = (trials...,evaluate!(paramcache.trial[k],paramcache.ptrial[k],r))
+  end
+  paramcache.trial = trials
+  paramcache
 end
-
-function Algebra.allocate_jacobian(
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  paramcache::ParamSystemCache)
-
-  copy(paramcache.A)
-end
-
-function Algebra.jacobian!(
-  A,
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  ws::Tuple{Vararg{Real}},
-  paramcache::ParamSystemCache)
-
-  copy_entries!(A,paramcache.A)
-  A
-end
-
-Polynomials.get_order(odeop::ODEParamOperator) = get_order(get_fe_operator(odeop))
-ODEs.get_num_forms(odeop::ODEParamOperator) = get_num_forms(get_fe_operator(odeop))
-ODEs.is_form_constant(odeop::ODEParamOperator,k::Integer) = is_form_constant(get_fe_operator(odeop),k)

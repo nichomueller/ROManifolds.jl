@@ -45,17 +45,17 @@ export LinearNonlinearParamEq
 export ParamOperator
 export LinearNonlinearParamOpFromFEOp
 export AbstractParamCache
-export ParamCache
-export ParamSystemCache
+export ParamOpCache
+export ParamOpSysCache
 export ParamNonlinearOperator
 export allocate_paramcache
 export update_paramcache!
+export allocate_systemcache
 export allocate_feopcache
 export get_fe_operator
 include("ParamOperator.jl")
 
 export ParamFEOperator
-export LinearParamFEOperator
 export get_param_space
 include("ParamFEOperator.jl")
 

@@ -170,7 +170,7 @@ function RBSteady.fe_jacobian!(
 end
 
 struct LinearNonlinearTransientRBOperator <: TransientRBOperator{LinearNonlinearParamODE}
-  op_linear::GenericTransientRBOperator{<:AbstractLinearParamODE}
+  op_linear::GenericTransientRBOperator{LinearParamODE}
   op_nonlinear::GenericTransientRBOperator{NonlinearParamODE}
 end
 
@@ -394,7 +394,7 @@ function select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveParamVector}},p
     new_XhF_i = ConsecutiveParamArray(us[i].data[:,indices])
     new_xhF = (new_xhF...,new_XhF_i)
   end
-  new_odeopcache = ParamCache(new_trial,ptrial,feop_cache,const_forms)
+  new_odeopcache = ParamOpCache(new_trial,ptrial,feop_cache,const_forms)
   return new_xhF,new_odeopcache
 end
 
@@ -411,7 +411,7 @@ function select_evalcache_at_indices(us::Tuple{Vararg{BlockConsecutiveParamVecto
     new_XhF_i = mortar([ConsecutiveParamArray(us_i.data[:,indices]) for us_i in blocks(us[i])])
     new_xhF = (new_xhF...,new_XhF_i)
   end
-  new_odeopcache = ParamCache(new_trial,ptrial,feop_cache,const_forms)
+  new_odeopcache = ParamOpCache(new_trial,ptrial,feop_cache,const_forms)
   return new_xhF,new_odeopcache
 end
 

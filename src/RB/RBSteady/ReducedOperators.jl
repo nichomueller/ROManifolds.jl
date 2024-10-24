@@ -51,7 +51,7 @@ struct RBCache <: AbstractParamCache
   A::HRParamArray
   b::HRParamArray
   trial::RBSpace
-  paramcache::ParamCache
+  paramcache::ParamOpCache
 end
 
 struct LinearNonlinearRBCache <: AbstractParamCache

@@ -19,23 +19,6 @@ abstract type ParamOperator{T<:UnEvalOperatorType} <: NonlinearOperator end
 
 get_fe_operator(op::ParamOperator) = @abstractmethod
 
-function allocate_paramcache(
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector)
-
-  nothing
-end
-
-function update_paramcache!(
-  paramcache,
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector)
-
-  paramcache
-end
-
 function Algebra.allocate_residual(
   op::ParamOperator,
   μ::Realization,
@@ -119,17 +102,61 @@ FESpaces.get_trial(op::ParamOperator) = get_trial(get_fe_operator(op))
 IndexMaps.get_vector_index_map(op::ParamOperator) = get_vector_index_map(get_fe_operator(op))
 IndexMaps.get_matrix_index_map(op::ParamOperator) = get_matrix_index_map(get_fe_operator(op))
 
+"""
+    allocate_paramcache(op::ParamOperator,μ::Realization,u::AbstractVector
+      ) -> ParamOpCache
+
+Similar to [`allocate_odeparamcache`](@ref) in [`Gridap`](@ref), when dealing with steady
+parametric problems
+
+"""
+function allocate_paramcache(
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector)
+
+  feop = get_fe_operator(op)
+  ptrial = get_trial(feop)
+  trial = evaluate(ptrial,μ)
+  fe_cache = allocate_feopcache(feop,μ,u)
+  ParamOpCache(trial,ptrial,fe_cache)
+end
+
+"""
+    update_paramcache!(paramcache, op::ParamOperator, μ::Realization) -> ParamOpCache
+
+Similar to [`update_odeparamcache!`](@ref) in [`Gridap`](@ref), when dealing with steady
+parametric problems
+
+"""
+function update_paramcache!(paramcache,op::ParamOperator,μ::Realization)
+  paramcache.trial = evaluate!(paramcache.trial,paramcache.ptrial,μ)
+  paramcache
+end
+
+function allocate_systemcache(
+  op::ParamOperator{LinearParamEq},
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  u0 = copy(u)
+  fill!(u0,zero(eltype(u0)))
+  A = jacobian(op,μ,u0,paramcache)
+  b = residual(op,μ,u0,paramcache)
+  return A,b
+end
+
 abstract type AbstractParamCache <: GridapType end
 
-mutable struct ParamCache <: AbstractParamCache
+mutable struct ParamOpCache <: AbstractParamCache
   trial
   ptrial
   feop_cache
-  const_forms
 end
 
-struct ParamSystemCache{Ta,Tb} <: AbstractParamCache
-  paramcache::ParamCache
+struct ParamOpSysCache{Ta,Tb} <: AbstractParamCache
+  paramcache::ParamOpCache
   A::Ta
   b::Tb
 end
