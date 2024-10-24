@@ -163,10 +163,6 @@ export fe_jacobian!
 export fe_residual!
 include("ReducedOperators.jl")
 
-export RBNewtonOperator
-export RBNewtonOp
-include("RBNewtonOperator.jl")
-
 export RBPerformance
 export rb_performance
 export create_dir

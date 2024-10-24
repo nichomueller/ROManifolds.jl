@@ -21,7 +21,7 @@ function ParamSteady.allocate_paramcache(
     trials = (trials...,allocate_space(pttrials[k+1],r))
   end
 
-  tfeopcache = allocate_tfeopcache(odeop.op,r,us)
+  feop_cache = allocate_feopcache(odeop.op,r,us)
 
   uh = ODEs._make_uh_from_us(odeop,us,trials)
   test = get_test(odeop.op)
@@ -57,7 +57,7 @@ function ParamSteady.allocate_paramcache(
     const_forms = (const_forms...,const_form)
   end
 
-  ParamCache(trials,pttrials,tfeopcache,const_forms)
+  ParamCache(trials,pttrials,feop_cache,const_forms)
 end
 
 function ParamSteady.update_paramcache!(paramcache,odeop::ODEParamOpFromTFEOp,r::TransientRealization)
@@ -66,10 +66,6 @@ function ParamSteady.update_paramcache!(paramcache,odeop::ODEParamOpFromTFEOp,r:
     trials = (trials...,evaluate!(paramcache.trial[k],paramcache.ptrial[k],r))
   end
   paramcache.trial = trials
-
-  tfeopcache,op = paramcache.feop_cache,odeop.op
-  paramcache.feop_cache = update_tfeopcache!(tfeopcache,op,r)
-
   paramcache
 end
 
@@ -337,10 +333,6 @@ function ParamSteady.update_paramcache!(
     trials = (trials...,evaluate!(paramcache.trial[k],paramcache.ptrial[k],r))
   end
   paramcache.trial = trials
-
-  tfeopcache,op = paramcache.feop_cache,odeop.op
-  paramcache.feop_cache = update_tfeopcache!(tfeopcache,op,r)
-
   paramcache
 end
 
@@ -359,9 +351,9 @@ function _define_odeopcache(
     trials = (trials...,evaluate(pttrials[k+1],r))
   end
 
-  tfeopcache = allocate_tfeopcache(odeop.op,r,us)
+  feop_cache = allocate_feopcache(odeop.op,r,us)
 
-  ParamCache(trials,pttrials,tfeopcache,nothing)
+  ParamCache(trials,pttrials,feop_cache,nothing)
 end
 
 function Algebra.allocate_residual(
@@ -633,7 +625,7 @@ function ParamSteady.allocate_paramcache(
   op_lin = get_linear_operator(op)
   A_lin = allocate_jacobian(op_lin,r,us,paramcache)
   b_lin = allocate_residual(op_lin,r,us,paramcache)
-  return LinearNonlinearParamCache(paramcache,A_lin,b_lin)
+  return ParamSystemCache(paramcache,A_lin,b_lin)
 end
 
 function update_paramcache!(
@@ -650,7 +642,7 @@ function Algebra.allocate_residual(
   us::Tuple{Vararg{AbstractVector}},
   cache)
 
-  b_lin = cache.b_lin
+  b_lin = cache.b
   copy(b_lin)
 end
 
@@ -660,7 +652,7 @@ function Algebra.allocate_jacobian(
   us::Tuple{Vararg{AbstractVector}},
   cache)
 
-  A_lin = cache.A_lin
+  A_lin = cache.A
   copy(A_lin)
 end
 
@@ -671,9 +663,16 @@ function Algebra.residual!(
   us::Tuple{Vararg{AbstractVector}},
   cache)
 
-  b_lin = cache.b_lin
-  copy_entries!(b,b_lin)
-  residual!(b,get_nonlinear_operator(op.op),r,us,paramcache;add=true)
+  A_lin = cache.A
+  b_lin = cache.b
+  @check isa(A_lin,Tuple)
+  paramcache = cache.paramcache
+  residual!(b,get_nonlinear_operator(op),r,us,paramcache)
+  for (_us,_A_lin) in zip(us,A_lin)
+    mul!(b,_A_lin,_us,1,1)
+  end
+  axpy!(1,b_lin,b)
+  b
 end
 
 function ODEs.jacobian_add!(
@@ -682,9 +681,14 @@ function ODEs.jacobian_add!(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
-  paramcache)
+  cache)
 
-  A_lin = cache.A_lin
-  copy_entries!(A,A_lin)
-  jacobian_add!(A,get_nonlinear_operator(op.op),r,us,ws,paramcache)
+  A_lin = cache.A
+  @check isa(A_lin,Tuple)
+  paramcache = cache.paramcache
+  jacobian_add!(A,get_nonlinear_operator(op),r,us,paramcache)
+  for _A_lin in A_lin
+    axpy!(1,_A_lin,A)
+  end
+  A
 end

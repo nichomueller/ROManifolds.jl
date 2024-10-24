@@ -128,13 +128,15 @@ mutable struct ParamCache <: AbstractParamCache
   const_forms
 end
 
-struct LinearNonlinearParamCache{A,B} <: AbstractParamCache
+struct ParamSystemCache{Ta,Tb} <: AbstractParamCache
   paramcache::ParamCache
-  A_lin::A
-  b_lin::B
+  A::Ta
+  b::Tb
 end
 
-struct ParamNonlinearOperator <: NonlinearOperator
+abstract type ParamNonlinearOperator <: NonlinearOperator end
+
+struct GenericParamNonlinearOperator <: NonlinearOperator
   op::ParamOperator
   μ::Realization
   paramcache::AbstractParamCache
@@ -144,11 +146,11 @@ function ParamNonlinearOperator(op::ParamOperator,μ::Realization)
   trial = get_trial(op)(μ)
   u = zero_free_values(trial)
   paramcache = allocate_paramcache(op,μ,u)
-  ParamNonlinearOperator(op,μ,paramcache)
+  GenericParamNonlinearOperator(op,μ,paramcache)
 end
 
 function Algebra.allocate_residual(
-  nlop::ParamNonlinearOperator,
+  nlop::GenericParamNonlinearOperator,
   x::AbstractVector)
 
   allocate_residual(nlop.op,nlop.μ,x,nlop.paramcache)
@@ -156,14 +158,14 @@ end
 
 function Algebra.residual!(
   b::AbstractVector,
-  nlop::ParamNonlinearOperator,
+  nlop::GenericParamNonlinearOperator,
   x::AbstractVector)
 
   residual!(b,nlop.op,nlop.μ,x,nlop.paramcache)
 end
 
 function Algebra.allocate_jacobian(
-  nlop::ParamNonlinearOperator,
+  nlop::GenericParamNonlinearOperator,
   x::AbstractVector)
 
   allocate_jacobian(nlop.op,nlop.μ,x,nlop.paramcache)
@@ -171,7 +173,7 @@ end
 
 function Algebra.jacobian!(
   A::AbstractMatrix,
-  nlop::ParamNonlinearOperator,
+  nlop::GenericParamNonlinearOperator,
   x::AbstractVector)
 
   jacobian!(A,nlop.op,nlop.μ,x,nlop.paramcache)

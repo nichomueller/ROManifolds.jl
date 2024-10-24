@@ -323,7 +323,7 @@ function allocate_paramcache(
   op_lin = get_linear_operator(op)
   A_lin = jacobian(op_lin,μ,u,paramcache)
   b_lin = residual(op_lin,μ,u,paramcache)
-  return LinearNonlinearParamCache(paramcache,A_lin,b_lin)
+  return ParamSystemCache(paramcache,A_lin,b_lin)
 end
 
 function update_paramcache!(
@@ -340,7 +340,7 @@ function Algebra.allocate_residual(
   u::AbstractVector,
   cache)
 
-  b_lin = cache.b_lin
+  b_lin = cache.b
   copy(b_lin)
 end
 
@@ -350,7 +350,7 @@ function Algebra.allocate_jacobian(
   u::AbstractVector,
   cache)
 
-  A_lin = cache.A_lin
+  A_lin = cache.A
   copy(A_lin)
 end
 
@@ -361,12 +361,12 @@ function Algebra.residual!(
   u::AbstractVector,
   cache)
 
-  A_lin = cache.A_lin
-  b_lin = cache.b_lin
+  A_lin = cache.A
+  b_lin = cache.b
   paramcache = cache.paramcache
   residual!(b,get_nonlinear_operator(op),μ,u,paramcache)
-  mul!(b,A_lin,u,true,true)
-  axpy!(1.0,b_lin,b)
+  mul!(b,A_lin,u,1,1)
+  axpy!(1,b_lin,b)
   b
 end
 
@@ -377,9 +377,9 @@ function ODEs.jacobian_add!(
   u::AbstractVector,
   cache)
 
-  A_lin = cache.A_lin
+  A_lin = cache.A
   paramcache = cache.paramcache
   jacobian_add!(A,get_nonlinear_operator(op),μ,u,paramcache)
-  axpy!(1.0,A_lin,A)
+  axpy!(1,A_lin,A)
   A
 end

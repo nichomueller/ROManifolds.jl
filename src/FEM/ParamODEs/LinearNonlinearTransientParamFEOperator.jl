@@ -17,7 +17,7 @@ ParamSteady.get_linear_operator(op::LinearNonlinearTransientParamFEOperator) = o
 ParamSteady.get_nonlinear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_nonlinear
 
 function FESpaces.get_algebraic_operator(feop::LinearNonlinearTransientParamFEOperator)
-  ODEParamOpFromTFEOpWithTrian(feop)
+  LinearNonlinearParamOpFromTFEOp(feop)
 end
 
 function FESpaces.get_test(op::LinearNonlinearTransientParamFEOperator)

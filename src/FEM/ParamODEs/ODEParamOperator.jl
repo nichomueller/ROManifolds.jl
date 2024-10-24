@@ -117,6 +117,50 @@ function Algebra.jacobian(
   A
 end
 
-Polynomials.get_order(odeop::ODEParamOperator) = get_order(get_fe_operator(op))
-ODEs.get_num_forms(odeop::ODEParamOperator) = get_num_forms(get_fe_operator(op))
-ODEs.is_form_constant(odeop::ODEParamOperator,k::Integer) = is_form_constant(get_fe_operator(op),k)
+# optimizations
+
+function Algebra.allocate_residual(
+  odeop::ODEParamOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  paramcache::ParamSystemCache)
+
+  copy(paramcache.b)
+end
+
+function Algebra.residual!(
+  b,
+  odeop::ODEParamOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  paramcache::ParamSystemCache)
+
+  mul!(b,paramcache.A,x)
+  axpy!(1,paramcache.b,b)
+  b
+end
+
+function Algebra.allocate_jacobian(
+  odeop::ODEParamOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  paramcache::ParamSystemCache)
+
+  copy(paramcache.A)
+end
+
+function Algebra.jacobian!(
+  A,
+  odeop::ODEParamOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}},
+  paramcache::ParamSystemCache)
+
+  copy_entries!(A,paramcache.A)
+  A
+end
+
+Polynomials.get_order(odeop::ODEParamOperator) = get_order(get_fe_operator(odeop))
+ODEs.get_num_forms(odeop::ODEParamOperator) = get_num_forms(get_fe_operator(odeop))
+ODEs.is_form_constant(odeop::ODEParamOperator,k::Integer) = is_form_constant(get_fe_operator(odeop),k)

@@ -46,10 +46,11 @@ export ParamOperator
 export LinearNonlinearParamOpFromFEOp
 export AbstractParamCache
 export ParamCache
-export LinearNonlinearParamCache
+export ParamSystemCache
 export ParamNonlinearOperator
 export allocate_paramcache
 export update_paramcache!
+export allocate_feopcache
 export get_fe_operator
 include("ParamOperator.jl")
 

@@ -21,13 +21,19 @@ struct TransientParamFEOperatorWithTrian{T,N} <: TransientParamFEOperator{T}
   end
 end
 
-function TransientParamFEOpFromWeakForm(args...)
-  args1...,trian_djac = args
-  args2...,trian_jac = args1
-  args3...,trian_res = args2
-  op = TransientParamFEOpFromWeakForm(args3...)
-  op_trian = TransientParamFEOperatorWithTrian(op,trian_res,(trian_jac,trian_djac))
-  return op_trian
+for f in (:TransientParamFEOpFromWeakForm,
+          :TransientParamSemilinearFEOpFromWeakForm,
+          :TransientParamLinearFEOpFromWeakForm)
+  @eval begin
+    function $f(args...)
+      args1...,trian_djac = args
+      args2...,trian_jac = args1
+      args3...,trian_res = args2
+      op = $f(args3...)
+      op_trian = TransientParamFEOperatorWithTrian(op,trian_res,(trian_jac,trian_djac))
+      return op_trian
+    end
+  end
 end
 
 function FESpaces.get_algebraic_operator(feop::TransientParamFEOperatorWithTrian)

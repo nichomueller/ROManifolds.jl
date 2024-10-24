@@ -138,6 +138,7 @@ function Algebra.residual!(
   u::RBParamVector,
   rbcache::RBCache)
 
+  inv_project!(u.data,rbcache.trial,u.redudced_data)
   residual!(cache,op,r,u.data,rbcache)
 end
 
@@ -162,6 +163,7 @@ function Algebra.jacobian!(
   u::RBParamVector,
   rbcache::RBCache)
 
+  inv_project!(u.data,rbcache.trial,u.redudced_data)
   jacobian!(cache,op,r,u.data,rbcache)
 end
 
@@ -274,8 +276,8 @@ function Algebra.residual!(
   rbcache::LinearNonlinearRBCache)
 
   nlop = get_nonlinear_operator(op)
-  A_lin = rbcache.A_lin
-  b_lin = rbcache.b_lin
+  A_lin = rbcache.A
+  b_lin = rbcache.b
   rbcache_nlin = rbcache.rbcache
 
   b_nlin = residual!(cache,nlop,r,u,rbcache_nlin)
@@ -293,7 +295,7 @@ function Algebra.jacobian!(
   rbcache::LinearNonlinearRBCache)
 
   nlop = get_nonlinear_operator(op)
-  A_lin = rbcache.A_lin
+  A_lin = rbcache.A
   rbcache_nlin = rbcache.rbcache
 
   A_nlin = jacobian!(cache,nlop,r,u,rbcache_nlin)

@@ -74,7 +74,7 @@ using ReducedOrderModels.ParamFESpaces
 #   trials = (trials...,allocate_space(pttrials[k+1],r))
 # end
 
-# tfeopcache = allocate_tfeopcache(odeop.op,r,us)
+# feop_cache = allocate_feopcache(odeop.op,r,us)
 
 # uh = ODEs._make_uh_from_us(odeop,us,trials)
 # test = get_test(odeop.op)

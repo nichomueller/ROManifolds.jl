@@ -1,6 +1,6 @@
 function ODEs.ode_start(
   solver::ODESolver,
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r0::TransientRealization,
   us0::Tuple{Vararg{AbstractVector}},
   odeparamcache)
@@ -12,7 +12,7 @@ end
 function ODEs.ode_finish!(
   uF::AbstractVector,
   solver::ODESolver,
-  odeop::ODEOperator,
+  odeop::ODEParamOperator,
   r0::TransientRealization,
   rf::TransientRealization,
   statef::Tuple{Vararg{AbstractVector}},
