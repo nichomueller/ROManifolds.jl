@@ -48,8 +48,8 @@ function reduced_operator(
 end
 
 struct RBCache <: AbstractParamCache
-  A::HypRedCache
-  b::HypRedCache
+  A::HRParamArray
+  b::HRParamArray
   trial::RBSpace
   paramcache::ParamCache
 end
@@ -88,11 +88,11 @@ function allocate_rbcache(
 
   A = allocate_jacobian(op.op,r,u,paramcache)
   coeffA,Â = allocate_hypred_cache(op.lhs,r)
-  Acache = HypRedCache(A,coeffA,Â)
+  Acache = HRParamArray(A,coeffA,Â)
 
   b = allocate_residual(op.op,r,u,paramcache)
   coeffb,b̂ = allocate_hypred_cache(op.rhs,r)
-  bcache = HypRedCache(b,coeffb,b̂)
+  bcache = HRParamArray(b,coeffb,b̂)
 
   trial = evaluate(get_trial(op),r)
 
@@ -118,7 +118,7 @@ function Algebra.allocate_jacobian(
 end
 
 function Algebra.residual!(
-  cache::HypRedCache,
+  cache::HRParamArray,
   op::GenericRBOperator,
   r::Realization,
   u::AbstractParamVector,
@@ -132,7 +132,7 @@ function Algebra.residual!(
 end
 
 function Algebra.residual!(
-  cache::HypRedCache,
+  cache::HRParamArray,
   op::GenericRBOperator,
   r::Realization,
   u::RBParamVector,
@@ -142,7 +142,7 @@ function Algebra.residual!(
 end
 
 function Algebra.jacobian!(
-  cache::HypRedCache,
+  cache::HRParamArray,
   op::GenericRBOperator,
   r::Realization,
   u::AbstractParamVector,
@@ -156,7 +156,7 @@ function Algebra.jacobian!(
 end
 
 function Algebra.jacobian!(
-  cache::HypRedCache,
+  cache::HRParamArray,
   op::GenericRBOperator,
   r::Realization,
   u::RBParamVector,
@@ -267,7 +267,7 @@ function Algebra.allocate_jacobian(
 end
 
 function Algebra.residual!(
-  cache::HypRedCache,
+  cache::HRParamArray,
   op::LinearNonlinearRBOperator,
   r::Realization,
   u::AbstractParamVector,
@@ -286,7 +286,7 @@ function Algebra.residual!(
 end
 
 function Algebra.jacobian!(
-  cache::HypRedCache,
+  cache::HRParamArray,
   op::LinearNonlinearRBOperator,
   r::Realization,
   u::AbstractParamVector,

@@ -19,8 +19,8 @@ domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain,partition)
 labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"diri1",[6,])
-add_tag_from_tags!(labels,"diri0",[1,2,3,4,5,7,8])
+add_tag_from_tags!(labels,"diri1",[7,])
+add_tag_from_tags!(labels,"diri0",[1,2,3,4,5,6])
 
 order = 2
 degree = 2*(order)+1
@@ -31,7 +31,7 @@ a(x,μ) = 1
 a(μ) = x->a(x,μ)
 aμ(μ) = ParamFunction(a,μ)
 
-g(x,μ) = VectorValue(μ[1],0.0)
+g(x,μ) = VectorValue(-μ[1]*x[2]*(1-x[2]),0.0)
 g(μ) = x->g(x,μ)
 gμ(μ) = ParamFunction(g,μ)
 g0(x,μ) = VectorValue(0.0,0.0)

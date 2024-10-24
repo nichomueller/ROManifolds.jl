@@ -42,6 +42,10 @@ function (-)(b::AbstractArray{<:Number},A::ParamArray)
   (-)((-)(A,b))
 end
 
+function (*)(b::Number,A::ParamArray)
+  (*)(A,b)
+end
+
 function Base.fill!(A::ParamArray,z::Number)
   fill!(get_all_data(A),z)
   return A
@@ -262,7 +266,7 @@ function get_param_entry(A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) whe
 end
 
 function get_param_entry(A::ConsecutiveParamArray,i...)
-  data′ = getindex(get_all_data(A),i...,:)
+  data′ = view(get_all_data(A),i...,:)
   ConsecutiveParamArray(data′)
 end
 

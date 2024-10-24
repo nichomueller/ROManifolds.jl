@@ -154,49 +154,6 @@ function FESpaces.FEFunction(r::RBSpace,x̂::AbstractVector)
   return FEFunction(fe,x,xdir)
 end
 
-struct RBParamVector{T,L,A<:ParamVector{T,L}} <: ParamArray{T,1,L}
-  data::A
-  reduced_data::A
-end
-
-Base.size(a::RBParamVector) = size(a.reduced_data)
-Base.getindex(a::RBParamVector,i::Integer) = getindex(a.reduced_data,i)
-Base.setindex!(a::RBParamVector,v,i::Integer) = setindex!(a.reduced_data,v,i)
-ParamDataStructures.get_all_data(a::RBParamVector) = get_all_data(a.reduced_data)
-ParamDataStructures.param_getindex(a::RBParamVector,i::Integer) = param_getindex(a.reduced_data,i)
-
-function Base.copy(a::RBParamVector)
-  data′ = copy(a.data)
-  reduced_data′ = copy(a.reduced_data)
-  RBParamVector(data′,reduced_data′)
-end
-
-function Base.similar(A::RBParamVector{T},::Type{S}) where {T,S<:AbstractVector}
-  data′ = similar(a.data,S)
-  reduced_data′ = similar(a.reduced_data,S)
-  RBParamVector(data′,reduced_data′)
-end
-
-function Base.similar(A::RBParamVector{T},::Type{S},dims::Dims{1}) where {T,S<:AbstractVector}
-  data′ = similar(a.data,S,dims)
-  reduced_data′ = similar(a.reduced_data,S,dims)
-  RBParamVector(data′,reduced_data′)
-end
-
-function Base.copyto!(a::RBParamVector,b::RBParamVector)
-  copyto!(a.data,b.data)
-  copyto!(a.reduced_data,b.reduced_data)
-  a
-end
-
-function project(r::RBSpace,a::RBParamVector)
-  project!(a.reduced_data,r,a.data)
-end
-
-function inv_project(r::RBSpace,a::RBParamVector)
-  inv_project!(a.data,r,a.reduced_data)
-end
-
 """
     SingleFieldRBSpace{A<:SingleFieldFESpace,B<:Projection} <: RBSpace
 

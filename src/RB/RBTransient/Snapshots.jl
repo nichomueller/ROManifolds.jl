@@ -144,6 +144,11 @@ struct TransientSnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractTransientSnapshots{T,N
   snaps::A
   trange::B
   prange::C
+  function TransientSnapshotsAtIndices(snaps::A,trange::B,prange::C) where {T,N,L,D,I,R,A<:AbstractTransientSnapshots{T,N,L,D,I,R},B,C}
+    @assert 1 <= minimum(trange) <= maximum(trange) <= _num_all_times(snaps)
+    @assert 1 <= minimum(prange) <= maximum(prange) <= _num_all_params(snaps)
+    new{T,N,L,D,I,R,A,B,C}(snaps,trange,prange)
+  end
 end
 
 function TransientSnapshotsAtIndices(s::TransientSnapshotsAtIndices,trange,prange)
@@ -165,6 +170,8 @@ ParamDataStructures.num_params(s::TransientSnapshotsAtIndices) = length(RBSteady
 
 _num_all_params(s::AbstractSnapshots) = num_params(s)
 _num_all_params(s::TransientSnapshotsAtIndices) = _num_all_params(s.snaps)
+_num_all_times(s::AbstractSnapshots) = num_times(s)
+_num_all_times(s::TransientSnapshotsAtIndices) = _num_all_times(s.snaps)
 
 ParamDataStructures.get_all_data(s::TransientSnapshotsAtIndices) = get_all_data(s.snaps)
 IndexMaps.get_index_map(s::TransientSnapshotsAtIndices) = get_index_map(s.snaps)

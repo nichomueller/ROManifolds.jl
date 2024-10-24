@@ -569,33 +569,11 @@ function inv_project!(cache,a::BlockHyperReduction,b::ArrayBlock)
   return hypred
 end
 
-# cache object
-
-struct HypRedCache
-  fe_quantity
-  coeff
-  hypred
-end
-
-LinearAlgebra.norm(cache::HypRedCache) = norm(cache.hypred)
-LinearAlgebra.rmul!(cache::HypRedCache,v::Number) = rmul!(cache.hypred,v)
-ParamDataStructures.param_getindex(cache::HypRedCache,i::Integer) = param_getindex(cache.hypred,i)
-
 for (T,S) in zip((:HyperReduction,:BlockHyperReduction,:AffineContribution),
                  (:AbstractParamArray,:ArrayBlock,:ArrayContribution))
   @eval begin
     function inv_project(a::$T,b::$S)
       @notimplemented "Must provide cache in advance"
-    end
-  end
-end
-
-for (T,S) in zip((:AffineContribution,:BlockHyperReduction),(:ArrayContribution,:ArrayBlock))
-  @eval begin
-    function inv_project!(cache::HypRedCache,a::$T,b::$S)
-      coeff = cache.coeff
-      hypred = cache.hypred
-      inv_project!((coeff,hypred),a,b)
     end
   end
 end

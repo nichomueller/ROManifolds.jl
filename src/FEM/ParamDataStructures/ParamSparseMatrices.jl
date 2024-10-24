@@ -172,6 +172,17 @@ Base.@propagate_inbounds function Base.getindex(A::ConsecutiveParamSparseMatrixC
   end
 end
 
+Base.@propagate_inbounds function Base.setindex!(
+  A::ConsecutiveParamSparseMatrixCSC,v::SparseMatrixCSC,i::Integer,j::Integer)
+
+  @boundscheck checkbounds(A,i,j)
+  if i == j
+    @assert innersize(A)==size(v) && getcolptr(A)==getcolptr(v) && rowvals(A)==rowvals(v)
+    setindex!(A.data,nonzeros(v),:,i)
+  end
+  v
+end
+
 function Base.similar(A::ConsecutiveParamSparseMatrixCSC)
   ConsecutiveParamSparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,similar(A.data))
 end
@@ -231,7 +242,7 @@ function GenericParamSparseMatrixCSC(a::AbstractVector{<:SparseMatrixCSC{Tv}}) w
       p += 1
     end
   end
-  GenericParamSparseMatrixCSC(m,n,colptr,rowval,data)
+  GenericParamSparseMatrixCSC(m,n,colptr,rowval,data,ptrs)
 end
 
 ArraysOfArrays.innersize(A::GenericParamSparseMatrixCSC) = (A.m,A.n)
@@ -249,6 +260,25 @@ function Base.getindex(A::GenericParamSparseMatrixCSC{Tv},i::Integer,j::Integer)
   else
     fill(zero(Tv),nrow,ncol)
   end
+end
+
+Base.@propagate_inbounds function Base.setindex!(
+  A::GenericParamSparseMatrixCSC,v::SparseMatrixCSC,i::Integer,j::Integer)
+
+  @boundscheck checkbounds(A,i,j)
+  if i == j
+    @assert innersize(A)==size(v)
+    u = one(eltype(A.ptrs))
+    pini = A.ptrs[i]
+    pend = A.ptrs[i+1]-u
+    colptr = A.colptr[pini:pend]
+    rowval = A.rowval[pini:pend]
+    data = A.data[pini:pend]
+    copyto!(colptr,getcolptr(v))
+    copyto!(rowval,rowvals(v))
+    copyto!(data,nonzeros(v))
+  end
+  v
 end
 
 function Base.similar(A::GenericParamSparseMatrixCSC)
@@ -346,6 +376,17 @@ Base.@propagate_inbounds function Base.getindex(A::ConsecutiveParamSparseMatrixC
   end
 end
 
+Base.@propagate_inbounds function Base.setindex!(
+  A::ConsecutiveParamSparseMatrixCSR,v::SparseMatrixCSR,i::Integer,j::Integer)
+
+  @boundscheck checkbounds(A,i,j)
+  if i == j
+    @assert innersize(A)==size(v) && getrowptr(A)==getrowptr(v) && colvals(A)==colvals(v)
+    setindex!(A.data,nonzeros(v),:,i)
+  end
+  v
+end
+
 function Base.similar(A::ConsecutiveParamSparseMatrixCSR{Bi}) where Bi
   ConsecutiveParamSparseMatrixCSR{Bi}(A.m,A.n,A.rowptr,A.colval,similar(A.data))
 end
@@ -405,7 +446,7 @@ function GenericParamSparseMatrixCSR(a::AbstractVector{<:SparseMatrixCSR{Bi,Tv}}
       p += 1
     end
   end
-  GenericParamSparseMatrixCSR{1}(m,n,rowptr,colval,data)
+  GenericParamSparseMatrixCSR{1}(m,n,rowptr,colval,data,ptrs)
 end
 
 ArraysOfArrays.innersize(A::GenericParamSparseMatrixCSR) = (A.m,A.n)
@@ -423,6 +464,25 @@ function Base.getindex(A::GenericParamSparseMatrixCSR{Bi,Tv},i::Integer,j::Integ
   else
     fill(zero(Tv),nrow,ncol)
   end
+end
+
+Base.@propagate_inbounds function Base.setindex!(
+  A::GenericParamSparseMatrixCSR,v::SparseMatrixCSR,i::Integer,j::Integer)
+
+  @boundscheck checkbounds(A,i,j)
+  if i == j
+    @assert innersize(A)==size(v)
+    u = one(eltype(A.ptrs))
+    pini = A.ptrs[i]
+    pend = A.ptrs[i+1]-u
+    rowptr = A.rowptr[pini:pend]
+    colval = A.colval[pini:pend]
+    data = A.data[pini:pend]
+    copyto!(rowptr,getrowptr(v))
+    copyto!(colval,colvals(v))
+    copyto!(data,nonzeros(v))
+  end
+  v
 end
 
 function Base.similar(A::GenericParamSparseMatrixCSR{Bi}) where Bi

@@ -125,11 +125,13 @@ export SingleFieldRBSpace
 export MultiFieldRBSpace
 export EvalRBSpace
 export EvalMultiFieldRBSpace
-export RBParamVector
 export fe_subspace
 export reduced_fe_space
 export reduced_basis
 include("RBSpace.jl")
+
+export RBParamVector
+include("RBParamVector.jl")
 
 export AbstractIntegrationDomain
 export IntegrationDomain
@@ -138,7 +140,6 @@ export EmptyHyperReduction
 export MDEIM
 export AffineContribution
 export BlockHyperReduction
-export HypRedCache
 export empirical_interpolation
 export integration_domain
 export get_integration_domain
@@ -148,6 +149,9 @@ export reduced_residual
 export reduced_weak_form
 export inv_project!
 include("HyperReduction.jl")
+
+export HRParamArray
+include("HRParamArray.jl")
 
 export RBOperator
 export GenericRBOperator

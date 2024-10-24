@@ -53,8 +53,8 @@ Generic constructor of a AbstractParamArray
 ParamArray(A) = @abstractmethod
 param_array(A,args...) = @abstractmethod
 
-# Numbers interface
 ParamArray(A::AbstractArray{<:Number}) = ParamNumber(A)
+ParamArray(A::AbstractParamArray) = A
 
 function param_array(a::Union{Number,AbstractArray{<:Number,0}},l::Integer)
   ParamNumber(fill(a,l))

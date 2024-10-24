@@ -185,6 +185,10 @@ function [`select_snapshots`](@ref)
 struct SnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractSteadySnapshots{T,N,L,D,I,R},B<:AbstractUnitRange{Int}} <: AbstractSteadySnapshots{T,N,L,D,I,R,A}
   snaps::A
   prange::B
+  function SnapshotsAtIndices(snaps::A,prange::B) where {T,N,L,D,I,R,A<:AbstractSteadySnapshots{T,N,L,D,I,R},B}
+    @assert 1 <= minimum(prange) <= maximum(prange) <= _num_all_params(snaps)
+    new{T,N,L,D,I,R,A,B}(snaps,prange)
+  end
 end
 
 function SnapshotsAtIndices(s::SnapshotsAtIndices,prange)
@@ -197,6 +201,9 @@ param_indices(s::SnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
 ParamDataStructures.get_all_data(s::SnapshotsAtIndices) = get_all_data(s.snaps)
 IndexMaps.get_index_map(s::SnapshotsAtIndices) = get_index_map(s.snaps)
+
+_num_all_params(s::AbstractSnapshots) = num_params(s)
+_num_all_params(s::SnapshotsAtIndices) = _num_all_params(s.snaps)
 
 function ParamDataStructures.get_values(s::SnapshotsAtIndices)
   data = get_all_data(get_all_data(s))

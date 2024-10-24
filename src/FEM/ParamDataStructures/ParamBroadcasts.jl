@@ -18,6 +18,8 @@ struct ParamBroadcast{D} <: AbstractParamBroadcast
   plength::Int
 end
 
+ParamBroadcast(A::AbstractParamArray) = ParamBroadcast(A,param_length(A))
+
 get_all_data(A::ParamBroadcast) = A.data
 param_length(A::ParamBroadcast) = A.plength
 
@@ -40,17 +42,11 @@ function Base.broadcasted(f,a::Number,B::ParamBroadcast)
 end
 
 function Base.broadcasted(f,A::AbstractParamArray,b::Number)
-  C = similar(A)
-  fAb = f(get_all_data(A),b)
-  copyto!(get_all_data(C),fAb)
-  return ParamBroadcast(C)
+  Base.broadcasted(f,A,fill(b,param_length(A)))
 end
 
 function Base.broadcasted(f,a::Number,B::AbstractParamArray)
-  C = similar(B)
-  faB = f(a,get_all_data(B))
-  copyto!(get_all_data(C),faB)
-  return ParamBroadcast(C)
+  Base.broadcasted(f,fill(a,param_length(B)),B)
 end
 
 function Base.broadcasted(f,A::AbstractParamArray,b::AbstractVector{<:Number})
@@ -58,8 +54,8 @@ function Base.broadcasted(f,A::AbstractParamArray,b::AbstractVector{<:Number})
   C = similar(A)
   for i in param_eachindex(A)
     ai = param_getindex(A,i)
-    ci = f(ai,b[i])
-    param_setindex!(C,i,ci)
+    ci = Base.materialize(Base.broadcasted(f,ai,b[i]))
+    param_setindex!(C,ci,i)
   end
   return ParamBroadcast(C)
 end
@@ -69,8 +65,8 @@ function Base.broadcasted(f,a::AbstractVector{<:Number},B::AbstractParamArray)
   C = similar(B)
   for i in param_eachindex(B)
     bi = param_getindex(B,i)
-    ci = f(a[i],bi)
-    param_setindex!(C,i,ci)
+    ci = Base.materialize(Base.broadcasted(f,a[i],bi))
+    param_setindex!(C,ci,i)
   end
   return ParamBroadcast(C)
 end

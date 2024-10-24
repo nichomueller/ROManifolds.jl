@@ -361,9 +361,12 @@ function Algebra.residual!(
   u::AbstractVector,
   cache)
 
+  A_lin = cache.A_lin
   b_lin = cache.b_lin
   paramcache = cache.paramcache
-  residual!(b,get_nonlinear_operator(op),μ,u,paramcache;add=true)
+  residual!(b,get_nonlinear_operator(op),μ,u,paramcache)
+  mul!(b,A_lin,u,true,true)
+  axpy!(1.0,b_lin,b)
   b
 end
 

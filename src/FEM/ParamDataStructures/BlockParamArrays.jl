@@ -1,4 +1,4 @@
-ParamArray(A::AbstractArray{<:ParamArray}) = mortar(A)
+ParamArray(A::AbstractArray{<:AbstractParamArray}) = mortar(A)
 
 function param_array(a::BlockArray,l::Integer)
   mortar(b -> param_array(b,l),blocks(a))
