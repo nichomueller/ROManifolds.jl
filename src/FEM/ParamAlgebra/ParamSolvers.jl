@@ -103,7 +103,6 @@ function Algebra._solve_nr!(x::AbstractParamVector,A,b,dx,ns,nls,op)
 
   while !done
     rmul!(b,-1)
-    jacobian!(A,op,x)
 
     @inbounds for i in param_eachindex(x)
       xi = param_getindex(x,i)
@@ -117,6 +116,10 @@ function Algebra._solve_nr!(x::AbstractParamVector,A,b,dx,ns,nls,op)
     residual!(b,op,x)
     res  = norm(b)
     done = LinearSolvers.update!(log,res)
+
+    if !done
+      jacobian!(A,op,x)
+    end
   end
 
   LinearSolvers.finalize!(log,res)

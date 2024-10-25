@@ -161,8 +161,8 @@ struct ConsecutiveParamArray{T,N,L,M,A<:AbstractArray{T,M}} <: ParamArray{T,N,L}
   end
 end
 
-const ConsecutiveParamVector{T,L} = ConsecutiveParamArray{T,1,L,2,Array{T,2}}
-const ConsecutiveParamMatrix{T,L} = ConsecutiveParamArray{T,2,L,3,Array{T,3}}
+const ConsecutiveParamVector{T,L} = ConsecutiveParamArray{T,1,L,2,<:AbstractArray{T,2}}
+const ConsecutiveParamMatrix{T,L} = ConsecutiveParamArray{T,2,L,3,<:AbstractArray{T,3}}
 
 get_all_data(A::ConsecutiveParamArray) = A.data
 

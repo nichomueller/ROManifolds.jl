@@ -6,7 +6,7 @@ using Serialization
 
 using ReducedOrderModels
 
-θ = 1.0
+θ = 0.5
 dt = 0.0025
 t0 = 0.0
 tf = 10*dt
@@ -68,13 +68,13 @@ trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
-  trial,test,trian_res,trian_stiffness,trian_mass)
+  trial,test,trian_res,trian_stiffness,trian_mass;constant_forms=(false,true))
 
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 
 tol = 1e-4
-state_reduction = TransientReduction(tol,energy;nparams=50)
+state_reduction = TransientReduction(coupling,tol,energy;nparams=50)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=50,nparams_jac=20,nparams_djac=1)
 
 fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
@@ -83,4 +83,4 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon,xh0μ)
-perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,μon)
+perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)

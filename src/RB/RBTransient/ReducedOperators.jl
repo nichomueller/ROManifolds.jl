@@ -105,12 +105,12 @@ function Algebra.residual!(
   us::Tuple{Vararg{RBParamVector}},
   rbcache::RBCache)
 
-  udata = ()
+  ufe = ()
   for u in us
-    inv_project!(u.data,rbcache.trial,u.redudced_data)
-    udata = (udata...,u.data)
+    inv_project!(u.fe_data,rbcache.trial,u.data)
+    ufe = (ufe...,u.fe_data)
   end
-  residual!(cache,op,r,udata,rbcache)
+  residual!(cache,op,r,ufe,rbcache)
 end
 
 function Algebra.jacobian!(
@@ -136,12 +136,12 @@ function Algebra.jacobian!(
   ws::Tuple{Vararg{Real}},
   rbcache::RBCache)
 
-  udata = ()
+  ufe = ()
   for u in us
-    inv_project!(u.data,rbcache.trial,u.redudced_data)
-    udata = (udata...,u.data)
+    inv_project!(u.fe_data,rbcache.trial,u.data)
+    ufe = (ufe...,u.fe_data)
   end
-  jacobian!(cache,op,r,udata,ws,rbcache)
+  jacobian!(cache,op,r,ufe,ws,rbcache)
 end
 
 function RBSteady.fe_residual!(
@@ -241,9 +241,7 @@ function Algebra.residual!(
 
   b_nlin = residual!(cache,nlop,r,us,rbcache_nlin)
   axpy!(1.0,b_lin,b_nlin)
-  for (u,A) in zip(us,A_lin)
-    mul!(b_nlin,A,u,true,true)
-  end
+  mul!(b_nlin,A_lin,us[1],true,true)
 
   return b_nlin
 end
@@ -254,16 +252,14 @@ function Algebra.jacobian!(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   ws::Tuple{Vararg{Real}},
-  paramcache::LinearNonlinearRBCache)
+  rbcache::LinearNonlinearRBCache)
 
   nlop = get_nonlinear_operator(op)
   A_lin = rbcache.A
   rbcache_nlin = rbcache.rbcache
 
   A_nlin = jacobian!(cache,nlop,r,us,ws,rbcache_nlin)
-  for A in A_lin
-    axpy!(1.0,A,A_nlin)
-  end
+  axpy!(1.0,A_lin,A_nlin)
 
   return A_nlin
 end

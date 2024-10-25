@@ -171,7 +171,10 @@ function LinearAlgebra.rmul!(A::BlockParamArray,b::Number)
 end
 
 function LinearAlgebra.axpy!(α::Number,A::BlockParamArray,B::BlockParamArray)
-  map((a,b) -> axpy!(α,a,b),blocks(A),blocks(B))
+  for (a,b) in zip(blocks(A),blocks(B))
+    (iszero(α) || iszero(a)) && continue
+    axpy!(α,a,b)
+  end
   return B
 end
 

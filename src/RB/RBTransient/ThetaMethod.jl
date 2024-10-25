@@ -1,6 +1,6 @@
 function RBSteady.allocate_rbcache(
   solver::ThetaMethod,
-  op::GenericTransientRBOperator,
+  op::TransientRBOperator,
   r::TransientRealization,
   u::AbstractParamVector)
 
@@ -68,7 +68,7 @@ function RBSteady.allocate_rbcache(
   solver::ThetaMethod,
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
-  us::AbstractParamVector)
+  us::Tuple{Vararg{AbstractParamVector}})
 
   dt,θ = solver.dt,solver.θ
   dtθ = θ*dt
@@ -91,25 +91,27 @@ function Algebra.solve!(
   op::TransientRBOperator{LinearNonlinearParamODE},
   r::TransientRealization,
   x::AbstractVector,
-  rbcache::LinearNonlinearRBCache)
+  cache::LinearNonlinearRBCache)
 
   sysslvr = solver.sysslvr
   dt,θ = solver.dt,solver.θ
   fill!(x,zero(eltype(x)))
-  ŷ = RBParamVector(x,x̂)
+  ŷ = RBParamVector(x̂,x)
+  uθ = copy(ŷ)
 
   function us(u)
-    copy!(uθ,u)
-    shift!(uθ,r,θ,1-θ)
-    axpy!(dtθ,ŷ,uθ)
+    copy!(uθ.fe_data,u.fe_data)
+    shift!(uθ.fe_data,r,θ,1-θ)
+    axpy!(dtθ,ŷ.fe_data,uθ.fe_data)
     (uθ,ŷ)
   end
 
   dtθ = θ*dt
   ws = (1,1/dtθ)
+  usx = (ŷ,ŷ)
 
-  Âcache = allocate_jacobian(op,r,usx,rbcache)
-  b̂cache = allocate_residual(op,r,usx,rbcache)
+  Âcache = jacobian(op,r,usx,ws,cache)
+  b̂cache = residual(op,r,usx,cache)
 
   Â_item = testitem(Âcache)
   x̂_item = testitem(x̂)
@@ -119,7 +121,7 @@ function Algebra.solve!(
   ns = numerical_setup(ss,Â_item,x̂_item)
 
   shift!(r,dt*(θ-1))
-  nlop = ParamStageOperator(op,rbcache,r,us,ws)
+  nlop = ParamStageOperator(op,cache,r,us,ws)
   Algebra._solve_nr!(ŷ,Âcache,b̂cache,dx̂,ns,sysslvr,nlop)
   shift!(r,dt*(1-θ))
 

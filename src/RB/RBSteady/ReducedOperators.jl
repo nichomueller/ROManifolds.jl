@@ -56,8 +56,8 @@ end
 
 struct LinearNonlinearRBCache <: AbstractParamCache
   rbcache::RBCache
-  A_lin::AbstractMatrix
-  b_lin::AbstractVector
+  A::AbstractMatrix
+  b::AbstractVector
 end
 
 abstract type RBOperator{T} <: ParamOperator{T} end
@@ -138,8 +138,8 @@ function Algebra.residual!(
   u::RBParamVector,
   rbcache::RBCache)
 
-  inv_project!(u.data,rbcache.trial,u.redudced_data)
-  residual!(cache,op,r,u.data,rbcache)
+  inv_project!(u.fe_data,rbcache.trial,u.data)
+  residual!(cache,op,r,u.fe_data,rbcache)
 end
 
 function Algebra.jacobian!(
@@ -163,8 +163,8 @@ function Algebra.jacobian!(
   u::RBParamVector,
   rbcache::RBCache)
 
-  inv_project!(u.data,rbcache.trial,u.redudced_data)
-  jacobian!(cache,op,r,u.data,rbcache)
+  inv_project!(u.fe_data,rbcache.trial,u.data)
+  jacobian!(cache,op,r,u.fe_data,rbcache)
 end
 
 function fe_jacobian!(
@@ -247,7 +247,7 @@ function allocate_rbcache(
   r::Realization,
   u::RBParamVector)
 
-  allocate_rbcache(op,r,u.data)
+  allocate_rbcache(op,r,u.fe_data)
 end
 
 function Algebra.allocate_residual(
@@ -357,7 +357,7 @@ function Algebra.solve!(
   rbcache::LinearNonlinearRBCache)
 
   nls = fesolver.nls
-  ŷ = RBParamVector(x,x̂)
+  ŷ = RBParamVector(x̂,x)
 
   Âcache = allocate_jacobian(op,r,ŷ,rbcache)
   b̂cache = allocate_residual(op,r,ŷ,rbcache)

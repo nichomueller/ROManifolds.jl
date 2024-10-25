@@ -487,7 +487,7 @@ end
 
 # linear - nonlinear case
 
-struct LinearNonlinearParamOpFromTFEOp <: ParamOperator{LinearNonlinearParamEq}
+struct LinearNonlinearParamOpFromTFEOp <: ODEParamOperator{LinearNonlinearParamODE}
   op::LinearNonlinearTransientParamFEOperator
 end
 

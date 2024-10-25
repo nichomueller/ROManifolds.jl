@@ -132,7 +132,6 @@ linear
 
 """
 struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE}
-  forms::Tuple{Vararg{Function}}
   res::Function
   jacs::Tuple{Vararg{Function}}
   constant_forms::Tuple{Vararg{Bool}}
@@ -153,7 +152,7 @@ function TransientParamLinearFEOperator(
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
   TransientParamLinearFEOpFromWeakForm(
-    forms,res,jacs,constant_forms,tpspace,assem,index_map,trial,test,order,args...)
+    res,jacs,constant_forms,tpspace,assem,index_map,trial,test,order,args...)
 end
 
 function TransientParamLinearFEOperator(
