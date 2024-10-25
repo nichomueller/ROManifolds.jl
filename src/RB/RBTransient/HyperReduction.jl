@@ -121,7 +121,7 @@ function RBSteady.inv_project!(cache,a::TupOfAffineContribution,b::TupOfArrayCon
 end
 
 function RBSteady.allocate_hypred_cache(a::TupOfAffineContribution,r::TransientRealization)
-  coeffs = map(ai -> RBSteady.allocate_coefficient(a,r),ai)
+  coeffs = map(ai -> RBSteady.allocate_coefficient(ai,r),a)
   hypred = RBSteady.allocate_hyper_reduction(first(a),r)
   return coeffs,hypred
 end

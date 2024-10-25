@@ -47,9 +47,9 @@ function reduced_operator(
   LinearNonlinearRBOperator(red_op_lin,red_op_nlin)
 end
 
-struct RBCache <: AbstractParamCache
-  A::HRParamArray
-  b::HRParamArray
+struct RBCache{Ta,Tb} <: AbstractParamCache
+  A::Ta
+  b::Tb
   trial::RBSpace
   paramcache::ParamOpCache
 end
@@ -62,7 +62,7 @@ end
 
 abstract type RBOperator{T} <: ParamOperator{T} end
 
-function allocate_rbcache(op::RBOperator,args...)
+function allocate_rbcache(fesolver,op::RBOperator,args...)
   @abstractmethod
 end
 
@@ -80,6 +80,7 @@ get_fe_trial(op::GenericRBOperator) = get_trial(op.op)
 get_fe_test(op::GenericRBOperator) = get_test(op.op)
 
 function allocate_rbcache(
+  fesolver,
   op::GenericRBOperator,
   r::Realization,
   u::AbstractParamVector)
@@ -199,7 +200,7 @@ splitting of terms in nonlinear applications
 
 """
 struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}
-  op_linear::GenericRBOperator{<:LinearParamEq}
+  op_linear::GenericRBOperator{LinearParamEq}
   op_nonlinear::GenericRBOperator{NonlinearParamEq}
 end
 
@@ -227,6 +228,7 @@ function get_fe_test(op::LinearNonlinearRBOperator)
 end
 
 function allocate_rbcache(
+  fesolver,
   op::LinearNonlinearRBOperator,
   r::Realization,
   u::AbstractParamVector)
@@ -234,8 +236,8 @@ function allocate_rbcache(
   lop = get_linear_operator(op)
   nlop = get_nonlinear_operator(op)
 
-  rbcache_lin = allocate_rbcache(lop,r,u)
-  rbcache_nlin = allocate_rbcache(nlop,r,u)
+  rbcache_lin = allocate_rbcache(fesolver,lop,r,u)
+  rbcache_nlin = allocate_rbcache(fesolver,nlop,r,u)
   A_lin = jacobian(lop,r,u,rbcache_lin)
   b_lin = residual(lop,r,u,rbcache_lin)
 
@@ -243,11 +245,12 @@ function allocate_rbcache(
 end
 
 function allocate_rbcache(
+  fesolver,
   op::LinearNonlinearRBOperator,
   r::Realization,
   u::RBParamVector)
 
-  allocate_rbcache(op,r,u.data)
+  allocate_rbcache(fesolver,op,r,u.data)
 end
 
 function Algebra.allocate_residual(
@@ -317,7 +320,7 @@ end
 function Algebra.solve(
   solver::RBSolver,
   op::RBOperator,
-  r::Realization)
+  r::AbstractRealization)
 
   fesolver = get_fe_solver(solver)
   fe_trial = get_fe_trial(op)(r)
@@ -325,7 +328,7 @@ function Algebra.solve(
   x = zero_free_values(fe_trial)
   x̂ = zero_free_values(trial)
 
-  rbcache = allocate_rbcache(op,r,x)
+  rbcache = allocate_rbcache(fesolver,op,r,x)
 
   t = @timed solve!(x̂,fesolver,op,r,x,rbcache)
   stats = CostTracker(t,nruns=num_params(r))
@@ -359,20 +362,18 @@ function Algebra.solve!(
   nls = fesolver.nls
   ŷ = RBParamVector(x,x̂)
 
-  Acache = allocate_jacobian(op,r,ŷ,rbcache)
-  bcache = allocate_residual(op,r,ŷ,rbcache)
-  Â = jacobian!(Acache,op,r,ŷ,rbcache)
-  b̂ = residual!(bcache,op,r,ŷ,rbcache)
+  Âcache = allocate_jacobian(op,r,ŷ,rbcache)
+  b̂cache = allocate_residual(op,r,ŷ,rbcache)
 
-  Â_item = testitem(Â)
+  Â_item = testitem(Âcache)
   x̂_item = testitem(x̂)
   dx̂ = allocate_in_domain(Â_item)
   fill!(dx̂,zero(eltype(dx̂)))
-  ss = symbolic_setup(nls.ls,Â_item)
+  ss = symbolic_setup(BackslashSolver(),Â_item)
   ns = numerical_setup(ss,Â_item,x̂_item)
 
   nlop = ParamNonlinearOperator(op,r,rbcache)
-  Algebra._solve_nr!(ŷ,Acache,bcache,dx̂,ns,nls,nlop)
+  Algebra._solve_nr!(ŷ,Âcache,b̂cache,dx̂,ns,nls,nlop)
 
   return x̂
 end

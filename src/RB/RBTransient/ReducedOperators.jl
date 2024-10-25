@@ -62,48 +62,22 @@ FESpaces.get_test(op::GenericTransientRBOperator) = op.test
 RBSteady.get_fe_trial(op::GenericTransientRBOperator) = get_trial(op.op)
 RBSteady.get_fe_test(op::GenericTransientRBOperator) = get_test(op.op)
 
-function allocate_odeparamcache(
-  fesolver,
-  op::GenericTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  @abstractmethod
-end
-
-function ParamSteady.allocate_paramcache(
-  op::GenericTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  allocate_paramcache(op.op,r,us)
-end
-
-function RBSteady.allocate_rbcache(
-  fesolver,
-  op::GenericTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  @abstractmethod
-end
-
 function Algebra.allocate_residual(
   op::GenericTransientRBOperator,
   r::TransientRealization,
-  args...)
+  us::Tuple{Vararg{AbstractParamVector}},
+  rbcache::RBCache)
 
-  rhs_rb = RBSteady.allocate_hypred_cache(op.rhs,r)
-  return rhs_rb
+  rbcache.b
 end
 
 function Algebra.allocate_jacobian(
   op::GenericTransientRBOperator,
   r::TransientRealization,
-  args...)
+  us::Tuple{Vararg{AbstractParamVector}},
+  rbcache::RBCache)
 
-  lhs_rb = RBSteady.allocate_hypred_cache(op.lhs,r)
-  return lhs_rb
+  first(rbcache.A)
 end
 
 function Algebra.residual!(
@@ -111,12 +85,28 @@ function Algebra.residual!(
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
-  paramcache;
-  kwargs...)
+  paramcache)
 
-  b,b̂ = cache
+  b = cache.fe_quantity
+  paramcache = rbcache.paramcache
+
   feb = fe_residual!(b,op,r,us,paramcache)
-  inv_project!(b̂,op.rhs,feb)
+  inv_project!(cache,op.rhs,feb)
+end
+
+function Algebra.residual!(
+  cache,
+  op::GenericTransientRBOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{RBParamVector}},
+  rbcache::RBCache)
+
+  udata = ()
+  for u in us
+    inv_project!(u.data,rbcache.trial,u.redudced_data)
+    udata = (udata...,u.data)
+  end
+  residual!(cache,op,r,udata,rbcache)
 end
 
 function Algebra.jacobian!(
@@ -125,11 +115,29 @@ function Algebra.jacobian!(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   ws::Tuple{Vararg{Real}},
-  paramcache)
+  rbcache::RBCache)
 
-  A,Â = cache
+  A = cache.fe_quantity
+  paramcache = rbcache.paramcache
+
   feA = fe_jacobian!(A,op,r,us,ws,paramcache)
-  inv_project!(Â,op.lhs,feA)
+  inv_project!(cache,op.lhs,feA)
+end
+
+function Algebra.jacobian!(
+  cache,
+  op::GenericTransientRBOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{RBParamVector}},
+  ws::Tuple{Vararg{Real}},
+  rbcache::RBCache)
+
+  udata = ()
+  for u in us
+    inv_project!(u.data,rbcache.trial,u.redudced_data)
+    udata = (udata...,u.data)
+  end
+  jacobian!(cache,op,r,udata,ws,rbcache)
 end
 
 function RBSteady.fe_residual!(
@@ -197,48 +205,22 @@ function RBSteady.get_fe_test(op::LinearNonlinearTransientRBOperator)
   RBSteady.get_fe_test(op.op_nonlinear)
 end
 
-function allocate_odeparamcache(
-  fesolver,
-  op::LinearNonlinearTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  @abstractmethod
-end
-
-function ParamSteady.allocate_paramcache(
-  op::LinearNonlinearTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  @notimplemented
-end
-
-function RBSteady.allocate_rbcache(
-  fesolver,
-  op::LinearNonlinearTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  cache_lin = RBSteady.allocate_rbcache(fesolver,get_linear_operator(op),r,us)
-  cache_nlin = RBSteady.allocate_rbcache(fesolver,get_nonlinear_operator(op),r,us)
-  return (cache_lin,cache_nlin)
-end
-
 function Algebra.allocate_residual(
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
-  args...)
+  us::Tuple{Vararg{AbstractParamVector}},
+  rbcache::LinearNonlinearRBCache)
 
-  @notimplemented
+  rbcache.rbcache.b
 end
 
 function Algebra.allocate_jacobian(
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
-  args...)
+  us::Tuple{Vararg{AbstractParamVector}},
+  rbcache::LinearNonlinearRBCache)
 
-  @notimplemented
+  first(rbcache.rbcache.A)
 end
 
 function Algebra.residual!(
@@ -246,10 +228,20 @@ function Algebra.residual!(
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
-  paramcache;
-  kwargs...)
+  paramcache::LinearNonlinearRBCache)
 
-  @notimplemented
+  nlop = get_nonlinear_operator(op)
+  A_lin = rbcache.A
+  b_lin = rbcache.b
+  rbcache_nlin = rbcache.rbcache
+
+  b_nlin = residual!(cache,nlop,r,us,rbcache_nlin)
+  axpy!(1.0,b_lin,b_nlin)
+  for (u,A) in zip(us,A_lin)
+    mul!(b_nlin,A,u,true,true)
+  end
+
+  return b_nlin
 end
 
 function Algebra.jacobian!(
@@ -258,90 +250,26 @@ function Algebra.jacobian!(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   ws::Tuple{Vararg{Real}},
-  paramcache)
+  paramcache::LinearNonlinearRBCache)
 
-  @notimplemented
+  nlop = get_nonlinear_operator(op)
+  A_lin = rbcache.A
+  rbcache_nlin = rbcache.rbcache
+
+  A_nlin = jacobian!(cache,nlop,r,us,ws,rbcache_nlin)
+  for A in A_lin
+    axpy!(1.0,A,A_nlin)
+  end
+
+  return A_nlin
 end
-
-# Solve a POD-MDEIM problem
 
 function Algebra.solve(
   solver::RBSolver,
   op::TransientRBOperator{NonlinearParamODE},
-  r::AbstractRealization)
+  r::TransientRealization)
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
-end
-
-function Algebra.solve(
-  solver::RBSolver,
-  op::TransientRBOperator,
-  r::TransientRealization;
-  kwargs...)
-
-  cache = solver.cache
-  if isnothing(cache.fecache) || isnothing(cache.rbcache)
-    RBSteady.init_online_cache!(solver,op,r)
-  else
-    RBSteady.online_cache!(solver,op,r)
-  end
-  solve!(cache,solver,op,r;kwargs...)
-end
-
-function Algebra.solve!(
-  cache,
-  solver::RBSolver,
-  op::TransientRBOperator,
-  r::TransientRealization;
-  kwargs...)
-
-  y,odeparamcache = cache.fecache
-  x̂,rbcache = cache.rbcache
-
-  t = @timed solve!(x̂,solver,op,r,(y,),odeparamcache,rbcache)
-  stats = CostTracker(t,nruns=num_params(r))
-
-  return x̂,stats
-end
-
-function Algebra.solve!(
-  x̂::AbstractVector,
-  solver::RBSolver,
-  op::TransientRBOperator,
-  r::TransientRealization,
-  statefe::Tuple{Vararg{AbstractVector}},
-  odeparamcache,
-  rbcache;
-  kwargs...)
-
-  fesolver = get_fe_solver(solver)
-
-  sysslvr = fesolver.sysslvr
-  odeslvrcache,paramcache = odeparamcache
-  _...,sysslvrcache = odeslvrcache
-
-  stageop = get_stage_operator(fesolver,op,r,statefe,odeparamcache,rbcache)
-  solve!(x̂,sysslvr,stageop,sysslvrcache)
-  return x̂
-end
-
-function Algebra.solve!(
-  x̂::AbstractVector,
-  solver::RBSolver,
-  op::TransientRBOperator{LinearNonlinearParamODE},
-  r::TransientRealization,
-  statefe::Tuple{Vararg{AbstractVector}},
-  odeparamcache,
-  rbcache;
-  kwargs...)
-
-  fesolver = get_fe_solver(solver)
-  nls = fesolver.sysslvr
-  x = statefe[1]
-
-  stageop = get_stage_operator(fesolver,op,r,statefe,odeparamcache,rbcache)
-  solve!(x̂,nls,stageop,r,x;kwargs...)
-  return x̂
 end
 
 # cache utils
