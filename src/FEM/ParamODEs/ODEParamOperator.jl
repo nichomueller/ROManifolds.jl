@@ -49,7 +49,7 @@ function Algebra.residual(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
 
-  paramcache = allocate_paramcache(odeop,r,us)
+  paramcache = allocate_paramcache(odeop,r,us;evaluated=true)
   residual(odeop,r,us,paramcache)
 end
 
@@ -103,7 +103,7 @@ function Algebra.jacobian(
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}})
 
-  paramcache = allocate_paramcache(odeop,r,us)
+  paramcache = allocate_paramcache(odeop,r,us;evaluated=true)
   jacobian(odeop,r,us,ws,paramcache)
 end
 
@@ -122,17 +122,19 @@ end
 function ParamSteady.allocate_paramcache(
   odeop::ODEParamOperator,
   r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}})
+  us::Tuple{Vararg{AbstractVector}};
+  evaluated=false)
 
   feop = get_fe_operator(odeop)
   order = get_order(odeop)
   pttrial = get_trial(feop)
-  trial = allocate_space(pttrial,r)
+  trial = evaluated ? evaluate(pttrial,r) : allocate_space(pttrial,r)
   pttrials = (pttrial,)
   trials = (trial,)
   for k in 1:order
     pttrials = (pttrials...,∂t(pttrials[k]))
-    trials = (trials...,allocate_space(pttrials[k+1],r))
+    trialk = evaluated ? evaluate(pttrials[k+1],r) : allocate_space(pttrials[k+1],r)
+    trials = (trials...,trialk)
   end
   feop_cache = allocate_feopcache(feop,r,us)
   ParamOpCache(trials,pttrials,feop_cache)

@@ -47,7 +47,11 @@ function RBSteady.reduced_operator(
   LinearNonlinearTransientRBOperator(red_op_lin,red_op_nlin)
 end
 
-abstract type TransientRBOperator{T} <: RBOperator{T} end
+abstract type TransientRBOperator{T} <: ODEParamOperator{T} end
+
+function RBSteady.allocate_rbcache(fesolver::ODESolver,op::RBOperator,args...)
+  @abstractmethod
+end
 
 struct GenericTransientRBOperator{T} <: TransientRBOperator{T}
   op::ODEParamOperator{T}
@@ -77,15 +81,15 @@ function Algebra.allocate_jacobian(
   us::Tuple{Vararg{AbstractParamVector}},
   rbcache::RBCache)
 
-  first(rbcache.A)
+  rbcache.A
 end
 
 function Algebra.residual!(
-  cache,
+  cache::HRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
-  paramcache)
+  rbcache::RBCache)
 
   b = cache.fe_quantity
   paramcache = rbcache.paramcache
@@ -95,7 +99,7 @@ function Algebra.residual!(
 end
 
 function Algebra.residual!(
-  cache,
+  cache::HRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{RBParamVector}},
@@ -110,7 +114,7 @@ function Algebra.residual!(
 end
 
 function Algebra.jacobian!(
-  cache,
+  cache::HRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
@@ -125,7 +129,7 @@ function Algebra.jacobian!(
 end
 
 function Algebra.jacobian!(
-  cache,
+  cache::HRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{RBParamVector}},
@@ -220,7 +224,7 @@ function Algebra.allocate_jacobian(
   us::Tuple{Vararg{AbstractParamVector}},
   rbcache::LinearNonlinearRBCache)
 
-  first(rbcache.rbcache.A)
+  rbcache.rbcache.A
 end
 
 function Algebra.residual!(
@@ -228,7 +232,7 @@ function Algebra.residual!(
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
-  paramcache::LinearNonlinearRBCache)
+  rbcache::LinearNonlinearRBCache)
 
   nlop = get_nonlinear_operator(op)
   A_lin = rbcache.A
@@ -270,6 +274,25 @@ function Algebra.solve(
   r::TransientRealization)
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
+end
+
+function Algebra.solve(
+  solver::RBSolver,
+  op::TransientRBOperator,
+  r::TransientRealization)
+
+  fesolver = get_fe_solver(solver)
+  fe_trial = get_fe_trial(op)(r)
+  trial = get_trial(op)(r)
+  x = zero_free_values(fe_trial)
+  x̂ = zero_free_values(trial)
+
+  rbcache = allocate_rbcache(fesolver,op,r,x)
+
+  t = @timed solve!(x̂,fesolver,op,r,x,rbcache)
+  stats = CostTracker(t,nruns=num_params(r))
+
+  return x̂,stats
 end
 
 # cache utils
@@ -314,7 +337,7 @@ function select_slvrcache_at_indices(cache::TupOfArrayContribution,indices)
 end
 
 function select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveParamVector}},paramcache,indices)
-  @unpack trial,ptrial,feop_cache,const_forms = paramcache
+  @unpack trial,ptrial,feop_cache = paramcache
   new_xhF = ()
   new_trial = ()
   for i = eachindex(trial)
@@ -322,12 +345,12 @@ function select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveParamVector}},p
     new_XhF_i = ConsecutiveParamArray(us[i].data[:,indices])
     new_xhF = (new_xhF...,new_XhF_i)
   end
-  new_odeopcache = ParamOpCache(new_trial,ptrial,feop_cache,const_forms)
+  new_odeopcache = ParamOpCache(new_trial,ptrial,feop_cache)
   return new_xhF,new_odeopcache
 end
 
 function select_evalcache_at_indices(us::Tuple{Vararg{BlockConsecutiveParamVector}},paramcache,indices)
-  @unpack trial,ptrial,feop_cache,const_forms = paramcache
+  @unpack trial,ptrial,feop_cache = paramcache
   new_xhF = ()
   new_trial = ()
   for i = eachindex(trial)
@@ -339,7 +362,7 @@ function select_evalcache_at_indices(us::Tuple{Vararg{BlockConsecutiveParamVecto
     new_XhF_i = mortar([ConsecutiveParamArray(us_i.data[:,indices]) for us_i in blocks(us[i])])
     new_xhF = (new_xhF...,new_XhF_i)
   end
-  new_odeopcache = ParamOpCache(new_trial,ptrial,feop_cache,const_forms)
+  new_odeopcache = ParamOpCache(new_trial,ptrial,feop_cache)
   return new_xhF,new_odeopcache
 end
 

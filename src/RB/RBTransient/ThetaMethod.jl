@@ -21,7 +21,7 @@ function RBSteady.allocate_rbcache(
   dt,θ = solver.dt,solver.θ
   shift!(r,dt*(θ-1))
 
-  paramcache = allocate_paramcache(op.op,r,us)
+  paramcache = allocate_paramcache(op.op,r,us;evaluated=true)
 
   A = allocate_jacobian(op.op,r,us,paramcache)
   coeffA,Â = allocate_hypred_cache(op.lhs,r)
@@ -46,6 +46,7 @@ function Algebra.solve!(
   x::AbstractVector,
   rbcache::RBCache)
 
+  sysslvr = solver.sysslvr
   dt,θ = solver.dt,solver.θ
   fill!(x,zero(eltype(x)))
   usx = (x,x)
@@ -56,7 +57,7 @@ function Algebra.solve!(
   Â = jacobian(op,r,usx,ws,rbcache)
   b̂ = residual(op,r,usx,rbcache)
   rmul!(b̂,-1)
-  solve!(x̂,fesolver.ls,Â,b̂)
+  solve!(x̂,sysslvr,Â,b̂)
   shift!(r,dt*(1-θ))
   return x̂
 end
@@ -76,8 +77,8 @@ function RBSteady.allocate_rbcache(
   lop = get_linear_operator(op)
   nlop = get_nonlinear_operator(op)
 
-  rbcache_lin = allocate_rbcache(fesolver,lop,r,us)
-  rbcache_nlin = allocate_rbcache(fesolver,nlop,r,us)
+  rbcache_lin = allocate_rbcache(solver,lop,r,us)
+  rbcache_nlin = allocate_rbcache(solver,nlop,r,us)
   A_lin = jacobian(lop,r,us,ws,rbcache_lin)
   b_lin = residual(lop,r,us,rbcache_lin)
 
@@ -92,7 +93,7 @@ function Algebra.solve!(
   x::AbstractVector,
   rbcache::LinearNonlinearRBCache)
 
-  nls = solver.nls
+  sysslvr = solver.sysslvr
   dt,θ = solver.dt,solver.θ
   fill!(x,zero(eltype(x)))
   ŷ = RBParamVector(x,x̂)
@@ -119,7 +120,7 @@ function Algebra.solve!(
 
   shift!(r,dt*(θ-1))
   nlop = ParamStageOperator(op,rbcache,r,us,ws)
-  Algebra._solve_nr!(ŷ,Âcache,b̂cache,dx̂,ns,nls,nlop)
+  Algebra._solve_nr!(ŷ,Âcache,b̂cache,dx̂,ns,sysslvr,nlop)
   shift!(r,dt*(1-θ))
 
   return x̂

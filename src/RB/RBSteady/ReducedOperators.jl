@@ -62,7 +62,7 @@ end
 
 abstract type RBOperator{T} <: ParamOperator{T} end
 
-function allocate_rbcache(fesolver,op::RBOperator,args...)
+function allocate_rbcache(op::RBOperator,args...)
   @abstractmethod
 end
 
@@ -80,7 +80,6 @@ get_fe_trial(op::GenericRBOperator) = get_trial(op.op)
 get_fe_test(op::GenericRBOperator) = get_test(op.op)
 
 function allocate_rbcache(
-  fesolver,
   op::GenericRBOperator,
   r::Realization,
   u::AbstractParamVector)
@@ -228,7 +227,6 @@ function get_fe_test(op::LinearNonlinearRBOperator)
 end
 
 function allocate_rbcache(
-  fesolver,
   op::LinearNonlinearRBOperator,
   r::Realization,
   u::AbstractParamVector)
@@ -236,8 +234,8 @@ function allocate_rbcache(
   lop = get_linear_operator(op)
   nlop = get_nonlinear_operator(op)
 
-  rbcache_lin = allocate_rbcache(fesolver,lop,r,u)
-  rbcache_nlin = allocate_rbcache(fesolver,nlop,r,u)
+  rbcache_lin = allocate_rbcache(lop,r,u)
+  rbcache_nlin = allocate_rbcache(nlop,r,u)
   A_lin = jacobian(lop,r,u,rbcache_lin)
   b_lin = residual(lop,r,u,rbcache_lin)
 
@@ -245,12 +243,11 @@ function allocate_rbcache(
 end
 
 function allocate_rbcache(
-  fesolver,
   op::LinearNonlinearRBOperator,
   r::Realization,
   u::RBParamVector)
 
-  allocate_rbcache(fesolver,op,r,u.data)
+  allocate_rbcache(op,r,u.data)
 end
 
 function Algebra.allocate_residual(
@@ -328,7 +325,7 @@ function Algebra.solve(
   x = zero_free_values(fe_trial)
   x̂ = zero_free_values(trial)
 
-  rbcache = allocate_rbcache(fesolver,op,r,x)
+  rbcache = allocate_rbcache(op,r,x)
 
   t = @timed solve!(x̂,fesolver,op,r,x,rbcache)
   stats = CostTracker(t,nruns=num_params(r))
