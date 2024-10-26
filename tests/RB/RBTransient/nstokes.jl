@@ -93,10 +93,10 @@ tol = 1e-4
 state_reduction = TransientReduction(coupling,tol,energy;nparams=20)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,nparams_djac=1)
 
-fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ;r)
+fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-μon = TransientRealization(Realization([[0.4,0.4,0.4]]),tdomain)
-x̂,rbstats = solve(rbsolver,rbop,μon)
+ronline = realization(feop;nparams=10)
+x̂,rbstats = solve(rbsolver,rbop,ronline)
 
-x,festats = solution_snapshots(rbsolver,feop,μon,xh0μ)
-perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
+x,festats = solution_snapshots(rbsolver,feop,ronline,xh0μ)
+perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)

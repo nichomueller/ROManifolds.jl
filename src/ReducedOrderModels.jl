@@ -218,6 +218,7 @@ export ParamOperator
 export LinearNonlinearParamOpFromFEOp
 
 export ParamFEOperator
+export LinearParamFEOperator
 export ParamFEOperatorWithTrian
 export set_triangulation
 export change_triangulation

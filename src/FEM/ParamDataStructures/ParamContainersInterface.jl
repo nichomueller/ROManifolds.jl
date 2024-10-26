@@ -90,10 +90,11 @@ end
 
 abstract type ParamType{T<:AbstractParamContainer,L} <: Core.Any end
 
-Base.eltype(::ParamType{T,L}) where {T,L} = eltype(T)
-param_length(::ParamType{T,L}) where {T,L} = L
-
 param_typeof(a::AbstractParamContainer) = ParamType{typeof(a),param_length(a)}
+
+const PType{T,L} = Union{ParamType{T,L},Type{ParamType{T,L}}}
+Base.eltype(::PType{T,L}) where {T,L} = eltype(T)
+param_length(::PType{T,L}) where {T,L} = L
 
 """
     struct ParamContainer{T} <: AbstractArray{T,1} end
@@ -118,13 +119,9 @@ Base.size(a::ParamContainer) = (param_length(a),)
 Base.getindex(a::ParamContainer,i::Integer) = getindex(a.data,i)
 Base.setindex!(a::ParamContainer,v,i::Integer) = setindex!(a.data,v,i)
 
-const ParamNumber{T} = ParamContainer{T<:Number}
+const ParamNumber = ParamContainer
 
 to_param_quantity(a::Number,plength::Integer) = ParamNumber(fill(a,plength))
-
-Base.size(a::ParamNumber) = (param_length(a),)
-Base.getindex(a::ParamNumber,i::Integer) = getindex(a.data,i)
-Base.setindex!(a::ParamNumber,v,i::Integer) = setindex!(a.data,v,i)
 
 for op in (:+,:-)
   @eval begin

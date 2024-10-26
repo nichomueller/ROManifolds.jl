@@ -56,6 +56,7 @@ export get_fe_operator
 include("ParamOperator.jl")
 
 export ParamFEOperator
+export LinearParamFEOperator
 export get_param_space
 include("ParamFEOperator.jl")
 

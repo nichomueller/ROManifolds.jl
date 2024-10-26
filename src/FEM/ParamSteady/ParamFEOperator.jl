@@ -114,7 +114,7 @@ function LinearParamFEOperator(
   jac′(μ,u,du,v,args...) = jac(μ,du,v,args...)
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
-  ParamFEOpFromWeakForm{LinearParamEq}(res,jac′,pspace,constant_jac,assem,index_map,trial,test)
+  ParamFEOpFromWeakForm{LinearParamEq}(res,jac′,pspace,assem,index_map,trial,test)
 end
 
 FESpaces.get_test(op::ParamFEOpFromWeakForm) = op.test

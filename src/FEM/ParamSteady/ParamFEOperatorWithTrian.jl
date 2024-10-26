@@ -21,19 +21,16 @@ struct ParamFEOperatorWithTrian{T} <: ParamFEOperator{T}
   end
 end
 
-function ParamFEOperator(
-  res::Function,
-  jac::Function,
-  pspace::ParamSpace,
-  trial::FESpace,
-  test::FESpace,
-  trian_res,
-  trian_jac;
-  kwargs...)
+for f in (:ParamFEOperator,:LinearParamFEOperator)
+  @eval begin
+    function $f(res::Function,jac::Function,pspace::ParamSpace,
+      trial::FESpace,test::FESpace,trian_res,trian_jac)
 
-  op = ParamFEOperator(res,jac,pspace,trial,test;kwargs...)
-  op_trian = ParamFEOperatorWithTrian(op,trian_res,trian_jac)
-  return op_trian
+      op = $f(res,jac,pspace,trial,test)
+      op_trian = ParamFEOperatorWithTrian(op,trian_res,trian_jac)
+      return op_trian
+    end
+  end
 end
 
 FESpaces.get_test(op::ParamFEOperatorWithTrian) = get_test(op.op)

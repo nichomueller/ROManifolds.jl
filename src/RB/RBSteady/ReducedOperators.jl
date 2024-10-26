@@ -359,8 +359,8 @@ function Algebra.solve!(
   nls = fesolver.nls
   ŷ = RBParamVector(x̂,x)
 
-  Âcache = allocate_jacobian(op,r,ŷ,rbcache)
-  b̂cache = allocate_residual(op,r,ŷ,rbcache)
+  Âcache = jacobian(op,r,ŷ,rbcache)
+  b̂cache = residual(op,r,ŷ,rbcache)
 
   Â_item = testitem(Âcache)
   x̂_item = testitem(x̂)

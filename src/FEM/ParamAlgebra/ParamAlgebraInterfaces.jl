@@ -1,12 +1,12 @@
 eltype2(x) = eltype(eltype(x))
 
 function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamVector
-  @warn "Allocating a vector of unit parametric length"
+  @warn "Allocating a vector of unit parametric length, will likely result in an error"
   vector = allocate_vector(eltype(V),n)
   param_array(vector,1)
 end
 
-function Algebra.allocate_vector(::ParamType{V,L},n::Integer) where {V<:AbstractParamVector,L}
+function Algebra.allocate_vector(::PType{V,L},n::Integer) where {V<:AbstractParamVector,L}
   vector = allocate_vector(eltype(V),n)
   param_array(vector,L)
 end
@@ -16,7 +16,7 @@ function Algebra.allocate_vector(::Type{<:BlockParamVector{T}},indices::BlockedU
   mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
 end
 
-function Algebra.allocate_vector(::ParamType{<:BlockParamVector{T},L},indices::BlockedUnitRange) where {T,L}
+function Algebra.allocate_vector(::PType{<:BlockParamVector{T},L},indices::BlockedUnitRange) where {T,L}
   V = ConsecutiveParamVector{T}
   PV = ParamType{V,L}
   mortar(map(ids -> allocate_vector(PV,ids),blocks(indices)))
@@ -158,13 +158,13 @@ end
   A
 end
 
-function Algebra.is_entry_stored(::ParamType{T},i,j) where T
+function Algebra.is_entry_stored(::PType{T},i,j) where T
   is_entry_stored(eltype(T),i,j)
 end
 
 # sparse functionalities
 
-function Algebra.allocate_coo_vectors(::ParamType{T,L},n::Integer) where {Tv,Ti,T<:ParamSparseMatrix{Tv,Ti},L}
+function Algebra.allocate_coo_vectors(::PType{T,L},n::Integer) where {Tv,Ti,T<:ParamSparseMatrix{Tv,Ti},L}
   I = zeros(Ti,n)
   J = zeros(Ti,n)
   V = zeros(Tv,n)
@@ -172,7 +172,7 @@ function Algebra.allocate_coo_vectors(::ParamType{T,L},n::Integer) where {Tv,Ti,
   I,J,PV
 end
 
-@inline function Algebra.push_coo!(::ParamType{<:ParamSparseMatrix},I,J,V,i,j,v)
+@inline function Algebra.push_coo!(::PType{<:ParamSparseMatrix},I,J,V,i,j,v)
   @notimplemented "Cannot push to ParamArray"
 end
 
@@ -195,13 +195,13 @@ Algebra.LoopStyle(::Type{<:ParamCounter{C}}) where C = LoopStyle(C)
   add_entry!(+,a.counter,v,i,j)
 end
 
-function Algebra.nz_counter(builder::SparseMatrixBuilder{ParamType{T,L}},axes) where {T,L}
+function Algebra.nz_counter(builder::SparseMatrixBuilder{<:PType{T,L}},axes) where {T,L}
   Tv = eltype(T)
   counter = nz_counter(SparseMatrixBuilder(Tv),axes)
   ParamCounter(counter,L)
 end
 
-function Algebra.nz_allocation(a::Algebra.ArrayCounter{ParamType{T,L}}) where {T,L}
+function Algebra.nz_allocation(a::Algebra.ArrayCounter{<:PType{T,L}}) where {T,L}
   Tv = eltype(T)
   v = similar(Tv,map(length,a.axes))
   fill!(v,zero(eltype(v)))
@@ -220,15 +220,15 @@ end
 
 # csc
 
-function Algebra.sparse_from_coo(::ParamType{<:ParamSparseMatrixCSC},I,J,V,m,n)
+function Algebra.sparse_from_coo(::PType{<:ParamSparseMatrixCSC},I,J,V,m,n)
   sparse(I,J,V,m,n)
 end
 
-@inline function Algebra.is_entry_stored(::ParamType{<:ParamSparseMatrixCSC},i,j)
+@inline function Algebra.is_entry_stored(::PType{<:ParamSparseMatrixCSC},i,j)
   true
 end
 
-function Algebra.finalize_coo!(::ParamType{<:ParamSparseMatrixCSC},I,J,V,m,n)
+function Algebra.finalize_coo!(::PType{<:ParamSparseMatrixCSC},I,J,V,m,n)
   nothing
 end
 

@@ -48,6 +48,7 @@ include("ParamSpace.jl")
 
 export AbstractParamContainer
 export ParamType
+export PType
 export ParamContainer
 export ParamNumber
 export get_param_data

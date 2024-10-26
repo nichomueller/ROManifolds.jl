@@ -10,7 +10,7 @@ end
 
 const TransientEvalRBSpace{A<:RBSpace} = EvalRBSpace{A,<:TransientRealization}
 
-function _change_length(::ParamType{T,L},r::TransientRealization) where {T,L}
+function _change_length(::PType{T,L},r::TransientRealization) where {T,L}
   ParamType{T,Int(L/num_times(r))}
 end
 

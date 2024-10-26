@@ -67,7 +67,8 @@ get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(f.space)
 function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   V = get_vector_type(f.space)
   L = param_length(f)
-  param_typeof(V,L)
+  PV = param_array(V(),L)
+  param_typeof(PV)
 end
 
 function FESpaces.gather_free_and_dirichlet_values!(

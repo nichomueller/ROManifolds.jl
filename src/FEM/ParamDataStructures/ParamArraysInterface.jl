@@ -703,31 +703,114 @@ function Arrays.evaluate!(C::ParamContainer,f::Fields.ZeroBlockMap,A,B::Abstract
   end |> ParamArray
 end
 
-# for T in (:AbstractParamArray,:AbstractArray,:Nothing), S in (:AbstractParamArray,:AbstractArray)
-#   (T∈(:AbstractArray,:Nothing) && S==:AbstractArray) && continue
-#   @eval begin
-#     function Arrays.return_cache(f::Fields.ZeroBlockMap,A::$T,B::$S)
-#       pA,pB = to_param_quantities(A,B)
-#       c = return_cache(f,testitem(pA),testitem(pB))
-#       cache = Vector{typeof(c)}(undef,param_length(pA))
-#       @inbounds for i in param_eachindex(pA)
-#         cache[i] = return_cache(f,param_getindex(pA,i),param_getindex(pB,i))
-#       end
-#       return ParamArray(cache)
-#     end
-#   end
-# end
+function Arrays.return_cache(
+  k::BroadcastingFieldOpMap,
+  f::ArrayBlock{<:AbstractArray,N},
+  g::ArrayBlock{<:AbstractArray,N}
+  ) where N
 
-# for T in (:AbstractArray,:ArrayBlock)
-#   @eval begin
-#     function Arrays.evaluate!(C::AbstractParamArray,f::Fields.ZeroBlockMap,A,B::AbstractParamArray)
-#       setsize!(C,size(B))
-#       r = C.array
-#       fill!(r,zero(eltype(r)))
-#       ConsecutiveParamArray(r)
-#     end
-#   end
-# end
+  @notimplementedif size(f) != size(g)
+  fi = testvalue(testitem(f))
+  gi = testvalue(testitem(g))
+  ci = return_cache(k,fi,gi)
+  hi = evaluate!(ci,k,fi,gi)
+  m = Fields.ZeroBlockMap()
+  a = Array{typeof(hi),N}(undef,size(f.array))
+  b = Array{typeof(ci),N}(undef,size(f.array))
+  zf = Array{typeof(return_cache(m,fi,gi))}(undef,size(f.array))
+  zg = Array{typeof(return_cache(m,gi,fi))}(undef,size(f.array))
+  t = map(|,f.touched,g.touched)
+  for i in eachindex(f.array)
+    if f.touched[i] && g.touched[i]
+      b[i] = return_cache(k,f.array[i],g.array[i])
+    elseif f.touched[i]
+      _fi = f.array[i]
+      zg[i] = return_cache(m,gi,_fi)
+      _gi = evaluate!(zg[i],m,gi,_fi)
+      b[i] = return_cache(k,_fi,_gi)
+    elseif g.touched[i]
+      _gi = g.array[i]
+      zf[i] = return_cache(m,fi,_gi)
+      _fi = evaluate!(zf[i],m,fi,_gi)
+      b[i] = return_cache(k,_fi,_gi)
+    end
+  end
+  ArrayBlock(a,t), b, zf, zg
+end
+
+function Arrays.return_cache(
+  k::BroadcastingFieldOpMap,
+  f::ArrayBlock{<:AbstractArray,1},
+  g::ArrayBlock{<:AbstractArray,2}
+  )
+
+  fi = testvalue(testitem(f))
+  gi = testvalue(testitem(g))
+  ci = return_cache(k,fi,gi)
+  hi = evaluate!(ci,k,fi,gi)
+  @check size(g.array,1) == 1 || size(g.array,2) == 0
+  s = (size(f.array,1),size(g.array,2))
+  a = Array{typeof(hi),2}(undef,s)
+  b = Array{typeof(ci),2}(undef,s)
+  t = fill(false,s)
+  for j in 1:s[2]
+    for i in 1:s[1]
+      if f.touched[i] && g.touched[1,j]
+        t[i,j] = true
+        b[i,j] = return_cache(k,f.array[i],g.array[1,j])
+      end
+    end
+  end
+  ArrayBlock(a,t), b
+end
+
+function Arrays.return_cache(
+  k::BroadcastingFieldOpMap,
+  f::ArrayBlock{<:AbstractArray,2},
+  g::ArrayBlock{<:AbstractArray,1}
+  )
+
+  fi = testvalue(testitem(f))
+  gi = testvalue(testitem(g))
+  ci = return_cache(k,fi,gi)
+  hi = evaluate!(ci,k,fi,gi)
+  @check size(f.array,1) == 1 || size(f.array,2) == 0
+  s = (size(g.array,1),size(f.array,2))
+  a = Array{typeof(hi),2}(undef,s)
+  b = Array{typeof(ci),2}(undef,s)
+  t = fill(false,s)
+  for j in 1:s[2]
+    for i in 1:s[1]
+      if f.touched[1,j] && g.touched[i]
+        t[i,j] = true
+        b[i,j] = return_cache(k,f.array[1,j],g.array[i])
+      end
+    end
+  end
+  ArrayBlock(a,t), b
+end
+
+function Arrays.return_cache(
+  k::BroadcastingFieldOpMap,
+  a::(ArrayBlock{<:AbstractArray,N})...
+  ) where N
+
+  a1 = first(a)
+  @notimplementedif any(ai->size(ai)!=size(a1),a)
+  ais = map(ai->testvalue(testitem(ai)),a)
+  ci = return_cache(k,ais...)
+  bi = evaluate!(ci,k,ais...)
+  c = Array{typeof(ci),N}(undef,size(a1))
+  array = Array{typeof(bi),N}(undef,size(a1))
+  for i in eachindex(a1.array)
+    @notimplementedif any(ai->ai.touched[i]!=a1.touched[i],a)
+    if a1.touched[i]
+      _ais = map(ai->ai.array[i],a)
+      c[i] = return_cache(k,_ais...)
+    end
+  end
+  ArrayBlock(array,a1.touched), c
+end
 
 function Fields.unwrap_cached_array(A::AbstractParamArray)
   C = param_return_cache(unwrap_cached_array,A)

@@ -298,7 +298,7 @@ function select_fe_space_at_indices(fs::FESpace,indices)
 end
 
 function select_fe_space_at_indices(fs::TrivialParamFESpace,indices)
-  TrivialParamFESpace(fs.space,Val(length(indices)))
+  TrivialParamFESpace(fs.space,length(indices))
 end
 
 function select_fe_space_at_indices(fs::SingleFieldParamFESpace,indices)

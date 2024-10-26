@@ -1,4 +1,4 @@
-struct ParamStageOperator{T} <: ParamNonlinearOperator
+struct ParamStageOperator{T} <: StageOperator
   op::ODEParamOperator{T}
   cache::AbstractParamCache
   r::TransientRealization
@@ -92,6 +92,21 @@ function Algebra.jacobian!(
   usx = lop.us(x)
   ws = lop.ws
   jacobian!(A,op,r,usx,ws,cache)
+end
+
+function Algebra.solve!(
+  x::AbstractParamVector,
+  ls::LinearSolver,
+  lop::ParamStageOperator{LinearParamODE},
+  cache::Nothing)
+
+  fill!(x,zero(eltype(x)))
+  b = residual(lop,x)
+  rmul!(b,-1)
+  A = jacobian(lop,x)
+  ns = solve!(x,ls,A,b)
+
+  Algebra.LinearSolverCache(A,b,ns)
 end
 
 function Algebra.solve!(
