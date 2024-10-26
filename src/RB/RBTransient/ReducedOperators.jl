@@ -107,7 +107,7 @@ function Algebra.residual!(
 
   ufe = ()
   for u in us
-    inv_project!(u.fe_data,rbcache.trial,u.data)
+    # inv_project!(u.fe_data,rbcache.trial,u.data) this should already be executed
     ufe = (ufe...,u.fe_data)
   end
   residual!(cache,op,r,ufe,rbcache)
@@ -138,7 +138,7 @@ function Algebra.jacobian!(
 
   ufe = ()
   for u in us
-    inv_project!(u.fe_data,rbcache.trial,u.data)
+    # inv_project!(u.fe_data,rbcache.trial,u.data) this should already be executed
     ufe = (ufe...,u.fe_data)
   end
   jacobian!(cache,op,r,ufe,ws,rbcache)
@@ -241,7 +241,7 @@ function Algebra.residual!(
 
   b_nlin = residual!(cache,nlop,r,us,rbcache_nlin)
   axpy!(1.0,b_lin,b_nlin)
-  mul!(b_nlin,A_lin,us[1],true,true)
+  mul!(b_nlin,A_lin,us[end],true,true)
 
   return b_nlin
 end

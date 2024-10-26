@@ -99,7 +99,8 @@ function Algebra.solve!(
   ŷ = RBParamVector(x̂,x)
   uθ = copy(ŷ)
 
-  function us(u)
+  function us(u::RBParamVector)
+    inv_project!(u.fe_data,cache.rbcache.trial,u.data)
     copy!(uθ.fe_data,u.fe_data)
     shift!(uθ.fe_data,r,θ,1-θ)
     axpy!(dtθ,ŷ.fe_data,uθ.fe_data)

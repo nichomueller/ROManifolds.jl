@@ -21,6 +21,7 @@ inv_project(a::Projection,x::AbstractArray) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection,c::Projection,args...) = @abstractmethod
 empirical_interpolation(a::Projection) = @abstractmethod
+rescale(op::Function,x::AbstractArray,b::Projection) = @abstractmethod
 gram_schmidt(a::Projection,b::Projection,args...) = gram_schmidt(get_basis(a),get_basis(b),args...)
 
 Base.:+(a::Projection,b::Projection) = union(a,b)
@@ -28,6 +29,7 @@ Base.:-(a::Projection,b::Projection) = union(a,b)
 Base.:*(a::Projection,b::Projection) = galerkin_projection(a,b)
 Base.:*(a::Projection,b::Projection,c::Projection) = galerkin_projection(a,b,c)
 Base.:*(a::Projection,x::AbstractArray) = inv_project(a,x)
+Base.:*(x::AbstractArray,b::Projection) = rescale(*,x,b)
 
 function Base.:*(b::Projection,y::ConsecutiveParamArray)
   item = zeros(num_reduced_dofs(b))
@@ -181,6 +183,10 @@ function empirical_interpolation(a::PODBasis)
   empirical_interpolation(get_basis(a))
 end
 
+function rescale(op::Function,x::AbstractArray,b::PODBasis)
+  PODBasis(op(x,get_basis(b)))
+end
+
 # TT interface
 
 """
@@ -261,6 +267,16 @@ function empirical_interpolation(a::TTSVDCores)
     end
   end
   return indices,interp
+end
+
+function rescale(op::Function,x::AbstractRankTensor{D1},b::TTSVDCores{D2}) where {D1,D2}
+  if D1 == D2
+    TTSVDCores(op(x,get_cores(b)),get_index_map(b))
+  else
+    c1 = op(x,get_cores(b)[1:D1])
+    c2 = get_cores(b)[D1+1:end]
+    TTSVDCores([c1...,c2...],get_index_map(b))
+  end
 end
 
 # multi field interface
