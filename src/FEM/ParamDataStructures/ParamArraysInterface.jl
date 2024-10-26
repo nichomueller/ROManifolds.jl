@@ -1,22 +1,22 @@
 """
-    abstract type AbstractParamArray{T,N,L,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N,L} end
+    abstract type AbstractParamArray{T,N,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N} end
 
-Type representing parametric abstract arrays of type A. L encodes the parametric length.
+Type representing parametric abstract arrays of type A.
 Subtypes:
 - [`ParamArray`](@ref).
 - [`ParamSparseMatrix`](@ref).
 
 """
-abstract type AbstractParamArray{T,N,L,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N,L} end
+abstract type AbstractParamArray{T,N,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N} end
 
-const AbstractParamVector{T,L} = AbstractParamArray{T,1,L,<:AbstractVector{T}}
-const AbstractParamMatrix{T,L} = AbstractParamArray{T,2,L,<:AbstractMatrix{T}}
-const AbstractParamArray3D{T,L} = AbstractParamArray{T,3,L,<:AbstractArray{T,3}}
+const AbstractParamVector{T} = AbstractParamArray{T,1,<:AbstractVector{T}}
+const AbstractParamMatrix{T} = AbstractParamArray{T,2,<:AbstractMatrix{T}}
+const AbstractParamArray3D{T} = AbstractParamArray{T,3,<:AbstractArray{T,3}}
 
 """
-    abstract type ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}} end
+    abstract type ParamArray{T,N} <: AbstractParamArray{T,N,Array{T,N}} end
 
-Type representing parametric arrays of type A. L encodes the parametric length.
+Type representing parametric arrays of type A.
 Subtypes:
 - [`ParamArray`](@ref).
 - [`ConsecutiveParamArray`](@ref).
@@ -24,20 +24,20 @@ Subtypes:
 - [`BlockParamArray`](@ref).
 
 """
-abstract type ParamArray{T,N,L} <: AbstractParamArray{T,N,L,Array{T,N}} end
-const ParamVector{T,L} = ParamArray{T,1,L}
-const ParamMatrix{T,L} = ParamArray{T,2,L}
+abstract type ParamArray{T,N} <: AbstractParamArray{T,N,Array{T,N}} end
+const ParamVector{T} = ParamArray{T,1}
+const ParamMatrix{T} = ParamArray{T,2}
 
 """
-    abstract type ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}
-      } <: AbstractParamArray{Tv,2,L,A} end
+    abstract type ParamSparseMatrix{Tv,Ti,A<:AbstractSparseMatrix{Tv,Ti}
+      } <: AbstractParamArray{Tv,2,A} end
 
-Type representing parametric abstract sparse matrices of type A. L encodes the parametric length.
+Type representing parametric abstract sparse matrices of type A.
 Subtypes:
 - [`ParamSparseMatrixCSC`](@ref).
 
 """
-abstract type ParamSparseMatrix{Tv,Ti,L,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,L,A} end
+abstract type ParamSparseMatrix{Tv,Ti,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,A} end
 
 
 """
@@ -183,9 +183,16 @@ end
 
 Arrays.testitem(A::AbstractParamArray) = param_getindex(A,1)
 
-function Arrays.testvalue(::Type{<:AbstractParamArray{T,N,L}}) where {T,N,L}
+function Arrays.testvalue(A::AbstractParamArray{T,N}) where {T,N}
   tv = testvalue(Array{T,N})
-  param_array(tv,L)
+  plength = param_length(A)
+  param_array(tv,plength)
+end
+
+function Arrays.testvalue(::Type{<:AbstractParamArray{T,N}}) where {T,N}
+  tv = testvalue(Array{T,N})
+  plength = one(Int)
+  param_array(tv,plength)
 end
 
 function Arrays.CachedArray(A::AbstractParamArray)

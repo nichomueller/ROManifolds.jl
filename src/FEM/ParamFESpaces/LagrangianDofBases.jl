@@ -24,9 +24,9 @@ function ReferenceFEs._evaluate_lagr_dof!(
 
   setsize!(c,(ndofs,))
   r = c.array
-  @inbounds for i in param_eachindex(c)
-    for node in LinearIndices(node_and_comp_to_dof)
-      comp_to_dof = node_and_comp_to_dof[node]
+  for node in LinearIndices(node_and_comp_to_dof)
+    comp_to_dof = node_and_comp_to_dof[node]
+    for i in param_eachindex(c)
       comp_to_val = node_comp_to_val.data[node,i]
       for comp in 1:ncomps
         dof = comp_to_dof[comp]
@@ -48,10 +48,10 @@ function ReferenceFEs._evaluate_lagr_dof!(
   _,npdofs = size(node_pdof_comp_to_val)
   setsize!(c,(ndofs,npdofs))
   r = c.array
-  @inbounds for i in param_eachindex(c)
-    for node in LinearIndices(node_and_comp_to_dof)
-      comp_to_dof = node_and_comp_to_dof[node]
-      for pdof in 1:npdofs
+  for node in LinearIndices(node_and_comp_to_dof)
+    comp_to_dof = node_and_comp_to_dof[node]
+    for pdof in 1:npdofs
+      for i in param_eachindex(c)
         comp_to_val = node_pdof_comp_to_val.data[node,pdof,i]
         for comp in 1:ncomps
           dof = comp_to_dof[comp]

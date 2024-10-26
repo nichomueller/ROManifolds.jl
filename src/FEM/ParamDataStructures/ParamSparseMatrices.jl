@@ -79,17 +79,17 @@ function recast(a::AbstractArray,A::ParamSparseMatrix)
 end
 
 """
-    abstract type ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSC{Tv,Ti}} end
+    abstract type ParamSparseMatrixCSC{Tv,Ti} <: ParamSparseMatrix{Tv,Ti,SparseMatrixCSC{Tv,Ti}} end
 
-Type representing parametric sparse matrices in CSC format. L encodes the parametric length.
+Type representing parametric sparse matrices in CSC format.
 Subtypes:
 - [`ParamSparseMatrixCSC`](@ref).
 
 """
-abstract type ParamSparseMatrixCSC{Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSC{Tv,Ti}} end
+abstract type ParamSparseMatrixCSC{Tv,Ti} <: ParamSparseMatrix{Tv,Ti,SparseMatrixCSC{Tv,Ti}} end
 
 """
-    struct ConsecutiveParamSparseMatrixCSC{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSC{Tv,Ti,L} end
+    struct ConsecutiveParamSparseMatrixCSC{Tv,Ti<:Integer} <: ParamSparseMatrixCSC{Tv,Ti} end
 
 Represents a vector of sparse matrices in CSC format. For sake of coherence, an
 instance of `ConsecutiveParamSparseMatrixCSC` inherits from AbstractMatrix{<:SparseMatrixCSC{Tv,Ti}
@@ -97,25 +97,15 @@ rather than AbstractVector{<:SparseMatrixCSC{Tv,Ti}, but should conceptually be
 thought as an AbstractVector{<:SparseMatrixCSC{Tv,Ti}.
 
 """
-struct ConsecutiveParamSparseMatrixCSC{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSC{Tv,Ti,L}
+struct ConsecutiveParamSparseMatrixCSC{Tv,Ti<:Integer} <: ParamSparseMatrixCSC{Tv,Ti}
   m::Int64
   n::Int64
   colptr::Vector{Ti}
   rowval::Vector{Ti}
   data::Matrix{Tv}
-  function ConsecutiveParamSparseMatrixCSC(
-    m::Int64,
-    n::Int64,
-    colptr::Vector{Ti},
-    rowval::Vector{Ti},
-    data::Matrix{Tv}
-    ) where {Tv,Ti}
-
-    L = size(data,2)
-    new{Tv,Ti,L}(m,n,colptr,rowval,data)
-  end
 end
 
+param_length(A::ConsecutiveParamSparseMatrixCSC) = size(A.data,2)
 get_all_data(A::ConsecutiveParamSparseMatrixCSC) = A.data
 
 SparseArrays.getcolptr(A::ConsecutiveParamSparseMatrixCSC) = A.colptr
@@ -198,27 +188,16 @@ function Base.copyto!(A::ConsecutiveParamSparseMatrixCSC,B::ConsecutiveParamSpar
   copyto!(A.data,B.data)
 end
 
-struct GenericParamSparseMatrixCSC{Tv,Ti<:Integer,L} <: ParamSparseMatrixCSC{Tv,Ti,L}
+struct GenericParamSparseMatrixCSC{Tv,Ti<:Integer} <: ParamSparseMatrixCSC{Tv,Ti}
   m::Int64
   n::Int64
   colptr::Vector{Ti}
   rowval::Vector{Ti}
   data::Vector{Tv}
   ptrs::Vector{Ti}
-  function GenericParamSparseMatrixCSC(
-    m::Int64,
-    n::Int64,
-    colptr::Vector{Ti},
-    rowval::Vector{Ti},
-    data::Matrix{Tv},
-    ptrs::Vector{Ti}
-    ) where {Tv,Ti}
-
-    L = length(ptrs)
-    new{Tv,Ti,L}(m,n,colptr,rowval,data)
-  end
 end
 
+param_length(A::GenericParamSparseMatrixCSC) = length(A.ptrs)-1
 get_all_data(A::GenericParamSparseMatrixCSC) = A.data
 
 function GenericParamSparseMatrixCSC(a::AbstractVector{<:SparseMatrixCSC{Tv}}) where Tv
@@ -299,9 +278,9 @@ end
 
 # CSR FORMAT
 
-abstract type ParamSparseMatrixCSR{Bi,Tv,Ti,L} <: ParamSparseMatrix{Tv,Ti,L,SparseMatrixCSR{Bi,Tv,Ti}} end
+abstract type ParamSparseMatrixCSR{Bi,Tv,Ti} <: ParamSparseMatrix{Tv,Ti,SparseMatrixCSR{Bi,Tv,Ti}} end
 
-struct ConsecutiveParamSparseMatrixCSR{Bi,Tv,Ti<:Integer,L} <: ParamSparseMatrixCSR{Bi,Tv,Ti,L}
+struct ConsecutiveParamSparseMatrixCSR{Bi,Tv,Ti<:Integer} <: ParamSparseMatrixCSR{Bi,Tv,Ti}
   m::Int64
   n::Int64
   rowptr::Vector{Ti}
@@ -315,11 +294,11 @@ struct ConsecutiveParamSparseMatrixCSR{Bi,Tv,Ti<:Integer,L} <: ParamSparseMatrix
     data::Matrix{Tv}
     ) where {Bi,Tv,Ti}
 
-    L = size(data,2)
-    new{Bi,Tv,Ti,L}(m,n,rowptr,colval,data)
+    new{Bi,Tv,Ti}(m,n,rowptr,colval,data)
   end
 end
 
+param_length(A::ConsecutiveParamSparseMatrixCSR) = size(A.data,2)
 get_all_data(A::ConsecutiveParamSparseMatrixCSR) = A.data
 
 SparseMatricesCSR.getrowptr(A::ConsecutiveParamSparseMatrixCSR) = A.rowptr
@@ -402,7 +381,7 @@ function Base.copyto!(A::ConsecutiveParamSparseMatrixCSR,B::ConsecutiveParamSpar
   copyto!(A.data,B.data)
 end
 
-struct GenericParamSparseMatrixCSR{Bi,Tv,Ti<:Integer,L} <: ParamSparseMatrixCSR{Bi,Tv,Ti,L}
+struct GenericParamSparseMatrixCSR{Bi,Tv,Ti<:Integer} <: ParamSparseMatrixCSR{Bi,Tv,Ti}
   m::Int64
   n::Int64
   rowptr::Vector{Ti}
@@ -414,15 +393,15 @@ struct GenericParamSparseMatrixCSR{Bi,Tv,Ti<:Integer,L} <: ParamSparseMatrixCSR{
     n::Int64,
     rowptr::Vector{Ti},
     colval::Vector{Ti},
-    data::Matrix{Tv},
+    data::Vector{Tv},
     ptrs::Vector{Ti}
     ) where {Bi,Tv,Ti}
 
-    L = length(ptrs)
-    new{Bi,Tv,Ti,L}(m,n,rowptr,colval,data)
+    new{Bi,Tv,Ti}(m,n,rowptr,colval,data)
   end
 end
 
+param_length(A::GenericParamSparseMatrixCSR) = length(A.ptrs)-1
 get_all_data(A::GenericParamSparseMatrixCSR) = A.data
 
 function GenericParamSparseMatrixCSR(a::AbstractVector{<:SparseMatrixCSR{Bi,Tv}}) where {Bi,Tv}
@@ -514,6 +493,6 @@ function _vec_of_pointers(a::AbstractVector{<:AbstractSparseMatrix})
   ptrs
 end
 
-const ConsecutiveParamSparseMatrix{Tv,Ti,L} = Union{
-  ConsecutiveParamSparseMatrixCSC{Tv,Ti,L},
-  ConsecutiveParamSparseMatrixCSR{<:Any,Tv,Ti,L}}
+const ConsecutiveParamSparseMatrix{Tv,Ti} = Union{
+  ConsecutiveParamSparseMatrixCSC{Tv,Ti},
+  ConsecutiveParamSparseMatrixCSR{<:Any,Tv,Ti}}

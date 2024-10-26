@@ -1,42 +1,58 @@
 eltype2(x) = eltype(eltype(x))
 
 function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamVector
+  @warn "Allocating a vector of unit parametric length"
   vector = allocate_vector(eltype(V),n)
-  param_array(vector,param_length(V))
+  param_array(vector,1)
 end
 
-function Algebra.allocate_vector(::Type{<:BlockParamVector{T,L}},indices::BlockedUnitRange) where {T,L}
-  V = ConsecutiveParamVector{T,L}
+function Algebra.allocate_vector(::ParamType{V,L},n::Integer) where {V<:AbstractParamVector,L}
+  vector = allocate_vector(eltype(V),n)
+  param_array(vector,L)
+end
+
+function Algebra.allocate_vector(::Type{<:BlockParamVector{T}},indices::BlockedUnitRange) where T
+  V = ConsecutiveParamVector{T}
   mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
 end
 
-function Algebra.allocate_in_range(::Type{V},matrix) where V<:AbstractParamVector
+function Algebra.allocate_vector(::ParamType{<:BlockParamVector{T},L},indices::BlockedUnitRange) where {T,L}
+  V = ConsecutiveParamVector{T}
+  PV = ParamType{V,L}
+  mortar(map(ids -> allocate_vector(PV,ids),blocks(indices)))
+end
+
+function Algebra.allocate_in_range(::Type{V},matrix::AbstractParamMatrix) where V<:AbstractParamVector
   rows = ParamDataStructures.inneraxes(matrix)[1]
-  allocate_vector(V,rows)
+  L = param_length(matrix)
+  PV = ParamType{V,L}
+  allocate_vector(PV,rows)
 end
 
-function Algebra.allocate_in_range(matrix::AbstractParamMatrix{T,L}) where {T,L}
-  V = ConsecutiveParamVector{T,L}
+function Algebra.allocate_in_range(matrix::AbstractParamMatrix{T}) where T
+  V = ConsecutiveParamVector{T}
   allocate_in_range(V,matrix)
 end
 
-function Algebra.allocate_in_range(matrix::BlockParamMatrix{T,L}) where {T,L}
-  V = BlockParamVector{T,L}
+function Algebra.allocate_in_range(matrix::BlockParamMatrix{T}) where T
+  V = BlockParamVector{T}
   allocate_in_range(V,matrix)
 end
 
-function Algebra.allocate_in_domain(::Type{V},matrix) where V<:AbstractParamVector
+function Algebra.allocate_in_domain(::Type{V},matrix::AbstractParamMatrix) where V<:AbstractParamVector
   cols = ParamDataStructures.inneraxes(matrix)[2]
-  allocate_vector(V,cols)
+  L = param_length(matrix)
+  PV = ParamType{V,L}
+  allocate_vector(PV,cols)
 end
 
-function Algebra.allocate_in_domain(matrix::AbstractParamMatrix{T,L}) where {T,L}
-  V = ConsecutiveParamVector{T,L}
+function Algebra.allocate_in_domain(matrix::AbstractParamMatrix{T}) where T
+  V = ConsecutiveParamVector{T}
   allocate_in_domain(V,matrix)
 end
 
-function Algebra.allocate_in_domain(matrix::BlockParamMatrix{T,L}) where {T,L}
-  V = BlockParamVector{T,L}
+function Algebra.allocate_in_domain(matrix::BlockParamMatrix{T}) where T
+  V = BlockParamVector{T}
   allocate_in_domain(V,matrix)
 end
 
@@ -142,114 +158,21 @@ end
   A
 end
 
-# @inline function Algebra.add_entry!(combine::Function,A::AbstractParamVector,v::AbstractArray,i)
-#   @inbounds for k = param_eachindex(A)
-#     A.data[k][i] = combine(A.data[k][i],v[k])
-#   end
-#   A
-# end
-
-# @inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamVector,v::Number,i)
-#   @inbounds for k = param_eachindex(A)
-#     A.data[i,k] = combine(A.data[i,k],v)
-#   end
-#   A
-# end
-
-# @inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamVector,v::AbstractArray,i)
-#   @inbounds for k = param_eachindex(A)
-#     A.data[i,k] = combine(A.data[i,k],v[k])
-#   end
-#   A
-# end
-
-function Algebra.is_entry_stored(::Type{T},i,j) where T<:AbstractParamMatrix
+function Algebra.is_entry_stored(::ParamType{T},i,j) where T
   is_entry_stored(eltype(T),i,j)
 end
 
-# @inline function Algebra.add_entry!(combine::Function,A::AbstractParamMatrix,v::Number,i,j)
-#   @inbounds for k = param_eachindex(A)
-#     A.data[k][i,j] = combine(A.data[k][i,j],v)
-#   end
-#   A
-# end
-
-# @inline function Algebra.add_entry!(combine::Function,A::AbstractParamMatrix,v::AbstractArray,i,j)
-#   @inbounds for k = param_eachindex(A)
-#     A.data[k][i,j] = combine(A.data[k][i,j],v[k])
-#   end
-#   A
-# end
-
-# @inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamMatrix,v::Number,i,j)
-#   @inbounds for k = param_eachindex(A)
-#     A.data[i,j,k] = combine(A.data[i,j,k],v)
-#   end
-#   A
-# end
-
-# @inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamMatrix,v::AbstractArray,i,j)
-#   @inbounds for k = param_eachindex(A)
-#     A.data[i,j,k] = combine(A.data[i,j,k],v[k])
-#   end
-#   A
-# end
-
-# function Algebra.add_entry!(combine::Function,A::ParamSparseMatrix,v::Number,i,j)
-#   k = nz_index(A,i,j)
-#   nz = nonzeros(A)
-#   @inbounds for l = param_eachindex(A)
-#     Aijl = nz[k,l]
-#     nz[k,l] = combine(Aijl,v)
-#   end
-#   A
-# end
-
-# function Algebra.add_entry!(combine::Function,A::ParamSparseMatrix,v::AbstractArray,i,j)
-#   k = nz_index(A,i,j)
-#   nz = nonzeros(A)
-#   @inbounds for l = param_eachindex(A)
-#     Aijl = nz[k,l]
-#     vl = v[l]
-#     nz[k,l] = combine(Aijl,vl)
-#   end
-#   A
-# end
-
-# @inline function Algebra.add_entry!(::typeof(+),a::Algebra.AllocationCOO{T},::Nothing,i,j) where T<:AbstractParamMatrix
-#   if Algebra.is_entry_stored(T,i,j)
-#     a.counter.nnz = a.counter.nnz + 1
-#     k = a.counter.nnz
-#     a.I[k] = i
-#     a.J[k] = j
-#   end
-#   nothing
-# end
-
-# @inline function Algebra.add_entry!(::typeof(+),a::Algebra.AllocationCOO{T},v,i,j) where T<:AbstractParamMatrix
-#   if Algebra.is_entry_stored(T,i,j)
-#     a.counter.nnz = a.counter.nnz + 1
-#     k = a.counter.nnz
-#     a.I[k] = i
-#     a.J[k] = j
-#     @inbounds for l = param_eachindex(T)
-#       a.V.data[l][k] = v.data[l]
-#     end
-#   end
-#   nothing
-# end
-
 # sparse functionalities
 
-function Algebra.allocate_coo_vectors(::Type{T},n::Integer) where {Tv,Ti,T<:ParamSparseMatrix{Tv,Ti}}
+function Algebra.allocate_coo_vectors(::ParamType{T,L},n::Integer) where {Tv,Ti,T<:ParamSparseMatrix{Tv,Ti},L}
   I = zeros(Ti,n)
   J = zeros(Ti,n)
   V = zeros(Tv,n)
-  PV = param_array(V,param_length(T))
+  PV = param_array(V,L)
   I,J,PV
 end
 
-@inline function Algebra.push_coo!(::Type{<:ParamSparseMatrix},I,J,V,i,j,v)
+@inline function Algebra.push_coo!(::ParamType{<:ParamSparseMatrix},I,J,V,i,j,v)
   @notimplemented "Cannot push to ParamArray"
 end
 
@@ -259,12 +182,12 @@ end
 Extends the concept of `counter` in Gridap to accommodate a parametric setting.
 
 """
-struct ParamCounter{C,L}
+struct ParamCounter{C}
   counter::C
-  ParamCounter{L}(counter::C) where {C,L} = new{C,L}(counter)
+  plength::Int
 end
 
-ParamDataStructures.param_length(::ParamCounter{C,L}) where {C,L} = L
+ParamDataStructures.param_length(a::ParamCounter) = a.plength
 
 Algebra.LoopStyle(::Type{<:ParamCounter{C}}) where C = LoopStyle(C)
 
@@ -272,40 +195,40 @@ Algebra.LoopStyle(::Type{<:ParamCounter{C}}) where C = LoopStyle(C)
   add_entry!(+,a.counter,v,i,j)
 end
 
-function Algebra.nz_counter(builder::SparseMatrixBuilder{T},axes) where T<:AbstractParamMatrix
+function Algebra.nz_counter(builder::SparseMatrixBuilder{ParamType{T,L}},axes) where {T,L}
   Tv = eltype(T)
-  L = param_length(T)
   counter = nz_counter(SparseMatrixBuilder(Tv),axes)
-  ParamCounter{L}(counter)
+  ParamCounter(counter,L)
 end
 
-function Algebra.nz_allocation(a::Algebra.ArrayCounter{T}) where T<:AbstractParamVector
-  S = eltype(T)
-  v = similar(S,map(length,a.axes))
+function Algebra.nz_allocation(a::Algebra.ArrayCounter{ParamType{T,L}}) where {T,L}
+  Tv = eltype(T)
+  v = similar(Tv,map(length,a.axes))
   fill!(v,zero(eltype(v)))
-  param_array(v,param_length(T))
+  param_array(v,L)
 end
 
-function Algebra.nz_allocation(a::ParamCounter{C,L}) where {C,L}
+function Algebra.nz_allocation(a::ParamCounter)
   inserter = nz_allocation(a.counter)
-  ParamInserter(inserter,L)
+  plength = param_length(a)
+  ParamInserter(inserter,plength)
 end
 
-function ParamInserter(inserter,L)
+function ParamInserter(inserter,plength)
   @abstractmethod
 end
 
 # csc
 
-function Algebra.sparse_from_coo(::Type{<:ParamSparseMatrixCSC},I,J,V,m,n)
+function Algebra.sparse_from_coo(::ParamType{<:ParamSparseMatrixCSC},I,J,V,m,n)
   sparse(I,J,V,m,n)
 end
 
-@inline function Algebra.is_entry_stored(::Type{<:ParamSparseMatrixCSC},i,j)
+@inline function Algebra.is_entry_stored(::ParamType{<:ParamSparseMatrixCSC},i,j)
   true
 end
 
-function Algebra.finalize_coo!(::Type{<:ParamSparseMatrixCSC},I,J,V,m,n)
+function Algebra.finalize_coo!(::ParamType{<:ParamSparseMatrixCSC},I,J,V,m,n)
   nothing
 end
 
@@ -319,30 +242,30 @@ Base.@propagate_inbounds function Algebra.nz_index(A::ParamSparseMatrixCSC,i0::I
   ((r1 > r2) || (rowvals(A)[r1] != i0)) ? -1 : r1
 end
 
-function ParamInserter(inserter::Algebra.InserterCSC,L)
+function ParamInserter(inserter::Algebra.InserterCSC,param_length)
   @unpack nrows,ncols,colptr,colnnz,rowval,nzval = inserter
-  pnzval = param_array(nzval,L)
+  pnzval = param_array(nzval,param_length)
   ParamInserterCSC(nrows,ncols,colptr,colnnz,rowval,pnzval)
 end
 
 """
-    struct ParamInserterCSC{Tv,Ti,L} end
+    struct ParamInserterCSC{Tv,Ti} end
 
 Extends the concept of `InserterCSC` in Gridap to accommodate a parametric setting.
 Tv is the type of the parametric nonzero entries of the CSC matrices to be
 assembled.
 
 """
-struct ParamInserterCSC{Tv,Ti,L}
+struct ParamInserterCSC{Tv,Ti}
   nrows::Int
   ncols::Int
   colptr::Vector{Ti}
   colnnz::Vector{Ti}
   rowval::Vector{Ti}
-  nzval::ConsecutiveParamVector{Tv,L}
+  nzval::ConsecutiveParamVector{Tv}
 end
 
-ParamDataStructures.param_length(::ParamInserterCSC{Tv,Ti,L}) where {Tv,Ti,L} = L
+ParamDataStructures.param_length(inserter::ParamInserterCSC) = param_length(inserter.nzval)
 
 Algebra.LoopStyle(::Type{<:ParamInserterCSC}) = Loop()
 

@@ -16,7 +16,7 @@ nonparametric DBC can be prescribed on such spaces.
 
 
 Subtypes:
-- TrivialParamFESpace{S,L} <: SingleFieldParamFESpace
+- TrivialParamFESpace{S} <: SingleFieldParamFESpace
 - TrialParamFESpace{S} <: SingleFieldParamFESpace
 
 """
@@ -67,7 +67,7 @@ get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(f.space)
 function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   V = get_vector_type(f.space)
   L = param_length(f)
-  typeof(param_array(V(),L))
+  param_typeof(V,L)
 end
 
 function FESpaces.gather_free_and_dirichlet_values!(
@@ -151,7 +151,7 @@ function FESpaces._free_and_dirichlet_values_fill!(
     dofs = getindex!(cache_dofs,cell_dofs,cell)
     for (i,dof) in enumerate(dofs)
       @inbounds for k in param_eachindex(free_vals)
-        val = vals[k][i]
+        val = get_all_data(vals)[i,k]
         if dof > 0
           free_data[dof,k] = val
         elseif dof < 0
@@ -165,22 +165,20 @@ function FESpaces._free_and_dirichlet_values_fill!(
 end
 
 """
-    TrivialParamFESpace{S,L} <: SingleFieldParamFESpace
+    TrivialParamFESpace{S} <: SingleFieldParamFESpace
 
-Wrapper for nonparametric FE spaces that we wish assumed a parametric length `L`
+Wrapper for nonparametric FE spaces that we wish assumed a parametric length `plength`
 
 """
 
-struct TrivialParamFESpace{S,L} <: SingleFieldParamFESpace
+struct TrivialParamFESpace{S} <: SingleFieldParamFESpace
   space::S
-  TrivialParamFESpace(space::S,::Val{L}) where {S,L} = new{S,L}(space)
+  plength::Int
 end
 
-TrivialParamFESpace(space::FESpace,plength::Integer) = TrivialParamFESpace(space,Val{plength}())
-
-ParamDataStructures.param_length(f::TrivialParamFESpace{S,L}) where {S,L} = L
+ParamDataStructures.param_length(f::TrivialParamFESpace) = f.plength
 ParamDataStructures.to_param_quantity(f::SingleFieldParamFESpace,plength::Integer) = f
-ParamDataStructures.to_param_quantity(f::SingleFieldFESpace,plength::Integer) = TrivialParamFESpace(f,Val{plength}())
+ParamDataStructures.to_param_quantity(f::SingleFieldFESpace,plength::Integer) = TrivialParamFESpace(f,plength)
 ParamDataStructures.param_getindex(f::TrivialParamFESpace,index::Integer) = f.space
 
 FESpaces.ConstraintStyle(::Type{<:TrivialParamFESpace{S}}) where S = ConstraintStyle(S)
@@ -348,12 +346,12 @@ end
 
 # utils
 
-struct ParamVectorWithEntryRemoved{T,L,A} <: ParamVector{T,L}
+struct ParamVectorWithEntryRemoved{T,A} <: ParamVector{T}
   a::A
   index::Int
-  function ParamVectorWithEntryRemoved(a::A,index::Integer) where {T,L,A<:AbstractParamVector{T,L}}
+  function ParamVectorWithEntryRemoved(a::A,index::Integer) where {T,A<:AbstractParamVector{T}}
     @assert 1 <= index <= innerlength(a)
-    new{T,L,A}(a,index)
+    new{T,A}(a,index)
   end
 end
 
@@ -361,7 +359,9 @@ function Arrays.VectorWithEntryRemoved(a::AbstractParamVector,index::Int)
   ParamVectorWithEntryRemoved(a,index)
 end
 
-const ConsecPVWithEntryRemoved{T,L} = ParamVectorWithEntryRemoved{T,L,ConsecutiveParamVector{T,L}}
+const ConsecPVWithEntryRemoved{T} = ParamVectorWithEntryRemoved{T,ConsecutiveParamVector{T}}
+
+ParamDataStructures.param_length(v::ParamVectorWithEntryRemoved) = param_length(v.a)
 
 Base.size(v::ParamVectorWithEntryRemoved) = size(v.a)
 
@@ -374,8 +374,8 @@ function Base.sum(v::ConsecPVWithEntryRemoved)
   sum(data,dims=1) - data[v.index,:]
 end
 
-function Base.sum(v::ParamVectorWithEntryRemoved{T,L}) where {T,L}
-  s = zeros(T,L)
+function Base.sum(v::ParamVectorWithEntryRemoved{T}) where T
+  s = zeros(T,param_length(v))
   @inbounds for k in param_eachindex(v)
     ak = v.a[k]
     for i in 1:innerlength(v)
@@ -388,13 +388,13 @@ function Base.sum(v::ParamVectorWithEntryRemoved{T,L}) where {T,L}
   end
 end
 
-struct ParamVectorWithEntryInserted{T,L,A} <: ParamVector{T,L}
+struct ParamVectorWithEntryInserted{T,A} <: ParamVector{T}
   a::A
   index::Int
   value::Vector{T}
-  function ParamVectorWithEntryInserted(a::A,index::Integer,value::Vector{T}) where {T,L,A<:AbstractParamVector{T,L}}
+  function ParamVectorWithEntryInserted(a::A,index::Integer,value::Vector{T}) where {T,A<:AbstractParamVector{T}}
     @assert 1 <= index <= innerlength(a)+1
-    new{T,L,A}(a,index,value)
+    new{T,A}(a,index,value)
   end
 end
 
@@ -402,7 +402,9 @@ function Arrays.VectorWithEntryInserted(a::AbstractParamVector,index::Int,value:
   ParamVectorWithEntryInserted(a,index,value)
 end
 
-const ConsecPVWithEntryInserted{T,L} = ParamVectorWithEntryInserted{T,L,ConsecutiveParamVector{T,L}}
+const ConsecPVWithEntryInserted{T} = ParamVectorWithEntryInserted{T,ConsecutiveParamVector{T}}
+
+ParamDataStructures.param_length(v::ParamVectorWithEntryInserted) = param_length(v.a)
 
 Base.size(v::ParamVectorWithEntryInserted) = size(v.a)
 
@@ -415,8 +417,8 @@ function Base.sum(v::ConsecPVWithEntryInserted)
   sum(data,dims=1) + v.value
 end
 
-function Base.sum(v::ParamVectorWithEntryInserted{T,L}) where {T,L}
-  s = zeros(T,L)
+function Base.sum(v::ParamVectorWithEntryInserted{T}) where T
+  s = zeros(T,param_length(v))
   @inbounds for k in param_eachindex(v.a)
     ak = v.a[k]
     for i in 1:innerlength(v.a)

@@ -10,22 +10,8 @@ end
 
 const TransientEvalRBSpace{A<:RBSpace} = EvalRBSpace{A,<:TransientRealization}
 
-_change_length(::Type{T},r::TransientRealization) where T = T
-
-function _change_length(
-  ::Type{ConsecutiveParamVector{T,L}},
-  r::TransientRealization
-  ) where {T,L}
-
-  ConsecutiveParamVector{T,Int(L/num_times(r))}
-end
-
-function _change_length(
-  ::Type{<:BlockParamVector{T,L}},
-  r::TransientRealization
-  ) where {T,L}
-
-  BlockParamVector{T,Int(L/num_times(r))}
+function _change_length(::ParamType{T,L},r::TransientRealization) where {T,L}
+  ParamType{T,Int(L/num_times(r))}
 end
 
 function FESpaces.get_vector_type(r::TransientEvalRBSpace)

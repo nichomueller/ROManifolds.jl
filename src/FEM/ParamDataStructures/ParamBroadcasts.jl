@@ -75,14 +75,6 @@ function Base.materialize(B::ParamBroadcast)
   ParamArray(Base.materialize(get_all_data(B)))
 end
 
-# function Base.materialize(B::ParamBroadcast)
-#   param_materialize(map(Base.materialize,get_all_data(B)))
-# end
-
-# param_materialize(A) = A
-# param_materialize(A::AbstractArray{<:AbstractArray{<:Number}}) = ArrayOfArrays(A)
-# param_materialize(A::AbstractArray{<:SparseMatrixCSC}) = ConsecutiveParamSparseMatrixCSC(A)
-
 function Base.materialize!(A::AbstractParamArray,B::ParamBroadcast)
   Base.materialize!(get_all_data(A),get_all_data(B))
   A

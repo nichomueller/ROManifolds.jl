@@ -6,9 +6,10 @@ ParamArray(a::AbstractArray{<:AbstractArray}) = ConsecutiveParamArray(a)
 get_all_data(A::ParamArray) = @abstractmethod
 
 function Base.setindex!(
-  A::ParamArray{T,N,L},
-  v::ParamArray{T′,N,L},
-  i::Vararg{Integer,N}) where {T,T′,N,L}
+  A::ParamArray{T,N},
+  v::ParamArray{T′,N},
+  i::Vararg{Integer,N}
+  ) where {T,T′,N}
 
   setindex!(get_all_data(A),get_all_data(v),i...,:)
 end
@@ -61,8 +62,8 @@ function LinearAlgebra.axpy!(α::Number,A::ParamArray,B::ParamArray)
   return B
 end
 
-function Arrays.setsize!(A::ParamArray{T,N,L},s::NTuple{N,Integer}) where {T,N,L}
-  setsize!(get_all_data(A),(s...,L))
+function Arrays.setsize!(A::ParamArray{T,N},s::NTuple{N,Integer}) where {T,N}
+  setsize!(get_all_data(A),(s...,param_length(A)))
   A
 end
 
@@ -75,20 +76,21 @@ function Base.getproperty(A::ParamArray,sym::Symbol)
 end
 
 """
-    struct TrivialParamArray{T,N,L,P<:AbstractArray{T,N}} <: ParamArray{T,N,L} end
+    struct TrivialParamArray{T,N,P<:AbstractArray{T,N}} <: ParamArray{T,N} end
 
 Wrapper for nonparametric arrays that we wish assumed a parametric length.
 
 """
-struct TrivialParamArray{T<:Number,N,L,A<:AbstractArray{T,N}} <: ParamArray{T,N,L}
+struct TrivialParamArray{T<:Number,N,A<:AbstractArray{T,N}} <: ParamArray{T,N}
   data::A
   plength::Int
   function TrivialParamArray(data::AbstractArray{T,N},plength::Int=1) where {T<:Number,N}
     A = typeof(data)
-    new{T,N,plength,A}(data,plength)
+    new{T,N,A}(data,plength)
   end
 end
 
+param_length(A::TrivialParamArray) = A.plength
 get_all_data(A::TrivialParamArray) = A.data
 
 function TrivialParamArray(A::AbstractParamArray,args...)
@@ -151,19 +153,19 @@ function get_param_entry(A::TrivialParamArray{T,N},i::Vararg{Integer,N}) where {
   fill(entry,param_length(A))
 end
 
-struct ConsecutiveParamArray{T,N,L,M,A<:AbstractArray{T,M}} <: ParamArray{T,N,L}
+struct ConsecutiveParamArray{T,N,M,A<:AbstractArray{T,M}} <: ParamArray{T,N}
   data::A
   function ConsecutiveParamArray(data::AbstractArray{T,M}) where {T<:Number,M}
     N = M - 1
-    L = size(data,M)
     A = typeof(data)
-    new{T,N,L,M,A}(data)
+    new{T,N,M,A}(data)
   end
 end
 
-const ConsecutiveParamVector{T,L} = ConsecutiveParamArray{T,1,L,2,<:AbstractArray{T,2}}
-const ConsecutiveParamMatrix{T,L} = ConsecutiveParamArray{T,2,L,3,<:AbstractArray{T,3}}
+const ConsecutiveParamVector{T} = ConsecutiveParamArray{T,1,2,<:AbstractArray{T,2}}
+const ConsecutiveParamMatrix{T} = ConsecutiveParamArray{T,2,3,<:AbstractArray{T,3}}
 
+param_length(A::ConsecutiveParamArray{T,N,M}) where {T,N,M} = size(A.data,M)
 get_all_data(A::ConsecutiveParamArray) = A.data
 
 function ConsecutiveParamArray(a::AbstractVector{<:AbstractArray{T,N}}) where {T,N}
@@ -271,22 +273,19 @@ function get_param_entry(A::ConsecutiveParamArray,i...)
 end
 
 """
-    struct ParamArray{T,N,L,P<:AbstractVector{<:AbstractArray{T,N}}} <: ParamArray{T,N,L} end
+    struct ParamArray{T,N,P<:AbstractVector{<:AbstractArray{T,N}}} <: ParamArray{T,N} end
 
 Represents conceptually a vector of arrays, but the entries are stored in
 consecutive memory addresses. So in practice it simply wraps an AbstractArray,
 with a parametric length equal to its last dimension
 
 """
-struct GenericParamVector{Tv,L,Ti} <: ParamArray{Tv,1,L}
+struct GenericParamVector{Tv,Ti} <: ParamArray{Tv,1}
   data::Vector{Tv}
   ptrs::Vector{Ti}
-  function GenericParamVector(data::Vector{Tv},ptrs::Vector{Ti}) where {Tv,Ti}
-    L = length(ptrs)-1
-    new{Tv,L,Ti}(data,ptrs)
-  end
 end
 
+param_length(A::GenericParamVector) = length(A.ptrs)-1
 get_all_data(A::GenericParamVector) = A.data
 get_ptrs(A::GenericParamVector) = A.ptrs
 
@@ -395,24 +394,21 @@ function Arrays.CachedArray(A::GenericParamVector)
   GenericParamVector(data′,ptrs)
 end
 
-function get_param_entry(A::GenericParamVector{T,L},i::Integer) where {T,L}
-  entries = Vector{T}(undef,L)
+function get_param_entry(A::GenericParamVector{T},i::Integer) where T
+  entries = Vector{T}(undef,param_length(A))
   @inbounds for k in param_eachindex(A)
     entries[k] = A[k][i]
   end
   entries
 end
 
-struct GenericParamMatrix{Tv,L,Ti} <: ParamArray{Tv,2,L}
+struct GenericParamMatrix{Tv,Ti} <: ParamArray{Tv,2}
   data::Vector{Tv}
   ptrs::Vector{Ti}
   nrows::Vector{Ti}
-  function GenericParamVector(data::Vector{Tv},ptrs::Vector{Ti}) where {Tv,Ti}
-    L = length(ptrs)-1
-    new{Tv,L,Ti}(data,ptrs)
-  end
 end
 
+param_length(A::GenericParamMatrix) = length(A.ptrs)-1
 get_all_data(A::GenericParamMatrix) = A.data
 get_ptrs(A::GenericParamMatrix) = A.data
 get_nrows(A::GenericParamMatrix) = A.nrows
@@ -520,8 +516,8 @@ function Arrays.CachedArray(A::GenericParamMatrix)
   GenericParamMatrix(data′,ptrs,nrows)
 end
 
-function get_param_entry(A::GenericParamMatrix{T,L},i::Integer,j::Integer) where {T,L}
-  entries = Vector{T}(undef,L)
+function get_param_entry(A::GenericParamMatrix{T},i::Integer,j::Integer) where T
+  entries = Vector{T}(undef,param_length(A))
   @inbounds for k in param_eachindex(A)
     entries[k] = A[k][i,j]
   end

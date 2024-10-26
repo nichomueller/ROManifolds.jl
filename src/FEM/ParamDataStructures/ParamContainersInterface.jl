@@ -66,10 +66,12 @@ function to_param_quantities(a...;plength=find_param_length(a...))
   return pa
 end
 
-"""
-    abstract type AbstractParamContainer{T,N,L} <: AbstractArray{T,N} end
+param_typeof(a) = typeof(a)
 
-Type representing generic parametric quantities. L encodes the parametric length.
+"""
+    abstract type AbstractParamContainer{T,N} <: AbstractArray{T,N} end
+
+Type representing generic parametric quantities
 Subtypes:
 - [`ParamContainer`](@ref).
 - [`ParamNumber`](@ref).
@@ -77,32 +79,36 @@ Subtypes:
 - [`AbstractSnapshots`](@ref).
 
 """
-abstract type AbstractParamContainer{T,N,L} <: AbstractArray{T,N} end
+abstract type AbstractParamContainer{T,N} <: AbstractArray{T,N} end
 
-param_length(::Type{<:AbstractParamContainer{T,N,L}}) where {T,N,L} = L
-param_length(::T) where {T<:AbstractParamContainer} = param_length(T)
-
-get_param_data(A::AbstractParamContainer) = (param_getindex(A,i) for i in param_eachindex(A))
+get_param_data(a::AbstractParamContainer) = (param_getindex(a,i) for i in param_eachindex(a))
 
 function to_param_quantity(a::AbstractParamContainer,plength::Integer)
   @check param_length(a) == plength
   return a
 end
 
+abstract type ParamType{T<:AbstractParamContainer,L} <: Core.Any end
+
+Base.eltype(::ParamType{T,L}) where {T,L} = eltype(T)
+param_length(::ParamType{T,L}) where {T,L} = L
+
+param_typeof(a::AbstractParamContainer) = ParamType{typeof(a),param_length(a)}
+
 """
-    struct ParamContainer{T,L} <: AbstractArray{T,1,L} end
+    struct ParamContainer{T} <: AbstractArray{T,1} end
 
 Used as a wrapper for non-array structures, e.g. factorizations
 
 """
-struct ParamContainer{T,L} <: AbstractParamContainer{T,1,L}
+struct ParamContainer{T} <: AbstractParamContainer{T,1}
   data::Vector{T}
-  ParamContainer(data::Vector{T}) where T = new{T,length(data)}(data)
 end
 
 ParamContainer(a::AbstractArray{<:Number}) = ParamNumber(a)
 ParamContainer(a::AbstractArray{<:AbstractArray}) = ParamArray(a)
 
+param_length(a::ParamContainer) = length(a.data)
 param_getindex(a::ParamContainer,i::Integer) = getindex(a,i)
 param_getindex(a::ParamContainer,v,i::Integer) = setindex!(a,v,i)
 
@@ -112,20 +118,7 @@ Base.size(a::ParamContainer) = (param_length(a),)
 Base.getindex(a::ParamContainer,i::Integer) = getindex(a.data,i)
 Base.setindex!(a::ParamContainer,v,i::Integer) = setindex!(a.data,v,i)
 
-"""
-    struct ParamNumber{T<:Number,L} <: AbstractParamContainer{T,1,L} end
-
-Represents parametric scalars, e.g. entries of parametric arrays across all
-parameters.
-
-"""
-struct ParamNumber{T<:Number,L} <: AbstractParamContainer{T,1,L}
-  data::Vector{T}
-  ParamNumber(data::Vector{T}) where T<:Number = new{T,length(data)}(data)
-end
-
-param_getindex(a::ParamNumber,i::Integer) = getindex(a,i)
-param_setindex!(a::ParamNumber,v,i::Integer) = setindex!(a,v,i)
+const ParamNumber{T} = ParamContainer{T<:Number}
 
 to_param_quantity(a::Number,plength::Integer) = ParamNumber(fill(a,plength))
 

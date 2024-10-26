@@ -5,31 +5,34 @@ function param_array(a::BlockArray,l::Integer)
 end
 
 """
-    struct BlockParamArray{T,N,L,A<:AbstractArray{<:AbstractParamArray{T,N,L},N},
-      B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N,L} end
+    struct BlockParamArray{T,N,A<:AbstractArray{<:AbstractParamArray{T,N},N},
+      B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N} end
 
 Is to a [`ParamArray`](@ref) as a BlockArray is to a regular AbstractArray.
 Instances of BlockParamArray are obtained by extending the function `_BlockArray`
 in the package BlockArrays.
 
 """
-struct BlockParamArray{T,N,L,A<:AbstractArray{<:AbstractParamArray{T,N,L},N},B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N,L}
+struct BlockParamArray{T,N,A<:AbstractArray{<:AbstractParamArray{T,N},N},B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N}
   data::A
   axes::B
 end
 
-const BlockParamVector{T,L} = BlockParamArray{T,1,L,<:AbstractVector{<:AbstractParamVector{T,L}}}
-const BlockParamMatrix{T,L} = BlockParamArray{T,2,L,<:AbstractMatrix{<:AbstractParamMatrix{T,L}}}
+const BlockParamVector{T} = BlockParamArray{T,1,<:AbstractVector{<:AbstractParamVector{T}}}
+const BlockParamMatrix{T} = BlockParamArray{T,2,<:AbstractMatrix{<:AbstractParamMatrix{T}}}
 
-const BlockConsecutiveParamVector{T,L} = BlockParamArray{T,1,L,<:AbstractVector{<:ConsecutiveParamVector{T,L}}}
-const BlockConsecutiveParamMatrix{T,L} = BlockParamArray{T,2,L,<:AbstractMatrix{<:ConsecutiveParamMatrix{T,L}}}
+const BlockConsecutiveParamVector{T} = BlockParamArray{T,1,<:AbstractVector{<:ConsecutiveParamVector{T}}}
+const BlockConsecutiveParamMatrix{T} = BlockParamArray{T,2,<:AbstractMatrix{<:ConsecutiveParamMatrix{T}}}
 
 function BlockArrays._BlockArray(data::AbstractArray{<:AbstractParamArray,N},axes::NTuple{N,AbstractUnitRange{Int}}) where N
+  @assert all(param_length(d)==param_length(first(data)) for d in data)
   BlockParamArray(data,axes)
 end
 
 nblocks(A) = @abstractmethod
 nblocks(A::Union{BlockedUnitRange,BlockArray,BlockParamArray}) = length(blocks(A))
+
+param_length(A::BlockParamArray) = param_length(first(blocks(A)))
 
 @inline Base.size(A::BlockParamArray) = map(length,axes(A))
 Base.axes(A::BlockParamArray) = A.axes
