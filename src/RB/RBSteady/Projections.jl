@@ -34,7 +34,7 @@ Base.:*(x::AbstractArray,b::Projection) = rescale(*,x,b)
 function Base.:*(b::Projection,y::ConsecutiveParamArray)
   item = zeros(num_reduced_dofs(b))
   plength = param_length(y)
-  x = param_array(item,plength)
+  x = consecutive_param_array(item,plength)
   mul!(x,b,y)
 end
 

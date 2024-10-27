@@ -1,5 +1,5 @@
-ParamArray(A::AbstractVector{<:SparseMatrixCSC}) = ConsecutiveParamSparseMatrixCSC(A)
-ParamArray(A::AbstractVector{<:SparseMatrixCSR}) = ConsecutiveParamSparseMatrixCSR(A)
+ParamArray(A::AbstractVector{<:SparseMatrixCSC};kwargs...) = ConsecutiveParamSparseMatrixCSC(A)
+ParamArray(A::AbstractVector{<:SparseMatrixCSR};kwargs...) = ConsecutiveParamSparseMatrixCSR(A)
 
 function SparseArrays.sparse(
   m::Int,
@@ -34,20 +34,20 @@ end
 
 get_all_data(A::ParamSparseMatrix) = @abstractmethod
 
-function LinearAlgebra.fillstored!(A::ParamSparseMatrix,z::Number)
-  fill!(get_all_data(A),z)
+function LinearAlgebra.fillstored!(A::ParamSparseMatrix,b::Number)
+  fill!(get_all_data(A),b)
   return A
 end
 
 # small hack, we shouldn't be able to fill an abstract array with a non-scalar
-function LinearAlgebra.fillstored!(A::ParamSparseMatrix,z::AbstractMatrix{<:Number})
-  @check all(z.==first(z))
-  LinearAlgebra.fillstored!(A,first(z))
+function LinearAlgebra.fillstored!(A::ParamSparseMatrix,b::AbstractMatrix{<:Number})
+  @check all(b.==first(b))
+  LinearAlgebra.fillstored!(A,first(b))
   return A
 end
 
-function Base.fill!(A::ParamSparseMatrix,z::Number)
-  fill!(get_all_data(A),z)
+function Base.fill!(A::ParamSparseMatrix,b::Number)
+  fill!(get_all_data(A),b)
   return A
 end
 
@@ -108,6 +108,8 @@ end
 param_length(A::ConsecutiveParamSparseMatrixCSC) = size(A.data,2)
 get_all_data(A::ConsecutiveParamSparseMatrixCSC) = A.data
 
+MemoryLayoutStyle(::Type{<:ConsecutiveParamSparseMatrixCSC}) = ConsecutiveMemory()
+
 SparseArrays.getcolptr(A::ConsecutiveParamSparseMatrixCSC) = A.colptr
 SparseArrays.rowvals(A::ConsecutiveParamSparseMatrixCSC) = A.rowval
 SparseArrays.nonzeros(A::ConsecutiveParamSparseMatrixCSC) = ConsecutiveParamArray(A.data)
@@ -141,7 +143,7 @@ function ConsecutiveParamSparseMatrixCSC(a::AbstractVector{<:SparseMatrixCSC{Tv}
   ConsecutiveParamSparseMatrixCSC(m,n,colptr,rowval,data)
 end
 
-function param_array(a::SparseMatrixCSC,l::Integer)
+function param_array(a::SparseMatrixCSC,l::Integer;kwargs...)
   outer = (1,1,l)
   data = repeat(nonzeros(a);outer)
   !copy && LinearAlgebra.fillstored!(data,zero(eltype(a)))
@@ -226,7 +228,7 @@ end
 
 ArraysOfArrays.innersize(A::GenericParamSparseMatrixCSC) = (A.m,A.n)
 
-function Base.getindex(A::GenericParamSparseMatrixCSC{Tv},i::Integer,j::Integer) where Tv
+Base.@propagate_inbounds function Base.getindex(A::GenericParamSparseMatrixCSC{Tv},i::Integer,j::Integer) where Tv
   @boundscheck checkbounds(A,i,j)
   if i == j
     u = one(eltype(A.ptrs))
@@ -301,6 +303,8 @@ end
 param_length(A::ConsecutiveParamSparseMatrixCSR) = size(A.data,2)
 get_all_data(A::ConsecutiveParamSparseMatrixCSR) = A.data
 
+MemoryLayoutStyle(::Type{<:ConsecutiveParamSparseMatrixCSR}) = ConsecutiveMemory()
+
 SparseMatricesCSR.getrowptr(A::ConsecutiveParamSparseMatrixCSR) = A.rowptr
 SparseMatricesCSR.colvals(A::ConsecutiveParamSparseMatrixCSR) = A.colval
 SparseArrays.nonzeros(A::ConsecutiveParamSparseMatrixCSR) = ConsecutiveParamArray(A.data)
@@ -334,7 +338,7 @@ function ConsecutiveParamSparseMatrixCSR(a::AbstractVector{<:SparseMatrixCSR{Bi,
   ConsecutiveParamSparseMatrixCSR{1}(m,n,rowptr,colval,data)
 end
 
-function param_array(a::SparseMatrixCSR,l::Integer)
+function param_array(a::SparseMatrixCSR,l::Integer;kwargs...)
   outer = (1,1,l)
   data = repeat(nonzeros(a);outer)
   !copy && LinearAlgebra.fillstored!(data,zero(eltype(a)))
@@ -430,7 +434,7 @@ end
 
 ArraysOfArrays.innersize(A::GenericParamSparseMatrixCSR) = (A.m,A.n)
 
-function Base.getindex(A::GenericParamSparseMatrixCSR{Bi,Tv},i::Integer,j::Integer) where {Bi,Tv}
+Base.@propagate_inbounds function Base.getindex(A::GenericParamSparseMatrixCSR{Bi,Tv},i::Integer,j::Integer) where {Bi,Tv}
   @boundscheck checkbounds(A,i,j)
   if i == j
     u = one(eltype(A.ptrs))

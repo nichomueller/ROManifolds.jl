@@ -67,7 +67,7 @@ get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(f.space)
 function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   V = get_vector_type(f.space)
   L = param_length(f)
-  PV = param_array(V(),L)
+  PV = consecutive_param_array(V(),L)
   param_typeof(PV)
 end
 
@@ -150,13 +150,13 @@ function FESpaces._free_and_dirichlet_values_fill!(
   for cell in cells
     vals = getindex!(cache_vals,cell_vals,cell)
     dofs = getindex!(cache_dofs,cell_dofs,cell)
-    for (i,dof) in enumerate(dofs)
-      @inbounds for k in param_eachindex(free_vals)
-        val = get_all_data(vals)[i,k]
+    for k in param_eachindex(free_vals)
+      val = param_getindex(vals,k)
+      for (i,dof) in enumerate(dofs)
         if dof > 0
-          free_data[dof,k] = val
+          free_data[dof,k] = val[i]
         elseif dof < 0
-          diri_data[-dof,k] = val
+          diri_data[-dof,k] = val[i]
         else
           @unreachable "dof ids either positive or negative, not zero"
         end

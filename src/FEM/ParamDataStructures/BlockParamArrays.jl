@@ -1,7 +1,7 @@
-ParamArray(A::AbstractArray{<:AbstractParamArray}) = mortar(A)
+ParamArray(A::AbstractArray{<:AbstractParamArray};kwargs...) = mortar(A)
 
-function param_array(a::BlockArray,l::Integer)
-  mortar(b -> param_array(b,l),blocks(a))
+function param_array(a::BlockArray,l::Integer;kwargs...)
+  mortar(b -> param_array(b,l;kwargs...),blocks(a))
 end
 
 """
@@ -31,6 +31,8 @@ end
 
 nblocks(A) = @abstractmethod
 nblocks(A::Union{BlockedUnitRange,BlockArray,BlockParamArray}) = length(blocks(A))
+
+MemoryLayoutStyle(::Type{<:BlockParamArray{T,N,A}}) where {T,N,A} = MemoryLayoutStyle(eltype(A))
 
 param_length(A::BlockParamArray) = param_length(first(blocks(A)))
 
@@ -161,8 +163,8 @@ end
 
 for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))
   @eval begin
-    function $f(A::BlockParamArray,z::Number)
-      map(a -> $f(a,z),blocks(A))
+    function $f(A::BlockParamArray,b::Number)
+      map(a -> $f(a,b),blocks(A))
       return A
     end
   end

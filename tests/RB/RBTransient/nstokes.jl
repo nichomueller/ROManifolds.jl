@@ -10,7 +10,7 @@ using GridapSolvers.NonlinearSolvers
 
 using ReducedOrderModels
 
-θ = 1.0
+θ = 0.5
 dt = 0.0025
 t0 = 0.0
 tf = 10*dt

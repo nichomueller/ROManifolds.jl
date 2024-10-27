@@ -3,12 +3,12 @@ eltype2(x) = eltype(eltype(x))
 function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamVector
   @warn "Allocating a vector of unit parametric length, will likely result in an error"
   vector = allocate_vector(eltype(V),n)
-  param_array(vector,1)
+  consecutive_param_array(vector,1)
 end
 
 function Algebra.allocate_vector(::PType{V,L},n::Integer) where {V<:AbstractParamVector,L}
   vector = allocate_vector(eltype(V),n)
-  param_array(vector,L)
+  consecutive_param_array(vector,L)
 end
 
 function Algebra.allocate_vector(::Type{<:BlockParamVector{T}},indices::BlockedUnitRange) where T
@@ -168,7 +168,7 @@ function Algebra.allocate_coo_vectors(::PType{T,L},n::Integer) where {Tv,Ti,T<:P
   I = zeros(Ti,n)
   J = zeros(Ti,n)
   V = zeros(Tv,n)
-  PV = param_array(V,L)
+  PV = consecutive_param_array(V,L)
   I,J,PV
 end
 
@@ -205,7 +205,7 @@ function Algebra.nz_allocation(a::Algebra.ArrayCounter{<:PType{T,L}}) where {T,L
   Tv = eltype(T)
   v = similar(Tv,map(length,a.axes))
   fill!(v,zero(eltype(v)))
-  param_array(v,L)
+  consecutive_param_array(v,L)
 end
 
 function Algebra.nz_allocation(a::ParamCounter)
@@ -244,7 +244,7 @@ end
 
 function ParamInserter(inserter::Algebra.InserterCSC,param_length)
   @unpack nrows,ncols,colptr,colnnz,rowval,nzval = inserter
-  pnzval = param_array(nzval,param_length)
+  pnzval = consecutive_param_array(nzval,param_length)
   ParamInserterCSC(nrows,ncols,colptr,colnnz,rowval,pnzval)
 end
 

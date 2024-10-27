@@ -72,7 +72,11 @@ export AbstractParamMatrix
 export ParamArray
 export ParamVector
 export ParamMatrix
+export MemoryLayoutStyle
+export ConsecutiveMemory
+export NonConsecutiveMemory
 export param_array
+export consecutive_param_array
 export innersize
 export innerlength
 export inneraxes
@@ -84,6 +88,7 @@ export ConsecutiveParamVector
 export ConsecutiveParamMatrix
 export GenericParamVector
 export GenericParamMatrix
+export ArrayOfArrays
 export get_all_data
 include("ParamArrays.jl")
 

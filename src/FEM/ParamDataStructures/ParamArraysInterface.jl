@@ -39,6 +39,12 @@ Subtypes:
 """
 abstract type ParamSparseMatrix{Tv,Ti,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,A} end
 
+abstract type MemoryLayoutStyle end
+struct ConsecutiveMemory <: MemoryLayoutStyle end
+struct NonConsecutiveMemory <: MemoryLayoutStyle end
+
+MemoryLayoutStyle(A::T) where T = MemoryLayoutStyle(T)
+MemoryLayoutStyle(::Type{<:AbstractParamArray}) = ConsecutiveMemory()
 
 """
     ParamArray(A::AbstractArray{<:Number}) -> ParamNumber
@@ -50,13 +56,14 @@ abstract type ParamSparseMatrix{Tv,Ti,A<:AbstractSparseMatrix{Tv,Ti}} <: Abstrac
 Generic constructor of a AbstractParamArray
 
 """
-ParamArray(A) = @abstractmethod
-param_array(A,args...) = @abstractmethod
+ParamArray(args...;kwargs...) = @abstractmethod
+param_array(args...;kwargs...) = @abstractmethod
+consecutive_param_array(args...) = param_array(args...;style=ConsecutiveMemory())
 
 ParamArray(A::AbstractArray{<:Number}) = ParamNumber(A)
 ParamArray(A::AbstractParamArray) = A
 
-function param_array(a::Union{Number,AbstractArray{<:Number,0}},l::Integer)
+function param_array(a::Union{Number,AbstractArray{<:Number,0}},l::Integer;kwargs...)
   ParamNumber(fill(a,l))
 end
 
@@ -186,13 +193,13 @@ Arrays.testitem(A::AbstractParamArray) = param_getindex(A,1)
 function Arrays.testvalue(A::AbstractParamArray{T,N}) where {T,N}
   tv = testvalue(Array{T,N})
   plength = param_length(A)
-  param_array(tv,plength)
+  param_array(tv,plength;style=MemoryLayoutStyle(A))
 end
 
-function Arrays.testvalue(::Type{<:AbstractParamArray{T,N}}) where {T,N}
+function Arrays.testvalue(::Type{A}) where {T,N,A<:AbstractParamArray{T,N}}
   tv = testvalue(Array{T,N})
   plength = one(Int)
-  param_array(tv,plength)
+  param_array(tv,plength;style=MemoryLayoutStyle(A))
 end
 
 function Arrays.CachedArray(A::AbstractParamArray)

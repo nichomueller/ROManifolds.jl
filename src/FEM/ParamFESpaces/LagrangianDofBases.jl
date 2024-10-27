@@ -17,17 +17,18 @@ end
 
 function ReferenceFEs._evaluate_lagr_dof!(
   c::AbstractVector,
-  node_comp_to_val::ConsecutiveParamVector,
+  node_comp_to_val::AbstractParamVector,
   node_and_comp_to_dof,
   ndofs,
   ncomps)
 
   setsize!(c,(ndofs,))
   r = c.array
-  for node in LinearIndices(node_and_comp_to_dof)
-    comp_to_dof = node_and_comp_to_dof[node]
-    for i in param_eachindex(c)
-      comp_to_val = node_comp_to_val.data[node,i]
+  for i in param_eachindex(c)
+    node_comp_to_val_i = param_getindex(node_comp_to_val,i)
+    for node in LinearIndices(node_and_comp_to_dof)
+      comp_to_dof = node_and_comp_to_dof[node]
+      comp_to_val = node_comp_to_val_i[node]
       for comp in 1:ncomps
         dof = comp_to_dof[comp]
         val = comp_to_val[comp]
@@ -40,7 +41,7 @@ end
 
 function ReferenceFEs._evaluate_lagr_dof!(
   c::AbstractMatrix,
-  node_pdof_comp_to_val::ConsecutiveParamMatrix,
+  node_pdof_comp_to_val::AbstractParamMatrix,
   node_and_comp_to_dof,
   ndofs,
   ncomps)
@@ -48,11 +49,12 @@ function ReferenceFEs._evaluate_lagr_dof!(
   _,npdofs = size(node_pdof_comp_to_val)
   setsize!(c,(ndofs,npdofs))
   r = c.array
-  for node in LinearIndices(node_and_comp_to_dof)
-    comp_to_dof = node_and_comp_to_dof[node]
-    for pdof in 1:npdofs
-      for i in param_eachindex(c)
-        comp_to_val = node_pdof_comp_to_val.data[node,pdof,i]
+  for i in param_eachindex(c)
+    node_pdof_comp_to_val_i = param_getindex(node_pdof_comp_to_val,i)
+    for node in LinearIndices(node_and_comp_to_dof)
+      comp_to_dof = node_and_comp_to_dof[node]
+      for pdof in 1:npdofs
+        comp_to_val = node_pdof_comp_to_val_i[node,pdof]
         for comp in 1:ncomps
           dof = comp_to_dof[comp]
           val = comp_to_val[comp]

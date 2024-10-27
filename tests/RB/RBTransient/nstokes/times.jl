@@ -97,7 +97,7 @@ for h in ("h007","h005","h0035")
     x = get_free_dof_values(zero(U))
 
     paramcache = allocate_paramcache(odeop,r,(x,x))
-    stageop = NonlinearParamStageOperator(odeop,paramcache,r,us,ws)
+    stageop = ParamStageOperator(odeop,paramcache,r,us,ws)
 
     println("Residual time with h = $h, nparams = $nparams:")
     @btime residual!(allocate_residual($stageop,$x),$stageop,$x)
@@ -278,8 +278,7 @@ index_and_item.index = index
 
 #############
 
-μ = rand(3)
-g′_in(x,t) = VectorValue(-x[2]*(W-x[2])*inflow(μ,t),0.0,0.0)
+g′_in(x,t) = VectorValue(-x[2]*(W-x[2])*inflow(rand(3),t),0.0,0.0)
 g′_in(t) = x->g′_in(x,t)
 g′_0(x,t) = VectorValue(0.0,0.0,0.0)
 g′_0(t) = x->g′_0(x,t)
@@ -405,7 +404,7 @@ cell = 1
 end
 
 @btime begin
-  for cell in 1:6817
+  for cell in $cells
     getindex!($cache_vals,$cell_vals,cell)
   end
 end
@@ -429,7 +428,7 @@ cache_dofs′ = array_cache(cell_dofs′)
 free_vals′ = zero_free_values(Ut′)
 
 @btime begin
-  for cell in 1:6817
+  for cell in $cells
     getindex!($cache_vals′,$cell_vals′,cell)
   end
 end

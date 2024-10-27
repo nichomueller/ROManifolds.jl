@@ -54,7 +54,7 @@ end
 
 function HomogeneousTrialParamFESpace(U::SingleFieldFESpace,::Val{N}) where N
   dv = zero_dirichlet_values(U)
-  dirichlet_values = param_array(dv,N)
+  dirichlet_values = consecutive_param_array(dv,N)
   TrialParamFESpace(dirichlet_values,U)
 end
 

@@ -1,7 +1,22 @@
 # generic constructors
 
-ParamArray(A::AbstractArray{<:Number},plength::Integer) = TrivialParamArray(A,plength)
-ParamArray(a::AbstractArray{<:AbstractArray}) = ConsecutiveParamArray(a)
+ParamArray(A::AbstractArray{<:Number},plength::Integer;kwargs...) = TrivialParamArray(A,plength)
+
+function ParamArray(a::AbstractArray{<:AbstractArray};style=NonConsecutiveMemory())
+  if style==ConsecutiveMemory()
+    ConsecutiveParamArray(a)
+  else
+    ArrayOfArrays(a)
+  end
+end
+
+function param_array(a::AbstractArray{<:Number,N},l::Integer;style=NonConsecutiveMemory()) where N
+  if style==ConsecutiveMemory()
+    ConsecutiveParamArray(a,l)
+  else
+    ArrayOfArrays(a,l)
+  end
+end
 
 get_all_data(A::ParamArray) = @abstractmethod
 
@@ -12,13 +27,6 @@ function Base.setindex!(
   ) where {T,T′,N}
 
   setindex!(get_all_data(A),get_all_data(v),i...,:)
-end
-
-for f in (:(Base.maximum),:(Base.minimum))
-  @eval begin
-    $f(A::ParamArray) = $f(get_all_data(A))
-    $f(g,A::ParamArray) = $f(g,get_all_data(A))
-  end
 end
 
 for op in (:+,:-,:*,:/)
@@ -47,8 +55,8 @@ function (*)(b::Number,A::ParamArray)
   (*)(A,b)
 end
 
-function Base.fill!(A::ParamArray,z::Number)
-  fill!(get_all_data(A),z)
+function Base.fill!(A::ParamArray,b::Number)
+  fill!(get_all_data(A),b)
   return A
 end
 
@@ -182,7 +190,7 @@ function ConsecutiveParamArray(a::AbstractVector{<:AbstractArray{T,N}}) where {T
   end
 end
 
-function param_array(a::AbstractArray{<:Number,N},l::Integer) where N
+function ConsecutiveParamArray(a::AbstractArray{<:Number,N},l::Integer) where N
   outer = (tfill(1,Val{N}())...,l)
   data = repeat(a;outer)
   ConsecutiveParamArray(data)
@@ -192,7 +200,7 @@ Base.size(A::ConsecutiveParamArray{T,N}) where {T,N} = tfill(param_length(A),Val
 
 ArraysOfArrays.innersize(A::ConsecutiveParamArray{T,N}) where {T,N} = ArraysOfArrays.front_tuple(size(get_all_data(A)),Val{N}())
 
-function Base.getindex(A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
+Base.@propagate_inbounds function Base.getindex(A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
   if all(i.==iblock)
@@ -202,7 +210,7 @@ function Base.getindex(A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where
   end
 end
 
-function Base.setindex!(A::ConsecutiveParamArray{T,N},v,i::Vararg{Integer,N}) where {T,N}
+Base.@propagate_inbounds function Base.setindex!(A::ConsecutiveParamArray{T,N},v,i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
   if all(i.==iblock)
@@ -315,7 +323,7 @@ function ArraysOfArrays.innersize(A::GenericParamVector)
   (innerlength,)
 end
 
-function Base.getindex(A::GenericParamVector,i::Integer)
+Base.@propagate_inbounds function Base.getindex(A::GenericParamVector,i::Integer)
   @boundscheck checkbounds(A,i)
   u = one(eltype(A.ptrs))
   pini = A.ptrs[i]
@@ -323,7 +331,7 @@ function Base.getindex(A::GenericParamVector,i::Integer)
   A.data[pini:pend]
 end
 
-function Base.setindex!(A::GenericParamVector,v,i::Integer)
+Base.@propagate_inbounds function Base.setindex!(A::GenericParamVector,v,i::Integer)
   @boundscheck checkbounds(A,i)
   u = one(eltype(A.ptrs))
   pini = A.ptrs[i]
@@ -438,7 +446,7 @@ Base.size(A::GenericParamMatrix) = (length(A.ptrs)-1,length(A.ptrs)-1)
 
 ArraysOfArrays.innersize(A::GenericParamMatrix) = @notimplemented
 
-function Base.getindex(A::GenericParamMatrix{Tv},i::Integer,j::Integer) where Tv
+Base.@propagate_inbounds function Base.getindex(A::GenericParamMatrix{Tv},i::Integer,j::Integer) where Tv
   @boundscheck checkbounds(A,i,j)
   u = one(eltype(A.ptrs))
   pini = A.ptrs[i]
@@ -452,7 +460,7 @@ function Base.getindex(A::GenericParamMatrix{Tv},i::Integer,j::Integer) where Tv
   end
 end
 
-function Base.setindex!(A::GenericParamMatrix,v,i::Integer,j::Integer)
+Base.@propagate_inbounds function Base.setindex!(A::GenericParamMatrix,v,i::Integer,j::Integer)
   @boundscheck checkbounds(A,i,j)
   u = one(eltype(A.ptrs))
   pini = A.ptrs[i]
@@ -520,6 +528,149 @@ function get_param_entry(A::GenericParamMatrix{T},i::Integer,j::Integer) where T
   entries = Vector{T}(undef,param_length(A))
   @inbounds for k in param_eachindex(A)
     entries[k] = A[k][i,j]
+  end
+  entries
+end
+
+struct ArrayOfArrays{T,N,A<:AbstractArray{T,N}} <: ParamArray{T,N}
+  data::Vector{A}
+end
+
+const VectorOfVectors{T} = ArrayOfArrays{T,1,<:AbstractVector{T}}
+const MatrixOfMatrices{T} = ArrayOfArrays{T,2,<:AbstractMatrix{T}}
+
+param_length(A::ArrayOfArrays) = length(A.data)
+
+function ArrayOfArrays(a::AbstractArray{<:Number},l::Integer)
+  data = Vector{typeof(a)}(undef,l)
+  @inbounds for i in 1:l
+    data[i] = copy(a)
+  end
+  ArrayOfArrays(data)
+end
+
+MemoryLayoutStyle(::Type{<:ArrayOfArrays}) = NonConsecutiveMemory()
+
+Base.size(A::ArrayOfArrays{T,N}) where {T,N} = tfill(param_length(A),Val{N}())
+
+ArraysOfArrays.innersize(A::ArrayOfArrays{T,N}) where {T,N} = size(first(A.data))
+
+Base.@propagate_inbounds function Base.getindex(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
+  @boundscheck checkbounds(A,i...)
+  iblock = first(i)
+  if all(i.==iblock)
+    A.data[iblock]
+  else
+    fill(zero(T),innersize(A))
+  end
+end
+
+Base.@propagate_inbounds function Base.setindex!(A::ArrayOfArrays{T,N},v,i::Vararg{Integer,N}) where {T,N}
+  @boundscheck checkbounds(A,i...)
+  iblock = first(i)
+  if all(i.==iblock)
+    A.data[iblock] = v
+  end
+end
+
+function Base.copy(A::ArrayOfArrays)
+  data′ = map(copy,A.data)
+  ArrayOfArrays(data′)
+end
+
+function Base.similar(A::ArrayOfArrays{T,N},::Type{<:AbstractArray{T′,N}}) where {T,T′,N}
+  data′ = map(a -> similar(a,T′),A.data)
+  ArrayOfArrays(data′)
+end
+
+function Base.similar(A::ArrayOfArrays{T,N},::Type{<:AbstractArray{T′}},dims::Dims{N}) where {T,T′,N}
+  data′ = map(a -> similar(a,T′,dims...),A.data)
+  ArrayOfArrays(data′)
+end
+
+function Base.copyto!(A::ArrayOfArrays,B::ArrayOfArrays)
+  map(copyto!,A.data,B.data)
+  A
+end
+
+function Base.vec(A::ArrayOfArrays)
+  data′ = map(vec,A.data)
+  ArrayOfArrays(data′)
+end
+
+function Base.setindex!(
+  A::ArrayOfArrays{T,N},
+  v::ArrayOfArrays{T′,N},
+  i::Vararg{Integer,N}
+  ) where {T,T′,N}
+
+  for (Ak,vk) in zip(A.data,v.data)
+    setindex!(Ak,vk,i...)
+  end
+end
+
+for op in (:+,:-)
+  @eval begin
+    function ($op)(A::ArrayOfArrays,B::ArrayOfArrays)
+      AB = similar(A)
+      @inbounds for i in param_eachindex(A)
+        AB[i] = ($op)(A[i],B[i])
+      end
+      AB
+    end
+  end
+end
+
+for op in (:*,:/)
+  @eval begin
+    function ($op)(A::ArrayOfArrays,b::Number)
+      Ab = similar(A)
+      @inbounds for i in param_eachindex(A)
+        Ab[i] = ($op)(A[i],b)
+      end
+      Ab
+    end
+  end
+end
+
+function Base.fill!(A::ArrayOfArrays,b::Number)
+  map(a -> fill!(a,b),A.data)
+  return A
+end
+
+function LinearAlgebra.rmul!(A::ArrayOfArrays,b::Number)
+  map(a -> rmul!(a,b),A.data)
+  return A
+end
+
+function LinearAlgebra.axpy!(α::Number,A::ArrayOfArrays,B::ArrayOfArrays)
+  map(a -> axpy!(α,a,b),A.data,B.data)
+  return B
+end
+
+function Arrays.CachedArray(A::ArrayOfArrays)
+  data′ = map(CachedArray,A.data)
+  ArrayOfArrays(data′)
+end
+
+function Arrays.setsize!(A::ArrayOfArrays{T,N},s::NTuple{N,Integer}) where {T,N}
+  map(a -> setsize!(a,s),A.data)
+  A
+end
+
+function Base.getproperty(A::ArrayOfArrays,sym::Symbol)
+  if sym == :array
+    data′ = map(a -> getfield(a,sym),A.data)
+    ArrayOfArrays(data′)
+  else
+    getfield(A,sym)
+  end
+end
+
+function get_param_entry(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
+  entries = Vector{T}(undef,param_length(A))
+  @inbounds for k in param_eachindex(A)
+    entries[k] = A.data[k][i...]
   end
   entries
 end
