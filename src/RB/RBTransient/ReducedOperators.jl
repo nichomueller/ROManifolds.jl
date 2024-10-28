@@ -367,7 +367,6 @@ function select_fe_quantities_at_indices(cache,us,paramcache,indices)
   red_cache = select_slvrcache_at_indices(cache,indices)
   # does the same with the stage variable `us` and the ode cache `paramcache`
   red_us,red_odeopcache = select_evalcache_at_indices(us,paramcache,indices)
-
   return red_cache,red_us,red_odeopcache
 end
 

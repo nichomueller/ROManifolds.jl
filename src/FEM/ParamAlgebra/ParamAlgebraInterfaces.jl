@@ -35,7 +35,7 @@ function Algebra.allocate_in_range(matrix::AbstractParamMatrix{T}) where T
 end
 
 function Algebra.allocate_in_range(matrix::BlockParamMatrix{T}) where T
-  V = BlockParamVector{T}
+  V = BlockConsecutiveParamVector{T}
   allocate_in_range(V,matrix)
 end
 
@@ -52,7 +52,7 @@ function Algebra.allocate_in_domain(matrix::AbstractParamMatrix{T}) where T
 end
 
 function Algebra.allocate_in_domain(matrix::BlockParamMatrix{T}) where T
-  V = BlockParamVector{T}
+  V = BlockConsecutiveParamVector{T}
   allocate_in_domain(V,matrix)
 end
 
@@ -208,16 +208,6 @@ function Algebra.nz_allocation(a::Algebra.ArrayCounter{<:PType{T,L}}) where {T,L
   consecutive_param_array(v,L)
 end
 
-function Algebra.nz_allocation(a::ParamCounter)
-  inserter = nz_allocation(a.counter)
-  plength = param_length(a)
-  ParamInserter(inserter,plength)
-end
-
-function ParamInserter(inserter,plength)
-  @abstractmethod
-end
-
 # csc
 
 function Algebra.sparse_from_coo(::PType{<:ParamSparseMatrixCSC},I,J,V,m,n)
@@ -242,10 +232,24 @@ Base.@propagate_inbounds function Algebra.nz_index(A::ParamSparseMatrixCSC,i0::I
   ((r1 > r2) || (rowvals(A)[r1] != i0)) ? -1 : r1
 end
 
-function ParamInserter(inserter::Algebra.InserterCSC,param_length)
-  @unpack nrows,ncols,colptr,colnnz,rowval,nzval = inserter
-  pnzval = consecutive_param_array(nzval,param_length)
-  ParamInserterCSC(nrows,ncols,colptr,colnnz,rowval,pnzval)
+# alternative implementation
+# We assumes same sparsity across parameters, to be generalized in the future
+
+function Algebra.nz_allocation(a::ParamCounter{<:Algebra.CounterCSC{Tv,Ti}}) where {Tv,Ti}
+  counter = a.counter
+  colptr = Vector{Ti}(undef,counter.ncols+1)
+  @inbounds for i in 1:counter.ncols
+    colptr[i+1] = counter.colnnzmax[i]
+  end
+  length_to_ptrs!(colptr)
+  plength = a.plength
+  ndata = colptr[end] - one(Ti)
+  pndata = ndata*plength
+  rowval = Vector{Ti}(undef,ndata)
+  nzval = zeros(Tv,pndata)
+  colnnz = counter.colnnzmax
+  fill!(colnnz,zero(Ti))
+  ParamInserterCSC(counter.nrows,counter.ncols,colptr,colnnz,rowval,nzval,plength)
 end
 
 """
@@ -262,10 +266,11 @@ struct ParamInserterCSC{Tv,Ti}
   colptr::Vector{Ti}
   colnnz::Vector{Ti}
   rowval::Vector{Ti}
-  nzval::ConsecutiveParamVector{Tv}
+  nzval::Vector{Tv}
+  plength::Int
 end
 
-ParamDataStructures.param_length(inserter::ParamInserterCSC) = param_length(inserter.nzval)
+ParamDataStructures.param_length(inserter::ParamInserterCSC) = inserter.plength
 
 Algebra.LoopStyle(::Type{<:ParamInserterCSC}) = Loop()
 
@@ -298,34 +303,36 @@ end
 @noinline function Algebra.add_entry!(::typeof(+),a::ParamInserterCSC,v::AbstractArray,i,j)
   pini = Int(a.colptr[j])
   pend = pini + Int(a.colnnz[j]) - 1
+  ndata = length(a.rowval)
+  pndata = length(a.nzval)
   p = searchsortedfirst(a.rowval,i,pini,pend,Base.Order.Forward)
   if (p>pend)
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    @inbounds for l = param_eachindex(a)
-      a.nzval.data[p,l] = v[l]
+    @inbounds for (l,vl) in enumerate(p:ndata:pndata)
+      a.nzval[vl] = v[l]
     end
   elseif a.rowval[p] != i
     # shift one forward from p to pend
-    @check  pend+1 < Int(a.colptr[j+1])
+    @check pend+1 < Int(a.colptr[j+1])
     for k in pend:-1:p
       o = k + 1
       a.rowval[o] = a.rowval[k]
-      @inbounds for l = param_eachindex(a)
-        a.nzval.data[o,l] = a.nzval.data[k,l]
+      @inbounds for l in k:ndata:pndata
+        a.nzval[l+1] = a.nzval[l]
       end
     end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    @inbounds for l = param_eachindex(a)
-      a.nzval.data[p,l] = v[l]
+    @inbounds for (l,vl) in enumerate(p:ndata:pndata)
+      a.nzval[vl] = v[l]
     end
   else
     # update existing entry
-    @inbounds for l = param_eachindex(a)
-      a.nzval.data[p,l] += v[l]
+    @inbounds for (l,vl) in enumerate(p:ndata:pndata)
+      a.nzval[vl] += v[l]
     end
   end
   nothing
@@ -333,12 +340,16 @@ end
 
 function Algebra.create_from_nz(a::ParamInserterCSC)
   k = 1
+  ndata = a.colptr[end]-1
+  pndata = length(a.nzval)
+  plength = param_length(a)
   for j in 1:a.ncols
     pini = Int(a.colptr[j])
     pend = pini + Int(a.colnnz[j]) - 1
     for p in pini:pend
-      @inbounds for l = param_eachindex(a)
-        a.nzval.data[k,l] = a.nzval.data[p,l]
+      @inbounds for (il,l) in enumerate(p:ndata:pndata)
+        α = k + (il-1)*ndata
+        a.nzval[α] = a.nzval[l]
       end
       a.rowval[k] = a.rowval[p]
       k += 1
@@ -349,9 +360,16 @@ function Algebra.create_from_nz(a::ParamInserterCSC)
   end
   length_to_ptrs!(a.colptr)
   nnz = a.colptr[end]-1
+  pnnz = nnz*plength
   resize!(a.rowval,nnz)
-
-  ConsecutiveParamSparseMatrixCSC(a.nrows,a.ncols,a.colptr,a.rowval,a.nzval.data[1:nnz,:])
+  δ = Int(length(a.nzval)/plength) - nnz
+  if δ > 0
+    @inbounds for l in 1:plength
+      Base._deleteat!(a.nzval,l*nnz+1,δ)
+    end
+  end
+  data = reshape(a.nzval,nnz,plength)
+  ConsecutiveParamSparseMatrixCSC(a.nrows,a.ncols,a.colptr,a.rowval,data)
 end
 
 # csr: implentation needed

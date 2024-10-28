@@ -170,8 +170,8 @@ struct ConsecutiveParamArray{T,N,M,A<:AbstractArray{T,M}} <: ParamArray{T,N}
   end
 end
 
-const ConsecutiveParamVector{T} = ConsecutiveParamArray{T,1,2,<:AbstractArray{T,2}}
-const ConsecutiveParamMatrix{T} = ConsecutiveParamArray{T,2,3,<:AbstractArray{T,3}}
+const ConsecutiveParamVector{T,A<:AbstractArray{T,2}} = ConsecutiveParamArray{T,1,2,A}
+const ConsecutiveParamMatrix{T,A<:AbstractArray{T,3}} = ConsecutiveParamArray{T,2,3,A}
 
 param_length(A::ConsecutiveParamArray{T,N,M}) where {T,N,M} = size(A.data,M)
 get_all_data(A::ConsecutiveParamArray) = A.data
@@ -535,9 +535,6 @@ end
 struct ArrayOfArrays{T,N,A<:AbstractArray{T,N}} <: ParamArray{T,N}
   data::Vector{A}
 end
-
-const VectorOfVectors{T} = ArrayOfArrays{T,1,<:AbstractVector{T}}
-const MatrixOfMatrices{T} = ArrayOfArrays{T,2,<:AbstractMatrix{T}}
 
 param_length(A::ArrayOfArrays) = length(A.data)
 

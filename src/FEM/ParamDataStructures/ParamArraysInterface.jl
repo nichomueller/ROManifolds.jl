@@ -266,7 +266,8 @@ function param_return_value(
   b::Union{Field,AbstractArray{<:Number}}...)
 
   v = return_value(f,testitem(A),b...)
-  return param_array(v,param_length(A))
+  pv = fill(v,param_length(A))
+  return ParamArray(pv)
 end
 
 function param_return_value(
@@ -276,7 +277,8 @@ function param_return_value(
   c::Union{Field,AbstractArray{<:Number}}...)
 
   v = return_value(f,a,testitem(B),c...)
-  return param_array(v,param_length(B))
+  pv = fill(v,param_length(B))
+  return ParamArray(pv)
 end
 
 function param_return_value(
@@ -287,7 +289,8 @@ function param_return_value(
   d::Union{Field,AbstractArray{<:Number}}...)
 
   v = return_value(f,a,b,testitem(C),d...)
-  return param_array(v,param_length(C))
+  pv = fill(v,param_length(C))
+  return ParamArray(pv)
 end
 
 function param_return_cache(
@@ -298,11 +301,12 @@ function param_return_cache(
   c = return_cache(f,testitem(A),b...)
   cx = evaluate!(c,f,testitem(A),b...)
   cache = Vector{typeof(c)}(undef,param_length(A))
-  data = param_array(cx,param_length(A))
+  data = Vector{typeof(cx)}(undef,param_length(A))
   @inbounds for i = param_eachindex(A)
     cache[i] = return_cache(f,param_getindex(A,i),b...)
   end
-  return cache,data
+  pdata = ParamArray(data)
+  return cache,pdata
 end
 
 function param_return_cache(
@@ -314,11 +318,12 @@ function param_return_cache(
   c′ = return_cache(f,a,testitem(B),c...)
   cx = evaluate!(c′,f,a,testitem(B),c...)
   cache = Vector{typeof(c′)}(undef,param_length(B))
-  data = param_array(cx,param_length(B))
+  data = Vector{typeof(cx)}(undef,param_length(B))
   @inbounds for i = param_eachindex(B)
     cache[i] = return_cache(f,a,param_getindex(B,i),c...)
   end
-  return cache,data
+  pdata = ParamArray(data)
+  return cache,pdata
 end
 
 function param_return_cache(
@@ -331,11 +336,12 @@ function param_return_cache(
   c′ = return_cache(f,a,b,testitem(C),d...)
   cx = evaluate!(c′,f,a,b,testitem(C),d...)
   cache = Vector{typeof(c′)}(undef,param_length(C))
-  data = param_array(cx,param_length(C))
+  data = Vector{typeof(cx)}(undef,param_length(C))
   @inbounds for i = param_eachindex(C)
     cache[i] = return_cache(f,a,b,param_getindex(C,i),d...)
   end
-  return cache,data
+  pdata = ParamArray(data)
+  return cache,pdata
 end
 
 function param_evaluate!(

@@ -18,11 +18,11 @@ struct BlockParamArray{T,N,A<:AbstractArray{<:AbstractParamArray{T,N},N},B<:NTup
   axes::B
 end
 
-const BlockParamVector{T} = BlockParamArray{T,1,<:AbstractVector{<:AbstractParamVector{T}}}
-const BlockParamMatrix{T} = BlockParamArray{T,2,<:AbstractMatrix{<:AbstractParamMatrix{T}}}
+const BlockParamVector{T,A,B} = BlockParamArray{T,1,A,B}
+const BlockParamMatrix{T,A,B} = BlockParamArray{T,2,A,B}
 
-const BlockConsecutiveParamVector{T} = BlockParamArray{T,1,<:AbstractVector{<:ConsecutiveParamVector{T}}}
-const BlockConsecutiveParamMatrix{T} = BlockParamArray{T,2,<:AbstractMatrix{<:ConsecutiveParamMatrix{T}}}
+const BlockConsecutiveParamVector{T,A<:Vector{<:ConsecutiveParamVector{T}},B} = BlockParamVector{T,A,B}
+const BlockConsecutiveParamMatrix{T,A<:Matrix{<:ConsecutiveParamMatrix{T}},B} = BlockParamMatrix{T,A,B}
 
 function BlockArrays._BlockArray(data::AbstractArray{<:AbstractParamArray,N},axes::NTuple{N,AbstractUnitRange{Int}}) where N
   @assert all(param_length(d)==param_length(first(data)) for d in data)

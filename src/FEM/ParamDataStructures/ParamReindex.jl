@@ -1,4 +1,4 @@
-const ParamReindex = Reindex{A} where A<:AbstractParamArray
+const ParamReindex = Reindex{<:AbstractParamArray}
 
 param_length(k::ParamReindex) = param_length(k.values)
 param_getindex(k::ParamReindex,i::Integer) = Reindex(param_getindex(k.values,i))
@@ -6,7 +6,7 @@ param_getindex(k::ParamReindex,i::Integer) = Reindex(param_getindex(k.values,i))
 Arrays.testitem(k::ParamReindex) = param_getindex(k,1)
 Arrays.testargs(k::ParamReindex,i...) = testargs(testitem(k),i...)
 
-const PosNegParamReindex = PosNegReindex{A,B} where {A<:AbstractParamArray,B<:AbstractParamArray}
+const PosNegParamReindex = PosNegReindex{<:AbstractParamArray,<:AbstractParamArray}
 
 function param_length(k::PosNegParamReindex)
   @check param_length(k.values_pos) == param_length(k.values_neg)

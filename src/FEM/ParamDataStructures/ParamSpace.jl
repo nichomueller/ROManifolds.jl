@@ -100,12 +100,12 @@ function TransientRealization(params::Realization,times::AbstractVector{<:Real},
 end
 
 function TransientRealization(params::Realization,time::Real,args...)
-  TransientRealizationAt(params,Ref(time))
+  TransientRealization(params,[time],args...)
 end
 
 function TransientRealization(params::Realization,times::AbstractVector{<:Real})
   t0,inner_times... = times
-  GenericTransientRealization(params,inner_times,t0)
+  TransientRealization(params,inner_times,t0)
 end
 
 get_initial_time(r::GenericTransientRealization) = r.t0
@@ -323,10 +323,6 @@ function ParamFunction(f::Function,p::AbstractArray)
   @notimplemented "Use a Realization as a parameter input"
 end
 
-function ParamFunction(f::Function,r::TrivialRealization)
-  f(r.params)
-end
-
 get_params(f::ParamFunction) = get_params(f.params)
 _get_params(f::ParamFunction) = _get_params(f.params)
 num_params(f::ParamFunction) = length(_get_params(f))
@@ -415,10 +411,6 @@ const 𝑓ₚₜ = TransientParamFunction
 
 function TransientParamFunction(f::Function,p::AbstractArray,t)
   @notimplemented "Use a Realization as a parameter input"
-end
-
-function TransientParamFunction(f::Function,r::TrivialRealization,t::Real)
-  f(r.params,t)
 end
 
 function TransientParamFunction(f::Function,r::TransientRealization)
