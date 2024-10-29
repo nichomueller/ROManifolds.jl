@@ -364,7 +364,7 @@ function Algebra.create_from_nz(a::ParamInserterCSC)
   resize!(a.rowval,nnz)
   δ = Int(length(a.nzval)/plength) - nnz
   if δ > 0
-    @inbounds for l in 1:plength
+    for l in 1:plength
       Base._deleteat!(a.nzval,l*nnz+1,δ)
     end
   end
