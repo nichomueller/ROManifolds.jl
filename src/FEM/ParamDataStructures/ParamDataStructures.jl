@@ -17,6 +17,7 @@ using Gridap.Helpers
 
 import Base:+,-,*,/,\
 import Distributions: Uniform,Normal
+import FillArrays: Fill
 import Statistics: mean
 import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
@@ -57,6 +58,7 @@ export param_eachindex
 export param_getindex
 export param_setindex!
 export get_param_entry
+export get_param_entry!
 export param_typeof
 include("ParamContainersInterface.jl")
 

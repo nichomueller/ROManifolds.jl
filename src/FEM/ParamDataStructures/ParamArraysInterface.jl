@@ -218,7 +218,7 @@ Generalization of [`return_value`](@ref) to the parametric case
 """
 function param_return_value(f::Union{Function,Map},A...)
   pA = to_param_quantities(A...)
-  c = return_value(f,testitem.(pA)...)
+  c = return_value(f,map(testitem,pA)...)
   data = param_array(c,param_length(first(pA)))
   return data
 end
@@ -231,12 +231,14 @@ Generalization of [`return_cache`](@ref) to the parametric case
 """
 function param_return_cache(f::Union{Function,Map},A...)
   pA = to_param_quantities(A...)
-  c = return_cache(f,testitem.(pA)...)
-  d = evaluate!(c,f,testitem.(pA)...)
-  cache = Vector{typeof(c)}(undef,param_length(first(pA)))
-  data = param_array(d,param_length(first(pA)))
-  @inbounds for i in param_eachindex(first(pA))
-    cache[i] = return_cache(f,param_getindex.(pA,i)...)
+  pA1 = first(pA)
+  item = map(testitem,pA)
+  c = return_cache(f,item...)
+  d = evaluate!(c,f,item...)
+  cache = Vector{typeof(c)}(undef,param_length(pA1))
+  data = param_array(d,param_length(pA1))
+  @inbounds for i in param_eachindex(pA1)
+    cache[i] = return_cache(f,map(a -> param_getindex(a,i),pA)...)
   end
   return cache,data
 end
@@ -252,7 +254,7 @@ function param_evaluate!(C,f::Union{Function,Map},A...)
   cache,data = C
   pA = to_param_quantities(A...;plength=param_length(data))
   @inbounds for i in param_eachindex(data)
-    vi = evaluate!(cache[i],f,param_getindex.(pA,i)...)
+    vi = evaluate!(cache[i],f,map(a -> param_getindex(a,i),pA)...)
     param_setindex!(data,vi,i)
   end
   data
@@ -286,6 +288,19 @@ function param_return_value(
   a::Union{Field,AbstractArray{<:Number}},
   b::Union{Field,AbstractArray{<:Number}},
   C::AbstractParamArray,
+  D::AbstractParamArray)
+
+  @check param_length(C) == param_length(D)
+  v = return_value(f,a,b,testitem(C),testitem(D))
+  pv = fill(v,param_length(C))
+  return ParamArray(pv)
+end
+
+function param_return_value(
+  f::Union{Function,Map},
+  a::Union{Field,AbstractArray{<:Number}},
+  b::Union{Field,AbstractArray{<:Number}},
+  C::AbstractParamArray,
   d::Union{Field,AbstractArray{<:Number}}...)
 
   v = return_value(f,a,b,testitem(C),d...)
@@ -298,8 +313,9 @@ function param_return_cache(
   A::AbstractParamArray,
   b::Union{Field,AbstractArray{<:Number}}...)
 
-  c = return_cache(f,testitem(A),b...)
-  cx = evaluate!(c,f,testitem(A),b...)
+  a = testitem(A)
+  c = return_cache(f,a,b...)
+  cx = evaluate!(c,f,a,b...)
   cache = Vector{typeof(c)}(undef,param_length(A))
   data = Vector{typeof(cx)}(undef,param_length(A))
   @inbounds for i = param_eachindex(A)
@@ -315,8 +331,9 @@ function param_return_cache(
   B::AbstractParamArray,
   c::Union{Field,AbstractArray{<:Number}}...)
 
-  c′ = return_cache(f,a,testitem(B),c...)
-  cx = evaluate!(c′,f,a,testitem(B),c...)
+  b = testitem(B)
+  c′ = return_cache(f,a,b,c...)
+  cx = evaluate!(c′,f,a,b,c...)
   cache = Vector{typeof(c′)}(undef,param_length(B))
   data = Vector{typeof(cx)}(undef,param_length(B))
   @inbounds for i = param_eachindex(B)
@@ -331,10 +348,32 @@ function param_return_cache(
   a::Union{Field,AbstractArray{<:Number}},
   b::Union{Field,AbstractArray{<:Number}},
   C::AbstractParamArray,
+  D::AbstractParamArray)
+
+  @check param_length(C) == param_length(D)
+  c = testitem(C)
+  d = testitem(D)
+  c′ = return_cache(f,a,b,c,d)
+  cx = evaluate!(c′,f,a,b,c,d)
+  cache = Vector{typeof(c′)}(undef,param_length(C))
+  data = Vector{typeof(cx)}(undef,param_length(C))
+  @inbounds for i = param_eachindex(C)
+    cache[i] = return_cache(f,a,b,param_getindex(C,i),param_getindex(D,i))
+  end
+  pdata = ParamArray(data)
+  return cache,pdata
+end
+
+function param_return_cache(
+  f::Union{Function,Map},
+  a::Union{Field,AbstractArray{<:Number}},
+  b::Union{Field,AbstractArray{<:Number}},
+  C::AbstractParamArray,
   d::Union{Field,AbstractArray{<:Number}}...)
 
-  c′ = return_cache(f,a,b,testitem(C),d...)
-  cx = evaluate!(c′,f,a,b,testitem(C),d...)
+  c = testitem(C)
+  c′ = return_cache(f,a,b,c,d...)
+  cx = evaluate!(c′,f,a,b,c,d...)
   cache = Vector{typeof(c′)}(undef,param_length(C))
   data = Vector{typeof(cx)}(undef,param_length(C))
   @inbounds for i = param_eachindex(C)
@@ -368,6 +407,23 @@ function param_evaluate!(
   cache,data = C
   @inbounds for i = param_eachindex(B)
     vi = evaluate!(cache[i],f,a,param_getindex(B,i),c...)
+    param_setindex!(data,vi,i)
+  end
+  return data
+end
+
+function param_evaluate!(
+  C′,
+  f::Union{Function,Map},
+  a::Union{Field,AbstractArray{<:Number}},
+  b::Union{Field,AbstractArray{<:Number}},
+  C::AbstractParamArray,
+  D::AbstractParamArray)
+
+  @check param_length(C) == param_length(D)
+  cache,data = C′
+  @inbounds for i = param_eachindex(C)
+    vi = evaluate!(cache[i],f,a,b,param_getindex(C,i),param_getindex(D,i))
     param_setindex!(data,vi,i)
   end
   return data
@@ -701,19 +757,69 @@ for T in (:AbstractParamArray,:AbstractArray,:Nothing), S in (:AbstractParamArra
   (T∈(:AbstractArray,:Nothing) && S==:AbstractArray) && continue
   @eval begin
     function Arrays.return_cache(f::Fields.ZeroBlockMap,A::$T,B::$S)
-      pA,pB = to_param_quantities(A,B)
-      map(get_param_data(pA),get_param_data(pB)) do a,b
-        CachedArray(similar(a,eltype(a),size(b)))
-      end |> ParamContainer
+      param_return_cache(f,A,B)
     end
   end
 end
 
-function Arrays.evaluate!(C::ParamContainer,f::Fields.ZeroBlockMap,A,B::AbstractArray)
-  pA,pB = to_param_quantities(A,B;plength=param_length(C))
-  map(C,get_param_data(pA),get_param_data(pB)) do c,a,b
-    evaluate!(c,f,a,b)
-  end |> ParamArray
+function Arrays.evaluate!(
+  C::Tuple{<:Any,<:AbstractParamArray},
+  f::Fields.ZeroBlockMap,
+  a,
+  b::AbstractArray)
+
+  cache,data = C
+  @inbounds for i in param_eachindex(data)
+    vi = evaluate!(cache[i],f,a,b)
+    param_setindex!(data,vi,i)
+  end
+  data
+end
+
+function Arrays.evaluate!(
+  C::Tuple{<:Any,<:AbstractParamArray},
+  f::Fields.ZeroBlockMap,
+  A::AbstractParamArray,
+  b::AbstractArray)
+
+  cache,data = C
+  @inbounds for i in param_eachindex(data)
+    ai = param_getindex(A,i)
+    vi = evaluate!(cache[i],f,ai,b)
+    param_setindex!(data,vi,i)
+  end
+  data
+end
+
+function Arrays.evaluate!(
+  C::Tuple{<:Any,<:AbstractParamArray},
+  f::Fields.ZeroBlockMap,
+  A::AbstractParamArray,
+  B::AbstractParamArray)
+
+  cache,data = C
+  @inbounds for i in param_eachindex(data)
+    ai = param_getindex(A,i)
+    bi = param_getindex(B,i)
+    vi = evaluate!(cache[i],f,ai,bi)
+    param_setindex!(data,vi,i)
+  end
+  data
+end
+
+function Arrays.evaluate!(
+  C::Tuple{<:Any,<:AbstractParamArray},
+  f::Fields.ZeroBlockMap,
+  a,
+  B::AbstractParamArray)
+
+  cache,data = C
+  @inbounds for i in param_eachindex(data)
+    bi = param_getindex(B,i)
+    vi = evaluate!(cache[i],f,a,bi)
+    param_setindex!(data,vi,i)
+  end
+  data
 end
 
 function Arrays.return_cache(
@@ -823,6 +929,80 @@ function Arrays.return_cache(
     end
   end
   ArrayBlock(array,a1.touched), c
+end
+
+for A in (:ArrayBlock,:AbstractArray)
+  for B in (:ArrayBlock,:AbstractArray)
+    for C in (:ArrayBlock,:AbstractArray)
+      if !(A == B == C)
+        @eval begin
+          function Arrays.evaluate!(cache,k::Fields.BroadcastingFieldOpMap,a::$A,b::$B,c::$C)
+            function _replace_nz_blocks!(cache::ArrayBlock,vali::AbstractArray)
+              for i in eachindex(cache.array)
+                if cache.touched[i]
+                  cache.array[i] = vali
+                end
+              end
+              cache
+            end
+
+            function _replace_nz_blocks!(cache::ArrayBlock,val::ArrayBlock)
+              for i in eachindex(cache.array)
+                if cache.touched[i]
+                  cache.array[i] = val.array[i]
+                end
+              end
+              cache
+            end
+
+            eval_cache,replace_cache = cache
+            cachea,cacheb,cachec = replace_cache
+
+            _replace_nz_blocks!(cachea,a)
+            _replace_nz_blocks!(cacheb,b)
+            _replace_nz_blocks!(cachec,c)
+
+            evaluate!(eval_cache,k,cachea,cacheb,cachec)
+          end
+        end
+      end
+      for D in (:ArrayBlock,:AbstractArray)
+        if !(A == B == C == D)
+          @eval begin
+            function Arrays.evaluate!(cache,k::Fields.BroadcastingFieldOpMap,a::$A,b::$B,c::$C,d::$D)
+              function _replace_nz_blocks!(cache::ArrayBlock,vali::AbstractArray)
+                for i in eachindex(cache.array)
+                  if cache.touched[i]
+                    cache.array[i] = vali
+                  end
+                end
+                cache
+              end
+
+              function _replace_nz_blocks!(cache::ArrayBlock,val::ArrayBlock)
+                for i in eachindex(cache.array)
+                  if cache.touched[i]
+                    cache.array[i] = val.array[i]
+                  end
+                end
+                cache
+              end
+
+              eval_cache,replace_cache = cache
+              cachea,cacheb,cachec,cached = replace_cache
+
+              _replace_nz_blocks!(cachea,a)
+              _replace_nz_blocks!(cacheb,b)
+              _replace_nz_blocks!(cachec,c)
+              _replace_nz_blocks!(cached,d)
+
+              evaluate!(eval_cache,k,cachea,cacheb,cachec,cached)
+            end
+          end
+        end
+      end
+    end
+  end
 end
 
 function Fields.unwrap_cached_array(A::AbstractParamArray)

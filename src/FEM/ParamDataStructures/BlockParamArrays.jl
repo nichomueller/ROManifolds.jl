@@ -191,7 +191,11 @@ function LinearAlgebra.norm(A::BlockParamArray)
   return sqrt.(n)
 end
 
-function get_param_entry(A::BlockParamArray{T},i...) where T
+function get_param_entry!(v::BlockVector,A::BlockParamArray,i...)
+  map((v,a) -> get_param_entry!(v,a,i...),blocks(v),blocks(A))
+end
+
+function get_param_entry(A::BlockParamArray,i...)
   entries = map(a -> get_param_entry(a,i...),blocks(A))
   mortar(entries)
 end

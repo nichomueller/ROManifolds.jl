@@ -156,6 +156,11 @@ function Arrays.CachedArray(A::TrivialParamArray)
   TrivialParamArray(data′,param_length(A))
 end
 
+function get_param_entry!(v::AbstractVector{T},A::TrivialParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
+  entry = getindex(get_all_data(A),i...)
+  fill!(v,entry)
+end
+
 function get_param_entry(A::TrivialParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
   entry = getindex(get_all_data(A),i...)
   fill(entry,param_length(A))
@@ -271,8 +276,12 @@ function param_getindex(A::ConsecutiveParamArray{T,N},i::Integer) where {T,N}
   view(A.data,ArraysOfArrays._ncolons(Val{N}())...,i)
 end
 
-function get_param_entry(A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
-  getindex(get_all_data(A),i...,:)
+function get_param_entry!(v::AbstractVector{T},A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
+  data = get_all_data(A)
+  for j in eachindex(v)
+    @inbounds v[j] = data[i...,j]
+  end
+  v
 end
 
 function get_param_entry(A::ConsecutiveParamArray,i...)
@@ -402,12 +411,17 @@ function Arrays.CachedArray(A::GenericParamVector)
   GenericParamVector(data′,ptrs)
 end
 
-function get_param_entry(A::GenericParamVector{T},i::Integer) where T
-  entries = Vector{T}(undef,param_length(A))
-  @inbounds for k in param_eachindex(A)
-    entries[k] = A[k][i]
+function get_param_entry!(v::AbstractVector{T},A::GenericParamVector{T},i::Integer) where T
+  for k in eachindex(v)
+    @inbounds v[k] = A[k][i]
   end
-  entries
+  v
+end
+
+function get_param_entry(A::GenericParamVector{T},i::Integer) where T
+  v = Vector{T}(undef,param_length(A))
+  get_param_entry!(v,A,i)
+  v
 end
 
 struct GenericParamMatrix{Tv,Ti} <: ParamArray{Tv,2}
@@ -524,12 +538,17 @@ function Arrays.CachedArray(A::GenericParamMatrix)
   GenericParamMatrix(data′,ptrs,nrows)
 end
 
-function get_param_entry(A::GenericParamMatrix{T},i::Integer,j::Integer) where T
-  entries = Vector{T}(undef,param_length(A))
-  @inbounds for k in param_eachindex(A)
-    entries[k] = A[k][i,j]
+function get_param_entry!(v::AbstractVector{T},A::GenericParamMatrix{T},i::Integer,j::Integer) where T
+  for k in eachindex(v)
+    @inbounds v[k] = A[k][i,j]
   end
-  entries
+  v
+end
+
+function get_param_entry(A::GenericParamMatrix{T},i::Integer,j::Integer) where T
+  v = Vector{T}(undef,param_length(A))
+  get_param_entry!(v,A,i,j)
+  v
 end
 
 struct ArrayOfArrays{T,N,A<:AbstractArray{T,N}} <: ParamArray{T,N}
@@ -664,12 +683,17 @@ function Base.getproperty(A::ArrayOfArrays,sym::Symbol)
   end
 end
 
-function get_param_entry(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
-  entries = Vector{T}(undef,param_length(A))
-  @inbounds for k in param_eachindex(A)
-    entries[k] = A.data[k][i...]
+function get_param_entry!(v::AbstractVector{T},A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
+  for k in eachindex(v)
+    @inbounds v[k] = A.data[k][i...]
   end
-  entries
+  v
+end
+
+function get_param_entry(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
+  v = Vector{T}(undef,param_length(A))
+  get_param_entry!(v,A,i...)
+  v
 end
 
 # utils

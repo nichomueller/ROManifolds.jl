@@ -56,14 +56,38 @@ function Algebra.allocate_in_domain(matrix::BlockParamMatrix{T}) where T
   allocate_in_domain(V,matrix)
 end
 
+function Arrays.return_cache(k::AddEntriesMap,A,vs::AbstractParamVector{T},is) where T
+  zeros(T,param_length(vs))
+end
+
+function Arrays.return_cache(k::AddEntriesMap,A,vs::AbstractParamMatrix{T},is,js) where T
+  zeros(T,param_length(vs))
+end
+
+function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::AbstractParamVector{T},is) where T
+  add_entries!(cache,k.combine,A,vs,is)
+end
+
+function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::AbstractParamMatrix{T},is,js) where T
+  add_entries!(cache,k.combine,A,vs,is,js)
+end
+
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamVector,is)
+  Algebra._add_entries!(cache,combine,A,vs,is)
+end
+
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamMatrix,is,js)
+  Algebra._add_entries!(cache,combine,A,vs,is,js)
+end
+
 @inline function Algebra._add_entries!(
-  combine::Function,A,vs::AbstractParamMatrix,is,js)
+  vij,combine::Function,A,vs::AbstractParamMatrix,is,js)
 
   for (lj,j) in enumerate(js)
     if j>0
       for (li,i) in enumerate(is)
         if i>0
-          vij = get_param_entry(vs,li,lj)
+          get_param_entry!(vij,vs,li,lj)
           add_entry!(combine,A,vij,i,j)
         end
       end
@@ -73,11 +97,11 @@ end
 end
 
 @inline function Algebra._add_entries!(
-  combine::Function,A,vs::AbstractParamVector,is)
+  vi,combine::Function,A,vs::AbstractParamVector,is)
 
   for (li,i) in enumerate(is)
     if i>0
-      vi = get_param_entry(vs,li)
+      get_param_entry!(vi,vs,li)
       add_entry!(combine,A,vi,i)
     end
   end
@@ -310,8 +334,8 @@ end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    @inbounds for (l,vl) in enumerate(p:ndata:pndata)
-      a.nzval[vl] = v[l]
+    for (l,vl) in enumerate(p:ndata:pndata)
+      @inbounds a.nzval[vl] = v[l]
     end
   elseif a.rowval[p] != i
     # shift one forward from p to pend
@@ -319,20 +343,20 @@ end
     for k in pend:-1:p
       o = k + 1
       a.rowval[o] = a.rowval[k]
-      @inbounds for l in k:ndata:pndata
-        a.nzval[l+1] = a.nzval[l]
+      for vl in k:ndata:pndata
+        @inbounds a.nzval[vl+1] = a.nzval[vl]
       end
     end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    @inbounds for (l,vl) in enumerate(p:ndata:pndata)
-      a.nzval[vl] = v[l]
+    for (l,vl) in enumerate(p:ndata:pndata)
+      @inbounds a.nzval[vl] = v[l]
     end
   else
     # update existing entry
-    @inbounds for (l,vl) in enumerate(p:ndata:pndata)
-      a.nzval[vl] += v[l]
+    for (l,vl) in enumerate(p:ndata:pndata)
+      @inbounds a.nzval[vl] += v[l]
     end
   end
   nothing

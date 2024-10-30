@@ -25,7 +25,7 @@ Returns the parametric entry of `a` at the index `i` ∈ {1,...,`param_length`(`
 
 """
 param_getindex(a,i::Integer) = @abstractmethod
-param_getindex(a::Union{Nothing,Function,Map},i::Integer) = a
+# param_getindex(a::Union{Nothing,Function,Map},i::Integer) = a
 
 param_setindex!(a,v,i::Integer) = @abstractmethod
 
@@ -39,7 +39,11 @@ possesses a parametric length, i.e. it is a parametrized quantity, it returns `a
 
 """
 to_param_quantity(a,plength::Integer) = @abstractmethod
-to_param_quantity(a::Union{Function,Map},plength::Integer) = a
+
+function to_param_quantity(a::AbstractParamFunction,plength::Integer)
+  @check param_length(a) == plength
+  return a
+end
 
 """
     find_param_length(a...) -> Int
@@ -102,8 +106,8 @@ param_length(::PType{T,L}) where {T,L} = L
 Used as a wrapper for non-array structures, e.g. factorizations
 
 """
-struct ParamContainer{T} <: AbstractParamContainer{T,1}
-  data::Vector{T}
+struct ParamContainer{T,A<:AbstractVector{T}} <: AbstractParamContainer{T,1}
+  data::A
 end
 
 ParamContainer(a::AbstractArray{<:Number}) = ParamNumber(a)
@@ -113,7 +117,7 @@ param_length(a::ParamContainer) = length(a.data)
 param_getindex(a::ParamContainer,i::Integer) = getindex(a,i)
 param_getindex(a::ParamContainer,v,i::Integer) = setindex!(a,v,i)
 
-to_param_quantity(a::Nothing,plength::Integer) = ParamContainer(fill(a,plength))
+to_param_quantity(a::Union{Function,Map,Nothing},plength::Integer) = ParamContainer(Fill(a,plength))
 
 Base.size(a::ParamContainer) = (param_length(a),)
 Base.getindex(a::ParamContainer,i::Integer) = getindex(a.data,i)
