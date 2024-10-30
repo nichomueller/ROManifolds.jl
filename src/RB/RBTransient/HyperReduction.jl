@@ -44,7 +44,7 @@ union_indices_time(a::TransientHyperReduction...) = union(get_indices_time.(a)..
 union_indices_space(a::AffineContribution) = union_indices_space(get_values(a)...)
 union_indices_time(a::AffineContribution) = union_indices_time(get_values(a)...)
 
-function RBSteady.reduced_triangulation(trian::Triangulation,b::TransientHyperReduction,r::FESubspace...)
+function RBSteady.reduced_triangulation(trian::Triangulation,b::TransientHyperReduction,r::RBSpace...)
   indices = get_integration_domain_space(b)
   RBSteady.reduced_triangulation(trian,indices,r...)
 end
@@ -52,8 +52,8 @@ end
 function RBSteady.HyperReduction(
   red::TransientMDEIMReduction,
   s::AbstractSnapshots,
-  trial::FESubspace,
-  test::FESubspace)
+  trial::RBSpace,
+  test::RBSpace)
 
   reduction = get_reduction(red)
   basis = projection(reduction,s)
@@ -71,8 +71,8 @@ get_integration_domain_time(a::TransientMDEIM) = get_integration_domain_time(a.d
 
 function RBSteady.reduced_jacobian(
   red::Tuple{Vararg{Reduction}},
-  trial::FESubspace,
-  test::FESubspace,
+  trial::RBSpace,
+  test::RBSpace,
   contribs::Tuple{Vararg{Any}})
 
   a = ()
@@ -118,6 +118,18 @@ function RBSteady.inv_project!(cache,a::TupOfAffineContribution,b::TupOfArrayCon
     end
   end
   return b̂
+end
+
+function RBSteady.inv_project!(cache::HRParamArray,a::TupOfAffineContribution,b::TupOfArrayContribution)
+  coeff = cache.coeff
+  hypred = cache.hypred
+  inv_project!((coeff,hypred),a,b)
+end
+
+function RBSteady.allocate_hypred_cache(a::TupOfAffineContribution,r::TransientRealization)
+  coeffs = map(ai -> RBSteady.allocate_coefficient(ai,r),a)
+  hypred = RBSteady.allocate_hyper_reduction(first(a),r)
+  return coeffs,hypred
 end
 
 # multi field interface

@@ -1,14 +1,14 @@
 function MultiFieldParamFESpace(
   spaces::Vector{<:SingleFieldParamFESpace};
-  style = ConsecutiveMultiFieldStyle())
+  style = BlockMultiFieldStyle())
 
-  if isa(style,BlockMultiFieldStyle)
-    style = BlockMultiFieldStyle(style,spaces)
-    VT = typeof(mortar(map(zero_free_values,spaces)))
-  else
-    VT = promote_type(map(get_vector_type,spaces)...)
-  end
-  MultiFieldFESpace(VT,spaces,style)
+  @notimplementedif !isa(style,BlockMultiFieldStyle)
+  style = BlockMultiFieldStyle(style,spaces)
+  fv = mortar(map(zero_free_values,spaces))
+  V = typeof(fv)
+  L = param_length(fv)
+  PV = ParamType{V,L}
+  MultiFieldFESpace(PV,spaces,style)
 end
 
 function MultiFieldParamFESpace(
@@ -43,13 +43,13 @@ function MultiField._restrict_to_field(
   offsets = MultiField._compute_field_offsets(U)
   pini = offsets[field] + 1
   pend = offsets[field] + num_free_dofs(U[field])
-  ParamDataStructures.param_view(free_values,pini:pend)
+  get_param_entry(free_values,pini:pend)
 end
 
 function MultiField._restrict_to_field(
   f,
   mfs::BlockMultiFieldStyle{NB,SB,P},
-  free_values::BlockVectorOfVectors,
+  free_values::BlockParamVector,
   field
   ) where {NB,SB,P}
 
@@ -65,7 +65,7 @@ function MultiField._restrict_to_field(
   offsets = compute_field_offsets(f,mfs)
   pini = offsets[field] + 1
   pend = offsets[field] + num_free_dofs(U[field])
-  return ParamDataStructures.param_view(block_free_values,pini:pend)
+  return get_param_entry(block_free_values,pini:pend)
 end
 
 function FESpaces.interpolate!(objects,free_values::AbstractParamVector,fe::MultiFieldFESpace)

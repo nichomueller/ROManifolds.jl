@@ -1,5 +1,5 @@
 """
-    struct GenericLinearNonlinearParamFEOperator <: ParamFEOperator{LinearNonlinearParamEq} end
+    struct LinearNonlinearParamFEOperator <: ParamFEOperator{LinearNonlinearParamEq} end
 
 Interface to accommodate the separation of terms depending on their linearity in
 a nonlinear problem. This allows to build and store once and for all linear
@@ -7,46 +7,10 @@ residuals/jacobians, and in the Newton-like iterations only evaluate and assembl
 only the nonlinear components
 
 """
-struct GenericLinearNonlinearParamFEOperator <: ParamFEOperator{LinearNonlinearParamEq}
+struct LinearNonlinearParamFEOperator <: ParamFEOperator{LinearNonlinearParamEq}
   op_linear::ParamFEOperator{LinearParamEq}
   op_nonlinear::ParamFEOperator{NonlinearParamEq}
 end
-
-"""
-    struct LinearNonlinearParamFEOperatorWithTrian <: ParamFEOperatorWithTrian{LinearNonlinearParamEq} end
-
-Is to a ParamFEOperatorWithTrian as a GenericLinearNonlinearParamFEOperator is to
-a ParamFEOperator
-
-"""
-struct LinearNonlinearParamFEOperatorWithTrian <: ParamFEOperatorWithTrian{LinearNonlinearParamEq}
-  op_linear::ParamFEOperatorWithTrian{LinearParamEq}
-  op_nonlinear::ParamFEOperatorWithTrian{NonlinearParamEq}
-end
-
-function LinNonlinParamFEOperator(
-  op_linear::ParamFEOperator,
-  op_nonlinear::ParamFEOperator)
-  GenericLinearNonlinearParamFEOperator(op_linear,op_nonlinear)
-end
-
-function LinNonlinParamFEOperator(
-  op_linear::ParamFEOperatorWithTrian,
-  op_nonlinear::ParamFEOperatorWithTrian)
-  LinearNonlinearParamFEOperatorWithTrian(op_linear,op_nonlinear)
-end
-
-"""
-    const LinearNonlinearParamFEOperator = Union{
-      GenericLinearNonlinearParamFEOperator,
-      LinearNonlinearParamFEOperatorWithTrian
-    }
-
-"""
-const LinearNonlinearParamFEOperator = Union{
-  GenericLinearNonlinearParamFEOperator,
-  LinearNonlinearParamFEOperatorWithTrian
-}
 
 """
     get_linear_operator(op::ParamFEOperator) -> ParamFEOperator
@@ -65,6 +29,10 @@ an error if the input is not defined as a linear-nonlinear FE operator
 
 """
 get_nonlinear_operator(op::LinearNonlinearParamFEOperator) = op.op_nonlinear
+
+function FESpaces.get_algebraic_operator(op::LinearNonlinearParamFEOperator)
+  LinearNonlinearParamOpFromFEOp(op)
+end
 
 function FESpaces.get_test(op::LinearNonlinearParamFEOperator)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)

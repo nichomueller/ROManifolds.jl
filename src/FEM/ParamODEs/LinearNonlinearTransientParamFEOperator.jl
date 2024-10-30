@@ -1,5 +1,5 @@
 """
-    struct GenericLinearNonlinearTransientParamFEOperator <:
+    struct LinearNonlinearTransientParamFEOperator <:
       TransientParamFEOperator{LinearNonlinearParamODE} end
 
 Interface to accommodate the separation of terms depending on their linearity in
@@ -8,50 +8,17 @@ residuals/jacobians, and in the Newton-like iterations only evaluate and assembl
 only the nonlinear components
 
 """
-struct GenericLinearNonlinearTransientParamFEOperator <: TransientParamFEOperator{LinearNonlinearParamODE}
+struct LinearNonlinearTransientParamFEOperator <: TransientParamFEOperator{LinearNonlinearParamODE}
   op_linear::TransientParamFEOperator{LinearParamODE}
   op_nonlinear::TransientParamFEOperator
 end
 
-"""
-    structLinearNonlinearTransientParamFEOperatorWithTrian <:
-      TransientParamFEOperatorWithTrian{LinearNonlinearParamODE} end
-
-Is to a TransientParamFEOperatorWithTrian as a GenericLinearNonlinearTransientParamFEOperator is to
-a TransientParamFEOperator
-
-"""
-struct LinearNonlinearTransientParamFEOperatorWithTrian <: TransientParamFEOperatorWithTrian{LinearNonlinearParamODE}
-  op_linear::TransientParamFEOperatorWithTrian{LinearParamODE}
-  op_nonlinear::TransientParamFEOperatorWithTrian
-end
-
-function LinNonlinTransientParamFEOperator(
-  op_linear::TransientParamFEOperator,
-  op_nonlinear::TransientParamFEOperator)
-  GenericLinearNonlinearTransientParamFEOperator(op_linear,op_nonlinear)
-end
-
-function LinNonlinTransientParamFEOperator(
-  op_linear::TransientParamFEOperatorWithTrian,
-  op_nonlinear::TransientParamFEOperatorWithTrian)
-  LinearNonlinearTransientParamFEOperatorWithTrian(op_linear,op_nonlinear)
-end
-
-"""
-    const LinearNonlinearTransientParamFEOperator = Union{
-      GenericLinearNonlinearTransientParamFEOperator,
-      LinearNonlinearTransientParamFEOperatorWithTrian
-    }
-
-"""
-const LinearNonlinearTransientParamFEOperator = Union{
-  GenericLinearNonlinearTransientParamFEOperator,
-  LinearNonlinearTransientParamFEOperatorWithTrian
-}
-
 ParamSteady.get_linear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_linear
 ParamSteady.get_nonlinear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_nonlinear
+
+function FESpaces.get_algebraic_operator(feop::LinearNonlinearTransientParamFEOperator)
+  LinearNonlinearParamOpFromTFEOp(feop)
+end
 
 function FESpaces.get_test(op::LinearNonlinearTransientParamFEOperator)
   @check get_test(op.op_linear) === get_test(op.op_nonlinear)
@@ -63,13 +30,18 @@ function FESpaces.get_trial(op::LinearNonlinearTransientParamFEOperator)
   get_trial(op.op_linear)
 end
 
+function ParamSteady.get_param_space(op::LinearNonlinearTransientParamFEOperator)
+  @check get_param_space(op.op_linear) === get_param_space(op.op_nonlinear)
+  get_param_space(op.op_linear)
+end
+
 function IndexMaps.get_index_map(op::LinearNonlinearTransientParamFEOperator)
   @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
   @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))
   get_index_map(op.op_linear)
 end
 
-function ReferenceFEs.get_order(op::LinearNonlinearTransientParamFEOperator)
+function Polynomials.get_order(op::LinearNonlinearTransientParamFEOperator)
   return max(get_order(op.op_linear),get_order(op.op_nonlinear))
 end
 

@@ -1,191 +1,127 @@
-"""
-    abstract type ParamStageOperator <: NonlinearOperator end
-
-Parametric extension of the type [`StageOperator`](@ref) in [`Gridap`](@ref)
-
-Subtypes:
-- [`LinearParamStageOperator`](@ref)
-- [`NonlinearParamStageOperator`](@ref)
-
-"""
-abstract type ParamStageOperator <: NonlinearOperator end
-
-"""
-"""
-struct NonlinearParamStageOperator <: ParamStageOperator
-  odeop::ODEOperator
-  odeopcache
-  rx::TransientRealization
-  usx::Function
+struct ParamStageOperator{T} <: StageOperator
+  op::ODEParamOperator{T}
+  cache::AbstractParamCache
+  r::TransientRealization
+  us::Function
   ws::Tuple{Vararg{Real}}
 end
 
-function Algebra.allocate_residual(nlop::NonlinearParamStageOperator,x::AbstractVector)
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
-  rx = nlop.rx
-  usx = nlop.usx(x)
-  allocate_residual(odeop,rx,usx,odeopcache)
+function Algebra.allocate_residual(nlop::ParamStageOperator,x::AbstractParamVector)
+  op = nlop.op
+  cache = nlop.cache
+  r = nlop.r
+  usx = nlop.us(x)
+  allocate_residual(op,r,usx,cache)
 end
 
 function Algebra.residual!(
-  b::AbstractVector,
-  nlop::NonlinearParamStageOperator,
-  x::AbstractVector)
+  b::AbstractParamVector,
+  nlop::ParamStageOperator,
+  x::AbstractParamVector)
 
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
-  rx = nlop.rx
-  usx = nlop.usx(x)
-  residual!(b,odeop,rx,usx,odeopcache)
+  op = nlop.op
+  cache = nlop.cache
+  r = nlop.r
+  usx = nlop.us(x)
+  residual!(b,op,r,usx,cache)
 end
 
-function Algebra.allocate_jacobian(nlop::NonlinearParamStageOperator,x::AbstractVector)
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
-  rx = nlop.rx
-  usx = nlop.usx(x)
-  allocate_jacobian(odeop,rx,usx,odeopcache)
+function Algebra.allocate_jacobian(nlop::ParamStageOperator,x::AbstractParamVector)
+  op = nlop.op
+  cache = nlop.cache
+  r = nlop.r
+  usx = nlop.us(x)
+  allocate_jacobian(op,r,usx,cache)
 end
 
 function Algebra.jacobian!(
-  A::AbstractMatrix,
-  nlop::NonlinearParamStageOperator,
-  x::AbstractVector)
+  A::AbstractParamMatrix,
+  nlop::ParamStageOperator,
+  x::AbstractParamVector)
 
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
-  rx = nlop.rx
-  usx = nlop.usx(x)
+  op = nlop.op
+  cache = nlop.cache
+  r = nlop.r
+  usx = nlop.us(x)
   ws = nlop.ws
-  jacobian!(A,odeop,rx,usx,ws,odeopcache)
+  jacobian!(A,op,r,usx,ws,cache)
   A
 end
 
-"""
-"""
-struct LinearParamStageOperator{Ta,Tb} <: ParamStageOperator
-  A::Ta
-  b::Tb
-  reuse::Bool
-end
+# linear case
 
-function LinearParamStageOperator(
-  odeop::ODEOperator,odeopcache,
-  rx::TransientRealization,
-  usx::Tuple{Vararg{AbstractVector}},
-  ws::Tuple{Vararg{Real}},
-  matcache,veccache,reuse::Bool,sysslvrcache)
+function Algebra.allocate_residual(
+  lop::ParamStageOperator{LinearParamODE},
+  x::AbstractParamVector)
 
-  b = residual!(veccache,odeop,rx,usx,odeopcache)
-  if isnothing(sysslvrcache) || !reuse
-    A = jacobian!(matcache,odeop,rx,usx,ws,odeopcache)
-  end
-  LinearParamStageOperator(A,b,reuse)
-end
-
-function Algebra.allocate_residual(lop::LinearParamStageOperator,x::AbstractVector)
-  b = allocate_in_range(typeof(lop.b),lop.A)
+  cache = lop.cache
+  b = copy(cache.b)
   fill!(b,zero(eltype(b)))
   b
 end
 
 function Algebra.residual!(
-  b::AbstractVector,
-  lop::LinearParamStageOperator,
-  x::AbstractVector)
+  b::AbstractParamVector,
+  lop::ParamStageOperator{LinearParamODE},
+  x::AbstractParamVector)
 
-  mul!(b,lop.A,x)
-  axpy!(1,lop.b,b)
-  b
+  op = lop.op
+  cache = lop.cache.paramcache
+  r = lop.r
+  usx = lop.us(x)
+  residual!(b,op,r,usx,cache)
 end
 
-function Algebra.allocate_jacobian(lop::LinearParamStageOperator,x::AbstractVector)
-  lop.A
-end
+function Algebra.allocate_jacobian(
+  lop::ParamStageOperator{LinearParamODE},
+  x::AbstractParamVector)
 
-function Algebra.jacobian!(
-  A::AbstractMatrix,
-  lop::LinearParamStageOperator,
-  x::AbstractVector)
-
-  copy_entries!(A,lop.A)
+  cache = lop.cache
+  A = copy(first(cache.A))
   A
 end
 
-function Algebra.solve!(
-  x::AbstractVector,
-  ls::LinearSolver,
-  lop::LinearParamStageOperator,
-  ns::Nothing)
+function Algebra.jacobian!(
+  A::AbstractParamMatrix,
+  lop::ParamStageOperator{LinearParamODE},
+  x::AbstractParamVector)
 
-  A = lop.A
-  ss = symbolic_setup(ls,A)
-  ns = numerical_setup(ss,A)
-
-  b = lop.b
-  rmul!(b,-1)
-
-  solve!(x,ns,b)
-  ns
+  op = lop.op
+  cache = lop.cache
+  r = lop.r
+  usx = lop.us(x)
+  ws = lop.ws
+  jacobian!(A,op,r,usx,ws,cache)
 end
 
 function Algebra.solve!(
-  x::AbstractVector,
+  x::AbstractParamVector,
   ls::LinearSolver,
-  lop::LinearParamStageOperator,
-  ns)
+  lop::ParamStageOperator{LinearParamODE},
+  cache::Nothing)
 
-  if !lop.reuse
-    A = lop.A
-    numerical_setup!(ns,A)
-  end
-
-  b = lop.b
+  fill!(x,zero(eltype(x)))
+  b = residual(lop,x)
   rmul!(b,-1)
+  A = jacobian(lop,x)
+  ns = solve!(x,ls,A,b)
 
-  solve!(x,ns,b)
-  ns
+  Algebra.LinearSolverCache(A,b,ns)
 end
 
-# interface for contributions
+function Algebra.solve!(
+  x::AbstractParamVector,
+  ls::LinearSolver,
+  lop::ParamStageOperator{LinearParamODE},
+  cache::Algebra.LinearSolverCache)
 
-function Algebra.residual!(
-  b::ArrayContribution,
-  nlop::NonlinearParamStageOperator,
-  x::AbstractVector)
-
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
-  rx = nlop.rx
-  usx = nlop.usx(x)
-  residual!(b,odeop,rx,usx,odeopcache)
-end
-
-function Algebra.jacobian!(
-  A::TupOfArrayContribution,
-  nlop::NonlinearParamStageOperator,
-  x::AbstractVector)
-
-  odeop,odeopcache = nlop.odeop,nlop.odeopcache
-  rx = nlop.rx
-  usx = nlop.usx(x)
-  ws = nlop.ws
-  jacobian!(A,odeop,rx,usx,ws,odeopcache)
-end
-
-function Algebra.residual!(
-  b::ArrayContribution,
-  lop::LinearParamStageOperator,
-  x::AbstractVector)
-
-  for A in lop.A
-    mul!(b,A,x)
-    axpy!(1,lop.b,b)
-  end
-  b
-end
-
-function Algebra.jacobian!(
-  A::TupOfArrayContribution,
-  lop::LinearParamStageOperator,
-  x::AbstractVector)
-
-  copy_entries!(A,lop.A)
-  A
+  fill!(x,zero(eltype(x)))
+  b = cache.b
+  A = cache.A
+  ns = cache.ns
+  residual!(b,lop,x)
+  rmul!(b,-1)
+  jacobian!(A,lop,x)
+  ns = solve!(x,ls,A,b)
+  cache
 end

@@ -18,10 +18,10 @@ num_fe_dofs(a::Projection) = @abstractmethod
 num_reduced_dofs(a::Projection) = @abstractmethod
 project(a::Projection,x::AbstractArray) = @abstractmethod
 inv_project(a::Projection,x::AbstractArray) = @abstractmethod
-rescale(op::Function,x::AbstractArray,b::Projection) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection,c::Projection,args...) = @abstractmethod
 empirical_interpolation(a::Projection) = @abstractmethod
+rescale(op::Function,x::AbstractArray,b::Projection) = @abstractmethod
 gram_schmidt(a::Projection,b::Projection,args...) = gram_schmidt(get_basis(a),get_basis(b),args...)
 
 Base.:+(a::Projection,b::Projection) = union(a,b)
@@ -31,10 +31,10 @@ Base.:*(a::Projection,b::Projection,c::Projection) = galerkin_projection(a,b,c)
 Base.:*(a::Projection,x::AbstractArray) = inv_project(a,x)
 Base.:*(x::AbstractArray,b::Projection) = rescale(*,x,b)
 
-function Base.:*(b::Projection,y::ConsecutiveArrayOfArrays)
+function Base.:*(b::Projection,y::ConsecutiveParamArray)
   item = zeros(num_reduced_dofs(b))
   plength = param_length(y)
-  x = array_of_consecutive_arrays(item,plength)
+  x = consecutive_param_array(item,plength)
   mul!(x,b,y)
 end
 
@@ -42,7 +42,7 @@ function LinearAlgebra.mul!(x::AbstractArray,b::Projection,y::AbstractArray,α::
   mul!(x,get_basis(b),y,α,β)
 end
 
-function LinearAlgebra.mul!(x::ConsecutiveArrayOfArrays,b::Projection,y::ConsecutiveArrayOfArrays,α::Number,β::Number)
+function LinearAlgebra.mul!(x::ConsecutiveParamArray,b::Projection,y::ConsecutiveParamArray,α::Number,β::Number)
   mul!(x.data,get_basis(b),y.data,α,β)
 end
 
@@ -107,9 +107,9 @@ function LinearAlgebra.mul!(
 end
 
 function LinearAlgebra.mul!(
-  x::ConsecutiveArrayOfArrays,
+  x::ConsecutiveParamArray,
   b::ReducedMatProjection,
-  y::ConsecutiveArrayOfArrays,
+  y::ConsecutiveParamArray,
   α::Number,β::Number)
 
   contraction!(x.data,get_basis(b),y.data,α,β)
@@ -146,13 +146,15 @@ function projection(red::PODReduction,s::AbstractArray{<:Number},args...)
   PODBasis(basis)
 end
 
+function projection(red::PODReduction,s::SparseSnapshots,args...)
+  basis = reduction(red,s,args...)
+  basis′ = recast(basis,s)
+  PODBasis(basis′)
+end
+
 get_basis(a::PODBasis) = a.basis
 num_fe_dofs(a::PODBasis) = size(get_basis(a),1)
 num_reduced_dofs(a::PODBasis) = size(get_basis(a),2)
-
-function rescale(op::Function,x::AbstractArray,b::PODBasis)
-  PODBasis(op(x,get_basis(b)))
-end
 
 Base.union(a::PODBasis,b::PODBasis,args...) = union(a,get_basis(b),args...)
 
@@ -181,6 +183,10 @@ function empirical_interpolation(a::PODBasis)
   empirical_interpolation(get_basis(a))
 end
 
+function rescale(op::Function,x::AbstractArray,b::PODBasis)
+  PODBasis(op(x,get_basis(b)))
+end
+
 # TT interface
 
 """
@@ -201,6 +207,13 @@ function projection(red::TTSVDReduction,s::AbstractSnapshots,args...)
   TTSVDCores(cores,index_map)
 end
 
+function projection(red::TTSVDReduction,s::SparseSnapshots,args...)
+  cores = reduction(red,s,args...)
+  cores′ = recast(cores,s)
+  index_map = get_index_map(s)
+  TTSVDCores(cores′,index_map)
+end
+
 get_cores(a::TTSVDCores) = a.cores
 
 get_basis(a::TTSVDCores) = cores2basis(get_index_map(a),get_cores(a)...)
@@ -208,16 +221,6 @@ num_fe_dofs(a::TTSVDCores) = prod(map(c -> size(c,2),get_cores(a)))
 num_reduced_dofs(a::TTSVDCores) = size(last(get_cores(a)),3)
 
 IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
-
-function rescale(op::Function,x::AbstractRankTensor{D1},b::TTSVDCores{D2}) where {D1,D2}
-  if D1 == D2
-    TTSVDCores(op(x,get_cores(b)),get_index_map(b))
-  else
-    c1 = op(x,get_cores(b)[1:D1])
-    c2 = get_cores(b)[D1+1:end]
-    TTSVDCores([c1...,c2...],get_index_map(b))
-  end
-end
 
 function Base.union(a::TTSVDCores,b::TTSVDCores,args...)
   @check get_index_map(a) == get_index_map(b)
@@ -264,6 +267,16 @@ function empirical_interpolation(a::TTSVDCores)
     end
   end
   return indices,interp
+end
+
+function rescale(op::Function,x::AbstractRankTensor{D1},b::TTSVDCores{D2}) where {D1,D2}
+  if D1 == D2
+    TTSVDCores(op(x,get_cores(b)),get_index_map(b))
+  else
+    c1 = op(x,get_cores(b)[1:D1])
+    c2 = get_cores(b)[D1+1:end]
+    TTSVDCores([c1...,c2...],get_index_map(b))
+  end
 end
 
 # multi field interface
@@ -399,7 +412,7 @@ for f in (:project,:inv_project)
     function Arrays.return_cache(
       ::typeof($f),
       a::BlockProjection,
-      x::Union{BlockVector,BlockVectorOfVectors})
+      x::Union{BlockVector,BlockParamVector})
 
       @check size(a) == nblocks(x)
       y = Vector{eltype(x)}(undef,nblocks(a))
@@ -413,7 +426,7 @@ for f in (:project,:inv_project)
       return mortar(y)
     end
 
-    function $f(a::BlockProjection,x::Union{BlockArray,BlockArrayOfArrays})
+    function $f(a::BlockProjection,x::Union{BlockArray,BlockParamArray})
       y = return_cache($f,a,x)
       for i in eachindex(a)
         if a.touched[i]

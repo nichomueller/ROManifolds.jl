@@ -1,20 +1,15 @@
 using Gridap
 using Gridap.Algebra
 using Gridap.FESpaces
+import Gridap.FESpaces: NonlinearFESolver
 using Gridap.MultiField
-using Test
 using DrWatson
 using Serialization
 
-using ReducedOrderModels.FEM
-using ReducedOrderModels.TProduct
-using ReducedOrderModels.ParamDataStructures
-using ReducedOrderModels.ParamFESpaces
-using ReducedOrderModels.ParamSteady
-using ReducedOrderModels.ParamODEs
+using GridapSolvers
+import GridapSolvers: LinearSolvers, NonlinearSolvers, BlockSolvers
 
-using ReducedOrderModels.RB
-using ReducedOrderModels.RB.RBSteady
+using ReducedOrderModels
 
 pranges = fill([1,10],3)
 pspace = ParamSpace(pranges)
@@ -24,8 +19,8 @@ domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain,partition)
 labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"diri1",[6,])
-add_tag_from_tags!(labels,"diri0",[1,2,3,4,5,7,8])
+add_tag_from_tags!(labels,"diri1",[7,])
+add_tag_from_tags!(labels,"diri0",[1,2,3,4,5,6])
 
 order = 2
 degree = 2*(order)+1
@@ -36,7 +31,7 @@ a(x,μ) = 1
 a(μ) = x->a(x,μ)
 aμ(μ) = ParamFunction(a,μ)
 
-g(x,μ) = VectorValue(μ[1],0.0)
+g(x,μ) = VectorValue(-μ[1]*x[2]*(1-x[2]),0.0)
 g(μ) = x->g(x,μ)
 gμ(μ) = ParamFunction(g,μ)
 g0(x,μ) = VectorValue(0.0,0.0)
@@ -69,9 +64,9 @@ test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 feop_lin = LinearParamFEOperator(res_lin,jac_lin,pspace,trial,test,trian_res,trian_jac)
 feop_nlin = ParamFEOperator(res_nlin,jac_nlin,pspace,trial,test,trian_res,trian_jac)
-feop = LinNonlinParamFEOperator(feop_lin,feop_nlin)
+feop = LinearNonlinearParamFEOperator(feop_lin,feop_nlin)
 
-fesolver = NonlinearFESolver(NewtonRaphsonSolver(LUSolver(),1e-10,20))
+fesolver = NonlinearFESolver(NonlinearSolvers.NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true))
 
 tol = 1e-4
 state_reduction = SupremizerReduction(coupling,tol,energy;nparams=30,sketch=:sprn)
@@ -83,4 +78,4 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon)
-perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,μon)
+perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)

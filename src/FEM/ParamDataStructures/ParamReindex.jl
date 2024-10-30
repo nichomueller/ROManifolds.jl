@@ -1,20 +1,18 @@
-const ParamReindex = Reindex{A} where A<:AbstractParamArray
+const ParamReindex = Reindex{<:AbstractParamArray}
 
 param_length(k::ParamReindex) = param_length(k.values)
-param_data(k::ParamReindex) = Reindex.(param_data(k.values))
 param_getindex(k::ParamReindex,i::Integer) = Reindex(param_getindex(k.values,i))
 
 Arrays.testitem(k::ParamReindex) = param_getindex(k,1)
 Arrays.testargs(k::ParamReindex,i...) = testargs(testitem(k),i...)
 
-const PosNegParamReindex = PosNegReindex{A,B} where {A<:AbstractParamArray,B<:AbstractParamArray}
+const PosNegParamReindex = PosNegReindex{<:AbstractParamArray,<:AbstractParamArray}
 
 function param_length(k::PosNegParamReindex)
   @check param_length(k.values_pos) == param_length(k.values_neg)
   param_length(k.values_pos)
 end
 
-param_data(k::PosNegParamReindex) = PosNegReindex(param_data.(k.values_pos),param_data.(k.values_neg))
 param_getindex(k::PosNegParamReindex,i::Integer) = PosNegReindex(param_getindex(k.values_pos,i),param_getindex(k.values_neg,i))
 
 Arrays.testitem(k::PosNegParamReindex) = param_getindex(k,1)
@@ -39,7 +37,7 @@ function Arrays.return_cache(
   c = return_cache(Broadcasting(testitem(f.f)),x...)
   a = evaluate!(c,Broadcasting(testitem(f.f)),x...)
   cache = Vector{typeof(c)}(undef,param_length(f.f))
-  data = array_of_similar_arrays(a,param_length(f.f))
+  data = param_array(a,param_length(f.f))
   @inbounds for i = param_eachindex(f.f)
     cache[i] = return_cache(Broadcasting(param_getindex(f.f,i)),x...)
   end
@@ -97,7 +95,7 @@ for T in (:ParamReindex,:PosNegParamReindex)
       c = return_cache(testitem(k),j)
       a = evaluate!(c,testitem(k),j)
       cache = Vector{typeof(c)}(undef,param_length(k))
-      data = array_of_similar_arrays(a,param_length(k))
+      data = param_array(a,param_length(k))
       for i = param_eachindex(k)
         cache[i] = return_cache(param_getindex(k,i),j)
       end

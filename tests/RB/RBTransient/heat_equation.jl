@@ -3,19 +3,13 @@ using Test
 using DrWatson
 using Serialization
 
-using ReducedOrderModels.ParamDataStructures
-using ReducedOrderModels.ParamFESpaces
-using ReducedOrderModels.ParamSteady
-using ReducedOrderModels.ParamODEs
-
-using ReducedOrderModels.RBSteady
-using ReducedOrderModels.RBTransient
+using ReducedOrderModels
 
 # time marching
 θ = 0.5
 dt = 0.01
 t0 = 0.0
-tf = 0.1
+tf = 10*dt
 
 # parametric space
 pranges = fill([1,10],3)
@@ -90,4 +84,4 @@ ronline = realization(feop;nparams=10)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 
 x,festats = solution_snapshots(rbsolver,feop,ronline,uh0μ)
-perf = rb_performance(rbsolver,rbop,x,x̂,festats,rbstats,ronline)
+perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)

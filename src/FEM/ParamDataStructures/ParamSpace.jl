@@ -10,6 +10,8 @@ parameter space. Two categories of such realizations are implemented:
 
 abstract type AbstractRealization end
 
+param_length(r::AbstractRealization) = length(r)
+
 """
     Realization{P<:AbstractVector} <: AbstractRealization
 
@@ -46,8 +48,6 @@ _get_params(r::TrivialRealization) = [r.params] # this function should stay loca
 num_params(r::Realization) = length(_get_params(r))
 Base.length(r::Realization) = num_params(r)
 Base.getindex(r::Realization,i) = Realization(getindex(_get_params(r),i))
-Base.copy(r::Realization) = Realization(copy(_get_params(r)))
-Arrays.testitem(r::Realization) = testitem(_get_params(r))
 
 # when iterating over a Realization{P}, we return eltype(P) ∀ index i
 function Base.iterate(r::Realization,state=1)
@@ -61,10 +61,6 @@ end
 function Base.zero(r::Realization)
   μ1 = first(_get_params(r))
   Realization(zeros(eltype(μ1),length(μ1)) .+ 1e-16)
-end
-
-function mean(r::Realization)
-  Realization(mean(_get_params(r)))
 end
 
 """
@@ -104,18 +100,16 @@ function TransientRealization(params::Realization,times::AbstractVector{<:Real},
 end
 
 function TransientRealization(params::Realization,time::Real,args...)
-  TransientRealizationAt(params,Ref(time))
+  TransientRealization(params,[time],args...)
 end
 
 function TransientRealization(params::Realization,times::AbstractVector{<:Real})
   t0,inner_times... = times
-  GenericTransientRealization(params,inner_times,t0)
+  TransientRealization(params,inner_times,t0)
 end
 
 get_initial_time(r::GenericTransientRealization) = r.t0
 get_times(r::GenericTransientRealization) = r.times
-Base.copy(r::GenericTransientRealization) = GenericTransientRealization(copy(r.params),copy(r.times),copy(r.t0))
-Arrays.testitem(r::GenericTransientRealization) = testitem(get_params(r)),r.t0
 
 function Base.getindex(r::GenericTransientRealization,i,j)
   TransientRealization(
@@ -131,10 +125,6 @@ end
 
 function Base.zero(r::GenericTransientRealization)
   GenericTransientRealization(zero(get_params(r)),get_times(r),get_initial_time(r))
-end
-
-function mean(r::GenericTransientRealization)
-  GenericTransientRealization(mean(get_params(r)),get_times(r),get_initial_time(r))
 end
 
 get_final_time(r::GenericTransientRealization) = last(get_times(r))
@@ -180,8 +170,6 @@ end
 
 get_initial_time(r::TransientRealizationAt) = @notimplemented
 get_times(r::TransientRealizationAt) = r.t[]
-Base.copy(r::TransientRealizationAt) = TransientRealizationAt(copy(r.params),Ref(copy(r.t)))
-Arrays.testitem(r::TransientRealizationAt) = testitem(get_params(r)),r.t[]
 
 function Base.getindex(r::TransientRealizationAt,i,j)
   @assert j == 1
@@ -210,16 +198,14 @@ Represents a standard set of parameters.
 
 """
 
-struct ParamSpace{P,S} <: AbstractSet{Realization}
+struct ParamSpace{P<:AbstractVector{<:AbstractVector},S} <: AbstractSet{Realization}
   param_domain::P
   sampling_style::S
-  function ParamSpace(
-    param_domain::P,
-    sampling::S=UniformSampling()
-    ) where {P<:AbstractVector{<:AbstractVector},S}
+end
 
-    new{P,S}(param_domain,sampling)
-  end
+function ParamSpace(param_domain::AbstractVector{<:AbstractVector})
+  sampling_style = UniformSampling()
+  ParamSpace(param_domain,sampling_style)
 end
 
 function Base.show(io::IO,::MIME"text/plain",p::ParamSpace)
@@ -227,10 +213,12 @@ function Base.show(io::IO,::MIME"text/plain",p::ParamSpace)
   println(io,msg)
 end
 
-function generate_param(p::ParamSpace)
-  _value(d,::UniformSampling) = rand(Uniform(first(d),last(d)))
-  _value(d,::NormalSampling) = rand(Normal(first(d),last(d)))
-  [_value(d,p.sampling_style) for d = p.param_domain]
+function _generate_param(p::ParamSpace{P,UniformSampling} where P)
+  [rand(Uniform(first(d),last(d))) for d = p.param_domain]
+end
+
+function _generate_param(p::ParamSpace{P,NormalSampling} where P)
+  [rand(Normal(first(d),last(d))) for d = p.param_domain]
 end
 
 """
@@ -238,10 +226,10 @@ end
     realization(p::TransientParamSpace;nparams=1) -> TransientRealization
 
 Extraction of a set of parameters from a given parametric space
-"""
 
+"""
 function realization(p::ParamSpace;nparams=1)
-  Realization([generate_param(p) for i = 1:nparams])
+  Realization([_generate_param(p) for i = 1:nparams])
 end
 
 """
@@ -259,9 +247,9 @@ end
 function TransientParamSpace(
   param_domain::AbstractVector{<:AbstractVector},
   temporal_domain::AbstractVector{<:Real},
-  sampling=UniformSampling())
+  args...)
 
-  parametric_space = ParamSpace(param_domain,sampling)
+  parametric_space = ParamSpace(param_domain,args...)
   TransientParamSpace(parametric_space,temporal_domain)
 end
 
@@ -335,15 +323,10 @@ function ParamFunction(f::Function,p::AbstractArray)
   @notimplemented "Use a Realization as a parameter input"
 end
 
-function ParamFunction(f::Function,r::TrivialRealization)
-  f(r.params)
-end
-
 get_params(f::ParamFunction) = get_params(f.params)
 _get_params(f::ParamFunction) = _get_params(f.params)
 num_params(f::ParamFunction) = length(_get_params(f))
 Base.length(f::ParamFunction) = num_params(f)
-Arrays.testitem(f::ParamFunction) = f.fun(testitem(f.params))
 Base.getindex(f::ParamFunction,i::Integer) = f.fun(_get_params(f)[i])
 
 function Base.:*(f::ParamFunction,α::Number)
@@ -430,10 +413,6 @@ function TransientParamFunction(f::Function,p::AbstractArray,t)
   @notimplemented "Use a Realization as a parameter input"
 end
 
-function TransientParamFunction(f::Function,r::TrivialRealization,t::Real)
-  f(r.params,t)
-end
-
 function TransientParamFunction(f::Function,r::TransientRealization)
   TransientParamFunction(f,get_params(r),get_times(r))
 end
@@ -444,7 +423,6 @@ num_params(f::TransientParamFunction) = length(_get_params(f))
 get_times(f::TransientParamFunction) = f.times
 num_times(f::TransientParamFunction) = length(get_times(f))
 Base.length(f::TransientParamFunction) = num_params(f)*num_times(f)
-Arrays.testitem(f::TransientParamFunction) = f.fun(testitem(f.params),testitem(f.times))
 function Base.getindex(f::TransientParamFunction,i::Integer)
   np = num_params(f)
   p = _get_params(f)[fast_index(i,np)]
@@ -513,6 +491,8 @@ end
 Arrays.return_value(f::TransientParamFunction,x) = f.fun(x,testitem(_get_params(f)),testitem(get_times(f)))
 
 Arrays.evaluate!(cache,f::AbstractParamFunction,x) = pteval(f,x)
+
+Arrays.evaluate!(cache,f::AbstractParamFunction,x::CellPoint) = CellField(f,get_triangulation(x))(x)
 
 (f::AbstractParamFunction)(x) = evaluate(f,x)
 

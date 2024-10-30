@@ -22,7 +22,7 @@ end
 
 function TrialParamFESpace(space::SingleFieldFESpace,objects)
   dirichlet_values = [compute_dirichlet_values_for_tags(space,objects[i]) for i = param_eachindex(objects)]
-  TrialParamFESpace(ConsecutiveArrayOfArrays(dirichlet_values),space)
+  TrialParamFESpace(ConsecutiveParamArray(dirichlet_values),space)
 end
 
 function TrialParamFESpace!(dir_values::AbstractParamVector,space::SingleFieldFESpace,objects)
@@ -54,7 +54,7 @@ end
 
 function HomogeneousTrialParamFESpace(U::SingleFieldFESpace,::Val{N}) where N
   dv = zero_dirichlet_values(U)
-  dirichlet_values = array_of_consecutive_zero_arrays(dv,N)
+  dirichlet_values = consecutive_param_array(dv,N)
   TrialParamFESpace(dirichlet_values,U)
 end
 

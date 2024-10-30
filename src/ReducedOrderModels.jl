@@ -117,14 +117,14 @@ export fast_index
 export shift!
 
 export AbstractParamContainer
+export ParamType
 export ParamContainer
 export ParamNumber
-export param_data
+export get_param_data
 export param_length
 export param_eachindex
 export param_getindex
 export param_setindex!
-export param_entry
 
 export ParamField
 export ParamFieldGradient
@@ -134,38 +134,34 @@ export OperationParamField
 export AbstractParamArray
 export AbstractParamVector
 export AbstractParamMatrix
-export ParamSparseMatrix
 export ParamArray
+export ParamVector
+export ParamMatrix
 export param_array
-export array_of_similar_arrays
-export array_of_zero_arrays
-export array_of_consecutive_arrays
-export array_of_consecutive_zero_arrays
 
-export ArrayOfArrays
-export VectorOfVectors
-export MatrixOfMatrices
+export TrivialParamArray
+export ConsecutiveParamArray
+export ConsecutiveParamVector
+export ConsecutiveParamMatrix
+export GenericParamVector
+export GenericParamMatrix
 
-export ConsecutiveArrayOfArrays
-export ConsecutiveVectorOfVectors
-export ConsecutiveMatrixOfMatrices
-export AbstractConsecutiveParamVector
-export AbstractConsecutiveParamMatrix
+export ConsecutiveParamVector
+export ConsecutiveParamMatrix
 
-export MatrixOfSparseMatricesCSC
-export VectorOfSparseVectors
+export ParamSparseMatrix
+export ParamSparseMatrixCSC
+export ParamSparseMatrixCSR
+export ConsecutiveParamSparseMatrixCSC
+export GenericParamSparseMatrixCSC
+export ConsecutiveParamSparseMatrixCSR
+export GenericParamSparseMatrixCSR
 
-export ConsecutiveParamArrays
-export consecutive_getindex
-export consecutive_setindex!
-export consecutive_mul
-
-export ArrayOfTrivialArrays
-
-export BlockArrayOfArrays
-export BlockVectorOfVectors
-export BlockMatrixOfMatrices
-export BlockParamView
+export BlockParamArray
+export BlockParamVector
+export BlockParamMatrix
+export BlockConsecutiveParamVector
+export BlockConsecutiveParamMatrix
 
 export Contribution
 export ArrayContribution
@@ -212,27 +208,21 @@ export UnEvalParamSingleFieldFESpace
 export ParamTrialFESpace
 export ParamMultiFieldFESpace
 
-export ParamOperatorType
+export UnEvalOperatorType
 export NonlinearParamEq
 export LinearParamEq
 export LinearNonlinearParamEq
 export ParamOperator
-export ParamOperatorWithTrian
-export ParamCache
-export allocate_paramcache
-export update_paramcache!
+export LinearNonlinearParamOpFromFEOp
 
 export ParamFEOperator
 export LinearParamFEOperator
 export ParamFEOperatorWithTrian
-export ParamFEOpFromWeakFormWithTrian
 export set_triangulation
 export change_triangulation
 
 export LinearNonlinearParamODE
-export LinNonlinParamFEOperator
 export LinearNonlinearParamFEOperator
-export LinearNonlinearParamFEOperatorWithTrian
 export get_linear_operator
 export get_nonlinear_operator
 export join_operators
@@ -248,36 +238,25 @@ export TransientMultiFieldParamFESpace
 
 export ODEParamOperatorType
 export NonlinearParamODE
-export AbstractLinearParamODE
-export QuasilinearParamODE
-export SemilinearParamODE
 export LinearParamODE
 export ODEParamOperator
-export ODEParamOperatorWithTrian
-export ParamODEOpFromTFEOpCache
 
 export ParamStageOperator
-export NonlinearParamStageOperator
-export LinearParamStageOperator
 
 export TransientParamFEOperator
 export TransientParamFEOpFromWeakForm
-export TransientParamSemilinearFEOperator
-export TransientParamSemilinearFEOpFromWeakForm
 export TransientParamLinearFEOperator
 export TransientParamLinearFEOpFromWeakForm
 export LinearTransientParamFEOperator
 export NonlinearTransientParamFEOperator
 
 export TransientParamFEOperatorWithTrian
-export TransientParamFEOpFromWeakFormWithTrian
+export TransientParamFEOperatorWithTrian
 export set_triangulation
 export change_triangulation
 
 export LinearNonlinearParamODE
-export LinNonlinTransientParamFEOperator
 export LinearNonlinearTransientParamFEOperator
-export LinearNonlinearTransientParamFEOperatorWithTrian
 export get_linear_operator
 export get_nonlinear_operator
 export join_operators
@@ -319,9 +298,9 @@ export SparseSnapshots
 export UnfoldingSteadySnapshots
 export BlockSnapshots
 export Snapshots
+export get_realization
 export flatten_snapshots
 export select_snapshots
-export get_realization
 export get_indexed_values
 export num_space_dofs
 
@@ -365,7 +344,7 @@ export project
 export inv_project
 export enrich!
 
-export FESubspace
+export RBSpace
 export SingleFieldRBSpace
 export MultiFieldRBSpace
 export EvalRBSpace
@@ -399,9 +378,6 @@ export get_fe_test
 export fe_jacobian!
 export fe_residual!
 
-export RBNewtonRaphsonOperator
-export RBNewtonRaphsonOp
-
 export RBPerformance
 export rb_performance
 export create_dir
@@ -433,8 +409,6 @@ export TransientAffineDecomposition
 export TransientRBOperator
 export GenericTransientRBOperator
 export LinearNonlinearTransientRBOperator
-
-export TransientRBNewtonRaphsonOp
 
 include("RB/RBTransient/RBTransient.jl")
 using ReducedOrderModels.RBTransient

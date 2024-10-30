@@ -78,6 +78,7 @@ Base.eltype(::Type{<:ArrayContribution{T}}) where T = T
 Base.ndims(::ArrayContribution{T,N}) where {T,N} = N
 Base.ndims(::Type{<:ArrayContribution{T,N}}) where {T,N} = N
 Base.copy(a::ArrayContribution) = Contribution(copy(a.values),a.trians)
+Base.copyto!(a::ArrayContribution,b::ArrayContribution) = copyto!(a.values,b.values)
 
 Base.sum(a::ArrayContribution) = sum(a.values)
 
@@ -160,6 +161,14 @@ const TupOfArrayContribution{T} = Tuple{Vararg{ArrayContribution{T}}}
 
 Base.eltype(::TupOfArrayContribution{T}) where T = T
 Base.eltype(::Type{<:TupOfArrayContribution{T}}) where T = T
+
+function Base.copy(a::TupOfArrayContribution)
+  b = ()
+  for ai in a
+    b = (b...,copy(ai))
+  end
+  b
+end
 
 function LinearAlgebra.fillstored!(a::TupOfArrayContribution,v)
   for ai in a

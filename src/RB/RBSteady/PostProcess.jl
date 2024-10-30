@@ -91,7 +91,7 @@ function load_projection(dir;label="")
   deserialize(proj_dir)
 end
 
-function DrWatson.save(dir,r::FESubspace;label="")
+function DrWatson.save(dir,r::RBSpace;label="")
   save(dir,get_reduced_subspace(r);label)
 end
 
@@ -176,7 +176,10 @@ function DrWatson.save(dir,op::LinearNonlinearRBOperator;label="")
   _save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nonlinear"))
 end
 
-function load_operator(dir,feop::LinearNonlinearParamFEOperatorWithTrian;label="")
+function load_operator(dir,feop::LinearNonlinearParamFEOperator;label="")
+  @assert isa(feop.op_linear,ParamFEOperatorWithTrian)
+  @assert isa(feop.op_nonlinear,ParamFEOperatorWithTrian)
+
   trial,test = _fixed_operator_parts(dir,feop.op_linear;label)
   pop_lin,red_lhs_lin,red_rhs_lin = _load_trian_operator_parts(
     dir,feop.op_linear,trial,test;label=_get_label("linear",label))
@@ -231,6 +234,7 @@ end
 
 function rb_performance(
   solver::RBSolver,
+  feop,
   rbop,
   fesnaps::AbstractArray,
   x̂::AbstractParamVector,
@@ -238,9 +242,8 @@ function rb_performance(
   rbstats::CostTracker,
   r::AbstractRealization)
 
-  feop = ParamSteady.get_fe_operator(rbop)
   x = inv_project(get_trial(rbop)(r),x̂)
-  rbsnaps = Snapshots(x,get_vector_index_map(rbop),r)
+  rbsnaps = Snapshots(x,get_vector_index_map(feop),r)
   rb_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats)
 end
 

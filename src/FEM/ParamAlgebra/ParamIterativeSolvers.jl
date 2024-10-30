@@ -8,7 +8,7 @@ end
 
 function Algebra.symbolic_setup(
   solver::GridapSolvers.BlockTriangularSolver,
-  mat::BlockMatrixOfMatrices)
+  mat::BlockParamMatrix)
 
   mat_blocks = blocks(mat)
   block_ss   = map(BlockSolvers.block_symbolic_setup,diag(solver.blocks),solver.solvers,diag(mat_blocks))
@@ -24,8 +24,8 @@ end
 
 function Algebra.symbolic_setup(
   solver::BlockSolvers.BlockTriangularSolver{T,N},
-  mat::BlockMatrixOfMatrices,
-  x::BlockVectorOfVectors) where {T,N}
+  mat::BlockParamMatrix,
+  x::BlockParamVector) where {T,N}
 
   mat_blocks = blocks(mat)
   block_ss   = map((b,s,m) -> BlockSolvers.block_symbolic_setup(b,s,m,x),diag(solver.blocks),solver.solvers,diag(mat_blocks))
@@ -41,7 +41,7 @@ end
 
 function Algebra.numerical_setup(
   ss::BlockSolvers.BlockTriangularSolverSS,
-  mat::BlockMatrixOfMatrices)
+  mat::BlockParamMatrix)
 
   solver   = ss.solver
   block_ns = map(BlockSolvers.block_numerical_setup,ss.block_ss,diag(blocks(mat)))
@@ -54,8 +54,8 @@ end
 
 function Algebra.numerical_setup(
   ss::BlockSolvers.BlockTriangularSolverSS,
-  mat::BlockMatrixOfMatrices,
-  x::BlockVectorOfVectors)
+  mat::BlockParamMatrix,
+  x::BlockParamVector)
 
   solver     = ss.solver
   mat_blocks = blocks(mat)
@@ -69,7 +69,7 @@ end
 
 function Algebra.numerical_setup!(
   ns::BlockSolvers.BlockTriangularSolverNS,
-  mat::BlockMatrixOfMatrices)
+  mat::BlockParamMatrix)
 
   solver       = ns.solver
   mat_blocks   = blocks(mat)
@@ -88,8 +88,8 @@ end
 
 function Algebra.numerical_setup!(
   ns::BlockSolvers.BlockTriangularSolverNS,
-  mat::BlockMatrixOfMatrices,
-  x::BlockVectorOfVectors)
+  mat::BlockParamMatrix,
+  x::BlockParamVector)
 
   solver       = ns.solver
   mat_blocks   = blocks(mat)
@@ -106,10 +106,20 @@ function Algebra.numerical_setup!(
   return ns
 end
 
+function BlockSolvers.restrict_blocks(x::BlockParamVector,ids::Vector{Int8})
+  if isempty(ids)
+    return x
+  elseif length(ids) == 1
+    return blocks(x)[ids[1]]
+  else
+    return mortar(blocks(x)[ids])
+  end
+end
+
 function BlockSolvers.block_symbolic_setup(
   block::BiformBlock,
   solver::LinearSolver,
-  mat::MatrixOfSparseMatricesCSC)
+  mat::ParamSparseMatrix)
 
   A = assemble_matrix(block.f,block.assem,block.trial,block.test)
   param_A = ParamDataStructures.array_of_copy_arrays(A,param_length(mat))
@@ -119,8 +129,8 @@ end
 function BlockSolvers.block_symbolic_setup(
   block::TriformBlock,
   solver::LinearSolver,
-  mat::MatrixOfSparseMatricesCSC,
-  x::ConsecutiveVectorOfVectors)
+  mat::ParamSparseMatrix,
+  x::AbstractParamVector)
 
   @check param_length(mat) == param_length(x)
   y  = BlockSolvers.restrict_blocks(x,block.ids)
@@ -139,19 +149,19 @@ function LinearSolvers.get_solver_caches(solver::LinearSolvers.FGMRESSolver,A::A
   Z  = [allocate_in_domain(A) for i in 1:m]
   zl = allocate_in_domain(A)
 
-  H = array_of_consecutive_zero_arrays(zeros(m+1,m),plength)  # Hessenberg matrix
-  g = array_of_consecutive_zero_arrays(zeros(m+1),plength)    # Residual vector
-  c = array_of_consecutive_zero_arrays(zeros(m),plength)      # Givens rotation cosines
-  s = array_of_consecutive_zero_arrays(zeros(m),plength)      # Givens rotation sines
+  H = consecutive_param_array(zeros(m+1,m),plength)  # Hessenberg matrix
+  g = consecutive_param_array(zeros(m+1),plength)    # Residual vector
+  c = consecutive_param_array(zeros(m),plength)      # Givens rotation cosines
+  s = consecutive_param_array(zeros(m),plength)      # Givens rotation sines
   return (V,Z,zl,H,g,c,s)
 end
 
 function expand_param_krylov_caches!(ns::LinearSolvers.FGMRESNumericalSetup)
-  function _similar_fill!(a::ConsecutiveArrayOfArrays,s...)
+  function _similar_fill!(a::ConsecutiveParamArray,s...)
     a_new = similar(a.data,eltype(a.data),s...,param_length(a))
     fill!(a_new,zero(eltype(a.data)))
     a_new[axes(a.data)...] .= a.data
-    return ConsecutiveArrayOfArrays(a_new)
+    return ConsecutiveParamArray(a_new)
   end
 
   V,Z,zl,H,g,c,s = ns.caches
@@ -174,9 +184,9 @@ function expand_param_krylov_caches!(ns::LinearSolvers.FGMRESNumericalSetup)
 end
 
 function Algebra.solve!(
-  x::BlockVectorOfVectors,
+  x::BlockParamVector,
   ns::BlockSolvers.BlockTriangularSolverNS{Val{:lower}},
-  b::BlockVectorOfVectors)
+  b::BlockParamVector)
 
   @check blocklength(x) == blocklength(b) == length(ns.block_ns)
   NB = length(ns.block_ns)
@@ -206,9 +216,9 @@ function Algebra.solve!(
 end
 
 function Gridap.Algebra.solve!(
-  x::BlockVectorOfVectors,
+  x::BlockParamVector,
   ns::BlockSolvers.BlockTriangularSolverNS{Val{:upper}},
-  b::BlockVectorOfVectors)
+  b::BlockParamVector)
 
   @check blocklength(x) == blocklength(b) == length(ns.block_ns)
   NB = length(ns.block_ns)
@@ -238,9 +248,9 @@ function Gridap.Algebra.solve!(
 end
 
 function Algebra.solve!(
-  x::AbstractParamVector,
+  x::ConsecutiveParamVector,
   ns::LinearSolvers.FGMRESNumericalSetup,
-  b::AbstractParamVector)
+  b::ConsecutiveParamVector)
 
   solver,A,Pl,Pr,caches = ns.solver,ns.A,ns.Pl_ns,ns.Pr_ns,ns.caches
   V,Z,zl,H,g,c,s = caches
@@ -321,9 +331,9 @@ function Algebra.solve!(
 end
 
 function Algebra.solve!(
-  x::BlockArrayOfArrays,
+  x::BlockConsecutiveParamVector,
   ns::LinearSolvers.FGMRESNumericalSetup,
-  b::BlockArrayOfArrays)
+  b::BlockConsecutiveParamVector)
 
   solver,A,Pl,Pr,caches = ns.solver,ns.A,ns.Pl_ns,ns.Pr_ns,ns.caches
   V,Z,zl,H,g,c,s = caches
@@ -331,7 +341,7 @@ function Algebra.solve!(
   log = solver.log
 
   plength = param_length(x)
-  nb = length(blocks(x))
+  nb = nblocks(x)
 
   fill!(V[1],zero(eltype(V[1])))
   fill!(zl,zero(eltype(zl)))
@@ -419,7 +429,11 @@ function Algebra.solve!(
   return x
 end
 
-function Algebra.solve!(x::AbstractParamVector,ns::LinearSolvers.CGNumericalSetup,b::AbstractParamVector)
+function Algebra.solve!(
+  x::ConsecutiveParamVector,
+  ns::LinearSolvers.CGNumericalSetup,
+  b::ConsecutiveParamVector)
+
   solver,A,Pl,caches = ns.solver,ns.A,ns.Pl_ns,ns.caches
   flexible,log = solver.flexible,solver.log
   w,p,z,r = caches

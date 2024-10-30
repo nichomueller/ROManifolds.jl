@@ -17,6 +17,7 @@ using Gridap.Helpers
 
 import Base:+,-,*,/,\
 import Distributions: Uniform,Normal
+import FillArrays: Fill
 import Statistics: mean
 import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
@@ -47,14 +48,18 @@ export shift!
 include("ParamSpace.jl")
 
 export AbstractParamContainer
+export ParamType
+export PType
 export ParamContainer
 export ParamNumber
-export param_data
+export get_param_data
 export param_length
 export param_eachindex
 export param_getindex
 export param_setindex!
-export param_entry
+export get_param_entry
+export get_param_entry!
+export param_typeof
 include("ParamContainersInterface.jl")
 
 export ParamField
@@ -66,50 +71,47 @@ include("ParamField.jl")
 export AbstractParamArray
 export AbstractParamVector
 export AbstractParamMatrix
-export ParamSparseMatrix
 export ParamArray
+export ParamVector
+export ParamMatrix
+export MemoryLayoutStyle
+export ConsecutiveMemory
+export NonConsecutiveMemory
 export param_array
-export array_of_similar_arrays
-export array_of_zero_arrays
-export array_of_consecutive_arrays
-export array_of_consecutive_zero_arrays
+export consecutive_param_array
+export innersize
 export innerlength
+export inneraxes
 include("ParamArraysInterface.jl")
 
+export TrivialParamArray
+export ConsecutiveParamArray
+export ConsecutiveParamVector
+export ConsecutiveParamMatrix
+export GenericParamVector
+export GenericParamMatrix
 export ArrayOfArrays
-export VectorOfVectors
-export MatrixOfMatrices
-include("ArrayOfArrays.jl")
+export get_all_data
+include("ParamArrays.jl")
 
-export ConsecutiveArrayOfArrays
-export ConsecutiveVectorOfVectors
-export ConsecutiveMatrixOfMatrices
-export AbstractConsecutiveParamVector
-export AbstractConsecutiveParamMatrix
-include("ConsecutiveArrayOfArrays.jl")
+export ParamSparseMatrix
+export ParamSparseMatrixCSC
+export ParamSparseMatrixCSR
+export ConsecutiveParamSparseMatrixCSC
+export GenericParamSparseMatrixCSC
+export ConsecutiveParamSparseMatrixCSR
+export GenericParamSparseMatrixCSR
+export ConsecutiveParamSparseMatrix
+include("ParamSparseMatrices.jl")
 
-export MatrixOfSparseMatricesCSC
-include("MatrixOfSparseMatrices.jl")
+export BlockParamArray
+export BlockParamVector
+export BlockParamMatrix
+export BlockConsecutiveParamVector
+export BlockConsecutiveParamMatrix
+export nblocks
+include("BlockParamArrays.jl")
 
-export VectorOfSparseVectors
-include("VectorOfSparseVectors.jl")
-
-export ConsecutiveParamArrays
-export consecutive_getindex
-export consecutive_setindex!
-export consecutive_mul
-include("ConsecutiveParamArrays.jl")
-
-export ArrayOfTrivialArrays
-include("ArrayOfTrivialArrays.jl")
-
-export BlockArrayOfArrays
-export BlockVectorOfVectors
-export BlockMatrixOfMatrices
-export BlockParamView
-include("BlockArrayOfArrays.jl")
-
-export ParamBroadcast
 include("ParamBroadcasts.jl")
 
 export ParamReindex

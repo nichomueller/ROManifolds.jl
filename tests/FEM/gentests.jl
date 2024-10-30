@@ -11,13 +11,13 @@ sol = odesol
 
 using Gridap.ODEs
 r = ParamDataStructures.get_at_time(r,:initial)
-cache = allocate_odecache(sol.solver,sol.odeop,r,sol.us0)
+cache = allocate_odeparamcache(sol.solver,sol.odeop,r,sol.us0)
 state0,cache = ode_start(sol.solver,sol.odeop,r,sol.us0,cache)
 statef = copy.(state0)
 rf,statef,cache = ode_march!(statef,sol.solver,sol.odeop,r,state0,cache)
 
 w0 = state0[1]
-odeslvrcache,odeopcache = cache
+odeslvrcache,paramcache = cache
 reuse,A,b,sysslvrcache = odeslvrcache
 
 sysslvr = fesolver.sysslvr
@@ -29,9 +29,9 @@ shift!(r,dtθ)
 usx = (w0,x)
 ws = (dtθ,1)
 
-update_odeopcache!(odeopcache,sol.odeop,r)
+update_paramcache!(paramcache,sol.odeop,r)
 
-stageop = LinearParamStageOperator(sol.odeop,odeopcache,r,usx,ws,A,b,reuse,sysslvrcache)
+stageop = LinearParamStageOperator(sol.odeop,paramcache,r,usx,ws,A,b,reuse,sysslvrcache)
 
 # sysslvrcache = solve!(x,sysslvr,stageop,sysslvrcache)
 using LinearAlgebra

@@ -14,19 +14,17 @@ a standard TransientFEOperator, there are the following novelties:
 Subtypes:
 
 - [`TransientParamFEOpFromWeakForm`](@ref)
-- [`TransientParamSemilinearFEOpFromWeakForm`](@ref)
 - [`TransientParamLinearFEOpFromWeakForm`](@ref)
 - [`TransientParamFEOperatorWithTrian`](@ref)
-- [`GenericLinearNonlinearTransientParamFEOperator`](@ref)
 
 """
-abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: TransientFEOperator{T} end
+abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: ParamFEOperator{T} end
 
 function FESpaces.get_algebraic_operator(op::TransientParamFEOperator)
   ODEParamOpFromTFEOp(op)
 end
 
-function ODEs.allocate_tfeopcache(
+function ParamSteady.allocate_feopcache(
   op::TransientParamFEOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
@@ -34,32 +32,21 @@ function ODEs.allocate_tfeopcache(
   nothing
 end
 
-function ODEs.update_tfeopcache!(
-  tfeopcache,
+function ParamSteady.update_feopcache!(
+  feop_cache,
   op::TransientParamFEOperator,
-  r::TransientRealization)
+  us::Tuple{Vararg{AbstractVector}})
 
-  tfeopcache
+  feop_cache
 end
 
-ParamDataStructures.realization(op::TransientParamFEOperator;kwargs...) = @abstractmethod
+ODEs.get_res(op::TransientParamFEOperator) = @abstractmethod
 
-function ParamFESpaces.get_param_assembler(op::TransientParamFEOperator,r::TransientRealization)
-  get_param_assembler(get_assembler(op),r)
+ODEs.get_jacs(op::TransientParamFEOperator) = @abstractmethod
+
+function Polynomials.get_order(feop::TransientParamFEOperator)
+  @abstractmethod
 end
-
-IndexMaps.get_index_map(op::TransientParamFEOperator) = @abstractmethod
-IndexMaps.get_vector_index_map(op::TransientParamFEOperator) = get_vector_index_map(get_index_map(op))
-IndexMaps.get_matrix_index_map(op::TransientParamFEOperator) = get_matrix_index_map(get_index_map(op))
-
-function FESpaces.assemble_matrix(op::TransientParamFEOperator,form::Function)
-  test = get_test(op)
-  trial = evaluate(get_trial(op),nothing)
-  ParamSteady._assemble_matrix(form,trial,test)
-end
-
-ParamSteady.get_linear_operator(op::TransientParamFEOperator) = @abstractmethod
-ParamSteady.get_nonlinear_operator(op::TransientParamFEOperator) = @abstractmethod
 
 """
     struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParamODE} end
@@ -130,114 +117,12 @@ end
 
 FESpaces.get_test(op::TransientParamFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamFEOpFromWeakForm) = op.trial
-ReferenceFEs.get_order(op::TransientParamFEOpFromWeakForm) = op.order
+ParamSteady.get_param_space(op::TransientParamFEOpFromWeakForm) = op.tpspace
+Polynomials.get_order(op::TransientParamFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::TransientParamFEOpFromWeakForm) = op.index_map
-ParamDataStructures.realization(op::TransientParamFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
-
-"""
-    struct TransientParamSemilinearFEOpFromWeakForm <: TransientParamFEOperator{SemilinearParamODE} end
-
-Most standard instance of TransientParamFEOperator, when the transient problem is
-semilinear
-
-"""
-struct TransientParamSemilinearFEOpFromWeakForm <: TransientParamFEOperator{SemilinearParamODE}
-  mass::Function
-  res::Function
-  jacs::Tuple{Vararg{Function}}
-  constant_mass::Bool
-  tpspace::TransientParamSpace
-  assem::Assembler
-  index_map::FEOperatorIndexMap
-  trial::FESpace
-  test::FESpace
-  order::Integer
-end
-
-function TransientParamSemilinearFEOperator(
-  mass::Function,res::Function,jacs::Tuple{Vararg{Function}},
-  tpspace,trial,test,args...;constant_mass::Bool=false)
-
-  order = length(jacs)
-  jac_N(μ,t,u,du,v,args...) = mass(μ,t,du,v,args...)
-  jacs = (jacs...,jac_N)
-  if order == 0
-    @warn ODEs.default_linear_msg
-    return TransientParamLinearFEOperator(
-      (mass,),res,jacs,tpspace,trial,test;constant_forms=(constant_mass,))
-  end
-  assem = SparseMatrixAssembler(trial,test)
-  index_map = FEOperatorIndexMap(trial,test)
-  TransientParamSemilinearFEOpFromWeakForm(
-    mass,res,jacs,constant_mass,tpspace,assem,index_map,trial,test,order,args...)
-end
-
-function TransientParamSemilinearFEOperator(
-  mass::Function,res::Function,jac::Function,tpspace,trial,test,args...;kwargs...)
-
-  TransientParamSemilinearFEOperator(mass,res,(jac,),
-    tpspace,trial,test,args...;kwargs...)
-end
-
-function TransientParamSemilinearFEOperator(
-  mass::Function,res::Function,jac::Function,jac_t::Function,
-  tpspace,trial,test,args...;kwargs...)
-
-  TransientParamSemilinearFEOperator(mass,res,(jac,jac_t),
-    tpspace,trial,test,args...;kwargs...)
-end
-
-function TransientParamSemilinearFEOperator(
-  mass::Function,res::Function,tpspace,trial,test,
-  args...;order::Integer=1,kwargs...)
-
-  if order == 0
-    @warn ODEs.default_linear_msg
-    return TransientLinearFEOperator(mass,res,trial,test;kwargs...)
-  end
-
-  jacs = ()
-  if order > 0
-    function jac_0(μ,t,u,du,v,args...)
-      function res_0(y)
-        u0 = TransientCellField(y,u.derivatives)
-        res(μ,t,u0,v,args...)
-      end
-      jacobian(res_0,u.cellfield)
-    end
-    jacs = (jacs...,jac_0)
-  end
-
-  for k in 1:order-1
-    function jac_k(μ,t,u,duk,v,args...)
-      function res_k(y)
-        derivatives = (u.derivatives[1:k-1]...,y,u.derivatives[k+1:end]...)
-        uk = TransientCellField(u.cellfield,derivatives)
-        res(t,uk,v,args...)
-      end
-      jacobian(res_k,u.derivatives[k])
-    end
-    jacs = (jacs...,jac_k)
-  end
-
-  TransientParamSemilinearFEOperator(mass,res,jacs,tpspace,trial,test,args...;kwargs...)
-end
-
-FESpaces.get_test(op::TransientParamSemilinearFEOpFromWeakForm) = op.test
-FESpaces.get_trial(op::TransientParamSemilinearFEOpFromWeakForm) = op.trial
-ReferenceFEs.get_order(op::TransientParamSemilinearFEOpFromWeakForm) = op.order
-ODEs.get_res(op::TransientParamSemilinearFEOpFromWeakForm) = op.res
-ODEs.get_jacs(op::TransientParamSemilinearFEOpFromWeakForm) = op.jacs
-ODEs.get_assembler(op::TransientParamSemilinearFEOpFromWeakForm) = op.assem
-IndexMaps.get_index_map(op::TransientParamSemilinearFEOpFromWeakForm) = op.index_map
-ParamDataStructures.realization(op::TransientParamSemilinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
-
-function ODEs.is_form_constant(op::TransientParamSemilinearFEOpFromWeakForm,k::Integer)
-  (k == get_order(op)+1) && op.constant_mass
-end
 
 """
     struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE} end
@@ -247,7 +132,6 @@ linear
 
 """
 struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE}
-  forms::Tuple{Vararg{Function}}
   res::Function
   jacs::Tuple{Vararg{Function}}
   constant_forms::Tuple{Vararg{Bool}}
@@ -268,7 +152,7 @@ function TransientParamLinearFEOperator(
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
   TransientParamLinearFEOpFromWeakForm(
-    forms,res,jacs,constant_forms,tpspace,assem,index_map,trial,test,order,args...)
+    res,jacs,constant_forms,tpspace,assem,index_map,trial,test,order,args...)
 end
 
 function TransientParamLinearFEOperator(
@@ -292,16 +176,13 @@ end
 
 FESpaces.get_test(op::TransientParamLinearFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamLinearFEOpFromWeakForm) = op.trial
-ReferenceFEs.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
+ParamSteady.get_param_space(op::TransientParamLinearFEOpFromWeakForm) = op.tpspace
+Polynomials.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
+ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer) = op.constant_forms[k]
 IndexMaps.get_index_map(op::TransientParamLinearFEOpFromWeakForm) = op.index_map
-ParamDataStructures.realization(op::TransientParamLinearFEOpFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
-
-function ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer)
-  op.constant_forms[k]
-end
 
 function test_transient_fe_operator(op::TransientParamFEOperator,uh,μt)
   odeop = get_algebraic_operator(op)

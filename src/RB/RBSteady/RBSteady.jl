@@ -67,9 +67,9 @@ export SparseSnapshots
 export UnfoldingSteadySnapshots
 export BlockSnapshots
 export Snapshots
+export get_realization
 export flatten_snapshots
 export select_snapshots
-export get_realization
 export get_indexed_values
 export num_space_dofs
 include("Snapshots.jl")
@@ -120,7 +120,7 @@ export inv_project
 export enrich!
 include("Projections.jl")
 
-export FESubspace
+export RBSpace
 export SingleFieldRBSpace
 export MultiFieldRBSpace
 export EvalRBSpace
@@ -129,6 +129,9 @@ export fe_subspace
 export reduced_fe_space
 export reduced_basis
 include("RBSpace.jl")
+
+export RBParamVector
+include("RBParamVector.jl")
 
 export AbstractIntegrationDomain
 export IntegrationDomain
@@ -145,21 +148,24 @@ export reduced_jacobian
 export reduced_residual
 export reduced_weak_form
 export inv_project!
+export allocate_hypred_cache
 include("HyperReduction.jl")
+
+export HRParamArray
+include("HRParamArray.jl")
 
 export RBOperator
 export GenericRBOperator
 export LinearNonlinearRBOperator
+export RBCache
+export LinearNonlinearRBCache
 export reduced_operator
 export get_fe_trial
 export get_fe_test
 export fe_jacobian!
 export fe_residual!
+export allocate_rbcache
 include("ReducedOperators.jl")
-
-export RBNewtonRaphsonOperator
-export RBNewtonRaphsonOp
-include("RBNewtonRaphsonOperator.jl")
 
 export RBPerformance
 export rb_performance

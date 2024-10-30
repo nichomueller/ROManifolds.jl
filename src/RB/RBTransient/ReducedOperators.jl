@@ -24,8 +24,8 @@ end
 function RBSteady.reduced_operator(
   solver::RBSolver,
   odeop::ODEParamOperator,
-  red_trial::FESubspace,
-  red_test::FESubspace,
+  red_trial::RBSpace,
+  red_test::RBSpace,
   s::AbstractArray)
 
   red_lhs,red_rhs = reduced_weak_form(solver,odeop,red_trial,red_test,s)
@@ -38,8 +38,8 @@ end
 function RBSteady.reduced_operator(
   solver::RBSolver,
   odeop::ODEParamOperator{LinearNonlinearParamODE},
-  red_trial::FESubspace,
-  red_test::FESubspace,
+  red_trial::RBSpace,
+  red_test::RBSpace,
   s::AbstractArray)
 
   red_op_lin = reduced_operator(solver,get_linear_operator(odeop),red_trial,red_test,s)
@@ -47,107 +47,101 @@ function RBSteady.reduced_operator(
   LinearNonlinearTransientRBOperator(red_op_lin,red_op_nlin)
 end
 
-abstract type TransientRBOperator{T} <: ODEParamOperatorWithTrian{T} end
+abstract type TransientRBOperator{T} <: ODEParamOperator{T} end
 
-RBSteady.allocate_rbcache(op::TransientRBOperator,r::TransientRealization) = @abstractmethod
+function RBSteady.allocate_rbcache(fesolver::ODESolver,op::RBOperator,args...)
+  @abstractmethod
+end
 
 struct GenericTransientRBOperator{T} <: TransientRBOperator{T}
-  op::ODEParamOperatorWithTrian{T}
-  trial::FESubspace
-  test::FESubspace
+  op::ODEParamOperator{T}
+  trial::RBSpace
+  test::RBSpace
   lhs::TupOfAffineContribution
   rhs::AffineContribution
 end
 
 FESpaces.get_trial(op::GenericTransientRBOperator) = op.trial
 FESpaces.get_test(op::GenericTransientRBOperator) = op.test
-ParamDataStructures.realization(op::GenericTransientRBOperator;kwargs...) = realization(op.op;kwargs...)
-ParamSteady.get_fe_operator(op::GenericTransientRBOperator) = ParamSteady.get_fe_operator(op.op)
-IndexMaps.get_vector_index_map(op::GenericTransientRBOperator) = get_vector_index_map(op.op)
-IndexMaps.get_matrix_index_map(op::GenericTransientRBOperator) = get_matrix_index_map(op.op)
 RBSteady.get_fe_trial(op::GenericTransientRBOperator) = get_trial(op.op)
 RBSteady.get_fe_test(op::GenericTransientRBOperator) = get_test(op.op)
-
-function ODEs.allocate_odecache(
-  fesolver,
-  op::GenericTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  @abstractmethod
-end
-
-function ODEs.allocate_odeopcache(
-  op::GenericTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  allocate_odeopcache(op.op,r,us)
-end
-
-function RBSteady.allocate_rbcache(
-  fesolver,
-  op::GenericTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  @abstractmethod
-end
-
-function update_odecache!(
-  odecache,
-  op::GenericTransientRBOperator,
-  r::TransientRealization)
-
-  odeslvrcache,odeopcache = odecache
-  odeopcache = update_odeopcache!(odeopcache,op,r)
-  (odeslvrcache,odeopcache)
-end
 
 function Algebra.allocate_residual(
   op::GenericTransientRBOperator,
   r::TransientRealization,
-  args...)
+  us::Tuple{Vararg{AbstractParamVector}},
+  rbcache::RBCache)
 
-  rhs_rb = RBSteady.allocate_hypred_cache(op.rhs,r)
-  return rhs_rb
+  rbcache.b
 end
 
 function Algebra.allocate_jacobian(
   op::GenericTransientRBOperator,
   r::TransientRealization,
-  args...)
+  us::Tuple{Vararg{AbstractParamVector}},
+  rbcache::RBCache)
 
-  lhs_coeff = map(lhs -> RBSteady.allocate_coefficient(lhs,r),op.lhs)
-  lhs_hypred = RBSteady.allocate_hyper_reduction(first(op.lhs),r)
-  lhs_rb = (lhs_coeff,lhs_hypred)
-  return lhs_rb
+  rbcache.A
 end
 
 function Algebra.residual!(
-  cache,
+  cache::HRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
-  odeopcache;
-  kwargs...)
+  rbcache::RBCache)
 
-  b,b̂ = cache
-  feb = fe_residual!(b,op,r,us,odeopcache)
-  inv_project!(b̂,op.rhs,feb)
+  b = cache.fe_quantity
+  paramcache = rbcache.paramcache
+
+  feb = fe_residual!(b,op,r,us,paramcache)
+  inv_project!(cache,op.rhs,feb)
+end
+
+function Algebra.residual!(
+  cache::HRParamArray,
+  op::GenericTransientRBOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{RBParamVector}},
+  rbcache::RBCache)
+
+  ufe = ()
+  for u in us
+    # inv_project!(u.fe_data,rbcache.trial,u.data) this should already be executed
+    ufe = (ufe...,u.fe_data)
+  end
+  residual!(cache,op,r,ufe,rbcache)
 end
 
 function Algebra.jacobian!(
-  cache,
+  cache::HRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   ws::Tuple{Vararg{Real}},
-  odeopcache)
+  rbcache::RBCache)
 
-  A,Â = cache
-  feA = fe_jacobian!(A,op,r,us,ws,odeopcache)
-  inv_project!(Â,op.lhs,feA)
+  A = cache.fe_quantity
+  paramcache = rbcache.paramcache
+
+  feA = fe_jacobian!(A,op,r,us,ws,paramcache)
+  inv_project!(cache,op.lhs,feA)
+end
+
+function Algebra.jacobian!(
+  cache::HRParamArray,
+  op::GenericTransientRBOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{RBParamVector}},
+  ws::Tuple{Vararg{Real}},
+  rbcache::RBCache)
+
+  ufe = ()
+  for u in us
+    # inv_project!(u.fe_data,rbcache.trial,u.data) this should already be executed
+    ufe = (ufe...,u.fe_data)
+  end
+  jacobian!(cache,op,r,ufe,ws,rbcache)
 end
 
 function RBSteady.fe_residual!(
@@ -155,14 +149,14 @@ function RBSteady.fe_residual!(
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
-  odeopcache)
+  paramcache)
 
   red_params = 1:num_params(r)
   red_times = union_indices_time(op.rhs)
   red_pt_indices = range_2d(red_params,red_times,num_params(r))
   red_r = r[red_params,red_times]
 
-  red_b,red_us,red_odeopcache = select_fe_quantities_at_indices(b,us,odeopcache,vec(red_pt_indices))
+  red_b,red_us,red_odeopcache = select_fe_quantities_at_indices(b,us,paramcache,vec(red_pt_indices))
   residual!(red_b,op.op,red_r,red_us,red_odeopcache)
   RBSteady.select_at_indices(red_b,op.rhs,red_pt_indices)
 end
@@ -173,14 +167,14 @@ function RBSteady.fe_jacobian!(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   ws::Tuple{Vararg{Real}},
-  odeopcache)
+  paramcache)
 
   red_params = 1:num_params(r)
   red_times = union_indices_time(op.lhs)
   red_pt_indices = range_2d(red_params,red_times,num_params(r))
   red_r = r[red_params,red_times]
 
-  red_A,red_us,red_odeopcache = select_fe_quantities_at_indices(A,us,odeopcache,vec(red_pt_indices))
+  red_A,red_us,red_odeopcache = select_fe_quantities_at_indices(A,us,paramcache,vec(red_pt_indices))
   jacobian!(red_A,op.op,red_r,red_us,ws,red_odeopcache)
   map(red_A,op.lhs) do red_A,lhs
     RBSteady.select_at_indices(red_A,lhs,red_pt_indices)
@@ -188,7 +182,7 @@ function RBSteady.fe_jacobian!(
 end
 
 struct LinearNonlinearTransientRBOperator <: TransientRBOperator{LinearNonlinearParamODE}
-  op_linear::GenericTransientRBOperator{<:AbstractLinearParamODE}
+  op_linear::GenericTransientRBOperator{LinearParamODE}
   op_nonlinear::GenericTransientRBOperator{NonlinearParamODE}
 end
 
@@ -205,24 +199,6 @@ function FESpaces.get_trial(op::LinearNonlinearTransientRBOperator)
   get_trial(op.op_nonlinear)
 end
 
-function ParamDataStructures.realization(op::LinearNonlinearTransientRBOperator;kwargs...)
-  realization(op.op_nonlinear;kwargs...)
-end
-
-function ParamSteady.get_fe_operator(op::LinearNonlinearTransientRBOperator)
-  join_operators(ParamSteady.get_fe_operator(op.op_linear),ParamSteady.get_fe_operator(op.op_nonlinear))
-end
-
-function IndexMaps.get_vector_index_map(op::LinearNonlinearTransientRBOperator)
-  @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
-  get_vector_index_map(op.op_linear)
-end
-
-function IndexMaps.get_matrix_index_map(op::LinearNonlinearTransientRBOperator)
-  @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))
-  get_matrix_index_map(op.op_linear)
-end
-
 function RBSteady.get_fe_trial(op::LinearNonlinearTransientRBOperator)
   @check RBSteady.get_fe_trial(op.op_linear) === get_fe_trial(op.op_nonlinear)
   RBSteady.get_fe_trial(op.op_nonlinear)
@@ -233,59 +209,22 @@ function RBSteady.get_fe_test(op::LinearNonlinearTransientRBOperator)
   RBSteady.get_fe_test(op.op_nonlinear)
 end
 
-function ODEs.allocate_odecache(
-  fesolver,
-  op::LinearNonlinearTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  @abstractmethod
-end
-
-function ODEs.allocate_odeopcache(
-  op::LinearNonlinearTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  @notimplemented
-end
-
-function update_odecache!(
-  odecache,
-  op::LinearNonlinearTransientRBOperator,
-  r::TransientRealization)
-
-  odecache_lin,odecache_nlin = odecache
-  odecache_lin = update_odecache!(odecache_lin,get_linear_operator(op),r)
-  odecache_nlin = update_odecache!(odecache_nlin,get_nonlinear_operator(op),r)
-  (odecache_lin,odecache_nlin)
-end
-
-function RBSteady.allocate_rbcache(
-  fesolver,
-  op::LinearNonlinearTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  cache_lin = RBSteady.allocate_rbcache(fesolver,get_linear_operator(op),r,us)
-  cache_nlin = RBSteady.allocate_rbcache(fesolver,get_nonlinear_operator(op),r,us)
-  return (cache_lin,cache_nlin)
-end
-
 function Algebra.allocate_residual(
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
-  args...)
+  us::Tuple{Vararg{AbstractParamVector}},
+  rbcache::LinearNonlinearRBCache)
 
-  @notimplemented
+  rbcache.rbcache.b
 end
 
 function Algebra.allocate_jacobian(
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
-  args...)
+  us::Tuple{Vararg{AbstractParamVector}},
+  rbcache::LinearNonlinearRBCache)
 
-  @notimplemented
+  rbcache.rbcache.A
 end
 
 function Algebra.residual!(
@@ -293,10 +232,18 @@ function Algebra.residual!(
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
-  odeopcache;
-  kwargs...)
+  rbcache::LinearNonlinearRBCache)
 
-  @notimplemented
+  nlop = get_nonlinear_operator(op)
+  A_lin = rbcache.A
+  b_lin = rbcache.b
+  rbcache_nlin = rbcache.rbcache
+
+  b_nlin = residual!(cache,nlop,r,us,rbcache_nlin)
+  axpy!(1.0,b_lin,b_nlin)
+  mul!(b_nlin,A_lin,us[end],true,true)
+
+  return b_nlin
 end
 
 function Algebra.jacobian!(
@@ -305,53 +252,22 @@ function Algebra.jacobian!(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   ws::Tuple{Vararg{Real}},
-  odeopcache)
+  rbcache::LinearNonlinearRBCache)
 
-  @notimplemented
-end
+  nlop = get_nonlinear_operator(op)
+  A_lin = rbcache.A
+  rbcache_nlin = rbcache.rbcache
 
-# Solve a POD-MDEIM problem
+  A_nlin = jacobian!(cache,nlop,r,us,ws,rbcache_nlin)
+  axpy!(1.0,A_lin,A_nlin)
 
-function RBSteady.init_online_cache!(
-  solver::RBSolver,
-  op::TransientRBOperator,
-  r::TransientRealization)
-
-  fe_trial = get_fe_trial(op)(r)
-  trial = get_trial(op)(r)
-  y = zero_free_values(fe_trial)
-  x̂ = zero_free_values(trial)
-
-  fesolver = get_fe_solver(solver)
-  odecache = allocate_odecache(fesolver,op,r,(y,))
-  rbcache = RBSteady.allocate_rbcache(fesolver,op,r,(y,))
-
-  cache = solver.cache
-  cache.fecache = (y,odecache)
-  cache.rbcache = (x̂,rbcache)
-  return
-end
-
-function RBSteady.online_cache!(
-  solver::RBSolver,
-  op::TransientRBOperator,
-  r::TransientRealization)
-
-  cache = solver.cache
-  y,odecache = cache.fecache
-  if param_length(r) != param_length(y)
-    RBSteady.init_online_cache!(solver,op,r)
-  else
-    odecache = update_odecache!(odecache,op,r)
-    cache.fecache = y,odecache
-  end
-  return
+  return A_nlin
 end
 
 function Algebra.solve(
   solver::RBSolver,
   op::TransientRBOperator{NonlinearParamODE},
-  r::AbstractRealization)
+  r::TransientRealization)
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
 end
@@ -359,124 +275,102 @@ end
 function Algebra.solve(
   solver::RBSolver,
   op::TransientRBOperator,
-  r::TransientRealization;
-  kwargs...)
+  r::TransientRealization)
 
-  cache = solver.cache
-  if isnothing(cache.fecache) || isnothing(cache.rbcache)
-    RBSteady.init_online_cache!(solver,op,r)
-  else
-    RBSteady.online_cache!(solver,op,r)
-  end
-  solve!(cache,solver,op,r;kwargs...)
-end
+  fesolver = get_fe_solver(solver)
+  fe_trial = get_fe_trial(op)(r)
+  trial = get_trial(op)(r)
+  x = zero_free_values(fe_trial)
+  x̂ = zero_free_values(trial)
 
-function Algebra.solve!(
-  cache,
-  solver::RBSolver,
-  op::TransientRBOperator,
-  r::TransientRealization;
-  kwargs...)
+  rbcache = allocate_rbcache(fesolver,op,r,x)
 
-  y,odecache = cache.fecache
-  x̂,rbcache = cache.rbcache
-
-  t = @timed solve!(x̂,solver,op,r,(y,),odecache,rbcache)
+  t = @timed solve!(x̂,fesolver,op,r,x,rbcache)
   stats = CostTracker(t,nruns=num_params(r))
 
   return x̂,stats
 end
 
-function Algebra.solve!(
-  x̂::AbstractVector,
-  solver::RBSolver,
-  op::TransientRBOperator,
-  r::TransientRealization,
-  statefe::Tuple{Vararg{AbstractVector}},
-  odecache,
-  rbcache;
-  kwargs...)
-
-  fesolver = get_fe_solver(solver)
-
-  sysslvr = fesolver.sysslvr
-  odeslvrcache,odeopcache = odecache
-  _...,sysslvrcache = odeslvrcache
-
-  stageop = get_stage_operator(fesolver,op,r,statefe,odecache,rbcache)
-  solve!(x̂,sysslvr,stageop,sysslvrcache)
-  return x̂
-end
-
-function Algebra.solve!(
-  x̂::AbstractVector,
-  solver::RBSolver,
-  op::TransientRBOperator{LinearNonlinearParamODE},
-  r::TransientRealization,
-  statefe::Tuple{Vararg{AbstractVector}},
-  odecache,
-  rbcache;
-  kwargs...)
-
-  fesolver = get_fe_solver(solver)
-  nls = fesolver.sysslvr
-  x = statefe[1]
-
-  stageop = get_stage_operator(fesolver,op,r,statefe,odecache,rbcache)
-  solve!(x̂,nls,stageop,r,x;kwargs...)
-  return x̂
-end
-
 # cache utils
 
-function RBSteady.select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveArrayOfArrays}},odeopcache,indices)
-  @unpack Us,Uts,tfeopcache,const_forms = odeopcache
-  new_xhF = ()
-  new_Us = ()
-  for i = eachindex(Us)
-    new_Us = (new_Us...,RBSteady.select_fe_space_at_indices(Us[i],indices))
-    new_XhF_i = ConsecutiveArrayOfArrays(us[i].data[:,indices])
-    new_xhF = (new_xhF...,new_XhF_i)
-  end
-  new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)
-  return new_xhF,new_odeopcache
+function select_fe_space_at_indices(fs::FESpace,indices)
+  @notimplemented
 end
 
-function RBSteady.select_evalcache_at_indices(us::Tuple{Vararg{BlockVectorOfVectors}},odeopcache,indices)
-  @unpack Us,Uts,tfeopcache,const_forms = odeopcache
-  new_xhF = ()
-  new_Us = ()
-  for i = eachindex(Us)
-    spacei = Us[i]
-    VT = spacei.vector_type
-    style = spacei.multi_field_style
-    spacesi = [RBSteady.select_fe_space_at_indices(spaceij,indices) for spaceij in spacei]
-    new_Us = (new_Us...,MultiFieldFESpace(VT,spacesi,style))
-    new_XhF_i = mortar([ConsecutiveArrayOfArrays(us_i.data[:,indices]) for us_i in blocks(us[i])])
-    new_xhF = (new_xhF...,new_XhF_i)
-  end
-  new_odeopcache = ODEOpFromTFEOpCache(new_Us,Uts,tfeopcache,const_forms)
-  return new_xhF,new_odeopcache
+function select_fe_space_at_indices(fs::TrivialParamFESpace,indices)
+  TrivialParamFESpace(fs.space,length(indices))
 end
 
-function RBSteady.select_slvrcache_at_indices(cache::TupOfArrayContribution,indices)
+function select_fe_space_at_indices(fs::SingleFieldParamFESpace,indices)
+  dvi = ConsecutiveParamArray(fs.dirichlet_values.data[:,indices])
+  TrialParamFESpace(dvi,fs.space)
+end
+
+function select_slvrcache_at_indices(b::ConsecutiveParamArray,indices)
+  ConsecutiveParamArray(b.data[:,indices])
+end
+
+function select_slvrcache_at_indices(A::ConsecutiveParamSparseMatrixCSC,indices)
+  ConsecutiveParamSparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,A.data[:,indices])
+end
+
+function select_slvrcache_at_indices(A::BlockParamArray,indices)
+  map(a -> select_slvrcache_at_indices(a,indices),blocks(A)) |> mortar
+end
+
+function select_slvrcache_at_indices(cache::ArrayContribution,indices)
+  contribution(cache.trians) do trian
+    select_slvrcache_at_indices(cache[trian],indices)
+  end
+end
+
+function select_slvrcache_at_indices(cache::TupOfArrayContribution,indices)
   red_cache = ()
   for c in cache
-    red_cache = (red_cache...,RBSteady.select_slvrcache_at_indices(c,indices))
+    red_cache = (red_cache...,select_slvrcache_at_indices(c,indices))
   end
   return red_cache
 end
 
-function select_fe_quantities_at_indices(cache,us,odeopcache,indices)
-  # returns the cache in the appropriate time-parameter locations
-  red_cache = RBSteady.select_slvrcache_at_indices(cache,indices)
-  # does the same with the stage variable `us` and the ode cache `odeopcache`
-  red_us,red_odeopcache = RBSteady.select_evalcache_at_indices(us,odeopcache,indices)
+function select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveParamVector}},paramcache,indices)
+  @unpack trial,ptrial,feop_cache = paramcache
+  new_xhF = ()
+  new_trial = ()
+  for i = eachindex(trial)
+    new_trial = (new_trial...,select_fe_space_at_indices(trial[i],indices))
+    new_XhF_i = ConsecutiveParamArray(us[i].data[:,indices])
+    new_xhF = (new_xhF...,new_XhF_i)
+  end
+  new_odeopcache = ParamOpCache(new_trial,ptrial,feop_cache)
+  return new_xhF,new_odeopcache
+end
 
+function select_evalcache_at_indices(us::Tuple{Vararg{BlockConsecutiveParamVector}},paramcache,indices)
+  @unpack trial,ptrial,feop_cache = paramcache
+  new_xhF = ()
+  new_trial = ()
+  for i = eachindex(trial)
+    spacei = trial[i]
+    VT = spacei.vector_type
+    style = spacei.multi_field_style
+    spacesi = [select_fe_space_at_indices(spaceij,indices) for spaceij in spacei]
+    new_trial = (new_trial...,MultiFieldFESpace(VT,spacesi,style))
+    new_XhF_i = mortar([ConsecutiveParamArray(us_i.data[:,indices]) for us_i in blocks(us[i])])
+    new_xhF = (new_xhF...,new_XhF_i)
+  end
+  new_odeopcache = ParamOpCache(new_trial,ptrial,feop_cache)
+  return new_xhF,new_odeopcache
+end
+
+function select_fe_quantities_at_indices(cache,us,paramcache,indices)
+  # returns the cache in the appropriate time-parameter locations
+  red_cache = select_slvrcache_at_indices(cache,indices)
+  # does the same with the stage variable `us` and the ode cache `paramcache`
+  red_us,red_odeopcache = select_evalcache_at_indices(us,paramcache,indices)
   return red_cache,red_us,red_odeopcache
 end
 
-get_entry(s::AbstractParamArray,is,ipt) = consecutive_getindex(s,is,ipt)
+get_entry(s::ConsecutiveParamVector,is,ipt) = get_all_data(s)[is,ipt]
 get_entry(s::ParamSparseMatrix,is,ipt) = param_getindex(s,ipt)[is]
 
 function RBSteady.select_at_indices(
@@ -485,16 +379,15 @@ function RBSteady.select_at_indices(
   ids_space,ids_time,ids_param)
 
   @check length(ids_space) == length(ids_time)
-  entry = zeros(eltype2(a),length(ids_space))
-  entries = array_of_consecutive_arrays(entry,length(ids_param))
-  @inbounds for ip = param_eachindex(entries)
+  entries = zeros(eltype2(a),length(ids_space),length(ids_param))
+  @inbounds for ip = 1:length(ids_param)
     for (i,(is,it)) in enumerate(zip(ids_space,ids_time))
       ipt = ip+(it-1)*length(ids_param)
       v = get_entry(a,is,ipt)
-      consecutive_setindex!(entries,v,i,ip)
+      entries[i,ip] = v
     end
   end
-  return entries
+  return ConsecutiveParamArray(entries)
 end
 
 function RBSteady.select_at_indices(
@@ -502,16 +395,15 @@ function RBSteady.select_at_indices(
   a::AbstractParamArray,
   ids_space,ids_time,ids_param)
 
-  entry = zeros(eltype2(a),length(ids_space),length(ids_time))
-  entries = array_of_consecutive_arrays(entry,length(ids_param))
-  @inbounds for ip = param_eachindex(entries)
+  entries = zeros(eltype2(a),length(ids_space),length(ids_time),length(ids_param))
+  @inbounds for ip = 1:length(ids_param)
     for (i,it) in enumerate(ids_time)
       ipt = ip+(it-1)*length(ids_param)
       v = get_entry(a,ids_space,ipt)
-      consecutive_setindex!(entries,v,:,i,ip)
+      entries[:,i,ip] = v
     end
   end
-  return entries
+  return ConsecutiveParamArray(entries)
 end
 
 function RBSteady.select_at_indices(s::AbstractArray,a::TransientHyperReduction,indices::Range2D)

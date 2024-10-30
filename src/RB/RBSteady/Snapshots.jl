@@ -1,9 +1,9 @@
 """
-    abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractRealization,A}
-      <: AbstractParamContainer{T,N,L} end
+    abstract type AbstractSnapshots{T,N,D,I<:AbstractIndexMap{D},R<:AbstractRealization,A}
+      <: AbstractParamContainer{T,N} end
 
-Type representing a collection of parametric abstract arrays of eltype T and
-parametric length L, that are associated with a realization of type R. The (spatial)
+Type representing a collection of parametric abstract arrays of eltype T,
+that are associated with a realization of type R. The (spatial)
 entries of any instance of AbstractSnapshots are indexed according to an index
 map of type I<:AbstractIndexMap{D}, where D encodes the spatial dimension.
 
@@ -12,15 +12,17 @@ Subtypes:
 - [`AbstractTransientSnapshots`](@ref)
 
 """
-abstract type AbstractSnapshots{T,N,L,D,I<:AbstractIndexMap{D},R<:AbstractRealization,A} <: AbstractParamContainer{T,N,L} end
+abstract type AbstractSnapshots{T,N,D,I<:AbstractIndexMap{D},R<:AbstractRealization,A} <: AbstractParamContainer{T,N} end
 
 ParamDataStructures.get_values(s::AbstractSnapshots) = @abstractmethod
 get_indexed_values(s::AbstractSnapshots) = @abstractmethod
 IndexMaps.get_index_map(s::AbstractSnapshots) = @abstractmethod
 get_realization(s::AbstractSnapshots) = @abstractmethod
 
+ParamDataStructures.param_length(s::AbstractSnapshots) = @notimplemented
+
 """
-    num_space_dofs(s::AbstractSnapshots{T,N,L,D}) where {T,N,L,D} -> NTuple{D,Integer}
+    num_space_dofs(s::AbstractSnapshots{T,N,D}) where {T,N,D} -> NTuple{D,Integer}
 
 Returns the spatial size of the snapshots
 
@@ -40,7 +42,7 @@ function Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractRealization)
 end
 
 function IndexMaps.change_index_map(i::AbstractIndexMap,s::AbstractSnapshots)
-  Snapshots(param_data(s),i,get_realization(s))
+  Snapshots(get_all_data(s),i,get_realization(s))
 end
 
 function IndexMaps.change_index_map(f,s::AbstractSnapshots)
@@ -63,8 +65,8 @@ function flatten_snapshots(s::AbstractSnapshots)
 end
 
 """
-    abstract type AbstractSteadySnapshots{T,N,L,D,I,A}
-      <: AbstractSnapshots{T,N,L,D,I,<:Realization,A} end
+    abstract type AbstractSteadySnapshots{T,N,D,I,A}
+      <: AbstractSnapshots{T,N,D,I,<:Realization,A} end
 
 Spatial specialization of an [`AbstractSnapshots`](@ref). The dimension `N` of a
 AbstractSteadySnapshots is equal to `D` + 1, where `D` represents the number of
@@ -106,17 +108,17 @@ julia> s = Snapshots(ParamArray(data),i,r)
 ```
 
 """
-abstract type AbstractSteadySnapshots{T,N,L,D,I,R<:Realization,A} <: AbstractSnapshots{T,N,L,D,I,R,A} end
+abstract type AbstractSteadySnapshots{T,N,D,I,R<:Realization,A} <: AbstractSnapshots{T,N,D,I,R,A} end
 
 Base.size(s::AbstractSteadySnapshots) = (num_space_dofs(s)...,num_params(s))
 
 """
-    struct GenericSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R,A} end
+    struct GenericSnapshots{T,N,D,I,R,A} <: AbstractSteadySnapshots{T,N,D,I,R,A} end
 
 Most standard implementation of a AbstractSteadySnapshots
 
 """
-struct GenericSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R,A}
+struct GenericSnapshots{T,N,D,I,R,A} <: AbstractSteadySnapshots{T,N,D,I,R,A}
   data::A
   index_map::I
   realization::R
@@ -125,9 +127,9 @@ struct GenericSnapshots{T,N,L,D,I,R,A} <: AbstractSteadySnapshots{T,N,L,D,I,R,A}
     data::A,
     index_map::I,
     realization::R
-    ) where {T,N,L,D,R,A<:AbstractParamArray{T,N,L},I<:AbstractIndexMap{D}}
+    ) where {T,N,D,R,A<:AbstractParamArray{T,N},I<:AbstractIndexMap{D}}
 
-    new{T,D+1,L,D,I,R,A}(data,index_map,realization)
+    new{T,D+1,D,I,R,A}(data,index_map,realization)
   end
 end
 
@@ -135,15 +137,15 @@ function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::Realization)
   GenericSnapshots(s,i,r)
 end
 
-ParamDataStructures.param_data(s::GenericSnapshots) = s.data
+ParamDataStructures.get_all_data(s::GenericSnapshots) = s.data
 ParamDataStructures.get_values(s::GenericSnapshots) = s.data
 IndexMaps.get_index_map(s::GenericSnapshots) = s.index_map
 get_realization(s::GenericSnapshots) = s.realization
 
 function get_indexed_values(s::GenericSnapshots)
   vi = vec(get_index_map(s))
-  v = consecutive_getindex(s.data,vi,:)
-  ConsecutiveArrayOfArrays(v)
+  data = get_all_data(s.data)
+  ConsecutiveParamArray(data[vi,:])
 end
 
 Base.@propagate_inbounds function Base.getindex(
@@ -154,7 +156,8 @@ Base.@propagate_inbounds function Base.getindex(
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
   ispace′ = s.index_map[ispace...]
-  ispace′ == 0 ? zero(eltype(s)) : consecutive_getindex(s.data,ispace′,iparam)
+  data = get_all_data(s.data)
+  ispace′ == 0 ? zero(eltype(s)) : data[ispace′,iparam]
 end
 
 Base.@propagate_inbounds function Base.setindex!(
@@ -166,12 +169,13 @@ Base.@propagate_inbounds function Base.setindex!(
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
   ispace′ = s.index_map[ispace...]
-  ispace′ != 0 && consecutive_setindex!(s.data,v,ispace′,iparam)
+  data = get_all_data(s.data)
+  ispace′ != 0 && (data[ispace′,iparam] = v)
 end
 
 """
-    struct SnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractSteadySnapshots{T,N,L,D,I,R},B<:AbstractUnitRange{Int}}
-      <: AbstractSteadySnapshots{T,N,L,D,I,R,A} end
+    struct SnapshotsAtIndices{T,N,D,I,R,A<:AbstractSteadySnapshots{T,N,D,I,R},B<:AbstractUnitRange{Int}}
+      <: AbstractSteadySnapshots{T,N,D,I,R,A} end
 
 Represents a AbstractSteadySnapshots `snaps` whose parametric range is restricted
 to the indices in `prange`. This type essentially acts as a view for suptypes of
@@ -180,9 +184,13 @@ parameter indices. An instance of SnapshotsAtIndices is created by calling the
 function [`select_snapshots`](@ref)
 
 """
-struct SnapshotsAtIndices{T,N,L,D,I,R,A<:AbstractSteadySnapshots{T,N,L,D,I,R},B<:AbstractUnitRange{Int}} <: AbstractSteadySnapshots{T,N,L,D,I,R,A}
+struct SnapshotsAtIndices{T,N,D,I,R,A<:AbstractSteadySnapshots{T,N,D,I,R},B<:AbstractUnitRange{Int}} <: AbstractSteadySnapshots{T,N,D,I,R,A}
   snaps::A
   prange::B
+  function SnapshotsAtIndices(snaps::A,prange::B) where {T,N,D,I,R,A<:AbstractSteadySnapshots{T,N,D,I,R},B}
+    @assert 1 <= minimum(prange) <= maximum(prange) <= _num_all_params(snaps)
+    new{T,N,D,I,R,A,B}(snaps,prange)
+  end
 end
 
 function SnapshotsAtIndices(s::SnapshotsAtIndices,prange)
@@ -193,18 +201,20 @@ end
 
 param_indices(s::SnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
-ParamDataStructures.param_data(s::SnapshotsAtIndices) = param_data(s.snaps)
+ParamDataStructures.get_all_data(s::SnapshotsAtIndices) = get_all_data(s.snaps)
 IndexMaps.get_index_map(s::SnapshotsAtIndices) = get_index_map(s.snaps)
 
+_num_all_params(s::AbstractSnapshots) = num_params(s)
+_num_all_params(s::SnapshotsAtIndices) = _num_all_params(s.snaps)
+
 function ParamDataStructures.get_values(s::SnapshotsAtIndices)
-  v = consecutive_getindex(param_data(s),:,param_indices(s))
-  ConsecutiveArrayOfArrays(v)
+  data = get_all_data(get_all_data(s))
+  ConsecutiveParamArray(data[:,param_indices(s)])
 end
 
 function get_indexed_values(s::SnapshotsAtIndices)
-  vi = vec(get_index_map(s))
-  v = consecutive_getindex(param_data(s),vi,param_indices(s))
-  ConsecutiveArrayOfArrays(v)
+  data = get_all_data(get_all_data(s))
+  ConsecutiveParamArray(data[:,param_indices(s)])
 end
 
 get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
@@ -251,7 +261,7 @@ function select_snapshots(s::AbstractSteadySnapshots,prange)
   SnapshotsAtIndices(s,prange)
 end
 
-struct ReshapedSnapshots{T,N,N′,L,D,I,R,A<:AbstractSteadySnapshots{T,N′,L,D,I,R},B} <: AbstractSteadySnapshots{T,N′,L,D,I,R,A}
+struct ReshapedSnapshots{T,N,N′,D,I,R,A<:AbstractSteadySnapshots{T,N′,D,I,R},B} <: AbstractSteadySnapshots{T,N′,D,I,R,A}
   snaps::A
   size::NTuple{N,Int}
   mi::B
@@ -304,65 +314,79 @@ end
 function get_indexed_values(s::ReshapedSnapshots)
   v = get_indexed_values(s.snaps)
   vr = reshape(v.data,s.size)
-  ConsecutiveArrayOfArrays(vr)
+  ConsecutiveParamArray(vr)
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::AbstractSnapshots{S,2}) where {T,S}
-  consecutive_mul(get_indexed_values(A),get_indexed_values(B))
+  consec_mul(get_indexed_values(A),get_indexed_values(B))
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::Adjoint{S,<:AbstractSnapshots}) where {T,S}
-  consecutive_mul(get_indexed_values(A),adjoint(get_indexed_values(B.parent)))
+  consec_mul(get_indexed_values(A),adjoint(get_indexed_values(B.parent)))
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::AbstractMatrix{S}) where {T,S}
-  consecutive_mul(get_indexed_values(A),B)
+  consec_mul(get_indexed_values(A),B)
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::Adjoint{T,<:AbstractMatrix{S}}) where {T,S}
-  consecutive_mul(get_indexed_values(A),B)
+  consec_mul(get_indexed_values(A),B)
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractSnapshots{T,2}},B::AbstractSnapshots{S,2}) where {T,S}
-  consecutive_mul(adjoint(get_indexed_values(A.parent)),get_indexed_values(B))
+  consec_mul(adjoint(get_indexed_values(A.parent)),get_indexed_values(B))
 end
 
 function Base.:*(A::AbstractMatrix{T},B::AbstractSnapshots{S,2}) where {T,S}
-  consecutive_mul(A,get_indexed_values(B))
+  consec_mul(A,get_indexed_values(B))
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::AbstractSnapshots{S,2}) where {T,S}
-  consecutive_mul(A,get_indexed_values(B))
+  consec_mul(A,get_indexed_values(B))
+end
+
+consecutive_mul(A::AbstractArray,B::AbstractArray) = @abstractmethod
+
+for T in (:ConsecutiveParamArray,:ConsecutiveParamSparseMatrix)
+  for S in (:ConsecutiveParamArray,:ConsecutiveParamSparseMatrix)
+    @eval begin
+      consec_mul(A::$T,B::$S) = get_all_data(A)*get_all_data(B)
+      consec_mul(A::$T,B::Adjoint{U,<:$S}) where U = get_all_data(A)*adjoint(get_all_data(B.parent))
+      consec_mul(A::Adjoint{U,<:$T},B::$S) where U = adjoint(get_all_data(A.parent))*get_all_data(B)
+    end
+  end
+  @eval begin
+    consec_mul(A::$T,B::Union{<:AbstractArray,Adjoint{U,<:AbstractArray}}) where U = get_all_data(A)*B
+    consec_mul(A::Union{<:AbstractArray,Adjoint{U,<:AbstractArray}},B::$T) where U = A*get_all_data(B)
+  end
 end
 
 # sparse interface
 
-const SimpleSparseSnapshots{T,N,L,D,I,R,A<:ParamSparseMatrix} = AbstractSnapshots{T,N,L,D,I,R,A}
-const CompositeSparseSnapshots{T,N,L,D,I,R,A<:SimpleSparseSnapshots} = AbstractSnapshots{T,N,L,D,I,R,A}
-const GenericSparseSnapshots{T,N,L,D,I,R,A<:CompositeSparseSnapshots} = AbstractSnapshots{T,N,L,D,I,R,A}
-const SparseSnapshots{T,N,L,D,I,R} = Union{
-  SimpleSparseSnapshots{T,N,L,D,I,R},
-  CompositeSparseSnapshots{T,N,L,D,I,R},
-  GenericSparseSnapshots{T,N,L,D,I,R}
+const SimpleSparseSnapshots{T,N,D,I,R,A<:ParamSparseMatrix} = AbstractSnapshots{T,N,D,I,R,A}
+const CompositeSparseSnapshots{T,N,D,I,R,A<:SimpleSparseSnapshots} = AbstractSnapshots{T,N,D,I,R,A}
+const GenericSparseSnapshots{T,N,D,I,R,A<:CompositeSparseSnapshots} = AbstractSnapshots{T,N,D,I,R,A}
+const SparseSnapshots{T,N,D,I,R} = Union{
+  SimpleSparseSnapshots{T,N,D,I,R},
+  CompositeSparseSnapshots{T,N,D,I,R},
+  GenericSparseSnapshots{T,N,D,I,R}
 }
 
 # multi field interface
 
 """
-    struct BlockSnapshots{S,N,L} <: AbstractParamContainer{S,N,L}
+    struct BlockSnapshots{S,N} <: AbstractParamContainer{S,N}
 
 Block container for AbstractSnapshots of type `S` in a MultiField setting. This
 type is conceived similarly to [`ArrayBlock`](@ref) in [`Gridap`](@ref)
 
 """
-struct BlockSnapshots{S,N,L} <: AbstractParamContainer{S,N,L}
+struct BlockSnapshots{S,N} <: AbstractParamContainer{S,N}
   array::Array{S,N}
   touched::Array{Bool,N}
-
   function BlockSnapshots(array::Array{S,N},touched::Array{Bool,N}) where {S,N}
     @check size(array) == size(touched)
-    L = param_length(first(array))
-    new{S,N,L}(array,touched)
+    new{S,N}(array,touched)
   end
 end
 
@@ -381,7 +405,7 @@ function Fields.BlockMap(s::NTuple,inds::AbstractVector{<:Integer})
   BlockMap(s,cis)
 end
 
-function Snapshots(data::BlockArrayOfArrays,i::AbstractArray{<:AbstractIndexMap},r::AbstractRealization)
+function Snapshots(data::BlockParamArray,i::AbstractArray{<:AbstractIndexMap},r::AbstractRealization)
   block_values = blocks(data)
   nblocks = blocksize(data)
   active_block_ids = findall(!iszero,block_values)
@@ -438,45 +462,35 @@ function Arrays.return_cache(::typeof(change_index_map),f,s::BlockSnapshots)
   return block_cache
 end
 
-function IndexMaps.change_index_map(f,s::BlockSnapshots)
-  array = return_cache(change_index_map,f,s)
-  touched = s.touched
-  for i in eachindex(touched)
-    if touched[i]
-      array[i] = change_index_map(f,s[i])
+for f in (:flatten_snapshots,:select_snapshots)
+  @eval begin
+    function Arrays.return_cache(::typeof($f),s::AbstractSnapshots,args...;kwargs...)
+      $f(s,args...;kwargs...)
+    end
+
+    function Arrays.return_cache(::typeof($f),s::BlockSnapshots,args...;kwargs...)
+      i = findfirst(s.touched)
+      @notimplementedif isnothing(i)
+      cache = return_cache($f,s[i],args...;kwargs...)
+      block_cache = Array{typeof(cache),ndims(s)}(undef,size(s))
+      return block_cache
     end
   end
-  return BlockSnapshots(array,touched)
 end
 
-function Arrays.return_cache(::typeof(flatten_snapshots),s::AbstractSnapshots)
-  flatten_snapshots(s)
-end
-
-function Arrays.return_cache(::typeof(flatten_snapshots),s::BlockSnapshots)
-  i = findfirst(s.touched)
-  @notimplementedif isnothing(i)
-  cache = return_cache(flatten_snapshots,s[i])
-  block_cache = Array{typeof(cache),ndims(s)}(undef,size(s))
-  return block_cache
-end
-
-function flatten_snapshots(s::BlockSnapshots)
-  array = return_cache(flatten_snapshots,s)
-  touched = s.touched
-  for i in eachindex(touched)
-    if touched[i]
-      array[i] = flatten_snapshots(s[i])
+for f in (:(IndexMaps.change_index_map),:flatten_snapshots,:select_snapshots)
+  @eval begin
+    function $f(s::BlockSnapshots,args...;kwargs...)
+      array = return_cache($f,s,args...;kwargs...)
+      touched = s.touched
+      for i in eachindex(touched)
+        if touched[i]
+          array[i] = $f(s[i],args...;kwargs...)
+        end
+      end
+      return BlockSnapshots(array,touched)
     end
   end
-  return BlockSnapshots(array,touched)
-end
-
-function select_snapshots(s::BlockSnapshots,args...;kwargs...)
-  active_block_ids = findall(s.touched)
-  block_map = BlockMap(size(s),active_block_ids)
-  active_block_snaps = [select_snapshots(s[n],args...;kwargs...) for n in active_block_ids]
-  BlockSnapshots(block_map,active_block_snaps)
 end
 
 # utils

@@ -34,7 +34,7 @@ function get_param_assembler(
 end
 
 function FESpaces.assemble_vector_add!(
-  b::BlockVectorOfVectors,
+  b::BlockParamVector,
   a::MultiField.BlockSparseMatrixAssembler,
   vecdata)
   b1 = ArrayBlock(blocks(b),fill(true,blocksize(b)))
@@ -43,7 +43,7 @@ function FESpaces.assemble_vector_add!(
 end
 
 function FESpaces.assemble_matrix_add!(
-  mat::BlockMatrixOfMatrices,
+  mat::BlockParamMatrix,
   a::MultiField.BlockSparseMatrixAssembler,
   matdata)
   m1 = ArrayBlock(blocks(mat),fill(true,blocksize(mat)))
@@ -52,8 +52,8 @@ function FESpaces.assemble_matrix_add!(
 end
 
 function FESpaces.assemble_matrix_and_vector_add!(
-  A::BlockMatrixOfMatrices,
-  b::BlockVectorOfVectors,
+  A::BlockParamMatrix,
+  b::BlockParamVector,
   a::MultiField.BlockSparseMatrixAssembler,
   data)
   m1 = ArrayBlock(blocks(A),fill(true,blocksize(A)))

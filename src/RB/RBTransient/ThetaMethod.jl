@@ -1,4 +1,16 @@
-#
+function RBSteady.allocate_rbcache(
+  solver::ThetaMethod,
+  op::TransientRBOperator,
+  r::TransientRealization,
+  u::AbstractParamVector)
+
+  w = copy(u)
+  fill!(w,zero(eltype(w)))
+  us = (w,w)
+  allocate_rbcache(solver,op,r,us)
+end
+
+# linear case
 
 function RBSteady.allocate_rbcache(
   solver::ThetaMethod,
@@ -6,139 +18,115 @@ function RBSteady.allocate_rbcache(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 
-  rb_lhs_cache = allocate_jacobian(op,r)
-  rb_rhs_cache = allocate_residual(op,r)
-  syscache = (rb_lhs_cache,rb_rhs_cache)
-
   dt,θ = solver.dt,solver.θ
   shift!(r,dt*(θ-1))
-  rbopcache = get_trial(op)(r)
+
+  paramcache = allocate_paramcache(op.op,r,us;evaluated=true)
+
+  A = allocate_jacobian(op.op,r,us,paramcache)
+  coeffA,Â = allocate_hypred_cache(op.lhs,r)
+  Acache = HRParamArray(A,coeffA,Â)
+
+  b = allocate_residual(op.op,r,us,paramcache)
+  coeffb,b̂ = allocate_hypred_cache(op.rhs,r)
+  bcache = HRParamArray(b,coeffb,b̂)
+
+  trial = evaluate(get_trial(op),r)
+
   shift!(r,dt*(1-θ))
 
-  return syscache,rbopcache
+  return RBCache(Acache,bcache,trial,paramcache)
 end
 
-# general nonlinear case
+function Algebra.solve!(
+  x̂::AbstractVector,
+  solver::ThetaMethod,
+  op::TransientRBOperator,
+  r::TransientRealization,
+  x::AbstractVector,
+  rbcache::RBCache)
 
-function ODEs.allocate_odecache(
+  sysslvr = solver.sysslvr
+  dt,θ = solver.dt,solver.θ
+  fill!(x,zero(eltype(x)))
+  usx = (x,x)
+  dtθ = θ*dt
+  ws = (1,1/dtθ)
+
+  shift!(r,dt*(θ-1))
+  Â = jacobian(op,r,usx,ws,rbcache)
+  b̂ = residual(op,r,usx,rbcache)
+  rmul!(b̂,-1)
+  solve!(x̂,sysslvr,Â,b̂)
+  shift!(r,dt*(1-θ))
+  return x̂
+end
+
+# linear - nonlinear case
+
+function RBSteady.allocate_rbcache(
   solver::ThetaMethod,
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 
-  odecache_lin = allocate_odecache(solver,get_linear_operator(op),r,us)
-  odecache_nlin = allocate_odecache(solver,get_nonlinear_operator(op),r,us)
-  odeslvrcache_nlin,odeopcache = odecache_nlin
-  uθ, = odeslvrcache_nlin
-  nlop = get_nonlinear_operator(op).op
-  A_nlin = allocate_jacobian(nlop,r,us,odeopcache)
-  b_nlin = allocate_residual(nlop,r,us,odeopcache)
-  odeslvrcache_nlin = uθ,A_nlin,b_nlin
-  odecache_nlin = odeslvrcache_nlin,odeopcache
-  return (odecache_lin,odecache_nlin)
+  dt,θ = solver.dt,solver.θ
+  dtθ = θ*dt
+  ws = (1,1/dtθ)
+
+  lop = get_linear_operator(op)
+  nlop = get_nonlinear_operator(op)
+
+  rbcache_lin = allocate_rbcache(solver,lop,r,us)
+  rbcache_nlin = allocate_rbcache(solver,nlop,r,us)
+  A_lin = jacobian(lop,r,us,ws,rbcache_lin)
+  b_lin = residual(lop,r,us,rbcache_lin)
+
+  return LinearNonlinearRBCache(rbcache_nlin,A_lin,b_lin)
 end
 
-function get_stage_operator(
+function Algebra.solve!(
+  x̂::AbstractVector,
   solver::ThetaMethod,
-  rbop::TransientRBOperator{LinearNonlinearParamODE},
+  op::TransientRBOperator{LinearNonlinearParamODE},
   r::TransientRealization,
-  state0::NTuple{1,AbstractVector},
-  odecache,
-  rbcache)
+  x::AbstractVector,
+  cache::LinearNonlinearRBCache)
 
-  u0 = state0[1]
-
-  # linear + nonlinear cache
-  odecache_lin,odecache_nlin = odecache
-  rbcache_lin,rbcache_nlin = rbcache
-
-  # linear cache
-  odeslvrcache_lin,odeopcache = odecache_lin
-  reuse_lin,A_lin,b_lin,sysslvrcache_lin = odeslvrcache_lin
-  rbsyscache_lin,rbopcache = rbcache_lin
-  Â_lin,b̂_lin = rbsyscache_lin
-
-  # nonlinear cache
-  odeslvrcache_nlin,_ = odecache_nlin
-  uθ,A_nlin,b_nlin = odeslvrcache_nlin
-  rbop_nlin = get_nonlinear_operator(rbop)
-  rbsyscache_nlin,_ = rbcache_nlin
-  Â_nlin,b̂_nlin = rbsyscache_nlin
-  rbsyscache_lin_nlin = (A_nlin,Â_nlin),(b_nlin,b̂_nlin)
-  cache_lin_nlin = rbsyscache_lin_nlin,rbopcache
-
-  # linear operator
-  rbop_lin = get_linear_operator(rbop)
-  lop = get_stage_operator(solver,rbop_lin,r,state0,odecache_lin,rbcache_lin)
-
-  x = copy(u0)
-  fill!(x,zero(eltype(x)))
-
+  sysslvr = solver.sysslvr
   dt,θ = solver.dt,solver.θ
+  fill!(x,zero(eltype(x)))
+  ŷ = RBParamVector(x̂,x)
+  uθ = copy(ŷ)
 
-  dtθ = θ*dt
-  shift!(r,dt*(θ-1))
-
-  function us(u)
-    copy!(uθ,u)
-    shift!(uθ,r,θ,1-θ)
-    axpy!(dtθ,x,uθ)
-    (uθ,x)
+  function us(u::RBParamVector)
+    inv_project!(u.fe_data,cache.rbcache.trial,u.data)
+    copy!(uθ.fe_data,u.fe_data)
+    shift!(uθ.fe_data,r,θ,1-θ)
+    axpy!(dtθ,ŷ.fe_data,uθ.fe_data)
+    (uθ,ŷ)
   end
 
-  ws = (1,1/dtθ)
-  rbop_nlin = get_nonlinear_operator(rbop)
-  stageop = RBNewtonRaphsonOperator(rbop_nlin,lop,odeopcache,r,us,ws,cache_lin_nlin)
-  shift!(r,dt*(1-θ))
-
-  return stageop
-end
-
-# linear case
-
-function ODEs.allocate_odecache(
-  solver::ThetaMethod,
-  op::GenericTransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
-
-  dt,θ = solver.dt,solver.θ
   dtθ = θ*dt
-  shift!(r,dt*(θ-1))
-
-  (odeslvrcache,odeopcache) = allocate_odecache(solver,op.op,r,us)
-  shift!(r,dt*(1-θ))
-
-  return (odeslvrcache,odeopcache)
-end
-
-function get_stage_operator(
-  solver::ThetaMethod,
-  rbop::TransientRBOperator{LinearParamODE},
-  r::TransientRealization,
-  state0::NTuple{1,AbstractVector},
-  odecache,
-  rbcache)
-
-  u0 = state0[1]
-  odeslvrcache,odeopcache = odecache
-  reuse,A,b,sysslvrcache = odeslvrcache
-  rbsyscache,_ = rbcache
-  Â,b̂ = rbsyscache
-
-  dt,θ = solver.dt,solver.θ
-
-  x = copy(u0)
-  fill!(x,zero(eltype(x)))
-  dtθ = θ*dt
-  shift!(r,dt*(θ-1))
-  us = (x,x)
   ws = (1,1/dtθ)
+  usx = (ŷ,ŷ)
 
-  stageop = LinearParamStageOperator(rbop,odeopcache,r,us,ws,(A,Â),(b,b̂),reuse,sysslvrcache)
+  Âcache = jacobian(op,r,usx,ws,cache)
+  b̂cache = residual(op,r,usx,cache)
+
+  Â_item = testitem(Âcache)
+  x̂_item = testitem(x̂)
+  dx̂ = allocate_in_domain(Â_item)
+  fill!(dx̂,zero(eltype(dx̂)))
+  ss = symbolic_setup(BackslashSolver(),Â_item)
+  ns = numerical_setup(ss,Â_item,x̂_item)
+
+  shift!(r,dt*(θ-1))
+  nlop = ParamStageOperator(op,cache,r,us,ws)
+  Algebra._solve_nr!(ŷ,Âcache,b̂cache,dx̂,ns,sysslvr,nlop)
   shift!(r,dt*(1-θ))
 
-  return stageop
+  return x̂
 end
 
 # utils
@@ -155,7 +143,7 @@ function ParamDataStructures.shift!(a::AbstractParamArray,r::TransientRealizatio
   end
 end
 
-function ParamDataStructures.shift!(a::BlockVectorOfVectors,r::TransientRealization,α::Number,β::Number)
+function ParamDataStructures.shift!(a::BlockParamVector,r::TransientRealization,α::Number,β::Number)
   @inbounds for ai in blocks(a)
     ParamDataStructures.shift!(ai,r,α,β)
   end

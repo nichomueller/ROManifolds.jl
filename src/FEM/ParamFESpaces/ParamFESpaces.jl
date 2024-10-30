@@ -6,6 +6,7 @@ using FillArrays
 using SparseArrays
 
 using Gridap
+using Gridap.Arrays
 using Gridap.Algebra
 using Gridap.CellData
 using Gridap.Fields

@@ -14,7 +14,7 @@ V[3] = rand(4)
 V[findblockindex.(axes(V),3)...] = rand(4)
 
 param_getindex(V,1)
-param_entry(V,1)
+get_param_entry(V,1)
 
 MM = Matrix{MatrixOfMatrices{Float64,2}}(undef,2,2)
 MM[1,1] = ParamArray([rand(3,3),rand(3,3)])
@@ -26,7 +26,7 @@ M = mortar(MM)
 M[3,3] = rand(4,4)
 
 param_getindex(M,1)
-param_entry(M,1,2)
+get_param_entry(M,1,2)
 
 M0 = zero(M)
 M′ = similar(M,typeof(rand(1,1)))
@@ -60,4 +60,4 @@ M = mortar(MM)
 
 luM = lu(M)
 
-PD = param_data(M)
+PD = get_param_data(M)
