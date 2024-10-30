@@ -28,7 +28,6 @@ end
 
 SparseArrays.getcolptr(A::MatrixOfSparseMatricesCSC) = A.colptr
 SparseArrays.rowvals(A::MatrixOfSparseMatricesCSC) = A.rowval
-SparseArrays.nonzeros(A::MatrixOfSparseMatricesCSC) = A.data
 SparseArrays.nnz(A::MatrixOfSparseMatricesCSC) = Int(getcolptr(A)[innersize(A,2)+1])-1
 SparseArrays.nonzeros(A::MatrixOfSparseMatricesCSC) = ConsecutiveArrayOfArrays(A.data)
 _nonzeros(A::MatrixOfSparseMatricesCSC,iblock::Integer...) = @inbounds getindex(A.data,:,iblock...)

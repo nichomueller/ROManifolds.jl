@@ -36,10 +36,10 @@ end
 
 # hacky
 function Base.setindex!(
-  A::ConsecutiveParamArrays{T,N,L},
-  v::ConsecutiveParamArrays{T′,N,L},
+  A::ConsecutiveParamArrays,
+  v::ConsecutiveParamArrays,
   i::Vararg{Integer}
-  ) where{T,T′,N,L}
+  )
 
   A.data[i...,:] = v.data
   v

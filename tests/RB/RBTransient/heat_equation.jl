@@ -3,16 +3,13 @@ using Test
 using DrWatson
 using Serialization
 
-using ReducedOrderModels.FEM
-using ReducedOrderModels.TProduct
 using ReducedOrderModels.ParamDataStructures
 using ReducedOrderModels.ParamFESpaces
 using ReducedOrderModels.ParamSteady
 using ReducedOrderModels.ParamODEs
 
-using ReducedOrderModels.RB
-using ReducedOrderModels.RB.RBSteady
-using ReducedOrderModels.RB.RBTransient
+using ReducedOrderModels.RBSteady
+using ReducedOrderModels.RBTransient
 
 # time marching
 θ = 0.5
