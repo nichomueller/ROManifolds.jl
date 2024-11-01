@@ -753,6 +753,22 @@ function Arrays.evaluate!(C,f::IntegrationMap,A::AbstractParamArray,w::AbstractV
   param_evaluate!(C,f,A,w,jq)
 end
 
+function Arrays.return_cache(f::CellData.ConstrainRowsMap,A::AbstractParamArray,constr,mask)
+  param_return_cache(f,A,constr,mask)
+end
+
+function Arrays.evaluate!(C,f::CellData.ConstrainRowsMap,A::AbstractParamArray,constr,mask)
+  param_evaluate!(C,f,A,constr,mask)
+end
+
+function Arrays.return_cache(f::CellData.ConstrainColsMap,A::AbstractParamArray,constr_t,mask)
+  return_cache(f,A,constr_t,mask)
+end
+
+function Arrays.evaluate!(C,f::CellData.ConstrainColsMap,A::AbstractParamArray,constr_t,mask)
+  param_evaluate!(C,f,A,constr_t,mask)
+end
+
 for T in (:AbstractParamArray,:AbstractArray,:Nothing), S in (:AbstractParamArray,:AbstractArray)
   (T∈(:AbstractArray,:Nothing) && S==:AbstractArray) && continue
   @eval begin
