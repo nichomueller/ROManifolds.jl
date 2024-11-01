@@ -28,7 +28,6 @@ dp = pmax - pmin
 cutgeo = cut(bgmodel,geo3)
 
 Ω_act = Triangulation(cutgeo,ACTIVE)
-Ω_bg = Triangulation(bgmodel)
 Ω = Triangulation(cutgeo,PHYSICAL)
 
 order = 1
@@ -52,13 +51,13 @@ dΓ = Measure(Γ,degree)
 const γd = 10.0    # Nitsche coefficient
 const h = dp[1]/n  # Mesh size according to the parameters of the background grid
 
-# g(x) = x[1] - x[2]
+g(x) = x[1] - x[2]
 
-# a(u,v) = ∫( ∇(v)⋅∇(u) )dΩ + ∫( (γd/h)*v*u  - v*(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))*u )dΓ
-# l(v) = ∫( (γd/h)*v*g - (n_Γ⋅∇(v))*g )dΓ
+a(u,v) = ∫( ∇(v)⋅∇(u) )dΩ + ∫( (γd/h)*v*u  - v*(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))*u )dΓ
+l(v) = ∫( (γd/h)*v*g - (n_Γ⋅∇(v))*g )dΓ
 
-# op = AffineFEOperator(a,l,U,V)
-# uh = solve(op)
+op = AffineFEOperator(a,l,U,V)
+uh = solve(op)
 
 
 # add parameters
@@ -86,3 +85,15 @@ state_reduction = Reduction(tol,energy;nparams=100,sketch=:sprn)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=80,nparams_jac=80)
 
 fesnaps,festats = solution_snapshots(rbsolver,feop)
+
+μ = get_realization(fesnaps)
+μ1 = μ.params[1]
+
+a(u,v) = ∫( ∇(v)⋅∇(u) )dΩ + ∫( (γd/h)*v*u  - v*(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))*u )dΓ
+l(v) = (-1)*∫( (γd/h)*v*f(μ1) - (n_Γ⋅∇(v))*f(μ1) )dΓ
+
+op = AffineFEOperator(a,l,U,V)
+uh = solve(op)
+u = uh.free_values
+
+u ≈ fesnaps[:,1]

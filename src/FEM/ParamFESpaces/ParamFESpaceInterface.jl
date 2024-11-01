@@ -6,7 +6,7 @@ get_dirichlet_cells(f::TProductFESpace) = get_dirichlet_cells(f.space)
 ParamDataStructures.param_length(f::FESpace) = 0
 
 """
-    abstract type SingleFieldParamFESpace <: SingleFieldFESpace end
+    abstract type SingleFieldParamFESpace{S} <: SingleFieldFESpace end
 
 Parametric extension of a [`SingleFieldFESpace`](@ref) in [`Gridap`](@ref). The
 FE spaces inhereting are (trial) spaces on which we can easily define a
@@ -16,65 +16,99 @@ nonparametric DBC can be prescribed on such spaces.
 
 
 Subtypes:
-- TrivialParamFESpace{S} <: SingleFieldParamFESpace
-- TrialParamFESpace{S} <: SingleFieldParamFESpace
+- TrivialParamFESpace{S} <: SingleFieldParamFESpace{S}
+- TrialParamFESpace{S} <: SingleFieldParamFESpace{S}
 
 """
-abstract type SingleFieldParamFESpace <: SingleFieldFESpace end
+abstract type SingleFieldParamFESpace{S} <: SingleFieldFESpace end
 
-FESpaces.get_free_dof_ids(f::SingleFieldParamFESpace) = get_free_dof_ids(f.space)
+FESpaces.get_fe_space(f::SingleFieldParamFESpace) = @abstractmethod
 
-FESpaces.get_triangulation(f::SingleFieldParamFESpace) = get_triangulation(f.space)
+FESpaces.get_free_dof_ids(f::SingleFieldParamFESpace) = get_free_dof_ids(get_fe_space(f))
 
-FESpaces.get_dof_value_type(f::SingleFieldParamFESpace) = get_dof_value_type(f.space)
+FESpaces.get_triangulation(f::SingleFieldParamFESpace) = get_triangulation(get_fe_space(f))
 
-FESpaces.get_cell_dof_ids(f::SingleFieldParamFESpace) = get_cell_dof_ids(f.space)
+FESpaces.get_dof_value_type(f::SingleFieldParamFESpace) = get_dof_value_type(get_fe_space(f))
 
-FESpaces.get_fe_basis(f::SingleFieldParamFESpace) = get_fe_basis(f.space)
+FESpaces.get_cell_dof_ids(f::SingleFieldParamFESpace) = get_cell_dof_ids(get_fe_space(f))
 
-FESpaces.get_trial_fe_basis(f::SingleFieldParamFESpace) = get_trial_fe_basis(f.space)
+FESpaces.get_fe_basis(f::SingleFieldParamFESpace) = get_fe_basis(get_fe_space(f))
 
-FESpaces.get_fe_dof_basis(f::SingleFieldParamFESpace) = get_fe_dof_basis(f.space)
+FESpaces.get_trial_fe_basis(f::SingleFieldParamFESpace) = get_trial_fe_basis(get_fe_space(f))
 
-FESpaces.get_cell_isconstrained(f::SingleFieldParamFESpace) = get_cell_isconstrained(f.space)
+FESpaces.get_fe_dof_basis(f::SingleFieldParamFESpace) = get_fe_dof_basis(get_fe_space(f))
 
-FESpaces.get_cell_constraints(f::SingleFieldParamFESpace) = get_cell_constraints(f.space)
+FESpaces.get_cell_isconstrained(f::SingleFieldParamFESpace) = get_cell_isconstrained(get_fe_space(f))
 
-FESpaces.get_dirichlet_dof_ids(f::SingleFieldParamFESpace) = get_dirichlet_dof_ids(f.space)
+FESpaces.get_cell_constraints(f::SingleFieldParamFESpace) = get_cell_constraints(get_fe_space(f))
 
-FESpaces.get_cell_is_dirichlet(f::SingleFieldParamFESpace) = get_cell_is_dirichlet(f.space)
+FESpaces.get_dirichlet_dof_ids(f::SingleFieldParamFESpace) = get_dirichlet_dof_ids(get_fe_space(f))
 
-FESpaces.num_dirichlet_dofs(f::SingleFieldParamFESpace) = num_dirichlet_dofs(f.space)
+FESpaces.get_cell_is_dirichlet(f::SingleFieldParamFESpace) = get_cell_is_dirichlet(get_fe_space(f))
 
-FESpaces.num_dirichlet_tags(f::SingleFieldParamFESpace) = num_dirichlet_tags(f.space)
+FESpaces.num_dirichlet_dofs(f::SingleFieldParamFESpace) = num_dirichlet_dofs(get_fe_space(f))
 
-FESpaces.get_dirichlet_dof_tag(f::SingleFieldParamFESpace) = get_dirichlet_dof_tag(f.space)
+FESpaces.num_dirichlet_tags(f::SingleFieldParamFESpace) = num_dirichlet_tags(get_fe_space(f))
 
-FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldParamFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
+FESpaces.get_dirichlet_dof_tag(f::SingleFieldParamFESpace) = get_dirichlet_dof_tag(get_fe_space(f))
 
-function get_vector_index_map(f::SingleFieldParamFESpace)
-  get_vector_index_map(f.space)
+function FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldParamFESpace,fv,dv)
+  scatter_free_and_dirichlet_values(get_fe_space(f),fv,dv)
 end
 
-function get_matrix_index_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace)
-  get_matrix_index_map(f.space,g)
+function FESpaces.gather_free_and_dirichlet_values(f::SingleFieldParamFESpace,cv)
+  gather_free_and_dirichlet_values(get_fe_space(f),cv)
 end
 
-get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(f.space)
+function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::SingleFieldParamFESpace,cv)
+  gather_free_and_dirichlet_values!(fv,dv,get_fe_space(f),cv)
+end
+
+function IndexMaps.get_vector_index_map(f::SingleFieldParamFESpace)
+  get_vector_index_map(get_fe_space(f))
+end
+
+function IndexMaps.get_matrix_index_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace)
+  get_matrix_index_map(get_fe_space(f),g)
+end
+
+get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(get_fe_space(f))
 
 # These functions allow us to use global ParamArrays
 
 function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
-  V = get_vector_type(f.space)
+  V = get_vector_type(get_fe_space(f))
   L = param_length(f)
   PV = consecutive_param_array(V(),L)
   param_typeof(PV)
 end
 
+function FESpaces.scatter_free_and_dirichlet_values(
+  f::FESpaceWithConstantFixed{<:FESpaces.FixConstant},
+  fv::AbstractParamVector,
+  dv::AbstractParamVector
+  )
+
+  @assert innerlength(dv) == 1
+  _dv = similar(dv,eltype(dv),0)
+  _fv = VectorWithEntryInserted(fv,f.dof_to_fix,get_param_entry(dv,1))
+  scatter_free_and_dirichlet_values(f.space,_fv,_dv)
+end
+
+function FESpaces.scatter_free_and_dirichlet_values(
+  f::FESpaceWithConstantFixed{<:FESpaces.DoNotFixConstant},
+  fv::AbstractParamVector,
+  dv::AbstractParamVector
+  )
+
+  @assert innerlength(dv) == 0
+  scatter_free_and_dirichlet_values(f.space,fv,dv)
+end
+
 function FESpaces.gather_free_and_dirichlet_values!(
   free_vals,
   dirichlet_vals,
-  f::SingleFieldParamFESpace,
+  f::SingleFieldParamFESpace{<:UnconstrainedFESpace},
   cell_vals)
 
   cell_dofs = get_cell_dof_ids(f)
@@ -165,45 +199,6 @@ function FESpaces._free_and_dirichlet_values_fill!(
   end
 end
 
-"""
-    TrivialParamFESpace{S} <: SingleFieldParamFESpace
-
-Wrapper for nonparametric FE spaces that we wish assumed a parametric length `plength`
-
-"""
-
-struct TrivialParamFESpace{S} <: SingleFieldParamFESpace
-  space::S
-  plength::Int
-end
-
-ParamDataStructures.param_length(f::TrivialParamFESpace) = f.plength
-ParamDataStructures.to_param_quantity(f::SingleFieldParamFESpace,plength::Integer) = f
-ParamDataStructures.to_param_quantity(f::SingleFieldFESpace,plength::Integer) = TrivialParamFESpace(f,plength)
-ParamDataStructures.param_getindex(f::TrivialParamFESpace,index::Integer) = f.space
-
-FESpaces.ConstraintStyle(::Type{<:TrivialParamFESpace{S}}) where S = ConstraintStyle(S)
-
-# Extend some of Gridap's functions when needed
-function FESpaces.FEFunction(
-  tf::TrivialParamFESpace{<:ZeroMeanFESpace},
-  free_values::AbstractParamVector,
-  dirichlet_values::AbstractParamVector)
-
-  f = tf.space
-  tf′ = TrivialParamFESpace(f.space,param_length(tf))
-  c = FESpaces._compute_new_fixedval(
-    free_values,
-    dirichlet_values,
-    f.vol_i,
-    f.vol,
-    f.space.dof_to_fix
-  )
-  fv = free_values + c
-  dv = dirichlet_values + c
-  FEFunction(tf′,fv,dv)
-end
-
 function FESpaces._compute_new_fixedval(
   fv::AbstractParamVector,
   dv::AbstractParamVector,
@@ -234,115 +229,111 @@ function FESpaces._compute_new_fixedval(
   return c
 end
 
-function FESpaces.EvaluationFunction(tf::TrivialParamFESpace{<:ZeroMeanFESpace},free_values)
-  f = tf.space
-  tf′ = TrivialParamFESpace(f.space,param_length(tf))
-  FEFunction(tf′,free_values)
-end
+function FESpaces._setup_dof_to_val!(
+  fdof_to_val::ConsecutiveParamVector,
+  ddof_to_val::ConsecutiveParamVector,
+  fmdof_to_val::ConsecutiveParamVector,
+  dmdof_to_val::ConsecutiveParamVector,
+  DOF_to_mDOFs,
+  DOF_to_coeffs,
+  n_fdofs,
+  n_fmdofs)
 
-function FESpaces.EvaluationFunction(tf::TrivialParamFESpace{<:TrialFESpace{<:ZeroMeanFESpace}},free_values)
-  f = tf.space
-  tf′ = TrivialParamFESpace(f.space,param_length(tf))
-  FEFunction(tf′,free_values)
-end
+  @check (param_length(fdof_to_val) == param_length(ddof_to_val) ==
+          param_length(fmdof_to_val) == param_length(dmdof_to_val))
+  f2v = get_all_data(fdof_to_val)
+  d2v = get_all_data(ddof_to_val)
+  fm2v = get_all_data(fmdof_to_val)
+  dm2v = get_all_data(dmdof_to_val)
 
-function FESpaces.EvaluationFunction(f::TrivialParamFESpace{<:TrivialParamFESpace{<:ZeroMeanFESpace}},free_values)
-  @error "do i need this?"
-end
+  T = eltype2(fdof_to_val)
+  plength = param_length(fdof_to_val)
+  val = zeros(T,plength)
 
-for T in (:TrialFESpace,:TProductFESpace,:ZeroMeanFESpace)
-  @eval begin
-    function FESpaces.scatter_free_and_dirichlet_values(
-      tf::TrivialParamFESpace{<:$T},
-      fv::AbstractParamVector,
-      dv::AbstractParamVector)
-
-      f = tf.space
-      tf′ = TrivialParamFESpace(f.space,param_length(tf))
-      scatter_free_and_dirichlet_values(tf′,fv,dv)
+  for DOF in 1:length(DOF_to_mDOFs)
+    pini = DOF_to_mDOFs.ptrs[DOF]
+    pend = DOF_to_mDOFs.ptrs[DOF+1]-1
+    fill!(val,zero(T))
+    for p in pini:pend
+      mDOF = DOF_to_mDOFs.data[p]
+      coeff = DOF_to_coeffs.data[p]
+      mdof = FESpaces._DOF_to_dof(mDOF,n_fmdofs)
+      if mdof > 0
+        fmdof = mdof
+        @inbounds for k in param_eachindex(f2v)
+          val[k] += fm2v[fmdof,k]*coeff
+        end
+      else
+        dmdof = -mdof
+        @inbounds for k in param_eachindex(f2v)
+          val[k] += dm2v[dmdof,k]*coeff
+        end
+      end
+    end
+    dof = FESpaces._DOF_to_dof(DOF,n_fdofs)
+    if dof > 0
+      fdof = dof
+      @inbounds for k in param_eachindex(f2v)
+        f2v[fdof,k] = val[k]
+      end
+    else
+      ddof = -dof
+      @inbounds for k in param_eachindex(f2v)
+        d2v[ddof,k] = val[k]
+      end
     end
   end
+
 end
 
-function FESpaces.scatter_free_and_dirichlet_values(
-  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
-  fv::AbstractParamVector,
-  dv::AbstractParamVector
-  ) where T<:FESpaces.FixConstant
+function FESpaces._setup_mdof_to_val!(
+  fdof_to_val::ConsecutiveParamVector,
+  ddof_to_val::ConsecutiveParamVector,
+  fmdof_to_val::ConsecutiveParamVector,
+  dmdof_to_val::ConsecutiveParamVector,
+  mDOF_to_DOF,
+  n_fdofs,
+  n_fmdofs)
 
-  @assert innerlength(dv) == 1
-  f = tf.space
-  tf′ = TrivialParamFESpace(f.space,param_length(tf))
-  _dv = similar(dv,eltype(dv),0)
-  _fv = VectorWithEntryInserted(fv,f.dof_to_fix,get_param_entry(dv,1))
-  scatter_free_and_dirichlet_values(tf′,_fv,_dv)
-end
+  @check (param_length(fdof_to_val) == param_length(ddof_to_val) ==
+          param_length(fmdof_to_val) == param_length(dmdof_to_val))
+  f2v = get_all_data(fdof_to_val)
+  d2v = get_all_data(ddof_to_val)
+  fm2v = get_all_data(fmdof_to_val)
+  dm2v = get_all_data(dmdof_to_val)
 
-function FESpaces.scatter_free_and_dirichlet_values(
-  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
-  fv::AbstractParamVector,
-  dv::AbstractParamVector
-  ) where T<:FESpaces.DoNotFixConstant
+  T = eltype2(fdof_to_val)
+  plength = param_length(fdof_to_val)
+  val = zeros(T,plength)
 
-  @assert innerlength(dv) == 0
-  f = tf.space
-  tf′ = TrivialParamFESpace(f.space,param_length(tf))
-  scatter_free_and_dirichlet_values(tf′,fv,dv)
-end
+  for mDOF in 1:length(mDOF_to_DOF)
+    DOF = mDOF_to_DOF[mDOF]
+    dof = FESpaces._DOF_to_dof(DOF,n_fdofs)
+    if dof > 0
+      fdof = dof
+      @inbounds for k in param_eachindex(f2v)
+        val[k] = f2v[fdof,k]
+      end
+    else
+      ddof = -dof
+      @inbounds for k in param_eachindex(f2v)
+        val[k] = d2v[ddof,k]
+      end
+    end
+    mdof = FESpaces._DOF_to_dof(mDOF,n_fmdofs)
+    if mdof > 0
+      fmdof = mdof
+      @inbounds for k in param_eachindex(f2v)
+        fm2v[fmdof,k] = val[k]
+      end
+    else
+      dmdof = -mdof
+      @inbounds for k in param_eachindex(f2v)
+        dm2v[dmdof,k] = val[k]
+      end
+    end
+  end
 
-function FESpaces.gather_free_and_dirichlet_values(
-  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
-  cv) where T<:FESpaces.FixConstant
-
-  f = tf.space
-  tf′ = TrivialParamFESpace(f.space,param_length(tf))
-  _fv,_dv = gather_free_and_dirichlet_values(tf′,cv)
-  @assert innerlength(_dv) == 0
-  fv = ParamVectorWithEntryRemoved(_fv,f.dof_to_fix)
-  dv = get_param_entry(_fv,f.dof_to_fix:f.dof_to_fix)
-  (fv,dv)
-end
-
-function FESpaces.gather_free_and_dirichlet_values(
-  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
-  cv) where T<:FESpaces.DoNotFixConstant
-
-  f = tf.space
-  tf′ = TrivialParamFESpace(f.space,param_length(tf))
-  gather_free_and_dirichlet_values(tf′,cv)
-end
-
-function FESpaces.gather_free_and_dirichlet_values!(
-  fv,
-  dv,
-  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
-  cv) where T<:FESpaces.FixConstant
-
-  @assert innerlength(dv) == 1
-  f = tf.space
-  tf′ = TrivialParamFESpace(f.space,param_length(tf))
-  _dv = similar(dv,eltype(dv),0)
-  _fv = VectorWithEntryInserted(fv,f.dof_to_fix,zero(eltype(fv)))
-  gather_free_and_dirichlet_values!(_fv,_dv,tf′,cv)
-  dv[1] = _fv.value
-  (fv,dv)
-end
-
-function FESpaces.gather_free_and_dirichlet_values!(
-  fv,
-  dv,
-  tf::TrivialParamFESpace{<:FESpaceWithConstantFixed{T}},
-  cv) where T<:FESpaces.DoNotFixConstant
-
-  f = tf.space
-  tf′ = TrivialParamFESpace(f.space,param_length(tf))
-  gather_free_and_dirichlet_values!(fv,dv,tf′,cv)
-end
-
-function FESpaces.TrialFESpace(tf::TrivialParamFESpace{<:FESpaceWithConstantFixed})
-  f = tf.space
-  U = TrialFESpace(f)
-  TrivialParamFESpace(U,param_length(tf))
 end
 
 # for testing purposes

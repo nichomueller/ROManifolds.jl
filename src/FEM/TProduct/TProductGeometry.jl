@@ -5,7 +5,6 @@ Tensor product discrete model, storing a vector of 1-D models `models_1d` of len
 and the D-dimensional model `model` defined as their tensor product.
 
 """
-
 struct TProductModel{D,A<:CartesianDiscreteModel{D},B<:AbstractVector{<:CartesianDiscreteModel}} <: DiscreteModel{D,D}
   model::A
   models_1d::B

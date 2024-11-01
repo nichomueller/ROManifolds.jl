@@ -181,6 +181,9 @@ export ParamCounter
 export ParamInserterCSC
 export eltype2
 
+include("FEM/ParamGeometry/ParamGeometry.jl")
+using ReducedOrderModels.ParamGeometry
+
 include("FEM/ParamAlgebra/ParamAlgebra.jl")
 using ReducedOrderModels.ParamAlgebra
 

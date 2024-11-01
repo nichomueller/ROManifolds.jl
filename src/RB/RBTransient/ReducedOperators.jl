@@ -301,7 +301,7 @@ function select_fe_space_at_indices(fs::TrivialParamFESpace,indices)
   TrivialParamFESpace(fs.space,length(indices))
 end
 
-function select_fe_space_at_indices(fs::SingleFieldParamFESpace,indices)
+function select_fe_space_at_indices(fs::TrialParamFESpace,indices)
   dvi = ConsecutiveParamArray(fs.dirichlet_values.data[:,indices])
   TrialParamFESpace(dvi,fs.space)
 end

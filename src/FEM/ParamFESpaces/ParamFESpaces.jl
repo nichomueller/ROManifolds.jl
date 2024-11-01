@@ -29,11 +29,13 @@ import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 
 export SingleFieldParamFESpace
-export TrivialParamFESpace
 include("ParamFESpaceInterface.jl")
 
 export MultiFieldParamFESpace
 include("MultiFieldParamFESpaces.jl")
+
+export TrivialParamFESpace
+include("TrivialParamFESpace.jl")
 
 export TrialParamFESpace
 export TrialParamFESpace!
