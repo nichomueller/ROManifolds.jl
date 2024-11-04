@@ -83,7 +83,8 @@ function _get_tp_dof_index_map(models::AbstractVector,spaces::AbstractVector,ord
   end
   function _local_dof_map(model,space)
     cell_ids = get_cell_dof_ids(space)
-    dof_maps_1d = _get_dof_index_map(model,cell_ids,order)
+    trian_ids = 1:num_cells(model)
+    dof_maps_1d = _get_dof_index_map(model,cell_ids,trian_ids,order)
     free_dof_maps_1d = dof_maps_1d[findall(dof_maps_1d.>0)]
     return free_dof_maps_1d
   end
@@ -117,11 +118,28 @@ function _get_tp_dof_index_map(models::AbstractVector,spaces::AbstractVector,ord
   return _d_dof_map(Val(1),Val(D)),free_dof_maps_1d
 end
 
-# zeromean
+# spaces with constraints
+
+function get_tp_dof_index_map(ls::FESpaceWithLinearConstraints,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
+  space = ls.space
+  mdof_to_bdof = ls.mDOF_to_DOF
+  sdof_to_bdof = setdiff(1:ls.n_fdofs,mdof_to_bdof)
+  i = get_tp_dof_index_map(space,spaces_1d)
+  ci = ConstrainedDofsIndexMap(i,mdof_to_bdof,sdof_to_bdof)
+  return TProductIndexMap(ci,i.indices_1d)
+end
+
+function get_tp_dof_index_map(cs::FESpaceWithConstantFixed,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
+  space = cs.space
+  ndofs = num_free_dofs(space) + num_dirichlet_dofs(space)
+  sdof_to_bdof = cs.dof_to_fix
+  mdof_to_bdof = setdiff(1:ndofs,sdof_to_bdof)
+  i = get_tp_dof_index_map(space,spaces_1d)
+  ci = ConstrainedDofsIndexMap(i,mdof_to_bdof,sdof_to_bdof)
+  return TProductIndexMap(ci,i.indices_1d)
+end
 
 function get_tp_dof_index_map(zs::ZeroMeanFESpace,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
-  space = zs.space.space
-  dof_to_fix = zs.space.dof_to_fix
-  i = get_tp_dof_index_map(space,spaces_1d)
-  return TProductIndexMap(FixedDofsIndexMap(i.indices,dof_to_fix),i.indices_1d)
+  space = zs.space
+  get_tp_dof_index_map(space,spaces_1d)
 end

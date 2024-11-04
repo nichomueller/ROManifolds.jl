@@ -25,13 +25,14 @@ function FESpaces.FESpace(
   cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
   cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
 
-  space = FESpace(model.model,cell_reffe;kwargs...)
-  spaces_1d = univariate_spaces(model,cell_reffes_1d;kwargs...)
+  space = FESpace(trian.trian,cell_reffe;kwargs...)
+  spaces_1d = univariate_spaces(model,trian,cell_reffes_1d;kwargs...)
   TProductFESpace(space,spaces_1d,trian)
 end
 
 function univariate_spaces(
   model::TProductModel,
+  trian::TProductTriangulation,
   cell_reffes;
   dirichlet_tags=Int[],
   conformity=nothing,
@@ -39,8 +40,8 @@ function univariate_spaces(
   kwargs...)
 
   add_1d_tags!(model,dirichlet_tags)
-  map((model,cell_reffe) -> FESpace(model,cell_reffe;dirichlet_tags,conformity,vector_type),
-    model.models_1d,cell_reffes)
+  map((trian,cell_reffe) -> FESpace(trian,cell_reffe;dirichlet_tags,conformity,vector_type),
+    trian.trians_1d,cell_reffes)
 end
 
 FESpaces.get_triangulation(f::TProductFESpace) = get_triangulation(f.space)

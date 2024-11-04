@@ -53,6 +53,14 @@ function FESpaces.get_dirichlet_dof_values(f::UnEvalParamSingleFieldFESpace)
   @unreachable msg
 end
 
+for F in (:TrialFESpace,:TransientTrialFESpace,:UnEvalParamSingleFieldFESpace)
+  @eval begin
+    function IndexMaps.get_matrix_index_map(trial::$F,test::SingleFieldFESpace)
+      get_matrix_index_map(trial.space,test)
+    end
+  end
+end
+
 """
     struct ParamTrialFESpace{A,B} <: UnEvalParamSingleFieldFESpace end
 

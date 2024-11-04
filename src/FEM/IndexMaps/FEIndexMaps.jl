@@ -37,11 +37,11 @@ function get_vector_index_map(test::FESpace)
   TrivialIndexMap(num_free_dofs(test))
 end
 
-function get_vector_index_map(tests::MultiFieldFESpace)
-  ntests = num_fields(tests)
-  index_maps = Vector{AbstractIndexMap}(undef,ntests)
-  for i in 1:ntests
-    index_maps[i] = get_vector_index_map(tests[i])
+function get_vector_index_map(test::MultiFieldFESpace)
+  ntest = num_fields(test)
+  index_maps = Vector{AbstractIndexMap}(undef,ntest)
+  for i in 1:ntest
+    index_maps[i] = get_vector_index_map(test[i])
   end
   return index_maps
 end
@@ -60,18 +60,12 @@ function get_matrix_index_map(trial::FESpace,test::FESpace)
   TrivialIndexMap(sparsity)
 end
 
-for F in (:TrialFESpace,:TransientTrialFESpace)
-  @eval begin
-    get_matrix_index_map(trial::$F,tests::SingleFieldFESpace) = get_matrix_index_map(trial.space,tests)
-  end
-end
-
-function get_matrix_index_map(trials::MultiFieldFESpace,tests::MultiFieldFESpace)
-  ntests = num_fields(tests)
-  ntrials = num_fields(trials)
-  index_maps = Matrix{AbstractIndexMap}(undef,ntests,ntrials)
-  for (i,j) in Iterators.product(1:ntests,1:ntrials)
-    index_maps[i,j] = get_matrix_index_map(trials[j],tests[i])
+function get_matrix_index_map(trial::MultiFieldFESpace,test::MultiFieldFESpace)
+  ntest = num_fields(test)
+  ntrial = num_fields(trial)
+  index_maps = Matrix{AbstractIndexMap}(undef,ntest,ntrial)
+  for (i,j) in Iterators.product(1:ntest,1:ntrial)
+    index_maps[i,j] = get_matrix_index_map(trial[j],test[i])
   end
   return index_maps
 end

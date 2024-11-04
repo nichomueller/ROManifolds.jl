@@ -56,10 +56,11 @@ function _global_2_local(sparsity::TProductSparsityPattern,I,J,i,j)
 end
 
 function _add_fixed_dofs(index_map::AbstractIndexMap)
-  if any(index_map.==0)
-    return FixedDofsIndexMap(index_map,findall(index_map.==zero(eltype(index_map))))
-  end
-  return index_map
+  # if any(index_map.==0)
+  #   return FixedDofsIndexMap(index_map,findall(index_map.==zero(eltype(index_map))))
+  # end
+  # return index_map
+  @notimplemented
 end
 
 function _add_fixed_dofs(index_map::AbstractArray)

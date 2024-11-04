@@ -46,7 +46,6 @@ Subtypes:
 - [`TrivialIndexMap`](@ref)
 - [`IndexMap`](@ref)
 - [`IndexMapView`](@ref)
-- [`FixedDofsIndexMap`](@ref)
 - [`TProductIndexMap`](@ref)
 - [`SparseIndexMap`](@ref)
 
@@ -56,28 +55,17 @@ abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D} end
 Base.view(i::AbstractIndexMap,locations) = IndexMapView(i,locations)
 
 """
-    free_dofs_map(i::AbstractIndexMap) -> AbstractIndexMap
+    remove_dirichlet_dofs(i::AbstractIndexMap) -> AbstractIndexMap
 
 Removes the negative indices from the index map, which correspond to Dirichlet
 boundary conditions.
 
 """
-function free_dofs_map(i::AbstractIndexMap)
+function remove_dirichlet_dofs(i::AbstractIndexMap)
   free_dofs_locations = findall(i.>zero(eltype(i)))
   s = _shape_per_dir(free_dofs_locations)
   free_dofs_locations′ = reshape(free_dofs_locations,s)
   view(i,free_dofs_locations′)
-end
-
-"""
-    dirichlet_dofs_map(i::AbstractIndexMap) -> AbstractVector
-
-Removes the positive indices from the index map, which correspond to free dofs.
-
-"""
-function dirichlet_dofs_map(i::AbstractIndexMap)
-  dir_dofs_locations = findall(i.<zero(eltype(i)))
-  i.indices[dir_dofs_locations]
 end
 
 """
@@ -100,14 +88,6 @@ Returns an index map given by `f`∘`i`, where f is a function encoding an index
 function change_index_map(f,i::AbstractIndexMap)
   i′::AbstractIndexMap = f(collect(vec(i)))
   i′
-end
-
-"""
-    fix_dof_index_map(i::AbstractIndexMap,dofs_to_fix) -> FixedDofsIndexMap
-
-"""
-function fix_dof_index_map(i::AbstractIndexMap,dofs_to_fix)
-  FixedDofsIndexMap(i,dofs_to_fix)
 end
 
 abstract type AbstractTrivialIndexMap <: AbstractIndexMap{1,Int} end
@@ -156,7 +136,6 @@ Base.size(i::IndexMap) = size(i.indices)
 Base.getindex(i::IndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::IndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
 Base.copy(i::IndexMap) = IndexMap(copy(i.indices))
-Base.stack(i::AbstractArray{<:IndexMap}) = IndexMap(stack(get_array.(i)))
 Arrays.get_array(i::IndexMap) = i.indices
 
 """
@@ -184,48 +163,57 @@ Base.getindex(i::IndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.loc
 Base.setindex!(i::IndexMapView{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,i.locations[j...])
 
 """
-    FixedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
+    ConstrainedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
 
 Index map to be used when imposing a zero mean constraint on a given `FESpace`. The fixed
 dofs are stored as a vector of CartesianIndex of dimension D; when indexing vectors
 defined on the zero mean `FESpace`, the length of the vector is 1
 
 """
-struct FixedDofsIndexMap{D,Ti,I} <: AbstractIndexMap{D,Ti}
-  indices::FixedEntriesArray{Ti,D,I}
-end
+struct ConstrainedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
+  indices::I
+  background::Vector{CartesianIndex{D}}
+  master::Vector{CartesianIndex{D}}
+  slave::Vector{CartesianIndex{D}}
+  function ConstrainedDofsIndexMap(
+    indices::I,
+    background::Vector{CartesianIndex{D}},
+    master::Vector{CartesianIndex{D}},
+    slave::Vector{CartesianIndex{D}}
+    ) where {D,Ti,I<:AbstractIndexMap{D,Ti}}
 
-function FixedDofsIndexMap(indices::AbstractIndexMap,dofs_to_fix)
-  indices′ = FixedEntriesArray(indices,dofs_to_fix)
-  FixedDofsIndexMap(indices′)
-end
-
-Arrays.get_array(i::FixedDofsIndexMap) = i.indices
-get_fixed_dofs(i::FixedDofsIndexMap) = get_fixed_entries(i.indices)
-
-Base.size(i::FixedDofsIndexMap) = size(i.indices)
-Base.getindex(i::FixedDofsIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
-Base.setindex!(i::FixedDofsIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
-Base.copy(i::FixedDofsIndexMap) = FixedDofsIndexMap(copy(i.indices))
-Base.view(i::FixedDofsIndexMap,locations) = FixedDofsIndexMap(view(i.indices,locations))
-Base.vec(i::FixedDofsIndexMap) = remove_fixed_dof(i)
-Base.stack(i::AbstractArray{<:FixedDofsIndexMap}) = FixedDofsIndexMap(stack(get_array.(i)))
-
-for f in (:free_dofs_map,:inv_index_map)
-  @eval begin
-    function $f(a::FixedEntriesArray)
-      FixedEntriesArray($f(a.array),a.fixed_entries)
-    end
-
-    function $f(i::FixedDofsIndexMap)
-      indices′ = $f(i.indices)
-      FixedDofsIndexMap(indices′)
-    end
+    @check length(indices) == length(background)+length(master)+length(slave)
+    @check (isempty(intersect(background,master))&&isempty(intersect(master,slave))&&
+      isempty(intersect(slave,background)))
+    new{D,Ti,I}(indices,background,master,slave)
   end
 end
 
-function remove_fixed_dof(i::FixedDofsIndexMap)
-  filter(x -> x != 0,i)
+function ConstrainedDofsIndexMap(
+  indices::AbstractIndexMap,
+  mdof_to_bdof::AbstractVector,
+  sdof_to_bdof::AbstractVector)
+
+  dof_layout = CartesianIndices(indices)
+  master = dof_layout[mdof_to_bdof]
+  slave = dof_layout[sdof_to_bdof]
+  background = setdiff(eachindex(indices),master)
+  setdiff!(background,slave)
+  ConstrainedDofsIndexMap(indices,background,master,slave)
+end
+
+Base.size(i::ConstrainedDofsIndexMap) = size(i.indices)
+Base.getindex(i::ConstrainedDofsIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
+Base.setindex!(i::ConstrainedDofsIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
+Base.copy(i::ConstrainedDofsIndexMap) = ConstrainedDofsIndexMap(copy(i.indices),i.background,i.master,i.slave)
+
+function remove_dirichlet_dofs(i::ConstrainedDofsIndexMap)
+  # cannot uncouple the constrained values as in normal index maps
+  i
+end
+
+function inv_index_map(i::ConstrainedDofsIndexMap)
+  @notimplemented
 end
 
 abstract type AbstractMultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti} end
@@ -334,7 +322,6 @@ Base.size(i::TProductIndexMap) = size(i.indices)
 Base.getindex(i::TProductIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::TProductIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
 Base.copy(i::TProductIndexMap) = TProductIndexMap(copy(i.indices),i.indices_1d)
-Base.vec(i::TProductIndexMap) = vec(i.indices)
 get_tp_indices(i::TProductIndexMap) = i.indices
 get_univariate_indices(i::TProductIndexMap) = i.indices_1d
 
@@ -357,7 +344,6 @@ Base.size(i::SparseIndexMap) = size(i.indices)
 Base.getindex(i::SparseIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::SparseIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
 Base.copy(i::SparseIndexMap) = SparseIndexMap(copy(i.indices),copy(i.indices_sparse),i.sparsity)
-Base.vec(i::SparseIndexMap) = vec(i.indices)
 get_index_map(i::SparseIndexMap) = i.indices
 get_sparse_index_map(i::SparseIndexMap) = i.indices_sparse
 get_sparsity(i::SparseIndexMap) = i.sparsity
