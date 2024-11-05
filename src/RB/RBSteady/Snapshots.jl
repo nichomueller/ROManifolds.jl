@@ -143,7 +143,7 @@ IndexMaps.get_index_map(s::GenericSnapshots) = s.index_map
 get_realization(s::GenericSnapshots) = s.realization
 
 function get_indexed_values(s::GenericSnapshots)
-  vi = vec(get_index_map(s))
+  vi = vectorize_map(get_index_map(s))
   data = get_all_data(s.data)
   ConsecutiveParamArray(data[vi,:])
 end

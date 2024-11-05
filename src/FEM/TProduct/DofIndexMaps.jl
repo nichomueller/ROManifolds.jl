@@ -28,7 +28,7 @@ function get_dof_index_map(space::FESpace)
   trian_ids = trian.tface_to_mface
   model = get_background_model(trian)
   index_map = get_dof_index_map(model,space,trian_ids)
-  return remove_dirichlet_dofs(index_map)
+  return remove_constrained_dofs(index_map)
 end
 
 function get_dof_index_map(model::DiscreteModel,space::FESpace,args...)

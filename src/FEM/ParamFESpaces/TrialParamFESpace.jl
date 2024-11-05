@@ -170,3 +170,42 @@ function FESpaces.gather_free_and_dirichlet_values!(
     f.n_fmdofs)
   fmdof_to_val,dmdof_to_val
 end
+
+function FESpaces.FEFunction(
+  tf::TrialParamFESpace{<:TProductFESpace},
+  free_values::AbstractParamVector,
+  dirichlet_values::AbstractParamVector)
+
+  f = tf.space
+  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  FEFunction(tf′,free_values,dirichlet_values)
+end
+
+function FESpaces.EvaluationFunction(tf::TrialParamFESpace{<:TProductFESpace},free_values)
+  f = tf.space
+  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  EvaluationFunction(tf′,free_values)
+end
+
+function FESpaces.scatter_free_and_dirichlet_values(tf::TrialParamFESpace{<:TProductFESpace},fv,dv)
+  f = tf.space
+  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  scatter_free_and_dirichlet_values(tf′,fv,dv)
+end
+
+function FESpaces.gather_free_and_dirichlet_values(tf::TrialParamFESpace{<:TProductFESpace},cv)
+  f = tf.space
+  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  gather_free_and_dirichlet_values(tf′,cv)
+end
+
+function FESpaces.gather_free_and_dirichlet_values!(
+  fv,
+  dv,
+  tf::TrialParamFESpace{<:TProductFESpace},
+  cv)
+
+  f = tf.space
+  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  gather_free_and_dirichlet_values!(fv,dv,tf′,cv)
+end

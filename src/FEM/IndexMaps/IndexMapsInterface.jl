@@ -55,13 +55,13 @@ abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D} end
 Base.view(i::AbstractIndexMap,locations) = IndexMapView(i,locations)
 
 """
-    remove_dirichlet_dofs(i::AbstractIndexMap) -> AbstractIndexMap
+    remove_constrained_dofs(i::AbstractIndexMap) -> AbstractIndexMap
 
 Removes the negative indices from the index map, which correspond to Dirichlet
 boundary conditions.
 
 """
-function remove_dirichlet_dofs(i::AbstractIndexMap)
+function remove_constrained_dofs(i::AbstractIndexMap)
   free_dofs_locations = findall(i.>zero(eltype(i)))
   s = _shape_per_dir(free_dofs_locations)
   free_dofs_locations′ = reshape(free_dofs_locations,s)
@@ -88,6 +88,12 @@ Returns an index map given by `f`∘`i`, where f is a function encoding an index
 function change_index_map(f,i::AbstractIndexMap)
   i′::AbstractIndexMap = f(collect(vec(i)))
   i′
+end
+
+vectorize_map(i::AbstractIndexMap) = vec(i)
+
+function permute_sparsity(a::SparsityPatternCSC,i::AbstractIndexMap,j::AbstractIndexMap)
+  permute_sparsity(a,vectorize_map(i),vectorize_map(j))
 end
 
 abstract type AbstractTrivialIndexMap <: AbstractIndexMap{1,Int} end
@@ -136,7 +142,6 @@ Base.size(i::IndexMap) = size(i.indices)
 Base.getindex(i::IndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::IndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
 Base.copy(i::IndexMap) = IndexMap(copy(i.indices))
-Arrays.get_array(i::IndexMap) = i.indices
 
 """
     IndexMapView{D,Ti,I<:AbstractIndexMap{D,Ti},L} <: AbstractIndexMap{D,Ti}
@@ -162,58 +167,115 @@ Base.size(i::IndexMapView) = size(i.locations)
 Base.getindex(i::IndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.locations[j...]]
 Base.setindex!(i::IndexMapView{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,i.locations[j...])
 
-"""
-    ConstrainedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
+abstract type ShowSlaveDofsStyle end
+struct ShowSlaveDofs <: ShowSlaveDofsStyle end
+struct DoNotShowSlaveDofs <: ShowSlaveDofsStyle end
 
-Index map to be used when imposing a zero mean constraint on a given `FESpace`. The fixed
-dofs are stored as a vector of CartesianIndex of dimension D; when indexing vectors
-defined on the zero mean `FESpace`, the length of the vector is 1
-
-"""
-struct ConstrainedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
+struct ConstrainedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti},A<:ShowSlaveDofsStyle} <: AbstractIndexMap{D,Ti}
   indices::I
-  background::Vector{CartesianIndex{D}}
-  master::Vector{CartesianIndex{D}}
-  slave::Vector{CartesianIndex{D}}
-  function ConstrainedDofsIndexMap(
-    indices::I,
-    background::Vector{CartesianIndex{D}},
-    master::Vector{CartesianIndex{D}},
-    slave::Vector{CartesianIndex{D}}
-    ) where {D,Ti,I<:AbstractIndexMap{D,Ti}}
-
-    @check length(indices) == length(background)+length(master)+length(slave)
-    @check (isempty(intersect(background,master))&&isempty(intersect(master,slave))&&
-      isempty(intersect(slave,background)))
-    new{D,Ti,I}(indices,background,master,slave)
-  end
+  mloc_to_loc::Vector{CartesianIndex{D}}
+  sloc_to_loc::Vector{CartesianIndex{D}}
+  show_slaves::A
 end
 
 function ConstrainedDofsIndexMap(
   indices::AbstractIndexMap,
-  mdof_to_bdof::AbstractVector,
-  sdof_to_bdof::AbstractVector)
+  mloc_to_loc::Vector{<:CartesianIndex},
+  sloc_to_loc::Vector{<:CartesianIndex})
+
+  ConstrainedDofsIndexMap(indices,mloc_to_loc,sloc_to_loc,ShowSlaveDofs())
+end
+
+function ConstrainedDofsIndexMap(
+  indices::AbstractIndexMap{D},
+  mdof_to_bdof::AbstractVector{<:Integer},
+  sdof_to_bdof::AbstractVector{<:Integer},
+  args...
+  ) where D
 
   dof_layout = CartesianIndices(indices)
-  master = dof_layout[mdof_to_bdof]
-  slave = dof_layout[sdof_to_bdof]
-  background = setdiff(eachindex(indices),master)
-  setdiff!(background,slave)
-  ConstrainedDofsIndexMap(indices,background,master,slave)
+  mloc_to_loc = Vector{CartesianIndex{D}}(undef,length(mdof_to_bdof))
+  sloc_to_loc = Vector{CartesianIndex{D}}(undef,length(sdof_to_bdof))
+  mcount = 1
+  scount = 1
+  for (i,ii) in enumerate(eachindex(indices))
+    ind = indices[i]
+    if ind ∈ mdof_to_bdof
+      mloc_to_loc[mcount] = ii
+      mcount += 1
+    elseif ind ∈ sdof_to_bdof
+      sloc_to_loc[scount] = ii
+      scount += 1
+    end
+  end
+  ConstrainedDofsIndexMap(indices,mloc_to_loc,sloc_to_loc,args...)
 end
 
 Base.size(i::ConstrainedDofsIndexMap) = size(i.indices)
 Base.getindex(i::ConstrainedDofsIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::ConstrainedDofsIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
-Base.copy(i::ConstrainedDofsIndexMap) = ConstrainedDofsIndexMap(copy(i.indices),i.background,i.master,i.slave)
+Base.copy(i::ConstrainedDofsIndexMap) = ConstrainedDofsIndexMap(copy(i.indices),i.mloc_to_loc,i.sloc_to_loc,i.show_slaves)
+vectorize_map(i::ConstrainedDofsIndexMap) = collect(Base.OneTo(maximum(i)))
 
-function remove_dirichlet_dofs(i::ConstrainedDofsIndexMap)
-  # cannot uncouple the constrained values as in normal index maps
-  i
+function get_masters(i::ConstrainedDofsIndexMap{D,Ti}) where {D,Ti}
+  n = length(i.mloc_to_loc)
+  m = Vector{Ti}(undef,n)
+  for (ij,j) in enumerate(i.mloc_to_loc)
+    m[ij] = i.indices[j]
+  end
+  return m
+end
+
+function get_slaves(i::ConstrainedDofsIndexMap{D,Ti,ShowSlaveDofs}) where {D,Ti}
+  n = length(i.sloc_to_loc)
+  s = Vector{Ti}(undef,n)
+  for (ij,j) in enumerate(i.sloc_to_loc)
+    s[ij] = i.indices[j]
+  end
+  return s
+end
+
+function get_background(i::ConstrainedDofsIndexMap{D,Ti,ShowSlaveDofs}) where {D,Ti}
+  n = length(i) - length(i.mloc_to_loc) - length(i.sloc_to_loc)
+  fill(zero(Ti),n)
+end
+
+function get_background(i::ConstrainedDofsIndexMap{D,Ti,DoNotShowSlaveDofs}) where {D,Ti}
+  n = length(i) - length(i.mloc_to_loc)
+  fill(zero(Ti),n)
+end
+
+function remove_constrained_dofs(i::ConstrainedDofsIndexMap)
+  indices = copy(i.indices)
+  z = zero(eltype(indices))
+  for j in i.sloc_to_loc
+    indices[j] = z
+  end
+  nslaves = 0
+  for j in eachindex(indices)
+    if j in i.sloc_to_loc
+      nslaves += 1
+    elseif j in i.mloc_to_loc
+      mj = indices[j]
+      indices[j] = mj - nslaves
+    end
+  end
+  ConstrainedDofsIndexMap(indices,i.mloc_to_loc,i.sloc_to_loc,DoNotShowSlaveDofs())
 end
 
 function inv_index_map(i::ConstrainedDofsIndexMap)
   @notimplemented
+end
+
+function inv_index_map(i::ConstrainedDofsIndexMap{D,Ti,DoNotShowSlaveDofs}) where {D,Ti}
+  i′ = copy(i)
+  indices = i′.indices
+  m = get_masters(i)
+  invm = invperm(m)
+  for (ij,j) in enumerate(i.mloc_to_loc)
+    indices[j] = invm[ij]
+  end
+  return i′
 end
 
 abstract type AbstractMultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti} end

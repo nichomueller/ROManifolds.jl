@@ -42,7 +42,7 @@ export SparseIndexMap
 export MultiValueSparseIndexMap
 export get_index_map
 export inv_index_map
-export remove_dirichlet_dofs
+export remove_constrained_dofs
 export change_index_map
 export get_sparse_index_map
 export recast

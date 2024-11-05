@@ -35,7 +35,7 @@ function _sort!(a::AbstractVector{<:AbstractVector},i::Tuple{<:TProductIndexMap}
   irow, = i
   irow1d = IndexMaps.get_univariate_indices(irow)
   for (i,(ai,irowi)) in enumerate(zip(a,irow1d))
-    a[i] = ai[vec(irowi)]
+    a[i] = ai[vectorize_map(irowi)]
   end
 end
 
@@ -44,7 +44,7 @@ function _sort!(a::AbstractVector{<:AbstractMatrix},i::Tuple{<:TProductIndexMap,
   irow1d = IndexMaps.get_univariate_indices(irow)
   icol1d = IndexMaps.get_univariate_indices(icol)
   for (i,(ai,irowi,icoli)) in enumerate(zip(a,irow1d,icol1d))
-    a[i] = ai[vec(irowi),vec(icoli)]
+    a[i] = ai[vectorize_map(irowi),vectorize_map(icoli)]
   end
 end
 

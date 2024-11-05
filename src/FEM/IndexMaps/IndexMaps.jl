@@ -31,6 +31,9 @@ export TrivialIndexMap
 export TrivialSparseIndexMap
 export IndexMap
 export IndexMapView
+export ShowSlaveDofsStyle
+export ShowSlaveDofs
+export DoNotShowSlaveDofs
 export ConstrainedDofsIndexMap
 export AbstractMultiValueIndexMap
 export MultiValueIndexMap
@@ -40,7 +43,8 @@ export SparseIndexMap
 export MultiValueSparseIndexMap
 export get_index_map
 export inv_index_map
-export remove_dirichlet_dofs
+export vectorize_map
+export remove_constrained_dofs
 export change_index_map
 export get_sparse_index_map
 export recast

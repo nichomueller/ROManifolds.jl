@@ -48,10 +48,6 @@ function permute_sparsity(a::SparsityPatternCSC,i::AbstractVector,j::AbstractVec
   SparsityPatternCSC(a.matrix[i,j])
 end
 
-function permute_sparsity(a::SparsityPatternCSC,i::AbstractArray,j::AbstractArray)
-  permute_sparsity(a,vec(i),vec(j))
-end
-
 struct MultiValueSparsityPatternCSC{Tv,Ti} <: SparsityPattern
   matrix::SparseMatrixCSC{Tv,Ti}
   ncomps::Int

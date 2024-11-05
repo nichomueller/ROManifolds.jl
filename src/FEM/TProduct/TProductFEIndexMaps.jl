@@ -55,27 +55,30 @@ function _global_2_local(sparsity::TProductSparsityPattern,I,J,i,j)
   return g2l
 end
 
-function _add_fixed_dofs(index_map::AbstractIndexMap)
-  # if any(index_map.==0)
-  #   return FixedDofsIndexMap(index_map,findall(index_map.==zero(eltype(index_map))))
-  # end
-  # return index_map
-  @notimplemented
-end
-
-function _add_fixed_dofs(index_map::AbstractArray)
-  _add_fixed_dofs(IndexMap(index_map))
+function _add_constrained_dofs(indices::AbstractArray{Ti}) where Ti
+  z = zero(Ti)
+  index_map = IndexMap(indices)
+  if any(indices.==z)
+    mdof_to_bdof = Ti[]
+    sdof_to_bdof = Ti[]
+    for (i,ind) in enumerate(indices)
+      ind != z && push!(mdof_to_bdof,i)
+    end
+    ConstrainedDofsIndexMap(index_map,mdof_to_bdof,sdof_to_bdof,DoNotShowSlaveDofs())
+  else
+    index_map
+  end
 end
 
 function _permute_index_map(index_map,I,J,nrows)
-  IJ = vec(I) .+ nrows .* (vec(J)'.-1)
+  IJ = vectorize_map(I) .+ nrows .* (vectorize_map(J)'.-1)
   iperm = copy(index_map)
   @inbounds for (k,pk) in enumerate(index_map)
     if pk > 0
       iperm[k] = IJ[pk]
     end
   end
-  return _add_fixed_dofs(iperm)
+  return _add_constrained_dofs(iperm)
 end
 
 function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractMultiValueIndexMap,nrows)
@@ -89,7 +92,7 @@ function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractM
       J′ = (J-1)*ncomps + icomp_J
       ic[j] = (J′-1)*nrows*ncomps + I′
     end
-    return _add_fixed_dofs(ic)
+    return _add_constrained_dofs(ic)
   end
 
   ncomps_I = num_components(I)
@@ -118,7 +121,7 @@ function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractI
       I′ = (I-1)*ncomps + icomp
       ic[j] = (J-1)*nrows*ncomps + I′
     end
-    return _add_fixed_dofs(ic)
+    return _add_constrained_dofs(ic)
   end
 
   ncomps = num_components(I)
@@ -141,7 +144,7 @@ function _permute_index_map(index_map,I::AbstractIndexMap,J::AbstractMultiValueI
       J′ = (J-1)*ncomps + icomp
       ic[j] = (J′-1)*nrows + I
     end
-    return _add_fixed_dofs(ic)
+    return _add_constrained_dofs(ic)
   end
 
   ncomps = num_components(J)
@@ -173,8 +176,8 @@ function _to_nz_index!(index_map,sparsity::SparsityPatternCSC)
   nrows = IndexMaps.num_rows(sparsity)
   for (i,index) in enumerate(index_map)
     if index > 0
-      irow = fast_index(index,nrows)
-      icol = slow_index(index,nrows)
+      irow = mod(index-1,nrows) + 1
+      icol = cld(index,nrows)
       index_map[i] = nz_index(sparsity.matrix,irow,icol)
     end
   end

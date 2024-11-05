@@ -118,3 +118,42 @@ function FESpaces.gather_free_and_dirichlet_values!(
     f.n_fmdofs)
   fmdof_to_val,dmdof_to_val
 end
+
+function FESpaces.FEFunction(
+  tf::TrivialParamFESpace{<:TProductFESpace},
+  free_values::AbstractParamVector,
+  dirichlet_values::AbstractParamVector)
+
+  f = tf.space
+  tf′ = TrivialParamFESpace(f.space,param_length(tf))
+  FEFunction(tf′,free_values,dirichlet_values)
+end
+
+function FESpaces.EvaluationFunction(tf::TrivialParamFESpace{<:TProductFESpace},free_values)
+  f = tf.space
+  tf′ = TrivialParamFESpace(f.space,param_length(tf))
+  EvaluationFunction(tf′,free_values)
+end
+
+function FESpaces.scatter_free_and_dirichlet_values(tf::TrivialParamFESpace{<:TProductFESpace},fv,dv)
+  f = tf.space
+  tf′ = TrivialParamFESpace(f.space,param_length(tf))
+  scatter_free_and_dirichlet_values(tf′,fv,dv)
+end
+
+function FESpaces.gather_free_and_dirichlet_values(tf::TrivialParamFESpace{<:TProductFESpace},cv)
+  f = tf.space
+  tf′ = TrivialParamFESpace(f.space,param_length(tf))
+  gather_free_and_dirichlet_values(tf′,cv)
+end
+
+function FESpaces.gather_free_and_dirichlet_values!(
+  fv,
+  dv,
+  tf::TrivialParamFESpace{<:TProductFESpace},
+  cv)
+
+  f = tf.space
+  tf′ = TrivialParamFESpace(f.space,param_length(tf))
+  gather_free_and_dirichlet_values!(fv,dv,tf′,cv)
+end
