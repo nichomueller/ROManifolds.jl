@@ -207,6 +207,10 @@ function is_parent(tparent::BoundaryTriangulation,tchild::Geometry.Triangulation
   tparent === tchild.parent
 end
 
+function is_parent(tparent::SubFacetTriangulation,tchild::Geometry.TriangulationView)
+  tparent === tchild.parent
+end
+
 function get_parent(t::Geometry.Grid)
   @abstractmethod
 end

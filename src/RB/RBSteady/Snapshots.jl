@@ -276,7 +276,7 @@ function Base.reshape(s::AbstractSnapshots,dims::Dims)
   strds = Base.front(Base.size_to_strides(map(length,axes(s))..., 1))
   strds1 = map(s->max(1,Int(s)),strds)
   mi = map(Base.SignedMultiplicativeInverse,strds1)
-  ReshapedSnapshots(parent,dims,reverse(mi))
+  ReshapedSnapshots(s,dims,reverse(mi))
 end
 
 Base.@propagate_inbounds function Base.getindex(

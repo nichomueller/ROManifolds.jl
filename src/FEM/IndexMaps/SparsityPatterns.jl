@@ -1,3 +1,34 @@
+function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
+  m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
+  cellidsrows = get_cell_dof_ids(V)
+  cellidscols = get_cell_dof_ids(U)
+  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
+  m2 = nz_allocation(m1)
+  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
+  m3 = create_from_nz(m2)
+  SparsityPattern(m3)
+end
+
+function get_sparsity(U::FESpace,V::FESpace)
+  get_sparsity(SparseMatrixAssembler(U,V),U,V)
+end
+
+function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
+  mat1 = nothing
+  rows_cache = array_cache(cellidsrows)
+  cols_cache = array_cache(cellidscols)
+
+  rows1 = getindex!(rows_cache,cellidsrows,1)
+  cols1 = getindex!(cols_cache,cellidscols,1)
+
+  touch! = FESpaces.TouchEntriesMap()
+  touch_cache = return_cache(touch!,A,mat1,rows1,cols1)
+  caches = touch_cache,rows_cache,cols_cache
+
+  FESpaces._symbolic_loop_matrix!(A,caches,cellidsrows,cellidscols,mat1)
+  return A
+end
+
 """
     abstract type SparsityPattern end
 
@@ -10,12 +41,6 @@ Subtypes:
 
 """
 abstract type SparsityPattern end
-
-# random sparsity pattern
-function SparsityPattern(;s=(1,1))
-  matrix = sparse(rand(s...))
-  SparsityPattern(matrix)
-end
 
 """
 """
@@ -84,37 +109,6 @@ univariate_nnz(a::TProductSparsityPattern) = Tuple(nnz.(a.sparsities_1d))
 univariate_nonzero_indices(a::TProductSparsityPattern) = Tuple(get_nonzero_indices.(a.sparsities_1d))
 
 recast(A::AbstractArray,a::TProductSparsityPattern) = recast(A,a.sparsity)
-
-function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
-  m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
-  cellidsrows = get_cell_dof_ids(V)
-  cellidscols = get_cell_dof_ids(U)
-  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
-  m2 = nz_allocation(m1)
-  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
-  m3 = create_from_nz(m2)
-  SparsityPattern(m3)
-end
-
-function get_sparsity(U::FESpace,V::FESpace)
-  get_sparsity(SparseMatrixAssembler(U,V),U,V)
-end
-
-function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
-  mat1 = nothing
-  rows_cache = array_cache(cellidsrows)
-  cols_cache = array_cache(cellidscols)
-
-  rows1 = getindex!(rows_cache,cellidsrows,1)
-  cols1 = getindex!(cols_cache,cellidscols,1)
-
-  touch! = FESpaces.TouchEntriesMap()
-  touch_cache = return_cache(touch!,A,mat1,rows1,cols1)
-  caches = touch_cache,rows_cache,cols_cache
-
-  FESpaces._symbolic_loop_matrix!(A,caches,cellidsrows,cellidscols,mat1)
-  return A
-end
 
 function permute_sparsity(a::TProductSparsityPattern,i,j)
   is,is_1d = i

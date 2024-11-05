@@ -82,7 +82,7 @@ function FESpaces.FEFunction(
   dirichlet_values::AbstractParamVector)
 
   f = tf.space
-  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  tf′ = TrialParamFESpace(tf.dirichlet_values,f.space,)
   c = FESpaces._compute_new_fixedval(
     free_values,
     dirichlet_values,
@@ -97,7 +97,7 @@ end
 
 function FESpaces.EvaluationFunction(tf::TrialParamFESpace{<:ZeroMeanFESpace},free_values)
   f = tf.space
-  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  tf′ = TrialParamFESpace(tf.dirichlet_values,f.space)
   FEFunction(tf′,free_values)
 end
 
@@ -107,7 +107,7 @@ function FESpaces.scatter_free_and_dirichlet_values(
   dmdof_to_val)
 
   f = tf.space
-  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  tf′ = TrialParamFESpace(tf.dirichlet_values,f.space)
   fdof_to_val = zero_free_values(tf′)
   ddof_to_val = zero_dirichlet_values(tf′)
   FESpaces._setup_dof_to_val!(
@@ -127,7 +127,7 @@ function FESpaces.gather_free_and_dirichlet_values(
   cv) where T<:FESpaces.FixConstant
 
   f = tf.space
-  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  tf′ = TrialParamFESpace(tf.dirichlet_values,f.space)
   _fv,_dv = gather_free_and_dirichlet_values(tf′,cv)
   @assert innerlength(_dv) == 0
   fv = ParamVectorWithEntryRemoved(_fv,f.dof_to_fix)
@@ -143,7 +143,7 @@ function FESpaces.gather_free_and_dirichlet_values!(
 
   @assert innerlength(dv) == 1
   f = tf.space
-  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  tf′ = TrialParamFESpace(tf.dirichlet_values,f.space)
   _dv = similar(dv,eltype(dv),0)
   _fv = ParamVectorWithEntryRemoved(fv,f.dof_to_fix,zero(eltype(fv)))
   gather_free_and_dirichlet_values!(_fv,_dv,tf′,cv)
@@ -158,7 +158,7 @@ function FESpaces.gather_free_and_dirichlet_values!(
   cell_to_ludof_to_val)
 
   f = tf.space
-  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  tf′ = TrialParamFESpace(tf.dirichlet_values,f.space)
   fdof_to_val,ddof_to_val = gather_free_and_dirichlet_values(tf′,cell_to_ludof_to_val)
   FESpaces._setup_mdof_to_val!(
     fmdof_to_val,
@@ -177,25 +177,25 @@ function FESpaces.FEFunction(
   dirichlet_values::AbstractParamVector)
 
   f = tf.space
-  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  tf′ = TrialParamFESpace(tf.dirichlet_values,f.space)
   FEFunction(tf′,free_values,dirichlet_values)
 end
 
 function FESpaces.EvaluationFunction(tf::TrialParamFESpace{<:TProductFESpace},free_values)
   f = tf.space
-  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  tf′ = TrialParamFESpace(tf.dirichlet_values,f.space)
   EvaluationFunction(tf′,free_values)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(tf::TrialParamFESpace{<:TProductFESpace},fv,dv)
   f = tf.space
-  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  tf′ = TrialParamFESpace(tf.dirichlet_values,f.space)
   scatter_free_and_dirichlet_values(tf′,fv,dv)
 end
 
 function FESpaces.gather_free_and_dirichlet_values(tf::TrialParamFESpace{<:TProductFESpace},cv)
   f = tf.space
-  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  tf′ = TrialParamFESpace(tf.dirichlet_values,f.space)
   gather_free_and_dirichlet_values(tf′,cv)
 end
 
@@ -206,6 +206,6 @@ function FESpaces.gather_free_and_dirichlet_values!(
   cv)
 
   f = tf.space
-  tf′ = TrialParamFESpace(f.space,tf.dirichlet_values)
+  tf′ = TrialParamFESpace(tf.dirichlet_values,f.space)
   gather_free_and_dirichlet_values!(fv,dv,tf′,cv)
 end

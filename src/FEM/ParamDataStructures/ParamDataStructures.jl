@@ -15,6 +15,10 @@ using Gridap.Geometry
 using Gridap.CellData
 using Gridap.Helpers
 
+import GridapEmbedded
+import GridapEmbedded.Interfaces
+import GridapEmbedded.Interfaces: SubFacetTriangulation
+
 import Base:+,-,*,/,\
 import Distributions: Uniform,Normal
 import FillArrays: Fill

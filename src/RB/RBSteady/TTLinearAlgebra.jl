@@ -256,7 +256,7 @@ end
 
 # empirical interpolation
 
-function basis_index(i,cores_indices::Vector{Vector{Int32}})
+function basis_index(i,cores_indices::Vector{Vector{Ti}}) where Ti
   Iprevs...,Icurr = cores_indices
   if length(Iprevs) == 0
     return i
@@ -268,12 +268,31 @@ function basis_index(i,cores_indices::Vector{Vector{Int32}})
   return (iprevs...,icurr)
 end
 
-function basis_indices(cores_indices::Vector{Vector{Int32}},index_map::AbstractIndexMap{D}) where D
-  L = length(cores_indices)
-  ninds = L - D + 1
+function basis_indices(
+  ::Val{1},
+  cores_indices::Vector{Vector{Ti}},
+  index_map::AbstractIndexMap{D}
+  )::Vector{Ti} where {Ti,D}
 
   Iprev...,Icurr = cores_indices
-  basis_indices = zeros(Int32,length(Icurr),ninds)
+  basis_indices = zeros(Ti,length(Icurr))
+  for (k,ik) in enumerate(Icurr)
+    indices_k = basis_index(ik,cores_indices)
+    basis_indices[k] = index_map[CartesianIndex(indices_k[1:D])]
+  end
+  return basis_indices
+end
+
+function basis_indices(
+  ::Val{N},
+  cores_indices::Vector{Vector{Ti}},
+  index_map::AbstractIndexMap{D}
+  )::Vector{Vector{Ti}} where {Ti,D,N}
+
+  L = length(cores_indices)
+
+  Iprev...,Icurr = cores_indices
+  basis_indices = zeros(Ti,length(Icurr),N)
   for (k,ik) in enumerate(Icurr)
     indices_k = basis_index(ik,cores_indices)
     basis_indices[k,1] = index_map[CartesianIndex(indices_k[1:D])]
@@ -285,6 +304,12 @@ function basis_indices(cores_indices::Vector{Vector{Int32}},index_map::AbstractI
   return collect.(eachcol(basis_indices))
 end
 
-function basis_indices(cores_indices::Vector{Vector{Int32}},index_map::SparseIndexMap)
+function basis_indices(cores_indices::Vector{<:Vector},index_map::AbstractIndexMap{D}) where D
+  L = length(cores_indices)
+  ninds = L - D + 1
+  return basis_indices(Val(ninds),cores_indices,index_map)
+end
+
+function basis_indices(cores_indices::Vector{<:Vector},index_map::SparseIndexMap)
   basis_indices(cores_indices,get_sparse_index_map(index_map))
 end

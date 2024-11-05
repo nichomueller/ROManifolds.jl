@@ -85,7 +85,9 @@ function GridapEmbedded.Interfaces.compute_subcell_to_inout(cut::TProductEmbedde
 end
 
 function GridapEmbedded.EmbeddedBoundary(cut::TProductEmbeddedDiscretization,args...)
-  EmbeddedBoundary(cut.cutgeo,args...)
+  bgmodel = get_background_model(cut)
+  cutgeo = GridapEmbedded.Distributed.change_bgmodel(cut.cutgeo,bgmodel.model)
+  EmbeddedBoundary(cutgeo,args...)
 end
 
 function GridapEmbedded.GhostSkeleton(cut::TProductEmbeddedDiscretization,in_or_out,name::String)

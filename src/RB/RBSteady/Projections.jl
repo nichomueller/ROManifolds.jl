@@ -201,7 +201,7 @@ struct TTSVDCores{D,A<:AbstractVector{<:AbstractArray{T,3} where T},I<:AbstractI
   index_map::I
 end
 
-function projection(red::TTSVDReduction,s::AbstractSnapshots,args...)
+function projection(red::TTSVDReduction,s::AbstractArray{<:Number},args...)
   cores = reduction(red,s,args...)
   index_map = get_index_map(s)
   TTSVDCores(cores,index_map)
