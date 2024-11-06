@@ -87,6 +87,56 @@ x̂,rbstats = solve(rbsolver,rbop,μon)
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 
+#############################
+using Gridap.ReferenceFEs
+using Gridap.FESpaces
+using Gridap.Geometry
+using ReducedOrderModels.TProduct
+
+space = test.space
+trian = Ω_in.trian
+# get_dof_index_map(space,trian)
+
+model = get_background_model(trian)
+cell_dof_ids = get_cell_dof_ids(space)
+
+trian_ids = trian.tface_to_mface
+
+dof = get_fe_dof_basis(space)
+T = TProduct.get_dof_type(dof)
+order = get_polynomial_order(space)
+comp_to_dofs = TProduct.get_comp_to_dofs(T,space,dof)
+
+# get_dof_index_map(T,model,cell_dof_ids,trian_ids,order,comp_to_dofs)
+
+Dc = 2
+Ti = Int32
+desc = get_cartesian_descriptor(model)
+
+periodic = desc.isperiodic
+ncells = desc.partition
+ndofs = order .* ncells .+ 1 .- periodic
+
+terms = TProduct._get_terms(first(get_polytopes(model)),fill(order,Dc))
+cache_cell_dof_ids = array_cache(cell_dof_ids)
+
+new_dof_ids = LinearIndices(ndofs)
+dof_map = fill(zero(Ti),ndofs)
+
+for (icell,cell) in enumerate(CartesianIndices(ncells))
+  if icell ∈ trian_ids
+    icell′ = findfirst(trian_ids.==icell)
+    first_new_dof  = order .* (Tuple(cell) .- 1) .+ 1
+    new_dofs_range = map(i -> i:i+order,first_new_dof)
+    new_dofs = view(new_dof_ids,new_dofs_range...)
+    cell_dofs = getindex!(cache_cell_dof_ids,cell_dof_ids,icell′)
+    for (idof,dof) in enumerate(cell_dofs)
+      t = terms[idof]
+      dof < 0 && continue
+      dof_map[new_dofs[t]] = dof
+    end
+  end
+end
 ############################## WITH TPOD #####################################
 
 bgmodel = CartesianDiscreteModel(pmin,pmax,partition)
@@ -123,21 +173,3 @@ x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
-
-#
-using Gridap.FESpaces
-using ReducedOrderModels.RBSteady
-
-red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-op = get_algebraic_operator(feop)
-
-jacs = jacobian_snapshots(rbsolver,op,fesnaps)
-red = rbsolver.jacobian_reduction
-basis = projection(red,s)
-proj_basis = project(test,basis,trial)
-indices,interp = empirical_interpolation(basis)
-factor = lu(interp)
-domain = integration_domain(indices)
-
-form(u,v) = ∫(∇(v)⋅∇(u) )dΩ_in + ∫(∇(v)⋅∇(u))dΩ_out
-AA = assemble_matrix(feop,form)

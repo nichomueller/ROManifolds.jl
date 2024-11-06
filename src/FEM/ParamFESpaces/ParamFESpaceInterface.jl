@@ -64,12 +64,12 @@ function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::SingleFieldParamFES
   gather_free_and_dirichlet_values!(fv,dv,get_fe_space(f),cv)
 end
 
-function IndexMaps.get_vector_index_map(f::SingleFieldParamFESpace,args...)
+function IndexMaps.get_vector_index_map(f::SingleFieldParamFESpace,t::Triangulation...)
   get_vector_index_map(get_fe_space(f))
 end
 
-function IndexMaps.get_matrix_index_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace,args...)
-  get_matrix_index_map(get_fe_space(f),g,args...)
+function IndexMaps.get_matrix_index_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace,t::Triangulation...)
+  get_matrix_index_map(get_fe_space(f),g,t...)
 end
 
 get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(get_fe_space(f))

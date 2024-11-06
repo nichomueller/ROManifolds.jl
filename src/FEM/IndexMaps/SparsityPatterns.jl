@@ -42,6 +42,16 @@ Subtypes:
 """
 abstract type SparsityPattern end
 
+function to_nz_index(i::AbstractArray,sparsity::SparsityPattern)
+  i′ = copy(i)
+  to_nz_index!(i′,sparsity)
+  return i′
+end
+
+function to_nz_index!(i::AbstractArray,sparsity::SparsityPattern)
+  @abstractmethod
+end
+
 """
 """
 struct SparsityPatternCSC{Tv,Ti} <: SparsityPattern
@@ -78,6 +88,17 @@ function sum_sparsities(a::SparsityPatternCSC...)
   matrices = map(get_matrix,a)
   matrix = _sparse_sum_preserve_sparsity(matrices...)
   SparsityPatternCSC(matrix)
+end
+
+function to_nz_index!(i::AbstractArray,sparsity::SparsityPatternCSC)
+  nrows = num_rows(sparsity)
+  for (j,index) in enumerate(i)
+    if index > 0
+      irow = fast_index(index,nrows)
+      icol = slow_index(index,nrows)
+      i[j] = nz_index(sparsity.matrix,irow,icol)
+    end
+  end
 end
 
 struct MultiValueSparsityPatternCSC{Tv,Ti} <: SparsityPattern
@@ -131,10 +152,13 @@ function permute_sparsity(s::TProductSparsityPattern,U::FESpace,V::FESpace)
   TProductSparsityPattern(psparsity,psparsities)
 end
 
-function sum_sparsities(a::TProductSparsityPattern...)
-  ssparsity = sum_sparsities(map(get_sparsity,a)...)
-  ssparsities = map(sum_sparsities,map(get_univariate_sparsity,a))
-  TProductSparsityPattern(ssparsity,ssparsities)
+function sum_sparsities(s::TProductSparsityPattern...)
+  ssparsity = sum_sparsities(map(get_sparsity,s)...)
+  TProductSparsityPattern(ssparsity,s.sparsities_1d)
+end
+
+function to_nz_index!(i::AbstractArray,sparsity::TProductSparsityPattern)
+  to_nz_index!(i,get_sparsity(sparsity))
 end
 
 # utils

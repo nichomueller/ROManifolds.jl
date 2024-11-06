@@ -1,22 +1,22 @@
-function IndexMaps.get_vector_index_map(test::TProductFESpace,args...)
+function IndexMaps.get_vector_index_map(test::TProductFESpace,t::Triangulation...)
   if length(test.spaces_1d) == 1 # in the 1-D case, we return a trivial map
-    get_vector_index_map(test.space,args...)
+    get_vector_index_map(test.space,t...)
   else
-    get_dof_index_map(test,args...)
+    get_dof_index_map(test,t...)
   end
 end
 
-function IndexMaps.get_matrix_index_map(trial::TProductFESpace,test::TProductFESpace,args...)
+function IndexMaps.get_matrix_index_map(trial::TProductFESpace,test::TProductFESpace,t::Triangulation...)
   if length(trial.spaces_1d) == length(test.spaces_1d) == 1 # in the 1-D case, we return a trivial map
-    get_matrix_index_map(trial.space,test.space)
+    get_matrix_index_map(trial.space,test.space,t...)
   else
-    sparsity = get_sparsity(trial,test,args...)
+    sparsity = get_sparsity(trial,test,t...)
     psparsity = permute_sparsity(sparsity,trial,test)
     I,J,_ = findnz(psparsity)
     i,j,_ = IndexMaps.univariate_findnz(psparsity)
     g2l_sparse = _global_2_local(psparsity,I,J,i,j)
     pg2l_sparse = _permute_index_map(g2l_sparse,trial,test)
-    pg2l = _to_nz_index(pg2l_sparse,sparsity)
+    pg2l = to_nz_index(pg2l_sparse,sparsity)
     SparseIndexMap(pg2l,pg2l_sparse,psparsity)
   end
 end
@@ -61,8 +61,8 @@ function _add_constrained_dofs(indices::AbstractArray{Ti}) where Ti
   if any(indices.==z)
     mdof_to_bdof = Ti[]
     sdof_to_bdof = Ti[]
-    for (i,ind) in enumerate(indices)
-      ind != z && push!(mdof_to_bdof,i)
+    for i in CartesianIndices(indices)
+      indices[i] != z && push!(mdof_to_bdof,i)
     end
     ConstrainedDofsIndexMap(index_map,mdof_to_bdof,sdof_to_bdof,DoNotShowSlaveDofs())
   else
@@ -160,25 +160,4 @@ function _permute_index_map(index_map,trial::TProductFESpace,test::TProductFESpa
   J = get_dof_index_map(trial)
   nrows = num_free_dofs(test)
   return _permute_index_map(index_map,I,J,nrows)
-end
-
-function _to_nz_index(index_map,sparsity)
-  index_map′ = copy(index_map)
-  _to_nz_index!(index_map′,sparsity)
-  return index_map′
-end
-
-function _to_nz_index!(index_map,sparsity::TProductSparsityPattern)
-  _to_nz_index!(index_map,get_sparsity(sparsity))
-end
-
-function _to_nz_index!(index_map,sparsity::SparsityPatternCSC)
-  nrows = IndexMaps.num_rows(sparsity)
-  for (i,index) in enumerate(index_map)
-    if index > 0
-      irow = fast_index(index,nrows)
-      icol = slow_index(index,nrows)
-      index_map[i] = nz_index(sparsity.matrix,irow,icol)
-    end
-  end
 end

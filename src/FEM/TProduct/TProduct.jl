@@ -19,6 +19,7 @@ using Gridap.TensorValues
 using Gridap.Helpers
 
 using GridapEmbedded
+using GridapEmbedded.Interfaces
 
 using ReducedOrderModels.Utils
 using ReducedOrderModels.IndexMaps

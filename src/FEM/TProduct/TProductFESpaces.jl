@@ -76,7 +76,7 @@ FESpaces.get_dirichlet_dof_tag(f::TProductFESpace) = get_dirichlet_dof_tag(f.spa
 
 FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-get_dof_index_map(f::TProductFESpace) = get_dof_index_map(f.space)
+get_dof_index_map(f::TProductFESpace,t::Triangulation...) = get_dof_index_map(f.space,t...)
 
 get_tp_dof_index_map(f::TProductFESpace) = get_tp_dof_index_map(f.space,f.spaces_1d)
 
@@ -96,8 +96,8 @@ end
 
 get_tp_trial_fe_basis(f::TrialFESpace{<:TProductFESpace}) = get_tp_trial_fe_basis(f.space)
 
-function IndexMaps.get_sparsity(U::TProductFESpace,V::TProductFESpace)
-  sparsity = get_sparsity(U.space,V.space)
+function IndexMaps.get_sparsity(U::TProductFESpace,V::TProductFESpace,args...)
+  sparsity = get_sparsity(U.space,V.space,args...)
   sparsities_1d = map(get_sparsity,U.spaces_1d,V.spaces_1d)
   return TProductSparsityPattern(sparsity,sparsities_1d)
 end

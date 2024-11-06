@@ -22,11 +22,9 @@ cell_dof_ids = Table([
         2  8  5 ]
 
 """
-function get_dof_index_map(space::FESpace)
-  trian = get_triangulation(space)
-  @notimplementedif !isa(trian,BodyFittedTriangulation)
-  trian_ids = trian.tface_to_mface
+function get_dof_index_map(space::FESpace,trian::Triangulation=get_triangulation(space))
   model = get_background_model(trian)
+  trian_ids = _get_trian_ids(trian)
   index_map = get_dof_index_map(model,space,trian_ids)
   return remove_constrained_dofs(index_map)
 end
@@ -44,11 +42,13 @@ function get_dof_index_map(
   space::UnconstrainedFESpace,
   trian_ids::AbstractVector)
 
+  cell_dof_ids = get_cell_dof_ids(space)
+
   dof = get_fe_dof_basis(space)
   T = get_dof_type(dof)
-  cell_dof_ids = get_cell_dof_ids(space)
   order = get_polynomial_order(space)
   comp_to_dofs = get_comp_to_dofs(T,space,dof)
+
   get_dof_index_map(T,model,cell_dof_ids,trian_ids,order,comp_to_dofs)
 end
 
@@ -110,7 +110,6 @@ function _get_dof_index_map(
       cell_dofs = getindex!(cache_cell_dof_ids,cell_dof_ids,icell′)
       for (idof,dof) in enumerate(cell_dofs)
         t = terms[idof]
-        # new_dofs[t] < 0 && continue
         dof < 0 && continue
         dof_map[new_dofs[t]] = dof
       end
@@ -122,29 +121,46 @@ end
 
 # spaces with constraints
 
-function get_dof_index_map(model::CartesianDiscreteModel,ls::FESpaceWithLinearConstraints,args...)
+function get_dof_index_map(
+  model::CartesianDiscreteModel,
+  ls::FESpaceWithLinearConstraints,
+  trian_ids::AbstractVector)
+
   space = ls.space
   mdof_to_bdof = ls.mDOF_to_DOF
   sdof_to_bdof = setdiff(1:ls.n_fdofs,mdof_to_bdof)
-  index_map = get_dof_index_map(model,space,args...)
+  index_map = get_dof_index_map(model,space,trian_ids)
   return ConstrainedDofsIndexMap(index_map,mdof_to_bdof,sdof_to_bdof)
 end
 
-function get_dof_index_map(model::CartesianDiscreteModel,cs::FESpaceWithConstantFixed,args...)
+function get_dof_index_map(
+  model::CartesianDiscreteModel,
+  cs::FESpaceWithConstantFixed,
+  trian_ids::AbstractVector)
+
   space = cs.space
   ndofs = num_free_dofs(space) + num_dirichlet_dofs(space)
   sdof_to_bdof = cs.dof_to_fix
   mdof_to_bdof = setdiff(1:ndofs,sdof_to_bdof)
-  index_map = get_dof_index_map(model,space,args...)
+  index_map = get_dof_index_map(model,space,trian_ids)
   return ConstrainedDofsIndexMap(index_map,mdof_to_bdof,sdof_to_bdof)
 end
 
-function get_dof_index_map(model::CartesianDiscreteModel,zs::ZeroMeanFESpace,args...)
+function get_dof_index_map(
+  model::CartesianDiscreteModel,
+  zs::ZeroMeanFESpace,
+  trian_ids::AbstractVector)
+
   space = zs.space
-  get_dof_index_map(model,space,args...)
+  get_dof_index_map(model,space,trian_ids)
 end
 
 # utils
+
+_get_trian_ids(t::BodyFittedTriangulation) = t.tface_to_mface
+_get_trian_ids(t::BoundaryTriangulation) = t.glue.tface_to_mface
+_get_trian_ids(t::Geometry.TriangulationView) = _get_trian_ids(t.parent)
+_get_trian_ids(t::Interfaces.SubFacetTriangulation) = t.subfacets.facet_to_bgcell
 
 """
     get_polynomial_order(fs::FESpace) -> Integer

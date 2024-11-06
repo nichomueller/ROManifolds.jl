@@ -28,6 +28,8 @@ export MultiValueSparsityPatternCSC
 export TProductSparsityPattern
 export get_sparsity
 export permute_sparsity
+export to_nz_index
+export to_nz_index!
 include("SparsityPatterns.jl")
 
 export AbstractIndexMap
