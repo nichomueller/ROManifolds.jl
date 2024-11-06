@@ -10,7 +10,7 @@ only the nonlinear components
 """
 struct LinearNonlinearTransientParamFEOperator{T} <: TransientParamFEOperator{LinearNonlinearParamODE,T}
   op_linear::TransientParamFEOperator{LinearParamODE,T}
-  op_nonlinear::TransientParamFEOperator{T}
+  op_nonlinear::TransientParamFEOperator{NonlinearParamODE,T}
 end
 
 ParamSteady.get_linear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_linear

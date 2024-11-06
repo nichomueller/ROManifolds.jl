@@ -110,14 +110,6 @@ function IndexMaps.permute_sparsity(s::TProductSparsityPattern,U::TProductFESpac
   permute_sparsity(s,(index_map_I,index_map_I_1d),(index_map_J,index_map_J_1d))
 end
 
-for F in (:TrialFESpace,:TransientTrialFESpace)
-  @eval begin
-    function get_matrix_index_map(U::$F{<:TProductFESpace},V::TProductFESpace)
-      get_matrix_index_map(U.space,V)
-    end
-  end
-end
-
 # multi field
 
 _remove_trial(f::SingleFieldFESpace) = f

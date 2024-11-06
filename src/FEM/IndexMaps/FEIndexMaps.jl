@@ -33,19 +33,18 @@ is a TrivialIndexMap; when the test space is of type TProductFESpace, a
 nontrivial index map is returned
 
 """
-function get_vector_index_map(test::FESpace)
+function get_vector_index_map(test::SingleFieldFESpace,args...)
   TrivialIndexMap(num_free_dofs(test))
 end
 
-function get_vector_index_map(test::MultiFieldFESpace)
+function get_vector_index_map(test::MultiFieldFESpace,args...)
   ntest = num_fields(test)
   index_maps = Vector{AbstractIndexMap}(undef,ntest)
   for i in 1:ntest
-    index_maps[i] = get_vector_index_map(test[i])
+    index_maps[i] = get_vector_index_map(test[i],args...)
   end
   return index_maps
 end
-
 
 """
     get_matrix_index_map(trial::FESpace,test::FESpace) -> AbstractIndexMap
@@ -55,17 +54,17 @@ is a TrivialIndexMap; when the trial and test spaces are of type TProductFESpace
 a SparseIndexMap is returned
 
 """
-function get_matrix_index_map(trial::FESpace,test::FESpace)
-  sparsity = get_sparsity(trial,test)
+function get_matrix_index_map(trial::SingleFieldFESpace,test::SingleFieldFESpace,args...)
+  sparsity = get_sparsity(trial,test,args...)
   TrivialIndexMap(sparsity)
 end
 
-function get_matrix_index_map(trial::MultiFieldFESpace,test::MultiFieldFESpace)
+function get_matrix_index_map(trial::MultiFieldFESpace,test::MultiFieldFESpace,args...)
   ntest = num_fields(test)
   ntrial = num_fields(trial)
   index_maps = Matrix{AbstractIndexMap}(undef,ntest,ntrial)
   for (i,j) in Iterators.product(1:ntest,1:ntrial)
-    index_maps[i,j] = get_matrix_index_map(trial[j],test[i])
+    index_maps[i,j] = get_matrix_index_map(trial[j],test[i],args...)
   end
   return index_maps
 end
@@ -82,52 +81,28 @@ function FEOperatorIndexMap(trial::FESpace,test::FESpace,trians_res,trians_jacs)
   FEOperatorIndexMap(matrix_map,vector_map)
 end
 
-function get_vector_index_map(
-  test::FESpace,
-  trians::Tuple{Vararg{Triangulation}})
-
-  contribution(trians) do trian
-    get_vector_index_map(test)
-  end
-end
-
-function get_matrix_index_map(
-  trial::FESpace,
-  test::FESpace,
-  trians::Tuple{Vararg{Triangulation}})
-
-  contribution(trians) do trian
-    sparsity = get_sparsity(trial,test,trian)
-    TrivialIndexMap(sparsity)
-  end
-end
-
-function get_matrix_index_map(
-  trial::MultiFieldFESpace,
-  test::MultiFieldFESpace,
-  trians::Tuple{Vararg{Triangulation}})
-
-  ntest = num_fields(test)
-  ntrial = num_fields(trial)
-  contribution(trians) do trian
-    index_maps = Matrix{AbstractIndexMap}(undef,ntest,ntrial)
-    for (i,j) in Iterators.product(1:ntest,1:ntrial)
-      index_maps[i,j] = get_matrix_index_map(trial[j],test[i],trian)
+for T in (:SingleFieldFESpace,:MultiFieldFESpace)
+  @eval begin
+    function get_vector_index_map(test::$T,trians::Tuple{Vararg{Triangulation}})
+      contribution(trians) do trian
+        get_vector_index_map(test,trian)
+      end
     end
-    index_maps
-  end
-end
 
-function get_matrix_index_map(
-  trial::FESpace,
-  test::FESpace,
-  trians::Tuple{Vararg{Tuple{Vararg{Triangulation}}}})
+    function get_matrix_index_map(trial::$T,test::$T,trians::Tuple{Vararg{Triangulation}})
+      contribution(trians) do trian
+        get_matrix_index_map(trial,test,trian)
+      end
+    end
 
-  index_maps = ()
-  for t in trians
-    index_maps = (index_maps...,get_matrix_index_map(trial,test,t))
+    function get_matrix_index_map(trial::$T,test::$T,trians::Tuple{Vararg{Tuple{Vararg{Triangulation}}}})
+      index_maps = ()
+      for t in trians
+        index_maps = (index_maps...,get_matrix_index_map(trial,test,t))
+      end
+      return index_maps
+    end
   end
-  return index_maps
 end
 
 function Utils.set_domains(i::FEOperatorIndexMap,trians_res,trians_jac)

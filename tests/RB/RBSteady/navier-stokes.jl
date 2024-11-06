@@ -7,7 +7,8 @@ using DrWatson
 using Serialization
 
 using GridapSolvers
-import GridapSolvers: LinearSolvers, NonlinearSolvers, BlockSolvers
+using GridapSolvers.LinearSolvers
+using GridapSolvers.NonlinearSolvers
 
 using ReducedOrderModels
 
@@ -66,7 +67,7 @@ feop_lin = LinearParamFEOperator(res_lin,jac_lin,pspace,trial,test,trian_res,tri
 feop_nlin = ParamFEOperator(res_nlin,jac_nlin,pspace,trial,test,trian_res,trian_jac)
 feop = LinearNonlinearParamFEOperator(feop_lin,feop_nlin)
 
-fesolver = NonlinearFESolver(NonlinearSolvers.NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true))
+fesolver = NonlinearFESolver(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true))
 
 tol = 1e-4
 state_reduction = SupremizerReduction(coupling,tol,energy;nparams=30,sketch=:sprn)

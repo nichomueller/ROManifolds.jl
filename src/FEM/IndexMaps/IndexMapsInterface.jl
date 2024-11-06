@@ -98,7 +98,19 @@ end
 
 sum_maps(i::AbstractIndexMap...) = first(i)
 
-function sum_maps(i::Tuple{Vararg{AbstractIndexMap}}...)
+function sum_maps(i::Array{I,N}...) where {I<:AbstractIndexMap,N}
+  i1 = first(i)
+  s = size(i1)
+  @check all(size(ii)==s for ii in i)
+  i′ = Array{I,N}(undef,s)
+  for j in eachindex(i1)
+    ij = map(ii -> getindex(ii,j),i)
+    i′[j] = sum_maps(ij...)
+  end
+  i′
+end
+
+function sum_maps(i::Tuple{Vararg{I}}...) where {I<:Union{AbstractIndexMap,AbstractArray{<:AbstractIndexMap}}}
   i′ = ()
   for ii in i
     i′ = (i′...,ii...)

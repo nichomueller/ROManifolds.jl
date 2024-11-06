@@ -151,11 +151,11 @@ IndexMaps.get_index_map(op::ParamFEOpFromWeakForm) = op.index_map
 get_trian_res(op::ParamFEOperator) = get_domains(get_vector_index_map(op))
 get_trian_jac(op::ParamFEOperator) = get_domains(get_matrix_index_map(op))
 
-function Utils.set_domains(op::JointParamFEOperator,trian_res,trian_jac)
+function Utils.set_domains(op::JointParamFEOperator,args...)
   op
 end
 
-function Utils.set_domains(op::ParamFEOperator)
+function Utils.set_domains(op::SplitParamFEOperator)
   set_domains(op,get_trian_res(op),get_trian_jac(op))
 end
 

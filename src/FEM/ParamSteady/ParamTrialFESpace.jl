@@ -55,8 +55,8 @@ end
 
 for F in (:TrialFESpace,:TransientTrialFESpace,:UnEvalParamSingleFieldFESpace)
   @eval begin
-    function IndexMaps.get_matrix_index_map(trial::$F,test::SingleFieldFESpace)
-      get_matrix_index_map(trial.space,test)
+    function IndexMaps.get_matrix_index_map(trial::$F,test::SingleFieldFESpace,args...)
+      get_matrix_index_map(trial.space,test,args...)
     end
   end
 end

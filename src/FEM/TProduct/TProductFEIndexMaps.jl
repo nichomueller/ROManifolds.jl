@@ -1,16 +1,16 @@
-function IndexMaps.get_vector_index_map(test::TProductFESpace)
+function IndexMaps.get_vector_index_map(test::TProductFESpace,args...)
   if length(test.spaces_1d) == 1 # in the 1-D case, we return a trivial map
-    get_vector_index_map(test.space)
+    get_vector_index_map(test.space,args...)
   else
-    get_dof_index_map(test)
+    get_dof_index_map(test,args...)
   end
 end
 
-function IndexMaps.get_matrix_index_map(trial::TProductFESpace,test::TProductFESpace)
+function IndexMaps.get_matrix_index_map(trial::TProductFESpace,test::TProductFESpace,args...)
   if length(trial.spaces_1d) == length(test.spaces_1d) == 1 # in the 1-D case, we return a trivial map
     get_matrix_index_map(trial.space,test.space)
   else
-    sparsity = get_sparsity(trial,test)
+    sparsity = get_sparsity(trial,test,args...)
     psparsity = permute_sparsity(sparsity,trial,test)
     I,J,_ = findnz(psparsity)
     i,j,_ = IndexMaps.univariate_findnz(psparsity)

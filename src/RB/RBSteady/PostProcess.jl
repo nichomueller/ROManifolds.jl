@@ -122,7 +122,7 @@ function load_contribution(dir,trian,args...;label::String="")
     deci = load_decomposition(dir;label=_get_label(label,i))
     redti = reduced_triangulation(t,deci,args...)
     if isa(redti,AbstractArray)
-      redti = ParamDataStructures.merge_triangulations(redti)
+      redti = Utils.merge_triangulations(redti)
     end
     dec = (dec...,deci)
     redt = (redt...,redti)

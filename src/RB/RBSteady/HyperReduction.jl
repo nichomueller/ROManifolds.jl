@@ -529,7 +529,7 @@ function reduced_form(
   end
 
   hyper_red = BlockProjection(hyper_reds,s.touched)
-  red_trian = ParamDataStructures.merge_triangulations(red_trians)
+  red_trian = Utils.merge_triangulations(red_trians)
 
   return hyper_red,red_trian
 end
@@ -554,7 +554,7 @@ function reduced_form(
   end
 
   hyper_red = BlockProjection(hyper_reds,s.touched)
-  red_trian = ParamDataStructures.merge_triangulations(red_trians)
+  red_trian = Utils.merge_triangulations(red_trians)
 
   return hyper_red,red_trian
 end
