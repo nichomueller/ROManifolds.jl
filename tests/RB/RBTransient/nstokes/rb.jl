@@ -48,7 +48,7 @@ p0μ(μ) = ParamFunction(p0,μ)
 conv(u,∇u) = (∇u')⋅u
 dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 
-h = "h0035"
+h = "h005"
 model_dir = datadir(joinpath("models","model_circle_$h.json"))
 model = DiscreteModelFromFile(model_dir)
 labels = get_face_labeling(model)
