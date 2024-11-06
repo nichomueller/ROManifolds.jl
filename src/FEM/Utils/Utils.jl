@@ -3,6 +3,7 @@ module Utils
 using LinearAlgebra
 
 using Gridap
+using Gridap.Algebra
 using Gridap.Arrays
 using Gridap.CellData
 using Gridap.FESpaces
@@ -43,6 +44,7 @@ export VectorContribution
 export MatrixContribution
 export TupOfArrayContribution
 export contribution
+export set_domains
 export change_domains
 include("Contributions.jl")
 

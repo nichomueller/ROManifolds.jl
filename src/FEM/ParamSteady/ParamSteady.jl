@@ -20,6 +20,7 @@ using GridapSolvers.LinearSolvers
 using GridapSolvers.BlockSolvers
 using GridapSolvers.MultilevelTools
 
+using ReducedOrderModels.Utils
 using ReducedOrderModels.IndexMaps
 using ReducedOrderModels.TProduct
 using ReducedOrderModels.ParamDataStructures
@@ -59,6 +60,8 @@ export get_fe_operator
 include("ParamOperator.jl")
 
 export ParamFEOperator
+export SplitParamFEOperator
+export JointParamFEOperator
 export LinearParamFEOperator
 export get_param_space
 include("ParamFEOperator.jl")

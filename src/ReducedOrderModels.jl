@@ -26,6 +26,7 @@ export VectorContribution
 export MatrixContribution
 export TupOfArrayContribution
 export contribution
+export set_domains
 export change_domains
 
 include("FEM/Utils/Utils.jl")

@@ -6,8 +6,12 @@ end
 
 get_fe_operator(op::ParamOpFromFEOp) = op.op
 
-function Utils.change_domains(op::ParamOpFromFEOp,trians_rhs,trians_lhs)
-  ParamOpFromFEOp(change_domains(op.op,trians_rhs,trians_lhs))
+for f in (:(Utils.set_domains),:(Utils.change_domains))
+  @eval begin
+    function $f(odeop::ParamOpFromFEOp,trians_rhs,trians_lhs)
+      ParamOpFromFEOp($f(odeop.op,trians_rhs,trians_lhs))
+    end
+  end
 end
 
 const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointTriangulation}
@@ -109,9 +113,10 @@ function Algebra.allocate_residual(
   v = get_fe_basis(test)
   assem = get_param_assembler(op.op,μ)
 
+  trian_res = get_trian_res(op.op)
   res = get_res(op.op)
   dc = res(μ,uh,v)
-  contribution(op.op.trian_res) do trian
+  contribution(trian_res) do trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     allocate_vector(assem,vecdata)
   end
@@ -132,10 +137,11 @@ function Algebra.residual!(
   v = get_fe_basis(test)
   assem = get_param_assembler(op.op,μ)
 
+  trian_res = get_trian_res(op.op)
   res = get_res(op.op)
   dc = res(μ,uh,v)
 
-  map(b.values,op.op.trian_res) do values,trian
+  map(b.values,trian_res) do values,trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     assemble_vector_add!(values,assem,vecdata)
   end
@@ -156,9 +162,10 @@ function Algebra.allocate_jacobian(
   v = get_fe_basis(test)
   assem = get_param_assembler(op.op,μ)
 
+  trian_jac = get_trian_jac(op.op)
   jac = get_jac(op.op)
   dc = jac(μ,uh,du,v)
-  contribution(op.op.trian_jac) do trian
+  contribution(trian_jac) do trian
     matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
     allocate_matrix(assem,matdata)
   end
@@ -178,9 +185,10 @@ function ODEs.jacobian_add!(
   v = get_fe_basis(test)
   assem = get_param_assembler(op.op,μ)
 
+  trian_jac = get_trian_jac(op.op)
   jac = get_jac(op.op)
   dc = jac(μ,uh,du,v)
-  map(A.values,op.op.trian_jac) do values,trian
+  map(A.values,trian_jac) do values,trian
     matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
     assemble_matrix_add!(values,assem,matdata)
   end

@@ -54,8 +54,12 @@ function Contribution(
   ArrayContribution{T,N}(v,t)
 end
 
-function change_domains(a::Contribution,t::Tuple{Vararg{Triangulation}})
-  Contribution(get_values(a),t)
+for f in (:set_domains,:change_domains)
+  @eval begin
+    function $f(a::Contribution,t::Tuple{Vararg{Triangulation}})
+      Contribution(get_values(a),t)
+    end
+  end
 end
 
 """
@@ -166,6 +170,22 @@ const TupOfArrayContribution{T} = Tuple{Vararg{ArrayContribution{T}}}
 Base.eltype(::TupOfArrayContribution{T}) where T = T
 Base.eltype(::Type{<:TupOfArrayContribution{T}}) where T = T
 
+function CellData.get_domains(a::TupOfArrayContribution)
+  trians = ()
+  for ai in a
+    trians = (trians...,CellData.get_domains(ai))
+  end
+  trians
+end
+
+function get_values(a::TupOfArrayContribution)
+  values = ()
+  for ai in a
+    values = (values...,get_values(ai))
+  end
+  values
+end
+
 function Base.copy(a::TupOfArrayContribution)
   b = ()
   for ai in a
@@ -189,10 +209,14 @@ function Algebra.copy_entries!(a::TupOfArrayContribution,b::TupOfArrayContributi
   a
 end
 
-function change_domains(a::TupOfArrayContribution,t::Tuple{Vararg{Tuple{Vararg{Triangulation}}}})
-  b = ()
-  for (ai,ti) in zip(a,t)
-    b = (b...,change_domains(ai,ti))
+for f in (:set_domains,:change_domains)
+  @eval begin
+    function $f(a::TupOfArrayContribution,t::Tuple{Vararg{Tuple{Vararg{Triangulation}}}})
+      b = ()
+      for (ai,ti) in zip(a,t)
+        b = (b...,$f(ai,ti))
+      end
+      b
+    end
   end
-  b
 end

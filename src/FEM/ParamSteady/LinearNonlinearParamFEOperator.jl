@@ -64,8 +64,8 @@ function join_operators(
   op_lin::ParamFEOperator,
   op_nlin::ParamFEOperator)
 
-  op_lin = change_domains(op_lin)
-  op_nlin = change_domains(op_nlin)
+  op_lin = set_domains(op_lin)
+  op_nlin = set_domains(op_nlin)
 
   @check get_trial(op_lin) == get_trial(op_nlin)
   @check get_test(op_lin) == get_test(op_nlin)
@@ -77,6 +77,16 @@ function join_operators(
   res(μ,u,v) = op_lin.res(μ,u,v) + op_nlin.res(μ,u,v)
   jac(μ,u,du,v) = op_lin.jac(μ,u,du,v) + op_nlin.jac(μ,u,du,v)
   ParamFEOperator(res,jac,op_lin.pspace,trial,test)
+end
+
+for f in (:(Utils.set_domains),:(Utils.change_domains))
+  @eval begin
+    function $f(op::LinearNonlinearParamFEOperator)
+      op_lin′ = $f(get_linear_operator(op))
+      op_nlin′ = $f(get_nonlinear_operator(op))
+      LinearNonlinearParamFEOperator(op_lin′,op_nlin′)
+    end
+  end
 end
 
 """

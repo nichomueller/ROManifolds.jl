@@ -18,8 +18,8 @@ Subtypes:
 
 """
 abstract type TransientParamFEOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamFEOperator{O,T} end
-const JointTransientParamFEOperator{O} = TransientParamFEOperator{O,JointTriangulation}
-const SplitTransientParamFEOperator{O} = TransientParamFEOperator{O,SplitTriangulation}
+const JointTransientParamFEOperator{O<:ODEParamOperatorType} = TransientParamFEOperator{O,JointTriangulation}
+const SplitTransientParamFEOperator{O<:ODEParamOperatorType} = TransientParamFEOperator{O,SplitTriangulation}
 
 function FESpaces.get_algebraic_operator(op::TransientParamFEOperator)
   ODEParamOpFromTFEOp(op)
@@ -176,14 +176,14 @@ end
 const SplitTransientParamLinearFEOpFromWeakForm = TransientParamLinearFEOpFromWeakForm{SplitTriangulation}
 
 function TransientParamLinearFEOperator(
-  res::Function,jacs::Tuple{Vararg{Function}},tpspace,trial,test,trian_res,trian_jacs...;
+  forms::Tuple{Vararg{Function}},res::Function,tpspace,trial,test,trian_res,trian_jacs...;
   constant_forms::Tuple{Vararg{Bool}}=ntuple(_ -> false,length(forms)))
 
-  order = length(jacs) - 1
+  order = length(forms) - 1
   jacs = ntuple(k -> ((μ,t,u,duk,v,args...) -> forms[k](μ,t,duk,v,args...)),length(forms))
   res′,jacs′ = _set_triangulations(res,jacs,test,trial,trian_res,trian_jacs)
   assem = SparseMatrixAssembler(trial,test)
-  index_map = FEOperatorIndexMap(trial,test,trian_res,trian_jacs...)
+  index_map = FEOperatorIndexMap(trial,test,trian_res,trian_jacs)
   TransientParamLinearFEOpFromWeakForm{SplitTriangulation}(
     res′,jacs′,constant_forms,tpspace,assem,index_map,trial,test,order)
 end
@@ -219,23 +219,27 @@ IndexMaps.get_index_map(op::TransientParamLinearFEOpFromWeakForm) = op.index_map
 
 # triangulation utils
 
-function Utils.change_domains(op::SplitTransientParamFEOpFromWeakForm,trian_res,trian_jacs)
-  polyn_order = get_polynomial_order(op.test)
-  res′ = _set_triangulation_form(op.res,trian_res,polyn_order)
-  jacs′ = _set_triangulation_jacs(op.jacs,trian_jacs,polyn_order)
-  index_map′ = change_domains(op.index_map,trian_res′,trian_jac′)
-  TransientParamFEOpFromWeakForm(
-    res′,jacs′,op.tpspace,op.assem,index_map′,op.trial,op.test,op.order)
-end
+for (f,T) in zip((:(Utils.set_domains),:(Utils.change_domains)),(:JointTriangulation,:SplitTriangulation))
+  @eval begin
+    function $f(op::SplitTransientParamFEOpFromWeakForm,trian_res,trian_jacs)
+      trian_res′ = order_triangulations(get_trian_res(op),trian_res)
+      trian_jacs′ = order_triangulations(get_trian_jac(op),trian_jacs)
+      res′,jacs′ = _set_triangulations(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
+      index_map′ = $f(op.index_map,trian_res′,trian_jacs′)
+      TransientParamFEOpFromWeakForm{$T}(
+        res′,jacs′,op.tpspace,op.assem,index_map′,op.trial,op.test,op.order)
+    end
 
-function Utils.change_domains(op::SplitTransientParamLinearFEOpFromWeakForm,trian_res,trian_jacs)
-  polyn_order = get_polynomial_order(op.test)
-  res′ = _set_triangulation_form(op.res,trian_res,polyn_order)
-  jacs′ = _set_triangulation_jacs(op.jacs,trian_jacs,polyn_order)
-  index_map′ = change_domains(op.index_map,trian_res′,trian_jac′)
-  TransientParamLinearFEOpFromWeakForm(
-    res′,jacs′,op.constant_forms,op.tpspace,
-    op.assem,index_map′,op.trial,op.test,op.order)
+    function $f(op::SplitTransientParamLinearFEOpFromWeakForm,trian_res,trian_jacs)
+      trian_res′ = order_triangulations(get_trian_res(op),trian_res)
+      trian_jacs′ = map(order_triangulations,get_trian_jac(op),trian_jacs)
+      res′,jacs′ = _set_triangulations(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
+      index_map′ = $f(op.index_map,trian_res′,trian_jacs′)
+      TransientParamLinearFEOpFromWeakForm{$T}(
+        res′,jacs′,op.constant_forms,op.tpspace,
+        op.assem,index_map′,op.trial,op.test,op.order)
+    end
+  end
 end
 
 function _set_triangulation_jac(
@@ -253,7 +257,7 @@ end
 function _set_triangulation_jacs(
   jacs::Tuple{Vararg{Function}},
   trians::Tuple{Vararg{Tuple{Vararg{Triangulation}}}},
-  order) where N
+  order)
 
   newjacs = ()
   for (jac,trian) in zip(jacs,trians)

@@ -10,6 +10,9 @@ using Gridap.FESpaces
 using Gridap.TensorValues
 using Gridap.Helpers
 
+using ReducedOrderModels
+using ReducedOrderModels.Utils
+
 import SparseArrays: AbstractSparseMatrix
 import PartitionedArrays: tuple_of_arrays
 

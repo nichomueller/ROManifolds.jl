@@ -60,9 +60,10 @@ function RBSteady.solution_snapshots(
   args...)
 
   fesolver = get_fe_solver(solver)
-  sol = solve(fesolver,feop,r,args...)
+  feop′ = set_domains(feop)
+  sol = solve(fesolver,feop′,r,args...)
   values,stats = collect(sol.odesol)
-  i = get_vector_index_map(feop)
+  i = get_vector_index_map(feop′)
   snaps = Snapshots(values,i,r)
   return snaps,stats
 end

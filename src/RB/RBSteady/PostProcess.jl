@@ -152,8 +152,8 @@ function _load_fixed_operator_parts(dir,feop;label="")
 end
 
 function _load_trian_operator_parts(dir,feop::SplitParamFEOperator,trial,test;label="")
-  trian_res = feop.trian_res
-  trian_jac = feop.trian_jac
+  trian_res = ParamSteady.get_trian_res(feop)
+  trian_jac = ParamSteady.get_trian_jac(feop)
   pop = get_algebraic_operator(feop)
   red_rhs = load_contribution(dir,trian_res,test;label=_get_label(label,"rhs"))
   red_lhs = load_contribution(dir,trian_jac,trial,test;label=_get_label(label,"lhs"))
@@ -232,7 +232,7 @@ end
 function rb_performance(
   solver::RBSolver,
   feop::ParamFEOperator,
-  rbop::RBOperator,
+  rbop,
   fesnaps::AbstractArray,
   x̂::AbstractParamVector,
   festats::CostTracker,
@@ -240,8 +240,9 @@ function rb_performance(
   r::AbstractRealization)
 
   x = inv_project(get_trial(rbop)(r),x̂)
-  rbsnaps = Snapshots(x,get_vector_index_map(feop),r)
-  rb_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats)
+  feop′ = set_domains(feop)
+  rbsnaps = Snapshots(x,get_vector_index_map(feop′),r)
+  rb_performance(solver,feop′,fesnaps,rbsnaps,festats,rbstats)
 end
 
 function DrWatson.save(dir,perf::RBPerformance;label="")

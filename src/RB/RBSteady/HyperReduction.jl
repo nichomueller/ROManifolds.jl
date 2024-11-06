@@ -254,7 +254,7 @@ function allocate_hyper_reduction(
   return hypred
 end
 
-function ParamDataStructures.Contribution(v::Tuple{Vararg{HyperReduction}},t::Tuple{Vararg{Triangulation}})
+function Utils.Contribution(v::Tuple{Vararg{HyperReduction}},t::Tuple{Vararg{Triangulation}})
   AffineContribution(v,t)
 end
 
@@ -358,7 +358,7 @@ end
 
 const BlockHyperReduction{A<:HyperReduction,N} = BlockProjection{A,N}
 
-function ParamDataStructures.Contribution(
+function Utils.Contribution(
   v::Tuple{Vararg{BlockHyperReduction}},
   t::Tuple{Vararg{Triangulation}})
 

@@ -26,7 +26,3 @@ function Algebra.solve(solver::FESolver,op::ParamFEOperator,r::Realization)
   vh,stats = solve!(uh,solver,op,r)
   vh,stats
 end
-
-function Algebra.solve(solver::FESolver,op::SplitParamFEOperator,r::Realization)
-  solve(solver,change_domains(op),r)
-end

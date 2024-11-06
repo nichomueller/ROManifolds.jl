@@ -8,9 +8,9 @@ residuals/jacobians, and in the Newton-like iterations only evaluate and assembl
 only the nonlinear components
 
 """
-struct LinearNonlinearTransientParamFEOperator <: TransientParamFEOperator{LinearNonlinearParamODE}
-  op_linear::TransientParamFEOperator{LinearParamODE}
-  op_nonlinear::TransientParamFEOperator
+struct LinearNonlinearTransientParamFEOperator{T} <: TransientParamFEOperator{LinearNonlinearParamODE,T}
+  op_linear::TransientParamFEOperator{LinearParamODE,T}
+  op_nonlinear::TransientParamFEOperator{T}
 end
 
 ParamSteady.get_linear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_linear
@@ -59,8 +59,8 @@ function ParamSteady.join_operators(
   op_lin::TransientParamFEOperator,
   op_nlin::TransientParamFEOperator)
 
-  op_lin = change_domains(op_lin)
-  op_nlin = change_domains(op_nlin)
+  op_lin = set_domains(op_lin)
+  op_nlin = set_domains(op_nlin)
 
   @check get_trial(op_lin) == get_trial(op_nlin)
   @check get_test(op_lin) == get_test(op_nlin)
@@ -90,6 +90,16 @@ function ParamSteady.join_operators(
   end
 
   TransientParamFEOperator(res,jacs,op_lin.tpspace,trial,test)
+end
+
+for f in (:(Utils.set_domains),:(Utils.change_domains))
+  @eval begin
+    function $f(op::LinearNonlinearTransientParamFEOperator)
+      op_lin′ = $f(get_linear_operator(op))
+      op_nlin′ = $f(get_nonlinear_operator(op))
+      LinearNonlinearTransientParamFEOperator(op_lin′,op_nlin′)
+    end
+  end
 end
 
 function ParamSteady.join_operators(op::LinearNonlinearTransientParamFEOperator)

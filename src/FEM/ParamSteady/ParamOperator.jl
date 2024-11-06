@@ -5,8 +5,8 @@ struct NonlinearParamEq <: UnEvalOperatorType end
 struct LinearNonlinearParamEq <: UnEvalOperatorType end
 
 abstract type TriangulationStyle <: GridapType end
-struct SplitTriangulation <: SplitTriangulationStyle end
-struct JointTriangulation <: SplitTriangulationStyle end
+struct SplitTriangulation <: TriangulationStyle end
+struct JointTriangulation <: TriangulationStyle end
 
 """
     abstract type ParamOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: NonlinearOperator end
@@ -15,7 +15,6 @@ Similar to [`ODEOperator`](@ref) in [`Gridap`](@ref), when dealing with steady
 parametric problems
 
 Subtypes:
-- [`ParamOperatorWithTrian`](@ref)
 - [`ParamOpFromFEOp`](@ref)
 
 """

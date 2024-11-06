@@ -17,8 +17,8 @@ Subtypes:
 
 """
 abstract type ParamFEOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: FEOperator end
-const JointParamFEOperator{O} = ParamFEOperator{O,JointTriangulation}
-const SplitParamFEOperator{O} = ParamFEOperator{O,SplitTriangulation}
+const JointParamFEOperator{O<:UnEvalOperatorType} = ParamFEOperator{O,JointTriangulation}
+const SplitParamFEOperator{O<:UnEvalOperatorType} = ParamFEOperator{O,SplitTriangulation}
 
 function FESpaces.get_test(feop::ParamFEOperator)
   @abstractmethod
@@ -148,24 +148,36 @@ IndexMaps.get_index_map(op::ParamFEOpFromWeakForm) = op.index_map
 
 # triangulation utils
 
-get_res_trian(op::ParamFEOperator) = get_domains(get_vector_index_map(op))
-get_jac_trian(op::ParamFEOperator) = get_domains(get_vector_index_map(op))
+get_trian_res(op::ParamFEOperator) = get_domains(get_vector_index_map(op))
+get_trian_jac(op::ParamFEOperator) = get_domains(get_matrix_index_map(op))
 
-function Utils.change_domains(op::JointParamFEOperator,trian_res,trian_jac)
+function Utils.set_domains(op::JointParamFEOperator,trian_res,trian_jac)
   op
 end
 
-function Utils.change_domains(op::SplitParamFEOpFromWeakForm{O},trian_res,trian_jac) where O
-  trian_res′ = order_triangulations(get_res_trian(op),trian_res)
-  trian_jac′ = order_triangulations(get_jac_trian(op),trian_jac)
-  res′,jac′ = _set_triangulations(op.res,op.jac,op.test,op.trial,trian_res′,trian_jac′)
-  index_map′ = change_domains(op.index_map,trian_res′,trian_jac′)
-  ParamFEOpFromWeakForm{O,SplitTriangulation}(
-    res′,jac′,op.pspace,op.assem,index_map′,op.trial,op.test)
+function Utils.set_domains(op::ParamFEOperator)
+  set_domains(op,get_trian_res(op),get_trian_jac(op))
+end
+
+function Utils.change_domains(op::JointParamFEOperator)
+  @notimplemented "The triangulations of this operator are fixed"
 end
 
 function Utils.change_domains(op::ParamFEOperator)
-  change_domains(op,get_res_trian(op),get_jac_trian(op))
+  @notimplemented "Need to provide triangulations for this function"
+end
+
+for (f,T) in zip((:(Utils.set_domains),:(Utils.change_domains)),(:JointTriangulation,:SplitTriangulation))
+  @eval begin
+    function $f(op::SplitParamFEOpFromWeakForm{O},trian_res,trian_jac) where O
+      trian_res′ = order_triangulations(get_trian_res(op),trian_res)
+      trian_jac′ = order_triangulations(get_trian_jac(op),trian_jac)
+      res′,jac′ = _set_triangulations(op.res,op.jac,op.test,op.trial,trian_res′,trian_jac′)
+      index_map′ = $f(op.index_map,trian_res′,trian_jac′)
+      ParamFEOpFromWeakForm{O,$T}(
+        res′,jac′,op.pspace,op.assem,index_map′,op.trial,op.test)
+    end
+  end
 end
 
 function _set_triangulation_jac(

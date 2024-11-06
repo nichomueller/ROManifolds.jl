@@ -96,6 +96,16 @@ function permute_sparsity(a::SparsityPatternCSC,i::AbstractIndexMap,j::AbstractI
   permute_sparsity(a,vectorize_map(i),vectorize_map(j))
 end
 
+sum_maps(i::AbstractIndexMap...) = first(i)
+
+function sum_maps(i::Tuple{Vararg{AbstractIndexMap}}...)
+  i′ = ()
+  for ii in i
+    i′ = (i′...,ii...)
+  end
+  sum_maps(i′...)
+end
+
 abstract type AbstractTrivialIndexMap <: AbstractIndexMap{1,Int} end
 
 Base.getindex(i::AbstractTrivialIndexMap,j::Integer) = j
@@ -127,6 +137,13 @@ TrivialIndexMap(i::TrivialSparseIndexMap) = i
 Base.size(i::TrivialSparseIndexMap) = (nnz(i.sparsity),)
 
 recast(a::AbstractArray,i::TrivialSparseIndexMap) = recast(a,i.sparsity)
+
+get_sparsity(i::TrivialSparseIndexMap) = i.sparsity
+
+function sum_maps(i::TrivialSparseIndexMap...)
+  sparsity = sum_sparsities(map(get_sparsity,i)...)
+  TrivialSparseIndexMap(sparsity)
+end
 
 """
     IndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
@@ -418,6 +435,29 @@ function inv_index_map(i::SparseIndexMap)
 end
 
 recast(a::AbstractArray,i::SparseIndexMap) = recast(a,i.sparsity)
+
+function sum_maps(i::SparseIndexMap...)
+  function _sum_maps(inds...)
+    ind′ = first(inds)
+    for ind in inds
+      @check size(ind) == size(ind′)
+      for (i,(indi′,indi)) in enumerate(zip(ind′,ind))
+        if !iszero(indi)
+          if iszero(indi′)
+            ind′[i] = indi
+          else
+            @check indi′ == indi
+          end
+        end
+      end
+    end
+    return inds′
+  end
+  indices = _sum_maps(map(get_index_map,i)...)
+  indices_sparse = _sum_maps(map(get_indices_sparse,i)...)
+  sparsity = sum_sparsities(map(get_sparsity,i)...)
+  SparseIndexMap(indices,indices_sparse,sparsity)
+end
 
 const MultiValueSparseIndexMap{D,Ti,A<:AbstractMultiValueIndexMap{D,Ti},B} = SparseIndexMap{D,Ti,A,B}
 

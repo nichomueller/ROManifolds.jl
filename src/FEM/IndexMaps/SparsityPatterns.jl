@@ -1,7 +1,7 @@
-function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
+function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace,args...)
   m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
-  cellidsrows = get_cell_dof_ids(V)
-  cellidscols = get_cell_dof_ids(U)
+  cellidsrows = get_cell_dof_ids(V,args...)
+  cellidscols = get_cell_dof_ids(U,args...)
   trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
   m2 = nz_allocation(m1)
   trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
@@ -9,8 +9,8 @@ function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
   SparsityPattern(m3)
 end
 
-function get_sparsity(U::FESpace,V::FESpace)
-  get_sparsity(SparseMatrixAssembler(U,V),U,V)
+function get_sparsity(U::FESpace,V::FESpace,args...)
+  get_sparsity(SparseMatrixAssembler(U,V),U,V,args...)
 end
 
 function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
@@ -73,6 +73,13 @@ function permute_sparsity(a::SparsityPatternCSC,i::AbstractVector,j::AbstractVec
   SparsityPatternCSC(a.matrix[i,j])
 end
 
+function sum_sparsities(a::SparsityPatternCSC...)
+  get_matrix(a::SparsityPatternCSC) = a.matrix
+  matrices = map(get_matrix,a)
+  matrix = _sparse_sum_preserve_sparsity(matrices...)
+  SparsityPatternCSC(matrix)
+end
+
 struct MultiValueSparsityPatternCSC{Tv,Ti} <: SparsityPattern
   matrix::SparseMatrixCSC{Tv,Ti}
   ncomps::Int
@@ -122,4 +129,21 @@ function permute_sparsity(s::TProductSparsityPattern,U::FESpace,V::FESpace)
   psparsity = permute_sparsity(s.sparsity,U.space,V.space)
   psparsities = map(permute_sparsity,s.sparsities_1d,U.spaces_1d,V.spaces_1d)
   TProductSparsityPattern(psparsity,psparsities)
+end
+
+function sum_sparsities(a::TProductSparsityPattern...)
+  ssparsity = sum_sparsities(map(get_sparsity,a)...)
+  ssparsities = map(sum_sparsities,map(get_univariate_sparsity,a))
+  TProductSparsityPattern(ssparsity,ssparsities)
+end
+
+# utils
+
+function _sparse_sum_preserve_sparsity(A::SparseMatrixCSC,Bs::SparseMatrixCSC...)
+  entrytypeC = Base.Broadcast.combine_eltypes(+,(A,Bs...))
+  indextypeC = SparseArrays.HigherOrderFns._promote_indtype(A,Bs...)
+  fofzeros = +(SparseArrays.HigherOrderFns._zeros_eltypes(A,Bs...)...)
+  maxnnzC = SparseArrays.widelength(A)
+  C = SparseArrays.HigherOrderFns._allocres(size(A),indextypeC,entrytypeC,maxnnzC)
+  SparseArrays.HigherOrderFns._map_notzeropres!(+,fofzeros,C,A,Bs...)
 end

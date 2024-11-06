@@ -26,6 +26,7 @@ import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ODEs: TransientCellField
 import Gridap.ReferenceFEs: get_order
+import ReducedOrderModels.ParamSteady: get_trian_res,get_trian_jac
 
 include("TimeDerivatives.jl")
 
@@ -45,6 +46,8 @@ export ParamStageOperator
 include("ParamStageOperator.jl")
 
 export TransientParamFEOperator
+export SplitTransientParamFEOperator
+export JointTransientParamFEOperator
 export TransientParamFEOpFromWeakForm
 export TransientParamLinearFEOperator
 export TransientParamLinearFEOpFromWeakForm

@@ -82,8 +82,9 @@ function solution_snapshots(
   r::Realization)
 
   fesolver = get_fe_solver(solver)
-  index_map = get_vector_index_map(op)
-  uh,stats = solve(fesolver,op,r)
+  op′ = set_domains(op)
+  index_map = get_vector_index_map(op′)
+  uh,stats = solve(fesolver,op′,r)
   values = get_free_dof_values(uh)
   snaps = Snapshots(values,index_map,r)
   return snaps,stats
