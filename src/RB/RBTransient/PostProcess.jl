@@ -10,9 +10,9 @@ function DrWatson.save(dir,op::GenericTransientRBOperator;kwargs...)
   RBSteady._save_trian_operator_parts(dir,op;kwargs...)
 end
 
-function RBSteady._load_trian_operator_parts(dir,feop::TransientParamFEOperatorWithTrian,trial,test;label="")
-  trian_res = feop.trian_res
-  trian_jacs = feop.trian_jacs
+function RBSteady._load_trian_operator_parts(dir,feop::SplitTransientParamFEOperator,trial,test;label="")
+  trian_res = ParamSteady.get_trian_res(feop)
+  trian_jacs = ParamSteady.get_trian_jac(feop)
   odeop = get_algebraic_operator(feop)
   red_rhs = RBSteady.load_contribution(dir,trian_res,test;label=RBSteady._get_label(label,"rhs"))
   red_lhs = ()
@@ -22,11 +22,11 @@ function RBSteady._load_trian_operator_parts(dir,feop::TransientParamFEOperatorW
   end
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
-  new_odeop = change_triangulation(odeop,trians_rhs,trians_lhs)
+  new_odeop = change_domains(odeop,trians_rhs,trians_lhs)
   return new_odeop,red_lhs,red_rhs
 end
 
-function RBSteady.load_operator(dir,feop::TransientParamFEOperatorWithTrian;kwargs...)
+function RBSteady.load_operator(dir,feop::SplitTransientParamFEOperator;kwargs...)
   trial,test = RBSteady._load_fixed_operator_parts(dir,feop;kwargs...)
   odeop,red_lhs,red_rhs = RBSteady._load_trian_operator_parts(dir,feop,trial,test;kwargs...)
   op = GenericTransientRBOperator(odeop,trial,test,red_lhs,red_rhs)
@@ -39,10 +39,7 @@ function DrWatson.save(dir,op::LinearNonlinearTransientRBOperator;label="")
   RBSteady._save_trian_operator_parts(dir,op.op_nonlinear;label=RBSteady._get_label(label,"nonlinear"))
 end
 
-function RBSteady.load_operator(dir,feop::LinearNonlinearTransientParamFEOperator;label="")
-  @assert isa(feop.op_linear,TransientParamFEOperatorWithTrian)
-  @assert isa(feop.op_nonlinear,TransientParamFEOperatorWithTrian)
-
+function RBSteady.load_operator(dir,feop::LinearNonlinearTransientRBOperator;label="")
   trial,test = RBSteady._load_fixed_operator_parts(dir,feop.op_linear;label)
   odeop_lin,red_lhs_lin,red_rhs_lin = RBSteady._load_trian_operator_parts(
     dir,feop.op_linear,trial,test;label=RBSteady._get_label("linear",label))

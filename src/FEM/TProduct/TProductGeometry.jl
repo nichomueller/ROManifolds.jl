@@ -144,7 +144,7 @@ end
 
 Geometry.get_background_model(trian::TProductTriangulation) = trian.model
 Geometry.get_grid(trian::TProductTriangulation) = get_grid(trian.trian)
-Geometry.get_glue(trian::TProductTriangulation{Dt},::Val{Dt}) where Dt = get_glue(trian.trian,Dt)
+Geometry.get_glue(trian::TProductTriangulation{Dt},::Val{Dt}) where Dt = get_glue(trian.trian,Val{Dt}())
 
 function Geometry.Triangulation(model::TProductModel;kwargs...)
   trian = Triangulation(model.model;kwargs...)

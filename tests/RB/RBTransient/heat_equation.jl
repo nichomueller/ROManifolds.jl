@@ -72,7 +72,7 @@ tol = 1e-4
 state_reduction = TransientReduction(tol,energy;nparams=50)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,nparams_djac=20)
 
-test_dir = datadir(joinpath("heateq","elasticity_$(1e-4)"))
+test_dir = datadir(joinpath("heateq","elasticity_$(tol)"))
 create_dir(test_dir)
 
 # RB method

@@ -82,8 +82,9 @@ function solution_snapshots(
   r::Realization)
 
   fesolver = get_fe_solver(solver)
-  index_map = get_vector_index_map(op)
-  uh,stats = solve(fesolver,op,r)
+  op′ = set_domains(op)
+  index_map = get_vector_index_map(op′)
+  uh,stats = solve(fesolver,op′,r)
   values = get_free_dof_values(uh)
   snaps = Snapshots(values,index_map,r)
   return snaps,stats
@@ -99,7 +100,7 @@ function residual_snapshots(solver::RBSolver,op::ParamOperator,s)
   return Snapshots(b,ib,r_res)
 end
 
-function residual_snapshots(solver::RBSolver,op::ParamOperator{<:LinearParamEq},s)
+function residual_snapshots(solver::RBSolver,op::ParamOperator{LinearParamEq},s)
   fesolver = get_fe_solver(solver)
   sres = select_snapshots(s,res_params(solver))
   us_res = get_values(sres) |> similar
@@ -120,7 +121,7 @@ function jacobian_snapshots(solver::RBSolver,op::ParamOperator,s)
   return Snapshots(A,iA,r_jac)
 end
 
-function jacobian_snapshots(solver::RBSolver,op::ParamOperator{<:LinearParamEq},s)
+function jacobian_snapshots(solver::RBSolver,op::ParamOperator{LinearParamEq},s)
   fesolver = get_fe_solver(solver)
   sjac = select_snapshots(s,jac_params(solver))
   us_jac = get_values(sjac) |> similar

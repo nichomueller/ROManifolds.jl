@@ -54,6 +54,14 @@ function Contribution(
   ArrayContribution{T,N}(v,t)
 end
 
+for f in (:set_domains,:change_domains)
+  @eval begin
+    function $f(a::Contribution,t::Tuple{Vararg{Triangulation}})
+      Contribution(get_values(a),t)
+    end
+  end
+end
+
 """
     struct ArrayContribution{T,N,V,K} <: Contribution end
 
@@ -162,6 +170,22 @@ const TupOfArrayContribution{T} = Tuple{Vararg{ArrayContribution{T}}}
 Base.eltype(::TupOfArrayContribution{T}) where T = T
 Base.eltype(::Type{<:TupOfArrayContribution{T}}) where T = T
 
+function CellData.get_domains(a::TupOfArrayContribution)
+  trians = ()
+  for ai in a
+    trians = (trians...,CellData.get_domains(ai))
+  end
+  trians
+end
+
+function get_values(a::TupOfArrayContribution)
+  values = ()
+  for ai in a
+    values = (values...,get_values(ai))
+  end
+  values
+end
+
 function Base.copy(a::TupOfArrayContribution)
   b = ()
   for ai in a
@@ -185,169 +209,14 @@ function Algebra.copy_entries!(a::TupOfArrayContribution,b::TupOfArrayContributi
   a
 end
 
-# triangulation utils
-
-"""
-    is_parent(tparent::Triangulation,tchild::Triangulation) -> Bool
-
-Returns true if `tchild` is a triangulation view of `tparent`, false otherwise
-
-"""
-function is_parent(tparent::Triangulation,tchild::Triangulation)
-  false
-end
-
-function is_parent(
-  tparent::BodyFittedTriangulation,
-  tchild::BodyFittedTriangulation{Dt,Dp,A,<:Geometry.GridView}) where {Dt,Dp,A}
-  tparent.grid === tchild.grid.parent
-end
-
-function is_parent(tparent::BoundaryTriangulation,tchild::Geometry.TriangulationView)
-  tparent === tchild.parent
-end
-
-function get_parent(t::Geometry.Grid)
-  @abstractmethod
-end
-
-function get_parent(gv::Geometry.GridView)
-  gv.parent
-end
-
-function get_parent(t::Geometry.TriangulationView)
-  t.parent
-end
-
-function get_parent(t::BodyFittedTriangulation)
-  grid = get_parent(get_grid(t))
-  model = get_background_model(t)
-  tface_to_mface = IdentityVector(num_cells(grid))
-  BodyFittedTriangulation(model,grid,tface_to_mface)
-end
-
-function get_parent(t::AbstractVector{<:Triangulation})
-  get_parent(first(t))
-end
-
-"""
-    is_parent(t::Triangulation) -> Triangulation
-
-When `t` is a triangulation view, returns its parent; throws an error when `t`
-is not a triangulation view
-
-"""
-function get_parent(t::Triangulation)
-  @abstractmethod
-end
-
-function Base.isapprox(t::Grid,s::Grid)
-  false
-end
-
-function Base.isapprox(t::T,s::T) where {T<:UnstructuredGrid}
-  (
-    t.cell_node_ids == s.cell_node_ids &&
-    t.cell_types == s.cell_types &&
-    t.node_coordinates == s.node_coordinates
-  )
-end
-
-function Base.isapprox(t::T,s::T) where {T<:Geometry.GridView}
-  t.parent ≈ s.parent
-end
-
-get_tface_to_mface(t::Triangulation) = @abstractmethod "$(typeof(t))"
-get_tface_to_mface(t::BodyFittedTriangulation) = t.tface_to_mface
-get_tface_to_mface(t::BoundaryTriangulation) = get_tface_to_mface(t.trian)
-
-function Base.isapprox(t::T,s::S) where {T<:Triangulation,S<:Triangulation}
-  false
-end
-
-function Base.isapprox(t::T,s::T) where {T<:Triangulation}
-  get_tface_to_mface(t) == get_tface_to_mface(s) && get_grid(t) ≈ get_grid(s)
-end
-
-function Base.isapprox(t::T,s::T) where {T<:Geometry.TriangulationView}
-  get_view_indices(t) == get_view_indices(s) && get_parent(t) ≈ get_parent(s)
-end
-
-function Base.isapprox(t::T,s::T) where {T<:BoundaryTriangulation}
-  (
-    t.trian.tface_to_mface == s.trian.tface_to_mface &&
-    t.trian.grid.parent.cell_node_ids == s.trian.grid.parent.cell_node_ids &&
-    t.trian.grid.parent.cell_types == s.trian.grid.parent.cell_types &&
-    t.trian.grid.parent.node_coordinates == s.trian.grid.parent.node_coordinates
-  )
-end
-
-function isapprox_parent(tparent::Triangulation,tchild::Triangulation)
-  tparent ≈ get_parent(tchild)
-end
-
-function get_view_indices(t::BodyFittedTriangulation)
-  grid = get_grid(t)
-  grid.cell_to_parent_cell
-end
-
-function get_view_indices(t::Geometry.TriangulationView)
-  t.cell_to_parent_cell
-end
-
-function get_union_indices(trians)
-  indices = map(get_view_indices,trians)
-  union(indices...) |> unique
-end
-
-"""
-    merge_triangulations(trians::Tuple{Vararg{Triangulation}}) -> Triangulation
-
-Given a tuple of triangulation views `trians`, returns the triangulation view
-on the union of the viewed cells. In other words, the minimum common integration
-domain is found
-
-"""
-function merge_triangulations(trians)
-  parent = get_parent(trians)
-  uindices = get_union_indices(trians)
-  view(parent,uindices)
-end
-
-function find_trian_permutation(a,b,cmp::Function)
-  map(a -> findfirst(b -> cmp(a,b),b),a)
-end
-
-function find_trian_permutation(a,b)
-  cmp = (a,b) -> a == b || is_parent(a,b)
-  map(a -> findfirst(b -> cmp(a,b),b),a)
-end
-
-"""
-    order_triangulations(tparents::Tuple{Vararg{Triangulation}},
-      tchildren::Tuple{Vararg{Triangulation}}) -> Tuple{Vararg{Triangulation}}
-
-Orders the triangulation children in the same way as the triangulation parents
-
-"""
-function order_triangulations(tparents,tchildren)
-  @check length(tparents) == length(tchildren)
-  iperm = find_trian_permutation(tparents,tchildren)
-  map(iperm->tchildren[iperm],iperm)
-end
-
-"""
-    find_closest_view(tparents::Tuple{Vararg{Triangulation}},
-      tchild::Triangulation) -> Integer, Triangulation
-
-Finds the approximate parent of `tchild`; it returns the parent's index and its
-view in the same indices as `tchild` (which should be a triangulation view)
-
-"""
-function find_closest_view(tparents,tchild::Triangulation)
-  cmp(a,b) = isapprox_parent(b,a)
-  iperm::Tuple{Vararg{Int}} = find_trian_permutation((tchild,),tparents,cmp)
-  @check length(iperm) == 1
-  indices = get_view_indices(tchild)
-  return iperm,view(tparents[iperm...],indices)
+for f in (:set_domains,:change_domains)
+  @eval begin
+    function $f(a::TupOfArrayContribution,t::Tuple{Vararg{Tuple{Vararg{Triangulation}}}})
+      b = ()
+      for (ai,ti) in zip(a,t)
+        b = (b...,$f(ai,ti))
+      end
+      b
+    end
+  end
 end

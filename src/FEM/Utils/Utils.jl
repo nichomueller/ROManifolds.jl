@@ -3,6 +3,7 @@ module Utils
 using LinearAlgebra
 
 using Gridap
+using Gridap.Algebra
 using Gridap.Arrays
 using Gridap.CellData
 using Gridap.FESpaces
@@ -10,6 +11,9 @@ using Gridap.Fields
 using Gridap.Geometry
 using Gridap.Helpers
 using Gridap.TensorValues
+
+using GridapEmbedded
+using GridapEmbedded.Interfaces
 
 export PerformanceTracker
 export CostTracker
@@ -28,6 +32,20 @@ export PartialTrace
 export ∂ₓ₁, ∂ₓ₂, ∂ₓ₃
 include("PartialFunctions.jl")
 
-include("TriangulationView.jl")
+export get_values
+export get_parent
+export order_triangulations
+export find_closest_view
+include("Triangulations.jl")
+
+export Contribution
+export ArrayContribution
+export VectorContribution
+export MatrixContribution
+export TupOfArrayContribution
+export contribution
+export set_domains
+export change_domains
+include("Contributions.jl")
 
 end # module

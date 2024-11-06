@@ -15,11 +15,27 @@ export PartialDerivative
 export PartialTrace
 export ∂ₓ₁, ∂ₓ₂, ∂ₓ₃
 
+export get_values
+export get_parent
+export order_triangulations
+export find_closest_view
+
+export Contribution
+export ArrayContribution
+export VectorContribution
+export MatrixContribution
+export TupOfArrayContribution
+export contribution
+export set_domains
+export change_domains
+
 include("FEM/Utils/Utils.jl")
 using ReducedOrderModels.Utils
 
 export recast_indices
 export get_nonzero_indices
+export slow_index
+export fast_index
 
 export SparsityPattern
 export SparsityPatternCSC
@@ -34,7 +50,6 @@ export TrivialIndexMap
 export TrivialSparseIndexMap
 export IndexMap
 export IndexMapView
-export FixedDofsIndexMap
 export AbstractMultiValueIndexMap
 export MultiValueIndexMap
 export MultiValueIndexMapView
@@ -43,12 +58,11 @@ export SparseIndexMap
 export MultiValueSparseIndexMap
 export get_index_map
 export inv_index_map
-export free_dofs_map
+export remove_constrained_dofs
 export change_index_map
 export get_sparse_index_map
 export recast
 export get_fixed_dofs
-export remove_fixed_dof
 export compose_indices
 export get_component
 export merge_components
@@ -112,8 +126,6 @@ export get_initial_time
 export get_final_time
 export num_params
 export num_times
-export slow_index
-export fast_index
 export shift!
 
 export AbstractParamContainer
@@ -163,17 +175,6 @@ export BlockParamMatrix
 export BlockConsecutiveParamVector
 export BlockConsecutiveParamMatrix
 
-export Contribution
-export ArrayContribution
-export VectorContribution
-export MatrixContribution
-export TupOfArrayContribution
-export contribution
-export get_values
-export get_parent
-export order_triangulations
-export find_closest_view
-
 include("FEM/ParamDataStructures/ParamDataStructures.jl")
 using ReducedOrderModels.ParamDataStructures
 
@@ -220,9 +221,6 @@ export LinearNonlinearParamOpFromFEOp
 
 export ParamFEOperator
 export LinearParamFEOperator
-export ParamFEOperatorWithTrian
-export set_triangulation
-export change_triangulation
 
 export LinearNonlinearParamODE
 export LinearNonlinearParamFEOperator
@@ -231,7 +229,8 @@ export get_nonlinear_operator
 export join_operators
 
 export ParamOpFromFEOp
-export ParamOpFromFEOpWithTrian
+export JointParamOpFromFEOp
+export SplitParamOpFromFEOp
 
 include("FEM/ParamSteady/ParamSteady.jl")
 using ReducedOrderModels.ParamSteady
@@ -253,11 +252,6 @@ export TransientParamLinearFEOpFromWeakForm
 export LinearTransientParamFEOperator
 export NonlinearTransientParamFEOperator
 
-export TransientParamFEOperatorWithTrian
-export TransientParamFEOperatorWithTrian
-export set_triangulation
-export change_triangulation
-
 export LinearNonlinearParamODE
 export LinearNonlinearTransientParamFEOperator
 export get_linear_operator
@@ -265,7 +259,6 @@ export get_nonlinear_operator
 export join_operators
 
 export ODEParamOpFromTFEOp
-export ODEParamOpFromTFEOpWithTrian
 
 export ODEParamSolution
 

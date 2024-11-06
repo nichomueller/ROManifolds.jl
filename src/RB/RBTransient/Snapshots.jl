@@ -78,7 +78,7 @@ function RBSteady.Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::Transie
 end
 
 ParamDataStructures.get_all_data(s::TransientGenericSnapshots) = s.data
-ParamDataStructures.get_values(s::TransientGenericSnapshots) = s.data
+Utils.get_values(s::TransientGenericSnapshots) = s.data
 IndexMaps.get_index_map(s::TransientGenericSnapshots) = s.index_map
 RBSteady.get_realization(s::TransientGenericSnapshots) = s.realization
 
@@ -177,7 +177,7 @@ ParamDataStructures.get_all_data(s::TransientSnapshotsAtIndices) = get_all_data(
 IndexMaps.get_index_map(s::TransientSnapshotsAtIndices) = get_index_map(s.snaps)
 RBSteady.get_realization(s::TransientSnapshotsAtIndices) = get_realization(s.snaps)[s.prange,s.trange]
 
-function ParamDataStructures.get_values(s::TransientSnapshotsAtIndices)
+function Utils.get_values(s::TransientSnapshotsAtIndices)
   prange = RBSteady.param_indices(s)
   trange = time_indices(s)
   np = _num_all_params(s)
@@ -284,7 +284,7 @@ end
 RBSteady.get_realization(s::TransientReshapedSnapshots) = get_realization(s.snaps)
 IndexMaps.get_index_map(s::TransientReshapedSnapshots) = get_index_map(s.snaps)
 
-function ParamDataStructures.get_values(s::TransientReshapedSnapshots)
+function Utils.get_values(s::TransientReshapedSnapshots)
   v = get_values(s.snaps)
   reshape(v.data,s.size)
 end
@@ -351,7 +351,7 @@ end
 
 ParamDataStructures.get_all_data(s::ModeTransientSnapshots) = get_all_data(s.snaps)
 RBSteady.num_space_dofs(s::ModeTransientSnapshots) = prod(num_space_dofs(s.snaps))
-ParamDataStructures.get_values(s::ModeTransientSnapshots) = get_values(s.snaps)
+Utils.get_values(s::ModeTransientSnapshots) = get_values(s.snaps)
 RBSteady.get_realization(s::ModeTransientSnapshots) = get_realization(s.snaps)
 IndexMaps.get_index_map(s::ModeTransientSnapshots) = get_index_map(s.snaps)
 
@@ -439,12 +439,12 @@ Base.getindex(r::Range2D,i::Integer,j::Integer) = r.axis1[i] + (r.axis2[j]-1)*r.
 
 # utils
 
-for I in (:AbstractIndexMap,:(AbstractArray{<:AbstractIndexMap}))
-  @eval begin
-    function RBSteady.Snapshots(a::TupOfArrayContribution,i::$I,r::AbstractRealization)
-      map(a->Snapshots(a,i,r),a)
-    end
-  end
+function RBSteady.Snapshots(
+  a::TupOfArrayContribution,
+  i::TupOfArrayContribution,
+  r::AbstractRealization)
+
+  map((a,i)->Snapshots(a,i,r),a,i)
 end
 
 function RBSteady.select_snapshots(a::TupOfArrayContribution,args...;kwargs...)

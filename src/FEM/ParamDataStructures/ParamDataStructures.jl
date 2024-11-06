@@ -42,8 +42,6 @@ export get_initial_time
 export get_final_time
 export num_params
 export num_times
-export slow_index
-export fast_index
 export shift!
 include("ParamSpace.jl")
 
@@ -117,17 +115,5 @@ include("ParamBroadcasts.jl")
 export ParamReindex
 export PosNegParamReindex
 include("ParamReindex.jl")
-
-export Contribution
-export ArrayContribution
-export VectorContribution
-export MatrixContribution
-export TupOfArrayContribution
-export contribution
-export get_values
-export get_parent
-export order_triangulations
-export find_closest_view
-include("Contribution.jl")
 
 end # module

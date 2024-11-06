@@ -88,46 +88,9 @@ end
 
 function Algebra.solve(
   solver::ODESolver,
-  op::TransientParamFEOperatorWithTrian,
-  r::TransientRealization,
-  uh0)
-
-  TransientParamFESolution(solver,op.op,r,uh0)
-end
-
-# function Algebra.solve(
-#   solver::ODESolver,
-#   op::LinearNonlinearTransientParamFEOperator,
-#   r::TransientRealization,
-#   uh0)
-
-#   lop = get_linear_operator(op)
-#   nlop = get_nonlinear_operator(op)
-#   if isa(lop,TransientParamFEOperatorWithTrian) || isa(nlop,TransientParamFEOperatorWithTrian)
-#     @assert isa(lop,TransientParamFEOperatorWithTrian) && isa(nlop,TransientParamFEOperatorWithTrian)
-#     op′ = LinearNonlinearTransientParamFEOperator(lop.op,nlop.op)
-#   else
-#     op′ = op
-#   end
-#   TransientParamFESolution(solver,op′,r,uh0)
-# end
-
-function Algebra.solve(
-  solver::ODESolver,
   op::LinearNonlinearTransientParamFEOperator,
   r::TransientRealization,
   uh0)
 
   TransientParamFESolution(solver,join_operators(op),r,uh0)
-end
-
-function test_transient_fe_solver(
-  solver::ODESolver,op::TransientParamFEOperator,r,u0)
-
-  solution = solve(solver,op,r,u0)
-  for (rn,uhn) in solution
-    @test isa(uhn,FEFunction)
-    @test isa(rn,TransientRealization)
-  end
-  true
 end

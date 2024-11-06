@@ -1,10 +1,20 @@
 """
 """
-struct ODEParamOpFromTFEOp{T} <: ODEParamOperator{T}
-  op::TransientParamFEOperator{T}
+struct ODEParamOpFromTFEOp{O,T} <: ODEParamOperator{O,T}
+  op::TransientParamFEOperator{O,T}
 end
 
 ParamSteady.get_fe_operator(op::ODEParamOpFromTFEOp) = op.op
+
+for f in (:(Utils.set_domains),:(Utils.change_domains))
+  @eval begin
+    function $f(odeop::ODEParamOpFromTFEOp,trians_rhs,trians_lhs)
+      ODEParamOpFromTFEOp($f(odeop.op,trians_rhs,trians_lhs))
+    end
+  end
+end
+
+const JointODEParamOpFromTFEOp{O} = ODEParamOpFromTFEOp{O,JointTriangulation}
 
 function Algebra.allocate_residual(
   odeop::ODEParamOpFromTFEOp,
@@ -213,24 +223,10 @@ function ParamSteady.allocate_systemcache(
   return A,b
 end
 
-"""
-"""
-struct ODEParamOpFromTFEOpWithTrian{T} <: ODEParamOperator{T}
-  op::TransientParamFEOperatorWithTrian{T}
-end
-
-ParamSteady.get_fe_operator(op::ODEParamOpFromTFEOpWithTrian) = op.op
-
-function ParamSteady.set_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
-  ODEParamOpFromTFEOpWithTrian(set_triangulation(odeop.op,trians_rhs,trians_lhs))
-end
-
-function ParamSteady.change_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
-  ODEParamOpFromTFEOpWithTrian(change_triangulation(odeop.op,trians_rhs,trians_lhs))
-end
+const SplitODEParamOpFromTFEOp{O} = ODEParamOpFromTFEOp{O,SplitTriangulation}
 
 function Algebra.allocate_residual(
-  odeop::ODEParamOpFromTFEOpWithTrian,
+  odeop::SplitODEParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache)
@@ -241,10 +237,11 @@ function Algebra.allocate_residual(
   assem = get_param_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
+  trian_res = get_trian_res(odeop.op)
   res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
-  b = contribution(odeop.op.trian_res) do trian
+  b = contribution(trian_res) do trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     allocate_vector(assem,vecdata)
   end
@@ -253,7 +250,7 @@ end
 
 function Algebra.residual!(
   b::ArrayContribution,
-  odeop::ODEParamOpFromTFEOpWithTrian,
+  odeop::SplitODEParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache;
@@ -268,10 +265,11 @@ function Algebra.residual!(
 
   μ,t = get_params(r),get_times(r)
 
+  trian_res = get_trian_res(odeop.op)
   res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
-  map(b.values,odeop.op.trian_res) do values,trian
+  map(b.values,trian_res) do values,trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     assemble_vector_add!(values,assem,vecdata)
   end
@@ -279,7 +277,7 @@ function Algebra.residual!(
 end
 
 function Algebra.residual(
-  odeop::ODEParamOpFromTFEOpWithTrian,
+  odeop::SplitODEParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache)
@@ -292,17 +290,18 @@ function Algebra.residual(
   μ,t = get_params(r),get_times(r)
 
   # Residual
+  trian_res = get_trian_res(odeop.op)
   res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
-  contribution(odeop.op.trian_res) do trian
+  contribution(trian_res) do trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     assemble_vector(assem,vecdata)
   end
 end
 
 function Algebra.allocate_jacobian(
-  odeop::ODEParamOpFromTFEOpWithTrian,
+  odeop::SplitODEParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache)
@@ -316,11 +315,12 @@ function Algebra.allocate_jacobian(
 
   μ,t = get_params(r),get_times(r)
 
+  trian_jacs = get_trian_jac(odeop.op)
   jacs = get_jacs(odeop.op)
   As = ()
   for k in 1:get_order(odeop.op)+1
     jac = jacs[k]
-    trian_jac = odeop.op.trian_jacs[k]
+    trian_jac = trian_jacs[k]
     dc = jac(μ,t,uh,du,v)
     A = contribution(trian_jac) do trian
       matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
@@ -333,7 +333,7 @@ end
 
 function ODEs.jacobian_add!(
   As::TupOfArrayContribution,
-  odeop::ODEParamOpFromTFEOpWithTrian,
+  odeop::SplitODEParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
@@ -348,13 +348,14 @@ function ODEs.jacobian_add!(
 
   μ,t = get_params(r),get_times(r)
 
+  trian_jacs = get_trian_jac(odeop.op)
   jacs = get_jacs(odeop.op)
   for k in 1:get_order(odeop)+1
     A = As[k]
     w = ws[k]
     iszero(w) && continue
     jac = jacs[k]
-    trian_jac = odeop.op.trian_jacs[k]
+    trian_jac = trian_jacs[k]
     dc = w * jac(μ,t,uh,du,v)
     if num_domains(dc) > 0
       map(A.values,trian_jac) do values,trian
@@ -369,7 +370,7 @@ end
 
 function ODEs.jacobian_add!(
   As::TupOfArrayContribution,
-  odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
+  odeop::SplitODEParamOpFromTFEOp{LinearParamODE},
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
@@ -385,6 +386,7 @@ function ODEs.jacobian_add!(
 
   μ,t = get_params(r),get_times(r)
 
+  trian_jacs = get_trian_jac(odeop.op)
   jacs = get_jacs(odeop.op)
   for k in 1:get_order(odeop)+1
     A = As[k]
@@ -394,7 +396,7 @@ function ODEs.jacobian_add!(
       axpy_entries!(w,cache.A[k],A)
     else
       jac = jacs[k]
-      trian_jac = odeop.op.trian_jacs[k]
+      trian_jac = trian_jacs[k]
       dc = w * jac(μ,t,uh,du,v)
       if num_domains(dc) > 0
         map(A.values,trian_jac) do values,trian
@@ -409,7 +411,7 @@ function ODEs.jacobian_add!(
 end
 
 function Algebra.jacobian(
-  odeop::ODEParamOpFromTFEOpWithTrian,
+  odeop::SplitODEParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
@@ -424,13 +426,14 @@ function Algebra.jacobian(
   assem = get_param_assembler(odeop.op,r)
   μ,t = get_params(r),get_times(r)
 
+  trian_jacs = get_trian_jac(odeop.op)
   jacs = get_jacs(odeop.op)
   As = ()
   for k in 1:get_order(odeop.op)+1
     w = ws[k]
     iszero(w) && continue
     jac = jacs[k]
-    trian_jac = odeop.op.trian_jacs[k]
+    trian_jac = trian_jacs[k]
     dc = w * jac(μ,t,uh,du,v)
     A = contribution(trian_jac) do trian
       matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
@@ -443,7 +446,7 @@ function Algebra.jacobian(
 end
 
 function ParamSteady.allocate_systemcache(
-  odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
+  odeop::SplitODEParamOpFromTFEOp{LinearParamODE},
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
@@ -465,6 +468,7 @@ function ParamSteady.allocate_systemcache(
   trial = evaluate(get_trial(feop),nothing)
   du = get_trial_fe_basis(trial)
   assem = get_param_assembler(feop,r)
+  trian_jacs = get_trian_jac(feop)
   jacs = get_jacs(feop)
   μ,t = get_params(r),get_times(r)
 
@@ -473,7 +477,7 @@ function ParamSteady.allocate_systemcache(
     w = ws[k]
     iszero(w) && continue
     jac = jacs[k]
-    trian_jac = feop.trian_jacs[k]
+    trian_jac = trian_jacs[k]
     dc = w * jac(μ,t,uh,du,v)
     Ak = contribution(trian_jac) do trian
       matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
@@ -487,8 +491,8 @@ end
 
 # linear - nonlinear case
 
-struct LinearNonlinearParamOpFromTFEOp <: ODEParamOperator{LinearNonlinearParamODE}
-  op::LinearNonlinearTransientParamFEOperator
+struct LinearNonlinearParamOpFromTFEOp{T} <: ODEParamOperator{LinearNonlinearParamODE,T}
+  op::LinearNonlinearTransientParamFEOperator{T}
 end
 
 ParamSteady.get_fe_operator(op::LinearNonlinearParamOpFromTFEOp) = op.op

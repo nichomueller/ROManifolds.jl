@@ -60,9 +60,10 @@ function RBSteady.solution_snapshots(
   args...)
 
   fesolver = get_fe_solver(solver)
-  sol = solve(fesolver,feop,r,args...)
+  feop′ = set_domains(feop)
+  sol = solve(fesolver,feop′,r,args...)
   values,stats = collect(sol.odesol)
-  i = get_vector_index_map(feop)
+  i = get_vector_index_map(feop′)
   snaps = Snapshots(values,i,r)
   return snaps,stats
 end
@@ -94,8 +95,8 @@ function RBSteady.jacobian_snapshots(
   iA = get_matrix_index_map(odeop)
   jac_reduction = RBSteady.get_jacobian_reduction(solver)
   sA = ()
-  for (reda,a) in zip(jac_reduction,A)
-    sa = Snapshots(a,iA,r_jac)
+  for (reda,a,ia) in zip(jac_reduction,A,iA)
+    sa = Snapshots(a,ia,r_jac)
     sA = (sA...,select_snapshots(sa,1:num_params(reda)))
   end
   return sA

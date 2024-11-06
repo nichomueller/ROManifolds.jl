@@ -14,7 +14,7 @@ Subtypes:
 """
 abstract type AbstractSnapshots{T,N,D,I<:AbstractIndexMap{D},R<:AbstractRealization,A} <: AbstractParamContainer{T,N} end
 
-ParamDataStructures.get_values(s::AbstractSnapshots) = @abstractmethod
+Utils.get_values(s::AbstractSnapshots) = @abstractmethod
 get_indexed_values(s::AbstractSnapshots) = @abstractmethod
 IndexMaps.get_index_map(s::AbstractSnapshots) = @abstractmethod
 get_realization(s::AbstractSnapshots) = @abstractmethod
@@ -138,12 +138,12 @@ function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::Realization)
 end
 
 ParamDataStructures.get_all_data(s::GenericSnapshots) = s.data
-ParamDataStructures.get_values(s::GenericSnapshots) = s.data
+Utils.get_values(s::GenericSnapshots) = s.data
 IndexMaps.get_index_map(s::GenericSnapshots) = s.index_map
 get_realization(s::GenericSnapshots) = s.realization
 
 function get_indexed_values(s::GenericSnapshots)
-  vi = vec(get_index_map(s))
+  vi = vectorize_map(get_index_map(s))
   data = get_all_data(s.data)
   ConsecutiveParamArray(data[vi,:])
 end
@@ -207,7 +207,7 @@ IndexMaps.get_index_map(s::SnapshotsAtIndices) = get_index_map(s.snaps)
 _num_all_params(s::AbstractSnapshots) = num_params(s)
 _num_all_params(s::SnapshotsAtIndices) = _num_all_params(s.snaps)
 
-function ParamDataStructures.get_values(s::SnapshotsAtIndices)
+function Utils.get_values(s::SnapshotsAtIndices)
   data = get_all_data(get_all_data(s))
   ConsecutiveParamArray(data[:,param_indices(s)])
 end
@@ -276,7 +276,7 @@ function Base.reshape(s::AbstractSnapshots,dims::Dims)
   strds = Base.front(Base.size_to_strides(map(length,axes(s))..., 1))
   strds1 = map(s->max(1,Int(s)),strds)
   mi = map(Base.SignedMultiplicativeInverse,strds1)
-  ReshapedSnapshots(parent,dims,reverse(mi))
+  ReshapedSnapshots(s,dims,reverse(mi))
 end
 
 Base.@propagate_inbounds function Base.getindex(
@@ -306,7 +306,7 @@ end
 get_realization(s::ReshapedSnapshots) = get_realization(s.snaps)
 IndexMaps.get_index_map(s::ReshapedSnapshots) = get_index_map(s.snaps)
 
-function ParamDataStructures.get_values(s::ReshapedSnapshots)
+function Utils.get_values(s::ReshapedSnapshots)
   v = get_values(s.snaps)
   reshape(v.data,s.size)
 end
@@ -442,7 +442,7 @@ end
 IndexMaps.get_index_map(s::BlockSnapshots) = get_index_map(testitem(s))
 get_realization(s::BlockSnapshots) = get_realization(testitem(s))
 
-function ParamDataStructures.get_values(s::BlockSnapshots)
+function Utils.get_values(s::BlockSnapshots)
   map(get_values,s.array) |> mortar
 end
 
@@ -495,13 +495,9 @@ end
 
 # utils
 
-for I in (:AbstractIndexMap,:(AbstractArray{<:AbstractIndexMap}))
-  @eval begin
-    function Snapshots(a::ArrayContribution,i::$I,r::AbstractRealization)
-      contribution(a.trians) do trian
-        Snapshots(a[trian],i,r)
-      end
-    end
+function Snapshots(a::ArrayContribution,i::ArrayContribution,r::AbstractRealization)
+  contribution(a.trians) do trian
+    Snapshots(a[trian],i[trian],r)
   end
 end
 

@@ -1,3 +1,34 @@
+function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace,args...)
+  m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
+  cellidsrows = get_cell_dof_ids(V,args...)
+  cellidscols = get_cell_dof_ids(U,args...)
+  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
+  m2 = nz_allocation(m1)
+  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
+  m3 = create_from_nz(m2)
+  SparsityPattern(m3)
+end
+
+function get_sparsity(U::FESpace,V::FESpace,args...)
+  get_sparsity(SparseMatrixAssembler(U,V),U,V,args...)
+end
+
+function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
+  mat1 = nothing
+  rows_cache = array_cache(cellidsrows)
+  cols_cache = array_cache(cellidscols)
+
+  rows1 = getindex!(rows_cache,cellidsrows,1)
+  cols1 = getindex!(cols_cache,cellidscols,1)
+
+  touch! = FESpaces.TouchEntriesMap()
+  touch_cache = return_cache(touch!,A,mat1,rows1,cols1)
+  caches = touch_cache,rows_cache,cols_cache
+
+  FESpaces._symbolic_loop_matrix!(A,caches,cellidsrows,cellidscols,mat1)
+  return A
+end
+
 """
     abstract type SparsityPattern end
 
@@ -10,12 +41,6 @@ Subtypes:
 
 """
 abstract type SparsityPattern end
-
-# random sparsity pattern
-function SparsityPattern(;s=(1,1))
-  matrix = sparse(rand(s...))
-  SparsityPattern(matrix)
-end
 
 """
 """
@@ -48,8 +73,11 @@ function permute_sparsity(a::SparsityPatternCSC,i::AbstractVector,j::AbstractVec
   SparsityPatternCSC(a.matrix[i,j])
 end
 
-function permute_sparsity(a::SparsityPatternCSC,i::AbstractArray,j::AbstractArray)
-  permute_sparsity(a,vec(i),vec(j))
+function sum_sparsities(a::SparsityPatternCSC...)
+  get_matrix(a::SparsityPatternCSC) = a.matrix
+  matrices = map(get_matrix,a)
+  matrix = _sparse_sum_preserve_sparsity(matrices...)
+  SparsityPatternCSC(matrix)
 end
 
 struct MultiValueSparsityPatternCSC{Tv,Ti} <: SparsityPattern
@@ -89,37 +117,6 @@ univariate_nonzero_indices(a::TProductSparsityPattern) = Tuple(get_nonzero_indic
 
 recast(A::AbstractArray,a::TProductSparsityPattern) = recast(A,a.sparsity)
 
-function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
-  m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
-  cellidsrows = get_cell_dof_ids(V)
-  cellidscols = get_cell_dof_ids(U)
-  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
-  m2 = nz_allocation(m1)
-  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
-  m3 = create_from_nz(m2)
-  SparsityPattern(m3)
-end
-
-function get_sparsity(U::FESpace,V::FESpace)
-  get_sparsity(SparseMatrixAssembler(U,V),U,V)
-end
-
-function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
-  mat1 = nothing
-  rows_cache = array_cache(cellidsrows)
-  cols_cache = array_cache(cellidscols)
-
-  rows1 = getindex!(rows_cache,cellidsrows,1)
-  cols1 = getindex!(cols_cache,cellidscols,1)
-
-  touch! = FESpaces.TouchEntriesMap()
-  touch_cache = return_cache(touch!,A,mat1,rows1,cols1)
-  caches = touch_cache,rows_cache,cols_cache
-
-  FESpaces._symbolic_loop_matrix!(A,caches,cellidsrows,cellidscols,mat1)
-  return A
-end
-
 function permute_sparsity(a::TProductSparsityPattern,i,j)
   is,is_1d = i
   js,js_1d = j
@@ -132,4 +129,21 @@ function permute_sparsity(s::TProductSparsityPattern,U::FESpace,V::FESpace)
   psparsity = permute_sparsity(s.sparsity,U.space,V.space)
   psparsities = map(permute_sparsity,s.sparsities_1d,U.spaces_1d,V.spaces_1d)
   TProductSparsityPattern(psparsity,psparsities)
+end
+
+function sum_sparsities(a::TProductSparsityPattern...)
+  ssparsity = sum_sparsities(map(get_sparsity,a)...)
+  ssparsities = map(sum_sparsities,map(get_univariate_sparsity,a))
+  TProductSparsityPattern(ssparsity,ssparsities)
+end
+
+# utils
+
+function _sparse_sum_preserve_sparsity(A::SparseMatrixCSC,Bs::SparseMatrixCSC...)
+  entrytypeC = Base.Broadcast.combine_eltypes(+,(A,Bs...))
+  indextypeC = SparseArrays.HigherOrderFns._promote_indtype(A,Bs...)
+  fofzeros = +(SparseArrays.HigherOrderFns._zeros_eltypes(A,Bs...)...)
+  maxnnzC = SparseArrays.widelength(A)
+  C = SparseArrays.HigherOrderFns._allocres(size(A),indextypeC,entrytypeC,maxnnzC)
+  SparseArrays.HigherOrderFns._map_notzeropres!(+,fofzeros,C,A,Bs...)
 end

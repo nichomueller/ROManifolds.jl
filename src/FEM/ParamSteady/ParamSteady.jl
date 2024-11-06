@@ -20,6 +20,7 @@ using GridapSolvers.LinearSolvers
 using GridapSolvers.BlockSolvers
 using GridapSolvers.MultilevelTools
 
+using ReducedOrderModels.Utils
 using ReducedOrderModels.IndexMaps
 using ReducedOrderModels.TProduct
 using ReducedOrderModels.ParamDataStructures
@@ -42,6 +43,9 @@ export UnEvalOperatorType
 export NonlinearParamEq
 export LinearParamEq
 export LinearNonlinearParamEq
+export TriangulationStyle
+export SplitTriangulation
+export JointTriangulation
 export ParamOperator
 export LinearNonlinearParamOpFromFEOp
 export AbstractParamCache
@@ -56,14 +60,11 @@ export get_fe_operator
 include("ParamOperator.jl")
 
 export ParamFEOperator
+export SplitParamFEOperator
+export JointParamFEOperator
 export LinearParamFEOperator
 export get_param_space
 include("ParamFEOperator.jl")
-
-export ParamFEOperatorWithTrian
-export set_triangulation
-export change_triangulation
-include("ParamFEOperatorWithTrian.jl")
 
 export LinearNonlinearParamFEOperator
 export get_linear_operator
@@ -72,7 +73,8 @@ export join_operators
 include("LinearNonlinearParamFEOperator.jl")
 
 export ParamOpFromFEOp
-export ParamOpFromFEOpWithTrian
+export JointParamOpFromFEOp
+export SplitParamOpFromFEOp
 include("ParamOpFromFEOp.jl")
 
 include("ParamSolutions.jl")

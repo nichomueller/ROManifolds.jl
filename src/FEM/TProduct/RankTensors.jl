@@ -152,21 +152,6 @@ function Base.getindex(a::BlockRankTensor{A,N},i::Block{N}) where {A,N}
   getindex(a.array,i.n...)
 end
 
-function primal_dual_blocks(a::BlockRankTensor)
-  primal_blocks = Int[]
-  dual_blocks = Int[]
-  for i in CartesianIndices(size(a))
-    if !(all(iszero.(a[i].arrays_1d)))
-      irow,icol = Tuple(i)
-      push!(primal_blocks,irow)
-      push!(dual_blocks,icol)
-    end
-  end
-  unique!(primal_blocks)
-  unique!(dual_blocks)
-  return primal_blocks,dual_blocks
-end
-
 # linear algebra
 
 function tpmul(a::Rank1Tensor{2},b::AbstractMatrix)

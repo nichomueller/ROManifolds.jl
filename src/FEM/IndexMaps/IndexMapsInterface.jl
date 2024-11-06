@@ -46,7 +46,6 @@ Subtypes:
 - [`TrivialIndexMap`](@ref)
 - [`IndexMap`](@ref)
 - [`IndexMapView`](@ref)
-- [`FixedDofsIndexMap`](@ref)
 - [`TProductIndexMap`](@ref)
 - [`SparseIndexMap`](@ref)
 
@@ -56,28 +55,17 @@ abstract type AbstractIndexMap{D,Ti} <: AbstractArray{Ti,D} end
 Base.view(i::AbstractIndexMap,locations) = IndexMapView(i,locations)
 
 """
-    free_dofs_map(i::AbstractIndexMap) -> AbstractIndexMap
+    remove_constrained_dofs(i::AbstractIndexMap) -> AbstractIndexMap
 
 Removes the negative indices from the index map, which correspond to Dirichlet
 boundary conditions.
 
 """
-function free_dofs_map(i::AbstractIndexMap)
+function remove_constrained_dofs(i::AbstractIndexMap)
   free_dofs_locations = findall(i.>zero(eltype(i)))
   s = _shape_per_dir(free_dofs_locations)
   free_dofs_locations′ = reshape(free_dofs_locations,s)
   view(i,free_dofs_locations′)
-end
-
-"""
-    dirichlet_dofs_map(i::AbstractIndexMap) -> AbstractVector
-
-Removes the positive indices from the index map, which correspond to free dofs.
-
-"""
-function dirichlet_dofs_map(i::AbstractIndexMap)
-  dir_dofs_locations = findall(i.<zero(eltype(i)))
-  i.indices[dir_dofs_locations]
 end
 
 """
@@ -102,12 +90,20 @@ function change_index_map(f,i::AbstractIndexMap)
   i′
 end
 
-"""
-    fix_dof_index_map(i::AbstractIndexMap,dofs_to_fix) -> FixedDofsIndexMap
+vectorize_map(i::AbstractIndexMap) = vec(i)
 
-"""
-function fix_dof_index_map(i::AbstractIndexMap,dofs_to_fix)
-  FixedDofsIndexMap(i,dofs_to_fix)
+function permute_sparsity(a::SparsityPatternCSC,i::AbstractIndexMap,j::AbstractIndexMap)
+  permute_sparsity(a,vectorize_map(i),vectorize_map(j))
+end
+
+sum_maps(i::AbstractIndexMap...) = first(i)
+
+function sum_maps(i::Tuple{Vararg{AbstractIndexMap}}...)
+  i′ = ()
+  for ii in i
+    i′ = (i′...,ii...)
+  end
+  sum_maps(i′...)
 end
 
 abstract type AbstractTrivialIndexMap <: AbstractIndexMap{1,Int} end
@@ -142,6 +138,13 @@ Base.size(i::TrivialSparseIndexMap) = (nnz(i.sparsity),)
 
 recast(a::AbstractArray,i::TrivialSparseIndexMap) = recast(a,i.sparsity)
 
+get_sparsity(i::TrivialSparseIndexMap) = i.sparsity
+
+function sum_maps(i::TrivialSparseIndexMap...)
+  sparsity = sum_sparsities(map(get_sparsity,i)...)
+  TrivialSparseIndexMap(sparsity)
+end
+
 """
     IndexMap{D,Ti} <: AbstractIndexMap{D,Ti}
 
@@ -156,8 +159,6 @@ Base.size(i::IndexMap) = size(i.indices)
 Base.getindex(i::IndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::IndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
 Base.copy(i::IndexMap) = IndexMap(copy(i.indices))
-Base.stack(i::AbstractArray{<:IndexMap}) = IndexMap(stack(get_array.(i)))
-Arrays.get_array(i::IndexMap) = i.indices
 
 """
     IndexMapView{D,Ti,I<:AbstractIndexMap{D,Ti},L} <: AbstractIndexMap{D,Ti}
@@ -183,49 +184,115 @@ Base.size(i::IndexMapView) = size(i.locations)
 Base.getindex(i::IndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.locations[j...]]
 Base.setindex!(i::IndexMapView{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,i.locations[j...])
 
-"""
-    FixedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti}} <: AbstractIndexMap{D,Ti}
+abstract type ShowSlaveDofsStyle end
+struct ShowSlaveDofs <: ShowSlaveDofsStyle end
+struct DoNotShowSlaveDofs <: ShowSlaveDofsStyle end
 
-Index map to be used when imposing a zero mean constraint on a given `FESpace`. The fixed
-dofs are stored as a vector of CartesianIndex of dimension D; when indexing vectors
-defined on the zero mean `FESpace`, the length of the vector is 1
-
-"""
-struct FixedDofsIndexMap{D,Ti,I} <: AbstractIndexMap{D,Ti}
-  indices::FixedEntriesArray{Ti,D,I}
+struct ConstrainedDofsIndexMap{D,Ti,I<:AbstractIndexMap{D,Ti},A<:ShowSlaveDofsStyle} <: AbstractIndexMap{D,Ti}
+  indices::I
+  mloc_to_loc::Vector{CartesianIndex{D}}
+  sloc_to_loc::Vector{CartesianIndex{D}}
+  show_slaves::A
 end
 
-function FixedDofsIndexMap(indices::AbstractIndexMap,dofs_to_fix)
-  indices′ = FixedEntriesArray(indices,dofs_to_fix)
-  FixedDofsIndexMap(indices′)
+function ConstrainedDofsIndexMap(
+  indices::AbstractIndexMap,
+  mloc_to_loc::Vector{<:CartesianIndex},
+  sloc_to_loc::Vector{<:CartesianIndex})
+
+  ConstrainedDofsIndexMap(indices,mloc_to_loc,sloc_to_loc,ShowSlaveDofs())
 end
 
-Arrays.get_array(i::FixedDofsIndexMap) = i.indices
-get_fixed_dofs(i::FixedDofsIndexMap) = get_fixed_entries(i.indices)
+function ConstrainedDofsIndexMap(
+  indices::AbstractIndexMap{D},
+  mdof_to_bdof::AbstractVector{<:Integer},
+  sdof_to_bdof::AbstractVector{<:Integer},
+  args...
+  ) where D
 
-Base.size(i::FixedDofsIndexMap) = size(i.indices)
-Base.getindex(i::FixedDofsIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
-Base.setindex!(i::FixedDofsIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
-Base.copy(i::FixedDofsIndexMap) = FixedDofsIndexMap(copy(i.indices))
-Base.view(i::FixedDofsIndexMap,locations) = FixedDofsIndexMap(view(i.indices,locations))
-Base.vec(i::FixedDofsIndexMap) = remove_fixed_dof(i)
-Base.stack(i::AbstractArray{<:FixedDofsIndexMap}) = FixedDofsIndexMap(stack(get_array.(i)))
-
-for f in (:free_dofs_map,:inv_index_map)
-  @eval begin
-    function $f(a::FixedEntriesArray)
-      FixedEntriesArray($f(a.array),a.fixed_entries)
-    end
-
-    function $f(i::FixedDofsIndexMap)
-      indices′ = $f(i.indices)
-      FixedDofsIndexMap(indices′)
+  dof_layout = CartesianIndices(indices)
+  mloc_to_loc = Vector{CartesianIndex{D}}(undef,length(mdof_to_bdof))
+  sloc_to_loc = Vector{CartesianIndex{D}}(undef,length(sdof_to_bdof))
+  mcount = 1
+  scount = 1
+  for (i,ii) in enumerate(eachindex(indices))
+    ind = indices[i]
+    if ind ∈ mdof_to_bdof
+      mloc_to_loc[mcount] = ii
+      mcount += 1
+    elseif ind ∈ sdof_to_bdof
+      sloc_to_loc[scount] = ii
+      scount += 1
     end
   end
+  ConstrainedDofsIndexMap(indices,mloc_to_loc,sloc_to_loc,args...)
 end
 
-function remove_fixed_dof(i::FixedDofsIndexMap)
-  filter(x -> x != 0,i)
+Base.size(i::ConstrainedDofsIndexMap) = size(i.indices)
+Base.getindex(i::ConstrainedDofsIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
+Base.setindex!(i::ConstrainedDofsIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
+Base.copy(i::ConstrainedDofsIndexMap) = ConstrainedDofsIndexMap(copy(i.indices),i.mloc_to_loc,i.sloc_to_loc,i.show_slaves)
+vectorize_map(i::ConstrainedDofsIndexMap) = collect(Base.OneTo(maximum(i)))
+
+function get_masters(i::ConstrainedDofsIndexMap{D,Ti}) where {D,Ti}
+  n = length(i.mloc_to_loc)
+  m = Vector{Ti}(undef,n)
+  for (ij,j) in enumerate(i.mloc_to_loc)
+    m[ij] = i.indices[j]
+  end
+  return m
+end
+
+function get_slaves(i::ConstrainedDofsIndexMap{D,Ti,ShowSlaveDofs}) where {D,Ti}
+  n = length(i.sloc_to_loc)
+  s = Vector{Ti}(undef,n)
+  for (ij,j) in enumerate(i.sloc_to_loc)
+    s[ij] = i.indices[j]
+  end
+  return s
+end
+
+function get_background(i::ConstrainedDofsIndexMap{D,Ti,ShowSlaveDofs}) where {D,Ti}
+  n = length(i) - length(i.mloc_to_loc) - length(i.sloc_to_loc)
+  fill(zero(Ti),n)
+end
+
+function get_background(i::ConstrainedDofsIndexMap{D,Ti,DoNotShowSlaveDofs}) where {D,Ti}
+  n = length(i) - length(i.mloc_to_loc)
+  fill(zero(Ti),n)
+end
+
+function remove_constrained_dofs(i::ConstrainedDofsIndexMap)
+  indices = copy(i.indices)
+  z = zero(eltype(indices))
+  for j in i.sloc_to_loc
+    indices[j] = z
+  end
+  nslaves = 0
+  for j in eachindex(indices)
+    if j in i.sloc_to_loc
+      nslaves += 1
+    elseif j in i.mloc_to_loc
+      mj = indices[j]
+      indices[j] = mj - nslaves
+    end
+  end
+  ConstrainedDofsIndexMap(indices,i.mloc_to_loc,i.sloc_to_loc,DoNotShowSlaveDofs())
+end
+
+function inv_index_map(i::ConstrainedDofsIndexMap)
+  @notimplemented
+end
+
+function inv_index_map(i::ConstrainedDofsIndexMap{D,Ti,DoNotShowSlaveDofs}) where {D,Ti}
+  i′ = copy(i)
+  indices = i′.indices
+  m = get_masters(i)
+  invm = invperm(m)
+  for (ij,j) in enumerate(i.mloc_to_loc)
+    indices[j] = invm[ij]
+  end
+  return i′
 end
 
 abstract type AbstractMultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti} end
@@ -334,7 +401,6 @@ Base.size(i::TProductIndexMap) = size(i.indices)
 Base.getindex(i::TProductIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::TProductIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
 Base.copy(i::TProductIndexMap) = TProductIndexMap(copy(i.indices),i.indices_1d)
-Base.vec(i::TProductIndexMap) = vec(i.indices)
 get_tp_indices(i::TProductIndexMap) = i.indices
 get_univariate_indices(i::TProductIndexMap) = i.indices_1d
 
@@ -357,7 +423,6 @@ Base.size(i::SparseIndexMap) = size(i.indices)
 Base.getindex(i::SparseIndexMap{D},j::Vararg{Integer,D}) where D = getindex(i.indices,j...)
 Base.setindex!(i::SparseIndexMap{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,j...)
 Base.copy(i::SparseIndexMap) = SparseIndexMap(copy(i.indices),copy(i.indices_sparse),i.sparsity)
-Base.vec(i::SparseIndexMap) = vec(i.indices)
 get_index_map(i::SparseIndexMap) = i.indices
 get_sparse_index_map(i::SparseIndexMap) = i.indices_sparse
 get_sparsity(i::SparseIndexMap) = i.sparsity
@@ -370,6 +435,29 @@ function inv_index_map(i::SparseIndexMap)
 end
 
 recast(a::AbstractArray,i::SparseIndexMap) = recast(a,i.sparsity)
+
+function sum_maps(i::SparseIndexMap...)
+  function _sum_maps(inds...)
+    ind′ = first(inds)
+    for ind in inds
+      @check size(ind) == size(ind′)
+      for (i,(indi′,indi)) in enumerate(zip(ind′,ind))
+        if !iszero(indi)
+          if iszero(indi′)
+            ind′[i] = indi
+          else
+            @check indi′ == indi
+          end
+        end
+      end
+    end
+    return inds′
+  end
+  indices = _sum_maps(map(get_index_map,i)...)
+  indices_sparse = _sum_maps(map(get_indices_sparse,i)...)
+  sparsity = sum_sparsities(map(get_sparsity,i)...)
+  SparseIndexMap(indices,indices_sparse,sparsity)
+end
 
 const MultiValueSparseIndexMap{D,Ti,A<:AbstractMultiValueIndexMap{D,Ti},B} = SparseIndexMap{D,Ti,A,B}
 

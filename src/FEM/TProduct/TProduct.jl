@@ -18,6 +18,8 @@ using Gridap.ReferenceFEs
 using Gridap.TensorValues
 using Gridap.Helpers
 
+using GridapEmbedded
+
 using ReducedOrderModels.Utils
 using ReducedOrderModels.IndexMaps
 
@@ -67,5 +69,8 @@ include("TProductCellData.jl")
 export TProductSparseMatrixAssembler
 export TProductBlockSparseMatrixAssembler
 include("TProductAssembly.jl")
+
+export TProductEmbeddedDiscretization
+include("Unfitted.jl")
 
 end # module
