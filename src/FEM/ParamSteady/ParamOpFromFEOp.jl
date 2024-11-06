@@ -1,13 +1,19 @@
 """
 """
-struct ParamOpFromFEOp{T} <: ParamOperator{T}
-  op::ParamFEOperator{T}
+struct ParamOpFromFEOp{O,T} <: ParamOperator{O,T}
+  op::ParamFEOperator{O,T}
 end
 
 get_fe_operator(op::ParamOpFromFEOp) = op.op
 
+function Utils.change_domains(op::ParamOpFromFEOp,trians_rhs,trians_lhs)
+  ParamOpFromFEOp(change_domains(op.op,trians_rhs,trians_lhs))
+end
+
+const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointTriangulation}
+
 function Algebra.allocate_residual(
-  op::ParamOpFromFEOp,
+  op::JointParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
   paramcache)
@@ -27,7 +33,7 @@ end
 
 function Algebra.residual!(
   b::AbstractVector,
-  op::ParamOpFromFEOp,
+  op::JointParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
   paramcache;
@@ -49,7 +55,7 @@ function Algebra.residual!(
 end
 
 function Algebra.allocate_jacobian(
-  op::ParamOpFromFEOp,
+  op::JointParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
   paramcache)
@@ -70,7 +76,7 @@ end
 
 function ODEs.jacobian_add!(
   A::AbstractMatrix,
-  op::ParamOpFromFEOp,
+  op::JointParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
   paramcache)
@@ -90,24 +96,10 @@ function ODEs.jacobian_add!(
   A
 end
 
-"""
-"""
-struct ParamOpFromFEOpWithTrian{T} <: ParamOperator{T}
-  op::ParamFEOperatorWithTrian{T}
-end
-
-get_fe_operator(op::ParamOpFromFEOpWithTrian) = op.op
-
-function set_triangulation(op::ParamOpFromFEOpWithTrian,trians_rhs,trians_lhs)
-  ParamOpFromFEOpWithTrian(set_triangulation(op.op,trians_rhs,trians_lhs))
-end
-
-function change_triangulation(op::ParamOpFromFEOpWithTrian,trians_rhs,trians_lhs)
-  ParamOpFromFEOpWithTrian(change_triangulation(op.op,trians_rhs,trians_lhs))
-end
+const SplitParamOpFromFEOp{O} = ParamOpFromFEOp{O,SplitTriangulation}
 
 function Algebra.allocate_residual(
-  op::ParamOpFromFEOpWithTrian,
+  op::SplitParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
   paramcache)
@@ -127,7 +119,7 @@ end
 
 function Algebra.residual!(
   b::Contribution,
-  op::ParamOpFromFEOpWithTrian,
+  op::SplitParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
   paramcache;
@@ -152,7 +144,7 @@ function Algebra.residual!(
 end
 
 function Algebra.allocate_jacobian(
-  op::ParamOpFromFEOpWithTrian,
+  op::SplitParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
   paramcache)
@@ -174,7 +166,7 @@ end
 
 function ODEs.jacobian_add!(
   A::Contribution,
-  op::ParamOpFromFEOpWithTrian,
+  op::SplitParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
   paramcache)
@@ -196,8 +188,8 @@ function ODEs.jacobian_add!(
   A
 end
 
-struct LinearNonlinearParamOpFromFEOp <: ParamOperator{LinearNonlinearParamEq}
-  op::LinearNonlinearParamFEOperator
+struct LinearNonlinearParamOpFromFEOp{T} <: ParamOperator{LinearNonlinearParamEq,T}
+  op::LinearNonlinearParamFEOperator{T}
 end
 
 get_fe_operator(op::LinearNonlinearParamOpFromFEOp) = op.op

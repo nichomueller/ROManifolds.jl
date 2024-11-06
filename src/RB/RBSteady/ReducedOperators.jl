@@ -31,13 +31,13 @@ function reduced_operator(
   red_lhs,red_rhs = reduced_weak_form(solver,op,red_trial,red_test,s)
   trians_rhs = get_domains(red_rhs)
   trians_lhs = get_domains(red_lhs)
-  new_op = change_triangulation(op,trians_rhs,trians_lhs)
+  new_op = change_domains(op,trians_rhs,trians_lhs)
   GenericRBOperator(new_op,red_trial,red_test,red_lhs,red_rhs)
 end
 
 function reduced_operator(
   solver::RBSolver,
-  op::ParamOperator{<:LinearNonlinearParamEq},
+  op::ParamOperator{LinearNonlinearParamEq},
   red_trial::RBSpace,
   red_test::RBSpace,
   s)
@@ -60,14 +60,14 @@ struct LinearNonlinearRBCache <: AbstractParamCache
   b::AbstractVector
 end
 
-abstract type RBOperator{T} <: ParamOperator{T} end
+abstract type RBOperator{O} <: ParamOperator{O,SplitTriangulation} end
 
 function allocate_rbcache(op::RBOperator,args...)
   @abstractmethod
 end
 
-struct GenericRBOperator{T} <: RBOperator{T}
-  op::ParamOperator{T}
+struct GenericRBOperator{O} <: RBOperator{O}
+  op::ParamOperator{O}
   trial::RBSpace
   test::RBSpace
   lhs::AffineContribution

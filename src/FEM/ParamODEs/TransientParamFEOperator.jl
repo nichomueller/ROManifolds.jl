@@ -15,10 +15,11 @@ Subtypes:
 
 - [`TransientParamFEOpFromWeakForm`](@ref)
 - [`TransientParamLinearFEOpFromWeakForm`](@ref)
-- [`TransientParamFEOperatorWithTrian`](@ref)
 
 """
-abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: ParamFEOperator{T} end
+abstract type TransientParamFEOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamFEOperator{O,T} end
+const JointTransientParamFEOperator{O} = TransientParamFEOperator{O,JointTriangulation}
+const SplitTransientParamFEOperator{O} = TransientParamFEOperator{O,SplitTriangulation}
 
 function FESpaces.get_algebraic_operator(op::TransientParamFEOperator)
   ODEParamOpFromTFEOp(op)
@@ -55,7 +56,7 @@ Most standard instance of TransientParamFEOperator, when the transient problem i
 nonlinear
 
 """
-struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParamODE}
+struct TransientParamFEOpFromWeakForm{T} <: TransientParamFEOperator{NonlinearParamODE,T}
   res::Function
   jacs::Tuple{Vararg{Function}}
   tpspace::TransientParamSpace
@@ -66,14 +67,29 @@ struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParam
   order::Integer
 end
 
+const JointTransientParamFEOpFromWeakForm = TransientParamFEOpFromWeakForm{JointTriangulation}
+
 function TransientParamFEOperator(
-  res::Function,jacs::Tuple{Vararg{Function}},tpspace,trial,test,args...)
+  res::Function,jacs::Tuple{Vararg{Function}},tpspace,trial,test)
 
   order = length(jacs) - 1
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
-  TransientParamFEOpFromWeakForm(
-    res,jacs,tpspace,assem,index_map,trial,test,order,args...)
+  TransientParamFEOpFromWeakForm{JointTriangulation}(
+    res,jacs,tpspace,assem,index_map,trial,test,order)
+end
+
+const SplitTransientParamFEOpFromWeakForm = TransientParamFEOpFromWeakForm{SplitTriangulation}
+
+function TransientParamFEOperator(
+  res::Function,jacs::Tuple{Vararg{Function}},tpspace,trial,test,trian_res,trian_jacs...)
+
+  order = length(jacs) - 1
+  res′,jacs′ = _set_triangulations(res,jacs,test,trial,trian_res,trian_jacs)
+  assem = SparseMatrixAssembler(trial,test)
+  index_map = FEOperatorIndexMap(trial,test)
+  TransientParamFEOpFromWeakForm{SplitTriangulation}(
+    res′,jacs′,tpspace,assem,index_map,trial,test,order)
 end
 
 function TransientParamFEOperator(
@@ -131,7 +147,7 @@ Most standard instance of TransientParamFEOperator, when the transient problem i
 linear
 
 """
-struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE}
+struct TransientParamLinearFEOpFromWeakForm{T} <: TransientParamFEOperator{LinearParamODE,T}
   res::Function
   jacs::Tuple{Vararg{Function}}
   constant_forms::Tuple{Vararg{Bool}}
@@ -143,16 +159,33 @@ struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearPa
   order::Integer
 end
 
+const JointTransientParamLinearFEOpFromWeakForm = TransientParamLinearFEOpFromWeakForm{JointTriangulation}
+
 function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},res::Function,tpspace,trial,test,
-  args...;constant_forms::Tuple{Vararg{Bool}}=ntuple(_ -> false,length(forms)))
+  forms::Tuple{Vararg{Function}},res::Function,tpspace,trial,test;
+  constant_forms::Tuple{Vararg{Bool}}=ntuple(_ -> false,length(forms)))
 
   order = length(forms)-1
-  jacs = ntuple(k -> ((μ,t,u,duk,v,args...) -> forms[k](μ,t,duk,v,args...)),length(forms))
+  jacs = ntuple(k -> ((μ,t,u,duk,v) -> forms[k](μ,t,duk,v)),length(forms))
   assem = SparseMatrixAssembler(trial,test)
-  index_map = FEOperatorIndexMap(trial,test)
-  TransientParamLinearFEOpFromWeakForm(
-    res,jacs,constant_forms,tpspace,assem,index_map,trial,test,order,args...)
+  index_map = FEOperatorIndexMap(trial,test,trian_res,trian_jacs...)
+  TransientParamLinearFEOpFromWeakForm{JointTriangulation}(
+    res,jacs,constant_forms,tpspace,assem,index_map,trial,test,order)
+end
+
+const SplitTransientParamLinearFEOpFromWeakForm = TransientParamLinearFEOpFromWeakForm{SplitTriangulation}
+
+function TransientParamLinearFEOperator(
+  res::Function,jacs::Tuple{Vararg{Function}},tpspace,trial,test,trian_res,trian_jacs...;
+  constant_forms::Tuple{Vararg{Bool}}=ntuple(_ -> false,length(forms)))
+
+  order = length(jacs) - 1
+  jacs = ntuple(k -> ((μ,t,u,duk,v,args...) -> forms[k](μ,t,duk,v,args...)),length(forms))
+  res′,jacs′ = _set_triangulations(res,jacs,test,trial,trian_res,trian_jacs)
+  assem = SparseMatrixAssembler(trial,test)
+  index_map = FEOperatorIndexMap(trial,test,trian_res,trian_jacs...)
+  TransientParamLinearFEOpFromWeakForm{SplitTriangulation}(
+    res′,jacs′,constant_forms,tpspace,assem,index_map,trial,test,order)
 end
 
 function TransientParamLinearFEOperator(
@@ -184,26 +217,74 @@ ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
 ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer) = op.constant_forms[k]
 IndexMaps.get_index_map(op::TransientParamLinearFEOpFromWeakForm) = op.index_map
 
-function test_transient_fe_operator(op::TransientParamFEOperator,uh,μt)
-  odeop = get_algebraic_operator(op)
-  @test isa(odeop,ODEParamOperator)
-  cache = allocate_cache(op)
-  V = get_test(op)
-  @test isa(V,FESpace)
-  U = get_trial(op)
-  U0 = U(μt)
-  @test isa(U0,TrialParamFESpace)
-  r = allocate_residual(op,μt,uh,cache)
-  @test isa(r,ParamVector)
-  xh = TransientCellField(uh,(uh,))
-  residual!(r,op,μt,xh,cache)
-  @test isa(r,ParamVector)
-  J = allocate_jacobian(op,μt,uh,cache)
-  @test isa(J,ParamMatrix)
-  jacobian!(J,op,μt,xh,1,1.0,cache)
-  @test isa(J,ParamMatrix)
-  jacobian!(J,op,μt,xh,2,1.0,cache)
-  @test isa(J,ParamMatrix)
-  cache = update_cache!(cache,op,μt)
-  true
+# triangulation utils
+
+function Utils.change_domains(op::SplitTransientParamFEOpFromWeakForm,trian_res,trian_jacs)
+  polyn_order = get_polynomial_order(op.test)
+  res′ = _set_triangulation_form(op.res,trian_res,polyn_order)
+  jacs′ = _set_triangulation_jacs(op.jacs,trian_jacs,polyn_order)
+  index_map′ = change_domains(op.index_map,trian_res′,trian_jac′)
+  TransientParamFEOpFromWeakForm(
+    res′,jacs′,op.tpspace,op.assem,index_map′,op.trial,op.test,op.order)
+end
+
+function Utils.change_domains(op::SplitTransientParamLinearFEOpFromWeakForm,trian_res,trian_jacs)
+  polyn_order = get_polynomial_order(op.test)
+  res′ = _set_triangulation_form(op.res,trian_res,polyn_order)
+  jacs′ = _set_triangulation_jacs(op.jacs,trian_jacs,polyn_order)
+  index_map′ = change_domains(op.index_map,trian_res′,trian_jac′)
+  TransientParamLinearFEOpFromWeakForm(
+    res′,jacs′,op.constant_forms,op.tpspace,
+    op.assem,index_map′,op.trial,op.test,op.order)
+end
+
+function _set_triangulation_jac(
+  jac::Function,
+  trian::Tuple{Vararg{Triangulation}},
+  order)
+
+  degree = 2*order
+  meas = Measure.(trian,degree)
+  newjac(μ,t,u,du,v,args...) = jac(μ,t,u,du,v,args...)
+  newjac(μ,t,u,du,v) = newjac(μ,t,u,du,v,meas...)
+  return newjac
+end
+
+function _set_triangulation_jacs(
+  jacs::Tuple{Vararg{Function}},
+  trians::Tuple{Vararg{Tuple{Vararg{Triangulation}}}},
+  order) where N
+
+  newjacs = ()
+  for (jac,trian) in zip(jacs,trians)
+    newjacs = (newjacs...,_set_triangulation_jac(jac,trian,order))
+  end
+  return newjacs
+end
+
+function _set_triangulation_form(
+  res::Function,
+  trian::Tuple{Vararg{Triangulation}},
+  order)
+
+  degree = 2*order
+  meas = Measure.(trian,degree)
+  newres(μ,t,u,v,args...) = res(μ,t,u,v,args...)
+  newres(μ,t,u,v) = newres(μ,t,u,v,meas...)
+  return newres
+end
+
+function _set_triangulations(
+  res::Function,
+  jacs::Tuple{Vararg{Function}},
+  test::FESpace,
+  trial::FESpace,
+  trian_res::Tuple{Vararg{Triangulation}},
+  trian_jacs::Tuple{Vararg{Tuple{Vararg{Triangulation}}}})
+
+  polyn_order = get_polynomial_order(test)
+  @check polyn_order == get_polynomial_order(trial)
+  res′ = _set_triangulation_form(res,trian_res,polyn_order)
+  jacs′ = _set_triangulation_jacs(jacs,trian_jacs,polyn_order)
+  return res′,jacs′
 end

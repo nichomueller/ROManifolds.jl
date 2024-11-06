@@ -495,13 +495,9 @@ end
 
 # utils
 
-for I in (:AbstractIndexMap,:(AbstractArray{<:AbstractIndexMap}))
-  @eval begin
-    function Snapshots(a::ArrayContribution,i::$I,r::AbstractRealization)
-      contribution(a.trians) do trian
-        Snapshots(a[trian],i,r)
-      end
-    end
+function Snapshots(a::ArrayContribution,i::ArrayContribution,r::AbstractRealization)
+  contribution(a.trians) do trian
+    Snapshots(a[trian],i[trian],r)
   end
 end
 

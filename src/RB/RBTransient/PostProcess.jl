@@ -22,7 +22,7 @@ function RBSteady._load_trian_operator_parts(dir,feop::TransientParamFEOperatorW
   end
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
-  new_odeop = change_triangulation(odeop,trians_rhs,trians_lhs)
+  new_odeop = change_domains(odeop,trians_rhs,trians_lhs)
   return new_odeop,red_lhs,red_rhs
 end
 

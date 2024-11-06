@@ -31,7 +31,7 @@ function RBSteady.reduced_operator(
   red_lhs,red_rhs = reduced_weak_form(solver,odeop,red_trial,red_test,s)
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
-  new_odeop = change_triangulation(odeop,trians_rhs,trians_lhs)
+  new_odeop = change_domains(odeop,trians_rhs,trians_lhs)
   GenericTransientRBOperator(new_odeop,red_trial,red_test,red_lhs,red_rhs)
 end
 
@@ -47,14 +47,14 @@ function RBSteady.reduced_operator(
   LinearNonlinearTransientRBOperator(red_op_lin,red_op_nlin)
 end
 
-abstract type TransientRBOperator{T} <: ODEParamOperator{T} end
+abstract type TransientRBOperator{O} <: ODEParamOperator{O,SplitTriangulation} end
 
 function RBSteady.allocate_rbcache(fesolver::ODESolver,op::RBOperator,args...)
   @abstractmethod
 end
 
-struct GenericTransientRBOperator{T} <: TransientRBOperator{T}
-  op::ODEParamOperator{T}
+struct GenericTransientRBOperator{O} <: TransientRBOperator{O}
+  op::ODEParamOperator{O}
   trial::RBSpace
   test::RBSpace
   lhs::TupOfAffineContribution

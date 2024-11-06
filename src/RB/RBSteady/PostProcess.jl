@@ -151,7 +151,7 @@ function _load_fixed_operator_parts(dir,feop;label="")
   return trial,test
 end
 
-function _load_trian_operator_parts(dir,feop::ParamFEOperatorWithTrian,trial,test;label="")
+function _load_trian_operator_parts(dir,feop::SplitParamFEOperator,trial,test;label="")
   trian_res = feop.trian_res
   trian_jac = feop.trian_jac
   pop = get_algebraic_operator(feop)
@@ -159,11 +159,11 @@ function _load_trian_operator_parts(dir,feop::ParamFEOperatorWithTrian,trial,tes
   red_lhs = load_contribution(dir,trian_jac,trial,test;label=_get_label(label,"lhs"))
   trians_rhs = get_domains(red_rhs)
   trians_lhs = get_domains(red_lhs)
-  new_pop = change_triangulation(pop,trians_rhs,trians_lhs)
+  new_pop = change_domains(pop,trians_rhs,trians_lhs)
   return new_pop,red_lhs,red_rhs
 end
 
-function load_operator(dir,feop::ParamFEOperatorWithTrian;kwargs...)
+function load_operator(dir,feop::SplitParamFEOperator;kwargs...)
   trial,test = _load_fixed_operator_parts(dir,feop;kwargs...)
   pop,red_lhs,red_rhs = _load_trian_operator_parts(dir,feop,trial,test;kwargs...)
   op = GenericRBOperator(pop,trial,test,red_lhs,red_rhs)
@@ -176,10 +176,7 @@ function DrWatson.save(dir,op::LinearNonlinearRBOperator;label="")
   _save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nonlinear"))
 end
 
-function load_operator(dir,feop::LinearNonlinearParamFEOperator;label="")
-  @assert isa(feop.op_linear,ParamFEOperatorWithTrian)
-  @assert isa(feop.op_nonlinear,ParamFEOperatorWithTrian)
-
+function load_operator(dir,feop::LinearNonlinearParamFEOperator{SplitTriangulation};label="")
   trial,test = _fixed_operator_parts(dir,feop.op_linear;label)
   pop_lin,red_lhs_lin,red_rhs_lin = _load_trian_operator_parts(
     dir,feop.op_linear,trial,test;label=_get_label("linear",label))
@@ -219,7 +216,7 @@ end
 
 function rb_performance(
   solver::RBSolver,
-  feop,
+  feop::ParamFEOperator,
   fesnaps::AbstractArray,
   rbsnaps::AbstractArray,
   festats::CostTracker,
@@ -234,8 +231,8 @@ end
 
 function rb_performance(
   solver::RBSolver,
-  feop,
-  rbop,
+  feop::ParamFEOperator,
+  rbop::RBOperator,
   fesnaps::AbstractArray,
   x̂::AbstractParamVector,
   festats::CostTracker,
@@ -285,7 +282,8 @@ end
 
 function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots)
   @check sol.touched == sol_approx.touched
-  error = Array{Float64,ndims(sol)}(undef,size(sol))
+  T = eltype2(sol)
+  error = Array{T,ndims(sol)}(undef,size(sol))
   for i in eachindex(sol)
     if sol.touched[i]
       error[i] = compute_relative_error(sol[i],sol_approx[i])
@@ -296,7 +294,8 @@ end
 
 function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
   @check sol.touched == sol_approx.touched
-  error = Array{Float64,ndims(sol)}(undef,size(sol))
+  T = eltype2(sol)
+  error = Array{T,ndims(sol)}(undef,size(sol))
   for i in eachindex(sol)
     if sol.touched[i]
       error[i] = compute_relative_error(sol[i],sol_approx[i],norm_matrix[Block(i,i)])

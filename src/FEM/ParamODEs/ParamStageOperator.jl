@@ -1,5 +1,5 @@
-struct ParamStageOperator{T} <: StageOperator
-  op::ODEParamOperator{T}
+struct ParamStageOperator{O} <: StageOperator
+  op::ODEParamOperator{O}
   cache::AbstractParamCache
   r::TransientRealization
   us::Function

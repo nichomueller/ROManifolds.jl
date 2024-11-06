@@ -176,8 +176,8 @@ function _to_nz_index!(index_map,sparsity::SparsityPatternCSC)
   nrows = IndexMaps.num_rows(sparsity)
   for (i,index) in enumerate(index_map)
     if index > 0
-      irow = mod(index-1,nrows) + 1
-      icol = cld(index,nrows)
+      irow = fast_index(index,nrows)
+      icol = slow_index(index,nrows)
       index_map[i] = nz_index(sparsity.matrix,irow,icol)
     end
   end

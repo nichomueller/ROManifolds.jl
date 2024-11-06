@@ -52,12 +52,6 @@ export LinearTransientParamFEOperator
 export NonlinearTransientParamFEOperator
 include("TransientParamFEOperator.jl")
 
-export TransientParamFEOperatorWithTrian
-export TransientParamFEOperatorWithTrian
-export set_triangulation
-export change_triangulation
-include("TransientParamFEOperatorWithTrian.jl")
-
 export LinearNonlinearParamODE
 export LinearNonlinearTransientParamFEOperator
 export get_linear_operator
@@ -66,7 +60,6 @@ export join_operators
 include("LinearNonlinearTransientParamFEOperator.jl")
 
 export ODEParamOpFromTFEOp
-export ODEParamOpFromTFEOpWithTrian
 include("ODEParamOpFromTFEOp.jl")
 
 include("ThetaMethod.jl")

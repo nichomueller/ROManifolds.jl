@@ -56,8 +56,11 @@ function FESpaces.assemble_matrix(op::LinearNonlinearTransientParamFEOperator,fo
 end
 
 function ParamSteady.join_operators(
-  op_lin::TransientParamFEOperator{LinearParamODE},
+  op_lin::TransientParamFEOperator,
   op_nlin::TransientParamFEOperator)
+
+  op_lin = change_domains(op_lin)
+  op_nlin = change_domains(op_nlin)
 
   @check get_trial(op_lin) == get_trial(op_nlin)
   @check get_test(op_lin) == get_test(op_nlin)
@@ -87,15 +90,6 @@ function ParamSteady.join_operators(
   end
 
   TransientParamFEOperator(res,jacs,op_lin.tpspace,trial,test)
-end
-
-function ParamSteady.join_operators(
-  op_lin::TransientParamFEOperatorWithTrian,
-  op_nlin::TransientParamFEOperatorWithTrian)
-
-  set_op_lin = set_triangulation(op_lin)
-  set_op_nlin = set_triangulation(op_nlin)
-  join_operators(set_op_lin,set_op_nlin)
 end
 
 function ParamSteady.join_operators(op::LinearNonlinearTransientParamFEOperator)

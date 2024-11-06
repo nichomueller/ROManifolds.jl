@@ -20,28 +20,13 @@ function Algebra.solve!(u,solver::LinearFESolver,feop::ParamFEOperator,r::Realiz
   uh,stats
 end
 
-function Algebra.solve(solver::FESolver,op::FEOperator,r::Realization)
+function Algebra.solve(solver::FESolver,op::ParamFEOperator,r::Realization)
   U = get_trial(op)(r)
   uh = zero(U)
   vh,stats = solve!(uh,solver,op,r)
   vh,stats
 end
 
-function Algebra.solve(solver::FESolver,op::ParamFEOperatorWithTrian,r::Realization)
-  solve(solver,op.op,r)
-end
-
-function Algebra.solve(solver::FESolver,op::LinearNonlinearParamFEOperator,r::Realization)
-  lop = get_linear_operator(op)
-  nlop = get_nonlinear_operator(op)
-  if isa(lop,ParamFEOperatorWithTrian) || isa(nlop,ParamFEOperatorWithTrian)
-    @assert isa(lop,ParamFEOperatorWithTrian) && isa(nlop,ParamFEOperatorWithTrian)
-    op′ = LinearNonlinearParamFEOperator(lop.op,nlop.op)
-  else
-    op′ = op
-  end
-  U = get_trial(op′)(r)
-  uh = zero(U)
-  vh,stats = solve!(uh,solver,op′,r)
-  vh,stats
+function Algebra.solve(solver::FESolver,op::SplitParamFEOperator,r::Realization)
+  solve(solver,change_domains(op),r)
 end

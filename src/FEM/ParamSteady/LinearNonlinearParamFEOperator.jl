@@ -7,9 +7,9 @@ residuals/jacobians, and in the Newton-like iterations only evaluate and assembl
 only the nonlinear components
 
 """
-struct LinearNonlinearParamFEOperator <: ParamFEOperator{LinearNonlinearParamEq}
-  op_linear::ParamFEOperator{LinearParamEq}
-  op_nonlinear::ParamFEOperator{NonlinearParamEq}
+struct LinearNonlinearParamFEOperator{T} <: ParamFEOperator{LinearNonlinearParamEq,T}
+  op_linear::ParamFEOperator{LinearParamEq,T}
+  op_nonlinear::ParamFEOperator{NonlinearParamEq,T}
 end
 
 """
@@ -64,6 +64,9 @@ function join_operators(
   op_lin::ParamFEOperator,
   op_nlin::ParamFEOperator)
 
+  op_lin = change_domains(op_lin)
+  op_nlin = change_domains(op_nlin)
+
   @check get_trial(op_lin) == get_trial(op_nlin)
   @check get_test(op_lin) == get_test(op_nlin)
   @check op_lin.pspace === op_nlin.pspace
@@ -74,15 +77,6 @@ function join_operators(
   res(μ,u,v) = op_lin.res(μ,u,v) + op_nlin.res(μ,u,v)
   jac(μ,u,du,v) = op_lin.jac(μ,u,du,v) + op_nlin.jac(μ,u,du,v)
   ParamFEOperator(res,jac,op_lin.pspace,trial,test)
-end
-
-function join_operators(
-  op_lin::ParamFEOperatorWithTrian,
-  op_nlin::ParamFEOperatorWithTrian)
-
-  set_op_lin = set_triangulation(op_lin)
-  set_op_nlin = set_triangulation(op_nlin)
-  join_operators(set_op_lin,set_op_nlin)
 end
 
 """

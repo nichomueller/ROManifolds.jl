@@ -15,6 +15,8 @@ import PartitionedArrays: tuple_of_arrays
 
 export recast_indices
 export get_nonzero_indices
+export slow_index
+export fast_index
 include("IndexOperations.jl")
 
 export SparsityPattern

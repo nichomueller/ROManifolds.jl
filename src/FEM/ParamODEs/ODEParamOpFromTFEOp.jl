@@ -1,10 +1,16 @@
 """
 """
-struct ODEParamOpFromTFEOp{T} <: ODEParamOperator{T}
-  op::TransientParamFEOperator{T}
+struct ODEParamOpFromTFEOp{O,T} <: ODEParamOperator{O,T}
+  op::TransientParamFEOperator{O,T}
 end
 
 ParamSteady.get_fe_operator(op::ODEParamOpFromTFEOp) = op.op
+
+function Utils.change_domains(odeop::ODEParamOpFromTFEOp,trians_rhs,trians_lhs)
+  ODEParamOpFromTFEOp(change_domains(odeop.op,trians_rhs,trians_lhs))
+end
+
+const JointODEParamOpFromTFEOp{O} = ODEParamOpFromTFEOp{O,JointTriangulation}
 
 function Algebra.allocate_residual(
   odeop::ODEParamOpFromTFEOp,
@@ -213,24 +219,10 @@ function ParamSteady.allocate_systemcache(
   return A,b
 end
 
-"""
-"""
-struct ODEParamOpFromTFEOpWithTrian{T} <: ODEParamOperator{T}
-  op::TransientParamFEOperatorWithTrian{T}
-end
-
-ParamSteady.get_fe_operator(op::ODEParamOpFromTFEOpWithTrian) = op.op
-
-function ParamSteady.set_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
-  ODEParamOpFromTFEOpWithTrian(set_triangulation(odeop.op,trians_rhs,trians_lhs))
-end
-
-function ParamSteady.change_triangulation(odeop::ODEParamOpFromTFEOpWithTrian,trians_rhs,trians_lhs)
-  ODEParamOpFromTFEOpWithTrian(change_triangulation(odeop.op,trians_rhs,trians_lhs))
-end
+const SplitODEParamOpFromTFEOp{O} = ODEParamOpFromTFEOp{O,SplitTriangulation}
 
 function Algebra.allocate_residual(
-  odeop::ODEParamOpFromTFEOpWithTrian,
+  odeop::SplitODEParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache)
@@ -253,7 +245,7 @@ end
 
 function Algebra.residual!(
   b::ArrayContribution,
-  odeop::ODEParamOpFromTFEOpWithTrian,
+  odeop::SplitODEParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache;
@@ -279,7 +271,7 @@ function Algebra.residual!(
 end
 
 function Algebra.residual(
-  odeop::ODEParamOpFromTFEOpWithTrian,
+  odeop::SplitODEParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache)
@@ -302,7 +294,7 @@ function Algebra.residual(
 end
 
 function Algebra.allocate_jacobian(
-  odeop::ODEParamOpFromTFEOpWithTrian,
+  odeop::SplitODEParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   paramcache)
@@ -333,7 +325,7 @@ end
 
 function ODEs.jacobian_add!(
   As::TupOfArrayContribution,
-  odeop::ODEParamOpFromTFEOpWithTrian,
+  odeop::SplitODEParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
@@ -369,7 +361,7 @@ end
 
 function ODEs.jacobian_add!(
   As::TupOfArrayContribution,
-  odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
+  odeop::SplitODEParamOpFromTFEOp{LinearParamODE},
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
@@ -409,7 +401,7 @@ function ODEs.jacobian_add!(
 end
 
 function Algebra.jacobian(
-  odeop::ODEParamOpFromTFEOpWithTrian,
+  odeop::SplitODEParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
@@ -443,7 +435,7 @@ function Algebra.jacobian(
 end
 
 function ParamSteady.allocate_systemcache(
-  odeop::ODEParamOpFromTFEOpWithTrian{LinearParamODE},
+  odeop::SplitODEParamOpFromTFEOp{LinearParamODE},
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
@@ -487,8 +479,8 @@ end
 
 # linear - nonlinear case
 
-struct LinearNonlinearParamOpFromTFEOp <: ODEParamOperator{LinearNonlinearParamODE}
-  op::LinearNonlinearTransientParamFEOperator
+struct LinearNonlinearParamOpFromTFEOp{T} <: ODEParamOperator{LinearNonlinearParamODE,T}
+  op::LinearNonlinearTransientParamFEOperator{T}
 end
 
 ParamSteady.get_fe_operator(op::LinearNonlinearParamOpFromTFEOp) = op.op

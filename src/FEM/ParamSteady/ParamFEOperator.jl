@@ -1,5 +1,5 @@
 """
-    abstract type ParamFEOperator{T<:UnEvalOperatorType} <: FEOperator end
+    abstract type ParamFEOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: FEOperator end
 
 Parametric extension of a [`FEOperator`](@ref) in [`Gridap`](@ref). Compared to
 a standard FEOperator, there are the following novelties:
@@ -16,7 +16,9 @@ Subtypes:
 - [`ParamFEOpFromWeakForm`](@ref)
 
 """
-abstract type ParamFEOperator{T<:UnEvalOperatorType} <: FEOperator end
+abstract type ParamFEOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: FEOperator end
+const JointParamFEOperator{O} = ParamFEOperator{O,JointTriangulation}
+const SplitParamFEOperator{O} = ParamFEOperator{O,SplitTriangulation}
 
 function FESpaces.get_test(feop::ParamFEOperator)
   @abstractmethod
@@ -85,12 +87,12 @@ function _assemble_matrix(f,U::MultiFieldFESpace,V::MultiFieldFESpace)
 end
 
 """
-    struct ParamFEOpFromWeakForm{T} <: ParamFEOperator{T} end
+    struct ParamFEOpFromWeakForm{O,T} <: ParamFEOperator{O,T} end
 
-Most standard instance of ParamFEOperator{T}
+Most standard instance of ParamFEOperator{O,T}
 
 """
-struct ParamFEOpFromWeakForm{T} <: ParamFEOperator{T}
+struct ParamFEOpFromWeakForm{O,T} <: ParamFEOperator{O,T}
   res::Function
   jac::Function
   pspace::ParamSpace
@@ -100,21 +102,40 @@ struct ParamFEOpFromWeakForm{T} <: ParamFEOperator{T}
   test::FESpace
 end
 
-function ParamFEOperator(
-  res::Function,jac::Function,pspace,trial,test)
+const JointParamFEOpFromWeakForm{O} = ParamFEOpFromWeakForm{O,JointTriangulation}
 
+function ParamFEOperator(res::Function,jac::Function,pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
-  ParamFEOpFromWeakForm{NonlinearParamEq}(res,jac,pspace,assem,index_map,trial,test)
+  ParamFEOpFromWeakForm{NonlinearParamEq,JointTriangulation}(
+    res,jac,pspace,assem,index_map,trial,test)
 end
 
-function LinearParamFEOperator(
-  res::Function,jac::Function,pspace,trial,test)
-
-  jac′(μ,u,du,v,args...) = jac(μ,du,v,args...)
+function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test)
+  jac′(μ,u,du,v) = jac(μ,du,v)
   assem = SparseMatrixAssembler(trial,test)
   index_map = FEOperatorIndexMap(trial,test)
-  ParamFEOpFromWeakForm{LinearParamEq}(res,jac′,pspace,assem,index_map,trial,test)
+  ParamFEOpFromWeakForm{LinearParamEq,JointTriangulation}(
+    res,jac′,pspace,assem,index_map,trial,test)
+end
+
+const SplitParamFEOpFromWeakForm{O} = ParamFEOpFromWeakForm{O,SplitTriangulation}
+
+function ParamFEOperator(res::Function,jac::Function,pspace,trial,test,trian_res,trian_jac)
+  res′,jac′ = _set_triangulations(res,jac,test,trial,trian_res,trian_jac)
+  assem = SparseMatrixAssembler(trial,test)
+  index_map = FEOperatorIndexMap(trial,test,trian_res,trian_jac)
+  ParamFEOpFromWeakForm{NonlinearParamEq,SplitTriangulation}(
+    res′,jac′,pspace,assem,index_map,trial,test)
+end
+
+function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test,trian_res,trian_jac)
+  jac′(μ,u,du,v,args...) = jac(μ,du,v,args...)
+  res′,jac′′ = _set_triangulations(res,jac′,test,trial,trian_res,trian_jac)
+  assem = SparseMatrixAssembler(trial,test)
+  index_map = FEOperatorIndexMap(trial,test,trian_res,trian_jac)
+  ParamFEOpFromWeakForm{LinearParamEq,SplitTriangulation}(
+    res′,jac′′,pspace,assem,index_map,trial,test)
 end
 
 FESpaces.get_test(op::ParamFEOpFromWeakForm) = op.test
@@ -124,3 +145,64 @@ ODEs.get_res(op::ParamFEOpFromWeakForm) = op.res
 get_jac(op::ParamFEOpFromWeakForm) = op.jac
 ODEs.get_assembler(op::ParamFEOpFromWeakForm) = op.assem
 IndexMaps.get_index_map(op::ParamFEOpFromWeakForm) = op.index_map
+
+# triangulation utils
+
+get_res_trian(op::ParamFEOperator) = get_domains(get_vector_index_map(op))
+get_jac_trian(op::ParamFEOperator) = get_domains(get_vector_index_map(op))
+
+function Utils.change_domains(op::JointParamFEOperator,trian_res,trian_jac)
+  op
+end
+
+function Utils.change_domains(op::SplitParamFEOpFromWeakForm{O},trian_res,trian_jac) where O
+  trian_res′ = order_triangulations(get_res_trian(op),trian_res)
+  trian_jac′ = order_triangulations(get_jac_trian(op),trian_jac)
+  res′,jac′ = _set_triangulations(op.res,op.jac,op.test,op.trial,trian_res′,trian_jac′)
+  index_map′ = change_domains(op.index_map,trian_res′,trian_jac′)
+  ParamFEOpFromWeakForm{O,SplitTriangulation}(
+    res′,jac′,op.pspace,op.assem,index_map′,op.trial,op.test)
+end
+
+function Utils.change_domains(op::ParamFEOperator)
+  change_domains(op,get_res_trian(op),get_jac_trian(op))
+end
+
+function _set_triangulation_jac(
+  jac::Function,
+  trian::Tuple{Vararg{Triangulation}},
+  order)
+
+  degree = 2*order
+  meas = Measure.(trian,degree)
+  jac′(μ,u,du,v,args...) = jac(μ,u,du,v,args...)
+  jac′(μ,u,du,v) = jac′(μ,u,du,v,meas...)
+  return jac′
+end
+
+function _set_triangulation_res(
+  res::Function,
+  trian::Tuple{Vararg{Triangulation}},
+  order)
+
+  degree = 2*order
+  meas = Measure.(trian,degree)
+  res′(μ,u,v,args...) = res(μ,u,v,args...)
+  res′(μ,u,v) = res′(μ,u,v,meas...)
+  return res′
+end
+
+function _set_triangulations(
+  res::Function,
+  jac::Function,
+  test::FESpace,
+  trial::FESpace,
+  trian_res::Tuple{Vararg{Triangulation}},
+  trian_jac::Tuple{Vararg{Triangulation}})
+
+  polyn_order = get_polynomial_order(test)
+  @check polyn_order == get_polynomial_order(trial)
+  res′ = _set_triangulation_res(res,trian_res,polyn_order)
+  jac′ = _set_triangulation_jac(jac,trian_jac,polyn_order)
+  return res′,jac′
+end

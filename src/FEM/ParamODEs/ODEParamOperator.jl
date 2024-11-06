@@ -11,7 +11,7 @@ struct LinearParamODE <: ODEParamOperatorType end
 struct LinearNonlinearParamODE <: ODEParamOperatorType end
 
 """
-    abstract type ODEParamOperator{T<:ODEParamOperatorType} <: ODEOperator{T} end
+    abstract type ODEParamOperator{T<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T} end
 
 Parametric extension of the type [`ODEOperator`](@ref) in [`Gridap`](@ref).
 
@@ -19,7 +19,7 @@ Subtypes:
 - [`ODEParamOpFromTFEOp`](@ref)
 
 """
-abstract type ODEParamOperator{T<:ODEParamOperatorType} <: ParamOperator{T} end
+abstract type ODEParamOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T} end
 
 Polynomials.get_order(odeop::ODEParamOperator) = get_order(get_fe_operator(odeop))
 ODEs.is_form_constant(odeop::ODEParamOperator,k::Integer) = is_form_constant(get_fe_operator(odeop),k)
