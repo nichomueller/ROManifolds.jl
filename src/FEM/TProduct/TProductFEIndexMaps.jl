@@ -55,21 +55,6 @@ function _global_2_local(sparsity::TProductSparsityPattern,I,J,i,j)
   return g2l
 end
 
-function _add_constrained_dofs(indices::AbstractArray{Ti}) where Ti
-  z = zero(Ti)
-  index_map = IndexMap(indices)
-  if any(indices.==z)
-    mdof_to_bdof = Ti[]
-    sdof_to_bdof = Ti[]
-    for i in CartesianIndices(indices)
-      indices[i] != z && push!(mdof_to_bdof,i)
-    end
-    ConstrainedDofsIndexMap(index_map,mdof_to_bdof,sdof_to_bdof,DoNotShowSlaveDofs())
-  else
-    index_map
-  end
-end
-
 function _permute_index_map(index_map,I,J,nrows)
   IJ = vectorize_map(I) .+ nrows .* (vectorize_map(J)'.-1)
   iperm = copy(index_map)
@@ -78,7 +63,7 @@ function _permute_index_map(index_map,I,J,nrows)
       iperm[k] = IJ[pk]
     end
   end
-  return _add_constrained_dofs(iperm)
+  return IndexMap(iperm)
 end
 
 function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractMultiValueIndexMap,nrows)
@@ -92,7 +77,7 @@ function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractM
       J′ = (J-1)*ncomps + icomp_J
       ic[j] = (J′-1)*nrows*ncomps + I′
     end
-    return _add_constrained_dofs(ic)
+    return IndexMap(ic)
   end
 
   ncomps_I = num_components(I)
@@ -121,7 +106,7 @@ function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractI
       I′ = (I-1)*ncomps + icomp
       ic[j] = (J-1)*nrows*ncomps + I′
     end
-    return _add_constrained_dofs(ic)
+    return IndexMap(ic)
   end
 
   ncomps = num_components(I)
@@ -144,7 +129,7 @@ function _permute_index_map(index_map,I::AbstractIndexMap,J::AbstractMultiValueI
       J′ = (J-1)*ncomps + icomp
       ic[j] = (J′-1)*nrows + I
     end
-    return _add_constrained_dofs(ic)
+    return IndexMap(ic)
   end
 
   ncomps = num_components(J)

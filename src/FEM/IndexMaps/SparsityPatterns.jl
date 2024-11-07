@@ -153,8 +153,11 @@ function permute_sparsity(s::TProductSparsityPattern,U::FESpace,V::FESpace)
 end
 
 function sum_sparsities(s::TProductSparsityPattern...)
+  item = first(s)
+  sitem_1d = get_univariate_sparsity(item)
+  # @check all(all(get_univariate_sparsity(si).==sitem_1d) for si in s)
   ssparsity = sum_sparsities(map(get_sparsity,s)...)
-  TProductSparsityPattern(ssparsity,s.sparsities_1d)
+  TProductSparsityPattern(ssparsity,sitem_1d)
 end
 
 function to_nz_index!(i::AbstractArray,sparsity::TProductSparsityPattern)
@@ -163,11 +166,11 @@ end
 
 # utils
 
-function _sparse_sum_preserve_sparsity(A::SparseMatrixCSC,Bs::SparseMatrixCSC...)
-  entrytypeC = Base.Broadcast.combine_eltypes(+,(A,Bs...))
-  indextypeC = SparseArrays.HigherOrderFns._promote_indtype(A,Bs...)
-  fofzeros = +(SparseArrays.HigherOrderFns._zeros_eltypes(A,Bs...)...)
-  maxnnzC = SparseArrays.widelength(A)
-  C = SparseArrays.HigherOrderFns._allocres(size(A),indextypeC,entrytypeC,maxnnzC)
-  SparseArrays.HigherOrderFns._map_notzeropres!(+,fofzeros,C,A,Bs...)
+function _sparse_sum_preserve_sparsity(A::SparseMatrixCSC{Tv}...) where Tv
+  for a in A
+    fill!(a.nzval,one(Tv))
+  end
+  B = sum(A)
+  fill!(B.nzval,zero(Tv))
+  return B
 end

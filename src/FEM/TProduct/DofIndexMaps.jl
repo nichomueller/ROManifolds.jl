@@ -103,11 +103,10 @@ function _get_dof_index_map(
 
   for (icell,cell) in enumerate(CartesianIndices(ncells))
     if icell ∈ trian_ids
-      icell′ = findfirst(trian_ids.==icell)
       first_new_dof  = order .* (Tuple(cell) .- 1) .+ 1
       new_dofs_range = map(i -> i:i+order,first_new_dof)
       new_dofs = view(new_dof_ids,new_dofs_range...)
-      cell_dofs = getindex!(cache_cell_dof_ids,cell_dof_ids,icell′)
+      cell_dofs = getindex!(cache_cell_dof_ids,cell_dof_ids,icell)
       for (idof,dof) in enumerate(cell_dofs)
         t = terms[idof]
         dof < 0 && continue

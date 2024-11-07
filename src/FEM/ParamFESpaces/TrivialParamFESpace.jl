@@ -27,4 +27,4 @@ end
 # utils
 
 remove_layer(f::TrivialParamFESpace) = TrivialParamFESpace(f.space.space,param_length(f))
-remove_layer(f::TrivialParamFESpace{<:TProductFESpace}) = TrivialParamFESpace(f.space.space.space,param_length(f))
+remove_layer(f::TrivialParamFESpace{<:UnconstrainedFESpace}) = f

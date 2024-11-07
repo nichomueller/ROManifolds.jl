@@ -36,6 +36,7 @@ cutgeo = cut(bgmodel,geo3)
 order = 1
 degree = 2*order
 
+dΩ = Measure(Ω,degree)
 dΩ_in = Measure(Ω_in,degree)
 dΩ_out = Measure(Ω_out,degree)
 Γ_in = EmbeddedBoundary(cutgeo)
@@ -74,7 +75,7 @@ feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,trians,trians)
 fesolver = LinearFESolver(LUSolver())
 
 tol = 1e-4
-energy(du,v) = ∫(v*du)dΩ_in + ∫(∇(v)⋅∇(du))dΩ_in
+energy(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
 state_reduction = TTSVDReduction(tol,energy;nparams=100)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=80,nparams_jac=80)
 
@@ -87,56 +88,6 @@ x̂,rbstats = solve(rbsolver,rbop,μon)
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 
-#############################
-using Gridap.ReferenceFEs
-using Gridap.FESpaces
-using Gridap.Geometry
-using ReducedOrderModels.TProduct
-
-space = test.space
-trian = Ω_in.trian
-# get_dof_index_map(space,trian)
-
-model = get_background_model(trian)
-cell_dof_ids = get_cell_dof_ids(space)
-
-trian_ids = trian.tface_to_mface
-
-dof = get_fe_dof_basis(space)
-T = TProduct.get_dof_type(dof)
-order = get_polynomial_order(space)
-comp_to_dofs = TProduct.get_comp_to_dofs(T,space,dof)
-
-# get_dof_index_map(T,model,cell_dof_ids,trian_ids,order,comp_to_dofs)
-
-Dc = 2
-Ti = Int32
-desc = get_cartesian_descriptor(model)
-
-periodic = desc.isperiodic
-ncells = desc.partition
-ndofs = order .* ncells .+ 1 .- periodic
-
-terms = TProduct._get_terms(first(get_polytopes(model)),fill(order,Dc))
-cache_cell_dof_ids = array_cache(cell_dof_ids)
-
-new_dof_ids = LinearIndices(ndofs)
-dof_map = fill(zero(Ti),ndofs)
-
-for (icell,cell) in enumerate(CartesianIndices(ncells))
-  if icell ∈ trian_ids
-    icell′ = findfirst(trian_ids.==icell)
-    first_new_dof  = order .* (Tuple(cell) .- 1) .+ 1
-    new_dofs_range = map(i -> i:i+order,first_new_dof)
-    new_dofs = view(new_dof_ids,new_dofs_range...)
-    cell_dofs = getindex!(cache_cell_dof_ids,cell_dof_ids,icell′)
-    for (idof,dof) in enumerate(cell_dofs)
-      t = terms[idof]
-      dof < 0 && continue
-      dof_map[new_dofs[t]] = dof
-    end
-  end
-end
 ############################## WITH TPOD #####################################
 
 bgmodel = CartesianDiscreteModel(pmin,pmax,partition)

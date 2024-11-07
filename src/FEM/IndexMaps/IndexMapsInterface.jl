@@ -1,37 +1,30 @@
-function _minimum_dir_d(i::AbstractVector{CartesianIndex{D}},d::Integer) where D
-  mind = Inf
-  for ii in i
-    if ii.I[d] < mind
-      mind = ii.I[d]
-    end
-  end
-  return mind
+function _admissible_range(iz_start::Int,iz_finish::Int;limits=1:finish)
+  start = first(limits)
+  finish = last(limits)
+  a = start==iz_start ? start + 1 : start
+  b = finish==iz_finish ? finish - 1 : finish
+  a:b
 end
 
-function _maximum_dir_d(i::AbstractVector{CartesianIndex{D}},d::Integer) where D
-  maxd = 0
-  for ii in i
-    if ii.I[d] > maxd
-      maxd = ii.I[d]
-    end
-  end
-  return maxd
+function _findfirstzero(i::AbstractArray{Ti,D}) where {Ti,D}
+  iz_start = findfirst(iszero,i)
+  isnothing(iz_start) ? CartesianIndex(tfill(1,Val(D))) : CartesianIndex(iz_start)
 end
 
-function _shape_per_dir(i::AbstractVector{CartesianIndex{D}}) where D
-  function _admissible_shape(d::Integer)
-    mind = _minimum_dir_d(i,d)
-    maxd = _maximum_dir_d(i,d)
-    @assert all([ii.I[d] ≥ mind for ii in i]) && all([ii.I[d] ≤ maxd for ii in i])
-    return maxd - mind + 1
-  end
-  ntuple(d -> _admissible_shape(d),D)
+function _findlastzero(i::AbstractArray{Ti,D}) where {Ti,D}
+  iz_finish = findlast(iszero,i)
+  isnothing(iz_finish) ? CartesianIndex(size(i)) : CartesianIndex(iz_finish)
 end
 
-function _shape_per_dir(i::AbstractVector{<:Integer})
-  min1 = minimum(i)
-  max1 = maximum(i)
-  (max1 - min1 + 1,)
+function _find_free_dofs_ranges(i::AbstractArray{Ti,D}) where {Ti,D}
+  iz_start = _findfirstzero(i)
+  iz_finish = _findlastzero(i)
+  ntuple(d -> _admissible_range(iz_start.I[d],iz_finish.I[d];limits=axes(i,d)),D)
+end
+
+function _find_free_dofs_locations(i::AbstractArray)
+  r = _find_free_dofs_ranges(i)
+  CartesianIndices(i)[r...]
 end
 
 """
@@ -62,14 +55,10 @@ boundary conditions.
 
 """
 function remove_constrained_dofs(i::AbstractIndexMap)
-  free_dofs_locations = findall(i.>zero(eltype(i)))
-  s = _shape_per_dir(free_dofs_locations)
-  if length(free_dofs_locations) == prod(s)
-    free_dofs_locations′ = reshape(free_dofs_locations,s)
-  else
-    free_dofs_locations′ = CartesianIndices(i)
-  end
-  view(i,free_dofs_locations′)
+  # free_dofs_locations = findall(i.>zero(eltype(i)))
+  # r = _range_per_dir(free_dofs_locations)
+  free_dofs_locations = _find_free_dofs_locations(i) #CartesianIndices(i)[r...]
+  view(i,free_dofs_locations)
 end
 
 """
@@ -221,9 +210,15 @@ Base.size(i::IndexMapView) = size(i.locations)
 Base.getindex(i::IndexMapView{D},j::Vararg{Integer,D}) where D = i.indices[i.locations[j...]]
 Base.setindex!(i::IndexMapView{D},v,j::Vararg{Integer,D}) where D = setindex!(i.indices,v,i.locations[j...])
 
+function inv_index_map(i::IndexMapView)
+  invi = reshape(invperm(vec(i)),size(i))
+  IndexMap(invi)
+end
+
 function sum_maps(i::IndexMapView...)
   get_indices(i::IndexMapView) = i.indices
-  sum_maps(map(get_indices,i)...)
+  i′ = sum_maps(map(get_indices,i)...)
+  remove_constrained_dofs(i′)
 end
 
 abstract type ShowSlaveDofsStyle end
@@ -339,17 +334,14 @@ end
 
 function sum_maps(i::ConstrainedDofsIndexMap{D}...) where D
   item = first(i)
+  @check all(ii.mloc_to_loc == item.mloc_to_loc for ii in i)
+  @check all(ii.sloc_to_loc == item.sloc_to_loc for ii in i)
   @check all(ii.show_slaves == item.show_slaves for ii in i)
 
   get_indices(i::ConstrainedDofsIndexMap) = i.indices
-  get_m2l(i::ConstrainedDofsIndexMap) = i.mloc_to_loc
-  get_s2l(i::ConstrainedDofsIndexMap) = i.sloc_to_loc
-
   indices = sum_maps(map(get_indices,i)...)
-  mloc_to_loc = sort(map(get_m2l,i)...)
-  sloc_to_loc = sort(map(get_s2l,i)...)
 
-  ConstrainedDofsIndexMap(indices,mloc_to_loc,sloc_to_loc,item.show_slaves)
+  ConstrainedDofsIndexMap(indices,item.mloc_to_loc,item.sloc_to_loc,item.show_slaves)
 end
 
 abstract type AbstractMultiValueIndexMap{D,Ti} <: AbstractIndexMap{D,Ti} end

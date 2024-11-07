@@ -57,11 +57,11 @@ function FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldParamFESpace,f
 end
 
 function FESpaces.gather_free_and_dirichlet_values(f::SingleFieldParamFESpace,cv)
-  gather_free_and_dirichlet_values(get_fe_space(f),cv)
+  gather_free_and_dirichlet_values(remove_layer(f),cv)
 end
 
 function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::SingleFieldParamFESpace,cv)
-  gather_free_and_dirichlet_values!(fv,dv,get_fe_space(f),cv)
+  gather_free_and_dirichlet_values!(fv,dv,remove_layer(f),cv)
 end
 
 function IndexMaps.get_vector_index_map(f::SingleFieldParamFESpace,t::Triangulation...)
@@ -433,34 +433,3 @@ end
 # utils
 
 remove_layer(f::SingleFieldParamFESpace) = @abstractmethod
-
-# for testing purposes
-
-function FESpaces.test_single_field_fe_space(f::SingleFieldParamFESpace,pred=(==))
-  fe_basis = get_fe_basis(f)
-  @test isa(fe_basis,CellField)
-  test_fe_space(f)
-  dirichlet_values = zero_dirichlet_values(f)
-  @test length(dirichlet_values) == num_dirichlet_dofs(f)
-  free_values = zero_free_values(f)
-  cell_vals = scatter_free_and_dirichlet_values(f,free_values,dirichlet_values)
-  fv, dv = gather_free_and_dirichlet_values(f,cell_vals)
-  @test pred(fv,free_values)
-  @test pred(dv,dirichlet_values)
-  gather_free_and_dirichlet_values!(fv,dv,f,cell_vals)
-  @test pred(fv,free_values)
-  @test pred(dv,dirichlet_values)
-  fv, dv = gather_free_and_dirichlet_values!(fv,dv,f,cell_vals)
-  @test pred(fv,free_values)
-  @test pred(dv,dirichlet_values)
-  fe_function = FEFunction(f,free_values,dirichlet_values)
-  @test isa(fe_function,SingleFieldParamFEFunction)
-  test_fe_function(fe_function)
-  ddof_to_tag = get_dirichlet_dof_tag(f)
-  @test length(ddof_to_tag) == num_dirichlet_dofs(f)
-  if length(get_dirichlet_dof_tag(f)) != 0
-    @test maximum(get_dirichlet_dof_tag(f)) <= num_dirichlet_tags(f)
-  end
-  cell_dof_basis = get_fe_dof_basis(f)
-  @test isa(cell_dof_basis,CellDof)
-end
