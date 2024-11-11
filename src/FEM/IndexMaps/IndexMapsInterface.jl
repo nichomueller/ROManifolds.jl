@@ -1,25 +1,25 @@
-function _admissible_range(iz_start::Int,iz_finish::Int;limits=1:finish)
+function _admissible_range(innz_start::Int,innz_finish::Int;limits=1:finish)
   start = first(limits)
   finish = last(limits)
-  a = start==iz_start ? start + 1 : start
-  b = finish==iz_finish ? finish - 1 : finish
+  a = innz_start>start ? start + 1 : start
+  b = innz_finish<finish ? finish - 1 : finish
   a:b
 end
 
-function _findfirstzero(i::AbstractArray{Ti,D}) where {Ti,D}
-  iz_start = findfirst(iszero,i)
-  isnothing(iz_start) ? CartesianIndex(tfill(1,Val(D))) : CartesianIndex(iz_start)
+function _findfirstnnz(i::AbstractArray{Ti,D}) where {Ti,D}
+  innz_start = findfirst(!iszero,i)
+  isnothing(innz_start) ? CartesianIndex(tfill(1,Val(D))) : CartesianIndex(innz_start)
 end
 
-function _findlastzero(i::AbstractArray{Ti,D}) where {Ti,D}
-  iz_finish = findlast(iszero,i)
-  isnothing(iz_finish) ? CartesianIndex(size(i)) : CartesianIndex(iz_finish)
+function _findlastnnz(i::AbstractArray{Ti,D}) where {Ti,D}
+  innz_finish = findlast(!iszero,i)
+  isnothing(innz_finish) ? CartesianIndex(size(i)) : CartesianIndex(innz_finish)
 end
 
 function _find_free_dofs_ranges(i::AbstractArray{Ti,D}) where {Ti,D}
-  iz_start = _findfirstzero(i)
-  iz_finish = _findlastzero(i)
-  ntuple(d -> _admissible_range(iz_start.I[d],iz_finish.I[d];limits=axes(i,d)),D)
+  innz_start = _findfirstnnz(i)
+  innz_finish = _findlastnnz(i)
+  ntuple(d -> _admissible_range(innz_start.I[d],innz_finish.I[d];limits=axes(i,d)),D)
 end
 
 function _find_free_dofs_locations(i::AbstractArray)
@@ -89,7 +89,7 @@ function permute_sparsity(a::SparsityPatternCSC,i::AbstractIndexMap,j::AbstractI
   permute_sparsity(a,vectorize_map(i),vectorize_map(j))
 end
 
-function sum_maps(inds::I...) where I<:AbstractIndexMap
+function sum_maps(inds::Tuple{Vararg{I}}) where I<:AbstractIndexMap
   ind = first(inds)
   for ii in inds
     @check size(ii) == size(ind)
@@ -103,27 +103,7 @@ function sum_maps(inds::I...) where I<:AbstractIndexMap
       end
     end
   end
-  return I(ind)
-end
-
-function sum_maps(i::Array{I,N}...) where {I<:AbstractIndexMap,N}
-  i1 = first(i)
-  s = size(i1)
-  @check all(size(ii)==s for ii in i)
-  i′ = Array{I,N}(undef,s)
-  for j in eachindex(i1)
-    ij = map(ii -> getindex(ii,j),i)
-    i′[j] = sum_maps(ij...)
-  end
-  i′
-end
-
-function sum_maps(i::Tuple{Vararg{I}}...) where {I<:Union{AbstractIndexMap,AbstractArray{<:AbstractIndexMap}}}
-  i′ = ()
-  for ii in i
-    i′ = (i′...,ii...)
-  end
-  sum_maps(i′...)
+  return ind
 end
 
 abstract type AbstractTrivialIndexMap <: AbstractIndexMap{1,Int} end
@@ -148,7 +128,7 @@ end
 TrivialIndexMap(i::AbstractArray) = TrivialIndexMap(length(i))
 Base.size(i::TrivialIndexMap) = (i.length,)
 
-function sum_maps(i::TrivialIndexMap...)
+function sum_maps(i::Tuple{Vararg{TrivialIndexMap}})
   item = first(i)
   @check all(size(ii) == size(item) for ii in i)
   item
@@ -166,8 +146,8 @@ recast(a::AbstractArray,i::TrivialSparseIndexMap) = recast(a,i.sparsity)
 
 get_sparsity(i::TrivialSparseIndexMap) = i.sparsity
 
-function sum_maps(i::TrivialSparseIndexMap...)
-  sparsity = sum_sparsities(map(get_sparsity,i)...)
+function sum_maps(i::Tuple{Vararg{TrivialSparseIndexMap}})
+  sparsity = sum_sparsities(map(get_sparsity,i))
   TrivialSparseIndexMap(sparsity)
 end
 
@@ -215,9 +195,9 @@ function inv_index_map(i::IndexMapView)
   IndexMap(invi)
 end
 
-function sum_maps(i::IndexMapView...)
+function sum_maps(i::Tuple{Vararg{IndexMapView}})
   get_indices(i::IndexMapView) = i.indices
-  i′ = sum_maps(map(get_indices,i)...)
+  i′ = sum_maps(map(get_indices,i))
   remove_constrained_dofs(i′)
 end
 
@@ -332,14 +312,14 @@ function inv_index_map(i::ConstrainedDofsIndexMap{D,Ti,DoNotShowSlaveDofs}) wher
   return i′
 end
 
-function sum_maps(i::ConstrainedDofsIndexMap{D}...) where D
+function sum_maps(i::Tuple{Vararg{ConstrainedDofsIndexMap{D}}}) where D
   item = first(i)
   @check all(ii.mloc_to_loc == item.mloc_to_loc for ii in i)
   @check all(ii.sloc_to_loc == item.sloc_to_loc for ii in i)
   @check all(ii.show_slaves == item.show_slaves for ii in i)
 
   get_indices(i::ConstrainedDofsIndexMap) = i.indices
-  indices = sum_maps(map(get_indices,i)...)
+  indices = sum_maps(map(get_indices,i))
 
   ConstrainedDofsIndexMap(indices,item.mloc_to_loc,item.sloc_to_loc,item.show_slaves)
 end
@@ -417,12 +397,6 @@ Base.setindex!(i::MultiValueIndexMap{D},v,j::Vararg{Integer,D}) where D = setind
 Base.copy(i::MultiValueIndexMap) = MultiValueIndexMap(copy(i.indices))
 TensorValues.num_components(i::MultiValueIndexMap{D}) where D = size(i.indices,D)
 
-function sum_maps(i::MultiValueIndexMap...)
-  get_indices(i::MultiValueIndexMap) = i.indices
-  indices = sum_maps(map(get_indices,i)...)
-  MultiValueIndexMap(indices)
-end
-
 struct MultiValueIndexMapView{D,Ti,I,L} <: AbstractMultiValueIndexMap{D,Ti}
   indices::I
   locations::L
@@ -437,9 +411,9 @@ Base.setindex!(i::MultiValueIndexMapView{D},v,j::Vararg{Integer,D}) where D = se
 Base.copy(i::MultiValueIndexMapView) = MultiValueIndexMap(copy(i.indices),i.locations)
 TensorValues.num_components(i::MultiValueIndexMapView{D}) where D = size(i,D)
 
-function sum_maps(i::MultiValueIndexMapView...)
+function sum_maps(i::Tuple{Vararg{MultiValueIndexMapView}})
   get_indices(i::MultiValueIndexMapView) = i.indices
-  sum_maps(map(get_indices,i)...)
+  sum_maps(map(get_indices,i))
 end
 
 """
@@ -464,12 +438,12 @@ Base.copy(i::TProductIndexMap) = TProductIndexMap(copy(i.indices),i.indices_1d)
 get_tp_indices(i::TProductIndexMap) = i.indices
 get_univariate_indices(i::TProductIndexMap) = i.indices_1d
 
-function sum_maps(i::TProductIndexMap...)
+function sum_maps(i::Tuple{Vararg{TProductIndexMap}})
   item = first(i)
   @check all(ii.indices_1d == item.indices_1d for ii in i)
 
   get_indices(i::TProductIndexMap) = i.indices
-  indices = sum_maps(map(get_indices,i)...)
+  indices = sum_maps(map(get_indices,i))
 
   TProductIndexMap(indices,item.indices_1d)
 end
@@ -506,11 +480,11 @@ end
 
 recast(a::AbstractArray,i::SparseIndexMap) = recast(a,i.sparsity)
 
-function sum_maps(i::SparseIndexMap...)
-  indices_sparse = sum_maps(map(get_sparse_index_map,i)...)
-  sparsity = sum_sparsities(map(get_sparsity,i)...)
+function sum_maps(sparsity::SparsityPattern,i::Tuple{Vararg{SparseIndexMap}})
+  indices_sparse = sum_maps(map(get_sparse_index_map,i))
+  psparsity = sum_sparsities(map(get_sparsity,i))
   indices = to_nz_index(indices_sparse,sparsity)
-  SparseIndexMap(indices,indices_sparse,sparsity)
+  SparseIndexMap(indices,indices_sparse,psparsity)
 end
 
 const MultiValueSparseIndexMap{D,Ti,A<:AbstractMultiValueIndexMap{D,Ti},B} = SparseIndexMap{D,Ti,A,B}

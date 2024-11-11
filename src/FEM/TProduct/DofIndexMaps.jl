@@ -157,9 +157,13 @@ end
 # utils
 
 _get_trian_ids(t::BodyFittedTriangulation) = t.tface_to_mface
-_get_trian_ids(t::BoundaryTriangulation) = t.glue.tface_to_mface
+_get_trian_ids(t::BoundaryTriangulation) = t.glue.face_to_bgface
 _get_trian_ids(t::Geometry.TriangulationView) = _get_trian_ids(t.parent)
 _get_trian_ids(t::Interfaces.SubFacetTriangulation) = t.subfacets.facet_to_bgcell
+_get_trian_ids(t::Interfaces.SubCellTriangulation) = t.subcells.cell_to_bgcell
+function _get_trian_ids(t::Geometry.AppendedTriangulation)
+  lazy_append(_get_trian_ids(t.a),_get_trian_ids(t.b))
+end
 
 """
     get_polynomial_order(fs::FESpace) -> Integer

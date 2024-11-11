@@ -71,7 +71,6 @@ export TProductSparseMatrixAssembler
 export TProductBlockSparseMatrixAssembler
 include("TProductAssembly.jl")
 
-export TProductEmbeddedDiscretization
 include("Unfitted.jl")
 
 end # module

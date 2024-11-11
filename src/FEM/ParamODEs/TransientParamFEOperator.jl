@@ -225,7 +225,7 @@ for (f,T) in zip((:(Utils.set_domains),:(Utils.change_domains)),(:JointTriangula
       trian_res′ = order_triangulations(get_trian_res(op),trian_res)
       trian_jacs′ = map(order_triangulations,get_trian_jac(op),trian_jacs)
       res′,jacs′ = _set_triangulations(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
-      index_map′ = $f(op.index_map,trian_res′,trian_jacs′)
+      index_map′ = $f(op.index_map,op.trial,op.test,trian_res′,trian_jacs′)
       TransientParamFEOpFromWeakForm{$T}(
         res′,jacs′,op.tpspace,op.assem,index_map′,op.trial,op.test,op.order)
     end
@@ -234,7 +234,7 @@ for (f,T) in zip((:(Utils.set_domains),:(Utils.change_domains)),(:JointTriangula
       trian_res′ = order_triangulations(get_trian_res(op),trian_res)
       trian_jacs′ = map(order_triangulations,get_trian_jac(op),trian_jacs)
       res′,jacs′ = _set_triangulations(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
-      index_map′ = $f(op.index_map,trian_res′,trian_jacs′)
+      index_map′ = $f(op.index_map,op.trial,op.test,trian_res′,trian_jacs′)
       TransientParamLinearFEOpFromWeakForm{$T}(
         res′,jacs′,op.constant_forms,op.tpspace,
         op.assem,index_map′,op.trial,op.test,op.order)

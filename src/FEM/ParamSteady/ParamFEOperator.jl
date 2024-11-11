@@ -172,8 +172,8 @@ for (f,T) in zip((:(Utils.set_domains),:(Utils.change_domains)),(:JointTriangula
     function $f(op::SplitParamFEOpFromWeakForm{O},trian_res,trian_jac) where O
       trian_res′ = order_triangulations(get_trian_res(op),trian_res)
       trian_jac′ = order_triangulations(get_trian_jac(op),trian_jac)
-      res′,jac′ = _set_triangulations(op.res,op.jac,op.test,op.trial,trian_res′,trian_jac′)
-      index_map′ = $f(op.index_map,trian_res′,trian_jac′)
+      res′,jac′ = _set_triangulations(op.res,op.jac,op.trial,op.test,trian_res′,trian_jac′)
+      index_map′ = $f(op.index_map,op.test,op.trial,trian_res′,trian_jac′)
       ParamFEOpFromWeakForm{O,$T}(
         res′,jac′,op.pspace,op.assem,index_map′,op.trial,op.test)
     end

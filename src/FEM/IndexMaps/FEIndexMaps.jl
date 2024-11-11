@@ -101,14 +101,67 @@ function get_matrix_index_map(trial::FESpace,test::FESpace,trians::Tuple{Vararg{
   return index_maps
 end
 
-function Utils.set_domains(i::FEOperatorIndexMap,trians_res,trians_jac)
-  matrix_map′ = sum_maps(get_values(get_matrix_index_map(i))...)
-  vector_map′ = sum_maps(get_values(get_vector_index_map(i))...)
+function Utils.set_domains(
+  i::FEOperatorIndexMap,
+  trial::SingleFieldFESpace,
+  test::SingleFieldFESpace,
+  trians_res,
+  trians_jac)
+
+  sparsity = get_sparsity(trial,test)
+  matrix_map = _get_matrix_index_map(i,trians_res)
+  vector_map = _get_vector_index_map(i,trians_jac)
+  matrix_map′ = sum_maps(sparsity,matrix_map)
+  vector_map′ = sum_maps(vector_map)
   FEOperatorIndexMap(matrix_map′,vector_map′)
 end
 
-function Utils.change_domains(i::FEOperatorIndexMap,trians_res,trians_jac)
+function Utils.set_domains(
+  i::FEOperatorIndexMap,
+  trial::MultiFieldFESpace,
+  test::MultiFieldFESpace,
+  trians_res,
+  trians_jac)
+
+  ntest = num_fields(test)
+  ntrial = num_fields(trial)
+  matrix_map = _get_matrix_index_map(i,trians_res)
+  vector_map = _get_vector_index_map(i,trians_jac)
+  matrix_map′ = Matrix{AbstractIndexMap}(undef,ntest,ntrial)
+  vector_map′ = Vector{AbstractIndexMap}(undef,ntest)
+  for i in 1:ntest
+    vmi = map(x -> getindex(x,i),vector_map)
+    vector_map′[i] = sum_maps(vmi)
+    for j in 1:ntrial
+      sparsity = get_sparsity(trial[j],test[i])
+      mmij = map(x -> getindex(x,i,j),matrix_map)
+      matrix_map′[i,j] = sum_maps(sparsity,mmij)
+    end
+  end
+  FEOperatorIndexMap(matrix_map′,vector_map′)
+end
+
+function Utils.change_domains(i::FEOperatorIndexMap,trial::FESpace,test::FESpace,trians_res,trians_jac)
   matrix_map′ = change_domains(get_matrix_index_map(i),trians_jac)
   vector_map′ = change_domains(get_vector_index_map(i),trians_res)
   FEOperatorIndexMap(matrix_map′,vector_map′)
+end
+
+# Utils
+
+function _get_vector_index_map(i::FEOperatorIndexMap,trians::Tuple{Vararg{Triangulation}})
+  get_values(get_vector_index_map(i))
+end
+
+function _get_matrix_index_map(i::FEOperatorIndexMap,trians::Tuple{Vararg{Triangulation}})
+  get_values(get_matrix_index_map(i))
+end
+
+function _get_matrix_index_map(i::FEOperatorIndexMap,trians::Tuple{Vararg{Tuple{Vararg{Triangulation}}}})
+  _matrix_map = get_values(get_matrix_index_map(i))
+  matrix_map = ()
+  for _imap in _matrix_map
+    matrix_map = (matrix_map...,_imap)
+  end
+  return matrix_map
 end

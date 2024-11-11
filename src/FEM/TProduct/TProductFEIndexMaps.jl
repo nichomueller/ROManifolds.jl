@@ -37,6 +37,7 @@ function _global_2_local(sparsity::TProductSparsityPattern,I,J,i,j)
   g2l = zeros(eltype(IJ),unnz...)
   lid = zeros(Int,length(lids))
   @inbounds for (k,gid) = enumerate(IJ)
+    fill!(lid,0)
     irows = tprows[I[k]]
     icols = tpcols[J[k]]
     @inbounds for d in eachindex(lids)
@@ -52,7 +53,7 @@ function _global_2_local(sparsity::TProductSparsityPattern,I,J,i,j)
     g2l[lid...] = gid
   end
 
-  return g2l
+  return IndexMap(g2l)
 end
 
 function _permute_index_map(index_map,I,J,nrows)
@@ -63,7 +64,7 @@ function _permute_index_map(index_map,I,J,nrows)
       iperm[k] = IJ[pk]
     end
   end
-  return IndexMap(iperm)
+  return iperm
 end
 
 function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractMultiValueIndexMap,nrows)
@@ -77,7 +78,7 @@ function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractM
       J′ = (J-1)*ncomps + icomp_J
       ic[j] = (J′-1)*nrows*ncomps + I′
     end
-    return IndexMap(ic)
+    return ic
   end
 
   ncomps_I = num_components(I)
@@ -106,7 +107,7 @@ function _permute_index_map(index_map,I::AbstractMultiValueIndexMap,J::AbstractI
       I′ = (I-1)*ncomps + icomp
       ic[j] = (J-1)*nrows*ncomps + I′
     end
-    return IndexMap(ic)
+    return ic
   end
 
   ncomps = num_components(I)
@@ -129,7 +130,7 @@ function _permute_index_map(index_map,I::AbstractIndexMap,J::AbstractMultiValueI
       J′ = (J-1)*ncomps + icomp
       ic[j] = (J′-1)*nrows + I
     end
-    return IndexMap(ic)
+    return ic
   end
 
   ncomps = num_components(J)

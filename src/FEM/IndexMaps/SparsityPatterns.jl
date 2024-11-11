@@ -52,6 +52,12 @@ function to_nz_index!(i::AbstractArray,sparsity::SparsityPattern)
   @abstractmethod
 end
 
+function permute_sparsity(s::SparsityPattern,U::FESpace,V::FESpace)
+  index_map_I = get_dof_index_map(V)
+  index_map_J = get_dof_index_map(U)
+  permute_sparsity(s,index_map_I,index_map_J)
+end
+
 """
 """
 struct SparsityPatternCSC{Tv,Ti} <: SparsityPattern
@@ -83,10 +89,10 @@ function permute_sparsity(a::SparsityPatternCSC,i::AbstractVector,j::AbstractVec
   SparsityPatternCSC(a.matrix[i,j])
 end
 
-function sum_sparsities(a::SparsityPatternCSC...)
+function sum_sparsities(a::Tuple{Vararg{SparsityPatternCSC}})
   get_matrix(a::SparsityPatternCSC) = a.matrix
   matrices = map(get_matrix,a)
-  matrix = _sparse_sum_preserve_sparsity(matrices...)
+  matrix = _sparse_sum_preserve_sparsity(matrices)
   SparsityPatternCSC(matrix)
 end
 
@@ -115,6 +121,28 @@ get_nonzero_indices(a::MultiValueSparsityPatternCSC) = get_nonzero_indices(a.mat
 TensorValues.num_components(a::MultiValueSparsityPatternCSC) = a.ncomps
 
 recast(A::AbstractArray,a::MultiValueSparsityPatternCSC) = @notimplemented
+
+function sum_sparsities(a::Tuple{Vararg{MultiValueSparsityPatternCSC}})
+  item = first(a)
+  ncomps = item.ncomps
+  @check all((num_components(ai)==ncomps for ai in a))
+
+  get_matrix(a::MultiValueSparsityPatternCSC) = a.matrix
+  matrices = map(get_matrix,a)
+  matrix = _sparse_sum_preserve_sparsity(matrices)
+  MultiValueSparsityPatternCSC(matrix,ncomps)
+end
+
+function to_nz_index!(i::AbstractArray,sparsity::MultiValueSparsityPatternCSC)
+  nrows = num_rows(sparsity)
+  for (j,index) in enumerate(i)
+    if index > 0
+      irow = fast_index(index,nrows)
+      icol = slow_index(index,nrows)
+      i[j] = nz_index(sparsity.matrix,irow,icol)
+    end
+  end
+end
 
 """
 """
@@ -146,17 +174,10 @@ function permute_sparsity(a::TProductSparsityPattern,i,j)
   TProductSparsityPattern(psparsity,psparsities_1d)
 end
 
-function permute_sparsity(s::TProductSparsityPattern,U::FESpace,V::FESpace)
-  psparsity = permute_sparsity(s.sparsity,U.space,V.space)
-  psparsities = map(permute_sparsity,s.sparsities_1d,U.spaces_1d,V.spaces_1d)
-  TProductSparsityPattern(psparsity,psparsities)
-end
-
-function sum_sparsities(s::TProductSparsityPattern...)
+function sum_sparsities(s::Tuple{Vararg{TProductSparsityPattern}})
   item = first(s)
   sitem_1d = get_univariate_sparsity(item)
-  # @check all(all(get_univariate_sparsity(si).==sitem_1d) for si in s)
-  ssparsity = sum_sparsities(map(get_sparsity,s)...)
+  ssparsity = sum_sparsities(map(get_sparsity,s))
   TProductSparsityPattern(ssparsity,sitem_1d)
 end
 
@@ -166,7 +187,7 @@ end
 
 # utils
 
-function _sparse_sum_preserve_sparsity(A::SparseMatrixCSC{Tv}...) where Tv
+function _sparse_sum_preserve_sparsity(A::Tuple{Vararg{SparseMatrixCSC{Tv}}}) where Tv
   for a in A
     fill!(a.nzval,one(Tv))
   end
