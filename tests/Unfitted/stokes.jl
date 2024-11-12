@@ -20,26 +20,23 @@ p1 = Point(0.3,0.5)
 p2 = Point(0.7,0.5)
 geo1 = disk(R,x0=p1)
 geo2 = disk(R,x0=p2)
-geo3 = union(geo1,geo2)
+geo3 = !union(geo1,geo2)
 
 bgmodel = TProductModel(domain,partition)
-labels = get_face_labeling(bgmodel)
-add_tag_from_tags!(labels,"wall",collect(1:6))
-add_tag_from_tags!(labels,"inlet",[7])
-add_tag_from_tags!(labels,"outlet",[8])
-
 cutgeo = cut(bgmodel,geo3)
 
-Ω = Triangulation(bgmodel)
-Γ_inlet = BoundaryTriangulation(bgmodel;tags="inlet")
-Γ_outlet = BoundaryTriangulation(bgmodel;tags="outlet")
-Ω_in = Triangulation(cutgeo,PHYSICAL_OUT) # fix this
-Ω_out = Triangulation(cutgeo,PHYSICAL_IN) # fix this
-Γ_in = EmbeddedBoundary(cutgeo)
+labels = get_face_labeling(bgmodel)
+add_tag_from_tags!(labels,"wall",collect(1:6))
+add_tag_from_tags!(labels,"Γn",[7,8])
 
-nΓ_inlet = get_normal_vector(Γ_inlet)
-nΓ_outlet = get_normal_vector(Γ_outlet)
-nΓ_in = get_normal_vector(Γ_in)
+Ω = Triangulation(bgmodel)
+Ω_in = Triangulation(cutgeo,PHYSICAL_IN)
+Ω_out = Triangulation(cutgeo,PHYSICAL_OUT)
+Γd = EmbeddedBoundary(cutgeo)
+Γn = BoundaryTriangulation(bgmodel;tags="Γn")
+
+n_Γd = get_normal_vector(Γd)
+n_Γn = get_normal_vector(Γn)
 
 order = 2
 degree = 2*order
@@ -47,59 +44,50 @@ degree = 2*order
 dΩ = Measure(Ω,degree)
 dΩ_in = Measure(Ω_in,degree)
 dΩ_out = Measure(Ω_out,degree)
-
-dΓ_in = Measure(Γ_in,degree)
-dΓ_inlet = Measure(Γ_inlet,degree)
-dΓ_outlet = Measure(Γ_outlet,degree)
+dΓd = Measure(Γd,degree)
+dΓn = Measure(Γn,degree)
 
 ν(x,μ) = μ[1]*exp(-μ[2])
 ν(μ) = x->ν(x,μ)
 νμ(μ) = ParamFunction(ν,μ)
 
-g_in(x,μ) = VectorValue(-x[2]*(1.0-x[2])*abs(μ[3]*sin(μ[2])/10),0.0)
-g_in(μ) = x->g_in(x,μ)
-gμ_in(μ) = ParamFunction(g_in,μ)
+u(x,μ) = VectorValue(x[1]*x[1],x[2])*abs(μ[1]*sin(μ[2]))
+u(μ) = x->u(x,μ)
+uμ(μ) = ParamFunction(u,μ)
+
+p(x,μ) = (x[1]-x[2])*abs(cos(μ[3]))
+p(μ) = x->p(x,μ)
+pμ(μ) = ParamFunction(p,μ)
+
+f(x,μ) = - Δ(u(μ))(x) + ∇(p(μ))(x)
+f(μ) = x->f(x,μ)
+fμ(μ) = ParamFunction(f,μ)
+
+g(x,μ) = (∇⋅u(μ))(x)
+g(μ) = x->g(x,μ)
+gμ(μ) = ParamFunction(g,μ)
+
 g_0(x,μ) = VectorValue(0.0,0.0)
 g_0(μ) = x->g_0(x,μ)
 gμ_0(μ) = ParamFunction(g_0,μ)
 
-ν0 = 1e-3   # Artificial viscosity
-γd = 10    # Nitsche coefficient (Dirichlet)
-γn = 10    # Nitsche coefficient (Neumann)
-h = L/n     # Mesh size
+const ν0 = 1e-3
+const γ = order*(order+1)
+const h = L/n
 
-function nitsche_jac(μ,u,v,dΓ,nΓ)
-  ∫( (γd/h)*v⋅u  - νμ(μ)*v⋅(nΓ⋅∇(u)) - νμ(μ)*(nΓ⋅∇(v))⋅u )dΓ
-end
-function nitsche_res(μ,v,dΓ,nΓ)
-  ∫( gμ_in(μ) ⋅ ((γd/h)*v  - νμ(μ)*(nΓ⋅∇(v))) )dΓ
-end
-function extension(μ,u,v,dΩ_out)
-  ∫( ν0*∇(v)⊙∇(u) )dΩ_out
-end
+a(μ,(u,p),(v,q),dΩ_in,dΩ_out,dΓd) =
+  ∫( ∇(v)⊙∇(u) - q*(∇⋅u) - (∇⋅v)*p )dΩ_in +
+  ∫( ν0*(∇(v)⊙∇(u) + q*p) )dΩ_out +
+  ∫( (γ/h)*v⋅u - v⋅(n_Γd⋅∇(u)) - (n_Γd⋅∇(v))⋅u + (p*n_Γd)⋅v + (q*n_Γd)⋅u )dΓd
 
-function a11(μ,u,v,dΩ_in,dΓ_in,dΓ_inlet)
-  (
-    ∫( νμ(μ)*∇(v)⊙∇(u) )dΩ_in
-    + nitsche_jac(μ,u,v,dΓ_in,nΓ_in)
-    + nitsche_jac(μ,u,v,dΓ_inlet,nΓ_inlet)
-  )
-end
+l(μ,(u,p),(v,q),dΩ_in,dΓd,dΓn) =
+  ∫( v⋅fμ(μ) - q*gμ(μ) )dΩ_in +
+  ∫( (γ/h)*v⋅uμ(μ) - (n_Γd⋅∇(v))⋅uμ(μ) + (q*n_Γd)⋅uμ(μ) )dΓd +
+  ∫( v⋅(n_Γn⋅∇(uμ(μ))) - (n_Γn⋅v)*pμ(μ) )dΓn -
+  ∫( ∇(v)⊙∇(u) - q*(∇⋅u) - (∇⋅v)*p )dΩ_in
 
-function stiffness(μ,(u,p),(v,q),dΩ_in,dΓ_in,dΓ_inlet)
-  a11(μ,u,v,dΩ_in,dΓ_in,dΓ_inlet) - ∫(p*(∇⋅(v)))dΩ_in + ∫(q*(∇⋅(u)))dΩ_in
-end
-
-function jac(μ,(u,p),(v,q),dΩ_in,dΩ_out,dΓ_in,dΓ_inlet)
-  stiffness(μ,(u,p),(v,q),dΩ_in,dΓ_in,dΓ_inlet) + extension(μ,u,v,dΩ_out)
-end
-
-function res(μ,(u,p),(v,q),dΩ_in,dΩ_out,dΓ_in,dΓ_inlet)
-  nitsche_res(μ,v,dΓ_inlet,nΓ_inlet) - ∫( νμ(μ)*∇(v)⊙∇(u) )dΩ_in
-end
-
-trian_res = (Ω_in,Ω_out,Γ_in,Γ_inlet)
-trian_jac = (Ω_in,Ω_out,Γ_in,Γ_inlet)
+trian_res = (Ω_in,Γd,Γn)
+trian_jac = (Ω_in,Ω_out,Γd)
 
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
@@ -107,18 +95,18 @@ energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(Ω,reffe_u;conformity=:H1,dirichlet_tags="wall")
 trial_u = ParamTrialFESpace(test_u,gμ_0)
-reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(Ω,reffe_p;conformity=:C0)
+reffe_p = ReferenceFE(lagrangian,Float64,order-1;space=:P)
+test_p = TestFESpace(Ω,reffe_p;conformity=:L2)
 trial_p = TrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = LinearParamFEOperator(res,jac,pspace,trial,test,trian_res,trian_jac)
+feop = LinearParamFEOperator(l,a,pspace,trial,test,trian_res,trian_jac)
 
 fesolver = LinearFESolver(LUSolver())
 
 tol = 1e-4
-state_reduction = SupremizerReduction(coupling,tol,energy;nparams=30,sketch=:sprn)
-rbsolver = RBSolver(fesolver,state_reduction;nparams_res=10,nparams_jac=10)
+state_reduction = SupremizerReduction(coupling,tol,energy;nparams=50,sketch=:sprn)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=30,nparams_jac=30)
 
 fesnaps,festats = solution_snapshots(rbsolver,feop)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
@@ -130,3 +118,26 @@ perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 
 r = realization(feop)
 fesnaps,festats = solution_snapshots(rbsolver,feop,r)
+
+# MORE INDEX MAPS :(
+get_matrix_index_map(test_u,test_u,Ω_in)
+get_matrix_index_map(test_u,test_u,Ω_out)
+get_matrix_index_map(test_u,test_u,Γd)
+get_matrix_index_map(test_u,test_p,Ω_in)
+
+using ReducedOrderModels.TProduct
+using ReducedOrderModels.IndexMaps
+using SparseArrays
+
+sparsity = get_sparsity(test_u,test_p,Ω_in)
+psparsity = permute_sparsity(sparsity,test_u,test_p)
+# I,J,_ = findnz(psparsity)
+# i,j,_ = IndexMaps.univariate_findnz(psparsity)
+# g2l_sparse = TProduct._global_2_local(psparsity,I,J,i,j)
+# pg2l_sparse = TProduct._permute_index_map(g2l_sparse,test_u,test_p)
+# pg2l = to_nz_index(pg2l_sparse,sparsity)
+# SparseIndexMap(pg2l,pg2l_sparse,psparsity)
+index_map_I = get_dof_index_map(test_p)
+index_map_J = get_dof_index_map(test_u)
+index_map_I_1d = get_tp_dof_index_map(test_p).indices_1d
+index_map_J_1d = get_tp_dof_index_map(test_u).indices_1d

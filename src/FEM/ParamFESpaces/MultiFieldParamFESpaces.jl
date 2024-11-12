@@ -31,7 +31,7 @@ function MultiFieldParamFESpace(
   MultiFieldFESpace(V,spaces;style)
 end
 
-FESpaces.get_dof_value_type(f::MultiFieldFESpace{MS,CS,V}) where {MS,CS,T,V<:AbstractParamArray{T}} = T
+FESpaces.get_dof_value_type(f::MultiFieldFESpace{MS,CS,<:ParamType{V}}) where {MS,CS,T,V<:AbstractParamArray{T}} = T
 
 function MultiField._restrict_to_field(
   f,

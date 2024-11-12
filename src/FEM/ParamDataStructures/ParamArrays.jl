@@ -284,6 +284,11 @@ function get_param_entry!(v::AbstractVector{T},A::ConsecutiveParamArray{T,N},i::
   v
 end
 
+function get_param_entry(A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
+  v = zeros(T,param_length(A))
+  get_param_entry!(v,A,i...)
+end
+
 function get_param_entry(A::ConsecutiveParamArray,i...)
   data′ = view(get_all_data(A),i...,:)
   ConsecutiveParamArray(data′)

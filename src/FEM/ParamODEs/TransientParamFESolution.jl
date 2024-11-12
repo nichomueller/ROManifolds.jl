@@ -15,11 +15,9 @@ function TransientParamFESolution(
   solver::ODESolver,
   op::TransientParamFEOperator,
   r::TransientRealization,
-  uh0::Tuple{Vararg{Function}})
+  u0::Tuple{Vararg{AbstractVector}})
 
-  params = get_params(r)
   odeop = get_algebraic_operator(op)
-  u0 = get_free_dof_values.(map(uh0->uh0(params),uh0))
   odesol = solve(solver,odeop,r,u0)
   trial = get_trial(op)
   TransientParamFESolution(odesol,trial)
@@ -29,7 +27,18 @@ function TransientParamFESolution(
   solver::ODESolver,
   op::TransientParamFEOperator,
   r::TransientRealization,
-  uh0::Function)
+  uh0::Tuple{Vararg{Function}})
+
+  params = get_params(r)
+  u0 = get_free_dof_values.(map(uh0->uh0(params),uh0))
+  TransientParamFESolution(solver,op,r,u0)
+end
+
+function TransientParamFESolution(
+  solver::ODESolver,
+  op::TransientParamFEOperator,
+  r::TransientRealization,
+  uh0::Union{Function,AbstractVector})
 
   TransientParamFESolution(solver,op,r,(uh0,))
 end

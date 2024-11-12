@@ -109,8 +109,8 @@ function Utils.set_domains(
   trians_jac)
 
   sparsity = get_sparsity(trial,test)
-  matrix_map = _get_matrix_index_map(i,trians_res)
-  vector_map = _get_vector_index_map(i,trians_jac)
+  matrix_map = _get_matrix_index_map(i,trians_jac)
+  vector_map = _get_vector_index_map(i,trians_res)
   matrix_map′ = sum_maps(sparsity,matrix_map)
   vector_map′ = sum_maps(vector_map)
   FEOperatorIndexMap(matrix_map′,vector_map′)
@@ -125,8 +125,8 @@ function Utils.set_domains(
 
   ntest = num_fields(test)
   ntrial = num_fields(trial)
-  matrix_map = _get_matrix_index_map(i,trians_res)
-  vector_map = _get_vector_index_map(i,trians_jac)
+  matrix_map = _get_matrix_index_map(i,trians_jac)
+  vector_map = _get_vector_index_map(i,trians_res)
   matrix_map′ = Matrix{AbstractIndexMap}(undef,ntest,ntrial)
   vector_map′ = Vector{AbstractIndexMap}(undef,ntest)
   for i in 1:ntest
@@ -161,7 +161,7 @@ function _get_matrix_index_map(i::FEOperatorIndexMap,trians::Tuple{Vararg{Tuple{
   _matrix_map = get_values(get_matrix_index_map(i))
   matrix_map = ()
   for _imap in _matrix_map
-    matrix_map = (matrix_map...,_imap)
+    matrix_map = (matrix_map...,_imap...)
   end
   return matrix_map
 end

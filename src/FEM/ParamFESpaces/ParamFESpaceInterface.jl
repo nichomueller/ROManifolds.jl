@@ -108,19 +108,19 @@ function FESpaces.EvaluationFunction(pf::SingleFieldParamFESpace{<:ZeroMeanFESpa
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceWithConstantFixed{<:FESpaces.FixConstant},
+  f::FESpaceWithConstantFixed{FESpaces.FixConstant},
   fv::AbstractParamVector,
   dv::AbstractParamVector
   )
 
   @assert innerlength(dv) == 1
   _dv = similar(dv,eltype(dv),0)
-  _fv = VectorWithEntryInserted(fv,f.dof_to_fix,get_param_entry(dv,1))
+  _fv = ParamVectorWithEntryInserted(fv,f.dof_to_fix,get_param_entry(dv,1))
   scatter_free_and_dirichlet_values(f.space,_fv,_dv)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceWithConstantFixed{<:FESpaces.DoNotFixConstant},
+  f::FESpaceWithConstantFixed{FESpaces.DoNotFixConstant},
   fv::AbstractParamVector,
   dv::AbstractParamVector
   )

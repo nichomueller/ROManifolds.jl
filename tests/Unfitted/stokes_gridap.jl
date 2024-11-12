@@ -1,82 +1,8 @@
 using Gridap
 using GridapEmbedded
-using Gridap.MultiField
-
-const L = 1
-const R  = 0.1
-const n = 30
-
-const domain = (0,L,0,L)
-const partition = (n,n)
-
-p1 = Point(0.3,0.5)
-p2 = Point(0.7,0.5)
-geo1 = disk(R,x0=p1)
-geo2 = disk(R,x0=p2)
-geo3 = !union(geo1,geo2)
-
-bgmodel = CartesianDiscreteModel(domain,partition)
-cutgeo = cut(bgmodel,geo3)
-
-Ω = Triangulation(bgmodel)
-Ω_in = Triangulation(cutgeo,PHYSICAL_IN)
-Ω_out = Triangulation(cutgeo,PHYSICAL_OUT)
-Γd = EmbeddedBoundary(cutgeo)
-Γn = BoundaryTriangulation(bgmodel;tags="boundary")
-
-Ω_act = Triangulation(cutgeo,ACTIVE)
-strategy = AggregateAllCutCells()
-aggregates = aggregate(strategy,cutgeo)
-
-nΓ_inlet = get_normal_vector(Γ_inlet)
-nΓ_outlet = get_normal_vector(Γ_outlet)
-nΓ_in = get_normal_vector(Γ_in)
-
-order = 2
-degree = 2*order
-
-dΩ_in = Measure(Ω_in,degree)
-
-dΓ_in = Measure(Γ_in,degree)
-dΓ_inlet = Measure(Γ_inlet,degree)
-
-g_in(x) = VectorValue(-x[2]*(1.0-x[2]),0.0)
-g_0(x) = VectorValue(0.0,0.0)
-
-γd = 10    # Nitsche coefficient (Dirichlet)
-γn = 10    # Nitsche coefficient (Neumann)
-h = L/n     # Mesh size
-
-nitsche_jac(u,v,dΓ,nΓ) = ∫( (γd/h)*v⋅u  - v⋅(nΓ⋅∇(u)) - (nΓ⋅∇(v))⋅u )dΓ
-nitsche_res(v,dΓ,nΓ) = ∫( g_in ⋅ ((γd/h)*v  - (nΓ⋅∇(v))) )dΓ
-
-a11(u,v) = ∫( ∇(v)⊙∇(u) )dΩ_in + nitsche_jac(u,v,dΓ_in,nΓ_in) + nitsche_jac(u,v,dΓ_inlet,nΓ_inlet)
-jac((u,p),(v,q)) = a11(u,v) - ∫(p*(∇⋅(v)))dΩ_in + ∫(q*(∇⋅(u)))dΩ_in
-res((v,q)) = ∫( g_in ⋅ ((γd/h)*v  - (nΓ_inlet⋅∇(v))) )dΓ_inlet
-
-reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-test_u = AgFEMSpace(TestFESpace(Ω_act,reffe_u,conformity=:H1,dirichlet_tags="wall"),aggregates)
-trial_u = TrialFESpace(test_u,g_0)
-reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = AgFEMSpace(TestFESpace(Ω_act,reffe_p;conformity=:C0),aggregates)
-trial_p = TrialFESpace(test_p)
-test = MultiFieldFESpace([test_u,test_p];style=BlockMultiFieldStyle())
-trial = MultiFieldFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = AffineFEOperator(jac,res,trial,test)
-
-fesolver = LinearFESolver(LUSolver())
-
-uh = solve(fesolver,feop)
-
-
-############## ok version
-
-using Gridap
-using GridapEmbedded
 using Test
 
 u(x) = VectorValue(x[1]*x[1], x[2])
-u0(x) = VectorValue(0.0, 0.0)
 p(x) = x[1] - x[2]
 
 f(x) = - Δ(u)(x) + ∇(p)(x)
@@ -143,47 +69,125 @@ op = AffineFEOperator(a,l,X,Y)
 uh,ph = solve(op)
 writevtk(Ω,"trian_O",cellfields=["uh"=>uh,"ph"=>ph])
 
-# try tweaking the boundary conditions
+eu = u - uh
+ep = p - ph
 
-u(x) = VectorValue(-x[2]*(1-x[2]), 0.0)
-u0(x) = VectorValue(0.0, 0.0)
+l2(u) = sqrt(sum( ∫( u⊙u )*dΩ ))
+h1(u) = sqrt(sum( ∫( u⊙u + ∇(u)⊙∇(u) )*dΩ ))
 
-labels = get_face_labeling(bgmodel)
-add_tag_from_tags!(labels,"wall",collect(1:6))
-add_tag_from_tags!(labels,"inlet",[7])
-add_tag_from_tags!(labels,"outlet",[8])
+eu_l2 = l2(eu)
+eu_h1 = h1(eu)
+ep_l2 = l2(ep)
 
-Γ = EmbeddedBoundary(cutgeo)
-Γd = BoundaryTriangulation(Ω_act,tags="inlet")
-Γn = BoundaryTriangulation(Ω_act,tags="outlet")
+# no aggregation, artificial viscosity instead
 
-dΓ = Measure(Γ,degree)
-dΓd = Measure(Γd,degree)
-dΓn = Measure(Γn,degree)
-n_Γ = get_normal_vector(Γ)
-n_Γd = get_normal_vector(Γd)
-n_Γn = get_normal_vector(Γn)
-
-Vstd = FESpace(Ω_act,reffe_u,conformity=:H1;dirichlet_tags="wall")
-V = AgFEMSpace(Vstd,aggregates)
-
+Ω_all = Triangulation(bgmodel)
+Ω_out = Triangulation(cutgeo,PHYSICAL_OUT)
+dΩ_out = Measure(Ω_out,degree)
+V = FESpace(Ω_all,reffe_u,conformity=:H1)
+Q = FESpace(Ω_all,reffe_p;conformity=:L2)
 U = TrialFESpace(V)
 P = TrialFESpace(Q)
-
-Y = MultiFieldFESpace([V,Q])
-X = MultiFieldFESpace([U,P])
-
+Y = MultiFieldFESpace([V,Q];style=BlockMultiFieldStyle())
+X = MultiFieldFESpace([U,P];style=BlockMultiFieldStyle())
 a((u,p),(v,q)) =
   ∫( ∇(v)⊙∇(u) - q*(∇⋅u) - (∇⋅v)*p ) * dΩ +
-  ∫( (γ/h)*v⋅u - v⋅(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))⋅u + (p*n_Γ)⋅v + (q*n_Γ)⋅u ) * dΓ +
+  ∫( 1e-3*(∇(v)⊙∇(u) + q*p) ) * dΩ_out +
   ∫( (γ/h)*v⋅u - v⋅(n_Γd⋅∇(u)) - (n_Γd⋅∇(v))⋅u + (p*n_Γd)⋅v + (q*n_Γd)⋅u ) * dΓd
-
 l((v,q)) =
   ∫( v⋅f - q*g ) * dΩ +
-  ∫( (γ/h)*v⋅u0 - (n_Γ⋅∇(v))⋅u0 + (q*n_Γ)⋅u0 ) * dΓ +
   ∫( (γ/h)*v⋅u - (n_Γd⋅∇(v))⋅u + (q*n_Γd)⋅u ) * dΓd +
   ∫( v⋅(n_Γn⋅∇(u)) - (n_Γn⋅v)*p ) * dΓn
-
 op = AffineFEOperator(a,l,X,Y)
 uh,ph = solve(op)
-writevtk(Ω,"trian_O",cellfields=["uh"=>uh,"ph"=>ph])
+
+writevtk(Ω,"data/plts/sol",cellfields=["uh"=>uh,"ph"=>ph])
+
+eu = u - uh
+ep = p - ph
+
+l2(u) = sqrt(sum( ∫( u⊙u )*dΩ ))
+h1(u) = sqrt(sum( ∫( u⊙u + ∇(u)⊙∇(u) )*dΩ ))
+
+eu_l2 = l2(eu)
+eu_h1 = h1(eu)
+ep_l2 = l2(ep)
+
+# parametric version, no tproduct
+
+using ReducedOrderModels
+using Gridap.MultiField
+
+pranges = fill([1,10],3)
+pspace = ParamSpace(pranges)
+
+Ω = Triangulation(bgmodel)
+Ω_in = Triangulation(cutgeo,PHYSICAL_IN)
+Ω_out = Triangulation(cutgeo,PHYSICAL_OUT)
+dΩ_in = Measure(Ω_in,degree)
+dΩ_out = Measure(Ω_out,degree)
+
+test_u = FESpace(Ω,reffe_u,conformity=:H1)
+trial_u = TrivialParamFESpace(test_u,5)
+
+test_p = FESpace(Ω,reffe_p;conformity=:L2)
+trial_p = TrialFESpace(test_p)
+
+uμfun(μ,x) = VectorValue(μ[1]*x[1]*x[1],μ[2]*x[2])
+uμfun(μ) = x -> uμfun(μ,x)
+uμ(μ) = ParamFunction(uμfun,μ)
+pμfun(μ,x) = μ[3]*(x[1] - x[2])
+pμfun(μ) = x -> pμfun(μ,x)
+pμ(μ) = ParamFunction(pμfun,μ)
+
+fμfun(μ,x) = - Δ(uμfun(μ))(x) + ∇(pμfun(μ))(x)
+fμfun(μ) = x -> fμfun(μ,x)
+fμ(μ) = ParamFunction(fμfun,μ)
+gμfun(μ,x) = (∇⋅uμfun(μ))(x)
+gμfun(μ) = x -> gμfun(μ,x)
+gμ(μ) = ParamFunction(gμfun,μ)
+
+aμ(μ,(u,p),(v,q)) =
+  ∫( ∇(v)⊙∇(u) - q*(∇⋅u) - (∇⋅v)*p ) * dΩ_in +
+  ∫( 1e-3*(∇(v)⊙∇(u) + p*q) ) * dΩ_out +
+  ∫( (γ/h)*v⋅u - v⋅(n_Γd⋅∇(u)) - (n_Γd⋅∇(v))⋅u + (p*n_Γd)⋅v + (q*n_Γd)⋅u ) * dΓd
+
+lμ(μ,(u,p),(v,q)) =
+  ∫( v⋅fμ(μ) - q*gμ(μ) ) * dΩ_in +
+  ∫( (γ/h)*v⋅uμ(μ) - (n_Γd⋅∇(v))⋅uμ(μ) + (q*n_Γd)⋅uμ(μ) ) * dΓd +
+  ∫( v⋅(n_Γn⋅∇(uμ(μ))) - (n_Γn⋅v)*pμ(μ) ) * dΓn -
+  ∫( ∇(v)⊙∇(u) - q*(∇⋅u) - (∇⋅v)*p ) * dΩ_in
+
+test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
+trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
+feop = LinearParamFEOperator(lμ,aμ,pspace,trial,test)
+fesolver = LinearFESolver(LUSolver())
+
+coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
+energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
+
+tol = 1e-4
+state_reduction = SupremizerReduction(coupling,tol,energy;nparams=5,sketch=:sprn)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=5,nparams_jac=5)
+
+fesnaps,festats = solution_snapshots(rbsolver,feop)
+
+μ = realization(feop;nparams=5)
+aa((u,p),(v,q)) = aμ(μ,(u,p),(v,q))
+ll((u,p),(v,q)) = lμ(μ,(u,p),(v,q))
+du,dp = get_trial_fe_basis(test)
+uh0,ph0 = zero(trial(μ))
+v,q = get_fe_basis(test)
+L = assemble_vector(ll((uh0,ph0),(v,q)),test)
+A = assemble_matrix(aa,test,test)
+
+# plotting
+
+r = get_realization(fesnaps)
+r1 = r[1]
+U1 = param_getindex(trial_u(r1),1)
+P1 = trial_p(r1)
+uh1 = FEFunction(U1,fesnaps[1][:,1])
+ph1 = FEFunction(P1,fesnaps[2][:,1])
+writevtk(Ω_in,"data/plts/sol_u.vtu",cellfields=["uh"=>uh1])
+writevtk(Ω_in,"data/plts/sol_p.vtu",cellfields=["ph"=>ph1])

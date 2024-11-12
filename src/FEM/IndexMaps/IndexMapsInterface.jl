@@ -8,12 +8,12 @@ end
 
 function _findfirstnnz(i::AbstractArray{Ti,D}) where {Ti,D}
   innz_start = findfirst(!iszero,i)
-  isnothing(innz_start) ? CartesianIndex(tfill(1,Val(D))) : CartesianIndex(innz_start)
+  CartesianIndex(innz_start)
 end
 
 function _findlastnnz(i::AbstractArray{Ti,D}) where {Ti,D}
   innz_finish = findlast(!iszero,i)
-  isnothing(innz_finish) ? CartesianIndex(size(i)) : CartesianIndex(innz_finish)
+  CartesianIndex(innz_finish)
 end
 
 function _find_free_dofs_ranges(i::AbstractArray{Ti,D}) where {Ti,D}
@@ -89,23 +89,6 @@ function permute_sparsity(a::SparsityPatternCSC,i::AbstractIndexMap,j::AbstractI
   permute_sparsity(a,vectorize_map(i),vectorize_map(j))
 end
 
-function sum_maps(inds::Tuple{Vararg{I}}) where I<:AbstractIndexMap
-  ind = first(inds)
-  for ii in inds
-    @check size(ii) == size(ind)
-    for (j,(ij′,iij)) in enumerate(zip(ind,ii))
-      if !iszero(iij)
-        if iszero(ij′)
-          ind[j] = iij
-        else
-          @check ij′ == iij
-        end
-      end
-    end
-  end
-  return ind
-end
-
 abstract type AbstractTrivialIndexMap <: AbstractIndexMap{1,Int} end
 
 Base.getindex(i::AbstractTrivialIndexMap,j::Integer) = j
@@ -146,8 +129,7 @@ recast(a::AbstractArray,i::TrivialSparseIndexMap) = recast(a,i.sparsity)
 
 get_sparsity(i::TrivialSparseIndexMap) = i.sparsity
 
-function sum_maps(i::Tuple{Vararg{TrivialSparseIndexMap}})
-  sparsity = sum_sparsities(map(get_sparsity,i))
+function sum_maps(sparsity::SparsityPattern,i::Tuple{Vararg{TrivialSparseIndexMap}})
   TrivialSparseIndexMap(sparsity)
 end
 

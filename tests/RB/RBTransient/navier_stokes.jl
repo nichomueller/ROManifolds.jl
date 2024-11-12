@@ -10,7 +10,7 @@ using GridapSolvers.NonlinearSolvers
 
 using ReducedOrderModels
 
-θ = 0.5
+θ = 1.0
 dt = 0.0025
 t0 = 0.0
 tf = 10*dt
@@ -28,7 +28,7 @@ add_tag_from_tags!(labels,"dirichlet",[7])
 add_tag_from_tags!(labels,"dirichlet0",collect(1:6))
 
 order = 2
-degree = 2*(order)+1
+degree = 2*order+1
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
 
@@ -90,13 +90,37 @@ fesolver = ThetaMethod(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=tru
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 
 tol = 1e-4
-state_reduction = TransientReduction(coupling,tol,energy;nparams=20)
+state_reduction = TransientReduction(coupling,tol,energy;nparams=50)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,nparams_djac=1)
+
+# ################## solve steady stokes problem for IC ##########################
+
+# steady_trial_u = ParamTrialFESpace(test_u,[μ -> gμt_in(μ,dt),μ -> gμt_0(μ,dt)])
+# steady_test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
+# steady_trial = MultiFieldParamFESpace([steady_trial_u,trial_p];style=BlockMultiFieldStyle())
+
+# steady_a(μ,(u,p),(v,q)) = ∫(aμt(μ,dt)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
+# steady_res(μ,(u,p),(v,q)) = (-1)*steady_a(μ,(u,p),(v,q))
+
+# steady_feop_lin = LinearParamFEOperator(steady_a,steady_res,ptspace.parametric_space,steady_trial,steady_test)
+# steady_fesolver = LinearFESolver(LUSolver())
+# steady_rbsolver = RBSolver(steady_fesolver,state_reduction)
+
+# r = realization(steady_feop_lin;nparams=50)
+# uh,stats = solve(steady_fesolver,steady_feop_lin,r)
+# vals = get_free_dof_values(uh)
+# rt = TransientRealization(r,tdomain)
+
+# ronline = realization(steady_feop_lin;nparams=5)
+# uhonline,statsonline = solve(steady_fesolver,steady_feop_lin,ronline)
+# valsonline = get_free_dof_values(uhonline)
+# rtonline = TransientRealization(ronline,tdomain)
+
+# ################################################################################
 
 fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-ronline = realization(feop;nparams=10)
-x̂,rbstats = solve(rbsolver,rbop,ronline)
+x̂,rbstats = solve(rbsolver,rbop,rtonline)
 
-x,festats = solution_snapshots(rbsolver,feop,ronline,xh0μ)
-perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)
+x,festats = solution_snapshots(rbsolver,feop,rtonline,valsonline)
+perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,rtonline)

@@ -110,6 +110,10 @@ export BlockConsecutiveParamMatrix
 export nblocks
 include("BlockParamArrays.jl")
 
+export ParamVectorWithEntryRemoved
+export ParamVectorWithEntryInserted
+include("ParamVectorWithEntries.jl")
+
 include("ParamBroadcasts.jl")
 
 export ParamReindex

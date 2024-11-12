@@ -264,10 +264,17 @@ function Algebra.jacobian!(
   return A_nlin
 end
 
+function Algebra.solve(solver::RBSolver,op::TransientRBOperator,r::TransientRealization)
+  fe_trial = get_fe_trial(op)(r)
+  x = zero_free_values(fe_trial)
+  solve(solver,op,r,x)
+end
+
 function Algebra.solve(
   solver::RBSolver,
   op::TransientRBOperator{NonlinearParamODE},
-  r::TransientRealization)
+  r::TransientRealization,
+  x::AbstractParamVector)
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
 end
@@ -275,12 +282,11 @@ end
 function Algebra.solve(
   solver::RBSolver,
   op::TransientRBOperator,
-  r::TransientRealization)
+  r::TransientRealization,
+  x::AbstractParamVector)
 
   fesolver = get_fe_solver(solver)
-  fe_trial = get_fe_trial(op)(r)
   trial = get_trial(op)(r)
-  x = zero_free_values(fe_trial)
   x̂ = zero_free_values(trial)
 
   rbcache = allocate_rbcache(fesolver,op,r,x)
