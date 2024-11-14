@@ -64,10 +64,6 @@ end
 # small hack
 Base.iszero(A::ParamSparseMatrix) = (nnz(A) == 0)
 
-function recast(a::AbstractVector,A::AbstractSparseMatrix)
-  @abstractmethod
-end
-
 function recast(a::AbstractMatrix,A::AbstractSparseMatrix)
   @check size(a,1) == nnz(A)
   B = map(v -> recast(v,A),collect.(eachcol(a)))

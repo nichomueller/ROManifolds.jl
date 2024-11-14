@@ -61,35 +61,36 @@ struct TransientParamFEOpFromWeakForm{T} <: TransientParamFEOperator{NonlinearPa
   jacs::Tuple{Vararg{Function}}
   tpspace::TransientParamSpace
   assem::Assembler
-  dof_map::FEOperatorDofMap
+  dof_map::FEDofMap
   trial::FESpace
   test::FESpace
+  domains::FEDomains
   order::Integer
 end
 
 const JointTransientParamFEOpFromWeakForm = TransientParamFEOpFromWeakForm{JointTriangulation}
+const SplitTransientParamFEOpFromWeakForm = TransientParamFEOpFromWeakForm{SplitTriangulation}
 
 function TransientParamFEOperator(
   res::Function,jacs::Tuple{Vararg{Function}},tpspace,trial,test)
 
   order = length(jacs) - 1
   assem = SparseMatrixAssembler(trial,test)
-  dof_map = FEOperatorDofMap(trial,test)
+  dof_map = FEDofMap(trial,test)
+  domains = FEDomains()
   TransientParamFEOpFromWeakForm{JointTriangulation}(
-    res,jacs,tpspace,assem,dof_map,trial,test,order)
+    res,jacs,tpspace,assem,dof_map,trial,test,domains,order)
 end
 
-const SplitTransientParamFEOpFromWeakForm = TransientParamFEOpFromWeakForm{SplitTriangulation}
-
 function TransientParamFEOperator(
-  res::Function,jacs::Tuple{Vararg{Function}},tpspace,trial,test,trian_res,trian_jacs...)
+  res::Function,jacs::Tuple{Vararg{Function}},tpspace,trial,test,domains)
 
   order = length(jacs) - 1
-  res′,jacs′ = _set_triangulations(res,jacs,test,trial,trian_res,trian_jacs)
+  res′,jacs′ = _set_domains(res,jacs,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
-  dof_map = FEOperatorDofMap(trial,test,trian_res,trian_jacs)
+  dof_map = FEDofMap(trial,test)
   TransientParamFEOpFromWeakForm{SplitTriangulation}(
-    res′,jacs′,tpspace,assem,dof_map,trial,test,order)
+    res′,jacs′,tpspace,assem,dof_map,trial,test,domains,order)
 end
 
 function TransientParamFEOperator(
@@ -133,12 +134,13 @@ end
 
 FESpaces.get_test(op::TransientParamFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamFEOpFromWeakForm) = op.trial
-ParamSteady.get_param_space(op::TransientParamFEOpFromWeakForm) = op.tpspace
 Polynomials.get_order(op::TransientParamFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamFEOpFromWeakForm) = op.assem
 DofMaps.get_dof_map(op::TransientParamFEOpFromWeakForm) = op.dof_map
+ParamSteady.get_param_space(op::TransientParamFEOpFromWeakForm) = op.tpspace
+ParamSteady.get_domains(op::TransientParamFEOpFromWeakForm) = op.domains
 
 """
     struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE} end
@@ -153,9 +155,10 @@ struct TransientParamLinearFEOpFromWeakForm{T} <: TransientParamFEOperator{Linea
   constant_forms::Tuple{Vararg{Bool}}
   tpspace::TransientParamSpace
   assem::Assembler
-  dof_map::FEOperatorDofMap
+  dof_map::FEDofMap
   trial::FESpace
   test::FESpace
+  domains::FEDomains
   order::Integer
 end
 
@@ -168,24 +171,25 @@ function TransientParamLinearFEOperator(
   order = length(forms)-1
   jacs = ntuple(k -> ((μ,t,u,duk,v) -> forms[k](μ,t,duk,v)),length(forms))
   assem = SparseMatrixAssembler(trial,test)
-  dof_map = FEOperatorDofMap(trial,test)
+  dof_map = FEDofMap(trial,test)
+  domains = FEDomains()
   TransientParamLinearFEOpFromWeakForm{JointTriangulation}(
-    res,jacs,constant_forms,tpspace,assem,dof_map,trial,test,order)
+    res,jacs,constant_forms,tpspace,assem,dof_map,trial,test,domains,order)
 end
 
 const SplitTransientParamLinearFEOpFromWeakForm = TransientParamLinearFEOpFromWeakForm{SplitTriangulation}
 
 function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},res::Function,tpspace,trial,test,trian_res,trian_jacs...;
+  forms::Tuple{Vararg{Function}},res::Function,tpspace,trial,test,domains;
   constant_forms::Tuple{Vararg{Bool}}=ntuple(_ -> false,length(forms)))
 
   order = length(forms) - 1
   jacs = ntuple(k -> ((μ,t,u,duk,v,args...) -> forms[k](μ,t,duk,v,args...)),length(forms))
-  res′,jacs′ = _set_triangulations(res,jacs,test,trial,trian_res,trian_jacs)
+  res′,jacs′ = _set_domains(res,jacs,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
-  dof_map = FEOperatorDofMap(trial,test,trian_res,trian_jacs)
+  dof_map = FEDofMap(trial,test)
   TransientParamLinearFEOpFromWeakForm{SplitTriangulation}(
-    res′,jacs′,constant_forms,tpspace,assem,dof_map,trial,test,order)
+    res′,jacs′,constant_forms,tpspace,assem,dof_map,trial,test,domains,order)
 end
 
 function TransientParamLinearFEOperator(
@@ -209,40 +213,44 @@ end
 
 FESpaces.get_test(op::TransientParamLinearFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamLinearFEOpFromWeakForm) = op.trial
-ParamSteady.get_param_space(op::TransientParamLinearFEOpFromWeakForm) = op.tpspace
 Polynomials.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
 ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer) = op.constant_forms[k]
 DofMaps.get_dof_map(op::TransientParamLinearFEOpFromWeakForm) = op.dof_map
+ParamSteady.get_param_space(op::TransientParamLinearFEOpFromWeakForm) = op.tpspace
+ParamSteady.get_domains(op::TransientParamLinearFEOpFromWeakForm) = op.domains
 
 # triangulation utils
 
-for (f,T) in zip((:(Utils.set_domains),:(Utils.change_domains)),(:JointTriangulation,:SplitTriangulation))
+for (f,T) in zip(
+  (:(ParamSteady.set_domains),:(ParamSteady.change_domains)),
+  (:JointTriangulation,:SplitTriangulation)
+  )
   @eval begin
-    function $f(op::SplitTransientParamFEOpFromWeakForm,trian_res,trian_jacs)
-      trian_res′ = order_triangulations(get_trian_res(op),trian_res)
-      trian_jacs′ = map(order_triangulations,get_trian_jac(op),trian_jacs)
-      res′,jacs′ = _set_triangulations(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
-      dof_map′ = $f(op.dof_map,op.trial,op.test,trian_res′,trian_jacs′)
+    function $f(op::SplitTransientParamFEOpFromWeakForm,domains)
+      trian_res′ = order_domains(get_domains_res(op),get_domains_res(domains))
+      trian_jacs′ = map(order_domains,get_domains_jac(op),get_domains_jac(domains))
+      res′,jacs′ = _set_domains(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
+      domains′ = FEDomains(trian_res′,trian_jac′)
       TransientParamFEOpFromWeakForm{$T}(
-        res′,jacs′,op.tpspace,op.assem,dof_map′,op.trial,op.test,op.order)
+        res′,jacs′,op.tpspace,op.assem,dof_map′,op.trial,op.test,op.order,domains′)
     end
 
-    function $f(op::SplitTransientParamLinearFEOpFromWeakForm,trian_res,trian_jacs)
-      trian_res′ = order_triangulations(get_trian_res(op),trian_res)
-      trian_jacs′ = map(order_triangulations,get_trian_jac(op),trian_jacs)
-      res′,jacs′ = _set_triangulations(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
-      dof_map′ = $f(op.dof_map,op.trial,op.test,trian_res′,trian_jacs′)
+    function $f(op::SplitTransientParamLinearFEOpFromWeakForm,domains)
+      trian_res′ = order_domains(get_domains_res(op),get_domains_res(domains))
+      trian_jacs′ = map(order_domains,get_domains_jac(op),get_domains_jac(domains))
+      res′,jacs′ = _set_domains(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
+      domains′ = FEDomains(trian_res′,trian_jac′)
       TransientParamLinearFEOpFromWeakForm{$T}(
         res′,jacs′,op.constant_forms,op.tpspace,
-        op.assem,dof_map′,op.trial,op.test,op.order)
+        op.assem,dof_map′,op.trial,op.test,op.order,domains′)
     end
   end
 end
 
-function _set_triangulation_jac(
+function _set_domain_jac(
   jac::Function,
   trian::Tuple{Vararg{Triangulation}},
   order)
@@ -254,19 +262,19 @@ function _set_triangulation_jac(
   return newjac
 end
 
-function _set_triangulation_jacs(
+function _set_domain_jacs(
   jacs::Tuple{Vararg{Function}},
   trians::Tuple{Vararg{Tuple{Vararg{Triangulation}}}},
   order)
 
   newjacs = ()
   for (jac,trian) in zip(jacs,trians)
-    newjacs = (newjacs...,_set_triangulation_jac(jac,trian,order))
+    newjacs = (newjacs...,_set_domain_jac(jac,trian,order))
   end
   return newjacs
 end
 
-function _set_triangulation_form(
+function _set_domain_form(
   res::Function,
   trian::Tuple{Vararg{Triangulation}},
   order)
@@ -278,7 +286,7 @@ function _set_triangulation_form(
   return newres
 end
 
-function _set_triangulations(
+function _set_domains(
   res::Function,
   jacs::Tuple{Vararg{Function}},
   test::FESpace,
@@ -288,7 +296,19 @@ function _set_triangulations(
 
   polyn_order = get_polynomial_order(test)
   @check polyn_order == get_polynomial_order(trial)
-  res′ = _set_triangulation_form(res,trian_res,polyn_order)
-  jacs′ = _set_triangulation_jacs(jacs,trian_jacs,polyn_order)
+  res′ = _set_domain_form(res,trian_res,polyn_order)
+  jacs′ = _set_domain_jacs(jacs,trian_jacs,polyn_order)
   return res′,jacs′
+end
+
+function _set_domains(
+  res::Function,
+  jacs::Tuple{Vararg{Function}},
+  test::FESpace,
+  trial::FESpace,
+  domains::FEDomains)
+
+  trian_res = get_domains_res(domains)
+  trian_jacs = get_domains_jac(domains)
+  _set_domains(res,jacs,test,trial,trian_res,trian_jacs)
 end

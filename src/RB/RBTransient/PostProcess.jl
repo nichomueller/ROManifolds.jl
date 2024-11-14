@@ -11,8 +11,8 @@ function DrWatson.save(dir,op::GenericTransientRBOperator;kwargs...)
 end
 
 function RBSteady._load_trian_operator_parts(dir,feop::SplitTransientParamFEOperator,trial,test;label="")
-  trian_res = ParamSteady.get_trian_res(feop)
-  trian_jacs = ParamSteady.get_trian_jac(feop)
+  trian_res = ParamSteady.get_domains_res(feop)
+  trian_jacs = ParamSteady.get_domains_jac(feop)
   odeop = get_algebraic_operator(feop)
   red_rhs = RBSteady.load_contribution(dir,trian_res,test;label=RBSteady._get_label(label,"rhs"))
   red_lhs = ()

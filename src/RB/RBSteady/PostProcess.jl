@@ -152,8 +152,8 @@ function _load_fixed_operator_parts(dir,feop;label="")
 end
 
 function _load_trian_operator_parts(dir,feop::SplitParamFEOperator,trial,test;label="")
-  trian_res = ParamSteady.get_trian_res(feop)
-  trian_jac = ParamSteady.get_trian_jac(feop)
+  trian_res = ParamSteady.get_domains_res(feop)
+  trian_jac = ParamSteady.get_domains_jac(feop)
   pop = get_algebraic_operator(feop)
   red_rhs = load_contribution(dir,trian_res,test;label=_get_label(label,"rhs"))
   red_lhs = load_contribution(dir,trian_jac,trial,test;label=_get_label(label,"lhs"))
@@ -241,7 +241,7 @@ function rb_performance(
 
   x = inv_project(get_trial(rbop)(r),x̂)
   feop′ = set_domains(feop)
-  rbsnaps = Snapshots(x,get_vector_dof_map(feop′),r)
+  rbsnaps = Snapshots(x,get_dof_map(feop′),r)
   rb_performance(solver,feop′,fesnaps,rbsnaps,festats,rbstats)
 end
 

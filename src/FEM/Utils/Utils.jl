@@ -34,7 +34,7 @@ include("PartialFunctions.jl")
 
 export get_values
 export get_parent
-export order_triangulations
+export order_domains
 export find_closest_view
 include("Triangulations.jl")
 

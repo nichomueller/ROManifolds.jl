@@ -103,7 +103,7 @@ rr(μ,u,v) = ∫( ∇(v)⋅(σσ∘∇(u)) - v*fμ(μ) )dΩ
 jj(μ,u,du,v) = ∫( ∇(v)⋅(dσσ∘(∇(du),∇(u))) )dΩ
 
 Uμ = ParamTrialFESpace(V,uμ)
-dof_map = FEOperatorDofMap(Uμ,V)
+dof_map = FEDofMap(Uμ,V)
 assem = SparseMatrixAssembler(SparseMatrixCSR{0,PetscScalar,PetscInt},
                               Vector{PetscScalar},Uμ,V)
 feop = ParamFEOpFromWeakForm{NonlinearParamEq}(rr,jj,pspace,assem,dof_map,Uμ,V)

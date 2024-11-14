@@ -135,7 +135,7 @@ DofMaps.get_dof_map(s::GenericSnapshots) = s.dof_map
 get_realization(s::GenericSnapshots) = s.realization
 
 function get_indexed_values(s::GenericSnapshots)
-  vi = vectorize_map(get_dof_map(s))
+  vi = vectorize(get_dof_map(s))
   data = get_all_data(s.data)
   ConsecutiveParamArray(data[vi,:])
 end

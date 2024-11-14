@@ -17,7 +17,7 @@ export ∂ₓ₁, ∂ₓ₂, ∂ₓ₃
 
 export get_values
 export get_parent
-export order_triangulations
+export order_domains
 export find_closest_view
 
 export Contribution
@@ -61,14 +61,14 @@ export get_sparse_dof_map
 export recast
 export get_component
 
-export FEOperatorDofMap
-export get_vector_dof_map
-export get_matrix_dof_map
+export FEDofMap
+export get_dof_map
+export get_sparse_dof_map
 
 include("FEM/DofMaps/DofMaps.jl")
 using ReducedOrderModels.DofMaps
 
-export get_ordered_dof_map
+export get_dof_map
 export get_polynomial_order
 
 export get_tp_dof_dof_map

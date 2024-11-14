@@ -1,7 +1,4 @@
-get_ordered_dof_map(f::SingleFieldFESpace) = TrivialDofMap(num_free_dofs(f))
-get_ordered_dof_map(f::MultiFieldFESpace) = @notimplemented
-
-abstract type AbstractDofMap{D,Ti,Tc} <: AbstractArray{Ti,D} end
+abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
 
 FESpaces.ConstraintStyle(::Type{<:AbstractDofMap}) = UnConstrained()
 
@@ -56,7 +53,7 @@ end
 
 # trivial map
 
-abstract type AbstractTrivialDofMap <: AbstractDofMap{1,Int,Float64} end
+abstract type AbstractTrivialDofMap <: AbstractDofMap{1,Int} end
 
 Base.getindex(i::AbstractTrivialDofMap,j::Integer) = j
 Base.setindex!(i::AbstractTrivialDofMap,v::Integer,j::Integer) = nothing
@@ -70,22 +67,20 @@ end
 TrivialDofMap(i::AbstractArray) = TrivialDofMap(length(i))
 Base.size(i::TrivialDofMap) = (i.length,)
 
-struct DofMap{D,Ti,Tc,A<:AbstractArray{Bool}} <: AbstractDofMap{D,Ti}
+struct DofMap{D,Ti,A<:AbstractArray{Bool}} <: AbstractDofMap{D,Ti}
   indices::Array{Ti,D}
   dof_to_cell::Table{Ti,Vector{Ti},Vector{Ti}}
   free_vals_box::Array{Int,D}
   cell_to_mask::A
-  dof_type::Type{Tc}
 end
 
 function DofMap(
   indices::AbstractArray,
   dof_to_cell::Table,
-  cell_to_mask::AbstractArray,
-  dof_type::Type=Float64)
+  cell_to_mask::AbstractArray)
 
   free_vals_box = find_free_values_box(indices)
-  DofMap(indices,dof_to_cell,free_vals_box,cell_to_mask,dof_type)
+  DofMap(indices,dof_to_cell,free_vals_box,cell_to_mask)
 end
 
 Base.IndexStyle(i::DofMap) = IndexLinear()
@@ -134,8 +129,7 @@ function Base.copy(i::DofMap)
     copy(i.indices),
     i.dof_to_cell,
     i.free_vals_box,
-    i.cell_to_mask,
-    i.dof_type)
+    i.cell_to_mask)
 end
 
 function Base.similar(i::DofMap)
@@ -143,8 +137,7 @@ function Base.similar(i::DofMap)
     similar(i.indices),
     i.dof_to_cell,
     i.free_vals_box,
-    i.cell_to_mask,
-    i.dof_type)
+    i.cell_to_mask)
 end
 
 function CellData.change_domain(i::DofMap,t::Triangulation)
@@ -153,13 +146,12 @@ function CellData.change_domain(i::DofMap,t::Triangulation)
     i.indices,
     i.dof_to_cell,
     i.free_vals_box,
-    cell_to_mask,
-    i.dof_type)
+    cell_to_mask)
 end
 
 # optimization
 
-const EntireDofMap{D,Ti,Tc,A<:Fill{Bool}} = DofMap{D,Ti,Tc,A}
+const EntireDofMap{D,Ti,A<:Fill{Bool}} = DofMap{D,Ti,A}
 
 Base.@propagate_inbounds function Base.getindex(
   i::EntireDofMap{D,Ti},
@@ -182,18 +174,15 @@ end
 
 # multi value
 
-const MultiValueDofMap{D,Ti,Tc<:MultiValue,A} = DofMap{D,Ti,Tc,A}
-
 function _to_scalar_values!(i::AbstractArray,D::Integer,d::Integer)
   i .= (i .- d) ./ D .+ 1
 end
 
-function get_component(i::MultiValueDofMap{D},d;multivalue::Bool=true) where D
+function get_component(i::DofMap{D},d;multivalue::Bool=true) where D
   ncomps = num_components(i)
   indices = collect(selectdim(i.indices,D,d))
-  dof_to_first_owner_cell = collect(selectdim(i.indices,D,d))
+  dof_to_cell = i.dof_to_cell[d:D:end]
   free_vals_box = collect(selectdim(i.free_vals_box,D,d))
-  dof_type = eltype(i.dof_type)
 
   if !multivalue
     for j in i.free_vals_box
@@ -204,14 +193,13 @@ function get_component(i::MultiValueDofMap{D},d;multivalue::Bool=true) where D
 
   DofMap(
     indices,
-    dof_to_first_owner_cell,
+    dof_to_cell,
     free_vals_box,
-    i.cell_to_mask,
-    dof_type)
+    i.cell_to_mask)
 end
 
-struct ConstrainedDofMap{D,Ti,Tc,A} <: AbstractDofMap{D,Ti,Tc}
-  map::DofMap{D,Ti,Tc,A}
+struct ConstrainedDofMap{D,Ti,A} <: AbstractDofMap{D,Ti}
+  map::DofMap{D,Ti,A}
   dof_to_constraint_mask::Vector{Bool}
 end
 
@@ -241,92 +229,30 @@ function Base.similar(i::ConstrainedDofMap)
   ConstrainedDofMap(similar(i.map),i.dof_to_constraint_mask)
 end
 
-# sparse maps
+# tensor product index map, a lot of previous machinery is not needed
 
-abstract type SparseDofMapStyle end
-abstract type FullDofMapIndexing <: SparseDofMapStyle end
-abstract type SparseDofMapIndexing <: SparseDofMapStyle end
-
-# trivial case
-
-struct TrivialSparseDofMap{A<:SparsityPattern} <: AbstractTrivialDofMap
-  sparsity::A
-end
-
-TrivialDofMap(sparsity::SparsityPattern) = TrivialSparseDofMap(sparsity)
-TrivialDofMap(i::TrivialSparseDofMap) = i
-Base.size(i::TrivialSparseDofMap) = (nnz(i.sparsity),)
-
-recast(a::AbstractArray,i::TrivialSparseDofMap) = recast(a,i.sparsity)
-
-SparseDofMapStyle(i::TrivialSparseDofMap) = FullDofMapIndexing()
-
-# non trivial case
-
-"""
-    SparseDofMap{D,Ti,A<:AbstractDofMap{D,Ti},B<:TProductSparsityPattern} <: AbstractDofMap{D,Ti}
-
-Index map used to select the nonzero entries of a sparse matrix. The field `sparsity`
-contains the tensor product sparsity of the matrix to be indexed. The field `indices`
-refers to the nonzero entries of the sparse matrix, whereas `indices_sparse` is
-used to access the corresponding sparse entries
-
-"""
-struct SparseDofMap{D,Ti,A<:SparsityPattern,B<:SparseDofMapStyle} <: AbstractDofMap{D,Ti}
+struct TProductDofMap{D,Ti,I<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
   indices::Array{Ti,D}
-  indices_sparse::Array{Ti,D}
-  sparsity::A
-  index_style::B
+  indices_1d::Vector{Vector{Ti}}
 end
 
-function SparseDofMap(
-  indices::AbstractArray,
-  indices_sparse::AbstractArray,
-  sparsity::SparsityPattern)
+Base.size(i::TProductDofMap) = size(i.indices)
 
-  index_style = FullDofMapIndexing()
-  SparseDofMap(indices,indices_sparse,sparsity,index_style)
-end
-
-# reindexing
-
-SparseDofMapStyle(i::SparseDofMap) = i.index_style
-
-function FullDofMap(i::SparseDofMap)
-  SparseDofMap(i.indices,i.indices_sparse,i.sparsity,FullDofMapIndexing())
-end
-
-function SparseDofMap(i::SparseDofMap)
-  SparseDofMap(i.indices,i.indices_sparse,i.sparsity,SparseDofMapIndexing())
-end
-
-Base.size(i::SparseDofMap) = size(i.indices)
-
-function Base.getindex(i::SparseDofMap{D,Ti,A,FullDofMap},j::Vararg{Integer,D}) where {D,Ti,A}
+function Base.getindex(i::TProductDofMap{D,Ti},j::Vararg{Integer,D}) where {D,Ti}
   getindex(i.indices,j...)
 end
 
-function Base.setindex!(i::SparseDofMap{D,Ti,A,FullDofMap},v,j::Vararg{Integer,D}) where {D,Ti,A}
+function Base.setindex!(i::TProductDofMap{D,Ti},v,j::Vararg{Integer,D}) where {D,Ti}
   setindex!(i.indices,v,j...)
 end
 
-function Base.getindex(i::SparseDofMap{D,Ti,A,SparseDofMap},j::Vararg{Integer,D}) where {D,Ti,A}
-  getindex(i.indices_sparse,j...)
+function Base.copy(i::TProductDofMap)
+  TProductDofMap(copy(i.indices),i.indices_1d,i.dof_map)
 end
 
-function Base.setindex!(i::SparseDofMap{D,Ti,A,SparseDofMap},v,j::Vararg{Integer,D}) where {D,Ti,A}
-  setindex!(i.indices_sparse,v,j...)
+function Base.similar(i::TProductDofMap)
+  TProductDofMap(similar(i.indices),i.indices_1d,i.dof_map)
 end
-
-function Base.copy(i::SparseDofMap)
-  SparseDofMap(copy(i.indices),copy(i.indices_sparse),i.sparsity,i.index_style)
-end
-
-function Base.similar(i::SparseDofMap)
-  SparseDofMap(similar(i.indices),similar(i.indices_sparse),i.sparsity,i.index_style)
-end
-
-recast(A::AbstractArray,i::SparseDofMap) = recast(A,i.sparsity)
 
 # nnz bounding boxes
 

@@ -63,7 +63,11 @@ export ParamFEOperator
 export SplitParamFEOperator
 export JointParamFEOperator
 export LinearParamFEOperator
+export FEDomains
 export get_param_space
+export get_domains
+export get_domains_res
+export get_domains_jac
 include("ParamFEOperator.jl")
 
 export LinearNonlinearParamFEOperator

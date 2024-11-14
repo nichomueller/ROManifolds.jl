@@ -76,21 +76,19 @@ function to_nz_index!(i::AbstractArray,a::SparsityPattern)
 end
 
 function order_sparsity(s::SparsityPattern,U::FESpace,V::FESpace)
-  rows = get_ordered_dof_map(V)
-  cols = get_ordered_dof_map(U)
+  rows = get_dof_map(V)
+  cols = get_dof_map(U)
   order_sparsity(s,rows,cols)
 end
 
 """
 """
-struct SparsityPatternCSC{Tv,Ti,A,B} <: SparsityPattern
+struct SparsityPatternCSC{Tv,Ti} <: SparsityPattern
   matrix::SparseMatrixCSC{Tv,Ti}
-  dof_type_trial::Type{A}
-  dof_type_test::Type{B}
 end
 
-function SparsityPattern(a::SparseMatrixCSC,dof_type_trial=Float64,dof_type_test=Float64)
-  SparsityPatternCSC(a,dof_type_trial,dof_type_test)
+function SparsityPattern(a::SparseMatrixCSC)
+  SparsityPatternCSC(a)
 end
 
 get_background_matrix(a::SparsityPatternCSC) = a.matrix
@@ -160,14 +158,6 @@ function CellData.change_domain(
   return SparsityPatternCSC(matrix)
 end
 
-# const MultiValueSparsityPatternCSC{Tv,Ti,A,B} = Union{
-#   SparsityPatternCSC{Tv,Ti,A<:MultiValue,B},
-#   SparsityPatternCSC{Tv,Ti,A,B<:MultiValue},
-#   SparsityPatternCSC{Tv,Ti,A<:MultiValue,B<:MultiValue}
-# }
-
-"""
-"""
 struct TProductSparsityPattern{A,B} <: SparsityPattern
   sparsity::A
   sparsities_1d::B
@@ -190,4 +180,38 @@ end
 
 function to_nz_index!(i::AbstractArray,a::TProductSparsityPattern)
   to_nz_index!(i,a.sparsity)
+end
+
+# univariate (tensor product factors) sparse dofs to sparse dofs
+function get_sparse_dof_map(sparsity::TProductSparsityPattern,I,J,i,j)
+  IJ = get_nonzero_indices(sparsity)
+  uids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
+
+  unrows = univariate_num_rows(sparsity)
+  uncols = univariate_num_cols(sparsity)
+  unnz = univariate_nnz(sparsity)
+
+  tprows = CartesianIndices(unrows)
+  tpcols = CartesianIndices(uncols)
+
+  sparse_dof_map = zeros(eltype(IJ),unnz...)
+  uid = zeros(Int,length(uids))
+  @inbounds for (k,id) = enumerate(IJ)
+    fill!(uid,0)
+    irows = tprows[I[k]]
+    icols = tpcols[J[k]]
+    @inbounds for d in eachindex(uids)
+      lidd = uids[d]
+      indd = CartesianIndex((irows.I[d],icols.I[d]))
+      @inbounds for (l,liddl) in enumerate(lidd)
+        if liddl == indd
+          uid[d] = l
+          break
+        end
+      end
+    end
+    sparse_dof_map[uid...] = id
+  end
+
+  return DofMap(sparse_dof_map)
 end

@@ -120,10 +120,10 @@ r = realization(feop)
 fesnaps,festats = solution_snapshots(rbsolver,feop,r)
 
 # MORE INDEX MAPS :(
-get_matrix_dof_map(test_u,test_u,Ω_in)
-get_matrix_dof_map(test_u,test_u,Ω_out)
-get_matrix_dof_map(test_u,test_u,Γd)
-get_matrix_dof_map(test_u,test_p,Ω_in)
+get_sparse_dof_map(test_u,test_u,Ω_in)
+get_sparse_dof_map(test_u,test_u,Ω_out)
+get_sparse_dof_map(test_u,test_u,Γd)
+get_sparse_dof_map(test_u,test_p,Ω_in)
 
 using ReducedOrderModels.TProduct
 using ReducedOrderModels.DofMaps
@@ -137,7 +137,7 @@ psparsity = order_sparsity(sparsity,test_u,test_p)
 # pg2l_sparse = TProduct._permute_dof_map(g2l_sparse,test_u,test_p)
 # pg2l = to_nz_index(pg2l_sparse,sparsity)
 # SparseDofMap(pg2l,pg2l_sparse,psparsity)
-dof_map_I = get_ordered_dof_map(test_p)
-dof_map_J = get_ordered_dof_map(test_u)
+dof_map_I = get_dof_map(test_p)
+dof_map_J = get_dof_map(test_u)
 dof_map_I_1d = get_tp_dof_dof_map(test_p).indices_1d
 dof_map_J_1d = get_tp_dof_dof_map(test_u).indices_1d

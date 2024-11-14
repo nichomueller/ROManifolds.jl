@@ -153,13 +153,13 @@ function find_trian_permutation(a,b)
 end
 
 """
-    order_triangulations(tparents::Tuple{Vararg{Triangulation}},
+    order_domains(tparents::Tuple{Vararg{Triangulation}},
       tchildren::Tuple{Vararg{Triangulation}}) -> Tuple{Vararg{Triangulation}}
 
 Orders the triangulation children in the same way as the triangulation parents
 
 """
-function order_triangulations(tparents,tchildren)
+function order_domains(tparents,tchildren)
   @check length(tparents) == length(tchildren)
   iperm = find_trian_permutation(tparents,tchildren)
   map(iperm->tchildren[iperm],iperm)

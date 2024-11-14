@@ -45,8 +45,8 @@ function FESpaces.get_trial(op::LinearNonlinearParamFEOperator)
 end
 
 function DofMaps.get_dof_map(op::LinearNonlinearParamFEOperator)
-  @check all(get_vector_dof_map(op.op_linear) .== get_vector_dof_map(op.op_nonlinear))
-  @check all(get_matrix_dof_map(op.op_linear) .== get_matrix_dof_map(op.op_nonlinear))
+  @check all(get_dof_map(op.op_linear) .== get_dof_map(op.op_nonlinear))
+  @check all(get_sparse_dof_map(op.op_linear) .== get_sparse_dof_map(op.op_nonlinear))
   get_dof_map(op.op_linear)
 end
 
@@ -79,7 +79,7 @@ function join_operators(
   ParamFEOperator(res,jac,op_lin.pspace,trial,test)
 end
 
-for f in (:(Utils.set_domains),:(Utils.change_domains))
+for f in (:set_domains,:change_domains)
   @eval begin
     function $f(op::LinearNonlinearParamFEOperator)
       op_lin′ = $f(get_linear_operator(op))

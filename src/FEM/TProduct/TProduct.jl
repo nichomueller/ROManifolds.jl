@@ -31,12 +31,8 @@ import PartitionedArrays: tuple_of_arrays
 import SparseArrays: AbstractSparseMatrixCSC
 import UnPack: @unpack
 
-export get_ordered_dof_map
-export get_polynomial_order
-include("DofDofMaps.jl")
-
 export get_tp_dof_dof_map
-include("TProductDofDofMaps.jl")
+include("TProductDofMaps.jl")
 
 export TProductModel
 export TProductTriangulation
@@ -47,8 +43,6 @@ export TProductFESpace
 export get_tp_fe_basis
 export get_tp_trial_fe_basis
 include("TProductFESpaces.jl")
-
-include("TProductFEDofMaps.jl")
 
 export AbstractRankTensor
 export Rank1Tensor
@@ -70,7 +64,5 @@ include("TProductCellData.jl")
 export TProductSparseMatrixAssembler
 export TProductBlockSparseMatrixAssembler
 include("TProductAssembly.jl")
-
-include("Unfitted.jl")
 
 end # module

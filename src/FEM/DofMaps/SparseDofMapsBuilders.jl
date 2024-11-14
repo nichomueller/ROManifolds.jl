@@ -1,19 +1,11 @@
-function DofMaps.get_vector_dof_map(test::TProductFESpace,t::Triangulation...)
-  if length(test.spaces_1d) == 1 # in the 1-D case, we return a trivial map
-    get_vector_dof_map(test.space,t...)
-  else
-    get_ordered_dof_map(test,t...)
-  end
-end
-
-function DofMaps.get_matrix_dof_map(trial::TProductFESpace,test::TProductFESpace,t::Triangulation...)
+function get_sparse_dof_map(trial::FESpace,test::FESpace)
   if length(trial.spaces_1d) == length(test.spaces_1d) == 1 # in the 1-D case, we return a trivial map
-    get_matrix_dof_map(trial.space,test.space,t...)
+    get_sparse_dof_map(trial.space,test.space,t...)
   else
     sparsity = SparsityPattern(trial,test,t...)
     psparsity = order_sparsity(sparsity,trial,test)
     I,J,_ = findnz(psparsity)
-    i,j,_ = DofMaps.univariate_findnz(psparsity)
+    i,j,_ = univariate_findnz(psparsity)
     g2l_sparse = _global_2_local(psparsity,I,J,i,j)
     pg2l_sparse = _permute_dof_map(g2l_sparse,trial,test)
     pg2l = to_nz_index(pg2l_sparse,sparsity)
@@ -27,9 +19,9 @@ function _global_2_local(sparsity::TProductSparsityPattern,I,J,i,j)
   IJ = get_nonzero_indices(sparsity)
   lids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
 
-  unrows = DofMaps.univariate_num_rows(sparsity)
-  uncols = DofMaps.univariate_num_cols(sparsity)
-  unnz = DofMaps.univariate_nnz(sparsity)
+  unrows = univariate_num_rows(sparsity)
+  uncols = univariate_num_cols(sparsity)
+  unnz = univariate_nnz(sparsity)
 
   tprows = CartesianIndices(unrows)
   tpcols = CartesianIndices(uncols)
@@ -57,7 +49,7 @@ function _global_2_local(sparsity::TProductSparsityPattern,I,J,i,j)
 end
 
 function _permute_dof_map(dof_map,I,J,nrows)
-  IJ = vectorize_map(I) .+ nrows .* (vectorize_map(J)'.-1)
+  IJ = vectorize(I) .+ nrows .* (vectorize(J)'.-1)
   iperm = copy(dof_map)
   @inbounds for (k,pk) in enumerate(dof_map)
     if pk > 0
@@ -142,8 +134,8 @@ function _permute_dof_map(dof_map,I::AbstractDofMap,J::AbstractMultiValueDofMap,
 end
 
 function _permute_dof_map(dof_map,trial::TProductFESpace,test::TProductFESpace)
-  I = get_ordered_dof_map(test)
-  J = get_ordered_dof_map(trial)
+  I = get_dof_map(test)
+  J = get_dof_map(trial)
   nrows = num_free_dofs(test)
   return _permute_dof_map(dof_map,I,J,nrows)
 end

@@ -36,8 +36,7 @@ function ParamSteady.get_param_space(op::LinearNonlinearTransientParamFEOperator
 end
 
 function DofMaps.get_dof_map(op::LinearNonlinearTransientParamFEOperator)
-  @check all(get_vector_dof_map(op.op_linear) .== get_vector_dof_map(op.op_nonlinear))
-  @check all(get_matrix_dof_map(op.op_linear) .== get_matrix_dof_map(op.op_nonlinear))
+  @check all(get_sparse_dof_map(op.op_linear) .== get_sparse_dof_map(op.op_nonlinear))
   get_dof_map(op.op_linear)
 end
 
@@ -92,7 +91,7 @@ function ParamSteady.join_operators(
   TransientParamFEOperator(res,jacs,op_lin.tpspace,trial,test)
 end
 
-for f in (:(Utils.set_domains),:(Utils.change_domains))
+for f in (:(ParamSteady.set_domains),:(ParamSteady.change_domains))
   @eval begin
     function $f(op::LinearNonlinearTransientParamFEOperator)
       op_lin′ = $f(get_linear_operator(op))
