@@ -20,7 +20,7 @@ using Gridap.TensorValues
 using Gridap.Helpers
 
 using ReducedOrderModels.Utils
-using ReducedOrderModels.IndexMaps
+using ReducedOrderModels.DofMaps
 using ReducedOrderModels.TProduct
 using ReducedOrderModels.ParamDataStructures
 using ReducedOrderModels.ParamAlgebra

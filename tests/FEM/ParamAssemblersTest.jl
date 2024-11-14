@@ -13,7 +13,7 @@ using Gridap.FESpaces
 using Gridap.CellData
 using Gridap.Algebra
 using ReducedOrderModels.FEM
-using ReducedOrderModels.IndexMaps
+using ReducedOrderModels.DofMaps
 using ReducedOrderModels.TProduct
 using ReducedOrderModels.ParamDataStructures
 using ReducedOrderModels.ParamAlgebra

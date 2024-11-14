@@ -23,7 +23,7 @@ import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
 import SparseArrays.getcolptr
 
-import ReducedOrderModels.IndexMaps: fast_index,slow_index,recast
+import ReducedOrderModels.DofMaps: fast_index,slow_index,recast
 
 export AbstractRealization
 export Realization

@@ -63,7 +63,7 @@ function RBSteady.solution_snapshots(
   feop′ = set_domains(feop)
   sol = solve(fesolver,feop′,r,args...)
   values,stats = collect(sol.odesol)
-  i = get_vector_index_map(feop′)
+  i = get_vector_dof_map(feop′)
   snaps = Snapshots(values,i,r)
   return snaps,stats
 end
@@ -78,7 +78,7 @@ function RBSteady.residual_snapshots(
   us_res = (get_values(sres),)
   r_res = get_realization(sres)
   b = residual(fesolver,odeop,r_res,us_res)
-  ib = get_vector_index_map(odeop)
+  ib = get_vector_dof_map(odeop)
   return Snapshots(b,ib,r_res)
 end
 
@@ -92,7 +92,7 @@ function RBSteady.jacobian_snapshots(
   us_jac = (get_values(sjac),)
   r_jac = get_realization(sjac)
   A = jacobian(fesolver,odeop,r_jac,us_jac)
-  iA = get_matrix_index_map(odeop)
+  iA = get_matrix_dof_map(odeop)
   jac_reduction = RBSteady.get_jacobian_reduction(solver)
   sA = ()
   for (reda,a,ia) in zip(jac_reduction,A,iA)

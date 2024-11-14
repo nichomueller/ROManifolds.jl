@@ -22,7 +22,7 @@ using GridapEmbedded
 using GridapEmbedded.Interfaces
 
 using ReducedOrderModels.Utils
-using ReducedOrderModels.IndexMaps
+using ReducedOrderModels.DofMaps
 
 import Base:+,-
 import FillArrays: Fill,fill
@@ -31,12 +31,12 @@ import PartitionedArrays: tuple_of_arrays
 import SparseArrays: AbstractSparseMatrixCSC
 import UnPack: @unpack
 
-export get_dof_index_map
+export get_ordered_dof_map
 export get_polynomial_order
-include("DofIndexMaps.jl")
+include("DofDofMaps.jl")
 
-export get_tp_dof_index_map
-include("TProductDofIndexMaps.jl")
+export get_tp_dof_dof_map
+include("TProductDofDofMaps.jl")
 
 export TProductModel
 export TProductTriangulation
@@ -48,7 +48,7 @@ export get_tp_fe_basis
 export get_tp_trial_fe_basis
 include("TProductFESpaces.jl")
 
-include("TProductFEIndexMaps.jl")
+include("TProductFEDofMaps.jl")
 
 export AbstractRankTensor
 export Rank1Tensor

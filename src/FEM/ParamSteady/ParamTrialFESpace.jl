@@ -55,8 +55,8 @@ end
 
 for F in (:TrialFESpace,:TransientTrialFESpace,:UnEvalParamSingleFieldFESpace)
   @eval begin
-    function IndexMaps.get_matrix_index_map(trial::$F,test::SingleFieldFESpace,t::Triangulation...)
-      get_matrix_index_map(trial.space,test,t...)
+    function DofMaps.get_matrix_dof_map(trial::$F,test::SingleFieldFESpace,t::Triangulation...)
+      get_matrix_dof_map(trial.space,test,t...)
     end
   end
 end

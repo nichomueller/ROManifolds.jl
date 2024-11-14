@@ -241,7 +241,7 @@ function rb_performance(
 
   x = inv_project(get_trial(rbop)(r),x̂)
   feop′ = set_domains(feop)
-  rbsnaps = Snapshots(x,get_vector_index_map(feop′),r)
+  rbsnaps = Snapshots(x,get_vector_dof_map(feop′),r)
   rb_performance(solver,feop′,fesnaps,rbsnaps,festats,rbstats)
 end
 

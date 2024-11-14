@@ -1,22 +1,22 @@
 """
-    abstract type AbstractSnapshots{T,N,D,I<:AbstractIndexMap{D},R<:AbstractRealization,A}
+    abstract type AbstractSnapshots{T,N,D,I<:AbstractDofMap{D},R<:AbstractRealization,A}
       <: AbstractParamContainer{T,N} end
 
 Type representing a collection of parametric abstract arrays of eltype T,
 that are associated with a realization of type R. The (spatial)
 entries of any instance of AbstractSnapshots are indexed according to an index
-map of type I<:AbstractIndexMap{D}, where D encodes the spatial dimension.
+map of type I<:AbstractDofMap{D}, where D encodes the spatial dimension.
 
 Subtypes:
 - [`AbstractSteadySnapshots`](@ref)
 - [`AbstractTransientSnapshots`](@ref)
 
 """
-abstract type AbstractSnapshots{T,N,D,I<:AbstractIndexMap{D},R<:AbstractRealization,A} <: AbstractParamContainer{T,N} end
+abstract type AbstractSnapshots{T,N,D,I<:AbstractDofMap{D},R<:AbstractRealization,A} <: AbstractParamContainer{T,N} end
 
 Utils.get_values(s::AbstractSnapshots) = @abstractmethod
 get_indexed_values(s::AbstractSnapshots) = @abstractmethod
-IndexMaps.get_index_map(s::AbstractSnapshots) = @abstractmethod
+DofMaps.get_dof_map(s::AbstractSnapshots) = @abstractmethod
 get_realization(s::AbstractSnapshots) = @abstractmethod
 
 ParamDataStructures.param_length(s::AbstractSnapshots) = @notimplemented
@@ -27,41 +27,33 @@ ParamDataStructures.param_length(s::AbstractSnapshots) = @notimplemented
 Returns the spatial size of the snapshots
 
 """
-num_space_dofs(s::AbstractSnapshots) = size(get_index_map(s))
+num_space_dofs(s::AbstractSnapshots) = size(get_dof_map(s))
 ParamDataStructures.num_params(s::AbstractSnapshots) = num_params(get_realization(s))
 
 """
-    Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractRealization
+    Snapshots(s::AbstractArray,i::AbstractDofMap,r::AbstractRealization
       ) -> AbstractSnapshots
 
 Constructor of an instance of AbstractSnapshots
 
 """
-function Snapshots(s::AbstractArray,i::AbstractIndexMap,r::AbstractRealization)
+function Snapshots(s::AbstractArray,i::AbstractDofMap,r::AbstractRealization)
   @abstractmethod
 end
 
-function IndexMaps.change_index_map(i::AbstractIndexMap,s::AbstractSnapshots)
-  Snapshots(get_all_data(s),i,get_realization(s))
-end
-
-function IndexMaps.change_index_map(f,s::AbstractSnapshots)
-  i′ = change_index_map(f,get_index_map(s))
-  change_index_map(i′,s)
-end
-
-function IndexMaps.recast(a::AbstractArray,s::AbstractSnapshots)
-  return recast(a,get_index_map(s))
+function DofMaps.recast(a::AbstractArray,s::AbstractSnapshots)
+  return recast(a,get_dof_map(s))
 end
 
 """
     flatten_snapshots(s::AbstractSnapshots) -> AbstractSnapshots
 
-The output snapshots are indexed according to a [`TrivialIndexMap`](@ref)
+The output snapshots are indexed according to a [`TrivialDofMap`](@ref)
 
 """
 function flatten_snapshots(s::AbstractSnapshots)
-  change_index_map(TrivialIndexMap,s)
+  i′ = TrivialDofMap(get_dof_map(s))
+  Snapshots(get_all_data(s),i′,get_realization(s))
 end
 
 """
@@ -85,8 +77,8 @@ julia> data = [rand(ns1*ns2) for ip = 1:np]
 2-element Vector{Vector{Float64}}:
  [0.4684452123483283, 0.1195886171030737, 0.1151790990455997, 0.0375575515915656]
  [0.9095165124078269, 0.7346081836882059, 0.8939511550403715, 0.2288086807377305]
-julia> i = IndexMap(collect(LinearIndices((ns1,ns2))))
-2×2 IndexMap{2, Int64}:
+julia> i = DofMap(collect(LinearIndices((ns1,ns2))))
+2×2 DofMap{2, Int64}:
  1  3
  2  4
 julia> pspace = ParamSpace(fill([0,1],3))
@@ -96,7 +88,7 @@ Realization{Vector{Vector{Float64}}}([
   [0.4021870679335007, 0.6585653527784044, 0.5110768420820191],
   [0.0950901750101361, 0.7049711670440882, 0.3490097863258958]])
 julia> s = Snapshots(ParamArray(data),i,r)
-2×2×2 GenericSnapshots{Float64, 3, 2, 2, IndexMap{2, Int64},
+2×2×2 GenericSnapshots{Float64, 3, 2, 2, DofMap{2, Int64},
   Realization{Vector{Vector{Float64}}}, VectorOfVectors{Float64, 2}}:
   [:, :, 1] =
   0.468445  0.115179
@@ -120,30 +112,30 @@ Most standard implementation of a AbstractSteadySnapshots
 """
 struct GenericSnapshots{T,N,D,I,R,A} <: AbstractSteadySnapshots{T,N,D,I,R,A}
   data::A
-  index_map::I
+  dof_map::I
   realization::R
 
   function GenericSnapshots(
     data::A,
-    index_map::I,
+    dof_map::I,
     realization::R
-    ) where {T,N,D,R,A<:AbstractParamArray{T,N},I<:AbstractIndexMap{D}}
+    ) where {T,N,D,R,A<:AbstractParamArray{T,N},I<:AbstractDofMap{D}}
 
-    new{T,D+1,D,I,R,A}(data,index_map,realization)
+    new{T,D+1,D,I,R,A}(data,dof_map,realization)
   end
 end
 
-function Snapshots(s::AbstractParamArray,i::AbstractIndexMap,r::Realization)
+function Snapshots(s::AbstractParamArray,i::AbstractDofMap,r::Realization)
   GenericSnapshots(s,i,r)
 end
 
 ParamDataStructures.get_all_data(s::GenericSnapshots) = s.data
 Utils.get_values(s::GenericSnapshots) = s.data
-IndexMaps.get_index_map(s::GenericSnapshots) = s.index_map
+DofMaps.get_dof_map(s::GenericSnapshots) = s.dof_map
 get_realization(s::GenericSnapshots) = s.realization
 
 function get_indexed_values(s::GenericSnapshots)
-  vi = vectorize_map(get_index_map(s))
+  vi = vectorize_map(get_dof_map(s))
   data = get_all_data(s.data)
   ConsecutiveParamArray(data[vi,:])
 end
@@ -155,7 +147,7 @@ Base.@propagate_inbounds function Base.getindex(
 
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
-  ispace′ = s.index_map[ispace...]
+  ispace′ = s.dof_map[ispace...]
   data = get_all_data(s.data)
   ispace′ == 0 ? zero(eltype(s)) : data[ispace′,iparam]
 end
@@ -168,7 +160,7 @@ Base.@propagate_inbounds function Base.setindex!(
 
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
-  ispace′ = s.index_map[ispace...]
+  ispace′ = s.dof_map[ispace...]
   data = get_all_data(s.data)
   ispace′ != 0 && (data[ispace′,iparam] = v)
 end
@@ -202,7 +194,7 @@ end
 param_indices(s::SnapshotsAtIndices) = s.prange
 ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
 ParamDataStructures.get_all_data(s::SnapshotsAtIndices) = get_all_data(s.snaps)
-IndexMaps.get_index_map(s::SnapshotsAtIndices) = get_index_map(s.snaps)
+DofMaps.get_dof_map(s::SnapshotsAtIndices) = get_dof_map(s.snaps)
 
 _num_all_params(s::AbstractSnapshots) = num_params(s)
 _num_all_params(s::SnapshotsAtIndices) = _num_all_params(s.snaps)
@@ -304,7 +296,7 @@ function Base.setindex!(
 end
 
 get_realization(s::ReshapedSnapshots) = get_realization(s.snaps)
-IndexMaps.get_index_map(s::ReshapedSnapshots) = get_index_map(s.snaps)
+DofMaps.get_dof_map(s::ReshapedSnapshots) = get_dof_map(s.snaps)
 
 function Utils.get_values(s::ReshapedSnapshots)
   v = get_values(s.snaps)
@@ -405,7 +397,7 @@ function Fields.BlockMap(s::NTuple,inds::AbstractVector{<:Integer})
   BlockMap(s,cis)
 end
 
-function Snapshots(data::BlockParamArray,i::AbstractArray{<:AbstractIndexMap},r::AbstractRealization)
+function Snapshots(data::BlockParamArray,i::AbstractArray{<:AbstractDofMap},r::AbstractRealization)
   block_values = blocks(data)
   nblocks = blocksize(data)
   active_block_ids = findall(!iszero,block_values)
@@ -439,7 +431,7 @@ function Arrays.testitem(s::BlockSnapshots)
   end
 end
 
-IndexMaps.get_index_map(s::BlockSnapshots) = get_index_map(testitem(s))
+DofMaps.get_dof_map(s::BlockSnapshots) = get_dof_map(testitem(s))
 get_realization(s::BlockSnapshots) = get_realization(testitem(s))
 
 function Utils.get_values(s::BlockSnapshots)
@@ -448,18 +440,6 @@ end
 
 function get_indexed_values(s::BlockSnapshots)
   map(get_indexed_values,s.array) |> mortar
-end
-
-function Arrays.return_cache(::typeof(change_index_map),f,s::AbstractSnapshots)
-  change_index_map(f,s)
-end
-
-function Arrays.return_cache(::typeof(change_index_map),f,s::BlockSnapshots)
-  i = findfirst(s.touched)
-  @notimplementedif isnothing(i)
-  cache = return_cache(change_index_map,f,s[i])
-  block_cache = Array{typeof(cache),ndims(s)}(undef,size(s))
-  return block_cache
 end
 
 for f in (:flatten_snapshots,:select_snapshots)
@@ -478,7 +458,7 @@ for f in (:flatten_snapshots,:select_snapshots)
   end
 end
 
-for f in (:(IndexMaps.change_index_map),:flatten_snapshots,:select_snapshots)
+for f in (:flatten_snapshots,:select_snapshots)
   @eval begin
     function $f(s::BlockSnapshots,args...;kwargs...)
       array = return_cache($f,s,args...;kwargs...)

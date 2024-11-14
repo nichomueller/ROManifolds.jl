@@ -35,10 +35,10 @@ function ParamSteady.get_param_space(op::LinearNonlinearTransientParamFEOperator
   get_param_space(op.op_linear)
 end
 
-function IndexMaps.get_index_map(op::LinearNonlinearTransientParamFEOperator)
-  @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
-  @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))
-  get_index_map(op.op_linear)
+function DofMaps.get_dof_map(op::LinearNonlinearTransientParamFEOperator)
+  @check all(get_vector_dof_map(op.op_linear) .== get_vector_dof_map(op.op_nonlinear))
+  @check all(get_matrix_dof_map(op.op_linear) .== get_matrix_dof_map(op.op_nonlinear))
+  get_dof_map(op.op_linear)
 end
 
 function Polynomials.get_order(op::LinearNonlinearTransientParamFEOperator)

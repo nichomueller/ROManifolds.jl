@@ -6,7 +6,7 @@ a standard TransientFEOperator, there are the following novelties:
 
 - a TransientParamSpace is provided, so that transient parametric realizations
   can be extracted directly from the TransientParamFEOperator
-- an AbstractIndexMap is provided, so that a nonstandard indexing strategy can
+- an AbstractDofMap is provided, so that a nonstandard indexing strategy can
   take place when dealing with FEFunctions
 - a function representing a norm matrix is provided, so that errors in the
   desired norm can be automatically computed
@@ -61,7 +61,7 @@ struct TransientParamFEOpFromWeakForm{T} <: TransientParamFEOperator{NonlinearPa
   jacs::Tuple{Vararg{Function}}
   tpspace::TransientParamSpace
   assem::Assembler
-  index_map::FEOperatorIndexMap
+  dof_map::FEOperatorDofMap
   trial::FESpace
   test::FESpace
   order::Integer
@@ -74,9 +74,9 @@ function TransientParamFEOperator(
 
   order = length(jacs) - 1
   assem = SparseMatrixAssembler(trial,test)
-  index_map = FEOperatorIndexMap(trial,test)
+  dof_map = FEOperatorDofMap(trial,test)
   TransientParamFEOpFromWeakForm{JointTriangulation}(
-    res,jacs,tpspace,assem,index_map,trial,test,order)
+    res,jacs,tpspace,assem,dof_map,trial,test,order)
 end
 
 const SplitTransientParamFEOpFromWeakForm = TransientParamFEOpFromWeakForm{SplitTriangulation}
@@ -87,9 +87,9 @@ function TransientParamFEOperator(
   order = length(jacs) - 1
   res′,jacs′ = _set_triangulations(res,jacs,test,trial,trian_res,trian_jacs)
   assem = SparseMatrixAssembler(trial,test)
-  index_map = FEOperatorIndexMap(trial,test,trian_res,trian_jacs)
+  dof_map = FEOperatorDofMap(trial,test,trian_res,trian_jacs)
   TransientParamFEOpFromWeakForm{SplitTriangulation}(
-    res′,jacs′,tpspace,assem,index_map,trial,test,order)
+    res′,jacs′,tpspace,assem,dof_map,trial,test,order)
 end
 
 function TransientParamFEOperator(
@@ -138,7 +138,7 @@ Polynomials.get_order(op::TransientParamFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamFEOpFromWeakForm) = op.assem
-IndexMaps.get_index_map(op::TransientParamFEOpFromWeakForm) = op.index_map
+DofMaps.get_dof_map(op::TransientParamFEOpFromWeakForm) = op.dof_map
 
 """
     struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE} end
@@ -153,7 +153,7 @@ struct TransientParamLinearFEOpFromWeakForm{T} <: TransientParamFEOperator{Linea
   constant_forms::Tuple{Vararg{Bool}}
   tpspace::TransientParamSpace
   assem::Assembler
-  index_map::FEOperatorIndexMap
+  dof_map::FEOperatorDofMap
   trial::FESpace
   test::FESpace
   order::Integer
@@ -168,9 +168,9 @@ function TransientParamLinearFEOperator(
   order = length(forms)-1
   jacs = ntuple(k -> ((μ,t,u,duk,v) -> forms[k](μ,t,duk,v)),length(forms))
   assem = SparseMatrixAssembler(trial,test)
-  index_map = FEOperatorIndexMap(trial,test)
+  dof_map = FEOperatorDofMap(trial,test)
   TransientParamLinearFEOpFromWeakForm{JointTriangulation}(
-    res,jacs,constant_forms,tpspace,assem,index_map,trial,test,order)
+    res,jacs,constant_forms,tpspace,assem,dof_map,trial,test,order)
 end
 
 const SplitTransientParamLinearFEOpFromWeakForm = TransientParamLinearFEOpFromWeakForm{SplitTriangulation}
@@ -183,9 +183,9 @@ function TransientParamLinearFEOperator(
   jacs = ntuple(k -> ((μ,t,u,duk,v,args...) -> forms[k](μ,t,duk,v,args...)),length(forms))
   res′,jacs′ = _set_triangulations(res,jacs,test,trial,trian_res,trian_jacs)
   assem = SparseMatrixAssembler(trial,test)
-  index_map = FEOperatorIndexMap(trial,test,trian_res,trian_jacs)
+  dof_map = FEOperatorDofMap(trial,test,trian_res,trian_jacs)
   TransientParamLinearFEOpFromWeakForm{SplitTriangulation}(
-    res′,jacs′,constant_forms,tpspace,assem,index_map,trial,test,order)
+    res′,jacs′,constant_forms,tpspace,assem,dof_map,trial,test,order)
 end
 
 function TransientParamLinearFEOperator(
@@ -215,7 +215,7 @@ ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
 ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer) = op.constant_forms[k]
-IndexMaps.get_index_map(op::TransientParamLinearFEOpFromWeakForm) = op.index_map
+DofMaps.get_dof_map(op::TransientParamLinearFEOpFromWeakForm) = op.dof_map
 
 # triangulation utils
 
@@ -225,19 +225,19 @@ for (f,T) in zip((:(Utils.set_domains),:(Utils.change_domains)),(:JointTriangula
       trian_res′ = order_triangulations(get_trian_res(op),trian_res)
       trian_jacs′ = map(order_triangulations,get_trian_jac(op),trian_jacs)
       res′,jacs′ = _set_triangulations(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
-      index_map′ = $f(op.index_map,op.trial,op.test,trian_res′,trian_jacs′)
+      dof_map′ = $f(op.dof_map,op.trial,op.test,trian_res′,trian_jacs′)
       TransientParamFEOpFromWeakForm{$T}(
-        res′,jacs′,op.tpspace,op.assem,index_map′,op.trial,op.test,op.order)
+        res′,jacs′,op.tpspace,op.assem,dof_map′,op.trial,op.test,op.order)
     end
 
     function $f(op::SplitTransientParamLinearFEOpFromWeakForm,trian_res,trian_jacs)
       trian_res′ = order_triangulations(get_trian_res(op),trian_res)
       trian_jacs′ = map(order_triangulations,get_trian_jac(op),trian_jacs)
       res′,jacs′ = _set_triangulations(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
-      index_map′ = $f(op.index_map,op.trial,op.test,trian_res′,trian_jacs′)
+      dof_map′ = $f(op.dof_map,op.trial,op.test,trian_res′,trian_jacs′)
       TransientParamLinearFEOpFromWeakForm{$T}(
         res′,jacs′,op.constant_forms,op.tpspace,
-        op.assem,index_map′,op.trial,op.test,op.order)
+        op.assem,dof_map′,op.trial,op.test,op.order)
     end
   end
 end

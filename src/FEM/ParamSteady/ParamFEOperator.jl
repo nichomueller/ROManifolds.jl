@@ -6,7 +6,7 @@ a standard FEOperator, there are the following novelties:
 
 - a ParamSpace is provided, so that parametric realizations can be extracted
   directly from the ParamFEOperator
-- an AbstractIndexMap is provided, so that a nonstandard indexing strategy can
+- an AbstractDofMap is provided, so that a nonstandard indexing strategy can
   take place when dealing with FEFunctions
 - a function representing a norm matrix is provided, so that errors in the
   desired norm can be automatically computed
@@ -50,9 +50,9 @@ function ParamFESpaces.get_param_assembler(op::ParamFEOperator,r::AbstractRealiz
   get_param_assembler(get_assembler(op),r)
 end
 
-IndexMaps.get_index_map(op::ParamFEOperator) = @abstractmethod
-IndexMaps.get_vector_index_map(op::ParamFEOperator) = get_vector_index_map(get_index_map(op))
-IndexMaps.get_matrix_index_map(op::ParamFEOperator) = get_matrix_index_map(get_index_map(op))
+DofMaps.get_dof_map(op::ParamFEOperator) = @abstractmethod
+DofMaps.get_vector_dof_map(op::ParamFEOperator) = get_vector_dof_map(get_dof_map(op))
+DofMaps.get_matrix_dof_map(op::ParamFEOperator) = get_matrix_dof_map(get_dof_map(op))
 
 function FESpaces.assemble_matrix(op::ParamFEOperator,form::Function)
   test = get_test(op)
@@ -97,7 +97,7 @@ struct ParamFEOpFromWeakForm{O,T} <: ParamFEOperator{O,T}
   jac::Function
   pspace::ParamSpace
   assem::Assembler
-  index_map::FEOperatorIndexMap
+  dof_map::FEOperatorDofMap
   trial::FESpace
   test::FESpace
 end
@@ -106,17 +106,17 @@ const JointParamFEOpFromWeakForm{O} = ParamFEOpFromWeakForm{O,JointTriangulation
 
 function ParamFEOperator(res::Function,jac::Function,pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
-  index_map = FEOperatorIndexMap(trial,test)
+  dof_map = FEOperatorDofMap(trial,test)
   ParamFEOpFromWeakForm{NonlinearParamEq,JointTriangulation}(
-    res,jac,pspace,assem,index_map,trial,test)
+    res,jac,pspace,assem,dof_map,trial,test)
 end
 
 function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test)
   jac′(μ,u,du,v) = jac(μ,du,v)
   assem = SparseMatrixAssembler(trial,test)
-  index_map = FEOperatorIndexMap(trial,test)
+  dof_map = FEOperatorDofMap(trial,test)
   ParamFEOpFromWeakForm{LinearParamEq,JointTriangulation}(
-    res,jac′,pspace,assem,index_map,trial,test)
+    res,jac′,pspace,assem,dof_map,trial,test)
 end
 
 const SplitParamFEOpFromWeakForm{O} = ParamFEOpFromWeakForm{O,SplitTriangulation}
@@ -124,18 +124,18 @@ const SplitParamFEOpFromWeakForm{O} = ParamFEOpFromWeakForm{O,SplitTriangulation
 function ParamFEOperator(res::Function,jac::Function,pspace,trial,test,trian_res,trian_jac)
   res′,jac′ = _set_triangulations(res,jac,test,trial,trian_res,trian_jac)
   assem = SparseMatrixAssembler(trial,test)
-  index_map = FEOperatorIndexMap(trial,test,trian_res,trian_jac)
+  dof_map = FEOperatorDofMap(trial,test,trian_res,trian_jac)
   ParamFEOpFromWeakForm{NonlinearParamEq,SplitTriangulation}(
-    res′,jac′,pspace,assem,index_map,trial,test)
+    res′,jac′,pspace,assem,dof_map,trial,test)
 end
 
 function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test,trian_res,trian_jac)
   jac′(μ,u,du,v,args...) = jac(μ,du,v,args...)
   res′,jac′′ = _set_triangulations(res,jac′,test,trial,trian_res,trian_jac)
   assem = SparseMatrixAssembler(trial,test)
-  index_map = FEOperatorIndexMap(trial,test,trian_res,trian_jac)
+  dof_map = FEOperatorDofMap(trial,test,trian_res,trian_jac)
   ParamFEOpFromWeakForm{LinearParamEq,SplitTriangulation}(
-    res′,jac′′,pspace,assem,index_map,trial,test)
+    res′,jac′′,pspace,assem,dof_map,trial,test)
 end
 
 FESpaces.get_test(op::ParamFEOpFromWeakForm) = op.test
@@ -144,12 +144,12 @@ get_param_space(op::ParamFEOpFromWeakForm) = op.pspace
 ODEs.get_res(op::ParamFEOpFromWeakForm) = op.res
 get_jac(op::ParamFEOpFromWeakForm) = op.jac
 ODEs.get_assembler(op::ParamFEOpFromWeakForm) = op.assem
-IndexMaps.get_index_map(op::ParamFEOpFromWeakForm) = op.index_map
+DofMaps.get_dof_map(op::ParamFEOpFromWeakForm) = op.dof_map
 
 # triangulation utils
 
-get_trian_res(op::ParamFEOperator) = get_domains(get_vector_index_map(op))
-get_trian_jac(op::ParamFEOperator) = get_domains(get_matrix_index_map(op))
+get_trian_res(op::ParamFEOperator) = get_domains(get_vector_dof_map(op))
+get_trian_jac(op::ParamFEOperator) = get_domains(get_matrix_dof_map(op))
 
 function Utils.set_domains(op::JointParamFEOperator,args...)
   op
@@ -173,9 +173,9 @@ for (f,T) in zip((:(Utils.set_domains),:(Utils.change_domains)),(:JointTriangula
       trian_res′ = order_triangulations(get_trian_res(op),trian_res)
       trian_jac′ = order_triangulations(get_trian_jac(op),trian_jac)
       res′,jac′ = _set_triangulations(op.res,op.jac,op.trial,op.test,trian_res′,trian_jac′)
-      index_map′ = $f(op.index_map,op.test,op.trial,trian_res′,trian_jac′)
+      dof_map′ = $f(op.dof_map,op.test,op.trial,trian_res′,trian_jac′)
       ParamFEOpFromWeakForm{O,$T}(
-        res′,jac′,op.pspace,op.assem,index_map′,op.trial,op.test)
+        res′,jac′,op.pspace,op.assem,dof_map′,op.trial,op.test)
     end
   end
 end

@@ -156,7 +156,7 @@ perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)
 # plotting
 
 # r = get_realization(fesnaps)
-# S′ = change_index_map(TrivialIndexMap,fesnaps)
+# S′ = flatten_snapshots(fesnaps)
 # S1 = S′[:,:,1]
 # r1 = r[1,:]
 # U1 = trial(r1)

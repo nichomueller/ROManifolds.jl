@@ -1,17 +1,4 @@
-function get_sparsity(a::SparseMatrixAssembler,U::FESpace,V::FESpace,args...)
-  m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
-  cellidsrows = get_cell_dof_ids(V,args...)
-  cellidscols = get_cell_dof_ids(U,args...)
-  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
-  m2 = nz_allocation(m1)
-  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
-  m3 = create_from_nz(m2)
-  SparsityPattern(m3)
-end
 
-function get_sparsity(U::FESpace,V::FESpace,args...)
-  get_sparsity(SparseMatrixAssembler(U,V),U,V,args...)
-end
 
 function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
   mat1 = nothing
@@ -42,107 +29,142 @@ Subtypes:
 """
 abstract type SparsityPattern end
 
-function to_nz_index(i::AbstractArray,sparsity::SparsityPattern)
+# constructors
+
+function SparsityPattern(a::SparseMatrixAssembler,U::FESpace,V::FESpace,TU,TV)
+  m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
+  cellidsrows = get_cell_dof_ids(V)
+  cellidscols = get_cell_dof_ids(U)
+  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
+  m2 = nz_allocation(m1)
+  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
+  m3 = create_from_nz(m2)
+  SparsityPattern(m3,TU,TV)
+end
+
+function SparsityPattern(U::FESpace,V::FESpace)
+  a = SparseMatrixAssembler(U,V)
+  TU = get_dof_type(U)
+  TV = get_dof_type(V)
+  SparsityPattern(a,U,V,TU,TV)
+end
+
+get_background_matrix(a::SparsityPattern) = @abstractmethod
+
+num_rows(a::SparsityPattern) = size(get_background_matrix(a),1)
+num_cols(a::SparsityPattern) = size(get_background_matrix(a),2)
+SparseArrays.findnz(a::SparsityPattern) = findnz(get_background_matrix(a))
+SparseArrays.nnz(a::SparsityPattern) = nnz(get_background_matrix(a))
+SparseArrays.nzrange(a::SparsityPattern,row::Integer) = nzrange(get_background_matrix(a),row)
+SparseArrays.rowvals(a::SparsityPattern) = rowvals(get_background_matrix(a))
+Algebra.nz_index(a::SparsityPattern,row::Integer,col::Integer) = nz_index(get_background_matrix(a),row,col)
+get_nonzero_indices(a::SparsityPattern) = get_nonzero_indices(get_background_matrix(a))
+
+recast(v::AbstractVector,A::AbstractSparseMatrix) = @abstractmethod
+recast(v::AbstractVector,A::SparseMatrixCSC) = SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,v)
+recast(v::AbstractVector,A::SparseMatrixCSR{Bi}) where Bi = SparseMatrixCSR{Bi}(A.m,A.n,A.rowptr,A.colval,v)
+recast(A::AbstractArray,a::SparsityPattern) = recast(A,get_background_matrix(a))
+
+function to_nz_index(i::AbstractArray,a::SparsityPattern)
   i′ = copy(i)
-  to_nz_index!(i′,sparsity)
+  to_nz_index!(i′,a)
   return i′
 end
 
-function to_nz_index!(i::AbstractArray,sparsity::SparsityPattern)
+function to_nz_index!(i::AbstractArray,a::SparsityPattern)
   @abstractmethod
 end
 
-function permute_sparsity(s::SparsityPattern,U::FESpace,V::FESpace)
-  index_map_I = get_dof_index_map(V)
-  index_map_J = get_dof_index_map(U)
-  permute_sparsity(s,index_map_I,index_map_J)
+function order_sparsity(s::SparsityPattern,U::FESpace,V::FESpace)
+  rows = get_ordered_dof_map(V)
+  cols = get_ordered_dof_map(U)
+  order_sparsity(s,rows,cols)
 end
 
 """
 """
-struct SparsityPatternCSC{Tv,Ti} <: SparsityPattern
+struct SparsityPatternCSC{Tv,Ti,A,B} <: SparsityPattern
   matrix::SparseMatrixCSC{Tv,Ti}
+  dof_type_trial::Type{A}
+  dof_type_test::Type{B}
 end
 
-SparsityPattern(a::SparseMatrixCSC) = SparsityPatternCSC(a)
+function SparsityPattern(a::SparseMatrixCSC,dof_type_trial=Float64,dof_type_test=Float64)
+  SparsityPatternCSC(a,dof_type_trial,dof_type_test)
+end
 
-get_sparsity(a::SparsityPatternCSC) = a
-num_rows(a::SparsityPatternCSC) = size(a.matrix,1)
-num_cols(a::SparsityPatternCSC) = size(a.matrix,2)
-SparseArrays.findnz(a::SparsityPatternCSC) = findnz(a.matrix)
-SparseArrays.nnz(a::SparsityPatternCSC) = nnz(a.matrix)
-SparseArrays.nzrange(a::SparsityPatternCSC,row::Integer) = nzrange(a.matrix,row)
-SparseArrays.rowvals(a::SparsityPatternCSC) = rowvals(a.matrix)
-get_nonzero_indices(a::SparsityPatternCSC) = get_nonzero_indices(a.matrix)
-
-recast(v::AbstractVector,A::SparseMatrixCSC) = SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,v)
-recast(A::AbstractArray,a::SparsityPatternCSC) = recast(A,a.matrix)
+get_background_matrix(a::SparsityPatternCSC) = a.matrix
 
 """
-    permute_sparsity(a::SparsityPattern,i,j) -> SparsityPattern
+    order_sparsity(a::SparsityPattern,i,j) -> SparsityPattern
 
 Permutes a sparsity patterns according to indices specified by `i` and `j`,
 representing the rows and columns respectively
 
 """
-function permute_sparsity(a::SparsityPatternCSC,i::AbstractVector,j::AbstractVector)
-  SparsityPatternCSC(a.matrix[i,j])
+function order_sparsity(a::SparsityPatternCSC,i::AbstractVector,j::AbstractVector)
+  SparsityPatternCSC(a.matrix[i,j],a.dof_type_trial,a.dof_type_test)
 end
 
-function sum_sparsities(a::Tuple{Vararg{SparsityPatternCSC}})
-  get_matrix(a::SparsityPatternCSC) = a.matrix
-  matrices = map(get_matrix,a)
-  matrix = _sparse_sum_preserve_sparsity(matrices)
-  SparsityPatternCSC(matrix)
-end
-
-function to_nz_index!(i::AbstractArray,sparsity::SparsityPatternCSC)
-  nrows = num_rows(sparsity)
+function to_nz_index!(i::AbstractArray,a::SparsityPatternCSC)
+  nrows = num_rows(a)
   for (j,index) in enumerate(i)
     if index > 0
       irow = fast_index(index,nrows)
       icol = slow_index(index,nrows)
-      i[j] = nz_index(sparsity.matrix,irow,icol)
+      i[j] = nz_index(a,irow,icol)
     end
   end
 end
 
-struct MultiValueSparsityPatternCSC{Tv,Ti} <: SparsityPattern
-  matrix::SparseMatrixCSC{Tv,Ti}
-  ncomps::Int
-end
+function CellData.change_domain(
+  a::SparsityPatternCSC,
+  row::DofMap{D,Ti},
+  col::DofMap{D,Ti}
+  ) where {D,Ti}
 
-get_sparsity(a::MultiValueSparsityPatternCSC) = a
-num_rows(a::MultiValueSparsityPatternCSC) = size(a.matrix,1)
-num_cols(a::MultiValueSparsityPatternCSC) = size(a.matrix,2)
-SparseArrays.findnz(a::MultiValueSparsityPatternCSC) = findnz(a.matrix)
-SparseArrays.nnz(a::MultiValueSparsityPatternCSC) = nnz(a.matrix)
-get_nonzero_indices(a::MultiValueSparsityPatternCSC) = get_nonzero_indices(a.matrix)
-TensorValues.num_components(a::MultiValueSparsityPatternCSC) = a.ncomps
+  m = num_rows(a)
+  n = num_cols(a)
+  rowval = copy(rowvals(a))
+  colptr = copy(SparseArrays.getcolptr(a))
+  nzval = copy(nonzeros(a))
+  colnnz = zeros(Ti,n)
+  entries_to_delete = fill(true,nnz(a))
 
-recast(A::AbstractArray,a::MultiValueSparsityPatternCSC) = @notimplemented
-
-function sum_sparsities(a::Tuple{Vararg{MultiValueSparsityPatternCSC}})
-  item = first(a)
-  ncomps = item.ncomps
-  @check all((num_components(ai)==ncomps for ai in a))
-
-  get_matrix(a::MultiValueSparsityPatternCSC) = a.matrix
-  matrices = map(get_matrix,a)
-  matrix = _sparse_sum_preserve_sparsity(matrices)
-  MultiValueSparsityPatternCSC(matrix,ncomps)
-end
-
-function to_nz_index!(i::AbstractArray,sparsity::MultiValueSparsityPatternCSC)
-  nrows = num_rows(sparsity)
-  for (j,index) in enumerate(i)
-    if index > 0
-      irow = fast_index(index,nrows)
-      icol = slow_index(index,nrows)
-      i[j] = nz_index(sparsity.matrix,irow,icol)
+  cache_row = array_cache(row.dof_to_cell)
+  cache_col = array_cache(col.dof_to_cell)
+  for j in col
+    if j > 0
+      cells_col = getindex!(cache_col,col.dof_to_cell,j)
+      for i in row
+        if i > 0
+          cells_row = getindex!(cache_row,row.dof_to_cell,i)
+          isempty(intersect(cells_col,cells_row)) && continue
+          ij = nz_index(a,i,j)
+          entries_to_delete[ij] = false
+          colnnz[j] += 1
+        end
+      end
     end
   end
+
+  @inbounds for j in 1:n
+    colptr[j+1] = colnnz[j]
+  end
+  length_to_ptrs!(colptr)
+
+  deleteat!(rowval,entries_to_delete)
+  deleteat!(nzval,entries_to_delete)
+  matrix = SparseMatrixCSC(m,n,colptr,rowval,nzval)
+
+  return SparsityPatternCSC(matrix)
 end
+
+# const MultiValueSparsityPatternCSC{Tv,Ti,A,B} = Union{
+#   SparsityPatternCSC{Tv,Ti,A<:MultiValue,B},
+#   SparsityPatternCSC{Tv,Ti,A,B<:MultiValue},
+#   SparsityPatternCSC{Tv,Ti,A<:MultiValue,B<:MultiValue}
+# }
 
 """
 """
@@ -151,47 +173,21 @@ struct TProductSparsityPattern{A,B} <: SparsityPattern
   sparsities_1d::B
 end
 
-get_sparsity(a::TProductSparsityPattern) = a.sparsity
-get_univariate_sparsity(a::TProductSparsityPattern) = a.sparsities_1d
-num_rows(a::TProductSparsityPattern) = num_rows(a.sparsity)
-num_cols(a::TProductSparsityPattern) = num_cols(a.sparsity)
-SparseArrays.findnz(a::TProductSparsityPattern) = findnz(a.sparsity)
-SparseArrays.nnz(a::TProductSparsityPattern) = nnz(a.sparsity)
-get_nonzero_indices(a::TProductSparsityPattern) = get_nonzero_indices(a.sparsity)
+get_background_matrix(a::TProductSparsityPattern) = get_background_matrix(a.sparsity)
+
 univariate_num_rows(a::TProductSparsityPattern) = Tuple(num_rows.(a.sparsities_1d))
 univariate_num_cols(a::TProductSparsityPattern) = Tuple(num_cols.(a.sparsities_1d))
 univariate_findnz(a::TProductSparsityPattern) = tuple_of_arrays(findnz.(a.sparsities_1d))
 univariate_nnz(a::TProductSparsityPattern) = Tuple(nnz.(a.sparsities_1d))
-univariate_nonzero_indices(a::TProductSparsityPattern) = Tuple(get_nonzero_indices.(a.sparsities_1d))
 
-recast(A::AbstractArray,a::TProductSparsityPattern) = recast(A,a.sparsity)
-
-function permute_sparsity(a::TProductSparsityPattern,i,j)
+function order_sparsity(a::TProductSparsityPattern,i,j)
   is,is_1d = i
   js,js_1d = j
-  psparsity = permute_sparsity(a.sparsity,is,js)
-  psparsities_1d = map(permute_sparsity,a.sparsities_1d,is_1d,js_1d)
-  TProductSparsityPattern(psparsity,psparsities_1d)
+  a′ = order_sparsity(a.sparsity,is,js)
+  a′_1d = map(order_sparsity,a.sparsities_1d,is_1d,js_1d)
+  TProductSparsityPattern(a′,a′_1d)
 end
 
-function sum_sparsities(s::Tuple{Vararg{TProductSparsityPattern}})
-  item = first(s)
-  sitem_1d = get_univariate_sparsity(item)
-  ssparsity = sum_sparsities(map(get_sparsity,s))
-  TProductSparsityPattern(ssparsity,sitem_1d)
-end
-
-function to_nz_index!(i::AbstractArray,sparsity::TProductSparsityPattern)
-  to_nz_index!(i,get_sparsity(sparsity))
-end
-
-# utils
-
-function _sparse_sum_preserve_sparsity(A::Tuple{Vararg{SparseMatrixCSC{Tv}}}) where Tv
-  for a in A
-    fill!(a.nzval,one(Tv))
-  end
-  B = sum(A)
-  fill!(B.nzval,zero(Tv))
-  return B
+function to_nz_index!(i::AbstractArray,a::TProductSparsityPattern)
+  to_nz_index!(i,a.sparsity)
 end

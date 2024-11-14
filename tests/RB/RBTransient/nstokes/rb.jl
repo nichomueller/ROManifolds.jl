@@ -109,7 +109,7 @@ function temp_solution_snapshots(
   sol = solve(fesolver,feop,r,args...)
   values,stats = collect(sol.odesol)
   save(joinpath(test_dir,"values.txt"),values)
-  i = get_vector_index_map(feop)
+  i = get_vector_dof_map(feop)
   snaps = Snapshots(values,i,r)
   return snaps,stats
 end

@@ -1,4 +1,4 @@
-module IndexMaps
+module DofMaps
 
 using LinearAlgebra
 using SparseArrays
@@ -26,45 +26,39 @@ export SparsityPattern
 export SparsityPatternCSC
 export MultiValueSparsityPatternCSC
 export TProductSparsityPattern
-export get_sparsity
-export permute_sparsity
+export order_sparsity
 export to_nz_index
 export to_nz_index!
 include("SparsityPatterns.jl")
 
-export AbstractIndexMap
-export AbstractTrivialIndexMap
-export TrivialIndexMap
-export TrivialSparseIndexMap
-export IndexMap
-export IndexMapView
+export AbstractDofMap
+export AbstractTrivialDofMap
+export TrivialDofMap
+export TrivialSparseDofMap
+export DofMap
+export DofMapView
 export ShowSlaveDofsStyle
 export ShowSlaveDofs
 export DoNotShowSlaveDofs
-export ConstrainedDofsIndexMap
-export AbstractMultiValueIndexMap
-export MultiValueIndexMap
-export MultiValueIndexMapView
-export TProductIndexMap
-export SparseIndexMap
-export MultiValueSparseIndexMap
-export get_index_map
-export inv_index_map
+export ConstrainedDofsDofMap
+export AbstractMultiValueDofMap
+export MultiValueDofMap
+export MultiValueDofMapView
+export TProductDofMap
+export SparseDofMap
+export MultiValueSparseDofMap
+export invert
 export vectorize_map
 export remove_constrained_dofs
-export change_index_map
-export get_sparse_index_map
+export get_sparse_dof_map
 export recast
 export get_fixed_dofs
-export compose_indices
 export get_component
-export merge_components
-export split_components
-include("IndexMapsInterface.jl")
+include("DofMapsInterface.jl")
 
-export FEOperatorIndexMap
-export get_vector_index_map
-export get_matrix_index_map
-include("FEIndexMaps.jl")
+export FEOperatorDofMap
+export get_vector_dof_map
+export get_matrix_dof_map
+include("FEDofMaps.jl")
 
 end # module

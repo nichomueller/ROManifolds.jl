@@ -294,11 +294,11 @@ function TProduct.tproduct_array(
   ::Type{<:PartialDerivative{N}},
   arrays_1d::Vector{<:AbstractArray},
   gradients_1d::Vector{<:AbstractArray},
-  index_map,
+  dof_map,
   args...) where N
 
-  TProduct.tp_sort!(arrays_1d,index_map)
-  TProduct.tp_sort!(gradients_1d,index_map)
+  TProduct.tp_sort!(arrays_1d,dof_map)
+  TProduct.tp_sort!(gradients_1d,dof_map)
   decompositions = TProduct._find_decompositions(nothing,arrays_1d,gradients_1d)
   GenericRank1Tensor(decompositions)
 end

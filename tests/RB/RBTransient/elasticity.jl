@@ -10,7 +10,7 @@ using Serialization
 
 using ReducedOrderModels.FEM
 using ReducedOrderModels.Utils
-using ReducedOrderModels.IndexMaps
+using ReducedOrderModels.DofMaps
 using ReducedOrderModels.TProduct
 using ReducedOrderModels.ParamDataStructures
 using ReducedOrderModels.ParamFESpaces

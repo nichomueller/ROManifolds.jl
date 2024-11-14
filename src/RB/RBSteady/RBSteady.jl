@@ -25,7 +25,7 @@ using GridapSolvers.LinearSolvers
 using GridapSolvers.NonlinearSolvers
 
 using ReducedOrderModels.Utils
-using ReducedOrderModels.IndexMaps
+using ReducedOrderModels.DofMaps
 using ReducedOrderModels.TProduct
 using ReducedOrderModels.ParamDataStructures
 using ReducedOrderModels.ParamAlgebra

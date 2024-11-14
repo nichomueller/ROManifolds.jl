@@ -108,8 +108,8 @@ function contraction(
   ) where {T,S,U}
 
   sparsity = factor2.sparsity
-  @check size(factor1,2) == IndexMaps.num_rows(sparsity)
-  @check IndexMaps.num_cols(sparsity) == size(factor3,2)
+  @check size(factor1,2) == DofMaps.num_rows(sparsity)
+  @check DofMaps.num_cols(sparsity) == size(factor3,2)
 
   A = reshape(permutedims(factor1,(1,3,2)),:,size(factor1,2))
   B = reshape(permutedims(factor2,(1,3,2)),:,size(factor2,2))
@@ -187,10 +187,10 @@ function cores2basis(cores::AbstractArray{Float64,3}...)
   dropdims(core;dims=1)
 end
 
-function cores2basis(index_map::AbstractIndexMap{D},cores::AbstractArray{Float64,3}...) where D
+function cores2basis(dof_map::AbstractDofMap{D},cores::AbstractArray{Float64,3}...) where D
   @check length(cores) ≥ D
   coresD = sequential_product(cores[1:D]...)
-  invmap = inv_index_map(index_map)
+  invmap = invert(dof_map)
   coresD′ = view(coresD,:,vec(invmap),:)
   if length(cores) == D
     dropdims(coresD′;dims=1)
@@ -234,7 +234,7 @@ end
 # utils
 
 Base.@propagate_inbounds function _sparsemul(B,C,sparsity::SparsityPatternCSC)
-  BC = zeros(size(B,1),IndexMaps.num_rows(sparsity),size(C,2))
+  BC = zeros(size(B,1),DofMaps.num_rows(sparsity),size(C,2))
   rv = rowvals(sparsity)
   for (iB,b) in enumerate(eachrow(B))
     for (iC,c) in enumerate(eachcol(C))
@@ -271,14 +271,14 @@ end
 function basis_indices(
   ::Val{1},
   cores_indices::Vector{Vector{Ti}},
-  index_map::AbstractIndexMap{D}
+  dof_map::AbstractDofMap{D}
   )::Vector{Ti} where {Ti,D}
 
   Iprev...,Icurr = cores_indices
   basis_indices = zeros(Ti,length(Icurr))
   for (k,ik) in enumerate(Icurr)
     indices_k = basis_index(ik,cores_indices)
-    basis_indices[k] = index_map[CartesianIndex(indices_k[1:D])]
+    basis_indices[k] = dof_map[CartesianIndex(indices_k[1:D])]
   end
   return basis_indices
 end
@@ -286,7 +286,7 @@ end
 function basis_indices(
   ::Val{N},
   cores_indices::Vector{Vector{Ti}},
-  index_map::AbstractIndexMap{D}
+  dof_map::AbstractDofMap{D}
   )::Vector{Vector{Ti}} where {Ti,D,N}
 
   L = length(cores_indices)
@@ -295,7 +295,7 @@ function basis_indices(
   basis_indices = zeros(Ti,length(Icurr),N)
   for (k,ik) in enumerate(Icurr)
     indices_k = basis_index(ik,cores_indices)
-    basis_indices[k,1] = index_map[CartesianIndex(indices_k[1:D])]
+    basis_indices[k,1] = dof_map[CartesianIndex(indices_k[1:D])]
     for (il,l) in enumerate(D+1:L)
       basis_indices[k,1+il] = indices_k[l]
     end
@@ -304,12 +304,12 @@ function basis_indices(
   return collect.(eachcol(basis_indices))
 end
 
-function basis_indices(cores_indices::Vector{<:Vector},index_map::AbstractIndexMap{D}) where D
+function basis_indices(cores_indices::Vector{<:Vector},dof_map::AbstractDofMap{D}) where D
   L = length(cores_indices)
   ninds = L - D + 1
-  return basis_indices(Val(ninds),cores_indices,index_map)
+  return basis_indices(Val(ninds),cores_indices,dof_map)
 end
 
-function basis_indices(cores_indices::Vector{<:Vector},index_map::SparseIndexMap)
-  basis_indices(cores_indices,get_sparse_index_map(index_map))
+function basis_indices(cores_indices::Vector{<:Vector},dof_map::SparseDofMap)
+  basis_indices(cores_indices,get_sparse_dof_map(dof_map))
 end

@@ -120,24 +120,24 @@ r = realization(feop)
 fesnaps,festats = solution_snapshots(rbsolver,feop,r)
 
 # MORE INDEX MAPS :(
-get_matrix_index_map(test_u,test_u,Ω_in)
-get_matrix_index_map(test_u,test_u,Ω_out)
-get_matrix_index_map(test_u,test_u,Γd)
-get_matrix_index_map(test_u,test_p,Ω_in)
+get_matrix_dof_map(test_u,test_u,Ω_in)
+get_matrix_dof_map(test_u,test_u,Ω_out)
+get_matrix_dof_map(test_u,test_u,Γd)
+get_matrix_dof_map(test_u,test_p,Ω_in)
 
 using ReducedOrderModels.TProduct
-using ReducedOrderModels.IndexMaps
+using ReducedOrderModels.DofMaps
 using SparseArrays
 
-sparsity = get_sparsity(test_u,test_p,Ω_in)
-psparsity = permute_sparsity(sparsity,test_u,test_p)
+sparsity = SparsityPattern(test_u,test_p)
+psparsity = order_sparsity(sparsity,test_u,test_p)
 # I,J,_ = findnz(psparsity)
-# i,j,_ = IndexMaps.univariate_findnz(psparsity)
+# i,j,_ = DofMaps.univariate_findnz(psparsity)
 # g2l_sparse = TProduct._global_2_local(psparsity,I,J,i,j)
-# pg2l_sparse = TProduct._permute_index_map(g2l_sparse,test_u,test_p)
+# pg2l_sparse = TProduct._permute_dof_map(g2l_sparse,test_u,test_p)
 # pg2l = to_nz_index(pg2l_sparse,sparsity)
-# SparseIndexMap(pg2l,pg2l_sparse,psparsity)
-index_map_I = get_dof_index_map(test_p)
-index_map_J = get_dof_index_map(test_u)
-index_map_I_1d = get_tp_dof_index_map(test_p).indices_1d
-index_map_J_1d = get_tp_dof_index_map(test_u).indices_1d
+# SparseDofMap(pg2l,pg2l_sparse,psparsity)
+dof_map_I = get_ordered_dof_map(test_p)
+dof_map_J = get_ordered_dof_map(test_u)
+dof_map_I_1d = get_tp_dof_dof_map(test_p).indices_1d
+dof_map_J_1d = get_tp_dof_dof_map(test_u).indices_1d

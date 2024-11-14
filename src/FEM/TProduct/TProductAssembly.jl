@@ -6,8 +6,8 @@ Assembly-related information when constructing a [`AbstractRankTensor`](ref)
 """
 struct TProductSparseMatrixAssembler{A<:SparseMatrixAssembler,R,C} <: SparseMatrixAssembler
   assems_1d::Vector{A}
-  row_index_map::R
-  col_index_map::C
+  row_dof_map::R
+  col_dof_map::C
 end
 
 function FESpaces.SparseMatrixAssembler(
@@ -18,9 +18,9 @@ function FESpaces.SparseMatrixAssembler(
   strategy::AssemblyStrategy=DefaultAssemblyStrategy())
 
   assems_1d = map((U,V)->SparseMatrixAssembler(mat,vec,U,V,strategy),trial.spaces_1d,test.spaces_1d)
-  row_index_map = get_tp_dof_index_map(test)
-  col_index_map = get_tp_dof_index_map(trial)
-  TProductSparseMatrixAssembler(assems_1d,row_index_map,col_index_map)
+  row_dof_map = get_tp_dof_dof_map(test)
+  col_dof_map = get_tp_dof_dof_map(trial)
+  TProductSparseMatrixAssembler(assems_1d,row_dof_map,col_dof_map)
 end
 
 function FESpaces.SparseMatrixAssembler(
@@ -94,7 +94,7 @@ end
 
 function FESpaces.allocate_vector(a::TProductSparseMatrixAssembler,vecdata::Vector)
   vecs_1d = map(allocate_vector,a.assems_1d,vecdata)
-  return tproduct_array(vecs_1d,(a.row_index_map,))
+  return tproduct_array(vecs_1d,(a.row_dof_map,))
 end
 
 function FESpaces.assemble_vector!(b,a::TProductSparseMatrixAssembler,vecdata::Vector)
@@ -107,12 +107,12 @@ end
 
 function FESpaces.assemble_vector(a::TProductSparseMatrixAssembler,vecdata::Vector)
   vecs_1d = map(assemble_vector,a.assems_1d,vecdata)
-  return tproduct_array(vecs_1d,(a.row_index_map,))
+  return tproduct_array(vecs_1d,(a.row_dof_map,))
 end
 
 function FESpaces.allocate_matrix(a::TProductSparseMatrixAssembler,matdata::Vector)
   mats_1d = map(allocate_matrix,a.assems_1d,matdata)
-  return tproduct_array(mats_1d,(a.row_index_map,a.col_index_map))
+  return tproduct_array(mats_1d,(a.row_dof_map,a.col_dof_map))
 end
 
 function FESpaces.assemble_matrix!(A,a::TProductSparseMatrixAssembler,matdata::Vector)
@@ -125,13 +125,13 @@ end
 
 function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::Vector)
   mats_1d = map(assemble_matrix,a.assems_1d,matdata)
-  return tproduct_array(mats_1d,(a.row_index_map,a.col_index_map))
+  return tproduct_array(mats_1d,(a.row_dof_map,a.col_dof_map))
 end
 
 function FESpaces.allocate_vector(a::TProductSparseMatrixAssembler,vecdata::GenericTProductDiffEval)
   vecs_1d = map(allocate_vector,a.assems_1d,vecdata.f)
   gradvecs_1d = map(allocate_vector,a.assems_1d,vecdata.g)
-  return tproduct_array(vecdata.op,vecs_1d,gradvecs_1d,(a.row_index_map,),vecdata.summation)
+  return tproduct_array(vecdata.op,vecs_1d,gradvecs_1d,(a.row_dof_map,),vecdata.summation)
 end
 
 function FESpaces.assemble_vector!(b,a::TProductSparseMatrixAssembler,vecdata::GenericTProductDiffEval)
@@ -147,13 +147,13 @@ end
 function FESpaces.assemble_vector(a::TProductSparseMatrixAssembler,vecdata::GenericTProductDiffEval)
   vecs_1d = map(assemble_vector,a.assems_1d,vecdata.f)
   gradvecs_1d = map(assemble_vector,a.assems_1d,vecdata.g)
-  return tproduct_array(vecdata.op,vecs_1d,gradvecs_1d,(a.row_index_map,),vecdata.summation)
+  return tproduct_array(vecdata.op,vecs_1d,gradvecs_1d,(a.row_dof_map,),vecdata.summation)
 end
 
 function FESpaces.allocate_matrix(a::TProductSparseMatrixAssembler,matdata::GenericTProductDiffEval)
   mats_1d = map(allocate_matrix,a.assems_1d,matdata.f)
   gradmats_1d = map(allocate_matrix,a.assems_1d,matdata.g)
-  return tproduct_array(matdata.op,mats_1d,gradmats_1d,(a.row_index_map,a.col_index_map),matdata.summation)
+  return tproduct_array(matdata.op,mats_1d,gradmats_1d,(a.row_dof_map,a.col_dof_map),matdata.summation)
 end
 
 function FESpaces.assemble_matrix!(A,a::TProductSparseMatrixAssembler,matdata::GenericTProductDiffEval)
@@ -169,7 +169,7 @@ end
 function FESpaces.assemble_matrix(a::TProductSparseMatrixAssembler,matdata::GenericTProductDiffEval)
   mats_1d = map(assemble_matrix,a.assems_1d,matdata.f)
   gradmats_1d = map(assemble_matrix,a.assems_1d,matdata.g)
-  return tproduct_array(matdata.op,mats_1d,gradmats_1d,(a.row_index_map,a.col_index_map),matdata.summation)
+  return tproduct_array(matdata.op,mats_1d,gradmats_1d,(a.row_dof_map,a.col_dof_map),matdata.summation)
 end
 
 # multi field
@@ -182,7 +182,7 @@ function TProductBlockSparseMatrixAssembler(trial::MultiFieldFESpace,test::Multi
     test′ = MultiFieldFESpace(test.vector_type,tests_d,test.multi_field_style)
     SparseMatrixAssembler(trial′,test′)
   end
-  row_index_map = map(get_tp_dof_index_map,test.spaces)
-  col_index_map = map(get_tp_dof_index_map,_remove_trial.(trial.spaces))
-  TProductSparseMatrixAssembler(assems_1d,row_index_map,col_index_map)
+  row_dof_map = map(get_tp_dof_dof_map,test.spaces)
+  col_dof_map = map(get_tp_dof_dof_map,_remove_trial.(trial.spaces))
+  TProductSparseMatrixAssembler(assems_1d,row_dof_map,col_dof_map)
 end

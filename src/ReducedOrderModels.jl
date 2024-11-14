@@ -41,44 +41,37 @@ export SparsityPattern
 export SparsityPatternCSC
 export MultiValueSparsityPatternCSC
 export TProductSparsityPattern
-export get_sparsity
-export permute_sparsity
+export order_sparsity
 
-export AbstractIndexMap
-export AbstractTrivialIndexMap
-export TrivialIndexMap
-export TrivialSparseIndexMap
-export IndexMap
-export IndexMapView
-export AbstractMultiValueIndexMap
-export MultiValueIndexMap
-export MultiValueIndexMapView
-export TProductIndexMap
-export SparseIndexMap
-export MultiValueSparseIndexMap
-export get_index_map
-export inv_index_map
+export AbstractDofMap
+export AbstractTrivialDofMap
+export TrivialDofMap
+export TrivialSparseDofMap
+export DofMap
+export DofMapView
+export AbstractMultiValueDofMap
+export MultiValueDofMap
+export MultiValueDofMapView
+export TProductDofMap
+export SparseDofMap
+export MultiValueSparseDofMap
+export invert
 export remove_constrained_dofs
-export change_index_map
-export get_sparse_index_map
+export get_sparse_dof_map
 export recast
-export get_fixed_dofs
-export compose_indices
 export get_component
-export merge_components
-export split_components
 
-export FEOperatorIndexMap
-export get_vector_index_map
-export get_matrix_index_map
+export FEOperatorDofMap
+export get_vector_dof_map
+export get_matrix_dof_map
 
-include("FEM/IndexMaps/IndexMaps.jl")
-using ReducedOrderModels.IndexMaps
+include("FEM/DofMaps/DofMaps.jl")
+using ReducedOrderModels.DofMaps
 
-export get_dof_index_map
+export get_ordered_dof_map
 export get_polynomial_order
 
-export get_tp_dof_index_map
+export get_tp_dof_dof_map
 
 export TProductModel
 export TProductTriangulation
