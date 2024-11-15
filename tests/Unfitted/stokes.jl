@@ -139,5 +139,5 @@ psparsity = order_sparsity(sparsity,test_u,test_p)
 # SparseDofMap(pg2l,pg2l_sparse,psparsity)
 dof_map_I = get_dof_map(test_p)
 dof_map_J = get_dof_map(test_u)
-dof_map_I_1d = get_tp_dof_dof_map(test_p).indices_1d
-dof_map_J_1d = get_tp_dof_dof_map(test_u).indices_1d
+dof_map_I_1d = get_tp_dof_map(test_p).indices_1d
+dof_map_J_1d = get_tp_dof_map(test_u).indices_1d

@@ -1,5 +1,6 @@
 abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
 
+FESpaces.ConstraintStyle(i::I) where I<:AbstractDofMap = ConstraintStyle(I)
 FESpaces.ConstraintStyle(::Type{<:AbstractDofMap}) = UnConstrained()
 
 function remove_constrained_dofs(i::AbstractDofMap)
@@ -7,7 +8,7 @@ function remove_constrained_dofs(i::AbstractDofMap)
 end
 
 function remove_constrained_dofs(i::AbstractDofMap,::UnConstrained)
-  i
+  collect(i)
 end
 
 function remove_constrained_dofs(i::AbstractDofMap,::Constrained)
@@ -178,22 +179,21 @@ function _to_scalar_values!(i::AbstractArray,D::Integer,d::Integer)
   i .= (i .- d) ./ D .+ 1
 end
 
-function get_component(i::DofMap{D},d;multivalue::Bool=true) where D
-  ncomps = num_components(i)
-  indices = collect(selectdim(i.indices,D,d))
-  dof_to_cell = i.dof_to_cell[d:D:end]
-  free_vals_box = collect(selectdim(i.free_vals_box,D,d))
+function get_component(i::DofMap{D};to_scalar=false) where D
+  ncomps = size(i,D)
+  indices = collect(selectdim(i.indices,D,ncomps))
+  free_vals_box = collect(selectdim(i.free_vals_box,D,1))
 
-  if !multivalue
-    for j in i.free_vals_box
+  if to_scalar
+    for j in free_vals_box
       indj = indices[j]
-      indices[j] = (indj - d) / ncomps + 1
+      indices[j] = indj / ncomps
     end
   end
 
   DofMap(
     indices,
-    dof_to_cell,
+    i.dof_to_cell,
     free_vals_box,
     i.cell_to_mask)
 end
@@ -289,5 +289,11 @@ end
 function find_free_values_box(inds::AbstractArray{Ti,D}) where {Ti,D}
   ranges = ntuple(d -> find_free_values_range(inds,d),D)
   box = LinearIndices(inds)[ranges...]
+  return box
+end
+
+function find_free_values_box(inds::AbstractVector{Ti}) where {Ti}
+  ranges = find_free_values_range(inds,1)
+  box = collect(ranges)
   return box
 end

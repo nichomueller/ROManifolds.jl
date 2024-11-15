@@ -31,7 +31,7 @@ import PartitionedArrays: tuple_of_arrays
 import SparseArrays: AbstractSparseMatrixCSC
 import UnPack: @unpack
 
-export get_tp_dof_dof_map
+export get_tp_dof_map
 include("TProductDofMaps.jl")
 
 export TProductModel

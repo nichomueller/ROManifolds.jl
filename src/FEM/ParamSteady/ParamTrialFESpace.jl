@@ -55,8 +55,8 @@ end
 
 for F in (:TrialFESpace,:TransientTrialFESpace,:UnEvalParamSingleFieldFESpace)
   @eval begin
-    function DofMaps.get_sparse_dof_map(trial::$F,test::SingleFieldFESpace,t::Triangulation...)
-      get_sparse_dof_map(trial.space,test,t...)
+    function DofMaps.get_sparse_dof_map(trial::$F,test::SingleFieldFESpace)
+      get_sparse_dof_map(trial.space,test)
     end
   end
 end

@@ -18,8 +18,8 @@ function FESpaces.SparseMatrixAssembler(
   strategy::AssemblyStrategy=DefaultAssemblyStrategy())
 
   assems_1d = map((U,V)->SparseMatrixAssembler(mat,vec,U,V,strategy),trial.spaces_1d,test.spaces_1d)
-  row_dof_map = get_tp_dof_dof_map(test)
-  col_dof_map = get_tp_dof_dof_map(trial)
+  row_dof_map = get_tp_dof_map(test)
+  col_dof_map = get_tp_dof_map(trial)
   TProductSparseMatrixAssembler(assems_1d,row_dof_map,col_dof_map)
 end
 
@@ -182,7 +182,7 @@ function TProductBlockSparseMatrixAssembler(trial::MultiFieldFESpace,test::Multi
     test′ = MultiFieldFESpace(test.vector_type,tests_d,test.multi_field_style)
     SparseMatrixAssembler(trial′,test′)
   end
-  row_dof_map = map(get_tp_dof_dof_map,test.spaces)
-  col_dof_map = map(get_tp_dof_dof_map,_remove_trial.(trial.spaces))
+  row_dof_map = map(get_tp_dof_map,test.spaces)
+  col_dof_map = map(get_tp_dof_map,_remove_trial.(trial.spaces))
   TProductSparseMatrixAssembler(assems_1d,row_dof_map,col_dof_map)
 end

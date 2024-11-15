@@ -44,53 +44,56 @@ end
 
 function get_dof_map(model::CartesianDiscreteModel,space::UnconstrainedFESpace)
   cell_dof_ids = get_cell_dof_ids(space)
+  cache = array_cache(cell_dof_ids)
   dof = get_fe_dof_basis(space)
   T = get_dof_type(dof)
   order = get_polynomial_order(space)
   comp_to_dofs = get_comp_to_dofs(T,space,dof)
 
-  dof_map,dof_owner = get_dof_map(T,model,cell_dof_ids,order,comp_to_dofs)
+  dof_map = get_dof_map(T,model,cache,cell_dof_ids,order,comp_to_dofs)
 
   trian = get_triangulation(space)
   cell_to_mask = get_cell_to_mask(trian)
 
-  return DofMap(dof_map,dof_owner,cell_to_mask)
+  dof_to_cell = _get_dof_to_cell(cache,cell_dof_ids,dof_map)
+
+  return DofMap(dof_map,dof_to_cell,cell_to_mask)
 end
 
 function get_dof_map(
   ::Type{T},
   model::CartesianDiscreteModel{D},
+  cache,
   cell_dof_ids::Table{Ti},
   order::Integer,
   args...
   ) where {T,Ti,D}
 
-  _get_dof_dof_map(model,cell_dof_ids,order)
+  _get_dof_map(model,cache,cell_dof_ids,order)
 end
 
 function get_dof_map(
   ::Type{T},
   model::CartesianDiscreteModel{D},
+  cache,
   cell_dof_ids::Table{Ti},
   order::Integer,
   comp_to_dofs::AbstractVector
   ) where {T<:MultiValue,Ti,D}
 
   dof_maps = Array{Ti,D}[]
-  dof_owners = Array{Ti,D}[]
   for dofs in comp_to_dofs
     cell_dof_comp_ids = _get_cell_dof_comp_ids(cell_dof_ids,dofs)
-    dof_map_comp,dof_owner_comp = _get_dof_dof_map(model,cell_dof_comp_ids,order)
+    dof_map_comp = _get_dof_map(model,cache,cell_dof_comp_ids,order)
     push!(dof_maps,dof_map_comp)
-    push!(dof_owners,dof_owner_comp)
   end
   dof_map = stack(dof_maps;dims=D+1)
-  dof_owner = stack(dof_maps;dims=D+1)
-  return dof_map,dof_owner
+  return dof_map
 end
 
-function _get_dof_dof_map(
+function _get_dof_map(
   model::CartesianDiscreteModel{Dc},
+  cache_cell_dof_ids,
   cell_dof_ids::Table{Ti},
   order::Integer) where {Dc,Ti}
 
@@ -101,11 +104,9 @@ function _get_dof_dof_map(
   ndofs = order .* ncells .+ 1 .- periodic
 
   terms = _get_terms(first(get_polytopes(model)),fill(order,Dc))
-  cache_cell_dof_ids = array_cache(cell_dof_ids)
 
   ordered_dof_ids = LinearIndices(ndofs)
   dof_map = zeros(Ti,ndofs)
-  dof_to_first_owner_cell = zeros(Ti,ndofs)
   touched_dof = zeros(Bool,ndofs)
 
   for (icell,cell) in enumerate(CartesianIndices(ncells))
@@ -119,11 +120,16 @@ function _get_dof_dof_map(
       (dof < 0 || touched_dof[odof]) && continue
       touched_dof[odof] = true
       dof_map[odof] = dof
-      dof_to_first_owner_cell[odof] = icell
     end
   end
 
-  return dof_map,dof_to_first_owner_cell
+  return dof_map
+end
+
+function _get_dof_to_cell(cache,cell_dof_ids,dof_map)
+  nfdofs = maximum(dof_map)
+  dof_to_cell = map(dof -> get_dof_to_cell(cache,cell_dof_ids,dof),1:nfdofs)
+  return Table(dof_to_cell)
 end
 
 # spaces with constraints
@@ -174,17 +180,74 @@ function get_sparse_dof_map(trial::MultiFieldFESpace,test::MultiFieldFESpace)
 end
 
 function get_sparse_dof_map(
+  trian::Triangulation{D},
+  rows::AbstractDofMap{D},
+  cols::AbstractDofMap{D},
+  unrows::AbstractVector,
+  uncols::AbstractVector,
+  sparsity::TProductSparsityPattern
+  ) where D
+
+  osparsity = order_sparsity(sparsity,(rows,unrows),(cols,uncols))
+  I,J,V = findnz(osparsity)
+  i,j,v = univariate_findnz(osparsity)
+  sparse_indices = get_sparse_dof_map(osparsity,I,J,i,j)
+  osparse_indices = order_sparse_dof_map(sparse_indices,rows,cols)
+  return osparsity,osparse_indices
+end
+
+function get_sparse_dof_map(
+  trian::Triangulation{D},
+  rows::AbstractDofMap{Dr},
+  cols::AbstractDofMap{Dc},
+  unrows::AbstractVector,
+  uncols::AbstractVector,
+  sparsity::TProductSparsityPattern
+  ) where {D,Dr,Dc}
+
+  @check Dr ≥ D
+  @check Dc ≥ D
+
+  first_component(a::AbstractDofMap{D};kwargs...) = a
+  first_component(a::AbstractDofMap{D′};kwargs...) where D′ = get_component(a;kwargs...)
+  ncomponents(a::AbstractDofMap{D}) = 1
+  ncomponents(a::AbstractDofMap{D′}) where D′ = size(a,D′)
+
+  rows′ = first_component(rows;to_scalar=false)
+  cols′ = first_component(cols;to_scalar=false)
+  rows′′ = first_component(rows;to_scalar=true)
+  cols′′ = first_component(cols;to_scalar=true)
+  ncomps_row = ncomponents(rows)
+  ncomps_col = ncomponents(cols)
+
+  osparsity = order_sparsity(sparsity,(rows′,unrows),(cols′,uncols))
+  I,J,V = findnz(osparsity)
+  i,j,v = univariate_findnz(osparsity)
+  sparse_indices = get_sparse_dof_map(osparsity,I,J,i,j)
+  osparse_indices = order_sparse_dof_map(sparse_indices,rows′′,cols′′)
+
+  osparse_indices_comp = add_sparse_components(osparse_indices,rows′′,cols′′,ncomps_row,ncomps_col)
+  return osparsity,osparse_indices_comp
+end
+
+function get_sparse_dof_map(
   trial::SingleFieldFESpace,
   test::SingleFieldFESpace,
   sparsity::TProductSparsityPattern)
 
-  osparsity = order_sparsity(sparsity,trial,test)
-  I,J,V = findnz(osparsity)
-  i,j,v = univariate_findnz(osparsity)
-  sparse_indices = get_sparse_dof_map(osparsity,I,J,i,j)
-  # osparse_indices = order_dof_map(sparse_indices,trial,test)
-  full_indices = to_nz_index(sparse_indices,sparsity)
-  SparseDofMap(pg2l,pg2l_sparse,osparsity)
+  trian = get_triangulation(trial)
+  model = get_background_matrix(trian)
+  @check model === get_background_matrix(get_triangulation(test))
+
+  rows = get_dof_map(test)
+  cols = get_dof_map(trial)
+  unrows = get_univariate_dof_map(test)
+  uncols = get_univariate_dof_map(trial)
+
+  osparsity,osparse_indices = get_sparse_dof_map(trian,rows,cols,unrows,uncols,sparsity)
+  ofull_indices = to_nz_index(osparse_indices,sparsity)
+
+  SparseDofMap(ofull_indices,osparse_indices,osparsity)
 end
 
 function get_sparse_dof_map(
@@ -201,11 +264,11 @@ function get_cell_to_mask(t::Triangulation)
   tface_to_mface = get_tface_to_mface(t)
   model = get_background_model(t)
   ncells = num_cells(model)
-  isa(tface_to_mface,IdentityVector) && return Fill(true,ncells)
-  cell_to_mask = fill(true,ncells)
+  isa(tface_to_mface,IdentityVector) && return Fill(false,ncells)
+  cell_to_mask = fill(false,ncells)
   for cell in eachindex(cell_to_mask)
     if !(cell ∈ tface_to_mface)
-      cell_to_mask[cell] = false
+      cell_to_mask[cell] = true
     end
   end
   return cell_to_mask
@@ -305,95 +368,51 @@ function _get_cell_dof_comp_ids(cell_dof_ids,dofs)
   return Table(new_cell_ids)
 end
 
+function get_dof_to_cell(cache,cell_dof_ids,dof)
+  cells = Int32[]
+  for cell in 1:length(cell_dof_ids)
+    cell_dofs = getindex!(cache,cell_dof_ids,cell)
+    if dof ∈ cell_dofs
+      append!(cells,cell)
+    end
+  end
+  cells
+end
+
 # sparse utilities
-# function _permute_dof_map(dof_map,I,J,nrows)
-#   IJ = vectorize(I) .+ nrows .* (vectorize(J)'.-1)
-#   iperm = copy(dof_map)
-#   @inbounds for (k,pk) in enumerate(dof_map)
-#     if pk > 0
-#       iperm[k] = IJ[pk]
-#     end
-#   end
-#   return iperm
-# end
 
-# function _permute_dof_map(dof_map,I::AbstractMultiValueDofMap,J::AbstractMultiValueDofMap,nrows)
-#   function _to_component_indices(i,ncomps,icomp_I,icomp_J,nrows)
-#     ic = copy(i)
-#     @inbounds for (j,IJ) in enumerate(i)
-#       IJ == 0 && continue
-#       I = fast_index(IJ,nrows)
-#       J = slow_index(IJ,nrows)
-#       I′ = (I-1)*ncomps + icomp_I
-#       J′ = (J-1)*ncomps + icomp_J
-#       ic[j] = (J′-1)*nrows*ncomps + I′
-#     end
-#     return ic
-#   end
+function order_sparse_dof_map(dof_map,I,J,nrows=maximum(I))
+  IJ = vectorize(I) .+ nrows .* (vectorize(J)'.-1)
+  odof_map = copy(dof_map)
+  @inbounds for (k,dofk) in enumerate(dof_map)
+    if dofk > 0
+      odof_map[k] = IJ[dofk]
+    end
+  end
+  return odof_map
+end
 
-#   ncomps_I = num_components(I)
-#   ncomps_J = num_components(J)
-#   @check ncomps_I == ncomps_J
-#   ncomps = ncomps_I
-#   nrows_per_comp = Int(nrows/ncomps)
+# multi component
 
-#   I1 = get_component(I,1;multivalue=false)
-#   J1 = get_component(J,1;multivalue=false)
-#   dof_map′ = _permute_dof_map(dof_map,I1,J1,nrows_per_comp)
+function add_sparse_components(dof_map,I,J,ncomps_I,ncomps_J,nrows=maximum(I))
+  Ti = eltype(dof_map)
+  ncomps_IJ = ncomps_I*ncomps_J
+  dof_maps = zeros(Ti,size(dof_map)...,ncomps_IJ)
 
-#   dof_map′′ = map(CartesianIndices((ncomps,ncomps))) do icomp
-#     _to_component_indices(dof_map′,ncomps,icomp.I[1],icomp.I[2],nrows_per_comp)
-#   end
-#   return MultiValueDofMap(dof_map′′)
-# end
+  for j in CartesianIndices(dof_map)
+    IJ = dof_map[j]
+    IJ == 0 && continue
+    I = fast_index(IJ,nrows)
+    J = slow_index(IJ,nrows)
+    for icomp_J in 1:ncomps_J
+      for icomp_I in 1:ncomps_I
+        icomp_IJ = icomp_I + ncomps_I*(icomp_J-1)
+        I′ = (I-1)*ncomps_I + icomp_I
+        J′ = (J-1)*ncomps_J + icomp_J
+        dof_maps[j,icomp_IJ] = (J′-1)*nrows*ncomps_I + I′
+      end
+    end
+  end
 
-# function _permute_dof_map(dof_map,I::AbstractMultiValueDofMap,J::AbstractDofMap,nrows)
-#   function _to_component_indices(i,ncomps,icomp,nrows)
-#     ic = copy(i)
-#     @inbounds for (j,IJ) in enumerate(i)
-#       IJ == 0 && continue
-#       I = fast_index(IJ,nrows)
-#       J = slow_index(IJ,nrows)
-#       I′ = (I-1)*ncomps + icomp
-#       ic[j] = (J-1)*nrows*ncomps + I′
-#     end
-#     return ic
-#   end
-
-#   ncomps = num_components(I)
-#   nrows_per_comp = Int(nrows/ncomps)
-
-#   I1 = get_component(I,1;multivalue=false)
-#   dof_map′ = _permute_dof_map(dof_map,I1,J,nrows_per_comp)
-
-#   dof_map′′ = map(icomp->_to_component_indices(dof_map′,ncomps,icomp,nrows_per_comp),1:ncomps)
-#   return MultiValueDofMap(dof_map′′)
-# end
-
-# function _permute_dof_map(dof_map,I::AbstractDofMap,J::AbstractMultiValueDofMap,nrows)
-#   function _to_component_indices(i,ncomps,icomp,nrows)
-#     ic = copy(i)
-#     @inbounds for (j,IJ) in enumerate(i)
-#       IJ == 0 && continue
-#       I = fast_index(IJ,nrows)
-#       J = slow_index(IJ,nrows)
-#       J′ = (J-1)*ncomps + icomp
-#       ic[j] = (J′-1)*nrows + I
-#     end
-#     return ic
-#   end
-
-#   ncomps = num_components(J)
-
-#   J1 = get_component(J,1;multivalue=false)
-#   dof_map′ = _permute_dof_map(dof_map,I,J1,nrows)
-#   dof_map′′ = map(icomp->_to_component_indices(dof_map′,ncomps,icomp,nrows),1:ncomps)
-#   return MultiValueDofMap(dof_map′′)
-# end
-
-# function _permute_dof_map(dof_map,trial::TProductFESpace,test::TProductFESpace)
-#   I = get_dof_map(test)
-#   J = get_dof_map(trial)
-#   nrows = num_free_dofs(test)
-#   return _permute_dof_map(dof_map,I,J,nrows)
-# end
+  return dof_maps
+end

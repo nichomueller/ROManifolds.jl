@@ -64,12 +64,12 @@ function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::SingleFieldParamFES
   gather_free_and_dirichlet_values!(fv,dv,remove_layer(f),cv)
 end
 
-function DofMaps.get_dof_map(f::SingleFieldParamFESpace,t::Triangulation...)
+function DofMaps.get_dof_map(f::SingleFieldParamFESpace)
   get_dof_map(get_fe_space(f))
 end
 
-function DofMaps.get_sparse_dof_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace,t::Triangulation...)
-  get_sparse_dof_map(get_fe_space(f),g,t...)
+function DofMaps.get_sparse_dof_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace)
+  get_sparse_dof_map(get_fe_space(f),g)
 end
 
 get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(get_fe_space(f))

@@ -11,8 +11,8 @@ struct TProductFESpace{A,B,C,D,E} <: SingleFieldFESpace
   space::A
   spaces_1d::B
   trian::C
-  dof_dof_map::D
-  tp_dof_dof_map::E
+  dof_map::D
+  tp_dof_map::E
 end
 
 function FESpaces.FESpace(
@@ -30,10 +30,10 @@ function FESpaces.FESpace(
   space = FESpace(trian.trian,cell_reffe;kwargs...)
   spaces_1d = univariate_spaces(model,trian,cell_reffes_1d;kwargs...)
 
-  dof_dof_map = get_dof_map(space)
-  tp_dof_dof_map = get_dof_map(space,spaces_1d)
+  dof_map = get_dof_map(space,model.model)
+  tp_dof_map = get_dof_map(space,spaces_1d)
 
-  TProductFESpace(space,spaces_1d,trian,dof_dof_map,tp_dof_dof_map)
+  TProductFESpace(space,spaces_1d,trian,dof_map,tp_dof_map)
 end
 
 function univariate_spaces(
@@ -82,9 +82,9 @@ FESpaces.get_dirichlet_dof_tag(f::TProductFESpace) = get_dirichlet_dof_tag(f.spa
 
 FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-get_dof_map(f::TProductFESpace,t::Triangulation...) = f.dof_dof_map
+get_dof_map(f::TProductFESpace) = f.dof_map
 
-get_tp_dof_dof_map(f::TProductFESpace) = f.tp_dof_dof_map
+get_tp_dof_map(f::TProductFESpace) = f.tp_dof_map
 
 get_tp_triangulation(f::TProductFESpace) = f.trian
 
@@ -111,8 +111,8 @@ end
 function DofMaps.order_sparsity(s::TProductSparsityPattern,U::TProductFESpace,V::TProductFESpace)
   dof_map_I = get_dof_map(V)
   dof_map_J = get_dof_map(U)
-  dof_map_I_1d = get_tp_dof_dof_map(V).indices_1d
-  dof_map_J_1d = get_tp_dof_dof_map(U).indices_1d
+  dof_map_I_1d = get_tp_dof_map(V).indices_1d
+  dof_map_J_1d = get_tp_dof_map(U).indices_1d
   order_sparsity(s,(dof_map_I,dof_map_I_1d),(dof_map_J,dof_map_J_1d))
 end
 

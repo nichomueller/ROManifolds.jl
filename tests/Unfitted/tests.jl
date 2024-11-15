@@ -5,6 +5,10 @@ using Gridap.Arrays
 using Gridap.CellData
 
 using ReducedOrderModels
+using ReducedOrderModels.DofMaps
+using ReducedOrderModels.TProduct
+
+using SparseArrays
 
 n = 20
 partition = (n,n)
@@ -21,143 +25,65 @@ s = SparsityPattern(test,test)
 
 trianv = view(trian,[1,10,100])
 iv = change_domain(i,trianv)
+sv = change_domain(s,iv,iv)
 
 cell_dof_ids = get_cell_dof_ids(test)
 
+trial = test
+imap = i
 
-sparsity = SparsityPattern(trial,test,t...)
-psparsity = order_sparsity(sparsity,trial,test)
+model1d = CartesianDiscreteModel((0,1),(n,))
+test1d = TestFESpace(model1d,reffe,conformity=:H1;dirichlet_tags=["boundary"])
+trial1d = test1d
+imap1d = [get_dof_map(model1d,test1d),get_dof_map(model1d,test1d)]
+
+sparsity = SparsityPattern(trial,test)
+sparsities_1d = [SparsityPattern(trial1d,test1d),SparsityPattern(trial1d,test1d)]
+sparsity = TProductSparsityPattern(sparsity,sparsities_1d)
+psparsity = order_sparsity(sparsity,(imap,imap1d),(imap,imap1d))
 I,J,_ = findnz(psparsity)
 i,j,_ = DofMaps.univariate_findnz(psparsity)
-g2l_sparse = _global_2_local(psparsity,I,J,i,j)
-pg2l_sparse = _permute_dof_map(g2l_sparse,trial,test)
-pg2l = to_nz_index(pg2l_sparse,sparsity)
-SparseDofMap(pg2l,pg2l_sparse,psparsity)
+sparse_indices = get_sparse_dof_map(psparsity,I,J,i,j)
+osparse_indices = DofMaps.order_sparse_dof_map(sparse_indices,imap,imap,num_free_dofs(test))
+ofull_indices = DofMaps.to_nz_index(osparse_indices,sparsity)
 
+# try multi variate
+reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
+test = TestFESpace(model,reffe,conformity=:H1;dirichlet_tags=["boundary"])
 
+i = get_dof_map(model,test)
+s = SparsityPattern(test,test)
 
+iv = change_domain(i,trianv)
+sv = change_domain(s,iv,iv)
 
+trial = test
+imap = i
 
+reffe1d = ReferenceFE(lagrangian,Float64,order)
+test1d = TestFESpace(model1d,reffe1d,conformity=:H1;dirichlet_tags=["boundary"])
+trial1d = test1d
+imap1d = [get_dof_map(model1d,test1d),get_dof_map(model1d,test1d)]
 
+sparsity = SparsityPattern(trial,test)
+sparsities_1d = [SparsityPattern(trial1d,test1d),SparsityPattern(trial1d,test1d)]
+sparsity = TProductSparsityPattern(sparsity,sparsities_1d)
+# psparsity = order_sparsity(sparsity,(imap,imap1d),(imap,imap1d))
 
+# imap′ = DofMaps.get_component(imap)
+osparsity,osparse_indices = get_sparse_dof_map(trian,imap,imap,imap1d,imap1d,sparsity)
+ofull_indices = to_nz_index(osparse_indices,sparsity)
+smap = SparseDofMap(ofull_indices,osparse_indices,osparsity)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-desc = get_cartesian_descriptor(model)
-
-periodic = desc.isperiodic
-ncells = desc.partition
-ndofs = order .* ncells .+ 1 .- periodic
-
-Dc,Ti = 2,Int32
-
-terms = _get_terms(first(get_polytopes(model)),fill(order,Dc))
-cache_cell_dof_ids = array_cache(cell_dof_ids)
-
-ordered_dof_ids = LinearIndices(ndofs)
-dof_map = zeros(Ti,ndofs)
-dof_to_cell_ptrs = zeros(Ti,prod(ndofs)+1)
-dof_to_cell_data = Ti[]
-for (icell,cell) in enumerate(CartesianIndices(ncells))
-  first_new_dof  = order .* (Tuple(cell) .- 1) .+ 1
-  ordered_dofs_range = map(i -> i:i+order,first_new_dof)
-  ordered_dofs = view(ordered_dof_ids,ordered_dofs_range...)
-  cell_dofs = getindex!(cache_cell_dof_ids,cell_dof_ids,icell)
-  for (idof,dof) in enumerate(cell_dofs)
-    dof < 0 && continue
-    t = terms[idof]
-    odof = ordered_dofs[t]
-    dof_map[odof] = dof
-    dof_to_cell_ptrs[odof] += 1
-    # dof_to_cell_ptrs[odof+1] += 1
-    # push!(dof_to_cell_data,Ti(icell))
-  end
-end
-length_to_ptrs!(dof_to_cell_ptrs)
-ndata = dof_to_cell_ptrs[end]-1
-dof_to_first_owner_cell = zeros(Ti,ndata)
-
-# for ndof in 1:num_free_dofs(test)
-#   ninds = findall(cell_dof_ids.data .== ndof)
-#   nptrs = cell_dof_ids.ptrs[ninds]
-#   dof_to_cell_data[nptrs] =
-# end
-
-for icell in 1:prod(ncells)
-
-  cell_dofs = getindex!(cache_cell_dof_ids,cell_dof_ids,icell)
-  for (idof,dof) in enumerate(cell_dofs)
-    dof < 0 && continue
-    dof_to_first_owner_cell[idof] = dof
-  end
-end
-dof_to_cell = Table(dof_to_cell_data,dof_to_cell_ptrs)
-
-
-cell_to_dof = cell_dof_ids
-dof_to_cell, = make_inverse_table(cell_to_dof.data[findall(cell_to_dof.data .> 0)],num_free_dofs(test))
-
-# DIO CANE
-
-i2j = cell_to_dof.data[findall(cell_to_dof.data .> 0)]
-nj = num_free_dofs(test)
-
-ni = length(i2j)
-@assert nj≥0
-
-p = sortperm(i2j)
-# i2j[p] is a sorted array of js
-
-cache = array_cache(cell_dof_ids)
-
-function return_cell(cache,cell_dof_ids,dof)
-  cells = Int32[]
-  for cell in 1:length(cell_dof_ids)
-    cell_dofs = getindex!(cache,cell_dof_ids,cell)
-    if dof ∈ cell_dofs
-      append!(cells,cell)
-    end
-  end
-  cells
-end
-
-@btime begin
-  cells = lazy_map(dof -> return_cell($cache,$cell_dof_ids,dof),1:1521)
-  Table(cells)
-end
-
-@btime begin
-  cells = map(dof -> return_cell($cache,$cell_dof_ids,dof),1:1521)
-  Table(cells)
-end
+# mixed case
+reffe = ReferenceFE(lagrangian,Float64,order)
+test = TestFESpace(model,reffe,conformity=:H1;dirichlet_tags=["boundary"])
+imap′ = get_dof_map(model,test)
+sparsity = SparsityPattern(trial,test)
+sparsity = TProductSparsityPattern(sparsity,sparsities_1d)
+osparsity,osparse_indices = get_sparse_dof_map(trian,imap′,imap,imap1d,imap1d,sparsity)
+ofull_indices = to_nz_index(osparse_indices,sparsity)
+smap = SparseDofMap(ofull_indices,osparse_indices,osparsity)
+sssmap = DofMaps.SparseDofMapIndexing(smap)
+sssmap1 = sssmap[:,:,2]
+smap1 = sparsity.sparsity.matrix[sssmap1]

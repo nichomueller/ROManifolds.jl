@@ -71,7 +71,7 @@ using ReducedOrderModels.DofMaps
 export get_dof_map
 export get_polynomial_order
 
-export get_tp_dof_dof_map
+export get_tp_dof_map
 
 export TProductModel
 export TProductTriangulation

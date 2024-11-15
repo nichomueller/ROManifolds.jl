@@ -1,8 +1,8 @@
 # sparse maps
 
 abstract type SparseDofMapStyle end
-abstract type FullDofMapIndexing <: SparseDofMapStyle end
-abstract type SparseDofMapIndexing <: SparseDofMapStyle end
+struct FullDofMapIndexing <: SparseDofMapStyle end
+struct SparseDofMapIndexing <: SparseDofMapStyle end
 
 # trivial case
 

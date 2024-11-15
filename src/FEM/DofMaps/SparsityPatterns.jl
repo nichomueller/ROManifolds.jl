@@ -31,7 +31,7 @@ abstract type SparsityPattern end
 
 # constructors
 
-function SparsityPattern(a::SparseMatrixAssembler,U::FESpace,V::FESpace,TU,TV)
+function SparsityPattern(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
   m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
   cellidsrows = get_cell_dof_ids(V)
   cellidscols = get_cell_dof_ids(U)
@@ -39,14 +39,12 @@ function SparsityPattern(a::SparseMatrixAssembler,U::FESpace,V::FESpace,TU,TV)
   m2 = nz_allocation(m1)
   trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
   m3 = create_from_nz(m2)
-  SparsityPattern(m3,TU,TV)
+  SparsityPattern(m3)
 end
 
 function SparsityPattern(U::FESpace,V::FESpace)
   a = SparseMatrixAssembler(U,V)
-  TU = get_dof_type(U)
-  TV = get_dof_type(V)
-  SparsityPattern(a,U,V,TU,TV)
+  SparsityPattern(a,U,V)
 end
 
 get_background_matrix(a::SparsityPattern) = @abstractmethod
@@ -55,8 +53,8 @@ num_rows(a::SparsityPattern) = size(get_background_matrix(a),1)
 num_cols(a::SparsityPattern) = size(get_background_matrix(a),2)
 SparseArrays.findnz(a::SparsityPattern) = findnz(get_background_matrix(a))
 SparseArrays.nnz(a::SparsityPattern) = nnz(get_background_matrix(a))
+SparseArrays.nonzeros(a::SparsityPattern) = nonzeros(get_background_matrix(a))
 SparseArrays.nzrange(a::SparsityPattern,row::Integer) = nzrange(get_background_matrix(a),row)
-SparseArrays.rowvals(a::SparsityPattern) = rowvals(get_background_matrix(a))
 Algebra.nz_index(a::SparsityPattern,row::Integer,col::Integer) = nz_index(get_background_matrix(a),row,col)
 get_nonzero_indices(a::SparsityPattern) = get_nonzero_indices(get_background_matrix(a))
 
@@ -81,6 +79,10 @@ function order_sparsity(s::SparsityPattern,U::FESpace,V::FESpace)
   order_sparsity(s,rows,cols)
 end
 
+function order_sparsity(s::SparsityPattern,rows::AbstractDofMap,cols::AbstractDofMap)
+  order_sparsity(s,vectorize(rows),vectorize(cols))
+end
+
 """
 """
 struct SparsityPatternCSC{Tv,Ti} <: SparsityPattern
@@ -92,6 +94,8 @@ function SparsityPattern(a::SparseMatrixCSC)
 end
 
 get_background_matrix(a::SparsityPatternCSC) = a.matrix
+SparseArrays.rowvals(a::SparsityPattern) = rowvals(get_background_matrix(a))
+SparseArrays.getcolptr(a::SparsityPatternCSC) = SparseArrays.getcolptr(a.matrix)
 
 """
     order_sparsity(a::SparsityPattern,i,j) -> SparsityPattern
@@ -100,8 +104,8 @@ Permutes a sparsity patterns according to indices specified by `i` and `j`,
 representing the rows and columns respectively
 
 """
-function order_sparsity(a::SparsityPatternCSC,i::AbstractVector,j::AbstractVector)
-  SparsityPatternCSC(a.matrix[i,j],a.dof_type_trial,a.dof_type_test)
+function order_sparsity(a::SparsityPatternCSC,i::Vector{<:Integer},j::Vector{<:Integer})
+  SparsityPatternCSC(a.matrix[i,j])
 end
 
 function to_nz_index!(i::AbstractArray,a::SparsityPatternCSC)
@@ -170,7 +174,7 @@ univariate_num_cols(a::TProductSparsityPattern) = Tuple(num_cols.(a.sparsities_1
 univariate_findnz(a::TProductSparsityPattern) = tuple_of_arrays(findnz.(a.sparsities_1d))
 univariate_nnz(a::TProductSparsityPattern) = Tuple(nnz.(a.sparsities_1d))
 
-function order_sparsity(a::TProductSparsityPattern,i,j)
+function order_sparsity(a::TProductSparsityPattern,i::Tuple,j::Tuple)
   is,is_1d = i
   js,js_1d = j
   a′ = order_sparsity(a.sparsity,is,js)
@@ -201,10 +205,10 @@ function get_sparse_dof_map(sparsity::TProductSparsityPattern,I,J,i,j)
     irows = tprows[I[k]]
     icols = tpcols[J[k]]
     @inbounds for d in eachindex(uids)
-      lidd = uids[d]
-      indd = CartesianIndex((irows.I[d],icols.I[d]))
-      @inbounds for (l,liddl) in enumerate(lidd)
-        if liddl == indd
+      uidd = uids[d]
+      idd = CartesianIndex((irows.I[d],icols.I[d]))
+      @inbounds for (l,uiddl) in enumerate(uidd)
+        if uiddl == idd
           uid[d] = l
           break
         end
@@ -213,5 +217,5 @@ function get_sparse_dof_map(sparsity::TProductSparsityPattern,I,J,i,j)
     sparse_dof_map[uid...] = id
   end
 
-  return DofMap(sparse_dof_map)
+  return sparse_dof_map
 end
