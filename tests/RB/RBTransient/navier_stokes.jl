@@ -67,6 +67,8 @@ jac_nlin(μ,t,(u,p),(du,dp),(v,q),dΩ) = dc(u,du,v,dΩ)
 trian_res = (Ω,)
 trian_jac = (Ω,)
 trian_jac_t = (Ω,)
+domains_lin = FEDomains(trian_res,(trian_jac,trian_jac_t))
+domains_nlin = FEDomains(trian_res,(trian_jac,))
 
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
@@ -81,9 +83,9 @@ test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyl
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 
 feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
-  trial,test,trian_res,trian_jac,trian_jac_t;constant_forms=(false,true))
+  trial,test,domains_lin;constant_forms=(false,true))
 feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,
-  trial,test,trian_res,trian_jac)
+  trial,test,domains_nlin)
 feop = LinearNonlinearTransientParamFEOperator(feop_lin,feop_nlin)
 
 fesolver = ThetaMethod(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true),dt,θ)
@@ -120,7 +122,8 @@ rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,npara
 
 fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-x̂,rbstats = solve(rbsolver,rbop,rtonline)
+r = realization(feop;nparams=10)
+x̂,rbstats = solve(rbsolver,rbop,r)
 
-x,festats = solution_snapshots(rbsolver,feop,rtonline,valsonline)
-perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,rtonline)
+x,festats = solution_snapshots(rbsolver,feop,r,xh0μ)
+perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,r)

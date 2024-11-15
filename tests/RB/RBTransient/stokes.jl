@@ -55,6 +55,7 @@ res(μ,t,(u,p),(v,q),dΩ) = ∫(v⋅∂t(u))dΩ + stiffness(μ,t,(u,p),(v,q),dΩ
 trian_res = (Ω,)
 trian_stiffness = (Ω,)
 trian_mass = (Ω,)
+domains = FEDomains(trian_res,(trian_stiffness,trian_mass))
 
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
@@ -68,7 +69,7 @@ trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
-  trial,test,trian_res,trian_stiffness,trian_mass;constant_forms=(false,true))
+  trial,test,domains;constant_forms=(false,true))
 
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))

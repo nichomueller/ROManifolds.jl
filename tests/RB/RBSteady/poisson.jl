@@ -38,13 +38,14 @@ res(μ,u,v,dΩ,dΓn) = stiffness(μ,u,v,dΩ) - rhs(μ,v,dΩ,dΓn)
 
 trian_res = (Ω,Γn)
 trian_stiffness = (Ω,)
+domains = FEDomains(trian_res,trian_stiffness)
 
 energy(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = ParamTrialFESpace(test,gμ)
-feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,trian_res,trian_stiffness)
+feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,domains)
 
 fesolver = LinearFESolver(LUSolver())
 

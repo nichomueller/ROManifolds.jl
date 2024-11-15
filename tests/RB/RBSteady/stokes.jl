@@ -38,6 +38,7 @@ res(μ,(u,p),(v,q),dΩ) = stiffness(μ,(u,p),(v,q),dΩ)
 
 trian_res = (Ω,)
 trian_stiffness = (Ω,)
+domains = FEDomains(trian_res,trian_stiffness)
 
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
@@ -52,7 +53,7 @@ test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,trian_res,trian_stiffness)
+feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,domains)
 
 fesolver = LinearFESolver(LUSolver())
 

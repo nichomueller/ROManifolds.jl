@@ -60,9 +60,9 @@ function ParamFESpaces.get_param_assembler(op::ParamFEOperator,r::AbstractRealiz
   get_param_assembler(get_assembler(op),r)
 end
 
-get_fe_dof_map(op::ParamFEOperator) = @abstractmethod
-DofMaps.get_dof_map(op::ParamFEOperator) = get_dof_map(get_fe_dof_map(op))
-DofMaps.get_sparse_dof_map(op::ParamFEOperator) = get_sparse_dof_map(get_fe_dof_map(op))
+get_fe_dof_maps(op::ParamFEOperator) = @abstractmethod
+DofMaps.get_dof_map(op::ParamFEOperator) = get_dof_map(get_fe_dof_maps(op))
+DofMaps.get_sparse_dof_map(op::ParamFEOperator) = get_sparse_dof_map(get_fe_dof_maps(op))
 
 CellData.get_domains(op::ParamFEOperator) = @abstractmethod
 get_domains_res(op::ParamFEOperator) = get_domains_res(get_domains(op))
@@ -124,7 +124,7 @@ struct ParamFEOpFromWeakForm{O,T} <: ParamFEOperator{O,T}
   jac::Function
   pspace::ParamSpace
   assem::Assembler
-  dof_map::FEDofMap
+  dof_maps::FEDofMap
   trial::FESpace
   test::FESpace
   domains::FEDomains
@@ -135,36 +135,36 @@ const SplitParamFEOpFromWeakForm{O} = ParamFEOpFromWeakForm{O,SplitDomains}
 
 function ParamFEOperator(res::Function,jac::Function,pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
-  dof_map = FEDofMap(trial,test)
+  dof_maps = FEDofMap(trial,test)
   domains = FEDomains()
   ParamFEOpFromWeakForm{NonlinearParamEq,JointDomains}(
-    res,jac,pspace,assem,dof_map,trial,test,domains)
+    res,jac,pspace,assem,dof_maps,trial,test,domains)
 end
 
 function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test)
   jac′(μ,u,du,v) = jac(μ,du,v)
   assem = SparseMatrixAssembler(trial,test)
-  dof_map = FEDofMap(trial,test)
+  dof_maps = FEDofMap(trial,test)
   domains = FEDomains()
   ParamFEOpFromWeakForm{LinearParamEq,JointDomains}(
-    res,jac′,pspace,assem,dof_map,trial,test,domains)
+    res,jac′,pspace,assem,dof_maps,trial,test,domains)
 end
 
 function ParamFEOperator(res::Function,jac::Function,pspace,trial,test,domains)
   res′,jac′ = _set_domains(res,jac,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
-  dof_map = FEDofMap(trial,test)
+  dof_maps = FEDofMap(trial,test)
   ParamFEOpFromWeakForm{NonlinearParamEq,SplitDomains}(
-    res′,jac′,pspace,assem,dof_map,trial,test,domains)
+    res′,jac′,pspace,assem,dof_maps,trial,test,domains)
 end
 
 function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test,domains)
   jac′(μ,u,du,v,args...) = jac(μ,du,v,args...)
   res′,jac′′ = _set_domains(res,jac′,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
-  dof_map = FEDofMap(trial,test)
+  dof_maps = FEDofMap(trial,test)
   ParamFEOpFromWeakForm{LinearParamEq,SplitDomains}(
-    res′,jac′′,pspace,assem,dof_map,trial,test,domains)
+    res′,jac′′,pspace,assem,dof_maps,trial,test,domains)
 end
 
 FESpaces.get_test(op::ParamFEOpFromWeakForm) = op.test
@@ -173,7 +173,7 @@ get_param_space(op::ParamFEOpFromWeakForm) = op.pspace
 ODEs.get_res(op::ParamFEOpFromWeakForm) = op.res
 get_jac(op::ParamFEOpFromWeakForm) = op.jac
 ODEs.get_assembler(op::ParamFEOpFromWeakForm) = op.assem
-get_fe_dof_map(op::ParamFEOpFromWeakForm) = op.dof_map
+get_fe_dof_maps(op::ParamFEOpFromWeakForm) = op.dof_maps
 CellData.get_domains(op::ParamFEOpFromWeakForm) = op.domains
 
 # triangulation utils
@@ -198,7 +198,7 @@ for f in (:set_domains,:change_domains)
       res′,jac′ = _set_domains(op.res,op.jac,op.trial,op.test,trian_res′,trian_jac′)
       domains′ = FEDomains(trian_res′,trian_jac′)
       ParamFEOpFromWeakForm{O,$T}(
-        res′,jac′,op.pspace,op.assem,a.dof_map,op.trial,op.test,domains′)
+        res′,jac′,op.pspace,op.assem,op.dof_maps,op.trial,op.test,domains′)
     end
   end
 end
@@ -251,5 +251,5 @@ function _set_domains(
 
   trian_res = get_domains_res(domains)
   trian_jac = get_domains_jac(domains)
-  _set_domains(res,jacs,test,trial,trian_res,trian_jac)
+  _set_domains(res,jac,test,trial,trian_res,trian_jac)
 end

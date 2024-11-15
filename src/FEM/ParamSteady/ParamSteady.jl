@@ -70,6 +70,7 @@ export get_domains_res
 export get_domains_jac
 export set_domains
 export change_domains
+export get_fe_dof_maps
 export get_dof_map_at_domains
 export get_sparse_dof_map_at_domains
 include("ParamFEOperator.jl")

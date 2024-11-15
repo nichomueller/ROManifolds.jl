@@ -51,6 +51,7 @@ res_nlin(μ,(u,p),(v,q),dΩ) = ∫( v⊙(conv∘(u,∇(u))) )dΩ
 
 trian_res = (Ω,)
 trian_jac = (Ω,)
+domains = FEDomains(trian_res,trian_jac)
 
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
@@ -63,8 +64,8 @@ test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop_lin = LinearParamFEOperator(res_lin,jac_lin,pspace,trial,test,trian_res,trian_jac)
-feop_nlin = ParamFEOperator(res_nlin,jac_nlin,pspace,trial,test,trian_res,trian_jac)
+feop_lin = LinearParamFEOperator(res_lin,jac_lin,pspace,trial,test,domains)
+feop_nlin = ParamFEOperator(res_nlin,jac_nlin,pspace,trial,test,domains)
 feop = LinearNonlinearParamFEOperator(feop_lin,feop_nlin)
 
 fesolver = NonlinearFESolver(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true))

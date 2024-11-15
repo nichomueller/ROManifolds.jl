@@ -192,7 +192,7 @@ end
 function get_sparse_dof_map(trial::MultiFieldFESpace,test::MultiFieldFESpace)
   ntest = num_fields(test)
   ntrial = num_fields(trial)
-  map(Iterators.product(1:ntest,1:ntrial)) do i,j
+  map(Iterators.product(1:ntest,1:ntrial)) do (i,j)
     get_sparse_dof_map(trial[j],test[i])
   end
 end
@@ -294,7 +294,7 @@ function get_sparse_dof_map(
 
   ntest = num_fields(test)
   ntrial = num_fields(trial)
-  map(Iterators.product(1:ntest,1:ntrial)) do i,j
+  map(Iterators.product(1:ntest,1:ntrial)) do (i,j)
     get_sparse_dof_map(trial[j],test[i],trian)
   end
 end
