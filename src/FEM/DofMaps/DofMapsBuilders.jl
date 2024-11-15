@@ -38,6 +38,24 @@ function get_dof_map(test::MultiFieldFESpace)
   end
 end
 
+function get_dof_map(test::SingleFieldFESpace,trian::Triangulation)
+  dof_map = get_dof_map(test)
+  change_domain(dof_map,trian)
+end
+
+function get_dof_map(test::MultiFieldFESpace,trian::Triangulation)
+  ntest = num_fields(test)
+  map(1:ntest) do i
+    get_dof_map(test[i],trian)
+  end
+end
+
+function get_dof_map(test::FESpace,trians::Tuple{Vararg{Triangulation}})
+  contribution(trians) do trian
+    get_dof_map(test,trian)
+  end
+end
+
 function get_dof_map(model::DiscreteModel,space::FESpace)
   @abstractmethod
 end
@@ -127,7 +145,7 @@ function _get_dof_map(
 end
 
 function _get_dof_to_cell(cache,cell_dof_ids,dof_map)
-  nfdofs = maximum(dof_map)
+  nfdofs = num_free_dofs(dof_map)
   dof_to_cell = map(dof -> get_dof_to_cell(cache,cell_dof_ids,dof),1:nfdofs)
   return Table(dof_to_cell)
 end
@@ -256,6 +274,39 @@ function get_sparse_dof_map(
   sparsity::SparsityPattern)
 
   TrivialDofMap(sparsity)
+end
+
+function get_sparse_dof_map(
+  trial::SingleFieldFESpace,
+  test::SingleFieldFESpace,
+  trian::Triangulation)
+
+  sparse_dof_map = get_sparse_dof_map(trial,test)
+  rows = get_dof_map(test,trian)
+  cols = get_dof_map(trial,trian)
+  change_domain(sparse_dof_map,rows,cols)
+end
+
+function get_sparse_dof_map(
+  trial::MultiFieldFESpace,
+  test::MultiFieldFESpace,
+  trian::Triangulation)
+
+  ntest = num_fields(test)
+  ntrial = num_fields(trial)
+  map(Iterators.product(1:ntest,1:ntrial)) do i,j
+    get_sparse_dof_map(trial[j],test[i],trian)
+  end
+end
+
+function get_sparse_dof_map(
+  trial::FESpace,
+  test::FESpace,
+  trians::Tuple{Vararg{Triangulation}})
+
+  contribution(trians) do trian
+    get_sparse_dof_map(trial,test,trian)
+  end
 end
 
 # utils

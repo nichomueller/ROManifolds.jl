@@ -18,6 +18,16 @@ recast(a::AbstractArray,i::TrivialSparseDofMap) = recast(a,i.sparsity)
 
 SparseDofMapStyle(i::TrivialSparseDofMap) = FullDofMapIndexing()
 
+function CellData.change_domain(
+  a::TrivialSparseDofMap,
+  row::AbstractDofMap{D,Ti},
+  col::AbstractDofMap{D,Ti}
+  ) where {D,Ti}
+
+  sparsity = change_domain(a.sparsity,row,col)
+  TrivialSparseDofMap(sparsity)
+end
+
 # non trivial case
 
 """
@@ -44,8 +54,6 @@ function SparseDofMap(
   index_style = FullDofMapIndexing()
   SparseDofMap(indices,indices_sparse,sparsity,index_style)
 end
-
-# reindexing
 
 SparseDofMapStyle(i::SparseDofMap) = i.index_style
 
@@ -84,3 +92,53 @@ function Base.similar(i::SparseDofMap)
 end
 
 recast(A::AbstractArray,i::SparseDofMap) = recast(A,i.sparsity)
+
+function CellData.change_domain(
+  i::SparseDofMap,
+  row::DofMap{D,Ti},
+  col::DofMap{D,Ti}
+  ) where {D,Ti}
+
+  nrows = num_rows(i.sparsity)
+  sparsity = change_domain(i.sparsity,row,col)
+  indices_sparse = sparse_change_domain(i.indices_sparse,row,col,nrows)
+  indices = to_nz_index(indices_sparse,i.sparsity)
+  SparseDofMap(indices,indices_sparse,sparsity,i.index_style)
+end
+
+function sparse_change_domain(
+  indices::Array{Ti,D},
+  row::DofMap{D,Ti},
+  col::DofMap{D,Ti},
+  nrows::Int) where {D,Ti}
+
+  indices′ = zeros(Ti,size(indices))
+  for (j,ij) in enumerate(indices′)
+    col_dof = fast_index(ij,nrows)
+    row_dof = slow_index(ij,nrows)
+    if show_dof(row,row_dof) && show_dof(col,col_dof)
+      indices′[j] = indices[j]
+    end
+  end
+  return indices′
+end
+
+# optimization
+
+function CellData.change_domain(
+  i::TrivialSparseDofMap,
+  row::EntireDofMap{D,Ti},
+  col::EntireDofMap{D,Ti}
+  ) where {D,Ti}
+
+  i
+end
+
+function CellData.change_domain(
+  i::SparseDofMap,
+  row::EntireDofMap{D,Ti},
+  col::EntireDofMap{D,Ti}
+  ) where {D,Ti}
+
+  i
+end

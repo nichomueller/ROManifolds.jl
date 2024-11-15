@@ -1,7 +1,19 @@
 abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
 
+Base.IndexStyle(i::AbstractDofMap) = IndexLinear()
+
 FESpaces.ConstraintStyle(i::I) where I<:AbstractDofMap = ConstraintStyle(I)
 FESpaces.ConstraintStyle(::Type{<:AbstractDofMap}) = UnConstrained()
+
+function FESpaces.num_free_dofs(i::AbstractArray)
+  nfdofs = 0
+  for j in i
+    if j > 0
+      nfdofs += 1
+    end
+  end
+  return nfdofs
+end
 
 function remove_constrained_dofs(i::AbstractDofMap)
   remove_constrained_dofs(i,ConstraintStyle(i))
@@ -60,6 +72,7 @@ Base.getindex(i::AbstractTrivialDofMap,j::Integer) = j
 Base.setindex!(i::AbstractTrivialDofMap,v::Integer,j::Integer) = nothing
 Base.copy(i::AbstractTrivialDofMap) = i
 Base.similar(i::AbstractTrivialDofMap) = i
+CellData.change_domain(i::AbstractTrivialDofMap,t::Triangulation) = i
 
 struct TrivialDofMap <: AbstractTrivialDofMap
   length::Int
@@ -84,7 +97,6 @@ function DofMap(
   DofMap(indices,dof_to_cell,free_vals_box,cell_to_mask)
 end
 
-Base.IndexStyle(i::DofMap) = IndexLinear()
 Base.size(i::DofMap) = size(i.free_vals_box)
 
 Base.@propagate_inbounds function Base.getindex(
@@ -126,28 +138,21 @@ end
 end
 
 function Base.copy(i::DofMap)
-  DofMap(
-    copy(i.indices),
-    i.dof_to_cell,
-    i.free_vals_box,
-    i.cell_to_mask)
+  DofMap(copy(i.indices),i.dof_to_cell,i.free_vals_box,i.cell_to_mask)
 end
 
 function Base.similar(i::DofMap)
-  DofMap(
-    similar(i.indices),
-    i.dof_to_cell,
-    i.free_vals_box,
-    i.cell_to_mask)
+  DofMap(similar(i.indices),i.dof_to_cell,i.free_vals_box,i.cell_to_mask)
 end
 
 function CellData.change_domain(i::DofMap,t::Triangulation)
-  cell_to_mask = get_cell_to_mask(t)
-  DofMap(
-    i.indices,
-    i.dof_to_cell,
-    i.free_vals_box,
-    cell_to_mask)
+  tface_to_mface = get_tface_to_mface(t)
+  if findall(!get_cell_to_mask(t)) == tface_to_mface
+    i
+  else
+    cell_to_mask = get_cell_to_mask(t)
+    DofMap(i.indices,i.dof_to_cell,i.free_vals_box,cell_to_mask)
+  end
 end
 
 # optimization
@@ -191,11 +196,7 @@ function get_component(i::DofMap{D};to_scalar=false) where D
     end
   end
 
-  DofMap(
-    indices,
-    i.dof_to_cell,
-    free_vals_box,
-    i.cell_to_mask)
+  DofMap(indices,i.dof_to_cell,free_vals_box,i.cell_to_mask)
 end
 
 struct ConstrainedDofMap{D,Ti,A} <: AbstractDofMap{D,Ti}
@@ -209,16 +210,12 @@ get_dof_to_constraints(i::ConstrainedDofMap) = i.dof_to_constraint_mask
 
 Base.size(i::ConstrainedDofMap) = size(i.map)
 
-function CellData.change_domain(i::ConstrainedDofMap,t::Triangulation)
-  ConstrainedDofMap(change_domain(i.map,t),i.dof_to_constraint_mask)
-end
-
-function Base.getindex(i::ConstrainedDofMap{D,Ti},j::Vararg{Integer,D}) where {D,Ti}
+function Base.getindex(i::ConstrainedDofMap,j::Integer)
   getindex(i.map,j...)
 end
 
-function Base.setindex!(i::ConstrainedDofMap{D,Ti},v,j::Vararg{Integer,D}) where {D,Ti}
-  !(i.dof_to_constraint_mask[j...]) && setindex!(i.map,v,j...)
+function Base.setindex!(i::ConstrainedDofMap,v,j::Integer)
+  setindex!(i.map,v,j)
 end
 
 function Base.copy(i::ConstrainedDofMap)
@@ -227,6 +224,10 @@ end
 
 function Base.similar(i::ConstrainedDofMap)
   ConstrainedDofMap(similar(i.map),i.dof_to_constraint_mask)
+end
+
+function CellData.change_domain(i::ConstrainedDofMap,t::Triangulation)
+  change_domain(i.map,t)
 end
 
 # tensor product index map, a lot of previous machinery is not needed

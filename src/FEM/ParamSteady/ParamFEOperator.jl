@@ -27,8 +27,8 @@ Subtypes:
 
 """
 abstract type ParamFEOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: FEOperator end
-const JointParamFEOperator{O<:UnEvalOperatorType} = ParamFEOperator{O,JointTriangulation}
-const SplitParamFEOperator{O<:UnEvalOperatorType} = ParamFEOperator{O,SplitTriangulation}
+const JointParamFEOperator{O<:UnEvalOperatorType} = ParamFEOperator{O,JointDomains}
+const SplitParamFEOperator{O<:UnEvalOperatorType} = ParamFEOperator{O,SplitDomains}
 
 function FESpaces.get_test(feop::ParamFEOperator)
   @abstractmethod
@@ -60,12 +60,26 @@ function ParamFESpaces.get_param_assembler(op::ParamFEOperator,r::AbstractRealiz
   get_param_assembler(get_assembler(op),r)
 end
 
-DofMaps.get_dof_map(op::ParamFEOperator) = @abstractmethod
-DofMaps.get_sparse_dof_map(op::ParamFEOperator) = get_sparse_dof_map(get_dof_map(op))
+get_fe_dof_map(op::ParamFEOperator) = @abstractmethod
+DofMaps.get_dof_map(op::ParamFEOperator) = get_dof_map(get_fe_dof_map(op))
+DofMaps.get_sparse_dof_map(op::ParamFEOperator) = get_sparse_dof_map(get_fe_dof_map(op))
 
-get_domains(op::ParamFEOperator) = @abstractmethod
+CellData.get_domains(op::ParamFEOperator) = @abstractmethod
 get_domains_res(op::ParamFEOperator) = get_domains_res(get_domains(op))
 get_domains_jac(op::ParamFEOperator) = get_domains_jac(get_domains(op))
+
+function get_dof_map_at_domains(op::ParamFEOperator)
+  test = get_test(op)
+  domains_res = get_domains_res(op)
+  get_dof_map(test,domains_res)
+end
+
+function get_sparse_dof_map_at_domains(op::ParamFEOperator)
+  test = get_test(op)
+  trial = get_trial(op)
+  domains_jac = get_domains_jac(op)
+  get_sparse_dof_map(trial,test,domains_jac)
+end
 
 function FESpaces.assemble_matrix(op::ParamFEOperator,form::Function)
   test = get_test(op)
@@ -116,14 +130,14 @@ struct ParamFEOpFromWeakForm{O,T} <: ParamFEOperator{O,T}
   domains::FEDomains
 end
 
-const JointParamFEOpFromWeakForm{O} = ParamFEOpFromWeakForm{O,JointTriangulation}
-const SplitParamFEOpFromWeakForm{O} = ParamFEOpFromWeakForm{O,SplitTriangulation}
+const JointParamFEOpFromWeakForm{O} = ParamFEOpFromWeakForm{O,JointDomains}
+const SplitParamFEOpFromWeakForm{O} = ParamFEOpFromWeakForm{O,SplitDomains}
 
 function ParamFEOperator(res::Function,jac::Function,pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   dof_map = FEDofMap(trial,test)
   domains = FEDomains()
-  ParamFEOpFromWeakForm{NonlinearParamEq,JointTriangulation}(
+  ParamFEOpFromWeakForm{NonlinearParamEq,JointDomains}(
     res,jac,pspace,assem,dof_map,trial,test,domains)
 end
 
@@ -132,7 +146,7 @@ function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   dof_map = FEDofMap(trial,test)
   domains = FEDomains()
-  ParamFEOpFromWeakForm{LinearParamEq,JointTriangulation}(
+  ParamFEOpFromWeakForm{LinearParamEq,JointDomains}(
     res,jac′,pspace,assem,dof_map,trial,test,domains)
 end
 
@@ -140,7 +154,7 @@ function ParamFEOperator(res::Function,jac::Function,pspace,trial,test,domains)
   res′,jac′ = _set_domains(res,jac,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
   dof_map = FEDofMap(trial,test)
-  ParamFEOpFromWeakForm{NonlinearParamEq,SplitTriangulation}(
+  ParamFEOpFromWeakForm{NonlinearParamEq,SplitDomains}(
     res′,jac′,pspace,assem,dof_map,trial,test,domains)
 end
 
@@ -149,7 +163,7 @@ function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test,dom
   res′,jac′′ = _set_domains(res,jac′,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
   dof_map = FEDofMap(trial,test)
-  ParamFEOpFromWeakForm{LinearParamEq,SplitTriangulation}(
+  ParamFEOpFromWeakForm{LinearParamEq,SplitDomains}(
     res′,jac′′,pspace,assem,dof_map,trial,test,domains)
 end
 
@@ -159,23 +173,32 @@ get_param_space(op::ParamFEOpFromWeakForm) = op.pspace
 ODEs.get_res(op::ParamFEOpFromWeakForm) = op.res
 get_jac(op::ParamFEOpFromWeakForm) = op.jac
 ODEs.get_assembler(op::ParamFEOpFromWeakForm) = op.assem
-DofMaps.get_dof_map(op::ParamFEOpFromWeakForm) = op.dof_map
-get_domains(op::ParamFEOpFromWeakForm) = op.domains
+get_fe_dof_map(op::ParamFEOpFromWeakForm) = op.dof_map
+CellData.get_domains(op::ParamFEOpFromWeakForm) = op.domains
 
 # triangulation utils
 
 set_domains(op::JointParamFEOperator,args...) = op
 change_domains(op::JointParamFEOperator,args...) = op
 
-for (f,T) in zip((:set_domains,:change_domains),(:JointTriangulation,:SplitTriangulation))
+for f in (:set_domains,:change_domains)
+  T = f == :set_domains ? :JointDomains : :SplitDomains
   @eval begin
-    function $f(op::SplitParamFEOpFromWeakForm{O},trian_res,trian_jac) where O
-      trian_res′ = order_domains(get_domains_res(op),trian_res)
-      trian_jac′ = order_domains(get_domains_jac(op),trian_jac)
+    function $f(op::SplitParamFEOperator)
+      $f(op,get_domains(op))
+    end
+
+    function $f(op::SplitParamFEOperator,domains::FEDomains)
+      $f(op,get_domains_res(domains),get_domains_jac(domains))
+    end
+
+    function $f(op::SplitParamFEOpFromWeakForm{O},trians_res,trians_jac) where O
+      trian_res′ = order_domains(get_domains_res(op),trians_res)
+      trian_jac′ = order_domains(get_domains_jac(op),trians_jac)
       res′,jac′ = _set_domains(op.res,op.jac,op.trial,op.test,trian_res′,trian_jac′)
       domains′ = FEDomains(trian_res′,trian_jac′)
       ParamFEOpFromWeakForm{O,$T}(
-        res′,jac′,op.pspace,op.assem,a.dof_map′,op.trial,op.test,domains′)
+        res′,jac′,op.pspace,op.assem,a.dof_map,op.trial,op.test,domains′)
     end
   end
 end

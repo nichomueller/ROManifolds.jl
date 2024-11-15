@@ -8,13 +8,13 @@ get_fe_operator(op::ParamOpFromFEOp) = op.op
 
 for f in (:set_domains,:change_domains)
   @eval begin
-    function $f(odeop::ParamOpFromFEOp,trians_rhs,trians_lhs)
-      ParamOpFromFEOp($f(odeop.op,trians_rhs,trians_lhs))
+    function $f(odeop::ParamOpFromFEOp,args...)
+      ParamOpFromFEOp($f(odeop.op,args...))
     end
   end
 end
 
-const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointTriangulation}
+const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointDomains}
 
 function Algebra.allocate_residual(
   op::JointParamOpFromFEOp,
@@ -100,7 +100,7 @@ function ODEs.jacobian_add!(
   A
 end
 
-const SplitParamOpFromFEOp{O} = ParamOpFromFEOp{O,SplitTriangulation}
+const SplitParamOpFromFEOp{O} = ParamOpFromFEOp{O,SplitDomains}
 
 function Algebra.allocate_residual(
   op::SplitParamOpFromFEOp,

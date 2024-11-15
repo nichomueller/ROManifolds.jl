@@ -47,7 +47,7 @@ function RBSteady.reduced_operator(
   LinearNonlinearTransientRBOperator(red_op_lin,red_op_nlin)
 end
 
-abstract type TransientRBOperator{O} <: ODEParamOperator{O,SplitTriangulation} end
+abstract type TransientRBOperator{O} <: ODEParamOperator{O,SplitDomains} end
 
 function RBSteady.allocate_rbcache(fesolver::ODESolver,op::RBOperator,args...)
   @abstractmethod

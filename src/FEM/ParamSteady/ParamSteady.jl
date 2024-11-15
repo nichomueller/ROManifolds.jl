@@ -44,8 +44,8 @@ export NonlinearParamEq
 export LinearParamEq
 export LinearNonlinearParamEq
 export TriangulationStyle
-export SplitTriangulation
-export JointTriangulation
+export SplitDomains
+export JointDomains
 export ParamOperator
 export LinearNonlinearParamOpFromFEOp
 export AbstractParamCache
@@ -68,6 +68,10 @@ export get_param_space
 export get_domains
 export get_domains_res
 export get_domains_jac
+export set_domains
+export change_domains
+export get_dof_map_at_domains
+export get_sparse_dof_map_at_domains
 include("ParamFEOperator.jl")
 
 export LinearNonlinearParamFEOperator

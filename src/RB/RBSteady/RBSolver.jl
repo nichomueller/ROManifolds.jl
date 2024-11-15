@@ -82,9 +82,8 @@ function solution_snapshots(
   r::Realization)
 
   fesolver = get_fe_solver(solver)
-  op′ = set_domains(op)
-  dof_map = get_dof_map(op′)
-  uh,stats = solve(fesolver,op′,r)
+  dof_map = get_dof_map(op)
+  uh,stats = solve(fesolver,op,r)
   values = get_free_dof_values(uh)
   snaps = Snapshots(values,dof_map,r)
   return snaps,stats
@@ -96,7 +95,7 @@ function residual_snapshots(solver::RBSolver,op::ParamOperator,s)
   us_res = get_values(sres)
   r_res = get_realization(sres)
   b = residual(op,r_res,us_res)
-  ib = get_dof_map(op)
+  ib = get_dof_map_at_domains(op)
   return Snapshots(b,ib,r_res)
 end
 
@@ -107,7 +106,7 @@ function residual_snapshots(solver::RBSolver,op::ParamOperator{LinearParamEq},s)
   fill!(us_res,zero(eltype2(us_res)))
   r_res = get_realization(sres)
   b = residual(op,r_res,us_res)
-  ib = get_dof_map(op)
+  ib = get_dof_map_at_domains(op)
   return Snapshots(b,ib,r_res)
 end
 
@@ -117,7 +116,7 @@ function jacobian_snapshots(solver::RBSolver,op::ParamOperator,s)
   us_jac = get_values(sjac)
   r_jac = get_realization(sjac)
   A = jacobian(op,r_jac,us_jac)
-  iA = get_sparse_dof_map(op)
+  iA = get_sparse_dof_map_at_domains(op)
   return Snapshots(A,iA,r_jac)
 end
 
@@ -128,6 +127,6 @@ function jacobian_snapshots(solver::RBSolver,op::ParamOperator{LinearParamEq},s)
   fill!(us_jac,zero(eltype2(us_jac)))
   r_jac = get_realization(sjac)
   A = jacobian(op,r_jac,us_jac)
-  iA = get_sparse_dof_map(op)
+  iA = get_sparse_dof_map_at_domains(op)
   return Snapshots(A,iA,r_jac)
 end

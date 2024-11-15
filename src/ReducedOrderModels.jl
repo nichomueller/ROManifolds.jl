@@ -214,6 +214,9 @@ export LinearNonlinearParamOpFromFEOp
 
 export ParamFEOperator
 export LinearParamFEOperator
+export FEDomains
+export set_domains
+export change_domains
 
 export LinearNonlinearParamODE
 export LinearNonlinearParamFEOperator

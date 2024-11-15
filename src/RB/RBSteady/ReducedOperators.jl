@@ -60,7 +60,7 @@ struct LinearNonlinearRBCache <: AbstractParamCache
   b::AbstractVector
 end
 
-abstract type RBOperator{O} <: ParamOperator{O,SplitTriangulation} end
+abstract type RBOperator{O} <: ParamOperator{O,SplitDomains} end
 
 function allocate_rbcache(op::RBOperator,args...)
   @abstractmethod

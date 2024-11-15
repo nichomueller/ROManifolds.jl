@@ -97,6 +97,15 @@ end
 
 function Algebra.solve(
   solver::ODESolver,
+  op::SplitTransientParamFEOperator,
+  r::TransientRealization,
+  uh0)
+
+  solve(solver,set_domains(op),r,uh0)
+end
+
+function Algebra.solve(
+  solver::ODESolver,
   op::LinearNonlinearTransientParamFEOperator,
   r::TransientRealization,
   uh0)

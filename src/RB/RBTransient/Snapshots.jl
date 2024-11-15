@@ -305,7 +305,7 @@ const TransientSparseSnapshots{T,N,D,I,R} = Union{
       = AbstractTransientSnapshots{T,3,1,<:AbstractTrivialDofMap,R,A}
 
 """
-const UnfoldingTransientSnapshots{T,R,A} = AbstractTransientSnapshots{T,3,1,<:AbstractTrivialDofMap,R,A}
+const UnfoldingTransientSnapshots{T,I<:AbstractTrivialDofMap,R,A} = AbstractTransientSnapshots{T,3,1,I,R,A}
 
 abstract type ModeAxes end
 struct Mode1Axes <: ModeAxes end
@@ -335,7 +335,7 @@ Mode2Axes:
  u(x1,tT,μ1) ⋯ u(x1,tT,μP) u(x2,tT,μ1) ⋯ u(x2,tT,μP) u(x3,tT,μ1) ⋯ ⋯ u(xN,tT,μ1) ⋯ u(xN,tT,μP)]
 
 """
-struct ModeTransientSnapshots{M<:ModeAxes,T,R,A<:UnfoldingTransientSnapshots{T,R}} <: AbstractTransientSnapshots{T,2,1,AbstractTrivialDofMap,R,A}
+struct ModeTransientSnapshots{M<:ModeAxes,T,I,R,A<:UnfoldingTransientSnapshots{T,I,R}} <: AbstractTransientSnapshots{T,2,1,I,R,A}
   snaps::A
   mode::M
 end
@@ -346,7 +346,8 @@ end
 
 function RBSteady.flatten_snapshots(s::AbstractTransientSnapshots)
   i′ = TrivialDofMap(get_dof_map(s))
-  ModeTransientSnapshots(get_all_data(s),i′,get_realization(s))
+  s′ = Snapshots(get_all_data(s),i′,get_realization(s))
+  ModeTransientSnapshots(s′)
 end
 
 ParamDataStructures.get_all_data(s::ModeTransientSnapshots) = get_all_data(s.snaps)
@@ -361,8 +362,8 @@ change_mode(s::ModeTransientSnapshots) = ModeTransientSnapshots(s.snaps,change_m
 get_mode(s::UnfoldingTransientSnapshots) = Mode1Axes()
 get_mode(s::ModeTransientSnapshots) = s.mode
 
-const Mode1TransientSnapshots{T,R,A} = ModeTransientSnapshots{Mode1Axes,T,R,A}
-const Mode2TransientSnapshots{T,R,A} = ModeTransientSnapshots{Mode2Axes,T,R,A}
+const Mode1TransientSnapshots{T,I,R,A} = ModeTransientSnapshots{Mode1Axes,T,I,R,A}
+const Mode2TransientSnapshots{T,I,R,A} = ModeTransientSnapshots{Mode2Axes,T,I,R,A}
 
 Base.size(s::Mode1TransientSnapshots) = (num_space_dofs(s),num_times(s)*num_params(s))
 Base.size(s::Mode2TransientSnapshots) = (num_times(s),num_space_dofs(s)*num_params(s))

@@ -83,6 +83,15 @@ function order_sparsity(s::SparsityPattern,rows::AbstractDofMap,cols::AbstractDo
   order_sparsity(s,vectorize(rows),vectorize(cols))
 end
 
+function CellData.change_domain(
+  a::SparsityPattern,
+  row::AbstractTrivialDofMap,
+  col::AbstractTrivialDofMap
+  )
+
+  a
+end
+
 """
 """
 struct SparsityPatternCSC{Tv,Ti} <: SparsityPattern

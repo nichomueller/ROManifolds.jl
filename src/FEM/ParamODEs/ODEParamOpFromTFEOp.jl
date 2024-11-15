@@ -8,13 +8,13 @@ ParamSteady.get_fe_operator(op::ODEParamOpFromTFEOp) = op.op
 
 for f in (:(ParamSteady.set_domains),:(ParamSteady.change_domains))
   @eval begin
-    function $f(odeop::ODEParamOpFromTFEOp,trians_rhs,trians_lhs)
-      ODEParamOpFromTFEOp($f(odeop.op,trians_rhs,trians_lhs))
+    function $f(odeop::ODEParamOpFromTFEOp,args...)
+      ODEParamOpFromTFEOp($f(odeop.op,args...))
     end
   end
 end
 
-const JointODEParamOpFromTFEOp{O} = ODEParamOpFromTFEOp{O,JointTriangulation}
+const JointODEParamOpFromTFEOp{O} = ODEParamOpFromTFEOp{O,JointDomains}
 
 function Algebra.allocate_residual(
   odeop::ODEParamOpFromTFEOp,
@@ -223,7 +223,7 @@ function ParamSteady.allocate_systemcache(
   return A,b
 end
 
-const SplitODEParamOpFromTFEOp{O} = ODEParamOpFromTFEOp{O,SplitTriangulation}
+const SplitODEParamOpFromTFEOp{O} = ODEParamOpFromTFEOp{O,SplitDomains}
 
 function Algebra.allocate_residual(
   odeop::SplitODEParamOpFromTFEOp,

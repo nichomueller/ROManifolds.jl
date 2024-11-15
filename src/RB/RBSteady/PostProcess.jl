@@ -176,7 +176,7 @@ function DrWatson.save(dir,op::LinearNonlinearRBOperator;label="")
   _save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nonlinear"))
 end
 
-function load_operator(dir,feop::LinearNonlinearParamFEOperator{SplitTriangulation};label="")
+function load_operator(dir,feop::LinearNonlinearParamFEOperator{SplitDomains};label="")
   trial,test = _fixed_operator_parts(dir,feop.op_linear;label)
   pop_lin,red_lhs_lin,red_rhs_lin = _load_trian_operator_parts(
     dir,feop.op_linear,trial,test;label=_get_label("linear",label))
@@ -240,9 +240,9 @@ function rb_performance(
   r::AbstractRealization)
 
   x = inv_project(get_trial(rbop)(r),x̂)
-  feop′ = set_domains(feop)
-  rbsnaps = Snapshots(x,get_dof_map(feop′),r)
-  rb_performance(solver,feop′,fesnaps,rbsnaps,festats,rbstats)
+  i = get_dof_map(feop)
+  rbsnaps = Snapshots(x,i,r)
+  rb_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats)
 end
 
 function DrWatson.save(dir,perf::RBPerformance;label="")
