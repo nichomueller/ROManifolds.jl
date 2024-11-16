@@ -82,10 +82,20 @@ Utils.get_values(s::TransientGenericSnapshots) = s.data
 DofMaps.get_dof_map(s::TransientGenericSnapshots) = s.dof_map
 RBSteady.get_realization(s::TransientGenericSnapshots) = s.realization
 
-function RBSteady.get_indexed_values(s::TransientGenericSnapshots)
-  vi = vec(get_dof_map(s))
+function RBSteady.get_indexed_values(s::TransientGenericSnapshots{T}) where T
+  # vi = vectorize(get_dof_map(s))
+  # idata = view(data,vi,:)
   data = get_all_data(s.data)
-  ConsecutiveParamArray(data[vi,:])
+  i = get_dof_map(s)
+  idata = zeros(T,size(data))
+  for (j,ij) in enumerate(i)
+    for k in 1:num_params(s)*num_times(s)
+      if ij > 0
+        @inbounds idata[ij,k] = data[j,k]
+      end
+    end
+  end
+  ConsecutiveParamArray(idata)
 end
 
 Base.@propagate_inbounds function Base.getindex(
@@ -183,19 +193,29 @@ function Utils.get_values(s::TransientSnapshotsAtIndices)
   np = _num_all_params(s)
   ptrange = range_1d(prange,trange,np)
   data = get_all_data(get_all_data(s))
-  v = data[:,ptrange]
+  v = view(data,:,ptrange)
   isa(s,SparseSnapshots) ? recast(v,s) : ConsecutiveParamArray(v)
 end
 
-function RBSteady.get_indexed_values(s::TransientSnapshotsAtIndices)
-  vi = vec(get_dof_map(s))
+function RBSteady.get_indexed_values(s::TransientSnapshotsAtIndices{T}) where T
+  # vi = vectorize(get_dof_map(s))
+  # data = get_all_data(get_all_data(s))
+  # v = view(data,vi,ptrange)
   prange = RBSteady.param_indices(s)
   trange = time_indices(s)
   np = _num_all_params(s)
   ptrange = range_1d(prange,trange,np)
   data = get_all_data(get_all_data(s))
-  v = data[vi,ptrange]
-  ConsecutiveParamArray(v)
+  i = get_dof_map(s)
+  idata = zeros(T,size(data))
+  for (j,ij) in enumerate(i)
+    for k in ptrange
+      if ij > 0
+        @inbounds idata[ij,k] = data[j,k]
+      end
+    end
+  end
+  ConsecutiveParamArray(idata)
 end
 
 Base.@propagate_inbounds function Base.getindex(

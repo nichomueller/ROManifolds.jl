@@ -5,16 +5,6 @@ Base.IndexStyle(i::AbstractDofMap) = IndexLinear()
 FESpaces.ConstraintStyle(i::I) where I<:AbstractDofMap = ConstraintStyle(I)
 FESpaces.ConstraintStyle(::Type{<:AbstractDofMap}) = UnConstrained()
 
-function FESpaces.num_free_dofs(i::AbstractArray)
-  nfdofs = 0
-  for j in i
-    if j > 0
-      nfdofs += 1
-    end
-  end
-  return nfdofs
-end
-
 function remove_constrained_dofs(i::AbstractDofMap)
   remove_constrained_dofs(i,ConstraintStyle(i))
 end
@@ -23,11 +13,45 @@ function remove_constrained_dofs(i::AbstractDofMap,::UnConstrained)
   collect(i)
 end
 
-function remove_constrained_dofs(i::AbstractDofMap,::Constrained)
-  @abstractmethod
+function remove_constrained_dofs(i::AbstractDofMap{Ti},::Constrained) where Ti
+  dof_to_constraint = get_dof_to_constraints(i)
+  nconstraints = findall(dof_to_constraint)
+  i′ = zeros(Ti,length(i)-nconstraints)
+  count = 0
+  for j in i
+    if !dof_to_constraint[j]
+      count += 1
+      i′[count] = j
+    end
+  end
+  i′
 end
 
-dofs_to_constrained_dofs(i::AbstractDofMap) = @abstractmethod
+# function remove_constrained_dofs(i::AbstractDofMap,::UnConstrained;remove_zeros=true)
+#   vi = vec(collect(i))
+#   if remove_zeros
+#     inds = map(iszero,vi)
+#     deleteat!(vi,inds)
+#     vi
+#   else
+#     vi
+#   end
+# end
+
+# function remove_constrained_dofs(i::AbstractDofMap,::Constrained;remove_zeros=true)
+#   dof_to_constraint = get_dof_to_constraints(i)
+#   isconstrained(x) = dof_to_constraint[x]
+#   vi = vec(collect(i))
+#   if remove_zeros
+#     inds = map(iszero || isconstrained,i)
+#   else
+#     inds = map(isconstrained,i)
+#   end
+#   deleteat!(i′,inds)
+#   i′
+# end
+
+get_dof_to_constraints(i::AbstractDofMap) = @abstractmethod
 
 TensorValues.num_components(::Type{<:AbstractDofMap{D,Ti}}) where {D,Ti} = num_components(Ti)
 
@@ -50,7 +74,7 @@ end
 function invert(i::AbstractDofMap,::Constrained)
   i′ = similar(i)
   s′ = size(i)
-  dof_to_mask = dofs_to_constrained_dofs(i)
+  dof_to_mask = dof_to_constraint_mask(i)
   invi = invperm(vectorize(i))
   nconstrained = 0
   for k in eachindex(i)
@@ -64,36 +88,56 @@ function invert(i::AbstractDofMap,::Constrained)
   i′
 end
 
+get_dof_to_cell(i::AbstractDofMap) = @abstractmethod
+get_cell_to_mask(i::AbstractDofMap) = @abstractmethod
+
+@inline function show_dof(i::AbstractDofMap,idof::Integer)
+  dof_to_cell = get_dof_to_cell(i)
+  cell_to_mask = get_cell_to_mask(i)
+
+  pini = dof_to_cell.ptrs[idof]
+  pend = dof_to_cell.ptrs[idof+1]-1
+
+  show = false
+  for j in pini:pend
+    if !cell_to_mask[dof_to_cell.data[j]]
+      show = true
+      break
+    end
+  end
+
+  return show
+end
+
 # trivial map
 
-abstract type AbstractTrivialDofMap <: AbstractDofMap{1,Int} end
+abstract type AbstractTrivialDofMap{Ti} <: AbstractDofMap{1,Ti} end
 
-Base.getindex(i::AbstractTrivialDofMap,j::Integer) = j
-Base.setindex!(i::AbstractTrivialDofMap,v::Integer,j::Integer) = nothing
+Base.setindex!(i::AbstractTrivialDofMap,v,j::Integer) = v
 Base.copy(i::AbstractTrivialDofMap) = i
 Base.similar(i::AbstractTrivialDofMap) = i
 
-struct TrivialDofMap <: AbstractTrivialDofMap
-  ndofs::Int
-end
-
-TrivialDofMap(i::AbstractArray) = TrivialDofMap(length(i))
-Base.size(i::TrivialDofMap) = (i.ndofs,)
-
-struct MaskedTrivialDofMap{A} <: AbstractTrivialDofMap
-  ndofs::Int
+struct TrivialDofMap{Ti,A<:AbstractArray{Bool}} <: AbstractTrivialDofMap{Ti}
+  dof_to_cell::Table{Ti,Vector{Ti},Vector{Ti}}
   cell_to_mask::A
 end
 
+function TrivialDofMap(i::AbstractDofMap)
+  TrivialDofMap(get_dof_to_cell(i),get_cell_to_mask(i))
+end
+
+Base.size(i::TrivialDofMap) = (length(i.dof_to_cell),)
+
+Base.@propagate_inbounds function Base.getindex(i::TrivialDofMap{Ti},j::Integer) where Ti
+  show_dof(i,j) ? j : zero(Ti)
+end
+
+get_dof_to_cell(i::TrivialDofMap) = i.dof_to_cell
+get_cell_to_mask(i::TrivialDofMap) = i.cell_to_mask
+
 function CellData.change_domain(i::TrivialDofMap,t::Triangulation)
-  tface_to_mface = get_tface_to_mface(t)
-  ndofs = 0
-  for cell in unique(tface_to_mface)
-    if !i.cell_to_mask[cell]
-      ndofs += 1
-    end
-  end
-  TrivialDofMap(ndofs,i.cell_to_mask)
+  cell_to_mask = get_cell_to_mask(t)
+  TrivialDofMap(i.dof_to_cell,cell_to_mask)
 end
 
 struct DofMap{D,Ti,A<:AbstractArray{Bool}} <: AbstractDofMap{D,Ti}
@@ -137,21 +181,6 @@ Base.@propagate_inbounds function Base.setindex!(
   v
 end
 
-@inline function show_dof(i::DofMap,idof::Integer)
-  pini = i.dof_to_cell.ptrs[idof]
-  pend = i.dof_to_cell.ptrs[idof+1]-1
-
-  show = false
-  for j in pini:pend
-    if !i.cell_to_mask[i.dof_to_cell.data[j]]
-      show = true
-      break
-    end
-  end
-
-  return show
-end
-
 function Base.copy(i::DofMap)
   DofMap(copy(i.indices),i.dof_to_cell,i.free_vals_box,i.cell_to_mask)
 end
@@ -161,10 +190,12 @@ function Base.similar(i::DofMap)
 end
 
 function CellData.change_domain(i::DofMap,t::Triangulation)
-  tface_to_mface = get_tface_to_mface(t)
   cell_to_mask = get_cell_to_mask(t)
   DofMap(i.indices,i.dof_to_cell,i.free_vals_box,cell_to_mask)
 end
+
+get_dof_to_cell(i::DofMap) = i.dof_to_cell
+get_cell_to_mask(i::DofMap) = i.cell_to_mask
 
 # optimization
 

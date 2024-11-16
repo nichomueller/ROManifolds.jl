@@ -6,11 +6,16 @@ struct SparseDofMapIndexing <: SparseDofMapStyle end
 
 # trivial case
 
-struct TrivialSparseDofMap{A<:SparsityPattern} <: AbstractTrivialDofMap
+struct TrivialSparseDofMap{A<:SparsityPattern} <: AbstractTrivialDofMap{Int32}
   sparsity::A
 end
 
+function TrivialDofMap(i::TrivialSparseDofMap)
+  TrivialSparseDofMap(i.sparsity)
+end
+
 Base.size(i::TrivialSparseDofMap) = (nnz(i.sparsity),)
+Base.getindex(i::TrivialSparseDofMap,j::Integer) = j
 
 recast(a::AbstractArray,i::TrivialSparseDofMap) = recast(a,i.sparsity)
 

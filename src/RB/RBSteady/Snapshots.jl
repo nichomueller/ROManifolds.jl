@@ -134,10 +134,22 @@ Utils.get_values(s::GenericSnapshots) = s.data
 DofMaps.get_dof_map(s::GenericSnapshots) = s.dof_map
 get_realization(s::GenericSnapshots) = s.realization
 
-function get_indexed_values(s::GenericSnapshots)
-  vi = vectorize(get_dof_map(s))
+#TODO this call to zeros should be avoided, but for now is necessary for efficient mul!
+# The solution would be to create a parametric lazy view that somehow is a StridedArray
+function get_indexed_values(s::GenericSnapshots{T}) where T
+  # vi = vectorize(get_dof_map(s))
+  i = get_dof_map(s)
   data = get_all_data(s.data)
-  ConsecutiveParamArray(data[vi,:])
+  # idata = view(data,vi,:)
+  idata = zeros(T,size(data))
+  for (j,ij) in enumerate(i)
+    for k in 1:num_params(s)
+      if ij > 0
+        @inbounds idata[ij,k] = data[j,k]
+      end
+    end
+  end
+  ConsecutiveParamArray(idata)
 end
 
 Base.@propagate_inbounds function Base.getindex(
@@ -201,12 +213,15 @@ _num_all_params(s::SnapshotsAtIndices) = _num_all_params(s.snaps)
 
 function Utils.get_values(s::SnapshotsAtIndices)
   data = get_all_data(get_all_data(s))
-  ConsecutiveParamArray(data[:,param_indices(s)])
+  v = view(data,:,param_indices(s))
+  ConsecutiveParamArray(v)
 end
 
 function get_indexed_values(s::SnapshotsAtIndices)
   data = get_all_data(get_all_data(s))
-  ConsecutiveParamArray(data[:,param_indices(s)])
+  vi = vectorize(get_dof_map(s))
+  v = view(data,vi,param_indices(s))
+  ConsecutiveParamArray(v)
 end
 
 get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]

@@ -83,15 +83,6 @@ function order_sparsity(s::SparsityPattern,rows::AbstractDofMap,cols::AbstractDo
   order_sparsity(s,vectorize(rows),vectorize(cols))
 end
 
-function CellData.change_domain(
-  a::SparsityPattern,
-  row::AbstractTrivialDofMap,
-  col::AbstractTrivialDofMap
-  )
-
-  a
-end
-
 """
 """
 struct SparsityPatternCSC{Tv,Ti} <: SparsityPattern
@@ -130,9 +121,12 @@ end
 
 function CellData.change_domain(
   a::SparsityPatternCSC,
-  row::DofMap{D,Ti},
-  col::DofMap{D,Ti}
+  row::AbstractDofMap{D,Ti},
+  col::AbstractDofMap{D,Ti}
   ) where {D,Ti}
+
+  dof_to_cell_row = get_dof_to_cell(row)
+  dof_to_cell_col = get_dof_to_cell(col)
 
   m = num_rows(a)
   n = num_cols(a)
@@ -142,14 +136,14 @@ function CellData.change_domain(
   colnnz = zeros(Ti,n)
   entries_to_delete = fill(true,nnz(a))
 
-  cache_row = array_cache(row.dof_to_cell)
-  cache_col = array_cache(col.dof_to_cell)
+  cache_row = array_cache(dof_to_cell_row)
+  cache_col = array_cache(dof_to_cell_col)
   for j in col
     if j > 0
-      cells_col = getindex!(cache_col,col.dof_to_cell,j)
+      cells_col = getindex!(cache_col,dof_to_cell_col,j)
       for i in row
         if i > 0
-          cells_row = getindex!(cache_row,row.dof_to_cell,i)
+          cells_row = getindex!(cache_row,dof_to_cell_row,i)
           if _cell_intersection(row,col,cells_row,cells_col)
             ij = nz_index(a,i,j)
             entries_to_delete[ij] = false
@@ -172,12 +166,14 @@ function CellData.change_domain(
   return SparsityPatternCSC(matrix)
 end
 
-function _cell_intersection(row,col,cells_row,cells_col)
+function _cell_intersection(row::AbstractDofMap,col::AbstractDofMap,cells_row,cells_col)
+  cell_to_mask_row = get_cell_to_mask(row)
+  cell_to_mask_col = get_cell_to_mask(col)
   check = false
   for cell_row in cells_row
-    if !row.cell_to_mask[cell_row]
+    if !cell_to_mask_row[cell_row]
       for cell_col in cells_col
-        if !col.cell_to_mask[cell_col]
+        if !cell_to_mask_col[cell_col]
           if cell_row == cell_col
             check = true
             break
