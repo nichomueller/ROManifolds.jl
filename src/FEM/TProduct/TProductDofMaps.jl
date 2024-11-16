@@ -82,9 +82,9 @@ function _get_tp_dof_map(models::AbstractVector,spaces::AbstractVector,order::In
     return atp
   end
   function _local_dof_map(model,space)
-    cell_ids = get_cell_dof_ids(space)
-    trian_ids = 1:num_cells(model)
-    dof_maps_1d = _get_dof_map(model,cell_ids,trian_ids,order)
+    cell_dof_ids = get_cell_dof_ids(space)
+    cache = array_cache(cell_dof_ids)
+    dof_maps_1d = get_dof_map(model,cache,cell_dof_ids,order)
     free_dof_maps_1d = dof_maps_1d[findall(dof_maps_1d.>0)]
     return free_dof_maps_1d
   end

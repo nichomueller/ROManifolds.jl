@@ -1,6 +1,6 @@
 function DofMaps.recast(a::AbstractVector{<:AbstractArray{T,3}},i::SparseDofMap) where T
   N = length(a)
-  us = DofMaps.get_univariate_sparsity(i)
+  us = i.sparsity.sparsities_1d
   @check length(us) ≤ N
   a′ = Vector{AbstractArray{T,3}}(undef,N)
   for n in eachindex(a)
@@ -116,17 +116,36 @@ end
 
 for f in (:first_block,:block_core)
   @eval begin
-    function $f(a::AbstractArray{T,3},b::AbstractArray...) where T
-      bfirst,blasts... = b
-      $f($f(a,bfirst),blasts...)
+    function $f(a::AbstractVector{<:AbstractArray{T,3}}) where T
+      D = length(a)
+      @check D ≤ 3
+      if D == 1
+        a[1]
+      elseif D == 2
+        $f(a[1],a[2])
+      else
+        $f($f(a[1],a[2]),a[3])
+      end
     end
   end
 end
 
-function block_cores(a::AbstractVector{<:AbstractArray{T}}...)::Vector{Array{T,3}} where T
+function block_cores(a::AbstractVector{<:AbstractVector{<:AbstractArray{T,3}}}) where T
   D = length(first(a))
   @check all(length(ai)==D for ai in a)
-  abfirst = first_block(getindex.(a,1)...)
-  ablasts = map(d -> block_core(getindex.(a,d)...),2:D)
+  abfirst = first_block(getindex.(a,1))
+  ablasts = map(d -> block_core(getindex.(a,d)),2:D)
   return [abfirst,ablasts...]
+end
+
+function block_cat(a::AbstractVector{<:AbstractArray{T,3}};kwargs...) where T
+  D = length(a)
+  @check D ≤ 3
+  if D == 1
+    a[1]
+  elseif D == 2
+    cat(a[1],a[2];kwargs...)
+  else
+    cat(a[1],a[2],a[3];kwargs...)
+  end
 end

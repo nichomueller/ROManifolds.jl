@@ -150,10 +150,11 @@ function CellData.change_domain(
       for i in row
         if i > 0
           cells_row = getindex!(cache_row,row.dof_to_cell,i)
-          isempty(intersect(cells_col,cells_row)) && continue
-          ij = nz_index(a,i,j)
-          entries_to_delete[ij] = false
-          colnnz[j] += 1
+          if _cell_intersection(row,col,cells_row,cells_col)
+            ij = nz_index(a,i,j)
+            entries_to_delete[ij] = false
+            colnnz[j] += 1
+          end
         end
       end
     end
@@ -169,6 +170,23 @@ function CellData.change_domain(
   matrix = SparseMatrixCSC(m,n,colptr,rowval,nzval)
 
   return SparsityPatternCSC(matrix)
+end
+
+function _cell_intersection(row,col,cells_row,cells_col)
+  check = false
+  for cell_row in cells_row
+    if !row.cell_to_mask[cell_row]
+      for cell_col in cells_col
+        if !col.cell_to_mask[cell_col]
+          if cell_row == cell_col
+            check = true
+            break
+          end
+        end
+      end
+    end
+  end
+  return check
 end
 
 struct TProductSparsityPattern{A,B} <: SparsityPattern
@@ -207,8 +225,8 @@ function get_sparse_dof_map(sparsity::TProductSparsityPattern,I,J,i,j)
   tprows = CartesianIndices(unrows)
   tpcols = CartesianIndices(uncols)
 
-  sparse_dof_map = zeros(eltype(IJ),unnz...)
-  uid = zeros(Int,length(uids))
+  sparse_dof_map = zeros(Int32,unnz...)
+  uid = zeros(Int32,length(uids))
   @inbounds for (k,id) = enumerate(IJ)
     fill!(uid,0)
     irows = tprows[I[k]]
@@ -227,4 +245,14 @@ function get_sparse_dof_map(sparsity::TProductSparsityPattern,I,J,i,j)
   end
 
   return sparse_dof_map
+end
+
+function CellData.change_domain(
+  a::TProductSparsityPattern,
+  row::DofMap{D,Ti},
+  col::DofMap{D,Ti}
+  ) where {D,Ti}
+
+  sparsity′ = change_domain(a.sparsity,row,col)
+  TProductSparsityPattern(sparsity′,a.sparsities_1d)
 end

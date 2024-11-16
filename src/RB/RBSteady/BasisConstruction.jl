@@ -185,8 +185,8 @@ function steady_ttsvd(
   cores_k,remainders_k = map(k -> steady_ttsvd(red_style,A,X[k]),1:K) |> tuple_of_arrays
 
   # tt decomposition of the sum
-  cores = block_cores(cores_k...)
-  remainder::Array{T,3} = cat(remainders_k...;dims=1)
+  cores = block_cores(cores_k)
+  remainder = block_cat(remainders_k;dims=1)
 
   # tt orthogonality
   remainder′ = orthogonalize!(red_style,cores,remainder,X)
@@ -278,7 +278,6 @@ function weight_array(prev_weight,core,X)
 
   @inbounds for k = 1:K
     Xk = X[k]
-    Wk = cur_weight[:,k,:]
     Wk_prev = prev_weight[:,k,:]
     mul!(cache_right,Xk,core2D)
     mul!(cache_left,core2D',cache_right)

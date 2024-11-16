@@ -69,16 +69,21 @@ get_domains_res(op::ParamFEOperator) = get_domains_res(get_domains(op))
 get_domains_jac(op::ParamFEOperator) = get_domains_jac(get_domains(op))
 
 function get_dof_map_at_domains(op::ParamFEOperator)
-  test = get_test(op)
+  dof_map = get_dof_map(op)
   domains_res = get_domains_res(op)
-  get_dof_map(test,domains_res)
+  change_domain(dof_map,domains_res)
 end
 
 function get_sparse_dof_map_at_domains(op::ParamFEOperator)
-  test = get_test(op)
-  trial = get_trial(op)
   domains_jac = get_domains_jac(op)
-  get_sparse_dof_map(trial,test,domains_jac)
+
+  dof_map_rows = get_dof_map(get_test(op))
+  dof_map_cols = get_dof_map(get_trial(op))
+  sparse_dof_map = get_sparse_dof_map(op)
+
+  dof_map_rows′ = change_domain(dof_map_rows,domains_jac)
+  dof_map_cols′ = change_domain(dof_map_cols,domains_jac)
+  change_domain(sparse_dof_map,dof_map_rows′,dof_map_cols′)
 end
 
 function FESpaces.assemble_matrix(op::ParamFEOperator,form::Function)

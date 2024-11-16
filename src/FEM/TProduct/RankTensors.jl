@@ -33,7 +33,7 @@ Base.getindex(a::GenericRankTensor,k::Integer) = get_decomposition(a,k)
 
 function _sort!(a::AbstractVector{<:AbstractVector},i::Tuple{<:TProductDofMap})
   irow, = i
-  irow1d = DofMaps.get_univariate_indices(irow)
+  irow1d = DofMaps.get_univariate_dof_map(irow)
   for (i,(ai,irowi)) in enumerate(zip(a,irow1d))
     a[i] = ai[vec(irowi)]
   end
@@ -41,8 +41,8 @@ end
 
 function _sort!(a::AbstractVector{<:AbstractMatrix},i::Tuple{<:TProductDofMap,<:TProductDofMap})
   irow,icol = i
-  irow1d = DofMaps.get_univariate_indices(irow)
-  icol1d = DofMaps.get_univariate_indices(icol)
+  irow1d = DofMaps.get_univariate_dof_map(irow)
+  icol1d = DofMaps.get_univariate_dof_map(icol)
   for (i,(ai,irowi,icoli)) in enumerate(zip(a,irow1d,icol1d))
     a[i] = ai[vec(irowi),vec(icoli)]
   end

@@ -40,10 +40,10 @@ function invert(i::AbstractDofMap)
 end
 
 function invert(i::AbstractDofMap,::UnConstrained)
-  i′ = similar(i)
-  s′ = size(i)
+  s = size(i)
+  i′ = zeros(eltype(i),s)
   invi = invperm(vectorize(i))
-  copyto!(i′,reshape(invi,s′))
+  copyto!(i′,reshape(invi,s))
   i′
 end
 
@@ -72,14 +72,29 @@ Base.getindex(i::AbstractTrivialDofMap,j::Integer) = j
 Base.setindex!(i::AbstractTrivialDofMap,v::Integer,j::Integer) = nothing
 Base.copy(i::AbstractTrivialDofMap) = i
 Base.similar(i::AbstractTrivialDofMap) = i
-CellData.change_domain(i::AbstractTrivialDofMap,t::Triangulation) = i
 
 struct TrivialDofMap <: AbstractTrivialDofMap
-  length::Int
+  ndofs::Int
 end
 
 TrivialDofMap(i::AbstractArray) = TrivialDofMap(length(i))
-Base.size(i::TrivialDofMap) = (i.length,)
+Base.size(i::TrivialDofMap) = (i.ndofs,)
+
+struct MaskedTrivialDofMap{A} <: AbstractTrivialDofMap
+  ndofs::Int
+  cell_to_mask::A
+end
+
+function CellData.change_domain(i::TrivialDofMap,t::Triangulation)
+  tface_to_mface = get_tface_to_mface(t)
+  ndofs = 0
+  for cell in unique(tface_to_mface)
+    if !i.cell_to_mask[cell]
+      ndofs += 1
+    end
+  end
+  TrivialDofMap(ndofs,i.cell_to_mask)
+end
 
 struct DofMap{D,Ti,A<:AbstractArray{Bool}} <: AbstractDofMap{D,Ti}
   indices::Array{Ti,D}
@@ -147,12 +162,8 @@ end
 
 function CellData.change_domain(i::DofMap,t::Triangulation)
   tface_to_mface = get_tface_to_mface(t)
-  if findall(!get_cell_to_mask(t)) == tface_to_mface
-    i
-  else
-    cell_to_mask = get_cell_to_mask(t)
-    DofMap(i.indices,i.dof_to_cell,i.free_vals_box,cell_to_mask)
-  end
+  cell_to_mask = get_cell_to_mask(t)
+  DofMap(i.indices,i.dof_to_cell,i.free_vals_box,cell_to_mask)
 end
 
 # optimization
@@ -232,7 +243,7 @@ end
 
 # tensor product index map, a lot of previous machinery is not needed
 
-struct TProductDofMap{D,Ti,I<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
+struct TProductDofMap{D,Ti} <: AbstractDofMap{D,Ti}
   indices::Array{Ti,D}
   indices_1d::Vector{Vector{Ti}}
 end
@@ -254,6 +265,8 @@ end
 function Base.similar(i::TProductDofMap)
   TProductDofMap(similar(i.indices),i.indices_1d,i.dof_map)
 end
+
+get_univariate_dof_map(i::TProductDofMap) = i.indices_1d
 
 # nnz bounding boxes
 

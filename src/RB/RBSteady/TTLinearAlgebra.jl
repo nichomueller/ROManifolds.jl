@@ -271,7 +271,7 @@ end
 function basis_indices(
   ::Val{1},
   cores_indices::Vector{Vector{Ti}},
-  dof_map::AbstractDofMap{D}
+  dof_map::AbstractArray{Ti,D}
   )::Vector{Ti} where {Ti,D}
 
   Iprev...,Icurr = cores_indices
@@ -286,7 +286,7 @@ end
 function basis_indices(
   ::Val{N},
   cores_indices::Vector{Vector{Ti}},
-  dof_map::AbstractDofMap{D}
+  dof_map::AbstractArray{Ti,D}
   )::Vector{Vector{Ti}} where {Ti,D,N}
 
   L = length(cores_indices)
@@ -304,12 +304,12 @@ function basis_indices(
   return collect.(eachcol(basis_indices))
 end
 
-function basis_indices(cores_indices::Vector{<:Vector},dof_map::AbstractDofMap{D}) where D
+function basis_indices(cores_indices::Vector{<:Vector},dof_map::AbstractArray{Ti,D}) where {Ti,D}
   L = length(cores_indices)
   ninds = L - D + 1
   return basis_indices(Val(ninds),cores_indices,dof_map)
 end
 
 function basis_indices(cores_indices::Vector{<:Vector},dof_map::SparseDofMap)
-  basis_indices(cores_indices,get_sparse_dof_map(dof_map))
+  basis_indices(cores_indices,dof_map.indices_sparse)
 end

@@ -30,8 +30,8 @@ function FESpaces.FESpace(
   space = FESpace(trian.trian,cell_reffe;kwargs...)
   spaces_1d = univariate_spaces(model,trian,cell_reffes_1d;kwargs...)
 
-  dof_map = get_dof_map(space,model.model)
-  tp_dof_map = get_dof_map(space,spaces_1d)
+  dof_map = get_dof_map(model.model,space)
+  tp_dof_map = get_tp_dof_map(space,spaces_1d)
 
   TProductFESpace(space,spaces_1d,trian,dof_map,tp_dof_map)
 end
@@ -82,7 +82,9 @@ FESpaces.get_dirichlet_dof_tag(f::TProductFESpace) = get_dirichlet_dof_tag(f.spa
 
 FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-get_dof_map(f::TProductFESpace) = f.dof_map
+DofMaps.get_dof_map(f::TProductFESpace) = f.dof_map
+
+DofMaps.get_univariate_dof_map(f::TProductFESpace) = DofMaps.get_univariate_dof_map(f.tp_dof_map)
 
 get_tp_dof_map(f::TProductFESpace) = f.tp_dof_map
 

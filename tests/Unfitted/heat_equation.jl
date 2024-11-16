@@ -90,14 +90,14 @@ res(μ,t,u,v,dΩ_in,dΩ_out,dΓ_in) = stiffness(μ,t,u,v,dΩ_in,dΩ_out,dΓ_in) 
 trians_res = (Ω_in,Ω_out,Γ_in)
 trians_stiffness = trians_res
 trians_mass = (Ω_in,)
+domains = FEDomains(trians_res,(trians_stiffness,trians_mass))
 
 energy(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["boundary"])
 trial = TransientTrialParamFESpace(test,g0μt)
-feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
-  trial,test,trians_res,trians_stiffness,trians_mass)
+feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,trial,test,domains)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 fesolver = ThetaMethod(LUSolver(),dt,θ)
@@ -133,11 +133,11 @@ dΓ_in = Measure(Γ_in,degree)
 trians_res = (Ω_in,Ω_out,Γ_in)
 trians_stiffness = trians_res
 trians_mass = (Ω_in,)
+domains = FEDomains(trians_res,(trians_stiffness,trians_mass))
 
 test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["boundary"])
 trial = TransientTrialParamFESpace(test,gμt)
-feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
-  trial,test,trians_res,trians_stiffness,trians_mass)
+feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,trial,test,domains)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 tol = 1e-4

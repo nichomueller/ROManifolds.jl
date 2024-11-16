@@ -50,12 +50,16 @@ function Polynomials.get_order(op::TransientParamFEOperator)
 end
 
 function ParamSteady.get_sparse_dof_map_at_domains(op::TransientParamFEOperator)
-  test = get_test(op)
-  trial = get_trial(op)
   domains_jacs = get_domains_jac(op)
+  dof_map_rows = get_dof_map(get_test(op))
+  dof_map_cols = get_dof_map(get_trial(op))
+  sparse_dof_map = get_sparse_dof_map(op)
   sparse_dof_maps = ()
   for domains_jac in domains_jacs
-    sparse_dof_maps = (sparse_dof_maps...,get_sparse_dof_map(test,trial,domains_jac))
+    dof_map_rows′ = change_domain(dof_map_rows,domains_jac)
+    dof_map_cols′ = change_domain(dof_map_cols,domains_jac)
+    sparse_dof_map′ = change_domain(sparse_dof_map,dof_map_rows′,dof_map_cols′)
+    sparse_dof_maps = (sparse_dof_maps...,sparse_dof_map′)
   end
   return sparse_dof_maps
 end

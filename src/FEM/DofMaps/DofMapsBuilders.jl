@@ -27,32 +27,42 @@ function get_dof_map(space::FESpace)
   get_dof_map(model,space)
 end
 
-function get_dof_map(test::SingleFieldFESpace)
-  TrivialDofMap(num_free_dofs(test))
+function get_dof_map(space::SingleFieldFESpace)
+  trian = get_triangulation(space)
+  nfdofs = num_free_dofs(space)
+  cell_dof_ids = get_cell_dof_ids(space)
+  cache = array_cache(cell_dof_ids)
+
+  dof_to_cell = _get_dof_to_cell(cache,cell_dof_ids,nfdofs)
+  cell_to_mask = get_cell_to_mask(trian)
+  TrivialDofMap(dof_to_cell,cell_to_mask)
 end
 
-function get_dof_map(test::MultiFieldFESpace)
-  ntest = num_fields(test)
-  map(1:ntest) do i
-    get_dof_map(test[i])
+function get_dof_map(space::MultiFieldFESpace)
+  nfields = num_fields(space)
+  map(1:nfields) do i
+    get_dof_map(space[i])
   end
 end
 
-function get_dof_map(test::SingleFieldFESpace,trian::Triangulation)
-  dof_map = get_dof_map(test)
+function get_dof_map(space::FESpace,trian::Union{Triangulation,Tuple{Vararg{Triangulation}}})
+  dof_map = get_dof_map(space)
   change_domain(dof_map,trian)
 end
 
-function get_dof_map(test::MultiFieldFESpace,trian::Triangulation)
-  ntest = num_fields(test)
-  map(1:ntest) do i
-    get_dof_map(test[i],trian)
+function CellData.change_domain(dof_map::AbstractDofMap,trian::Triangulation)
+  @abstractmethod
+end
+
+function CellData.change_domain(dof_maps::AbstractArray{<:AbstractDofMap},trian::Triangulation)
+  map(dof_maps) do dof_map
+    change_domain(dof_map,trian)
   end
 end
 
-function get_dof_map(test::FESpace,trians::Tuple{Vararg{Triangulation}})
+function CellData.change_domain(dof_map,trians::Tuple{Vararg{Triangulation}})
   contribution(trians) do trian
-    get_dof_map(test,trian)
+    change_domain(dof_map,trian)
   end
 end
 
@@ -73,7 +83,8 @@ function get_dof_map(model::CartesianDiscreteModel,space::UnconstrainedFESpace)
   trian = get_triangulation(space)
   cell_to_mask = get_cell_to_mask(trian)
 
-  dof_to_cell = _get_dof_to_cell(cache,cell_dof_ids,dof_map)
+  nfdofs = num_free_dofs(space)
+  dof_to_cell = _get_dof_to_cell(cache,cell_dof_ids,nfdofs)
 
   return DofMap(dof_map,dof_to_cell,cell_to_mask)
 end
@@ -87,7 +98,7 @@ function get_dof_map(
   args...
   ) where {T,Ti,D}
 
-  _get_dof_map(model,cache,cell_dof_ids,order)
+  get_dof_map(model,cache,cell_dof_ids,order)
 end
 
 function get_dof_map(
@@ -102,14 +113,14 @@ function get_dof_map(
   dof_maps = Array{Ti,D}[]
   for dofs in comp_to_dofs
     cell_dof_comp_ids = _get_cell_dof_comp_ids(cell_dof_ids,dofs)
-    dof_map_comp = _get_dof_map(model,cache,cell_dof_comp_ids,order)
+    dof_map_comp = get_dof_map(model,cache,cell_dof_comp_ids,order)
     push!(dof_maps,dof_map_comp)
   end
   dof_map = stack(dof_maps;dims=D+1)
   return dof_map
 end
 
-function _get_dof_map(
+function get_dof_map(
   model::CartesianDiscreteModel{Dc},
   cache_cell_dof_ids,
   cell_dof_ids::Table{Ti},
@@ -144,8 +155,7 @@ function _get_dof_map(
   return dof_map
 end
 
-function _get_dof_to_cell(cache,cell_dof_ids,dof_map)
-  nfdofs = num_free_dofs(dof_map)
+function _get_dof_to_cell(cache,cell_dof_ids,nfdofs)
   dof_to_cell = map(dof -> get_dof_to_cell(cache,cell_dof_ids,dof),1:nfdofs)
   return Table(dof_to_cell)
 end
@@ -175,6 +185,9 @@ function get_dof_map(model::CartesianDiscreteModel,zs::ZeroMeanFESpace)
 end
 
 # sparse interface
+
+get_univariate_dof_map(f::SingleFieldFESpace) = @abstractmethod
+get_univariate_dof_map(f::MultiFieldFESpace) = @notimplemented
 
 """
     get_sparse_dof_map(trial::FESpace,test::FESpace) -> AbstractDofMap
@@ -254,8 +267,8 @@ function get_sparse_dof_map(
   sparsity::TProductSparsityPattern)
 
   trian = get_triangulation(trial)
-  model = get_background_matrix(trian)
-  @check model === get_background_matrix(get_triangulation(test))
+  model = get_background_model(trian)
+  @check model === get_background_model(get_triangulation(test))
 
   rows = get_dof_map(test)
   cols = get_dof_map(trial)
@@ -273,13 +286,13 @@ function get_sparse_dof_map(
   test::SingleFieldFESpace,
   sparsity::SparsityPattern)
 
-  TrivialDofMap(sparsity)
+  TrivialSparseDofMap(sparsity)
 end
 
 function get_sparse_dof_map(
-  trial::SingleFieldFESpace,
-  test::SingleFieldFESpace,
-  trian::Triangulation)
+  trial::FESpace,
+  test::FESpace,
+  trian::Union{Triangulation,Tuple{Vararg{Triangulation}}})
 
   sparse_dof_map = get_sparse_dof_map(trial,test)
   rows = get_dof_map(test,trian)
@@ -287,25 +300,33 @@ function get_sparse_dof_map(
   change_domain(sparse_dof_map,rows,cols)
 end
 
-function get_sparse_dof_map(
-  trial::MultiFieldFESpace,
-  test::MultiFieldFESpace,
-  trian::Triangulation)
+function CellData.change_domain(
+  sparse_dof_map::AbstractDofMap,
+  rows::AbstractDofMap,
+  cols::AbstractDofMap)
 
-  ntest = num_fields(test)
-  ntrial = num_fields(trial)
-  map(Iterators.product(1:ntest,1:ntrial)) do (i,j)
-    get_sparse_dof_map(trial[j],test[i],trian)
+  @abstractmethod
+end
+
+function CellData.change_domain(
+  sparse_dof_maps::AbstractArray{<:AbstractDofMap},
+  rows::AbstractDofMap,
+  cols::AbstractDofMap)
+
+  map(sparse_dof_maps) do sparse_dof_map
+    change_domain(sparse_dof_map,rows,cols)
   end
 end
 
-function get_sparse_dof_map(
-  trial::FESpace,
-  test::FESpace,
-  trians::Tuple{Vararg{Triangulation}})
+function CellData.change_domain(
+  sparse_dof_map,
+  rows::ArrayContribution,
+  cols::ArrayContribution)
 
+  @check all( ( tr === tc for (tr,tc) in zip(get_domains(rows),get_domains(cols)) ) )
+  trians = get_domains(rows)
   contribution(trians) do trian
-    get_sparse_dof_map(trial,test,trian)
+    change_domain(sparse_dof_map,rows[trian],cols[trian])
   end
 end
 
@@ -339,7 +360,7 @@ get_tface_to_mface(t::Geometry.BodyFittedTriangulation) = t.tface_to_mface
 get_tface_to_mface(t::Geometry.BoundaryTriangulation) = t.glue.face_to_bgface
 get_tface_to_mface(t::Geometry.TriangulationView) = get_tface_to_mface(t.parent)
 get_tface_to_mface(t::Interfaces.SubFacetTriangulation) = t.subfacets.facet_to_bgcell
-get_tface_to_mface(t::Interfaces.SubCellTriangulation) = t.subcells.cell_to_bgcell
+get_tface_to_mface(t::Interfaces.SubCellTriangulation) = unique(t.subcells.cell_to_bgcell)
 function get_tface_to_mface(t::Geometry.AppendedTriangulation)
   lazy_append(get_tface_to_mface(t.a),get_tface_to_mface(t.b))
 end

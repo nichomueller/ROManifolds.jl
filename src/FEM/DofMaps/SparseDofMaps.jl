@@ -10,8 +10,6 @@ struct TrivialSparseDofMap{A<:SparsityPattern} <: AbstractTrivialDofMap
   sparsity::A
 end
 
-TrivialDofMap(sparsity::SparsityPattern) = TrivialSparseDofMap(sparsity)
-TrivialDofMap(i::TrivialSparseDofMap) = i
 Base.size(i::TrivialSparseDofMap) = (nnz(i.sparsity),)
 
 recast(a::AbstractArray,i::TrivialSparseDofMap) = recast(a,i.sparsity)
@@ -19,12 +17,12 @@ recast(a::AbstractArray,i::TrivialSparseDofMap) = recast(a,i.sparsity)
 SparseDofMapStyle(i::TrivialSparseDofMap) = FullDofMapIndexing()
 
 function CellData.change_domain(
-  a::TrivialSparseDofMap,
+  i::TrivialSparseDofMap,
   row::AbstractDofMap{D,Ti},
   col::AbstractDofMap{D,Ti}
   ) where {D,Ti}
 
-  sparsity = change_domain(a.sparsity,row,col)
+  sparsity = change_domain(i.sparsity,row,col)
   TrivialSparseDofMap(sparsity)
 end
 
@@ -67,20 +65,20 @@ end
 
 Base.size(i::SparseDofMap) = size(i.indices)
 
-function Base.getindex(i::SparseDofMap{D,Ti,A,FullDofMapIndexing},j::Vararg{Integer,D}) where {D,Ti,A}
-  getindex(i.indices,j...)
+function Base.getindex(i::SparseDofMap{D,Ti,A,FullDofMapIndexing},j::Integer) where {D,Ti,A}
+  getindex(i.indices,j)
 end
 
-function Base.setindex!(i::SparseDofMap{D,Ti,A,FullDofMapIndexing},v,j::Vararg{Integer,D}) where {D,Ti,A}
-  setindex!(i.indices,v,j...)
+function Base.setindex!(i::SparseDofMap{D,Ti,A,FullDofMapIndexing},v,j::Integer) where {D,Ti,A}
+  setindex!(i.indices,v,j)
 end
 
-function Base.getindex(i::SparseDofMap{D,Ti,A,SparseDofMapIndexing},j::Vararg{Integer,D}) where {D,Ti,A}
-  getindex(i.indices_sparse,j...)
+function Base.getindex(i::SparseDofMap{D,Ti,A,SparseDofMapIndexing},j::Integer) where {D,Ti,A}
+  getindex(i.indices_sparse,j)
 end
 
-function Base.setindex!(i::SparseDofMap{D,Ti,A,SparseDofMapIndexing},v,j::Vararg{Integer,D}) where {D,Ti,A}
-  setindex!(i.indices_sparse,v,j...)
+function Base.setindex!(i::SparseDofMap{D,Ti,A,SparseDofMapIndexing},v,j::Integer) where {D,Ti,A}
+  setindex!(i.indices_sparse,v,j)
 end
 
 function Base.copy(i::SparseDofMap)
@@ -99,11 +97,12 @@ function CellData.change_domain(
   col::DofMap{D,Ti}
   ) where {D,Ti}
 
-  nrows = num_rows(i.sparsity)
+  # nrows = num_rows(i.sparsity)
   sparsity = change_domain(i.sparsity,row,col)
-  indices_sparse = sparse_change_domain(i.indices_sparse,row,col,nrows)
-  indices = to_nz_index(indices_sparse,i.sparsity)
-  SparseDofMap(indices,indices_sparse,sparsity,i.index_style)
+  # indices_sparse = sparse_change_domain(i.indices_sparse,row,col,nrows)
+  # indices = to_nz_index(indices_sparse,i.sparsity)
+  # SparseDofMap(indices,indices_sparse,sparsity,i.index_style)
+  SparseDofMap(i.indices,i.indices_sparse,sparsity,i.index_style)
 end
 
 function sparse_change_domain(
@@ -113,7 +112,7 @@ function sparse_change_domain(
   nrows::Int) where {D,Ti}
 
   indices′ = zeros(Ti,size(indices))
-  for (j,ij) in enumerate(indices′)
+  for (j,ij) in enumerate(indices)
     col_dof = fast_index(ij,nrows)
     row_dof = slow_index(ij,nrows)
     if show_dof(row,row_dof) && show_dof(col,col_dof)
