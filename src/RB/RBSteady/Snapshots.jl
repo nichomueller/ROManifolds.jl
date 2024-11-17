@@ -15,7 +15,7 @@ Subtypes:
 abstract type AbstractSnapshots{T,N,D,I<:AbstractDofMap{D},R<:AbstractRealization,A} <: AbstractParamContainer{T,N} end
 
 Utils.get_values(s::AbstractSnapshots) = @abstractmethod
-get_indexed_values(s::AbstractSnapshots) = @abstractmethod
+get_indexed_data(s::AbstractSnapshots) = @abstractmethod
 DofMaps.get_dof_map(s::AbstractSnapshots) = @abstractmethod
 get_realization(s::AbstractSnapshots) = @abstractmethod
 
@@ -53,7 +53,7 @@ The output snapshots are indexed according to a [`TrivialDofMap`](@ref)
 """
 function flatten_snapshots(s::AbstractSnapshots)
   i′ = TrivialDofMap(get_dof_map(s))
-  Snapshots(get_all_data(s),i′,get_realization(s))
+  Snapshots(get_values(s),i′,get_realization(s))
 end
 
 """
@@ -129,18 +129,18 @@ function Snapshots(s::AbstractParamArray,i::AbstractDofMap,r::Realization)
   GenericSnapshots(s,i,r)
 end
 
-ParamDataStructures.get_all_data(s::GenericSnapshots) = s.data
+ParamDataStructures.get_all_data(s::GenericSnapshots) = get_all_data(s.data)
 Utils.get_values(s::GenericSnapshots) = s.data
 DofMaps.get_dof_map(s::GenericSnapshots) = s.dof_map
 get_realization(s::GenericSnapshots) = s.realization
 
-#TODO this call to zeros should be avoided, but for now is necessary for efficient mul!
-# The solution would be to create a parametric lazy view that somehow is a StridedArray
-function get_indexed_values(s::GenericSnapshots{T}) where T
-  # vi = vectorize(get_dof_map(s))
+function get_indexed_data(s::GenericSnapshots{T}) where T
+  vi = vectorize(get_dof_map(s))
+  data = get_all_data(s)
+  if isnothing(findfirst(iszero,vi))
+    return view(data,vi,:)
+  end
   i = get_dof_map(s)
-  data = get_all_data(s.data)
-  # idata = view(data,vi,:)
   idata = zeros(T,size(data))
   for (j,ij) in enumerate(i)
     for k in 1:num_params(s)
@@ -149,7 +149,7 @@ function get_indexed_values(s::GenericSnapshots{T}) where T
       end
     end
   end
-  ConsecutiveParamArray(idata)
+  return idata
 end
 
 Base.@propagate_inbounds function Base.getindex(
@@ -160,7 +160,7 @@ Base.@propagate_inbounds function Base.getindex(
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
   ispace′ = s.dof_map[ispace...]
-  data = get_all_data(s.data)
+  data = get_all_data(s)
   ispace′ == 0 ? zero(eltype(s)) : data[ispace′,iparam]
 end
 
@@ -173,7 +173,7 @@ Base.@propagate_inbounds function Base.setindex!(
   @boundscheck checkbounds(s,i...)
   ispace...,iparam = i
   ispace′ = s.dof_map[ispace...]
-  data = get_all_data(s.data)
+  data = get_all_data(s)
   ispace′ != 0 && (data[ispace′,iparam] = v)
 end
 
@@ -212,16 +212,14 @@ _num_all_params(s::AbstractSnapshots) = num_params(s)
 _num_all_params(s::SnapshotsAtIndices) = _num_all_params(s.snaps)
 
 function Utils.get_values(s::SnapshotsAtIndices)
-  data = get_all_data(get_all_data(s))
+  data = get_all_data(s)
   v = view(data,:,param_indices(s))
   ConsecutiveParamArray(v)
 end
 
-function get_indexed_values(s::SnapshotsAtIndices)
-  data = get_all_data(get_all_data(s))
-  vi = vectorize(get_dof_map(s))
-  v = view(data,vi,param_indices(s))
-  ConsecutiveParamArray(v)
+function get_indexed_data(s::SnapshotsAtIndices)
+  idata = get_indexed_data(s.snaps)
+  view(idata,:,param_indices(s))
 end
 
 get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
@@ -318,53 +316,47 @@ function Utils.get_values(s::ReshapedSnapshots)
   reshape(v.data,s.size)
 end
 
-function get_indexed_values(s::ReshapedSnapshots)
-  v = get_indexed_values(s.snaps)
-  vr = reshape(v.data,s.size)
-  ConsecutiveParamArray(vr)
+function get_indexed_data(s::ReshapedSnapshots)
+  v = get_indexed_data(s.snaps)
+  reshape(v,s.size)
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::AbstractSnapshots{S,2}) where {T,S}
-  consec_mul(get_indexed_values(A),get_indexed_values(B))
+  consec_mul(get_indexed_data(A),get_indexed_data(B))
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::Adjoint{S,<:AbstractSnapshots}) where {T,S}
-  consec_mul(get_indexed_values(A),adjoint(get_indexed_values(B.parent)))
+  consec_mul(get_indexed_data(A),adjoint(get_indexed_data(B.parent)))
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::AbstractMatrix{S}) where {T,S}
-  consec_mul(get_indexed_values(A),B)
+  consec_mul(get_indexed_data(A),B)
 end
 
 function Base.:*(A::AbstractSnapshots{T,2},B::Adjoint{T,<:AbstractMatrix{S}}) where {T,S}
-  consec_mul(get_indexed_values(A),B)
+  consec_mul(get_indexed_data(A),B)
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractSnapshots{T,2}},B::AbstractSnapshots{S,2}) where {T,S}
-  consec_mul(adjoint(get_indexed_values(A.parent)),get_indexed_values(B))
+  consec_mul(adjoint(get_indexed_data(A.parent)),get_indexed_data(B))
 end
 
 function Base.:*(A::AbstractMatrix{T},B::AbstractSnapshots{S,2}) where {T,S}
-  consec_mul(A,get_indexed_values(B))
+  consec_mul(A,get_indexed_data(B))
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::AbstractSnapshots{S,2}) where {T,S}
-  consec_mul(A,get_indexed_values(B))
+  consec_mul(A,get_indexed_data(B))
 end
 
-consecutive_mul(A::AbstractArray,B::AbstractArray) = @abstractmethod
+consec_mul(A::AbstractArray,B::AbstractArray) = A*B
 
 for T in (:ConsecutiveParamArray,:ConsecutiveParamSparseMatrix)
-  for S in (:ConsecutiveParamArray,:ConsecutiveParamSparseMatrix)
-    @eval begin
-      consec_mul(A::$T,B::$S) = get_all_data(A)*get_all_data(B)
-      consec_mul(A::$T,B::Adjoint{U,<:$S}) where U = get_all_data(A)*adjoint(get_all_data(B.parent))
-      consec_mul(A::Adjoint{U,<:$T},B::$S) where U = adjoint(get_all_data(A.parent))*get_all_data(B)
-    end
-  end
   @eval begin
-    consec_mul(A::$T,B::Union{<:AbstractArray,Adjoint{U,<:AbstractArray}}) where U = get_all_data(A)*B
-    consec_mul(A::Union{<:AbstractArray,Adjoint{U,<:AbstractArray}},B::$T) where U = A*get_all_data(B)
+    consec_mul(A::$T,B::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}}) where S = get_all_data(A)*B
+    consec_mul(A::Adjoint{S,<:$T},B::Union{<:AbstractArray,Adjoint{U,<:AbstractArray}}) where {S,U} = adjoint(get_all_data(A.parent))*B
+    consec_mul(A::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}},B::$T) where S = A*get_all_data(B)
+    consec_mul(A::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}},B::Adjoint{U,<:$T}) where {S,U} = A*adjoint(get_all_data(B.parent))
   end
 end
 
@@ -453,8 +445,8 @@ function Utils.get_values(s::BlockSnapshots)
   map(get_values,s.array) |> mortar
 end
 
-function get_indexed_values(s::BlockSnapshots)
-  map(get_indexed_values,s.array) |> mortar
+function get_indexed_data(s::BlockSnapshots)
+  map(get_indexed_data,s.array)
 end
 
 for f in (:flatten_snapshots,:select_snapshots)

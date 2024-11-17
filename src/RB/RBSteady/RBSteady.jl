@@ -70,7 +70,7 @@ export Snapshots
 export get_realization
 export flatten_snapshots
 export select_snapshots
-export get_indexed_values
+export get_indexed_data
 export num_space_dofs
 include("Snapshots.jl")
 

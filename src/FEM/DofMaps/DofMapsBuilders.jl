@@ -309,12 +309,14 @@ function CellData.change_domain(
 end
 
 function CellData.change_domain(
-  sparse_dof_maps::AbstractArray{<:AbstractDofMap},
-  rows::AbstractDofMap,
-  cols::AbstractDofMap)
+  sparse_dof_maps::AbstractMatrix{<:AbstractDofMap},
+  rows::AbstractVector{<:AbstractDofMap},
+  cols::AbstractVector{<:AbstractDofMap})
 
-  map(sparse_dof_maps) do sparse_dof_map
-    change_domain(sparse_dof_map,rows,cols)
+  @check size(sparse_dof_maps,1) == length(rows)
+  @check size(sparse_dof_maps,2) == length(cols)
+  map(Iterators.product(1:length(rows),1:length(cols))) do (i,j)
+    change_domain(sparse_dof_maps[i,j],rows[i],cols[j])
   end
 end
 
