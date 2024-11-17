@@ -83,6 +83,27 @@ function order_sparsity(s::SparsityPattern,rows::AbstractDofMap,cols::AbstractDo
   order_sparsity(s,vectorize(rows),vectorize(cols))
 end
 
+function CellData.change_domain(
+  a::SparsityPattern,
+  rows::ArrayContribution,
+  cols::ArrayContribution)
+
+  @check all( ( tr === tc for (tr,tc) in zip(get_domains(rows),get_domains(cols)) ) )
+  trians = get_domains(rows)
+  contribution(trians) do trian
+    change_domain(a,rows[trian],cols[trian])
+  end
+end
+
+function Utils.Contribution(
+  v::Tuple{Vararg{SparsityPattern}},
+  t::Tuple{Vararg{Triangulation}})
+
+  matrix = get_background_matrix(first(v))
+  Tv = eltype(matrix)
+  ArrayContribution{Tv,2}(v,t)
+end
+
 """
 """
 struct SparsityPatternCSC{Tv,Ti} <: SparsityPattern
@@ -211,7 +232,7 @@ end
 
 # univariate (tensor product factors) sparse dofs to sparse dofs
 function get_sparse_dof_map(sparsity::TProductSparsityPattern,I,J,i,j)
-  IJ = get_nonzero_indices(sparsity)
+  IJ = I .+ (J .- 1)*num_rows(sparsity)
   uids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
 
   unrows = univariate_num_rows(sparsity)

@@ -60,6 +60,7 @@ include("SparseDofMaps.jl")
 export get_dof_map
 export get_dof_type
 export get_sparse_dof_map
+export get_univariate_dof_map
 export get_polynomial_order
 include("DofMapsBuilders.jl")
 

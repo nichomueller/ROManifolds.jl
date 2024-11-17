@@ -145,13 +145,13 @@ energy(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
 state_reduction = TransientReduction(tol,energy;nparams=100,sketch=:sprn)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=80,nparams_jac=80)
 
-fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-ronline = realization(feop;nparams=10)
-x̂,rbstats = solve(rbsolver,rbop,ronline)
+fesnaps′,festats′ = solution_snapshots(rbsolver,feop,uh0μ)
+rbop′ = reduced_operator(rbsolver,feop,fesnaps′)
+# ronline = realization(feop;nparams=10)
+x̂′,rbstats′ = solve(rbsolver,rbop′,ronline)
 
-x,festats = solution_snapshots(rbsolver,feop,ronline,uh0μ)
-perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)
+x′,festats′ = solution_snapshots(rbsolver,feop,ronline,uh0μ)
+perf′ = rb_performance(rbsolver,feop,rbop′,x′,x̂′,festats′,rbstats′,ronline)
 
 # plotting
 

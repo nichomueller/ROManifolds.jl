@@ -76,14 +76,16 @@ end
 
 function get_sparse_dof_map_at_domains(op::ParamFEOperator)
   domains_jac = get_domains_jac(op)
+  trial = get_trial(op)
+  test = get_test(op)
 
-  dof_map_rows = get_dof_map(get_test(op))
-  dof_map_cols = get_dof_map(get_trial(op))
+  dof_map_rows = get_dof_map(test)
+  dof_map_cols = get_dof_map(trial)
   sparse_dof_map = get_sparse_dof_map(op)
+  sparsity = sparse_dof_map.sparsity
 
-  dof_map_rows′ = change_domain(dof_map_rows,domains_jac)
-  dof_map_cols′ = change_domain(dof_map_cols,domains_jac)
-  change_domain(sparse_dof_map,dof_map_rows′,dof_map_cols′)
+  sparsity′ = change_domain(sparsity,domains_jac)
+  get_sparse_dof_map(trial,test,sparsity′)
 end
 
 function FESpaces.assemble_matrix(op::ParamFEOperator,form::Function)

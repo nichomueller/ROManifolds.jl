@@ -84,7 +84,7 @@ FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv) = scatter_f
 
 DofMaps.get_dof_map(f::TProductFESpace) = f.dof_map
 
-DofMaps.get_univariate_dof_map(f::TProductFESpace) = DofMaps.get_univariate_dof_map(f.tp_dof_map)
+DofMaps.get_univariate_dof_map(f::TProductFESpace) = get_univariate_dof_map(f.tp_dof_map)
 
 get_tp_dof_map(f::TProductFESpace) = f.tp_dof_map
 

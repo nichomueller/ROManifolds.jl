@@ -102,30 +102,31 @@ function CellData.change_domain(
   col::DofMap{D,Ti}
   ) where {D,Ti}
 
+  @notimplemented "Implementation needed, read commented lines"
   # nrows = num_rows(i.sparsity)
-  sparsity = change_domain(i.sparsity,row,col)
+  # sparsity = change_domain(i.sparsity,row,col)
   # indices_sparse = sparse_change_domain(i.indices_sparse,row,col,nrows)
   # indices = to_nz_index(indices_sparse,i.sparsity)
   # SparseDofMap(indices,indices_sparse,sparsity,i.index_style)
-  SparseDofMap(i.indices,i.indices_sparse,sparsity,i.index_style)
+  # SparseDofMap(i.indices,i.indices_sparse,sparsity,i.index_style)
 end
 
-function sparse_change_domain(
-  indices::Array{Ti,D},
-  row::DofMap{D,Ti},
-  col::DofMap{D,Ti},
-  nrows::Int) where {D,Ti}
+# function sparse_change_domain(
+#   indices::Array{Ti,D},
+#   row::DofMap{D,Ti},
+#   col::DofMap{D,Ti},
+#   nrows::Int) where {D,Ti}
 
-  indices′ = zeros(Ti,size(indices))
-  for (j,ij) in enumerate(indices)
-    col_dof = fast_index(ij,nrows)
-    row_dof = slow_index(ij,nrows)
-    if show_dof(row,row_dof) && show_dof(col,col_dof)
-      indices′[j] = indices[j]
-    end
-  end
-  return indices′
-end
+#   indices′ = zeros(Ti,size(indices))
+#   for (j,ij) in enumerate(indices)
+#     col_dof = fast_index(ij,nrows)
+#     row_dof = slow_index(ij,nrows)
+#     if show_dof(row,row_dof) && show_dof(col,col_dof)
+#       indices′[j] = indices[j]
+#     end
+#   end
+#   return indices′
+# end
 
 # optimization
 

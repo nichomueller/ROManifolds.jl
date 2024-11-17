@@ -292,6 +292,16 @@ end
 function get_sparse_dof_map(
   trial::FESpace,
   test::FESpace,
+  sparsity::ArrayContribution)
+
+  contribution(get_domains(sparsity)) do trian
+    get_sparse_dof_map(trial,test,sparsity[trian])
+  end
+end
+
+function get_sparse_dof_map(
+  trial::FESpace,
+  test::FESpace,
   trian::Union{Triangulation,Tuple{Vararg{Triangulation}}})
 
   sparse_dof_map = get_sparse_dof_map(trial,test)
