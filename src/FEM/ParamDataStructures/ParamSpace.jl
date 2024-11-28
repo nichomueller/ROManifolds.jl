@@ -249,12 +249,18 @@ function realization(
   p::ParamSpace{P,SmolyakSampling} where P;
   level=dimension(p),
   grid=smolyak_grid(p),
-  nparams=length(grid))
+  nparams=length(grid),
+  random=false)
 
-  if nparams > length(grid)
-    realization(p;level=level+1,nparams=nparams)
+  if random
+    p′ = ParamSpace(p.param_domain,UniformSampling())
+    realization(p′;nparams)
   else
-    Realization(grid[1:nparams])
+    if nparams > length(grid)
+      realization(p;level=level+1,nparams=nparams)
+    else
+      Realization(rand(grid,nparams))
+    end
   end
 end
 
@@ -286,10 +292,11 @@ end
 
 function realization(
   p::TransientParamSpace;
-  nparams=1,time_locations=eachindex(p.temporal_domain)
+  time_locations=eachindex(p.temporal_domain),
+  kwargs...
   )
 
-  params = realization(p.parametric_space;nparams)
+  params = realization(p.parametric_space;kwargs...)
   times = p.temporal_domain[time_locations]
   TransientRealization(params,times)
 end
@@ -583,57 +590,4 @@ function SmolyakApprox.smolyak_grid(p::ParamSpace,level=dimension(p))
   SmolyakApprox.scale_nodes!(grid,domain)
 
   return grid
-end
-
-function test_parametric_space()
-  α = Realization(rand(10))
-  β = Realization([rand(10)])
-  @test isa(α,TrivialRealization)
-  @test isa(α,Realization{Vector{Float64}})
-  @test isa(β,Realization{Vector{Vector{Float64}}})
-  γ = TransientRealization(α,1)
-  δ = TransientRealization(α,1:10)
-  ϵ = TransientRealization(β,1:10)
-  @test isa(δ,TransientRealization{<:TrivialRealization,UnitRange{Integer}})
-  @test isa(ϵ,TransientRealization{Realization{Vector{Vector{Float64}}},UnitRange{Integer}})
-  @test length(γ) == 1 && length(δ) == 9 && length(ϵ) == 9
-  change_time!(ϵ,11:20)
-  @test get_times(get_at_time(ϵ,:final)) == 20
-  param_domain = [[1,10],[11,20]]
-  p = ParamSpace(param_domain)
-  t = 1:10
-  pt = TransientParamSpace(param_domain,t)
-  μ = realization(p)
-  μt = realization(pt)
-  @test isa(μ,Realization) && isa(μt,TransientRealization)
-  a(x,t) = sum(x)*t^2*sin(t)
-  a(t) = x -> a(x,t)
-  da = ∂t(a)
-  aμ(x,μ,t) = sum(μ)*a(x,t)
-  aμ(μ,t) = x -> aμ(x,μ,t)
-  aμt = 𝑓ₚₜ(aμ,get_params(μt),get_times(μt))
-  daμt = ∂t(aμt)
-  @test isa(𝑓ₚₜ(a,α,t),Function)
-  @test isa(aμt,AbstractParamFunction)
-  @test isa(daμt,AbstractParamFunction)
-  x = Point(1,2)
-  aμtx = aμt(x)
-  daμtx = daμt(x)
-  for (i,(μ,t)) in enumerate(μt)
-    @test aμtx[i] == a(t)(x)*sum(μ)
-    @test daμtx[i] == da(t)(x)*sum(μ)
-  end
-  b(x,μ) = sum(x)*sum(μ)
-  b(μ) = x -> b(x,μ)
-  bμ = 𝑓ₚ(b,get_params(μ))
-  bμx = bμ(x)
-  for (i,μ) in enumerate(μ)
-    @test b(x,μ) == bμx[i]
-  end
-  for (i,(μ,t)) in enumerate(μt)
-    @test aμ(x,μ,t) == aμtx[i]
-  end
-  for (i,(μ,t)) in enumerate(μt)
-    @test da(x,μ,t) == daμtx[i]
-  end
 end

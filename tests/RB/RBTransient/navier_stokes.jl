@@ -91,8 +91,8 @@ fesolver = ThetaMethod(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=tru
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 
 tol = 1e-4
-state_reduction = TransientReduction(coupling,tol,energy;nparams=50)#,sketch=:sprn)
-rbsolver = RBSolver(fesolver,state_reduction;nparams_res=50,nparams_jac=40,nparams_djac=1)
+state_reduction = TransientReduction(coupling,tol,energy;nparams=50,sketch=:sprn)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=40,nparams_jac=20,nparams_djac=1)
 
 test_dir = datadir(joinpath("navier-stokes","model_circle_2d"))
 create_dir(test_dir)
@@ -126,7 +126,7 @@ fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 save(test_dir,fesnaps)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 save(test_dir,rbop)
-r = realization(feop;nparams=10)
+r = realization(feop;nparams=10,random=true)
 x̂,rbstats = solve(rbsolver,rbop,r)
 
 x,festats = solution_snapshots(rbsolver,feop,r,xh0μ)

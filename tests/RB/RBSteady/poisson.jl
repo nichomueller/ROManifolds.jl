@@ -60,7 +60,7 @@ fesnaps,festats = solution_snapshots(rbsolver,feop)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 save(test_dir,rbop)
 
-μon = realization(feop;nparams=10)
+μon = realization(feop;nparams=10,random=true)
 x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon)
