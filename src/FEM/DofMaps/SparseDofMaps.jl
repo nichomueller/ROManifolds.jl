@@ -1,5 +1,8 @@
 # sparse maps
 
+get_sparsity(::AbstractDofMap) = @abstractmethod
+get_sparsity(i::Array{<:AbstractDofMap}) = map(get_sparsity,i)
+
 abstract type SparseDofMapStyle end
 struct FullDofMapIndexing <: SparseDofMapStyle end
 struct SparseDofMapIndexing <: SparseDofMapStyle end
@@ -17,6 +20,7 @@ end
 Base.size(i::TrivialSparseDofMap) = (nnz(i.sparsity),)
 Base.getindex(i::TrivialSparseDofMap,j::Integer) = j
 
+get_sparsity(i::TrivialSparseDofMap) = i.sparsity
 recast(a::AbstractArray,i::TrivialSparseDofMap) = recast(a,i.sparsity)
 
 SparseDofMapStyle(i::TrivialSparseDofMap) = FullDofMapIndexing()
@@ -93,6 +97,8 @@ end
 function Base.similar(i::SparseDofMap)
   SparseDofMap(similar(i.indices),similar(i.indices_sparse),i.sparsity,i.index_style)
 end
+
+get_sparsity(i::SparseDofMap) = i.sparsity
 
 recast(A::AbstractArray,i::SparseDofMap) = recast(A,i.sparsity)
 

@@ -18,6 +18,10 @@ get_decomposition(a::Rank1Tensor,k::Integer) = k == 1 ? a : error("Exceeded rank
 Base.size(a::Rank1Tensor) = (dimension(a),)
 Base.getindex(a::Rank1Tensor,d::Integer) = get_factors(a)[d]
 
+function LinearAlgebra.cholesky(a::Rank1Tensor)
+  cholesky.(get_factors(a))
+end
+
 struct GenericRankTensor{D,K,A<:AbstractArray} <: AbstractRankTensor{D,K}
   decompositions::Vector{Rank1Tensor{D,A}}
   function GenericRankTensor(decompositions::Vector{Rank1Tensor{D,A}}) where {D,A}
@@ -30,6 +34,11 @@ get_decomposition(a::GenericRankTensor,k::Integer) = a.decompositions[k]
 get_factor(a::GenericRankTensor,d::Integer,k::Integer) = get_factor(get_decomposition(a,k),d)
 Base.size(a::GenericRankTensor) = (rank(a),)
 Base.getindex(a::GenericRankTensor,k::Integer) = get_decomposition(a,k)
+
+#TODO will have to change this at some point
+function LinearAlgebra.cholesky(a::GenericRankTensor)
+  cholesky(get_decomposition(a,1))
+end
 
 function _sort!(a::AbstractVector{<:AbstractVector},i::Tuple{<:TProductDofMap})
   irow, = i

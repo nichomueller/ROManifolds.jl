@@ -200,7 +200,7 @@ function FESpaces.gather_free_and_dirichlet_values!(
   f = get_fe_space(pf)
   pf′ = remove_layer(pf)
   _dv = similar(dv,eltype(dv),0)
-  _fv = ParamVectorWithEntryRemoved(fv,f.dof_to_fix,zero(eltype(fv)))
+  _fv = ParamVectorWithEntryInserted(fv,f.dof_to_fix,zero(eltype(fv)))
   gather_free_and_dirichlet_values!(_fv,_dv,pf′,cv)
   dv[1] = _fv.value
   (fv,dv)
@@ -250,11 +250,12 @@ function FESpaces.gather_dirichlet_values!(
 end
 
 function FESpaces._fill_dirichlet_values_for_tag!(
-  dirichlet_values::ConsecutiveParamVector,
-  dv::ConsecutiveParamVector,
+  dirichlet_values::AbstractParamVector,
+  dv::AbstractParamVector,
   tag,
   dirichlet_dof_to_tag)
 
+  @check MemoryLayoutStyle(dirichlet_values) == MemoryLayoutStyle(dv) == ConsecutiveMemory()
   @check param_length(dirichlet_values) == param_length(dv)
   diri_data = get_all_data(dirichlet_values)
   dv_data = get_all_data(dv)
@@ -268,14 +269,15 @@ function FESpaces._fill_dirichlet_values_for_tag!(
 end
 
 function FESpaces._free_and_dirichlet_values_fill!(
-  free_vals::ConsecutiveParamVector,
-  dirichlet_vals::ConsecutiveParamVector,
+  free_vals::AbstractParamVector,
+  dirichlet_vals::AbstractParamVector,
   cache_vals,
   cache_dofs,
   cell_vals,
   cell_dofs,
   cells)
 
+  @check MemoryLayoutStyle(dirichlet_vals) == MemoryLayoutStyle(free_vals) == ConsecutiveMemory()
   @check param_length(free_vals) == param_length(dirichlet_vals)
   free_data = get_all_data(free_vals)
   diri_data = get_all_data(dirichlet_vals)

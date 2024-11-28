@@ -88,6 +88,7 @@ l(μ,(u,p),(v,q),dΩ_in,dΓd,dΓn) =
 
 trian_res = (Ω_in,Γd,Γn)
 trian_jac = (Ω_in,Ω_out,Γd)
+domains = FEDomains(trian_res,trian_jac)
 
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
@@ -95,16 +96,16 @@ energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(Ω,reffe_u;conformity=:H1,dirichlet_tags="wall")
 trial_u = ParamTrialFESpace(test_u,gμ_0)
-reffe_p = ReferenceFE(lagrangian,Float64,order-1;space=:P)
-test_p = TestFESpace(Ω,reffe_p;conformity=:L2)
+reffe_p = ReferenceFE(lagrangian,Float64,order-1)#;space=:P)
+test_p = TestFESpace(Ω,reffe_p;conformity=:C0)#:L2)
 trial_p = TrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = LinearParamFEOperator(l,a,pspace,trial,test,trian_res,trian_jac)
+feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
 
 fesolver = LinearFESolver(LUSolver())
 
-tol = 1e-4
+tol = fill(1e-4,4)
 state_reduction = SupremizerReduction(coupling,tol,energy;nparams=50,sketch=:sprn)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=30,nparams_jac=30)
 
@@ -119,25 +120,38 @@ perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 r = realization(feop)
 fesnaps,festats = solution_snapshots(rbsolver,feop,r)
 
-# MORE INDEX MAPS :(
-get_sparse_dof_map(test_u,test_u,Ω_in)
-get_sparse_dof_map(test_u,test_u,Ω_out)
-get_sparse_dof_map(test_u,test_u,Γd)
-get_sparse_dof_map(test_u,test_p,Ω_in)
+# u1 = flatten_snapshots(fesnaps[1])[:,1]
+# p1 = flatten_snapshots(fesnaps[2])[:,1]
+# r1 = get_realization(fesnaps[1])[1]
+# U1 = param_getindex(trial_u(r1),1)
+# uh = FEFunction(U1,u1)
+# ph = FEFunction(trial_p,p1)
+# writevtk(Ω_in,datadir("plts/sol"),cellfields=["uh"=>uh,"ph"=>ph])
 
-using ReducedOrderModels.TProduct
-using ReducedOrderModels.DofMaps
+X = assemble_matrix(feop,energy)
+B = assemble_matrix(coupling,test,test)
+basis = reduced_basis(state_reduction.reduction,fesnaps,X)
+
 using SparseArrays
+using BlockArrays
+using LinearAlgebra
 
-sparsity = SparsityPattern(test_u,test_p)
-psparsity = order_sparsity(sparsity,test_u,test_p)
-# I,J,_ = findnz(psparsity)
-# i,j,_ = DofMaps.univariate_findnz(psparsity)
-# g2l_sparse = TProduct._global_2_local(psparsity,I,J,i,j)
-# pg2l_sparse = TProduct._permute_dof_map(g2l_sparse,test_u,test_p)
-# pg2l = to_nz_index(pg2l_sparse,sparsity)
-# SparseDofMap(pg2l,pg2l_sparse,psparsity)
-dof_map_I = get_dof_map(test_p)
-dof_map_J = get_dof_map(test_u)
-dof_map_I_1d = get_tp_dof_map(test_p).indices_1d
-dof_map_J_1d = get_tp_dof_map(test_u).indices_1d
+a_primal,a_dual... = basis.array
+X_primal = X[Block(1,1)]
+H_primal = cholesky(X_primal)
+i = 1
+dual_i = get_basis(a_dual[i])
+primal_map = get_dof_map(a_primal)
+dual_i_map = get_dof_map(a_dual[i])
+C_primal_dual_i = B[Block(1,i+1)]
+C_vi = view(C_primal_dual_i,primal_map,dual_i_map)
+supr_i = H_primal \ C_primal_dual_i * dual_i
+a_primal = union(a_primal,supr_i,X_primal)
+
+
+fe_trial =
+trial = get_trial(op)(r)
+x = zero_free_values(get_trial(rbop.op_linear)(ronline))
+x̂ = zero_free_values(rbop.op_linear.trial(ronline))
+
+rbcache = allocate_rbcache(fesolver,rbop,ronline,x)

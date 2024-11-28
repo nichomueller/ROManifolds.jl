@@ -11,6 +11,10 @@ function Arrays.VectorWithEntryRemoved(a::AbstractParamVector,index::Int)
   ParamVectorWithEntryRemoved(a,index)
 end
 
+MemoryLayoutStyle(::Type{<:ParamVectorWithEntryRemoved}) = ConsecutiveMemory()
+
+get_all_data(v::ParamVectorWithEntryRemoved) = MatrixWithRowRemoved(get_all_data(v.a),v.index)
+
 param_length(v::ParamVectorWithEntryRemoved) = param_length(v.a)
 
 Base.size(v::ParamVectorWithEntryRemoved) = size(v.a)
@@ -38,6 +42,10 @@ function Arrays.VectorWithEntryInserted(a::AbstractParamVector,index::Int,value:
   ParamVectorWithEntryInserted(a,index,value)
 end
 
+MemoryLayoutStyle(::Type{<:ParamVectorWithEntryInserted}) = ConsecutiveMemory()
+
+get_all_data(v::ParamVectorWithEntryInserted) = MatrixWithRowInserted(get_all_data(v.a),v.index,v.value)
+
 param_length(v::ParamVectorWithEntryInserted) = param_length(v.a)
 
 Base.size(v::ParamVectorWithEntryInserted) = size(v.a)
@@ -49,4 +57,35 @@ end
 function Base.sum(v::ParamVectorWithEntryInserted)
   data = get_all_data(v.a)
   sum(data,dims=1) + v.value
+end
+
+struct MatrixWithRowRemoved{T,A<:AbstractMatrix{T}} <: AbstractMatrix{T}
+  matrix::A
+  index::Int
+end
+
+Base.size(a::MatrixWithRowRemoved) = (size(a.matrix,1)-1,size(a.matrix,2))
+
+function Base.getindex(a::MatrixWithRowRemoved,i::Integer,j::Integer)
+  i < a.index ? a.matrix[i,j] : a.matrix[i+1,j]
+end
+
+function Base.setindex!(a::MatrixWithRowRemoved,v,i::Integer,j::Integer)
+  i < a.index ? (a.matrix[i,j]=v) : (a.matrix[i+1,j]=v)
+end
+
+struct MatrixWithRowInserted{T,A<:AbstractMatrix{T}} <: AbstractMatrix{T}
+  matrix::A
+  index::Int
+  value::Vector{T}
+end
+
+Base.size(a::MatrixWithRowInserted) = (size(a.matrix,1)+1,size(a.matrix,2))
+
+function Base.getindex(a::MatrixWithRowInserted,i::Integer,j::Integer)
+  i < a.index ? a.matrix[i,j] : (i==a.index ? a.value[j] : a.matrix[i-1,j])
+end
+
+function Base.setindex!(a::MatrixWithRowInserted,v,i::Integer,j::Integer)
+  i < a.index ? (a.matrix[i,j]=v) : (i==a.index ? a.value[j] = v : a.matrix[i-1,j] = v)
 end

@@ -56,7 +56,7 @@ function ParamSteady.get_sparse_dof_map_at_domains(op::TransientParamFEOperator)
   dof_map_rows = get_dof_map(test)
   dof_map_cols = get_dof_map(trial)
   sparse_dof_map = get_sparse_dof_map(op)
-  sparsity = sparse_dof_map.sparsity
+  sparsity = get_sparsity(sparse_dof_map)
   sparse_dof_maps = ()
   for domains_jac in domains_jacs
     dof_map_rows′ = change_domain(dof_map_rows,domains_jac)

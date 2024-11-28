@@ -168,7 +168,7 @@ function get_dof_map(model::CartesianDiscreteModel,ls::FESpaceWithLinearConstrai
   sdof_to_bdof = setdiff(1:ndofs,ls.mDOF_to_DOF)
   dof_to_constraints = get_dof_to_constraints(sdof_to_bdof,ndofs)
   dof_map = get_dof_map(model,space)
-  return ConstrainedDofsDofMap(dof_map,dof_to_constraints)
+  return ConstrainedDofMap(dof_map,dof_to_constraints)
 end
 
 function get_dof_map(model::CartesianDiscreteModel,cs::FESpaceWithConstantFixed)
@@ -176,7 +176,7 @@ function get_dof_map(model::CartesianDiscreteModel,cs::FESpaceWithConstantFixed)
   ndofs = num_free_dofs(space)
   dof_to_constraints = get_dof_to_constraints(cs.sdof_to_bdof,ndofs)
   dof_map = get_dof_map(model,space)
-  return ConstrainedDofsDofMap(dof_map,dof_to_constraints)
+  return ConstrainedDofMap(dof_map,dof_to_constraints)
 end
 
 function get_dof_map(model::CartesianDiscreteModel,zs::ZeroMeanFESpace)
@@ -287,6 +287,18 @@ function get_sparse_dof_map(
   sparsity::SparsityPattern)
 
   TrivialSparseDofMap(sparsity)
+end
+
+function get_sparse_dof_map(
+  trial::MultiFieldFESpace,
+  test::MultiFieldFESpace,
+  sparsity::Matrix{<:SparsityPattern})
+
+  ntest = num_fields(test)
+  ntrial = num_fields(trial)
+  map(Iterators.product(1:ntest,1:ntrial)) do (i,j)
+    get_sparse_dof_map(trial[j],test[i],sparsity[i,j])
+  end
 end
 
 function get_sparse_dof_map(

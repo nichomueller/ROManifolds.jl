@@ -13,26 +13,25 @@ using ReducedOrderModels
 θ = 1.0
 dt = 0.0025
 t0 = 0.0
-tf = 10*dt
+tf = 60*dt
 
-pranges = fill([1,10],3)
+pranges = fill([1.0,10.0],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
-n = 10
-domain = (0,1,0,1)
-partition = (n,n)
-model = CartesianDiscreteModel(domain,partition)
+model_dir = datadir(joinpath("models","new_model_circle_2d.json"))
+model = DiscreteModelFromFile(model_dir)
 labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet",[7])
-add_tag_from_tags!(labels,"dirichlet0",collect(1:6))
+add_tag_from_tags!(labels,"dirichlet0",["walls_p","walls","cylinders_p","cylinders"])
+add_tag_from_tags!(labels,"dirichlet",["inlet"])
 
 order = 2
 degree = 2*order+1
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
 
-a(x,μ,t) = μ[1]*exp((sin(t)+cos(t))/sum(μ))
+const Re = 100.0
+a(x,μ,t) = μ[1]/Re
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
@@ -41,8 +40,8 @@ dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 c(u,v,dΩ) = ∫( v⊙(conv∘(u,∇(u))) )dΩ
 dc(u,du,v,dΩ) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )dΩ
 
-const W = 1.0
-inflow(μ,t) = abs(1-cos(9*π*t/(5*tf))+μ[3]*sin(μ[2]*9*π*t/(5*tf))/100)
+const W = 0.5
+inflow(μ,t) = abs(1-cos(2π*t/tf)+μ[3]*sin(μ[2]*2π*t/tf)/100)
 g_in(x,μ,t) = VectorValue(-x[2]*(W-x[2])*inflow(μ,t),0.0)
 g_in(μ,t) = x->g_in(x,μ,t)
 gμt_in(μ,t) = TransientParamFunction(g_in,μ,t)
@@ -77,7 +76,7 @@ reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet","dirichlet0"])
 trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_0])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:C0)
+test_p = TestFESpace(model,reffe_p;conformity=:H1)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -92,8 +91,11 @@ fesolver = ThetaMethod(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=tru
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 
 tol = 1e-4
-state_reduction = TransientReduction(coupling,tol,energy;nparams=50)
-rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,nparams_djac=1)
+state_reduction = TransientReduction(coupling,tol,energy;nparams=50)#,sketch=:sprn)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=50,nparams_jac=40,nparams_djac=1)
+
+test_dir = datadir(joinpath("navier-stokes","model_circle_2d"))
+create_dir(test_dir)
 
 # ################## solve steady stokes problem for IC ##########################
 
@@ -121,9 +123,47 @@ rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,npara
 # ################################################################################
 
 fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
+save(test_dir,fesnaps)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
+save(test_dir,rbop)
 r = realization(feop;nparams=10)
 x̂,rbstats = solve(rbsolver,rbop,r)
 
 x,festats = solution_snapshots(rbsolver,feop,r,xh0μ)
 perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,r)
+println(perf)
+
+# # plotting
+
+# r = get_realization(fesnaps)
+# S′ = flatten_snapshots(fesnaps)
+# S1 = S′[1][:,:,1]
+# r1 = r[1,:]
+# U1 = trial_u(r1)
+# plt_dir = datadir("plts")
+# create_dir(plt_dir)
+# for i in 1:length(r1)
+#   Ui = param_getindex(U1,i)
+#   uhi = FEFunction(Ui,S1[:,i])
+#   writevtk(Ω,joinpath(plt_dir,"u_$i.vtu"),cellfields=["uh"=>uhi])
+# end
+# S2 = S′[2][:,:,1]
+# for i in 1:length(r1)
+#   Pi = trial_p
+#   phi = FEFunction(Pi,S2[:,i])
+#   writevtk(Ω,joinpath(plt_dir,"p_$i.vtu"),cellfields=["ph"=>phi])
+# end
+
+# STOKES
+tol = 1e-4
+state_reduction = TransientReduction(coupling,tol,energy;nparams=50,sketch=:sprn)
+fesolver_lin = ThetaMethod(LUSolver(),dt,θ)
+rbsolver_lin = RBSolver(fesolver_lin,state_reduction;nparams_res=50,nparams_jac=20,nparams_djac=1)
+fesnaps,festats = solution_snapshots(rbsolver_lin,feop_lin,xh0μ)
+rbop = reduced_operator(rbsolver_lin,feop_lin,fesnaps)
+r = realization(feop_lin;nparams=10)
+x̂,rbstats = solve(rbsolver_lin,rbop,r)
+
+x,festats = solution_snapshots(rbsolver_lin,feop_lin,r,xh0μ)
+perf = rb_performance(rbsolver_lin,feop_lin,rbop,x,x̂,festats,rbstats,r)
+println(perf)

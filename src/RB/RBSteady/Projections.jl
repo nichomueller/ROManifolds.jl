@@ -342,16 +342,6 @@ struct BlockProjection{A<:Projection,N} <: Projection
   end
 end
 
-function BlockProjection(k::BlockMap{N},a::AbstractArray{A}) where {A<:Projection,N}
-  array = Array{A,N}(undef,k.size)
-  touched = fill(false,k.size)
-  for (t,i) in enumerate(k.indices)
-    array[i] = a[t]
-    touched[i] = true
-  end
-  BlockProjection(array,touched)
-end
-
 function BlockProjection(a::AbstractArray{A},touched::Array{Bool,N}) where {A<:Projection,N}
   array = Array{A,N}(undef,k.size)
   for i in touched
@@ -467,4 +457,13 @@ function enrich!(
   end
   a[1] = a_primal
   return
+end
+
+function enrich!(
+  red::SupremizerReduction{<:TTSVDRanks},
+  a::BlockProjection,
+  norm_matrix::BlockRankTensor,
+  supr_matrix::BlockMatrix)
+
+  @notimplemented
 end

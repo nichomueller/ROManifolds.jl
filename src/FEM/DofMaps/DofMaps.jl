@@ -55,6 +55,7 @@ export FullDofMapIndexing
 export SparseDofMapIndexing
 export TrivialSparseDofMap
 export SparseDofMap
+export get_sparsity
 include("SparseDofMaps.jl")
 
 export get_dof_map

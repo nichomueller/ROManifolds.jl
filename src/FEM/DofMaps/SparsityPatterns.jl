@@ -84,6 +84,19 @@ function order_sparsity(s::SparsityPattern,rows::AbstractDofMap,cols::AbstractDo
 end
 
 function CellData.change_domain(
+  a::AbstractMatrix{<:SparsityPattern},
+  rows::AbstractVector{<:AbstractDofMap},
+  cols::AbstractVector{<:AbstractDofMap}
+  )
+
+  @check size(a,1) == length(rows)
+  @check size(a,2) == length(cols)
+  map(Iterators.product(1:length(rows),1:length(cols))) do (i,j)
+    change_domain(a[i,j],rows[i],cols[j])
+  end
+end
+
+function CellData.change_domain(
   a::SparsityPattern,
   rows::ArrayContribution,
   cols::ArrayContribution)

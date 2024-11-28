@@ -104,6 +104,7 @@ export Realization
 export TransientRealization
 export UniformSampling
 export NormalSampling
+export SmolyakSampling
 export ParamSpace
 export TransientParamSpace
 export AbstractParamFunction

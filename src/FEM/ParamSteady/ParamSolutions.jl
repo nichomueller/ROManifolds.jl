@@ -3,7 +3,7 @@ function Algebra.solve!(u,solver::NonlinearFESolver,feop::ParamFEOperator,r::Rea
   op = get_algebraic_operator(feop)
   nlop = ParamNonlinearOperator(op,r)
   t = @timed solve!(x,solver.nls,nlop)
-  stats = CostTracker(t,name="FEM")
+  stats = CostTracker(t,name="FEM";nruns=num_params(r))
   trial = get_trial(feop)(r)
   uh = FEFunction(trial,x)
   uh,stats
@@ -14,7 +14,7 @@ function Algebra.solve!(u,solver::LinearFESolver,feop::ParamFEOperator,r::Realiz
   op = get_algebraic_operator(feop)
   nlop = ParamNonlinearOperator(op,r)
   t = @timed solve!(x,solver.ls,nlop)
-  stats = CostTracker(t,name="FEM")
+  stats = CostTracker(t,name="FEM";nruns=num_params(r))
   trial = get_trial(feop)(r)
   uh = FEFunction(trial,x)
   uh,stats

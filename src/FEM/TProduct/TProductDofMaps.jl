@@ -60,7 +60,7 @@ function get_tp_dof_map(
   order::Integer
   ) where T<:MultiValue
 
-  ncomp = num_components(T)
+  ncomps = num_components(T)
   dof_map,dof_maps_1d = get_tp_dof_map(eltype(T),models,spaces,order)
   ncomp_dof_map = repeat(dof_map;outer=(ntuple(_->1,ncomps)...,ncomps))
   return ncomp_dof_map,dof_maps_1d
@@ -125,7 +125,7 @@ function get_tp_dof_map(ls::FESpaceWithLinearConstraints,spaces_1d::AbstractVect
   mdof_to_bdof = ls.mDOF_to_DOF
   sdof_to_bdof = setdiff(1:ls.n_fdofs,mdof_to_bdof)
   i = get_tp_dof_map(space,spaces_1d)
-  ci = ConstrainedDofsDofMap(i,mdof_to_bdof,sdof_to_bdof)
+  ci = ConstrainedDofMap(i,mdof_to_bdof,sdof_to_bdof)
   return TProductDofMap(ci,i.indices_1d)
 end
 
@@ -135,7 +135,7 @@ function get_tp_dof_map(cs::FESpaceWithConstantFixed,spaces_1d::AbstractVector{<
   sdof_to_bdof = cs.dof_to_fix
   mdof_to_bdof = setdiff(1:ndofs,sdof_to_bdof)
   i = get_tp_dof_map(space,spaces_1d)
-  ci = ConstrainedDofsDofMap(i,mdof_to_bdof,sdof_to_bdof)
+  ci = ConstrainedDofMap(i,mdof_to_bdof,sdof_to_bdof)
   return TProductDofMap(ci,i.indices_1d)
 end
 

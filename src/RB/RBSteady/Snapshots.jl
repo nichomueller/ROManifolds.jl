@@ -266,7 +266,7 @@ function select_snapshots(s::AbstractSteadySnapshots,prange)
   SnapshotsAtIndices(s,prange)
 end
 
-struct ReshapedSnapshots{T,N,N′,D,I,R,A<:AbstractSteadySnapshots{T,N′,D,I,R},B} <: AbstractSteadySnapshots{T,N′,D,I,R,A}
+struct ReshapedSnapshots{T,N,N′,D,I,R,A<:AbstractSteadySnapshots{T,N′,D,I,R},B} <: AbstractSteadySnapshots{T,N,D,I,R,A}
   snaps::A
   size::NTuple{N,Int}
   mi::B
@@ -278,7 +278,7 @@ function Base.reshape(s::AbstractSnapshots,dims::Dims)
   n = length(s)
   prod(dims) == n || DimensionMismatch()
 
-  strds = Base.front(Base.size_to_strides(map(length,axes(s))..., 1))
+  strds = Base.front(Base.size_to_strides(map(length,axes(s))...,1))
   strds1 = map(s->max(1,Int(s)),strds)
   mi = map(Base.SignedMultiplicativeInverse,strds1)
   ReshapedSnapshots(s,dims,reverse(mi))
@@ -380,37 +380,41 @@ Block container for AbstractSnapshots of type `S` in a MultiField setting. This
 type is conceived similarly to [`ArrayBlock`](@ref) in [`Gridap`](@ref)
 
 """
-struct BlockSnapshots{S,N} <: AbstractParamContainer{S,N}
+struct BlockSnapshots{S<:AbstractSnapshots,N} <: AbstractParamContainer{S,N}
   array::Array{S,N}
   touched::Array{Bool,N}
-  function BlockSnapshots(array::Array{S,N},touched::Array{Bool,N}) where {S,N}
+
+  function BlockSnapshots(
+    array::Array{S,N},
+    touched::Array{Bool,N}
+    ) where {S<:AbstractSnapshots,N}
+
     @check size(array) == size(touched)
     new{S,N}(array,touched)
   end
 end
 
-function BlockSnapshots(k::BlockMap{N},a::AbstractArray{S}) where {S,N}
-  array = Array{S,N}(undef,k.size)
-  touched = fill(false,k.size)
-  for (t,i) in enumerate(k.indices)
-    array[i] = a[t]
-    touched[i] = true
-  end
-  BlockSnapshots(array,touched)
-end
+function Snapshots(
+  data::BlockParamArray{T,N},
+  i::AbstractArray{<:AbstractDofMap},
+  r::AbstractRealization) where {T,N}
 
-function Fields.BlockMap(s::NTuple,inds::AbstractVector{<:Integer})
-  cis = [CartesianIndex((i,)) for i in inds]
-  BlockMap(s,cis)
-end
-
-function Snapshots(data::BlockParamArray,i::AbstractArray{<:AbstractDofMap},r::AbstractRealization)
   block_values = blocks(data)
-  nblocks = blocksize(data)
-  active_block_ids = findall(!iszero,block_values)
-  block_map = BlockMap(nblocks,active_block_ids)
-  active_block_snaps = [Snapshots(block_values[n],i[n],r) for n in active_block_ids]
-  BlockSnapshots(block_map,active_block_snaps)
+  s = size(block_values)
+  @check s == size(i)
+
+  array = Array{AbstractSnapshots,N}(undef,s)
+  touched = Array{Bool,N}(undef,s)
+  for (j,dataj) in enumerate(block_values)
+    if !iszero(dataj)
+      array[j] = Snapshots(dataj,i[j],r)
+      touched[j] = true
+    else
+      touched[j] = false
+    end
+  end
+
+  BlockSnapshots(array,touched)
 end
 
 BlockArrays.blocks(s::BlockSnapshots) = s.array
@@ -438,7 +442,7 @@ function Arrays.testitem(s::BlockSnapshots)
   end
 end
 
-DofMaps.get_dof_map(s::BlockSnapshots) = get_dof_map(testitem(s))
+DofMaps.get_dof_map(s::BlockSnapshots) = map(get_dof_map,s.array)
 get_realization(s::BlockSnapshots) = get_realization(testitem(s))
 
 function Utils.get_values(s::BlockSnapshots)
@@ -451,15 +455,10 @@ end
 
 for f in (:flatten_snapshots,:select_snapshots)
   @eval begin
-    function Arrays.return_cache(::typeof($f),s::AbstractSnapshots,args...;kwargs...)
-      $f(s,args...;kwargs...)
-    end
-
     function Arrays.return_cache(::typeof($f),s::BlockSnapshots,args...;kwargs...)
-      i = findfirst(s.touched)
-      @notimplementedif isnothing(i)
-      cache = return_cache($f,s[i],args...;kwargs...)
-      block_cache = Array{typeof(cache),ndims(s)}(undef,size(s))
+      S = AbstractSnapshots
+      N = ndims(s)
+      block_cache = Array{S,N}(undef,size(s))
       return block_cache
     end
   end

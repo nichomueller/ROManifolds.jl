@@ -120,8 +120,8 @@ end
 
 # multi field
 
-_remove_trial(f::SingleFieldFESpace) = f
-_remove_trial(f::TrialFESpace) = f.space
+_remove_trial(f::SingleFieldFESpace) = _remove_trial(f.space)
+_remove_trial(f::TProductFESpace) = f
 
 function get_tp_triangulation(f::MultiFieldFESpace)
   s1 = _remove_trial(first(f.spaces))

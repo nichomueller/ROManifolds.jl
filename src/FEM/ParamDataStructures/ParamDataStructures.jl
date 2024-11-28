@@ -4,6 +4,7 @@ using LinearAlgebra
 using ArraysOfArrays
 using BlockArrays
 using ForwardDiff
+using SmolyakApprox
 using SparseArrays
 using SparseMatricesCSR
 
@@ -30,6 +31,7 @@ export Realization
 export TransientRealization
 export UniformSampling
 export NormalSampling
+export SmolyakSampling
 export ParamSpace
 export TransientParamSpace
 export AbstractParamFunction

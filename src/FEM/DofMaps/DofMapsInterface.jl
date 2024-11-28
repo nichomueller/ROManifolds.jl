@@ -27,30 +27,6 @@ function remove_constrained_dofs(i::AbstractDofMap{Ti},::Constrained) where Ti
   i′
 end
 
-# function remove_constrained_dofs(i::AbstractDofMap,::UnConstrained;remove_zeros=true)
-#   vi = vec(collect(i))
-#   if remove_zeros
-#     inds = map(iszero,vi)
-#     deleteat!(vi,inds)
-#     vi
-#   else
-#     vi
-#   end
-# end
-
-# function remove_constrained_dofs(i::AbstractDofMap,::Constrained;remove_zeros=true)
-#   dof_to_constraint = get_dof_to_constraints(i)
-#   isconstrained(x) = dof_to_constraint[x]
-#   vi = vec(collect(i))
-#   if remove_zeros
-#     inds = map(iszero || isconstrained,i)
-#   else
-#     inds = map(isconstrained,i)
-#   end
-#   deleteat!(i′,inds)
-#   i′
-# end
-
 get_dof_to_constraints(i::AbstractDofMap) = @abstractmethod
 
 TensorValues.num_components(::Type{<:AbstractDofMap{D,Ti}}) where {D,Ti} = num_components(Ti)

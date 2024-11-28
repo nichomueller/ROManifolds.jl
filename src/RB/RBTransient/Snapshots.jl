@@ -261,7 +261,7 @@ function Base.reshape(s::AbstractTransientSnapshots,dims::Dims)
   n = length(s)
   prod(dims) == n || DimensionMismatch()
 
-  strds = Base.front(Base.size_to_strides(map(length,axes(s))..., 1))
+  strds = Base.front(Base.size_to_strides(map(length,axes(s))...,1))
   strds1 = map(s->max(1,Int(s)),strds)
   mi = map(Base.SignedMultiplicativeInverse,strds1)
   TransientReshapedSnapshots(s,dims,reverse(mi))
@@ -422,16 +422,28 @@ RBSteady.get_indexed_data(s::Mode2TransientSnapshots) = collect(s)
 # block snapshots
 
 function RBSteady.Snapshots(
-  data::AbstractVector{<:BlockParamArray},
+  data::AbstractVector{<:BlockParamArray{T,N}},
   i::AbstractArray{<:AbstractDofMap},
-  r::AbstractRealization)
+  r::AbstractRealization) where {T,N}
 
   block_values = blocks.(data)
-  nblocks = blocksize(first(data))
-  active_block_ids = findall(!iszero,blocks(first(data)))
-  block_map = BlockMap(nblocks,active_block_ids)
-  active_block_snaps = [Snapshots(map(v->getindex(v,n),block_values),i[n],r) for n in active_block_ids]
-  BlockSnapshots(block_map,active_block_snaps)
+  block_value1 = first(block_values)
+  s = size(block_value1)
+  @check s == size(i)
+
+  array = Array{AbstractSnapshots,N}(undef,s)
+  touched = Array{Bool,N}(undef,s)
+  for (j,data1j) in enumerate(block_value1)
+    if !iszero(data1j)
+      dataj = map(v->getindex(v,j),block_values)
+      array[j] = Snapshots(dataj,i[j],r)
+      touched[j] = true
+    else
+      touched[j] = false
+    end
+  end
+
+  BlockSnapshots(array,touched)
 end
 
 # utils
