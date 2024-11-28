@@ -44,10 +44,10 @@ function FESpaces.get_trial(op::LinearNonlinearParamFEOperator)
   get_trial(op.op_linear)
 end
 
-function IndexMaps.get_index_map(op::LinearNonlinearParamFEOperator)
-  @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
-  @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))
-  get_index_map(op.op_linear)
+function get_fe_dof_maps(op::LinearNonlinearParamFEOperator)
+  @check all(get_dof_map(op.op_linear) .== get_dof_map(op.op_nonlinear))
+  @check all(get_sparse_dof_map(op.op_linear) .== get_sparse_dof_map(op.op_nonlinear))
+  get_fe_dof_maps(op.op_linear)
 end
 
 function ParamDataStructures.realization(op::LinearNonlinearParamFEOperator;kwargs...)
@@ -79,16 +79,6 @@ function join_operators(
   ParamFEOperator(res,jac,op_lin.pspace,trial,test)
 end
 
-for f in (:(Utils.set_domains),:(Utils.change_domains))
-  @eval begin
-    function $f(op::LinearNonlinearParamFEOperator)
-      op_lin′ = $f(get_linear_operator(op))
-      op_nlin′ = $f(get_nonlinear_operator(op))
-      LinearNonlinearParamFEOperator(op_lin′,op_nlin′)
-    end
-  end
-end
-
 """
     join_operators(op::LinearNonlinearParamFEOperator) -> ParamFEOperator
 
@@ -99,4 +89,10 @@ function join_operators(op::LinearNonlinearParamFEOperator)
   op_lin = get_linear_operator(op)
   op_nlin = get_nonlinear_operator(op)
   join_operators(op_lin,op_nlin)
+end
+
+function set_domains(op::LinearNonlinearParamFEOperator)
+  op_lin = set_domains(get_linear_operator(op))
+  op_nlin = set_domains(get_nonlinear_operator(op))
+  LinearNonlinearParamFEOperator(op_lin,op_nlin)
 end

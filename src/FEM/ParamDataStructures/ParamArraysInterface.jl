@@ -1022,8 +1022,8 @@ for A in (:ArrayBlock,:AbstractArray)
 end
 
 function Fields.unwrap_cached_array(A::AbstractParamArray)
-  C = param_return_cache(unwrap_cached_array,A)
-  param_evaluate!(C,unwrap_cached_array,A)
+  C = param_return_cache(Fields.unwrap_cached_array,A)
+  param_evaluate!(C,Fields.unwrap_cached_array,A)
 end
 
 function Fields._setsize_as!(A::AbstractParamArray,B::AbstractParamArray)

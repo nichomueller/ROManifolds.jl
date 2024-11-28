@@ -1,19 +1,19 @@
 """
-    get_tp_dof_index_map(space::FESpace,spaces_1d::AbstractVector{<:FESpace}) -> AbstractIndexMap
+    get_tp_dof_map(space::FESpace,spaces_1d::AbstractVector{<:FESpace}) -> AbstractDofMap
 
 Returns the dofs of the FE space defined as the tensor product of `spaces_1d`,
 sorted by coordinate order, for every dimension. The variable `space` represents
 the FESpace defined on the TProductModel with a standard Gridap procedure.
 The role of `space` is limited to providing the algorithm with the correct dof type
 and polynomial order. If `space` is a D-dimensional FESpace, the vector `spaces_1d`
-is of length D, and the output index map will be a subtype of AbstractIndexMap{D}.
+is of length D, and the output index map will be a subtype of AbstractDofMap{D}.
 
 The following example clarifies the function's task:
 
 cell_dof_ids_1 = Table([[1, 3, 2]])
 cell_dof_ids_2 = Table([[1, 4, 2, 5, 3]])
 
-  get_tp_dof_index_map(⋅)
+  get_tp_dof_map(⋅)
         ⟹ ⟹ ⟹
 
       [ 1  7  4  10  7
@@ -21,18 +21,18 @@ cell_dof_ids_2 = Table([[1, 4, 2, 5, 3]])
         2  8  5  12  8 ]
 
 """
-function get_tp_dof_index_map(space::FESpace,spaces_1d::AbstractVector{<:FESpace})
+function get_tp_dof_map(space::FESpace,spaces_1d::AbstractVector{<:FESpace})
   @abstractmethod
 end
 
-function get_tp_dof_index_map(space::UnconstrainedFESpace,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
+function get_tp_dof_map(space::UnconstrainedFESpace,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
   trians_1d = map(get_triangulation,spaces_1d)
   models_1d = map(get_background_model,trians_1d)
-  index_map,index_maps_1d = get_tp_dof_index_map(space,models_1d,spaces_1d)
-  return TProductIndexMap(index_map,index_maps_1d)
+  dof_map,dof_maps_1d = get_tp_dof_map(space,models_1d,spaces_1d)
+  return TProductDofMap(dof_map,dof_maps_1d)
 end
 
-function get_tp_dof_index_map(
+function get_tp_dof_map(
   space::UnconstrainedFESpace,
   models_1d::AbstractVector{<:CartesianDiscreteModel},
   spaces_1d::AbstractVector{<:UnconstrainedFESpace})
@@ -40,34 +40,34 @@ function get_tp_dof_index_map(
   dof = get_fe_dof_basis(space)
   T = get_dof_type(dof)
   order = get_polynomial_order(space)
-  get_tp_dof_index_map(T,models_1d,spaces_1d,order)
+  get_tp_dof_map(T,models_1d,spaces_1d,order)
 end
 
-function get_tp_dof_index_map(
+function get_tp_dof_map(
   ::Type{T},
   models::AbstractVector,
   spaces::AbstractVector,
   order::Integer
   ) where T
 
-  _get_tp_dof_index_map(models,spaces,order)
+  _get_tp_dof_map(models,spaces,order)
 end
 
-function get_tp_dof_index_map(
+function get_tp_dof_map(
   ::Type{T},
   models::AbstractVector,
   spaces::AbstractVector,
   order::Integer
   ) where T<:MultiValue
 
-  ncomp = num_components(T)
-  dof_map,dof_maps_1d = get_tp_dof_index_map(eltype(T),models,spaces,order)
-  ncomp_dof_map = compose_indices(dof_map,ncomp)
+  ncomps = num_components(T)
+  dof_map,dof_maps_1d = get_tp_dof_map(eltype(T),models,spaces,order)
+  ncomp_dof_map = repeat(dof_map;outer=(ntuple(_->1,ncomps)...,ncomps))
   return ncomp_dof_map,dof_maps_1d
 end
 
 # this function computes only the free dofs tensor product permutation
-function _get_tp_dof_index_map(models::AbstractVector,spaces::AbstractVector,order::Integer)
+function _get_tp_dof_map(models::AbstractVector,spaces::AbstractVector,order::Integer)
   @assert length(models) == length(spaces)
   D = length(models)
 
@@ -82,9 +82,9 @@ function _get_tp_dof_index_map(models::AbstractVector,spaces::AbstractVector,ord
     return atp
   end
   function _local_dof_map(model,space)
-    cell_ids = get_cell_dof_ids(space)
-    trian_ids = 1:num_cells(model)
-    dof_maps_1d = _get_dof_index_map(model,cell_ids,trian_ids,order)
+    cell_dof_ids = get_cell_dof_ids(space)
+    cache = array_cache(cell_dof_ids)
+    dof_maps_1d = get_dof_map(model,cache,cell_dof_ids,order)
     free_dof_maps_1d = dof_maps_1d[findall(dof_maps_1d.>0)]
     return free_dof_maps_1d
   end
@@ -120,26 +120,26 @@ end
 
 # spaces with constraints
 
-function get_tp_dof_index_map(ls::FESpaceWithLinearConstraints,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
+function get_tp_dof_map(ls::FESpaceWithLinearConstraints,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
   space = ls.space
   mdof_to_bdof = ls.mDOF_to_DOF
   sdof_to_bdof = setdiff(1:ls.n_fdofs,mdof_to_bdof)
-  i = get_tp_dof_index_map(space,spaces_1d)
-  ci = ConstrainedDofsIndexMap(i,mdof_to_bdof,sdof_to_bdof)
-  return TProductIndexMap(ci,i.indices_1d)
+  i = get_tp_dof_map(space,spaces_1d)
+  ci = ConstrainedDofMap(i,mdof_to_bdof,sdof_to_bdof)
+  return TProductDofMap(ci,i.indices_1d)
 end
 
-function get_tp_dof_index_map(cs::FESpaceWithConstantFixed,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
+function get_tp_dof_map(cs::FESpaceWithConstantFixed,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
   space = cs.space
   ndofs = num_free_dofs(space) + num_dirichlet_dofs(space)
   sdof_to_bdof = cs.dof_to_fix
   mdof_to_bdof = setdiff(1:ndofs,sdof_to_bdof)
-  i = get_tp_dof_index_map(space,spaces_1d)
-  ci = ConstrainedDofsIndexMap(i,mdof_to_bdof,sdof_to_bdof)
-  return TProductIndexMap(ci,i.indices_1d)
+  i = get_tp_dof_map(space,spaces_1d)
+  ci = ConstrainedDofMap(i,mdof_to_bdof,sdof_to_bdof)
+  return TProductDofMap(ci,i.indices_1d)
 end
 
-function get_tp_dof_index_map(zs::ZeroMeanFESpace,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
+function get_tp_dof_map(zs::ZeroMeanFESpace,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
   space = zs.space
-  get_tp_dof_index_map(space,spaces_1d)
+  get_tp_dof_map(space,spaces_1d)
 end

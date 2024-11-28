@@ -8,7 +8,7 @@ mutable struct CostTracker <: PerformanceTracker
   nruns::Int
 end
 
-function CostTracker(;name="",time=0.0,nallocs=0.0,nruns=0)
+function CostTracker(;name="",time=0.0,nallocs=0.0,nruns=1)
   CostTracker(name,time,nallocs,nruns)
 end
 
@@ -41,12 +41,11 @@ function reset_tracker!(t::CostTracker)
   t.nruns = 0
 end
 
-function update_tracker!(t::CostTracker,stats::NamedTuple,nruns=t.nruns+1;msg="")
+function update_tracker!(t::CostTracker,stats::NamedTuple;msg="")
   time = stats[:time]
   nallocs = stats[:bytes] / 1e6
   t.time += time
   t.nallocs += nallocs
-  t.nruns = nruns
   if !isempty(msg)
     println(msg)
     show(stdout,MIME"text/plain"(),t)

@@ -1,6 +1,6 @@
-function IndexMaps.recast(a::AbstractVector{<:AbstractArray{T,3}},i::SparseIndexMap) where T
+function DofMaps.recast(a::AbstractVector{<:AbstractArray{T,3}},i::SparseDofMap) where T
   N = length(a)
-  us = IndexMaps.get_univariate_sparsity(i)
+  us = i.sparsity.sparsities_1d
   @check length(us) ≤ N
   a′ = Vector{AbstractArray{T,3}}(undef,N)
   for n in eachindex(a)
@@ -48,9 +48,8 @@ end
 
 Base.size(a::SparseCoreCSC) = size(a.array)
 Base.getindex(a::SparseCoreCSC,i::Vararg{Integer,3}) = getindex(a.array,i...)
-IndexMaps.get_sparsity(a::SparseCoreCSC) = get_sparsity(a.sparsity)
 
-num_space_dofs(a::SparseCoreCSC) = IndexMaps.num_rows(a.sparsity)*IndexMaps.num_cols(a.sparsity)
+num_space_dofs(a::SparseCoreCSC) = DofMaps.num_rows(a.sparsity)*DofMaps.num_cols(a.sparsity)
 
 to_4d_core(a::SparseCoreCSC) = SparseCoreCSC4D(a)
 
@@ -60,13 +59,12 @@ struct SparseCoreCSC4D{T,Ti} <: SparseCore{T,4}
 end
 
 function SparseCoreCSC4D(core::SparseCoreCSC)
-  sparsity = get_sparsity(core)
-  irows,icols,_ = findnz(sparsity)
+  irows,icols,_ = findnz(core.sparsity)
   SparseCoreCSC4D(core,CartesianIndex.(irows,icols))
 end
 
-Base.size(a::SparseCoreCSC4D) = (size(a.core.array,1),IndexMaps.num_rows(a.core.sparsity),
-  IndexMaps.num_cols(a.core.sparsity),size(a.core.array,3))
+Base.size(a::SparseCoreCSC4D) = (size(a.core.array,1),DofMaps.num_rows(a.core.sparsity),
+  DofMaps.num_cols(a.core.sparsity),size(a.core.array,3))
 
 function Base.getindex(a::SparseCoreCSC4D,i::Vararg{Integer,4})
   if CartesianIndex(i[2:3]) ∈ a.sparse_indexes
@@ -118,17 +116,36 @@ end
 
 for f in (:first_block,:block_core)
   @eval begin
-    function $f(a::AbstractArray{T,3},b::AbstractArray...) where T
-      bfirst,blasts... = b
-      $f($f(a,bfirst),blasts...)
+    function $f(a::AbstractVector{<:AbstractArray{T,3}}) where T
+      D = length(a)
+      @check D ≤ 3
+      if D == 1
+        a[1]
+      elseif D == 2
+        $f(a[1],a[2])
+      else
+        $f($f(a[1],a[2]),a[3])
+      end
     end
   end
 end
 
-function block_cores(a::AbstractVector{<:AbstractArray{T}}...)::Vector{Array{T,3}} where T
+function block_cores(a::AbstractVector{<:AbstractVector{<:AbstractArray{T,3}}}) where T
   D = length(first(a))
   @check all(length(ai)==D for ai in a)
-  abfirst = first_block(getindex.(a,1)...)
-  ablasts = map(d -> block_core(getindex.(a,d)...),2:D)
+  abfirst = first_block(getindex.(a,1))
+  ablasts = map(d -> block_core(getindex.(a,d)),2:D)
   return [abfirst,ablasts...]
+end
+
+function block_cat(a::AbstractVector{<:AbstractArray{T,3}};kwargs...) where T
+  D = length(a)
+  @check D ≤ 3
+  if D == 1
+    a[1]
+  elseif D == 2
+    cat(a[1],a[2];kwargs...)
+  else
+    cat(a[1],a[2],a[3];kwargs...)
+  end
 end

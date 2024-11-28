@@ -25,7 +25,7 @@ using GridapSolvers.LinearSolvers
 using GridapSolvers.NonlinearSolvers
 
 using ReducedOrderModels.Utils
-using ReducedOrderModels.IndexMaps
+using ReducedOrderModels.DofMaps
 using ReducedOrderModels.TProduct
 using ReducedOrderModels.ParamDataStructures
 using ReducedOrderModels.ParamAlgebra
@@ -70,7 +70,7 @@ export Snapshots
 export get_realization
 export flatten_snapshots
 export select_snapshots
-export get_indexed_values
+export get_indexed_data
 export num_space_dofs
 include("Snapshots.jl")
 

@@ -6,15 +6,15 @@ end
 
 ParamSteady.get_fe_operator(op::ODEParamOpFromTFEOp) = op.op
 
-for f in (:(Utils.set_domains),:(Utils.change_domains))
+for f in (:(ParamSteady.set_domains),:(ParamSteady.change_domains))
   @eval begin
-    function $f(odeop::ODEParamOpFromTFEOp,trians_rhs,trians_lhs)
-      ODEParamOpFromTFEOp($f(odeop.op,trians_rhs,trians_lhs))
+    function $f(odeop::ODEParamOpFromTFEOp,args...)
+      ODEParamOpFromTFEOp($f(odeop.op,args...))
     end
   end
 end
 
-const JointODEParamOpFromTFEOp{O} = ODEParamOpFromTFEOp{O,JointTriangulation}
+const JointODEParamOpFromTFEOp{O} = ODEParamOpFromTFEOp{O,JointDomains}
 
 function Algebra.allocate_residual(
   odeop::ODEParamOpFromTFEOp,
@@ -223,7 +223,7 @@ function ParamSteady.allocate_systemcache(
   return A,b
 end
 
-const SplitODEParamOpFromTFEOp{O} = ODEParamOpFromTFEOp{O,SplitTriangulation}
+const SplitODEParamOpFromTFEOp{O} = ODEParamOpFromTFEOp{O,SplitDomains}
 
 function Algebra.allocate_residual(
   odeop::SplitODEParamOpFromTFEOp,
@@ -237,7 +237,7 @@ function Algebra.allocate_residual(
   assem = get_param_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
-  trian_res = get_trian_res(odeop.op)
+  trian_res = get_domains_res(odeop.op)
   res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
@@ -265,7 +265,7 @@ function Algebra.residual!(
 
   μ,t = get_params(r),get_times(r)
 
-  trian_res = get_trian_res(odeop.op)
+  trian_res = get_domains_res(odeop.op)
   res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
@@ -290,7 +290,7 @@ function Algebra.residual(
   μ,t = get_params(r),get_times(r)
 
   # Residual
-  trian_res = get_trian_res(odeop.op)
+  trian_res = get_domains_res(odeop.op)
   res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
@@ -315,7 +315,7 @@ function Algebra.allocate_jacobian(
 
   μ,t = get_params(r),get_times(r)
 
-  trian_jacs = get_trian_jac(odeop.op)
+  trian_jacs = get_domains_jac(odeop.op)
   jacs = get_jacs(odeop.op)
   As = ()
   for k in 1:get_order(odeop.op)+1
@@ -348,7 +348,7 @@ function ODEs.jacobian_add!(
 
   μ,t = get_params(r),get_times(r)
 
-  trian_jacs = get_trian_jac(odeop.op)
+  trian_jacs = get_domains_jac(odeop.op)
   jacs = get_jacs(odeop.op)
   for k in 1:get_order(odeop)+1
     A = As[k]
@@ -386,7 +386,7 @@ function ODEs.jacobian_add!(
 
   μ,t = get_params(r),get_times(r)
 
-  trian_jacs = get_trian_jac(odeop.op)
+  trian_jacs = get_domains_jac(odeop.op)
   jacs = get_jacs(odeop.op)
   for k in 1:get_order(odeop)+1
     A = As[k]
@@ -426,7 +426,7 @@ function Algebra.jacobian(
   assem = get_param_assembler(odeop.op,r)
   μ,t = get_params(r),get_times(r)
 
-  trian_jacs = get_trian_jac(odeop.op)
+  trian_jacs = get_domains_jac(odeop.op)
   jacs = get_jacs(odeop.op)
   As = ()
   for k in 1:get_order(odeop.op)+1
@@ -468,7 +468,7 @@ function ParamSteady.allocate_systemcache(
   trial = evaluate(get_trial(feop),nothing)
   du = get_trial_fe_basis(trial)
   assem = get_param_assembler(feop,r)
-  trian_jacs = get_trian_jac(feop)
+  trian_jacs = get_domains_jac(feop)
   jacs = get_jacs(feop)
   μ,t = get_params(r),get_times(r)
 

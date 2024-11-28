@@ -122,7 +122,7 @@ function load_contribution(dir,trian,args...;label::String="")
     deci = load_decomposition(dir;label=_get_label(label,i))
     redti = reduced_triangulation(t,deci,args...)
     if isa(redti,AbstractArray)
-      redti = ParamDataStructures.merge_triangulations(redti)
+      redti = Utils.merge_triangulations(redti)
     end
     dec = (dec...,deci)
     redt = (redt...,redti)
@@ -152,8 +152,8 @@ function _load_fixed_operator_parts(dir,feop;label="")
 end
 
 function _load_trian_operator_parts(dir,feop::SplitParamFEOperator,trial,test;label="")
-  trian_res = ParamSteady.get_trian_res(feop)
-  trian_jac = ParamSteady.get_trian_jac(feop)
+  trian_res = ParamSteady.get_domains_res(feop)
+  trian_jac = ParamSteady.get_domains_jac(feop)
   pop = get_algebraic_operator(feop)
   red_rhs = load_contribution(dir,trian_res,test;label=_get_label(label,"rhs"))
   red_lhs = load_contribution(dir,trian_jac,trial,test;label=_get_label(label,"lhs"))
@@ -176,7 +176,7 @@ function DrWatson.save(dir,op::LinearNonlinearRBOperator;label="")
   _save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nonlinear"))
 end
 
-function load_operator(dir,feop::LinearNonlinearParamFEOperator{SplitTriangulation};label="")
+function load_operator(dir,feop::LinearNonlinearParamFEOperator{SplitDomains};label="")
   trial,test = _fixed_operator_parts(dir,feop.op_linear;label)
   pop_lin,red_lhs_lin,red_rhs_lin = _load_trian_operator_parts(
     dir,feop.op_linear,trial,test;label=_get_label("linear",label))
@@ -240,9 +240,9 @@ function rb_performance(
   r::AbstractRealization)
 
   x = inv_project(get_trial(rbop)(r),x̂)
-  feop′ = set_domains(feop)
-  rbsnaps = Snapshots(x,get_vector_index_map(feop′),r)
-  rb_performance(solver,feop′,fesnaps,rbsnaps,festats,rbstats)
+  i = get_dof_map(feop)
+  rbsnaps = Snapshots(x,i,r)
+  rb_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats)
 end
 
 function DrWatson.save(dir,perf::RBPerformance;label="")

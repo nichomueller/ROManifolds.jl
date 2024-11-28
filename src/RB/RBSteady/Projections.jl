@@ -196,34 +196,34 @@ Projection stemming from a tensor train singular value decomposition [`ttsvd`](@
 An index map of type `I` is provided for indexing purposes
 
 """
-struct TTSVDCores{D,A<:AbstractVector{<:AbstractArray{T,3} where T},I<:AbstractIndexMap{D}} <: Projection
+struct TTSVDCores{D,A<:AbstractVector{<:AbstractArray{T,3} where T},I<:AbstractDofMap{D}} <: Projection
   cores::A
-  index_map::I
+  dof_map::I
 end
 
 function projection(red::TTSVDReduction,s::AbstractArray{<:Number},args...)
   cores = reduction(red,s,args...)
-  index_map = get_index_map(s)
-  TTSVDCores(cores,index_map)
+  dof_map = get_dof_map(s)
+  TTSVDCores(cores,dof_map)
 end
 
 function projection(red::TTSVDReduction,s::SparseSnapshots,args...)
   cores = reduction(red,s,args...)
   cores′ = recast(cores,s)
-  index_map = get_index_map(s)
-  TTSVDCores(cores′,index_map)
+  dof_map = get_dof_map(s)
+  TTSVDCores(cores′,dof_map)
 end
 
 get_cores(a::TTSVDCores) = a.cores
 
-get_basis(a::TTSVDCores) = cores2basis(get_index_map(a),get_cores(a)...)
+get_basis(a::TTSVDCores) = cores2basis(get_dof_map(a),get_cores(a)...)
 num_fe_dofs(a::TTSVDCores) = prod(map(c -> size(c,2),get_cores(a)))
 num_reduced_dofs(a::TTSVDCores) = size(last(get_cores(a)),3)
 
-IndexMaps.get_index_map(a::TTSVDCores) = a.index_map
+DofMaps.get_dof_map(a::TTSVDCores) = a.dof_map
 
 function Base.union(a::TTSVDCores,b::TTSVDCores,args...)
-  @check get_index_map(a) == get_index_map(b)
+  @check get_dof_map(a) == get_dof_map(b)
   union(a,get_cores(b),args...)
 end
 
@@ -231,7 +231,7 @@ function Base.union(a::TTSVDCores,cores_b::AbstractVector{<:AbstractArray},args.
   cores_a = get_cores(a)
   cores_ab = block_cores(cores_a,cores_b)
   orthogonalize!(cores_ab,args...)
-  TTSVDCores(cores_ab,get_index_map(a))
+  TTSVDCores(cores_ab,get_dof_map(a))
 end
 
 function galerkin_projection(proj_left::TTSVDCores,a::TTSVDCores)
@@ -252,7 +252,7 @@ end
 function empirical_interpolation(a::TTSVDCores)
   local indices,interp
   cores = get_cores(a)
-  index_map = get_index_map(a)
+  dof_map = get_dof_map(a)
   c = cores2basis(first(cores))
   cache = eim_cache(c)
   vinds = Vector{Int32}[]
@@ -263,7 +263,7 @@ function empirical_interpolation(a::TTSVDCores)
       interp_core = reshape(interp,1,size(interp)...)
       c = cores2basis(interp_core,cores[i+1])
     else
-      indices = basis_indices(vinds,index_map)
+      indices = basis_indices(vinds,dof_map)
     end
   end
   return indices,interp
@@ -271,11 +271,11 @@ end
 
 function rescale(op::Function,x::AbstractRankTensor{D1},b::TTSVDCores{D2}) where {D1,D2}
   if D1 == D2
-    TTSVDCores(op(x,get_cores(b)),get_index_map(b))
+    TTSVDCores(op(x,get_cores(b)),get_dof_map(b))
   else
     c1 = op(x,get_cores(b)[1:D1])
     c2 = get_cores(b)[D1+1:end]
-    TTSVDCores([c1...,c2...],get_index_map(b))
+    TTSVDCores([c1...,c2...],get_dof_map(b))
   end
 end
 
@@ -288,7 +288,7 @@ end
 
 function Arrays.return_cache(::typeof(projection),::TTSVDReduction,s::AbstractSnapshots)
   c = testvalue(Vector{Array{eltype(s),3}})
-  i = get_index_map(s)
+  i = get_dof_map(s)
   return TTSVDCores(c,i)
 end
 
@@ -340,16 +340,6 @@ struct BlockProjection{A<:Projection,N} <: Projection
     @check size(array) == size(touched)
     new{A,N}(array,touched)
   end
-end
-
-function BlockProjection(k::BlockMap{N},a::AbstractArray{A}) where {A<:Projection,N}
-  array = Array{A,N}(undef,k.size)
-  touched = fill(false,k.size)
-  for (t,i) in enumerate(k.indices)
-    array[i] = a[t]
-    touched[i] = true
-  end
-  BlockProjection(array,touched)
 end
 
 function BlockProjection(a::AbstractArray{A},touched::Array{Bool,N}) where {A<:Projection,N}
@@ -467,4 +457,13 @@ function enrich!(
   end
   a[1] = a_primal
   return
+end
+
+function enrich!(
+  red::SupremizerReduction{<:TTSVDRanks},
+  a::BlockProjection,
+  norm_matrix::BlockRankTensor,
+  supr_matrix::BlockMatrix)
+
+  @notimplemented
 end

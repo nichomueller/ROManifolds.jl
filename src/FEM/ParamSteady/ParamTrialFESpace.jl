@@ -55,8 +55,16 @@ end
 
 for F in (:TrialFESpace,:TransientTrialFESpace,:UnEvalParamSingleFieldFESpace)
   @eval begin
-    function IndexMaps.get_matrix_index_map(trial::$F,test::SingleFieldFESpace)
-      get_matrix_index_map(trial.space,test)
+    function DofMaps.get_dof_map(trial::$F)
+      get_dof_map(trial.space)
+    end
+
+    function DofMaps.get_univariate_dof_map(trial::$F)
+      get_univariate_dof_map(trial.space)
+    end
+
+    function DofMaps.get_sparse_dof_map(trial::$F,test::SingleFieldFESpace)
+      get_sparse_dof_map(trial.space,test)
     end
   end
 end

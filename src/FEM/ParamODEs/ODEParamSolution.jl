@@ -42,7 +42,7 @@ function ODEParamSolution(
   r::TransientRealization,
   us0::Tuple{Vararg{V}}) where V
 
-  tracker = CostTracker(name="FEM time marching")
+  tracker = CostTracker(name="FEM time marching";nruns=num_params(r))
   ODEParamSolution(solver,odeop,r,us0,tracker)
 end
 

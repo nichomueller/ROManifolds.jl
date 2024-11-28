@@ -6,15 +6,15 @@ end
 
 get_fe_operator(op::ParamOpFromFEOp) = op.op
 
-for f in (:(Utils.set_domains),:(Utils.change_domains))
+for f in (:set_domains,:change_domains)
   @eval begin
-    function $f(odeop::ParamOpFromFEOp,trians_rhs,trians_lhs)
-      ParamOpFromFEOp($f(odeop.op,trians_rhs,trians_lhs))
+    function $f(odeop::ParamOpFromFEOp,args...)
+      ParamOpFromFEOp($f(odeop.op,args...))
     end
   end
 end
 
-const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointTriangulation}
+const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointDomains}
 
 function Algebra.allocate_residual(
   op::JointParamOpFromFEOp,
@@ -100,7 +100,7 @@ function ODEs.jacobian_add!(
   A
 end
 
-const SplitParamOpFromFEOp{O} = ParamOpFromFEOp{O,SplitTriangulation}
+const SplitParamOpFromFEOp{O} = ParamOpFromFEOp{O,SplitDomains}
 
 function Algebra.allocate_residual(
   op::SplitParamOpFromFEOp,
@@ -113,7 +113,7 @@ function Algebra.allocate_residual(
   v = get_fe_basis(test)
   assem = get_param_assembler(op.op,μ)
 
-  trian_res = get_trian_res(op.op)
+  trian_res = get_domains_res(op.op)
   res = get_res(op.op)
   dc = res(μ,uh,v)
   contribution(trian_res) do trian
@@ -137,7 +137,7 @@ function Algebra.residual!(
   v = get_fe_basis(test)
   assem = get_param_assembler(op.op,μ)
 
-  trian_res = get_trian_res(op.op)
+  trian_res = get_domains_res(op.op)
   res = get_res(op.op)
   dc = res(μ,uh,v)
 
@@ -162,7 +162,7 @@ function Algebra.allocate_jacobian(
   v = get_fe_basis(test)
   assem = get_param_assembler(op.op,μ)
 
-  trian_jac = get_trian_jac(op.op)
+  trian_jac = get_domains_jac(op.op)
   jac = get_jac(op.op)
   dc = jac(μ,uh,du,v)
   contribution(trian_jac) do trian
@@ -185,7 +185,7 @@ function ODEs.jacobian_add!(
   v = get_fe_basis(test)
   assem = get_param_assembler(op.op,μ)
 
-  trian_jac = get_trian_jac(op.op)
+  trian_jac = get_domains_jac(op.op)
   jac = get_jac(op.op)
   dc = jac(μ,uh,du,v)
   map(A.values,trian_jac) do values,trian

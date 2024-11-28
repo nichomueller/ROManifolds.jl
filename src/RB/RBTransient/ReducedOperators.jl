@@ -47,7 +47,7 @@ function RBSteady.reduced_operator(
   LinearNonlinearTransientRBOperator(red_op_lin,red_op_nlin)
 end
 
-abstract type TransientRBOperator{O} <: ODEParamOperator{O,SplitTriangulation} end
+abstract type TransientRBOperator{O} <: ODEParamOperator{O,SplitDomains} end
 
 function RBSteady.allocate_rbcache(fesolver::ODESolver,op::RBOperator,args...)
   @abstractmethod
@@ -264,10 +264,17 @@ function Algebra.jacobian!(
   return A_nlin
 end
 
+function Algebra.solve(solver::RBSolver,op::TransientRBOperator,r::TransientRealization)
+  fe_trial = get_fe_trial(op)(r)
+  x = zero_free_values(fe_trial)
+  solve(solver,op,r,x)
+end
+
 function Algebra.solve(
   solver::RBSolver,
   op::TransientRBOperator{NonlinearParamODE},
-  r::TransientRealization)
+  r::TransientRealization,
+  x::AbstractParamVector)
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
 end
@@ -275,18 +282,17 @@ end
 function Algebra.solve(
   solver::RBSolver,
   op::TransientRBOperator,
-  r::TransientRealization)
+  r::TransientRealization,
+  x::AbstractParamVector)
 
   fesolver = get_fe_solver(solver)
-  fe_trial = get_fe_trial(op)(r)
   trial = get_trial(op)(r)
-  x = zero_free_values(fe_trial)
   x̂ = zero_free_values(trial)
 
   rbcache = allocate_rbcache(fesolver,op,r,x)
 
   t = @timed solve!(x̂,fesolver,op,r,x,rbcache)
-  stats = CostTracker(t,nruns=num_params(r))
+  stats = CostTracker(t,nruns=num_params(r),name="RB solver")
 
   return x̂,stats
 end

@@ -1,5 +1,5 @@
 """
-    TProductFESpace{A,B,C} <: SingleFieldFESpace
+    TProductFESpace{A,B,C,D,E} <: SingleFieldFESpace
 
 Tensor product single field FE space, storing a vector of 1-D FE spaces `spaces_1d`
 of length D, and the D-dimensional FE space `space` defined as their tensor product.
@@ -7,10 +7,12 @@ The tensor product triangulation `trian` is provided as a field to avoid
 incompatibility issues when passing to MultiField scenarios
 
 """
-struct TProductFESpace{A,B,C} <: SingleFieldFESpace
+struct TProductFESpace{A,B,C,D,E} <: SingleFieldFESpace
   space::A
   spaces_1d::B
   trian::C
+  dof_map::D
+  tp_dof_map::E
 end
 
 function FESpaces.FESpace(
@@ -27,7 +29,11 @@ function FESpaces.FESpace(
 
   space = FESpace(trian.trian,cell_reffe;kwargs...)
   spaces_1d = univariate_spaces(model,trian,cell_reffes_1d;kwargs...)
-  TProductFESpace(space,spaces_1d,trian)
+
+  dof_map = get_dof_map(model.model,space)
+  tp_dof_map = get_tp_dof_map(space,spaces_1d)
+
+  TProductFESpace(space,spaces_1d,trian,dof_map,tp_dof_map)
 end
 
 function univariate_spaces(
@@ -76,9 +82,11 @@ FESpaces.get_dirichlet_dof_tag(f::TProductFESpace) = get_dirichlet_dof_tag(f.spa
 
 FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-get_dof_index_map(f::TProductFESpace) = get_dof_index_map(f.space)
+DofMaps.get_dof_map(f::TProductFESpace) = f.dof_map
 
-get_tp_dof_index_map(f::TProductFESpace) = get_tp_dof_index_map(f.space,f.spaces_1d)
+DofMaps.get_univariate_dof_map(f::TProductFESpace) = get_univariate_dof_map(f.tp_dof_map)
+
+get_tp_dof_map(f::TProductFESpace) = f.tp_dof_map
 
 get_tp_triangulation(f::TProductFESpace) = f.trian
 
@@ -96,32 +104,24 @@ end
 
 get_tp_trial_fe_basis(f::TrialFESpace{<:TProductFESpace}) = get_tp_trial_fe_basis(f.space)
 
-function IndexMaps.get_sparsity(U::TProductFESpace,V::TProductFESpace)
-  sparsity = get_sparsity(U.space,V.space)
-  sparsities_1d = map(get_sparsity,U.spaces_1d,V.spaces_1d)
+function DofMaps.SparsityPattern(U::TProductFESpace,V::TProductFESpace)
+  sparsity = SparsityPattern(U.space,V.space)
+  sparsities_1d = map(SparsityPattern,U.spaces_1d,V.spaces_1d)
   return TProductSparsityPattern(sparsity,sparsities_1d)
 end
 
-function IndexMaps.permute_sparsity(s::TProductSparsityPattern,U::TProductFESpace,V::TProductFESpace)
-  index_map_I = get_dof_index_map(V)
-  index_map_J = get_dof_index_map(U)
-  index_map_I_1d = get_tp_dof_index_map(V).indices_1d
-  index_map_J_1d = get_tp_dof_index_map(U).indices_1d
-  permute_sparsity(s,(index_map_I,index_map_I_1d),(index_map_J,index_map_J_1d))
-end
-
-for F in (:TrialFESpace,:TransientTrialFESpace)
-  @eval begin
-    function get_matrix_index_map(U::$F{<:TProductFESpace},V::TProductFESpace)
-      get_matrix_index_map(U.space,V)
-    end
-  end
+function DofMaps.order_sparsity(s::TProductSparsityPattern,U::TProductFESpace,V::TProductFESpace)
+  dof_map_I = get_dof_map(V)
+  dof_map_J = get_dof_map(U)
+  dof_map_I_1d = get_tp_dof_map(V).indices_1d
+  dof_map_J_1d = get_tp_dof_map(U).indices_1d
+  order_sparsity(s,(dof_map_I,dof_map_I_1d),(dof_map_J,dof_map_J_1d))
 end
 
 # multi field
 
-_remove_trial(f::SingleFieldFESpace) = f
-_remove_trial(f::TrialFESpace) = f.space
+_remove_trial(f::SingleFieldFESpace) = _remove_trial(f.space)
+_remove_trial(f::TProductFESpace) = f
 
 function get_tp_triangulation(f::MultiFieldFESpace)
   s1 = _remove_trial(first(f.spaces))

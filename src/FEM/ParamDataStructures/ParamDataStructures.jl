@@ -4,6 +4,7 @@ using LinearAlgebra
 using ArraysOfArrays
 using BlockArrays
 using ForwardDiff
+using SmolyakApprox
 using SparseArrays
 using SparseMatricesCSR
 
@@ -23,13 +24,14 @@ import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
 import SparseArrays.getcolptr
 
-import ReducedOrderModels.IndexMaps: fast_index,slow_index,recast
+import ReducedOrderModels.DofMaps: fast_index,slow_index,recast
 
 export AbstractRealization
 export Realization
 export TransientRealization
 export UniformSampling
 export NormalSampling
+export SmolyakSampling
 export ParamSpace
 export TransientParamSpace
 export AbstractParamFunction
@@ -109,6 +111,10 @@ export BlockConsecutiveParamVector
 export BlockConsecutiveParamMatrix
 export nblocks
 include("BlockParamArrays.jl")
+
+export ParamVectorWithEntryRemoved
+export ParamVectorWithEntryInserted
+include("ParamVectorWithEntries.jl")
 
 include("ParamBroadcasts.jl")
 

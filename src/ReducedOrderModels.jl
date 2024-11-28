@@ -17,7 +17,7 @@ export ∂ₓ₁, ∂ₓ₂, ∂ₓ₃
 
 export get_values
 export get_parent
-export order_triangulations
+export order_domains
 export find_closest_view
 
 export Contribution
@@ -41,44 +41,34 @@ export SparsityPattern
 export SparsityPatternCSC
 export MultiValueSparsityPatternCSC
 export TProductSparsityPattern
-export get_sparsity
-export permute_sparsity
+export order_sparsity
 
-export AbstractIndexMap
-export AbstractTrivialIndexMap
-export TrivialIndexMap
-export TrivialSparseIndexMap
-export IndexMap
-export IndexMapView
-export AbstractMultiValueIndexMap
-export MultiValueIndexMap
-export MultiValueIndexMapView
-export TProductIndexMap
-export SparseIndexMap
-export MultiValueSparseIndexMap
-export get_index_map
-export inv_index_map
+export AbstractDofMap
+export AbstractTrivialDofMap
+export TrivialDofMap
+export TrivialSparseDofMap
+export DofMap
+export DofMapView
+export AbstractMultiValueDofMap
+export MultiValueDofMap
+export MultiValueDofMapView
+export TProductDofMap
+export SparseDofMap
+export MultiValueSparseDofMap
+export invert
 export remove_constrained_dofs
-export change_index_map
-export get_sparse_index_map
+export get_sparse_dof_map
 export recast
-export get_fixed_dofs
-export compose_indices
 export get_component
-export merge_components
-export split_components
 
-export FEOperatorIndexMap
-export get_vector_index_map
-export get_matrix_index_map
+export FEDofMap
+export get_dof_map
+export get_sparse_dof_map
 
-include("FEM/IndexMaps/IndexMaps.jl")
-using ReducedOrderModels.IndexMaps
+include("FEM/DofMaps/DofMaps.jl")
+using ReducedOrderModels.DofMaps
 
-export get_dof_index_map
-export get_polynomial_order
-
-export get_tp_dof_index_map
+export get_tp_dof_map
 
 export TProductModel
 export TProductTriangulation
@@ -114,6 +104,7 @@ export Realization
 export TransientRealization
 export UniformSampling
 export NormalSampling
+export SmolyakSampling
 export ParamSpace
 export TransientParamSpace
 export AbstractParamFunction
@@ -221,6 +212,9 @@ export LinearNonlinearParamOpFromFEOp
 
 export ParamFEOperator
 export LinearParamFEOperator
+export FEDomains
+export set_domains
+export change_domains
 
 export LinearNonlinearParamODE
 export LinearNonlinearParamFEOperator
@@ -297,7 +291,7 @@ export Snapshots
 export get_realization
 export flatten_snapshots
 export select_snapshots
-export get_indexed_values
+export get_indexed_data
 export num_space_dofs
 
 export galerkin_projection

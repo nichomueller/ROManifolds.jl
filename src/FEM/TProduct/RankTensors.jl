@@ -18,6 +18,10 @@ get_decomposition(a::Rank1Tensor,k::Integer) = k == 1 ? a : error("Exceeded rank
 Base.size(a::Rank1Tensor) = (dimension(a),)
 Base.getindex(a::Rank1Tensor,d::Integer) = get_factors(a)[d]
 
+function LinearAlgebra.cholesky(a::Rank1Tensor)
+  cholesky.(get_factors(a))
+end
+
 struct GenericRankTensor{D,K,A<:AbstractArray} <: AbstractRankTensor{D,K}
   decompositions::Vector{Rank1Tensor{D,A}}
   function GenericRankTensor(decompositions::Vector{Rank1Tensor{D,A}}) where {D,A}
@@ -31,25 +35,30 @@ get_factor(a::GenericRankTensor,d::Integer,k::Integer) = get_factor(get_decompos
 Base.size(a::GenericRankTensor) = (rank(a),)
 Base.getindex(a::GenericRankTensor,k::Integer) = get_decomposition(a,k)
 
-function _sort!(a::AbstractVector{<:AbstractVector},i::Tuple{<:TProductIndexMap})
+#TODO will have to change this at some point
+function LinearAlgebra.cholesky(a::GenericRankTensor)
+  cholesky(get_decomposition(a,1))
+end
+
+function _sort!(a::AbstractVector{<:AbstractVector},i::Tuple{<:TProductDofMap})
   irow, = i
-  irow1d = IndexMaps.get_univariate_indices(irow)
+  irow1d = DofMaps.get_univariate_dof_map(irow)
   for (i,(ai,irowi)) in enumerate(zip(a,irow1d))
     a[i] = ai[vec(irowi)]
   end
 end
 
-function _sort!(a::AbstractVector{<:AbstractMatrix},i::Tuple{<:TProductIndexMap,<:TProductIndexMap})
+function _sort!(a::AbstractVector{<:AbstractMatrix},i::Tuple{<:TProductDofMap,<:TProductDofMap})
   irow,icol = i
-  irow1d = IndexMaps.get_univariate_indices(irow)
-  icol1d = IndexMaps.get_univariate_indices(icol)
+  irow1d = DofMaps.get_univariate_dof_map(irow)
+  icol1d = DofMaps.get_univariate_dof_map(icol)
   for (i,(ai,irowi,icoli)) in enumerate(zip(a,irow1d,icol1d))
     a[i] = ai[vec(irowi),vec(icoli)]
   end
 end
 
-function tproduct_array(arrays_1d::Vector{<:AbstractArray},index_map)
-  _sort!(arrays_1d,index_map)
+function tproduct_array(arrays_1d::Vector{<:AbstractArray},dof_map)
+  _sort!(arrays_1d,dof_map)
   Rank1Tensor(arrays_1d)
 end
 
@@ -57,21 +66,21 @@ function tproduct_array(
   ::Nothing,
   arrays_1d::Vector{<:AbstractArray},
   gradients_1d::Vector{<:AbstractArray},
-  index_map,
+  dof_map,
   summation=nothing)
 
-  tproduct_array(arrays_1d,index_map)
+  tproduct_array(arrays_1d,dof_map)
 end
 
 function tproduct_array(
   ::typeof(gradient),
   arrays_1d::Vector{<:AbstractArray},
   gradients_1d::Vector{<:AbstractArray},
-  index_map,
+  dof_map,
   summation=nothing)
 
-  _sort!(arrays_1d,index_map)
-  _sort!(gradients_1d,index_map)
+  _sort!(arrays_1d,dof_map)
+  _sort!(gradients_1d,dof_map)
   decompositions = _find_decompositions(summation,arrays_1d,gradients_1d)
   GenericRankTensor(decompositions)
 end
@@ -103,27 +112,27 @@ struct BlockRankTensor{A<:AbstractRankTensor,N} <: AbstractArray{A,N}
   array::Array{A,N}
 end
 
-function tproduct_array(arrays_1d::Vector{<:BlockArray},index_map)
+function tproduct_array(arrays_1d::Vector{<:BlockArray},dof_map)
   s_blocks = blocksize(first(arrays_1d))
   arrays = map(CartesianIndices(s_blocks)) do i
     iblock = Block(Tuple(i))
     arrays_1d_i = getindex.(arrays_1d,iblock)
-    index_map_i = getindex.(index_map,Tuple(i))
-    tproduct_array(arrays_1d_i,index_map_i)
+    dof_map_i = getindex.(dof_map,Tuple(i))
+    tproduct_array(arrays_1d_i,dof_map_i)
   end
   BlockRankTensor(arrays)
 end
 
-function tproduct_array(op::ArrayBlock,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},index_map,s::ArrayBlock)
+function tproduct_array(op::ArrayBlock,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},dof_map,s::ArrayBlock)
   s_blocks = blocksize(first(arrays_1d))
   arrays = map(CartesianIndices(s_blocks)) do i
     iblock = Block(Tuple(i))
     arrays_1d_i = getindex.(arrays_1d,iblock)
     gradients_1d_i = getindex.(gradients_1d,iblock)
-    index_map_i = getindex.(index_map,Tuple(i))
+    dof_map_i = getindex.(dof_map,Tuple(i))
     op_i = op[Tuple(i)...]
     s_i = s[Tuple(i)...]
-    tproduct_array(op_i,arrays_1d_i,gradients_1d_i,index_map_i,s_i)
+    tproduct_array(op_i,arrays_1d_i,gradients_1d_i,dof_map_i,s_i)
   end
   BlockRankTensor(arrays)
 end

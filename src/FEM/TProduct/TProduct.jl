@@ -19,9 +19,10 @@ using Gridap.TensorValues
 using Gridap.Helpers
 
 using GridapEmbedded
+using GridapEmbedded.Interfaces
 
 using ReducedOrderModels.Utils
-using ReducedOrderModels.IndexMaps
+using ReducedOrderModels.DofMaps
 
 import Base:+,-
 import FillArrays: Fill,fill
@@ -30,12 +31,8 @@ import PartitionedArrays: tuple_of_arrays
 import SparseArrays: AbstractSparseMatrixCSC
 import UnPack: @unpack
 
-export get_dof_index_map
-export get_polynomial_order
-include("DofIndexMaps.jl")
-
-export get_tp_dof_index_map
-include("TProductDofIndexMaps.jl")
+export get_tp_dof_map
+include("TProductDofMaps.jl")
 
 export TProductModel
 export TProductTriangulation
@@ -46,8 +43,6 @@ export TProductFESpace
 export get_tp_fe_basis
 export get_tp_trial_fe_basis
 include("TProductFESpaces.jl")
-
-include("TProductFEIndexMaps.jl")
 
 export AbstractRankTensor
 export Rank1Tensor
@@ -69,8 +64,5 @@ include("TProductCellData.jl")
 export TProductSparseMatrixAssembler
 export TProductBlockSparseMatrixAssembler
 include("TProductAssembly.jl")
-
-export TProductEmbeddedDiscretization
-include("Unfitted.jl")
 
 end # module

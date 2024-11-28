@@ -57,19 +57,23 @@ function FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldParamFESpace,f
 end
 
 function FESpaces.gather_free_and_dirichlet_values(f::SingleFieldParamFESpace,cv)
-  gather_free_and_dirichlet_values(get_fe_space(f),cv)
+  gather_free_and_dirichlet_values(remove_layer(f),cv)
 end
 
 function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::SingleFieldParamFESpace,cv)
-  gather_free_and_dirichlet_values!(fv,dv,get_fe_space(f),cv)
+  gather_free_and_dirichlet_values!(fv,dv,remove_layer(f),cv)
 end
 
-function IndexMaps.get_vector_index_map(f::SingleFieldParamFESpace)
-  get_vector_index_map(get_fe_space(f))
+function DofMaps.get_dof_map(f::SingleFieldParamFESpace)
+  get_dof_map(get_fe_space(f))
 end
 
-function IndexMaps.get_matrix_index_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace)
-  get_matrix_index_map(get_fe_space(f),g)
+function DofMaps.get_univariate_dof_map(f::SingleFieldParamFESpace)
+  get_univariate_dof_map(get_fe_space(f))
+end
+
+function DofMaps.get_sparse_dof_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace)
+  get_sparse_dof_map(get_fe_space(f),g)
 end
 
 get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(get_fe_space(f))
@@ -108,19 +112,19 @@ function FESpaces.EvaluationFunction(pf::SingleFieldParamFESpace{<:ZeroMeanFESpa
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceWithConstantFixed{<:FESpaces.FixConstant},
+  f::FESpaceWithConstantFixed{FESpaces.FixConstant},
   fv::AbstractParamVector,
   dv::AbstractParamVector
   )
 
   @assert innerlength(dv) == 1
   _dv = similar(dv,eltype(dv),0)
-  _fv = VectorWithEntryInserted(fv,f.dof_to_fix,get_param_entry(dv,1))
+  _fv = ParamVectorWithEntryInserted(fv,f.dof_to_fix,get_param_entry(dv,1))
   scatter_free_and_dirichlet_values(f.space,_fv,_dv)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceWithConstantFixed{<:FESpaces.DoNotFixConstant},
+  f::FESpaceWithConstantFixed{FESpaces.DoNotFixConstant},
   fv::AbstractParamVector,
   dv::AbstractParamVector
   )
@@ -196,7 +200,7 @@ function FESpaces.gather_free_and_dirichlet_values!(
   f = get_fe_space(pf)
   pf′ = remove_layer(pf)
   _dv = similar(dv,eltype(dv),0)
-  _fv = ParamVectorWithEntryRemoved(fv,f.dof_to_fix,zero(eltype(fv)))
+  _fv = ParamVectorWithEntryInserted(fv,f.dof_to_fix,zero(eltype(fv)))
   gather_free_and_dirichlet_values!(_fv,_dv,pf′,cv)
   dv[1] = _fv.value
   (fv,dv)
@@ -246,11 +250,12 @@ function FESpaces.gather_dirichlet_values!(
 end
 
 function FESpaces._fill_dirichlet_values_for_tag!(
-  dirichlet_values::ConsecutiveParamVector,
-  dv::ConsecutiveParamVector,
+  dirichlet_values::AbstractParamVector,
+  dv::AbstractParamVector,
   tag,
   dirichlet_dof_to_tag)
 
+  @check MemoryLayoutStyle(dirichlet_values) == MemoryLayoutStyle(dv) == ConsecutiveMemory()
   @check param_length(dirichlet_values) == param_length(dv)
   diri_data = get_all_data(dirichlet_values)
   dv_data = get_all_data(dv)
@@ -264,14 +269,15 @@ function FESpaces._fill_dirichlet_values_for_tag!(
 end
 
 function FESpaces._free_and_dirichlet_values_fill!(
-  free_vals::ConsecutiveParamVector,
-  dirichlet_vals::ConsecutiveParamVector,
+  free_vals::AbstractParamVector,
+  dirichlet_vals::AbstractParamVector,
   cache_vals,
   cache_dofs,
   cell_vals,
   cell_dofs,
   cells)
 
+  @check MemoryLayoutStyle(dirichlet_vals) == MemoryLayoutStyle(free_vals) == ConsecutiveMemory()
   @check param_length(free_vals) == param_length(dirichlet_vals)
   free_data = get_all_data(free_vals)
   diri_data = get_all_data(dirichlet_vals)
@@ -433,34 +439,3 @@ end
 # utils
 
 remove_layer(f::SingleFieldParamFESpace) = @abstractmethod
-
-# for testing purposes
-
-function FESpaces.test_single_field_fe_space(f::SingleFieldParamFESpace,pred=(==))
-  fe_basis = get_fe_basis(f)
-  @test isa(fe_basis,CellField)
-  test_fe_space(f)
-  dirichlet_values = zero_dirichlet_values(f)
-  @test length(dirichlet_values) == num_dirichlet_dofs(f)
-  free_values = zero_free_values(f)
-  cell_vals = scatter_free_and_dirichlet_values(f,free_values,dirichlet_values)
-  fv, dv = gather_free_and_dirichlet_values(f,cell_vals)
-  @test pred(fv,free_values)
-  @test pred(dv,dirichlet_values)
-  gather_free_and_dirichlet_values!(fv,dv,f,cell_vals)
-  @test pred(fv,free_values)
-  @test pred(dv,dirichlet_values)
-  fv, dv = gather_free_and_dirichlet_values!(fv,dv,f,cell_vals)
-  @test pred(fv,free_values)
-  @test pred(dv,dirichlet_values)
-  fe_function = FEFunction(f,free_values,dirichlet_values)
-  @test isa(fe_function,SingleFieldParamFEFunction)
-  test_fe_function(fe_function)
-  ddof_to_tag = get_dirichlet_dof_tag(f)
-  @test length(ddof_to_tag) == num_dirichlet_dofs(f)
-  if length(get_dirichlet_dof_tag(f)) != 0
-    @test maximum(get_dirichlet_dof_tag(f)) <= num_dirichlet_tags(f)
-  end
-  cell_dof_basis = get_fe_dof_basis(f)
-  @test isa(cell_dof_basis,CellDof)
-end

@@ -54,14 +54,6 @@ function Contribution(
   ArrayContribution{T,N}(v,t)
 end
 
-for f in (:set_domains,:change_domains)
-  @eval begin
-    function $f(a::Contribution,t::Tuple{Vararg{Triangulation}})
-      Contribution(get_values(a),t)
-    end
-  end
-end
-
 """
     struct ArrayContribution{T,N,V,K} <: Contribution end
 
@@ -207,16 +199,4 @@ function Algebra.copy_entries!(a::TupOfArrayContribution,b::TupOfArrayContributi
     copy_entries!(a,b)
   end
   a
-end
-
-for f in (:set_domains,:change_domains)
-  @eval begin
-    function $f(a::TupOfArrayContribution,t::Tuple{Vararg{Tuple{Vararg{Triangulation}}}})
-      b = ()
-      for (ai,ti) in zip(a,t)
-        b = (b...,$f(ai,ti))
-      end
-      b
-    end
-  end
 end

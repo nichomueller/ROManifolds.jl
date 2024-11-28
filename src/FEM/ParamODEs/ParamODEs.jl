@@ -14,7 +14,7 @@ using Gridap.Polynomials
 using Gridap.Helpers
 
 using ReducedOrderModels.Utils
-using ReducedOrderModels.IndexMaps
+using ReducedOrderModels.DofMaps
 using ReducedOrderModels.TProduct
 using ReducedOrderModels.ParamDataStructures
 using ReducedOrderModels.ParamFESpaces
@@ -26,7 +26,7 @@ import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ODEs: TransientCellField
 import Gridap.ReferenceFEs: get_order
-import ReducedOrderModels.ParamSteady: get_trian_res,get_trian_jac
+import ReducedOrderModels.ParamSteady: get_domains_res,get_domains_jac
 
 include("TimeDerivatives.jl")
 

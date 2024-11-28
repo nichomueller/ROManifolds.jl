@@ -55,14 +55,14 @@ res(μ,t,u,v,dΩ,dΓn) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rh
 trian_res = (Ω,Γn)
 trian_stiffness = (Ω,)
 trian_mass = (Ω,)
+domains = FEDomains(trian_res,(trian_stiffness,trian_mass))
 
 energy(du,v) = ∫(du*v)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
-feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
-  trial,test,trian_res,trian_stiffness,trian_mass)
+feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,trial,test,domains)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 # solvers
@@ -80,7 +80,7 @@ create_dir(test_dir)
 fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
 # fesnaps = load_snapshots(test_dir)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-ronline = realization(feop;nparams=10)
+ronline = realization(feop;nparams=10,random=true)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 
 x,festats = solution_snapshots(rbsolver,feop,ronline,uh0μ)

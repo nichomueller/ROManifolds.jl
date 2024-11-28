@@ -60,7 +60,7 @@ struct LinearNonlinearRBCache <: AbstractParamCache
   b::AbstractVector
 end
 
-abstract type RBOperator{O} <: ParamOperator{O,SplitTriangulation} end
+abstract type RBOperator{O} <: ParamOperator{O,SplitDomains} end
 
 function allocate_rbcache(op::RBOperator,args...)
   @abstractmethod
@@ -328,7 +328,7 @@ function Algebra.solve(
   rbcache = allocate_rbcache(op,r,x)
 
   t = @timed solve!(x̂,fesolver,op,r,x,rbcache)
-  stats = CostTracker(t,nruns=num_params(r))
+  stats = CostTracker(t,nruns=num_params(r),name="RB solver")
 
   return x̂,stats
 end

@@ -14,12 +14,20 @@ function is_parent(
   tparent.grid === tchild.grid.parent
 end
 
-function is_parent(tparent::BoundaryTriangulation,tchild::Geometry.TriangulationView)
+function is_parent(tparent::Triangulation,tchild::Geometry.TriangulationView)
   tparent === tchild.parent
 end
 
-function is_parent(tparent::Interfaces.SubFacetTriangulation,tchild::Geometry.TriangulationView)
-  tparent === tchild.parent
+for T in (:Triangulation,:(BodyFittedTriangulation{Dt,Dp,A,<:Geometry.GridView} where {Dt,Dp,A}),:(Geometry.TriangulationView))
+  @eval begin
+    function is_parent(tparent::Geometry.AppendedTriangulation,tchild::$T)
+      is_parent(tparent.a,tchild) || is_parent(tparent.b,tchild)
+    end
+  end
+end
+
+function is_parent(tparent::Geometry.AppendedTriangulation,tchild::Geometry.AppendedTriangulation)
+  is_parent(tparent.a,tchild.a,) && is_parent(tparent.b,tchild.b)
 end
 
 function get_parent(t::Geometry.Grid)
@@ -46,7 +54,7 @@ function get_parent(t::AbstractVector{<:Triangulation})
 end
 
 """
-    is_parent(t::Triangulation) -> Triangulation
+    get_parent(t::Triangulation) -> Triangulation
 
 When `t` is a triangulation view, returns its parent; throws an error when `t`
 is not a triangulation view
@@ -72,16 +80,22 @@ function Base.isapprox(t::T,s::T) where {T<:Geometry.GridView}
   t.parent ≈ s.parent
 end
 
-get_tface_to_mface(t::Triangulation) = @abstractmethod
-get_tface_to_mface(t::BodyFittedTriangulation) = t.tface_to_mface
-get_tface_to_mface(t::BoundaryTriangulation) = get_tface_to_mface(t.trian)
+get_parent_ids(t::Triangulation) = @abstractmethod
+get_parent_ids(t::BodyFittedTriangulation) = t.tface_to_mface
+get_parent_ids(t::BoundaryTriangulation) = get_parent_ids(t.trian)
+
+function get_parent_ids(t::Geometry.AppendedTriangulation)
+  a = get_parent_ids(t.a)
+  b = get_parent_ids(t.b)
+  lazy_append(a,b)
+end
 
 function Base.isapprox(t::T,s::S) where {T<:Triangulation,S<:Triangulation}
   false
 end
 
 function Base.isapprox(t::T,s::T) where {T<:Triangulation}
-  get_tface_to_mface(t) == get_tface_to_mface(s) && get_grid(t) ≈ get_grid(s)
+  get_parent_ids(t) == get_parent_ids(s) && get_grid(t) ≈ get_grid(s)
 end
 
 function Base.isapprox(t::T,s::T) where {T<:Geometry.TriangulationView}
@@ -139,13 +153,13 @@ function find_trian_permutation(a,b)
 end
 
 """
-    order_triangulations(tparents::Tuple{Vararg{Triangulation}},
+    order_domains(tparents::Tuple{Vararg{Triangulation}},
       tchildren::Tuple{Vararg{Triangulation}}) -> Tuple{Vararg{Triangulation}}
 
 Orders the triangulation children in the same way as the triangulation parents
 
 """
-function order_triangulations(tparents,tchildren)
+function order_domains(tparents,tchildren)
   @check length(tparents) == length(tchildren)
   iperm = find_trian_permutation(tparents,tchildren)
   map(iperm->tchildren[iperm],iperm)
@@ -198,4 +212,23 @@ function CellData.change_domain(a::CellField,strian::Triangulation,::PhysicalDom
   parent = CellData.change_domain(a,strian,PhysicalDomain(),ttrian.parent,PhysicalDomain())
   cell_data = lazy_map(Reindex(CellData.get_data(parent)),ttrian.cell_to_parent_cell)
   return CellData.similar_cell_field(a,cell_data,ttrian,PhysicalDomain())
+end
+
+# correct bug
+
+function Base.view(trian::Geometry.AppendedTriangulation,ids::AbstractArray)
+  Ti = eltype(ids)
+  ids1 = Ti[]
+  ids2 = Ti[]
+  n1 = num_cells(trian.a)
+  for i in ids
+    if i <= n1
+      push!(ids1,i)
+    else
+      push!(ids2,i-n1)
+    end
+  end
+  trian1 = view(trian.a,ids1)
+  trian2 = view(trian.b,ids2)
+  num_cells(trian1) == 0 ? trian2 : lazy_append(trian1,trian2)
 end

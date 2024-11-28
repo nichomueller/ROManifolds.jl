@@ -190,6 +190,7 @@ end
 abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end
 struct NormalSampling <: SamplingStyle end
+struct SmolyakSampling <: SamplingStyle end
 
 """
     ParamSpace{P,S} <: AbstractSet{Realization}
@@ -198,14 +199,26 @@ Represents a standard set of parameters.
 
 """
 
-struct ParamSpace{P<:AbstractVector{<:AbstractVector},S} <: AbstractSet{Realization}
+struct ParamSpace{P<:AbstractVector{<:AbstractVector},S<:SamplingStyle} <: AbstractSet{Realization}
   param_domain::P
   sampling_style::S
 end
 
+dimension(p::ParamSpace) = length(p.param_domain)
+
 function ParamSpace(param_domain::AbstractVector{<:AbstractVector})
-  sampling_style = UniformSampling()
+  sampling_style = SmolyakSampling()
   ParamSpace(param_domain,sampling_style)
+end
+
+function ParamSpace(domain_tuple::NTuple{N,T},args...) where {N,T}
+  @notimplementedif !isconcretetype(T)
+  @notimplementedif isodd(N)
+  param_domain = Vector{Vector{T}}(undef,Int(N/2))
+  for (i,n) in enumerate(1:2:N)
+    param_domain[i] = [domain_tuple[n],domain_tuple[n+1]]
+  end
+  ParamSpace(param_domain,args...)
 end
 
 function Base.show(io::IO,::MIME"text/plain",p::ParamSpace)
@@ -228,8 +241,27 @@ end
 Extraction of a set of parameters from a given parametric space
 
 """
-function realization(p::ParamSpace;nparams=1)
+function realization(p::ParamSpace{P,S} where {P,S};nparams=1,kwargs...)
   Realization([_generate_param(p) for i = 1:nparams])
+end
+
+function realization(
+  p::ParamSpace{P,SmolyakSampling} where P;
+  level=dimension(p),
+  grid=smolyak_grid(p),
+  nparams=length(grid),
+  random=false)
+
+  if random
+    p′ = ParamSpace(p.param_domain,UniformSampling())
+    realization(p′;nparams)
+  else
+    if nparams > length(grid)
+      realization(p;level=level+1,nparams=nparams)
+    else
+      Realization(rand(grid,nparams))
+    end
+  end
 end
 
 """
@@ -245,7 +277,7 @@ struct TransientParamSpace{P,T} <: AbstractSet{TransientRealization}
 end
 
 function TransientParamSpace(
-  param_domain::AbstractVector{<:AbstractVector},
+  param_domain::Union{Tuple,AbstractVector},
   temporal_domain::AbstractVector{<:Real},
   args...)
 
@@ -260,10 +292,11 @@ end
 
 function realization(
   p::TransientParamSpace;
-  nparams=1,time_locations=eachindex(p.temporal_domain)
+  time_locations=eachindex(p.temporal_domain),
+  kwargs...
   )
 
-  params = realization(p.parametric_space;nparams)
+  params = realization(p.parametric_space;kwargs...)
   times = p.temporal_domain[time_locations]
   TransientRealization(params,times)
 end
@@ -496,55 +529,65 @@ Arrays.evaluate!(cache,f::AbstractParamFunction,x::CellPoint) = CellField(f,get_
 
 (f::AbstractParamFunction)(x) = evaluate(f,x)
 
-function test_parametric_space()
-  α = Realization(rand(10))
-  β = Realization([rand(10)])
-  @test isa(α,TrivialRealization)
-  @test isa(α,Realization{Vector{Float64}})
-  @test isa(β,Realization{Vector{Vector{Float64}}})
-  γ = TransientRealization(α,1)
-  δ = TransientRealization(α,1:10)
-  ϵ = TransientRealization(β,1:10)
-  @test isa(δ,TransientRealization{<:TrivialRealization,UnitRange{Integer}})
-  @test isa(ϵ,TransientRealization{Realization{Vector{Vector{Float64}}},UnitRange{Integer}})
-  @test length(γ) == 1 && length(δ) == 9 && length(ϵ) == 9
-  change_time!(ϵ,11:20)
-  @test get_times(get_at_time(ϵ,:final)) == 20
-  param_domain = [[1,10],[11,20]]
-  p = ParamSpace(param_domain)
-  t = 1:10
-  pt = TransientParamSpace(param_domain,t)
-  μ = realization(p)
-  μt = realization(pt)
-  @test isa(μ,Realization) && isa(μt,TransientRealization)
-  a(x,t) = sum(x)*t^2*sin(t)
-  a(t) = x -> a(x,t)
-  da = ∂t(a)
-  aμ(x,μ,t) = sum(μ)*a(x,t)
-  aμ(μ,t) = x -> aμ(x,μ,t)
-  aμt = 𝑓ₚₜ(aμ,get_params(μt),get_times(μt))
-  daμt = ∂t(aμt)
-  @test isa(𝑓ₚₜ(a,α,t),Function)
-  @test isa(aμt,AbstractParamFunction)
-  @test isa(daμt,AbstractParamFunction)
-  x = Point(1,2)
-  aμtx = aμt(x)
-  daμtx = daμt(x)
-  for (i,(μ,t)) in enumerate(μt)
-    @test aμtx[i] == a(t)(x)*sum(μ)
-    @test daμtx[i] == da(t)(x)*sum(μ)
+# Smolyak utils
+
+function SmolyakApprox.scale_nodes!(
+  grid::AbstractVector{<:AbstractVector},
+  domain::AbstractVector{<:AbstractVector})
+
+  @inbounds for (i,gridi) in enumerate(grid)
+    gridi = grid[i]
+    for (j,gridij) in enumerate(gridi)
+      gridi[j] = domain[j][2] + (1.0+gridij)*(domain[j][1]-domain[j][2])*0.5
+    end
   end
-  b(x,μ) = sum(x)*sum(μ)
-  b(μ) = x -> b(x,μ)
-  bμ = 𝑓ₚ(b,get_params(μ))
-  bμx = bμ(x)
-  for (i,μ) in enumerate(μ)
-    @test b(x,μ) == bμx[i]
+
+end
+
+function SmolyakApprox.smolyak_grid(p::ParamSpace,level=dimension(p))
+  d = dimension(p)
+  domain = p.param_domain
+
+  T = eltype(domain)
+
+  multi_index        = SmolyakApprox.generate_multi_index(d,level)
+  unique_multi_index = sort(unique(multi_index))
+  unique_node_number = SmolyakApprox.m_i.(unique_multi_index)
+
+  # Create base nodes to be used in the sparse grid
+
+  base_nodes   = Vector{T}(undef,length(unique_node_number))
+  for i in eachindex(unique_node_number)
+    base_nodes[i] = SmolyakApprox.chebyshev_extrema(unique_node_number[i])
   end
-  for (i,(μ,t)) in enumerate(μt)
-    @test aμ(x,μ,t) == aμtx[i]
+
+  # Determine the unique nodes introduced at each higher level
+
+  unique_base_nodes = Vector{T}(undef,length(unique_node_number))
+  unique_base_nodes[1] = base_nodes[1]
+  for i = 2:length(unique_base_nodes)
+    unique_base_nodes[i] = setdiff(base_nodes[i],base_nodes[i-1])
   end
-  for (i,(μ,t)) in enumerate(μt)
-    @test da(x,μ,t) == daμtx[i]
+
+  # Construct the sparse grid from the unique nodes
+
+  grid = Vector{T}(undef,SmolyakApprox.determine_grid_size(multi_index)[1])
+  l = 1
+  @inbounds for j in axes(multi_index,1)
+    new_nodes = unique_base_nodes[multi_index[j,1]] # Here new_nodes is a 1d array
+    for i = 2:d
+      new_nodes = SmolyakApprox.combine_nodes(new_nodes,unique_base_nodes[multi_index[j,i]])  # Here new_nodes becomes a 2d array
+    end
+    m = size(new_nodes,1)
+    for (ik,k) in enumerate(l:l+m-1)
+      grid[k] = new_nodes[ik,:]
+    end
+    l += m
   end
+
+  # Now scale the nodes to the desired domain
+
+  SmolyakApprox.scale_nodes!(grid,domain)
+
+  return grid
 end

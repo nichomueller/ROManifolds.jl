@@ -79,4 +79,4 @@ end
 # utils
 
 remove_layer(f::TrialParamFESpace) = TrialParamFESpace(f.dirichlet_values,f.space.space)
-remove_layer(f::TrialParamFESpace{<:TProductFESpace}) = TrialParamFESpace(f.dirichlet_values,f.space.space.space)
+remove_layer(f::TrialParamFESpace{<:UnconstrainedFESpace}) = f

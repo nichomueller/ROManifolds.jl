@@ -10,7 +10,7 @@ only the nonlinear components
 """
 struct LinearNonlinearTransientParamFEOperator{T} <: TransientParamFEOperator{LinearNonlinearParamODE,T}
   op_linear::TransientParamFEOperator{LinearParamODE,T}
-  op_nonlinear::TransientParamFEOperator{T}
+  op_nonlinear::TransientParamFEOperator{NonlinearParamODE,T}
 end
 
 ParamSteady.get_linear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_linear
@@ -35,10 +35,9 @@ function ParamSteady.get_param_space(op::LinearNonlinearTransientParamFEOperator
   get_param_space(op.op_linear)
 end
 
-function IndexMaps.get_index_map(op::LinearNonlinearTransientParamFEOperator)
-  @check all(get_vector_index_map(op.op_linear) .== get_vector_index_map(op.op_nonlinear))
-  @check all(get_matrix_index_map(op.op_linear) .== get_matrix_index_map(op.op_nonlinear))
-  get_index_map(op.op_linear)
+function ParamSteady.get_fe_dof_maps(op::LinearNonlinearTransientParamFEOperator)
+  @check all(get_sparse_dof_map(op.op_linear) .== get_sparse_dof_map(op.op_nonlinear))
+  get_fe_dof_maps(op.op_linear)
 end
 
 function Polynomials.get_order(op::LinearNonlinearTransientParamFEOperator)
@@ -92,7 +91,7 @@ function ParamSteady.join_operators(
   TransientParamFEOperator(res,jacs,op_lin.tpspace,trial,test)
 end
 
-for f in (:(Utils.set_domains),:(Utils.change_domains))
+for f in (:(ParamSteady.set_domains),:(ParamSteady.change_domains))
   @eval begin
     function $f(op::LinearNonlinearTransientParamFEOperator)
       op_lin′ = $f(get_linear_operator(op))

@@ -167,14 +167,16 @@ function HyperReduction(
   return MDEIM(red,proj_basis,factor,domain)
 end
 
-function get_reduced_cells(cell_dof_ids,dofs::AbstractVector)
-  cells = eltype(eltype(cell_dof_ids))[]
-  for (cell,celldofs) = enumerate(cell_dof_ids)
+function get_reduced_cells(cell_dof_ids::AbstractArray{<:AbstractArray},dofs::AbstractVector)
+  cells = Int32[]
+  cache = array_cache(cell_dof_ids)
+  for cell = eachindex(cell_dof_ids)
+    celldofs = getindex!(cache,cell_dof_ids,cell)
     if !isempty(intersect(dofs,celldofs))
       append!(cells,cell)
     end
   end
-  return unique(cells)
+  return cells
 end
 
 function get_reduced_cells(
@@ -529,7 +531,7 @@ function reduced_form(
   end
 
   hyper_red = BlockProjection(hyper_reds,s.touched)
-  red_trian = ParamDataStructures.merge_triangulations(red_trians)
+  red_trian = Utils.merge_triangulations(red_trians)
 
   return hyper_red,red_trian
 end
@@ -554,7 +556,7 @@ function reduced_form(
   end
 
   hyper_red = BlockProjection(hyper_reds,s.touched)
-  red_trian = ParamDataStructures.merge_triangulations(red_trians)
+  red_trian = Utils.merge_triangulations(red_trians)
 
   return hyper_red,red_trian
 end
