@@ -21,7 +21,7 @@ using ReducedOrderModels.Utils
 
 import FillArrays: Fill
 import PartitionedArrays: tuple_of_arrays
-import SparseArrays: AbstractSparseMatrix
+import SparseArrays: AbstractSparseMatrix,AbstractSparseMatrixCSC
 import SparseMatricesCSR: SparseMatrixCSR
 
 export recast_indices
@@ -43,7 +43,9 @@ include("DofMapsInterface.jl")
 
 export SparsityPattern
 export SparsityPatternCSC
+export OrderedSparsityPattern
 export TProductSparsityPattern
+export get_background_matrix
 export order_sparsity
 export recast
 export to_nz_index

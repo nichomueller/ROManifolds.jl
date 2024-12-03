@@ -31,6 +31,11 @@ Subtypes:
 """
 abstract type SparseCore{T,N} <: AbstractTTCore{T,N} end
 
+function SparseCore(array::Array{T,3},sparsity::OrderedSparsityPattern) where T
+  sparsity′ = SparsityPattern(get_background_matrix(sparsity))
+  SparseCore(array,sparsity′)
+end
+
 """
     struct SparseCoreCSC{T,Ti} <: SparseCore{T,3} end
 

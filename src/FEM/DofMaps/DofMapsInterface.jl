@@ -202,19 +202,52 @@ function _to_scalar_values!(i::AbstractArray,D::Integer,d::Integer)
   i .= (i .- d) ./ D .+ 1
 end
 
-function get_component(i::DofMap{D};to_scalar=false) where D
-  ncomps = size(i,D)
-  indices = collect(selectdim(i.indices,D,ncomps))
+function get_component(i::DofMap{D},d::Integer=1;to_scalar=false) where D
+  indices = collect(selectdim(i.indices,D,d))
   free_vals_box = collect(selectdim(i.free_vals_box,D,1))
+  dof_to_cell = get_dof_to_cell(i)
 
   if to_scalar
+    ncomps = size(i,D)
+    δ = ncomps-d
     for j in free_vals_box
       indj = indices[j]
-      indices[j] = indj / ncomps
+      indices[j] = (indj+δ) / ncomps
     end
+    dof_to_cell = dof_to_cell[d:ncomps:length(dof_to_cell)]
   end
 
-  DofMap(indices,i.dof_to_cell,free_vals_box,i.cell_to_mask)
+  DofMap(indices,dof_to_cell,free_vals_box,i.cell_to_mask)
+end
+
+function get_component(
+  trian::Triangulation{Dc,D},
+  i::AbstractDofMap{D},
+  args...;
+  kwargs...
+  ) where {Dc,D}
+
+  i
+end
+
+function get_component(
+  trian::Triangulation{Dc,Dp},
+  i::AbstractDofMap{D},
+  args...;
+  kwargs...
+  ) where {Dc,Dp,D}
+
+  get_component(i,args...;kwargs...)
+end
+
+function get_component(
+  trian::Triangulation,
+  i::AbstractVector{<:AbstractDofMap},
+  args...;
+  kwargs...
+  )
+
+  map(i->get_component(trian,i,args...;kwargs...),i)
 end
 
 struct ConstrainedDofMap{D,Ti,A} <: AbstractDofMap{D,Ti}
@@ -257,12 +290,12 @@ end
 
 Base.size(i::TProductDofMap) = size(i.indices)
 
-function Base.getindex(i::TProductDofMap{D,Ti},j::Vararg{Integer,D}) where {D,Ti}
-  getindex(i.indices,j...)
+function Base.getindex(i::TProductDofMap,j::Integer)
+  getindex(i.indices,j)
 end
 
-function Base.setindex!(i::TProductDofMap{D,Ti},v,j::Vararg{Integer,D}) where {D,Ti}
-  setindex!(i.indices,v,j...)
+function Base.setindex!(i::TProductDofMap,v,j::Integer)
+  setindex!(i.indices,v,j)
 end
 
 function Base.copy(i::TProductDofMap)

@@ -173,21 +173,34 @@ Base.@propagate_inbounds function sequential_product(
   reshape(aB,s1,s2,s3,s4,s5,s6)
 end
 
+function sequential_product(
+  factor1::AbstractArray{T,6},
+  factor2::AbstractArray{S,4}
+  ) where {T,S}
+
+  @check size(factor1,1) == size(factor1,2) == size(factor1,3) == 1
+  if size(factor1,4) == size(factor2,1) && size(factor1,5) == size(factor2,2)
+    _seq_prod_missing_trial(factor1,factor2)
+  else size(factor1,5) == size(factor2,1) && size(factor1,6) == size(factor2,2)
+    _seq_prod_missing_test(factor1,factor2)
+  end
+end
+
 function sequential_product(factor1::AbstractArray,factors::AbstractArray...)
   factor2,last_factors... = factors
   sequential_product(sequential_product(factor1,factor2),last_factors...)
 end
 
-function cores2basis(core::AbstractArray{Float64,3})
+function cores2basis(core::AbstractArray{T,3}) where T
   reshape(core,:,size(core,3))
 end
 
-function cores2basis(cores::AbstractArray{Float64,3}...)
+function cores2basis(cores::AbstractArray{T,3}...) where T
   core = sequential_product(cores...)
   dropdims(core;dims=1)
 end
 
-function cores2basis(dof_map::AbstractDofMap{D},cores::AbstractArray{Float64,3}...) where D
+function cores2basis(dof_map::AbstractDofMap{D},cores::AbstractArray{T,3}...) where {T,D}
   @check length(cores) ≥ D
   coresD = sequential_product(cores[1:D]...)
   invmap = invert(dof_map)
@@ -200,8 +213,9 @@ function cores2basis(dof_map::AbstractDofMap{D},cores::AbstractArray{Float64,3}.
 end
 
 function galerkin_projection(
-  cores_test::Vector{<:AbstractArray{Float64,3}},
-  cores::Vector{<:AbstractArray{Float64,3}})
+  cores_test::Vector{<:AbstractArray{T,3}},
+  cores::Vector{<:AbstractArray{T,3}}
+  ) where T
 
   rcores = contraction.(cores_test,cores)
   rcore = sequential_product(rcores...)
@@ -209,19 +223,32 @@ function galerkin_projection(
 end
 
 function galerkin_projection(
-  cores_test::Vector{<:AbstractArray{Float64,3}},
-  cores::Vector{<:AbstractArray{Float64,3}},
-  cores_trial::Vector{<:AbstractArray{Float64,3}})
+  cores_test::Vector{<:AbstractArray{T,3}},
+  cores::Vector{<:AbstractArray{T,3}},
+  cores_trial::Vector{<:AbstractArray{T,3}}
+  ) where T
 
-  rcores = contraction.(cores_test,cores,cores_trial)
+  rcores = map(1:length(cores)) do d
+    cond_test = isassigned(cores_test,d)
+    cond_trial = isassigned(cores_trial,d)
+    @notimplementedif !(cond_test || cond_trial)
+    if cond_test && cond_trial
+      contraction(cores_test[d],cores[d],cores_trial[d])
+    elseif cond_test
+      contraction(cores_test[d],cores[d])
+    else
+      contraction(cores[d],cores_trial[d])
+    end
+  end
   rcore = sequential_product(rcores...)
   dropdims(rcore;dims=(1,2,3))
 end
 
 function reduced_coupling(
-  cores_p::Vector{<:AbstractArray{Float64,3}},
+  cores_p::Vector{<:AbstractArray{T,3}},
   B::Rank1Tensor,
-  cores_d::Vector{<:AbstractArray{Float64,3}})
+  cores_d::Vector{<:AbstractArray{T,3}}
+  ) where T
 
   factors = get_factors(B)
   @check length(cores_p)-1 == length(factors) == length(cores_d)
@@ -252,6 +279,29 @@ end
   aijk = A[i,j,k]
   A[i,j,k] = combine(aijk,v)
   A
+end
+
+Base.@propagate_inbounds function _seq_prod_missing_trial(
+  factor1::AbstractArray{T,6},
+  factor2::AbstractArray{S,4}
+  ) where {T,S}
+
+  factor1′ = permutedims(factor1,(1,2,3,6,4,5))
+  factor12′ = _seq_prod_missing_test(factor1′,factor2)
+  permutedims(factor12′,(1,2,3,5,6,4))
+end
+
+Base.@propagate_inbounds function _seq_prod_missing_test(
+  factor1::AbstractArray{T,6},
+  factor2::AbstractArray{S,4}
+  ) where {T,S}
+
+  n = size(factor1,5)*size(factor1,6)
+  A = reshape(factor1,:,n)
+  B = reshape(factor2,n,:)
+  AB = A*B
+  s1,s2,s3,s4,s5,s6 = 1,1,1,size(factor1,4),size(factor2,3),size(factor2,4)
+  reshape(AB,s1,s2,s3,s4,s5,s6)
 end
 
 # empirical interpolation

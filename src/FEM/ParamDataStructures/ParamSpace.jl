@@ -548,7 +548,7 @@ function SmolyakApprox.smolyak_grid(p::ParamSpace,level=dimension(p))
   d = dimension(p)
   domain = p.param_domain
 
-  T = eltype(domain)
+  T = Vector{Float64}
 
   multi_index        = SmolyakApprox.generate_multi_index(d,level)
   unique_multi_index = sort(unique(multi_index))

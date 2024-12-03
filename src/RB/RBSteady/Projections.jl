@@ -22,10 +22,11 @@ galerkin_projection(a::Projection,b::Projection) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection,c::Projection,args...) = @abstractmethod
 empirical_interpolation(a::Projection) = @abstractmethod
 rescale(op::Function,x::AbstractArray,b::Projection) = @abstractmethod
+union_bases(a::Projection,b::Projection,args...) = @abstractmethod
 gram_schmidt(a::Projection,b::Projection,args...) = gram_schmidt(get_basis(a),get_basis(b),args...)
 
-Base.:+(a::Projection,b::Projection) = union(a,b)
-Base.:-(a::Projection,b::Projection) = union(a,b)
+Base.:+(a::Projection,b::Projection) = union_bases(a,b)
+Base.:-(a::Projection,b::Projection) = union_bases(a,b)
 Base.:*(a::Projection,b::Projection) = galerkin_projection(a,b)
 Base.:*(a::Projection,b::Projection,c::Projection) = galerkin_projection(a,b,c)
 Base.:*(a::Projection,x::AbstractArray) = inv_project(a,x)
@@ -156,9 +157,9 @@ get_basis(a::PODBasis) = a.basis
 num_fe_dofs(a::PODBasis) = size(get_basis(a),1)
 num_reduced_dofs(a::PODBasis) = size(get_basis(a),2)
 
-Base.union(a::PODBasis,b::PODBasis,args...) = union(a,get_basis(b),args...)
+union_bases(a::PODBasis,b::PODBasis,args...) = union_bases(a,get_basis(b),args...)
 
-function Base.union(a::PODBasis,basis_b::AbstractMatrix,args...)
+function union_bases(a::PODBasis,basis_b::AbstractMatrix,args...)
   basis_a = get_basis(a)
   basis_ab, = gram_schmidt(basis_b,basis_a,args...)
   PODBasis(basis_ab)
@@ -222,15 +223,33 @@ num_reduced_dofs(a::TTSVDCores) = size(last(get_cores(a)),3)
 
 DofMaps.get_dof_map(a::TTSVDCores) = a.dof_map
 
-function Base.union(a::TTSVDCores,b::TTSVDCores,args...)
+function union_bases(a::TTSVDCores,b::TTSVDCores,args...)
   @check get_dof_map(a) == get_dof_map(b)
-  union(a,get_cores(b),args...)
+  union_bases(a,get_cores(b),args...)
 end
 
-function Base.union(a::TTSVDCores,cores_b::AbstractVector{<:AbstractArray},args...)
+function union_bases(
+  a::TTSVDCores,
+  cores_b::AbstractVector{<:AbstractArray},
+  args...
+  )
+
+  red_style = TTSVDReduction(fill(1e-4,length(cores_a)))
+  union_bases(a,cores_b,red_style,args...)
+end
+
+function union_bases(
+  a::TTSVDCores,
+  cores_b::AbstractVector{<:AbstractArray},
+  red_style::ReductionStyle,
+  args...
+  )
+
   cores_a = get_cores(a)
-  cores_ab = block_cores(cores_a,cores_b)
-  orthogonalize!(cores_ab,args...)
+  @check length(cores_a) == length(cores_b)
+
+  cores_ab = block_cores([cores_a,cores_b])
+  orthogonalize!(red_style,cores_ab,args...)
   TTSVDCores(cores_ab,get_dof_map(a))
 end
 
@@ -281,22 +300,19 @@ end
 
 # multi field interface
 
-function Arrays.return_cache(::typeof(projection),::PODReduction,s::AbstractSnapshots)
-  b = testvalue(Matrix{eltype(s)})
-  return PODBasis(b)
+function Arrays.return_type(::typeof(projection),::PODReduction,s::AbstractSnapshots)
+  PODBasis
 end
 
-function Arrays.return_cache(::typeof(projection),::TTSVDReduction,s::AbstractSnapshots)
-  c = testvalue(Vector{Array{eltype(s),3}})
-  i = get_dof_map(s)
-  return TTSVDCores(c,i)
+function Arrays.return_type(::typeof(projection),::TTSVDReduction,s::AbstractSnapshots)
+  TTSVDCores
 end
 
 function Arrays.return_cache(::typeof(projection),red::Reduction,s::BlockSnapshots)
   i = findfirst(s.touched)
   @notimplementedif isnothing(i)
-  basis = return_cache(projection,red,blocks(s)[i])
-  block_basis = Array{typeof(basis),ndims(s)}(undef,size(s))
+  A = return_type(projection,red,blocks(s)[i])
+  block_basis = Array{A,ndims(s)}(undef,size(s))
   touched = s.touched
   return BlockProjection(block_basis,touched)
 end
@@ -446,6 +462,7 @@ function enrich!(
   supr_matrix::BlockMatrix)
 
   @check a.touched[1] "Primal field not defined"
+  red_style = ReductionStyle(red)
   a_primal,a_dual... = a.array
   X_primal = norm_matrix[Block(1,1)]
   H_primal = cholesky(X_primal)
@@ -453,7 +470,7 @@ function enrich!(
     dual_i = get_basis(a_dual[i])
     C_primal_dual_i = supr_matrix[Block(1,i+1)]
     supr_i = H_primal \ C_primal_dual_i * dual_i
-    a_primal = union(a_primal,supr_i,X_primal)
+    a_primal = union_bases(a_primal,supr_i,X_primal,red_style)
   end
   a[1] = a_primal
   return
@@ -465,5 +482,76 @@ function enrich!(
   norm_matrix::BlockRankTensor,
   supr_matrix::BlockMatrix)
 
-  @notimplemented
+  @check a.touched[1] "Primal field not defined"
+  red_style = ReductionStyle(red)
+  a_primal,a_dual... = a.array
+  primal_map = get_dof_map(a_primal)
+  X_primal = norm_matrix[Block(1,1)]
+  for i = eachindex(a_dual)
+    dual_i = get_basis(a_dual[i])
+    C_primal_dual_i = supr_matrix[Block(1,i+1)]
+    C_primal = view(C_primal_dual_i * dual_i,primal_map)
+    supr_i = enrichment_ttsvd(red_style,C_primal,X_primal)
+    a_primal = union_bases(a_primal,supr_i,red_style,X_primal)
+  end
+  a[1] = a_primal
+  return
+end
+
+function enrichment_ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
+  prev_rank = size(A,1)
+  cur_size = size(A,2)
+  M = reshape(A,prev_rank*cur_size,:)
+
+  L,p = _cholesky_decomp(X)
+  L′ = kron(I(prev_rank),L)
+  p′ = vec(((collect(1:prev_rank).-1)*cur_size .+ p')')
+  XM = L′'\M[p′,:]
+  Ur,Sr,Vr = truncated_svd(red_style,XM)
+
+  core = reshape(Ur,prev_rank,cur_size,:)
+  remainder = Sr.*Vr'
+  return core,remainder
+end
+
+function enrichment_ttsvd(
+  red_style::TTSVDRanks,
+  A::AbstractArray{T,N},
+  X::Rank1Tensor{D}
+  ) where {T,N,D}
+
+  cores = Array{T,3}[]
+  oldrank = 1
+  remainder = reshape(A,oldrank,size(A,1),:)
+  for d in 1:D
+    core_d,remainder_d = enrichment_ttsvd_loop(red_style[d],remainder,X[d])
+    oldrank = size(core_d,3)
+    remainder::Array{T,3} = reshape(remainder_d,oldrank,size(A,d+1),:)
+    push!(cores,core_d)
+  end
+
+  return cores,remainder
+end
+
+function enrichment_ttsvd(
+  red_style::TTSVDRanks,
+  A::AbstractArray{T,N},
+  X::GenericRankTensor{D,K}
+  ) where {T,N,D,K}
+
+  # compute initial tt decompositions
+  cores_k,remainders_k = map(k -> enrichment_ttsvd(red_style,A,X[k]),1:K) |> tuple_of_arrays
+
+  # tt decomposition of the sum
+  cores = block_cores(cores_k)
+  remainder = block_cat(remainders_k;dims=1)
+
+  for d in D+1:N
+    core_d,remainder_d = ttsvd_loop(red_style[d],remainder)
+    oldrank = size(core_d,3)
+    remainder::Array{T,3} = reshape(remainder_d,oldrank,size(A,d+1),:)
+    push!(cores,core_d)
+  end
+
+  return cores
 end

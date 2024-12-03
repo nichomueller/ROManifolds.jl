@@ -84,7 +84,9 @@ function get_sparse_dof_map_at_domains(op::ParamFEOperator)
   sparse_dof_map = get_sparse_dof_map(op)
   sparsity = get_sparsity(sparse_dof_map)
 
-  sparsity′ = change_domain(sparsity,domains_jac)
+  dof_map_rows′ = change_domain(dof_map_rows,domains_jac)
+  dof_map_cols′ = change_domain(dof_map_cols,domains_jac)
+  sparsity′ = change_domain(sparsity,dof_map_rows′,dof_map_cols′)
   get_sparse_dof_map(trial,test,sparsity′)
 end
 

@@ -141,10 +141,10 @@ end
 
 # multfield interface
 
-function Arrays.return_cache(::typeof(projection),red::TransientReduction,s::AbstractSnapshots)
-  cache_space = return_cache(projection,get_reduction_space(red),s)
-  cache_time = return_cache(projection,get_reduction_time(red),s)
-  return TransientBasis(cache_space,cache_time)
+function Arrays.return_type(::typeof(projection),red::TransientReduction,s::AbstractSnapshots)
+  A = return_type(projection,get_reduction_space(red),s)
+  B = return_type(projection,get_reduction_time(red),s)
+  return TransientBasis{A,B}
 end
 
 function RBSteady.enrich!(

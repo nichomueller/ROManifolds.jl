@@ -106,19 +106,16 @@ feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
 fesolver = LinearFESolver(LUSolver())
 
 tol = fill(1e-4,4)
-state_reduction = SupremizerReduction(coupling,tol,energy;nparams=50,sketch=:sprn)
-rbsolver = RBSolver(fesolver,state_reduction;nparams_res=30,nparams_jac=30)
+state_reduction = SupremizerReduction(coupling,tol,energy;nparams=10)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=10,nparams_jac=10)
 
 fesnaps,festats = solution_snapshots(rbsolver,feop)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-μon = realization(feop;nparams=10)
+μon = realization(feop;nparams=10,random=true)
 x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
-
-r = realization(feop)
-fesnaps,festats = solution_snapshots(rbsolver,feop,r)
 
 # u1 = flatten_snapshots(fesnaps[1])[:,1]
 # p1 = flatten_snapshots(fesnaps[2])[:,1]
@@ -128,30 +125,30 @@ fesnaps,festats = solution_snapshots(rbsolver,feop,r)
 # ph = FEFunction(trial_p,p1)
 # writevtk(Ω_in,datadir("plts/sol"),cellfields=["uh"=>uh,"ph"=>ph])
 
-X = assemble_matrix(feop,energy)
-B = assemble_matrix(coupling,test,test)
-basis = reduced_basis(state_reduction.reduction,fesnaps,X)
-
-using SparseArrays
-using BlockArrays
-using LinearAlgebra
-
-a_primal,a_dual... = basis.array
-X_primal = X[Block(1,1)]
-H_primal = cholesky(X_primal)
-i = 1
-dual_i = get_basis(a_dual[i])
-primal_map = get_dof_map(a_primal)
-dual_i_map = get_dof_map(a_dual[i])
-C_primal_dual_i = B[Block(1,i+1)]
-C_vi = view(C_primal_dual_i,primal_map,dual_i_map)
-supr_i = H_primal \ C_primal_dual_i * dual_i
-a_primal = union(a_primal,supr_i,X_primal)
+using Gridap.FESpaces
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+op = get_algebraic_operator(feop)
+jacs = jacobian_snapshots(rbsolver,op,fesnaps)
+jac_red = rbsolver.jacobian_reduction
+reduced_jacobian(jac_red,red_trial,red_test,jacs)
 
 
-fe_trial =
-trial = get_trial(op)(r)
-x = zero_free_values(get_trial(rbop.op_linear)(ronline))
-x̂ = zero_free_values(rbop.op_linear.trial(ronline))
+basis1 = projection(jac_red.reduction,jacs[1][1])
+proj_basis1 = project(red_test[1],basis1,red_trial[1])
 
-rbcache = allocate_rbcache(fesolver,rbop,ronline,x)
+basis2 = projection(jac_red.reduction,jacs[1][2])
+proj_basis2 = project(red_test[2],basis2,red_trial[1])
+
+basis3 = projection(jac_red.reduction,jacs[1][3])
+proj_basis3 = project(red_test[1],basis3,red_trial[2])
+
+f1((u,p),(v,q)) = ∫( ∇(v)⊙∇(u) - q*(∇⋅u) - (∇⋅v)*p )dΩ_in
+f2((u,p),(v,q)) = ∫( ν0*(∇(v)⊙∇(u) + q*p) )dΩ_out
+f3((u,p),(v,q)) = ∫( (γ/h)*v⋅u - v⋅(n_Γd⋅∇(u)) - (n_Γd⋅∇(v))⋅u + (p*n_Γd)⋅v + (q*n_Γd)⋅u )dΓd
+A = assemble_matrix(f1,test,test)
+B = assemble_matrix(f2,test,test)
+C = assemble_matrix(f3,test,test)
+
+J = jacs[2][1]
+dmap = J.dof_map
+sdmap = dmap.indices_sparse

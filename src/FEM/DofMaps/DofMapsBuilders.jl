@@ -239,15 +239,13 @@ function get_sparse_dof_map(
   @check Dr ≥ D
   @check Dc ≥ D
 
-  first_component(a::AbstractDofMap{D};kwargs...) = a
-  first_component(a::AbstractDofMap{D′};kwargs...) where D′ = get_component(a;kwargs...)
   ncomponents(a::AbstractDofMap{D}) = 1
   ncomponents(a::AbstractDofMap{D′}) where D′ = size(a,D′)
 
-  rows′ = first_component(rows;to_scalar=false)
-  cols′ = first_component(cols;to_scalar=false)
-  rows′′ = first_component(rows;to_scalar=true)
-  cols′′ = first_component(cols;to_scalar=true)
+  rows′ = get_component(trian,rows;to_scalar=false)
+  cols′ = get_component(trian,cols;to_scalar=false)
+  rows′′ = get_component(trian,rows;to_scalar=true)
+  cols′′ = get_component(trian,cols;to_scalar=true)
   ncomps_row = ncomponents(rows)
   ncomps_col = ncomponents(cols)
 
@@ -348,9 +346,12 @@ function CellData.change_domain(
   cols::ArrayContribution)
 
   @check all( ( tr === tc for (tr,tc) in zip(get_domains(rows),get_domains(cols)) ) )
+
   trians = get_domains(rows)
   contribution(trians) do trian
-    change_domain(sparse_dof_map,rows[trian],cols[trian])
+    rows_t = get_component(trian,rows[trian];to_scalar=true)
+    cols_t = get_component(trian,cols[trian];to_scalar=true)
+    change_domain(sparse_dof_map,rows_t,cols_t)
   end
 end
 

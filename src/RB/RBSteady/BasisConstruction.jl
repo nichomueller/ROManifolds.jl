@@ -135,10 +135,10 @@ function ttsvd(
   oldrank = 1
   remainder = reshape(A,oldrank,size(A,1),:)
   for d in 1:N-1
-    core_d,remainder_d = ttsvd_loop(red_style[d],remainder)
-    oldrank = size(core_d,3)
-    remainder::Array{T,3} = reshape(remainder_d,oldrank,size(A,d+1),:)
-    push!(cores,core_d)
+    cur_core,cur_remainder = ttsvd_loop(red_style[d],remainder)
+    oldrank = size(cur_core,3)
+    remainder::Array{T,3} = reshape(cur_remainder,oldrank,size(A,d+1),:)
+    push!(cores,cur_core)
   end
   return cores,remainder
 end
@@ -166,10 +166,10 @@ function steady_ttsvd(
   oldrank = 1
   remainder = reshape(A,oldrank,size(A,1),:)
   for d in 1:D
-    core_d,remainder_d = ttsvd_loop(red_style[d],remainder,X[d])
-    oldrank = size(core_d,3)
-    remainder::Array{T,3} = reshape(remainder_d,oldrank,size(A,d+1),:)
-    push!(cores,core_d)
+    cur_core,cur_remainder = ttsvd_loop(red_style[d],remainder,X[d])
+    oldrank = size(cur_core,3)
+    remainder::Array{T,3} = reshape(cur_remainder,oldrank,size(A,d+1),:)
+    push!(cores,cur_core)
   end
 
   return cores,remainder
@@ -202,53 +202,73 @@ function generalized_ttsvd(
 
   cores,remainder = steady_ttsvd(red_style,A,X)
   for d = D+1:N-1
-    core_d,remainder_d = RBSteady.ttsvd_loop(red_style[d],remainder)
-    remainder = reshape(remainder_d,size(core_d,3),size(A,d+1),:)
-    push!(cores,core_d)
+    cur_core,cur_remainder = RBSteady.ttsvd_loop(red_style[d],remainder)
+    remainder = reshape(cur_remainder,size(cur_core,3),size(A,d+1),:)
+    push!(cores,cur_core)
   end
 
   return cores,remainder
 end
 
-function orthogonalize!(red_style,cores,remainder,X::AbstractRankTensor)
+function orthogonalize!(
+  red_style::ReductionStyle,
+  cores::AbstractVector,
+  X::AbstractRankTensor{D}
+  ) where D
+
+  local R
   weight = ones(1,rank(X),1)
   decomp = get_decomposition(X)
-  for d in eachindex(cores)
-    core_d = cores[d]
+  for d in 1:D
+    cur_core = cores[d]
     if d == length(cores)
       XW = ttnorm_array(X,weight)
-      core_d′,R = reduce_rank(red_style[d],core_d,XW)
-      cores[d] = core_d′
-      remainder = absorb(remainder,R)
+      cur_core′,R = reduce_rank(red_style[d],cur_core,XW)
+      cores[d] = cur_core′
     else
       next_core = cores[d+1]
       X_d = getindex.(decomp,d)
-      core_d′,R = reduce_rank(red_style[d],core_d)
-      cores[d] = core_d′
-      cores[d+1] = absorb(next_core,R)
-      weight = weight_array(weight,core_d′,X_d)
-    end
-  end
-  return remainder
-end
-
-function orthogonalize!(red_style,cores,remainder)
-  for d in eachindex(cores)
-    if d == length(cores)
-      remainder = absorb(remainder,R)
-    else
-      cur_core = cores[d]
-      next_core = cores[d+1]
       cur_core′,R = reduce_rank(red_style[d],cur_core)
-      next_core′ = absorb(next_core,R)
       cores[d] = cur_core′
-      cores[d+1] = next_core′
+      cores[d+1] = absorb(next_core,R)
+      weight = weight_array(weight,cur_core′,X_d)
     end
   end
-  return remainder
+  for d in D+1:length(cores)
+    cur_core = cores[d]
+    cur_core′,R = reduce_rank(red_style[d],cur_core)
+    cores[d] = cur_core′
+    d == length(cores) && continue
+    next_core = cores[d+1]
+    next_core′ = absorb(next_core,R)
+    cores[d+1] = next_core′
+  end
+  return R
 end
 
-function reduce_rank(red_style,core::AbstractArray{T,3},args...) where T
+function orthogonalize!(
+  red_style::ReductionStyle,
+  cores::AbstractVector)
+
+  local R
+  for d in 1:length(cores)-1
+    cur_core = cores[d]
+    next_core = cores[d+1]
+    cur_core′,R = reduce_rank(red_style[d],cur_core)
+    next_core′ = absorb(next_core,R)
+    cores[d] = cur_core′
+    cores[d+1] = next_core′
+  end
+  return R
+end
+
+function orthogonalize!(red_style,cores,remainder,args...)
+  R = orthogonalize!(red_style,cores,args...)
+  remainder′ = absorb(remainder,R)
+  return remainder′
+end
+
+function reduce_rank(red_style::ReductionStyle,core::AbstractArray{T,3},args...) where T
   mat = reshape(core,:,size(core,3))
   Ur,Sr,Vr = tpod(red_style,mat,args...)
   core′ = reshape(Ur,size(core,1),size(core,2),:)
@@ -358,20 +378,25 @@ for (f,g) in zip((:pivoted_qr,:pivoted_qr!),(:qr,:qr!))
       R = C.R[1:r,invperm(C.jpvt)]
       return Q,R
     end
+
+    $f(A,red_style::SearchSVDRank) = $f(A;tol=red_style.tol)
+    $f(A,red_style::FixedSVDRank) = $f(A)
+    $f(A,red_style::LRApproxRank) = $f(A;tol=red_style.opts.rtol)
+    $f(A,red_style::TTSVDRanks) = $f(A,first(red_style.style))
   end
 end
 
 for (f,g) in zip((:gram_schmidt,:gram_schmidt!),(:pivoted_qr,:pivoted_qr!))
   @eval begin
-    function $f(M::AbstractMatrix)
-      Q,R = $g(M)
+    function $f(M::AbstractMatrix,args...)
+      Q,R = $g(M,args...)
       return Q,R
     end
 
-    function $f(M::AbstractMatrix,X::AbstractSparseMatrix)
+    function $f(M::AbstractMatrix,X::AbstractSparseMatrix,args...)
       L,p = _cholesky_decomp(X)
       XM = L'*M[p,:]
-      Q̃,R = $g(XM)
+      Q̃,R = $g(XM,args...)
       Q = (L'\Q̃)[invperm(p),:]
       return Q,R
     end

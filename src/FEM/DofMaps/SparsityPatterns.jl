@@ -16,6 +16,10 @@ function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
   return A
 end
 
+abstract type SparsityOrder end
+struct OrderedSparsity <: SparsityOrder end
+struct DefaultSparsity <: SparsityOrder end
+
 """
     abstract type SparsityPattern end
 
@@ -47,6 +51,8 @@ function SparsityPattern(U::FESpace,V::FESpace)
   SparsityPattern(a,U,V)
 end
 
+SparsityOrder(a::SparsityPattern) = DefaultSparsity()
+
 get_background_matrix(a::SparsityPattern) = @abstractmethod
 
 num_rows(a::SparsityPattern) = size(get_background_matrix(a),1)
@@ -70,17 +76,28 @@ function to_nz_index(i::AbstractArray,a::SparsityPattern)
 end
 
 function to_nz_index!(i::AbstractArray,a::SparsityPattern)
+  to_nz_index!(i,get_background_matrix(a))
+end
+
+function to_nz_index!(i::AbstractArray,a::AbstractSparseMatrix)
   @abstractmethod
+end
+
+function to_nz_index!(i::AbstractArray,a::SparseMatrixCSC)
+  nrows = size(a,1)
+  for (j,index) in enumerate(i)
+    if index > 0
+      irow = fast_index(index,nrows)
+      icol = slow_index(index,nrows)
+      i[j] = nz_index(a,irow,icol)
+    end
+  end
 end
 
 function order_sparsity(s::SparsityPattern,U::FESpace,V::FESpace)
   rows = get_dof_map(V)
   cols = get_dof_map(U)
   order_sparsity(s,rows,cols)
-end
-
-function order_sparsity(s::SparsityPattern,rows::AbstractDofMap,cols::AbstractDofMap)
-  order_sparsity(s,vectorize(rows),vectorize(cols))
 end
 
 function CellData.change_domain(
@@ -102,9 +119,12 @@ function CellData.change_domain(
   cols::ArrayContribution)
 
   @check all( ( tr === tc for (tr,tc) in zip(get_domains(rows),get_domains(cols)) ) )
+
   trians = get_domains(rows)
   contribution(trians) do trian
-    change_domain(a,rows[trian],cols[trian])
+    rows_t = get_component(trian,rows[trian];to_scalar=true)
+    cols_t = get_component(trian,cols[trian];to_scalar=true)
+    change_domain(a,rows_t,cols_t)
   end
 end
 
@@ -129,7 +149,7 @@ end
 
 get_background_matrix(a::SparsityPatternCSC) = a.matrix
 SparseArrays.rowvals(a::SparsityPattern) = rowvals(get_background_matrix(a))
-SparseArrays.getcolptr(a::SparsityPatternCSC) = SparseArrays.getcolptr(a.matrix)
+SparseArrays.getcolptr(a::SparsityPatternCSC) = SparseArrays.getcolptr(get_background_matrix(a))
 
 """
     order_sparsity(a::SparsityPattern,i,j) -> SparsityPattern
@@ -138,26 +158,38 @@ Permutes a sparsity patterns according to indices specified by `i` and `j`,
 representing the rows and columns respectively
 
 """
-function order_sparsity(a::SparsityPatternCSC,i::Vector{<:Integer},j::Vector{<:Integer})
-  SparsityPatternCSC(a.matrix[i,j])
+function order_sparsity(a::SparsityPatternCSC,i::AbstractArray,j::AbstractArray)
+  old_matrix = a.matrix
+  matrix = old_matrix[i,j]
+  OrderedSparsityPattern(matrix,old_matrix)
 end
 
-function to_nz_index!(i::AbstractArray,a::SparsityPatternCSC)
-  nrows = num_rows(a)
-  for (j,index) in enumerate(i)
-    if index > 0
-      irow = fast_index(index,nrows)
-      icol = slow_index(index,nrows)
-      i[j] = nz_index(a,irow,icol)
-    end
-  end
+struct OrderedSparsityPattern{A} <: SparsityPattern
+  matrix::A
+  old_matrix::A
+end
+
+SparsityOrder(a::OrderedSparsityPattern) = OrderedSparsity()
+
+get_background_matrix(a::OrderedSparsityPattern) = a.matrix
+SparseArrays.rowvals(a::OrderedSparsityPattern) = rowvals(get_background_matrix(a))
+SparseArrays.getcolptr(a::OrderedSparsityPattern) = SparseArrays.getcolptr(get_background_matrix(a))
+
+# function to_nz_index!(i::AbstractArray,a::OrderedSparsityPattern)
+#   to_nz_index!(i,a.old_matrix)
+# end
+
+#TODO because of code shortcomings, this sparsity pattern should already be ordered;
+# to be changed in future versions
+function order_sparsity(a::OrderedSparsityPattern,i::AbstractArray,j::AbstractArray)
+  a
 end
 
 function CellData.change_domain(
-  a::SparsityPatternCSC,
-  row::AbstractDofMap{D,Ti},
-  col::AbstractDofMap{D,Ti}
-  ) where {D,Ti}
+  a::SparsityPatternCSC{Tv,Ti},
+  row::AbstractDofMap{D},
+  col::AbstractDofMap{D}
+  ) where {Tv,Ti,D}
 
   dof_to_cell_row = get_dof_to_cell(row)
   dof_to_cell_col = get_dof_to_cell(col)
@@ -179,8 +211,8 @@ function CellData.change_domain(
         if i > 0
           cells_row = getindex!(cache_row,dof_to_cell_row,i)
           if _cell_intersection(row,col,cells_row,cells_col)
-            ij = nz_index(a,i,j)
-            entries_to_delete[ij] = false
+            k = nz_index(a,i,j)
+            entries_to_delete[k] = false
             colnnz[j] += 1
           end
         end
@@ -198,6 +230,53 @@ function CellData.change_domain(
   matrix = SparseMatrixCSC(m,n,colptr,rowval,nzval)
 
   return SparsityPatternCSC(matrix)
+end
+
+function CellData.change_domain(
+  a::OrderedSparsityPattern,
+  row::AbstractDofMap{D},
+  col::AbstractDofMap{D}
+  ) where D
+
+  dof_to_cell_row = get_dof_to_cell(row)
+  dof_to_cell_col = get_dof_to_cell(col)
+
+  m = num_rows(a)
+  n = num_cols(a)
+  rowval = copy(rowvals(a))
+  colptr = copy(SparseArrays.getcolptr(a))
+  nzval = copy(nonzeros(a))
+  colnnz = zeros(eltype(rowval),n)
+  entries_to_delete = fill(true,nnz(a))
+
+  cache_row = array_cache(dof_to_cell_row)
+  cache_col = array_cache(dof_to_cell_col)
+  for (ij,j) in enumerate(col)
+    if j > 0
+      cells_col = getindex!(cache_col,dof_to_cell_col,j)
+      for (ii,i) in enumerate(row)
+        if i > 0
+          cells_row = getindex!(cache_row,dof_to_cell_row,i)
+          if _cell_intersection(row,col,cells_row,cells_col)
+            k = nz_index(a,ii,ij)
+            entries_to_delete[k] = false
+            colnnz[ij] += 1
+          end
+        end
+      end
+    end
+  end
+
+  @inbounds for j in 1:n
+    colptr[j+1] = colnnz[j]
+  end
+  length_to_ptrs!(colptr)
+
+  deleteat!(rowval,entries_to_delete)
+  deleteat!(nzval,entries_to_delete)
+  matrix = SparseMatrixCSC(m,n,colptr,rowval,nzval)
+
+  return OrderedSparsityPattern(matrix,a.old_matrix)
 end
 
 function _cell_intersection(row::AbstractDofMap,col::AbstractDofMap,cells_row,cells_col)
@@ -223,6 +302,8 @@ struct TProductSparsityPattern{A,B} <: SparsityPattern
   sparsity::A
   sparsities_1d::B
 end
+
+SparsityOrder(a::TProductSparsityPattern) = SparsityOrder(a.sparsity)
 
 get_background_matrix(a::TProductSparsityPattern) = get_background_matrix(a.sparsity)
 
@@ -285,4 +366,35 @@ function CellData.change_domain(
 
   sparsity′ = change_domain(a.sparsity,row,col)
   TProductSparsityPattern(sparsity′,a.sparsities_1d)
+end
+
+# utils
+
+function Base.getindex(
+  A::AbstractSparseMatrixCSC{Tv,Ti},
+  I::AbstractDofMap,
+  J::AbstractDofMap
+  ) where {Tv,Ti<:Integer}
+
+  I′ = vectorize(I)
+  J′ = vectorize(J)
+
+  fill!(A.nzval,one(Tv))
+  k = findfirst(iszero,A)
+  fill!(A.nzval,zero(Tv))
+  iz,jz = Tuple(k)
+
+  for (ii,i) in enumerate(I′)
+    if i == 0
+      I′[ii] = iz
+    end
+  end
+
+  for (ij,j) in enumerate(J′)
+    if j == 0
+      J′[ij] = jz
+    end
+  end
+
+  return A[I′,J′]
 end
