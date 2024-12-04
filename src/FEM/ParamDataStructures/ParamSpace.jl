@@ -190,6 +190,7 @@ end
 abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end
 struct NormalSampling <: SamplingStyle end
+struct HaltonSampling <: SamplingStyle end
 struct SmolyakSampling <: SamplingStyle end
 
 """
@@ -207,7 +208,7 @@ end
 dimension(p::ParamSpace) = length(p.param_domain)
 
 function ParamSpace(param_domain::AbstractVector{<:AbstractVector})
-  sampling_style = SmolyakSampling()
+  sampling_style = HaltonSampling()
   ParamSpace(param_domain,sampling_style)
 end
 
@@ -245,6 +246,16 @@ function realization(p::ParamSpace{P,S} where {P,S};nparams=1,kwargs...)
   Realization([_generate_param(p) for i = 1:nparams])
 end
 
+function realization(p::ParamSpace{P,HaltonSampling} where P;nparams=1,random=false,kwargs...)
+  if random
+    p′ = ParamSpace(p.param_domain,UniformSampling())
+    realization(p′;nparams)
+  else
+    hs = shifted_halton(p,nparams)
+    Realization(hs)
+  end
+end
+
 function realization(
   p::ParamSpace{P,SmolyakSampling} where P;
   level=dimension(p),
@@ -259,7 +270,7 @@ function realization(
     if nparams > length(grid)
       realization(p;level=level+1,nparams=nparams)
     else
-      Realization(rand(grid,nparams))
+      Realization(grid[1:nparams])
     end
   end
 end
@@ -529,6 +540,22 @@ Arrays.evaluate!(cache,f::AbstractParamFunction,x::CellPoint) = CellField(f,get_
 
 (f::AbstractParamFunction)(x) = evaluate(f,x)
 
+# Halton utils
+
+function shifted_halton(p::ParamSpace,nparams::Integer)
+  domain = p.param_domain
+  d = dimension(p)
+  hs = HaltonPoint(d,length=nparams)
+  hs′ = collect(hs)
+  for x in hs′
+    for (di,xdi) in enumerate(x)
+      a,b = domain[di]
+      x[di] = a + (b-a)*xdi
+    end
+  end
+  return hs′
+end
+
 # Smolyak utils
 
 function SmolyakApprox.scale_nodes!(
@@ -544,21 +571,36 @@ function SmolyakApprox.scale_nodes!(
 
 end
 
-function SmolyakApprox.smolyak_grid(p::ParamSpace,level=dimension(p))
+function uniform_extrema(N::S,domain=[1.0,-1.0]) where {S<:Integer}
+  points = fill((domain[1]+domain[2])/2,N)
+  L = domain[2]-domain[1]
+  @inbounds for i = 1:div(N,2)
+    x = L/(2*i)
+    points[i]     += x
+    points[N-i+1] -= x
+  end
+  return points
+end
+
+function SmolyakApprox.smolyak_grid(
+  p::ParamSpace,
+  node_type=SmolyakApprox.chebyshev_extrema,
+  level=dimension(p))
+
   d = dimension(p)
   domain = p.param_domain
 
   T = Vector{Float64}
 
-  multi_index        = SmolyakApprox.generate_multi_index(d,level)
+  multi_index = SmolyakApprox.generate_multi_index(d,level)
   unique_multi_index = sort(unique(multi_index))
   unique_node_number = SmolyakApprox.m_i.(unique_multi_index)
 
   # Create base nodes to be used in the sparse grid
 
-  base_nodes   = Vector{T}(undef,length(unique_node_number))
+  base_nodes = Vector{T}(undef,length(unique_node_number))
   for i in eachindex(unique_node_number)
-    base_nodes[i] = SmolyakApprox.chebyshev_extrema(unique_node_number[i])
+    base_nodes[i] = node_type(unique_node_number[i])
   end
 
   # Determine the unique nodes introduced at each higher level
