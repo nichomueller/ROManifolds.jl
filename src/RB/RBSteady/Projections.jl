@@ -480,7 +480,7 @@ function enrich!(
   red::SupremizerReduction{<:TTSVDRanks},
   a::BlockProjection,
   norm_matrix::BlockRankTensor,
-  supr_matrix::BlockMatrix)
+  supr_matrix::BlockRankTensor)
 
   @check a.touched[1] "Primal field not defined"
   red_style = ReductionStyle(red)
@@ -488,70 +488,91 @@ function enrich!(
   primal_map = get_dof_map(a_primal)
   X_primal = norm_matrix[Block(1,1)]
   for i = eachindex(a_dual)
-    dual_i = get_basis(a_dual[i])
+    dual_i = get_cores(a_dual[i])
     C_primal_dual_i = supr_matrix[Block(1,i+1)]
-    C_primal = view(C_primal_dual_i * dual_i,primal_map)
-    supr_i = enrichment_ttsvd(red_style,C_primal,X_primal)
+    supr_i = tt_supremizer(red_style,X_primal,C_primal_dual_i,dual_i)
     a_primal = union_bases(a_primal,supr_i,red_style,X_primal)
   end
   a[1] = a_primal
   return
 end
 
-function enrichment_ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
-  prev_rank = size(A,1)
-  cur_size = size(A,2)
-  M = reshape(A,prev_rank*cur_size,:)
+# function enrich!(
+#   red::SupremizerReduction{<:TTSVDRanks},
+#   a::BlockProjection,
+#   norm_matrix::BlockRankTensor,
+#   supr_matrix::BlockMatrix)
 
-  L,p = _cholesky_decomp(X)
-  L′ = kron(I(prev_rank),L)
-  p′ = vec(((collect(1:prev_rank).-1)*cur_size .+ p')')
-  XM = L′'\M[p′,:]
-  Ur,Sr,Vr = truncated_svd(red_style,XM)
+#   @check a.touched[1] "Primal field not defined"
+#   red_style = ReductionStyle(red)
+#   a_primal,a_dual... = a.array
+#   primal_map = get_dof_map(a_primal)
+#   X_primal = norm_matrix[Block(1,1)]
+#   for i = eachindex(a_dual)
+#     dual_i = get_basis(a_dual[i])
+#     C_primal_dual_i = supr_matrix[Block(1,i+1)]
+#     C_primal = view(C_primal_dual_i * dual_i,primal_map)
+#     supr_i = enrichment_ttsvd(red_style,C_primal,X_primal)
+#     a_primal = union_bases(a_primal,supr_i,red_style,X_primal)
+#   end
+#   a[1] = a_primal
+#   return
+# end
 
-  core = reshape(Ur,prev_rank,cur_size,:)
-  remainder = Sr.*Vr'
-  return core,remainder
-end
+# function enrichment_ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
+#   prev_rank = size(A,1)
+#   cur_size = size(A,2)
+#   M = reshape(A,prev_rank*cur_size,:)
 
-function enrichment_ttsvd(
-  red_style::TTSVDRanks,
-  A::AbstractArray{T,N},
-  X::Rank1Tensor{D}
-  ) where {T,N,D}
+#   L,p = _cholesky_decomp(X)
+#   L′ = kron(I(prev_rank),L)
+#   p′ = vec(((collect(1:prev_rank).-1)*cur_size .+ p')')
+#   XM = L′'\M[p′,:]
+#   Ur,Sr,Vr = truncated_svd(red_style,XM)
 
-  cores = Array{T,3}[]
-  oldrank = 1
-  remainder = reshape(A,oldrank,size(A,1),:)
-  for d in 1:D
-    core_d,remainder_d = enrichment_ttsvd_loop(red_style[d],remainder,X[d])
-    oldrank = size(core_d,3)
-    remainder::Array{T,3} = reshape(remainder_d,oldrank,size(A,d+1),:)
-    push!(cores,core_d)
-  end
+#   core = reshape(Ur,prev_rank,cur_size,:)
+#   remainder = Sr.*Vr'
+#   return core,remainder
+# end
 
-  return cores,remainder
-end
+# function enrichment_ttsvd(
+#   red_style::TTSVDRanks,
+#   A::AbstractArray{T,N},
+#   X::Rank1Tensor{D}
+#   ) where {T,N,D}
 
-function enrichment_ttsvd(
-  red_style::TTSVDRanks,
-  A::AbstractArray{T,N},
-  X::GenericRankTensor{D,K}
-  ) where {T,N,D,K}
+#   cores = Array{T,3}[]
+#   oldrank = 1
+#   remainder = reshape(A,oldrank,size(A,1),:)
+#   for d in 1:D
+#     core_d,remainder_d = enrichment_ttsvd_loop(red_style[d],remainder,X[d])
+#     oldrank = size(core_d,3)
+#     remainder::Array{T,3} = reshape(remainder_d,oldrank,size(A,d+1),:)
+#     push!(cores,core_d)
+#   end
 
-  # compute initial tt decompositions
-  cores_k,remainders_k = map(k -> enrichment_ttsvd(red_style,A,X[k]),1:K) |> tuple_of_arrays
+#   return cores,remainder
+# end
 
-  # tt decomposition of the sum
-  cores = block_cores(cores_k)
-  remainder = block_cat(remainders_k;dims=1)
+# function enrichment_ttsvd(
+#   red_style::TTSVDRanks,
+#   A::AbstractArray{T,N},
+#   X::GenericRankTensor{D,K}
+#   ) where {T,N,D,K}
 
-  for d in D+1:N
-    core_d,remainder_d = ttsvd_loop(red_style[d],remainder)
-    oldrank = size(core_d,3)
-    remainder::Array{T,3} = reshape(remainder_d,oldrank,size(A,d+1),:)
-    push!(cores,core_d)
-  end
+#   # compute initial tt decompositions
+#   cores_k,remainders_k = map(k -> enrichment_ttsvd(red_style,A,X[k]),1:K) |> tuple_of_arrays
 
-  return cores
-end
+#   # tt decomposition of the sum
+#   cores = block_cores(cores_k)
+#   remainder = block_cat(remainders_k;dims=1)
+
+#   for d in D+1:N
+#     core_d,remainder_d = ttsvd_loop(red_style[d],remainder)
+#     oldrank = size(core_d,3)
+#     remainder::Array{T,3} = reshape(remainder_d,oldrank,size(A,d+1),:)
+#     push!(cores,core_d)
+#   end
+
+#   return cores
+# end

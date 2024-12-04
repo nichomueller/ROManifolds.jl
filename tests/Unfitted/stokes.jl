@@ -90,7 +90,7 @@ trian_res = (Ω_in,Γd,Γn)
 trian_jac = (Ω_in,Ω_out,Γd)
 domains = FEDomains(trian_res,trian_jac)
 
-coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
+coupling((du,dp),(v,q)) = ∫(dp*∂₁(v))dΩ + ∫(dp*∂₂(v))dΩ#∫(dp*(∇⋅(v)))dΩ
 energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
@@ -125,30 +125,21 @@ perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 # ph = FEFunction(trial_p,p1)
 # writevtk(Ω_in,datadir("plts/sol"),cellfields=["uh"=>uh,"ph"=>ph])
 
-using Gridap.FESpaces
-red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-op = get_algebraic_operator(feop)
-jacs = jacobian_snapshots(rbsolver,op,fesnaps)
-jac_red = rbsolver.jacobian_reduction
-reduced_jacobian(jac_red,red_trial,red_test,jacs)
+# check if supremizers work
 
+supr_form(dp,v) = ∫(dp*(∇⋅(v)))dΩ
+BT = assemble_matrix(supr_form,test_p.space,test_u.space)
+Φ_u = get_basis(rbop.test.subspace[1])
+Φ_p = get_basis(rbop.test.subspace[2])
+B̂ = Φ_u'*BT*Φ_p
 
-basis1 = projection(jac_red.reduction,jacs[1][1])
-proj_basis1 = project(red_test[1],basis1,red_trial[1])
+# standard code
+energy_u(du,v) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ
+X_primal = assemble_matrix(energy_u,test_u.space,test_u.space)
 
-basis2 = projection(jac_red.reduction,jacs[1][2])
-proj_basis2 = project(red_test[2],basis2,red_trial[1])
+i = 1
+H_primal = cholesky(X_primal)
+supr_i = H_primal \ BT * Φ_p
+Φ_su = RBSteady.union_bases(PODBasis(Φ_u),supr_i,X_primal,red_style[1]).basis
 
-basis3 = projection(jac_red.reduction,jacs[1][3])
-proj_basis3 = project(red_test[1],basis3,red_trial[2])
-
-f1((u,p),(v,q)) = ∫( ∇(v)⊙∇(u) - q*(∇⋅u) - (∇⋅v)*p )dΩ_in
-f2((u,p),(v,q)) = ∫( ν0*(∇(v)⊙∇(u) + q*p) )dΩ_out
-f3((u,p),(v,q)) = ∫( (γ/h)*v⋅u - v⋅(n_Γd⋅∇(u)) - (n_Γd⋅∇(v))⋅u + (p*n_Γd)⋅v + (q*n_Γd)⋅u )dΓd
-A = assemble_matrix(f1,test,test)
-B = assemble_matrix(f2,test,test)
-C = assemble_matrix(f3,test,test)
-
-J = jacs[2][1]
-dmap = J.dof_map
-sdmap = dmap.indices_sparse
+B̂_ok = Φ_su'*BT*Φ_p

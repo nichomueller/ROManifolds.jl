@@ -274,7 +274,7 @@ function get_sparse_dof_map(
   uncols = get_univariate_dof_map(trial)
 
   osparsity,osparse_indices = get_sparse_dof_map(trian,rows,cols,unrows,uncols,sparsity)
-  ofull_indices = to_nz_index(osparse_indices,sparsity)
+  ofull_indices = to_nz_index(osparse_indices)
 
   SparseDofMap(ofull_indices,osparse_indices,osparsity)
 end

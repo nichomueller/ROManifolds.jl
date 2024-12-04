@@ -4,9 +4,13 @@ struct PartialDerivative{N} <: PartialFunctions end
 
 PartialDerivative{N}(f) where N = Operation(PartialTrace{N}())(∇(f))
 
-const ∂ₓ₁ = PartialDerivative{1}
-const ∂ₓ₂ = PartialDerivative{2}
-const ∂ₓ₃ = PartialDerivative{3}
+const ∂₁ = PartialDerivative{1}
+const ∂₂ = PartialDerivative{2}
+const ∂₃ = PartialDerivative{3}
+
+const ∂₁₂ = PartialDerivative{(1,2)}
+const ∂₁₂₃ = PartialDerivative{(1,2,3)}
+const ∂ₙ = Union{∂₁₂,∂₁₂₃}
 
 function Arrays.evaluate!(cache,::Broadcasting{<:PartialDerivative{N}},f) where N
   Broadcasting(Operation(PartialTrace{N}()))(Broadcasting(∇)(f))

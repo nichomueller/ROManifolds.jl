@@ -29,7 +29,7 @@ include("PerformanceTrackers.jl")
 export PartialFunctions
 export PartialDerivative
 export PartialTrace
-export ∂ₓ₁, ∂ₓ₂, ∂ₓ₃
+export ∂₁, ∂₂, ∂₃
 include("PartialFunctions.jl")
 
 export get_values

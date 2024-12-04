@@ -175,10 +175,6 @@ get_background_matrix(a::OrderedSparsityPattern) = a.matrix
 SparseArrays.rowvals(a::OrderedSparsityPattern) = rowvals(get_background_matrix(a))
 SparseArrays.getcolptr(a::OrderedSparsityPattern) = SparseArrays.getcolptr(get_background_matrix(a))
 
-# function to_nz_index!(i::AbstractArray,a::OrderedSparsityPattern)
-#   to_nz_index!(i,a.old_matrix)
-# end
-
 #TODO because of code shortcomings, this sparsity pattern should already be ordered;
 # to be changed in future versions
 function order_sparsity(a::OrderedSparsityPattern,i::AbstractArray,j::AbstractArray)
@@ -397,4 +393,27 @@ function Base.getindex(
   end
 
   return A[I′,J′]
+end
+
+# to nz indices in case we don't provide a sparsity pattern
+
+function to_nz_index(i::AbstractArray)
+  nz_sortperm(i)
+end
+
+function nz_sortperm(a::AbstractArray)
+  a′ = similar(a)
+  nz_sortperm!(a′,a)
+  a′
+end
+
+function nz_sortperm!(a′::AbstractArray,a::AbstractArray)
+  fill!(a′,zero(eltype(a′)))
+  anz = sortperm(a[findall(!iszero,a)])
+  count = 1
+  for (i,ai) in enumerate(a)
+    iszero(ai) && continue
+    a′[i] = anz[count]
+    count += 1
+  end
 end

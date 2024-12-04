@@ -65,7 +65,8 @@ function reduced_basis(
   s::AbstractArray)
 
   norm_matrix = assemble_matrix(feop,get_norm(red))
-  supr_matrix = assemble_matrix(get_supr(red),get_trial(feop),get_test(feop))
+  # supr_matrix = assemble_matrix(get_supr(red),get_trial(feop),get_test(feop))
+  supr_matrix = assemble_matrix(feop,get_supr(red))
   basis = reduced_basis(get_reduction(red),s,norm_matrix)
   enrich!(red,basis,norm_matrix,supr_matrix)
   return basis

@@ -49,6 +49,12 @@ function get_parent(t::BodyFittedTriangulation)
   BodyFittedTriangulation(model,grid,tface_to_mface)
 end
 
+function get_parent(t::Geometry.AppendedTriangulation)
+  a = get_parent(t.a)
+  b = get_parent(t.b)
+  lazy_append(a,b)
+end
+
 function get_parent(t::AbstractVector{<:Triangulation})
   get_parent(first(t))
 end
@@ -122,6 +128,12 @@ end
 
 function get_view_indices(t::Geometry.TriangulationView)
   t.cell_to_parent_cell
+end
+
+function get_view_indices(t::Geometry.AppendedTriangulation)
+  a = get_view_indices(t.a)
+  b = get_view_indices(t.b)
+  lazy_append(a,b)
 end
 
 function get_union_indices(trians)

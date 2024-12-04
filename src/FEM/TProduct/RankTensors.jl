@@ -85,6 +85,32 @@ function tproduct_array(
   GenericRankTensor(decompositions)
 end
 
+function tproduct_array(
+  ::PartialDerivative{N},
+  arrays_1d::Vector{<:AbstractArray},
+  gradients_1d::Vector{<:AbstractArray},
+  dof_map,
+  args...) where N
+
+  _sort!(arrays_1d,dof_map)
+  _sort!(gradients_1d,dof_map)
+  arrays_1d[N] = gradients_1d[N]
+  Rank1Tensor(arrays_1d)
+end
+
+function tproduct_array(
+  ::Utils.∂ₙ,
+  arrays_1d::Vector{<:AbstractArray},
+  gradients_1d::Vector{<:AbstractArray},
+  dof_map,
+  args...)
+
+  _sort!(arrays_1d,dof_map)
+  _sort!(gradients_1d,dof_map)
+  decompositions = _find_decompositions(nothing,arrays_1d,gradients_1d)
+  GenericRankTensor(decompositions)
+end
+
 function _find_decompositions(::Nothing,arrays_1d,gradients_1d)
   @check length(arrays_1d) == length(gradients_1d)
   inds = LinearIndices(arrays_1d)
@@ -96,7 +122,7 @@ function _find_decompositions(::Nothing,arrays_1d,gradients_1d)
   return d
 end
 
-function _find_decompositions(summation,arrays_1d,gradients_1d)
+function _find_decompositions(::typeof(+),arrays_1d,gradients_1d)
   @check length(arrays_1d) == length(gradients_1d)
   inds = LinearIndices(arrays_1d)
   d = map(inds) do i

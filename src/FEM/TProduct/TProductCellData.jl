@@ -266,41 +266,28 @@ const PartialDerivativeTProductCellField{N,A,B,C} = GenericTProductDiffCellField
 
 function Arrays.return_cache(k::Operation{typeof(*)},α::TProductCellDatum,β::PartialDerivativeTProductCellField)
   cache = return_cache(k,α,get_data(β))
-  diff_cache = return_cache(k,α,TProduct.get_diff_data(β))
+  diff_cache = return_cache(k,α,get_diff_data(β))
   return cache,diff_cache
 end
 
 function Arrays.return_cache(k::Operation{typeof(*)},α::PartialDerivativeTProductCellField,β::TProductCellDatum)
   cache = return_cache(k,get_data(α),β)
-  diff_cache = return_cache(k,α,TProduct.get_diff_data(β),β)
+  diff_cache = return_cache(k,get_diff_data(α),β)
   return cache,diff_cache
 end
 
 function Arrays.evaluate!(_cache,k::Operation{typeof(*)},α::TProductCellDatum,β::PartialDerivativeTProductCellField{N}) where N
   cache,diff_cache = _cache
   αβ = evaluate!(cache,k,α,get_data(β))
-  dαβ = evaluate!(cache,k,α,TProduct.get_diff_data(β))
-  return GenericTProductDiffCellField(PartialDerivative{N},αβ,dαβ)
+  dαβ = evaluate!(cache,k,α,get_diff_data(β))
+  return GenericTProductDiffCellField(β.op,αβ,dαβ)
 end
 
 function Arrays.evaluate!(_cache,k::Operation{typeof(*)},α::PartialDerivativeTProductCellField{N},β::TProductCellDatum) where N
   cache,diff_cache = _cache
   αβ = evaluate!(cache,k,get_data(α),β)
-  dαβ = evaluate!(cache,k,TProduct.get_diff_data(α),β)
-  return GenericTProductDiffCellField(PartialDerivative{N},αβ,dαβ)
-end
-
-function TProduct.tproduct_array(
-  ::Type{<:PartialDerivative{N}},
-  arrays_1d::Vector{<:AbstractArray},
-  gradients_1d::Vector{<:AbstractArray},
-  dof_map,
-  args...) where N
-
-  TProduct.tp_sort!(arrays_1d,dof_map)
-  TProduct.tp_sort!(gradients_1d,dof_map)
-  decompositions = TProduct._find_decompositions(nothing,arrays_1d,gradients_1d)
-  GenericRank1Tensor(decompositions)
+  dαβ = evaluate!(cache,k,get_diff_data(α),β)
+  return GenericTProductDiffCellField(α.op,αβ,dαβ)
 end
 
 # integration
@@ -345,13 +332,16 @@ function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::AbstractVector{<:Doma
   end
 end
 
-function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::GenericTProductDiffEval)
+function _add_tp_cell_data(f,a::GenericTProductDiffEval{Oa},b::GenericTProductDiffEval{Ob}) where {Oa,Ob}
   af1,ag1 = testitem(a.f[1]),testitem(a.g[1])
   bf1,bg1 = testitem(b.f[1]),testitem(b.g[1])
   bf = _is_different_block(af1,bf1)
   bg = _is_different_block(ag1,bg1)
+  if !(bf || bg)
+    return _add_tp_div_cell_data(ag1,bg1,f,a,b)
+  end
   op = _disjoint_block_operation(a.op,ag1,bg1,b.op)
-  summation = _block_operation(f,af1,bf1,a.summation)
+  summation = _block_operation(ag1,bg1,f,af1,bf1,a.summation)
   if bf && bg
     GenericTProductDiffEval(op,f(a.f,b.f),f(a.g,b.g),summation)
   elseif bf
@@ -361,6 +351,30 @@ function _add_tp_cell_data(f,a::GenericTProductDiffEval,b::GenericTProductDiffEv
   else
     @notimplemented
   end
+end
+
+#TODO probably this function is wrong in general
+function _add_tp_div_cell_data(
+  ag1,bg1,f,
+  a::GenericTProductDiffEval{PartialDerivative{A}},
+  b::GenericTProductDiffEval{PartialDerivative{B}}
+  ) where {A,B}
+
+  op = PartialDerivative{(A...,B...)}()
+  s = nothing
+  GenericTProductDiffEval(op,a.f,a.g,s)
+end
+
+function _add_tp_div_cell_data(
+  ag1,bg1,f,
+  a::GenericTProductDiffEval{ArrayBlock{PartialDerivative{A},N}},
+  b::GenericTProductDiffEval{ArrayBlock{PartialDerivative{B},N}}
+  ) where {A,B,N}
+
+  f′ = PartialDerivative{(A...,B...)}()
+  op = _block_operation(f′,ag1,bg1)
+  s = _block_operation(nothing,ag1,bg1)
+  GenericTProductDiffEval(op,a.f,a.g,s)
 end
 
 function _is_different_block(a1,b1)

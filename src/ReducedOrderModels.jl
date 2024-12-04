@@ -13,7 +13,7 @@ export induced_norm
 export PartialFunctions
 export PartialDerivative
 export PartialTrace
-export ∂ₓ₁, ∂ₓ₂, ∂ₓ₃
+export ∂₁, ∂₂, ∂₃
 
 export get_values
 export get_parent

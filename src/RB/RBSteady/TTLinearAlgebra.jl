@@ -244,18 +244,53 @@ function galerkin_projection(
   dropdims(rcore;dims=(1,2,3))
 end
 
-function reduced_coupling(
-  cores_p::Vector{<:AbstractArray{T,3}},
-  B::Rank1Tensor,
+# supremizer computation
+
+function tt_supremizer(
+  red_style,
+  X::Vector{<:Factorization},
+  B::Vector{<:AbstractSparseMatrix},
   cores_d::Vector{<:AbstractArray{T,3}}
   ) where T
 
-  factors = get_factors(B)
-  @check length(cores_p)-1 == length(factors) == length(cores_d)
-  @check all(size(f,2) == size(c,2) for (f,c) in zip(factors,cores))
-  rcores = contraction.(cores_p,factors,cores_d)
-  rcore = sequential_product(rcores...)
-  dropdims(rcore;dims=(1,2,3))
+  @check length(X) == length(B)
+  nC = length(cores_d)
+  supr_cores = Vector{Array{T,3}}(undef,nC)
+  for d in 1:nC
+    if isassigned(X,d)
+      cur_core = cores_d[d]
+      XinvB = X[d] \ B[d]
+      supr_cores[d] = _sparse_rescaling(XinvB,cur_core)
+    else
+      supr_cores[d] = cur_core
+    end
+  end
+  return supr_cores
+end
+
+function tt_supremizer(
+  red_style,
+  X::AbstractRankTensor,
+  B::GenericRankTensor,
+  cores_d::Vector{<:AbstractArray{T,3}}
+  ) where T
+
+  Xfactors = cholesky(X)
+  nB = length(get_decomposition(B))
+  vec_supr = Vector{Vector{Array{T,3}}}(undef,nB)
+  for iB in 1:nB
+    Bi = get_decomposition(B)[iB]
+    Bfactors = get_factors(Bi)
+    vec_supr[iB] = tt_supremizer(red_style,Xfactors,Bfactors,cores_d)
+  end
+  #TODO is this necessary?
+  S = cores2basis(vec_supr[1]...)
+  for iB in 2:nB
+    S = vcat(S,cores2basis(vec_supr[iB]...))
+  end
+  supr = reshape(S,map(x->size(x,2),vec_supr[1])...,nB,:)
+  supr_cores, = ttsvd(red_style,supr)
+  return supr_cores
 end
 
 # utils
@@ -302,6 +337,21 @@ Base.@propagate_inbounds function _seq_prod_missing_test(
   AB = A*B
   s1,s2,s3,s4,s5,s6 = 1,1,1,size(factor1,4),size(factor2,3),size(factor2,4)
   reshape(AB,s1,s2,s3,s4,s5,s6)
+end
+
+# rescale a 3d-core by a (sparse) matrix
+
+function _sparse_rescaling(X::AbstractSparseMatrix,core::AbstractArray{T,3}) where T
+  prev_rank = size(core,1)
+  cur_size = size(core,2)
+  cur_size′ = size(X,1)
+  M = reshape(core,prev_rank*cur_size,:)
+
+  X′ = kron(I(prev_rank),X)
+  XM = X′*M
+  Xcore = reshape(XM,prev_rank,cur_size′,:)
+
+  return Xcore
 end
 
 # empirical interpolation
