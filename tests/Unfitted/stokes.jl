@@ -134,12 +134,16 @@ BT = assemble_matrix(supr_form,test_p.space,test_u.space)
 B̂ = Φ_u'*BT*Φ_p
 
 # standard code
+using ReducedOrderModels.RBSteady
+using LinearAlgebra
 energy_u(du,v) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ
 X_primal = assemble_matrix(energy_u,test_u.space,test_u.space)
 
 i = 1
 H_primal = cholesky(X_primal)
 supr_i = H_primal \ BT * Φ_p
+red = state_reduction.reduction
+red_style = ReductionStyle(red)
 Φ_su = RBSteady.union_bases(PODBasis(Φ_u),supr_i,X_primal,red_style[1]).basis
 
 B̂_ok = Φ_su'*BT*Φ_p

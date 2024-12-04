@@ -154,3 +154,20 @@ function block_cat(a::AbstractVector{<:AbstractArray{T,3}};kwargs...) where T
     cat(a[1],a[2],a[3];kwargs...)
   end
 end
+
+function _block_cores_add_component(
+  a::AbstractVector{<:AbstractVector{<:AbstractArray{T,3}}}
+  ) where T
+
+  D = length(first(a))
+  ablocks = block_cores(a)
+  ND = size(last(ablocks),3)
+  N = Int(ND/D)
+  In = T.(I(N))
+  ablast = zeros(T,ND,D,N)
+  for d in 1:D
+    @views ablast[(d-1)*N+1:d*N,d,:] = In
+  end
+  push!(ablocks,ablast)
+  return ablocks
+end

@@ -1,7 +1,7 @@
 [MPIPreferences]
 __clear__ = ["preloads_env_switch"]
 _format = "1.0"
-abi = "MPICH"
+abi = "OpenMPI"
 binary = "system"
 cclibs = []
 libmpi = "libmpi"

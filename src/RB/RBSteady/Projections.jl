@@ -490,7 +490,7 @@ function enrich!(
   for i = eachindex(a_dual)
     dual_i = get_cores(a_dual[i])
     C_primal_dual_i = supr_matrix[Block(1,i+1)]
-    supr_i = tt_supremizer(red_style,X_primal,C_primal_dual_i,dual_i)
+    supr_i = tt_supremizer(X_primal,C_primal_dual_i,dual_i)
     a_primal = union_bases(a_primal,supr_i,red_style,X_primal)
   end
   a[1] = a_primal

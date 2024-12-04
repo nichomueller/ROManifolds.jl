@@ -246,12 +246,18 @@ function realization(p::ParamSpace{P,S} where {P,S};nparams=1,kwargs...)
   Realization([_generate_param(p) for i = 1:nparams])
 end
 
-function realization(p::ParamSpace{P,HaltonSampling} where P;nparams=1,random=false,kwargs...)
+function realization(
+  p::ParamSpace{P,HaltonSampling} where P;
+  nparams=1,
+  start=1,
+  random=false,
+  kwargs...)
+
   if random
     p′ = ParamSpace(p.param_domain,UniformSampling())
     realization(p′;nparams)
   else
-    hs = shifted_halton(p,nparams)
+    hs = shifted_halton(p;length=nparams,start=start)
     Realization(hs)
   end
 end
@@ -542,10 +548,10 @@ Arrays.evaluate!(cache,f::AbstractParamFunction,x::CellPoint) = CellField(f,get_
 
 # Halton utils
 
-function shifted_halton(p::ParamSpace,nparams::Integer)
+function shifted_halton(p::ParamSpace;kwargs...)
   domain = p.param_domain
   d = dimension(p)
-  hs = HaltonPoint(d,length=nparams)
+  hs = HaltonPoint(d;kwargs...)
   hs′ = collect(hs)
   for x in hs′
     for (di,xdi) in enumerate(x)

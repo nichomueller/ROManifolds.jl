@@ -247,7 +247,6 @@ end
 # supremizer computation
 
 function tt_supremizer(
-  red_style,
   X::Vector{<:Factorization},
   B::Vector{<:AbstractSparseMatrix},
   cores_d::Vector{<:AbstractArray{T,3}}
@@ -269,7 +268,6 @@ function tt_supremizer(
 end
 
 function tt_supremizer(
-  red_style,
   X::AbstractRankTensor,
   B::GenericRankTensor,
   cores_d::Vector{<:AbstractArray{T,3}}
@@ -281,15 +279,16 @@ function tt_supremizer(
   for iB in 1:nB
     Bi = get_decomposition(B)[iB]
     Bfactors = get_factors(Bi)
-    vec_supr[iB] = tt_supremizer(red_style,Xfactors,Bfactors,cores_d)
+    vec_supr[iB] = tt_supremizer(Xfactors,Bfactors,cores_d)
   end
-  #TODO is this necessary?
-  S = cores2basis(vec_supr[1]...)
-  for iB in 2:nB
-    S = vcat(S,cores2basis(vec_supr[iB]...))
-  end
-  supr = reshape(S,map(x->size(x,2),vec_supr[1])...,nB,:)
-  supr_cores, = ttsvd(red_style,supr)
+  # #TODO is this necessary?
+  # S = cores2basis(vec_supr[1]...)
+  # for iB in 2:nB
+  #   S = vcat(S,cores2basis(vec_supr[iB]...))
+  # end
+  # supr = reshape(S,map(x->size(x,2),vec_supr[1])...,nB,:)
+  # supr_cores, = ttsvd(red_style,supr)
+  supr_cores = _block_cores_add_component(vec_supr)
   return supr_cores
 end
 
