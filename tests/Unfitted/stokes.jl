@@ -125,56 +125,72 @@ perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 # ph = FEFunction(trial_p,p1)
 # writevtk(Ω_in,datadir("plts/sol"),cellfields=["uh"=>uh,"ph"=>ph])
 
-using BlockArrays
-norm_matrix = assemble_matrix(feop,energy)
-supr_matrix = assemble_matrix(feop,coupling)
-basis = reduced_basis(state_reduction.reduction,fesnaps,norm_matrix)
-red_style = ReductionStyle(state_reduction.reduction)
-a_primal,a_dual... = basis.array
-primal_map = get_dof_map(a_primal)
-X_primal = norm_matrix[Block(1,1)]
+using Gridap.FESpaces
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+op = get_algebraic_operator(feop)
+jacs = jacobian_snapshots(rbsolver,op,fesnaps)
+jac_red = rbsolver.jacobian_reduction
+red_jac = reduced_jacobian(jac_red,red_trial,red_test,jacs)
+trians_lhs = get_domains(red_jac)
+
+red = get_reduction(jac_red)
+basis = projection(red,jacs[1][1,2])
+proj_basis = project(red_test[1],basis,red_trial[2])
+# indices,interp = empirical_interpolation(basis)
+cores = get_cores(basis)
+dof_map = get_dof_map(basis)
+c = cores2basis(first(cores))
+cache = RBSteady.eim_cache(c)
+vinds = Vector{Int32}[]
 i = 1
-dual_i = get_cores(a_dual[i])
-C_primal_dual_i = supr_matrix[Block(1,i+1)]
-supr_i = RBSteady.tt_supremizer(X_primal,C_primal_dual_i,dual_i)
-aa_primal = RBSteady.union_bases(a_primal,supr_i,red_style,X_primal)
+inds,interp = RBSteady.empirical_interpolation!(cache,c)
+push!(vinds,copy(inds))
+interp_core = reshape(interp,1,size(interp)...)
+c = cores2basis(interp_core,cores[i+1])
+i = 2
+inds,interp = RBSteady.empirical_interpolation!(cache,c)
+push!(vinds,copy(inds))
+interp_core = reshape(interp,1,size(interp)...)
+c = cores2basis(interp_core,cores[i+1])
+i = 3
+inds,interp = RBSteady.empirical_interpolation!(cache,c)
+push!(vinds,copy(inds))
+# iindices = RBSteady.basis_indices(vinds,dof_map)
+# findices = dof_map[findfirst(dof_map.indices_sparse.==iindices[1])]
+LL = length(vinds)
+D = ndims(dof_map.indices_sparse)
+ninds = LL - D + 1
 
-# check if supremizers work
+Iprev...,Icurr = vinds
+basis_indices = zeros(Int32,length(Icurr))
+k = 1
+ik = Icurr[k]
+# indices_k = RBSteady.basis_index(ik,vinds)
+Iprevs...,Icurr = vinds
+Iprevprevs...,Iprev = Iprevs
+rankprev = length(Iprev)
+icurr = slow_index(ik,rankprev)
+iprevs = RBSteady.basis_index(Iprev[fast_index(ik,rankprev)],Iprevs)
+basis_indices[k] = dof_map.indices_sparse[CartesianIndex(indices_k[1:D])]
 
-supr_form(dp,v) = ∫(dp*(∇⋅(v)))dΩ
-BT = assemble_matrix(supr_form,test_p.space,test_u.space)
-Φ_u = get_basis(aa_primal)
-Φ_p = get_basis(a_dual[1])
-B̂ = Φ_u'*BT*Φ_p
-det(B̂'B̂)
+Φ = cores2basis(basis.cores...)
+_indices,_interp = empirical_interpolation(Φ)
+_sinds = dof_map.indices_sparse[findfirst(dof_map.==_indices)]
 
-# standard code
-using ReducedOrderModels.RBSteady
-using LinearAlgebra
-energy_u(du,v) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ
-X_primal = assemble_matrix(energy_u,test_u.space,test_u.space)
 
-i = 1
-H_primal = cholesky(X_primal)
-supr_i = H_primal \ BT * Φ_p
-red = state_reduction.reduction
-red_style = ReductionStyle(red)
-Φ_u = get_basis(a_primal)
-Φ_su = RBSteady.union_bases(PODBasis(Φ_u),supr_i,X_primal,red_style[1]).basis
 
-B̂_ok = Φ_su'*BT*Φ_p
+# r = μon
+# x = zero_free_values(trial(r))
+# x̂ = zero_free_values(rbop.trial(r))
 
-# check if supremizers are ok w.r.t mass matrix
+# rbcache = allocate_rbcache(rbop,r,x)
 
-mtt((du,dp),(v,q)) = ∫(du⋅v)dΩ
-Mtt = assemble_matrix(feop,mtt)[Block(1,1)]
-supr_i = RBSteady.tt_supremizer(Mtt,C_primal_dual_i,dual_i)
-Stt = cores2basis(get_dof_map(test_u),supr_i...)
+# using Gridap.Algebra
+# solve!(x̂,fesolver,rbop,r,x,rbcache)
+# Â = jacobian(rbop,r,x,rbcache)
 
-M = assemble_matrix((du,v)->∫(du⋅v)dΩ,test_u.space,test_u.space)
-HM = cholesky(M)
-supr_i = HM \ BT * Φ_p
+# A = allocate_jacobian(rbop,r,x,rbcache)
+# # jacobian!(A,rbop,r,x,rbcache)
 
-aa_primal′ = RBSteady.union_bases(a_primal,supr_i,red_style,X_primal)
-Φ_u′ = get_basis(aa_primal′)
-B̂′ = Φ_u′'*BT*Φ_p
+# paramcache = rbcache.paramcache
+# feA = fe_jacobian!(A.fe_quantity,rbop,r,x,paramcache)

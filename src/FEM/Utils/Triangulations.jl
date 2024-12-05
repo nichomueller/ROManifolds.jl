@@ -27,7 +27,12 @@ for T in (:Triangulation,:(BodyFittedTriangulation{Dt,Dp,A,<:Geometry.GridView} 
 end
 
 function is_parent(tparent::Geometry.AppendedTriangulation,tchild::Geometry.AppendedTriangulation)
-  is_parent(tparent.a,tchild.a,) && is_parent(tparent.b,tchild.b)
+  is_parent(tparent.a,tchild.a) && is_parent(tparent.b,tchild.b)
+end
+
+function is_parent(tparent::Geometry.AppendedTriangulation,tchild::Triangulation)
+  ( is_parent(tparent.a,tchild) && !is_parent(tparent.b,tchild) ) ||
+  ( !is_parent(tparent.a,tchild) && is_parent(tparent.b,tchild) )
 end
 
 function get_parent(t::Geometry.Grid)
@@ -53,10 +58,6 @@ function get_parent(t::Geometry.AppendedTriangulation)
   a = get_parent(t.a)
   b = get_parent(t.b)
   lazy_append(a,b)
-end
-
-function get_parent(t::AbstractVector{<:Triangulation})
-  get_parent(first(t))
 end
 
 """
@@ -150,7 +151,7 @@ domain is found
 
 """
 function merge_triangulations(trians)
-  parent = get_parent(trians)
+  parent = get_parent(first(trians))
   uindices = get_union_indices(trians)
   view(parent,uindices)
 end
@@ -242,5 +243,5 @@ function Base.view(trian::Geometry.AppendedTriangulation,ids::AbstractArray)
   end
   trian1 = view(trian.a,ids1)
   trian2 = view(trian.b,ids2)
-  num_cells(trian1) == 0 ? trian2 : lazy_append(trian1,trian2)
+  isempty(ids1) ? trian2 : (isempty(ids2) ? trian1 : lazy_append(trian1,trian2))
 end

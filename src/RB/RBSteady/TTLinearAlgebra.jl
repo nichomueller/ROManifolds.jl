@@ -399,6 +399,7 @@ end
 function basis_indices(cores_indices::Vector{<:Vector},dof_map::AbstractArray{Ti,D}) where {Ti,D}
   L = length(cores_indices)
   ninds = L - D + 1
+  @check ninds > 0
   return basis_indices(Val(ninds),cores_indices,dof_map)
 end
 
