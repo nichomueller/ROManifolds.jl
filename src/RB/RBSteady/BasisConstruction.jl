@@ -114,10 +114,11 @@ function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractS
   cur_size = size(A,2)
   M = reshape(A,prev_rank*cur_size,:)
 
-  L,p = _cholesky_decomp(X)
-  L′ = kron(I(prev_rank),L)
-  p′ = vec(((collect(1:prev_rank).-1)*cur_size .+ p')')
-  Ur,Sr,Vr = tpod(red_style,M,L′,p′)
+  #TODO make this more efficient
+  L,p = _cholesky_decomp(kron(X,I(prev_rank)))
+  # L = cholesky(kron(I(prev_rank),X)).L
+  # p = ?
+  Ur,Sr,Vr = tpod(red_style,M,L,p)
 
   core = reshape(Ur,prev_rank,cur_size,:)
   remainder = Sr.*Vr'
@@ -206,7 +207,6 @@ function generalized_ttsvd(
     remainder = reshape(cur_remainder,size(cur_core,3),size(A,d+1),:)
     push!(cores,cur_core)
   end
-
   return cores,remainder
 end
 
@@ -221,10 +221,14 @@ function orthogonalize!(
   decomp = get_decomposition(X)
   for d in 1:D
     cur_core = cores[d]
-    if d == length(cores)
+    if d == D
       XW = ttnorm_array(X,weight)
       cur_core′,R = reduce_rank(red_style[d],cur_core,XW)
       cores[d] = cur_core′
+      if d < length(cores)
+        next_core = cores[d+1]
+        cores[d+1] = absorb(next_core,R)
+      end
     else
       next_core = cores[d+1]
       X_d = getindex.(decomp,d)
@@ -238,7 +242,7 @@ function orthogonalize!(
     cur_core = cores[d]
     cur_core′,R = reduce_rank(red_style[d],cur_core)
     cores[d] = cur_core′
-    d == length(cores) && continue
+    d == length(cores) && break
     next_core = cores[d+1]
     next_core′ = absorb(next_core,R)
     cores[d+1] = next_core′
@@ -416,7 +420,7 @@ end
 
 function check_orthogonality(cores::AbstractVector{<:AbstractArray{T,3}},X::AbstractRankTensor) where T
   Xglobal = kron(X)
-  basis = dropdims(_cores2basis(cores...);dims=1)
+  basis = cores2basis(cores...)
   isorth = norm(basis'*Xglobal*basis - I) ≤ 1e-10
   return isorth
 end

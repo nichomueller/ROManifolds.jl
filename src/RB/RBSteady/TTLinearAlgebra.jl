@@ -281,13 +281,6 @@ function tt_supremizer(
     Bfactors = get_factors(Bi)
     vec_supr[iB] = tt_supremizer(Xfactors,Bfactors,cores_d)
   end
-  # #TODO is this necessary?
-  # S = cores2basis(vec_supr[1]...)
-  # for iB in 2:nB
-  #   S = vcat(S,cores2basis(vec_supr[iB]...))
-  # end
-  # supr = reshape(S,map(x->size(x,2),vec_supr[1])...,nB,:)
-  # supr_cores, = ttsvd(red_style,supr)
   supr_cores = _block_cores_add_component(vec_supr)
   return supr_cores
 end
@@ -346,7 +339,7 @@ function _sparse_rescaling(X::AbstractSparseMatrix,core::AbstractArray{T,3}) whe
   cur_size′ = size(X,1)
   M = reshape(core,prev_rank*cur_size,:)
 
-  X′ = kron(I(prev_rank),X)
+  X′ = kron(X,I(prev_rank))
   XM = X′*M
   Xcore = reshape(XM,prev_rank,cur_size′,:)
 

@@ -125,13 +125,28 @@ perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 # ph = FEFunction(trial_p,p1)
 # writevtk(Ω_in,datadir("plts/sol"),cellfields=["uh"=>uh,"ph"=>ph])
 
+using BlockArrays
+norm_matrix = assemble_matrix(feop,energy)
+supr_matrix = assemble_matrix(feop,coupling)
+basis = reduced_basis(state_reduction.reduction,fesnaps,norm_matrix)
+red_style = ReductionStyle(state_reduction.reduction)
+a_primal,a_dual... = basis.array
+primal_map = get_dof_map(a_primal)
+X_primal = norm_matrix[Block(1,1)]
+i = 1
+dual_i = get_cores(a_dual[i])
+C_primal_dual_i = supr_matrix[Block(1,i+1)]
+supr_i = RBSteady.tt_supremizer(X_primal,C_primal_dual_i,dual_i)
+aa_primal = RBSteady.union_bases(a_primal,supr_i,red_style,X_primal)
+
 # check if supremizers work
 
 supr_form(dp,v) = ∫(dp*(∇⋅(v)))dΩ
 BT = assemble_matrix(supr_form,test_p.space,test_u.space)
-Φ_u = get_basis(rbop.test.subspace[1])
-Φ_p = get_basis(rbop.test.subspace[2])
+Φ_u = get_basis(aa_primal)
+Φ_p = get_basis(a_dual[1])
 B̂ = Φ_u'*BT*Φ_p
+det(B̂'B̂)
 
 # standard code
 using ReducedOrderModels.RBSteady
@@ -144,6 +159,22 @@ H_primal = cholesky(X_primal)
 supr_i = H_primal \ BT * Φ_p
 red = state_reduction.reduction
 red_style = ReductionStyle(red)
+Φ_u = get_basis(a_primal)
 Φ_su = RBSteady.union_bases(PODBasis(Φ_u),supr_i,X_primal,red_style[1]).basis
 
 B̂_ok = Φ_su'*BT*Φ_p
+
+# check if supremizers are ok w.r.t mass matrix
+
+mtt((du,dp),(v,q)) = ∫(du⋅v)dΩ
+Mtt = assemble_matrix(feop,mtt)[Block(1,1)]
+supr_i = RBSteady.tt_supremizer(Mtt,C_primal_dual_i,dual_i)
+Stt = cores2basis(get_dof_map(test_u),supr_i...)
+
+M = assemble_matrix((du,v)->∫(du⋅v)dΩ,test_u.space,test_u.space)
+HM = cholesky(M)
+supr_i = HM \ BT * Φ_p
+
+aa_primal′ = RBSteady.union_bases(a_primal,supr_i,red_style,X_primal)
+Φ_u′ = get_basis(aa_primal′)
+B̂′ = Φ_u′'*BT*Φ_p

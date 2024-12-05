@@ -31,13 +31,20 @@ struct GenericRankTensor{D,K,A<:AbstractArray} <: AbstractRankTensor{D,K}
 end
 
 get_decomposition(a::GenericRankTensor,k::Integer) = a.decompositions[k]
-get_factor(a::GenericRankTensor,d::Integer,k::Integer) = get_factor(get_decomposition(a,k),d)
+get_factor(a::GenericRankTensor,d::Integer,k::Integer) = get_factors(get_decomposition(a,k))[d]
 Base.size(a::GenericRankTensor) = (rank(a),)
 Base.getindex(a::GenericRankTensor,k::Integer) = get_decomposition(a,k)
 
 #TODO will have to change this at some point
-function LinearAlgebra.cholesky(a::GenericRankTensor)
-  cholesky(get_decomposition(a,1))
+function LinearAlgebra.cholesky(a::GenericRankTensor{D,K}) where {D,K}
+  # cholesky(get_decomposition(a,1))
+  map(1:D) do d
+    factor = get_factor(a,d,1)
+    for k = 2:K
+      factor += get_factor(a,d,k)
+    end
+    cholesky(factor)
+  end
 end
 
 function _sort!(a::AbstractVector{<:AbstractVector},i::Tuple{<:TProductDofMap})
