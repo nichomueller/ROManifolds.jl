@@ -90,7 +90,7 @@ trian_res = (Ω_in,Γd,Γn)
 trian_jac = (Ω_in,Ω_out,Γd)
 domains = FEDomains(trian_res,trian_jac)
 
-coupling((du,dp),(v,q)) = ∫(dp*∂₁(v))dΩ + ∫(dp*∂₂(v))dΩ#∫(dp*(∇⋅(v)))dΩ
+coupling((du,dp),(v,q)) = ∫(dp*∂₁(v))dΩ + ∫(dp*∂₂(v))dΩ
 energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)

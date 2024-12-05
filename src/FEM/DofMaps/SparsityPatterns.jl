@@ -413,7 +413,7 @@ function nz_sortperm!(a′::AbstractArray,a::AbstractArray)
   count = 1
   for (i,ai) in enumerate(a)
     iszero(ai) && continue
-    a′[i] = anz[count]
+    a′[anz[count]] = i
     count += 1
   end
 end

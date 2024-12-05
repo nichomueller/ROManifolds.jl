@@ -21,18 +21,14 @@ end
 for T in (:Triangulation,:(BodyFittedTriangulation{Dt,Dp,A,<:Geometry.GridView} where {Dt,Dp,A}),:(Geometry.TriangulationView))
   @eval begin
     function is_parent(tparent::Geometry.AppendedTriangulation,tchild::$T)
-      is_parent(tparent.a,tchild) || is_parent(tparent.b,tchild)
+      ( is_parent(tparent.a,tchild) && !is_parent(tparent.b,tchild) ) ||
+      ( !is_parent(tparent.a,tchild) && is_parent(tparent.b,tchild) )
     end
   end
 end
 
 function is_parent(tparent::Geometry.AppendedTriangulation,tchild::Geometry.AppendedTriangulation)
   is_parent(tparent.a,tchild.a) && is_parent(tparent.b,tchild.b)
-end
-
-function is_parent(tparent::Geometry.AppendedTriangulation,tchild::Triangulation)
-  ( is_parent(tparent.a,tchild) && !is_parent(tparent.b,tchild) ) ||
-  ( !is_parent(tparent.a,tchild) && is_parent(tparent.b,tchild) )
 end
 
 function get_parent(t::Geometry.Grid)
