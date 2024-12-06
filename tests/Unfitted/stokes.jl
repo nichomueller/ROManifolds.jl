@@ -106,8 +106,8 @@ feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
 fesolver = LinearFESolver(LUSolver())
 
 tol = fill(1e-4,4)
-state_reduction = SupremizerReduction(coupling,tol,energy;nparams=10)
-rbsolver = RBSolver(fesolver,state_reduction;nparams_res=10,nparams_jac=10)
+state_reduction = SupremizerReduction(coupling,tol,energy;nparams=100)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=50,nparams_jac=50)
 
 fesnaps,festats = solution_snapshots(rbsolver,feop)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
@@ -117,80 +117,55 @@ x̂,rbstats = solve(rbsolver,rbop,μon)
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 
-# u1 = flatten_snapshots(fesnaps[1])[:,1]
-# p1 = flatten_snapshots(fesnaps[2])[:,1]
-# r1 = get_realization(fesnaps[1])[1]
-# U1 = param_getindex(trial_u(r1),1)
-# uh = FEFunction(U1,u1)
-# ph = FEFunction(trial_p,p1)
-# writevtk(Ω_in,datadir("plts/sol"),cellfields=["uh"=>uh,"ph"=>ph])
+u1 = flatten_snapshots(x[1])[:,1]
+p1 = flatten_snapshots(x[2])[:,1]
+r1 = get_realization(x[1])[1]
+U1 = param_getindex(trial_u(r1),1)
+uh = FEFunction(U1,u1)
+ph = FEFunction(trial_p,p1)
+writevtk(Ω_in,datadir("plts/sol"),cellfields=["uh"=>uh,"ph"=>ph])
 
-using Gridap.FESpaces
-red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-op = get_algebraic_operator(feop)
-jacs = jacobian_snapshots(rbsolver,op,fesnaps)
-jac_red = rbsolver.jacobian_reduction
-red_jac = reduced_jacobian(jac_red,red_trial,red_test,jacs)
-trians_lhs = get_domains(red_jac)
+xrb = Snapshots(inv_project(get_trial(rbop)(μon),x̂),get_dof_map(feop),μon)
+u1 = flatten_snapshots(xrb[1])[:,1]
+p1 = flatten_snapshots(xrb[2])[:,1]
+uh = FEFunction(U1,u1)
+ph = FEFunction(trial_p,p1)
+writevtk(Ω_in,datadir("plts/sol_approx"),cellfields=["uh"=>uh,"ph"=>ph])
 
-red = get_reduction(jac_red)
-basis = projection(red,jacs[1][1,2])
-proj_basis = project(red_test[1],basis,red_trial[2])
-# indices,interp = empirical_interpolation(basis)
-cores = get_cores(basis)
-dof_map = get_dof_map(basis)
-c = cores2basis(first(cores))
-cache = RBSteady.eim_cache(c)
-vinds = Vector{Int32}[]
-i = 1
-inds,interp = RBSteady.empirical_interpolation!(cache,c)
-push!(vinds,copy(inds))
-interp_core = reshape(interp,1,size(interp)...)
-c = cores2basis(interp_core,cores[i+1])
-i = 2
-inds,interp = RBSteady.empirical_interpolation!(cache,c)
-push!(vinds,copy(inds))
-interp_core = reshape(interp,1,size(interp)...)
-c = cores2basis(interp_core,cores[i+1])
-i = 3
-inds,interp = RBSteady.empirical_interpolation!(cache,c)
-push!(vinds,copy(inds))
-# iindices = RBSteady.basis_indices(vinds,dof_map)
-# findices = dof_map[findfirst(dof_map.indices_sparse.==iindices[1])]
-LL = length(vinds)
-D = ndims(dof_map.indices_sparse)
-ninds = LL - D + 1
+# try with pod
 
-Iprev...,Icurr = vinds
-basis_indices = zeros(Int32,length(Icurr))
-k = 1
-ik = Icurr[k]
-# indices_k = RBSteady.basis_index(ik,vinds)
-Iprevs...,Icurr = vinds
-Iprevprevs...,Iprev = Iprevs
-rankprev = length(Iprev)
-icurr = slow_index(ik,rankprev)
-iprevs = RBSteady.basis_index(Iprev[fast_index(ik,rankprev)],Iprevs)
-basis_indices[k] = dof_map.indices_sparse[CartesianIndex(indices_k[1:D])]
+bgmodel′ = bgmodel.model
+cutgeo′ = cut(bgmodel′,geo3)
 
-Φ = cores2basis(basis.cores...)
-_indices,_interp = empirical_interpolation(Φ)
-_sinds = dof_map.indices_sparse[findfirst(dof_map.==_indices)]
+Ω′ = Ω.trian
+dΩ′ = dΩ.measure
 
+test_u′ = TestFESpace(bgmodel′,reffe_u;conformity=:H1,dirichlet_tags="wall")
+trial_u′ = ParamTrialFESpace(test_u′,gμ_0)
+test_p′ = TestFESpace(bgmodel′,reffe_p;conformity=:H1)
+trial_p′ = TrialFESpace(test_p′)
+test′ = MultiFieldParamFESpace([test_u′,test_p′];style=BlockMultiFieldStyle())
+trial′ = MultiFieldParamFESpace([trial_u′,trial_p′];style=BlockMultiFieldStyle())
+feop′ = LinearParamFEOperator(l,a,pspace,trial′,test′,domains)
 
+coupling′((du,dp),(v,q)) = ∫((∇⋅v)*dp)dΩ_in
 
-# r = μon
-# x = zero_free_values(trial(r))
-# x̂ = zero_free_values(rbop.trial(r))
+state_reduction′ = SupremizerReduction(coupling′,1e-4,energy;nparams=100)
+rbsolver′ = RBSolver(fesolver,state_reduction′;nparams_res=50,nparams_jac=50)
 
-# rbcache = allocate_rbcache(rbop,r,x)
+fesnaps′,festats′ = solution_snapshots(rbsolver′,feop′)
+rbop′ = reduced_operator(rbsolver′,feop′,fesnaps′)
+x̂′,rbstats′ = solve(rbsolver′,rbop′,μon)
 
-# using Gridap.Algebra
-# solve!(x̂,fesolver,rbop,r,x,rbcache)
-# Â = jacobian(rbop,r,x,rbcache)
+x′,festats′ = solution_snapshots(rbsolver′,feop′,μon)
+perf′ = rb_performance(rbsolver′,feop′,rbop′,x′,x̂′,festats′,rbstats′,μon)
 
-# A = allocate_jacobian(rbop,r,x,rbcache)
-# # jacobian!(A,rbop,r,x,rbcache)
+xrb = Snapshots(inv_project(get_trial(rbop′)(μon),x̂′),get_dof_map(feop′),μon)
 
-# paramcache = rbcache.paramcache
-# feA = fe_jacobian!(A.fe_quantity,rbop,r,x,paramcache)
+u1 = (x′[1]-xrb[1])[:,1]
+p1 = (x′[2]-xrb[2])[:,1]
+r1 = get_realization(x′[1])[1]
+U1 = param_getindex(trial_u′(r1),1)
+uh = FEFunction(U1,u1)
+ph = FEFunction(trial_p′,p1)
+writevtk(Ω_in,datadir("plts/err"),cellfields=["uh"=>uh,"ph"=>ph])

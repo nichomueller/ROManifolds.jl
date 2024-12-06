@@ -242,6 +242,16 @@ end
 
 function get_component(
   trian::Triangulation,
+  i::AbstractTrivialDofMap,
+  args...;
+  kwargs...
+  )
+
+  i
+end
+
+function get_component(
+  trian::Triangulation,
   i::AbstractVector{<:AbstractDofMap},
   args...;
   kwargs...

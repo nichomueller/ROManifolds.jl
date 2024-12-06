@@ -382,7 +382,7 @@ function get_dof_to_constraints(constrained_dofs::AbstractVector,ndofs::Int)
 end
 
 get_tface_to_mface(t::Geometry.BodyFittedTriangulation) = t.tface_to_mface
-get_tface_to_mface(t::Geometry.BoundaryTriangulation) = t.glue.face_to_bgface
+get_tface_to_mface(t::Geometry.BoundaryTriangulation) = t.glue.face_to_cell
 get_tface_to_mface(t::Geometry.TriangulationView) = get_tface_to_mface(t.parent)
 get_tface_to_mface(t::Interfaces.SubFacetTriangulation) = t.subfacets.facet_to_bgcell
 get_tface_to_mface(t::Interfaces.SubCellTriangulation) = unique(t.subcells.cell_to_bgcell)

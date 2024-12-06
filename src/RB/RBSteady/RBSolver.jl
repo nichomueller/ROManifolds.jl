@@ -89,9 +89,9 @@ function solution_snapshots(
   return snaps,stats
 end
 
-function residual_snapshots(solver::RBSolver,op::ParamOperator,s)
+function residual_snapshots(solver::RBSolver,op::ParamOperator,s;nparams=res_params(solver))
   fesolver = get_fe_solver(solver)
-  sres = select_snapshots(s,res_params(solver))
+  sres = select_snapshots(s,nparams)
   us_res = get_values(sres)
   r_res = get_realization(sres)
   b = residual(op,r_res,us_res)
@@ -99,9 +99,9 @@ function residual_snapshots(solver::RBSolver,op::ParamOperator,s)
   return Snapshots(b,ib,r_res)
 end
 
-function residual_snapshots(solver::RBSolver,op::ParamOperator{LinearParamEq},s)
+function residual_snapshots(solver::RBSolver,op::ParamOperator{LinearParamEq},s;nparams=res_params(solver))
   fesolver = get_fe_solver(solver)
-  sres = select_snapshots(s,res_params(solver))
+  sres = select_snapshots(s,nparams)
   us_res = get_values(sres) |> similar
   fill!(us_res,zero(eltype2(us_res)))
   r_res = get_realization(sres)
@@ -110,9 +110,9 @@ function residual_snapshots(solver::RBSolver,op::ParamOperator{LinearParamEq},s)
   return Snapshots(b,ib,r_res)
 end
 
-function jacobian_snapshots(solver::RBSolver,op::ParamOperator,s)
+function jacobian_snapshots(solver::RBSolver,op::ParamOperator,s;nparams=jac_params(solver))
   fesolver = get_fe_solver(solver)
-  sjac = select_snapshots(s,jac_params(solver))
+  sjac = select_snapshots(s,nparams)
   us_jac = get_values(sjac)
   r_jac = get_realization(sjac)
   A = jacobian(op,r_jac,us_jac)
@@ -120,9 +120,9 @@ function jacobian_snapshots(solver::RBSolver,op::ParamOperator,s)
   return Snapshots(A,iA,r_jac)
 end
 
-function jacobian_snapshots(solver::RBSolver,op::ParamOperator{LinearParamEq},s)
+function jacobian_snapshots(solver::RBSolver,op::ParamOperator{LinearParamEq},s;nparams=jac_params(solver))
   fesolver = get_fe_solver(solver)
-  sjac = select_snapshots(s,jac_params(solver))
+  sjac = select_snapshots(s,nparams)
   us_jac = get_values(sjac) |> similar
   fill!(us_jac,zero(eltype2(us_jac)))
   r_jac = get_realization(sjac)

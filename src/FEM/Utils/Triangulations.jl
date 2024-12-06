@@ -21,8 +21,7 @@ end
 for T in (:Triangulation,:(BodyFittedTriangulation{Dt,Dp,A,<:Geometry.GridView} where {Dt,Dp,A}),:(Geometry.TriangulationView))
   @eval begin
     function is_parent(tparent::Geometry.AppendedTriangulation,tchild::$T)
-      ( is_parent(tparent.a,tchild) && !is_parent(tparent.b,tchild) ) ||
-      ( !is_parent(tparent.a,tchild) && is_parent(tparent.b,tchild) )
+      is_parent(tparent.a,tchild) || is_parent(tparent.b,tchild)
     end
   end
 end
@@ -133,22 +132,53 @@ function get_view_indices(t::Geometry.AppendedTriangulation)
   lazy_append(a,b)
 end
 
-function get_union_indices(trians)
+function get_union_indices(parent::Triangulation,trians)
   indices = map(get_view_indices,trians)
   union(indices...) |> unique
 end
 
+function get_union_indices(parent::AppendedTriangulation,trians)
+  indices = ()
+  for t in trians
+    indst = get_view_indices(t)
+    if !isa(t,AppendedTriangulation)
+      _shift_inds!(indst,t,parent)
+    end
+    indices = (indices...,indst...)
+  end
+  union(indices...) |> unique
+end
+
+function _shift_inds!(i::AbstractVector,child::Triangulation,parent::AppendedTriangulation)
+  isappended(t) = isa(t,AppendedTriangulation)
+  @notimplementedif isappended(parent.a) || isappended(parent.b)
+  cmp = (a,b) -> a == b || is_parent(a,b)
+  j = findfirst(a -> cmp(a,child),(parent.a,parent.b))
+  if j == 2
+    ncells = num_cells(parent.a)
+    i .+= ncells
+  end
+  i
+end
+
 """
-    merge_triangulations(trians::Tuple{Vararg{Triangulation}}) -> Triangulation
+    merge_triangulations(trians::AbstractVector{<:Triangulation}) -> Triangulation
 
 Given a tuple of triangulation views `trians`, returns the triangulation view
 on the union of the viewed cells. In other words, the minimum common integration
 domain is found
 
 """
-function merge_triangulations(trians)
-  parent = get_parent(first(trians))
-  uindices = get_union_indices(trians)
+function merge_triangulations(trians::AbstractVector{<:Triangulation})
+  trian = first(trians)
+  x = get_node_coordinates(trian)
+  for t in trians[2:end]
+    if get_node_coordinates(t) !== x
+      trian = lazy_append(trian,t)
+    end
+  end
+  parent = get_parent(trian)
+  uindices = get_union_indices(parent,trians)
   view(parent,uindices)
 end
 

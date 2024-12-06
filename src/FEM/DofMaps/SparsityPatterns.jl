@@ -409,11 +409,8 @@ end
 
 function nz_sortperm!(a′::AbstractArray,a::AbstractArray)
   fill!(a′,zero(eltype(a′)))
-  anz = sortperm(a[findall(!iszero,a)])
-  count = 1
-  for (i,ai) in enumerate(a)
-    iszero(ai) && continue
-    a′[anz[count]] = i
-    count += 1
-  end
+  inz = findall(!iszero,a)
+  anz = sortperm(a[inz])
+  inds = LinearIndices(size(anz))
+  a′[inz[anz]] = inds
 end
