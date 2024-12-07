@@ -16,6 +16,8 @@ using Gridap.TensorValues
 using GridapEmbedded
 using GridapEmbedded.Interfaces
 
+import FillArrays: Fill
+
 export PerformanceTracker
 export CostTracker
 export SU

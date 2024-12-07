@@ -45,7 +45,7 @@ end
 function get_parent(t::BodyFittedTriangulation)
   grid = get_parent(get_grid(t))
   model = get_background_model(t)
-  tface_to_mface = IdentityVector(num_cells(grid))
+  tface_to_mface = get_parent(t.tface_to_mface)
   BodyFittedTriangulation(model,grid,tface_to_mface)
 end
 
@@ -65,6 +65,8 @@ is not a triangulation view
 function get_parent(t::Triangulation)
   @abstractmethod
 end
+
+get_parent(i::LazyArray{<:Fill{<:Reindex}}) = i.maps.value.values
 
 function Base.isapprox(t::Grid,s::Grid)
   false
