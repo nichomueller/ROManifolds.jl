@@ -222,13 +222,13 @@ function galerkin_projection(
   dropdims(rcore;dims=(1,2))
 end
 
-function galerkin_projection(
+function unbalanced_contractions(
   cores_test::Vector{<:AbstractArray{T,3}},
   cores::Vector{<:AbstractArray{T,3}},
   cores_trial::Vector{<:AbstractArray{T,3}}
   ) where T
 
-  rcores = map(1:length(cores)) do d
+  map(1:length(cores)) do d
     cond_test = isassigned(cores_test,d)
     cond_trial = isassigned(cores_trial,d)
     @notimplementedif !(cond_test || cond_trial)
@@ -240,6 +240,15 @@ function galerkin_projection(
       contraction(cores[d],cores_trial[d])
     end
   end
+end
+
+function galerkin_projection(
+  cores_test::Vector{<:AbstractArray{T,3}},
+  cores::Vector{<:AbstractArray{T,3}},
+  cores_trial::Vector{<:AbstractArray{T,3}}
+  ) where T
+
+  rcores = unbalanced_contractions(cores_test,cores,cores_trial)
   rcore = sequential_product(rcores...)
   dropdims(rcore;dims=(1,2,3))
 end
@@ -253,25 +262,22 @@ function tt_supremizer(
   ) where T
 
   @check length(X) == length(B)
-  nC = length(cores_d)
-  supr_cores = Vector{Array{T,3}}(undef,nC)
-  for d in 1:nC
-    if isassigned(X,d)
-      cur_core = cores_d[d]
-      XinvB = X[d] \ B[d]
-      supr_cores[d] = _sparse_rescaling(XinvB,cur_core)
-    else
-      supr_cores[d] = cur_core
-    end
+  @check length(X) ≤ length(cores_d)
+  n = length(X)
+  supr_cores = Vector{Array{T,3}}(undef,n)
+  for d in 1:n
+    cur_core = cores_d[d]
+    XinvB = X[d] \ B[d]
+    supr_cores[d] = _sparse_rescaling(XinvB,cur_core)
   end
   return supr_cores
 end
 
 function tt_supremizer(
-  X::AbstractRankTensor,
+  X::AbstractRankTensor{D},
   B::GenericRankTensor,
   cores_d::Vector{<:AbstractArray{T,3}}
-  ) where T
+  ) where {D,T}
 
   Xfactors = cholesky(X)
   nB = length(get_decomposition(B))
@@ -282,6 +288,9 @@ function tt_supremizer(
     vec_supr[iB] = tt_supremizer(Xfactors,Bfactors,cores_d)
   end
   supr_cores = _block_cores_add_component(vec_supr)
+  if length(cores_d) > D
+    push!(supr_cores,last(cores_d))
+  end
   return supr_cores
 end
 

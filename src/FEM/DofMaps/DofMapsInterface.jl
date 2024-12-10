@@ -68,6 +68,7 @@ get_dof_to_cell(i::AbstractDofMap) = @abstractmethod
 get_cell_to_mask(i::AbstractDofMap) = @abstractmethod
 
 @inline function show_dof(i::AbstractDofMap,idof::Integer)
+  iszero(idof) && return true
   dof_to_cell = get_dof_to_cell(i)
   cell_to_mask = get_cell_to_mask(i)
 
@@ -126,9 +127,10 @@ end
 function DofMap(
   indices::AbstractArray,
   dof_to_cell::Table,
-  cell_to_mask::AbstractArray)
+  cell_to_mask::AbstractArray,
+  diri_entities::AbstractMatrix)
 
-  free_vals_box = find_free_values_box(indices)
+  free_vals_box = find_free_values_box(indices,diri_entities)
   DofMap(indices,dof_to_cell,free_vals_box,cell_to_mask)
 end
 
@@ -320,44 +322,21 @@ get_univariate_dof_map(i::TProductDofMap) = i.indices_1d
 
 # nnz bounding boxes
 
-function get_extrema(i::AbstractArray,d::Int)
-  dslices = eachslice(i,dims=d)
-  start = dslices[1]
-  finish = dslices[end]
-  return (start,finish)
+function find_free_values_range(inds,diri_entities,d)
+  s_d = size(inds,d)
+  entity_d = view(diri_entities,:,d)
+  start = first(entity_d) ? 2 : 1
+  finish = last(entity_d) ? s_d-1 : s_d
+  start:finish
 end
 
-isneg(a::Number) = a ≤ 0
+function find_free_values_box(
+  inds::AbstractArray{Ti,D},
+  diri_entities::AbstractMatrix{Bool}
+  ) where {Ti,D}
 
-function find_free_values_range(inds::AbstractArray,d::Int)
-  istart,ifinish = get_extrema(inds,d)
-  allneg_left = true
-  allneg_right = true
-  i = 1
-  while i ≤ length(istart) && (allneg_left || allneg_right)
-    if allneg_left
-      ileft = @views istart[i]
-      allneg_left = isneg(ileft) ? allneg_left : !allneg_left
-    end
-    if allneg_right
-      iright = @views ifinish[i]
-      allneg_right = isneg(iright) ? allneg_right : !allneg_right
-    end
-    i += 1
-  end
-  start = allneg_left ? 2 : 1
-  finish = allneg_right ? size(inds,d)-1 : size(inds,d)
-  return start:finish
-end
-
-function find_free_values_box(inds::AbstractArray{Ti,D}) where {Ti,D}
-  ranges = ntuple(d -> find_free_values_range(inds,d),D)
+  @check size(diri_entities,2) == D
+  ranges = ntuple(d -> find_free_values_range(inds,diri_entities,d),D)
   box = LinearIndices(inds)[ranges...]
-  return box
-end
-
-function find_free_values_box(inds::AbstractVector{Ti}) where {Ti}
-  ranges = find_free_values_range(inds,1)
-  box = collect(ranges)
   return box
 end

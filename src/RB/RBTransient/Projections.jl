@@ -125,7 +125,7 @@ function RBSteady.galerkin_projection(
   pl_space = get_cores_space(proj_left)
   a_space = get_cores_space(a)
   pr_space = get_cores_space(proj_right)
-  p_space = contraction.(pl_space,a_space,pr_space)
+  p_space = unbalanced_contractions(pl_space,a_space,pr_space)
 
   # time
   pl_time = get_core_time(proj_left)

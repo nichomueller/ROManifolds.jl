@@ -108,11 +108,7 @@ function add_1d_tags!(model::TProductModel{D},name) where D
   for ax in 1:D
     label1d = get_face_labeling(model.models_1d[ax])
     name in label1d.tag_to_name && continue
-    if ax in axs
-      tags_at_ax = tags_1d[findall(axs.==ax)]
-    else
-      tags_at_ax = Int[]
-    end
+    tags_at_ax = (ax in axs) ? tags_1d[findall(axs.==ax)] : Int[]
     add_tag_from_tags!(label1d,name,tags_at_ax)
   end
 end

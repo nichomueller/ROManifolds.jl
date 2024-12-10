@@ -23,8 +23,10 @@ cell_dof_ids = Table([
 
 """
 function get_dof_map(space::FESpace)
+  trian = get_triangulation(space)
   model = get_background_model(trian)
-  get_dof_map(model,space)
+  diri_entities = get_dirichlet_entities(space)
+  get_dof_map(model,space,diri_entities)
 end
 
 function get_dof_map(space::SingleFieldFESpace)
@@ -70,7 +72,15 @@ function get_dof_map(model::DiscreteModel,space::FESpace)
   @abstractmethod
 end
 
-function get_dof_map(model::CartesianDiscreteModel,space::UnconstrainedFESpace)
+function get_dof_map(
+  model::CartesianDiscreteModel{D},
+  space::UnconstrainedFESpace,
+  diri_entities::AbstractMatrix=fill(false,2,D)
+  ) where D
+
+  trian = get_triangulation(space)
+  cell_to_mask = get_cell_to_mask(trian)
+
   cell_dof_ids = get_cell_dof_ids(space)
   cache = array_cache(cell_dof_ids)
   dof = get_fe_dof_basis(space)
@@ -78,34 +88,33 @@ function get_dof_map(model::CartesianDiscreteModel,space::UnconstrainedFESpace)
   order = get_polynomial_order(space)
   comp_to_dofs = get_comp_to_dofs(T,space,dof)
 
-  dof_map = get_dof_map(T,model,cache,cell_dof_ids,order,comp_to_dofs)
-
-  trian = get_triangulation(space)
-  cell_to_mask = get_cell_to_mask(trian)
+  dof_map = get_dof_map(T,model,trian,cache,cell_dof_ids,order,comp_to_dofs)
 
   nfdofs = num_free_dofs(space)
   dof_to_cell = _get_dof_to_cell(cache,cell_dof_ids,nfdofs)
 
-  return DofMap(dof_map,dof_to_cell,cell_to_mask)
+  return DofMap(dof_map,dof_to_cell,cell_to_mask,diri_entities)
 end
 
 function get_dof_map(
   ::Type{T},
   model::CartesianDiscreteModel{D},
+  trian::Triangulation,
   cache,
-  cell_dof_ids::Table{Ti},
+  cell_dof_ids::AbstractVector{<:AbstractVector{Ti}},
   order::Integer,
   args...
   ) where {T,Ti,D}
 
-  get_dof_map(model,cache,cell_dof_ids,order)
+  get_dof_map(model,trian,cache,cell_dof_ids,order)
 end
 
 function get_dof_map(
   ::Type{T},
   model::CartesianDiscreteModel{D},
+  trian::Triangulation,
   cache,
-  cell_dof_ids::Table{Ti},
+  cell_dof_ids::AbstractVector{<:AbstractVector{Ti}},
   order::Integer,
   comp_to_dofs::AbstractVector
   ) where {T<:MultiValue,Ti,D}
@@ -113,7 +122,7 @@ function get_dof_map(
   dof_maps = Array{Ti,D}[]
   for dofs in comp_to_dofs
     cell_dof_comp_ids = _get_cell_dof_comp_ids(cell_dof_ids,dofs)
-    dof_map_comp = get_dof_map(model,cache,cell_dof_comp_ids,order)
+    dof_map_comp = get_dof_map(model,trian,cache,cell_dof_comp_ids,order)
     push!(dof_maps,dof_map_comp)
   end
   dof_map = stack(dof_maps;dims=D+1)
@@ -122,8 +131,9 @@ end
 
 function get_dof_map(
   model::CartesianDiscreteModel{Dc},
+  trian::Triangulation,
   cache_cell_dof_ids,
-  cell_dof_ids::Table{Ti},
+  cell_dof_ids::AbstractVector{<:AbstractVector{Ti}},
   order::Integer) where {Dc,Ti}
 
   desc = get_cartesian_descriptor(model)
@@ -138,7 +148,11 @@ function get_dof_map(
   dof_map = zeros(Ti,ndofs)
   touched_dof = zeros(Bool,ndofs)
 
-  for (icell,cell) in enumerate(CartesianIndices(ncells))
+  cells = CartesianIndices(ncells)
+  tface_to_mface = get_tface_to_mface(trian)
+
+  for (icell,icell′) in enumerate(tface_to_mface)
+    cell = cells[icell′]
     first_new_dof  = order .* (Tuple(cell) .- 1) .+ 1
     ordered_dofs_range = map(i -> i:i+order,first_new_dof)
     ordered_dofs = view(ordered_dof_ids,ordered_dofs_range...)
@@ -357,16 +371,18 @@ end
 
 # utils
 
+function get_dirichlet_entities(f::FESpace)
+  @abstractmethod
+end
+
 function get_cell_to_mask(t::Triangulation)
   tface_to_mface = get_tface_to_mface(t)
   model = get_background_model(t)
   ncells = num_cells(model)
   isa(tface_to_mface,IdentityVector) && return Fill(false,ncells)
-  cell_to_mask = fill(false,ncells)
-  for cell in eachindex(cell_to_mask)
-    if !(cell ∈ tface_to_mface)
-      cell_to_mask[cell] = true
-    end
+  cell_to_mask = fill(true,ncells)
+  for cell in tface_to_mface
+    cell_to_mask[cell] = false
   end
   return cell_to_mask
 end

@@ -25,15 +25,11 @@ geo3 = !union(geo1,geo2)
 bgmodel = TProductModel(domain,partition)
 cutgeo = cut(bgmodel,geo3)
 
-labels = get_face_labeling(bgmodel)
-add_tag_from_tags!(labels,"wall",collect(1:6))
-add_tag_from_tags!(labels,"Γn",[7,8])
-
 Ω = Triangulation(bgmodel)
 Ω_in = Triangulation(cutgeo,PHYSICAL_IN)
 Ω_out = Triangulation(cutgeo,PHYSICAL_OUT)
 Γd = EmbeddedBoundary(cutgeo)
-Γn = BoundaryTriangulation(bgmodel;tags="Γn")
+Γn = BoundaryTriangulation(bgmodel;tags="boundary")
 
 n_Γd = get_normal_vector(Γd)
 n_Γn = get_normal_vector(Γn)
@@ -51,11 +47,11 @@ dΓn = Measure(Γn,degree)
 ν(μ) = x->ν(x,μ)
 νμ(μ) = ParamFunction(ν,μ)
 
-u(x,μ) = VectorValue(x[1]*x[1],x[2])*abs(μ[1]*sin(μ[2]))
+u(x,μ) = VectorValue(μ[1]*x[1]*x[1],x[2]*abs(sin(μ[2])))
 u(μ) = x->u(x,μ)
 uμ(μ) = ParamFunction(u,μ)
 
-p(x,μ) = (x[1]-x[2])*abs(cos(μ[3]))
+p(x,μ) = (x[1]*abs(cos(μ[3]))-x[2])
 p(μ) = x->p(x,μ)
 pμ(μ) = ParamFunction(p,μ)
 
@@ -76,9 +72,9 @@ const γ = order*(order+1)
 const h = L/n
 
 a(μ,(u,p),(v,q),dΩ_in,dΩ_out,dΓd) =
-  ∫( ∇(v)⊙∇(u) - q*(∇⋅u) - (∇⋅v)*p )dΩ_in +
+  ∫( ∇(v)⊙∇(u) - q*(∇⋅u) + (∇⋅v)*p )dΩ_in +
   ∫( ν0*(∇(v)⊙∇(u) + q*p) )dΩ_out +
-  ∫( (γ/h)*v⋅u - v⋅(n_Γd⋅∇(u)) - (n_Γd⋅∇(v))⋅u + (p*n_Γd)⋅v + (q*n_Γd)⋅u )dΓd
+  ∫( (γ/h)*v⋅u - v⋅(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))⋅u + (p*n_Γ)⋅v - (q*n_Γ)⋅u )dΓd
 
 l(μ,(u,p),(v,q),dΩ_in,dΓd,dΓn) =
   ∫( v⋅fμ(μ) - q*gμ(μ) )dΩ_in +

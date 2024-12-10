@@ -84,6 +84,7 @@ include("TTCores.jl")
 
 export TTContraction
 export contraction
+export unbalanced_contractions
 export sequential_product
 export cores2basis
 include("TTLinearAlgebra.jl")

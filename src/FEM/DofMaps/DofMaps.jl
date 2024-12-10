@@ -64,10 +64,14 @@ export get_dof_map
 export get_dof_type
 export get_sparse_dof_map
 export get_univariate_dof_map
+export get_dirichlet_entities
 export get_polynomial_order
 include("DofMapsBuilders.jl")
 
 export FEDofMap
 include("FEDofMaps.jl")
+
+export DofMapArray
+include("DofMapArrays.jl")
 
 end # module

@@ -30,7 +30,8 @@ function FESpaces.FESpace(
   space = FESpace(trian.trian,cell_reffe;kwargs...)
   spaces_1d = univariate_spaces(model,trian,cell_reffes_1d;kwargs...)
 
-  dof_map = get_dof_map(model.model,space)
+  diri_entities = get_dirichlet_entities(model.models_1d)
+  dof_map = get_dof_map(model.model,space,diri_entities)
   tp_dof_map = get_tp_dof_map(space,spaces_1d)
 
   TProductFESpace(space,spaces_1d,trian,dof_map,tp_dof_map)
@@ -100,6 +101,28 @@ function get_tp_trial_fe_basis(f::TProductFESpace)
   basis = map(get_trial_fe_basis,f.spaces_1d)
   trian = get_tp_triangulation(f)
   TProductFEBasis(basis,trian)
+end
+
+function DofMaps.get_dirichlet_entities(f::TProductFESpace)
+  trian = get_tp_triangulation(f)
+  model = get_background_model(f)
+  get_dirichlet_entities(model)
+end
+
+function DofMaps.get_dirichlet_entities(models::Vector{<:CartesianDiscreteModel})
+  D = length(models)
+  isdirichlet = zeros(Bool,2,D)
+  for (d,model) in enumerate(models)
+    labels = get_face_labeling(model)
+    tag = findfirst(labels.tag_to_name.=="dirichlet")
+    isempty(tag) && continue
+    entities = labels.tag_to_entities[tag]
+    isempty(entities) && continue
+    for entity in entities
+      isdirichlet[entity,d] = true
+    end
+  end
+  return isdirichlet
 end
 
 get_tp_trial_fe_basis(f::TrialFESpace{<:TProductFESpace}) = get_tp_trial_fe_basis(f.space)
