@@ -36,8 +36,9 @@ function get_dof_map(space::SingleFieldFESpace)
   cache = array_cache(cell_dof_ids)
 
   dof_to_cell = _get_dof_to_cell(cache,cell_dof_ids,nfdofs)
-  cell_to_mask = get_cell_to_mask(trian)
-  TrivialDofMap(dof_to_cell,cell_to_mask)
+  tface_to_mask = get_tface_to_mask(trian)
+  tface_to_mface = get_tface_to_mface(trian)
+  TrivialDofMap(dof_to_cell,tface_to_mask,tface_to_mface)
 end
 
 function get_dof_map(space::MultiFieldFESpace)
@@ -79,7 +80,8 @@ function get_dof_map(
   ) where D
 
   trian = get_triangulation(space)
-  cell_to_mask = get_cell_to_mask(trian)
+  tface_to_mask = get_tface_to_mask(trian)
+  tface_to_mface = get_tface_to_mface(trian)
 
   cell_dof_ids = get_cell_dof_ids(space)
   cache = array_cache(cell_dof_ids)
@@ -88,33 +90,33 @@ function get_dof_map(
   order = get_polynomial_order(space)
   comp_to_dofs = get_comp_to_dofs(T,space,dof)
 
-  dof_map = get_dof_map(T,model,trian,cache,cell_dof_ids,order,comp_to_dofs)
+  dof_map = get_dof_map(T,model,cache,cell_dof_ids,tface_to_mface,order,comp_to_dofs)
 
   nfdofs = num_free_dofs(space)
   dof_to_cell = _get_dof_to_cell(cache,cell_dof_ids,nfdofs)
 
-  return DofMap(dof_map,dof_to_cell,cell_to_mask,diri_entities)
+  return DofMap(dof_map,dof_to_cell,tface_to_mask,tface_to_mface,diri_entities)
 end
 
 function get_dof_map(
   ::Type{T},
   model::CartesianDiscreteModel{D},
-  trian::Triangulation,
   cache,
   cell_dof_ids::AbstractVector{<:AbstractVector{Ti}},
+  tface_to_mface::AbstractVector{<:Integer},
   order::Integer,
   args...
   ) where {T,Ti,D}
 
-  get_dof_map(model,trian,cache,cell_dof_ids,order)
+  get_dof_map(model,cache,cell_dof_ids,tface_to_mface,order)
 end
 
 function get_dof_map(
   ::Type{T},
   model::CartesianDiscreteModel{D},
-  trian::Triangulation,
   cache,
   cell_dof_ids::AbstractVector{<:AbstractVector{Ti}},
+  tface_to_mface::AbstractVector{<:Integer},
   order::Integer,
   comp_to_dofs::AbstractVector
   ) where {T<:MultiValue,Ti,D}
@@ -122,7 +124,7 @@ function get_dof_map(
   dof_maps = Array{Ti,D}[]
   for dofs in comp_to_dofs
     cell_dof_comp_ids = _get_cell_dof_comp_ids(cell_dof_ids,dofs)
-    dof_map_comp = get_dof_map(model,trian,cache,cell_dof_comp_ids,order)
+    dof_map_comp = get_dof_map(model,cache,cell_dof_comp_ids,tface_to_mface,order)
     push!(dof_maps,dof_map_comp)
   end
   dof_map = stack(dof_maps;dims=D+1)
@@ -131,9 +133,9 @@ end
 
 function get_dof_map(
   model::CartesianDiscreteModel{Dc},
-  trian::Triangulation,
   cache_cell_dof_ids,
   cell_dof_ids::AbstractVector{<:AbstractVector{Ti}},
+  tface_to_mface::AbstractVector{<:Integer},
   order::Integer) where {Dc,Ti}
 
   desc = get_cartesian_descriptor(model)
@@ -149,7 +151,6 @@ function get_dof_map(
   touched_dof = zeros(Bool,ndofs)
 
   cells = CartesianIndices(ncells)
-  tface_to_mface = get_tface_to_mface(trian)
 
   for (icell,icell′) in enumerate(tface_to_mface)
     cell = cells[icell′]
@@ -375,16 +376,36 @@ function get_dirichlet_entities(f::FESpace)
   @abstractmethod
 end
 
-function get_cell_to_mask(t::Triangulation)
-  tface_to_mface = get_tface_to_mface(t)
-  model = get_background_model(t)
-  ncells = num_cells(model)
-  isa(tface_to_mface,IdentityVector) && return Fill(false,ncells)
-  cell_to_mask = fill(true,ncells)
-  for cell in tface_to_mface
-    cell_to_mask[cell] = false
+function get_tface_to_mask(t::Triangulation...)
+  get_tface_to_mask(map(get_tface_to_mface,t)...)
+end
+
+function get_tface_to_mask(tface_to_mface::AbstractVector{<:Integer})
+  ncells = length(tface_to_mface)
+  fill(false,ncells)
+end
+
+function get_tface_to_mask(
+  ttface_to_mface::AbstractVector{<:Integer},
+  stface_to_mface::AbstractVector{<:Integer}
+  )
+
+  msg = "There must be a triangulation inclusion in one direction!"
+  s2t = indexin(stface_to_mface,ttface_to_mface)
+  @check all((!isnothing(i) for i in s2t)) msg
+  if ttface_to_mface == stface_to_mface
+    tface_to_mask = get_tface_to_mask(s)
+  else
+    t2s = indexin(ttface_to_mface,stface_to_mface)
+    ncells = length(ttface_to_mface)
+    tface_to_mask = fill(false,ncells)
+    for i in eachindex(tface_to_mask)
+      if isnothing(t2s[i])
+        tface_to_mask[i] = true
+      end
+    end
   end
-  return cell_to_mask
+  return tface_to_mask
 end
 
 function get_dof_to_constraints(constrained_dofs::AbstractVector,ndofs::Int)
@@ -395,15 +416,6 @@ function get_dof_to_constraints(constrained_dofs::AbstractVector,ndofs::Int)
     end
   end
   return dof_to_constraint
-end
-
-get_tface_to_mface(t::Geometry.BodyFittedTriangulation) = t.tface_to_mface
-get_tface_to_mface(t::Geometry.BoundaryTriangulation) = t.glue.face_to_cell
-get_tface_to_mface(t::Geometry.TriangulationView) = get_tface_to_mface(t.parent)
-get_tface_to_mface(t::Interfaces.SubFacetTriangulation) = t.subfacets.facet_to_bgcell
-get_tface_to_mface(t::Interfaces.SubCellTriangulation) = unique(t.subcells.cell_to_bgcell)
-function get_tface_to_mface(t::Geometry.AppendedTriangulation)
-  lazy_append(get_tface_to_mface(t.a),get_tface_to_mface(t.b))
 end
 
 """

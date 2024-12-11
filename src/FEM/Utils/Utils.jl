@@ -38,7 +38,7 @@ include("PartialFunctions.jl")
 export get_values
 export get_parent
 export order_domains
-export find_closest_view
+export get_tface_to_mface
 include("Triangulations.jl")
 
 export Contribution

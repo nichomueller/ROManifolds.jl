@@ -115,7 +115,7 @@ function DofMaps.get_dirichlet_entities(models::Vector{<:CartesianDiscreteModel}
   for (d,model) in enumerate(models)
     labels = get_face_labeling(model)
     tag = findfirst(labels.tag_to_name.=="dirichlet")
-    isempty(tag) && continue
+    isnothing(tag) && continue
     entities = labels.tag_to_entities[tag]
     isempty(entities) && continue
     for entity in entities

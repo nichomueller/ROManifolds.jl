@@ -18,7 +18,6 @@ export ∂₁, ∂₂, ∂₃
 export get_values
 export get_parent
 export order_domains
-export find_closest_view
 
 export Contribution
 export ArrayContribution

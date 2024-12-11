@@ -276,13 +276,13 @@ function CellData.change_domain(
 end
 
 function _cell_intersection(row::AbstractDofMap,col::AbstractDofMap,cells_row,cells_col)
-  cell_to_mask_row = get_cell_to_mask(row)
-  cell_to_mask_col = get_cell_to_mask(col)
+  tface_to_mask_row = get_tface_to_mask(row)
+  tface_to_mask_col = get_tface_to_mask(col)
   check = false
   for cell_row in cells_row
-    if !cell_to_mask_row[cell_row]
+    if !tface_to_mask_row[cell_row]
       for cell_col in cells_col
-        if !cell_to_mask_col[cell_col]
+        if !tface_to_mask_col[cell_col]
           if cell_row == cell_col
             check = true
             break

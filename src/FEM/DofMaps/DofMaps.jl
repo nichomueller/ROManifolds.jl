@@ -66,6 +66,7 @@ export get_sparse_dof_map
 export get_univariate_dof_map
 export get_dirichlet_entities
 export get_polynomial_order
+export get_tface_to_mask
 include("DofMapsBuilders.jl")
 
 export FEDofMap

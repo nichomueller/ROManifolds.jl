@@ -65,19 +65,20 @@ function invert(i::AbstractDofMap,::Constrained)
 end
 
 get_dof_to_cell(i::AbstractDofMap) = @abstractmethod
-get_cell_to_mask(i::AbstractDofMap) = @abstractmethod
+get_tface_to_mask(i::AbstractDofMap) = @abstractmethod
+Utils.get_tface_to_mface(i::AbstractDofMap) = @abstractmethod
 
 @inline function show_dof(i::AbstractDofMap,idof::Integer)
   iszero(idof) && return true
   dof_to_cell = get_dof_to_cell(i)
-  cell_to_mask = get_cell_to_mask(i)
+  tface_to_mask = get_tface_to_mask(i)
 
   pini = dof_to_cell.ptrs[idof]
   pend = dof_to_cell.ptrs[idof+1]-1
 
   show = false
   for j in pini:pend
-    if !cell_to_mask[dof_to_cell.data[j]]
+    if !tface_to_mask[dof_to_cell.data[j]]
       show = true
       break
     end
@@ -94,13 +95,14 @@ Base.setindex!(i::AbstractTrivialDofMap,v,j::Integer) = v
 Base.copy(i::AbstractTrivialDofMap) = i
 Base.similar(i::AbstractTrivialDofMap) = i
 
-struct TrivialDofMap{Ti,A<:AbstractArray{Bool}} <: AbstractTrivialDofMap{Ti}
+struct TrivialDofMap{Ti,A<:AbstractVector{Bool}} <: AbstractTrivialDofMap{Ti}
   dof_to_cell::Table{Ti,Vector{Ti},Vector{Ti}}
-  cell_to_mask::A
+  tface_to_mask::Vector{Bool}
+  tface_to_mface::A
 end
 
 function TrivialDofMap(i::AbstractDofMap)
-  TrivialDofMap(get_dof_to_cell(i),get_cell_to_mask(i))
+  TrivialDofMap(get_dof_to_cell(i),get_tface_to_mask(i),get_tface_to_mface(i))
 end
 
 Base.size(i::TrivialDofMap) = (length(i.dof_to_cell),)
@@ -110,28 +112,32 @@ Base.@propagate_inbounds function Base.getindex(i::TrivialDofMap{Ti},j::Integer)
 end
 
 get_dof_to_cell(i::TrivialDofMap) = i.dof_to_cell
-get_cell_to_mask(i::TrivialDofMap) = i.cell_to_mask
+get_tface_to_mask(i::TrivialDofMap) = i.tface_to_mask
+Utils.get_tface_to_mface(i::TrivialDofMap) = i.tface_to_mface
 
 function CellData.change_domain(i::TrivialDofMap,t::Triangulation)
-  cell_to_mask = get_cell_to_mask(t)
-  TrivialDofMap(i.dof_to_cell,cell_to_mask)
+  tface_to_mface = get_tface_to_mface(t)
+  tface_to_mask = get_tface_to_mask(tface_to_mface,i.tface_to_mface)
+  TrivialDofMap(i.dof_to_cell,tface_to_mask,i.tface_to_mface)
 end
 
-struct DofMap{D,Ti,A<:AbstractArray{Bool}} <: AbstractDofMap{D,Ti}
+struct DofMap{D,Ti,A<:AbstractVector} <: AbstractDofMap{D,Ti}
   indices::Array{Ti,D}
   dof_to_cell::Table{Ti,Vector{Ti},Vector{Ti}}
   free_vals_box::Array{Int,D}
-  cell_to_mask::A
+  tface_to_mask::Vector{Bool}
+  tface_to_mface::A
 end
 
 function DofMap(
   indices::AbstractArray,
   dof_to_cell::Table,
-  cell_to_mask::AbstractArray,
+  tface_to_mask::AbstractVector,
+  tface_to_mface::AbstractVector,
   diri_entities::AbstractMatrix)
 
   free_vals_box = find_free_values_box(indices,diri_entities)
-  DofMap(indices,dof_to_cell,free_vals_box,cell_to_mask)
+  DofMap(indices,dof_to_cell,free_vals_box,tface_to_mask,tface_to_mface)
 end
 
 Base.size(i::DofMap) = size(i.free_vals_box)
@@ -160,24 +166,26 @@ Base.@propagate_inbounds function Base.setindex!(
 end
 
 function Base.copy(i::DofMap)
-  DofMap(copy(i.indices),i.dof_to_cell,i.free_vals_box,i.cell_to_mask)
+  DofMap(copy(i.indices),i.dof_to_cell,i.free_vals_box,i.tface_to_mask,i.tface_to_mface)
 end
 
 function Base.similar(i::DofMap)
-  DofMap(similar(i.indices),i.dof_to_cell,i.free_vals_box,i.cell_to_mask)
+  DofMap(similar(i.indices),i.dof_to_cell,i.free_vals_box,i.tface_to_mask,i.tface_to_mface)
 end
 
 function CellData.change_domain(i::DofMap,t::Triangulation)
-  cell_to_mask = get_cell_to_mask(t)
-  DofMap(i.indices,i.dof_to_cell,i.free_vals_box,cell_to_mask)
+  tface_to_mface = get_tface_to_mface(t)
+  tface_to_mask = get_tface_to_mask(tface_to_mface,i.tface_to_mface)
+  DofMap(i.indices,i.dof_to_cell,i.free_vals_box,tface_to_mask,i.tface_to_mface)
 end
 
 get_dof_to_cell(i::DofMap) = i.dof_to_cell
-get_cell_to_mask(i::DofMap) = i.cell_to_mask
+get_tface_to_mask(i::DofMap) = i.tface_to_mask
+Utils.get_tface_to_mface(i::DofMap) = i.tface_to_mface
 
 # optimization
 
-const EntireDofMap{D,Ti,A<:Fill{Bool}} = DofMap{D,Ti,A}
+const EntireDofMap{D,Ti,A<:IdentityVector} = DofMap{D,Ti,A}
 
 Base.@propagate_inbounds function Base.getindex(
   i::EntireDofMap{D,Ti},
@@ -219,7 +227,7 @@ function get_component(i::DofMap{D},d::Integer=1;to_scalar=false) where D
     dof_to_cell = dof_to_cell[d:ncomps:length(dof_to_cell)]
   end
 
-  DofMap(indices,dof_to_cell,free_vals_box,i.cell_to_mask)
+  DofMap(indices,dof_to_cell,free_vals_box,i.tface_to_mask,i.tface_to_mface)
 end
 
 function get_component(
@@ -335,8 +343,13 @@ function find_free_values_box(
   diri_entities::AbstractMatrix{Bool}
   ) where {Ti,D}
 
-  @check size(diri_entities,2) == D
-  ranges = ntuple(d -> find_free_values_range(inds,diri_entities,d),D)
-  box = LinearIndices(inds)[ranges...]
+  D′ = size(diri_entities,2)
+  ranges = ntuple(d -> find_free_values_range(inds,diri_entities,d),D′)
+  if D != D′
+    @assert D == D′+1
+    box = LinearIndices(inds)[ranges...,:]
+  else
+    box = LinearIndices(inds)[ranges...]
+  end
   return box
 end

@@ -84,14 +84,13 @@ function Base.isapprox(t::T,s::T) where {T<:Geometry.GridView}
   t.parent ≈ s.parent
 end
 
-get_parent_ids(t::Triangulation) = @abstractmethod
-get_parent_ids(t::BodyFittedTriangulation) = t.tface_to_mface
-get_parent_ids(t::BoundaryTriangulation) = get_parent_ids(t.trian)
-
-function get_parent_ids(t::Geometry.AppendedTriangulation)
-  a = get_parent_ids(t.a)
-  b = get_parent_ids(t.b)
-  lazy_append(a,b)
+get_tface_to_mface(t::Geometry.BodyFittedTriangulation) = t.tface_to_mface
+get_tface_to_mface(t::Geometry.BoundaryTriangulation) = t.glue.face_to_cell
+get_tface_to_mface(t::Geometry.TriangulationView) = get_tface_to_mface(t.parent)
+get_tface_to_mface(t::Interfaces.SubFacetTriangulation) = t.subfacets.facet_to_bgcell
+get_tface_to_mface(t::Interfaces.SubCellTriangulation) = unique(t.subcells.cell_to_bgcell)
+function get_tface_to_mface(t::Geometry.AppendedTriangulation)
+  lazy_append(get_tface_to_mface(t.a),get_tface_to_mface(t.b))
 end
 
 function Base.isapprox(t::T,s::S) where {T<:Triangulation,S<:Triangulation}
@@ -99,7 +98,7 @@ function Base.isapprox(t::T,s::S) where {T<:Triangulation,S<:Triangulation}
 end
 
 function Base.isapprox(t::T,s::T) where {T<:Triangulation}
-  get_parent_ids(t) == get_parent_ids(s) && get_grid(t) ≈ get_grid(s)
+  get_tface_to_mface(t) == get_tface_to_mface(s) && get_grid(t) ≈ get_grid(s)
 end
 
 function Base.isapprox(t::T,s::T) where {T<:Geometry.TriangulationView}
@@ -117,6 +116,14 @@ end
 
 function isapprox_parent(tparent::Triangulation,tchild::Triangulation)
   tparent ≈ get_parent(tchild)
+end
+
+function isincluded(tchild::Triangulation,tparent::Triangulation)
+  isparent(tparent,tchild) && return true
+  tface_to_mface_child = get_tface_to_mface(tchild)
+  tface_to_mface_parent = get_tface_to_mface(tparent)
+  child_to_parent = indexin(tface_to_mface_child,tface_to_mface_parent)
+  all((!isnothing(c2p) for c2p in child_to_parent))
 end
 
 function get_view_indices(t::BodyFittedTriangulation)
