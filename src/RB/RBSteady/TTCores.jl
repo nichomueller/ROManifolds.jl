@@ -31,8 +31,8 @@ Subtypes:
 """
 abstract type SparseCore{T,N} <: AbstractTTCore{T,N} end
 
-function SparseCore(array::Array{T,3},sparsity::OrderedSparsityPattern) where T
-  sparsity′ = SparsityPattern(get_background_matrix(sparsity))
+function SparseCore(array::Array{T,3},sparsity::SparsityPattern) where T
+  sparsity′ = get_background_sparsity(sparsity)
   SparseCore(array,sparsity′)
 end
 
@@ -44,10 +44,10 @@ Tensor train cores for sparse matrices in CSC format
 """
 struct SparseCoreCSC{T,Ti} <: SparseCore{T,3}
   array::Array{T,3}
-  sparsity::SparsityPatternCSC{T,Ti}
+  sparsity::SparsityCSC{T,Ti}
 end
 
-function SparseCore(array::Array{T,3},sparsity::SparsityPatternCSC{T}) where T
+function SparseCore(array::Array{T,3},sparsity::SparsityCSC{T}) where T
   SparseCoreCSC(array,sparsity)
 end
 

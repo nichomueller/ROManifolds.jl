@@ -382,7 +382,7 @@ end
 
 function get_tface_to_mask(tface_to_mface::AbstractVector{<:Integer})
   ncells = length(tface_to_mface)
-  fill(false,ncells)
+  Fill(false,ncells)
 end
 
 function get_tface_to_mask(
@@ -390,17 +390,15 @@ function get_tface_to_mask(
   stface_to_mface::AbstractVector{<:Integer}
   )
 
-  msg = "There must be a triangulation inclusion in one direction!"
-  s2t = indexin(stface_to_mface,ttface_to_mface)
-  @check all((!isnothing(i) for i in s2t)) msg
+  t2s::Vector{Int} = indexin(ttface_to_mface,stface_to_mface)
   if ttface_to_mface == stface_to_mface
     tface_to_mask = get_tface_to_mask(s)
   else
-    t2s = indexin(ttface_to_mface,stface_to_mface)
-    ncells = length(ttface_to_mface)
+    s2t = indexin(stface_to_mface,ttface_to_mface)
+    ncells = length(stface_to_mface)
     tface_to_mask = fill(false,ncells)
     for i in eachindex(tface_to_mask)
-      if isnothing(t2s[i])
+      if isnothing(s2t[i])
         tface_to_mask[i] = true
       end
     end

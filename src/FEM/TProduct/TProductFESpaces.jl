@@ -130,7 +130,7 @@ get_tp_trial_fe_basis(f::TrialFESpace{<:TProductFESpace}) = get_tp_trial_fe_basi
 function DofMaps.SparsityPattern(U::TProductFESpace,V::TProductFESpace)
   sparsity = SparsityPattern(U.space,V.space)
   sparsities_1d = map(SparsityPattern,U.spaces_1d,V.spaces_1d)
-  return TProductSparsityPattern(sparsity,sparsities_1d)
+  return TProductSparsity(sparsity,sparsities_1d)
 end
 
 function DofMaps.order_sparsity(s::TProductSparsityPattern,U::TProductFESpace,V::TProductFESpace)

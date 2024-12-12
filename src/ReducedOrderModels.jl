@@ -37,9 +37,9 @@ export slow_index
 export fast_index
 
 export SparsityPattern
-export SparsityPatternCSC
+export SparsityCSC
 export MultiValueSparsityPatternCSC
-export TProductSparsityPattern
+export TProductSparsity
 export order_sparsity
 
 export AbstractDofMap

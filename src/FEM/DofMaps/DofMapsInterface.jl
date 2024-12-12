@@ -5,6 +5,10 @@ Base.IndexStyle(i::AbstractDofMap) = IndexLinear()
 FESpaces.ConstraintStyle(i::I) where I<:AbstractDofMap = ConstraintStyle(I)
 FESpaces.ConstraintStyle(::Type{<:AbstractDofMap}) = UnConstrained()
 
+get_dof_to_cell(i::AbstractDofMap) = @abstractmethod
+get_tface_to_mask(i::AbstractDofMap) = @abstractmethod
+Utils.get_tface_to_mface(i::AbstractDofMap) = @abstractmethod
+
 function remove_constrained_dofs(i::AbstractDofMap)
   remove_constrained_dofs(i,ConstraintStyle(i))
 end
@@ -40,33 +44,49 @@ function invert(i::AbstractDofMap)
 end
 
 function invert(i::AbstractDofMap,::UnConstrained)
-  s = size(i)
-  i′ = zeros(eltype(i),s)
-  invi = invperm(vectorize(i))
-  copyto!(i′,reshape(invi,s))
+  i′ = similar(i)
+  invert!(i′,i)
   i′
+end
+
+function invert!(i′::AbstractDofMap,i::AbstractDofMap)
+  fill!(i′,zero(eltype(i′)))
+  inz = findall(!iszero,i)
+  i′[inz] = invperm(i[inz])
 end
 
 function invert(i::AbstractDofMap,::Constrained)
-  i′ = similar(i)
-  s′ = size(i)
-  dof_to_mask = dof_to_constraint_mask(i)
-  invi = invperm(vectorize(i))
-  nconstrained = 0
-  for k in eachindex(i)
-    if dof_to_mask[k]
-      i′[k] = i[k]
-      nconstrained += 1
-    else
-      i′[k] = invi[k-nconstrained]
-    end
-  end
-  i′
+  @notimplemented
+  # i′ = similar(i)
+  # s′ = size(i)
+  # dof_to_mask = dof_to_constraint_mask(i)
+  # invi = invperm(vectorize(i))
+  # nconstrained = 0
+  # for k in eachindex(i)
+  #   if dof_to_mask[k]
+  #     i′[k] = i[k]
+  #     nconstrained += 1
+  #   else
+  #     i′[k] = invi[k-nconstrained]
+  #   end
+  # end
+  # i′
 end
 
-get_dof_to_cell(i::AbstractDofMap) = @abstractmethod
-get_tface_to_mask(i::AbstractDofMap) = @abstractmethod
-Utils.get_tface_to_mface(i::AbstractDofMap) = @abstractmethod
+# i1 ∘ i2
+function compose_maps(i1::AbstractArray{Ti,D},i2::AbstractArray{Ti,D}) where {Ti,D}
+  @assert size(i1) == size(i2)
+  i12 = zeros(Ti,size(i1))
+  for (i,m2i) in enumerate(i2)
+    iszero(m2i) && continue
+    i12[i] = i1[m2i]
+  end
+  return i12
+end
+
+function get_dof_to_parent_dof_map(i::AbstractDofMap,parent::AbstractDofMap)
+  @abstractmethod
+end
 
 @inline function show_dof(i::AbstractDofMap,idof::Integer)
   iszero(idof) && return true
@@ -95,10 +115,10 @@ Base.setindex!(i::AbstractTrivialDofMap,v,j::Integer) = v
 Base.copy(i::AbstractTrivialDofMap) = i
 Base.similar(i::AbstractTrivialDofMap) = i
 
-struct TrivialDofMap{Ti,A<:AbstractVector{Bool}} <: AbstractTrivialDofMap{Ti}
+struct TrivialDofMap{Ti,A<:AbstractVector,B<:AbstractVector} <: AbstractTrivialDofMap{Ti}
   dof_to_cell::Table{Ti,Vector{Ti},Vector{Ti}}
-  tface_to_mask::Vector{Bool}
-  tface_to_mface::A
+  tface_to_mask::A
+  tface_to_mface::B
 end
 
 function TrivialDofMap(i::AbstractDofMap)
@@ -121,12 +141,12 @@ function CellData.change_domain(i::TrivialDofMap,t::Triangulation)
   TrivialDofMap(i.dof_to_cell,tface_to_mask,i.tface_to_mface)
 end
 
-struct DofMap{D,Ti,A<:AbstractVector} <: AbstractDofMap{D,Ti}
+struct DofMap{D,Ti,A<:AbstractVector,B<:AbstractVector} <: AbstractDofMap{D,Ti}
   indices::Array{Ti,D}
   dof_to_cell::Table{Ti,Vector{Ti},Vector{Ti}}
   free_vals_box::Array{Int,D}
-  tface_to_mask::Vector{Bool}
-  tface_to_mface::A
+  tface_to_mask::A
+  tface_to_mface::B
 end
 
 function DofMap(
@@ -183,25 +203,24 @@ get_dof_to_cell(i::DofMap) = i.dof_to_cell
 get_tface_to_mask(i::DofMap) = i.tface_to_mask
 Utils.get_tface_to_mface(i::DofMap) = i.tface_to_mface
 
+function get_dof_to_parent_dof_map(i::DofMap{D,Ti},parent::DofMap{D,Ti}) where {D,Ti}
+  face_to_face_parent::Vector{Int} = indexin(i.tface_to_mface,parent.tface_to_mface)
+  inv_parent = invert(parent)
+  i2parent = compose_maps(i,inv_parent)
+  return i2parent
+end
+
 # optimization
 
-const EntireDofMap{D,Ti,A<:IdentityVector} = DofMap{D,Ti,A}
+const EntireDofMap{D,Ti,A<:Fill{Bool},B<:AbstractVector} = DofMap{D,Ti,A,B}
 
-Base.@propagate_inbounds function Base.getindex(
-  i::EntireDofMap{D,Ti},
-  j::Vararg{Integer,D}
-  ) where {D,Ti}
-
-  free_j = i.free_vals_box[j...]
+Base.@propagate_inbounds function Base.getindex(i::EntireDofMap,j::Integer)
+  free_j = i.free_vals_box[j]
   i.indices[free_j]
 end
 
-Base.@propagate_inbounds function Base.setindex!(
-  i::EntireDofMap{D,Ti},
-  v,j::Vararg{Integer,D}
-  ) where {D,Ti}
-
-  free_j = i.free_vals_box[j...]
+Base.@propagate_inbounds function Base.setindex!(i::EntireDofMap,v,j::Integer)
+  free_j = i.free_vals_box[j]
   i.indices[free_j] = v
   v
 end
@@ -270,8 +289,8 @@ function get_component(
   map(i->get_component(trian,i,args...;kwargs...),i)
 end
 
-struct ConstrainedDofMap{D,Ti,A} <: AbstractDofMap{D,Ti}
-  map::DofMap{D,Ti,A}
+struct ConstrainedDofMap{D,Ti,A,B} <: AbstractDofMap{D,Ti}
+  map::DofMap{D,Ti,A,B}
   dof_to_constraint_mask::Vector{Bool}
 end
 
@@ -282,7 +301,7 @@ get_dof_to_constraints(i::ConstrainedDofMap) = i.dof_to_constraint_mask
 Base.size(i::ConstrainedDofMap) = size(i.map)
 
 function Base.getindex(i::ConstrainedDofMap,j::Integer)
-  getindex(i.map,j...)
+  getindex(i.map,j)
 end
 
 function Base.setindex!(i::ConstrainedDofMap,v,j::Integer)

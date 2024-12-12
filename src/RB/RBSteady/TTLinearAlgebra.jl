@@ -296,7 +296,7 @@ end
 
 # utils
 
-Base.@propagate_inbounds function _sparsemul(B,C,sparsity::SparsityPatternCSC)
+Base.@propagate_inbounds function _sparsemul(B,C,sparsity::SparsityCSC)
   BC = zeros(size(B,1),DofMaps.num_rows(sparsity),size(C,2))
   rv = rowvals(sparsity)
   for (iB,b) in enumerate(eachrow(B))

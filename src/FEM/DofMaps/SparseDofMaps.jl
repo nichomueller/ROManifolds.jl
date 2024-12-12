@@ -38,7 +38,7 @@ end
 # non trivial case
 
 """
-    SparseDofMap{D,Ti,A<:AbstractDofMap{D,Ti},B<:TProductSparsityPattern} <: AbstractDofMap{D,Ti}
+    SparseDofMap{D,Ti,A<:AbstractDofMap{D,Ti},B<:TProductSparsity} <: AbstractDofMap{D,Ti}
 
 Index map used to select the nonzero entries of a sparse matrix. The field `sparsity`
 contains the tensor product sparsity of the matrix to be indexed. The field `indices`

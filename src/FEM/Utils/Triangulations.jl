@@ -123,7 +123,7 @@ function isincluded(tchild::Triangulation,tparent::Triangulation)
   tface_to_mface_child = get_tface_to_mface(tchild)
   tface_to_mface_parent = get_tface_to_mface(tparent)
   child_to_parent = indexin(tface_to_mface_child,tface_to_mface_parent)
-  all((!isnothing(c2p) for c2p in child_to_parent))
+  isa(child_to_parent,Vector{Int})
 end
 
 function get_view_indices(t::BodyFittedTriangulation)

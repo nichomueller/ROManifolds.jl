@@ -42,14 +42,15 @@ export vectorize
 include("DofMapsInterface.jl")
 
 export SparsityPattern
-export SparsityPatternCSC
-export OrderedSparsityPattern
+export SparsityCSC
+export OrderedSparsity
 export TProductSparsityPattern
-export get_background_matrix
+export TProductSparsity
+export SparsityToTProductSparsity
+export get_background_sparsity
 export order_sparsity
 export recast
-export to_nz_index
-export to_nz_index!
+export get_matrix_to_parent_matrix
 include("SparsityPatterns.jl")
 
 export SparseDofMapStyle
