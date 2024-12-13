@@ -63,6 +63,10 @@ SparseArrays.nzrange(a::SparsityPattern,row::Integer) = nzrange(get_background_m
 Algebra.nz_index(a::SparsityPattern,row::Integer,col::Integer) = nz_index(get_background_matrix(a),row,col)
 get_nonzero_indices(a::SparsityPattern) = get_nonzero_indices(get_background_matrix(a))
 
+# if CSC trait
+SparseArrays.rowvals(a::SparsityPattern) = rowvals(get_background_matrix(a))
+SparseArrays.getcolptr(a::SparsityPattern) = SparseArrays.getcolptr(get_background_matrix(a))
+
 recast(v::AbstractVector,A::AbstractSparseMatrix) = @abstractmethod
 recast(v::AbstractVector,A::SparseMatrixCSC) = SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,v)
 recast(v::AbstractVector,A::SparseMatrixCSR{Bi}) where Bi = SparseMatrixCSR{Bi}(A.m,A.n,A.rowptr,A.colval,v)
@@ -147,8 +151,6 @@ function SparsityPattern(a::SparseMatrixCSC)
 end
 
 get_background_matrix(a::SparsityCSC) = a.matrix
-SparseArrays.rowvals(a::SparsityPattern) = rowvals(get_background_matrix(a))
-SparseArrays.getcolptr(a::SparsityCSC) = SparseArrays.getcolptr(get_background_matrix(a))
 
 """
     order_sparsity(a::SparsityPattern,i,j) -> SparsityPattern
@@ -158,27 +160,30 @@ representing the rows and columns respectively
 
 """
 function order_sparsity(a::SparsityCSC,i::AbstractArray,j::AbstractArray)
-  old_matrix = a.matrix
-  matrix = old_matrix[i,j]
-  OrderedSparsity(matrix,old_matrix)
+  unsorted_matrix = a.matrix
+  matrix = unsorted_matrix[i,j]
+  OrderedSparsity(matrix,unsorted_matrix)
 end
 
-struct OrderedSparsity{A} <: SparsityPattern
+abstract type OrderedSparsityPattern <: SparsityPattern end
+
+get_unsorted_matrix(a::OrderedSparsityPattern) = @abstractmethod
+
+#TODO because of code shortcomings, this sparsity pattern should already be ordered;
+# to be changed in future versions
+function order_sparsity(a::OrderedSparsityPattern,i::AbstractArray,j::AbstractArray)
+  a
+end
+
+struct OrderedSparsity{A} <: OrderedSparsityPattern
   matrix::A
-  old_matrix::A
+  unsorted_matrix::A
 end
 
 SparsityOrderStyle(a::OrderedSparsity) = OrderedSparsityStyle()
 
 get_background_matrix(a::OrderedSparsity) = a.matrix
-SparseArrays.rowvals(a::OrderedSparsity) = rowvals(get_background_matrix(a))
-SparseArrays.getcolptr(a::OrderedSparsity) = SparseArrays.getcolptr(get_background_matrix(a))
-
-#TODO because of code shortcomings, this sparsity pattern should already be ordered;
-# to be changed in future versions
-function order_sparsity(a::OrderedSparsity,i::AbstractArray,j::AbstractArray)
-  a
-end
+get_unsorted_matrix(a::OrderedSparsity) = a.unsorted_matrix
 
 function CellData.change_domain(
   a::SparsityCSC{Tv,Ti},
@@ -271,7 +276,7 @@ function CellData.change_domain(
   deleteat!(nzval,entries_to_delete)
   matrix = SparseMatrixCSC(m,n,colptr,rowval,nzval)
 
-  return OrderedSparsity(matrix,a.old_matrix)
+  return OrderedSparsity(matrix,get_unsorted_matrix(a))
 end
 
 function _cell_intersection(row::AbstractDofMap,col::AbstractDofMap,cells_row,cells_col)
@@ -321,13 +326,13 @@ function order_sparsity(a::TProductSparsity,i::Tuple,j::Tuple)
 end
 
 # univariate (tensor product factors) sparse dofs to sparse dofs
-function get_sparse_dof_map(sparsity::TProductSparsity,I,J,i,j)
-  nrows = num_rows(sparsity)
+function get_sparse_dof_map(a::TProductSparsity,I,J,i,j)
+  nrows = num_rows(a)
 
   uids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
-  unrows = univariate_num_rows(sparsity)
-  uncols = univariate_num_cols(sparsity)
-  unnz = univariate_nnz(sparsity)
+  unrows = univariate_num_rows(a)
+  uncols = univariate_num_cols(a)
+  unnz = univariate_nnz(a)
 
   tprows = CartesianIndices(unrows)
   tpcols = CartesianIndices(uncols)
@@ -368,102 +373,136 @@ function CellData.change_domain(
   TProductSparsity(sparsity′,a.sparsities_1d)
 end
 
-struct SparsityToTProductSparsity{A<:SparsityPattern,B<:TProductSparsity,C,D} <: TProductSparsityPattern
+struct SparsityToTProductSparsity{A,B,C,D} <: TProductSparsityPattern
   sparsity::A
-  parent_sparsity::B
+  sparsities_1d::B
   dof_to_parent_dof_row::C
   dof_to_parent_dof_col::D
 end
 
-function SparsityOrderStyle(a::SparsityToTProductSparsity)
-  @check SparsityOrderStyle(sparsity) == SparsityOrderStyle(parent_sparsity)
-  SparsityOrderStyle(sparsity)
+SparsityOrderStyle(a::SparsityToTProductSparsity) = SparsityOrderStyle(a.sparsity)
+
+get_background_matrix(a::SparsityToTProductSparsity) = get_background_matrix(a.sparsity)
+
+get_univariate_sparsities(a::SparsityToTProductSparsity) = a.sparsities_1d
+
+struct SparsityToOrderedSparsity{A<:OrderedSparsityPattern,B} <: OrderedSparsityPattern
+  sparsity::A
+  unsorted_matrix::B
 end
 
-get_background_matrix(a::SparsityToTProductSparsity) = get_background_matrix(a.parent_sparsity)
+SparsityOrderStyle(a::SparsityToOrderedSparsity) = OrderedSparsityStyle()
 
-get_univariate_sparsities(a::SparsityToTProductSparsity) = get_univariate_sparsities(a.parent_sparsity)
+get_background_matrix(a::SparsityToOrderedSparsity) = get_background_matrix(a.sparsity)
+get_unsorted_matrix(a::SparsityToOrderedSparsity) = a.unsorted_matrix
 
 function order_sparsity(a::SparsityToTProductSparsity,i::Tuple,j::Tuple)
-  # parent_sparsity′ = order_sparsity(a.parent_sparsity,i,j)
-  # @warn "Must add a reordering function for a.sparsity when order > 1"
-  # SparsityToTProductSparsity(a.sparsity,parent_sparsity′,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
   is,is_1d = i
   js,js_1d = j
-  tp_matrix = get_matrix_to_parent_matrix(a)
+  matrix = get_background_matrix(a)
+  tp_matrix = get_parent_matrix(a)
   a′ = order_sparsity(SparsityPattern(tp_matrix),is,js)
+  a′′ = SparsityToOrderedSparsity(a′,matrix)
   a′_1d = map(order_sparsity,get_univariate_sparsities(a),is_1d,js_1d)
-  TProductSparsity(a′,a′_1d)
+  SparsityToTProductSparsity(a′′,a′_1d,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
 end
 
-# function get_sparse_dof_map(a::SparsityToTProductSparsity,Iparent,Jparent,i,j)
-#   style = RecastParentSparsity()
-#   Iparent′,Jparent′,Vparent′ = get_findnz_to_parent_findnz(style,a)
-#   get_sparse_dof_map(a.parent_sparsity,Iparent′,Jparent′,i,j)
-# end
+# univariate (tensor product factors) sparse dofs to sparse dofs
+function get_sparse_dof_map(a::SparsityToTProductSparsity{<:SparsityToOrderedSparsity},I,J,i,j)
+  nrows = num_rows(a)
+
+  uids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
+  unrows = univariate_num_rows(a)
+  uncols = univariate_num_cols(a)
+  unnz = univariate_nnz(a)
+
+  tprows = CartesianIndices(unrows)
+  tpcols = CartesianIndices(uncols)
+
+  sparse_dof_map = zeros(Int32,unnz...)
+  uid = zeros(Int32,length(uids))
+  @inbounds for k = eachindex(I)
+    fill!(uid,0)
+    Ik = I[k]
+    Jk = J[k]
+    (iszero(Ik) || iszero(Jk)) && continue
+    Iuk = Iu[k]
+    Juk = Ju[k]
+    IJk = Ik + (Jk - 1)*nrows
+    irows = tprows[Ik]
+    icols = tpcols[Jk]
+    @inbounds for d in eachindex(uids)
+      uidd = uids[d]
+      idd = CartesianIndex((irows.I[d],icols.I[d]))
+      @inbounds for (l,uiddl) in enumerate(uidd)
+        if uiddl == idd
+          uid[d] = l
+          break
+        end
+      end
+    end
+    sparse_dof_map[uid...] = IJk
+  end
+
+  return sparse_dof_map
+end
+
+function CellData.change_domain(
+  a::SparsityToOrderedSparsity,
+  row::AbstractDofMap{D},
+  col::AbstractDofMap{D}
+  ) where D
+
+  a′ = change_domain(a.sparsity,row,col)
+  SparsityToOrderedSparsity(a′,get_unsorted_matrix(a))
+end
 
 abstract type RecastStyle end
 struct RecastChildSparsity <: RecastStyle end
 struct RecastParentSparsity <: RecastStyle end
 
 function recast(A::AbstractArray,a::SparsityToTProductSparsity)
-  recast(A,get_matrix_to_parent_matrix(a))
+  recast(A,get_parent_matrix(a))
 end
 
-function get_matrix_to_parent_matrix(a::SparsityToTProductSparsity)
+function get_parent_matrix(a::SparsityToTProductSparsity)
   style = RecastChildSparsity()
-  I,J,V = get_findnz_to_parent_findnz(style,a)
-  m,n = size(get_background_matrix(a))
+  I,J,V = get_parent_findnz(style,a)
+  m = length(a.dof_to_parent_dof_row)
+  n = length(a.dof_to_parent_dof_col)
   sparse(I,J,V,m,n)
 end
 
-function get_findnz_to_parent_findnz(style::RecastStyle,a::SparsityToTProductSparsity)
-  A = get_background_matrix(a.sparsity)
-  Aparent = get_background_matrix(a.parent_sparsity)
-  get_findnz_to_parent_findnz(style,A,Aparent,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
+function get_parent_findnz(style::RecastStyle,a::SparsityToTProductSparsity)
+  A = get_background_matrix(a)
+  get_parent_findnz(style,A,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
 end
 
-function get_findnz_to_parent_findnz(
+function get_parent_findnz(
   ::RecastStyle,
   A::AbstractSparseMatrix,
-  Aparent::AbstractSparseMatrix,
   dof_to_parent_dof_row::AbstractArray,
   dof_to_parent_dof_col::AbstractArray)
 
   @abstractmethod
 end
 
-function get_findnz_to_parent_findnz(
+function get_parent_findnz(
   ::RecastChildSparsity,
   A::SparseMatrixCSC{Tv,Ti},
-  Aparent::SparseMatrixCSC{Tv,Ti},
   dof_to_parent_dof_row::AbstractArray,
   dof_to_parent_dof_col::AbstractArray
   ) where {Tv,Ti}
 
   I,J,V = findnz(A)
-  l2pl_row = get_locations_to_parent_locations(dof_to_parent_dof_row)
-  l2pl_col = get_locations_to_parent_locations(dof_to_parent_dof_col)
+  l2pl_row = get_parent_locations(dof_to_parent_dof_row)
+  l2pl_col = get_parent_locations(dof_to_parent_dof_col)
 
   for k in eachindex(I)
     I[k] = l2pl_row[I[k]]
     J[k] = l2pl_col[J[k]]
   end
 
-  return I,J,V
-end
-
-function get_findnz_to_parent_findnz(
-  ::RecastParentSparsity,
-  A::SparseMatrixCSC{Tv,Ti},
-  Aparent::SparseMatrixCSC{Tv,Ti},
-  dof_to_parent_dof_row::AbstractArray,
-  dof_to_parent_dof_col::AbstractArray
-  ) where {Tv,Ti}
-
-  _,_,V = findnz(Aparent)
-  I = vec(dof_to_parent_dof_row)
-  J = vec(dof_to_parent_dof_col)
   return I,J,V
 end
 
@@ -518,14 +557,12 @@ function nz_sortperm!(a′::AbstractArray,a::AbstractArray)
   a′[inz[anz]] = inds
 end
 
-function get_locations_to_parent_locations(a::AbstractArray{Ti}) where Ti
+function get_parent_locations(a::AbstractArray{Ti}) where Ti
   inds = LinearIndices(a)
   anz = inds[findall(!iszero,a)]
-  # a2pa = zeros(Ti,length(anz))
   l2pl = zeros(Ti,length(anz))
   for (inz,anzi) in enumerate(anz)
-    # a2pa[inz] = a[anzi]
     l2pl[inz] = anzi
   end
-  return l2pl # a2pa,l2pl
+  return l2pl
 end

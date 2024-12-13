@@ -504,12 +504,14 @@ end
 
 # sparse utilities
 
-function order_sparse_dof_map(dof_map,I,J,nrows=maximum(I))
-  IJ = vectorize(I) .+ nrows .* (vectorize(J)'.-1)
+function order_sparse_dof_map(dof_map,I,J,nrows=maximum(Int,I))
+  IJ = range_2d(vectorize(I),vectorize(J),nrows)
   odof_map = copy(dof_map)
   @inbounds for (k,dofk) in enumerate(dof_map)
     if dofk > 0
-      odof_map[k] = IJ[dofk]
+      IJk = IJ[dofk]
+      IJk > 0 && (odof_map[k] = IJk)
+      # odof_map[k] = IJ[dofk]
     end
   end
   return odof_map

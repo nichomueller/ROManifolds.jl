@@ -43,13 +43,13 @@ function invert(i::AbstractDofMap)
   invert(i,ConstraintStyle(i))
 end
 
-function invert(i::AbstractDofMap,::UnConstrained)
+function invert(i::AbstractArray,args...)
   i′ = similar(i)
   invert!(i′,i)
   i′
 end
 
-function invert!(i′::AbstractDofMap,i::AbstractDofMap)
+function invert!(i′::AbstractArray,i::AbstractArray)
   fill!(i′,zero(eltype(i′)))
   inz = findall(!iszero,i)
   i′[inz] = invperm(i[inz])

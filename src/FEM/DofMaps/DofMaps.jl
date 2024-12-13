@@ -30,6 +30,11 @@ export slow_index
 export fast_index
 include("IndexOperations.jl")
 
+export Range2D
+export range_1d
+export range_2d
+include("Ranges.jl")
+
 export AbstractDofMap
 export AbstractTrivialDofMap
 export TrivialDofMap
