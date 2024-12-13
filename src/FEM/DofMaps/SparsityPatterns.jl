@@ -368,10 +368,11 @@ function CellData.change_domain(
   TProductSparsity(sparsity′,a.sparsities_1d)
 end
 
-struct SparsityToTProductSparsity{A<:SparsityPattern,B<:TProductSparsity,C} <: TProductSparsityPattern
+struct SparsityToTProductSparsity{A<:SparsityPattern,B<:TProductSparsity,C,D} <: TProductSparsityPattern
   sparsity::A
   parent_sparsity::B
-  dof_to_parent_dof::C
+  dof_to_parent_dof_row::C
+  dof_to_parent_dof_col::D
 end
 
 function SparsityOrderStyle(a::SparsityToTProductSparsity)
@@ -384,16 +385,22 @@ get_background_matrix(a::SparsityToTProductSparsity) = get_background_matrix(a.p
 get_univariate_sparsities(a::SparsityToTProductSparsity) = get_univariate_sparsities(a.parent_sparsity)
 
 function order_sparsity(a::SparsityToTProductSparsity,i::Tuple,j::Tuple)
-  parent_sparsity′ = order_sparsity(a.parent_sparsity,i,j)
-  @warn "Must add a reordering function for a.sparsity when order > 1"
-  SparsityToTProductSparsity(a.sparsity,parent_sparsity′,a.dof_to_parent_dof)
+  # parent_sparsity′ = order_sparsity(a.parent_sparsity,i,j)
+  # @warn "Must add a reordering function for a.sparsity when order > 1"
+  # SparsityToTProductSparsity(a.sparsity,parent_sparsity′,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
+  is,is_1d = i
+  js,js_1d = j
+  tp_matrix = get_matrix_to_parent_matrix(a)
+  a′ = order_sparsity(SparsityPattern(tp_matrix),is,js)
+  a′_1d = map(order_sparsity,get_univariate_sparsities(a),is_1d,js_1d)
+  TProductSparsity(a′,a′_1d)
 end
 
-function get_sparse_dof_map(a::SparsityToTProductSparsity,Iparent,Jparent,i,j)
-  style = RecastParentSparsity()
-  Iparent′,Jparent′,Vparent′ = get_findnz_to_parent_findnz(style,a)
-  get_sparse_dof_map(a.parent_sparsity,Iparent′,Jparent′,i,j)
-end
+# function get_sparse_dof_map(a::SparsityToTProductSparsity,Iparent,Jparent,i,j)
+#   style = RecastParentSparsity()
+#   Iparent′,Jparent′,Vparent′ = get_findnz_to_parent_findnz(style,a)
+#   get_sparse_dof_map(a.parent_sparsity,Iparent′,Jparent′,i,j)
+# end
 
 abstract type RecastStyle end
 struct RecastChildSparsity <: RecastStyle end
@@ -413,14 +420,15 @@ end
 function get_findnz_to_parent_findnz(style::RecastStyle,a::SparsityToTProductSparsity)
   A = get_background_matrix(a.sparsity)
   Aparent = get_background_matrix(a.parent_sparsity)
-  get_findnz_to_parent_findnz(style,A,Aparent,a.dof_to_parent_dof)
+  get_findnz_to_parent_findnz(style,A,Aparent,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
 end
 
 function get_findnz_to_parent_findnz(
   ::RecastStyle,
   A::AbstractSparseMatrix,
   Aparent::AbstractSparseMatrix,
-  dof_to_parent_dof::AbstractArray)
+  dof_to_parent_dof_row::AbstractArray,
+  dof_to_parent_dof_col::AbstractArray)
 
   @abstractmethod
 end
@@ -429,14 +437,17 @@ function get_findnz_to_parent_findnz(
   ::RecastChildSparsity,
   A::SparseMatrixCSC{Tv,Ti},
   Aparent::SparseMatrixCSC{Tv,Ti},
-  dof_to_parent_dof::AbstractArray
+  dof_to_parent_dof_row::AbstractArray,
+  dof_to_parent_dof_col::AbstractArray
   ) where {Tv,Ti}
 
   I,J,V = findnz(A)
+  l2pl_row = get_locations_to_parent_locations(dof_to_parent_dof_row)
+  l2pl_col = get_locations_to_parent_locations(dof_to_parent_dof_col)
 
   for k in eachindex(I)
-    I[k] = dof_to_parent_dof[I[k]]
-    J[k] = dof_to_parent_dof[J[k]]
+    I[k] = l2pl_row[I[k]]
+    J[k] = l2pl_col[J[k]]
   end
 
   return I,J,V
@@ -446,31 +457,14 @@ function get_findnz_to_parent_findnz(
   ::RecastParentSparsity,
   A::SparseMatrixCSC{Tv,Ti},
   Aparent::SparseMatrixCSC{Tv,Ti},
-  dof_to_parent_dof::AbstractArray
+  dof_to_parent_dof_row::AbstractArray,
+  dof_to_parent_dof_col::AbstractArray
   ) where {Tv,Ti}
 
-  I,J,V = findnz(A)
-  Iparent,Jparent,Vparent = findnz(Aparent)
-  N = nnz(Aparent)
-
-  Iparent′ = zeros(Ti,N)
-  Jparent′ = zeros(Ti,N)
-  Vparent′ = zeros(Tv,N)
-
-  for col in axes(A,2)
-    parent_col = dof_to_parent_dof[col]
-    for k in SparseArrays.getcolptr(A)[col] : (SparseArrays.getcolptr(A)[col+1]-1)
-      row = rowvals(A)[k]
-      val = nonzeros(A)[k]
-      parent_row = dof_to_parent_dof[row]
-      nzi = nz_index(Aparent,parent_row,parent_col)
-      Iparent′[nzi] = parent_row
-      Jparent′[nzi] = parent_col
-      Vparent′[nzi] = val
-    end
-  end
-
-  return Iparent′,Jparent′,Vparent′
+  _,_,V = findnz(Aparent)
+  I = vec(dof_to_parent_dof_row)
+  J = vec(dof_to_parent_dof_col)
+  return I,J,V
 end
 
 # utils
@@ -522,4 +516,16 @@ function nz_sortperm!(a′::AbstractArray,a::AbstractArray)
   anz = sortperm(a[inz])
   inds = LinearIndices(size(anz))
   a′[inz[anz]] = inds
+end
+
+function get_locations_to_parent_locations(a::AbstractArray{Ti}) where Ti
+  inds = LinearIndices(a)
+  anz = inds[findall(!iszero,a)]
+  # a2pa = zeros(Ti,length(anz))
+  l2pl = zeros(Ti,length(anz))
+  for (inz,anzi) in enumerate(anz)
+    # a2pa[inz] = a[anzi]
+    l2pl[inz] = anzi
+  end
+  return l2pl # a2pa,l2pl
 end
