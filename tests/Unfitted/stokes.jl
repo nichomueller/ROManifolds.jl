@@ -90,10 +90,10 @@ coupling((du,dp),(v,q)) = ∫(dp*∂₁(v))dΩ + ∫(dp*∂₂(v))dΩ
 energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-test_u = TestFESpace(Ω,reffe_u;conformity=:H1,dirichlet_tags="wall")
+test_u = TProductFESpace(Ω,reffe_u;conformity=:H1,dirichlet_tags="wall")
 trial_u = ParamTrialFESpace(test_u,gμ_0)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(Ω,reffe_p;conformity=:H1)
+test_p = TProductFESpace(Ω,reffe_p;conformity=:H1)
 trial_p = TrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())

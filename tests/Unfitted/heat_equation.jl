@@ -95,7 +95,7 @@ domains = FEDomains(trians_res,(trians_stiffness,trians_mass))
 energy(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
-test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["boundary"])
+test = TProductFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["boundary"])
 trial = TransientTrialParamFESpace(test,g0μt)
 feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,trial,test,domains)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))

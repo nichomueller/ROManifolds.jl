@@ -296,6 +296,9 @@ end
 
 FESpaces.ConstraintStyle(::Type{<:ConstrainedDofMap}) = Constrained()
 
+get_dof_to_cell(i::ConstrainedDofMap) = get_dof_to_cell(i.map)
+get_tface_to_mask(i::ConstrainedDofMap) = get_tface_to_mask(i.map)
+Utils.get_tface_to_mface(i::ConstrainedDofMap) = get_tface_to_mface(i.map)
 get_dof_to_constraints(i::ConstrainedDofMap) = i.dof_to_constraint_mask
 
 Base.size(i::ConstrainedDofMap) = size(i.map)
@@ -317,7 +320,58 @@ function Base.similar(i::ConstrainedDofMap)
 end
 
 function CellData.change_domain(i::ConstrainedDofMap,t::Triangulation)
-  change_domain(i.map,t)
+  @notimplemented
+end
+
+struct DofMap2DofMap{D,Ti,I<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
+  map::I
+  background_map::I
+end
+
+FESpaces.ConstraintStyle(::Type{DofMap2DofMap{D,Ti,I}}) where {D,Ti,I} = ConstraintStyle(I)
+
+get_dof_to_cell(i::DofMap2DofMap) = get_dof_to_cell(i.map)
+get_tface_to_mask(i::DofMap2DofMap) = get_tface_to_mask(i.map)
+Utils.get_tface_to_mface(i::DofMap2DofMap) = get_tface_to_mface(i.map)
+
+Base.size(i::DofMap2DofMap) = size(i.map)
+
+function Base.getindex(i::DofMap2DofMap,j::Integer)
+  getindex(i.map,j)
+end
+
+function Base.setindex!(i::DofMap2DofMap,v,j::Integer)
+  setindex!(i.map,v,j)
+end
+
+function Base.copy(i::DofMap2DofMap)
+  DofMap2DofMap(copy(i.map),copy(i.background_map))
+end
+
+function Base.similar(i::DofMap2DofMap)
+  DofMap2DofMap(similar(i.map),similar(i.background_map))
+end
+
+function CellData.change_domain(i::DofMap2DofMap,t::Triangulation)
+  map′ = change_domain(i.map,t)
+  background_map′ = change_domain(i.background_map,t)
+  DofMap2DofMap(map′,background_map′)
+end
+
+function get_dof_to_parent_dof_map(i::DofMap2DofMap)
+  get_dof_to_parent_dof_map(i.map,i.background_map)
+end
+
+function get_component(
+  trian::Triangulation,
+  i::DofMap2DofMap,
+  args...;
+  kwargs...
+  )
+
+  map′ = get_component(trian,i.map,args...;kwargs...)
+  background_map′ = get_component(trian,i.background_map,args...;kwargs...)
+  DofMap2DofMap(map′,background_map′)
 end
 
 # tensor product index map, a lot of previous machinery is not needed

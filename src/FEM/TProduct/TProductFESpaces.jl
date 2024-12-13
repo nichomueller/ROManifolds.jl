@@ -1,5 +1,5 @@
 """
-    TProductFESpace{A,B,C,D,E} <: SingleFieldFESpace
+    TProductFESpace{A,B,C,D,E,F} <: SingleFieldFESpace
 
 Tensor product single field FE space, storing a vector of 1-D FE spaces `spaces_1d`
 of length D, and the D-dimensional FE space `space` defined as their tensor product.
@@ -15,7 +15,7 @@ struct TProductFESpace{A,B,C,D,E} <: SingleFieldFESpace
   tp_dof_map::E
 end
 
-function FESpaces.FESpace(
+function TProductFESpace(
   trian::TProductTriangulation,
   reffe::Tuple{<:ReferenceFEName,Any,Any};
   kwargs...)
@@ -24,10 +24,11 @@ function FESpaces.FESpace(
   T,order = reffe_args
 
   model = get_background_model(trian)
-  cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
-  cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
 
+  cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
   space = FESpace(trian.trian,cell_reffe;kwargs...)
+
+  cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
   spaces_1d = univariate_spaces(model,trian,cell_reffes_1d;kwargs...)
 
   diri_entities = get_dirichlet_entities(spaces_1d)
@@ -35,6 +36,33 @@ function FESpaces.FESpace(
   tp_dof_map = get_tp_dof_map(space,spaces_1d)
 
   TProductFESpace(space,spaces_1d,trian,dof_map,tp_dof_map)
+end
+
+# The FE space is defined on a triangulation that isn't tensor-product, but which
+# admits a background tensor-product triangulation
+function TProductFESpace(
+  trian::Triangulation,
+  bgtrian::TProductTriangulation,
+  reffe::Tuple{<:ReferenceFEName,Any,Any};
+  kwargs...)
+
+  @check Utils.isincluded(trian,bgtrian)
+
+  tpspace = TProductFESpace(bgtrian,reffe;kwargs...)
+
+  basis,reffe_args,reffe_kwargs = reffe
+  T,order = reffe_args
+
+  model = get_active_model(trian)
+
+  cell_reffe = ReferenceFE(model,basis,T,order;reffe_kwargs...)
+  space = FESpace(trian,cell_reffe;kwargs...)
+
+  diri_entities = get_dirichlet_entities(tpspace)
+  dof_map = get_dof_map(model,space,diri_entities)
+  dof_map′ = dof_map_2_dof_map(dof_map,tpspace.dof_map)
+
+  TProductFESpace(space,spaces_1d,bgtrian,dof_map′,tp_dof_map)
 end
 
 function univariate_spaces(
@@ -132,6 +160,19 @@ function DofMaps.SparsityPattern(U::TProductFESpace,V::TProductFESpace)
   sparsity = SparsityPattern(U.space,V.space)
   sparsities_1d = map(SparsityPattern,U.spaces_1d,V.spaces_1d)
   return TProductSparsity(sparsity,sparsities_1d)
+end
+
+function DofMaps.SparsityPattern(
+  U::TProductFESpace{A,B,C,<:DofMap2DofMap},
+  V::TProductFESpace{A,B,C,<:DofMap2DofMap}
+  ) where {A,B,C}
+
+  sparsity = SparsityPattern(U.space,V.space)
+  sparsities_1d = map(SparsityPattern,U.spaces_1d,V.spaces_1d)
+  dof_map_tp_row =
+  dof_to_parent_row = DofMaps.get_dof_to_parent_dof_map(V.dof_map,dof_map_tp_row)
+  dof_to_parent_col = DofMaps.get_dof_to_parent_dof_map(U.dof_map,dof_map_tp_col)
+  return SparsityToTProductSparsity(sparsity,sparsities_1d)
 end
 
 function DofMaps.order_sparsity(s::TProductSparsityPattern,U::TProductFESpace,V::TProductFESpace)

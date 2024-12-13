@@ -68,7 +68,7 @@ res(μ,u,v,dΩ_in,dΩ_out,dΓ_in) = rhs(μ,v,dΓ_in) - stiffness(μ,u,v,dΩ_in,d
 reffe = ReferenceFE(lagrangian,Float64,order)
 
 trians = (Ω_in,Ω_out,Γ_in)
-test = TestFESpace(Ω,reffe,conformity=:H1;dirichlet_tags=["boundary"])
+test = TProductFESpace(Ω,reffe,conformity=:H1;dirichlet_tags=["boundary"])
 trial = ParamTrialFESpace(test,g0μ)
 feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,trians,trians)
 

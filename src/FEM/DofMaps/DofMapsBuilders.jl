@@ -238,7 +238,7 @@ function get_sparse_dof_map(
   I,J,V = findnz(osparsity)
   i,j,v = univariate_findnz(osparsity)
   sparse_indices = get_sparse_dof_map(osparsity,I,J,i,j)
-  osparse_indices = order_sparse_dof_map(sparse_indices,rows,cols)
+  osparse_indices = order_sparse_dof_map(osparsity,sparse_indices,rows,cols)
   return osparsity,osparse_indices
 end
 
@@ -268,7 +268,7 @@ function get_sparse_dof_map(
   I,J,V = findnz(osparsity)
   i,j,v = univariate_findnz(osparsity)
   sparse_indices = get_sparse_dof_map(osparsity,I,J,i,j)
-  osparse_indices = order_sparse_dof_map(sparse_indices,rows′′,cols′′)
+  osparse_indices = order_sparse_dof_map(osparsity,sparse_indices,rows′′,cols′′)
 
   osparse_indices_comp = add_sparse_components(osparse_indices,rows′′,cols′′,ncomps_row,ncomps_col)
   return osparsity,osparse_indices_comp
@@ -500,21 +500,6 @@ function get_dof_to_cell(cache,cell_dof_ids,dof)
     end
   end
   cells
-end
-
-# sparse utilities
-
-function order_sparse_dof_map(dof_map,I,J,nrows=maximum(Int,I))
-  IJ = range_2d(vectorize(I),vectorize(J),nrows)
-  odof_map = copy(dof_map)
-  @inbounds for (k,dofk) in enumerate(dof_map)
-    if dofk > 0
-      IJk = IJ[dofk]
-      IJk > 0 && (odof_map[k] = IJk)
-      # odof_map[k] = IJ[dofk]
-    end
-  end
-  return odof_map
 end
 
 # multi component

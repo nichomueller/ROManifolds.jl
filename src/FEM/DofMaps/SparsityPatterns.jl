@@ -306,27 +306,8 @@ univariate_num_cols(a::TProductSparsityPattern) = Tuple(num_cols.(get_univariate
 univariate_findnz(a::TProductSparsityPattern) = tuple_of_arrays(findnz.(get_univariate_sparsities(a)))
 univariate_nnz(a::TProductSparsityPattern) = Tuple(nnz.(get_univariate_sparsities(a)))
 
-struct TProductSparsity{A,B} <: TProductSparsityPattern
-  sparsity::A
-  sparsities_1d::B
-end
-
-SparsityOrderStyle(a::TProductSparsity) = SparsityOrderStyle(a.sparsity)
-
-get_background_matrix(a::TProductSparsity) = get_background_matrix(a.sparsity)
-
-get_univariate_sparsities(a::TProductSparsity) = a.sparsities_1d
-
-function order_sparsity(a::TProductSparsity,i::Tuple,j::Tuple)
-  is,is_1d = i
-  js,js_1d = j
-  a′ = order_sparsity(a.sparsity,is,js)
-  a′_1d = map(order_sparsity,a.sparsities_1d,is_1d,js_1d)
-  TProductSparsity(a′,a′_1d)
-end
-
 # univariate (tensor product factors) sparse dofs to sparse dofs
-function get_sparse_dof_map(a::TProductSparsity,I,J,i,j)
+function get_sparse_dof_map(a::TProductSparsityPattern,I,J,i,j)
   nrows = num_rows(a)
 
   uids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
@@ -361,6 +342,37 @@ function get_sparse_dof_map(a::TProductSparsity,I,J,i,j)
   end
 
   return sparse_dof_map
+end
+
+function order_sparse_dof_map(a::TProductSparsityPattern,sparse_dof_map,I,J)
+  nrows = num_rows(a)
+  IJ = range_2d(vectorize(I),vectorize(J),nrows)
+  odof_map = copy(dof_map)
+  @inbounds for (k,dofk) in enumerate(dof_map)
+    if dofk > 0
+      odof_map[k] = IJ[dofk]
+    end
+  end
+  return odof_map
+end
+
+struct TProductSparsity{A,B} <: TProductSparsityPattern
+  sparsity::A
+  sparsities_1d::B
+end
+
+SparsityOrderStyle(a::TProductSparsity) = SparsityOrderStyle(a.sparsity)
+
+get_background_matrix(a::TProductSparsity) = get_background_matrix(a.sparsity)
+
+get_univariate_sparsities(a::TProductSparsity) = a.sparsities_1d
+
+function order_sparsity(a::TProductSparsity,i::Tuple,j::Tuple)
+  is,is_1d = i
+  js,js_1d = j
+  a′ = order_sparsity(a.sparsity,is,js)
+  a′_1d = map(order_sparsity,a.sparsities_1d,is_1d,js_1d)
+  TProductSparsity(a′,a′_1d)
 end
 
 function CellData.change_domain(
@@ -386,109 +398,52 @@ get_background_matrix(a::SparsityToTProductSparsity) = get_background_matrix(a.s
 
 get_univariate_sparsities(a::SparsityToTProductSparsity) = a.sparsities_1d
 
-struct SparsityToOrderedSparsity{A<:OrderedSparsityPattern,B} <: OrderedSparsityPattern
-  sparsity::A
-  unsorted_matrix::B
-end
-
-SparsityOrderStyle(a::SparsityToOrderedSparsity) = OrderedSparsityStyle()
-
-get_background_matrix(a::SparsityToOrderedSparsity) = get_background_matrix(a.sparsity)
-get_unsorted_matrix(a::SparsityToOrderedSparsity) = a.unsorted_matrix
-
 function order_sparsity(a::SparsityToTProductSparsity,i::Tuple,j::Tuple)
   is,is_1d = i
   js,js_1d = j
   matrix = get_background_matrix(a)
   tp_matrix = get_parent_matrix(a)
   a′ = order_sparsity(SparsityPattern(tp_matrix),is,js)
-  a′′ = SparsityToOrderedSparsity(a′,matrix)
   a′_1d = map(order_sparsity,get_univariate_sparsities(a),is_1d,js_1d)
-  SparsityToTProductSparsity(a′′,a′_1d,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
+  SparsityToTProductSparsity(a′,a′_1d,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
 end
 
-# univariate (tensor product factors) sparse dofs to sparse dofs
-function get_sparse_dof_map(a::SparsityToTProductSparsity{<:SparsityToOrderedSparsity},I,J,i,j)
+function order_sparse_dof_map(a::SparsityToTProductSparsity,dof_map,I,J)
   nrows = num_rows(a)
-
-  uids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
-  unrows = univariate_num_rows(a)
-  uncols = univariate_num_cols(a)
-  unnz = univariate_nnz(a)
-
-  tprows = CartesianIndices(unrows)
-  tpcols = CartesianIndices(uncols)
-
-  sparse_dof_map = zeros(Int32,unnz...)
-  uid = zeros(Int32,length(uids))
-  @inbounds for k = eachindex(I)
-    fill!(uid,0)
-    Ik = I[k]
-    Jk = J[k]
-    (iszero(Ik) || iszero(Jk)) && continue
-    Iuk = Iu[k]
-    Juk = Ju[k]
-    IJk = Ik + (Jk - 1)*nrows
-    irows = tprows[Ik]
-    icols = tpcols[Jk]
-    @inbounds for d in eachindex(uids)
-      uidd = uids[d]
-      idd = CartesianIndex((irows.I[d],icols.I[d]))
-      @inbounds for (l,uiddl) in enumerate(uidd)
-        if uiddl == idd
-          uid[d] = l
-          break
-        end
-      end
+  onrows = maximum(Int,a.dof_to_parent_dof_row)
+  IJ = range_2d(vectorize(I),vectorize(J),nrows)
+  odof_map = copy(dof_map)
+  fill!(odof_map,zero(eltype(odof_map)))
+  @inbounds for (k,dofk) in enumerate(dof_map)
+    if dofk > 0
+      IJk = IJ[dofk]
+      Ik = fast_index(IJk,nrows)
+      Jk = slow_index(IJk,nrows)
+      ik = a.dof_to_parent_dof_row[Ik]
+      jk = a.dof_to_parent_dof_col[Jk]
+      odof_map[k] = ik + (jk-1)*onrows
     end
-    sparse_dof_map[uid...] = IJk
   end
-
-  return sparse_dof_map
+  return odof_map
 end
-
-function CellData.change_domain(
-  a::SparsityToOrderedSparsity,
-  row::AbstractDofMap{D},
-  col::AbstractDofMap{D}
-  ) where D
-
-  a′ = change_domain(a.sparsity,row,col)
-  SparsityToOrderedSparsity(a′,get_unsorted_matrix(a))
-end
-
-abstract type RecastStyle end
-struct RecastChildSparsity <: RecastStyle end
-struct RecastParentSparsity <: RecastStyle end
 
 function recast(A::AbstractArray,a::SparsityToTProductSparsity)
   recast(A,get_parent_matrix(a))
 end
 
 function get_parent_matrix(a::SparsityToTProductSparsity)
-  style = RecastChildSparsity()
-  I,J,V = get_parent_findnz(style,a)
+  I,J,V = get_parent_findnz(a)
   m = length(a.dof_to_parent_dof_row)
   n = length(a.dof_to_parent_dof_col)
   sparse(I,J,V,m,n)
 end
 
-function get_parent_findnz(style::RecastStyle,a::SparsityToTProductSparsity)
+function get_parent_findnz(a::SparsityToTProductSparsity)
   A = get_background_matrix(a)
-  get_parent_findnz(style,A,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
+  get_parent_findnz(A,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
 end
 
 function get_parent_findnz(
-  ::RecastStyle,
-  A::AbstractSparseMatrix,
-  dof_to_parent_dof_row::AbstractArray,
-  dof_to_parent_dof_col::AbstractArray)
-
-  @abstractmethod
-end
-
-function get_parent_findnz(
-  ::RecastChildSparsity,
   A::SparseMatrixCSC{Tv,Ti},
   dof_to_parent_dof_row::AbstractArray,
   dof_to_parent_dof_col::AbstractArray
