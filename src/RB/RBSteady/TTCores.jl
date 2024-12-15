@@ -20,6 +20,23 @@ Subtypes:
 """
 abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
 
+struct DofMapCore{T,A<:AbstractArray{T,3},B<:AbstractArray} <: AbstractTTCore{T,3}
+  core::A
+  dof_map::B
+end
+
+Base.size(a::DofMapCore) = (size(a.core,1),length(a.dof_map),size(a.core,3))
+
+function Base.getindex(a::DofMapCore,i::Integer,j::Integer,k::Integer)
+  j′ = a.dof_map[j]
+  iszero(j′) ? zero(eltype(a)) : a.core[i,j′,k]
+end
+
+function Base.setindex!(a::DofMapCore,v,i::Integer,j::Integer,k::Integer)
+  j′ = a.dof_map[j]
+  !iszero(j′) && (a.core[i,j′,k] = v)
+end
+
 """
     abstract type SparseCore{T,N} <: AbstractTTCore{T,N} end
 

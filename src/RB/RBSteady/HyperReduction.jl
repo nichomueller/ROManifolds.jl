@@ -213,6 +213,13 @@ function reduced_triangulation(trian::Triangulation,i::AbstractIntegrationDomain
   return red_trian
 end
 
+function reduced_triangulation(trian::SkeletonTriangulation,i::AbstractIntegrationDomain,r::RBSpace...)
+  f = map(get_fe_space,r)
+  red_integr_cells = get_reduced_cells(trian.plus,i,f...)
+  red_trian = view(trian,red_integr_cells)
+  return red_trian
+end
+
 function reduced_triangulation(trian::Triangulation,b::HyperReduction,r::RBSpace...)
   indices = get_integration_domain(b)
   reduced_triangulation(trian,indices,r...)

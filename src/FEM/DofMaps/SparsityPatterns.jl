@@ -18,6 +18,9 @@ abstract type SparsityOrderStyle end
 struct OrderedSparsityStyle <: SparsityOrderStyle end
 struct DefaultSparsityStyle <: SparsityOrderStyle end
 
+is_ordered(::OrderedSparsityStyle) = true
+is_ordered(::DefaultSparsityStyle) = false
+
 """
     abstract type SparsityPattern end
 
@@ -50,6 +53,8 @@ function SparsityPattern(U::FESpace,V::FESpace)
 end
 
 SparsityOrderStyle(a::SparsityPattern) = DefaultSparsityStyle()
+
+is_ordered(a::SparsityPattern) = is_ordered(SparsityOrderStyle(a))
 
 get_background_matrix(a::SparsityPattern) = @abstractmethod
 get_background_sparsity(a::SparsityPattern) = SparsityPattern(get_background_matrix(a))
@@ -321,13 +326,13 @@ function get_sparse_dof_map(a::TProductSparsityPattern,I,J,i,j)
   sparse_dof_map = zeros(Int32,unnz...)
   uid = zeros(Int32,length(uids))
   @inbounds for k = eachindex(I)
-    fill!(uid,0)
     Ik = I[k]
     Jk = J[k]
     (iszero(Ik) || iszero(Jk)) && continue
     IJk = Ik + (Jk - 1)*nrows
     irows = tprows[Ik]
     icols = tpcols[Jk]
+    fill!(uid,0)
     @inbounds for d in eachindex(uids)
       uidd = uids[d]
       idd = CartesianIndex((irows.I[d],icols.I[d]))
@@ -347,13 +352,13 @@ end
 function order_sparse_dof_map(a::TProductSparsityPattern,sparse_dof_map,I,J)
   nrows = num_rows(a)
   IJ = range_2d(vectorize(I),vectorize(J),nrows)
-  odof_map = copy(dof_map)
-  @inbounds for (k,dofk) in enumerate(dof_map)
+  sparse_odof_map = copy(sparse_dof_map)
+  @inbounds for (k,dofk) in enumerate(sparse_dof_map)
     if dofk > 0
-      odof_map[k] = IJ[dofk]
+      sparse_odof_map[k] = IJ[dofk]
     end
   end
-  return odof_map
+  return sparse_odof_map
 end
 
 struct TProductSparsity{A,B} <: TProductSparsityPattern
@@ -381,8 +386,8 @@ function CellData.change_domain(
   col::DofMap{D,Ti}
   ) where {D,Ti}
 
-  sparsity′ = change_domain(a.sparsity,row,col)
-  TProductSparsity(sparsity′,a.sparsities_1d)
+  a′ = change_domain(a.sparsity,row,col)
+  TProductSparsity(a′,a.sparsities_1d)
 end
 
 struct SparsityToTProductSparsity{A,B,C,D} <: TProductSparsityPattern
@@ -399,32 +404,51 @@ get_background_matrix(a::SparsityToTProductSparsity) = get_background_matrix(a.s
 get_univariate_sparsities(a::SparsityToTProductSparsity) = a.sparsities_1d
 
 function order_sparsity(a::SparsityToTProductSparsity,i::Tuple,j::Tuple)
+  is_ordered(a) && return a
   is,is_1d = i
   js,js_1d = j
-  matrix = get_background_matrix(a)
   tp_matrix = get_parent_matrix(a)
-  a′ = order_sparsity(SparsityPattern(tp_matrix),is,js)
+  a′ = order_sparsity(SparsityPattern(tp_matrix),get_parent_map(is),get_parent_map(js))
   a′_1d = map(order_sparsity,get_univariate_sparsities(a),is_1d,js_1d)
   SparsityToTProductSparsity(a′,a′_1d,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
 end
 
-function order_sparse_dof_map(a::SparsityToTProductSparsity,dof_map,I,J)
+function order_sparse_dof_map(a::SparsityToTProductSparsity,sparse_dof_map,I,J)
   nrows = num_rows(a)
   onrows = maximum(Int,a.dof_to_parent_dof_row)
-  IJ = range_2d(vectorize(I),vectorize(J),nrows)
-  odof_map = copy(dof_map)
-  fill!(odof_map,zero(eltype(odof_map)))
-  @inbounds for (k,dofk) in enumerate(dof_map)
+  IJ = range_2d(vectorize(get_parent_map(I)),vectorize(get_parent_map(J)),nrows)
+  sparse_odof_map = copy(sparse_dof_map)
+  fill!(sparse_odof_map,zero(eltype(sparse_odof_map)))
+  @inbounds for (k,dofk) in enumerate(sparse_dof_map)
     if dofk > 0
       IJk = IJ[dofk]
       Ik = fast_index(IJk,nrows)
       Jk = slow_index(IJk,nrows)
       ik = a.dof_to_parent_dof_row[Ik]
       jk = a.dof_to_parent_dof_col[Jk]
-      odof_map[k] = ik + (jk-1)*onrows
+      sparse_odof_map[k] = ik + (jk-1)*onrows
     end
   end
-  return odof_map
+  return sparse_odof_map
+end
+
+function CellData.change_domain(
+  a::SparsityToTProductSparsity,
+  row::DofMapPortion{D,Ti},
+  col::DofMapPortion{D,Ti}
+  ) where {D,Ti}
+
+  @notimplemented
+end
+
+function CellData.change_domain(
+  a::SparsityToTProductSparsity{<:OrderedSparsityPattern},
+  row::DofMapPortion{D,Ti},
+  col::DofMapPortion{D,Ti}
+  ) where {D,Ti}
+
+  a′ = change_domain(a.sparsity,row.parent_map,col.parent_map)
+  SparsityToTProductSparsity(a′,a.sparsities_1d,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
 end
 
 function recast(A::AbstractArray,a::SparsityToTProductSparsity)
@@ -436,6 +460,10 @@ function get_parent_matrix(a::SparsityToTProductSparsity)
   m = length(a.dof_to_parent_dof_row)
   n = length(a.dof_to_parent_dof_col)
   sparse(I,J,V,m,n)
+end
+
+function get_parent_matrix(a::SparsityToTProductSparsity{<:OrderedSparsityPattern})
+  get_background_matrix(a)
 end
 
 function get_parent_findnz(a::SparsityToTProductSparsity)

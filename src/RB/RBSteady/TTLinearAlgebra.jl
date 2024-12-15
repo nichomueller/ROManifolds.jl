@@ -204,7 +204,7 @@ function cores2basis(dof_map::AbstractDofMap{D},cores::AbstractArray{T,3}...) wh
   @check length(cores) ≥ D
   coresD = sequential_product(cores[1:D]...)
   invmap = invert(dof_map)
-  coresD′ = view(coresD,:,vec(invmap),:)
+  coresD′ = DofMapCore(coresD,invmap)
   if length(cores) == D
     dropdims(coresD′;dims=1)
   else
@@ -369,34 +369,40 @@ function basis_index(i,cores_indices::Vector{Vector{Ti}}) where Ti
   return (iprevs...,icurr)
 end
 
-function basis_indices(
+# We distinguish the case ::Val{1} from the others, since we must somehow dispatch on
+# steady / unsteady applications. However, from an implementation standpoint, these
+# two functions do exactly the same things. Note that, when the snapshots are zero,
+# the basis is the identity. In this case, the selected index is 1. However, we
+# might have dof_map[1] = 0, depending on the underlying triangulation. Therefore,
+# the function is modified to never return a zero.
+function get_basis_indices(
   ::Val{1},
   cores_indices::Vector{Vector{Ti}},
   dof_map::AbstractArray{Ti,D}
   )::Vector{Ti} where {Ti,D}
 
   Iprev...,Icurr = cores_indices
-  basis_indices = zeros(Ti,length(Icurr))
+  get_basis_indices = zeros(Ti,length(Icurr))
+  o = one(Ti)
   for (k,ik) in enumerate(Icurr)
     indices_k = basis_index(ik,cores_indices)
-    basis_indices[k] = dof_map[CartesianIndex(indices_k[1:D])]
+    get_basis_indices[k] = max(o,dof_map[CartesianIndex(indices_k[1:D])])
   end
-  return basis_indices
+  return get_basis_indices
 end
 
-function basis_indices(
+function get_basis_indices(
   ::Val{N},
   cores_indices::Vector{Vector{Ti}},
   dof_map::AbstractArray{Ti,D}
   )::Vector{Vector{Ti}} where {Ti,D,N}
 
-  L = length(cores_indices)
-
   Iprev...,Icurr = cores_indices
-  basis_indices = zeros(Ti,length(Icurr),N)
+  basis_indices = zeros(Ti,length(Icurr),ninds)
+  o = one(Ti)
   for (k,ik) in enumerate(Icurr)
     indices_k = basis_index(ik,cores_indices)
-    basis_indices[k,1] = dof_map[CartesianIndex(indices_k[1:D])]
+    basis_indices[k,1] = max(o,dof_map[CartesianIndex(indices_k[1:D])])
     for (il,l) in enumerate(D+1:L)
       basis_indices[k,1+il] = indices_k[l]
     end
@@ -405,13 +411,13 @@ function basis_indices(
   return collect.(eachcol(basis_indices))
 end
 
-function basis_indices(cores_indices::Vector{<:Vector},dof_map::AbstractArray{Ti,D}) where {Ti,D}
+function get_basis_indices(cores_indices::Vector{<:Vector},dof_map::AbstractArray{Ti,D}) where {Ti,D}
   L = length(cores_indices)
   ninds = L - D + 1
   @check ninds > 0
-  return basis_indices(Val(ninds),cores_indices,dof_map)
+  return get_basis_indices(Val(ninds),cores_indices,dof_map)
 end
 
-function basis_indices(cores_indices::Vector{<:Vector},dof_map::SparseDofMap)
-  basis_indices(cores_indices,dof_map.indices_sparse)
+function get_basis_indices(cores_indices::Vector{<:Vector},dof_map::SparseDofMap)
+  get_basis_indices(cores_indices,dof_map.indices_sparse)
 end

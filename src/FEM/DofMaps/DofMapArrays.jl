@@ -1,0 +1,24 @@
+abstract type AbstractDofMapArray{T,D} <: AbstractArray{T,D} end
+
+struct DofMapArray{T,D,Ti,A<:AbstractArray{T},I<:AbstractArray{Ti,D}} <: AbstractDofMapArray{T,D}
+  array::A
+  dof_map::I
+end
+
+Base.size(a::DofMapArray) = size(a.dof_map)
+Base.IndexStyle(a::DofMapArray) = IndexLinear()
+
+function Base.getindex(a::DofMapArray,i::Integer)
+  i′ = a.dof_map[i]
+  i′ == 0 ? zero(eltype(a)) : a.array[i′]
+end
+
+function Base.setindex!(a::DofMapArray,v,i::Integer)
+  i′ = a.dof_map[i]
+  i′ != 0 && setindex!(a.array,v,i′)
+end
+
+function CellData.change_domain(a::DofMapArray,args...)
+  dof_map′ = change_domain(a.dof_map,args...)
+  DofMapArray(a.array,dof_map′)
+end

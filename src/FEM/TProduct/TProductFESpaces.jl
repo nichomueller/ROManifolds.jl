@@ -42,13 +42,13 @@ end
 # admits a background tensor-product triangulation
 function TProductFESpace(
   trian::Triangulation,
-  bgtrian::TProductTriangulation,
+  tptrian::TProductTriangulation,
   reffe::Tuple{<:ReferenceFEName,Any,Any};
   kwargs...)
 
-  @check Utils.isincluded(trian,bgtrian)
+  @check Utils.is_included(trian,tptrian.trian)
 
-  tpspace = TProductFESpace(bgtrian,reffe;kwargs...)
+  tpspace = TProductFESpace(tptrian,reffe;kwargs...)
 
   basis,reffe_args,reffe_kwargs = reffe
   T,order = reffe_args
@@ -58,11 +58,10 @@ function TProductFESpace(
   cell_reffe = ReferenceFE(model,basis,T,order;reffe_kwargs...)
   space = FESpace(trian,cell_reffe;kwargs...)
 
-  diri_entities = get_dirichlet_entities(tpspace)
-  dof_map = get_dof_map(model,space,diri_entities)
-  dof_map′ = dof_map_2_dof_map(dof_map,tpspace.dof_map)
+  diri_entities = get_dirichlet_entities(tpspace.spaces_1d)
+  dof_map = get_dof_map(model,space,tpspace,diri_entities)
 
-  TProductFESpace(space,spaces_1d,bgtrian,dof_map′,tp_dof_map)
+  TProductFESpace(space,tpspace.spaces_1d,tptrian,dof_map,tpspace.tp_dof_map)
 end
 
 function univariate_spaces(
@@ -131,16 +130,10 @@ function get_tp_trial_fe_basis(f::TProductFESpace)
   TProductFEBasis(basis,trian)
 end
 
+get_tp_trial_fe_basis(f::TrialFESpace{<:TProductFESpace}) = get_tp_trial_fe_basis(f.space)
+
 function DofMaps.get_dirichlet_entities(f::TProductFESpace)
-  spaces = f.spaces_1d
-  D = length(spaces)
-  isdirichlet = zeros(Bool,2,D)
-  for (d,space) in enumerate(spaces)
-    celldiri = get_cell_is_dirichlet(space)
-    isdirichlet[entity,1] = first(celldiri)
-    isdirichlet[entity,2] = last(celldiri)
-  end
-  return isdirichlet
+  get_dirichlet_entities(f.spaces_1d)
 end
 
 function DofMaps.get_dirichlet_entities(spaces::Vector{<:FESpace})
@@ -154,8 +147,6 @@ function DofMaps.get_dirichlet_entities(spaces::Vector{<:FESpace})
   return isdirichlet
 end
 
-get_tp_trial_fe_basis(f::TrialFESpace{<:TProductFESpace}) = get_tp_trial_fe_basis(f.space)
-
 function DofMaps.SparsityPattern(U::TProductFESpace,V::TProductFESpace)
   sparsity = SparsityPattern(U.space,V.space)
   sparsities_1d = map(SparsityPattern,U.spaces_1d,V.spaces_1d)
@@ -163,16 +154,15 @@ function DofMaps.SparsityPattern(U::TProductFESpace,V::TProductFESpace)
 end
 
 function DofMaps.SparsityPattern(
-  U::TProductFESpace{A,B,C,<:DofMap2DofMap},
-  V::TProductFESpace{A,B,C,<:DofMap2DofMap}
+  U::TProductFESpace{A,B,C,<:DofMapPortion},
+  V::TProductFESpace{A,B,C,<:DofMapPortion}
   ) where {A,B,C}
 
   sparsity = SparsityPattern(U.space,V.space)
   sparsities_1d = map(SparsityPattern,U.spaces_1d,V.spaces_1d)
-  dof_map_tp_row =
-  dof_to_parent_row = DofMaps.get_dof_to_parent_dof_map(V.dof_map,dof_map_tp_row)
-  dof_to_parent_col = DofMaps.get_dof_to_parent_dof_map(U.dof_map,dof_map_tp_col)
-  return SparsityToTProductSparsity(sparsity,sparsities_1d)
+  dof_to_parent_row = DofMaps.get_dof_to_parent_dof_map(V.dof_map)
+  dof_to_parent_col = DofMaps.get_dof_to_parent_dof_map(U.dof_map)
+  return SparsityToTProductSparsity(sparsity,sparsities_1d,dof_to_parent_row,dof_to_parent_col)
 end
 
 function DofMaps.order_sparsity(s::TProductSparsityPattern,U::TProductFESpace,V::TProductFESpace)
@@ -181,6 +171,18 @@ function DofMaps.order_sparsity(s::TProductSparsityPattern,U::TProductFESpace,V:
   dof_map_I_1d = get_tp_dof_map(V).indices_1d
   dof_map_J_1d = get_tp_dof_map(U).indices_1d
   order_sparsity(s,(dof_map_I,dof_map_I_1d),(dof_map_J,dof_map_J_1d))
+end
+
+function DofMaps.get_dof_map(
+  model::DiscreteModelPortion,
+  space::FESpace,
+  tpspace::TProductFESpace,
+  diri_entities::AbstractMatrix)
+
+  parent_model = Geometry.get_parent_model(model)
+  dof_map = get_dof_map(parent_model,space,diri_entities)
+  parent_dof_map = get_dof_map(tpspace)
+  DofMapPortion(dof_map,parent_dof_map)
 end
 
 # multi field

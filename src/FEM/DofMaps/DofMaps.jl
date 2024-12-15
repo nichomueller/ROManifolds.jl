@@ -41,7 +41,7 @@ export TrivialDofMap
 export TrivialSparseDofMap
 export DofMap
 export ConstrainedDofMap
-export DofMap2DofMap
+export DofMapPortion
 export TProductDofMap
 export invert
 export vectorize

@@ -39,8 +39,8 @@ function vectorize(i::AbstractDofMap)
   vec(remove_constrained_dofs(i))
 end
 
-function invert(i::AbstractDofMap)
-  invert(i,ConstraintStyle(i))
+function invert(i::AbstractDofMap;kwargs...)
+  invert(i,ConstraintStyle(i);kwargs...)
 end
 
 function invert(i::AbstractArray,args...)
@@ -55,7 +55,7 @@ function invert!(i′::AbstractArray,i::AbstractArray)
   i′[inz] = invperm(i[inz])
 end
 
-function invert(i::AbstractDofMap,::Constrained)
+function invert(i::AbstractDofMap,::Constrained;kwargs...)
   @notimplemented
   # i′ = similar(i)
   # s′ = size(i)
@@ -323,55 +323,58 @@ function CellData.change_domain(i::ConstrainedDofMap,t::Triangulation)
   @notimplemented
 end
 
-struct DofMap2DofMap{D,Ti,I<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
-  map::I
-  background_map::I
+struct DofMapPortion{D,Ti,A<:AbstractDofMap{D,Ti},B<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
+  map::A
+  parent_map::B
 end
 
-FESpaces.ConstraintStyle(::Type{DofMap2DofMap{D,Ti,I}}) where {D,Ti,I} = ConstraintStyle(I)
+FESpaces.ConstraintStyle(::Type{DofMapPortion{D,Ti,I}}) where {D,Ti,I} = ConstraintStyle(I)
 
-get_dof_to_cell(i::DofMap2DofMap) = get_dof_to_cell(i.map)
-get_tface_to_mask(i::DofMap2DofMap) = get_tface_to_mask(i.map)
-Utils.get_tface_to_mface(i::DofMap2DofMap) = get_tface_to_mface(i.map)
+get_dof_to_cell(i::DofMapPortion) = get_dof_to_cell(i.map)
+get_tface_to_mask(i::DofMapPortion) = get_tface_to_mask(i.map)
+Utils.get_tface_to_mface(i::DofMapPortion) = get_tface_to_mface(i.map)
 
-Base.size(i::DofMap2DofMap) = size(i.map)
+get_parent_map(i::AbstractDofMap) = @abstractmethod
+get_parent_map(i::DofMapPortion) = i.parent_map
 
-function Base.getindex(i::DofMap2DofMap,j::Integer)
+Base.size(i::DofMapPortion) = size(i.map)
+
+function Base.getindex(i::DofMapPortion,j::Integer)
   getindex(i.map,j)
 end
 
-function Base.setindex!(i::DofMap2DofMap,v,j::Integer)
+function Base.setindex!(i::DofMapPortion,v,j::Integer)
   setindex!(i.map,v,j)
 end
 
-function Base.copy(i::DofMap2DofMap)
-  DofMap2DofMap(copy(i.map),copy(i.background_map))
+function Base.copy(i::DofMapPortion)
+  DofMapPortion(copy(i.map),copy(i.parent_map))
 end
 
-function Base.similar(i::DofMap2DofMap)
-  DofMap2DofMap(similar(i.map),similar(i.background_map))
+function Base.similar(i::DofMapPortion)
+  DofMapPortion(similar(i.map),similar(i.parent_map))
 end
 
-function CellData.change_domain(i::DofMap2DofMap,t::Triangulation)
+function CellData.change_domain(i::DofMapPortion,t::Triangulation)
   map′ = change_domain(i.map,t)
-  background_map′ = change_domain(i.background_map,t)
-  DofMap2DofMap(map′,background_map′)
+  parent_map′ = change_domain(i.parent_map,t)
+  DofMapPortion(map′,parent_map′)
 end
 
-function get_dof_to_parent_dof_map(i::DofMap2DofMap)
-  get_dof_to_parent_dof_map(i.map,i.background_map)
+function get_dof_to_parent_dof_map(i::DofMapPortion)
+  get_dof_to_parent_dof_map(i.map,i.parent_map)
 end
 
 function get_component(
   trian::Triangulation,
-  i::DofMap2DofMap,
+  i::DofMapPortion,
   args...;
   kwargs...
   )
 
   map′ = get_component(trian,i.map,args...;kwargs...)
-  background_map′ = get_component(trian,i.background_map,args...;kwargs...)
-  DofMap2DofMap(map′,background_map′)
+  parent_map′ = get_component(trian,i.parent_map,args...;kwargs...)
+  DofMapPortion(map′,parent_map′)
 end
 
 # tensor product index map, a lot of previous machinery is not needed

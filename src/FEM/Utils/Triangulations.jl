@@ -30,6 +30,10 @@ function is_parent(tparent::Geometry.AppendedTriangulation,tchild::Geometry.Appe
   is_parent(tparent.a,tchild.a) && is_parent(tparent.b,tchild.b)
 end
 
+function is_parent(tparent::SkeletonTriangulation,tchild::SkeletonPair)
+  is_parent(tparent.plus,tchild.plus) && is_parent(tparent.minus,tchild.minus)
+end
+
 function get_parent(t::Geometry.Grid)
   @abstractmethod
 end
@@ -92,6 +96,9 @@ get_tface_to_mface(t::Interfaces.SubCellTriangulation) = unique(t.subcells.cell_
 function get_tface_to_mface(t::Geometry.AppendedTriangulation)
   lazy_append(get_tface_to_mface(t.a),get_tface_to_mface(t.b))
 end
+function get_tface_to_mface(t::SkeletonTriangulation) #TODO Is this correct?
+  unique(lazy_append(get_tface_to_mface(t.plus),get_tface_to_mface(t.minus)))
+end
 
 function Base.isapprox(t::T,s::S) where {T<:Triangulation,S<:Triangulation}
   false
@@ -118,12 +125,12 @@ function isapprox_parent(tparent::Triangulation,tchild::Triangulation)
   tparent ≈ get_parent(tchild)
 end
 
-function isincluded(tchild::Triangulation,tparent::Triangulation)
-  isparent(tparent,tchild) && return true
+function is_included(tchild::Triangulation,tparent::Triangulation)
   tface_to_mface_child = get_tface_to_mface(tchild)
   tface_to_mface_parent = get_tface_to_mface(tparent)
   child_to_parent = indexin(tface_to_mface_child,tface_to_mface_parent)
-  isa(child_to_parent,Vector{Int})
+  child_no_parent = findfirst(isnothing,child_to_parent)
+  return isnothing(child_no_parent)
 end
 
 function get_view_indices(t::BodyFittedTriangulation)

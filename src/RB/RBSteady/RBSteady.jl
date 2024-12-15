@@ -78,6 +78,7 @@ export galerkin_projection
 include("GalerkinProjections.jl")
 
 export AbstractTTCore
+export DofMapCore
 export SparseCore
 export SparseCoreCSC
 include("TTCores.jl")

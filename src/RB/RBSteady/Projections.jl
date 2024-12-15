@@ -282,7 +282,7 @@ function empirical_interpolation(a::TTSVDCores)
       interp_core = reshape(interp,1,size(interp)...)
       c = cores2basis(interp_core,cores[i+1])
     else
-      indices = basis_indices(vinds,dof_map)
+      indices = get_basis_indices(vinds,dof_map)
     end
   end
   return indices,interp
