@@ -124,21 +124,19 @@ end
 
 function get_tp_dof_map(ls::FESpaceWithLinearConstraints,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
   space = ls.space
-  mdof_to_bdof = ls.mDOF_to_DOF
-  sdof_to_bdof = setdiff(1:ls.n_fdofs,mdof_to_bdof)
-  i = get_tp_dof_map(space,spaces_1d)
-  ci = ConstrainedDofMap(i,mdof_to_bdof,sdof_to_bdof)
-  return TProductDofMap(ci,i.indices_1d)
+  ndofs = num_free_dofs(space)
+  sdof_to_bdof = setdiff(1:ndofs,ls.mDOF_to_DOF)
+  dof_to_constraints = get_dof_to_constraints(sdof_to_bdof,ndofs)
+  dof_map = get_tp_dof_map(space,spaces_1d)
+  return ConstrainedTProductDofMap(dof_map,dof_to_constraints)
 end
 
 function get_tp_dof_map(cs::FESpaceWithConstantFixed,spaces_1d::AbstractVector{<:UnconstrainedFESpace})
   space = cs.space
-  ndofs = num_free_dofs(space) + num_dirichlet_dofs(space)
-  sdof_to_bdof = cs.dof_to_fix
-  mdof_to_bdof = setdiff(1:ndofs,sdof_to_bdof)
-  i = get_tp_dof_map(space,spaces_1d)
-  ci = ConstrainedDofMap(i,mdof_to_bdof,sdof_to_bdof)
-  return TProductDofMap(ci,i.indices_1d)
+  ndofs = num_free_dofs(space)
+  dof_to_constraints = get_dof_to_constraints(cs.dof_to_fix,ndofs)
+  dof_map = get_tp_dof_map(space,spaces_1d)
+  return ConstrainedTProductDofMap(dof_map,dof_to_constraints)
 end
 
 function get_tp_dof_map(zs::ZeroMeanFESpace,spaces_1d::AbstractVector{<:UnconstrainedFESpace})

@@ -18,16 +18,8 @@ function remove_constrained_dofs(i::AbstractDofMap,::UnConstrained)
 end
 
 function remove_constrained_dofs(i::AbstractDofMap{Ti},::Constrained) where Ti
-  dof_to_constraint = get_dof_to_constraints(i)
-  nconstraints = findall(dof_to_constraint)
-  i′ = zeros(Ti,length(i)-nconstraints)
-  count = 0
-  for j in i
-    if !dof_to_constraint[j]
-      count += 1
-      i′[count] = j
-    end
-  end
+  i′ = collect(vec(i))
+  deleteat!(i′,get_dof_to_constraints(i))
   i′
 end
 
@@ -55,22 +47,9 @@ function invert!(i′::AbstractArray,i::AbstractArray)
   i′[inz] = invperm(i[inz])
 end
 
-function invert(i::AbstractDofMap,::Constrained;kwargs...)
-  @notimplemented
-  # i′ = similar(i)
-  # s′ = size(i)
-  # dof_to_mask = dof_to_constraint_mask(i)
-  # invi = invperm(vectorize(i))
-  # nconstrained = 0
-  # for k in eachindex(i)
-  #   if dof_to_mask[k]
-  #     i′[k] = i[k]
-  #     nconstrained += 1
-  #   else
-  #     i′[k] = invi[k-nconstrained]
-  #   end
-  # end
-  # i′
+function invert(i::AbstractDofMap,::Constrained)
+  i′ = remove_constrained_dofs(i)
+  invert(i′)
 end
 
 # i1 ∘ i2
@@ -304,11 +283,11 @@ get_dof_to_constraints(i::ConstrainedDofMap) = i.dof_to_constraint_mask
 Base.size(i::ConstrainedDofMap) = size(i.map)
 
 function Base.getindex(i::ConstrainedDofMap,j::Integer)
-  getindex(i.map,j)
+  i.dof_to_constraint_mask[j] ? zero(eltype(i)) : getindex(i.map,j)
 end
 
 function Base.setindex!(i::ConstrainedDofMap,v,j::Integer)
-  setindex!(i.map,v,j)
+  !i.dof_to_constraint_mask[j] && setindex!(i.map,v,j)
 end
 
 function Base.copy(i::ConstrainedDofMap)
@@ -320,7 +299,7 @@ function Base.similar(i::ConstrainedDofMap)
 end
 
 function CellData.change_domain(i::ConstrainedDofMap,t::Triangulation)
-  @notimplemented
+  ConstrainedDofMap(change_domain(i.map,t),i.dof_to_constraint_mask)
 end
 
 struct DofMapPortion{D,Ti,A<:AbstractDofMap{D,Ti},B<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
@@ -384,6 +363,8 @@ struct TProductDofMap{D,Ti} <: AbstractDofMap{D,Ti}
   indices_1d::Vector{Vector{Ti}}
 end
 
+FESpaces.ConstraintStyle(::Type{<:TProductDofMap}) = UnConstrained()
+
 Base.size(i::TProductDofMap) = size(i.indices)
 
 function Base.getindex(i::TProductDofMap,j::Integer)
@@ -403,6 +384,35 @@ function Base.similar(i::TProductDofMap)
 end
 
 get_univariate_dof_map(i::TProductDofMap) = i.indices_1d
+
+struct ConstrainedTProductDofMap{D,Ti} <: AbstractDofMap{D,Ti}
+  map::TProductDofMap{D,Ti}
+  dof_to_constraint_mask::Vector{Bool}
+end
+
+FESpaces.ConstraintStyle(::Type{<:ConstrainedTProductDofMap}) = Constrained()
+
+get_dof_to_constraints(i::ConstrainedTProductDofMap) = i.dof_to_constraint_mask
+
+Base.size(i::ConstrainedTProductDofMap) = size(i.map)
+
+function Base.getindex(i::ConstrainedTProductDofMap,j::Integer)
+  i.dof_to_constraint_mask[j] ? zero(eltype(i)) : getindex(i.map,j)
+end
+
+function Base.setindex!(i::ConstrainedTProductDofMap,v,j::Integer)
+  !i.dof_to_constraint_mask[j] && setindex!(i.map,v,j)
+end
+
+function Base.copy(i::ConstrainedTProductDofMap)
+  ConstrainedTProductDofMap(copy(i.map),i.dof_to_constraint_mask)
+end
+
+function Base.similar(i::ConstrainedTProductDofMap)
+  ConstrainedTProductDofMap(similar(i.map),i.dof_to_constraint_mask)
+end
+
+get_univariate_dof_map(i::ConstrainedTProductDofMap) = get_univariate_dof_map(i.map)
 
 # nnz bounding boxes
 

@@ -220,11 +220,12 @@ function rb_performance(
   fesnaps::AbstractArray,
   rbsnaps::AbstractArray,
   festats::CostTracker,
-  rbstats::CostTracker)
+  rbstats::CostTracker,
+  args...)
 
   state_red = get_state_reduction(solver)
   norm_style = NormStyle(state_red)
-  error = compute_relative_error(norm_style,feop,fesnaps,rbsnaps)
+  error = compute_relative_error(norm_style,feop,fesnaps,rbsnaps,args...)
   speedup = compute_speedup(festats,rbstats)
   RBPerformance(error,speedup)
 end
@@ -237,12 +238,14 @@ function rb_performance(
   x̂::AbstractParamVector,
   festats::CostTracker,
   rbstats::CostTracker,
-  r::AbstractRealization)
+  r::AbstractRealization,
+  args...)
 
-  x = inv_project(get_trial(rbop)(r),x̂)
+  Û = get_trial(rbop)(r)
+  x = inv_project(Û,x̂)
   i = get_dof_map(feop)
   rbsnaps = Snapshots(x,i,r)
-  rb_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats)
+  rb_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats,args...)
 end
 
 function DrWatson.save(dir,perf::RBPerformance;label="")
@@ -253,6 +256,12 @@ end
 function load_results(dir;label="")
   results_dir = get_filename(dir,"results",label)
   deserialize(results_dir,perf)
+end
+
+function Utils.compute_relative_error(norm_style::NormStyle,feop,sol,sol_approx,trian::Triangulation)
+  sol_trian = change_domain(sol,trian)
+  sol_approx_trian = change_domain(sol_approx,trian)
+  compute_relative_error(norm_style,feop,sol_trian,sol_approx_trian)
 end
 
 function Utils.compute_relative_error(norm_style::EnergyNorm,feop,sol,sol_approx)

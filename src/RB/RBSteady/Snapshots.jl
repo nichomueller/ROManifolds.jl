@@ -45,6 +45,11 @@ function DofMaps.recast(a::AbstractArray,s::AbstractSnapshots)
   return recast(a,get_dof_map(s))
 end
 
+function CellData.change_domain(s::AbstractSnapshots,args...)
+  i′ = change_domain(get_dof_map(s),args...)
+  return Snapshots(get_values(s),i′,get_realization(s))
+end
+
 """
     flatten_snapshots(s::AbstractSnapshots) -> AbstractSnapshots
 

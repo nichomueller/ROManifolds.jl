@@ -148,8 +148,16 @@ function Geometry.Triangulation(model::TProductModel;kwargs...)
   TProductTriangulation(model,trian,trians_1d)
 end
 
-function Geometry.BoundaryTriangulation(model::TProductModel,args...;kwargs...)
-  BoundaryTriangulation(model.model,args...;kwargs...)
+for T in (:(AbstractVector{<:Integer}),:(AbstractVector{Bool}))
+  @eval begin
+    function Geometry.BoundaryTriangulation(
+      model::TProductModel,
+      face_to_bgface::$T,
+      bgface_to_lcell::AbstractVector{<:Integer})
+
+      BoundaryTriangulation(model.model,face_to_bgface,bgface_to_lcell)
+    end
+  end
 end
 
 function CellData.get_cell_points(trian::TProductTriangulation)

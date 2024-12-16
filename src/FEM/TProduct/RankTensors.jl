@@ -47,7 +47,7 @@ function LinearAlgebra.cholesky(a::GenericRankTensor{D,K}) where {D,K}
   end
 end
 
-function _sort!(a::AbstractVector{<:AbstractVector},i::Tuple{<:TProductDofMap})
+function _sort!(a::AbstractVector{<:AbstractVector},i::Tuple{<:AbstractDofMap})
   irow, = i
   irow1d = DofMaps.get_univariate_dof_map(irow)
   for (i,(ai,irowi)) in enumerate(zip(a,irow1d))
@@ -55,7 +55,7 @@ function _sort!(a::AbstractVector{<:AbstractVector},i::Tuple{<:TProductDofMap})
   end
 end
 
-function _sort!(a::AbstractVector{<:AbstractMatrix},i::Tuple{<:TProductDofMap,<:TProductDofMap})
+function _sort!(a::AbstractVector{<:AbstractMatrix},i::Tuple{<:AbstractDofMap,<:AbstractDofMap})
   irow,icol = i
   irow1d = DofMaps.get_univariate_dof_map(irow)
   icol1d = DofMaps.get_univariate_dof_map(icol)

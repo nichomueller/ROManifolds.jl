@@ -9,49 +9,44 @@ using ReducedOrderModels
 pranges = fill([1,10],3)
 pspace = ParamSpace(pranges)
 
-const L = 1
-const R  = 0.1
-const n = 30
+R = 0.3
+pmin = Point(0,0)
+pmax = Point(1,1)
+n = 20
+partition = (n,n)
 
-const domain = (0,L,0,L)
-const partition = (n,n)
+geo1 = disk(R,x0=Point(0.5,0.5))
+geo2 = ! geo1
 
-p1 = Point(0.3,0.5)
-p2 = Point(0.7,0.5)
-geo1 = disk(R,x0=p1)
-geo2 = disk(R,x0=p2)
-geo3 = !union(geo1,geo2)
+bgmodel = TProductModel(pmin,pmax,partition)
+cutgeo = cut(bgmodel,geo2)
+cutgeo_facets = cut_facets(bgmodel,geo2)
 
-bgmodel = TProductModel(domain,partition)
-cutgeo = cut(bgmodel,geo3)
-
-Ω = Triangulation(bgmodel)
-Ω_in = Triangulation(cutgeo,PHYSICAL_IN)
+Ωbg = Triangulation(bgmodel)
+Ω = Triangulation(cutgeo,PHYSICAL_IN)
 Ω_out = Triangulation(cutgeo,PHYSICAL_OUT)
-Γd = EmbeddedBoundary(cutgeo)
-Γn = BoundaryTriangulation(bgmodel;tags="boundary")
+Γ = EmbeddedBoundary(cutgeo)
+Γg = GhostSkeleton(cutgeo)
+Γi = SkeletonTriangulation(cutgeo_facets)
 
-n_Γd = get_normal_vector(Γd)
-n_Γn = get_normal_vector(Γn)
+n_Γ = get_normal_vector(Γ)
+n_Γg = get_normal_vector(Γg)
+n_Γi = get_normal_vector(Γi)
 
 order = 2
 degree = 2*order
 
+dΩbg = Measure(Ωbg,degree)
 dΩ = Measure(Ω,degree)
-dΩ_in = Measure(Ω_in,degree)
-dΩ_out = Measure(Ω_out,degree)
-dΓd = Measure(Γd,degree)
-dΓn = Measure(Γn,degree)
+dΓ = Measure(Γ,degree)
+dΓg = Measure(Γg,degree)
+dΓi = Measure(Γi,degree)
 
-ν(x,μ) = μ[1]*exp(-μ[2])
-ν(μ) = x->ν(x,μ)
-νμ(μ) = ParamFunction(ν,μ)
-
-u(x,μ) = VectorValue(μ[1]*x[1]*x[1],x[2]*abs(sin(μ[2])))
+u(x,μ) = VectorValue(μ[1]*x[1]*x[1],μ[2]*x[2])
 u(μ) = x->u(x,μ)
 uμ(μ) = ParamFunction(u,μ)
 
-p(x,μ) = (x[1]*abs(cos(μ[3]))-x[2])
+p(x,μ) = μ[3]*x[1]-x[2]
 p(μ) = x->p(x,μ)
 pμ(μ) = ParamFunction(p,μ)
 
@@ -68,32 +63,47 @@ g_0(μ) = x->g_0(x,μ)
 gμ_0(μ) = ParamFunction(g_0,μ)
 
 const ν0 = 1e-3
-const γ = order*(order+1)
-const h = L/n
+const h = (pmax - pmin)[1]/n
 
-a(μ,(u,p),(v,q),dΩ_in,dΩ_out,dΓd) =
-  ∫( ∇(v)⊙∇(u) - q*(∇⋅u) + (∇⋅v)*p )dΩ_in +
-  ∫( ν0*(∇(v)⊙∇(u) + q*p) )dΩ_out +
-  ∫( (γ/h)*v⋅u - v⋅(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))⋅u + (p*n_Γ)⋅v - (q*n_Γ)⋅u )dΓd
+β0 = 0.25
+β1 = 0.2
+β2 = 0.1
+β3 = 0.05
+γ = 10.0
 
-l(μ,(u,p),(v,q),dΩ_in,dΓd,dΓn) =
-  ∫( v⋅fμ(μ) - q*gμ(μ) )dΩ_in +
-  ∫( (γ/h)*v⋅uμ(μ) - (n_Γd⋅∇(v))⋅uμ(μ) + (q*n_Γd)⋅uμ(μ) )dΓd +
-  ∫( v⋅(n_Γn⋅∇(uμ(μ))) - (n_Γn⋅v)*pμ(μ) )dΓn -
-  ∫( ∇(v)⊙∇(u) - q*(∇⋅u) - (∇⋅v)*p )dΩ_in
+a_Ω(u,v) = ∇(u)⊙∇(v)
+b_Ω(v,p) = - (∇⋅v)*p
+c_Γi(p,q) = (β0*h)*jump(p)*jump(q)
+c_Ω(p,q) = (β1*h^2)*∇(p)⋅∇(q)
+e_Ωout((u,p),(v,q)) = ν0*(∇(v)⊙∇(u) + q*p)
+a_Γ(u,v) = - (n_Γ⋅∇(u))⋅v - u⋅(n_Γ⋅∇(v)) + (γ/h)*u⋅v
+b_Γ(v,p) = (n_Γ⋅v)*p
+i_Γg(u,v) = (β2*h)*jump(n_Γg⋅∇(u))⋅jump(n_Γg⋅∇(v))
+j_Γg(p,q) = (β3*h^3)*jump(n_Γg⋅∇(p))*jump(n_Γg⋅∇(q)) + c_Γi(p,q)
+ϕ_Ω(μ,q) = (β1*h^2)*∇(q)⋅fμ(μ)
 
-trian_res = (Ω_in,Γd,Γn)
-trian_jac = (Ω_in,Ω_out,Γd)
+a(μ,(u,p),(v,q),dΩ,dΩ_out,dΓ,dΓg) =
+  (∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) ) * dΩ +
+  ∫( e_Ωout((u,p),(v,q)) )dΩ_out +
+  ∫( a_Γ(u,v)+b_Γ(u,q)+b_Γ(v,p) ) * dΓ +
+  ∫( i_Γg(u,v) - j_Γg(p,q) ) * dΓg)
+
+l(μ,(u,p),(v,q),dΩ,dΓ) =
+  ∫( v⋅fμ(μ) - ϕ_Ω(μ,q) - q*gμ(μ) ) * dΩ +
+  ∫( uμ(μ)⊙( (γ/h)*v - n_Γ⋅∇(v) + q*n_Γ ) ) * dΓ
+
+trian_res = (Ω,Γ)
+trian_jac = (Ω,Ω_out,Γ,Γg)
 domains = FEDomains(trian_res,trian_jac)
 
-coupling((du,dp),(v,q)) = ∫(dp*∂₁(v))dΩ + ∫(dp*∂₂(v))dΩ
-energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
+coupling((du,dp),(v,q)) = ∫(dp*∂₁(v))dΩbg + ∫(dp*∂₂(v))dΩbg
+energy((du,dp),(v,q)) = ∫(du⋅v)dΩbg + ∫(∇(v)⊙∇(du))dΩbg + ∫(dp*q)dΩbg
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-test_u = TProductFESpace(Ω,reffe_u;conformity=:H1,dirichlet_tags="wall")
-trial_u = ParamTrialFESpace(test_u,gμ_0)
+test_u = TProductFESpace(Ωbg,reffe_u;conformity=:H1,dirichlet_tags="boundary")
+trial_u = ParamTrialFESpace(test_u,uμ)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TProductFESpace(Ω,reffe_p;conformity=:H1)
+test_p = TProductFESpace(Ωbg,reffe_p;conformity=:H1,constraint=:zeromean)
 trial_p = TrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -113,55 +123,17 @@ x̂,rbstats = solve(rbsolver,rbop,μon)
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 
-u1 = flatten_snapshots(x[1])[:,1]
-p1 = flatten_snapshots(x[2])[:,1]
-r1 = get_realization(x[1])[1]
-U1 = param_getindex(trial_u(r1),1)
-uh = FEFunction(U1,u1)
-ph = FEFunction(trial_p,p1)
-writevtk(Ω_in,datadir("plts/sol"),cellfields=["uh"=>uh,"ph"=>ph])
+# u1 = flatten_snapshots(x[1])[:,1]
+# p1 = flatten_snapshots(x[2])[:,1]
+# r1 = get_realization(x[1])[1]
+# U1 = param_getindex(trial_u(r1),1)
+# uh = FEFunction(U1,u1)
+# ph = FEFunction(trial_p,p1)
+# writevtk(Ω,datadir("plts/sol"),cellfields=["uh"=>uh,"ph"=>ph])
 
-xrb = Snapshots(inv_project(get_trial(rbop)(μon),x̂),get_dof_map(feop),μon)
-u1 = flatten_snapshots(xrb[1])[:,1]
-p1 = flatten_snapshots(xrb[2])[:,1]
-uh = FEFunction(U1,u1)
-ph = FEFunction(trial_p,p1)
-writevtk(Ω_in,datadir("plts/sol_approx"),cellfields=["uh"=>uh,"ph"=>ph])
-
-# try with pod
-
-bgmodel′ = bgmodel.model
-cutgeo′ = cut(bgmodel′,geo3)
-
-Ω′ = Ω.trian
-dΩ′ = dΩ.measure
-
-test_u′ = TestFESpace(bgmodel′,reffe_u;conformity=:H1,dirichlet_tags="wall")
-trial_u′ = ParamTrialFESpace(test_u′,gμ_0)
-test_p′ = TestFESpace(bgmodel′,reffe_p;conformity=:H1)
-trial_p′ = TrialFESpace(test_p′)
-test′ = MultiFieldParamFESpace([test_u′,test_p′];style=BlockMultiFieldStyle())
-trial′ = MultiFieldParamFESpace([trial_u′,trial_p′];style=BlockMultiFieldStyle())
-feop′ = LinearParamFEOperator(l,a,pspace,trial′,test′,domains)
-
-coupling′((du,dp),(v,q)) = ∫((∇⋅v)*dp)dΩ_in
-
-state_reduction′ = SupremizerReduction(coupling′,1e-4,energy;nparams=100)
-rbsolver′ = RBSolver(fesolver,state_reduction′;nparams_res=50,nparams_jac=50)
-
-fesnaps′,festats′ = solution_snapshots(rbsolver′,feop′)
-rbop′ = reduced_operator(rbsolver′,feop′,fesnaps′)
-x̂′,rbstats′ = solve(rbsolver′,rbop′,μon)
-
-x′,festats′ = solution_snapshots(rbsolver′,feop′,μon)
-perf′ = rb_performance(rbsolver′,feop′,rbop′,x′,x̂′,festats′,rbstats′,μon)
-
-xrb = Snapshots(inv_project(get_trial(rbop′)(μon),x̂′),get_dof_map(feop′),μon)
-
-u1 = (x′[1]-xrb[1])[:,1]
-p1 = (x′[2]-xrb[2])[:,1]
-r1 = get_realization(x′[1])[1]
-U1 = param_getindex(trial_u′(r1),1)
-uh = FEFunction(U1,u1)
-ph = FEFunction(trial_p′,p1)
-writevtk(Ω_in,datadir("plts/err"),cellfields=["uh"=>uh,"ph"=>ph])
+# xrb = Snapshots(inv_project(get_trial(rbop)(μon),x̂),get_dof_map(feop),μon)
+# u1 = flatten_snapshots(xrb[1])[:,1]
+# p1 = flatten_snapshots(xrb[2])[:,1]
+# uh = FEFunction(U1,u1)
+# ph = FEFunction(trial_p,p1)
+# writevtk(Ω,datadir("plts/sol_approx"),cellfields=["uh"=>uh,"ph"=>ph])

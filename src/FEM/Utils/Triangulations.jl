@@ -157,24 +157,60 @@ function get_union_indices(parent::AppendedTriangulation,trians)
   indices = ()
   for t in trians
     indst = get_view_indices(t)
-    if !isa(t,AppendedTriangulation)
-      _shift_inds!(indst,t,parent)
-    end
+    shift_appended_ids!(indst,t,parent)
     indices = (indices...,indst...)
   end
   union(indices...) |> unique
 end
 
-function _shift_inds!(i::AbstractVector,child::Triangulation,parent::AppendedTriangulation)
-  isappended(t) = isa(t,AppendedTriangulation)
-  @notimplementedif isappended(parent.a) || isappended(parent.b)
-  cmp = (a,b) -> a == b || is_parent(a,b)
-  j = findfirst(a -> cmp(a,child),(parent.a,parent.b))
-  if j == 2
-    ncells = num_cells(parent.a)
-    i .+= ncells
+function shift_appended_ids!(i::AbstractVector,child::Triangulation,parent::AppendedTriangulation)
+  parents_tree = get_tree_of_parents(child,parent)
+  parent_id = findfirst(parents_tree)
+  @check !isnothing(parent_id)
+
+  parent_id == 1 && return
+
+  ncells_tree = get_tree_of_ncells(parent)
+  cumulative_ncells = cumsum(ncells_tree)
+  ncells_add_parent = cumulative_ncells[parent_id-1]
+  i .+= ncells_add_parent
+
+  return
+end
+
+function shift_appended_ids!(i::AppendedArray,child::AppendedTriangulation,parent::AppendedTriangulation)
+  shift_appended_ids!(i.a,child.a,parent)
+  shift_appended_ids!(i.b,child.b,parent)
+end
+
+function get_tree_of_ncells(trian::Triangulation)
+  num_cells(trian)
+end
+
+function get_tree_of_ncells(trian::AppendedTriangulation)
+  tree = (get_tree_of_ncells(trian.a),get_tree_of_ncells(trian.b))
+  splat_tuple(tree)
+end
+
+function get_tree_of_parents(child::Triangulation,parent::Triangulation)
+  parent == child || is_parent(parent,child)
+end
+
+function get_tree_of_parents(child::Triangulation,parent::AppendedTriangulation)
+  tree = (get_tree_of_parents(child,parent.a),get_tree_of_parents(child,parent.b))
+  splat_tuple(tree)
+end
+
+function splat_tuple(t::Any)
+  t
+end
+
+function splat_tuple(t::Tuple)
+  st = ()
+  for ti in t
+    st = (st...,splat_tuple(ti)...)
   end
-  i
+  st
 end
 
 """
@@ -187,13 +223,13 @@ domain is found
 """
 function merge_triangulations(trians::AbstractVector{<:Triangulation})
   trian = first(trians)
-  x = get_node_coordinates(trian)
+  parent = get_parent(trian)
   for t in trians[2:end]
-    if get_node_coordinates(t) !== x
-      trian = lazy_append(trian,t)
+    cur_parent = get_parent(t)
+    if is_included(parent,cur_parent)
+      parent = cur_parent
     end
   end
-  parent = get_parent(trian)
   uindices = get_union_indices(parent,trians)
   view(parent,uindices)
 end

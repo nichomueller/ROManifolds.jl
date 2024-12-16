@@ -382,8 +382,8 @@ end
 
 function CellData.change_domain(
   a::TProductSparsity,
-  row::DofMap{D,Ti},
-  col::DofMap{D,Ti}
+  row::AbstractDofMap{D,Ti},
+  col::AbstractDofMap{D,Ti}
   ) where {D,Ti}
 
   a′ = change_domain(a.sparsity,row,col)

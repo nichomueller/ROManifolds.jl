@@ -43,6 +43,7 @@ export DofMap
 export ConstrainedDofMap
 export DofMapPortion
 export TProductDofMap
+export ConstrainedTProductDofMap
 export invert
 export vectorize
 include("DofMapsInterface.jl")
@@ -72,8 +73,10 @@ export get_dof_type
 export get_sparse_dof_map
 export get_univariate_dof_map
 export get_dirichlet_entities
+export cell_reffe_to_reffe
 export get_polynomial_order
 export get_tface_to_mask
+export get_dof_to_constraints
 include("DofMapsBuilders.jl")
 
 export FEDofMap

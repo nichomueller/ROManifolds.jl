@@ -177,26 +177,26 @@ end
 
 # spaces with constraints
 
-function get_dof_map(model::CartesianDiscreteModel,ls::FESpaceWithLinearConstraints)
+function get_dof_map(model::CartesianDiscreteModel,ls::FESpaceWithLinearConstraints,args...)
   space = ls.space
   ndofs = num_free_dofs(space)
   sdof_to_bdof = setdiff(1:ndofs,ls.mDOF_to_DOF)
   dof_to_constraints = get_dof_to_constraints(sdof_to_bdof,ndofs)
-  dof_map = get_dof_map(model,space)
+  dof_map = get_dof_map(model,space,args...)
   return ConstrainedDofMap(dof_map,dof_to_constraints)
 end
 
-function get_dof_map(model::CartesianDiscreteModel,cs::FESpaceWithConstantFixed)
+function get_dof_map(model::CartesianDiscreteModel,cs::FESpaceWithConstantFixed,args...)
   space = cs.space
   ndofs = num_free_dofs(space)
-  dof_to_constraints = get_dof_to_constraints(cs.sdof_to_bdof,ndofs)
-  dof_map = get_dof_map(model,space)
+  dof_to_constraints = get_dof_to_constraints(cs.dof_to_fix,ndofs)
+  dof_map = get_dof_map(model,space,args...)
   return ConstrainedDofMap(dof_map,dof_to_constraints)
 end
 
-function get_dof_map(model::CartesianDiscreteModel,zs::ZeroMeanFESpace)
+function get_dof_map(model::CartesianDiscreteModel,zs::ZeroMeanFESpace,args...)
   space = zs.space
-  get_dof_map(model,space)
+  get_dof_map(model,space,args...)
 end
 
 # sparse interface
@@ -392,7 +392,7 @@ function get_tface_to_mask(
 
   t2s::Vector{Int} = indexin(ttface_to_mface,stface_to_mface)
   if ttface_to_mface == stface_to_mface
-    tface_to_mask = get_tface_to_mask(s)
+    tface_to_mask = get_tface_to_mask(stface_to_mface)
   else
     s2t = indexin(stface_to_mface,ttface_to_mface)
     ncells = length(stface_to_mface)
@@ -406,7 +406,7 @@ function get_tface_to_mask(
   return tface_to_mask
 end
 
-function get_dof_to_constraints(constrained_dofs::AbstractVector,ndofs::Int)
+function get_dof_to_constraints(constrained_dofs,ndofs::Int)
   dof_to_constraint = fill(true,ndofs)
   for dof in eachindex(dof_to_constraint)
     if !(dof ∈ constrained_dofs)
@@ -434,6 +434,33 @@ end
 get_dof_type(b) = @abstractmethod
 get_dof_type(b::LagrangianDofBasis{P,V}) where {P,V} = change_eltype(V,Float64)
 get_dof_type(dof::CellDof) = get_dof_type(testitem(get_data(dof)))
+
+reffe_to_reffe_name(::ReferenceFEName) = @abstractmethod
+reffe_to_reffe_name(::LagrangianRefFE) = lagrangian
+reffe_to_reffe_name(::BezierRefFE) = bezier
+reffe_to_reffe_name(::GenericRefFE{T}) where T = T
+
+function cell_reffe_to_reffe(::DomainStyle,model::DiscreteModel,reffe::Tuple{<:ReferenceFEName,Any,Any})
+  basis,reffe_args,reffe_kwargs = reffe
+  T,order = reffe_args
+  ReferenceFE(model,basis,T,order;reffe_kwargs...)
+end
+
+function cell_reffe_to_reffe(::ReferenceDomain,model::DiscreteModel,cell_reffe::CellFE)
+  reffe = first(get_reffes(model))
+  reffe_name = reffe_to_reffe_name(reffe)
+  order = cell_reffe.max_order
+  T = get_dof_type(testitem(cell_reffe.cell_dof_basis))
+  ReferenceFE(reffe_name,T,order)
+end
+
+function cell_reffe_to_reffe(::PhysicalDomain,model::DiscreteModel,cell_reffe::CellFE)
+  cell_reffe
+end
+
+function cell_reffe_to_reffe(model::DiscreteModel,args...)
+  cell_reffe_to_reffe(ReferenceDomain(),model,args...)
+end
 
 function get_comp_to_dofs(::Type{T},space::FESpace,dof::CellDof) where T
   @abstractmethod
