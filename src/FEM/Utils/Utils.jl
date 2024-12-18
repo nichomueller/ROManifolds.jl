@@ -1,6 +1,8 @@
 module Utils
 
 using LinearAlgebra
+using BlockArrays
+using FillArrays
 
 using Gridap
 using Gridap.Algebra
@@ -10,13 +12,16 @@ using Gridap.FESpaces
 using Gridap.Fields
 using Gridap.Geometry
 using Gridap.Helpers
+using Gridap.MultiField
 using Gridap.ReferenceFEs
 using Gridap.TensorValues
 
 using GridapEmbedded
 using GridapEmbedded.Interfaces
 
-import FillArrays: Fill
+using GridapSolvers
+using GridapSolvers.PatchBasedSmoothers
+import GridapSolvers.PatchBasedSmoothers: inject!, prolongate!
 
 export PerformanceTracker
 export CostTracker
@@ -48,5 +53,16 @@ export MatrixContribution
 export TupOfArrayContribution
 export contribution
 include("Contributions.jl")
+
+export ColoredArray
+include("ColoredArrays.jl")
+
+export ColoredFESpace
+export inject!
+export prolongate!
+include("ColoredFESpaces.jl")
+
+export MultiColorFESpace
+include("ColoredMultiFieldFESpaces.jl")
 
 end # module

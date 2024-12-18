@@ -99,6 +99,11 @@ end
 function get_tface_to_mface(t::SkeletonTriangulation) #TODO Is this correct?
   unique(lazy_append(get_tface_to_mface(t.plus),get_tface_to_mface(t.minus)))
 end
+function get_tface_to_mface(t::Geometry.CompositeTriangulation)
+  rface_to_mface = get_tface_to_mface(t.rtrian)
+  dface_to_rface = get_tface_to_mface(t.dtrian)
+  dface_to_mface = collect(lazy_map(Reindex(rface_to_mface),dface_to_rface))
+end
 
 function Base.isapprox(t::T,s::S) where {T<:Triangulation,S<:Triangulation}
   false

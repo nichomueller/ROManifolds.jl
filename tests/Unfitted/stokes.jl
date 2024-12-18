@@ -23,15 +23,18 @@ cutgeo = cut(bgmodel,geo2)
 cutgeo_facets = cut_facets(bgmodel,geo2)
 
 Ωbg = Triangulation(bgmodel)
+Ωact = Triangulation(cutgeo,ACTIVE)
 Ω = Triangulation(cutgeo,PHYSICAL_IN)
 Ω_out = Triangulation(cutgeo,PHYSICAL_OUT)
 Γ = EmbeddedBoundary(cutgeo)
 Γg = GhostSkeleton(cutgeo)
 Γi = SkeletonTriangulation(cutgeo_facets)
+Γn = BoundaryTriangulation(Ωact,tags="boundary")
 
 n_Γ = get_normal_vector(Γ)
 n_Γg = get_normal_vector(Γg)
 n_Γi = get_normal_vector(Γi)
+n_Γn = get_normal_vector(Γn)
 
 order = 2
 degree = 2*order
@@ -41,6 +44,8 @@ dΩ = Measure(Ω,degree)
 dΓ = Measure(Γ,degree)
 dΓg = Measure(Γg,degree)
 dΓi = Measure(Γi,degree)
+dΓn = Measure(Γn,degree)
+dΩ_out = Measure(Ω_out,degree)
 
 u(x,μ) = VectorValue(μ[1]*x[1]*x[1],μ[2]*x[2])
 u(μ) = x->u(x,μ)
@@ -88,11 +93,12 @@ a(μ,(u,p),(v,q),dΩ,dΩ_out,dΓ,dΓg) =
   ∫( a_Γ(u,v)+b_Γ(u,q)+b_Γ(v,p) ) * dΓ +
   ∫( i_Γg(u,v) - j_Γg(p,q) ) * dΓg)
 
-l(μ,(u,p),(v,q),dΩ,dΓ) =
+l(μ,(u,p),(v,q),dΩ,dΓ,dΓn) =
   ∫( v⋅fμ(μ) - ϕ_Ω(μ,q) - q*gμ(μ) ) * dΩ +
-  ∫( uμ(μ)⊙( (γ/h)*v - n_Γ⋅∇(v) + q*n_Γ ) ) * dΓ
+  ∫( uμ(μ)⊙( (γ/h)*v - n_Γ⋅∇(v) + q*n_Γ ) ) * dΓ +
+  ∫( v⋅(n_Γn⋅∇(u)) - (n_Γn⋅v)*p ) * dΓn
 
-trian_res = (Ω,Γ)
+trian_res = (Ω,Γ,Γn)
 trian_jac = (Ω,Ω_out,Γ,Γg)
 domains = FEDomains(trian_res,trian_jac)
 
@@ -137,3 +143,94 @@ perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 # uh = FEFunction(U1,u1)
 # ph = FEFunction(trial_p,p1)
 # writevtk(Ω,datadir("plts/sol_approx"),cellfields=["uh"=>uh,"ph"=>ph])
+
+R = 0.3
+pmin = Point(0,0)
+pmax = Point(1,1)
+n = 20
+partition = (n,n)
+
+geo1 = disk(R,x0=Point(0.5,0.5))
+geo2 = ! geo1
+
+bgmodel = CartesianDiscreteModel(pmin,pmax,partition)
+cutgeo = cut(bgmodel,geo2)
+cutgeo_facets = cut_facets(bgmodel,geo2)
+
+Ωbg = Triangulation(bgmodel)
+Ωact = Triangulation(cutgeo,ACTIVE)
+Ω = Triangulation(cutgeo,PHYSICAL_IN)
+Ω_out = Triangulation(cutgeo,PHYSICAL_OUT)
+Γ = EmbeddedBoundary(cutgeo)
+Γg = GhostSkeleton(cutgeo)
+Γi = SkeletonTriangulation(cutgeo_facets)
+Γn = BoundaryTriangulation(Ωact,tags="boundary")
+
+n_Γ = get_normal_vector(Γ)
+n_Γg = get_normal_vector(Γg)
+n_Γi = get_normal_vector(Γi)
+n_Γn = get_normal_vector(Γn)
+
+order = 2
+degree = 2*order
+
+dΩbg = Measure(Ωbg,degree)
+dΩ = Measure(Ω,degree)
+dΓ = Measure(Γ,degree)
+dΓg = Measure(Γg,degree)
+dΓi = Measure(Γi,degree)
+dΓn = Measure(Γn,degree)
+dΩ_out = Measure(Ω_out,degree)
+
+# μ = get_realization(fesnaps).params[1]
+# uu(x) = VectorValue(μ[1]*x[1]*x[1],μ[2]*x[2])
+# pp(x) = μ[3]*x[1]-x[2]
+uu(x) = VectorValue(x[1]*x[1],x[2])
+pp(x) = x[1]-x[2]
+ff(x) = - Δ(uu)(x) + ∇(pp)(x)
+gg(x) = (∇⋅uu)(x)
+
+ϕϕ_Ω(q) = (β1*h^2)*∇(q)⋅ff
+
+aa((u,p),(v,q)) =
+  (∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) ) * dΩ +
+  ∫( e_Ωout((u,p),(v,q)) )dΩ_out +
+  ∫( a_Γ(u,v)+b_Γ(u,q)+b_Γ(v,p) ) * dΓ +
+  ∫( i_Γg(u,v) - j_Γg(p,q) ) * dΓg)
+
+ll((v,q)) =
+  ∫( v⋅ff - ϕϕ_Ω(q) - q*gg ) * dΩ +
+  ∫( uu⊙( (γ/h)*v - n_Γ⋅∇(v) + q*n_Γ ) ) * dΓ +
+  ∫( v⋅(n_Γn⋅∇(uu)) - (n_Γn⋅v)*pp ) * dΓn
+
+op = AffineFEOperator(aa,ll,test,test)
+uh,ph = solve(op)
+
+l2(u) = sqrt(sum( ∫( u⊙u )*dΩ ))
+h1(u) = sqrt(sum( ∫( u⊙u + ∇(u)⊙∇(u) )*dΩ ))
+
+eu_h1 = h1(uu - uh)
+ep_l2 = l2(pp - ph)
+
+aaa((u,p),(v,q)) =
+  (∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) ) * dΩ +
+  ∫( a_Γ(u,v)+b_Γ(u,q)+b_Γ(v,p) ) * dΓ +
+  ∫( i_Γg(u,v) - j_Γg(p,q) ) * dΓg)
+
+lll((v,q)) =
+  ∫( v⋅ff - ϕϕ_Ω(q) - q*gg ) * dΩ +
+  ∫( uu⊙( (γ/h)*v - n_Γ⋅∇(v) + q*n_Γ ) ) * dΓ +
+  ∫( v⋅(n_Γn⋅∇(uu)) - (n_Γn⋅v)*pp ) * dΓn
+
+V = FESpace(Ωact,reffe_u;conformity=:H1,dirichlet_tags="boundary")
+Q = FESpace(Ωact,reffe_p;conformity=:H1,constraint=:zeromean)
+Y = MultiFieldParamFESpace([V,Q])
+X = Y
+
+oop = AffineFEOperator(aaa,lll,Y,X)
+uuh,pph = solve(oop)
+
+writevtk(Ω,datadir("plts/err_cutfem"),cellfields=["euh"=>uh-uuh,"eph"=>ph-pph])
+
+eeu_h1 = h1(uu - uuh)
+eep_l2 = l2(pp - pph)
