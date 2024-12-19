@@ -54,15 +54,18 @@ export TupOfArrayContribution
 export contribution
 include("Contributions.jl")
 
-export ColoredArray
-include("ColoredArrays.jl")
+# export ColoredArray
+# include("ColoredArrays.jl")
 
-export ColoredFESpace
-export inject!
-export prolongate!
-include("ColoredFESpaces.jl")
+# export ColoredFESpace
+# export inject!
+# export prolongate!
+# include("ColoredFESpaces.jl")
 
-export MultiColorFESpace
-include("ColoredMultiFieldFESpaces.jl")
+# export MultiColorFESpace
+# include("ColoredMultiFieldFESpaces.jl")
+
+export NewFESpace
+include("NewFESpace.jl")
 
 end # module

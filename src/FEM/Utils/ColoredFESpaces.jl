@@ -16,19 +16,21 @@
 struct ColoredFESpace{V,A} <: SingleFieldFESpace
   space:: A
   colors:: Vector{Int8}
+  cell_to_color::Vector{Int8}
   color_to_ndofs::Vector{Int64}
   dof_to_color::Vector{Int8}
   dof_to_pdof::Vector{Int32}
   function ColoredFESpace(
     space::SingleFieldFESpace,
     colors::Vector{Int8},
+    cell_to_color::Vector{Int8},
     color_to_ndofs::Vector{Int64},
     dof_to_color::Vector{Int8},
     dof_to_pdof::Vector{Int32}
   )
     V = typeof(mortar(map(n->zeros(n),color_to_ndofs)))
     A = typeof(space)
-    new{V,A}(space,colors,color_to_ndofs,dof_to_color,dof_to_pdof)
+    new{V,A}(space,colors,cell_to_color,color_to_ndofs,dof_to_color,dof_to_pdof)
   end
 end
 
@@ -36,8 +38,9 @@ function ColoredFESpace(space::FESpace,trian_in::Triangulation)
   trian = get_triangulation(space)
   trian_out = complementary(trian_in,trian)
   colors,color_to_ndofs,dof_to_color = get_dof_to_color(space,trian_in,trian_out)
+  cell_to_color = get_cell_to_color(trian,trian_in,trian_out)
   dof_to_pdof = get_dof_to_colored_dof(color_to_ndofs,dof_to_color)
-  ColoredFESpace(space,colors,color_to_ndofs,dof_to_color,dof_to_pdof)
+  ColoredFESpace(space,colors,cell_to_color,color_to_ndofs,dof_to_color,dof_to_pdof)
 end
 
 # FESpace interface
@@ -68,7 +71,12 @@ function FESpaces.get_cell_dof_ids(W::ColoredFESpace)
 end
 
 function FESpaces.get_cell_dof_ids(W::ColoredFESpace,trian::Triangulation)
-
+  if !is_active(trian,W)
+    color = get_interface_color(W)
+    get_color_cell_dof_ids(W,trian,color)
+  else
+    FESpaces.get_cell_fe_data(get_cell_dof_ids,W,trian)
+  end
 end
 
 # ColoredFESpace interface
@@ -77,6 +85,10 @@ num_colors(W::ColoredFESpace) = length(W.colors)
 num_dofs_per_color(W::ColoredFESpace) = W.color_to_ndofs
 get_dof_color(W::ColoredFESpace) = W.dof_to_color
 get_dof_to_colored_dof(W::ColoredFESpace) = W.dof_to_pdof
+
+get_inside_color(W::ColoredFESpace) = W.colors[1]
+get_interface_color(W::ColoredFESpace) = W.colors[2]
+get_outside_color(W::ColoredFESpace) = W.colors[3]
 
 """
     get_cell_dof_color(W::ColoredFESpace)
@@ -110,7 +122,15 @@ function get_color_cell_dof_ids(W::ColoredFESpace,color::Integer)
   else
     data = lazy_map(Reindex(dof_to_pdof),cell_dof_ids.data)
   end
-  return Table(data,cell_dof_ids.ptrs)
+
+  cell_pdof_ids = Table(data,cell_dof_ids.ptrs)
+  cell_dof_to_color = get_cell_dof_color(W)
+  return lazy_map(ColorMap(),cell_pdof_ids,cell_dof_to_color)
+end
+
+function get_color_cell_dof_ids(W::ColoredFESpace,trian::Triangulation,color::Integer)
+  f = space -> get_color_cell_dof_ids(space,color)
+  FESpaces.get_cell_fe_data(f,W,trian)
 end
 
 # Assembly
@@ -248,15 +268,15 @@ end
 
 function get_dof_to_color(space::FESpace,trian_in::Triangulation,trian_out::Triangulation)
   ncolors = 3
-  colors = collect(Int8,ncolors) # in, interface, out
+  colors = collect(Int8,1:ncolors) # in, interface, out
   ndofs = num_free_dofs(space)
 
   reject_ndofs = ndofs
   color_to_ndofs = Vector{Int64}(undef,ncolors)
   dof_to_color   = fill(Int8(-1),ndofs)
 
-  dof_to_mask_in = my_get_dof_mask(space,trian_in)
-  dof_to_mask_out = my_get_dof_mask(space,trian_out)
+  dof_to_mask_in = get_dof_mask(space,trian_in)
+  dof_to_mask_out = get_dof_mask(space,trian_out)
   dof_to_mask_Γ = dof_to_mask_in .&& dof_to_mask_out
   dof_to_mask_in[findall(dof_to_mask_Γ)] .= false
   dof_to_mask_out[findall(dof_to_mask_Γ)] .= false
@@ -291,9 +311,37 @@ function get_dof_mask(space::FESpace,trian::Triangulation{Dc}) where Dc
   return dof_to_mask
 end
 
+function get_cell_to_color(trian::Triangulation,trian_in::Triangulation,trian_out::Triangulation)
+  cell_to_color = fill(Int8(-1),num_cells(trian))
+  cell_to_mask_in = get_cell_mask(trian,trian_in)
+  cell_to_mask_out = get_cell_mask(trian,trian_out)
+  cell_to_mask_Γ = cell_to_mask_in .&& cell_to_mask_out
+  cell_to_mask_in[findall(cell_to_mask_Γ)] .= false
+  cell_to_mask_out[findall(cell_to_mask_Γ)] .= false
+  for (i,cell_to_mask) in enumerate((cell_to_mask_in,cell_to_mask_Γ,cell_to_mask_out))
+    cell_to_color[cell_to_mask] .= i
+  end
+  return cell_to_color
+end
+
+function get_cell_mask(trian::Triangulation,t::Triangulation)
+  @check is_included(t,trian)
+  cell_to_mask = fill(false,num_cells(trian))
+  tface_to_mface = get_tface_to_mface(t)
+  cell_to_mask[tface_to_mface] .= true
+  return cell_to_mask
+end
+
 function complementary(trian_in::Triangulation,trian::Triangulation)
   tface_to_mface = get_tface_to_mface(trian)
   tface_in_to_mface = get_tface_to_mface(trian_in)
   tface_out_to_mface = setdiff(tface_to_mface,tface_in_to_mface)
   view(trian,tface_out_to_mface)
+end
+
+function is_active(trian::Triangulation,W::ColoredFESpace)
+  color = get_outside_color(W)
+  cells_to_color = W.cell_to_color
+  cells = get_tface_to_mface(trian)
+  !( all(cells_to_color[cells] .== color) )
 end

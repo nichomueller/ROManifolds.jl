@@ -28,7 +28,6 @@ function Base.show(io::IO,k::MIME"text/plain",o::ColoredArray)
 end
 
 function Arrays.testitem(f::ColoredArray{T}) where T
-  #@notimplementedif !isconcretetype(T)
   f.array[][1], f.colors[][1]
 end
 
@@ -116,17 +115,17 @@ end
   A
 end
 
-# Color mask, to mask out entries that are not of a given color
+# Color mask, to mask out entries that are of a given color
 
 struct ColorMask
-  color :: Int8
+  color::Int8
 end
 
 function Fields.evaluate!(cache,k::ColorMask,v::T,c::Int8) where T <: Number
   if c == k.color
-    return v
-  else
     return -one(T)
+  else
+    return v
   end
 end
 

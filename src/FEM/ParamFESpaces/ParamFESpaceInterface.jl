@@ -1,6 +1,9 @@
 function get_dirichlet_cells end
 get_dirichlet_cells(f::FESpace) = @abstractmethod
 get_dirichlet_cells(f::UnconstrainedFESpace) = f.dirichlet_cells
+get_dirichlet_cells(f::FESpaceWithConstantFixed) = get_dirichlet_cells(f.space)
+get_dirichlet_cells(f::ZeroMeanFESpace) = get_dirichlet_cells(f.space)
+get_dirichlet_cells(f::TrialFESpace) = get_dirichlet_cells(f.space)
 get_dirichlet_cells(f::TProductFESpace) = get_dirichlet_cells(f.space)
 
 ParamDataStructures.param_length(f::FESpace) = 0
@@ -106,7 +109,10 @@ function FESpaces.FEFunction(
   FEFunction(pf′,fv,dv)
 end
 
-function FESpaces.EvaluationFunction(pf::SingleFieldParamFESpace{<:ZeroMeanFESpace},free_values)
+function FESpaces.EvaluationFunction(
+  pf::SingleFieldParamFESpace{<:ZeroMeanFESpace},
+  free_values::AbstractParamVector)
+
   pf′ = remove_layer(pf)
   FEFunction(pf′,free_values)
 end
@@ -135,8 +141,8 @@ end
 
 function FESpaces.scatter_free_and_dirichlet_values(
   pf::SingleFieldParamFESpace{<:FESpaceWithLinearConstraints},
-  fmdof_to_val,
-  dmdof_to_val)
+  fmdof_to_val::AbstractParamVector,
+  dmdof_to_val::AbstractParamVector)
 
   f = get_fe_space(pf)
   pf′ = remove_layer(pf)
@@ -168,8 +174,8 @@ function FESpaces.gather_free_and_dirichlet_values(
 end
 
 function FESpaces.gather_free_and_dirichlet_values!(
-  free_vals,
-  dirichlet_vals,
+  free_vals::AbstractParamVector,
+  dirichlet_vals::AbstractParamVector,
   f::SingleFieldParamFESpace{<:UnconstrainedFESpace},
   cell_vals)
 
@@ -191,8 +197,8 @@ function FESpaces.gather_free_and_dirichlet_values!(
 end
 
 function FESpaces.gather_free_and_dirichlet_values!(
-  fv,
-  dv,
+  fv::AbstractParamVector,
+  dv::AbstractParamVector,
   pf::SingleFieldParamFESpace{<:FESpaceWithConstantFixed{T}},
   cv) where T<:FESpaces.FixConstant
 
@@ -200,9 +206,9 @@ function FESpaces.gather_free_and_dirichlet_values!(
   f = get_fe_space(pf)
   pf′ = remove_layer(pf)
   _dv = similar(dv,eltype(dv),0)
-  _fv = ParamVectorWithEntryInserted(fv,f.dof_to_fix,zero(eltype(fv)))
+  _fv = ParamVectorWithEntryInserted(fv,f.dof_to_fix,zeros(eltype2(fv),param_length(fv)))
   gather_free_and_dirichlet_values!(_fv,_dv,pf′,cv)
-  dv[1] = _fv.value
+  dv.data[1,:] = _fv.value
   (fv,dv)
 end
 

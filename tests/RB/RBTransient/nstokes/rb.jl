@@ -11,10 +11,10 @@ using GridapSolvers.NonlinearSolvers
 using ReducedOrderModels
 
 # time marching
-θ = 0.5
+θ = 1.0
 dt = 0.0025
 t0 = 0.0
-tf = 50*dt
+tf = 60*dt
 
 # parametric space
 pranges = fill([1,10],3)
@@ -48,7 +48,7 @@ p0μ(μ) = ParamFunction(p0,μ)
 conv(u,∇u) = (∇u')⋅u
 dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 
-h = "h005"
+h = "h007"
 model_dir = datadir(joinpath("models","model_circle_$h.json"))
 model = DiscreteModelFromFile(model_dir)
 labels = get_face_labeling(model)
@@ -62,6 +62,8 @@ dΩ = Measure(Ω,degree)
 trian_res = (Ω,)
 trian_jac = (Ω,)
 trian_jac_t = (Ω,)
+domains_lin = FEDomains(trian_res,(trian_jac,trian_jac_t))
+domains_nlin = FEDomains(trian_res,(trian_jac,))
 
 c(u,v,dΩ) = ∫( v⊙(conv∘(u,∇(u))) )dΩ
 dc(u,du,v,dΩ) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )dΩ
@@ -82,15 +84,14 @@ test_u = TestFESpace(model,reffe_u;conformity=:H1,
   dirichlet_masks=[[true,true,true],[false,false,true],[true,true,true]])
 trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_in,gμt_0])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:C0)
-trial_p = TrialFESpace(test_p)
+test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+trial_p = TransientTrialParamFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 
 feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
-  trial,test,trian_res,trian_jac,trian_jac_t;constant_forms=(false,true))
-feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,
-  trial,test,trian_res,trian_jac)
+  trial,test,domains_lin;constant_forms=(false,true))
+feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,trial,test,domains_nlin)
 feop = LinearNonlinearTransientParamFEOperator(feop_lin,feop_nlin)
 
 fesolver = ThetaMethod(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true),dt,θ)
@@ -99,32 +100,18 @@ xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 test_dir = datadir(joinpath("navier-stokes","model_circle_$h"))
 create_dir(test_dir)
 
-function temp_solution_snapshots(
-  solver::RBSolver,
-  feop::TransientParamFEOperator,
-  args...)
-
-  r = realization(feop;nparams=60)
-  fesolver = get_fe_solver(solver)
-  sol = solve(fesolver,feop,r,args...)
-  values,stats = collect(sol.odesol)
-  save(joinpath(test_dir,"values.txt"),values)
-  i = get_dof_map(feop)
-  snaps = Snapshots(values,i,r)
-  return snaps,stats
-end
-
 tol = 1e-4
 state_reduction = TransientReduction(coupling,tol,energy;nparams=50,sketch=:sprn)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,nparams_djac=1)
 
-fesnaps,festats = temp_solution_snapshots(rbsolver,feop,xh0μ)
+fesnaps, = solution_snapshots(rbsolver,feop,xh0μ)
 println(festats)
 save(test_dir,fesnaps)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 save(test_dir,rbop)
-ronline = get_realization(fesnaps)[51:60,:]
-xonline = select_snapshots(fesnaps,51:60)
+ronline = realization(feop;nparams=10,random=true)
+xonline,festats = solution_snapshots(rbsolver,feop,xh0μ)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 println(rbstats)
 perf = rb_performance(rbsolver,feop,rbop,xonline,x̂,festats,rbstats,ronline)
+println(perf)

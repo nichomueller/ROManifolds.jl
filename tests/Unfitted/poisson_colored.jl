@@ -1,4 +1,6 @@
 using Gridap
+using Gridap.FESpaces
+using Gridap.Algebra
 using GridapEmbedded
 using GridapEmbedded.Interfaces
 using ReducedOrderModels
@@ -51,7 +53,7 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 Vcut = FESpace(Ω_act,reffe)
 Ucut = TrialFESpace(Vcut)
 
-Vbg = FESpace(Ω_bg,reffe)
+Vbg = FESpace(Ω_bg,reffe;conformity=:H1,dirichlet_tags="boundary")
 
 # function _get_dofs(cellids::AbstractArray{<:AbstractArray})
 #   _get_dofs(Table(cellids))
@@ -117,11 +119,9 @@ Vbg = FESpace(Ω_bg,reffe)
 # active_dofs_on_interface = get_active_dofs_on_interface(Vbg,Ω_act,Ω_out)
 # dof_to_pdof = Utils.get_dof_to_colored_dof(tag_to_ndofs,dof_to_tag)
 
-Ωact_in = Triangulation(cutgeo,ACTIVE_IN)
-Ωact_out = Triangulation(cutgeo,ACTIVE_OUT)
-Vcolor = cutfem_dof_to_tag(Vbg,Ωact_in,Ωact_out)
+# Vcolor = ColoredFESpace(Vbg,Ω_act)
 # Vcolor = MultiColorFESpace(Vbg,tags,tag_to_ndofs,dof_to_tag,dof_to_pdof)
-Ucolor = TrialFESpace(Vcolor)
+# Ucolor = TrialFESpace(Vcolor)
 
 γd = 10.0
 γg = 0.1
@@ -135,67 +135,101 @@ aout(u,v) = ∫( ∇(v)⋅∇(u) ) * dΩ_out
 
 a(u,v) = acut(u,v) + aout(u,v)
 
-l(v) = ∫( v*f ) * dΩ + ∫( (γd/h)*v*ud - (n_Γ⋅∇(v))*ud ) * dΓ
+lcut(v) = ∫( v*f ) * dΩ + ∫( (γd/h)*v*ud - (n_Γ⋅∇(v))*ud ) * dΓ
+lout(v) = ∫( ∇(v)⋅∇(ud) ) * dΩ_out
+l(v) = lcut(v) - lout(v)
 
-using Gridap.FESpaces
-assem = SparseMatrixAssembler(Ucolor,Vcolor)
-du = get_trial_fe_basis(Ucolor)
-v = get_fe_basis(Vcolor)
-matcontribs,veccontribs = acut(du,v),l(v)
-data = collect_cell_matrix_and_vector(Ucolor,Vcolor,matcontribs,veccontribs)
-A,b = assemble_matrix_and_vector(assem,data)
-x = zero_free_values(Vcolor)
-ldiv!(x,lu(A),b)
-A′ = copy(A)
-A′[Block(2,3)] .= 0.0
-A′[Block(3,2)] .= 0.0
-x′ = zero_free_values(Vcolor)
-ldiv!(x′,lu(A′),b)
-
-sqrt(norm(x[Block(1)])^2 + norm(x[Block(3)])^2)
-sqrt(norm(x′[Block(1)])^2 + norm(x′[Block(3)])^2)
+# using Gridap.FESpaces
+# assem = SparseMatrixAssembler(Ucolor,Vcolor)
+# du = get_trial_fe_basis(Ucolor)
+# v = get_fe_basis(Vcolor)
+# matcontribs,veccontribs = a(du,v),l(v)
+# data = collect_cell_matrix_and_vector(Ucolor,Vcolor,matcontribs,veccontribs)
+# A,b = assemble_matrix_and_vector(assem,data)
+# x = zero_free_values(Vcolor)
+# ldiv!(x,lu(A),b)
 
 # op = AffineFEOperator(acut,l,Ucut,Vcut)
 # uh = solve(op)
-assem_cut = SparseMatrixAssembler(Ucut,Vcut)
-data_cut = collect_cell_matrix_and_vector(Ucut,Vcut,matcontribs,veccontribs)
-A_cut,b_cut = assemble_matrix_and_vector(assem_cut,data_cut)
 
-cellids_cut = get_cell_dof_ids(Vcut)
-cellids_color = get_cell_dof_ids(Vcolor)
+# sqrt(norm(x[Block(1)])^2 + norm(x[Block(2)])^2) ≈ norm(uh.free_values)
 
-tface_act = get_tface_to_mface(Ωact)
-for (cell_act,cell_color) in enumerate(tface_act)
-  ids_cut = cellids_cut[cell_act]
-  ids_color = cellids_color[cell_color]
-  @assert length(ids_cut)==length(ids_color)
-  for i in 1:length(ids_cut)
-    colori = ids_color.colors[][i]
-    @assert op.op.vector[ids_cut[i]] ≈ b[Block(colori)][ids_color.array[][i]]
+# assem_cut = SparseMatrixAssembler(Ucut,Vcut)
+# matcontribscut,veccontribscut = acut(du,v),veccontribs
+# data_cut = collect_cell_matrix_and_vector(Ucut,Vcut,matcontribscut,veccontribscut)
+# A_cut,b_cut = assemble_matrix_and_vector(assem_cut,data_cut)
+
+# cellids_cut = get_cell_dof_ids(Vcut)
+# cellids_color = get_cell_dof_ids(Vcolor)
+
+# tface_act = get_tface_to_mface(Ω_act)
+# for (cell_act,cell_color) in enumerate(tface_act)
+#   ids_cut = cellids_cut[cell_act]
+#   ids_color = cellids_color[cell_color]
+#   @assert length(ids_cut)==length(ids_color)
+#   for i in 1:length(ids_cut)
+#     colori = ids_color.colors[][i]
+#     @assert b_cut[ids_cut[i]] ≈ b[Block(colori)][ids_color.array[][i]]
+#   end
+# end
+
+# for (cell_act,cell_color) in enumerate(tface_act)
+#   ids_cut = cellids_cut[cell_act]
+#   ids_color = cellids_color[cell_color]
+#   @assert length(ids_cut)==length(ids_color)
+#   for i in 1:length(ids_cut)
+#     colori = ids_color.colors[][i]
+#     arrayi = ids_color.array[][i]
+#     ids_cuti = ids_cut[i]
+#     for j in 1:length(ids_cut)
+#       colorj = ids_color.colors[][j]
+#       arrayj = ids_color.array[][j]
+#       ids_cutj = ids_cut[j]
+#       @assert A_cut[ids_cuti,ids_cutj] ≈ A[Block(colori,colorj)][arrayi,arrayj] "$cell_act"
+#     end
+#   end
+# end
+
+Vnew = NewFESpace(Vbg,Ω_act)
+Unew = TrialFESpace(Vnew,ud)
+opnew = AffineFEOperator(a,l,Unew,Vnew)
+uhnew = solve(opnew)
+
+# ids = -unique(Vnew.cell_dof_ids.data[findall(Vnew.cell_dof_ids.data .< 0)])
+bnew = opnew.op.vector
+# bnewids = bnew[ids]
+
+tface_in = get_tface_to_mface(Ω_act)
+tface_out = get_tface_to_mface(Ω_out)
+cell = 1
+for cell_out in tface_out
+  ids = Vnew.cell_dof_ids[cell_out]
+  if any(ids.<0)
+    cell = cell_out
+    break
   end
 end
+ids = abs.(Vnew.cell_dof_ids[cell])
+bnew[ids]
 
-for (cell_act,cell_color) in enumerate(tface_act)
-  ids_cut = cellids_cut[cell_act]
-  ids_color = cellids_color[cell_color]
-  @assert length(ids_cut)==length(ids_color)
-  for i in 1:length(ids_cut)
-    colori = ids_color.colors[][i]
-    arrayi = ids_color.array[][i]
-    ids_cuti = ids_cut[i]
-    for j in 1:length(ids_cut)
-      colorj = ids_color.colors[][j]
-      arrayj = ids_color.array[][j]
-      ids_cutj = ids_cut[j]
-      @assert op.op.matrix[ids_cuti,ids_cutj] ≈ A[Block(colori,colorj)][arrayi,arrayj] "$cell_act"
-    end
-  end
-end
+v = get_fe_basis(Vnew)
+assem = SparseMatrixAssembler(Vnew,Vnew)
+vecdata = collect_cell_vector(Vnew,l(v))
 
-matcontribs = a(du,v)
-data = collect_cell_matrix(Ucolor,Vcolor,matcontribs)
-A = assemble_matrix(assem,data)
+vd = (vecdata[1][2],vecdata[2][2])
+v1 = nz_counter(get_vector_builder(assem),(get_rows(assem),))
+symbolic_loop_vector!(v1,assem,vd)
+v2 = nz_allocation(v1)
+numeric_loop_vector!(v2,assem,vd)
+v3 = create_from_nz(v2)
 
-matcontribscut = acut(du,v)
-datacut = collect_cell_matrix(Ucolor,Vcolor,matcontribscut)
-Acut = assemble_matrix(assem,datacut)
+writevtk(Ω_bg,datadir("plts/sol"),cellfields=["uh"=>uhnew])
+
+using Gridap.Algebra
+
+x = opnew.op.matrix \ opnew.op.vector
+
+b̃ = opnew.op.vector - boutok
+x̃ = opnew.op.matrix \ b̃
+x̃h = FEFunction(Unew,x̃)
+writevtk(Ω_bg,datadir("plts/sol_new"),cellfields=["uh"=>x̃h])

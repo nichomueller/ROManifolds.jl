@@ -92,7 +92,12 @@ struct ParamTrialFESpace{A,B} <: UnEvalParamSingleFieldFESpace
 end
 
 function ParamTrialFESpace(space)
-  HomogeneousTrialFESpace(space)
+  dof = get_fe_dof_basis(space)
+  T = get_dof_type(dof)
+  g(x,μ) = zero(T)
+  g(μ) = x -> g(x,μ)
+  gμ(μ) = ParamFunction(g,μ)
+  ParamTrialFESpace(space,gμ)
 end
 
 FESpaces.ConstraintStyle(::Type{<:ParamTrialFESpace{A}}) where A = ConstraintStyle(A)

@@ -21,7 +21,12 @@ struct TransientTrialParamFESpace{A,B} <: UnEvalParamSingleFieldFESpace
 end
 
 function TransientTrialParamFESpace(space)
-  HomogeneousTrialFESpace(space)
+  dof = get_fe_dof_basis(space)
+  T = get_dof_type(dof)
+  g(x,μ,t) = zero(T)
+  g(μ,t) = x -> g(x,μ,t)
+  gμt(μ,t) = TransientParamFunction(g,μ,t)
+  TransientTrialParamFESpace(space,gμt)
 end
 
 FESpaces.ConstraintStyle(::Type{<:TransientTrialParamFESpace{A}}) where A = ConstraintStyle(A)
