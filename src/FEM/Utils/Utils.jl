@@ -65,6 +65,9 @@ include("Contributions.jl")
 # export MultiColorFESpace
 # include("ColoredMultiFieldFESpaces.jl")
 
+# export NewColoredFESpace
+# include("NewColoredFESpace.jl")
+
 export NewFESpace
 include("NewFESpace.jl")
 

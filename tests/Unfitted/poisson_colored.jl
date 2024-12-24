@@ -5,6 +5,7 @@ using GridapEmbedded
 using GridapEmbedded.Interfaces
 using ReducedOrderModels
 using ReducedOrderModels.Utils
+using DrWatson
 
 u(x) = x[1] - x[2]
 f(x) = -Δ(u)(x)
@@ -53,7 +54,7 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 Vcut = FESpace(Ω_act,reffe)
 Ucut = TrialFESpace(Vcut)
 
-Vbg = FESpace(Ω_bg,reffe;conformity=:H1,dirichlet_tags="boundary")
+Vbg = FESpace(Ω_bg,reffe;conformity=:H1)#,dirichlet_tags="boundary")
 
 # function _get_dofs(cellids::AbstractArray{<:AbstractArray})
 #   _get_dofs(Table(cellids))
@@ -119,9 +120,9 @@ Vbg = FESpace(Ω_bg,reffe;conformity=:H1,dirichlet_tags="boundary")
 # active_dofs_on_interface = get_active_dofs_on_interface(Vbg,Ω_act,Ω_out)
 # dof_to_pdof = Utils.get_dof_to_colored_dof(tag_to_ndofs,dof_to_tag)
 
-# Vcolor = ColoredFESpace(Vbg,Ω_act)
-# Vcolor = MultiColorFESpace(Vbg,tags,tag_to_ndofs,dof_to_tag,dof_to_pdof)
-# Ucolor = TrialFESpace(Vcolor)
+# V = ColoredFESpace(Vbg,Ω_act)
+# V = MultiColorFESpace(Vbg,tags,tag_to_ndofs,dof_to_tag,dof_to_pdof)
+# U = TrialFESpace(V)
 
 γd = 10.0
 γg = 0.1
@@ -137,16 +138,15 @@ a(u,v) = acut(u,v) + aout(u,v)
 
 lcut(v) = ∫( v*f ) * dΩ + ∫( (γd/h)*v*ud - (n_Γ⋅∇(v))*ud ) * dΓ
 lout(v) = ∫( ∇(v)⋅∇(ud) ) * dΩ_out
-l(v) = lcut(v) - lout(v)
+l(v) = lcut(v) #+ lout(v)
 
-# using Gridap.FESpaces
-# assem = SparseMatrixAssembler(Ucolor,Vcolor)
-# du = get_trial_fe_basis(Ucolor)
-# v = get_fe_basis(Vcolor)
+# assem = SparseMatrixAssembler(U,V)
+# du = get_trial_fe_basis(U)
+# v = get_fe_basis(V)
 # matcontribs,veccontribs = a(du,v),l(v)
-# data = collect_cell_matrix_and_vector(Ucolor,Vcolor,matcontribs,veccontribs)
+# data = collect_cell_matrix_and_vector(U,V,matcontribs,veccontribs)
 # A,b = assemble_matrix_and_vector(assem,data)
-# x = zero_free_values(Vcolor)
+# x = zero_free_values(V)
 # ldiv!(x,lu(A),b)
 
 # op = AffineFEOperator(acut,l,Ucut,Vcut)
@@ -160,7 +160,7 @@ l(v) = lcut(v) - lout(v)
 # A_cut,b_cut = assemble_matrix_and_vector(assem_cut,data_cut)
 
 # cellids_cut = get_cell_dof_ids(Vcut)
-# cellids_color = get_cell_dof_ids(Vcolor)
+# cellids_color = get_cell_dof_ids(V)
 
 # tface_act = get_tface_to_mface(Ω_act)
 # for (cell_act,cell_color) in enumerate(tface_act)
@@ -190,46 +190,76 @@ l(v) = lcut(v) - lout(v)
 #   end
 # end
 
-Vnew = NewFESpace(Vbg,Ω_act)
-Unew = TrialFESpace(Vnew,ud)
-opnew = AffineFEOperator(a,l,Unew,Vnew)
-uhnew = solve(opnew)
+V = NewFESpace(Vbg,Ω_act)
+U = TrialFESpace(V,ud)
+op = AffineFEOperator(a,l,U,V)
+uh = solve(op)
 
-# ids = -unique(Vnew.cell_dof_ids.data[findall(Vnew.cell_dof_ids.data .< 0)])
-bnew = opnew.op.vector
-# bnewids = bnew[ids]
+opcut = AffineFEOperator(acut,l,Ucut,Vcut)
+uhcut = solve(opcut)
 
-tface_in = get_tface_to_mface(Ω_act)
-tface_out = get_tface_to_mface(Ω_out)
-cell = 1
-for cell_out in tface_out
-  ids = Vnew.cell_dof_ids[cell_out]
-  if any(ids.<0)
-    cell = cell_out
-    break
+norm(uh.free_values) == norm(uhcut.free_values)
+
+writevtk(Ω_bg,datadir("plts/sol"),cellfields=["uh"=>uh])
+
+# v = get_fe_basis(V)
+# assem = SparseMatrixAssembler(V,V)
+# vecdata = collect_cell_vector(V,l(v))
+
+# vd = (vecdata[1][2],vecdata[2][2])
+# v1 = nz_counter(get_vector_builder(assem),(get_rows(assem),))
+# symbolic_loop_vector!(v1,assem,vd)
+# v2 = nz_allocation(v1)
+# numeric_loop_vector!(v2,assem,vd)
+# v3 = create_from_nz(v2)
+
+Ubg = TrialFESpace(Vbg,ud)
+opbg = AffineFEOperator(a,l,Ubg,Vbg)
+uhbg = solve(opbg)
+
+writevtk(Ω_bg,datadir("plts/err"),cellfields=["uh"=>uh,"uhbg"=>uhbg,"eh"=>uh-uhbg])
+
+trian = Ω_bg
+trian_in = Ω_act
+trian_out = Ω_out
+dof_to_color = Utils.get_dof_to_color(Vbg,trian_in,trian_out)
+dofs_out = findall(dof_to_color .== Utils.INACTIVE_COLOR)
+
+# b = assemble_vector(lout,V)
+# A = assemble_matrix(aout,U,V)
+# M = assemble_matrix((u,v)->∫(u*v)dΩ_out,U,V)
+
+# xout = A[dofs_out,dofs_out] \ b[dofs_out]
+
+# free_vals = copy(uh.free_values)
+# free_vals[dofs_out] .+= xout
+# uh′ = FEFunction(U,free_vals)
+# writevtk(Ω_bg,datadir("plts/err"),cellfields=["uh"=>uh′])
+
+x = get_cell_points(Ω_bg)
+duh = ∇(uh)
+duhx = duh(x)
+
+cells_in = get_tface_to_mface(Ω_act)
+grads_in = duhx[cells_in]
+
+maxabs = 1
+for gradscell in grads_in
+  for gradscellpoint in gradscell
+    for gradscellpointdir in gradscellpoint.data
+      maxabs = max(maxabs,maximum(abs(gradscellpointdir)))
+    end
   end
 end
-ids = abs.(Vnew.cell_dof_ids[cell])
-bnew[ids]
 
-v = get_fe_basis(Vnew)
-assem = SparseMatrixAssembler(Vnew,Vnew)
-vecdata = collect_cell_vector(Vnew,l(v))
+cells_out = get_tface_to_mface(Ω_out)
+grads_out = duhx[cells_out]
 
-vd = (vecdata[1][2],vecdata[2][2])
-v1 = nz_counter(get_vector_builder(assem),(get_rows(assem),))
-symbolic_loop_vector!(v1,assem,vd)
-v2 = nz_allocation(v1)
-numeric_loop_vector!(v2,assem,vd)
-v3 = create_from_nz(v2)
-
-writevtk(Ω_bg,datadir("plts/sol"),cellfields=["uh"=>uhnew])
-
-using Gridap.Algebra
-
-x = opnew.op.matrix \ opnew.op.vector
-
-b̃ = opnew.op.vector - boutok
-x̃ = opnew.op.matrix \ b̃
-x̃h = FEFunction(Unew,x̃)
-writevtk(Ω_bg,datadir("plts/sol_new"),cellfields=["uh"=>x̃h])
+maxabs = 1
+for gradscell in grads_out
+  for gradscellpoint in gradscell
+    for gradscellpointdir in gradscellpoint.data
+      maxabs = max(maxabs,maximum(abs(gradscellpointdir)))
+    end
+  end
+end
