@@ -10,14 +10,14 @@ using ReducedOrderModels
 pranges = fill([1,10],3)
 pspace = ParamSpace(pranges)
 
-R  = 0.5
+R = 0.5
 L = 0.8*(2*R)
 p1 = Point(0.0,0.0)
 p2 = p1 + VectorValue(L,0.0)
 
 geo1 = disk(R,x0=p1)
 geo2 = disk(R,x0=p2)
-geo3 = setdiff(geo1,geo2)
+geo = setdiff(geo1,geo2)
 
 t = 1.01
 pmin = p1-t*R
@@ -28,7 +28,7 @@ n = 30
 partition = (n,n)
 bgmodel = TProductModel(pmin,pmax,partition)
 
-cutgeo = cut(bgmodel,geo3)
+cutgeo = cut(bgmodel,geo)
 Ωbg = Triangulation(bgmodel)
 Ωact = Triangulation(cutgeo,ACTIVE)
 Ω = Triangulation(cutgeo,PHYSICAL)
@@ -36,7 +36,7 @@ cutgeo = cut(bgmodel,geo3)
 Γ = EmbeddedBoundary(cutgeo)
 Γg = GhostSkeleton(cutgeo)
 
-order = 2
+order = 1
 degree = 2*order
 
 dΩbg = Measure(Ωbg,degree)
@@ -51,41 +51,32 @@ nΓg = get_normal_vector(Γg)
 const γd = 10.0
 const γg = 0.1
 const h = dp[1]/n
-const ν0 = 1e-3
 
-ν(x,μ) = 1+exp(-x[1]/sum(μ))
+ν(x,μ) = sum(μ)
 ν(μ) = x->ν(x,μ)
 νμ(μ) = ParamFunction(ν,μ)
 
-f(x,μ) = μ[1]*exp(-x[1]/μ[2])*abs(sin(μ[3]))
+f(x,μ) = μ[1]*x[1] - μ[2]*x[2]
 f(μ) = x->f(x,μ)
 fμ(μ) = ParamFunction(f,μ)
 
-g(x,μ) = 0.0
+g(x,μ) = μ[3]*sum(x)
 g(μ) = x->g(x,μ)
 gμ(μ) = ParamFunction(g,μ)
 
-# a(μ,u,v,dΩ,dΩ_out,dΓ,dΓg) = ( ∫( νμ(μ)*∇(v)⋅∇(u) )dΩ + ∫( ∇(v)⋅∇(u) )dΩ_out
-#   + ∫( (γd/h)*v*u  - νμ(μ)*v*(nΓ⋅∇(u)) - νμ(μ)*(nΓ⋅∇(v))*u )dΓ
-#   + ∫( (γg*h)*jump(nΓg⋅∇(v))*jump(nΓg⋅∇(u)) ) * dΓg
-#   )
-
-# b(μ,u,v,dΩ,dΓ) = ∫( (γd/h)*v*fμ(μ) - νμ(μ)*∇(v)⋅∇(u) )dΩ + ∫( (γd/h)*v*u - (nΓ⋅∇(v))*u ) * dΓ
-
-# non-symmetric formulation for stability
-
-a(μ,u,v,dΩ,dΩ_out,dΓ,dΓg) = ( ∫( νμ(μ)*∇(v)⋅∇(u) )dΩ + ∫( ν0*∇(v)⋅∇(u) )dΩ_out
-  + ∫( (-1)*νμ(μ)*v*(nΓ⋅∇(u)) + νμ(μ)*(nΓ⋅∇(v))*u )dΓ
+a(μ,u,v,dΩ,dΩ_out,dΓ,dΓg) = ( ∫( νμ(μ)*∇(v)⋅∇(u) )dΩ + ∫( ∇(v)⋅∇(u) )dΩ_out
+  + ∫( (γd/h)*v*u  - νμ(μ)*v*(nΓ⋅∇(u)) - νμ(μ)*(nΓ⋅∇(v))*u )dΓ
   + ∫( (γg*h)*jump(nΓg⋅∇(v))*jump(nΓg⋅∇(u)) ) * dΓg
   )
 
-b(μ,u,v,dΩ,dΓ) = ∫( v*fμ(μ) - νμ(μ)*∇(v)⋅∇(u) )dΩ + ∫( (γd/h)*v*gμ(μ) - (nΓ⋅∇(v))*gμ(μ) ) * dΓ
+b(μ,u,v,dΩ,dΩ_out,dΓ) = (∫( (γd/h)*v*fμ(μ) )dΩ + ∫( ∇(v)⋅∇(gμ(μ)) )dΩ_out
+  + ∫( (γd/h)*v*gμ(μ) - (nΓ⋅∇(v))*gμ(μ) ) * dΓ )
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 
-domains = FEDomains((Ω,Γ),(Ω,Ω_out,Γ,Γg))
-test = TProductFESpace(Ωbg,reffe,conformity=:H1;dirichlet_tags=["boundary"])
-trial = ParamTrialFESpace(test,gμ)
+domains = FEDomains((Ω,Ω_out,Γ),(Ω,Ω_out,Γ,Γg))
+test = TProductFESpace(Ωbg,reffe,conformity=:H1)
+trial = ParamTrialFESpace(test)
 feop = LinearParamFEOperator(b,a,pspace,trial,test,domains)
 
 fesolver = LinearFESolver(LUSolver())
@@ -103,3 +94,15 @@ x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon,Ω)
+
+xrb = Snapshots(inv_project(rbop.trial(μon),x̂),get_dof_map(feop),μon)
+
+u1 = flatten_snapshots(x)[:,1]
+r1 = get_realization(x)[1]
+U1 = param_getindex(trial(r1),1)
+uh = FEFunction(U1,u1)
+
+û1 = flatten_snapshots(xrb)[:,1]
+ûh = FEFunction(U1,û1)
+
+writevtk(Ω,datadir("plts/sol"),cellfields=["uh"=>uh,"ûh"=>ûh,"eh"=>uh-ûh])
