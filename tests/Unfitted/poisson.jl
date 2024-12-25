@@ -36,7 +36,7 @@ cutgeo = cut(bgmodel,geo)
 Γ = EmbeddedBoundary(cutgeo)
 Γg = GhostSkeleton(cutgeo)
 
-order = 1
+order = 2
 degree = 2*order
 
 dΩbg = Measure(Ωbg,degree)
@@ -64,17 +64,25 @@ g(x,μ) = μ[3]*sum(x)
 g(μ) = x->g(x,μ)
 gμ(μ) = ParamFunction(g,μ)
 
-a(μ,u,v,dΩ,dΩ_out,dΓ,dΓg) = ( ∫( νμ(μ)*∇(v)⋅∇(u) )dΩ + ∫( ∇(v)⋅∇(u) )dΩ_out
-  + ∫( (γd/h)*v*u  - νμ(μ)*v*(nΓ⋅∇(u)) - νμ(μ)*(nΓ⋅∇(v))*u )dΓ
-  + ∫( (γg*h)*jump(nΓg⋅∇(v))*jump(nΓg⋅∇(u)) ) * dΓg
-  )
+# a(μ,u,v,dΩ,dΩ_out,dΓ,dΓg) = ( ∫( νμ(μ)*∇(v)⋅∇(u) )dΩ + ∫( ∇(v)⋅∇(u) )dΩ_out
+#   + ∫( (γd/h)*v*u  - νμ(μ)*v*(nΓ⋅∇(u)) - νμ(μ)*(nΓ⋅∇(v))*u )dΓ
+#   + ∫( (γg*h)*jump(nΓg⋅∇(v))*jump(nΓg⋅∇(u)) ) * dΓg
+#   )
 
-b(μ,u,v,dΩ,dΩ_out,dΓ) = (∫( (γd/h)*v*fμ(μ) )dΩ + ∫( ∇(v)⋅∇(gμ(μ)) )dΩ_out
-  + ∫( (γd/h)*v*gμ(μ) - (nΓ⋅∇(v))*gμ(μ) ) * dΓ )
+# b(μ,u,v,dΩ,dΩ_out,dΓ) = (∫( v*fμ(μ) )dΩ + ∫( ∇(v)⋅∇(gμ(μ)) )dΩ_out
+#   + ∫( (γd/h)*v*gμ(μ) - νμ(μ)*(nΓ⋅∇(v))*gμ(μ) ) * dΓ )
+
+# domains = FEDomains((Ω,Ω_out,Γ),(Ω,Ω_out,Γ,Γg))
+
+# non - symmetric formulation
+
+a(μ,u,v,dΩ,dΩ_out,dΓ) = ∫( νμ(μ)*∇(v)⋅∇(u) )dΩ + ∫( ∇(v)⋅∇(u) )dΩ_out - ∫( νμ(μ)*v*(nΓ⋅∇(u)) - νμ(μ)*(nΓ⋅∇(v))*u )dΓ
+b(μ,u,v,dΩ,dΩ_out,dΓ) = ∫( v*fμ(μ) )dΩ + ∫( ∇(v)⋅∇(gμ(μ)) )dΩ_out + ∫( νμ(μ)*(nΓ⋅∇(v))*gμ(μ) ) * dΓ
+
+domains = FEDomains((Ω,Ω_out,Γ),(Ω,Ω_out,Γ))
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 
-domains = FEDomains((Ω,Ω_out,Γ),(Ω,Ω_out,Γ,Γg))
 test = TProductFESpace(Ωbg,reffe,conformity=:H1)
 trial = ParamTrialFESpace(test)
 feop = LinearParamFEOperator(b,a,pspace,trial,test,domains)
@@ -94,15 +102,3 @@ x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon,Ω)
-
-xrb = Snapshots(inv_project(rbop.trial(μon),x̂),get_dof_map(feop),μon)
-
-u1 = flatten_snapshots(x)[:,1]
-r1 = get_realization(x)[1]
-U1 = param_getindex(trial(r1),1)
-uh = FEFunction(U1,u1)
-
-û1 = flatten_snapshots(xrb)[:,1]
-ûh = FEFunction(U1,û1)
-
-writevtk(Ω,datadir("plts/sol"),cellfields=["uh"=>uh,"ûh"=>ûh,"eh"=>uh-ûh])
