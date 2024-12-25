@@ -300,8 +300,8 @@ end
 
 # multi field interface
 
-function Arrays.return_type(::typeof(projection),::PODReduction,s::AbstractSnapshots)
-  PODBasis
+function Arrays.return_type(::typeof(projection),::PODReduction,s::AbstractSnapshots{T}) where T
+  PODBasis{Matrix{T}}
 end
 
 function Arrays.return_type(::typeof(projection),::TTSVDReduction,s::AbstractSnapshots)
