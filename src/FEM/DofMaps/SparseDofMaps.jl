@@ -44,7 +44,6 @@ Index map used to select the nonzero entries of a sparse matrix. The field `spar
 contains the tensor product sparsity of the matrix to be indexed. The field `indices`
 refers to the nonzero entries of the sparse matrix, whereas `indices_sparse` is
 used to access the corresponding sparse entries
-
 """
 struct SparseDofMap{D,Ti,A<:SparsityPattern,B<:SparseDofMapStyle} <: AbstractDofMap{D,Ti}
   indices::Array{Ti,D}

@@ -508,13 +508,14 @@ end
 function ParamSteady.allocate_paramcache(
   op::LinearNonlinearParamOpFromTFEOp,
   r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}})
+  us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}})
 
   op_lin = get_linear_operator(op)
   op_nlin = get_nonlinear_operator(op)
 
   paramcache = allocate_paramcache(op_nlin,r,us)
-  A_lin,b_lin = allocate_systemcache(op_lin,r,us,paramcache)
+  A_lin,b_lin = allocate_systemcache(op_lin,r,us,ws,paramcache)
 
   return ParamOpSysCache(paramcache,A_lin,b_lin)
 end

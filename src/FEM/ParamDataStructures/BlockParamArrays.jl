@@ -11,7 +11,6 @@ end
 Is to a [`ParamArray`](@ref) as a BlockArray is to a regular AbstractArray.
 Instances of BlockParamArray are obtained by extending the function `_BlockArray`
 in the package BlockArrays.
-
 """
 struct BlockParamArray{T,N,A<:AbstractArray{<:AbstractParamArray{T,N},N},B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N}
   data::A

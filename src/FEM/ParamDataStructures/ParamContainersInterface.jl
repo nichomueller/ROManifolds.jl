@@ -2,7 +2,6 @@
     param_length(a) -> Int
 
 Returns the parametric length of `a`
-
 """
 param_length(a) = @abstractmethod
 param_length(a::Union{Nothing,Function,Map,Field,AbstractArray{<:Field}}) = 0
@@ -11,24 +10,31 @@ param_length(a::Union{Number,AbstractArray{<:Number}}) = 0
 param_length(a::CellField) = param_length(testitem(get_data(a)))
 
 """
-    get_param_data(a) -> Any
+    get_param_data(a) -> AbstractArray{<:Any}
 
 Returns the parametric data of `a`
-
 """
 get_param_data(a) = @abstractmethod
 
 """
     param_getindex(a,i::Integer) -> Any
 
-Returns the parametric entry of `a` at the index `i` ∈ {1,...,`param_length`(`a`)}
-
+Returns the parametric entry of `a` at the index `i` ∈ {1,...,`param_length(a)`}
 """
 param_getindex(a,i::Integer) = @abstractmethod
-# param_getindex(a::Union{Nothing,Function,Map},i::Integer) = a
 
+"""
+    param_setindex!(a,v,i::Integer) -> Any
+
+Sets the parametric entry of `a` to `v` at the index `i` ∈ {1,...,`param_length(a)`}
+"""
 param_setindex!(a,v,i::Integer) = @abstractmethod
 
+"""
+    param_eachindex(a,i::Integer) -> Any
+
+Returns the parametric range of `a` 1:`param_length(a)`
+"""
 param_eachindex(a) = Base.OneTo(param_length(a))
 
 """
@@ -36,7 +42,6 @@ param_eachindex(a) = Base.OneTo(param_length(a))
 
 Returns a quantity with parametric length `plength` from `a`. When `a` already
 possesses a parametric length, i.e. it is a parametrized quantity, it returns `a`
-
 """
 to_param_quantity(a,plength::Integer) = @abstractmethod
 
@@ -51,7 +56,6 @@ end
 Returns the parametric length of all parametric quantities. An error is thrown
 if there are no parametric quantities or if at least two quantities have different
 parametric length
-
 """
 function find_param_length(a...)
   plengths::Tuple{Vararg{Int}} = filter(!iszero,param_length.(a))
@@ -63,7 +67,6 @@ end
     to_param_quantities(a...;plength=find_param_length(a...)) -> Any
 
 Converts the input quantities to parametric quantities
-
 """
 function to_param_quantities(a...;plength=find_param_length(a...))
   pa = map(f->to_param_quantity(f,plength),a)
@@ -75,13 +78,11 @@ param_typeof(a) = typeof(a)
 """
     abstract type AbstractParamContainer{T,N} <: AbstractArray{T,N} end
 
-Type representing generic parametric quantities
+Type representing generic parametric quantities.
 Subtypes:
-- [`ParamContainer`](@ref).
-- [`ParamNumber`](@ref).
-- [`AbstractParamArray`](@ref).
-- [`AbstractSnapshots`](@ref).
-
+- [`ParamContainer`](@ref)
+- [`AbstractParamArray`](@ref)
+- [`AbstractSnapshots`](@ref)
 """
 abstract type AbstractParamContainer{T,N} <: AbstractArray{T,N} end
 

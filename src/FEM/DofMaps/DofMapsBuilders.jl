@@ -2,8 +2,8 @@
     get_dof_map(space::FESpace) -> AbstractDofMap
 
 Returns the dofs sorted by coordinate order, for every dimension. Therefore,
-if `space` is a D-dimensional FESpace, the output index map will be a subtype
-of AbstractDofMap{D}.
+if `space` is a D-dimensional FESpace, and the dof type has a number of components
+equals to ncomp, the output index map will be a subtype of AbstractDofMap{D*ncomp}.
 
 The following example clarifies the function's task:
 
@@ -14,13 +14,11 @@ cell_dof_ids = Table([
   [9, 8, 6, 5]
 ])
 
-  get_dof_map(⋅)
-      ⟹ ⟹ ⟹
+calling get_dof_map(⋅) returns:
 
-      [ 1  7  4
-        3  9  6
-        2  8  5 ]
-
+    [ 1  7  4
+      3  9  6
+      2  8  5 ]
 """
 function get_dof_map(space::FESpace)
   trian = get_triangulation(space)
@@ -53,6 +51,9 @@ function get_dof_map(space::FESpace,trian::Union{Triangulation,Tuple{Vararg{Tria
   change_domain(dof_map,trian)
 end
 
+# We extend this Gridap function to change the domain of the dof_map. If the
+# triangulation masks a set of cells, the output dof map will mask (i.e. set to zero)
+# the dofs corresponding to those cells
 function CellData.change_domain(dof_map::AbstractDofMap,trian::Triangulation)
   @abstractmethod
 end
@@ -208,9 +209,8 @@ get_univariate_dof_map(f::MultiFieldFESpace) = @notimplemented
     get_sparse_dof_map(trial::FESpace,test::FESpace) -> AbstractDofMap
 
 Returns the index maps related to jacobians in a FE problem. The default output
-is a TrivialDofMap; when the trial and test spaces are of type TProductFESpace,
-a SparseDofMap is returned
-
+is a [`TrivialSparseDofMap`](@ref); when the trial and test spaces are of type
+[`TProductFESpace`](@ref), a [`SparseDofMap`](@ref) is returned.
 """
 function get_sparse_dof_map(trial::SingleFieldFESpace,test::SingleFieldFESpace)
   sparsity = SparsityPattern(trial,test)
@@ -376,6 +376,13 @@ function get_dirichlet_entities(f::FESpace)
   @abstractmethod
 end
 
+"""
+    get_tface_to_mask(t::Triangulation...) -> AbstractArray{Bool}
+
+Returns a vector `v` of length equal to the number of cells of the first input
+triangulation. We have `v[icell] = true` if the cell number `icell` is masked
+(i.e. it is inactive), and `false` otherwise
+"""
 function get_tface_to_mask(t::Triangulation...)
   get_tface_to_mask(map(get_tface_to_mface,t)...)
 end
@@ -420,7 +427,6 @@ end
     get_polynomial_order(fs::FESpace) -> Integer
 
 Retrieves the polynomial order of `fs`
-
 """
 get_polynomial_order(fs::SingleFieldFESpace) = get_polynomial_order(get_fe_basis(fs))
 get_polynomial_order(fs::MultiFieldFESpace) = maximum(map(get_polynomial_order,fs.spaces))

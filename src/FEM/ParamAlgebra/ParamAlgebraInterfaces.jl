@@ -204,7 +204,6 @@ end
     ParamCounter{C}
 
 Extends the concept of `counter` in Gridap to accommodate a parametric setting.
-
 """
 struct ParamCounter{C}
   counter::C
@@ -282,7 +281,6 @@ end
 Extends the concept of `InserterCSC` in Gridap to accommodate a parametric setting.
 Tv is the type of the parametric nonzero entries of the CSC matrices to be
 assembled.
-
 """
 struct ParamInserterCSC{Tv,Ti}
   nrows::Int
@@ -396,4 +394,4 @@ function Algebra.create_from_nz(a::ParamInserterCSC)
   ConsecutiveParamSparseMatrixCSC(a.nrows,a.ncols,a.colptr,a.rowval,data)
 end
 
-# csr: implentation needed
+# csr/coo: implentation needed

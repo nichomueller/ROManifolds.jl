@@ -82,9 +82,9 @@ reffe_u = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,
   dirichlet_tags=["inlet","dirichlet_nopenetration","dirichlet_noslip"],
   dirichlet_masks=[[true,true,true],[false,false,true],[true,true,true]])
-trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_in,gμt_0])
+trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_0,gμt_0])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+test_p = TestFESpace(model,reffe_p;conformity=:H1)
 trial_p = TransientTrialParamFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -104,16 +104,47 @@ tol = 1e-4
 state_reduction = TransientReduction(coupling,tol,energy;nparams=50,sketch=:sprn)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,nparams_djac=1)
 
-# fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
+fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 # save(test_dir,fesnaps)
 # println(festats)
-fesnaps = load_snapshots(test_dir)
+# fesnaps = load_snapshots(test_dir)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-save(test_dir,rbop)
+# save(test_dir,rbop)
 ronline = realization(feop;nparams=10,random=true)
 xonline,festats = solution_snapshots(rbsolver,feop,xh0μ;r=ronline)
-save(test_dir,xonline;label="online")
+# save(test_dir,xonline;label="online")
+# xonline = load_snapshots(test_dir;label="online")
+# ronline = get_realization(xonline)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 println(rbstats)
 perf = rb_performance(rbsolver,feop,rbop,xonline,x̂,festats,rbstats,ronline)
 println(perf)
+
+# function param_writevtk(Ω,trial::FESpace,s,dir=datadir("plts");cellfieldnames=String[])
+#   create_dir(dir)
+#   r = get_realization(s)
+#   U = trial(r)
+#   sh = FEFunction(U,get_values(s))
+#   sh1 = param_getindex(sh,1) # fetch only first parameter
+#   celldata = [name => uh for (name,uh) in zip(cellfieldnames,sh1)]
+#   param_writevtk(Ω,dir,celldata)
+# end
+
+r = get_realization(fesnaps)
+S′ = flatten_snapshots(fesnaps)
+S1 = S′[1][:,:,1]
+r1 = r[1,:]
+U1 = trial_u(r1)
+plt_dir = datadir("plts")
+create_dir(plt_dir)
+for i in 1:length(r1)
+  Ui = param_getindex(U1,i)
+  uhi = FEFunction(Ui,S1[:,i])
+  writevtk(Ω,joinpath(plt_dir,"u_$i.vtu"),cellfields=["uh"=>uhi])
+end
+S2 = S′[2][:,:,1]
+for i in 1:length(r1)
+  Pi = trial_p(nothing)
+  phi = FEFunction(Pi,S2[:,i])
+  writevtk(Ω,joinpath(plt_dir,"p_$i.vtu"),cellfields=["ph"=>phi])
+end

@@ -37,11 +37,9 @@ function RBSteady.inv_project!(x,r::TransientEvalRBSpace,x̂::AbstractParamVecto
   rsub = RBSteady.get_reduced_subspace(r)
   @inbounds for ip in eachindex(x̂)
     Xip = inv_project(rsub,x̂[ip])
-    if ndims(Xip) == 1
-      Xip = reshape(Xip,:,nt)
-    end
+    Xipt = reshape(Xip,:,nt)
     for it in 1:nt
-      x[ip+(it-1)*np] = Xip[:,it]
+      x[ip+(it-1)*np] = Xipt[:,it]
     end
   end
   return x

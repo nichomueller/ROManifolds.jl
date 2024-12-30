@@ -1,3 +1,18 @@
+"""
+    abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
+
+Type representing an ordering of dofs in a certain [`FESpace`](@ref). This type
+is used for efficient (lazy) reordering of the free values of a [`FEFunction`](@ref)
+defined on the aforementioned FESpace. Subtypes:
+
+- [`AbstractTrivialDofMap`](@ref)
+- [`DofMap`](@ref)
+- [`ConstrainedDofMap`](@ref)
+- [`DofMapPortion`](@ref)
+- [`TProductDofMap`](@ref)
+- [`ConstrainedTProductDofMap`](@ref)
+- [`SparseDofMap`](@ref)
+"""
 abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
 
 Base.IndexStyle(i::AbstractDofMap) = IndexLinear()
@@ -27,10 +42,21 @@ get_dof_to_constraints(i::AbstractDofMap) = @abstractmethod
 
 TensorValues.num_components(::Type{<:AbstractDofMap{D,Ti}}) where {D,Ti} = num_components(Ti)
 
+"""
+    vectorize(i::AbstractDofMap) -> AbstractVector
+
+Reshapes `i` as a vector, and removes the constrained dofs in `i` (if any)
+"""
 function vectorize(i::AbstractDofMap)
   vec(remove_constrained_dofs(i))
 end
 
+"""
+    invert(i::AbstractDofMap;kwargs...) -> AbstractArray
+
+Calls the function [`invperm`](@ref) on the nonzero entries of `i`, and places
+zeros on the remaining zero entries of `i`. The output has the same size as `i`
+"""
 function invert(i::AbstractDofMap;kwargs...)
   invert(i,ConstraintStyle(i);kwargs...)
 end
@@ -67,6 +93,7 @@ function get_dof_to_parent_dof_map(i::AbstractDofMap,parent::AbstractDofMap)
   @abstractmethod
 end
 
+# returns the dof `i[idof]` if `idof` is not masked, and zero otherwise
 @inline function show_dof(i::AbstractDofMap,idof::Integer)
   iszero(idof) && return true
   dof_to_cell = get_dof_to_cell(i)
@@ -86,14 +113,29 @@ end
   return show
 end
 
-# trivial map
+"""
+    abstract type AbstractTrivialDofMap{Ti} <: AbstractDofMap{1,Ti} end
 
+Type representing the trivial dof maps, which are returned when we do not desire
+a reordering of the entries. Subtypes:
+
+- [`TrivialDofMap`](@ref)
+- [`TrivialSparseDofMap`](@ref)
+"""
 abstract type AbstractTrivialDofMap{Ti} <: AbstractDofMap{1,Ti} end
 
 Base.setindex!(i::AbstractTrivialDofMap,v,j::Integer) = v
 Base.copy(i::AbstractTrivialDofMap) = i
 Base.similar(i::AbstractTrivialDofMap) = i
 
+"""
+    struct TrivialDofMap{Ti,A,B} <: AbstractTrivialDofMap{Ti} end
+
+In its simples case, it should be conceived as a unit-range from 1 to the number
+of free dofs of a given FE space. The fields `dof_to_cell`, `tface_to_mask` and
+`tface_to_mface` are provided in order to successfully change the underlying
+triangulation via [`change_domain`](@ref), if needed
+"""
 struct TrivialDofMap{Ti,A<:AbstractVector,B<:AbstractVector} <: AbstractTrivialDofMap{Ti}
   dof_to_cell::Table{Ti,Vector{Ti},Vector{Ti}}
   tface_to_mask::A
@@ -120,6 +162,21 @@ function CellData.change_domain(i::TrivialDofMap,t::Triangulation)
   TrivialDofMap(i.dof_to_cell,tface_to_mask,i.tface_to_mface)
 end
 
+"""
+    struct DofMap{D,Ti,A,B} <: AbstractDofMap{D,Ti} end
+
+Fields:
+- `indices`: D-array of indices corresponding to the reordered dofs
+- `dof_to_cell`: the inverse function of cell_dof_ids in Gridap, which associates
+  a list of dofs to a given cell
+- `free_vals_box`: D-array containing the indices of the free dofs in `indices`
+- `tface_to_mask`: list returned by [`get_tface_to_mask`](@ref). By default, this
+  field considers the `tface_to_mask` associated to the triangulation of the FE
+  space. However, when changing the triangulation of the index map via
+  [`change_domain`](@ref), we change the `tface_to_mask`
+- `tface_to_mface`: list of active cells of the triangulation of the FE space we
+  consider
+"""
 struct DofMap{D,Ti,A<:AbstractVector,B<:AbstractVector} <: AbstractDofMap{D,Ti}
   indices::Array{Ti,D}
   dof_to_cell::Table{Ti,Vector{Ti},Vector{Ti}}
@@ -210,6 +267,19 @@ function _to_scalar_values!(i::AbstractArray,D::Integer,d::Integer)
   i .= (i .- d) ./ D .+ 1
 end
 
+"""
+    get_component(i::AbstractDofMap{D},args...;kwargs...) -> AbstractDofMap{D-1}
+
+Selects the last dimension of `i`, and returns the corresponding dof map. This
+function should only be used when the last dimension of `i` corresponds to
+the components axis. For example, let us consider a triangulation on a 3D geometry,
+on which we define a FE space `f` with a number of dofs per direction (Nx,Ny,Nz).
+If `f` is a space of scalar-valued functions, then the size of `i` is (Nx,Ny,Nz),
+and calling this function returns a dof map of size (Nx,Ny); if `f` is a space of
+vector-valued functions with ncomps components, then the size of `i` is (Nx,Ny,Nz,ncomps),
+calling this function returns a dof map of size (Nx,Ny,Nz).
+
+"""
 function get_component(i::DofMap{D},d::Integer=1;to_scalar=false) where D
   indices = collect(selectdim(i.indices,D,d))
   free_vals_box = collect(selectdim(i.free_vals_box,D,1))
@@ -268,6 +338,13 @@ function get_component(
   map(i->get_component(trian,i,args...;kwargs...),i)
 end
 
+"""
+    struct ConstrainedDofMap{D,Ti,A,B} <: AbstractDofMap{D,Ti} end
+
+Same as a [`DofMap`](@ref), but contains an additional field `dof_to_constraint_mask`
+which tracks the constrained dofs. If a dof is constrained, a zero is shown at its
+place
+"""
 struct ConstrainedDofMap{D,Ti,A,B} <: AbstractDofMap{D,Ti}
   map::DofMap{D,Ti,A,B}
   dof_to_constraint_mask::Vector{Bool}
@@ -302,6 +379,13 @@ function CellData.change_domain(i::ConstrainedDofMap,t::Triangulation)
   ConstrainedDofMap(change_domain(i.map,t),i.dof_to_constraint_mask)
 end
 
+"""
+    struct DofMapPortion{D,Ti,A,B} <: AbstractDofMap{D,Ti} end
+
+A dof map for FE spaces defined on portions of a grid, whose information is contained
+in the field `map`. The field `parent_map` contains the dof map relative to the
+same FE space, when it is defined on the entire underlying grid.
+"""
 struct DofMapPortion{D,Ti,A<:AbstractDofMap{D,Ti},B<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
   map::A
   parent_map::B
@@ -358,12 +442,19 @@ end
 
 # tensor product index map, a lot of previous machinery is not needed
 
+"""
+    TProductDofMap{D,Ti} <: AbstractDofMap{D,Ti}
+
+Fields:
+- `indices`: provides the ordering of dofs for a FE space obtained as the tensor
+  product of `D` one-dimensional FE spaces
+- `indices_1d`: provides the ordering of dofs for each of the `D` one-dimensional
+  FE spaces
+"""
 struct TProductDofMap{D,Ti} <: AbstractDofMap{D,Ti}
   indices::Array{Ti,D}
   indices_1d::Vector{Vector{Ti}}
 end
-
-FESpaces.ConstraintStyle(::Type{<:TProductDofMap}) = UnConstrained()
 
 Base.size(i::TProductDofMap) = size(i.indices)
 
@@ -385,6 +476,13 @@ end
 
 get_univariate_dof_map(i::TProductDofMap) = i.indices_1d
 
+"""
+    ConstrainedTProductDofMap{D,Ti} <: AbstractDofMap{D,Ti}
+
+Same as a [`TProductDofMap`](@ref), but contains an additional field `dof_to_constraint_mask`
+which tracks the constrained dofs. If a dof is constrained, a zero is shown at its
+place
+"""
 struct ConstrainedTProductDofMap{D,Ti} <: AbstractDofMap{D,Ti}
   map::TProductDofMap{D,Ti}
   dof_to_constraint_mask::Vector{Bool}

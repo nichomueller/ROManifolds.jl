@@ -4,8 +4,10 @@
       dof_map::B
     end
 
-Used to store the index maps related to jacobians and residuals in a FE problem
-
+Used to store the dof maps related to jacobian and residual in a FE
+approximation problem. Fields:
+- `sparse_dof_map`: dof map associated to the jacobian
+- `dof_map`: dof map associated to the residual
 """
 struct FEDofMap{A,B}
   sparse_dof_map::A

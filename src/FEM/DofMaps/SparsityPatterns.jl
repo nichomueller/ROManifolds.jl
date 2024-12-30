@@ -29,8 +29,8 @@ jacobian in a FE problem.
 
 Subtypes:
 - [`SparsityCSC`](@ref)
-- [`TProductSparsity`](@ref)
-
+- [`OrderedSparsityPattern`](@ref)
+- [`TProductSparsityPattern`](@ref)
 """
 abstract type SparsityPattern end
 
@@ -77,6 +77,14 @@ recast(v::AbstractVector,A::SparseMatrixCSC) = SparseMatrixCSC(A.m,A.n,A.colptr,
 recast(v::AbstractVector,A::SparseMatrixCSR{Bi}) where Bi = SparseMatrixCSR{Bi}(A.m,A.n,A.rowptr,A.colval,v)
 recast(A::AbstractArray,a::SparsityPattern) = recast(A,get_background_matrix(a))
 
+"""
+    to_nz_index(i::AbstractArray,a::SparsityPattern) -> AbstractArray
+
+Given a sparsity pattern `a` representing a M×N sparse matrix with Nnz nonzero
+entries, and a D-array of indices `i` with values in {1,...,MN}, returns the
+corresponding D-array of indices with values in {1,...,Nnz}. A -1 is placed
+whenever an entry of `i` corresponds to a zero entry of the sparse matrix
+"""
 function to_nz_index(i::AbstractArray,a::SparsityPattern)
   i′ = copy(i)
   to_nz_index!(i′,a)
@@ -102,10 +110,10 @@ function to_nz_index!(i::AbstractArray,a::SparseMatrixCSC)
   end
 end
 
-function order_sparsity(s::SparsityPattern,U::FESpace,V::FESpace)
+function order_sparsity(a::SparsityPattern,U::FESpace,V::FESpace)
   rows = get_dof_map(V)
   cols = get_dof_map(U)
-  order_sparsity(s,rows,cols)
+  order_sparsity(a,rows,cols)
 end
 
 function CellData.change_domain(
@@ -160,9 +168,8 @@ get_background_matrix(a::SparsityCSC) = a.matrix
 """
     order_sparsity(a::SparsityPattern,i,j) -> SparsityPattern
 
-Permutes a sparsity patterns according to indices specified by `i` and `j`,
+Permutes a sparsity pattern according to indices specified by `i` and `j`,
 representing the rows and columns respectively
-
 """
 function order_sparsity(a::SparsityCSC,i::AbstractArray,j::AbstractArray)
   unsorted_matrix = a.matrix
@@ -170,6 +177,15 @@ function order_sparsity(a::SparsityCSC,i::AbstractArray,j::AbstractArray)
   OrderedSparsity(matrix,unsorted_matrix)
 end
 
+"""
+    abstract type OrderedSparsityPattern <: SparsityPattern end
+
+Type used to represent an ordered sparsity pattern, obtained by calling the
+function [`order_sparsity`](@ref) on an unordered sparsity pattern.
+
+Subtypes:
+- [`OrderedSparsity`](@ref)
+"""
 abstract type OrderedSparsityPattern <: SparsityPattern end
 
 get_unsorted_matrix(a::OrderedSparsityPattern) = @abstractmethod
@@ -180,6 +196,8 @@ function order_sparsity(a::OrderedSparsityPattern,i::AbstractArray,j::AbstractAr
   a
 end
 
+"""
+"""
 struct OrderedSparsity{A} <: OrderedSparsityPattern
   matrix::A
   unsorted_matrix::A
@@ -303,6 +321,19 @@ function _cell_intersection(row::AbstractDofMap,col::AbstractDofMap,cells_row,ce
   return check
 end
 
+"""
+    abstract type TProductSparsityPattern <: SparsityPattern end
+
+Type used to represent a sparsity pattern of a matrix obtained by integrating a
+bilinear form on a triangulation that can be obtained as the tensor product of a
+1-d triangulations. For example, this can be done when the mesh is Cartesian, and
+the discretizing elements are cubes. Subtypes of TProductSparsityPattern can be
+used to build a non-trivial sparse dof map with [`get_sparse_dof_map`](@ref).
+
+Subtypes:
+- [`TProductSparsity`](@ref)
+- [`SparsityToTProductSparsity`](@ref)
+"""
 abstract type TProductSparsityPattern <: SparsityPattern end
 
 get_univariate_sparsities(a::TProductSparsityPattern) = @abstractmethod
@@ -311,7 +342,23 @@ univariate_num_cols(a::TProductSparsityPattern) = Tuple(num_cols.(get_univariate
 univariate_findnz(a::TProductSparsityPattern) = tuple_of_arrays(findnz.(get_univariate_sparsities(a)))
 univariate_nnz(a::TProductSparsityPattern) = Tuple(nnz.(get_univariate_sparsities(a)))
 
-# univariate (tensor product factors) sparse dofs to sparse dofs
+"""
+    get_sparse_dof_map(a::TProductSparsityPattern,I,J,i,j) -> AbstractArray
+
+Fields:
+- `a`: the underlying (tensor-product) sparsity
+- `I`: the nonzero rows of the underlying (tensor-product) sparse matrix
+- `J`: the nonzero cols of the underlying (tensor-product) sparse matrix
+- `i`: a vector of nonzero rows of each of the D 1-dimensional sparse matrices
+- `j`: a vector of nonzero cols of each of the D 1-dimensional sparse matrices
+
+We call Nnz_1,...,Nnz_D the number of nonzero entries of each of the D 1-dimensional
+sparse matrices. We call (M,N) the size of the (tensor-product) sparse matrix. This
+function returns a map `sparse_dof_map: Nnz_1 ×... × Nnz_D ⟶ MN` that associates
+to each nonzero entry of the 1-D matrices an entry of the tensor product matrix.
+Calling this function assumes that both the tensor-product sparsity and the 1-D
+sparsities have been reordered in advance, otherwise the function will fail
+"""
 function get_sparse_dof_map(a::TProductSparsityPattern,I,J,i,j)
   nrows = num_rows(a)
 
@@ -349,6 +396,13 @@ function get_sparse_dof_map(a::TProductSparsityPattern,I,J,i,j)
   return sparse_dof_map
 end
 
+"""
+    order_sparse_dof_map(a::TProductSparsityPattern,sparse_dof_map,I,J) -> AbstractArray
+
+Orders the sparse dof map defined in [`get_sparse_dof_map`](@ref). Note that the
+function returns exactly the input if the interpolation order is 1, and in all other
+cases the output differs from the input
+"""
 function order_sparse_dof_map(a::TProductSparsityPattern,sparse_dof_map,I,J)
   nrows = num_rows(a)
   IJ = range_2d(vectorize(I),vectorize(J),nrows)
@@ -361,6 +415,9 @@ function order_sparse_dof_map(a::TProductSparsityPattern,sparse_dof_map,I,J)
   return sparse_odof_map
 end
 
+"""
+    struct TProductSparsity{A,B} <: TProductSparsityPattern
+"""
 struct TProductSparsity{A,B} <: TProductSparsityPattern
   sparsity::A
   sparsities_1d::B
@@ -390,6 +447,11 @@ function CellData.change_domain(
   TProductSparsity(a′,a.sparsities_1d)
 end
 
+"""
+    struct SparsityToTProductSparsity{A,B} <: TProductSparsityPattern
+
+To be used when the underlying trial and test spaces are defined on a grid portion
+"""
 struct SparsityToTProductSparsity{A,B,C,D} <: TProductSparsityPattern
   sparsity::A
   sparsities_1d::B
@@ -520,7 +582,7 @@ function Base.getindex(
   return A[I′,J′]
 end
 
-# to nz indices in case we don't provide a sparsity pattern
+# to_nz_index in case we don't provide a sparsity pattern
 
 function to_nz_index(i::AbstractArray)
   nz_sortperm(i)

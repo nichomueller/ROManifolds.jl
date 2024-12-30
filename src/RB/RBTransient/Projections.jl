@@ -42,15 +42,18 @@ function RBSteady.inv_project(a::TransientBasis,X̂::AbstractMatrix)
   return X
 end
 
-for f in (:(RBSteady.project),:(RBSteady.inv_project))
-  @eval begin
-    function $f(a::TransientBasis,y::AbstractVector)
-      ns = num_reduced_dofs(a.basis_space)
-      nt = num_reduced_dofs(a.basis_time)
-      Y = reshape(y,ns,nt)
-      $f(a,Y)
-    end
-  end
+function RBSteady.project(a::TransientBasis,y::AbstractVector)
+  ns = num_fe_dofs(a.basis_space)
+  nt = num_fe_dofs(a.basis_time)
+  Y = reshape(y,ns,nt)
+  vec(project(a,Y))
+end
+
+function RBSteady.inv_project(a::TransientBasis,y::AbstractVector)
+  ns = num_reduced_dofs(a.basis_space)
+  nt = num_reduced_dofs(a.basis_time)
+  Y = reshape(y,ns,nt)
+  vec(inv_project(a,Y))
 end
 
 function RBSteady.galerkin_projection(

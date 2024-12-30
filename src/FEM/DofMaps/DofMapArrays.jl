@@ -1,6 +1,10 @@
-abstract type AbstractDofMapArray{T,D} <: AbstractArray{T,D} end
+"""
+    DofMapArray{T,D,Ti,A,I} <: AbstractArray{T,D}
 
-struct DofMapArray{T,D,Ti,A<:AbstractArray{T},I<:AbstractArray{Ti,D}} <: AbstractDofMapArray{T,D}
+Array `array` whose entries are indexed according to the order specified in
+the dof map `dof_map`
+"""
+struct DofMapArray{T,D,Ti,A<:AbstractArray{T},I<:AbstractArray{Ti,D}} <: AbstractArray{T,D}
   array::A
   dof_map::I
 end
