@@ -2,7 +2,6 @@
     TrialParamFESpace{S} <: SingleFieldParamFESpace{S}
 
 Most standard implementation of a parametric trial FE space
-
 """
 struct TrialParamFESpace{S} <: SingleFieldParamFESpace{S}
   dirichlet_values::AbstractParamVector

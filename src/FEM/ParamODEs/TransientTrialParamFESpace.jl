@@ -1,11 +1,11 @@
 """
-    struct TransientTrialParamFESpace{A,B} <: UnEvalParamSingleFieldFESpace end
+    struct TransientTrialParamFESpace{A,B} <: UnEvalSingleFieldFESpace end
 
 Structure used in transient applications. When a TransientTrialParamFESpace is
 evaluated in a [`TransientRealization`](@ref), a parametric trial FE space is returned
 
 """
-struct TransientTrialParamFESpace{A,B} <: UnEvalParamSingleFieldFESpace
+struct TransientTrialParamFESpace{A,B} <: UnEvalSingleFieldFESpace
   space::A
   space0::B
   dirichlet::Union{Function,AbstractVector{<:Function}}
@@ -86,7 +86,7 @@ const TransientMultiFieldParamFESpace = MultiFieldFESpace
 function has_unevaluated(U::MultiFieldFESpace)
   (
     any(space -> space isa TransientTrialFESpace,U.spaces) ||
-    any(space -> space isa UnEvalParamSingleFieldFESpace,U.spaces)
+    any(space -> space isa UnEvalSingleFieldFESpace,U.spaces)
   )
 end
 
@@ -145,20 +145,4 @@ end
 
 function Arrays.evaluate(U::MultiFieldFESpace,r::TransientRealization)
   evaluate(U,get_params(r),get_times(r))
-end
-
-function test_transient_trial_fe_space(Uh,μ)
-  UhX = evaluate(Uh,nothing)
-  @test isa(UhX,FESpace)
-  Uh0 = allocate_space(Uh,μ,0.0)
-  Uh0 = evaluate!(Uh0,Uh,μ,0.0)
-  @test isa(Uh0,FESpace)
-  Uh0 = evaluate(Uh,μ,0.0)
-  @test isa(Uh0,FESpace)
-  Uh0 = Uh(μ,0.0)
-  @test isa(Uh0,FESpace)
-  Uht=∂t(Uh)
-  Uht0=Uht(μ,0.0)
-  @test isa(Uht0,FESpace)
-  true
 end

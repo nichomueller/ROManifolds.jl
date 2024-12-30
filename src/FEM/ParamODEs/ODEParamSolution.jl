@@ -25,8 +25,9 @@ end
 """
     struct ODEParamSolution{V} <: ODESolution end
 
-Generic wrapper for the evolution of an `ODEParamOperator` with an `ODESolver`.
-
+Wrapper for the evolution of a differential problem represented by
+the field `odeop`, and solved by means of the ode solver `solver`. Parametric
+extension of the type [`ODESolution`](@ref) in [`Gridap`](@ref)
 """
 struct ODEParamSolution{V} <: ODESolution
   solver::ODESolver
@@ -97,14 +98,4 @@ function Algebra.solve(
   u0::T) where T
 
   ODEParamSolution(solver,odeop,r,u0)
-end
-
-# for testing purposes
-
-function ODEs.test_ode_solution(sol::ODEParamSolution)
-  for (r_n,u_n) in sol
-    @test isa(r_n,TransientRealization)
-    @test isa(u_n,ParamVector)
-  end
-  true
 end

@@ -13,15 +13,11 @@ ParamDataStructures.param_length(f::FESpace) = 0
 
 Parametric extension of a [`SingleFieldFESpace`](@ref) in [`Gridap`](@ref). The
 FE spaces inhereting are (trial) spaces on which we can easily define a
-[`ParamFEFunction`](@ref). Most commonly, a SingleFieldParamFESpace is
-characterized by parametric Dirichlet boundary conditions, but a standard
-nonparametric DBC can be prescribed on such spaces.
-
+[`ParamFEFunction`](@ref).
 
 Subtypes:
 - TrivialParamFESpace{S} <: SingleFieldParamFESpace{S}
 - TrialParamFESpace{S} <: SingleFieldParamFESpace{S}
-
 """
 abstract type SingleFieldParamFESpace{S} <: SingleFieldFESpace end
 

@@ -142,7 +142,7 @@ struct PODBasis{A<:AbstractMatrix} <: Projection
   basis::A
 end
 
-function projection(red::PODReduction,s::AbstractArray{<:Number},args...)
+function projection(red::PODReduction,s::Snapshots,args...)
   basis = reduction(red,s,args...)
   PODBasis(basis)
 end
@@ -202,7 +202,7 @@ struct TTSVDCores{D,A<:AbstractVector{<:AbstractArray{T,3} where T},I<:AbstractD
   dof_map::I
 end
 
-function projection(red::TTSVDReduction,s::AbstractArray{<:Number},args...)
+function projection(red::TTSVDReduction,s::Snapshots,args...)
   cores = reduction(red,s,args...)
   dof_map = get_dof_map(s)
   TTSVDCores(cores,dof_map)
@@ -300,11 +300,11 @@ end
 
 # multi field interface
 
-function Arrays.return_type(::typeof(projection),::PODReduction,s::AbstractSnapshots{T}) where T
+function Arrays.return_type(::typeof(projection),::PODReduction,s::Snapshots{T}) where T
   PODBasis{Matrix{T}}
 end
 
-function Arrays.return_type(::typeof(projection),::TTSVDReduction,s::AbstractSnapshots)
+function Arrays.return_type(::typeof(projection),::TTSVDReduction,s::Snapshots)
   TTSVDCores
 end
 

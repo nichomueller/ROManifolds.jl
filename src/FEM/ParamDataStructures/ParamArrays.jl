@@ -1,7 +1,10 @@
 # generic constructors
 
-ParamArray(A::AbstractArray{<:Number},plength::Integer;kwargs...) = TrivialParamArray(A,plength)
+ParamArray(a::AbstractArray{<:Number},l::Integer;kwargs...) = TrivialParamArray(a,l)
 
+# Within Gridap lazy maps (i.e. we deal with cell-wise arrays), we use the
+# NonConsecutiveMemory style; otherwise, when dealing with global arrays, we use
+# the ConsecutiveMemory style
 function ParamArray(a::AbstractArray{<:AbstractArray};style=NonConsecutiveMemory())
   if style==ConsecutiveMemory()
     ConsecutiveParamArray(a)
@@ -18,6 +21,11 @@ function param_array(a::AbstractArray{<:Number,N},l::Integer;style=NonConsecutiv
   end
 end
 
+"""
+    get_all_data(A::ParamArray) -> AbstractArray{<:Any}
+
+Returns all the entries stored in `A`, assuming `A` stores its entries consecutively
+"""
 get_all_data(A::ParamArray) = @abstractmethod
 
 function Base.setindex!(
@@ -84,10 +92,9 @@ function Base.getproperty(A::ParamArray,sym::Symbol)
 end
 
 """
-    struct TrivialParamArray{T,N,P<:AbstractArray{T,N}} <: ParamArray{T,N} end
+    struct TrivialParamArray{T<:Number,N,A<:AbstractArray{T,N}} <: ParamArray{T,N} end
 
-Wrapper for nonparametric arrays that we wish assumed a parametric length.
-
+Wrapper for nonparametric arrays that we wish assumed a parametric length
 """
 struct TrivialParamArray{T<:Number,N,A<:AbstractArray{T,N}} <: ParamArray{T,N}
   data::A
@@ -166,6 +173,13 @@ function get_param_entry(A::TrivialParamArray{T,N},i::Vararg{Integer,N}) where {
   fill(entry,param_length(A))
 end
 
+"""
+    struct ConsecutiveParamArray{T,N,M,A<:AbstractArray{T,M}} <: ParamArray{T,N} end
+
+Parametric array with entries stored consecutively in memory. It is
+characterized by an inner size equal to `size(data)[1:N]`, and parametric length
+equal to `size(data,N+1)`, where `data` is an AbstractArray of dimension M = N+1
+"""
 struct ConsecutiveParamArray{T,N,M,A<:AbstractArray{T,M}} <: ParamArray{T,N}
   data::A
   function ConsecutiveParamArray(data::AbstractArray{T,M}) where {T<:Number,M}
@@ -295,12 +309,7 @@ function get_param_entry(A::ConsecutiveParamArray,i...)
 end
 
 """
-    struct ParamArray{T,N,P<:AbstractVector{<:AbstractArray{T,N}}} <: ParamArray{T,N} end
-
-Represents conceptually a vector of arrays, but the entries are stored in
-consecutive memory addresses. So in practice it simply wraps an AbstractArray,
-with a parametric length equal to its last dimension
-
+    struct GenericParamVector{Tv,Ti} <: ParamArray{Tv,1} end
 """
 struct GenericParamVector{Tv,Ti} <: ParamArray{Tv,1}
   data::Vector{Tv}
@@ -429,6 +438,9 @@ function get_param_entry(A::GenericParamVector{T},i::Integer) where T
   v
 end
 
+"""
+    struct GenericParamMatrix{Tv,Ti} <: ParamArray{Tv,2} end
+"""
 struct GenericParamMatrix{Tv,Ti} <: ParamArray{Tv,2}
   data::Vector{Tv}
   ptrs::Vector{Ti}
@@ -556,6 +568,13 @@ function get_param_entry(A::GenericParamMatrix{T},i::Integer,j::Integer) where T
   v
 end
 
+"""
+    struct ArrayOfArrays{T,N,A<:AbstractArray{T,N}} <: ParamArray{T,N} end
+
+Parametric array with entries stored non-consecutively in memory. It is
+characterized by an inner size equal to `size(data[1])`, and parametric length
+equal to `length(data)`, where `data` is a Vector{<:AbstractArray}
+"""
 struct ArrayOfArrays{T,N,A<:AbstractArray{T,N}} <: ParamArray{T,N}
   data::Vector{A}
 end

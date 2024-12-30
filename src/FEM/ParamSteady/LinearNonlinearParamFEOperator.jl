@@ -1,11 +1,10 @@
 """
-    struct LinearNonlinearParamFEOperator <: ParamFEOperator{LinearNonlinearParamEq} end
+    struct LinearNonlinearParamFEOperator{T} <: ParamFEOperator{LinearNonlinearParamEq,T} end
 
 Interface to accommodate the separation of terms depending on their linearity in
 a nonlinear problem. This allows to build and store once and for all linear
 residuals/jacobians, and in the Newton-like iterations only evaluate and assemble
 only the nonlinear components
-
 """
 struct LinearNonlinearParamFEOperator{T} <: ParamFEOperator{LinearNonlinearParamEq,T}
   op_linear::ParamFEOperator{LinearParamEq,T}
@@ -17,7 +16,6 @@ end
 
 Returns the linear part of the operator of a linear-nonlinear FE operator; throws
 an error if the input is not defined as a linear-nonlinear FE operator
-
 """
 get_linear_operator(op::LinearNonlinearParamFEOperator) = op.op_linear
 
@@ -26,7 +24,6 @@ get_linear_operator(op::LinearNonlinearParamFEOperator) = op.op_linear
 
 Returns the nonlinear part of the operator of a linear-nonlinear FE operator; throws
 an error if the input is not defined as a linear-nonlinear FE operator
-
 """
 get_nonlinear_operator(op::LinearNonlinearParamFEOperator) = op.op_nonlinear
 
@@ -82,8 +79,7 @@ end
 """
     join_operators(op::LinearNonlinearParamFEOperator) -> ParamFEOperator
 
-Joins the linear/nonlinear parts of the operator and returns the result
-
+Joins the linear/nonlinear parts of the operator and returns the resulting operator
 """
 function join_operators(op::LinearNonlinearParamFEOperator)
   op_lin = get_linear_operator(op)

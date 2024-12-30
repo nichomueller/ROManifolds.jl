@@ -39,7 +39,7 @@ export TransientReduction
 export TransientMDEIMReduction
 include("ReductionMethods.jl")
 
-export AbstractTransientSnapshots
+export TransientSnapshots
 export TransientGenericSnapshots
 export TransientSparseSnapshots
 export UnfoldingTransientSnapshots

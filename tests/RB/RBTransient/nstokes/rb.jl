@@ -14,7 +14,7 @@ using ReducedOrderModels
 θ = 1.0
 dt = 0.0025
 t0 = 0.0
-tf = 60*dt
+tf = 20*dt
 
 # parametric space
 pranges = fill([1,10],3)
@@ -97,7 +97,7 @@ feop = LinearNonlinearTransientParamFEOperator(feop_lin,feop_nlin)
 fesolver = ThetaMethod(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true),dt,θ)
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 
-test_dir = datadir(joinpath("navier-stokes","model_circle_$h"))
+test_dir = datadir(joinpath("navier-stokes-t20","model_circle_$h"))
 create_dir(test_dir)
 
 tol = 1e-4
@@ -105,14 +105,14 @@ state_reduction = TransientReduction(coupling,tol,energy;nparams=50,sketch=:sprn
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,nparams_djac=1)
 
 fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
-# save(test_dir,fesnaps)
+save(test_dir,fesnaps)
 # println(festats)
 # fesnaps = load_snapshots(test_dir)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 # save(test_dir,rbop)
 ronline = realization(feop;nparams=10,random=true)
 xonline,festats = solution_snapshots(rbsolver,feop,xh0μ;r=ronline)
-# save(test_dir,xonline;label="online")
+save(test_dir,xonline;label="online")
 # xonline = load_snapshots(test_dir;label="online")
 # ronline = get_realization(xonline)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
@@ -130,21 +130,21 @@ println(perf)
 #   param_writevtk(Ω,dir,celldata)
 # end
 
-r = get_realization(fesnaps)
-S′ = flatten_snapshots(fesnaps)
-S1 = S′[1][:,:,1]
-r1 = r[1,:]
-U1 = trial_u(r1)
-plt_dir = datadir("plts")
-create_dir(plt_dir)
-for i in 1:length(r1)
-  Ui = param_getindex(U1,i)
-  uhi = FEFunction(Ui,S1[:,i])
-  writevtk(Ω,joinpath(plt_dir,"u_$i.vtu"),cellfields=["uh"=>uhi])
-end
-S2 = S′[2][:,:,1]
-for i in 1:length(r1)
-  Pi = trial_p(nothing)
-  phi = FEFunction(Pi,S2[:,i])
-  writevtk(Ω,joinpath(plt_dir,"p_$i.vtu"),cellfields=["ph"=>phi])
-end
+# r = get_realization(fesnaps)
+# S′ = flatten_snapshots(fesnaps)
+# S1 = S′[1][:,:,1]
+# r1 = r[1,:]
+# U1 = trial_u(r1)
+# plt_dir = datadir("plts")
+# create_dir(plt_dir)
+# for i in 1:length(r1)
+#   Ui = param_getindex(U1,i)
+#   uhi = FEFunction(Ui,S1[:,i])
+#   writevtk(Ω,joinpath(plt_dir,"u_$i.vtu"),cellfields=["uh"=>uhi])
+# end
+# S2 = S′[2][:,:,1]
+# for i in 1:length(r1)
+#   Pi = trial_p(nothing)
+#   phi = FEFunction(Pi,S2[:,i])
+#   writevtk(Ω,joinpath(plt_dir,"p_$i.vtu"),cellfields=["ph"=>phi])
+# end

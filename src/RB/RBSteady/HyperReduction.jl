@@ -140,7 +140,7 @@ get_integration_domain(a::MDEIM) = a.domain
 
 function HyperReduction(
   red::AbstractMDEIMReduction,
-  s::AbstractSnapshots,
+  s::Snapshots,
   test::RBSpace)
 
   red = get_reduction(red)
@@ -154,7 +154,7 @@ end
 
 function HyperReduction(
   red::AbstractMDEIMReduction,
-  s::AbstractSnapshots,
+  s::Snapshots,
   trial::RBSpace,
   test::RBSpace)
 
@@ -324,7 +324,7 @@ end
 
 function reduced_form(
   red::Reduction,
-  s::AbstractSnapshots,
+  s::Snapshots,
   trian::Triangulation,
   args...)
 

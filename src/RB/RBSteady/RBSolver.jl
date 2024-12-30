@@ -60,8 +60,8 @@ res_params(s::RBSolver) = 1:num_res_params(s)
 jac_params(s::RBSolver) = 1:num_jac_params(s)
 
 """
-    solution_snapshots(solver::RBSolver,op::ParamFEOperator;kwargs...) -> AbstractSteadySnapshots
-    solution_snapshots(solver::RBSolver,op::TransientParamFEOperator;kwargs...) -> AbstractTransientSnapshots
+    solution_snapshots(solver::RBSolver,op::ParamFEOperator;kwargs...) -> SteadySnapshots
+    solution_snapshots(solver::RBSolver,op::TransientParamFEOperator;kwargs...) -> TransientSnapshots
 
 The problem is solved several times, and the solution snapshots are returned along
 with the information related to the computational expense of the FE method
@@ -89,7 +89,12 @@ function solution_snapshots(
   return snaps,stats
 end
 
-function residual_snapshots(solver::RBSolver,op::ParamOperator,s;nparams=res_params(solver))
+function residual_snapshots(
+  solver::RBSolver,
+  op::ParamOperator,
+  s::AbstractSnapshots;
+  nparams=res_params(solver))
+
   fesolver = get_fe_solver(solver)
   sres = select_snapshots(s,nparams)
   us_res = get_values(sres)
@@ -99,7 +104,12 @@ function residual_snapshots(solver::RBSolver,op::ParamOperator,s;nparams=res_par
   return Snapshots(b,ib,r_res)
 end
 
-function residual_snapshots(solver::RBSolver,op::ParamOperator{LinearParamEq},s;nparams=res_params(solver))
+function residual_snapshots(
+  solver::RBSolver,
+  op::ParamOperator{LinearParamEq},
+  s::AbstractSnapshots;
+  nparams=res_params(solver))
+
   fesolver = get_fe_solver(solver)
   sres = select_snapshots(s,nparams)
   us_res = get_values(sres) |> similar
@@ -110,7 +120,12 @@ function residual_snapshots(solver::RBSolver,op::ParamOperator{LinearParamEq},s;
   return Snapshots(b,ib,r_res)
 end
 
-function jacobian_snapshots(solver::RBSolver,op::ParamOperator,s;nparams=jac_params(solver))
+function jacobian_snapshots(
+  solver::RBSolver,
+  op::ParamOperator,
+  s::AbstractSnapshots;
+  nparams=jac_params(solver))
+
   fesolver = get_fe_solver(solver)
   sjac = select_snapshots(s,nparams)
   us_jac = get_values(sjac)
@@ -120,7 +135,12 @@ function jacobian_snapshots(solver::RBSolver,op::ParamOperator,s;nparams=jac_par
   return Snapshots(A,iA,r_jac)
 end
 
-function jacobian_snapshots(solver::RBSolver,op::ParamOperator{LinearParamEq},s;nparams=jac_params(solver))
+function jacobian_snapshots(
+  solver::RBSolver,
+  op::ParamOperator{LinearParamEq},
+  s::AbstractSnapshots;
+  nparams=jac_params(solver))
+
   fesolver = get_fe_solver(solver)
   sjac = select_snapshots(s,nparams)
   us_jac = get_values(sjac) |> similar

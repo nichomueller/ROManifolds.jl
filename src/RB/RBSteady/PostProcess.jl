@@ -61,7 +61,7 @@ function get_filename(dir::String,name::String,labels...;extension=".jld")
   joinpath(dir,_get_label(name,labels...)*extension)
 end
 
-function DrWatson.save(dir,s::Union{AbstractSnapshots,BlockSnapshots};label="")
+function DrWatson.save(dir,s::AbstractSnapshots;label="")
   snaps_dir = get_filename(dir,"snapshots",label)
   serialize(snaps_dir,s)
 end
@@ -274,8 +274,8 @@ function Utils.compute_relative_error(norm_style::EuclideanNorm,feop,sol,sol_app
 end
 
 function Utils.compute_relative_error(
-  sol::AbstractSteadySnapshots{T,N},
-  sol_approx::AbstractSteadySnapshots{T,N},
+  sol::SteadySnapshots{T,N},
+  sol_approx::SteadySnapshots{T,N},
   args...) where {T,N}
 
   @check size(sol) == size(sol_approx)

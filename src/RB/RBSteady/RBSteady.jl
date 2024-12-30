@@ -61,12 +61,12 @@ export get_reduction
 include("ReductionMethods.jl")
 
 export AbstractSnapshots
+export Snapshots
 export GenericSnapshots
 export SnapshotsAtIndices
 export SparseSnapshots
 export UnfoldingSteadySnapshots
 export BlockSnapshots
-export Snapshots
 export get_realization
 export flatten_snapshots
 export select_snapshots

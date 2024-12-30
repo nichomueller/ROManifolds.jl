@@ -1,3 +1,7 @@
+"""
+    struct ParamStageOperator{O} <: StageOperator
+(Nonlinear) stage operator to solve a parametric ODE with a time marching scheme
+"""
 struct ParamStageOperator{O} <: StageOperator
   op::ODEParamOperator{O}
   cache::AbstractParamCache

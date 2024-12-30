@@ -1,22 +1,72 @@
+"""
+    abstract type UnEvalOperatorType <: GridapType end
+
+Type representing operators that are not evaluated yet. This may include operators
+representing transient problems (although the implementation in [`Gridap`](@ref)
+differs), parametric problems, and a combination thereof. Could become a supertype
+of [`ODEOperatorType`](@ref) in [`Gridap`](@ref). Subtypes:
+
+- [`LinearParamEq`](@ref)
+- [`NonlinearParamEq`](@ref)
+- [`LinearNonlinearParamEq`](@ref)
+- [`ODEParamOperatorType`](@ref)
+"""
 abstract type UnEvalOperatorType <: GridapType end
 
+"""
+    struct LinearParamEq <: UnEvalOperatorType end
+"""
 struct LinearParamEq <: UnEvalOperatorType end
+
+"""
+    struct NonlinearParamEq <: UnEvalOperatorType end
+"""
 struct NonlinearParamEq <: UnEvalOperatorType end
+
+"""
+    struct LinearNonlinearParamEq <: UnEvalOperatorType end
+"""
 struct LinearNonlinearParamEq <: UnEvalOperatorType end
 
+"""
+    abstract type TriangulationStyle <: GridapType end
+
+Subtypes:
+
+- [`JointDomains`](@ref)
+- [`SplitDomains`](@ref)
+"""
 abstract type TriangulationStyle <: GridapType end
-struct SplitDomains <: TriangulationStyle end
+
+"""
+    struct JointDomains <: TriangulationStyle end
+
+Trait for a FE operator indicating that residuals/jacobians in this operator
+should be computed summing the contributions relative to each triangulation as
+occurs in [`Gridap`](@ref)
+"""
 struct JointDomains <: TriangulationStyle end
+
+"""
+    struct SplitDomains <: TriangulationStyle end
+
+Trait for a FE operator indicating that residuals/jacobians in this operator
+should be computed keeping the contributions relative to each triangulation separate
+"""
+struct SplitDomains <: TriangulationStyle end
 
 """
     abstract type ParamOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: NonlinearOperator end
 
-Similar to [`ODEOperator`](@ref) in [`Gridap`](@ref), when dealing with steady
-parametric problems
+Type representing algebraic operators (i.e. [`NonlinearOperator`](@ref)) when
+solving parametric differential problems.
 
 Subtypes:
-- [`ParamOpFromFEOp`](@ref)
 
+- [`ParamOpFromFEOp`](@ref)
+- [`LinearNonlinearParamOpFromFEOp`](@ref)
+- [`ODEParamOperator`](@ref)
+- [`RBOperator`](@ref)
 """
 abstract type ParamOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: NonlinearOperator end
 
@@ -113,9 +163,8 @@ get_sparse_dof_map_at_domains(op::ParamOperator) = get_sparse_dof_map_at_domains
     allocate_paramcache(op::ParamOperator,μ::Realization,u::AbstractVector
       ) -> ParamOpCache
 
-Similar to [`allocate_odeparamcache`](@ref) in [`Gridap`](@ref), when dealing with steady
+Similar to [`allocate_odecache`](@ref) in [`Gridap`](@ref), when dealing with
 parametric problems
-
 """
 function allocate_paramcache(
   op::ParamOperator,
@@ -132,9 +181,8 @@ end
 """
     update_paramcache!(paramcache, op::ParamOperator, μ::Realization) -> ParamOpCache
 
-Similar to [`update_odeparamcache!`](@ref) in [`Gridap`](@ref), when dealing with steady
+Similar to [`update_odecache!`](@ref) in [`Gridap`](@ref), when dealing with
 parametric problems
-
 """
 function update_paramcache!(paramcache,op::ParamOperator,μ::Realization)
   paramcache.trial = evaluate!(paramcache.trial,paramcache.ptrial,μ)
@@ -168,6 +216,14 @@ struct ParamOpSysCache{Ta,Tb} <: AbstractParamCache
   b::Tb
 end
 
+"""
+    struct ParamNonlinearOperator <: NonlinearOperator
+
+Fields:
+- `op`: [`ParamOperator`](@ref) representing a parametric differential problem
+- `μ`: [`Realization`](@ref) representing the parameters at which the problem is solved
+- `paramcache`: cache of the problem
+"""
 struct ParamNonlinearOperator <: NonlinearOperator
   op::ParamOperator
   μ::Realization

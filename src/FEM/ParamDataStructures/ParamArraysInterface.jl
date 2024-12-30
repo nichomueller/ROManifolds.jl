@@ -3,9 +3,8 @@
 
 Type representing parametric abstract arrays of type A.
 Subtypes:
-- [`ParamArray`](@ref).
-- [`ParamSparseMatrix`](@ref).
-
+- [`ParamArray`](@ref)
+- [`ParamSparseMatrix`](@ref)
 """
 abstract type AbstractParamArray{T,N,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N} end
 
@@ -18,11 +17,10 @@ const AbstractParamArray3D{T} = AbstractParamArray{T,3,<:AbstractArray{T,3}}
 
 Type representing parametric arrays of type A.
 Subtypes:
-- [`ParamArray`](@ref).
-- [`ConsecutiveParamArray`](@ref).
-- [`TrivialParamArray`](@ref).
-- [`BlockParamArray`](@ref).
-
+- [`ParamArray`](@ref)
+- [`ConsecutiveParamArray`](@ref)
+- [`TrivialParamArray`](@ref)
+- [`BlockParamArray`](@ref)
 """
 abstract type ParamArray{T,N} <: AbstractParamArray{T,N,Array{T,N}} end
 const ParamVector{T} = ParamArray{T,1}
@@ -34,13 +32,28 @@ const ParamMatrix{T} = ParamArray{T,2}
 
 Type representing parametric abstract sparse matrices of type A.
 Subtypes:
-- [`ParamSparseMatrixCSC`](@ref).
-
+- [`ParamSparseMatrixCSC`](@ref)
+- [`ParamSparseMatrixCSR`](@ref)
 """
 abstract type ParamSparseMatrix{Tv,Ti,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,A} end
 
+"""
+    abstract type MemoryLayoutStyle end
+"""
 abstract type MemoryLayoutStyle end
+
+"""
+    struct ConsecutiveMemory <: MemoryLayoutStyle end
+
+Parametric objects with this trait store their values consecutively
+"""
 struct ConsecutiveMemory <: MemoryLayoutStyle end
+
+"""
+    struct NonConsecutiveMemory <: MemoryLayoutStyle end
+
+Parametric objects with this trait do not store their values consecutively
+"""
 struct NonConsecutiveMemory <: MemoryLayoutStyle end
 
 MemoryLayoutStyle(A::T) where T = MemoryLayoutStyle(T)
@@ -54,7 +67,6 @@ MemoryLayoutStyle(::Type{<:AbstractParamArray}) = ConsecutiveMemory()
     ParamArray(A::AbstractArray{<:ParamArray}) -> BlockParamArray
 
 Generic constructor of a AbstractParamArray
-
 """
 ParamArray(args...;kwargs...) = @abstractmethod
 param_array(args...;kwargs...) = @abstractmethod
@@ -69,11 +81,30 @@ end
 
 param_getindex(A::AbstractParamArray{T,N},i::Integer) where {T,N} = getindex(A,tfill(i,Val{N}())...)
 param_setindex!(A::AbstractParamArray{T,N},v,i::Integer) where {T,N} = setindex!(A,v,tfill(i,Val{N}())...)
-get_param_entry(A::AbstractParamArray,i...) = @abstractmethod
 to_param_quantity(a::AbstractArray,plength::Integer) = ParamArray(a,plength)
 
+"""
+    innerlength(A::AbstractParamArray) -> Int
+
+Returns the length of `A` for a single parameter. Thus, the total entries of `A`
+is equals to `param_length(A)*innerlength(A)`
+"""
 innerlength(A::AbstractParamArray) = prod(innersize(A))
+
+"""
+    inneraxes(A::AbstractParamArray) -> Tuple{Vararg{Base.OneTo}}
+
+Returns the axes of `A` for a single parameter
+"""
 inneraxes(A::AbstractParamArray) = Base.OneTo.(innersize(A))
+
+"""
+    get_param_entry(A::AbstractParamArray{T},i...) where T -> Vector{eltype(T)}
+
+Returns a vector of the entries of `A` at index `i`, for every parameter. The
+length of the output is equals to `param_length(A)`
+"""
+get_param_entry(A::AbstractParamArray,i...) = @abstractmethod
 
 # small hack, zero(::Type{<:AbstractArray}) is not implemented in Base
 function Base.zero(::Type{<:AbstractArray{T,N}}) where {T<:Number,N}

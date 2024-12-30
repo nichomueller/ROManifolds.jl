@@ -1,10 +1,16 @@
 """
     abstract type ParamFEFunction <: FEFunction end
 
-Parametric extension of a [`FEFunction`](@ref) in [`Gridap`](@ref)
+Parametric extension of a [`FEFunction`](@ref) in [`Gridap`](@ref). Subtypes:
+
+- [`SingleFieldParamFEFunction`](@ref)
+- [`MultiFieldParamFEFunction`](@ref)
 """
 abstract type ParamFEFunction <: FEFunction end
 
+"""
+    struct SingleFieldParamFEFunction{T<:CellField} <: ParamFEFunction end
+"""
 struct SingleFieldParamFEFunction{T<:CellField} <: ParamFEFunction
   cell_field::T
   cell_dof_values::AbstractArray{<:AbstractParamVector{<:Number}}
@@ -44,23 +50,6 @@ end
 
 # for visualization/testing purposes
 
-function FESpaces.test_fe_function(f::SingleFieldParamFEFunction)
-  lazy_getter(a,i=1) = lazy_map(x->param_getindex(x,i),a)
-  trian = get_triangulation(f)
-  free_values = get_free_dof_values(f)
-  fe_space = get_fe_space(f)
-  cell_values = get_cell_dof_values(f,trian)
-  dirichlet_values = f.dirichlet_values
-  for i in param_eachindex(fe_space)
-    fe_space_i = param_getindex(fe_space,i)
-    fi = FEFunction(fe_space_i,free_values[i])
-    test_fe_function(fi)
-    @test param_getindex(free_values,i) == get_free_dof_values(fi)
-    @test lazy_getter(cell_values,i) == get_cell_dof_values(fi,trian)
-    @test param_getindex(dirichlet_values,i) == fi.dirichlet_values
-  end
-end
-
 function ParamDataStructures.param_getindex(f::GenericCellField,index::Integer)
   data = get_data(f)
   trian = get_triangulation(f)
@@ -83,6 +72,9 @@ function ParamDataStructures.param_getindex(f::SingleFieldParamFEFunction,index:
   SingleFieldFEFunction(cf,cv,fv,dv,fs)
 end
 
+"""
+    struct MultiFieldParamFEFunction{T<:MultiFieldCellField} <: ParamFEFunction end
+"""
 struct MultiFieldParamFEFunction{T<:MultiFieldCellField} <: ParamFEFunction
   single_fe_functions::Vector{<:SingleFieldParamFEFunction}
   free_values::AbstractArray

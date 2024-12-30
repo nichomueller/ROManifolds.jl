@@ -51,8 +51,8 @@ function RBSteady.load_operator(dir,feop::LinearNonlinearTransientRBOperator;lab
 end
 
 function Utils.compute_relative_error(
-  sol::AbstractTransientSnapshots{T,N},
-  sol_approx::AbstractTransientSnapshots{T,N},
+  sol::TransientSnapshots{T,N},
+  sol_approx::TransientSnapshots{T,N},
   args...) where {T,N}
 
   @check size(sol) == size(sol_approx)

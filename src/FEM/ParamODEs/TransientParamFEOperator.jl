@@ -1,5 +1,5 @@
 """
-    abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: TransientFEOperator{T} end
+    abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: ParamFEOperator{T} end
 
 Parametric extension of a [`TransientFEOperator`](@ref) in [`Gridap`](@ref). Compared to
 a standard TransientFEOperator, there are the following novelties:

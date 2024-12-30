@@ -104,7 +104,6 @@ export TransientRealization
 export UniformSampling
 export NormalSampling
 export HaltonSampling
-export SmolyakSampling
 export ParamSpace
 export TransientParamSpace
 export AbstractParamFunction
@@ -199,7 +198,7 @@ export collect_cell_vector_for_trian
 include("FEM/ParamFESpaces/ParamFESpaces.jl")
 using ReducedOrderModels.ParamFESpaces
 
-export UnEvalParamSingleFieldFESpace
+export UnEvalSingleFieldFESpace
 export ParamTrialFESpace
 export ParamMultiFieldFESpace
 
@@ -282,12 +281,12 @@ export AdaptiveReduction
 export get_reduction
 
 export AbstractSnapshots
+export Snapshots
 export GenericSnapshots
 export SnapshotsAtIndices
 export SparseSnapshots
 export UnfoldingSteadySnapshots
 export BlockSnapshots
-export Snapshots
 export get_realization
 export flatten_snapshots
 export select_snapshots
@@ -382,7 +381,7 @@ using ReducedOrderModels.RBSteady
 export TransientReduction
 export TransientMDEIMReduction
 
-export AbstractTransientSnapshots
+export TransientSnapshots
 export TransientGenericSnapshots
 export TransientSparseSnapshots
 export UnfoldingTransientSnapshots

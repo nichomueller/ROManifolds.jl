@@ -2,7 +2,6 @@
     TrivialParamFESpace{S} <: SingleFieldParamFESpace{S}
 
 Wrapper for nonparametric FE spaces that we wish assumed a parametric length `plength`
-
 """
 struct TrivialParamFESpace{S} <: SingleFieldParamFESpace{S}
   space::S

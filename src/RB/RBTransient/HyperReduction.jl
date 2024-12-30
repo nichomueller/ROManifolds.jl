@@ -51,7 +51,7 @@ end
 
 function RBSteady.HyperReduction(
   red::TransientMDEIMReduction,
-  s::AbstractSnapshots,
+  s::Snapshots,
   trial::RBSpace,
   test::RBSpace)
 

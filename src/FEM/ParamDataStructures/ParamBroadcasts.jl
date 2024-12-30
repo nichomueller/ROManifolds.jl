@@ -6,7 +6,6 @@ operations that are usually not allowed in a normal broadcasting setting, e.g.
 adding a scalar to an array of arrays. Subtypes:
 
 - [`ParamBroadcast`]
-
 """
 abstract type AbstractParamBroadcast end
 

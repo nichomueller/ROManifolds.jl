@@ -1,22 +1,18 @@
 """
-    reduced_fe_space(solver::RBSolver,feop::ParamFEOperator,s::AbstractSteadySnapshots
-      ) -> (RBSpace, RBSpace)
-    reduced_fe_space(solver::RBSolver,feop::TransientParamFEOperator,s::AbstractTransientSnapshots
-      ) -> (RBSpace, RBSpace)
-    reduced_fe_space(solver::RBSolver,feop::TransientParamFEOperator,s::BlockSnapshots
+    reduced_fe_space(solver::RBSolver,feop::ParamFEOperator,s::AbstractSnapshots
       ) -> (RBSpace, RBSpace)
 
 Computes the subspace of the test, trial FE spaces contained in the FE operator
 `feop` by compressing the snapshots `s`
 
 """
-function reduced_fe_space(solver::RBSolver,feop,s)
+function reduced_fe_space(solver::RBSolver,feop::ParamFEOperator,s::AbstractSnapshots)
   red = get_state_reduction(solver)
   soff = select_snapshots(s,offline_params(solver))
   reduced_fe_space(red,feop,soff)
 end
 
-function reduced_fe_space(red::Reduction,feop,s)
+function reduced_fe_space(red::Reduction,feop::ParamFEOperator,s::AbstractSnapshots)
   t = @timed begin
     basis = reduced_basis(red,feop,s)
   end
@@ -28,15 +24,14 @@ function reduced_fe_space(red::Reduction,feop,s)
 end
 
 """
-    reduced_basis(red,s::AbstractSnapshots,args...) -> (Projection, Projection)
+    reduced_basis(red::Reduction,s::AbstractSnapshots,args...) -> (Projection, Projection)
 
 Computes the bases spanning the subspace of test, trial FE spaces by compressing
 the snapshots `s`
-
 """
 function reduced_basis(
   red::Reduction,
-  s::AbstractArray,
+  s::AbstractSnapshots,
   args...)
 
   projection(red,s,args...)
@@ -44,16 +39,16 @@ end
 
 function reduced_basis(
   red::Reduction,
-  feop::GridapType,
-  s::AbstractArray)
+  feop::ParamFEOperator,
+  s::AbstractSnapshots)
 
   reduced_basis(red,s)
 end
 
 function reduced_basis(
   red::Reduction{<:ReductionStyle,EnergyNorm},
-  feop::GridapType,
-  s::AbstractArray)
+  feop::ParamFEOperator,
+  s::AbstractSnapshots)
 
   norm_matrix = assemble_matrix(feop,get_norm(red))
   reduced_basis(red,s,norm_matrix)
@@ -61,8 +56,8 @@ end
 
 function reduced_basis(
   red::SupremizerReduction,
-  feop::GridapType,
-  s::AbstractArray)
+  feop::ParamFEOperator,
+  s::AbstractSnapshots)
 
   norm_matrix = assemble_matrix(feop,get_norm(red))
   supr_matrix = assemble_matrix(feop,get_supr(red))

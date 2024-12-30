@@ -1,3 +1,13 @@
+"""
+    struct FEDomains{A,B}
+      domains_res::A
+      domains_jac::B
+    end
+
+Fields:
+- `domains_res`: triangulations relative to the residual (nothing by default)
+- `domains_jac`: triangulations relative to the jacobian (nothing by default)
+"""
 struct FEDomains{A,B}
   domains_res::A
   domains_jac::B
@@ -16,15 +26,16 @@ a standard FEOperator, there are the following novelties:
 
 - a ParamSpace is provided, so that parametric realizations can be extracted
   directly from the ParamFEOperator
-- an AbstractDofMap is provided, so that a nonstandard indexing strategy can
-  take place when dealing with FEFunctions
+- a FEDofMap is provided, to allow a reindexing of the [`ParamFEFunction`]
+  representing the problem's solution
 - a function representing a norm matrix is provided, so that errors in the
   desired norm can be automatically computed
 
 Subtypes:
 
 - [`ParamFEOpFromWeakForm`](@ref)
-
+- [`LinearNonlinearParamFEOperator`](@ref)
+- [`TransientParamFEOperator`](@ref)
 """
 abstract type ParamFEOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: FEOperator end
 const JointParamFEOperator{O<:UnEvalOperatorType} = ParamFEOperator{O,JointDomains}
@@ -68,12 +79,22 @@ CellData.get_domains(op::ParamFEOperator) = @abstractmethod
 get_domains_res(op::ParamFEOperator) = get_domains_res(get_domains(op))
 get_domains_jac(op::ParamFEOperator) = get_domains_jac(get_domains(op))
 
+"""
+    get_dof_map_at_domains(op::ParamFEOperator) -> Contribution
+
+Returns the residual dof map restricted to every residual triangulation
+"""
 function get_dof_map_at_domains(op::ParamFEOperator)
   dof_map = get_dof_map(op)
   domains_res = get_domains_res(op)
   change_domain(dof_map,domains_res)
 end
 
+"""
+    get_sparse_dof_map_at_domains(op::ParamFEOperator) -> Contribution
+
+Returns the jacobian dof map restricted to every jacobian triangulation
+"""
 function get_sparse_dof_map_at_domains(op::ParamFEOperator)
   domains_jac = get_domains_jac(op)
   trial = get_trial(op)
@@ -90,6 +111,8 @@ function get_sparse_dof_map_at_domains(op::ParamFEOperator)
   get_sparse_dof_map(trial,test,sparsity′)
 end
 
+# used to build a (norm) matrix directly from the FE operator, instead of
+# unpacking the trial and test spaces
 function FESpaces.assemble_matrix(op::ParamFEOperator,form::Function)
   test = get_test(op)
   trial = evaluate(get_trial(op),nothing)
@@ -125,8 +148,7 @@ end
 """
     struct ParamFEOpFromWeakForm{O,T} <: ParamFEOperator{O,T} end
 
-Most standard instance of ParamFEOperator{O,T}
-
+Most standard instance of a parametric FE operator
 """
 struct ParamFEOpFromWeakForm{O,T} <: ParamFEOperator{O,T}
   res::Function
@@ -187,7 +209,20 @@ CellData.get_domains(op::ParamFEOpFromWeakForm) = op.domains
 
 # triangulation utils
 
+"""
+    set_domains(op::ParamFEOperator,args...) -> JointParamFEOperator
+
+Fixes the triangulations for residual/jacobian; the resulting operator will have
+the trait [`JointDomains`](@ref) activated
+"""
 set_domains(op::JointParamFEOperator,args...) = op
+
+"""
+    change_domains(op::ParamFEOperator,args...) -> ParamFEOperator
+
+Changes the triangulations for residual/jacobian; the resulting operator will have
+the same [`TriangulationStyle`](@ref) trait as the one of the input
+"""
 change_domains(op::JointParamFEOperator,args...) = op
 
 for f in (:set_domains,:change_domains)

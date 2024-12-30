@@ -6,7 +6,6 @@ Interface to accommodate the separation of terms depending on their linearity in
 a nonlinear problem. This allows to build and store once and for all linear
 residuals/jacobians, and in the Newton-like iterations only evaluate and assemble
 only the nonlinear components
-
 """
 struct LinearNonlinearTransientParamFEOperator{T} <: TransientParamFEOperator{LinearNonlinearParamODE,T}
   op_linear::TransientParamFEOperator{LinearParamODE,T}

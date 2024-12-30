@@ -28,9 +28,7 @@ end
     get_param_assembler(a::SparseMatrixAssembler,r::AbstractRealization) -> SparseMatrixAssembler
 
 Returns a parametric assembler, which assembles parametric residuals and jacobians.
-The consequent assembly routines remain the same as in [`Gridap`](@ref), i.e.
-SparseMatrixBuilder -> ArrayCounter -> ArrayAllocator -> Array
-
+The consequent assembly routines remain the same as in [`Gridap`](@ref)
 """
 function get_param_assembler(
   a::SparseMatrixAssembler,

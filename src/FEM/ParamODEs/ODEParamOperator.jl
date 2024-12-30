@@ -1,8 +1,7 @@
 """
     abstract type ODEParamOperatorType <: UnEvalOperatorType end
 
-Parametric extension of the type [`UnEvalOperatorType`](@ref) in [`Gridap`](@ref)
-
+Parametric extension of the type [`ODEOperatorType`](@ref) in [`Gridap`](@ref)
 """
 abstract type ODEParamOperatorType <: UnEvalOperatorType end
 
@@ -17,7 +16,8 @@ Parametric extension of the type [`ODEOperator`](@ref) in [`Gridap`](@ref).
 
 Subtypes:
 - [`ODEParamOpFromTFEOp`](@ref)
-
+- [`LinearNonlinearParamOpFromTFEOp`](@ref)
+- [`TransientRBOperator`](@ref)
 """
 abstract type ODEParamOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T} end
 

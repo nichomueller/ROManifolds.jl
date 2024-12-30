@@ -1,11 +1,11 @@
-function RBSteady.projection(red::TransientAffineReduction,s::AbstractTransientSnapshots,args...)
+function RBSteady.projection(red::TransientAffineReduction,s::TransientSnapshots,args...)
   s1 = flatten_snapshots(select_snapshots(s,1,1))
   basis_space = projection(get_reduction_space(red),s1,args...)
   basis_time = PODBasis(I[1:num_times(s),1:1])
   TransientBasis(basis_space,basis_time)
 end
 
-function RBSteady.projection(red::TransientReduction,s::AbstractTransientSnapshots,args...)
+function RBSteady.projection(red::TransientReduction,s::TransientSnapshots,args...)
   s1 = flatten_snapshots(s)
   basis_space = projection(get_reduction_space(red),s1,args...)
   proj_s1 = galerkin_projection(get_basis(basis_space),s1,args...)
@@ -144,7 +144,7 @@ end
 
 # multfield interface
 
-function Arrays.return_type(::typeof(projection),red::TransientReduction,s::AbstractSnapshots)
+function Arrays.return_type(::typeof(projection),red::TransientReduction,s::Snapshots)
   A = return_type(projection,get_reduction_space(red),s)
   B = return_type(projection,get_reduction_time(red),s)
   return TransientBasis{A,B}

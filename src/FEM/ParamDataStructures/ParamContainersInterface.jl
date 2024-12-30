@@ -10,9 +10,10 @@ param_length(a::Union{Number,AbstractArray{<:Number}}) = 0
 param_length(a::CellField) = param_length(testitem(get_data(a)))
 
 """
-    get_param_data(a) -> AbstractArray{<:Any}
+    get_param_data(a) -> Any
 
-Returns the parametric data of `a`
+Returns the parametric data of `a`, usually in the form of a AbstractVector or
+a NTuple
 """
 get_param_data(a) = @abstractmethod
 
@@ -93,9 +94,15 @@ function to_param_quantity(a::AbstractParamContainer,plength::Integer)
   return a
 end
 
-abstract type ParamType{T<:AbstractParamContainer,L} <: Core.Any end
+"""
+    param_typeof(a::AbstractParamContainer) -> Any
 
+Returns a type-like structure thanks to which we can access the parametric
+length of `a`` without `a` itself
+"""
 param_typeof(a::AbstractParamContainer) = ParamType{typeof(a),param_length(a)}
+
+abstract type ParamType{T<:AbstractParamContainer,L} <: Core.Any end
 
 const PType{T,L} = Union{ParamType{T,L},Type{ParamType{T,L}}}
 Base.eltype(::PType{T,L}) where {T,L} = eltype(T)
@@ -104,8 +111,7 @@ param_length(::PType{T,L}) where {T,L} = L
 """
     struct ParamContainer{T} <: AbstractArray{T,1} end
 
-Used as a wrapper for non-array structures, e.g. factorizations
-
+Used as a wrapper for non-array structures, e.g. factorizations or numbers
 """
 struct ParamContainer{T,A<:AbstractVector{T}} <: AbstractParamContainer{T,1}
   data::A

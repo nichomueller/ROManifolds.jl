@@ -1,3 +1,6 @@
+# these structs are only needed when dealing with a parametric version of a FE
+# space of type FESpaceWithConstantFixed
+
 struct ParamVectorWithEntryRemoved{T,A} <: ParamVector{T}
   a::A
   index::Int

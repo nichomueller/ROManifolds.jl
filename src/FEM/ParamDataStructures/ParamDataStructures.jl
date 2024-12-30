@@ -5,7 +5,6 @@ using ArraysOfArrays
 using BlockArrays
 using ForwardDiff
 using HaltonSequences
-using SmolyakApprox
 using SparseArrays
 using SparseMatricesCSR
 
@@ -33,7 +32,6 @@ export TransientRealization
 export UniformSampling
 export NormalSampling
 export HaltonSampling
-export SmolyakSampling
 export ParamSpace
 export TransientParamSpace
 export AbstractParamFunction
