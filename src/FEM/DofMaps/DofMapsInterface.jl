@@ -2,7 +2,7 @@
     abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
 
 Type representing an ordering of dofs in a certain [`FESpace`](@ref). This type
-is used for efficient (lazy) reordering of the free values of a [`FEFunction`](@ref)
+is used for efficient (lazy) reindexing of the free values of a [`FEFunction`](@ref)
 defined on the aforementioned FESpace. Subtypes:
 
 - [`AbstractTrivialDofMap`](@ref)
@@ -117,7 +117,7 @@ end
     abstract type AbstractTrivialDofMap{Ti} <: AbstractDofMap{1,Ti} end
 
 Type representing the trivial dof maps, which are returned when we do not desire
-a reordering of the entries. Subtypes:
+a reindexing of the entries. Subtypes:
 
 - [`TrivialDofMap`](@ref)
 - [`TrivialSparseDofMap`](@ref)

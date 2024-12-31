@@ -1,5 +1,13 @@
-abstract type PartialFunctions <: Function end
+"""
+    abstract type PartialFunctions <: Map end
+"""
+abstract type PartialFunctions <: Map end
 
+"""
+    struct PartialDerivative{N} <: PartialFunctions end
+
+Map that implements a partial derivative in [`Gridap`](@ref)
+"""
 struct PartialDerivative{N} <: PartialFunctions end
 
 PartialDerivative{N}(f) where N = Operation(PartialTrace{N}())(∇(f))

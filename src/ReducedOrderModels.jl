@@ -198,7 +198,7 @@ export collect_cell_vector_for_trian
 include("FEM/ParamFESpaces/ParamFESpaces.jl")
 using ReducedOrderModels.ParamFESpaces
 
-export UnEvalSingleFieldFESpace
+export UnEvalTrialFESpace
 export ParamTrialFESpace
 export ParamMultiFieldFESpace
 

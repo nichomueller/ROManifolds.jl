@@ -34,7 +34,7 @@ import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ReferenceFEs: get_order
 import ReducedOrderModels.Utils: CostTracker
 
-export UnEvalSingleFieldFESpace
+export UnEvalTrialFESpace
 export ParamTrialFESpace
 export ParamMultiFieldFESpace
 include("ParamTrialFESpace.jl")

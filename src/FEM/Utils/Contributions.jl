@@ -3,10 +3,12 @@
 
 Represents quantitites whose values vary upon a triangulation. The values can
 be accessed by indexing a the corresponding triangulation. See [`DomainContribution`](@ref)
-in [`Gridap`](@ref) for more details. Subtypes:
+in [`Gridap`](@ref) for more details.
+
+Subtypes:
+
 - [`ArrayContribution`](@ref)
 - [`AffineContribution`](@ref)
-
 """
 abstract type Contribution end
 
@@ -55,10 +57,12 @@ function Contribution(
 end
 
 """
-    struct ArrayContribution{T,N,V,K} <: Contribution end
+    struct ArrayContribution{T,N,V,K} <: Contribution
+      values::V
+      trians::K
+    end
 
-Contribution whose values are arrays and/or parametric arrays.
-
+Contribution whose `values` are AbstractArrays
 """
 struct ArrayContribution{T,N,V,K} <: Contribution
   values::V

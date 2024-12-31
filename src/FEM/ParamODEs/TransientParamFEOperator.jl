@@ -4,10 +4,10 @@
 Parametric extension of a [`TransientFEOperator`](@ref) in [`Gridap`](@ref). Compared to
 a standard TransientFEOperator, there are the following novelties:
 
-- a TransientParamSpace is provided, so that transient parametric realizations
-  can be extracted directly from the TransientParamFEOperator
-- an AbstractDofMap is provided, so that a nonstandard indexing strategy can
-  take place when dealing with FEFunctions
+- a TransientParamSpace is provided, so that parametric realizations can be extracted
+  directly from the TransientParamFEOperator
+- a FEDofMap is provided, to allow a reindexing of the [`ParamFEFunction`]
+  representing the problem's solution
 - a function representing a norm matrix is provided, so that errors in the
   desired norm can be automatically computed
 
@@ -15,7 +15,7 @@ Subtypes:
 
 - [`TransientParamFEOpFromWeakForm`](@ref)
 - [`TransientParamLinearFEOpFromWeakForm`](@ref)
-
+- [`LinearNonlinearTransientParamFEOperator`](@ref)
 """
 abstract type TransientParamFEOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamFEOperator{O,T} end
 const JointTransientParamFEOperator{O<:ODEParamOperatorType} = TransientParamFEOperator{O,JointDomains}
@@ -71,9 +71,8 @@ end
 """
     struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParamODE} end
 
-Most standard instance of TransientParamFEOperator, when the transient problem is
+Instance of TransientParamFEOperator, to be used when the transient problem is
 nonlinear
-
 """
 struct TransientParamFEOpFromWeakForm{T} <: TransientParamFEOperator{NonlinearParamODE,T}
   res::Function
@@ -164,9 +163,8 @@ CellData.get_domains(op::TransientParamFEOpFromWeakForm) = op.domains
 """
     struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE} end
 
-Most standard instance of TransientParamFEOperator, when the transient problem is
+Instance of TransientParamFEOperator, to be used when the transient problem is
 linear
-
 """
 struct TransientParamLinearFEOpFromWeakForm{T} <: TransientParamFEOperator{LinearParamODE,T}
   res::Function

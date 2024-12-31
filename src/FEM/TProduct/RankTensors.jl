@@ -1,8 +1,27 @@
+"""
+    abstract type AbstractRankTensor{D,K} end
+
+Type representing a tensor `a` of dimension `D` and rank `K`, i.e. assuming the form
+a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k.
+
+Subtypes:
+
+- [`Rank1Tensor`](@ref)
+- [`GenericRankTensor`](@ref)
+"""
 abstract type AbstractRankTensor{D,K} end
 
 dimension(a::AbstractRankTensor{D,K}) where {D,K} = D
 LinearAlgebra.rank(a::AbstractRankTensor{D,K}) where {D,K} = K
 get_decomposition(a::AbstractRankTensor) = ntuple(k -> get_decomposition(a,k),Val{rank(a)}())
+
+"""
+    get_decomposition(a::AbstractRankTensor,k::Integer) -> Vector{<:AbstractArray}
+
+For a tensor `a` of dimension `D` and rank `K` assuming the form
+a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k
+returns the decomposition relative to the kth rank [a_1^k, ⋯, a_D^k]
+"""
 get_decomposition(a::AbstractRankTensor,k::Integer) = @abstractmethod
 
 struct Rank1Tensor{D,A<:AbstractArray} <: AbstractRankTensor{D,1}
@@ -37,7 +56,6 @@ Base.getindex(a::GenericRankTensor,k::Integer) = get_decomposition(a,k)
 
 #TODO will have to change this at some point
 function LinearAlgebra.cholesky(a::GenericRankTensor{D,K}) where {D,K}
-  # cholesky(get_decomposition(a,1))
   map(1:D) do d
     factor = get_factor(a,d,1)
     for k = 2:K
@@ -64,6 +82,21 @@ function _sort!(a::AbstractVector{<:AbstractMatrix},i::Tuple{<:AbstractDofMap,<:
   end
 end
 
+"""
+    tproduct_array(arrays_1d::Vector{<:AbstractArray},dof_map) -> Rank1Tensor
+    tproduct_array(op,arrays_1d::Vector{<:AbstractArray},gradients_1d::Vector{<:AbstractArray},dof_map,args...) -> GenericRankTensor
+
+Returns a AbstractRankTensor storing the arrays `arrays_1d` (usually matrices)
+arising from an integration routine on D 1-d triangulations whose tensor product
+gives a D-dimensional triangulation. The argument `dof_map` is a reindexing map
+for the input. In the absence of the field `gradients_1d`, the output is a [`Rank1Tensor`](@ref);
+when provided, the output is a [`GenericRankTensor`](@ref)
+
+    tproduct_array(arrays_1d::Vector{<:BlockArray},dof_map) -> BlockRankTensor
+    tproduct_array(op,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},dof_map,args...) -> BlockRankTensor
+
+Generalization of the previous functions to multi-field scenarios
+"""
 function tproduct_array(arrays_1d::Vector{<:AbstractArray},dof_map)
   _sort!(arrays_1d,dof_map)
   Rank1Tensor(arrays_1d)
@@ -140,7 +173,13 @@ function _find_decompositions(::typeof(+),arrays_1d,gradients_1d)
   return d
 end
 
-# MultiField interface
+"""
+    struct BlockRankTensor{A<:AbstractRankTensor,N} <: AbstractArray{A,N}
+      array::Array{A,N}
+    end
+
+Multi-field version of a [`AbstractRankTensor`](@ref)
+"""
 struct BlockRankTensor{A<:AbstractRankTensor,N} <: AbstractArray{A,N}
   array::Array{A,N}
 end

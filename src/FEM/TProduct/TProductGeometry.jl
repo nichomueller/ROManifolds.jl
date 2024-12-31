@@ -3,7 +3,6 @@
 
 Tensor product discrete model, storing a vector of 1-D models `models_1d` of length D,
 and the D-dimensional model `model` defined as their tensor product.
-
 """
 struct TProductModel{D,A<:CartesianDiscreteModel{D},B<:AbstractVector{<:CartesianDiscreteModel}} <: DiscreteModel{D,D}
   model::A
@@ -67,7 +66,6 @@ Given the node coordinates of a D-dimensional tensor product discrete model `coo
 and the subset of nodes in a given tag `nodes_in_tag`, returns the vector of
 corresponding 1-D tags, and a vector of axes whose entries are ∈ {1, ..., D}
 specify the direction (i.e. dimension) of the tag
-
 """
 function entities_1d_in_tag(coords::AbstractArray{VectorValue{D,T},D},nodes_in_tag) where {D,T}
   ax_to_entities = _axes_to_lower_dim_entities(coords)
@@ -95,7 +93,6 @@ end
 Adds the tags corresponding to `name` (usually a String or Vector{String}), which
 encodes a set of tags on a D-dimensional TProductModel, to the vector of 1-D
 models
-
 """
 function add_1d_tags!(model::TProductModel{D},name) where D
   isempty(name) && return
@@ -123,7 +120,6 @@ end
 Tensor product triangulation, storing a tensor product model, a vector of 1-D
 triangulations `trians_1d` of length D, and the D-dimensional triangulation `trian`
 defined as their tensor product.
-
 """
 struct TProductTriangulation{Dt,Dp,A<:TProductModel,B<:BodyFittedTriangulation{Dt,Dp},C<:AbstractVector{<:Triangulation}} <: Triangulation{Dt,Dp}
   model::A

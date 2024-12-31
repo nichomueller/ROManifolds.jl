@@ -70,11 +70,11 @@ end
 function RBSteady.residual_snapshots(
   solver::RBSolver,
   odeop::ODEParamOperator,
-  snaps;
+  s::AbstractSnapshots;
   nparams=RBSteady.res_params(solver))
 
   fesolver = get_fe_solver(solver)
-  sres = select_snapshots(snaps,nparams)
+  sres = select_snapshots(s,nparams)
   us_res = (get_values(sres),)
   r_res = get_realization(sres)
   b = residual(fesolver,odeop,r_res,us_res)
@@ -85,11 +85,11 @@ end
 function RBSteady.jacobian_snapshots(
   solver::RBSolver,
   odeop::ODEParamOperator,
-  snaps;
+  s::AbstractSnapshots;
   nparams=RBSteady.jac_params(solver))
 
   fesolver = get_fe_solver(solver)
-  sjac = select_snapshots(snaps,nparams)
+  sjac = select_snapshots(s,nparams)
   us_jac = (get_values(sjac),)
   r_jac = get_realization(sjac)
   A = jacobian(fesolver,odeop,r_jac,us_jac)

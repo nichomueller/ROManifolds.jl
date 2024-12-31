@@ -1,12 +1,29 @@
 """
     abstract type ODEParamOperatorType <: UnEvalOperatorType end
 
-Parametric extension of the type [`ODEOperatorType`](@ref) in [`Gridap`](@ref)
+Parametric extension of the type [`ODEOperatorType`](@ref) in [`Gridap`](@ref).
+
+Subtypes:
+
+- [`NonlinearParamODE`](@ref)
+- [`LinearParamODE`](@ref)
+- [`LinearNonlinearParamODE`](@ref)
 """
 abstract type ODEParamOperatorType <: UnEvalOperatorType end
 
+"""
+    struct NonlinearParamODE <: ODEParamOperatorType end
+"""
 struct NonlinearParamODE <: ODEParamOperatorType end
+
+"""
+    struct LinearParamODE <: ODEParamOperatorType end
+"""
 struct LinearParamODE <: ODEParamOperatorType end
+
+"""
+    struct LinearNonlinearParamODE <: ODEParamOperatorType end
+"""
 struct LinearNonlinearParamODE <: ODEParamOperatorType end
 
 """

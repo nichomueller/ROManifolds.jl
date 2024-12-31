@@ -14,7 +14,6 @@ cell_dof_ids_1 = Table([[1, 3, 2]])
 cell_dof_ids_2 = Table([[1, 4, 2, 5, 3]])
 
   get_tp_dof_map(⋅)
-        ⟹ ⟹ ⟹
 
       [ 1  7  4  10  7
         3  9  6  11  9

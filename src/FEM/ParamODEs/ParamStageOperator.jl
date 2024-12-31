@@ -1,5 +1,12 @@
 """
     struct ParamStageOperator{O} <: StageOperator
+      op::ODEParamOperator{O}
+      cache::AbstractParamCache
+      r::TransientRealization
+      us::Function
+      ws::Tuple{Vararg{Real}}
+    end
+
 (Nonlinear) stage operator to solve a parametric ODE with a time marching scheme
 """
 struct ParamStageOperator{O} <: StageOperator

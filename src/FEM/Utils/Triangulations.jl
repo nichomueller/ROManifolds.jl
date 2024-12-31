@@ -2,7 +2,6 @@
     is_parent(tparent::Triangulation,tchild::Triangulation) -> Bool
 
 Returns true if `tchild` is a triangulation view of `tparent`, false otherwise
-
 """
 function is_parent(tparent::Triangulation,tchild::Triangulation)
   false
@@ -64,7 +63,6 @@ end
 
 When `t` is a triangulation view, returns its parent; throws an error when `t`
 is not a triangulation view
-
 """
 function get_parent(t::Triangulation)
   @abstractmethod
@@ -105,6 +103,9 @@ function get_tface_to_mface(t::Geometry.CompositeTriangulation)
   dface_to_mface = collect(lazy_map(Reindex(rface_to_mface),dface_to_rface))
 end
 
+# We use the symbol ≈ can between two triangulations `t` and `s` in the following
+# sense: if `t` and `s` store the same information but have a different UID, then
+# this function returns true; otherwise, it returns false
 function Base.isapprox(t::T,s::S) where {T<:Triangulation,S<:Triangulation}
   false
 end
@@ -130,6 +131,12 @@ function isapprox_parent(tparent::Triangulation,tchild::Triangulation)
   tparent ≈ get_parent(tchild)
 end
 
+"""
+    is_included(tchild::Triangulation,tparent::Triangulation) -> Bool
+
+Returns true if `tchild` is a triangulation included in `tparent`, false otherwise.
+This condition is not as strong as [`is_parent`](@ref)
+"""
 function is_included(tchild::Triangulation,tparent::Triangulation)
   tface_to_mface_child = get_tface_to_mface(tchild)
   tface_to_mface_parent = get_tface_to_mface(tparent)
@@ -206,25 +213,12 @@ function get_tree_of_parents(child::Triangulation,parent::AppendedTriangulation)
   splat_tuple(tree)
 end
 
-function splat_tuple(t::Any)
-  t
-end
-
-function splat_tuple(t::Tuple)
-  st = ()
-  for ti in t
-    st = (st...,splat_tuple(ti)...)
-  end
-  st
-end
-
 """
     merge_triangulations(trians::AbstractVector{<:Triangulation}) -> Triangulation
 
 Given a tuple of triangulation views `trians`, returns the triangulation view
 on the union of the viewed cells. In other words, the minimum common integration
 domain is found
-
 """
 function merge_triangulations(trians::AbstractVector{<:Triangulation})
   trian = first(trians)
@@ -253,7 +247,6 @@ end
       tchildren::Tuple{Vararg{Triangulation}}) -> Tuple{Vararg{Triangulation}}
 
 Orders the triangulation children in the same way as the triangulation parents
-
 """
 function order_domains(tparents,tchildren)
   @check length(tparents) == length(tchildren)
@@ -263,11 +256,10 @@ end
 
 """
     find_closest_view(tparents::Tuple{Vararg{Triangulation}},
-      tchild::Triangulation) -> Integer, Triangulation
+      tchild::Triangulation) -> (Integer, Triangulation)
 
 Finds the approximate parent of `tchild`; it returns the parent's index and its
 view in the same indices as `tchild` (which should be a triangulation view)
-
 """
 function find_closest_view(tparents,tchild::Triangulation)
   cmp(a,b) = isapprox_parent(b,a)
@@ -327,4 +319,18 @@ function Base.view(trian::Geometry.AppendedTriangulation,ids::AbstractArray)
   trian1 = view(trian.a,ids1)
   trian2 = view(trian.b,ids2)
   isempty(ids1) ? trian2 : (isempty(ids2) ? trian1 : lazy_append(trian1,trian2))
+end
+
+# utils
+
+function splat_tuple(t::Any)
+  t
+end
+
+function splat_tuple(t::Tuple)
+  st = ()
+  for ti in t
+    st = (st...,splat_tuple(ti)...)
+  end
+  st
 end

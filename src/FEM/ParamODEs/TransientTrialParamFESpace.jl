@@ -1,51 +1,19 @@
-"""
-    struct TransientTrialParamFESpace{A,B} <: UnEvalSingleFieldFESpace end
+const TransientTrialParamFESpace = UnEvalTrialFESpace
 
-Structure used in transient applications. When a TransientTrialParamFESpace is
-evaluated in a [`TransientRealization`](@ref), a parametric trial FE space is returned
-
-"""
-struct TransientTrialParamFESpace{A,B} <: UnEvalSingleFieldFESpace
-  space::A
-  space0::B
-  dirichlet::Union{Function,AbstractVector{<:Function}}
-
-  function TransientTrialParamFESpace(
-    space::A,
-    dirichlet::Union{Function,AbstractVector{<:Function}}) where A
-
-    space0 = HomogeneousTrialFESpace(space)
-    B = typeof(space0)
-    new{A,B}(space,space0,dirichlet)
-  end
+function ODEs.allocate_space(U::UnEvalTrialFESpace,μ::Realization,t)
+  HomogeneousTrialParamFESpace(U.space,length(μ)*length(t))
 end
 
-function TransientTrialParamFESpace(space)
-  dof = get_fe_dof_basis(space)
-  T = get_dof_type(dof)
-  g(x,μ,t) = zero(T)
-  g(μ,t) = x -> g(x,μ,t)
-  gμt(μ,t) = TransientParamFunction(g,μ,t)
-  TransientTrialParamFESpace(space,gμt)
-end
-
-FESpaces.ConstraintStyle(::Type{<:TransientTrialParamFESpace{A}}) where A = ConstraintStyle(A)
-
-function ODEs.allocate_space(U::TransientTrialParamFESpace,params,times)
-  HomogeneousTrialParamFESpace(U.space,Val(length(params)*length(times)))
-end
-
-function ODEs.allocate_space(U::TransientTrialParamFESpace,r::TransientRealization)
+function ODEs.allocate_space(U::UnEvalTrialFESpace,r::TransientRealization)
   allocate_space(U,get_params(r),get_times(r))
 end
 
 function Arrays.evaluate!(
   Upt::TrialParamFESpace,
-  U::TransientTrialParamFESpace,
-  params,
-  times)
+  U::UnEvalTrialFESpace,
+  μ::Realization,t)
 
-  dir(f) = f(params,times)
+  dir(f) = f(μ,t)
   dir(f::Vector) = dir.(f)
   TrialParamFESpace!(Upt,dir(U.dirichlet))
   Upt
@@ -53,31 +21,30 @@ end
 
 function Arrays.evaluate!(
   Upt::TrialParamFESpace,
-  U::TransientTrialParamFESpace,
+  U::UnEvalTrialFESpace,
   r::TransientRealization)
 
   evaluate!(Upt,U,get_params(r),get_times(r))
 end
 
-Arrays.evaluate(U::TransientTrialParamFESpace,params::Nothing,times::Nothing) = U.space0
-Arrays.evaluate(U::TransientTrialParamFESpace,r::Nothing) = U.space0
+Arrays.evaluate(U::UnEvalTrialFESpace,μ::Nothing,t::Nothing) = U.space0
 
-(U::TransientTrialParamFESpace)(params,times) = evaluate(U,params,times)
-(U::TrialFESpace)(params,times) = U
-(U::ZeroMeanFESpace)(params,times) = U
+(U::UnEvalTrialFESpace)(μ,t) = evaluate(U,μ,t)
+(U::TrialFESpace)(μ,t) = U
+(U::ZeroMeanFESpace)(μ,t) = U
 
-function ODEs.time_derivative(U::TransientTrialParamFESpace)
+function ODEs.time_derivative(U::UnEvalTrialFESpace)
   ∂tdir(f) = (μ,t) -> time_derivative(f(μ,t))
   ∂tdir(f::Vector) = ∂tdir.(f)
-  TransientTrialParamFESpace(U.space,∂tdir(U.dirichlet))
+  UnEvalTrialFESpace(U.space,∂tdir(U.dirichlet))
 end
 
-# Define the TransientTrialParamFESpace interface for stationary spaces
+# Define the UnEvalTrialFESpace interface for stationary spaces
 
-ODEs.allocate_space(U::FESpace,params,times) = U
-Arrays.evaluate!(Upt::FESpace,U::FESpace,params,times) = U
-Arrays.evaluate(U::FESpace,params,times) = U
-(space::FESpace)(params,times) = evaluate(space,params,times)
+ODEs.allocate_space(U::FESpace,μ,t) = U
+Arrays.evaluate!(Upt::FESpace,U::FESpace,μ,t) = U
+Arrays.evaluate(U::FESpace,μ,t) = U
+(space::FESpace)(μ,t) = evaluate(space,μ,t)
 
 # Define the interface for MultiField
 
@@ -86,12 +53,12 @@ const TransientMultiFieldParamFESpace = MultiFieldFESpace
 function has_unevaluated(U::MultiFieldFESpace)
   (
     any(space -> space isa TransientTrialFESpace,U.spaces) ||
-    any(space -> space isa UnEvalSingleFieldFESpace,U.spaces)
+    any(space -> space isa UnEvalTrialFESpace,U.spaces)
   )
 end
 
 function has_param_transient(U::MultiFieldFESpace)
-  any(space -> space isa TransientTrialParamFESpace,U.spaces)
+  any(space -> space isa UnEvalTrialFESpace,U.spaces)
 end
 
 function ODEs.allocate_space(U::MultiFieldFESpace,μ,t)

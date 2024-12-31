@@ -51,9 +51,9 @@ function TrialParamFESpace!(f::Function,space::TrialParamFESpace)
   TrialParamFESpace!(space,f)
 end
 
-function HomogeneousTrialParamFESpace(U::SingleFieldFESpace,::Val{N}) where N
+function HomogeneousTrialParamFESpace(U::SingleFieldFESpace,n::Int)
   dv = zero_dirichlet_values(U)
-  dirichlet_values = consecutive_param_array(dv,N)
+  dirichlet_values = consecutive_param_array(dv,n)
   TrialParamFESpace(dirichlet_values,U)
 end
 

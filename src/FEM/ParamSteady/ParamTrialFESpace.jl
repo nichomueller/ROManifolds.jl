@@ -1,49 +1,73 @@
 """
-    abstract type UnEvalSingleFieldFESpace <: SingleFieldFESpace end
+    struct UnEvalTrialFESpace{A,B} <: SingleFieldFESpace end
 
-Type representing trial FE spaces that are not evaluated yet. This may include
+Struct representing trial FE spaces that are not evaluated yet. This may include
 FE spaces representing transient problems (although the implementation in [`Gridap`](@ref)
-differs), parametric problems, and a combination thereof. Could become a supertype
-of [`TransientTrialFESpace`](@ref) in [`Gridap`](@ref). Subtypes:
-
-Subtypes:
-- [`ParamTrialFESpace`](@ref)
-- [`TransientTrialParamFESpace`](@ref)
+differs), parametric problems, and a combination thereof. Could incorporate
+a [`TransientTrialFESpace`](@ref) in [`Gridap`](@ref) in future versions
 """
-abstract type UnEvalSingleFieldFESpace <: SingleFieldFESpace end
+struct UnEvalTrialFESpace{A,B} <: SingleFieldFESpace
+  space::A
+  space0::B
+  dirichlet::Union{Function,AbstractVector{<:Function}}
 
-function Arrays.evaluate(U::UnEvalSingleFieldFESpace,args...)
-  Upt = allocate_space(U,args...)
-  evaluate!(Upt,U,args...)
-  Upt
+  function UnEvalTrialFESpace(
+    space::A,
+    dirichlet::Union{Function,AbstractVector{<:Function}}) where A
+
+    space0 = HomogeneousTrialFESpace(space)
+    B = typeof(space0)
+    new{A,B}(space,space0,dirichlet)
+  end
 end
 
-(U::UnEvalSingleFieldFESpace)(r) = evaluate(U,r)
+const ParamTrialFESpace = UnEvalTrialFESpace
 
-FESpaces.get_free_dof_ids(f::UnEvalSingleFieldFESpace) = get_free_dof_ids(f.space)
-FESpaces.get_vector_type(f::UnEvalSingleFieldFESpace) = get_vector_type(f.space)
-CellData.get_triangulation(f::UnEvalSingleFieldFESpace) = get_triangulation(f.space)
-FESpaces.get_cell_dof_ids(f::UnEvalSingleFieldFESpace) = get_cell_dof_ids(f.space)
-FESpaces.get_fe_basis(f::UnEvalSingleFieldFESpace) = get_fe_basis(f.space)
-FESpaces.get_fe_dof_basis(f::UnEvalSingleFieldFESpace) = get_fe_dof_basis(f.space)
-function FESpaces.get_cell_constraints(f::UnEvalSingleFieldFESpace,c::Constrained)
+function ParamTrialFESpace(space)
+  dof = get_fe_dof_basis(space)
+  T = get_dof_type(dof)
+  function _param_zero(μ::Realization)
+    z(x,μ) = zero(T)
+    z(μ) = x -> z(x,μ)
+    zμ(μ) = ParamFunction(z,μ)
+    return zμ
+  end
+  function _param_zero(μ::Realization,t)
+    z(x,μ,t) = zero(T)
+    z(μ,t) = x -> z(x,μ,t)
+    zμt(μ,t) = TransientParamFunction(z,μ,t)
+    return zμt
+  end
+  UnEvalTrialFESpace(space,_param_zero)
+end
+
+# FE space interface
+
+FESpaces.ConstraintStyle(::Type{<:UnEvalTrialFESpace{A}}) where A = ConstraintStyle(A)
+FESpaces.get_free_dof_ids(f::UnEvalTrialFESpace) = get_free_dof_ids(f.space)
+FESpaces.get_vector_type(f::UnEvalTrialFESpace) = get_vector_type(f.space)
+CellData.get_triangulation(f::UnEvalTrialFESpace) = get_triangulation(f.space)
+FESpaces.get_cell_dof_ids(f::UnEvalTrialFESpace) = get_cell_dof_ids(f.space)
+FESpaces.get_fe_basis(f::UnEvalTrialFESpace) = get_fe_basis(f.space)
+FESpaces.get_fe_dof_basis(f::UnEvalTrialFESpace) = get_fe_dof_basis(f.space)
+function FESpaces.get_cell_constraints(f::UnEvalTrialFESpace,c::Constrained)
   get_cell_constraints(f.space,c)
 end
-function FESpaces.get_cell_isconstrained(f::UnEvalSingleFieldFESpace,c::Constrained)
+function FESpaces.get_cell_isconstrained(f::UnEvalTrialFESpace,c::Constrained)
   get_cell_isconstrained(f.space,c)
 end
 
-FESpaces.get_dirichlet_dof_ids(f::UnEvalSingleFieldFESpace) = get_dirichlet_dof_ids(f.space)
-FESpaces.num_dirichlet_tags(f::UnEvalSingleFieldFESpace) = num_dirichlet_tags(f.space)
-FESpaces.get_dirichlet_dof_tag(f::UnEvalSingleFieldFESpace) = get_dirichlet_dof_tag(f.space)
-function FESpaces.scatter_free_and_dirichlet_values(f::UnEvalSingleFieldFESpace,free_values,dirichlet_values)
+FESpaces.get_dirichlet_dof_ids(f::UnEvalTrialFESpace) = get_dirichlet_dof_ids(f.space)
+FESpaces.num_dirichlet_tags(f::UnEvalTrialFESpace) = num_dirichlet_tags(f.space)
+FESpaces.get_dirichlet_dof_tag(f::UnEvalTrialFESpace) = get_dirichlet_dof_tag(f.space)
+function FESpaces.scatter_free_and_dirichlet_values(f::UnEvalTrialFESpace,free_values,dirichlet_values)
   scatter_free_and_dirichlet_values(f.space,free_values,dirichlet_values)
 end
-function FESpaces.gather_free_and_dirichlet_values!(free_values,dirichlet_values,f::UnEvalSingleFieldFESpace,cell_vals)
+function FESpaces.gather_free_and_dirichlet_values!(free_values,dirichlet_values,f::UnEvalTrialFESpace,cell_vals)
   gather_free_and_dirichlet_values!(free_values,dirichlet_values,f.space,cell_vals)
 end
 
-function FESpaces.get_dirichlet_dof_values(f::UnEvalSingleFieldFESpace)
+function FESpaces.get_dirichlet_dof_values(f::UnEvalTrialFESpace)
   msg = """
   It does not make sense to get the Dirichlet DOF values of a transient FE space. You
   should first evaluate the transient FE space at a point in time and get the Dirichlet
@@ -52,7 +76,7 @@ function FESpaces.get_dirichlet_dof_values(f::UnEvalSingleFieldFESpace)
   @unreachable msg
 end
 
-for F in (:TrialFESpace,:TransientTrialFESpace,:UnEvalSingleFieldFESpace)
+for F in (:TrialFESpace,:TransientTrialFESpace,:UnEvalTrialFESpace)
   @eval begin
     function DofMaps.get_dof_map(trial::$F)
       get_dof_map(trial.space)
@@ -68,53 +92,29 @@ for F in (:TrialFESpace,:TransientTrialFESpace,:UnEvalSingleFieldFESpace)
   end
 end
 
-"""
-    struct ParamTrialFESpace{A,B} <: UnEvalSingleFieldFESpace end
+# Evaluations
 
-Structure used in steady applications. When a ParamTrialFESpace is evaluated in a
-[`Realization`](@ref), a parametric trial FE space is returned
-
-"""
-struct ParamTrialFESpace{A,B} <: UnEvalSingleFieldFESpace
-  space::A
-  space0::B
-  dirichlet::Union{Function,AbstractVector{<:Function}}
-
-  function ParamTrialFESpace(
-    space::A,
-    dirichlet::Union{Function,AbstractVector{<:Function}}) where A
-
-    space0 = HomogeneousTrialFESpace(space)
-    B = typeof(space0)
-    new{A,B}(space,space0,dirichlet)
-  end
+function ODEs.allocate_space(U::UnEvalTrialFESpace,r::Realization)
+  HomogeneousTrialParamFESpace(U.space,length(r))
 end
 
-function ParamTrialFESpace(space)
-  dof = get_fe_dof_basis(space)
-  T = get_dof_type(dof)
-  g(x,μ) = zero(T)
-  g(μ) = x -> g(x,μ)
-  gμ(μ) = ParamFunction(g,μ)
-  ParamTrialFESpace(space,gμ)
+function Arrays.evaluate(U::UnEvalTrialFESpace,args...)
+  Upt = allocate_space(U,args...)
+  evaluate!(Upt,U,args...)
+  Upt
 end
 
-FESpaces.ConstraintStyle(::Type{<:ParamTrialFESpace{A}}) where A = ConstraintStyle(A)
-
-function ODEs.allocate_space(U::ParamTrialFESpace,r::Realization)
-  HomogeneousTrialParamFESpace(U.space,Val(length(r)))
-end
-
-function Arrays.evaluate!(Upt::TrialParamFESpace,U::ParamTrialFESpace,r::Realization)
+function Arrays.evaluate!(Upt::TrialParamFESpace,U::UnEvalTrialFESpace,r::Realization)
   dir(f) = f(r)
   dir(f::Vector) = dir.(f)
   TrialParamFESpace!(Upt,dir(U.dirichlet))
   Upt
 end
 
-Arrays.evaluate(U::ParamTrialFESpace,r::Nothing) = U.space0
+(U::UnEvalTrialFESpace)(r) = evaluate(U,r)
+Arrays.evaluate(U::UnEvalTrialFESpace,r::Nothing) = U.space0
 
-# Define the ParamTrialFESpace interface for stationary spaces
+# Define the UnEvalTrialFESpace interface for stationary spaces
 
 ODEs.allocate_space(U::FESpace,r) = U
 Arrays.evaluate!(Upt::FESpace,U::FESpace,r::AbstractRealization) = U
@@ -125,7 +125,7 @@ Arrays.evaluate(U::FESpace,r) = U
 const ParamMultiFieldFESpace = MultiFieldFESpace
 
 function has_param(U::MultiFieldFESpace)
-  any(space -> space isa ParamTrialFESpace,U.spaces)
+  any(space -> space isa UnEvalTrialFESpace,U.spaces)
 end
 
 function ODEs.allocate_space(U::MultiFieldFESpace,r::Realization)
