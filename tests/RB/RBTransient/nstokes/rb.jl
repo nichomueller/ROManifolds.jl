@@ -107,7 +107,7 @@ rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,npara
 
 fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 save(test_dir,fesnaps)
-# println(festats)
+println(festats)
 # fesnaps = load_snapshots(test_dir)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 # save(test_dir,rbop)
@@ -118,7 +118,7 @@ save(test_dir,xonline;label="online")
 # ronline = get_realization(xonline)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 println(rbstats)
-perf = rb_performance(rbsolver,feop,rbop,xonline,x̂,festats,rbstats,ronline)
+perf = eval_performance(rbsolver,feop,rbop,xonline,x̂,festats,rbstats,ronline)
 println(perf)
 
 # function param_writevtk(Ω,trial::FESpace,s,dir=datadir("plts");cellfieldnames=String[])

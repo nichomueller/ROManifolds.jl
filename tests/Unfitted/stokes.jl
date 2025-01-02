@@ -106,7 +106,7 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon)
-perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 
 # u1 = flatten_snapshots(x[1])[:,1]
 # p1 = flatten_snapshots(x[2])[:,1]

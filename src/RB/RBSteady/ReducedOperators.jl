@@ -37,8 +37,8 @@ function reduced_operator(
   red_lhs,red_rhs = reduced_weak_form(solver,op,red_trial,red_test,s)
   trians_rhs = get_domains(red_rhs)
   trians_lhs = get_domains(red_lhs)
-  new_op = change_domains(op,trians_rhs,trians_lhs)
-  GenericRBOperator(new_op,red_trial,red_test,red_lhs,red_rhs)
+  op′ = change_domains(op,trians_rhs,trians_lhs)
+  GenericRBOperator(op′,red_trial,red_test,red_lhs,red_rhs)
 end
 
 function reduced_operator(

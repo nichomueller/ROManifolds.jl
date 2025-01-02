@@ -368,7 +368,7 @@ export fe_jacobian!
 export fe_residual!
 
 export RBPerformance
-export rb_performance
+export eval_performance
 export create_dir
 export load_solve
 export load_snapshots

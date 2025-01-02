@@ -29,7 +29,7 @@ function load_solve(solver,feop,dir)
   rbop = load_operator(dir,feop)
   rb_sol,rb_stats,_ = solve(solver,rbop,fe_sol)
   old_results = deserialize(get_results_filename(dir))
-  results = rb_performance(solver,rbop,fe_sol,rb_sol,rb_stats,fe_stats)
+  results = eval_performance(solver,rbop,fe_sol,rb_sol,rb_stats,fe_stats)
   return results
 end
 
@@ -212,7 +212,7 @@ function Base.show(io::IO,perf::RBPerformance)
   show(io,MIME"text/plain"(),perf)
 end
 
-function rb_performance(
+function eval_performance(
   solver::RBSolver,
   feop::ParamFEOperator,
   fesnaps::AbstractArray,
@@ -228,7 +228,7 @@ function rb_performance(
   RBPerformance(error,speedup)
 end
 
-function rb_performance(
+function eval_performance(
   solver::RBSolver,
   feop::ParamFEOperator,
   rbop,
@@ -243,7 +243,7 @@ function rb_performance(
   x = inv_project(Û,x̂)
   i = get_dof_map(feop)
   rbsnaps = Snapshots(x,i,r)
-  rb_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats,args...)
+  eval_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats,args...)
 end
 
 function DrWatson.save(dir,perf::RBPerformance;label="")

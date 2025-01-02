@@ -84,4 +84,4 @@ ronline = realization(feop;nparams=10,random=true)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 
 x,festats = solution_snapshots(rbsolver,feop,ronline,uh0μ)
-perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)

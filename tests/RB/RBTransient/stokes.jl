@@ -84,4 +84,4 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon,xh0μ)
-perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)

@@ -130,7 +130,7 @@ r = realization(feop;nparams=10,random=true)
 x̂,rbstats = solve(rbsolver,rbop,r)
 
 x,festats = solution_snapshots(rbsolver,feop,r,xh0μ)
-perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,r)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,r)
 println(perf)
 
 # # plotting
@@ -165,5 +165,5 @@ r = realization(feop_lin;nparams=10)
 x̂,rbstats = solve(rbsolver_lin,rbop,r)
 
 x,festats = solution_snapshots(rbsolver_lin,feop_lin,r,xh0μ)
-perf = rb_performance(rbsolver_lin,feop_lin,rbop,x,x̂,festats,rbstats,r)
+perf = eval_performance(rbsolver_lin,feop_lin,rbop,x,x̂,festats,rbstats,r)
 println(perf)

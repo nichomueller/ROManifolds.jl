@@ -122,7 +122,7 @@ x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon,xh0μ)
 save(x;label="online")
-perf = rb_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon,Ω)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon,Ω)
 println(perf)
 
 # r = get_realization(fesnaps)

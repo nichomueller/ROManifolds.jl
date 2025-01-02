@@ -170,7 +170,7 @@ export allocate_rbcache
 include("ReducedOperators.jl")
 
 export RBPerformance
-export rb_performance
+export eval_performance
 export create_dir
 export load_solve
 export load_snapshots
