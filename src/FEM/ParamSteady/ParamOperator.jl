@@ -218,6 +218,10 @@ end
 
 """
     struct ParamNonlinearOperator <: NonlinearOperator
+      op::ParamOperator
+      μ::Realization
+      paramcache::AbstractParamCache
+    end
 
 Fields:
 - `op`: [`ParamOperator`](@ref) representing a parametric differential problem

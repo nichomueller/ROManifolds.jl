@@ -417,6 +417,9 @@ end
 
 """
     struct TProductSparsity{A,B} <: TProductSparsityPattern
+      sparsity::A
+      sparsities_1d::B
+    end
 """
 struct TProductSparsity{A,B} <: TProductSparsityPattern
   sparsity::A
@@ -448,7 +451,12 @@ function CellData.change_domain(
 end
 
 """
-    struct SparsityToTProductSparsity{A,B} <: TProductSparsityPattern
+    struct SparsityToTProductSparsity{A,B,C,D} <: TProductSparsityPattern
+      sparsity::A
+      sparsities_1d::B
+      dof_to_parent_dof_row::C
+      dof_to_parent_dof_col::D
+    end
 
 To be used when the underlying trial and test spaces are defined on a grid portion
 """

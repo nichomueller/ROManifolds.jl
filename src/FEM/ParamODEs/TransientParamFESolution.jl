@@ -1,5 +1,8 @@
 """
-    struct TransientParamFESolution{V} <: TransientFESolution end
+    struct TransientParamFESolution{V} <: TransientFESolution
+      odesol::ODEParamSolution{V}
+      trial
+    end
 
 Wrapper around a `TransientParamFEOperator` and `ODESolver` that represents the
 parametric solution at a set of time steps. It is an iterator that computes the solution

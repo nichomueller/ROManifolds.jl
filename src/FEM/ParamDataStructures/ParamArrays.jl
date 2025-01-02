@@ -92,7 +92,10 @@ function Base.getproperty(A::ParamArray,sym::Symbol)
 end
 
 """
-    struct TrivialParamArray{T<:Number,N,A<:AbstractArray{T,N}} <: ParamArray{T,N} end
+    struct TrivialParamArray{T<:Number,N,A<:AbstractArray{T,N}} <: ParamArray{T,N}
+      data::A
+      plength::Int
+    end
 
 Wrapper for nonparametric arrays that we wish assumed a parametric length
 """
@@ -174,7 +177,9 @@ function get_param_entry(A::TrivialParamArray{T,N},i::Vararg{Integer,N}) where {
 end
 
 """
-    struct ConsecutiveParamArray{T,N,M,A<:AbstractArray{T,M}} <: ParamArray{T,N} end
+    struct ConsecutiveParamArray{T,N,M,A<:AbstractArray{T,M}} <: ParamArray{T,N}
+      data::A
+    end
 
 Parametric array with entries stored consecutively in memory. It is
 characterized by an inner size equal to `size(data)[1:N]`, and parametric length
@@ -309,7 +314,10 @@ function get_param_entry(A::ConsecutiveParamArray,i...)
 end
 
 """
-    struct GenericParamVector{Tv,Ti} <: ParamArray{Tv,1} end
+    struct GenericParamVector{Tv,Ti} <: ParamArray{Tv,1}
+      data::Vector{Tv}
+      ptrs::Vector{Ti}
+    end
 """
 struct GenericParamVector{Tv,Ti} <: ParamArray{Tv,1}
   data::Vector{Tv}
@@ -439,7 +447,11 @@ function get_param_entry(A::GenericParamVector{T},i::Integer) where T
 end
 
 """
-    struct GenericParamMatrix{Tv,Ti} <: ParamArray{Tv,2} end
+    struct GenericParamMatrix{Tv,Ti} <: ParamArray{Tv,2}
+      data::Vector{Tv}
+      ptrs::Vector{Ti}
+      nrows::Vector{Ti}
+    end
 """
 struct GenericParamMatrix{Tv,Ti} <: ParamArray{Tv,2}
   data::Vector{Tv}
@@ -569,7 +581,9 @@ function get_param_entry(A::GenericParamMatrix{T},i::Integer,j::Integer) where T
 end
 
 """
-    struct ArrayOfArrays{T,N,A<:AbstractArray{T,N}} <: ParamArray{T,N} end
+    struct ArrayOfArrays{T,N,A<:AbstractArray{T,N}} <: ParamArray{T,N}
+      data::Vector{A}
+    end
 
 Parametric array with entries stored non-consecutively in memory. It is
 characterized by an inner size equal to `size(data[1])`, and parametric length

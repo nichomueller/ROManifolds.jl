@@ -15,11 +15,20 @@ end
 Type for nonstandard representations of tensor train cores.
 
 Subtypes:
-- [`SparseCore`](@ref)
 
+- [`DofMapCore`](@ref)
+- [`SparseCore`](@ref)
 """
 abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
 
+"""
+    struct DofMapCore{T,A<:AbstractArray{T,3},B<:AbstractArray} <: AbstractTTCore{T,3}
+      core::A
+      dof_map::B
+    end
+
+Represents a tensor train core `core` reindexed by means of an index mapping `dof_map`
+"""
 struct DofMapCore{T,A<:AbstractArray{T,3},B<:AbstractArray} <: AbstractTTCore{T,3}
   core::A
   dof_map::B
@@ -43,8 +52,9 @@ end
 Tensor train cores for sparse matrices.
 
 Subtypes:
-- [`SparseCoreCSC`](@ref)
 
+- [`SparseCoreCSC`](@ref)
+- [`SparseCoreCSC4D`](@ref)
 """
 abstract type SparseCore{T,N} <: AbstractTTCore{T,N} end
 
@@ -54,10 +64,12 @@ function SparseCore(array::Array{T,3},sparsity::SparsityPattern) where T
 end
 
 """
-    struct SparseCoreCSC{T,Ti} <: SparseCore{T,3} end
+    struct SparseCoreCSC{T,Ti} <: SparseCore{T,3}
+      array::Array{T,3}
+      sparsity::SparsityCSC{T,Ti}
+    end
 
 Tensor train cores for sparse matrices in CSC format
-
 """
 struct SparseCoreCSC{T,Ti} <: SparseCore{T,3}
   array::Array{T,3}
@@ -75,6 +87,14 @@ num_space_dofs(a::SparseCoreCSC) = DofMaps.num_rows(a.sparsity)*DofMaps.num_cols
 
 to_4d_core(a::SparseCoreCSC) = SparseCoreCSC4D(a)
 
+"""
+    struct SparseCoreCSC4D{T,Ti} <: SparseCore{T,4}
+      core::SparseCoreCSC{T,Ti}
+      sparse_indexes::Vector{CartesianIndex{2}}
+    end
+
+Tensor train cores for sparse matrices in CSC format, reshaped as 4-d arrays
+"""
 struct SparseCoreCSC4D{T,Ti} <: SparseCore{T,4}
   core::SparseCoreCSC{T,Ti}
   sparse_indexes::Vector{CartesianIndex{2}}
@@ -152,6 +172,22 @@ for f in (:first_block,:block_core)
   end
 end
 
+"""
+    block_cores(a::AbstractVector{<:AbstractArray{T,3}}...) -> AbstractVector{<:AbstractArray{T,3}}
+
+Given a series of tensor train decompositions a = (a1, ..., aN) such that
+
+an = an1 ⋅ an2 ⋅ ⋯ ⋅ anD
+
+for any n ∈ {1,...,N}, returns the tensor train decomposition `b` such that
+
+b1 = [a11, ..., aN1]
+b2 = diag(b12, ..., bN2)
+ ⋮
+bD = diag(b1D, ..., bND)
+
+Note that `b` represents the tensor train decomposition of a1 + ... + aN
+"""
 function block_cores(a::AbstractVector{<:AbstractVector{<:AbstractArray{T,3}}}) where T
   D = length(first(a))
   @check all(length(ai)==D for ai in a)

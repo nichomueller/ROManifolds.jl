@@ -129,7 +129,11 @@ Base.copy(i::AbstractTrivialDofMap) = i
 Base.similar(i::AbstractTrivialDofMap) = i
 
 """
-    struct TrivialDofMap{Ti,A,B} <: AbstractTrivialDofMap{Ti} end
+    struct TrivialDofMap{Ti,A<:AbstractVector,B<:AbstractVector} <: AbstractTrivialDofMap{Ti}
+      dof_to_cell::Table{Ti,Vector{Ti},Vector{Ti}}
+      tface_to_mask::A
+      tface_to_mface::B
+    end
 
 In its simples case, it should be conceived as a unit-range from 1 to the number
 of free dofs of a given FE space. The fields `dof_to_cell`, `tface_to_mask` and
@@ -163,7 +167,13 @@ function CellData.change_domain(i::TrivialDofMap,t::Triangulation)
 end
 
 """
-    struct DofMap{D,Ti,A,B} <: AbstractDofMap{D,Ti} end
+    struct DofMap{D,Ti,A<:AbstractVector,B<:AbstractVector} <: AbstractDofMap{D,Ti}
+      indices::Array{Ti,D}
+      dof_to_cell::Table{Ti,Vector{Ti},Vector{Ti}}
+      free_vals_box::Array{Int,D}
+      tface_to_mask::A
+      tface_to_mface::B
+    end
 
 Fields:
 - `indices`: D-array of indices corresponding to the reordered dofs
@@ -339,7 +349,10 @@ function get_component(
 end
 
 """
-    struct ConstrainedDofMap{D,Ti,A,B} <: AbstractDofMap{D,Ti} end
+    struct ConstrainedDofMap{D,Ti,A,B} <: AbstractDofMap{D,Ti}
+      map::DofMap{D,Ti,A,B}
+      dof_to_constraint_mask::Vector{Bool}
+    end
 
 Same as a [`DofMap`](@ref), but contains an additional field `dof_to_constraint_mask`
 which tracks the constrained dofs. If a dof is constrained, a zero is shown at its
@@ -380,7 +393,10 @@ function CellData.change_domain(i::ConstrainedDofMap,t::Triangulation)
 end
 
 """
-    struct DofMapPortion{D,Ti,A,B} <: AbstractDofMap{D,Ti} end
+    struct DofMapPortion{D,Ti,A<:AbstractDofMap{D,Ti},B<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
+      map::A
+      parent_map::B
+    end
 
 A dof map for FE spaces defined on portions of a grid, whose information is contained
 in the field `map`. The field `parent_map` contains the dof map relative to the

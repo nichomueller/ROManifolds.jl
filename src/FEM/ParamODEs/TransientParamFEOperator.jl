@@ -69,7 +69,17 @@ function ParamSteady.get_sparse_dof_map_at_domains(op::TransientParamFEOperator)
 end
 
 """
-    struct TransientParamFEOpFromWeakForm <: TransientParamFEOperator{NonlinearParamODE} end
+    struct TransientParamFEOpFromWeakForm{T} <: TransientParamFEOperator{NonlinearParamODE,T}
+      res::Function
+      jacs::Tuple{Vararg{Function}}
+      tpspace::TransientParamSpace
+      assem::Assembler
+      dof_maps::FEDofMap
+      trial::FESpace
+      test::FESpace
+      domains::FEDomains
+      order::Integer
+    end
 
 Instance of TransientParamFEOperator, to be used when the transient problem is
 nonlinear
@@ -161,7 +171,18 @@ ParamSteady.get_param_space(op::TransientParamFEOpFromWeakForm) = op.tpspace
 CellData.get_domains(op::TransientParamFEOpFromWeakForm) = op.domains
 
 """
-    struct TransientParamLinearFEOpFromWeakForm <: TransientParamFEOperator{LinearParamODE} end
+    struct TransientParamLinearFEOpFromWeakForm{T} <: TransientParamFEOperator{LinearParamODE,T}
+      res::Function
+      jacs::Tuple{Vararg{Function}}
+      constant_forms::Tuple{Vararg{Bool}}
+      tpspace::TransientParamSpace
+      assem::Assembler
+      dof_maps::FEDofMap
+      trial::FESpace
+      test::FESpace
+      domains::FEDomains
+      order::Integer
+    end
 
 Instance of TransientParamFEOperator, to be used when the transient problem is
 linear

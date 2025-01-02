@@ -146,7 +146,16 @@ function _assemble_matrix(f,U::MultiFieldFESpace,V::MultiFieldFESpace)
 end
 
 """
-    struct ParamFEOpFromWeakForm{O,T} <: ParamFEOperator{O,T} end
+    struct ParamFEOpFromWeakForm{O,T} <: ParamFEOperator{O,T}
+      res::Function
+      jac::Function
+      pspace::ParamSpace
+      assem::Assembler
+      dof_maps::FEDofMap
+      trial::FESpace
+      test::FESpace
+      domains::FEDomains
+    end
 
 Most standard instance of a parametric FE operator
 """

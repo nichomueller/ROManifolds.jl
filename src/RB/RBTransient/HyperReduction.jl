@@ -1,3 +1,11 @@
+"""
+    struct TransientIntegrationDomain <: AbstractIntegrationDomain{AbstractVector{Int32}}
+      indices_space::IntegrationDomain
+      indices_time::IntegrationDomain
+    end
+
+Integration domain for a projection operator in a transient context
+"""
 struct TransientIntegrationDomain <: AbstractIntegrationDomain{AbstractVector{Int32}}
   indices_space::IntegrationDomain
   indices_time::IntegrationDomain

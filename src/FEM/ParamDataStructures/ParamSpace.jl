@@ -11,7 +11,9 @@ abstract type AbstractRealization end
 param_length(r::AbstractRealization) = length(r)
 
 """
-    struct Realization{P<:AbstractVector} <: AbstractRealization end
+    struct Realization{P<:AbstractVector} <: AbstractRealization
+      params::P
+    end
 
 Represents standard parametric realizations, i.e. samples extracted from
 a given parameter space. The field `params` is most commonly a vector of vectors.
@@ -60,7 +62,7 @@ function Base.zero(r::Realization)
 end
 
 """
-    struct TransientRealization{P<:Realization,T<:Real} <: AbstractRealization end
+    abstract type TransientRealization{P<:Realization,T<:Real} <: AbstractRealization end
 
 Represents temporal parametric realizations, i.e. samples extracted from
 a given parameter space for every time step in a temporal range. The most obvious
@@ -77,9 +79,13 @@ num_params(r::TransientRealization) = num_params(r.params)
 num_times(r::TransientRealization) = length(get_times(r))
 
 """
-    struct GenericTransientRealization{P,T,A} <: TransientRealization{P,T} end
+    struct GenericTransientRealization{P,T,A} <: TransientRealization{P,T}
+      params::P
+      times::A
+      t0::T
+    end
 
-Most standard implementation of an transient parametric realization.
+Most standard implementation of a [`TransientRealization`](@ref).
 """
 struct GenericTransientRealization{P,T,A} <: TransientRealization{P,T}
   params::P
@@ -148,7 +154,10 @@ function get_at_time(r::GenericTransientRealization{P,T} where P,time::T)  where
 end
 
 """
-    struct TransientRealizationAt{P,T} <: TransientRealization{P,T} end
+    struct TransientRealizationAt{P,T} <: TransientRealization{P,T}
+      params::P
+      t::Base.RefValue{T}
+    end
 
 Represents a GenericTransientRealization{P,T} at a certain time instant `t`.
 To avoid making it a mutable struct, the time instant `t` is stored as a Base.RefValue{T}.
@@ -200,7 +209,10 @@ struct NormalSampling <: SamplingStyle end
 struct HaltonSampling <: SamplingStyle end
 
 """
-    struct ParamSpace{P,S} <: AbstractSet{Realization} end
+    struct ParamSpace{P<:AbstractVector{<:AbstractVector},S<:SamplingStyle} <: AbstractSet{Realization}
+      param_domain::P
+      sampling_style::S
+    end
 
 Fields:
 - `param_domain`: domain of definition of the parameters
@@ -271,7 +283,10 @@ function realization(
 end
 
 """
-    TransientParamSpace{P<:ParamSpace,T} <: AbstractSet{TransientRealization}
+    struct TransientParamSpace{P<:ParamSpace,T} <: AbstractSet{TransientRealization}
+      parametric_space::P
+      temporal_domain::T
+    end
 
 Fields:
 - `parametric_space`: underlying parameter space
@@ -314,19 +329,20 @@ function shift!(p::TransientParamSpace,δ::Real)
 end
 
 """
-    AbstractParamFunction{P<:Realization} <: Function
+    abstract type AbstractParamFunction{P<:Realization} <: Function end
 
 Representation of parametric functions with domain a parametric space.
 Two categories of such functions are implemented:
 - [`ParamFunction`](@ref).
 - [`TransientParamFunction`](@ref).
-
 """
-
 abstract type AbstractParamFunction{P<:Realization} <: Function end
 
 """
-    ParamFunction{F,P} <: AbstractParamFunction{P}
+    struct ParamFunction{F,P} <: AbstractParamFunction{P}
+      fun::F
+      params::P
+    end
 
 Representation of parametric functions with domain a parametric space. Given a
 function `f` : Ω₁ × ... × Ωₙ × U+1D4DF, where U+1D4DF is a `ParamSpace`,
@@ -429,7 +445,11 @@ end
 Arrays.return_value(f::ParamFunction,x) = f.fun(x,testitem(_get_params(f)))
 
 """
-    TransientParamFunction{F,P,T} <: AbstractParamFunction{P}
+    struct TransientParamFunction{F,P,T} <: AbstractParamFunction{P}
+      fun::F
+      params::P
+      times::T
+    end
 
 Representation of parametric functions with domain a transient parametric space.
 Given a function `f` : Ω₁ × ... × Ωₙ × U+1D4DF × [t₁,t₂], where [t₁,t₂] is a

@@ -1,3 +1,9 @@
+"""
+    reduced_operator(solver::RBSolver,feop::ParamFEOperator,args...;kwargs...) -> RBOperator
+    reduced_operator(solver::RBSolver,feop::TransientParamFEOperator,args...;kwargs...) -> TransientRBOperator
+
+Computes a RB operator from the FE operator `feop`
+"""
 function reduced_operator(
   solver::RBSolver,
   feop::ParamFEOperator,
@@ -60,12 +66,43 @@ struct LinearNonlinearRBCache <: AbstractParamCache
   b::AbstractVector
 end
 
+"""
+    abstract type RBOperator{O} <: ParamOperator{O,SplitDomains} end
+
+Type representing reduced algebraic operators used within a reduced order modelling
+framework. A RBOperator should contain the following information:
+
+- a reduced test and trial space, computed according to [`reduced_fe_space`](@ref)
+- a hyper-reduced residual and jacobian, computed according to [`reduced_weak_form`](@ref)
+
+Subtypes:
+
+- [`GenericRBOperator`](@ref)
+- [`LinearNonlinearRBOperator`](@ref)
+"""
 abstract type RBOperator{O} <: ParamOperator{O,SplitDomains} end
 
 function allocate_rbcache(op::RBOperator,args...)
   @abstractmethod
 end
 
+"""
+    struct GenericRBOperator{O} <: RBOperator{O}
+      op::ParamOperator{O}
+      trial::RBSpace
+      test::RBSpace
+      lhs::AffineContribution
+      rhs::AffineContribution
+    end
+
+Fields:
+
+- `op`: underlying high dimensional FE operator
+- `trial`: reduced trial space
+- `test`: reduced trial space
+- `lhs`: hyper-reduced left hand side
+- `rhs`: hyper-reduced right hand side
+"""
 struct GenericRBOperator{O} <: RBOperator{O}
   op::ParamOperator{O}
   trial::RBSpace
@@ -167,6 +204,17 @@ function Algebra.jacobian!(
   jacobian!(cache,op,r,u.fe_data,rbcache)
 end
 
+"""
+    fe_jacobian!(A,op::RBOperator,r::Realization,u::AbstractParamVector,paramcache
+      ) -> AbstractParamMatrix
+    fe_jacobian!(
+      A,op::TransientRBOperator,r::TransientRealization,
+      u::Tuple{Vararg{AbstractParamVector}},ws::Tuple{Vararg{Real}},paramcache
+      ) -> AbstractParamMatrix
+
+Full order jacobian computed via integration on the LHS AbstractIntegrationDomains
+stored in `op`
+"""
 function fe_jacobian!(
   A,
   op::GenericRBOperator,
@@ -179,6 +227,17 @@ function fe_jacobian!(
   return Ai
 end
 
+"""
+    fe_residual!(A,op::RBOperator,r::Realization,u::AbstractParamVector,paramcache
+      ) -> AbstractParamVector
+    fe_residual!(
+      A,op::TransientRBOperator,r::TransientRealization,
+      u::Tuple{Vararg{AbstractParamVector}},paramcache
+      ) -> AbstractParamVector
+
+Full order residual computed via integration on the RHS AbstractIntegrationDomains
+stored in `op`
+"""
 function fe_residual!(
   b,
   op::GenericRBOperator,
@@ -192,11 +251,13 @@ function fe_residual!(
 end
 
 """
-    struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq} end
+    struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}
+      op_linear::GenericRBOperator{LinearParamEq}
+      op_nonlinear::GenericRBOperator{NonlinearParamEq}
+    end
 
 Extends the concept of [`GenericRBOperator`](@ref) to accommodate the linear/nonlinear
 splitting of terms in nonlinear applications
-
 """
 struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}
   op_linear::GenericRBOperator{LinearParamEq}

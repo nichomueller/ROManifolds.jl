@@ -28,7 +28,9 @@ to_param_quantity(f::ParamField,plength::Integer) = f
 to_param_quantity(f::Union{Field,AbstractArray{<:Field}},plength::Integer) = TrivialParamField(f,plength)
 
 """
-    struct TrivialParamField{F} <: ParamField end
+    struct TrivialParamField{F} <: ParamField
+      data::Fill{F}
+    end
 
 Wrapper for nonparametric fields that we wish assumed a parametric length.
 """
@@ -48,7 +50,9 @@ get_param_data(f::TrivialParamField) = f.data
 Arrays.evaluate(f::TrivialParamField,x::Point) = fill(evaluate(f.field,x),f.plength)
 
 """
-    struct GenericParamField{T<:AbstractParamFunction} <: ParamField end
+    struct GenericParamField{T<:GenericField} <: ParamField
+      data::Vector{T}
+    end
 
 Parametric extension of a GenericField in [`Gridap`](@ref)
 """
@@ -65,7 +69,9 @@ Arrays.return_cache(f::GenericParamField,x::Point) = fill(return_cache(f.data[1]
 Arrays.evaluate!(cache,f::GenericParamField,x::Point) = map(o->evaluate!(cache,o,x),f.data)
 
 """
-    struct ParamFieldGradient{N,F} <: ParamField end
+    struct ParamFieldGradient{N,F} <: ParamField
+      object::F
+    end
 
 Parametric extension of a FieldGradient in [`Gridap`](@ref)
 """
@@ -93,7 +99,9 @@ function Arrays.evaluate!(c,f::ParamFieldGradient{N,<:GenericParamField},x::Poin
 end
 
 """
-    struct OperationParamField{O,F} <: ParamField end
+    struct OperationParamField{T<:Fields.OperationField} <: ParamField
+      data::Vector{T}
+    end
 
 Parametric extension of a OperationField in [`Gridap`](@ref)
 """

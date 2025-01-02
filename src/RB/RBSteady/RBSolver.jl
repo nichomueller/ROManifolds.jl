@@ -1,5 +1,10 @@
 """
-    struct RBSolver{A,B,C,D} end
+    struct RBSolver{A<:GridapType,B}
+      fesolver::A
+      state_reduction::Reduction
+      residual_reduction::Reduction
+      jacobian_reduction::B
+    end
 
 Wrapper around a FE solver (e.g. [`FESolver`](@ref) or [`ODESolver`](@ref)) with
 additional information on the reduced basis (RB) method employed to solve a given
@@ -18,7 +23,8 @@ In particular:
 
 - ϵ: tolerance used in the projection-based truncated proper orthogonal
   decomposition (TPOD) or in the tensor train singular value decomposition (TT-SVD),
-  where a basis spanning the reduced subspace is computed
+  where a basis spanning the reduced subspace is computed; the value of ϵ is
+  responsible for selecting the dimension of the subspace, i.e. n = n(ϵ)
 - nparams_state: number of snapshots considered when running TPOD or TT-SVD
 - nparams_res: number of snapshots considered when running MDEIM for the residual
 - nparams_jac: number of snapshots considered when running MDEIM for the jacobian
@@ -60,12 +66,16 @@ res_params(s::RBSolver) = 1:num_res_params(s)
 jac_params(s::RBSolver) = 1:num_jac_params(s)
 
 """
-    solution_snapshots(solver::RBSolver,op::ParamFEOperator;kwargs...) -> SteadySnapshots
-    solution_snapshots(solver::RBSolver,op::TransientParamFEOperator;kwargs...) -> TransientSnapshots
+    solution_snapshots(solver::RBSolver,op::ParamFEOperator;nparams,r) -> SteadySnapshots
+    solution_snapshots(solver::RBSolver,op::TransientParamFEOperator,u0;nparams,r) -> TransientSnapshots
 
-The problem is solved several times, and the solution snapshots are returned along
-with the information related to the computational expense of the FE method
+The problem encoded in the FE operator `op` is solved several times, and the solution
+snapshots are returned along with the information related to the computational
+cost of the FE method. In transient settings, an initial condition `u0` should be
+provided. The keyword arguments are
 
+- `nparams`: number of parameters for which the snapshots should be computed
+- `r`: realization (i.e. set of parameters) for which the snapshots should be computed
 """
 function solution_snapshots(
   solver::RBSolver,
@@ -89,6 +99,15 @@ function solution_snapshots(
   return snaps,stats
 end
 
+"""
+    residual_snapshots(solver::RBSolver,op::ParamOperator,s::AbstractSnapshots;nparams) -> Contribution
+    residual_snapshots(solver::RBSolver,op::ODEParamOperator,s::AbstractSnapshots;nparams) -> Contribution
+
+Returns a residual [`Contribution`](@ref) relative to the FE operator `op`. The
+quantity `s` denotes the solution snapshots in which we evaluate the residual. Note
+that we can select a smaller number of parameters `nparams` compared to the
+number of parameters used to compute `s`
+"""
 function residual_snapshots(
   solver::RBSolver,
   op::ParamOperator,
@@ -120,6 +139,16 @@ function residual_snapshots(
   return Snapshots(b,ib,r_res)
 end
 
+"""
+    jacobian_snapshots(solver::RBSolver,op::ParamOperator,s::AbstractSnapshots;nparams) -> Contribution
+    jacobian_snapshots(solver::RBSolver,op::ODEParamOperator,s::AbstractSnapshots;nparams) -> Tuple{Vararg{Contribution}}
+
+Returns a jacobian [`Contribution`](@ref) relative to the FE operator `op`. The
+quantity `s` denotes the solution snapshots in which we evaluate the jacobian. Note
+that we can select a smaller number of parameters `nparams` compared to the
+number of parameters used to compute `s`. In transient settings, the output is a
+tuple whose `n`th element is the jacobian relative to the `n`th temporal derivative
+"""
 function jacobian_snapshots(
   solver::RBSolver,
   op::ParamOperator,

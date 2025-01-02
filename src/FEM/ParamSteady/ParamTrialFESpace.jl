@@ -1,5 +1,9 @@
 """
-    struct UnEvalTrialFESpace{A,B} <: SingleFieldFESpace end
+    struct UnEvalTrialFESpace{A,B} <: SingleFieldFESpace
+      space::A
+      space0::B
+      dirichlet::Union{Function,AbstractVector{<:Function}}
+    end
 
 Struct representing trial FE spaces that are not evaluated yet. This may include
 FE spaces representing transient problems (although the implementation in [`Gridap`](@ref)

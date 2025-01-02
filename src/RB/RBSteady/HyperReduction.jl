@@ -36,10 +36,28 @@ function empirical_interpolation(A::ParamSparseMatrix)
   return I′,AI
 end
 
+"""
+    abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
+
+Type representing the set of interpolation rows of a [`Projection`](@ref) subjected
+to a EIM approximation with [`empirical_interpolation`](@ref).
+
+Subtypes:
+
+- [`IntegrationDomain`]
+- [`TransientIntegrationDomain`]
+"""
 abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
 
 integration_domain(i::AbstractArray) = @abstractmethod
 
+"""
+    struct IntegrationDomain <: AbstractIntegrationDomain{Int32}
+      indices::Vector{Int32}
+    end
+
+Integration domain for a projection operator in a steady context
+"""
 struct IntegrationDomain <: AbstractIntegrationDomain{Int32}
   indices::Vector{Int32}
 end
@@ -71,11 +89,57 @@ function Base.getindex(a::ParamSparseMatrix,i::IntegrationDomain)
   return ConsecutiveParamArray(entries)
 end
 
+"""
+    abstract type HyperReduction{
+      A<:Reduction,
+      B<:ReducedProjection,
+      C<:AbstractIntegrationDomain
+      } <: Projection end
+
+Subtype of a [`Projection`](@ref) dedicated to the outputd of a hyper-reduction
+(e.g. an empirical interpolation method (EIM)) procedure applied on residual/jacobians
+of a differential problem. This procedure can be summarized in the following steps:
+
+1) compute a snapshots tensor `T`
+2) construct a [`Projection`](@ref) `Φ` by running the function [`reduction`](@ref) on `T`
+3) find the EIM quantities `i`,`Φi` by running the function [`empirical_interpolation`](@ref)
+on `Φ`
+
+The triplet (`Φ`, `Φi`,`i`) represents the minimum information needed to run the
+online phase of the hyper-reduction. However, we recall that a RB method requires
+the (Petrov-)Galerkin projection of residuals/jacobians on a reduced subspace
+built from solution snapshots, instead of providing the projection `Φ` we return
+the reduced projection `Φrb`, where
+
+- for residuals: Φrb = test_basis' * Φ
+- for jacobians: Φrb = test_basis' * Φ * trial_basis
+
+The output of this operation is a ReducedProjection. Therefore, a HyperReduction
+is completely characterized by the triplet (`Φrb`,`Φi`,`i`).
+
+Subtypes:
+
+- [`EmptyHyperReduction`](@ref)
+- [`MDEIM`](@ref)
+"""
 abstract type HyperReduction{A<:Reduction,B<:ReducedProjection,C<:AbstractIntegrationDomain} <: Projection end
 
 HyperReduction(::Reduction,args...) = @abstractmethod
 
+"""
+    get_interpolation(a::HyperReduction) -> Factorization
+
+For a [`HyperReduction`](@ref) `a` represented by the triplet (`Φrb`,`Φi`,`i`),
+returns `Φi`, usually stored as a Factorization
+"""
 get_interpolation(a::HyperReduction) = @abstractmethod
+
+"""
+    get_integration_domain(a::HyperReduction) -> AbstractIntegrationDomain
+
+For a [`HyperReduction`](@ref) `a` represented by the triplet (`Φrb`,`Φi`,`i`),
+returns `i`
+"""
 get_integration_domain(a::HyperReduction) = @abstractmethod
 
 num_reduced_dofs(a::HyperReduction) = num_reduced_dofs(get_basis(a))
@@ -96,6 +160,14 @@ function inv_project!(cache,a::HyperReduction,b::AbstractParamArray)
   return b̂
 end
 
+"""
+    struct EmptyHyperReduction{A,B} <: HyperReduction{A,B,IntegrationDomain}
+      reduction::A
+      basis::B
+    end
+
+Trivial hyper-reduction returned whenever the residual/jacobian is zero
+"""
 struct EmptyHyperReduction{A,B} <: HyperReduction{A,B,IntegrationDomain}
   reduction::A
   basis::B
@@ -127,6 +199,16 @@ function HyperReduction(
   return EmptyHyperReduction(red,basis)
 end
 
+"""
+    struct MDEIM{A,B,C} <: HyperReduction{A,B,C}
+      reduction::A
+      basis::B
+      interpolation::Factorization
+      domain::C
+    end
+
+Hyper-reduction returned by a matrix-based empirical interpolation method
+"""
 struct MDEIM{A,B,C} <: HyperReduction{A,B,C}
   reduction::A
   basis::B
@@ -167,30 +249,41 @@ function HyperReduction(
   return MDEIM(red,proj_basis,factor,domain)
 end
 
-function get_reduced_cells(cell_dof_ids::AbstractArray{<:AbstractArray},dofs::AbstractVector)
-  cells = Int32[]
+"""
+    reduced_dofs_to_reduced_cells(
+      cell_dof_ids::AbstractArray{<:AbstractArray},
+      reduced_dofs::AbstractVector
+      ) -> AbstractVector
+
+Returns the list of cells corresponding to the AbstractIntegrationDomain `reduced_dofs`
+"""
+function reduced_dofs_to_reduced_cells(
+  cell_dof_ids::AbstractArray{<:AbstractArray},
+  reduced_dofs::AbstractVector)
+
+  reduced_cells = Int32[]
   cache = array_cache(cell_dof_ids)
   for cell = eachindex(cell_dof_ids)
     celldofs = getindex!(cache,cell_dof_ids,cell)
-    if !isempty(intersect(dofs,celldofs))
-      append!(cells,cell)
+    if !isempty(intersect(reduced_dofs,celldofs))
+      append!(reduced_cells,cell)
     end
   end
-  return cells
+  return reduced_cells
 end
 
-function get_reduced_cells(
+function reduced_dofs_to_reduced_cells(
   trian::Triangulation,
   ids::AbstractVector,
   test::FESpace)
 
   cell_dof_ids = get_cell_dof_ids(test,trian)
   indices_space_rows = fast_index(ids,num_free_dofs(test))
-  red_integr_cells = get_reduced_cells(cell_dof_ids,indices_space_rows)
+  red_integr_cells = reduced_dofs_to_reduced_cells(cell_dof_ids,indices_space_rows)
   return red_integr_cells
 end
 
-function get_reduced_cells(
+function reduced_dofs_to_reduced_cells(
   trian::Triangulation,
   ids::AbstractVector,
   trial::FESpace,
@@ -200,22 +293,27 @@ function get_reduced_cells(
   cell_dof_ids_test = get_cell_dof_ids(test,trian)
   indices_space_cols = slow_index(ids,num_free_dofs(test))
   indices_space_rows = fast_index(ids,num_free_dofs(test))
-  red_integr_cells_trial = get_reduced_cells(cell_dof_ids_trial,indices_space_cols)
-  red_integr_cells_test = get_reduced_cells(cell_dof_ids_test,indices_space_rows)
+  red_integr_cells_trial = reduced_dofs_to_reduced_cells(cell_dof_ids_trial,indices_space_cols)
+  red_integr_cells_test = reduced_dofs_to_reduced_cells(cell_dof_ids_test,indices_space_rows)
   red_integr_cells = union(red_integr_cells_trial,red_integr_cells_test)
   return red_integr_cells
 end
 
+"""
+    reduced_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,r::RBSpace...)
+
+Returns the triangulation view of `trian` on the cells containing `i`
+"""
 function reduced_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,r::RBSpace...)
   f = map(get_fe_space,r)
-  red_integr_cells = get_reduced_cells(trian,i,f...)
+  red_integr_cells = reduced_dofs_to_reduced_cells(trian,i,f...)
   red_trian = view(trian,red_integr_cells)
   return red_trian
 end
 
 function reduced_triangulation(trian::SkeletonTriangulation,i::AbstractIntegrationDomain,r::RBSpace...)
   f = map(get_fe_space,r)
-  red_integr_cells = get_reduced_cells(trian.plus,i,f...)
+  red_integr_cells = reduced_dofs_to_reduced_cells(trian.plus,i,f...)
   red_trian = view(trian,red_integr_cells)
   return red_trian
 end
@@ -270,8 +368,10 @@ end
 """
     struct AffineContribution{A,V,K} <: Contribution
 
-The values of an AffineContribution are AffineDecompositions
+Contribution whose `values` assume one of the following types:
 
+- HyperReduction for single field problems
+- BlockProjection{<:HyperReductions} for multi field problems
 """
 struct AffineContribution{A<:Projection,V,K} <: Contribution
   values::V
@@ -333,6 +433,13 @@ function reduced_form(
   return hyper_red,red_trian
 end
 
+"""
+    reduced_residual(red::Reduction,test::RBSpace,c::ArrayContribution) -> AffineContribution
+
+Returns the [`AffineContribution`](@ref) obtained following the hyper-reduction
+of the [`ArrayContribution`](@ref) `c`, which contains a list of residual snapshots
+defined on a corresponding list of triangulations
+"""
 function reduced_residual(red::Reduction,test::RBSpace,c::ArrayContribution)
   t = @timed begin
     a,trians = map(get_domains(c),get_values(c)) do trian,values
@@ -343,6 +450,16 @@ function reduced_residual(red::Reduction,test::RBSpace,c::ArrayContribution)
   return Contribution(a,trians)
 end
 
+"""
+    reduced_jacobian(red::Reduction,trial::RBSpace,test::RBSpace,c::ArrayContribution) -> AffineContribution
+    reduced_jacobian(red::Reduction,trial::RBSpace,test::RBSpace,c::Tuple) -> Tuple{Vararg{AffineContribution}}
+
+Returns the [`AffineContribution`](@ref) obtained following the hyper-reduction
+of the [`ArrayContribution`](@ref) `c`, which contains a list of jacobian snapshots
+defined on a corresponding list of triangulations. In transient applications, `c`
+is a tuple of contributions, thus the output will correspondingly be a tuple of
+`AffineContribution`
+"""
 function reduced_jacobian(red::Reduction,trial::RBSpace,test::RBSpace,c::ArrayContribution)
   t = @timed begin
     a,trians = map(get_domains(c),get_values(c)) do trian,values
@@ -353,6 +470,13 @@ function reduced_jacobian(red::Reduction,trial::RBSpace,test::RBSpace,c::ArrayCo
   return Contribution(a,trians)
 end
 
+"""
+    reduced_weak_form(solver::RBSolver,op,red_trial::RBSpace,red_test::RBSpace,s::AbstractArray)
+
+Reduces the residual/jacobian contained in `op` via hyper-reduction. This function
+first builds the residual/jacobian snapshots, and then calls the functions
+[`reduced_residual`](@ref) and [`reduced_jacobian`](@ref)
+"""
 function reduced_weak_form(solver::RBSolver,op,red_trial::RBSpace,red_test::RBSpace,s::AbstractArray)
   jac = jacobian_snapshots(solver,op,s)
   res = residual_snapshots(solver,op,s)

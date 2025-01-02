@@ -11,10 +11,10 @@ using GridapSolvers.NonlinearSolvers
 using ReducedOrderModels
 
 # time marching
-θ = 1.0
+θ = 1
 dt = 0.0025
 t0 = 0.0
-tf = 20*dt
+tf = 60*dt
 
 # parametric space
 pranges = fill([1,10],3)
@@ -30,7 +30,8 @@ a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
 const W = 0.5
-inflow(μ,t) = abs(1-cos(π*t/tf)+μ[3]*sin(μ[2]*π*t/tf)/100)
+const Pt = 1
+inflow(μ,t) = abs(1-cos(π*t*Pt/tf)+μ[3]*sin(μ[2]*π*t*Pt/tf)/100)
 g_in(x,μ,t) = VectorValue(-x[2]*(W-x[2])*inflow(μ,t),0.0,0.0)
 g_in(μ,t) = x->g_in(x,μ,t)
 gμt_in(μ,t) = TransientParamFunction(g_in,μ,t)

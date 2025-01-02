@@ -23,7 +23,13 @@ function ODEs.ode_finish!(
 end
 
 """
-    struct ODEParamSolution{V} <: ODESolution end
+    struct ODEParamSolution{V} <: ODESolution
+      solver::ODESolver
+      odeop::ODEParamOperator
+      r::TransientRealization
+      us0::Tuple{Vararg{V}}
+      tracker::CostTracker
+    end
 
 Wrapper for the evolution of a differential problem represented by
 the field `odeop`, and solved by means of the ode solver `solver`. Parametric

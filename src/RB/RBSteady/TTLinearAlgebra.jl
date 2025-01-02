@@ -13,6 +13,13 @@ function contraction!(::Union{AbstractArray,Number}...)
   @abstractmethod
 end
 
+"""
+    contraction(basis::AbstractArray,coefficient::AbstractArray) -> AbstractArray
+
+Multiplies a reduced basis `basis` by a set of reduced coeffiecients `coefficient`.
+It acts as a generalized linear combination, since `basis` might have a dimension
+higher than 2.
+"""
 function contraction(
   basis::AbstractArray{T,3},
   coefficient::AbstractVector{S}
@@ -55,6 +62,16 @@ function contraction!(
   end
 end
 
+"""
+    contraction(Φₗₖ::AbstractArray{T,3},Aₖ::AbstractArray{T,3}) -> AbstractArray{T,4}
+    contraction(Φₗₖ::AbstractArray{T,3},Aₖ::AbstractArray{T,3},Φᵣₖ::AbstractArray{T,3}) -> AbstractArray{T,6}
+
+Contraction of tensor train cores, as a result of a (Petrov)-Galerkin projection.
+The contraction of `Aₖ` by `Φₗₖ` is the left-contraction of a TT core `Aₖ` by a
+(left, test) TT core `Φₗₖ`, whereas the contraction of `Aₖ` by `Φᵣₖ` is the
+right-contraction of a TT core `Aₖ` by a (right, trial) TT core `Φᵣₖ`. The dimension
+of the output of a contraction involving N factors is: 3N - N = 2N.
+"""
 Base.@propagate_inbounds function contraction(
   factor1::AbstractArray{T,3},
   factor2::AbstractArray{S,3}
@@ -123,6 +140,12 @@ function contraction(
   return TTContraction(ABCp)
 end
 
+"""
+    sequential_product(a::AbstractArray,b::AbstractArray...) -> AbstractArray
+
+This function sequentially multiplies the results of several (sequential as well)
+calls to [`contraction`](@ref)
+"""
 function sequential_product(::AbstractArray...)
   @abstractmethod
 end
@@ -191,6 +214,13 @@ function sequential_product(factor1::AbstractArray,factors::AbstractArray...)
   sequential_product(sequential_product(factor1,factor2),last_factors...)
 end
 
+"""
+    cores2basis(cores::AbstractArray{T,3}...) -> AbstractMatrix
+    cores2basis(dof_map::AbstractDofMap{D},cores::AbstractArray{T,3}...) -> AbstractMatrix
+
+Returns a basis in a matrix format from a list of tensor train cores. When also
+supplying the indexing strategy `dof_map`, the result is reindexed accordingly
+"""
 function cores2basis(core::AbstractArray{T,3}) where T
   reshape(core,:,size(core,3))
 end
@@ -253,7 +283,7 @@ function galerkin_projection(
   dropdims(rcore;dims=(1,2,3))
 end
 
-# supremizer computation
+# supremizer computation for tensor train decompositions
 
 function tt_supremizer(
   X::Vector{<:Factorization},

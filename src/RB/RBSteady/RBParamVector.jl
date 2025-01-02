@@ -1,3 +1,12 @@
+"""
+    struct RBParamVector{T,A<:ParamVector{T},B} <: ParamArray{T,1}
+      data::A
+      fe_data::B
+    end
+
+Parametric vector obtained by applying a [`Projection`](@ref) on a high-dimensional
+parametric FE vector `fe_data`, which is stored (but mostly unused) for conveniency
+"""
 struct RBParamVector{T,A<:ParamVector{T},B} <: ParamArray{T,1}
   data::A
   fe_data::B

@@ -1,3 +1,4 @@
+# check TransientMDEIMReduction for more details
 time_combinations(fesolver::ODESolver) = @notimplemented
 
 function time_combinations(fesolver::GeneralizedAlpha1)

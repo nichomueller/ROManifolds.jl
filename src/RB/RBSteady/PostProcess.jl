@@ -19,10 +19,9 @@ end
 
 Loads the snapshots previously saved to file, loads the reduced operator
 previously saved to file, and returns the results. This function allows to entirely
-skip the RB's offline phase. The field `dir` should be the directory at which the
+skip the RB's offline phase. The field `dir` should be the directory where the
 saved quantities can be found. Note that this function must be used after the test
 case has been run at least once!
-
 """
 function load_solve(solver,feop,dir)
   fe_sol = load_snapshots(dir)
@@ -195,7 +194,6 @@ end
 
 Allows to compute errors and computational speedups to compare the properties of
 the algorithm with the FE performance.
-
 """
 struct RBPerformance
   error

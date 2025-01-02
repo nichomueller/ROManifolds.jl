@@ -1,5 +1,8 @@
 """
-    struct LinearNonlinearParamFEOperator{T} <: ParamFEOperator{LinearNonlinearParamEq,T} end
+    struct LinearNonlinearParamFEOperator{T} <: ParamFEOperator{LinearNonlinearParamEq,T}
+      op_linear::ParamFEOperator{LinearParamEq,T}
+      op_nonlinear::ParamFEOperator{NonlinearParamEq,T}
+    end
 
 Interface to accommodate the separation of terms depending on their linearity in
 a nonlinear problem. This allows to build and store once and for all linear

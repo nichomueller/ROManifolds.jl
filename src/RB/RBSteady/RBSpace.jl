@@ -4,7 +4,6 @@
 
 Computes the subspace of the test, trial FE spaces contained in the FE operator
 `feop` by compressing the snapshots `s`
-
 """
 function reduced_fe_space(solver::RBSolver,feop::ParamFEOperator,s::AbstractSnapshots)
   red = get_state_reduction(solver)
@@ -76,9 +75,10 @@ end
 Represents a vector subspace of a FE space.
 
 Subtypes:
+
 - [`SingleFieldRBSpace`](@ref)
 - [`MultiFieldRBSpace`](@ref)
-
+- [`EvalRBSpace`](@ref)
 """
 abstract type RBSpace <: FESpace end
 
@@ -150,14 +150,16 @@ function FESpaces.FEFunction(r::RBSpace,x̂::AbstractVector)
 end
 
 """
-    SingleFieldRBSpace{A<:SingleFieldFESpace,B<:Projection} <: RBSpace
+    struct SingleFieldRBSpace <: RBSpace
+      space::SingleFieldFESpace
+      subspace::Projection
+    end
 
-Reduced basis subspace in a steady setting
-
+Reduced basis subspace of a [`SingleFieldFESpace`](@ref)
 """
-struct SingleFieldRBSpace{A<:SingleFieldFESpace,B<:Projection} <: RBSpace
-  space::A
-  subspace::B
+struct SingleFieldRBSpace <: RBSpace
+  space::SingleFieldFESpace
+  subspace::Projection
 end
 
 function fe_subspace(space::SingleFieldFESpace,basis::Projection)
@@ -168,14 +170,16 @@ get_fe_space(r::SingleFieldRBSpace) = r.space
 get_reduced_subspace(r::SingleFieldRBSpace) = r.subspace
 
 """
-    MultiFieldRBSpace{A<:MultiFieldFESpace,B<:BlockProjection} <: RBSpace
+    struct MultiFieldRBSpace <: RBSpace
+      space::MultiFieldFESpace
+      subspace::BlockProjection
+    end
 
-Reduced basis subspace in a MultiField setting
-
+Reduced basis subspace of a [`MultiFieldFESpace`](@ref)
 """
-struct MultiFieldRBSpace{A<:MultiFieldFESpace,B<:BlockProjection} <: RBSpace
-  space::A
-  subspace::B
+struct MultiFieldRBSpace <: RBSpace
+  space::MultiFieldFESpace
+  subspace::BlockProjection
 end
 
 function fe_subspace(space::MultiFieldFESpace,subspace::BlockProjection)
@@ -208,7 +212,8 @@ for f in (:project,:inv_project)
   end
 end
 
-# dealing with the transient case here
+# conceptually this part is not needed, but it helps dispatching on the steady-unsteady
+# cases
 
 function Arrays.evaluate(r::RBSpace,args...)
   space = evaluate(get_fe_space(r),args...)
@@ -216,6 +221,8 @@ function Arrays.evaluate(r::RBSpace,args...)
   EvalRBSpace(subspace,args...)
 end
 
+"""
+"""
 struct EvalRBSpace{A<:RBSpace,B<:AbstractRealization} <: RBSpace
   subspace::A
   realization::B

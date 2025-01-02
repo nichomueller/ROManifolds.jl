@@ -276,7 +276,15 @@ function Algebra.nz_allocation(a::ParamCounter{<:Algebra.CounterCSC{Tv,Ti}}) whe
 end
 
 """
-    struct ParamInserterCSC{Tv,Ti} end
+    struct ParamInserterCSC{Tv,Ti}
+      nrows::Int
+      ncols::Int
+      colptr::Vector{Ti}
+      colnnz::Vector{Ti}
+      rowval::Vector{Ti}
+      nzval::Vector{Tv}
+      plength::Int
+    end
 
 Extends the concept of [`InserterCSC`](@ref) in [`Gridap`](@ref) to accommodate
 a parametric setting. Tv is the type of the parametric nonzero entries of the

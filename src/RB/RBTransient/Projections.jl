@@ -1,64 +1,75 @@
 function RBSteady.projection(red::TransientAffineReduction,s::TransientSnapshots,args...)
   s1 = flatten_snapshots(select_snapshots(s,1,1))
-  basis_space = projection(get_reduction_space(red),s1,args...)
-  basis_time = PODBasis(I[1:num_times(s),1:1])
-  TransientBasis(basis_space,basis_time)
+  projection_space = projection(get_reduction_space(red),s1,args...)
+  projection_time = PODBasis(I[1:num_times(s),1:1])
+  TransientProjection(projection_space,projection_time)
 end
 
 function RBSteady.projection(red::TransientReduction,s::TransientSnapshots,args...)
   s1 = flatten_snapshots(s)
-  basis_space = projection(get_reduction_space(red),s1,args...)
-  proj_s1 = galerkin_projection(get_basis(basis_space),s1,args...)
+  projection_space = projection(get_reduction_space(red),s1,args...)
+  proj_s1 = galerkin_projection(get_basis(projection_space),s1,args...)
   proj_s2 = change_mode(proj_s1,num_params(s))
-  basis_time = projection(get_reduction_time(red),proj_s2)
-  TransientBasis(basis_space,basis_time)
+  projection_time = projection(get_reduction_time(red),proj_s2)
+  TransientProjection(projection_space,projection_time)
 end
 
 """
+    struct TransientProjection <: Projection
+      projection_space::Projection
+      projection_time::Projection
+    end
+
+Projection operator for transient problems, containing a spatial projection and
+a temporal one. The space-time projection operator is equal to
+
+`projection_time ⊗ projection_space`
+
+which, for efficiency reasons, is never explicitly computed
 """
-struct TransientBasis{A<:Projection,B<:Projection} <: Projection
-  basis_space::A
-  basis_time::B
+struct TransientProjection <: Projection
+  projection_space::Projection
+  projection_time::Projection
 end
 
-get_basis_space(a::TransientBasis) = get_basis(a.basis_space)
-get_basis_time(a::TransientBasis) = get_basis(a.basis_time)
+get_basis_space(a::TransientProjection) = get_basis(a.projection_space)
+get_basis_time(a::TransientProjection) = get_basis(a.projection_time)
 
-RBSteady.get_basis(a::TransientBasis) = kron(get_basis_time(a),get_basis_space(a))
-RBSteady.num_fe_dofs(a::TransientBasis) = num_fe_dofs(a.basis_space)*num_fe_dofs(a.basis_time)
-RBSteady.num_reduced_dofs(a::TransientBasis) = num_reduced_dofs(a.basis_space)*num_reduced_dofs(a.basis_time)
+RBSteady.get_basis(a::TransientProjection) = kron(get_basis_time(a),get_basis_space(a))
+RBSteady.num_fe_dofs(a::TransientProjection) = num_fe_dofs(a.projection_space)*num_fe_dofs(a.projection_time)
+RBSteady.num_reduced_dofs(a::TransientProjection) = num_reduced_dofs(a.projection_space)*num_reduced_dofs(a.projection_time)
 
-function RBSteady.project(a::TransientBasis,X::AbstractMatrix)
-  basis_space = get_basis(a.basis_space)
-  basis_time = get_basis(a.basis_time)
+function RBSteady.project(a::TransientProjection,X::AbstractMatrix)
+  basis_space = get_basis(a.projection_space)
+  basis_time = get_basis(a.projection_time)
   X̂ = basis_space'*X*basis_time
   return X̂
 end
 
-function RBSteady.inv_project(a::TransientBasis,X̂::AbstractMatrix)
-  basis_space = get_basis(a.basis_space)
-  basis_time = get_basis(a.basis_time)
+function RBSteady.inv_project(a::TransientProjection,X̂::AbstractMatrix)
+  basis_space = get_basis(a.projection_space)
+  basis_time = get_basis(a.projection_time)
   X = basis_space*X̂*basis_time'
   return X
 end
 
-function RBSteady.project(a::TransientBasis,y::AbstractVector)
-  ns = num_fe_dofs(a.basis_space)
-  nt = num_fe_dofs(a.basis_time)
+function RBSteady.project(a::TransientProjection,y::AbstractVector)
+  ns = num_fe_dofs(a.projection_space)
+  nt = num_fe_dofs(a.projection_time)
   Y = reshape(y,ns,nt)
   vec(project(a,Y))
 end
 
-function RBSteady.inv_project(a::TransientBasis,y::AbstractVector)
-  ns = num_reduced_dofs(a.basis_space)
-  nt = num_reduced_dofs(a.basis_time)
+function RBSteady.inv_project(a::TransientProjection,y::AbstractVector)
+  ns = num_reduced_dofs(a.projection_space)
+  nt = num_reduced_dofs(a.projection_time)
   Y = reshape(y,ns,nt)
   vec(inv_project(a,Y))
 end
 
 function RBSteady.galerkin_projection(
-  proj_left::TransientBasis,
-  a::TransientBasis)
+  proj_left::TransientProjection,
+  a::TransientProjection)
 
   proj_basis_space = galerkin_projection(get_basis_space(proj_left),get_basis_space(a))
   proj_basis_time = galerkin_projection(get_basis_time(proj_left),get_basis_time(a))
@@ -67,17 +78,17 @@ function RBSteady.galerkin_projection(
 end
 
 function RBSteady.galerkin_projection(
-  proj_left::TransientBasis,
-  a::TransientBasis,
-  proj_right::TransientBasis)
+  proj_left::TransientProjection,
+  a::TransientProjection,
+  proj_right::TransientProjection)
 
   @notimplemented "In unsteady problems, we need to provide a combining function"
 end
 
 function RBSteady.galerkin_projection(
-  proj_left::TransientBasis,
-  a::TransientBasis,
-  proj_right::TransientBasis,
+  proj_left::TransientProjection,
+  a::TransientProjection,
+  proj_right::TransientProjection,
   combine)
 
   proj_basis_space = galerkin_projection(
@@ -92,8 +103,8 @@ function RBSteady.galerkin_projection(
     combine)
 
   nleft = num_reduced_dofs(proj_left)
-  ns = num_reduced_dofs(a.basis_space)
-  nt = num_reduced_dofs(a.basis_time)
+  ns = num_reduced_dofs(a.projection_space)
+  nt = num_reduced_dofs(a.projection_time)
   n = num_reduced_dofs(a)
   nright = num_reduced_dofs(proj_right)
 
@@ -106,7 +117,7 @@ function RBSteady.galerkin_projection(
   return ReducedProjection(proj_basis)
 end
 
-function RBSteady.empirical_interpolation(a::TransientBasis)
+function RBSteady.empirical_interpolation(a::TransientProjection)
   indices_space,interp_space = empirical_interpolation(get_basis_space(a))
   indices_time,interp_time = empirical_interpolation(get_basis_time(a))
   interp = kron(interp_time,interp_space)
@@ -145,22 +156,20 @@ end
 # multfield interface
 
 function Arrays.return_type(::typeof(projection),red::TransientReduction,s::Snapshots)
-  A = return_type(projection,get_reduction_space(red),s)
-  B = return_type(projection,get_reduction_time(red),s)
-  return TransientBasis{A,B}
+  TransientReduction
 end
 
 function RBSteady.enrich!(
   red::SupremizerReduction,
-  a::BlockProjection{<:TransientBasis},
+  a::BlockProjection{<:TransientProjection},
   norm_matrix::BlockMatrix,
   supr_matrix::BlockMatrix;
   kwargs...)
 
   @check a.touched[1] "Primal field not defined"
   a_primal,a_dual... = a.array
-  a_primal_space = a_primal.basis_space
-  a_primal_time = a_primal.basis_time
+  a_primal_space = a_primal.projection_space
+  a_primal_time = a_primal.projection_time
   X_primal = norm_matrix[Block(1,1)]
   H_primal = cholesky(X_primal)
   for i = eachindex(a_dual)
@@ -174,17 +183,20 @@ function RBSteady.enrich!(
       a_primal_time = time_enrichment(red,a_primal_time,dual_i_time;kwargs...)
     end
   end
-  a[1] = TransientBasis(a_primal_space,a_primal_time)
+  a[1] = TransientProjection(a_primal_space,a_primal_time)
   return
 end
 
 """
-    time_enrichment(basis_time::ArrayBlock;kwargs...) -> Vector{<:Matrix}
+    time_enrichment(red::SupremizerReduction,a_primal::Projection,basis_dual) -> AbstractMatrix
 
-Enriches the temporal basis with temporal supremizers computed from
-the kernel of the temporal basis associated to the primal field projected onto
-the column space of the temporal basis (bases) associated to the duel field(s)
+Temporal supremizer enrichment. (Approximate) Procedure:
 
+- for every b_dual in basis_dual
+- compute Φ_primal_dual = get_basis(a_primal)'*get_basis(b_dual)
+- compute v = kernel(Φ_primal_dual)
+- compute v′ = orth_complement(v,a_primal)
+- enrich a_primal = [a_primal,v′]
 """
 function time_enrichment(red::SupremizerReduction,a_primal::Projection,basis_dual)
   tol = RBSteady.get_supr_tol(red)

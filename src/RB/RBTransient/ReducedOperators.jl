@@ -53,6 +53,27 @@ function RBSteady.allocate_rbcache(fesolver::ODESolver,op::RBOperator,args...)
   @abstractmethod
 end
 
+"""
+    struct GenericTransientRBOperator{O} <: TransientRBOperator{O}
+      op::ODEParamOperator{O}
+      trial::RBSpace
+      test::RBSpace
+      lhs::TupOfAffineContribution
+      rhs::AffineContribution
+    end
+
+Transient counterpart of a [`GenericRBOperator`] used in steady problems. Fields:
+
+- `op`: underlying high dimensional FE operator
+- `trial`: reduced trial space
+- `test`: reduced trial space
+- `lhs`: hyper-reduced left hand side
+- `rhs`: hyper-reduced right hand side
+
+The major difference with respect to the steady setting is that the `lhs` is a
+n-tuple of [`AffineContribution`](@ref), where n is the maximum order of the
+time derivatives
+"""
 struct GenericTransientRBOperator{O} <: TransientRBOperator{O}
   op::ODEParamOperator{O}
   trial::RBSpace
@@ -181,6 +202,15 @@ function RBSteady.fe_jacobian!(
   end
 end
 
+"""
+    struct LinearNonlinearTransientRBOperator <: TransientRBOperator{LinearNonlinearParamODE}
+      op_linear::GenericTransientRBOperator{LinearParamODE}
+      op_nonlinear::GenericTransientRBOperator{NonlinearParamODE}
+    end
+
+Extends the concept of [`GenericTransientRBOperator`](@ref) to accommodate the linear/nonlinear
+splitting of terms in nonlinear applications
+"""
 struct LinearNonlinearTransientRBOperator <: TransientRBOperator{LinearNonlinearParamODE}
   op_linear::GenericTransientRBOperator{LinearParamODE}
   op_nonlinear::GenericTransientRBOperator{NonlinearParamODE}

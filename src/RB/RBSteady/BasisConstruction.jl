@@ -1,3 +1,10 @@
+"""
+    reduction(red::Reduction,A::AbstractArray,args...) -> AbstractArray
+    reduction(red::Reduction,A::AbstractArray,X::AbstractSparseMatrix) -> AbstractArray
+
+Given an array (of snapshots) `A`, returns a reduced basis obtained by means of
+the reduction strategy `red`
+"""
 function reduction(red::Reduction,A::AbstractArray)
   @abstractmethod
 end
@@ -14,8 +21,8 @@ function reduction(red::TTSVDReduction,A::AbstractArray,args...)
   return cores
 end
 
-function _size_cond(M::AbstractMatrix)
-  length(M) > 1e6 && (size(M,1) > 1e2*size(M,2) || size(M,2) > 1e2*size(M,1)) #false #
+function _size_cond(A::AbstractMatrix)
+  length(A) > 1e6 && (size(A,1) > 1e2*size(A,2) || size(A,2) > 1e2*size(A,1)) #false #
 end
 
 function _cholesky_decomp(X::AbstractSparseMatrix)
@@ -36,74 +43,83 @@ function select_rank(red_style::SearchSVDRank,S::AbstractVector)
   return rank
 end
 
-function truncated_svd(red_style::SearchSVDRank,M::AbstractMatrix;issquare=false)
-  U,S,V = svd(M)
+function truncated_svd(red_style::SearchSVDRank,A::AbstractMatrix;issquare=false)
+  U,S,V = svd(A)
   if issquare S = sqrt.(S) end
   rank = select_rank(red_style,S)
   return U[:,1:rank],S[1:rank],V[:,1:rank]
 end
 
-function truncated_svd(red_style::FixedSVDRank,M::AbstractMatrix;issquare=false)
-  U,S,V = svd(M)
+function truncated_svd(red_style::FixedSVDRank,A::AbstractMatrix;issquare=false)
+  U,S,V = svd(A)
   if issquare S = sqrt.(S) end
   rank = red_style.rank
   return U[:,1:rank],S[1:rank],V[:,1:rank]
 end
 
-function truncated_svd(red_style::LRApproxRank,M::AbstractMatrix;kwargs...)
-  psvd(M,red_style.opts)
+function truncated_svd(red_style::LRApproxRank,A::AbstractMatrix;kwargs...)
+  psvd(A,red_style.opts)
 end
 
-function tpod(red_style::ReductionStyle,M::AbstractMatrix,X::AbstractSparseMatrix)
-  tpod(red_style,M,_cholesky_decomp(X)...)
+"""
+    tpod(red_style::ReductionStyle,A::AbstractMatrix) -> AbstractMatrix
+    tpod(red_style::ReductionStyle,A::AbstractMatrix,X::AbstractSparseMatrix) -> AbstractMatrix
+
+Truncated proper orthogonal decomposition of `A`. When provided, `X` is a
+(symmetric, positive definite) norm matrix with respect to which the output
+is made orthogonal. If `X` is not provided, the output is orthogonal with respect
+to the euclidean norm
+"""
+function tpod(red_style::ReductionStyle,A::AbstractMatrix,X::AbstractSparseMatrix)
+  tpod(red_style,A,_cholesky_decomp(X)...)
 end
 
-function tpod(red_style::ReductionStyle,M::AbstractMatrix)
-  truncated_svd(red_style,M)
+function tpod(red_style::ReductionStyle,A::AbstractMatrix)
+  truncated_svd(red_style,A)
 end
 
-function tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
-  XM = L'*M[p,:]
-  Ũr,Sr,Vr = truncated_svd(red_style,XM)
+function tpod(red_style::ReductionStyle,A::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
+  XA = L'*A[p,:]
+  Ũr,Sr,Vr = truncated_svd(red_style,XA)
   Ur = (L'\Ũr)[invperm(p),:]
   return Ur,Sr,Vr
 end
 
-function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix)
-  MM = M'*M
-  _,Sr,Vr = truncated_svd(red_style,MM;issquare=true)
-  Ur = (M*Vr)*inv(Diagonal(Sr).+eps())
+function massive_rows_tpod(red_style::ReductionStyle,A::AbstractMatrix)
+  AA = A'*A
+  _,Sr,Vr = truncated_svd(red_style,AA;issquare=true)
+  Ur = (A*Vr)*inv(Diagonal(Sr).+eps())
   return Ur,Sr,Vr
 end
 
-function massive_rows_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
-  XM = L'*M[p,:]
-  MXM = XM'*XM
-  _,Sr,Vr = truncated_svd(red_style,MXM;issquare=true)
-  Ũr = (XM*Vr)*inv(Diagonal(Sr).+eps())
+function massive_rows_tpod(red_style::ReductionStyle,A::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
+  XA = L'*A[p,:]
+  AXA = XA'*XA
+  _,Sr,Vr = truncated_svd(red_style,AXA;issquare=true)
+  Ũr = (XA*Vr)*inv(Diagonal(Sr).+eps())
   Ur = (L'\Ũr)[invperm(p),:]
   return Ur,Sr,Vr
 end
 
-function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix)
-  MM = M*M'
-  Ur,Sr,_ = truncated_svd(red_style,MM;issquare=true)
-  Vr = inv(Diagonal(Sr).+eps())*(Ur'M)
+function massive_cols_tpod(red_style::ReductionStyle,A::AbstractMatrix)
+  AA = A*A'
+  Ur,Sr,_ = truncated_svd(red_style,AA;issquare=true)
+  Vr = inv(Diagonal(Sr).+eps())*(Ur'A)
   return Ur,Sr,Vr'
 end
 
-function massive_cols_tpod(red_style::ReductionStyle,M::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
-  XM = L'*M[p,:]
-  MXM = XM*XM'
-  Ũr,Sr,_ = truncated_svd(red_style,MXM;issquare=true)
-  Vr = inv(Diagonal(Sr).+eps())*(Ũr'XM)
+function massive_cols_tpod(red_style::ReductionStyle,A::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
+  XA = L'*A[p,:]
+  AXA = XA*XA'
+  Ũr,Sr,_ = truncated_svd(red_style,AXA;issquare=true)
+  Vr = inv(Diagonal(Sr).+eps())*(Ũr'XA)
   Ur = (L'\Ũr)[invperm(p),:]
   return Ur,Sr,Vr'
 end
 
 function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3}) where T
-  M = reshape(A,size(A,1)*size(A,2),:)
-  Ur,Sr,Vr = tpod(red_style,M)
+  A′ = reshape(A,size(A,1)*size(A,2),:)
+  Ur,Sr,Vr = tpod(red_style,A′)
   core = reshape(Ur,size(A,1),size(A,2),:)
   remainder = Sr.*Vr'
   return core,remainder
@@ -112,21 +128,27 @@ end
 function ttsvd_loop(red_style::ReductionStyle,A::AbstractArray{T,3},X::AbstractSparseMatrix) where T
   prev_rank = size(A,1)
   cur_size = size(A,2)
-  M = reshape(A,prev_rank*cur_size,:)
+  A′ = reshape(A,prev_rank*cur_size,:)
 
   #TODO make this more efficient
   L,p = _cholesky_decomp(kron(X,I(prev_rank)))
-  # L = cholesky(kron(I(prev_rank),X)).L
-  # p = ?
-  Ur,Sr,Vr = tpod(red_style,M,L,p)
+  Ur,Sr,Vr = tpod(red_style,A′,L,p)
 
   core = reshape(Ur,prev_rank,cur_size,:)
   remainder = Sr.*Vr'
   return core,remainder
 end
 
-# We are not interested in the last dimension (corresponds to the parameter)
+"""
+    ttsvd(red_style::TTSVDRanks,A::AbstractArray) -> AbstractVector{<:AbstractArray}
+    ttsvd(red_style::TTSVDRanks,A::AbstractArray,X::AbstractRankTensor) -> AbstractVector{<:AbstractArray}
 
+Tensor train SVD of `A`. When provided, `X` is a (symmetric, positive definite)
+norm tensor with respect to which the output is made orthogonal.
+Note: if `ndims(A)` = N, the length of the ouptput is `N-1`, since we are not
+interested in reducing the axis of the parameters. Check https://arxiv.org/abs/2412.14460
+for more details
+"""
 function ttsvd(
   red_style::TTSVDRanks,
   A::AbstractArray{T,N}
@@ -336,7 +358,6 @@ end
 Orthogonal projection of `v` on the column space of `basis`. When a symmetric,
 positive definite matrix `X` is provided as an argument, the output is `X`-orthogonal,
 otherwise it is ℓ²-orthogonal
-
 """
 function orth_projection(
   v::AbstractVector,
@@ -392,15 +413,15 @@ end
 
 for (f,g) in zip((:gram_schmidt,:gram_schmidt!),(:pivoted_qr,:pivoted_qr!))
   @eval begin
-    function $f(M::AbstractMatrix,args...)
-      Q,R = $g(M,args...)
+    function $f(A::AbstractMatrix,args...)
+      Q,R = $g(A,args...)
       return Q,R
     end
 
-    function $f(M::AbstractMatrix,X::AbstractSparseMatrix,args...)
+    function $f(A::AbstractMatrix,X::AbstractSparseMatrix,args...)
       L,p = _cholesky_decomp(X)
-      XM = L'*M[p,:]
-      Q̃,R = $g(XM,args...)
+      XA = L'*A[p,:]
+      Q̃,R = $g(XA,args...)
       Q = (L'\Q̃)[invperm(p),:]
       return Q,R
     end
@@ -409,8 +430,8 @@ end
 
 for f in (:gram_schmidt,:gram_schmidt!)
   @eval begin
-    function $f(M::AbstractMatrix,basis::AbstractMatrix,args...)
-      Q,R = $f(hcat(basis,M),args...)
+    function $f(A::AbstractMatrix,basis::AbstractMatrix,args...)
+      Q,R = $f(hcat(basis,A),args...)
       return Q,R
     end
   end

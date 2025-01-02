@@ -1,28 +1,96 @@
 """
-    abstract type Projection end
+    abstract type Projection <: Map end
 
-Represents a basis for a vector (sub)space, used as a (Petrov)-Galerkin projection
-operator. In other words, Projection variables are operators from a high dimensional
-vector space to a low dimensional one
+Represents a basis for a `n`-dimensional vector subspace of a `N`-dimensional
+vector space (where `N` ≫ `n`), to be used as a (Petrov)-Galerkin projection
+operator. The kernel of a Projection is `n`-dimensional, whereas its image is
+`N`-dimensional.
 
 Subtypes:
-- [`PODProjection`](@ref)
-- [`TTSVDProjection`](@ref)
-- [`ReducedAlgebraicOperator`](@ref)
 
+- [`PODBasis`](@ref)
+- [`TTSVDCores`](@ref)
+- [`BlockProjection`](@ref)
+- [`InvProjection`](@ref)
+- [`ReducedProjection`](@ref)
+- [`HyperReduction`](@ref)
 """
 abstract type Projection <: Map end
 
+"""
+    get_basis(a::Projection) -> AbstractMatrix
+
+Returns the basis spanning the reduced subspace represented by the projection `a`
+"""
 get_basis(a::Projection) = @abstractmethod
+
+"""
+    num_fe_dofs(a::Projection) -> Int
+
+For a projection map `a` from a low dimensional space `n` to a high dimensional
+one `N`, returns `N`
+"""
 num_fe_dofs(a::Projection) = @abstractmethod
+
+"""
+    num_reduced_dofs(a::Projection) -> Int
+
+For a projection map `a` from a low dimensional space `n` to a high dimensional
+one `N`, returns `n`
+"""
 num_reduced_dofs(a::Projection) = @abstractmethod
+
+"""
+    project(a::Projection,x::AbstractArray) -> AbstractArray
+
+Projects a high-dimensional object `x` onto the subspace represented by `a`
+"""
 project(a::Projection,x::AbstractArray) = @abstractmethod
+
+"""
+    inv_project(a::Projection,x::AbstractArray) -> AbstractArray
+
+Recasts a low-dimensional object `x` onto the high-dimensional space in which `a`
+is immersed
+"""
 inv_project(a::Projection,x::AbstractArray) = @abstractmethod
+
+"""
+    galerkin_projection(a::Projection,b::Projection) -> ReducedProjection
+    galerkin_projection(a::Projection,b::Projection,c::Projection,args...) -> ReducedProjection
+
+(Petrov) Galerkin projection of a projection map `b` onto the subspace `a` (row
+projection) and, if applicable, onto the subspace `c` (column projection)
+"""
 galerkin_projection(a::Projection,b::Projection) = @abstractmethod
 galerkin_projection(a::Projection,b::Projection,c::Projection,args...) = @abstractmethod
+
+"""
+    empirical_interpolation(a::Projection) -> (AbstractVector,AbstractMatrix)
+
+Computes the EIM of `a`. The outputs are:
+
+- a vector of integers `i`, corresponding to a list of interpolation row indices
+- a matrix `Φi = view(Φ,i)`, where `Φ = get_basis(a)`. This quantity represents
+the restricted basis on the set of interpolation rows `i`
+"""
 empirical_interpolation(a::Projection) = @abstractmethod
+
 rescale(op::Function,x::AbstractArray,b::Projection) = @abstractmethod
+
+"""
+    union_bases(a::Projection,b::Projection,args...) -> Projection
+
+Computes the projection corresponding to the union of `a` and `b`. In essence this
+operation performs as
+
+Φa = get_basis(a)
+Φb = get_basis(b)
+Φab = union(Φa,Φb)
+return gram_schmidt(Φab)
+"""
 union_bases(a::Projection,b::Projection,args...) = @abstractmethod
+
 gram_schmidt(a::Projection,b::Projection,args...) = gram_schmidt(get_basis(a),get_basis(b),args...)
 
 Base.:+(a::Projection,b::Projection) = union_bases(a,b)
@@ -47,14 +115,12 @@ function LinearAlgebra.mul!(x::ConsecutiveParamArray,b::Projection,y::Consecutiv
   mul!(x.data,get_basis(b),y.data,α,β)
 end
 
-# row space to column space
 function project(a::Projection,x::AbstractVector)
   basis = get_basis(a)
   x̂ = basis'*x
   return x̂
 end
 
-# column space to row space
 function inv_project(a::Projection,x̂::AbstractVector)
   basis = get_basis(a)
   x = basis*x̂
@@ -71,8 +137,15 @@ function Arrays.return_cache(::typeof(inv_project),a::Projection,x̂::AbstractVe
   return x
 end
 
-struct InvProjection{P<:Projection} <: Projection
-  projection::P
+"""
+    struct InvProjection <: Projection
+      projection::Projection
+    end
+
+Represents the inverse map of a [`Projection`](@ref) `projection`
+"""
+struct InvProjection <: Projection
+  projection::Projection
 end
 
 Base.adjoint(a::Projection) = InvProjection(a)
@@ -83,6 +156,16 @@ num_reduced_dofs(a::InvProjection) = num_reduced_dofs(a)
 project(a::InvProjection,x::AbstractArray) = inv_project(a.projection,x)
 inv_project(a::InvProjection,x::AbstractArray) = project(a.projection,x)
 
+"""
+    abstract type ReducedProjection{A<:AbstractArray} <: Projection end
+
+Type representing a (Petrov-)Galerkin projection of a [`Projection`](@ref) onto
+a reduced subspace represented by another [`Projection`](@ref).
+
+Subtypes:
+
+- [`ReducedAlgebraicProjection](@ref)
+"""
 abstract type ReducedProjection{A<:AbstractArray} <: Projection end
 
 const ReducedVecProjection = ReducedProjection{<:AbstractMatrix}
@@ -116,6 +199,8 @@ function LinearAlgebra.mul!(
   contraction!(x.data,get_basis(b),y.data,α,β)
 end
 
+"""
+"""
 struct ReducedAlgebraicProjection{A} <: ReducedProjection{A}
   basis::A
 end
@@ -133,13 +218,14 @@ function projection(red::AffineReduction,s::AbstractMatrix,args...)
 end
 
 """
-    struct PODBasis{A<:AbstractMatrix} <: Projection
+    struct PODBasis <: Projection
+      basis::AbstractMatrix
+    end
 
-Projection stemming from a truncated proper orthogonal decomposition [`truncated_pod`](@ref)
-
+Projection stemming from a truncated proper orthogonal decomposition [`tpod`](@ref)
 """
-struct PODBasis{A<:AbstractMatrix} <: Projection
-  basis::A
+struct PODBasis <: Projection
+  basis::AbstractMatrix
 end
 
 function projection(red::PODReduction,s::AbstractArray{<:Number},args...)
@@ -191,15 +277,17 @@ end
 # TT interface
 
 """
-    TTSVDCores{A<:AbstractVector{<:AbstractArray{T,D}},I} <: Projection
+    struct TTSVDCores <: Projection
+      cores::AbstractVector{<:AbstractArray{T,3} where T}
+      dof_map::AbstractDofMap
+    end
 
-Projection stemming from a tensor train singular value decomposition [`ttsvd`](@ref).
-An index map of type `I` is provided for indexing purposes
-
+Projection stemming from a tensor train SVD [`ttsvd`](@ref). For reindexing purposes
+a field `dof_map` is provided along with the tensor train cores `cores`
 """
-struct TTSVDCores{D,A<:AbstractVector{<:AbstractArray{T,3} where T},I<:AbstractDofMap{D}} <: Projection
-  cores::A
-  dof_map::I
+struct TTSVDCores <: Projection
+  cores::AbstractVector{<:AbstractArray{T,3} where T}
+  dof_map::AbstractDofMap
 end
 
 function projection(red::TTSVDReduction,s::AbstractArray{<:Number},args...)
@@ -215,6 +303,7 @@ function projection(red::TTSVDReduction,s::SparseSnapshots,args...)
   TTSVDCores(cores′,dof_map)
 end
 
+get_cores(a::Projection) = @notimplemented
 get_cores(a::TTSVDCores) = a.cores
 
 get_basis(a::TTSVDCores) = cores2basis(get_dof_map(a),get_cores(a)...)
@@ -288,20 +377,22 @@ function empirical_interpolation(a::TTSVDCores)
   return indices,interp
 end
 
-function rescale(op::Function,x::AbstractRankTensor{D1},b::TTSVDCores{D2}) where {D1,D2}
-  if D1 == D2
-    TTSVDCores(op(x,get_cores(b)),get_dof_map(b))
+function rescale(op::Function,x::AbstractRankTensor{D},b::TTSVDCores) where D
+  cores = get_cores(b)
+  dof_map = get_dof_map(b)
+  if D == ndims(dof_map)
+    TTSVDCores(op(x,cores),dof_map)
   else
-    c1 = op(x,get_cores(b)[1:D1])
-    c2 = get_cores(b)[D1+1:end]
-    TTSVDCores([c1...,c2...],get_dof_map(b))
+    c1 = op(x,cores[1:D])
+    c2 = cores[D+1:end]
+    TTSVDCores([c1...,c2...],dof_map)
   end
 end
 
 # multi field interface
 
 function Arrays.return_type(::typeof(projection),::PODReduction,s::Snapshots{T}) where T
-  PODBasis{Matrix{T}}
+  PODBasis
 end
 
 function Arrays.return_type(::typeof(projection),::TTSVDReduction,s::Snapshots)
@@ -342,7 +433,6 @@ end
 
 Block container for Projection of type `A` in a MultiField setting. This
 type is conceived similarly to [`ArrayBlock`](@ref) in [`Gridap`](@ref)
-
 """
 struct BlockProjection{A<:Projection,N} <: Projection
   array::Array{A,N}
@@ -383,14 +473,6 @@ end
 function Base.setindex!(a::BlockProjection,v,i...)
   @check a.touched[i...] "Only touched entries can be set"
   a.array[i...] = v
-end
-
-function get_basis(a::BlockProjection{A,N}) where {A,N}
-  @notimplemented
-end
-
-function get_cores(a::BlockProjection{<:TTSVDCores,N}) where N
-  @notimplemented
 end
 
 function num_fe_dofs(a::BlockProjection)
@@ -445,15 +527,11 @@ for f in (:project,:inv_project)
 end
 
 """
-    enrich!(
-      a::BlockProjection,
-      norm_matrix::AbstractMatrix,
-      supr_matrix::AbstractMatrix,
-      args...) -> BlockProjection
+    enrich!(red::SupremizerReduction,a::BlockProjection,norm_matrix,supr_matrix) -> Nothing
 
-Returns the supremizer-enriched BlockProjection. This function stabilizes Inf-Sup
-problems projected on a reduced vector space
-
+In-place augmentation of the primal block of a [`BlockProjection`](@ref) `a`.
+This function has the purpose of stabilizing the reduced equations stemming from
+a saddle point problem
 """
 function enrich!(
   red::SupremizerReduction,

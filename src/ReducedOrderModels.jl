@@ -387,7 +387,7 @@ export TransientSparseSnapshots
 export UnfoldingTransientSnapshots
 export ModeTransientSnapshots
 
-export TransientBasis
+export TransientProjection
 
 export TransientRBSpace
 export TransientEvalMultiFieldRBSpace

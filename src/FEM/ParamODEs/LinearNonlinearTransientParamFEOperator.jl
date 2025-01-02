@@ -1,6 +1,8 @@
 """
-    struct LinearNonlinearTransientParamFEOperator <:
-      TransientParamFEOperator{LinearNonlinearParamODE} end
+    struct LinearNonlinearTransientParamFEOperator{T} <: TransientParamFEOperator{LinearNonlinearParamODE,T}
+      op_linear::TransientParamFEOperator{LinearParamODE,T}
+      op_nonlinear::TransientParamFEOperator{NonlinearParamODE,T}
+    end
 
 Interface to accommodate the separation of terms depending on their linearity in
 a nonlinear problem. This allows to build and store once and for all linear

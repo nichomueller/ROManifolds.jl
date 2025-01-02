@@ -1,15 +1,54 @@
+"""
+    abstract type ReductionStyle end
+
+Type indicating the reduction strategy to employ.
+
+Subtypes:
+
+- [`SearchSVDRank`](@ref)
+- [`FixedSVDRank`](@ref)
+- [`LRApproxRank`](@ref)
+- [`TTSVDRanks`](@ref)
+"""
 abstract type ReductionStyle end
 
 ReductionStyle(args...;kwargs...) = @abstractmethod
 
+"""
+    struct SearchSVDRank <: ReductionStyle
+      tol::Float64
+    end
+
+Struct employed when the chosen reduction algorithm is a truncated POD at a
+tolerance `tol`. Check https://doi.org/10.1007/978-3-319-15431-2 for more details
+on the truncated POD algorithm
+"""
 struct SearchSVDRank <: ReductionStyle
   tol::Float64
 end
 
+"""
+    struct FixedSVDRank <: ReductionStyle
+      rank::Int
+    end
+
+Struct employed when the chosen reduction algorithm is a truncated POD at a
+rank `rank`. Check https://doi.org/10.1007/978-3-319-15431-2 for more details on
+the truncated POD algorithm
+"""
 struct FixedSVDRank <: ReductionStyle
   rank::Int
 end
 
+"""
+    struct LRApproxRank <: ReductionStyle
+      opts::LRAOptions
+    end
+
+Struct employed when the chosen reduction algorithm is a randomized POD that
+leverages the package [`LowRankApprox`](@ref). The field `opts` specifies the
+options needed to run the randomized POD
+"""
 struct LRApproxRank <: ReductionStyle
   opts::LRAOptions
 end
@@ -32,8 +71,17 @@ function ReductionStyle(rank::Int;sketch=nothing,kwargs...)
   isa(sketch,Symbol) ? LRApproxRank(rank;sketch,kwargs...) : FixedSVDRank(rank)
 end
 
-struct TTSVDRanks{A<:ReductionStyle} <: ReductionStyle
-  style::Vector{A}
+"""
+    struct TTSVDRanks <: ReductionStyle
+      style::Vector{<:ReductionStyle}
+    end
+
+Struct employed when the chosen reduction algorithm is a TTSVD, with reduction
+algorithm at each step specified in the vector of reduction styles `style`. Check
+https://doi.org/10.1137/090752286 for more details on the TTSVD algorithm
+"""
+struct TTSVDRanks <: ReductionStyle
+  style::Vector{<:ReductionStyle}
 end
 
 function TTSVDRanks(tolranks::Vector{<:Union{Float64,Int}},args...;kwargs...)
@@ -51,19 +99,68 @@ ReductionStyle(tolrank::Vector{<:Union{Float64,Int}};kwargs...) = TTSVDRanks(tol
 Base.size(r::TTSVDRanks) = (length(r.style),)
 Base.getindex(r::TTSVDRanks,i::Integer) = getindex(r.style,i)
 
+"""
+    abstract type NormStyle end
+
+Subtypes:
+
+- [`EuclideanNorm`](@ref)
+- [`EnergyNorm`](@ref)
+"""
 abstract type NormStyle end
 
 get_norm(n::NormStyle) = @abstractmethod
 
+"""
+    struct EuclideanNorm <: NormStyle end
+
+Trait indicating that the reduction algorithm will produce a basis orthogonal in
+the euclidean norm
+"""
 struct EuclideanNorm <: NormStyle end
 
+"""
+    struct EnergyNorm <: NormStyle
+      norm_op::Function
+    end
+
+Trait indicating that the reduction algorithm will produce a basis orthogonal in
+the norm specified by `norm_op`. Note: `norm_op` should represent a symmetric,
+positive definite bilinear form (matrix)
+"""
 struct EnergyNorm <: NormStyle
   norm_op::Function
 end
 
 get_norm(n::EnergyNorm) = n.norm_op
 
+"""
+    abstract type Reduction{A<:ReductionStyle,B<:NormStyle} end
+
+Type indicating the reduction strategy to employ, and the information regarding
+the norm with respect to which the reduction should occur.
+
+Subtypes:
+
+- [`DirectReduction`](@ref)
+- [`GreedyReduction`](@ref)
+- [`SupremizerReduction`](@ref)
+- [`AbstractMDEIMReduction`](@ref)
+- [`TransientReduction`](@ref)
+"""
 abstract type Reduction{A<:ReductionStyle,B<:NormStyle} end
+
+"""
+    abstract type DirectReduction{A,B} <: Reduction{A,B} end
+
+Type representing direct reduction methods, e.g. truncated POD, TTSVD, etc.
+
+Subtypes:
+
+- [`AffineReduction`](@ref)
+- [`PODReduction`](@ref)
+- [`TTSVDReduction`](@ref)
+"""
 abstract type DirectReduction{A,B} <: Reduction{A,B} end
 abstract type GreedyReduction{A,B} <: Reduction{A,B} end
 
@@ -73,6 +170,16 @@ NormStyle(r::Reduction) = @abstractmethod
 ParamDataStructures.num_params(r::Reduction) = @abstractmethod
 get_norm(r::Reduction) = get_norm(NormStyle(r))
 
+"""
+    struct AffineReduction{A,B} <: DirectReduction{A,B}
+      red_style::A
+      norm_style::B
+    end
+
+Reduction employed when the input data is independent with respect to the
+considered realization. Therefore, simply considering a number of parameters
+equal to 1 suffices for this type of reduction
+"""
 struct AffineReduction{A,B} <: DirectReduction{A,B}
   red_style::A
   norm_style::B
@@ -97,6 +204,16 @@ ReductionStyle(r::AffineReduction) = r.red_style
 NormStyle(r::AffineReduction) = r.norm_style
 ParamDataStructures.num_params(r::AffineReduction) = 1
 
+"""
+    struct PODReduction{A,B} <: DirectReduction{A,B}
+      red_style::A
+      norm_style::B
+      nparams::Int
+    end
+
+Reduction by means of a truncated POD. The field `nparams` indicates the number
+of parameters selected for the computation of the snapshots
+"""
 struct PODReduction{A,B} <: DirectReduction{A,B}
   red_style::A
   norm_style::B
@@ -127,8 +244,18 @@ ReductionStyle(r::PODReduction) = r.red_style
 NormStyle(r::PODReduction) = r.norm_style
 ParamDataStructures.num_params(r::PODReduction) = r.nparams
 
-struct TTSVDReduction{A,B} <: DirectReduction{A,B}
-  red_style::A
+"""
+    struct TTSVDReduction{B} <: DirectReduction{TTSVDRanks,B}
+      red_style::TTSVDRanks
+      norm_style::B
+      nparams::Int
+    end
+
+Reduction by means of a TTSVD. The field `nparams` indicates the number
+of parameters selected for the computation of the snapshots
+"""
+struct TTSVDReduction{B} <: DirectReduction{TTSVDRanks,B}
+  red_style::TTSVDRanks
   norm_style::B
   nparams::Int
 end
@@ -159,6 +286,26 @@ ReductionStyle(r::TTSVDReduction) = r.red_style
 NormStyle(r::TTSVDReduction) = r.norm_style
 ParamDataStructures.num_params(r::TTSVDReduction) = r.nparams
 
+"""
+    struct SupremizerReduction{A,R<:Reduction{A,EnergyNorm}} <: Reduction{A,EnergyNorm}
+      reduction::R
+      supr_op::Function
+      supr_tol::Float64
+    end
+
+Wrapper for reduction methods `reduction` that require an additional step of
+stabilization, by means of a supremizer enrichment. Check https://doi.org/10.1002/nme.4772
+for more details in a steady setting, and https://doi.org/10.1137/22M1509114 for
+more details in a transient setting. The fields `supr_op` and `supr_tol` (which
+is only needed only in transient applications) are respectively the supremizing
+operator and the tolerance involved in the enrichment. For a saddle point problem
+with a jacobian of the form
+
+[ A   Bᵀ
+  B   C ]
+
+this operator is given by the bilinear form representing the matrix Bᵀ.
+"""
 struct SupremizerReduction{A,R<:Reduction{A,EnergyNorm}} <: Reduction{A,EnergyNorm}
   reduction::R
   supr_op::Function
@@ -197,8 +344,29 @@ function Reduction(supr_op::Function,args...;kwargs...)
   SupremizerReduction(supr_op,args...;kwargs...)
 end
 
+"""
+    abstract type AbstractMDEIMReduction{A} <: Reduction{A,EuclideanNorm} end
+
+Type representing a hyper-reduction approximation by means of a MDEIM algorithm.
+Check https://doi.org/10.1016/j.jcp.2015.09.046 for more details on MDEIM. This
+reduction strategy is usually employed only for the approximation of a residual
+and/or jacobian of a differential problem. Note that orthogonality with respect
+to a norm other than the euclidean is not required for this reduction type.
+
+Subtypes:
+
+- [`MDEIMReduction`](@ref)
+- [`TransientMDEIMReduction`](@ref)
+"""
 abstract type AbstractMDEIMReduction{A} <: Reduction{A,EuclideanNorm} end
 
+"""
+    struct MDEIMReduction{A,R<:Reduction{A,EuclideanNorm}} <: AbstractMDEIMReduction{A}
+      reduction::R
+    end
+
+MDEIM struct employed in steady problems
+"""
 struct MDEIMReduction{A,R<:Reduction{A,EuclideanNorm}} <: AbstractMDEIMReduction{A}
   reduction::R
 end
@@ -213,6 +381,16 @@ ReductionStyle(r::MDEIMReduction) = ReductionStyle(get_reduction(r))
 NormStyle(r::MDEIMReduction) = NormStyle(get_reduction(r))
 ParamDataStructures.num_params(r::MDEIMReduction) = num_params(get_reduction(r))
 
+"""
+    struct AdaptiveReduction{A,B,R<:DirectReduction{A,B}} <: GreedyReduction{A,B}
+      reduction::R
+      adaptive_nparams::Int
+      adaptive_tol::Float64
+      adaptive_maxiter::Int
+    end
+
+Not implemented yet. Will serve as a parameter-adaptivity greedy reduction algorithm
+"""
 struct AdaptiveReduction{A,B,R<:DirectReduction{A,B}} <: GreedyReduction{A,B}
   reduction::R
   adaptive_nparams::Int
