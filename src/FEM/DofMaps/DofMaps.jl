@@ -16,8 +16,8 @@ using Gridap.Helpers
 using GridapEmbedded
 using GridapEmbedded.Interfaces
 
-using ReducedOrderModels
-using ReducedOrderModels.Utils
+using ROM
+using ROM.Utils
 
 import FillArrays: Fill
 import PartitionedArrays: tuple_of_arrays

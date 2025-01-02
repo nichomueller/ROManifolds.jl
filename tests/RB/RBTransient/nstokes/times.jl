@@ -9,10 +9,10 @@ using DrWatson
 using Serialization
 using BenchmarkTools
 
-using ReducedOrderModels
-using ReducedOrderModels.ParamDataStructures
-using ReducedOrderModels.ParamSteady
-using ReducedOrderModels.ParamFESpaces
+using ROM
+using ROM.ParamDataStructures
+using ROM.ParamSteady
+using ROM.ParamFESpaces
 
 # time marching
 θ = 0.5

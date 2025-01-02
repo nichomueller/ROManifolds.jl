@@ -6,8 +6,8 @@ using Gridap.Arrays
 using Gridap.Geometry
 using Gridap.Helpers
 
-using ReducedOrderModels.Utils
-using ReducedOrderModels.ParamDataStructures
+using ROM.Utils
+using ROM.ParamDataStructures
 
 import FillArrays: Fill
 

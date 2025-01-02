@@ -19,16 +19,16 @@ using Gridap.ODEs
 using Gridap.TensorValues
 using Gridap.Helpers
 
-using ReducedOrderModels.Utils
-using ReducedOrderModels.DofMaps
-using ReducedOrderModels.TProduct
-using ReducedOrderModels.ParamDataStructures
-using ReducedOrderModels.ParamAlgebra
-using ReducedOrderModels.ParamFESpaces
-using ReducedOrderModels.ParamSteady
-using ReducedOrderModels.ParamODEs
+using ROM.Utils
+using ROM.DofMaps
+using ROM.TProduct
+using ROM.ParamDataStructures
+using ROM.ParamAlgebra
+using ROM.ParamFESpaces
+using ROM.ParamSteady
+using ROM.ParamODEs
 
-using ReducedOrderModels.RBSteady
+using ROM.RBSteady
 
 import Base: +,-,*,\
 import UnPack: @unpack

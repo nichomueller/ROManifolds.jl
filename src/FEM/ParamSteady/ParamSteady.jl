@@ -20,19 +20,19 @@ using GridapSolvers.LinearSolvers
 using GridapSolvers.BlockSolvers
 using GridapSolvers.MultilevelTools
 
-using ReducedOrderModels.Utils
-using ReducedOrderModels.DofMaps
-using ReducedOrderModels.TProduct
-using ReducedOrderModels.ParamDataStructures
-using ReducedOrderModels.ParamAlgebra
-using ReducedOrderModels.ParamFESpaces
+using ROM.Utils
+using ROM.DofMaps
+using ROM.TProduct
+using ROM.ParamDataStructures
+using ROM.ParamAlgebra
+using ROM.ParamFESpaces
 
 import Test: @test
 import UnPack: @unpack
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ReferenceFEs: get_order
-import ReducedOrderModels.Utils: CostTracker
+import ROM.Utils: CostTracker
 
 export UnEvalTrialFESpace
 export ParamTrialFESpace

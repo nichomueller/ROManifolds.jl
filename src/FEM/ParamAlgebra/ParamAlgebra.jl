@@ -18,7 +18,7 @@ using GridapSolvers.NonlinearSolvers
 using GridapSolvers.MultilevelTools
 using GridapSolvers.BlockSolvers
 
-using ReducedOrderModels.ParamDataStructures
+using ROM.ParamDataStructures
 
 import UnPack: @unpack
 import ArraysOfArrays: innersize

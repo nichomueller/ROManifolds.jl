@@ -21,8 +21,8 @@ using Gridap.Helpers
 using GridapEmbedded
 using GridapEmbedded.Interfaces
 
-using ReducedOrderModels.Utils
-using ReducedOrderModels.DofMaps
+using ROM.Utils
+using ROM.DofMaps
 
 import Base:+,-
 import FillArrays: Fill,fill

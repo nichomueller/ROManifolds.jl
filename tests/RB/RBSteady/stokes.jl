@@ -3,7 +3,7 @@ using Gridap.MultiField
 using DrWatson
 using Serialization
 
-using ReducedOrderModels
+using ROM
 
 pranges = fill([1,10],3)
 pspace = ParamSpace(pranges)

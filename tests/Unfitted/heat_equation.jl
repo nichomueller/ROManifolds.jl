@@ -4,7 +4,7 @@ using Test
 using DrWatson
 using Serialization
 
-using ReducedOrderModels
+using ROM
 
 # time marching
 θ = 0.5
@@ -162,7 +162,7 @@ perf′ = rb_performance(rbsolver,feop,rbop′,x′,x̂′,festats′,rbstats′
 # U1 = trial(r1)
 # plt_dir = datadir("plts")
 # create_dir(plt_dir)
-# using ReducedOrderModels.ParamDataStructures
+# using ROM.ParamDataStructures
 # for i in 1:length(r1)
 #   Ui = param_getindex(U1,i)
 #   uhi = FEFunction(Ui,S1[:,i])

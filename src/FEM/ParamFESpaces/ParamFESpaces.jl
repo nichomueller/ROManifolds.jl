@@ -17,10 +17,10 @@ using Gridap.ReferenceFEs
 using Gridap.TensorValues
 using Gridap.Helpers
 
-using ReducedOrderModels.DofMaps
-using ReducedOrderModels.TProduct
-using ReducedOrderModels.ParamDataStructures
-using ReducedOrderModels.ParamAlgebra
+using ROM.DofMaps
+using ROM.TProduct
+using ROM.ParamDataStructures
+using ROM.ParamAlgebra
 
 import Test: @test
 import ArraysOfArrays: _innerlength

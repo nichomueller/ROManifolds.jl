@@ -2,7 +2,7 @@ using Gridap
 using Test
 using DrWatson
 
-using ReducedOrderModels
+using ROM
 
 pranges = fill([1,10],3)
 pspace = ParamSpace(pranges)

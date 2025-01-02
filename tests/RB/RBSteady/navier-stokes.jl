@@ -10,7 +10,7 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers
 using GridapSolvers.NonlinearSolvers
 
-using ReducedOrderModels
+using ROM
 
 pranges = fill([1,10],3)
 pspace = ParamSpace(pranges)

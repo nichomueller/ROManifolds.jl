@@ -13,12 +13,12 @@ using Gridap.ODEs
 using Gridap.Polynomials
 using Gridap.Helpers
 
-using ReducedOrderModels.Utils
-using ReducedOrderModels.DofMaps
-using ReducedOrderModels.TProduct
-using ReducedOrderModels.ParamDataStructures
-using ReducedOrderModels.ParamFESpaces
-using ReducedOrderModels.ParamSteady
+using ROM.Utils
+using ROM.DofMaps
+using ROM.TProduct
+using ROM.ParamDataStructures
+using ROM.ParamFESpaces
+using ROM.ParamSteady
 
 import Test: @test
 import UnPack: @unpack
@@ -26,7 +26,7 @@ import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ODEs: TransientCellField
 import Gridap.ReferenceFEs: get_order
-import ReducedOrderModels.ParamSteady: get_domains_res,get_domains_jac
+import ROM.ParamSteady: get_domains_res,get_domains_jac
 
 include("TimeDerivatives.jl")
 

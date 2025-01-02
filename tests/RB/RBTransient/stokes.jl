@@ -4,7 +4,7 @@ using Test
 using DrWatson
 using Serialization
 
-using ReducedOrderModels
+using ROM
 
 θ = 0.5
 dt = 0.0025

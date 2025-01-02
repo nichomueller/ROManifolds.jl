@@ -1,4 +1,4 @@
-module ReducedOrderModels
+module ROM
 
 export PerformanceTracker
 export CostTracker
@@ -29,7 +29,7 @@ export set_domains
 export change_domains
 
 include("FEM/Utils/Utils.jl")
-using ReducedOrderModels.Utils
+using ROM.Utils
 
 export recast_indices
 export get_nonzero_indices
@@ -65,7 +65,7 @@ export get_dof_map
 export get_sparse_dof_map
 
 include("FEM/DofMaps/DofMaps.jl")
-using ReducedOrderModels.DofMaps
+using ROM.DofMaps
 
 export get_tp_dof_map
 
@@ -96,7 +96,7 @@ export TProductSparseMatrixAssembler
 export TProductBlockSparseMatrixAssembler
 
 include("FEM/TProduct/TProduct.jl")
-using ReducedOrderModels.TProduct
+using ROM.TProduct
 
 export AbstractRealization
 export Realization
@@ -166,17 +166,17 @@ export BlockConsecutiveParamVector
 export BlockConsecutiveParamMatrix
 
 include("FEM/ParamDataStructures/ParamDataStructures.jl")
-using ReducedOrderModels.ParamDataStructures
+using ROM.ParamDataStructures
 
 export ParamCounter
 export ParamInserterCSC
 export eltype2
 
 include("FEM/ParamGeometry/ParamGeometry.jl")
-using ReducedOrderModels.ParamGeometry
+using ROM.ParamGeometry
 
 include("FEM/ParamAlgebra/ParamAlgebra.jl")
-using ReducedOrderModels.ParamAlgebra
+using ROM.ParamAlgebra
 
 export SingleFieldParamFESpace
 export TrivialParamFESpace
@@ -196,7 +196,7 @@ export collect_cell_matrix_for_trian
 export collect_cell_vector_for_trian
 
 include("FEM/ParamFESpaces/ParamFESpaces.jl")
-using ReducedOrderModels.ParamFESpaces
+using ROM.ParamFESpaces
 
 export UnEvalTrialFESpace
 export ParamTrialFESpace
@@ -226,7 +226,7 @@ export JointParamOpFromFEOp
 export SplitParamOpFromFEOp
 
 include("FEM/ParamSteady/ParamSteady.jl")
-using ReducedOrderModels.ParamSteady
+using ROM.ParamSteady
 
 export TransientTrialParamFESpace
 export TransientMultiFieldParamFESpace
@@ -258,7 +258,7 @@ export ODEParamSolution
 export TransientParamFESolution
 
 include("FEM/ParamODEs/ParamODEs.jl")
-using ReducedOrderModels.ParamODEs
+using ROM.ParamODEs
 
 export ReductionStyle
 export SearchSVDRank
@@ -376,7 +376,7 @@ export load_operator
 export load_results
 
 include("RB/RBSteady/RBSteady.jl")
-using ReducedOrderModels.RBSteady
+using ROM.RBSteady
 
 export TransientReduction
 export TransientMDEIMReduction
@@ -400,8 +400,8 @@ export GenericTransientRBOperator
 export LinearNonlinearTransientRBOperator
 
 include("RB/RBTransient/RBTransient.jl")
-using ReducedOrderModels.RBTransient
+using ROM.RBTransient
 
 # include("Distributed/Distributed.jl")
-# using ReducedOrderModels.Distributed
+# using ROM.Distributed
 end

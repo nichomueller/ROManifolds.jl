@@ -8,7 +8,7 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers
 using GridapSolvers.NonlinearSolvers
 
-using ReducedOrderModels
+using ROM
 
 θ = 1.0
 dt = 0.0025

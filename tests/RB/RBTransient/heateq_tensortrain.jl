@@ -3,7 +3,7 @@ using Test
 using DrWatson
 using Serialization
 
-using ReducedOrderModels
+using ROM
 
 # time marching
 θ = 0.5

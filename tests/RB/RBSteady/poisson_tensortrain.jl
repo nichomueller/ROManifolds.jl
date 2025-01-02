@@ -3,7 +3,7 @@ using Test
 using DrWatson
 using Serialization
 
-using ReducedOrderModels
+using ROM
 
 # parametric space
 pranges = fill([1,10],3)
