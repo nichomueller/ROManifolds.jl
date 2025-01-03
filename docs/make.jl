@@ -7,9 +7,7 @@ makedocs(;
     format=Documenter.HTML(),
     pages=[
         "Introduction" => "index.md",
-        "Usage" => "usage.md",
-        "Steady" => "steady.md",
-        "Transient" => "transient.md",
+        "Usage" => ["steady.md","transient.md"],
         "Contributing" => "contributing.md",
         "Reference" => ["public_api.md","types.md","functions.md"],
     ],

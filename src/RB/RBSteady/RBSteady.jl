@@ -169,7 +169,7 @@ export fe_residual!
 export allocate_rbcache
 include("ReducedOperators.jl")
 
-export RBPerformance
+export ROMPerformance
 export eval_performance
 export create_dir
 export load_solve

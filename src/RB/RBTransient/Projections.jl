@@ -156,7 +156,7 @@ end
 # multfield interface
 
 function Arrays.return_type(::typeof(projection),red::TransientReduction,s::Snapshots)
-  TransientReduction
+  TransientProjection
 end
 
 function RBSteady.enrich!(

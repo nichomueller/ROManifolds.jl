@@ -13,7 +13,7 @@ partition = (3,3,3)
 model = CartesianDiscreteModel(domain,partition)
 labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"no_slip",collect(1:22))
-add_tag_from_tags!(labels,"np_penetration",[23,24])
+add_tag_from_tags!(labels,"no_penetration",[23,24])
 add_tag_from_tags!(labels,"inlet",[25])
 add_tag_from_tags!(labels,"outlet",[26])
 
@@ -45,7 +45,7 @@ energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,
-  dirichlet_tags=["no_slip","np_penetration","inlet"],
+  dirichlet_tags=["no_slip","no_penetration","inlet"],
   dirichlet_masks=[(true,true,true),(false,false,true),(true,true,true)])
 trial_u = ParamTrialFESpace(test_u,[gμ_0,gμ_in,gμ_in])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)

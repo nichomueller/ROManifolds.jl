@@ -2,7 +2,6 @@
     create_dir(dir::String) -> Nothing
 
 Recursive creation of a directory `dir`
-
 """
 function create_dir(dir::String)
   if !isdir(dir)
@@ -14,8 +13,8 @@ function create_dir(dir::String)
 end
 
 """
-    load_solve(solver::RBSolver,feop::ParamFEOperator,dir::String;kwargs...) -> RBPerformance
-    load_solve(solver::RBSolver,feop::TransientParamFEOperator,dir::String;kwargs...) -> RBPerformance
+    load_solve(solver::RBSolver,feop::ParamFEOperator,dir::String;kwargs...) -> ROMPerformance
+    load_solve(solver::RBSolver,feop::TransientParamFEOperator,dir::String;kwargs...) -> ROMPerformance
 
 Loads the snapshots previously saved to file, loads the reduced operator
 previously saved to file, and returns the results. This function allows to entirely
@@ -70,9 +69,9 @@ function load_snapshots(dir;label="")
   deserialize(snaps_dir)
 end
 
-function DrWatson.save(dir,stats::NamedTuple;label="")
+function DrWatson.save(dir,stats::PerformanceTracker;label="")
   stats_dir = get_filename(dir,"stats",label)
-  serialize(stats_dir,s)
+  serialize(stats_dir,stats)
 end
 
 function load_stats(dir;label="")
@@ -99,9 +98,13 @@ function load_fe_subspace(dir,f::FESpace;label="")
   fe_subspace(f,basis)
 end
 
-function DrWatson.save(dir,hp::HyperReduction;label="")
-  hr_dir = get_filename(dir,"hypred",label)
-  serialize(hr_dir,hp)
+for T in (:HyperReduction,:BlockHyperReduction)
+  @eval begin
+    function DrWatson.save(dir,hp::$T;label="")
+      hr_dir = get_filename(dir,"hypred",label)
+      serialize(hr_dir,hp)
+    end
+  end
 end
 
 function load_decomposition(dir;label="")
@@ -187,36 +190,36 @@ function load_operator(dir,feop::LinearNonlinearParamFEOperator{SplitDomains};la
 end
 
 """
-    struct RBPerformance{E}
-      error::E
-      speedup::SU
+    struct ROMPerformance
+      error
+      speedup
     end
 
 Allows to compute errors and computational speedups to compare the properties of
 the algorithm with the FE performance.
 """
-struct RBPerformance
+struct ROMPerformance
   error
   speedup
 end
 
-function Base.show(io::IO,k::MIME"text/plain",perf::RBPerformance)
-  println(io," ----------------------- RBPerformance ----------------------------")
+function Base.show(io::IO,k::MIME"text/plain",perf::ROMPerformance)
+  println(io," ----------------------- ROMPerformance ----------------------------")
   println(io," > error: $(perf.error)")
   println(io," > speedup in time: $(perf.speedup.speedup_time)")
   println(io," > speedup in memory: $(perf.speedup.speedup_memory)")
   println(io," -------------------------------------------------------------")
 end
 
-function Base.show(io::IO,perf::RBPerformance)
+function Base.show(io::IO,perf::ROMPerformance)
   show(io,MIME"text/plain"(),perf)
 end
 
 function eval_performance(
   solver::RBSolver,
   feop::ParamFEOperator,
-  fesnaps::AbstractArray,
-  rbsnaps::AbstractArray,
+  fesnaps::AbstractSnapshots,
+  rbsnaps::AbstractSnapshots,
   festats::CostTracker,
   rbstats::CostTracker,
   args...)
@@ -225,14 +228,14 @@ function eval_performance(
   norm_style = NormStyle(state_red)
   error = compute_relative_error(norm_style,feop,fesnaps,rbsnaps,args...)
   speedup = compute_speedup(festats,rbstats)
-  RBPerformance(error,speedup)
+  ROMPerformance(error,speedup)
 end
 
 function eval_performance(
   solver::RBSolver,
   feop::ParamFEOperator,
-  rbop,
-  fesnaps::AbstractArray,
+  rbop::ParamOperator,
+  fesnaps::AbstractSnapshots,
   x̂::AbstractParamVector,
   festats::CostTracker,
   rbstats::CostTracker,
@@ -246,7 +249,7 @@ function eval_performance(
   eval_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats,args...)
 end
 
-function DrWatson.save(dir,perf::RBPerformance;label="")
+function DrWatson.save(dir,perf::ROMPerformance;label="")
   results_dir = get_filename(dir,"results",label)
   serialize(results_dir,perf)
 end
@@ -302,8 +305,7 @@ end
 
 function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
   @check sol.touched == sol_approx.touched
-  T = eltype2(sol)
-  error = Array{T,ndims(sol)}(undef,size(sol))
+  error = zeros(size(sol))
   for i in eachindex(sol)
     if sol.touched[i]
       error[i] = compute_relative_error(sol[i],sol_approx[i],norm_matrix[Block(i,i)])

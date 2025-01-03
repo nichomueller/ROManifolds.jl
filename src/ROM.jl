@@ -367,7 +367,7 @@ export get_fe_test
 export fe_jacobian!
 export fe_residual!
 
-export RBPerformance
+export ROMPerformance
 export eval_performance
 export create_dir
 export load_solve

@@ -391,7 +391,7 @@ end
 
 # multi field interface
 
-function Arrays.return_type(::typeof(projection),::PODReduction,s::Snapshots{T}) where T
+function Arrays.return_type(::typeof(projection),::PODReduction,s::Snapshots)
   PODBasis
 end
 

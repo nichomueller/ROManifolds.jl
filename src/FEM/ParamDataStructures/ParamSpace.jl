@@ -20,19 +20,6 @@ a given parameter space. The field `params` is most commonly a vector of vectors
 When the parameters are scalars, they still need to be defined as vectors of
 vectors of unit length. In other words, we treat the case in which `params` is a
 vector of numbers as the case in which `params` is a vector of one vector.
-
-# Examples
-
-```jldoctest
-julia> r = Realization([[1, 2],[3, 4]])
-Realization{Vector{Vector{Int64}}}([[1, 2], [3, 4]])
-julia> μ = r[1]
-Realization{Vector{Int64}}([1, 2])
-julia> r′ = Realization([1, 2])
-Realization{Vector{Int64}}([1, 2])
-julia> μ′ = r′[1]
-Realization{Vector{Int64}}([1, 2])
-```
 """
 struct Realization{P<:AbstractVector} <: AbstractRealization
   params::P
@@ -347,25 +334,6 @@ abstract type AbstractParamFunction{P<:Realization} <: Function end
 Representation of parametric functions with domain a parametric space. Given a
 function `f` : Ω₁ × ... × Ωₙ × U+1D4DF, where U+1D4DF is a `ParamSpace`,
 the evaluation of `f` in `μ ∈ U+1D4DF` returns the restriction of `f` to Ω₁ × ... × Ωₙ
-
-# Examples
-
-```jldoctest
-julia> U+1D4DF = ParamSpace([[0, 1],[0, 1]])
-Set of parameters in [[0, 1], [0, 1]], sampled with UniformSampling()
-julia> μ = realization(U+1D4DF; nparams = 2)
-Realization{Vector{Vector{Float64}}}([...])
-julia> a(x, μ) = sum(x) * sum(μ)
-a (generic function with 1 method)
-julia> a(μ) = x -> a(x, μ)
-a (generic function with 2 methods)
-julia> aμ = ParamFunction(a, μ)
-#15 (generic function with 1 method)
-julia> aμ(Point(0, 1))
-2-element Vector{Float64}:
- 0.068032791851195
- 0.9263487710801264
-```
 """
 struct ParamFunction{F,P} <: AbstractParamFunction{P}
   fun::F

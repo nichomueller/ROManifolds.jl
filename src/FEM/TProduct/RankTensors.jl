@@ -244,11 +244,7 @@ function tpmul(a::Rank1Tensor{3},b::AbstractArray{T,3} where T)
 end
 
 function tpmul(a::AbstractRankTensor{D,K},b::AbstractArray) where {D,K}
-  c = tpmul(get_decomposition(a,1),b)
-  for k = 2:K
-    c += tpmul(get_decomposition(a,k),b)
-  end
-  return c
+  sum(map(k -> tpmul(get_decomposition(a,k),b)))
 end
 
 function Utils.induced_norm(a::AbstractArray{T,D},X::AbstractRankTensor{D}) where {T,D}
