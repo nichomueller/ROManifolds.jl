@@ -5,10 +5,10 @@ Type indicating the reduction strategy to employ.
 
 Subtypes:
 
-- [`SearchSVDRank`](@ref)
-- [`FixedSVDRank`](@ref)
-- [`LRApproxRank`](@ref)
-- [`TTSVDRanks`](@ref)
+- `SearchSVDRank`
+- `FixedSVDRank`
+- `LRApproxRank`
+- `TTSVDRanks`
 """
 abstract type ReductionStyle end
 
@@ -46,7 +46,7 @@ end
     end
 
 Struct employed when the chosen reduction algorithm is a randomized POD that
-leverages the package [`LowRankApprox`](@ref). The field `opts` specifies the
+leverages the package `LowRankApprox`. The field `opts` specifies the
 options needed to run the randomized POD
 """
 struct LRApproxRank <: ReductionStyle
@@ -104,8 +104,8 @@ Base.getindex(r::TTSVDRanks,i::Integer) = getindex(r.style,i)
 
 Subtypes:
 
-- [`EuclideanNorm`](@ref)
-- [`EnergyNorm`](@ref)
+- `EuclideanNorm`
+- `EnergyNorm`
 """
 abstract type NormStyle end
 
@@ -142,11 +142,11 @@ the norm with respect to which the reduction should occur.
 
 Subtypes:
 
-- [`DirectReduction`](@ref)
-- [`GreedyReduction`](@ref)
-- [`SupremizerReduction`](@ref)
-- [`AbstractMDEIMReduction`](@ref)
-- [`TransientReduction`](@ref)
+- `DirectReduction`
+- `GreedyReduction`
+- `SupremizerReduction`
+- `AbstractMDEIMReduction`
+- `TransientReduction`
 """
 abstract type Reduction{A<:ReductionStyle,B<:NormStyle} end
 
@@ -157,9 +157,9 @@ Type representing direct reduction methods, e.g. truncated POD, TTSVD, etc.
 
 Subtypes:
 
-- [`AffineReduction`](@ref)
-- [`PODReduction`](@ref)
-- [`TTSVDReduction`](@ref)
+- `AffineReduction`
+- `PODReduction`
+- `TTSVDReduction`
 """
 abstract type DirectReduction{A,B} <: Reduction{A,B} end
 abstract type GreedyReduction{A,B} <: Reduction{A,B} end
@@ -355,8 +355,8 @@ to a norm other than the euclidean is not required for this reduction type.
 
 Subtypes:
 
-- [`MDEIMReduction`](@ref)
-- [`TransientMDEIMReduction`](@ref)
+- `MDEIMReduction`
+- `TransientMDEIMReduction`
 """
 abstract type AbstractMDEIMReduction{A} <: Reduction{A,EuclideanNorm} end
 

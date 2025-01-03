@@ -2,10 +2,10 @@
     abstract type ParamField <: Field end
 
 Represents a parametric field. Subtypes:
-- [`TrivialParamField`](@ref)
-- [`GenericParamField`](@ref)
-- [`ParamFieldGradient`](@ref)
-- [`OperationParamField`](@ref)
+- `TrivialParamField`
+- `GenericParamField`
+- `ParamFieldGradient`
+- `OperationParamField`
 """
 abstract type ParamField <: Field end
 

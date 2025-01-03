@@ -8,12 +8,12 @@ operator. The kernel of a Projection is `n`-dimensional, whereas its image is
 
 Subtypes:
 
-- [`PODBasis`](@ref)
-- [`TTSVDCores`](@ref)
-- [`BlockProjection`](@ref)
-- [`InvProjection`](@ref)
-- [`ReducedProjection`](@ref)
-- [`HyperReduction`](@ref)
+- `PODBasis`
+- `TTSVDCores`
+- `BlockProjection`
+- `InvProjection`
+- `ReducedProjection`
+- `HyperReduction`
 """
 abstract type Projection <: Map end
 
@@ -142,7 +142,7 @@ end
       projection::Projection
     end
 
-Represents the inverse map of a [`Projection`](@ref) `projection`
+Represents the inverse map of a `Projection` `projection`
 """
 struct InvProjection <: Projection
   projection::Projection
@@ -159,12 +159,12 @@ inv_project(a::InvProjection,x::AbstractArray) = project(a.projection,x)
 """
     abstract type ReducedProjection{A<:AbstractArray} <: Projection end
 
-Type representing a (Petrov-)Galerkin projection of a [`Projection`](@ref) onto
-a reduced subspace represented by another [`Projection`](@ref).
+Type representing a (Petrov-)Galerkin projection of a `Projection` onto
+a reduced subspace represented by another `Projection`.
 
 Subtypes:
 
-- [`ReducedAlgebraicProjection](@ref)
+- `ReducedAlgebraicProjection](@ref)
 """
 abstract type ReducedProjection{A<:AbstractArray} <: Projection end
 
@@ -222,7 +222,7 @@ end
       basis::AbstractMatrix
     end
 
-Projection stemming from a truncated proper orthogonal decomposition [`tpod`](@ref)
+Projection stemming from a truncated proper orthogonal decomposition `tpod`
 """
 struct PODBasis <: Projection
   basis::AbstractMatrix
@@ -282,7 +282,7 @@ end
       dof_map::AbstractDofMap
     end
 
-Projection stemming from a tensor train SVD [`ttsvd`](@ref). For reindexing purposes
+Projection stemming from a tensor train SVD `ttsvd`. For reindexing purposes
 a field `dof_map` is provided along with the tensor train cores `cores`
 """
 struct TTSVDCores <: Projection
@@ -432,7 +432,7 @@ end
     struct BlockProjection{A,N} <: Projection end
 
 Block container for Projection of type `A` in a MultiField setting. This
-type is conceived similarly to [`ArrayBlock`](@ref) in `Gridap`
+type is conceived similarly to `ArrayBlock` in `Gridap`
 """
 struct BlockProjection{A<:Projection,N} <: Projection
   array::Array{A,N}
@@ -529,7 +529,7 @@ end
 """
     enrich!(red::SupremizerReduction,a::BlockProjection,norm_matrix,supr_matrix) -> Nothing
 
-In-place augmentation of the primal block of a [`BlockProjection`](@ref) `a`.
+In-place augmentation of the primal block of a `BlockProjection` `a`.
 This function has the purpose of stabilizing the reduced equations stemming from
 a saddle point problem
 """

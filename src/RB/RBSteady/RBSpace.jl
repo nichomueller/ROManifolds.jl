@@ -76,9 +76,9 @@ Represents a vector subspace of a FE space.
 
 Subtypes:
 
-- [`SingleFieldRBSpace`](@ref)
-- [`MultiFieldRBSpace`](@ref)
-- [`EvalRBSpace`](@ref)
+- `SingleFieldRBSpace`
+- `MultiFieldRBSpace`
+- `EvalRBSpace`
 """
 abstract type RBSpace <: FESpace end
 

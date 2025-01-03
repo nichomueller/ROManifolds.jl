@@ -12,10 +12,10 @@ Fields:
   on an AbstractIntegrationDomain
 - `coeff`: parameter-dependent coefficient computed during the online phase
   according to the formula `coeff = Φi⁻¹ * fe_quantity[i,:]`, where (Φi,i) are
-  stored in a [`HyperReduction`](@ref) object
+  stored in a `HyperReduction` object
 - `hypred`: the ouptut of the online phase of a hyper-reduction strategy, acoording
   to the formula `hypred = Φrb * coeff`, where Φrb is stored in a
-  [`HyperReduction`](@ref) object
+  `HyperReduction` object
 """
 struct HRParamArray{T,N,A,B,C<:ParamArray{T,N}} <: ParamArray{T,N}
   fe_quantity::A

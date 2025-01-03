@@ -6,8 +6,8 @@ a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k.
 
 Subtypes:
 
-- [`Rank1Tensor`](@ref)
-- [`GenericRankTensor`](@ref)
+- `Rank1Tensor`
+- `GenericRankTensor`
 """
 abstract type AbstractRankTensor{D,K} end
 
@@ -109,8 +109,8 @@ end
 Returns a AbstractRankTensor storing the arrays `arrays_1d` (usually matrices)
 arising from an integration routine on D 1-d triangulations whose tensor product
 gives a D-dimensional triangulation. The argument `dof_map` is a reindexing map
-for the input. In the absence of the field `gradients_1d`, the output is a [`Rank1Tensor`](@ref);
-when provided, the output is a [`GenericRankTensor`](@ref)
+for the input. In the absence of the field `gradients_1d`, the output is a `Rank1Tensor`;
+when provided, the output is a `GenericRankTensor`
 
     tproduct_array(arrays_1d::Vector{<:BlockArray},dof_map) -> BlockRankTensor
     tproduct_array(op,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},dof_map,args...) -> BlockRankTensor
@@ -198,7 +198,7 @@ end
       array::Array{A,N}
     end
 
-Multi-field version of a [`AbstractRankTensor`](@ref)
+Multi-field version of a `AbstractRankTensor`
 """
 struct BlockRankTensor{A<:AbstractRankTensor,N} <: AbstractArray{A,N}
   array::Array{A,N}

@@ -54,13 +54,13 @@ Type representing reduced algebraic operators used within a reduced order modell
 framework in transient applications. A TransientRBOperator should contain the
 following information:
 
-- a reduced test and trial space, computed according to [`reduced_fe_space`](@ref)
-- a hyper-reduced residual and jacobian, computed according to [`reduced_weak_form`](@ref)
+- a reduced test and trial space, computed according to `reduced_fe_space`
+- a hyper-reduced residual and jacobian, computed according to `reduced_weak_form`
 
 Subtypes:
 
-- [`GenericTransientRBOperator`](@ref)
-- [`LinearNonlinearTransientRBOperator`](@ref)
+- `GenericTransientRBOperator`
+- `LinearNonlinearTransientRBOperator`
 """
 abstract type TransientRBOperator{O} <: ODEParamOperator{O,SplitDomains} end
 
@@ -77,7 +77,7 @@ end
       rhs::AffineContribution
     end
 
-Transient counterpart of a [`GenericRBOperator`] used in steady problems. Fields:
+Transient counterpart of a `GenericRBOperator`] used in steady problems. Fields:
 
 - `op`: underlying high dimensional FE operator
 - `trial`: reduced trial space
@@ -86,7 +86,7 @@ Transient counterpart of a [`GenericRBOperator`] used in steady problems. Fields
 - `rhs`: hyper-reduced right hand side
 
 The major difference with respect to the steady setting is that the `lhs` is a
-n-tuple of [`AffineContribution`](@ref), where n is the maximum order of the
+n-tuple of `AffineContribution`, where n is the maximum order of the
 time derivatives
 """
 struct GenericTransientRBOperator{O} <: TransientRBOperator{O}
@@ -223,7 +223,7 @@ end
       op_nonlinear::GenericTransientRBOperator{NonlinearParamODE}
     end
 
-Extends the concept of [`GenericTransientRBOperator`](@ref) to accommodate the linear/nonlinear
+Extends the concept of `GenericTransientRBOperator` to accommodate the linear/nonlinear
 splitting of terms in nonlinear applications
 """
 struct LinearNonlinearTransientRBOperator <: TransientRBOperator{LinearNonlinearParamODE}

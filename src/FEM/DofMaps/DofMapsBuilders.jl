@@ -209,8 +209,8 @@ get_univariate_dof_map(f::MultiFieldFESpace) = @notimplemented
     get_sparse_dof_map(trial::FESpace,test::FESpace) -> AbstractDofMap
 
 Returns the index maps related to jacobians in a FE problem. The default output
-is a [`TrivialSparseDofMap`](@ref); when the trial and test spaces are of type
-[`TProductFESpace`](@ref), a [`SparseDofMap`](@ref) is returned.
+is a `TrivialSparseDofMap`; when the trial and test spaces are of type
+`TProductFESpace`, a `SparseDofMap` is returned.
 """
 function get_sparse_dof_map(trial::SingleFieldFESpace,test::SingleFieldFESpace)
   sparsity = SparsityPattern(trial,test)

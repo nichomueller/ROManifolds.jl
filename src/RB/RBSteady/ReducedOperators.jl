@@ -71,13 +71,13 @@ end
 Type representing reduced algebraic operators used within a reduced order modelling
 framework in steady applications. A RBOperator should contain the following information:
 
-- a reduced test and trial space, computed according to [`reduced_fe_space`](@ref)
-- a hyper-reduced residual and jacobian, computed according to [`reduced_weak_form`](@ref)
+- a reduced test and trial space, computed according to `reduced_fe_space`
+- a hyper-reduced residual and jacobian, computed according to `reduced_weak_form`
 
 Subtypes:
 
-- [`GenericRBOperator`](@ref)
-- [`LinearNonlinearRBOperator`](@ref)
+- `GenericRBOperator`
+- `LinearNonlinearRBOperator`
 """
 abstract type RBOperator{O} <: ParamOperator{O,SplitDomains} end
 
@@ -255,7 +255,7 @@ end
       op_nonlinear::GenericRBOperator{NonlinearParamEq}
     end
 
-Extends the concept of [`GenericRBOperator`](@ref) to accommodate the linear/nonlinear
+Extends the concept of `GenericRBOperator` to accommodate the linear/nonlinear
 splitting of terms in nonlinear applications
 """
 struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}

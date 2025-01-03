@@ -3,8 +3,8 @@
 
 Type representing parametric realizations, i.e. samples extracted from a given
 parameter space. Two categories of such realizations are implemented:
-- [`Realization`](@ref).
-- [`TransientRealization`](@ref).
+- `Realization`.
+- `TransientRealization`.
 """
 abstract type AbstractRealization end
 
@@ -72,7 +72,7 @@ num_times(r::TransientRealization) = length(get_times(r))
       t0::T
     end
 
-Most standard implementation of a [`TransientRealization`](@ref).
+Most standard implementation of a `TransientRealization`.
 """
 struct GenericTransientRealization{P,T,A} <: TransientRealization{P,T}
   params::P
@@ -177,9 +177,9 @@ end
     abstract type SamplingStyle end
 
 Subtypes:
-- [`UniformSampling`](@ref)
-- [`NormalSampling`](@ref)
-- [`HaltonSampling`](@ref)
+- `UniformSampling`
+- `NormalSampling`
+- `HaltonSampling`
 """
 abstract type SamplingStyle end
 
@@ -204,7 +204,7 @@ struct HaltonSampling <: SamplingStyle end
 Fields:
 - `param_domain`: domain of definition of the parameters
 - `sampling_style`: distribution on `param_domain` according to which we can
-  sample the parameters (by default it is set to [`HaltonSampling`](@ref))
+  sample the parameters (by default it is set to `HaltonSampling`)
 """
 struct ParamSpace{P<:AbstractVector{<:AbstractVector},S<:SamplingStyle} <: AbstractSet{Realization}
   param_domain::P
@@ -247,7 +247,7 @@ end
 
 Extraction of a set of `nparams` parameters from a given parametric space
 according to the sampling strategy specified in `p`. However, if the keyword
-`random` is set to true, the sampling strategy is set to [`UniformSampling`](@ref)
+`random` is set to true, the sampling strategy is set to `UniformSampling`
 """
 function realization(p::ParamSpace{P,S} where {P,S};nparams=1,kwargs...)
   Realization([_generate_param(p) for i = 1:nparams])
@@ -320,8 +320,8 @@ end
 
 Representation of parametric functions with domain a parametric space.
 Two categories of such functions are implemented:
-- [`ParamFunction`](@ref).
-- [`TransientParamFunction`](@ref).
+- `ParamFunction`.
+- `TransientParamFunction`.
 """
 abstract type AbstractParamFunction{P<:Realization} <: Function end
 

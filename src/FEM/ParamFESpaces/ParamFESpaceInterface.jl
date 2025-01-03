@@ -13,7 +13,7 @@ ParamDataStructures.param_length(f::FESpace) = 0
 
 Parametric extension of a `SingleFieldFESpace` in `Gridap`. The
 FE spaces inhereting are (trial) spaces on which we can easily define a
-[`ParamFEFunction`](@ref).
+`ParamFEFunction`.
 
 Subtypes:
 - TrivialParamFESpace{S} <: SingleFieldParamFESpace{S}

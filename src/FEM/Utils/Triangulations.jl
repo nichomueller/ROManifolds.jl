@@ -135,7 +135,7 @@ end
     is_included(tchild::Triangulation,tparent::Triangulation) -> Bool
 
 Returns true if `tchild` is a triangulation included in `tparent`, false otherwise.
-This condition is not as strong as [`is_parent`](@ref)
+This condition is not as strong as `is_parent`
 """
 function is_included(tchild::Triangulation,tparent::Triangulation)
   tface_to_mface_child = get_tface_to_mface(tchild)

@@ -1,17 +1,17 @@
 """
     abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
 
-Type representing an ordering of dofs in a certain [`FESpace`](@ref). This type
+Type representing an ordering of dofs in a certain `FESpace`. This type
 is used for efficient (lazy) reindexing of the free values of a `FEFunction`
 defined on the aforementioned FESpace. Subtypes:
 
-- [`AbstractTrivialDofMap`](@ref)
-- [`DofMap`](@ref)
-- [`ConstrainedDofMap`](@ref)
-- [`DofMapPortion`](@ref)
-- [`TProductDofMap`](@ref)
-- [`ConstrainedTProductDofMap`](@ref)
-- [`SparseDofMap`](@ref)
+- `AbstractTrivialDofMap`
+- `DofMap`
+- `ConstrainedDofMap`
+- `DofMapPortion`
+- `TProductDofMap`
+- `ConstrainedTProductDofMap`
+- `SparseDofMap`
 """
 abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
 
@@ -54,7 +54,7 @@ end
 """
     invert(i::AbstractDofMap;kwargs...) -> AbstractArray
 
-Calls the function [`invperm`](@ref) on the nonzero entries of `i`, and places
+Calls the function `invperm` on the nonzero entries of `i`, and places
 zeros on the remaining zero entries of `i`. The output has the same size as `i`
 """
 function invert(i::AbstractDofMap;kwargs...)
@@ -119,8 +119,8 @@ end
 Type representing the trivial dof maps, which are returned when we do not desire
 a reindexing of the entries. Subtypes:
 
-- [`TrivialDofMap`](@ref)
-- [`TrivialSparseDofMap`](@ref)
+- `TrivialDofMap`
+- `TrivialSparseDofMap`
 """
 abstract type AbstractTrivialDofMap{Ti} <: AbstractDofMap{1,Ti} end
 
@@ -138,7 +138,7 @@ Base.similar(i::AbstractTrivialDofMap) = i
 In its simples case, it should be conceived as a unit-range from 1 to the number
 of free dofs of a given FE space. The fields `dof_to_cell`, `tface_to_mask` and
 `tface_to_mface` are provided in order to successfully change the underlying
-triangulation via [`change_domain`](@ref), if needed
+triangulation via `change_domain`, if needed
 """
 struct TrivialDofMap{Ti,A<:AbstractVector,B<:AbstractVector} <: AbstractTrivialDofMap{Ti}
   dof_to_cell::Table{Ti,Vector{Ti},Vector{Ti}}
@@ -180,10 +180,10 @@ Fields:
 - `dof_to_cell`: the inverse function of cell_dof_ids in `Gridap`, which associates
   a list of dofs to a given cell
 - `free_vals_box`: D-array containing the indices of the free dofs in `indices`
-- `tface_to_mask`: list returned by [`get_tface_to_mask`](@ref). By default, this
+- `tface_to_mask`: list returned by `get_tface_to_mask`. By default, this
   field considers the `tface_to_mask` associated to the triangulation of the FE
   space. However, when changing the triangulation of the index map via
-  [`change_domain`](@ref), we change the `tface_to_mask`
+  `change_domain`, we change the `tface_to_mask`
 - `tface_to_mface`: list of active cells of the triangulation of the FE space we
   consider
 """
@@ -354,7 +354,7 @@ end
       dof_to_constraint_mask::Vector{Bool}
     end
 
-Same as a [`DofMap`](@ref), but contains an additional field `dof_to_constraint_mask`
+Same as a `DofMap`, but contains an additional field `dof_to_constraint_mask`
 which tracks the constrained dofs. If a dof is constrained, a zero is shown at its
 place
 """
@@ -495,7 +495,7 @@ get_univariate_dof_map(i::TProductDofMap) = i.indices_1d
 """
     ConstrainedTProductDofMap{D,Ti} <: AbstractDofMap{D,Ti}
 
-Same as a [`TProductDofMap`](@ref), but contains an additional field `dof_to_constraint_mask`
+Same as a `TProductDofMap`, but contains an additional field `dof_to_constraint_mask`
 which tracks the constrained dofs. If a dof is constrained, a zero is shown at its
 place
 """

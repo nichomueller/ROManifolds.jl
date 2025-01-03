@@ -3,8 +3,8 @@
 
 Type representing parametric abstract arrays of type A.
 Subtypes:
-- [`ParamArray`](@ref)
-- [`ParamSparseMatrix`](@ref)
+- `ParamArray`
+- `ParamSparseMatrix`
 """
 abstract type AbstractParamArray{T,N,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N} end
 
@@ -17,10 +17,10 @@ const AbstractParamArray3D{T} = AbstractParamArray{T,3,<:AbstractArray{T,3}}
 
 Type representing parametric arrays of type A.
 Subtypes:
-- [`ParamArray`](@ref)
-- [`ConsecutiveParamArray`](@ref)
-- [`TrivialParamArray`](@ref)
-- [`BlockParamArray`](@ref)
+- `ParamArray`
+- `ConsecutiveParamArray`
+- `TrivialParamArray`
+- `BlockParamArray`
 """
 abstract type ParamArray{T,N} <: AbstractParamArray{T,N,Array{T,N}} end
 const ParamVector{T} = ParamArray{T,1}
@@ -32,8 +32,8 @@ const ParamMatrix{T} = ParamArray{T,2}
 
 Type representing parametric abstract sparse matrices of type A.
 Subtypes:
-- [`ParamSparseMatrixCSC`](@ref)
-- [`ParamSparseMatrixCSR`](@ref)
+- `ParamSparseMatrixCSC`
+- `ParamSparseMatrixCSR`
 """
 abstract type ParamSparseMatrix{Tv,Ti,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,A} end
 

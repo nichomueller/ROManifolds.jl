@@ -26,16 +26,16 @@ a standard FEOperator, there are the following novelties:
 
 - a ParamSpace is provided, so that parametric realizations can be extracted
   directly from the ParamFEOperator
-- a FEDofMap is provided, to allow a reindexing of the [`ParamFEFunction`]
+- a FEDofMap is provided, to allow a reindexing of the `ParamFEFunction`]
   representing the problem's solution
 - a function representing a norm matrix is provided, so that errors in the
   desired norm can be automatically computed
 
 Subtypes:
 
-- [`ParamFEOpFromWeakForm`](@ref)
-- [`LinearNonlinearParamFEOperator`](@ref)
-- [`TransientParamFEOperator`](@ref)
+- `ParamFEOpFromWeakForm`
+- `LinearNonlinearParamFEOperator`
+- `TransientParamFEOperator`
 """
 abstract type ParamFEOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: FEOperator end
 const JointParamFEOperator{O<:UnEvalOperatorType} = ParamFEOperator{O,JointDomains}
@@ -222,7 +222,7 @@ CellData.get_domains(op::ParamFEOpFromWeakForm) = op.domains
     set_domains(op::ParamFEOperator,args...) -> JointParamFEOperator
 
 Fixes the triangulations for residual/jacobian; the resulting operator will have
-the trait [`JointDomains`](@ref) activated
+the trait `JointDomains` activated
 """
 set_domains(op::JointParamFEOperator,args...) = op
 
@@ -230,7 +230,7 @@ set_domains(op::JointParamFEOperator,args...) = op
     change_domains(op::ParamFEOperator,args...) -> ParamFEOperator
 
 Changes the triangulations for residual/jacobian; the resulting operator will have
-the same [`TriangulationStyle`](@ref) trait as the one of the input
+the same `TriangulationStyle` trait as the one of the input
 """
 change_domains(op::JointParamFEOperator,args...) = op
 

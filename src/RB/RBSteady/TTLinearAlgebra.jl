@@ -144,7 +144,7 @@ end
     sequential_product(a::AbstractArray,b::AbstractArray...) -> AbstractArray
 
 This function sequentially multiplies the results of several (sequential as well)
-calls to [`contraction`](@ref)
+calls to `contraction`
 """
 function sequential_product(::AbstractArray...)
   @abstractmethod

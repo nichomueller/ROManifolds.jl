@@ -27,8 +27,8 @@ end
     abstract type TProductCellField <: CellField end
 
 Subtypes:
-- [`GenericTProductCellField`](@ref)
-- [`TProductDiffCellField`](@ref)
+- `GenericTProductCellField`
+- `TProductDiffCellField`
 
 """
 abstract type TProductCellField <: CellField end

@@ -1,16 +1,16 @@
 """
     abstract type TransientSnapshots{T,N,D,I,R<:TransientRealization,A} <: Snapshots{T,N,D,I,R,A} end
 
-Transient specialization of a [`Snapshots`](@ref). The dimension `N` of a
+Transient specialization of a `Snapshots`. The dimension `N` of a
 SteadySnapshots is equal to `D` + 2, where `D` represents the number of
 spatial axes, to which a temporal and a parametric dimension are added.
 
 Subtypes:
-- [`TransientGenericSnapshots`](@ref)
-- [`GenericSnapshots`](@ref)
-- [`TransientSnapshotsAtIndices`](@ref)
-- [`TransientReshapedSnapshots`](@ref)
-- [`ModeTransientSnapshots`](@ref)
+- `TransientGenericSnapshots`
+- `GenericSnapshots`
+- `TransientSnapshotsAtIndices`
+- `TransientReshapedSnapshots`
+- `ModeTransientSnapshots`
 """
 abstract type TransientSnapshots{T,N,D,I,R<:TransientRealization,A} <: Snapshots{T,N,D,I,R,A} end
 
@@ -115,7 +115,7 @@ Represents a TransientSnapshots `snaps` whose parametric and temporal ranges
 are restricted to the indices in `prange` and `trange`. This type essentially acts
 as a view for suptypes of TransientSnapshots, at every space location, on
 a selected number of parameter/time indices. An instance of TransientSnapshotsAtIndices
-is created by calling the function [`select_snapshots`](@ref)
+is created by calling the function `select_snapshots`
 """
 struct TransientSnapshotsAtIndices{T,N,D,I,R,A<:TransientSnapshots{T,N,D,I,R},B,C} <: TransientSnapshots{T,N,D,I,R,A}
   snaps::A

@@ -6,16 +6,16 @@ a standard TransientFEOperator, there are the following novelties:
 
 - a TransientParamSpace is provided, so that parametric realizations can be extracted
   directly from the TransientParamFEOperator
-- a FEDofMap is provided, to allow a reindexing of the [`ParamFEFunction`]
+- a FEDofMap is provided, to allow a reindexing of the `ParamFEFunction`]
   representing the problem's solution
 - a function representing a norm matrix is provided, so that errors in the
   desired norm can be automatically computed
 
 Subtypes:
 
-- [`TransientParamFEOpFromWeakForm`](@ref)
-- [`TransientParamLinearFEOpFromWeakForm`](@ref)
-- [`LinearNonlinearTransientParamFEOperator`](@ref)
+- `TransientParamFEOpFromWeakForm`
+- `TransientParamLinearFEOpFromWeakForm`
+- `LinearNonlinearTransientParamFEOperator`
 """
 abstract type TransientParamFEOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamFEOperator{O,T} end
 const JointTransientParamFEOperator{O<:ODEParamOperatorType} = TransientParamFEOperator{O,JointDomains}

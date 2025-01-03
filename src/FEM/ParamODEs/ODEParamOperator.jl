@@ -5,9 +5,9 @@ Parametric extension of the type `ODEOperatorType` in `Gridap`.
 
 Subtypes:
 
-- [`NonlinearParamODE`](@ref)
-- [`LinearParamODE`](@ref)
-- [`LinearNonlinearParamODE`](@ref)
+- `NonlinearParamODE`
+- `LinearParamODE`
+- `LinearNonlinearParamODE`
 """
 abstract type ODEParamOperatorType <: UnEvalOperatorType end
 
@@ -29,12 +29,12 @@ struct LinearNonlinearParamODE <: ODEParamOperatorType end
 """
     abstract type ODEParamOperator{T<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T} end
 
-Parametric extension of the type [`ODEOperator`](@ref) in `Gridap`.
+Parametric extension of the type `ODEOperator` in `Gridap`.
 
 Subtypes:
-- [`ODEParamOpFromTFEOp`](@ref)
-- [`LinearNonlinearParamOpFromTFEOp`](@ref)
-- [`TransientRBOperator`](@ref)
+- `ODEParamOpFromTFEOp`
+- `LinearNonlinearParamOpFromTFEOp`
+- `TransientRBOperator`
 """
 abstract type ODEParamOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T} end
 

@@ -81,9 +81,9 @@ param_typeof(a) = typeof(a)
 
 Type representing generic parametric quantities.
 Subtypes:
-- [`ParamContainer`](@ref)
-- [`AbstractParamArray`](@ref)
-- [`AbstractSnapshots`](@ref)
+- `ParamContainer`
+- `AbstractParamArray`
+- `AbstractSnapshots`
 """
 abstract type AbstractParamContainer{T,N} <: AbstractArray{T,N} end
 

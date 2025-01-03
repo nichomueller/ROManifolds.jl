@@ -6,7 +6,7 @@
       jacobian_reduction::B
     end
 
-Wrapper around a FE solver (e.g. [`FESolver`](@ref) or [`ODESolver`](@ref)) with
+Wrapper around a FE solver (e.g. `FESolver` or `ODESolver`) with
 additional information on the reduced basis (RB) method employed to solve a given
 problem dependent on a set of parameters. A RB method is a projection-based
 reduced order model where
@@ -103,7 +103,7 @@ end
     residual_snapshots(solver::RBSolver,op::ParamOperator,s::AbstractSnapshots;nparams) -> Contribution
     residual_snapshots(solver::RBSolver,op::ODEParamOperator,s::AbstractSnapshots;nparams) -> Contribution
 
-Returns a residual [`Contribution`](@ref) relative to the FE operator `op`. The
+Returns a residual `Contribution` relative to the FE operator `op`. The
 quantity `s` denotes the solution snapshots in which we evaluate the residual. Note
 that we can select a smaller number of parameters `nparams` compared to the
 number of parameters used to compute `s`
@@ -143,7 +143,7 @@ end
     jacobian_snapshots(solver::RBSolver,op::ParamOperator,s::AbstractSnapshots;nparams) -> Contribution
     jacobian_snapshots(solver::RBSolver,op::ODEParamOperator,s::AbstractSnapshots;nparams) -> Tuple{Vararg{Contribution}}
 
-Returns a jacobian [`Contribution`](@ref) relative to the FE operator `op`. The
+Returns a jacobian `Contribution` relative to the FE operator `op`. The
 quantity `s` denotes the solution snapshots in which we evaluate the jacobian. Note
 that we can select a smaller number of parameters `nparams` compared to the
 number of parameters used to compute `s`. In transient settings, the output is a

@@ -5,7 +5,7 @@ Represents a broadcast operation over parametric quantities. This allows to perf
 operations that are usually not allowed in a normal broadcasting setting, e.g.
 adding a scalar to an array of arrays. Subtypes:
 
-- [`ParamBroadcast`]
+- `ParamBroadcast`]
 """
 abstract type AbstractParamBroadcast end
 

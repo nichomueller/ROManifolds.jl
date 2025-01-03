@@ -79,8 +79,8 @@ end
 
 Type representing parametric sparse matrices in CSC format.
 Subtypes:
-- [`ConsecutiveParamSparseMatrixCSC`](@ref)
-- [`GenericParamSparseMatrixCSC`](@ref)
+- `ConsecutiveParamSparseMatrixCSC`
+- `GenericParamSparseMatrixCSC`
 
 """
 abstract type ParamSparseMatrixCSC{Tv,Ti} <: ParamSparseMatrix{Tv,Ti,SparseMatrixCSC{Tv,Ti}} end
@@ -291,8 +291,8 @@ end
 
 Type representing parametric sparse matrices in CSR format.
 Subtypes:
-- [`ConsecutiveParamSparseMatrixCSR`](@ref)
-- [`GenericParamSparseMatrixCSR`](@ref)
+- `ConsecutiveParamSparseMatrixCSR`
+- `GenericParamSparseMatrixCSR`
 
 """
 abstract type ParamSparseMatrixCSR{Bi,Tv,Ti} <: ParamSparseMatrix{Tv,Ti,SparseMatrixCSR{Bi,Tv,Ti}} end

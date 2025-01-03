@@ -6,10 +6,10 @@ representing transient problems (although the implementation in `Gridap`
 differs), parametric problems, and a combination thereof. Could become a supertype
 of `ODEOperatorType` in `Gridap`. Subtypes:
 
-- [`LinearParamEq`](@ref)
-- [`NonlinearParamEq`](@ref)
-- [`LinearNonlinearParamEq`](@ref)
-- [`ODEParamOperatorType`](@ref)
+- `LinearParamEq`
+- `NonlinearParamEq`
+- `LinearNonlinearParamEq`
+- `ODEParamOperatorType`
 """
 abstract type UnEvalOperatorType <: GridapType end
 
@@ -33,8 +33,8 @@ struct LinearNonlinearParamEq <: UnEvalOperatorType end
 
 Subtypes:
 
-- [`JointDomains`](@ref)
-- [`SplitDomains`](@ref)
+- `JointDomains`
+- `SplitDomains`
 """
 abstract type TriangulationStyle <: GridapType end
 
@@ -63,10 +63,10 @@ solving parametric differential problems.
 
 Subtypes:
 
-- [`ParamOpFromFEOp`](@ref)
-- [`LinearNonlinearParamOpFromFEOp`](@ref)
-- [`ODEParamOperator`](@ref)
-- [`RBOperator`](@ref)
+- `ParamOpFromFEOp`
+- `LinearNonlinearParamOpFromFEOp`
+- `ODEParamOperator`
+- `RBOperator`
 """
 abstract type ParamOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: NonlinearOperator end
 
@@ -163,7 +163,7 @@ get_sparse_dof_map_at_domains(op::ParamOperator) = get_sparse_dof_map_at_domains
     allocate_paramcache(op::ParamOperator,μ::Realization,u::AbstractVector
       ) -> ParamOpCache
 
-Similar to [`allocate_odecache`](@ref) in `Gridap`, when dealing with
+Similar to `allocate_odecache` in `Gridap`, when dealing with
 parametric problems
 """
 function allocate_paramcache(
@@ -181,7 +181,7 @@ end
 """
     update_paramcache!(paramcache, op::ParamOperator, μ::Realization) -> ParamOpCache
 
-Similar to [`update_odecache!`](@ref) in `Gridap`, when dealing with
+Similar to `update_odecache!` in `Gridap`, when dealing with
 parametric problems
 """
 function update_paramcache!(paramcache,op::ParamOperator,μ::Realization)
@@ -224,8 +224,8 @@ end
     end
 
 Fields:
-- `op`: [`ParamOperator`](@ref) representing a parametric differential problem
-- `μ`: [`Realization`](@ref) representing the parameters at which the problem is solved
+- `op`: `ParamOperator` representing a parametric differential problem
+- `μ`: `Realization` representing the parameters at which the problem is solved
 - `paramcache`: cache of the problem
 """
 struct ParamNonlinearOperator <: NonlinearOperator

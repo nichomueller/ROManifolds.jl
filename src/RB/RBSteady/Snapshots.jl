@@ -5,15 +5,15 @@ Type representing N-dimensional arrays of snapshots. Subtypes must contain the
 following information:
 
 - data: a (parametric) array
-- realization: a subtype of [`AbstractRealization`](@ref), representing the points
+- realization: a subtype of `AbstractRealization`, representing the points
   in the parameter space used to compute the array `data`
-- dof map: a subtype of [`AbstractDofMap`](@ref), representing a reindexing strategy
+- dof map: a subtype of `AbstractDofMap`, representing a reindexing strategy
   for the array `data`
 
 Subtypes:
 
-- [`Snapshots`](@ref)
-- [`BlockSnapshots`](@ref)
+- `Snapshots`
+- `BlockSnapshots`
 """
 abstract type AbstractSnapshots{T,N} <: AbstractParamContainer{T,N} end
 
@@ -36,13 +36,13 @@ Type representing a collection of parametric abstract arrays of eltype `T`,
 that are associated with a realization of type `R`. The (spatial)
 entries of any instance of `Snapshots` are indexed according to an index
 map of type `I`:AbstractDofMap{`D`}, where `D` encodes the spatial dimension. Note
-that, as opposed to subtypes of [`AbstractParamArray`](@ref), which are arrays
+that, as opposed to subtypes of `AbstractParamArray`, which are arrays
 of arrays, subtypes of `Snapshots` are arrays of numbers.
 
 Subtypes:
 
-- [`Snapshots`](@ref)
-- [`BlockSnapshots`](@ref)
+- `Snapshots`
+- `BlockSnapshots`
 """
 abstract type Snapshots{T,N,D,I<:AbstractDofMap{D},R<:AbstractRealization,A} <: AbstractSnapshots{T,N} end
 
@@ -83,7 +83,7 @@ end
 """
     flatten_snapshots(s::Snapshots) -> Snapshots
 
-The output snapshots are indexed according to a [`AbstractTrivialDofMap`](@ref)
+The output snapshots are indexed according to a `AbstractTrivialDofMap`
 """
 function flatten_snapshots(s::Snapshots)
   i′ = TrivialDofMap(get_dof_map(s))
@@ -93,14 +93,14 @@ end
 """
     abstract type SteadySnapshots{T,N,D,I,A} <: Snapshots{T,N,D,I,<:Realization,A} end
 
-Spatial specialization of an [`Snapshots`](@ref). The dimension `N` of a
+Spatial specialization of an `Snapshots`. The dimension `N` of a
 SteadySnapshots is equal to `D` + 1, where `D` represents the number of
 spatial axes, to which a parametric dimension is added.
 
 Subtypes:
-- [`GenericSnapshots`](@ref)
-- [`SnapshotsAtIndices`](@ref)
-- [`ReshapedSnapshots`](@ref)
+- `GenericSnapshots`
+- `SnapshotsAtIndices`
+- `ReshapedSnapshots`
 """
 abstract type SteadySnapshots{T,N,D,I,R<:Realization,A} <: Snapshots{T,N,D,I,R,A} end
 
@@ -192,7 +192,7 @@ Represents a SteadySnapshots `snaps` whose parametric range is restricted
 to the indices in `prange`. This type essentially acts as a view for suptypes of
 SteadySnapshots, at every space location, on a selected number of
 parameter indices. An instance of SnapshotsAtIndices is created by calling the
-function [`select_snapshots`](@ref)
+function `select_snapshots`
 """
 struct SnapshotsAtIndices{T,N,D,I,R,A<:SteadySnapshots{T,N,D,I,R},B<:AbstractUnitRange{Int}} <: SteadySnapshots{T,N,D,I,R,A}
   snaps::A
@@ -354,7 +354,7 @@ const SparseSnapshots{T,N,D,I,R} = Union{
     struct BlockSnapshots{S,N} <: AbstractSnapshots{S,N}
 
 Block container for Snapshots of type `S` in a MultiField setting. This
-type is conceived similarly to [`ArrayBlock`](@ref) in Gridap
+type is conceived similarly to `ArrayBlock` in Gridap
 """
 struct BlockSnapshots{S<:Snapshots,N} <: AbstractSnapshots{S,N}
   array::Array{S,N}

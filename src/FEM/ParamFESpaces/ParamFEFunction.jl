@@ -3,8 +3,8 @@
 
 Parametric extension of a `FEFunction` in `Gridap`. Subtypes:
 
-- [`SingleFieldParamFEFunction`](@ref)
-- [`MultiFieldParamFEFunction`](@ref)
+- `SingleFieldParamFEFunction`
+- `MultiFieldParamFEFunction`
 """
 abstract type ParamFEFunction <: FEFunction end
 

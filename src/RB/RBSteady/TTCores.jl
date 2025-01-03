@@ -16,8 +16,8 @@ Type for nonstandard representations of tensor train cores.
 
 Subtypes:
 
-- [`DofMapCore`](@ref)
-- [`SparseCore`](@ref)
+- `DofMapCore`
+- `SparseCore`
 """
 abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
 
@@ -53,8 +53,8 @@ Tensor train cores for sparse matrices.
 
 Subtypes:
 
-- [`SparseCoreCSC`](@ref)
-- [`SparseCoreCSC4D`](@ref)
+- `SparseCoreCSC`
+- `SparseCoreCSC4D`
 """
 abstract type SparseCore{T,N} <: AbstractTTCore{T,N} end
 

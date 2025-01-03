@@ -39,13 +39,13 @@ end
 """
     abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
 
-Type representing the set of interpolation rows of a [`Projection`](@ref) subjected
-to a EIM approximation with [`empirical_interpolation`](@ref).
+Type representing the set of interpolation rows of a `Projection` subjected
+to a EIM approximation with `empirical_interpolation`.
 
 Subtypes:
 
-- [`IntegrationDomain`]
-- [`TransientIntegrationDomain`]
+- `IntegrationDomain`]
+- `TransientIntegrationDomain`]
 """
 abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
 
@@ -96,13 +96,13 @@ end
       C<:AbstractIntegrationDomain
       } <: Projection end
 
-Subtype of a [`Projection`](@ref) dedicated to the outputd of a hyper-reduction
+Subtype of a `Projection` dedicated to the outputd of a hyper-reduction
 (e.g. an empirical interpolation method (EIM)) procedure applied on residual/jacobians
 of a differential problem. This procedure can be summarized in the following steps:
 
 1) compute a snapshots tensor `T`
-2) construct a [`Projection`](@ref) `Φ` by running the function [`reduction`](@ref) on `T`
-3) find the EIM quantities `i`,`Φi` by running the function [`empirical_interpolation`](@ref)
+2) construct a `Projection` `Φ` by running the function `reduction` on `T`
+3) find the EIM quantities `i`,`Φi` by running the function `empirical_interpolation`
 on `Φ`
 
 The triplet (`Φ`, `Φi`,`i`) represents the minimum information needed to run the
@@ -119,8 +119,8 @@ is completely characterized by the triplet (`Φrb`,`Φi`,`i`).
 
 Subtypes:
 
-- [`EmptyHyperReduction`](@ref)
-- [`MDEIM`](@ref)
+- `EmptyHyperReduction`
+- `MDEIM`
 """
 abstract type HyperReduction{A<:Reduction,B<:ReducedProjection,C<:AbstractIntegrationDomain} <: Projection end
 
@@ -129,7 +129,7 @@ HyperReduction(::Reduction,args...) = @abstractmethod
 """
     get_interpolation(a::HyperReduction) -> Factorization
 
-For a [`HyperReduction`](@ref) `a` represented by the triplet (`Φrb`,`Φi`,`i`),
+For a `HyperReduction` `a` represented by the triplet (`Φrb`,`Φi`,`i`),
 returns `Φi`, usually stored as a Factorization
 """
 get_interpolation(a::HyperReduction) = @abstractmethod
@@ -137,7 +137,7 @@ get_interpolation(a::HyperReduction) = @abstractmethod
 """
     get_integration_domain(a::HyperReduction) -> AbstractIntegrationDomain
 
-For a [`HyperReduction`](@ref) `a` represented by the triplet (`Φrb`,`Φi`,`i`),
+For a `HyperReduction` `a` represented by the triplet (`Φrb`,`Φi`,`i`),
 returns `i`
 """
 get_integration_domain(a::HyperReduction) = @abstractmethod
@@ -436,8 +436,8 @@ end
 """
     reduced_residual(red::Reduction,test::RBSpace,c::ArrayContribution) -> AffineContribution
 
-Returns the [`AffineContribution`](@ref) obtained following the hyper-reduction
-of the [`ArrayContribution`](@ref) `c`, which contains a list of residual snapshots
+Returns the `AffineContribution` obtained following the hyper-reduction
+of the `ArrayContribution` `c`, which contains a list of residual snapshots
 defined on a corresponding list of triangulations
 """
 function reduced_residual(red::Reduction,test::RBSpace,c::ArrayContribution)
@@ -454,8 +454,8 @@ end
     reduced_jacobian(red::Reduction,trial::RBSpace,test::RBSpace,c::ArrayContribution) -> AffineContribution
     reduced_jacobian(red::Reduction,trial::RBSpace,test::RBSpace,c::Tuple) -> Tuple{Vararg{AffineContribution}}
 
-Returns the [`AffineContribution`](@ref) obtained following the hyper-reduction
-of the [`ArrayContribution`](@ref) `c`, which contains a list of jacobian snapshots
+Returns the `AffineContribution` obtained following the hyper-reduction
+of the `ArrayContribution` `c`, which contains a list of jacobian snapshots
 defined on a corresponding list of triangulations. In transient applications, `c`
 is a tuple of contributions, thus the output will correspondingly be a tuple of
 `AffineContribution`
@@ -475,7 +475,7 @@ end
 
 Reduces the residual/jacobian contained in `op` via hyper-reduction. This function
 first builds the residual/jacobian snapshots, and then calls the functions
-[`reduced_residual`](@ref) and [`reduced_jacobian`](@ref)
+`reduced_residual` and `reduced_jacobian`
 """
 function reduced_weak_form(solver::RBSolver,op,red_trial::RBSpace,red_test::RBSpace,s::AbstractArray)
   jac = jacobian_snapshots(solver,op,s)

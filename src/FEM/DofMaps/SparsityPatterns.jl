@@ -28,9 +28,9 @@ Type used to represent the sparsity pattern of a sparse matrix, usually the
 jacobian in a FE problem.
 
 Subtypes:
-- [`SparsityCSC`](@ref)
-- [`OrderedSparsityPattern`](@ref)
-- [`TProductSparsityPattern`](@ref)
+- `SparsityCSC`
+- `OrderedSparsityPattern`
+- `TProductSparsityPattern`
 """
 abstract type SparsityPattern end
 
@@ -181,10 +181,10 @@ end
     abstract type OrderedSparsityPattern <: SparsityPattern end
 
 Type used to represent an ordered sparsity pattern, obtained by calling the
-function [`order_sparsity`](@ref) on an unordered sparsity pattern.
+function `order_sparsity` on an unordered sparsity pattern.
 
 Subtypes:
-- [`OrderedSparsity`](@ref)
+- `OrderedSparsity`
 """
 abstract type OrderedSparsityPattern <: SparsityPattern end
 
@@ -328,11 +328,11 @@ Type used to represent a sparsity pattern of a matrix obtained by integrating a
 bilinear form on a triangulation that can be obtained as the tensor product of a
 1-d triangulations. For example, this can be done when the mesh is Cartesian, and
 the discretizing elements are cubes. Subtypes of TProductSparsityPattern can be
-used to build a non-trivial sparse dof map with [`get_sparse_dof_map`](@ref).
+used to build a non-trivial sparse dof map with `get_sparse_dof_map`.
 
 Subtypes:
-- [`TProductSparsity`](@ref)
-- [`SparsityToTProductSparsity`](@ref)
+- `TProductSparsity`
+- `SparsityToTProductSparsity`
 """
 abstract type TProductSparsityPattern <: SparsityPattern end
 
@@ -399,7 +399,7 @@ end
 """
     order_sparse_dof_map(a::TProductSparsityPattern,sparse_dof_map,I,J) -> AbstractArray
 
-Orders the sparse dof map defined in [`get_sparse_dof_map`](@ref). Note that the
+Orders the sparse dof map defined in `get_sparse_dof_map`. Note that the
 function returns exactly the input if the interpolation order is 1, and in all other
 cases the output differs from the input
 """

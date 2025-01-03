@@ -7,8 +7,8 @@ in `Gridap` for more details.
 
 Subtypes:
 
-- [`ArrayContribution`](@ref)
-- [`AffineContribution`](@ref)
+- `ArrayContribution`
+- `AffineContribution`
 """
 abstract type Contribution end
 
