@@ -54,7 +54,7 @@ Arrays.evaluate(f::TrivialParamField,x::Point) = fill(evaluate(f.field,x),f.plen
       data::Vector{T}
     end
 
-Parametric extension of a GenericField in [`Gridap`](@ref)
+Parametric extension of a GenericField in `Gridap`
 """
 struct GenericParamField{T<:GenericField} <: ParamField
   data::Vector{T}
@@ -73,7 +73,7 @@ Arrays.evaluate!(cache,f::GenericParamField,x::Point) = map(o->evaluate!(cache,o
       object::F
     end
 
-Parametric extension of a FieldGradient in [`Gridap`](@ref)
+Parametric extension of a FieldGradient in `Gridap`
 """
 struct ParamFieldGradient{N,F} <: ParamField
   object::F
@@ -103,7 +103,7 @@ end
       data::Vector{T}
     end
 
-Parametric extension of a OperationField in [`Gridap`](@ref)
+Parametric extension of a OperationField in `Gridap`
 """
 struct OperationParamField{T<:Fields.OperationField} <: ParamField
   data::Vector{T}

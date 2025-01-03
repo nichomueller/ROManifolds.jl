@@ -6,7 +6,7 @@ abstract type PartialFunctions <: Map end
 """
     struct PartialDerivative{N} <: PartialFunctions end
 
-Map that implements a partial derivative in [`Gridap`](@ref)
+Map that implements a partial derivative in `Gridap`
 """
 struct PartialDerivative{N} <: PartialFunctions end
 

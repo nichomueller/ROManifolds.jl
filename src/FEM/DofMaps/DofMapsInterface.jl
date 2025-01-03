@@ -2,7 +2,7 @@
     abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
 
 Type representing an ordering of dofs in a certain [`FESpace`](@ref). This type
-is used for efficient (lazy) reindexing of the free values of a [`FEFunction`](@ref)
+is used for efficient (lazy) reindexing of the free values of a `FEFunction`
 defined on the aforementioned FESpace. Subtypes:
 
 - [`AbstractTrivialDofMap`](@ref)
@@ -177,7 +177,7 @@ end
 
 Fields:
 - `indices`: D-array of indices corresponding to the reordered dofs
-- `dof_to_cell`: the inverse function of cell_dof_ids in [`Gridap`](@ref), which associates
+- `dof_to_cell`: the inverse function of cell_dof_ids in `Gridap`, which associates
   a list of dofs to a given cell
 - `free_vals_box`: D-array containing the indices of the free dofs in `indices`
 - `tface_to_mask`: list returned by [`get_tface_to_mask`](@ref). By default, this

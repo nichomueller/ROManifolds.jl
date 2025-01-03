@@ -279,7 +279,7 @@ end
     end
 
 Represents a SteadySnapshots `snaps` whose size is resized to `size`. This struct
-is equivalent to [`ReshapedArray`](@ref), and is only used to make sure the result
+is equivalent to `ReshapedArray`, and is only used to make sure the result
 of this operation is still a subtype of SteadySnapshots
 """
 struct ReshapedSnapshots{T,N,N′,D,I,R,A<:SteadySnapshots{T,N′,D,I,R},B} <: SteadySnapshots{T,N,D,I,R,A}
@@ -354,7 +354,7 @@ const SparseSnapshots{T,N,D,I,R} = Union{
     struct BlockSnapshots{S,N} <: AbstractSnapshots{S,N}
 
 Block container for Snapshots of type `S` in a MultiField setting. This
-type is conceived similarly to [`ArrayBlock`](@ref) in [`Gridap`](@ref)
+type is conceived similarly to [`ArrayBlock`](@ref) in Gridap
 """
 struct BlockSnapshots{S<:Snapshots,N} <: AbstractSnapshots{S,N}
   array::Array{S,N}

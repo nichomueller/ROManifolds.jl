@@ -47,6 +47,21 @@ function RBSteady.reduced_operator(
   LinearNonlinearTransientRBOperator(red_op_lin,red_op_nlin)
 end
 
+"""
+    abstract type TransientRBOperator{O} <: ODEParamOperator{O,SplitDomains} end
+
+Type representing reduced algebraic operators used within a reduced order modelling
+framework in transient applications. A TransientRBOperator should contain the
+following information:
+
+- a reduced test and trial space, computed according to [`reduced_fe_space`](@ref)
+- a hyper-reduced residual and jacobian, computed according to [`reduced_weak_form`](@ref)
+
+Subtypes:
+
+- [`GenericTransientRBOperator`](@ref)
+- [`LinearNonlinearTransientRBOperator`](@ref)
+"""
 abstract type TransientRBOperator{O} <: ODEParamOperator{O,SplitDomains} end
 
 function RBSteady.allocate_rbcache(fesolver::ODESolver,op::RBOperator,args...)

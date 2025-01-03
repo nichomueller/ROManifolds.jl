@@ -13,3 +13,12 @@ This package provides a set of tools for the solution of parameterized partial d
 ## Future work
 
 We envision two main developments for the library. Firstly, the development of a scalable, distributed-in-memory interface. Secondly, the extension to nonlinear ROMs, for example models with an autoencoder-like structure, which have alredy been proven to be effective in the literature.
+
+## Manual
+
+```@contents
+Pages = [
+  "Utils.md",
+  "DofMaps.md",
+  ]
+```

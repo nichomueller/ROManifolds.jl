@@ -33,7 +33,7 @@ end
 
 Wrapper for the evolution of a differential problem represented by
 the field `odeop`, and solved by means of the ode solver `solver`. Parametric
-extension of the type [`ODESolution`](@ref) in [`Gridap`](@ref)
+extension of the type `ODESolution` in `Gridap`
 """
 struct ODEParamSolution{V} <: ODESolution
   solver::ODESolver

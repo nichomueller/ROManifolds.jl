@@ -19,11 +19,22 @@ get_decomposition(a::AbstractRankTensor) = ntuple(k -> get_decomposition(a,k),Va
     get_decomposition(a::AbstractRankTensor,k::Integer) -> Vector{<:AbstractArray}
 
 For a tensor `a` of dimension `D` and rank `K` assuming the form
+
 a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k
+
 returns the decomposition relative to the kth rank [a_1^k, ⋯, a_D^k]
 """
 get_decomposition(a::AbstractRankTensor,k::Integer) = @abstractmethod
 
+"""
+    struct Rank1Tensor{D,A<:AbstractArray} <: AbstractRankTensor{D,1}
+      factors::Vector{A}
+    end
+
+Structure representing rank-1 tensors, i.e. assuming the form
+
+a = a_1 ⊗ ⋯ ⊗ a_D
+"""
 struct Rank1Tensor{D,A<:AbstractArray} <: AbstractRankTensor{D,1}
   factors::Vector{A}
   function Rank1Tensor(factors::Vector{A}) where A
@@ -41,6 +52,15 @@ function LinearAlgebra.cholesky(a::Rank1Tensor)
   cholesky.(get_factors(a))
 end
 
+"""
+    struct GenericRankTensor{D,K,A<:AbstractArray} <: AbstractRankTensor{D,K}
+      decompositions::Vector{Rank1Tensor{D,A}}
+    end
+
+Structure representing a generic rank-K tensor, i.e. assuming the form
+
+a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k
+"""
 struct GenericRankTensor{D,K,A<:AbstractArray} <: AbstractRankTensor{D,K}
   decompositions::Vector{Rank1Tensor{D,A}}
   function GenericRankTensor(decompositions::Vector{Rank1Tensor{D,A}}) where {D,A}

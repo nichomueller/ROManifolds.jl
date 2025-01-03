@@ -203,7 +203,7 @@ end
 """
     ParamCounter{C}
 
-Extends the concept of a `counter` in [`Gridap`](@ref) to accommodate a parametric setting.
+Extends the concept of a `counter` in `Gridap` to accommodate a parametric setting.
 """
 struct ParamCounter{C}
   counter::C
@@ -286,7 +286,7 @@ end
       plength::Int
     end
 
-Extends the concept of [`InserterCSC`](@ref) in [`Gridap`](@ref) to accommodate
+Extends the concept of `InserterCSC` in `Gridap` to accommodate
 a parametric setting. Tv is the type of the parametric nonzero entries of the
 CSC matrices to be assembled.
 """

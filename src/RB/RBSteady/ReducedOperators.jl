@@ -69,7 +69,7 @@ end
     abstract type RBOperator{O} <: ParamOperator{O,SplitDomains} end
 
 Type representing reduced algebraic operators used within a reduced order modelling
-framework. A RBOperator should contain the following information:
+framework in steady applications. A RBOperator should contain the following information:
 
 - a reduced test and trial space, computed according to [`reduced_fe_space`](@ref)
 - a hyper-reduced residual and jacobian, computed according to [`reduced_weak_form`](@ref)

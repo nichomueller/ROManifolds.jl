@@ -11,7 +11,7 @@ ParamDataStructures.param_length(f::FESpace) = 0
 """
     abstract type SingleFieldParamFESpace{S} <: SingleFieldFESpace end
 
-Parametric extension of a [`SingleFieldFESpace`](@ref) in [`Gridap`](@ref). The
+Parametric extension of a `SingleFieldFESpace` in `Gridap`. The
 FE spaces inhereting are (trial) spaces on which we can easily define a
 [`ParamFEFunction`](@ref).
 

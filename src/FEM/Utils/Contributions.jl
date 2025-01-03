@@ -2,8 +2,8 @@
     abstract type Contribution end
 
 Represents quantitites whose values vary upon a triangulation. The values can
-be accessed by indexing a the corresponding triangulation. See [`DomainContribution`](@ref)
-in [`Gridap`](@ref) for more details.
+be accessed by indexing a the corresponding triangulation. See DomainContribution
+in `Gridap` for more details.
 
 Subtypes:
 

@@ -6,9 +6,9 @@
     end
 
 Struct representing trial FE spaces that are not evaluated yet. This may include
-FE spaces representing transient problems (although the implementation in [`Gridap`](@ref)
+FE spaces representing transient problems (although the implementation in `Gridap`
 differs), parametric problems, and a combination thereof. Could incorporate
-a [`TransientTrialFESpace`](@ref) in [`Gridap`](@ref) in future versions
+a [`TransientTrialFESpace`](@ref) in `Gridap` in future versions
 """
 struct UnEvalTrialFESpace{A,B} <: SingleFieldFESpace
   space::A

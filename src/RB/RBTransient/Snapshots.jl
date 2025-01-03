@@ -222,7 +222,7 @@ end
     end
 
 Represents a TransientSnapshots `snaps` whose size is resized to `size`. This struct
-is equivalent to [`ReshapedArray`](@ref), and is only used to make sure the result
+is equivalent to `ReshapedArray`, and is only used to make sure the result
 of this operation is still a subtype of TransientSnapshots
 """
 struct TransientReshapedSnapshots{T,N,N′,D,I,R,A<:TransientSnapshots{T,N′,D,I,R},B} <: TransientSnapshots{T,N,D,I,R,A}

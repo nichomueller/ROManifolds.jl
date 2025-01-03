@@ -244,8 +244,7 @@ end
 """
     param_return_value(f::Union{Function,Map},A...) -> Any
 
-Generalization of [`return_value`](@ref) to the parametric case
-
+Generalization of the `Gridap` function `return_value` to the parametric case
 """
 function param_return_value(f::Union{Function,Map},A...)
   pA = to_param_quantities(A...)
@@ -257,8 +256,7 @@ end
 """
     param_return_cache(f::Union{Function,Map},A...) -> Any
 
-Generalization of [`return_cache`](@ref) to the parametric case
-
+Generalization of the `Gridap` function `return_cache` to the parametric case
 """
 function param_return_cache(f::Union{Function,Map},A...)
   pA = to_param_quantities(A...)
@@ -278,8 +276,7 @@ end
 """
     param_evaluate!(C,f::Union{Function,Map},A...) -> Any
 
-Generalization of [`evaluate!`](@ref) to the parametric case
-
+Generalization of the `Gridap` function `evaluate!` to the parametric case
 """
 function param_evaluate!(C,f::Union{Function,Map},A...)
   cache,data = C
