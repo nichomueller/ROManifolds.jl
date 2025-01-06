@@ -176,6 +176,7 @@ export load_solve
 export load_snapshots
 export load_operator
 export load_results
+export plot_a_solution
 include("PostProcess.jl")
 
 end # module

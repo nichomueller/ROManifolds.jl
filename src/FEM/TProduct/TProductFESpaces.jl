@@ -137,7 +137,7 @@ end
 
 function DofMaps.get_dirichlet_entities(spaces::Vector{<:FESpace})
   D = length(spaces)
-  isdirichlet = zeros(Bool,2,D)
+  isdirichlet = zeros(Bool,D,2)
   for (d,space) in enumerate(spaces)
     celldiri = get_cell_is_dirichlet(space)
     isdirichlet[d,1] = first(celldiri)

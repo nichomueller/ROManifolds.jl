@@ -1,8 +1,14 @@
 module SteadyStokesPOD
 
-using ExamplesInterface
+using DrWatson
+using Gridap
+using ROM
 
-pranges = fill((1,10,-1,5,1,2))
+import Gridap.MultiField: BlockMultiFieldStyle
+
+include("ExamplesInterface.jl")
+
+pranges = (1,10,-1,5,1,2)
 pspace = ParamSpace(pranges)
 
 model_dir = datadir(joinpath("models","model_circle_h007.json"))
@@ -28,12 +34,12 @@ g_0(x,μ) = VectorValue(0.0,0.0,0.0)
 g_0(μ) = x->g_0(x,μ)
 gμ_0(μ) = ParamFunction(g_0,μ)
 
-stiffness(μ,(u,p),(v,q),dΩ) = ∫(aμ(μ)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
-res(μ,(u,p),(v,q),dΩ) = stiffness(μ,(u,p),(v,q),dΩ)
+a(μ,(u,p),(v,q),dΩ) = ∫(aμ(μ)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
+l(μ,(u,p),(v,q),dΩ) = a(μ,(u,p),(v,q),dΩ)
 
-trian_res = (Ω,)
-trian_stiffness = (Ω,)
-domains = FEDomains(trian_res,trian_stiffness)
+trian_l = (Ω,)
+trian_a = (Ω,)
+domains = FEDomains(trian_l,trian_a)
 
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 energy((du,dp),(v,q)) = ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
@@ -48,7 +54,7 @@ test_p = TestFESpace(model,reffe_p;conformity=:H1)
 trial_p = TrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,domains)
+feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
 
 fesolver = LinearFESolver(LUSolver())
 
@@ -60,6 +66,6 @@ dir = datadir("stokes_pod")
 create_dir(dir)
 
 tols = [1e-1,1e-2,1e-3,1e-4,1e-5]
-run_test(dir,rbsolver,feop,tols)
+ExamplesInterface.run_test(dir,rbsolver,feop,tols)
 
 end

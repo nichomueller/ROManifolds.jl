@@ -9,7 +9,7 @@ struct SparseDofMapIndexing <: SparseDofMapStyle end
 
 # trivial case
 
-struct TrivialSparseDofMap{A<:SparsityPattern} <: AbstractTrivialDofMap{Int32}
+struct TrivialSparseDofMap{A<:SparsityPattern} <: AbstractTrivialDofMap{Int}
   sparsity::A
 end
 

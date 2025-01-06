@@ -1,12 +1,12 @@
 """
-    struct TransientIntegrationDomain <: AbstractIntegrationDomain{AbstractVector{Int32}}
+    struct TransientIntegrationDomain <: AbstractIntegrationDomain{AbstractVector{Int}}
       indices_space::IntegrationDomain
       indices_time::IntegrationDomain
     end
 
 Integration domain for a projection operator in a transient context
 """
-struct TransientIntegrationDomain <: AbstractIntegrationDomain{AbstractVector{Int32}}
+struct TransientIntegrationDomain <: AbstractIntegrationDomain{AbstractVector{Int}}
   indices_space::IntegrationDomain
   indices_time::IntegrationDomain
 end
@@ -96,9 +96,10 @@ function RBSteady.inv_project!(
   b::AbstractParamArray)
 
   coeff,b̂ = cache
+  o = one(eltype2(b̂))
   interp = RBSteady.get_interpolation(a)
   ldiv!(coeff,interp,vec(b))
-  muladd!(b̂,a,coeff)
+  mul!(b̂,a,coeff,o,o)
   return b̂
 end
 
@@ -187,7 +188,7 @@ function union_indices_space(a::BlockHyperReduction...)
 end
 
 function union_indices_time(a::BlockHyperReduction...)
-  cache = Vector{Int32}[]
+  cache = Vector{Int}[]
   for ai in a
     for i in eachindex(ai)
       if ai.touched[i]

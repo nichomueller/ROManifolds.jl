@@ -1,4 +1,5 @@
 ReferenceFEs.num_components(::Type{<:AbstractArray{T}}) where T = num_components(T)
+ReferenceFEs.num_indep_components(::Type{<:AbstractArray{T}}) where T = num_indep_components(T)
 
 function ReferenceFEs._lagr_dof_cache(node_comp_to_val::AbstractParamVector,ndofs)
   T = eltype2(node_comp_to_val)

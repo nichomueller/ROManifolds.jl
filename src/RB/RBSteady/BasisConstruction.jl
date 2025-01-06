@@ -179,6 +179,19 @@ function ttsvd(
   end
 end
 
+function ttsvd(
+  red_style::UnsafeTTSVDRanks,
+  A::AbstractArray{T,N},
+  X::AbstractRankTensor
+  ) where {T,N}
+
+  # compute euclidean tt cores
+  cores,remainder = ttsvd(red_style,A)
+  # tt orthogonality
+  remainder′ = orthogonalize!(red_style,cores,remainder,X)
+  return cores,remainder′
+end
+
 function steady_ttsvd(
   red_style::TTSVDRanks,
   A::AbstractArray{T,N},

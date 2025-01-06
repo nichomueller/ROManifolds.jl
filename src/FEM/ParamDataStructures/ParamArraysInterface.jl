@@ -272,7 +272,6 @@ function param_return_cache(f::Union{Function,Map},A...)
   return cache,data
 end
 
-
 """
     param_evaluate!(C,f::Union{Function,Map},A...) -> Any
 
@@ -473,6 +472,249 @@ function param_evaluate!(
   return data
 end
 
+# when the map is parametric
+
+const ParamMap = Union{AbstractParamFunction,Broadcasting{<:AbstractParamFunction},BroadcastingFieldOpMap{<:AbstractParamFunction}}
+
+param_length(F::BroadcastingFieldOpMap{<:AbstractParamFunction}) = param_length(F.op)
+param_length(F::Broadcasting{<:AbstractParamFunction}) = param_length(F.f)
+param_getindex(F::BroadcastingFieldOpMap{<:AbstractParamFunction},i::Int) = BroadcastingFieldOpMap(param_getindex(F.op,i))
+param_getindex(F::Broadcasting{<:AbstractParamFunction},i::Int) = Broadcasting(param_getindex(F.f,i))
+Arrays.testitem(F::BroadcastingFieldOpMap{<:AbstractParamFunction}) = param_getindex(F,1)
+Arrays.testitem(F::Broadcasting{<:AbstractParamFunction}) = param_getindex(F,1)
+
+function param_return_value(F::ParamMap,A...)
+  plength = param_length(F)
+  fitem = testitem(F)
+  pA = to_param_quantities(A...;plength)
+  c = return_value(f,map(testitem,pA)...)
+  data = param_array(c,plength)
+  return data
+end
+
+function param_return_cache(F::ParamMap,A...)
+  plength = param_length(F)
+  fitem = testitem(F)
+  pA = to_param_quantities(A...;plength)
+  item = map(testitem,pA)
+  c = return_cache(fitem,item...)
+  d = evaluate!(c,fitem,item...)
+  cache = Vector{typeof(c)}(undef,plength)
+  data = param_array(d,plength)
+  @inbounds for i in 1:plength
+    fi = param_getindex(F,i)
+    cache[i] = return_cache(fi,map(a -> param_getindex(a,i),pA)...)
+  end
+  return cache,data
+end
+
+function param_evaluate!(C,F::ParamMap,A...)
+  cache,data = C
+  plength = param_length(data)
+  B = to_param_quantities(b...;plength)
+  @inbounds for i in 1:plength
+    fi = param_getindex(F,i)
+    vi = evaluate!(cache[i],fi,map(a -> param_getindex(a,i),pA)...)
+    param_setindex!(data,vi,i)
+  end
+  data
+end
+
+# optimizations
+
+function param_return_value(
+  F::ParamMap,
+  A::AbstractParamArray,
+  b::Union{Field,AbstractArray{<:Number}}...)
+
+  @check param_length(F) == param_length(A)
+  v = return_value(testitem(F),testitem(A),b...)
+  pv = fill(v,param_length(F))
+  return ParamArray(pv)
+end
+
+function param_return_value(
+  F::ParamMap,
+  a::Union{Field,AbstractArray{<:Number}},
+  B::AbstractParamArray,
+  c::Union{Field,AbstractArray{<:Number}}...)
+
+  @check param_length(F) == param_length(B)
+  v = return_value(testitem(F),a,testitem(B),c...)
+  pv = fill(v,param_length(B))
+  return ParamArray(pv)
+end
+
+function param_return_value(
+  F::ParamMap,
+  a::Union{Field,AbstractArray{<:Number}},
+  b::Union{Field,AbstractArray{<:Number}},
+  C::AbstractParamArray,
+  D::AbstractParamArray)
+
+  @check param_length(F) == param_length(C) == param_length(D)
+  v = return_value(testitem(F),a,b,testitem(C),testitem(D))
+  pv = fill(v,param_length(C))
+  return ParamArray(pv)
+end
+
+function param_return_value(
+  F::ParamMap,
+  a::Union{Field,AbstractArray{<:Number}},
+  b::Union{Field,AbstractArray{<:Number}},
+  C::AbstractParamArray,
+  d::Union{Field,AbstractArray{<:Number}}...)
+
+  @check param_length(F) == param_length(C)
+  v = return_value(testitem(F),a,b,testitem(C),d...)
+  pv = fill(v,param_length(C))
+  return ParamArray(pv)
+end
+
+function param_return_cache(
+  F::ParamMap,
+  A::AbstractParamArray,
+  b::Union{Field,AbstractArray{<:Number}}...)
+
+  @check param_length(F) == param_length(A)
+  f = testitem(F)
+  a = testitem(A)
+  c = return_cache(f,a,b...)
+  cx = evaluate!(c,f,a,b...)
+  cache = Vector{typeof(c)}(undef,param_length(A))
+  data = Vector{typeof(cx)}(undef,param_length(A))
+  @inbounds for i = param_eachindex(A)
+    cache[i] = return_cache(param_getindex(F,i),param_getindex(A,i),b...)
+  end
+  pdata = ParamArray(data)
+  return cache,pdata
+end
+
+function param_return_cache(
+  F::ParamMap,
+  a::Union{Field,AbstractArray{<:Number}},
+  B::AbstractParamArray,
+  c::Union{Field,AbstractArray{<:Number}}...)
+
+  @check param_length(F) == param_length(B)
+  f = testitem(F)
+  b = testitem(B)
+  c′ = return_cache(f,a,b,c...)
+  cx = evaluate!(c′,f,a,b,c...)
+  cache = Vector{typeof(c′)}(undef,param_length(B))
+  data = Vector{typeof(cx)}(undef,param_length(B))
+  @inbounds for i = param_eachindex(B)
+    cache[i] = return_cache(param_getindex(F,i),a,param_getindex(B,i),c...)
+  end
+  pdata = ParamArray(data)
+  return cache,pdata
+end
+
+function param_return_cache(
+  F::ParamMap,
+  a::Union{Field,AbstractArray{<:Number}},
+  b::Union{Field,AbstractArray{<:Number}},
+  C::AbstractParamArray,
+  D::AbstractParamArray)
+
+  @check param_length(F) == param_length(C) == param_length(D)
+  f = testitem(F)
+  c = testitem(C)
+  d = testitem(D)
+  c′ = return_cache(f,a,b,c,d)
+  cx = evaluate!(c′,f,a,b,c,d)
+  cache = Vector{typeof(c′)}(undef,param_length(C))
+  data = Vector{typeof(cx)}(undef,param_length(C))
+  @inbounds for i = param_eachindex(C)
+    cache[i] = return_cache(param_getindex(F,i),a,b,param_getindex(C,i),param_getindex(D,i))
+  end
+  pdata = ParamArray(data)
+  return cache,pdata
+end
+
+function param_return_cache(
+  F::ParamMap,
+  a::Union{Field,AbstractArray{<:Number}},
+  b::Union{Field,AbstractArray{<:Number}},
+  C::AbstractParamArray,
+  d::Union{Field,AbstractArray{<:Number}}...)
+
+  @check param_length(F) == param_length(C)
+  f = testitem(F)
+  c = testitem(C)
+  c′ = return_cache(f,a,b,c,d...)
+  cx = evaluate!(c′,f,a,b,c,d...)
+  cache = Vector{typeof(c′)}(undef,param_length(C))
+  data = Vector{typeof(cx)}(undef,param_length(C))
+  @inbounds for i = param_eachindex(C)
+    cache[i] = return_cache(param_getindex(F,i),a,b,param_getindex(C,i),d...)
+  end
+  pdata = ParamArray(data)
+  return cache,pdata
+end
+
+function param_evaluate!(
+  C,
+  F::ParamMap,
+  A::AbstractParamArray,
+  b::Union{Field,AbstractArray{<:Number}}...)
+
+  cache,data = C
+  @inbounds for i = param_eachindex(A)
+    vi = evaluate!(cache[i],param_getindex(F,i),param_getindex(A,i),b...)
+    param_setindex!(data,vi,i)
+  end
+  return data
+end
+
+function param_evaluate!(
+  C,
+  F::ParamMap,
+  a::Union{Field,AbstractArray{<:Number}},
+  B::AbstractParamArray,
+  c::Union{Field,AbstractArray{<:Number}}...)
+
+  cache,data = C
+  @inbounds for i = param_eachindex(B)
+    vi = evaluate!(cache[i],param_getindex(F,i),a,param_getindex(B,i),c...)
+    param_setindex!(data,vi,i)
+  end
+  return data
+end
+
+function param_evaluate!(
+  C′,
+  F::ParamMap,
+  a::Union{Field,AbstractArray{<:Number}},
+  b::Union{Field,AbstractArray{<:Number}},
+  C::AbstractParamArray,
+  D::AbstractParamArray)
+
+  @check param_length(C) == param_length(D)
+  cache,data = C′
+  @inbounds for i = param_eachindex(C)
+    vi = evaluate!(cache[i],param_getindex(F,i),a,b,param_getindex(C,i),param_getindex(D,i))
+    param_setindex!(data,vi,i)
+  end
+  return data
+end
+
+function param_evaluate!(
+  C′,
+  F::ParamMap,
+  a::Union{Field,AbstractArray{<:Number}},
+  b::Union{Field,AbstractArray{<:Number}},
+  C::AbstractParamArray,
+  d::Union{Field,AbstractArray{<:Number}}...)
+
+  cache,data = C′
+  @inbounds for i = param_eachindex(C)
+    vi = evaluate!(cache[i],param_getindex(F,i),a,b,param_getindex(C,i),d...)
+    param_setindex!(data,vi,i)
+  end
+  return data
+end
+
 for T in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamArray3D)
   for S in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamArray3D)
     @eval begin
@@ -589,69 +831,63 @@ for op in (:+,:-,:*)
 
 end
 
-function Arrays.return_cache(
-  f::BroadcastingFieldOpMap{<:AbstractParamFunction},
-  x::Union{Number,AbstractArray{<:Number}}...)
+# when map is parametric
 
-  g = BroadcastingFieldOpMap(testitem(f.op))
-  c = return_cache(g,x...)
-  d = evaluate!(c,g,x...)
-  cache = Vector{typeof(c)}(undef,param_length(f.op))
-  data = param_array(d,param_length(f.op))
-  @inbounds for i in param_eachindex(f.op)
-    g = BroadcastingFieldOpMap(getindex(f.op,i))
-    cache[i] = return_cache(g,x...)
-  end
-  return cache,data
+function Arrays.return_value(F::AbstractParamFunction,args...)
+  param_return_value(F,args...)
 end
 
-function Arrays.evaluate!(
-  C,
-  f::BroadcastingFieldOpMap{<:AbstractParamFunction},
-  x::Union{Number,AbstractArray{<:Number}}...)
-
-  cache,data = C
-  @inbounds for i in param_eachindex(data)
-    g = BroadcastingFieldOpMap(getindex(f.op,i))
-    vi = evaluate!(cache[i],g,x...)
-    param_setindex!(data,vi,i)
-  end
-  data
+function Arrays.return_cache(F::AbstractParamFunction,args...)
+  param_return_cache(F,args...)
 end
 
-function Arrays.return_cache(
-  f::BroadcastingFieldOpMap{<:AbstractParamFunction},
-  A::AbstractParamArray,
-  b::Union{AbstractParamArray,AbstractArray{<:Number}}...)
-
-  plength = param_length(f.op)
-  g = BroadcastingFieldOpMap(testitem(f.op))
-  B = to_param_quantities(b...;plength)
-  c = return_cache(g,testitem(A),testitem.(B)...)
-  d = evaluate!(c,g,testitem(A),testitem.(B)...)
-  cache = Vector{typeof(c)}(undef,plength)
-  data = param_array(d,plength)
-  @inbounds for i in 1:plength
-    g = BroadcastingFieldOpMap(getindex(f.op,i))
-    cache[i] = return_cache(g,param_getindex(A,i),param_getindex.(B,i)...)
-  end
-  return cache,data
+function Arrays.evaluate!(C,F::AbstractParamFunction,args...)
+  param_evaluate!(C,F,args...)
 end
 
-function Arrays.evaluate!(
-  C,
-  f::BroadcastingFieldOpMap{<:AbstractParamFunction},
-  A::AbstractParamArray,
-  b::Union{AbstractParamArray,AbstractArray{<:Number}}...)
+for T in (:Number,:AbstractParamVector,:AbstractParamMatrix,:AbstractParamArray3D)
+  for S in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamArray3D)
+    @eval begin
+      function Arrays.return_value(F::BroadcastingFieldOpMap{<:AbstractParamFunction},A::$T,B::$S)
+        param_return_value(F,A,B)
+      end
 
-  cache,data = C
-  B = to_param_quantities(b...;plength=param_length(f.op))
-  @inbounds for i in param_eachindex(f.op)
-    g = BroadcastingFieldOpMap(getindex(f.op,i))
-    vi = evaluate!(cache[i],g,param_getindex(A,i),param_getindex.(B,i)...)
-    param_setindex!(data,vi,i)
+      function Arrays.return_cache(F::BroadcastingFieldOpMap{<:AbstractParamFunction},A::$T,B::$S)
+        param_return_cache(F,A,B)
+      end
+
+      function Arrays.evaluate!(C,F::BroadcastingFieldOpMap{<:AbstractParamFunction},A::$T,B::$S)
+        param_evaluate!(C,F,A,B)
+      end
+    end
   end
-  data
+  for S in (:Number,:(AbstractVector{<:Number}),:(AbstractMatrix{<:Number}),:(AbstractArray{<:Number,3}))
+    @eval begin
+      function Arrays.return_value(f::BroadcastingFieldOpMap,A::$T,B::$S)
+        param_return_value(f,A,B)
+      end
+
+      function Arrays.return_value(f::BroadcastingFieldOpMap,A::$S,B::$T)
+        param_return_value(f,A,B)
+      end
+
+      function Arrays.return_cache(f::BroadcastingFieldOpMap,A::$T,B::$S)
+        param_return_cache(f,A,B)
+      end
+
+      function Arrays.return_cache(f::BroadcastingFieldOpMap,A::$S,B::$T)
+        param_return_cache(f,A,B)
+      end
+
+      function Arrays.evaluate!(C,f::BroadcastingFieldOpMap,A::$T,B::$S)
+        param_evaluate!(C,f,A,B)
+      end
+
+      function Arrays.evaluate!(C,f::BroadcastingFieldOpMap,A::$S,B::$T)
+        param_evaluate!(C,f,A,B)
+      end
+    end
+  end
 end
 
 function Arrays.return_value(::typeof(*),A::AbstractParamArray,B::AbstractParamArray)

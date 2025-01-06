@@ -363,7 +363,7 @@ function empirical_interpolation(a::TTSVDCores)
   dof_map = get_dof_map(a)
   c = cores2basis(first(cores))
   cache = eim_cache(c)
-  vinds = Vector{Int32}[]
+  vinds = Vector{Int}[]
   for i = eachindex(cores)
     inds,interp = empirical_interpolation!(cache,c)
     push!(vinds,copy(inds))
@@ -459,8 +459,9 @@ function BlockProjection(a::AbstractArray{A},touched::Array{Bool,N}) where {A<:P
 end
 
 Base.ndims(a::BlockProjection) = ndims(a.touched)
-Base.size(a::BlockProjection) = size(a.touched)
-Base.axes(a::BlockProjection) = axes(a.touched)
+Base.size(a::BlockProjection,args...) = size(a.touched,args...)
+Base.axes(a::BlockProjection,args...) = axes(a.touched,args...)
+Base.length(a::BlockProjection) = length(a.touched)
 Base.eachindex(a::BlockProjection) = eachindex(a.touched)
 
 function Base.getindex(a::BlockProjection,i...)

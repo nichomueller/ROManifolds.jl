@@ -77,7 +77,7 @@ end
 function get_dof_map(
   model::CartesianDiscreteModel{D},
   space::UnconstrainedFESpace,
-  diri_entities::AbstractMatrix=fill(false,2,D)
+  diri_entities::AbstractMatrix=fill(false,D,2)
   ) where D
 
   trian = get_triangulation(space)
@@ -475,11 +475,7 @@ end
 function get_comp_to_dofs(::Type{T},space::UnconstrainedFESpace,dof::CellDof) where T
   glue = space.metadata
   ncomps = num_components(T)
-  dof2comp = if isnothing(glue)
-    _get_dofs_to_comp(space,dof)
-  else
-    vcat(glue.free_dof_to_comp...,glue.dirichlet_dof_to_comp...)
-  end
+  dof2comp = _get_dofs_to_comp(space,dof)
   comp2dof = Vector{typeof(dof2comp)}(undef,ncomps)
   for comp in 1:ncomps
     comp2dof[comp] = findall(dof2comp.==comp)

@@ -9,6 +9,7 @@ parameter space. Two categories of such realizations are implemented:
 abstract type AbstractRealization end
 
 param_length(r::AbstractRealization) = length(r)
+param_getindex(r::AbstractRealization,i::Integer) = getindex(r,i)
 
 """
     struct Realization{P<:AbstractVector} <: AbstractRealization
@@ -324,6 +325,10 @@ Two categories of such functions are implemented:
 - `TransientParamFunction`.
 """
 abstract type AbstractParamFunction{P<:Realization} <: Function end
+
+param_length(f::AbstractParamFunction) = length(f)
+param_getindex(f::AbstractParamFunction,i::Integer) = getindex(f,i)
+Arrays.testitem(f::AbstractParamFunction) = param_getindex(f,1)
 
 """
     struct ParamFunction{F,P} <: AbstractParamFunction{P}

@@ -532,7 +532,7 @@ get_univariate_dof_map(i::ConstrainedTProductDofMap) = get_univariate_dof_map(i.
 
 function find_free_values_range(inds,diri_entities,d)
   s_d = size(inds,d)
-  entity_d = view(diri_entities,:,d)
+  entity_d = view(diri_entities,d,:)
   start = first(entity_d) ? 2 : 1
   finish = last(entity_d) ? s_d-1 : s_d
   start:finish
@@ -543,7 +543,7 @@ function find_free_values_box(
   diri_entities::AbstractMatrix{Bool}
   ) where {Ti,D}
 
-  D′ = size(diri_entities,2)
+  D′ = size(diri_entities,1)
   ranges = ntuple(d -> find_free_values_range(inds,diri_entities,d),D′)
   if D != D′
     @assert D == D′+1

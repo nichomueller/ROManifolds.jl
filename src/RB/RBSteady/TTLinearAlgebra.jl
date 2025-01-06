@@ -408,8 +408,8 @@ end
 function get_basis_indices(
   ::Val{1},
   cores_indices::Vector{Vector{Ti}},
-  dof_map::AbstractArray{Ti,D}
-  )::Vector{Ti} where {Ti,D}
+  dof_map::AbstractArray{Ti′,D}
+  )::Vector{Ti} where {Ti,Ti′,D}
 
   Iprev...,Icurr = cores_indices
   get_basis_indices = zeros(Ti,length(Icurr))
@@ -424,8 +424,8 @@ end
 function get_basis_indices(
   ::Val{N},
   cores_indices::Vector{Vector{Ti}},
-  dof_map::AbstractArray{Ti,D}
-  )::Vector{Vector{Ti}} where {Ti,D,N}
+  dof_map::AbstractArray{Ti′,D}
+  )::Vector{Vector{Ti}} where {Ti,Ti′,D,N}
 
   Iprev...,Icurr = cores_indices
   basis_indices = zeros(Ti,length(Icurr),ninds)

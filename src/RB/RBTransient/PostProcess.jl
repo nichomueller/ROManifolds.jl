@@ -72,3 +72,12 @@ function Utils.compute_relative_error(
   end
   return mean(errors)
 end
+
+function RBSteady.plot_a_solution(dir,Ω,uh,ûh,r::TransientRealization)
+  for i in 1:num_times(r)
+    uhi = param_getindex(uh,i)
+    ûhi = param_getindex(ûh,i)
+    ehi = uhi - ûhi
+    writevtk(Ω,dir*"$i.vtu",cellfields=["uh"=>uhi,"ûh"=>ûhi,"eh"=>ehi])
+  end
+end

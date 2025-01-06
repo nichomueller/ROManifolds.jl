@@ -20,7 +20,7 @@ end
 function eim_cache(A::AbstractMatrix)
   m,n = size(A)
   res = zeros(eltype(A),m)
-  I = zeros(Int32,n)
+  I = zeros(Int,n)
   return I,res
 end
 
@@ -52,14 +52,14 @@ abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
 integration_domain(i::AbstractArray) = @abstractmethod
 
 """
-    struct IntegrationDomain <: AbstractIntegrationDomain{Int32}
-      indices::Vector{Int32}
+    struct IntegrationDomain <: AbstractIntegrationDomain{Int}
+      indices::Vector{Int}
     end
 
 Integration domain for a projection operator in a steady context
 """
-struct IntegrationDomain <: AbstractIntegrationDomain{Int32}
-  indices::Vector{Int32}
+struct IntegrationDomain <: AbstractIntegrationDomain{Int}
+  indices::Vector{Int}
 end
 
 integration_domain(i::AbstractVector{<:Number}) = IntegrationDomain(i)
@@ -154,9 +154,10 @@ end
 
 function inv_project!(cache,a::HyperReduction,b::AbstractParamArray)
   coeff,b̂ = cache
+  o = one(eltype2(b̂))
   interp = get_interpolation(a)
   ldiv!(coeff,interp,b)
-  muladd!(b̂,a,coeff)
+  mul!(b̂,a,coeff,o,o)
   return b̂
 end
 

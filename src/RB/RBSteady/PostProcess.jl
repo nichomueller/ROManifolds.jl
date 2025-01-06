@@ -313,3 +313,60 @@ function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnaps
   end
   error
 end
+
+function plot_a_solution(dir,Ω,uh,ûh,r::Realization)
+  uh1 = param_getindex(uh,1)
+  ûh1 = param_getindex(ûh,1)
+  eh1 = uh1 - ûh1
+  writevtk(Ω,dir*".vtu",cellfields=["uh"=>uh1,"ûh"=>ûh1,"eh"=>eh1])
+end
+
+function plot_a_solution(
+  dir,
+  feop::ParamFEOperator,
+  sol::Snapshots,
+  sol_approx::Snapshots,
+  field=1)
+
+  r = get_realization(sol)
+
+  trial = get_trial(feop)(r)
+  U = isa(trial,MultiFieldFESpace) ? trial[field] : trial
+  Ω = get_triangulation(U)
+
+  uh = FEFunction(U,get_values(sol))
+  ûh = FEFunction(U,get_values(sol_approx))
+  dirfield = joinpath(dir,"var_$field")
+
+  plot_a_solution(dirfield,Ω,uh,ûh,r)
+end
+
+function plot_a_solution(
+  dir,
+  feop::ParamFEOperator,
+  sol::BlockSnapshots,
+  sol_approx::BlockSnapshots,
+  args...)
+
+  @check sol.touched == sol_approx.touched
+  for i in eachindex(sol)
+    if sol.touched[i]
+      plot_a_solution(dir,feop,sol[i],sol_approx[i],i)
+    end
+  end
+end
+
+function plot_a_solution(
+  dir,
+  feop::ParamFEOperator,
+  rbop::ParamOperator,
+  fesnaps::AbstractSnapshots,
+  x̂::AbstractParamVector,
+  r::AbstractRealization)
+
+  Û = get_trial(rbop)(r)
+  x = inv_project(Û,x̂)
+  i = get_dof_map(feop)
+  rbsnaps = Snapshots(x,i,r)
+  plot_a_solution(dir,feop,fesnaps,rbsnaps)
+end

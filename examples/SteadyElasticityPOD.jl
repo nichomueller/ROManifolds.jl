@@ -1,9 +1,13 @@
 module SteadyElasticityPOD
 
-using ExamplesInterface
+using DrWatson
+using Gridap
+using ROM
+
+include("ExamplesInterface.jl")
 
 pranges = (1e10,9*1e10,0.25,0.42,-4*1e5,4*1e5,-4*1e5,4*1e5,-4*1e5,4*1e5)
-ptspace = ParamSpace(pranges)
+pspace = ParamSpace(pranges)
 
 domain = (0,1,0,0.5,0,0.25)
 partition = (20,10,10)
@@ -23,24 +27,29 @@ add_tag_from_tags!(labels,"neumann3",[26])
 p(μ) = μ[1]/(2(1+μ[2]))
 
 σ(ε,μ) = λ(μ)*tr(ε)*one(ε) + 2*p(μ)*ε
-σμ(μ) = ParamFunction(ε -> σ(ε,μ),μ)
+σ(μ) = ε -> σ(ε,μ)
+σμ(μ) = ParamFunction(σ,μ)
 
 h1(x,μ) = VectorValue(0.0,0.0,μ[3])
-h1μ(μ) = ParamFunction(x->h1(x,μ),μ)
+h1(μ) = x -> h1(x,μ)
+h1μ(μ) = ParamFunction(h1,μ)
 
 h2(x,μ) = VectorValue(0.0,μ[4],0.0)
-h2μ(μ) = ParamFunction(x->h2(x,μ),μ)
+h2(μ) = x -> h2(x,μ)
+h2μ(μ) = ParamFunction(h2,μ)
 
 h3(x,μ) = VectorValue(μ[5]*x[1],0.0,0.0)
-h3μ(μ) = ParamFunction(x->h3(x,μ),μ)
+h3(μ) = x -> h3(x,μ)
+h3μ(μ) = ParamFunction(h3,μ)
 
 g(x,μ) = VectorValue(0.0,0.0,0.0)
-gμ(μ) = ParamFunction(x->g(x,μ),μ)
+g(μ) = x -> g(x,μ)
+gμ(μ) = ParamFunction(g,μ)
 
 order = 2
 reffe = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
-test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial = TrialParamFESpace(test,gμ)
+test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags="dirichlet")
+trial = ParamTrialFESpace(test,gμ)
 
 degree = 2*order
 dΩ = Measure(Ω,degree)
@@ -49,22 +58,24 @@ dΓ2 = Measure(Γ2,degree)
 dΓ3 = Measure(Γ3,degree)
 
 a(μ,u,v,dΩ) = ∫( ε(v) ⊙ (σμ(μ)∘ε(u)) )*dΩ
-l(μ,u,v,dΩ,dΓ1,dΓ2,dΓ3) = a(μ,u,v,dΩ) - ∫(v⋅h1μ(μ))dΓ1 - ∫(v⋅h2μ(μ))dΓ2 - ∫(v⋅h3μ(μ))dΓ3
+l(μ,u,v,dΓ1,dΓ2,dΓ3) = ∫(v⋅h1μ(μ))dΓ1 + ∫(v⋅h2μ(μ))dΓ2 + ∫(v⋅h3μ(μ))dΓ3 # -a(μ,u,v,dΩ)
 
-trian_l,trian_a = (dΩ,dΓ1,dΓ2,dΓ3),(dΩ,)
+trian_l,trian_a = (Γ1,Γ2,Γ3),(Ω,)
 domains = FEDomains(trian_l,trian_a)
 feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
 
 fesolver = LinearFESolver(LUSolver())
 
+energy(du,v) = ∫(∇(v)⊙∇(du))dΩ
+
 tol = 1e-5
-state_reduction = PODReduction(coupling,tol,energy;nparams=80,sketch=:sprn)
+state_reduction = Reduction(tol,energy;nparams=80,sketch=:sprn)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=40,nparams_jac=40)
 
 dir = datadir("elasticity_pod")
 create_dir(dir)
 
 tols = [1e-1,1e-2,1e-3,1e-4,1e-5]
-run_test(dir,rbsolver,feop,tols)
+ExamplesInterface.run_test(dir,rbsolver,feop,tols)
 
 end

@@ -1,4 +1,23 @@
+"""
+ROM, solution of parameterized partial differential equations (PDEs) with
+reduced order models (ROMs) in the Julia programming language
+
+The module is structured in the following sub-modules:
+
+- [`ROM.Utils`](@ref)
+- [`ROM.DofMaps`](@ref)
+- [`ROM.TProduct`](@ref)
+- [`ROM.ParamDataStructures`](@ref)
+- [`ROM.ParamGeometry`](@ref)
+- [`ROM.ParamAlgebra`](@ref)
+- [`ROM.ParamFESpaces`](@ref)
+- [`ROM.ParamSteady`](@ref)
+- [`ROM.RBSteady`](@ref)
+- [`ROM.RBTransient`](@ref)
+"""
 module ROM
+
+using DocStringExtensions
 
 export PerformanceTracker
 export CostTracker
@@ -374,6 +393,7 @@ export load_solve
 export load_snapshots
 export load_operator
 export load_results
+export plot_a_solution
 
 include("RB/RBSteady/RBSteady.jl")
 using ROM.RBSteady
@@ -401,7 +421,4 @@ export LinearNonlinearTransientRBOperator
 
 include("RB/RBTransient/RBTransient.jl")
 using ROM.RBTransient
-
-# include("Distributed/Distributed.jl")
-# using ROM.Distributed
 end

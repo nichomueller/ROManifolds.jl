@@ -1,4 +1,4 @@
-struct Range2D{I<:AbstractVector,J<:AbstractVector} <: AbstractMatrix{Int32}
+struct Range2D{I<:AbstractVector,J<:AbstractVector} <: AbstractMatrix{Int}
   axis1::I
   axis2::J
   scale::Int

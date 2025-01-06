@@ -1,3 +1,7 @@
+_filter_domains(a) = a
+_filter_domains(a::Tuple) = map(_filter_domains,a)
+_filter_domains(a::TProductTriangulation) = a.trian
+
 """
     struct FEDomains{A,B}
       domains_res::A
@@ -11,6 +15,14 @@ Fields:
 struct FEDomains{A,B}
   domains_res::A
   domains_jac::B
+
+  function FEDomains(domains_res,domains_jac)
+    domains_res′ = _filter_domains(domains_res)
+    domains_jac′ = _filter_domains(domains_jac)
+    A = typeof(domains_res′)
+    B = typeof(domains_jac′)
+    new{A,B}(domains_res′,domains_jac′)
+  end
 end
 
 FEDomains(args...) = FEDomains(nothing,nothing)

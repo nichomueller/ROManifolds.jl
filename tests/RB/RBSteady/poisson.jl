@@ -6,14 +6,14 @@ using ROM
 
 pranges = fill([1,10],3)
 pspace = ParamSpace(pranges)
-model_dir = datadir(joinpath("models","elasticity_3cyl2D.json"))
+model_dir = datadir(joinpath("models","model_circle_short.json"))
 model = DiscreteModelFromFile(model_dir)
 
 order = 1
 degree = 2*order
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
-Γn = BoundaryTriangulation(model,tags=["neumann"])
+Γn = BoundaryTriangulation(model,tags=["outlet"])
 dΓn = Measure(Γn,degree)
 
 a(x,μ) = 1+exp(-x[1]/sum(μ))
@@ -43,7 +43,7 @@ domains = FEDomains(trian_res,trian_stiffness)
 energy(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["walls_p","walls_c","walls","inlet"])
 trial = ParamTrialFESpace(test,gμ)
 feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,domains)
 

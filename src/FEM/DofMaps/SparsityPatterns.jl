@@ -370,8 +370,8 @@ function get_sparse_dof_map(a::TProductSparsityPattern,I,J,i,j)
   tprows = CartesianIndices(unrows)
   tpcols = CartesianIndices(uncols)
 
-  sparse_dof_map = zeros(Int32,unnz...)
-  uid = zeros(Int32,length(uids))
+  sparse_dof_map = zeros(Int,unnz...)
+  uid = zeros(Int,length(uids))
   @inbounds for k = eachindex(I)
     Ik = I[k]
     Jk = J[k]
