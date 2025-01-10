@@ -29,7 +29,7 @@ function BlockArrays._BlockArray(data::AbstractArray{<:AbstractParamArray,N},axe
 end
 
 nblocks(A) = @abstractmethod
-nblocks(A::Union{BlockedUnitRange,BlockArray,BlockParamArray}) = length(blocks(A))
+nblocks(A::Union{BlockArrays.AbstractBlockedUnitRange,BlockArray,BlockParamArray}) = length(blocks(A))
 
 MemoryLayoutStyle(::Type{<:BlockParamArray{T,N,A}}) where {T,N,A} = MemoryLayoutStyle(eltype(A))
 
@@ -139,7 +139,7 @@ function Base.similar(A::BlockParamArray{T,N},::Type{<:AbstractArray{T′,N}}) w
   BlockParamArray(map(a->similar(a,Array{T′,N}),blocks(A)),A.axes)
 end
 
-function Base.similar(A::BlockParamArray{T,N},::Type{S},axes::Vararg{BlockedUnitRange}) where {T,T′,N,S<:AbstractArray{T′,N}}
+function Base.similar(A::BlockParamArray{T,N},::Type{S},axes::Vararg{BlockArrays.AbstractBlockedUnitRange}) where {T,T′,N,S<:AbstractArray{T′,N}}
   A′ = map(eachindex(blocks(A))) do i
     ai = blocks(A)[i]
     axi = map(ax -> blocks(ax)[i],axes)

@@ -23,7 +23,7 @@ degree = 2*(order)+1
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
 
-a(x,μ) = μ[1]*exp(-μ[2])
+a(x,μ) = μ[1]*exp(-μ[2]*x[1])
 a(μ) = x->a(x,μ)
 aμ(μ) = ParamFunction(a,μ)
 

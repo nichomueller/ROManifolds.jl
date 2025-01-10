@@ -244,9 +244,61 @@ function eval_performance(
 
   Û = get_trial(rbop)(r)
   x = inv_project(Û,x̂)
-  i = get_dof_map(feop)
+  i = get_dof_map(fesnaps)
   rbsnaps = Snapshots(x,i,r)
   eval_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats,args...)
+end
+
+function eval_convergence(
+  feop::ParamFEOperator,
+  rbop::ParamOperator,
+  rbsolver::RBSolver,
+  fesnaps::Snapshots,
+  festats::CostTracker,
+  r::AbstractRealization)
+
+  test = get_test(rbop)
+  trial = get_trial(rbop)
+  n = num_free_dofs(test)
+  step = convergence_step(test)
+
+  perfs = ROMPerformance[]
+  for ntol = n:-step:1
+    rbop_ntol = set_rank(rbop,ntol)
+    x̂_ntol,rbstats_ntol = solve(rbsolver,rbop_ntol,r)
+    perf_tol = eval_performance(rbsolver,feop,rbop_ntol,fesnaps,x̂_ntol,festats,rbstats_ntol,r)
+    push!(perfs,perf_tol)
+  end
+
+  return perfs
+end
+
+function eval_convergence(
+  feop::ParamFEOperator,
+  rbop::ParamOperator,
+  rbsolver::RBSolver,
+  fesnaps::BlockSnapshots,
+  festats::CostTracker,
+  r::AbstractRealization)
+
+  test = get_test(rbop)
+  trial = get_trial(rbop)
+  n = num_free_dofs(test)
+
+  map(1:num_fields(test)) do field
+    perfs = ROMPerformance[]
+    ntol = copy(n)
+    nfield = n[field]
+    stepfield = convergence_step(test[field])
+    for nfieldtol = nfield:-stepfield:1
+      ntol[field] = nfieldtol
+      rbop_ntol = set_rank(rbop,ntol)
+      x̂_ntol,rbstats_ntol = solve(rbsolver,rbop_ntol,r)
+      perf_tol = eval_performance(rbsolver,feop,rbop_ntol,fesnaps,x̂_ntol,festats,rbstats_ntol,r)
+      push!(perfs,perf_tol)
+    end
+    return perfs
+  end
 end
 
 function DrWatson.save(dir,perf::ROMPerformance;label="")
@@ -336,7 +388,7 @@ function plot_a_solution(
 
   uh = FEFunction(U,get_values(sol))
   ûh = FEFunction(U,get_values(sol_approx))
-  dirfield = joinpath(dir,"var_$field")
+  dirfield = joinpath(dir,"var$field")
 
   plot_a_solution(dirfield,Ω,uh,ûh,r)
 end
@@ -366,7 +418,7 @@ function plot_a_solution(
 
   Û = get_trial(rbop)(r)
   x = inv_project(Û,x̂)
-  i = get_dof_map(feop)
+  i = get_dof_map(fesnaps)
   rbsnaps = Snapshots(x,i,r)
   plot_a_solution(dir,feop,fesnaps,rbsnaps)
 end

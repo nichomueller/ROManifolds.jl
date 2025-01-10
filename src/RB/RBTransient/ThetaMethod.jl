@@ -131,14 +131,17 @@ end
 
 # utils
 
-function ParamDataStructures.shift!(a::AbstractParamArray,r::TransientRealization,α::Number,β::Number)
-  b = copy(a)
+function ParamDataStructures.shift!(a::ConsecutiveParamVector,r::TransientRealization,α::Number,β::Number)
+  data = get_all_data(a)
+  data′ = copy(data)
   np = num_params(r)
   @assert param_length(a) == param_length(r)
-  for i = param_eachindex(a)
-    it = slow_index(i,np)
+  for ipt = param_eachindex(a)
+    it = slow_index(ipt,np)
     if it > 1
-      a[i] .= α*a[i] + β*b[i-np]
+      for is in axes(data,1)
+        data[is,ipt] = α*data[is,ipt] + β*data′[is,ipt-np]
+      end
     end
   end
 end

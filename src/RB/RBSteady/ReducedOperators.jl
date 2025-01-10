@@ -249,6 +249,14 @@ function fe_residual!(
   return bi
 end
 
+function set_rank(op::GenericRBOperator,rank)
+  test_rank = set_rank(op.test,rank)
+  trial_rank = set_rank(op.trial,rank)
+  lhs_rank = set_rank(op.lhs,rank,rank)
+  rhs_rank = set_rank(op.rhs,rank)
+  GenericRBOperator(op.op,trial_rank,test_rank,lhs_rank,rhs_rank)
+end
+
 """
     struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}
       op_linear::GenericRBOperator{LinearParamEq}
@@ -362,6 +370,12 @@ function Algebra.jacobian!(
   axpy!(1.0,A_lin,A_nlin)
 
   return A_nlin
+end
+
+function set_rank(op::LinearNonlinearRBOperator,rank)
+  op_lin_rank = set_rank(op.op_linear,rank)
+  op_nlin_rank = set_rank(op.op_nonlinear,rank)
+  LinearNonlinearRBOperator(op_lin_rank,op_nlin_rank)
 end
 
 # Solve a POD-MDEIM problem

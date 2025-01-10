@@ -11,12 +11,12 @@ function Algebra.allocate_vector(::PType{V,L},n::Integer) where {V<:AbstractPara
   consecutive_param_array(vector,L)
 end
 
-function Algebra.allocate_vector(::Type{<:BlockParamVector{T}},indices::BlockedUnitRange) where T
+function Algebra.allocate_vector(::Type{<:BlockParamVector{T}},indices::BlockArrays.AbstractBlockedUnitRange) where T
   V = ConsecutiveParamVector{T}
   mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
 end
 
-function Algebra.allocate_vector(::PType{<:BlockParamVector{T},L},indices::BlockedUnitRange) where {T,L}
+function Algebra.allocate_vector(::PType{<:BlockParamVector{T},L},indices::BlockArrays.AbstractBlockedUnitRange) where {T,L}
   V = ConsecutiveParamVector{T}
   PV = ParamType{V,L}
   mortar(map(ids -> allocate_vector(PV,ids),blocks(indices)))

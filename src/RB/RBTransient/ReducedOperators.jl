@@ -217,6 +217,14 @@ function RBSteady.fe_jacobian!(
   end
 end
 
+function RBSteady.set_rank(op::GenericTransientRBOperator,rank)
+  test_rank = set_rank(op.test,rank)
+  trial_rank = set_rank(op.trial,rank)
+  lhs_rank = set_rank(op.lhs,rank,rank)
+  rhs_rank = set_rank(op.rhs,rank)
+  GenericTransientRBOperator(op.op,trial_rank,test_rank,lhs_rank,rhs_rank)
+end
+
 """
     struct LinearNonlinearTransientRBOperator <: TransientRBOperator{LinearNonlinearParamODE}
       op_linear::GenericTransientRBOperator{LinearParamODE}
@@ -307,6 +315,12 @@ function Algebra.jacobian!(
   axpy!(1.0,A_lin,A_nlin)
 
   return A_nlin
+end
+
+function RBSteady.set_rank(op::LinearNonlinearTransientRBOperator,rank)
+  op_lin_rank = set_rank(op.op_linear,rank)
+  op_nlin_rank = set_rank(op.op_nonlinear,rank)
+  LinearNonlinearTransientRBOperator(op_lin_rank,op_nlin_rank)
 end
 
 function Algebra.solve(solver::RBSolver,op::TransientRBOperator,r::TransientRealization)

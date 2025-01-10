@@ -8,31 +8,28 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers
 using GridapSolvers.NonlinearSolvers
 
-θ = 0.5
+include("ExamplesInterface.jl")
+
+θ = 1.0
 dt = 0.0025
 t0 = 0.0
 tf = 40*dt
 
-pranges = (1e10,9*1e10,0.25,0.42,-4*1e5,4*1e5,-4*1e5,4*1e5,-4*1e5,4*1e5)
+pranges = (1e2,5*1e2,0.25,1.25,1e-3,1e-2,1e-3,1e-2)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
 domain = (0,1,0,0.5,0,0.25)
-partition = (20,10,10)
+partition = (20,10,5)
 model = CartesianDiscreteModel(domain,partition)
 labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"dirichlet",[1,3,5,7,13,15,17,19,25])
-add_tag_from_tags!(labels,"neumann1",[22])
-add_tag_from_tags!(labels,"neumann2",[24])
-add_tag_from_tags!(labels,"neumann3",[26])
+add_tag_from_tags!(labels,"dirichlet0",[1,3,5,7,13,15,17,19,25])
+add_tag_from_tags!(labels,"dirichlet",[2,4,6,8,14,16,18,20,26])
 
 Ω = Triangulation(model)
-Γ1 = BoundaryTriangulation(model,tags="neumann1")
-Γ2 = BoundaryTriangulation(model,tags="neumann2")
-Γ3 = BoundaryTriangulation(model,tags="neumann3")
 
-λ(μ) = μ[1]*μ[2]/((1+μ[2])*(1-2*μ[2]))
-p(μ) = μ[1]/(2(1+μ[2]))
+λ(μ) = μ[1]
+p(μ) = μ[2]
 
 # Deformation Gradient
 F(∇u) = one(∇u) + ∇u'
@@ -63,21 +60,13 @@ dSμt(μ,t) = TransientParamFunction(dS,μ,t)
 σ(μ,t) = ∇u -> σ(∇u,μ,t)
 σμt(μ,t) = TransientParamFunction(σ,μ,t)
 
-h1(x,μ,t) = VectorValue(0.0,0.0,μ[3]*exp(sin(2*π*t/tf)))
-h1(μ,t) = x -> h1(x,μ,t)
-h1μt(μ,t) = TransientParamFunction(h1,μ,t)
-
-h2(x,μ,t) = VectorValue(0.0,μ[4]*exp(cos(2*π*t/tf)),0.0)
-h2(μ,t) = x -> h2(x,μ,t)
-h2μt(μ,t) = TransientParamFunction(h2,μ,t)
-
-h3(x,μ,t) = VectorValue(μ[5]*x[1]*(1+t),0.0,0.0)
-h3(μ,t) = x -> h3(x,μ,t)
-h3μt(μ,t) = TransientParamFunction(h3,μ,t)
-
-g(x,μ,t) = VectorValue(0.0,0.0,0.0)
+g(x,μ,t) = VectorValue(0.0,μ[3],μ[4])
 g(μ,t) = x -> g(x,μ,t)
 gμt(μ,t) = TransientParamFunction(g,μ,t)
+
+g0(x,μ,t) = VectorValue(0.0,0.0,0.0)
+g0(μ,t) = x -> g0(x,μ,t)
+g0μt(μ,t) = TransientParamFunction(g0,μ,t)
 
 u0(x,μ) = VectorValue(0.0,0.0,0.0)
 u0(μ) = x->u0(x,μ)
@@ -85,20 +74,17 @@ u0μ(μ) = ParamFunction(u0,μ)
 
 order = 1
 reffe = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
-test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial = TransientTrialParamFESpace(test,gμt)
+test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
+trial = TransientTrialParamFESpace(test,[g0μt,gμt])
 
 degree = 2*order
 dΩ = Measure(Ω,degree)
-dΓ1 = Measure(Γ1,degree)
-dΓ2 = Measure(Γ2,degree)
-dΓ3 = Measure(Γ3,degree)
 
-res(μ,t,u,v,dΓ1,dΓ2,dΓ3) = (-1)*(∫(v⋅h1μt(μ,t))dΓ1 + ∫(v⋅h2μt(μ,t))dΓ2 + ∫(v⋅h3μt(μ,t))dΓ3)
+res(μ,t,u,v,dΩ) = ∫(v⋅∂t(u))dΩ
 mass(μ,t,uₜ,v,dΩ) = ∫(v⋅uₜ)dΩ
 stiffness(μ,t,u,v,dΩ) = ∫(0*v⋅u)dΩ
 
-trian_res = (Γ1,Γ2,Γ3,)
+trian_res = (Ω,)
 trian_jac = (Ω,)
 trian_jac_t = (Ω,)
 domains_lin = FEDomains(trian_res,(trian_jac,trian_jac_t))
@@ -131,8 +117,98 @@ dir = datadir("transient_hyper_elasticity_pod")
 create_dir(dir)
 
 tols = [1e-1,1e-2,1e-3,1e-4,1e-5]
-ExamplesInterface.run_test(dir,rbsolver,feop,tols)
-
-fesnaps, = solution_snapshots(rbsolver,feop,uh0μ)
+ExamplesInterface.run_test(dir,rbsolver,feop,tols,uh0μ)
 
 end
+
+r = realization(ptspace)
+μ = get_params(r).params[1]
+
+_S(∇u,t) = S(∇u,μ,t)
+_S(t) = ∇u -> _S(∇u,t)
+_dS(∇du,∇u,t) = dS(∇du,∇u,μ,t)
+_dS(t) = (∇du,∇u) -> _dS(∇du,∇u,t)
+_g(x,t) = g(x,μ,t)
+_g(t) = x -> _g(x,t)
+_g0(x,t) = g0(x,μ,t)
+_g0(t) = x -> _g0(x,t)
+_σ(∇u,t) = σ(∇u,μ,t)
+_σ(t) = ∇u -> _σ(∇u,t)
+
+_res(t,u,v) = ∫(v⋅∂t(u))dΩ + ∫( (dE∘(∇(v),∇(u))) ⊙ (_S(t)∘∇(u)) )dΩ
+_jac_t(t,u,du,v) = ∫(v⋅du)dΩ
+_jac(t,u,du,v) = ∫( (dE∘(∇(v),∇(u))) ⊙ (_dS(t)∘(∇(du),∇(u))) + ∇(v) ⊙ ( (_S(t)∘∇(u))⋅∇(du) ) )dΩ
+
+U = TransientTrialFESpace(test,[_g0,_g])
+_feop = TransientFEOperator(_res,(_jac,_jac_t),U,test)
+
+_uh0 = interpolate_everywhere(x->VectorValue(0,0,0),U(t0))
+
+uh = solve(fesolver,_feop,t0,tf,_uh0)
+sol = Vector{Float64}[]
+for (tn,uhn) in uh
+  push!(sol,copy(get_free_dof_values(uhn)))
+end
+
+using Gridap.ODEs
+
+odesltn = uh.odesltn
+odeslvr, odeop = odesltn.odeslvr, odesltn.odeop
+t0, us0 = odesltn.t0, odesltn.us0
+
+# Allocate cache
+odecache = allocate_odecache(odeslvr, odeop, t0, us0)
+
+# Starting procedure
+state0, odecache = ode_start(
+  odeslvr, odeop,
+  t0, us0,
+  odecache
+)
+
+# Marching procedure
+first_state = copy.(state0)
+stateF = copy.(state0)
+
+# Unpack inputs
+w0 = state0[1]
+odeslvrcache, odeopcache = odecache
+uθ, sysslvrcache = odeslvrcache
+
+# Unpack solver
+odeslvr = fesolver
+sysslvr = odeslvr.sysslvr
+dt, θ = odeslvr.dt, odeslvr.θ
+
+# Define scheme
+x = stateF[1]
+dtθ = θ * dt
+tx = t0 + dtθ
+function _usx(x)
+  copy!(uθ, w0)
+  axpy!(dtθ, x, uθ)
+  (uθ, x)
+end
+ws = (dtθ, 1)
+
+# Update ODE operator cache
+update_odeopcache!(odeopcache, odeop, tx)
+
+# Create and solve stage operator
+stageop = NonlinearStageOperator(
+  odeop, odeopcache,
+  tx, _usx, ws
+)
+
+sysslvrcache = solve!(x, sysslvr, stageop, sysslvrcache)
+
+# Update state
+tF = t0 + dt
+stateF = ODEs._udate_theta!(stateF, state0, dt, x)
+
+state0 = copy.(stateF)
+stateF = copy.(first_state)
+t0 = tF
+
+odeslvrcache = (uθ, sysslvrcache)
+odecache = (odeslvrcache, odeopcache)

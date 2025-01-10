@@ -86,13 +86,17 @@ end
 
 function update_reduction(red::TransientReduction,tol)
   TransientReduction(
-    update_reduction(red.reduction_space),
+    update_reduction(red.reduction_space,tol),
     update_reduction(red.reduction_time,tol)
     )
 end
 
 function update_reduction(red::TransientMDEIMReduction,tol)
-  TransientMDEIMReduction(update_reduction(red.reduction),red.combine)
+  TransientMDEIMReduction(update_reduction(red.reduction,tol),red.combine)
+end
+
+function update_reduction(red::NTuple{N,TransientMDEIMReduction},tol) where N
+  map(r->update_reduction(r,tol),red)
 end
 
 function update_solver(rbsolver::RBSolver,tol)
@@ -103,11 +107,11 @@ function update_solver(rbsolver::RBSolver,tol)
   RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction)
 end
 
-function run_test(dir::String,rbsolver::RBSolver,feop::ParamFEOperator,tols=[1e-1,1e-2,1e-3,1e-4,1e-5])
-  fesnaps = try_loading_fe_snapshots(dir,rbsolver,feop)
+function run_test(dir::String,rbsolver::RBSolver,feop::ParamFEOperator,tols=[1e-1,1e-2,1e-3,1e-4,1e-5],args...)
+  fesnaps = try_loading_fe_snapshots(dir,rbsolver,feop,args...)
 
   μon = realization(feop;nparams=10,random=true)
-  x,festats = solution_snapshots(rbsolver,feop,μon)
+  x,festats = solution_snapshots(rbsolver,feop,μon,args...)
 
   perfs = ROMPerformance[]
 

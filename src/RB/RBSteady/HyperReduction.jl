@@ -200,6 +200,11 @@ function HyperReduction(
   return EmptyHyperReduction(red,basis)
 end
 
+function set_rank(a::EmptyHyperReduction,rank::Integer...)
+  basis_rank = set_rank(a.basis,rank...)
+  EmptyHyperReduction(a.reduction,basis_rank)
+end
+
 """
     struct MDEIM{A,B,C} <: HyperReduction{A,B,C}
       reduction::A
@@ -248,6 +253,11 @@ function HyperReduction(
   factor = lu(interp)
   domain = integration_domain(indices)
   return MDEIM(red,proj_basis,factor,domain)
+end
+
+function set_rank(a::MDEIM,rank::Integer...)
+  basis_rank = set_rank(a.basis,rank...)
+  MDEIM(a.reduction,basis_rank,a.interpolation,a.domain)
 end
 
 """
@@ -416,6 +426,12 @@ function inv_project!(cache,a::AffineContribution,b::ArrayContribution)
   return hypred
 end
 
+function set_rank(a::AffineContribution,rank...)
+  contribution(get_domains(a)) do trian
+    set_rank(a[trian],rank...)
+  end
+end
+
 function reduced_form(
   red::Reduction,
   args...)
@@ -541,6 +557,36 @@ function union_indices(a::BlockHyperReduction...)
     end
   end
   ArrayBlock(cache,a[1].touched)
+end
+
+function inv_project!(cache,a::BlockHyperReduction,b::ArrayBlock)
+  coeff,hypred = cache
+  for i in eachindex(a)
+    if a.touched[i]
+      inv_project!((coeff[i],blocks(hypred)[i]),a[i],b[i])
+    end
+  end
+  return hypred
+end
+
+for (T,S) in zip((:HyperReduction,:BlockHyperReduction,:AffineContribution),
+                 (:AbstractParamArray,:ArrayBlock,:ArrayContribution))
+  @eval begin
+    function inv_project(a::$T,b::$S)
+      @notimplemented "Must provide cache in advance"
+    end
+  end
+end
+
+function set_rank(a::BlockHyperReduction{A},rank_trial,rank_test) where A
+  hyper_reds = Matrix{A}(undef,size(a))
+  for (i,j) in Iterators.product(1:length(rank_test),1:length(rank_trial))
+    if a.touched[i,j]
+      hyper_reds[i,j] = set_rank(a[i,j],rank_trial[j],rank_test[i])
+    end
+  end
+  hyper_red = BlockProjection(hyper_reds,a.touched)
+  return hyper_red
 end
 
 function Arrays.return_cache(
@@ -691,23 +737,4 @@ function reduced_form(
   red_trian = Utils.merge_triangulations(red_trians)
 
   return hyper_red,red_trian
-end
-
-function inv_project!(cache,a::BlockHyperReduction,b::ArrayBlock)
-  coeff,hypred = cache
-  for i in eachindex(a)
-    if a.touched[i]
-      inv_project!((coeff[i],blocks(hypred)[i]),a[i],b[i])
-    end
-  end
-  return hypred
-end
-
-for (T,S) in zip((:HyperReduction,:BlockHyperReduction,:AffineContribution),
-                 (:AbstractParamArray,:ArrayBlock,:ArrayContribution))
-  @eval begin
-    function inv_project(a::$T,b::$S)
-      @notimplemented "Must provide cache in advance"
-    end
-  end
 end

@@ -76,7 +76,14 @@ the restricted basis on the set of interpolation rows `i`
 """
 empirical_interpolation(a::Projection) = @abstractmethod
 
-rescale(op::Function,x::AbstractArray,b::Projection) = @abstractmethod
+"""
+    set_rank(a::Projection,rank...) -> Projection
+
+Sets the rank of the projection `a` to `rank`
+"""
+set_rank(a::Projection,rank...) = @abstractmethod
+
+convergence_step(a::Projection) = ceil(Int,num_reduced_dofs(a) / 10)
 
 """
     union_bases(a::Projection,b::Projection,args...) -> Projection
@@ -92,6 +99,8 @@ return gram_schmidt(Φab)
 union_bases(a::Projection,b::Projection,args...) = @abstractmethod
 
 gram_schmidt(a::Projection,b::Projection,args...) = gram_schmidt(get_basis(a),get_basis(b),args...)
+
+rescale(op::Function,x::AbstractArray,b::Projection) = @abstractmethod
 
 Base.:+(a::Projection,b::Projection) = union_bases(a,b)
 Base.:-(a::Projection,b::Projection) = union_bases(a,b)
@@ -156,6 +165,11 @@ num_reduced_dofs(a::InvProjection) = num_reduced_dofs(a)
 project(a::InvProjection,x::AbstractArray) = inv_project(a.projection,x)
 inv_project(a::InvProjection,x::AbstractArray) = project(a.projection,x)
 
+function set_rank(a::InvProjection,rank::Integer)
+  a_rank = set_rank(a.projection,rank)
+  InvProjection(a_rank)
+end
+
 """
     abstract type ReducedProjection{A<:AbstractArray} <: Projection end
 
@@ -217,6 +231,16 @@ function projection(red::AffineReduction,s::AbstractMatrix,args...)
   projection(podred,s,args...)
 end
 
+function set_rank(a::ReducedVecProjection,rank::Integer)
+  a_rank = view(a.basis,1:rank,:)
+  ReducedAlgebraicProjection(a_rank)
+end
+
+function set_rank(a::ReducedMatProjection,rank_trial::Integer,rank_test::Integer)
+  a_rank = view(a.basis,1:rank_test,:,1:rank_trial)
+  ReducedAlgebraicProjection(a_rank)
+end
+
 """
     struct PODBasis <: Projection
       basis::AbstractMatrix
@@ -268,6 +292,11 @@ end
 
 function empirical_interpolation(a::PODBasis)
   empirical_interpolation(get_basis(a))
+end
+
+function set_rank(a::PODBasis,rank::Integer)
+  basis_rank = view(get_basis(a),:,1:rank)
+  PODBasis(basis_rank)
 end
 
 function rescale(op::Function,x::AbstractArray,b::PODBasis)
@@ -375,6 +404,13 @@ function empirical_interpolation(a::TTSVDCores)
     end
   end
   return indices,interp
+end
+
+function set_rank(a::TTSVDCores,rank::Integer)
+  cores = get_cores(a)
+  dof_map = get_dof_map(a)
+  cores_rank = [cores[1:end-1]...,view(cores[end],:,:,1:rank)]
+  TTSVDCores(cores_rank,dof_map)
 end
 
 function rescale(op::Function,x::AbstractRankTensor{D},b::TTSVDCores) where D
@@ -525,6 +561,16 @@ for f in (:project,:inv_project)
       return y
     end
   end
+end
+
+function set_rank(a::BlockProjection,rank::Vector{<:Integer})
+  a_rank = BlockProjection(copy(a.array),copy(a.touched))
+  for i in eachindex(a_rank)
+    if a_rank.touched[i]
+      a_rank[i] = set_rank(a_rank[i],rank[i])
+    end
+  end
+  return a_rank
 end
 
 """

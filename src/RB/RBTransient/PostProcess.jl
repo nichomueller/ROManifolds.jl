@@ -74,10 +74,11 @@ function Utils.compute_relative_error(
 end
 
 function RBSteady.plot_a_solution(dir,Ω,uh,ûh,r::TransientRealization)
+  np = num_params(r)
   for i in 1:num_times(r)
-    uhi = param_getindex(uh,i)
-    ûhi = param_getindex(ûh,i)
+    uhi = param_getindex(uh,(i-1)*np+1)
+    ûhi = param_getindex(ûh,(i-1)*np+1)
     ehi = uhi - ûhi
-    writevtk(Ω,dir*"$i.vtu",cellfields=["uh"=>uhi,"ûh"=>ûhi,"eh"=>ehi])
+    writevtk(Ω,dir*"_$i.vtu",cellfields=["uh"=>uhi,"ûh"=>ûhi,"eh"=>ehi])
   end
 end

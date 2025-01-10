@@ -119,6 +119,7 @@ export num_reduced_dofs
 export get_cores
 export project
 export inv_project
+export set_rank
 export enrich!
 include("Projections.jl")
 
@@ -171,6 +172,7 @@ include("ReducedOperators.jl")
 
 export ROMPerformance
 export eval_performance
+export eval_convergence
 export create_dir
 export load_solve
 export load_snapshots

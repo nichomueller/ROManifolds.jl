@@ -6,19 +6,25 @@ using ROM
 
 include("ExamplesInterface.jl")
 
-pranges = (1e10,9*1e10,0.25,0.42,-4*1e5,4*1e5,-4*1e5,4*1e5,-4*1e5,4*1e5)
-pspace = ParamSpace(pranges)
+θ = 0.5
+dt = 0.0025
+t0 = 0.0
+tf = 40*dt
+
+pranges = fill([1,10],3)
+tdomain = t0:dt:tf
+ptspace = TransientParamSpace(pranges,tdomain)
 
 model_dir = datadir(joinpath("models","model_circle_h007.json"))
 model = DiscreteModelFromFile(model_dir)
 labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"neumann",["cylinders"])
+add_tag_from_tags!(labels,"neumann",["outlet"])
 add_tag_from_tags!(labels,"dirichlet",["inlet","walls"])
 
 Ω = Triangulation(model)
 Γn = BoundaryTriangulation(model,tags="neumann")
 
-a(x,μ,t) = 1+exp(-sin(t)^2*x[1]/sum(μ))
+a(x,μ,t) = 1+exp(sin(t)*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
@@ -38,7 +44,8 @@ u0(x,μ) = 0
 u0(μ) = x->u0(x,μ)
 u0μ(μ) = ParamFunction(u0,μ)
 
-degree = 2*order
+order = 1
+degree = 2*order+1
 dΩ = Measure(Ω,degree)
 dΓn = Measure(Γn,degree)
 
@@ -60,17 +67,28 @@ trial = TransientTrialParamFESpace(test,gμt)
 feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,trial,test,domains)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
-fesolver = LinearFESolver(LUSolver())
+fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 tol = 1e-5
 energy(du,v) = ∫(∇(v)⊙∇(du))dΩ
-state_reduction = Reduction(tol,energy;nparams=80,sketch=:sprn)
-rbsolver = RBSolver(fesolver,state_reduction;nparams_res=40,nparams_jac=40)
+state_reduction = TransientReduction(tol,energy;nparams=40,sketch=:sprn)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,nparams_djac=1)
 
 dir = datadir("heateq_pod")
 create_dir(dir)
 
 tols = [1e-1,1e-2,1e-3,1e-4,1e-5]
-ExamplesInterface.run_test(dir,rbsolver,feop,tols)
+ExamplesInterface.run_test(dir,rbsolver,feop,tols,uh0μ)
 
 end
+
+test = rbop.test
+trial = rbop.trial
+n = num_free_dofs(test)
+step = ROM.RBSteady.convergence_step(test)
+
+ntol = n-step
+# for ntol = n:-step:1
+rbop_ntol = ROM.RBSteady.set_rank(rbop,ntol)
+x̂_ntol,rbstats_ntol = solve(rbsolver,rbop_ntol,μon)
+perf_tol = eval_performance(rbsolver,feop,rbop_ntol,x,x̂_ntol,festats,rbstats_ntol,μon)

@@ -388,6 +388,7 @@ export fe_residual!
 
 export ROMPerformance
 export eval_performance
+export eval_convergence
 export create_dir
 export load_solve
 export load_snapshots

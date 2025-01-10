@@ -833,57 +833,45 @@ end
 
 # when map is parametric
 
-function Arrays.return_value(F::AbstractParamFunction,args...)
-  param_return_value(F,args...)
-end
-
-function Arrays.return_cache(F::AbstractParamFunction,args...)
-  param_return_cache(F,args...)
-end
-
-function Arrays.evaluate!(C,F::AbstractParamFunction,args...)
-  param_evaluate!(C,F,args...)
-end
-
 for T in (:Number,:AbstractParamVector,:AbstractParamMatrix,:AbstractParamArray3D)
-  for S in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamArray3D)
+  for S in (:Number,:AbstractParamVector,:AbstractParamMatrix,:AbstractParamArray3D)
     @eval begin
-      function Arrays.return_value(F::BroadcastingFieldOpMap{<:AbstractParamFunction},A::$T,B::$S)
+      function Arrays.return_value(F::ParamMap,A::$T,B::$S)
         param_return_value(F,A,B)
       end
 
-      function Arrays.return_cache(F::BroadcastingFieldOpMap{<:AbstractParamFunction},A::$T,B::$S)
+      function Arrays.return_cache(F::ParamMap,A::$T,B::$S)
         param_return_cache(F,A,B)
       end
 
-      function Arrays.evaluate!(C,F::BroadcastingFieldOpMap{<:AbstractParamFunction},A::$T,B::$S)
+      function Arrays.evaluate!(C,F::ParamMap,A::$T,B::$S)
         param_evaluate!(C,F,A,B)
       end
     end
   end
-  for S in (:Number,:(AbstractVector{<:Number}),:(AbstractMatrix{<:Number}),:(AbstractArray{<:Number,3}))
+  for S in (:(AbstractVector{<:Number}),:(AbstractMatrix{<:Number}),:(AbstractArray{<:Number,3}))
     @eval begin
-      function Arrays.return_value(f::BroadcastingFieldOpMap,A::$T,B::$S)
+      function Arrays.return_value(f::ParamMap,A::$T,B::$S)
         param_return_value(f,A,B)
       end
 
-      function Arrays.return_value(f::BroadcastingFieldOpMap,A::$S,B::$T)
+      function Arrays.return_value(f::ParamMap,A::$S,B::$T)
         param_return_value(f,A,B)
       end
 
-      function Arrays.return_cache(f::BroadcastingFieldOpMap,A::$T,B::$S)
+      function Arrays.return_cache(f::ParamMap,A::$T,B::$S)
         param_return_cache(f,A,B)
       end
 
-      function Arrays.return_cache(f::BroadcastingFieldOpMap,A::$S,B::$T)
+      function Arrays.return_cache(f::ParamMap,A::$S,B::$T)
         param_return_cache(f,A,B)
       end
 
-      function Arrays.evaluate!(C,f::BroadcastingFieldOpMap,A::$T,B::$S)
+      function Arrays.evaluate!(C,f::ParamMap,A::$T,B::$S)
         param_evaluate!(C,f,A,B)
       end
 
-      function Arrays.evaluate!(C,f::BroadcastingFieldOpMap,A::$S,B::$T)
+      function Arrays.evaluate!(C,f::ParamMap,A::$S,B::$T)
         param_evaluate!(C,f,A,B)
       end
     end
