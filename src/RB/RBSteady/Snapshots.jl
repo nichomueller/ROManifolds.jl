@@ -204,9 +204,8 @@ struct SnapshotsAtIndices{T,N,D,I,R,A<:SteadySnapshots{T,N,D,I,R},B<:AbstractUni
 end
 
 function SnapshotsAtIndices(s::SnapshotsAtIndices,prange)
-  old_prange = s.prange
-  @check intersect(old_prange,prange) == prange
-  SnapshotsAtIndices(s.snaps,prange)
+  prange′ = s.prange[prange]
+  SnapshotsAtIndices(s.snaps,prange′)
 end
 
 param_indices(s::SnapshotsAtIndices) = s.prange
@@ -351,7 +350,10 @@ const SparseSnapshots{T,N,D,I,R} = Union{
 # multi field interface
 
 """
-    struct BlockSnapshots{S,N} <: AbstractSnapshots{S,N}
+    struct BlockSnapshots{S<:Snapshots,N} <: AbstractSnapshots{S,N}
+      array::Array{S,N}
+      touched::Array{Bool,N}
+    end
 
 Block container for Snapshots of type `S` in a MultiField setting. This
 type is conceived similarly to `ArrayBlock` in Gridap

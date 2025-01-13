@@ -487,7 +487,7 @@ function param_return_value(F::ParamMap,A...)
   plength = param_length(F)
   fitem = testitem(F)
   pA = to_param_quantities(A...;plength)
-  c = return_value(f,map(testitem,pA)...)
+  c = return_value(fitem,map(testitem,pA)...)
   data = param_array(c,plength)
   return data
 end

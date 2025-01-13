@@ -125,9 +125,9 @@ function run_test(dir::String,rbsolver::RBSolver,feop::ParamFEOperator,tols=[1e-
     create_dir(plot_dir_tol)
 
     rbsolver = update_solver(rbsolver,tol)
-    rbop = try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps)
+    rbop = try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps,args...)
 
-    x̂,rbstats = solve(rbsolver,rbop,μon)
+    x̂,rbstats = solve(rbsolver,rbop,μon,args...)
     perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
     push!(perfs,perf)
 

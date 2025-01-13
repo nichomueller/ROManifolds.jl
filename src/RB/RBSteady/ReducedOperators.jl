@@ -382,14 +382,6 @@ end
 
 function Algebra.solve(
   solver::RBSolver,
-  op::RBOperator{NonlinearParamEq},
-  r::Realization)
-
-  @notimplemented "Split affine from nonlinear operator when running the RB solve"
-end
-
-function Algebra.solve(
-  solver::RBSolver,
   op::RBOperator,
   r::AbstractRealization)
 

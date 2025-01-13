@@ -17,10 +17,10 @@ function time_combinations(fesolver::GeneralizedAlpha2)
 end
 
 function time_combinations(fesolver::ThetaMethod)
-  θ = fesolver.θ
+  dt,θ = fesolver.dt,fesolver.θ
   combine_res(x) = x
   combine_jac(x,y) = θ*x+(1-θ)*y
-  combine_djac(x,y) = θ*(x-y)
+  combine_djac(x,y) = (x-y)/dt
   return combine_res,combine_jac,combine_djac
 end
 
@@ -63,8 +63,9 @@ function RBSteady.solution_snapshots(
   fesolver = get_fe_solver(solver)
   sol = solve(fesolver,feop,r,args...)
   values,stats = collect(sol.odesol)
+  initial_values = collect_initial_values(sol.odesol)
   i = get_dof_map(feop)
-  snaps = Snapshots(values,i,r)
+  snaps = Snapshots(values,initial_values,i,r)
   return snaps,stats
 end
 
@@ -77,8 +78,9 @@ function RBSteady.residual_snapshots(
   fesolver = get_fe_solver(solver)
   sres = select_snapshots(s,nparams)
   us_res = (get_values(sres),)
+  us0_res = get_initial_values(sres)
   r_res = get_realization(sres)
-  b = residual(fesolver,odeop,r_res,us_res)
+  b = residual(fesolver,odeop,r_res,us_res,us0_res)
   ib = get_dof_map_at_domains(odeop)
   return Snapshots(b,ib,r_res)
 end
@@ -92,8 +94,9 @@ function RBSteady.jacobian_snapshots(
   fesolver = get_fe_solver(solver)
   sjac = select_snapshots(s,nparams)
   us_jac = (get_values(sjac),)
+  us0_jac = get_initial_values(sjac)
   r_jac = get_realization(sjac)
-  A = jacobian(fesolver,odeop,r_jac,us_jac)
+  A = jacobian(fesolver,odeop,r_jac,us_jac,us0_jac)
   iA = get_sparse_dof_map_at_domains(odeop)
   jac_reduction = RBSteady.get_jacobian_reduction(solver)
   sA = ()

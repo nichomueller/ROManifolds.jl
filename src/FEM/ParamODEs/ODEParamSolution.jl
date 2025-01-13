@@ -97,6 +97,10 @@ function Base.collect(sol::ODEParamSolution{V}) where V
   return free_values,sol.tracker
 end
 
+function collect_initial_values(sol::ODEParamSolution)
+  sol.us0[1]
+end
+
 function Algebra.solve(
   solver::ODESolver,
   odeop::ODEParamOperator,

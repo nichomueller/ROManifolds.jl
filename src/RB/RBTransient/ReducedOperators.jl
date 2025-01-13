@@ -14,9 +14,10 @@ end
 function RBSteady.reduced_operator(
   solver::RBSolver,
   feop::TransientParamFEOperator,
-  s::AbstractArray)
+  s::AbstractSnapshots,
+  args...)
 
-  red_trial,red_test = reduced_fe_space(solver,feop,s)
+  red_trial,red_test = reduced_fe_space(solver,feop,s,args...)
   odeop = get_algebraic_operator(feop)
   reduced_operator(solver,odeop,red_trial,red_test,s)
 end
@@ -26,7 +27,7 @@ function RBSteady.reduced_operator(
   odeop::ODEParamOperator,
   red_trial::RBSpace,
   red_test::RBSpace,
-  s::AbstractArray)
+  s::AbstractSnapshots)
 
   red_lhs,red_rhs = reduced_weak_form(solver,odeop,red_trial,red_test,s)
   trians_rhs = get_domains(red_rhs)
@@ -40,7 +41,7 @@ function RBSteady.reduced_operator(
   odeop::ODEParamOperator{LinearNonlinearParamODE},
   red_trial::RBSpace,
   red_test::RBSpace,
-  s::AbstractArray)
+  s::AbstractSnapshots)
 
   red_op_lin = reduced_operator(solver,get_linear_operator(odeop),red_trial,red_test,s)
   red_op_nlin = reduced_operator(solver,get_nonlinear_operator(odeop),red_trial,red_test,s)
@@ -143,7 +144,6 @@ function Algebra.residual!(
 
   ufe = ()
   for u in us
-    # inv_project!(u.fe_data,rbcache.trial,u.data) this should already be executed
     ufe = (ufe...,u.fe_data)
   end
   residual!(cache,op,r,ufe,rbcache)
@@ -174,7 +174,6 @@ function Algebra.jacobian!(
 
   ufe = ()
   for u in us
-    # inv_project!(u.fe_data,rbcache.trial,u.data) this should already be executed
     ufe = (ufe...,u.fe_data)
   end
   jacobian!(cache,op,r,ufe,ws,rbcache)
@@ -294,7 +293,7 @@ function Algebra.residual!(
 
   b_nlin = residual!(cache,nlop,r,us,rbcache_nlin)
   axpy!(1.0,b_lin,b_nlin)
-  mul!(b_nlin,A_lin,us[end],true,true)
+  mul!(b_nlin,A_lin,us[2],true,true)
 
   return b_nlin
 end
@@ -323,26 +322,24 @@ function RBSteady.set_rank(op::LinearNonlinearTransientRBOperator,rank)
   LinearNonlinearTransientRBOperator(op_lin_rank,op_nlin_rank)
 end
 
-function Algebra.solve(solver::RBSolver,op::TransientRBOperator,r::TransientRealization)
-  fe_trial = get_fe_trial(op)(r)
-  x = zero_free_values(fe_trial)
-  solve(solver,op,r,x)
-end
-
 function Algebra.solve(
   solver::RBSolver,
-  op::TransientRBOperator{NonlinearParamODE},
+  op::TransientRBOperator,
   r::TransientRealization,
-  x::AbstractParamVector)
+  xh0::Union{Function,AbstractVector})
 
-  @notimplemented "Split affine from nonlinear operator when running the RB solve"
+  fe_trial = get_fe_trial(op)(r)
+  x0 = get_free_dof_values(xh0(get_params(r)))
+  x = zero_free_values(fe_trial)
+  solve(solver,op,r,x,x0)
 end
 
 function Algebra.solve(
   solver::RBSolver,
   op::TransientRBOperator,
   r::TransientRealization,
-  x::AbstractParamVector)
+  x::AbstractParamVector,
+  x0::AbstractParamVector)
 
   fesolver = get_fe_solver(solver)
   trial = get_trial(op)(r)
@@ -350,7 +347,7 @@ function Algebra.solve(
 
   rbcache = allocate_rbcache(fesolver,op,r,x)
 
-  t = @timed solve!(x̂,fesolver,op,r,x,rbcache)
+  t = @timed solve!(x̂,fesolver,op,r,x,x0,rbcache)
   stats = CostTracker(t,nruns=num_params(r),name="RB solver")
 
   return x̂,stats
@@ -471,7 +468,7 @@ function RBSteady.select_at_indices(
   return ConsecutiveParamArray(entries)
 end
 
-function RBSteady.select_at_indices(s::AbstractArray,a::TransientHyperReduction,indices::Range2D)
+function RBSteady.select_at_indices(s::AbstractParamArray,a::TransientHyperReduction,indices::Range2D)
   ids_space = get_indices_space(a)
   ids_param = indices.axis1
   common_ids_time = indices.axis2

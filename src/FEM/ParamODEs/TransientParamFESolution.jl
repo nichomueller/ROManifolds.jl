@@ -89,6 +89,10 @@ function Base.collect(sol::TransientParamFESolution{V}) where V
   return free_values,odesol.tracker
 end
 
+function collect_initial_values(sol::TransientParamFESolution)
+  collect_initial_values(sol.odesol)
+end
+
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperator,

@@ -68,6 +68,7 @@ include("ODEParamOpFromTFEOp.jl")
 include("ThetaMethod.jl")
 
 export ODEParamSolution
+export collect_initial_values
 include("ODEParamSolution.jl")
 
 export TransientParamFESolution

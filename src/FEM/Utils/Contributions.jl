@@ -81,8 +81,8 @@ Base.eltype(::ArrayContribution{T}) where T = T
 Base.eltype(::Type{<:ArrayContribution{T}}) where T = T
 Base.ndims(::ArrayContribution{T,N}) where {T,N} = N
 Base.ndims(::Type{<:ArrayContribution{T,N}}) where {T,N} = N
-Base.copy(a::ArrayContribution) = Contribution(copy(a.values),a.trians)
-Base.copyto!(a::ArrayContribution,b::ArrayContribution) = copyto!(a.values,b.values)
+Base.copy(a::ArrayContribution) = Contribution(copy.(a.values),a.trians)
+Base.copyto!(a::ArrayContribution,b::ArrayContribution) = map(copyto!,a.values,b.values)
 
 Base.sum(a::ArrayContribution) = sum(a.values)
 

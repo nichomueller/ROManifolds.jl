@@ -42,6 +42,7 @@ include("ReductionMethods.jl")
 export TransientSnapshots
 export TransientGenericSnapshots
 export TransientSparseSnapshots
+export TransientSnapshotsWithIC
 export UnfoldingTransientSnapshots
 export ModeTransientSnapshots
 include("Snapshots.jl")

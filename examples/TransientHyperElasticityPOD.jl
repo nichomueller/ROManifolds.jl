@@ -110,8 +110,8 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 tol = 1e-5
 energy(du,v) = ∫(v⋅du)dΩ + ∫(∇(v)⊙∇(du))dΩ
-state_reduction = TransientReduction(tol,energy;nparams=50)
-rbsolver = RBSolver(fesolver,state_reduction;nparams_res=20,nparams_jac=20,nparams_djac=1)
+state_reduction = TransientReduction(tol,energy;nparams=10)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=10,nparams_jac=10,nparams_djac=1)
 
 dir = datadir("transient_hyper_elasticity_pod")
 create_dir(dir)
@@ -121,94 +121,94 @@ ExamplesInterface.run_test(dir,rbsolver,feop,tols,uh0μ)
 
 end
 
-r = realization(ptspace)
-μ = get_params(r).params[1]
+# r = realization(ptspace)
+# μ = get_params(r).params[1]
 
-_S(∇u,t) = S(∇u,μ,t)
-_S(t) = ∇u -> _S(∇u,t)
-_dS(∇du,∇u,t) = dS(∇du,∇u,μ,t)
-_dS(t) = (∇du,∇u) -> _dS(∇du,∇u,t)
-_g(x,t) = g(x,μ,t)
-_g(t) = x -> _g(x,t)
-_g0(x,t) = g0(x,μ,t)
-_g0(t) = x -> _g0(x,t)
-_σ(∇u,t) = σ(∇u,μ,t)
-_σ(t) = ∇u -> _σ(∇u,t)
+# _S(∇u,t) = S(∇u,μ,t)
+# _S(t) = ∇u -> _S(∇u,t)
+# _dS(∇du,∇u,t) = dS(∇du,∇u,μ,t)
+# _dS(t) = (∇du,∇u) -> _dS(∇du,∇u,t)
+# _g(x,t) = g(x,μ,t)
+# _g(t) = x -> _g(x,t)
+# _g0(x,t) = g0(x,μ,t)
+# _g0(t) = x -> _g0(x,t)
+# _σ(∇u,t) = σ(∇u,μ,t)
+# _σ(t) = ∇u -> _σ(∇u,t)
 
-_res(t,u,v) = ∫(v⋅∂t(u))dΩ + ∫( (dE∘(∇(v),∇(u))) ⊙ (_S(t)∘∇(u)) )dΩ
-_jac_t(t,u,du,v) = ∫(v⋅du)dΩ
-_jac(t,u,du,v) = ∫( (dE∘(∇(v),∇(u))) ⊙ (_dS(t)∘(∇(du),∇(u))) + ∇(v) ⊙ ( (_S(t)∘∇(u))⋅∇(du) ) )dΩ
+# _res(t,u,v) = ∫(v⋅∂t(u))dΩ + ∫( (dE∘(∇(v),∇(u))) ⊙ (_S(t)∘∇(u)) )dΩ
+# _jac_t(t,u,du,v) = ∫(v⋅du)dΩ
+# _jac(t,u,du,v) = ∫( (dE∘(∇(v),∇(u))) ⊙ (_dS(t)∘(∇(du),∇(u))) + ∇(v) ⊙ ( (_S(t)∘∇(u))⋅∇(du) ) )dΩ
 
-U = TransientTrialFESpace(test,[_g0,_g])
-_feop = TransientFEOperator(_res,(_jac,_jac_t),U,test)
+# U = TransientTrialFESpace(test,[_g0,_g])
+# _feop = TransientFEOperator(_res,(_jac,_jac_t),U,test)
 
-_uh0 = interpolate_everywhere(x->VectorValue(0,0,0),U(t0))
+# _uh0 = interpolate_everywhere(x->VectorValue(0,0,0),U(t0))
 
-uh = solve(fesolver,_feop,t0,tf,_uh0)
-sol = Vector{Float64}[]
-for (tn,uhn) in uh
-  push!(sol,copy(get_free_dof_values(uhn)))
-end
+# uh = solve(fesolver,_feop,t0,tf,_uh0)
+# sol = Vector{Float64}[]
+# for (tn,uhn) in uh
+#   push!(sol,copy(get_free_dof_values(uhn)))
+# end
 
-using Gridap.ODEs
+# using Gridap.ODEs
 
-odesltn = uh.odesltn
-odeslvr, odeop = odesltn.odeslvr, odesltn.odeop
-t0, us0 = odesltn.t0, odesltn.us0
+# odesltn = uh.odesltn
+# odeslvr, odeop = odesltn.odeslvr, odesltn.odeop
+# t0, us0 = odesltn.t0, odesltn.us0
 
-# Allocate cache
-odecache = allocate_odecache(odeslvr, odeop, t0, us0)
+# # Allocate cache
+# odecache = allocate_odecache(odeslvr, odeop, t0, us0)
 
-# Starting procedure
-state0, odecache = ode_start(
-  odeslvr, odeop,
-  t0, us0,
-  odecache
-)
+# # Starting procedure
+# state0, odecache = ode_start(
+#   odeslvr, odeop,
+#   t0, us0,
+#   odecache
+# )
 
-# Marching procedure
-first_state = copy.(state0)
-stateF = copy.(state0)
+# # Marching procedure
+# first_state = copy.(state0)
+# stateF = copy.(state0)
 
-# Unpack inputs
-w0 = state0[1]
-odeslvrcache, odeopcache = odecache
-uθ, sysslvrcache = odeslvrcache
+# # Unpack inputs
+# w0 = state0[1]
+# odeslvrcache, odeopcache = odecache
+# uθ, sysslvrcache = odeslvrcache
 
-# Unpack solver
-odeslvr = fesolver
-sysslvr = odeslvr.sysslvr
-dt, θ = odeslvr.dt, odeslvr.θ
+# # Unpack solver
+# odeslvr = fesolver
+# sysslvr = odeslvr.sysslvr
+# dt, θ = odeslvr.dt, odeslvr.θ
 
-# Define scheme
-x = stateF[1]
-dtθ = θ * dt
-tx = t0 + dtθ
-function _usx(x)
-  copy!(uθ, w0)
-  axpy!(dtθ, x, uθ)
-  (uθ, x)
-end
-ws = (dtθ, 1)
+# # Define scheme
+# x = stateF[1]
+# dtθ = θ * dt
+# tx = t0 + dtθ
+# function _usx(x)
+#   copy!(uθ, w0)
+#   axpy!(dtθ, x, uθ)
+#   (uθ, x)
+# end
+# ws = (dtθ, 1)
 
-# Update ODE operator cache
-update_odeopcache!(odeopcache, odeop, tx)
+# # Update ODE operator cache
+# update_odeopcache!(odeopcache, odeop, tx)
 
-# Create and solve stage operator
-stageop = NonlinearStageOperator(
-  odeop, odeopcache,
-  tx, _usx, ws
-)
+# # Create and solve stage operator
+# stageop = NonlinearStageOperator(
+#   odeop, odeopcache,
+#   tx, _usx, ws
+# )
 
-sysslvrcache = solve!(x, sysslvr, stageop, sysslvrcache)
+# sysslvrcache = solve!(x, sysslvr, stageop, sysslvrcache)
 
-# Update state
-tF = t0 + dt
-stateF = ODEs._udate_theta!(stateF, state0, dt, x)
+# # Update state
+# tF = t0 + dt
+# stateF = ODEs._udate_theta!(stateF, state0, dt, x)
 
-state0 = copy.(stateF)
-stateF = copy.(first_state)
-t0 = tF
+# state0 = copy.(stateF)
+# stateF = copy.(first_state)
+# t0 = tF
 
-odeslvrcache = (uθ, sysslvrcache)
-odecache = (odeslvrcache, odeopcache)
+# odeslvrcache = (uθ, sysslvrcache)
+# odecache = (odeslvrcache, odeopcache)

@@ -51,17 +51,18 @@ function Algebra.residual(
   solver::ThetaMethod,
   odeop::ODEParamOperator,
   r::TransientRealization,
-  state0::NTuple{1,AbstractVector})
+  state::NTuple{1,AbstractParamVector},
+  u0::AbstractParamVector)
 
-  u0 = state0[1]
+  u = state[1]
   dt,θ = solver.dt,solver.θ
   dtθ = θ*dt
-  x = copy(u0)
-  uθ = copy(u0)
+  x = copy(u)
+  uθ = copy(u)
 
   shift!(r,dt*(θ-1))
-  shift!(uθ,r,θ,1-θ)
-  axpy!(dtθ,x,uθ)
+  shift!(uθ,u0,θ,1-θ)
+  shift!(x,u0,1/dt,-1/dt)
   us = (uθ,x)
   b = residual(odeop,r,us)
   shift!(r,dt*(1-θ))
@@ -73,19 +74,19 @@ function Algebra.jacobian(
   solver::ThetaMethod,
   odeop::ODEParamOperator,
   r::TransientRealization,
-  state0::NTuple{1,AbstractVector})
+  state::NTuple{1,AbstractVector},
+  u0::AbstractParamVector)
 
-  u0 = state0[1]
+  u = state[1]
   dt,θ = solver.dt,solver.θ
-  dtθ = θ*dt
-  x = copy(u0)
-  uθ = copy(u0)
+  x = copy(u)
+  uθ = copy(u)
 
   shift!(r,dt*(θ-1))
-  shift!(uθ,r,θ,1-θ)
-  axpy!(dtθ,x,uθ)
+  shift!(uθ,u0,θ,1-θ)
+  shift!(x,u0,1/dt,-1/dt)
   us = (uθ,x)
-  ws = (1,1/dtθ)
+  ws = (1,1)
 
   A = jacobian(odeop,r,us,ws)
   shift!(r,dt*(1-θ))
@@ -106,7 +107,7 @@ function allocate_odeparamcache(
 
   dt,θ = solver.dt,solver.θ
   dtθ = θ*dt
-  ws = (dtθ,1)
+  ws = (1,1)
 
   paramcache = allocate_paramcache(odeop,r0,us0N)
   A,b = allocate_systemcache(odeop,r0,us0N,ws,paramcache)
@@ -152,14 +153,15 @@ function Algebra.residual(
   solver::ThetaMethod,
   odeop::ODEParamOperator{LinearParamODE},
   r::TransientRealization,
-  state0::NTuple{1,AbstractVector})
+  state::NTuple{1,AbstractParamVector},
+  u0::AbstractParamVector)
 
-  u0 = state0[1]
+  u = state[1]
   dt,θ = solver.dt,solver.θ
   dtθ = θ*dt
-  x = copy(u0)
+  x = copy(u)
   fill!(x,zero(eltype(x)))
-  us = (x,x)
+  us = (u,x)
 
   shift!(r,dt*(θ-1))
   b = residual(odeop,r,us)
@@ -172,15 +174,15 @@ function Algebra.jacobian(
   solver::ThetaMethod,
   odeop::ODEParamOperator{LinearParamODE},
   r::TransientRealization,
-  state0::NTuple{1,AbstractVector})
+  state::NTuple{1,AbstractVector},
+  u0::AbstractParamVector)
 
-  u0 = state0[1]
+  u = state[1]
   dt,θ = solver.dt,solver.θ
-  dtθ = θ*dt
-  ws = (1,1/dtθ)
-  x = copy(u0)
+  ws = (1,1)
+  x = copy(u)
   fill!(x,zero(eltype(x)))
-  us = (x,x)
+  us = (u,x)
 
   shift!(r,dt*(θ-1))
   A = jacobian(odeop,r,us,ws)

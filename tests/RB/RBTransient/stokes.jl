@@ -81,7 +81,7 @@ rbsolver = RBSolver(fesolver,state_reduction;nparams_res=50,nparams_jac=20,npara
 fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 μon = realization(feop;nparams=10,random=true)
-x̂,rbstats = solve(rbsolver,rbop,μon)
+x̂,rbstats = solve(rbsolver,rbop,μon,xh0μ)
 
 x,festats = solution_snapshots(rbsolver,feop,μon,xh0μ)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)

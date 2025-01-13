@@ -81,7 +81,7 @@ fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
 # fesnaps = load_snapshots(test_dir)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 ronline = realization(feop;nparams=10,random=true)
-x̂,rbstats = solve(rbsolver,rbop,ronline)
+x̂,rbstats = solve(rbsolver,rbop,ronline,uh0μ)
 
 x,festats = solution_snapshots(rbsolver,feop,ronline,uh0μ)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)

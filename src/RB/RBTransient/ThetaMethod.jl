@@ -44,14 +44,14 @@ function Algebra.solve!(
   op::TransientRBOperator,
   r::TransientRealization,
   x::AbstractVector,
+  x0::AbstractVector,
   rbcache::RBCache)
 
   sysslvr = solver.sysslvr
   dt,θ = solver.dt,solver.θ
   fill!(x,zero(eltype(x)))
   usx = (x,x)
-  dtθ = θ*dt
-  ws = (1,1/dtθ)
+  ws = (1,1)
 
   shift!(r,dt*(θ-1))
   Â = jacobian(op,r,usx,ws,rbcache)
@@ -70,9 +70,7 @@ function RBSteady.allocate_rbcache(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 
-  dt,θ = solver.dt,solver.θ
-  dtθ = θ*dt
-  ws = (1,1/dtθ)
+  ws = (1,1)
 
   lop = get_linear_operator(op)
   nlop = get_nonlinear_operator(op)
@@ -91,24 +89,24 @@ function Algebra.solve!(
   op::TransientRBOperator{LinearNonlinearParamODE},
   r::TransientRealization,
   x::AbstractVector,
+  x0::AbstractVector,
   cache::LinearNonlinearRBCache)
 
   sysslvr = solver.sysslvr
   dt,θ = solver.dt,solver.θ
-  fill!(x,zero(eltype(x)))
   ŷ = RBParamVector(x̂,x)
   uθ = copy(ŷ)
 
   function us(u::RBParamVector)
     inv_project!(u.fe_data,cache.rbcache.trial,u.data)
     copy!(uθ.fe_data,u.fe_data)
-    shift!(uθ.fe_data,r,θ,1-θ)
-    axpy!(dtθ,ŷ.fe_data,uθ.fe_data)
+    shift!(uθ.fe_data,x0,θ,1-θ)
+    copy!(ŷ.fe_data,u.fe_data)
+    shift!(ŷ.fe_data,x0,1/dt,-1/dt)
     (uθ,ŷ)
   end
 
-  dtθ = θ*dt
-  ws = (1,1/dtθ)
+  ws = (1,1)
   usx = (ŷ,ŷ)
 
   Âcache = jacobian(op,r,usx,ws,cache)
@@ -131,14 +129,23 @@ end
 
 # utils
 
-function ParamDataStructures.shift!(a::ConsecutiveParamVector,r::TransientRealization,α::Number,β::Number)
+function ParamDataStructures.shift!(
+  a::ConsecutiveParamVector,
+  a0::ConsecutiveParamVector,
+  α::Number,
+  β::Number)
+
   data = get_all_data(a)
+  data0 = get_all_data(a0)
   data′ = copy(data)
-  np = num_params(r)
-  @assert param_length(a) == param_length(r)
+  np = param_length(a0)
   for ipt = param_eachindex(a)
     it = slow_index(ipt,np)
-    if it > 1
+    if it == 1
+      for is in axes(data,1)
+        data[is,ipt] = α*data[is,ipt] + β*data0[is,ipt]
+      end
+    else
       for is in axes(data,1)
         data[is,ipt] = α*data[is,ipt] + β*data′[is,ipt-np]
       end
@@ -146,8 +153,13 @@ function ParamDataStructures.shift!(a::ConsecutiveParamVector,r::TransientRealiz
   end
 end
 
-function ParamDataStructures.shift!(a::BlockParamVector,r::TransientRealization,α::Number,β::Number)
-  @inbounds for ai in blocks(a)
-    ParamDataStructures.shift!(ai,r,α,β)
+function ParamDataStructures.shift!(
+  a::BlockParamVector,
+  a0::BlockParamVector,
+  α::Number,
+  β::Number)
+
+  @inbounds for (ai,a0i) in zip(blocks(a),blocks(a0))
+    ParamDataStructures.shift!(ai,a0i,α,β)
   end
 end
