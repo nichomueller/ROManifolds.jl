@@ -152,8 +152,12 @@ function ordered_common_locations(a::HyperReduction,args...)
   ordered_common_locations(get_integration_domain(a),args...)
 end
 
-function inv_project!(cache,a::HyperReduction,b::AbstractParamArray)
-  coeff,b̂ = cache
+function inv_project!(
+  b̂::AbstractParamArray,
+  coeff::AbstractParamArray,
+  a::HyperReduction,
+  b::AbstractParamArray)
+
   o = one(eltype2(b̂))
   interp = get_interpolation(a)
   ldiv!(coeff,interp,b)
@@ -416,12 +420,16 @@ function allocate_hypred_cache(a::AffineContribution,r::AbstractRealization)
   return coeffs,hypred
 end
 
-function inv_project!(cache,a::AffineContribution,b::ArrayContribution)
-  @check length(a) == length(b)
-  coeff,hypred = cache
+function inv_project!(
+  hypred::AbstractParamArray,
+  coeff::ArrayContribution,
+  a::AffineContribution,
+  b::ArrayContribution)
+
+  @check length(coeff) == length(a) == length(b)
   fill!(hypred,zero(eltype(hypred)))
   for (aval,bval,cval) in zip(get_values(a),get_values(b),get_values(coeff))
-    inv_project!((cval,hypred),aval,bval)
+    inv_project!(hypred,cval,aval,bval)
   end
   return hypred
 end
@@ -559,11 +567,15 @@ function union_indices(a::BlockHyperReduction...)
   ArrayBlock(cache,a[1].touched)
 end
 
-function inv_project!(cache,a::BlockHyperReduction,b::ArrayBlock)
-  coeff,hypred = cache
+function inv_project!(
+  hypred::BlockParamArray,
+  coeff::ArrayBlock,
+  a::BlockHyperReduction,
+  b::ArrayBlock)
+
   for i in eachindex(a)
     if a.touched[i]
-      inv_project!((coeff[i],blocks(hypred)[i]),a[i],b[i])
+      inv_project!(blocks(hypred)[i],coeff[i],a[i],b[i])
     end
   end
   return hypred

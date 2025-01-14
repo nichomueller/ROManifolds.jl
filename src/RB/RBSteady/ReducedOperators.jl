@@ -52,18 +52,21 @@ function reduced_operator(
   LinearNonlinearRBOperator(red_op_lin,red_op_nlin)
 end
 
-struct RBCache{Ta,Tb} <: AbstractParamCache
+struct RBCache{Ta} <: AbstractParamCache
   A::Ta
-  b::Tb
+  b::HRParamArray
   trial::RBSpace
   paramcache::ParamOpCache
 end
 
-struct LinearNonlinearRBCache <: AbstractParamCache
+struct LinearNonlinearRBCache{Ta} <: AbstractParamCache
   rbcache::RBCache
-  A::AbstractMatrix
+  A::Ta
   b::AbstractVector
 end
+
+linear_residual(cache::LinearNonlinearRBCache) = cache.b
+linear_jacobian(cache::LinearNonlinearRBCache) = cache.A
 
 """
     abstract type RBOperator{O} <: ParamOperator{O,SplitDomains} end
@@ -141,7 +144,7 @@ function Algebra.allocate_residual(
   u::AbstractParamVector,
   rbcache::RBCache)
 
-  rbcache.b
+  similar(rbcache.b)
 end
 
 function Algebra.allocate_jacobian(
@@ -150,7 +153,7 @@ function Algebra.allocate_jacobian(
   u::AbstractParamVector,
   rbcache::RBCache)
 
-  rbcache.A
+  similar(rbcache.A)
 end
 
 function Algebra.residual!(
@@ -324,7 +327,7 @@ function Algebra.allocate_residual(
   u::AbstractParamVector,
   rbcache::LinearNonlinearRBCache)
 
-  rbcache.rbcache.b
+  allocate_residual(get_nonlinear_operator(op),r,u,rbcache.rbcache)
 end
 
 function Algebra.allocate_jacobian(
@@ -333,7 +336,7 @@ function Algebra.allocate_jacobian(
   u::AbstractParamVector,
   rbcache::LinearNonlinearRBCache)
 
-  rbcache.rbcache.A
+  allocate_jacobian(get_nonlinear_operator(op),r,u,rbcache.rbcache)
 end
 
 function Algebra.residual!(
@@ -344,8 +347,8 @@ function Algebra.residual!(
   rbcache::LinearNonlinearRBCache)
 
   nlop = get_nonlinear_operator(op)
-  A_lin = rbcache.A
-  b_lin = rbcache.b
+  A_lin = linear_jacobian(rbcache)
+  b_lin = linear_residual(rbcache)
   rbcache_nlin = rbcache.rbcache
 
   b_nlin = residual!(cache,nlop,r,u,rbcache_nlin)
@@ -363,7 +366,7 @@ function Algebra.jacobian!(
   rbcache::LinearNonlinearRBCache)
 
   nlop = get_nonlinear_operator(op)
-  A_lin = rbcache.A
+  A_lin = linear_jacobian(rbcache)
   rbcache_nlin = rbcache.rbcache
 
   A_nlin = jacobian!(cache,nlop,r,u,rbcache_nlin)

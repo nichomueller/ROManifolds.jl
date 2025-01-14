@@ -82,6 +82,7 @@ Base.eltype(::Type{<:ArrayContribution{T}}) where T = T
 Base.ndims(::ArrayContribution{T,N}) where {T,N} = N
 Base.ndims(::Type{<:ArrayContribution{T,N}}) where {T,N} = N
 Base.copy(a::ArrayContribution) = Contribution(copy.(a.values),a.trians)
+Base.similar(a::ArrayContribution) = Contribution(similar.(a.values),a.trians)
 Base.copyto!(a::ArrayContribution,b::ArrayContribution) = map(copyto!,a.values,b.values)
 
 Base.sum(a::ArrayContribution) = sum(a.values)
@@ -182,12 +183,16 @@ function get_values(a::TupOfArrayContribution)
   values
 end
 
-function Base.copy(a::TupOfArrayContribution)
-  b = ()
-  for ai in a
-    b = (b...,copy(ai))
+for f in (:(Base.copy),:(Base.similar))
+  @eval begin
+    function $f(a::TupOfArrayContribution)
+      b = ()
+      for ai in a
+        b = (b...,$f(ai))
+      end
+      b
+    end
   end
-  b
 end
 
 function LinearAlgebra.fillstored!(a::TupOfArrayContribution,v)

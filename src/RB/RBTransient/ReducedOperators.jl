@@ -69,6 +69,8 @@ function RBSteady.allocate_rbcache(fesolver::ODESolver,op::RBOperator,args...)
   @abstractmethod
 end
 
+RBSteady.linear_jacobian(cache::LinearNonlinearRBCache{<:TupOfHRParamArray}) = sum(cache.A.hypred)
+
 """
     struct GenericTransientRBOperator{O} <: TransientRBOperator{O}
       op::ODEParamOperator{O}
@@ -109,7 +111,7 @@ function Algebra.allocate_residual(
   us::Tuple{Vararg{AbstractParamVector}},
   rbcache::RBCache)
 
-  rbcache.b
+  similar(rbcache.b)
 end
 
 function Algebra.allocate_jacobian(
@@ -118,11 +120,11 @@ function Algebra.allocate_jacobian(
   us::Tuple{Vararg{AbstractParamVector}},
   rbcache::RBCache)
 
-  rbcache.A
+  similar(rbcache.A)
 end
 
 function Algebra.residual!(
-  cache::HRParamArray,
+  cache::AbstractHRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
@@ -136,7 +138,7 @@ function Algebra.residual!(
 end
 
 function Algebra.residual!(
-  cache::HRParamArray,
+  cache::AbstractHRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{RBParamVector}},
@@ -150,7 +152,7 @@ function Algebra.residual!(
 end
 
 function Algebra.jacobian!(
-  cache::HRParamArray,
+  cache::AbstractHRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
@@ -165,7 +167,7 @@ function Algebra.jacobian!(
 end
 
 function Algebra.jacobian!(
-  cache::HRParamArray,
+  cache::AbstractHRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{RBParamVector}},
@@ -267,7 +269,7 @@ function Algebra.allocate_residual(
   us::Tuple{Vararg{AbstractParamVector}},
   rbcache::LinearNonlinearRBCache)
 
-  rbcache.rbcache.b
+  allocate_residual(get_nonlinear_operator(op),r,us,rbcache.rbcache)
 end
 
 function Algebra.allocate_jacobian(
@@ -276,7 +278,7 @@ function Algebra.allocate_jacobian(
   us::Tuple{Vararg{AbstractParamVector}},
   rbcache::LinearNonlinearRBCache)
 
-  rbcache.rbcache.A
+  allocate_jacobian(get_nonlinear_operator(op),r,us,rbcache.rbcache)
 end
 
 function Algebra.residual!(
@@ -284,16 +286,19 @@ function Algebra.residual!(
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
-  rbcache::LinearNonlinearRBCache)
+  rbcache::LinearNonlinearRBCache{<:TupOfHRParamArray})
+
+  @check length(rbcache.A) == length(us)
 
   nlop = get_nonlinear_operator(op)
-  A_lin = rbcache.A
-  b_lin = rbcache.b
+  b_lin = RBSteady.linear_residual(rbcache)
   rbcache_nlin = rbcache.rbcache
 
   b_nlin = residual!(cache,nlop,r,us,rbcache_nlin)
   axpy!(1.0,b_lin,b_nlin)
-  mul!(b_nlin,A_lin,us[2],true,true)
+  for (A_lin,u) in zip(rbcache.A.hypred,us)
+    mul!(b_nlin,A_lin,u,true,true)
+  end
 
   return b_nlin
 end
@@ -307,7 +312,7 @@ function Algebra.jacobian!(
   rbcache::LinearNonlinearRBCache)
 
   nlop = get_nonlinear_operator(op)
-  A_lin = rbcache.A
+  A_lin = RBSteady.linear_jacobian(rbcache)
   rbcache_nlin = rbcache.rbcache
 
   A_nlin = jacobian!(cache,nlop,r,us,ws,rbcache_nlin)

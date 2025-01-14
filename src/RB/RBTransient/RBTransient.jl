@@ -66,6 +66,8 @@ export TransientMDEIM
 export TransientAffineDecomposition
 include("HyperReduction.jl")
 
+include("HRParamArray.jl")
+
 export TransientRBOperator
 export GenericTransientRBOperator
 export LinearNonlinearTransientRBOperator

@@ -16,7 +16,8 @@ function RBSteady.allocate_rbcache(
   solver::ThetaMethod,
   op::GenericTransientRBOperator,
   r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
+  us::Tuple{Vararg{AbstractParamVector}},
+  args...)
 
   dt,θ = solver.dt,solver.θ
   shift!(r,dt*(θ-1))
@@ -24,7 +25,7 @@ function RBSteady.allocate_rbcache(
   paramcache = allocate_paramcache(op.op,r,us;evaluated=true)
 
   A = allocate_jacobian(op.op,r,us,paramcache)
-  coeffA,Â = allocate_hypred_cache(op.lhs,r)
+  coeffA,Â = allocate_hypred_cache(op.lhs,r,args...)
   Acache = HRParamArray(A,coeffA,Â)
 
   b = allocate_residual(op.op,r,us,paramcache)
@@ -75,7 +76,7 @@ function RBSteady.allocate_rbcache(
   lop = get_linear_operator(op)
   nlop = get_nonlinear_operator(op)
 
-  rbcache_lin = allocate_rbcache(solver,lop,r,us)
+  rbcache_lin = allocate_rbcache(solver,lop,r,us,SplitJacobian())
   rbcache_nlin = allocate_rbcache(solver,nlop,r,us)
   A_lin = jacobian(lop,r,us,ws,rbcache_lin)
   b_lin = residual(lop,r,us,rbcache_lin)
@@ -95,19 +96,20 @@ function Algebra.solve!(
   sysslvr = solver.sysslvr
   dt,θ = solver.dt,solver.θ
   ŷ = RBParamVector(x̂,x)
-  uθ = copy(ŷ)
+  uθ = copy(x)
+  dut = copy(x)
 
   function us(u::RBParamVector)
     inv_project!(u.fe_data,cache.rbcache.trial,u.data)
-    copy!(uθ.fe_data,u.fe_data)
-    shift!(uθ.fe_data,x0,θ,1-θ)
-    copy!(ŷ.fe_data,u.fe_data)
-    shift!(ŷ.fe_data,x0,1/dt,-1/dt)
-    (uθ,ŷ)
+    copyto!(uθ,u.fe_data)
+    shift!(uθ,x0,θ,1-θ)
+    copyto!(dut,u.fe_data)
+    shift!(dut,x0,1/dt,-1/dt)
+    (uθ,dut)
   end
 
   ws = (1,1)
-  usx = (ŷ,ŷ)
+  usx = us(ŷ)
 
   Âcache = jacobian(op,r,usx,ws,cache)
   b̂cache = residual(op,r,usx,cache)

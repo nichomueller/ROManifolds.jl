@@ -91,11 +91,11 @@ function RBSteady.reduced_jacobian(
 end
 
 function RBSteady.inv_project!(
-  cache,
+  b̂::AbstractParamArray,
+  coeff::AbstractParamArray,
   a::TransientHyperReduction{<:TransientReduction},
   b::AbstractParamArray)
 
-  coeff,b̂ = cache
   o = one(eltype2(b̂))
   interp = RBSteady.get_interpolation(a)
   ldiv!(coeff,interp,vec(b))
@@ -117,32 +117,51 @@ function RBSteady.allocate_coefficient(a::TupOfAffineContribution,b::TupOfArrayC
   return coeffs
 end
 
-function RBSteady.inv_project!(cache,a::TupOfAffineContribution,b::TupOfArrayContribution)
-  @check length(a) == length(b)
-  coeff,b̂ = cache
-  fill!(b̂,zero(eltype(b̂)))
+function RBSteady.inv_project!(
+  b̂::AbstractParamArray,
+  coeff::TupOfArrayContribution,
+  a::TupOfAffineContribution,
+  b::TupOfArrayContribution)
+
   for (ai,bi,ci) in zip(a,b,coeff)
-    for (aval,bval,cval) in zip(get_values(ai),get_values(bi),get_values(ci))
-      inv_project!((cval,b̂),aval,bval)
-    end
+    RBSteady.inv_project!(b̂,ci,ai,bi)
   end
   return b̂
-end
-
-function RBSteady.inv_project!(cache::HRParamArray,a::TupOfAffineContribution,b::TupOfArrayContribution)
-  coeff = cache.coeff
-  hypred = cache.hypred
-  inv_project!((coeff,hypred),a,b)
 end
 
 function RBSteady.set_rank(a::TupOfAffineContribution,rank::Int...)
   map(ai -> set_rank(ai,rank...),a)
 end
 
-function RBSteady.allocate_hypred_cache(a::TupOfAffineContribution,r::TransientRealization)
+abstract type JacobianStyle end
+struct JointJacobian <: JacobianStyle end
+struct SplitJacobian <: JacobianStyle end
+
+function RBSteady.allocate_hypred_cache(
+  a::TupOfAffineContribution,
+  r::TransientRealization,
+  ::JointJacobian)
+
   coeffs = map(ai -> RBSteady.allocate_coefficient(ai,r),a)
   hypred = RBSteady.allocate_hyper_reduction(first(a),r)
   return coeffs,hypred
+end
+
+function RBSteady.allocate_hypred_cache(
+  a::TupOfAffineContribution,
+  r::TransientRealization,
+  ::SplitJacobian)
+
+  coeffs = map(ai -> RBSteady.allocate_coefficient(ai,r),a)
+  hypred = map(ai -> RBSteady.allocate_hyper_reduction(ai,r),a)
+  return coeffs,hypred
+end
+
+function RBSteady.allocate_hypred_cache(
+  a::TupOfAffineContribution,
+  r::TransientRealization)
+
+  allocate_hypred_cache(a,r,JointJacobian())
 end
 
 # multi field interface

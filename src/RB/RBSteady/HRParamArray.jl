@@ -30,25 +30,15 @@ ParamDataStructures.param_length(a::HRParamArray) = param_length(a.hypred)
 ParamDataStructures.get_all_data(a::HRParamArray) = get_all_data(a.hypred)
 ParamDataStructures.param_getindex(a::HRParamArray,i::Integer) = param_getindex(a.hypred,i)
 
-function Base.copy(a::HRParamArray)
-  fe_quantity′ = copy(a.fe_quantity)
-  coeff′ = copy(a.coeff)
-  hypred′ = copy(a.hypred)
-  HRParamArray(fe_quantity′,coeff′,hypred′)
-end
-
-function Base.similar(A::HRParamArray{T},::Type{S}) where {T,S<:AbstractVector}
-  fe_quantity′ = similar(a.fe_quantity)
-  coeff′ = similar(a.coeff)
-  hypred′ = similar(a.hypred,S)
-  HRParamArray(fe_quantity′,coeff′,hypred′)
-end
-
-function Base.similar(A::HRParamArray{T,N},::Type{S},dims::Dims{N}) where {T,T′,N,S<:AbstractArray{T′,N}}
-  fe_quantity′ = similar(a.fe_quantity)
-  coeff′ = similar(a.coeff)
-  hypred′ = similar(a.hypred,S,dims)
-  HRParamArray(fe_quantity′,coeff′,hypred′)
+for f in (:(Base.copy),:(Base.similar))
+  @eval begin
+    function $f(a::HRParamArray)
+      fe_quantity′ = $f(a.fe_quantity)
+      coeff′ = $f(a.coeff)
+      hypred′ = $f(a.hypred)
+      HRParamArray(fe_quantity′,coeff′,hypred′)
+    end
+  end
 end
 
 function Base.copyto!(a::HRParamArray,b::HRParamArray)
@@ -81,9 +71,9 @@ end
 for (T,S) in zip((:AffineContribution,:BlockHyperReduction),(:ArrayContribution,:ArrayBlock))
   @eval begin
     function inv_project!(cache::HRParamArray,a::$T,b::$S)
-      coeff = cache.coeff
       hypred = cache.hypred
-      inv_project!((coeff,hypred),a,b)
+      coeff = cache.coeff
+      inv_project!(hypred,coeff,a,b)
     end
   end
 end
