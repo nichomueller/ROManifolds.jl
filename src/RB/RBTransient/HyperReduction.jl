@@ -123,8 +123,12 @@ function RBSteady.inv_project!(
   a::TupOfAffineContribution,
   b::TupOfArrayContribution)
 
+  @check length(coeff) == length(a) == length(b)
+  fill!(b̂,zero(eltype(b̂)))
   for (ai,bi,ci) in zip(a,b,coeff)
-    RBSteady.inv_project!(b̂,ci,ai,bi)
+    for (aval,bval,cval) in zip(get_values(ai),get_values(bi),get_values(ci))
+      inv_project!(b̂,cval,aval,bval)
+    end
   end
   return b̂
 end

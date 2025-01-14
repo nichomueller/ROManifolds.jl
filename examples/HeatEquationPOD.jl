@@ -81,14 +81,3 @@ tols = [1e-1,1e-2,1e-3,1e-4,1e-5]
 ExamplesInterface.run_test(dir,rbsolver,feop,tols,uh0μ)
 
 end
-
-test = rbop.test
-trial = rbop.trial
-n = num_free_dofs(test)
-step = ROM.RBSteady.convergence_step(test)
-
-ntol = n-step
-# for ntol = n:-step:1
-rbop_ntol = ROM.RBSteady.set_rank(rbop,ntol)
-x̂_ntol,rbstats_ntol = solve(rbsolver,rbop_ntol,μon)
-perf_tol = eval_performance(rbsolver,feop,rbop_ntol,x,x̂_ntol,festats,rbstats_ntol,μon)

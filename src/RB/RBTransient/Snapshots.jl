@@ -479,6 +479,49 @@ function RBSteady.Snapshots(
   BlockSnapshots(array,touched)
 end
 
+function RBSteady.Snapshots(
+  data::AbstractVector{<:BlockParamArray{T,N}},
+  data0::BlockParamArray{T,N},
+  i::AbstractArray{<:AbstractDofMap},
+  r::AbstractRealization) where {T,N}
+
+  block_values = blocks.(data)
+  block_value0 = blocks(data0)
+  block_value1 = first(block_values)
+  s = size(block_value0)
+  @check s == size(i)
+
+  array = Array{Snapshots,N}(undef,s)
+  touched = Array{Bool,N}(undef,s)
+  for (j,data1j) in enumerate(block_value1)
+    if !iszero(data1j)
+      dataj = map(v->getindex(v,j),block_values)
+      array[j] = Snapshots(dataj,block_value0[j],i[j],r)
+      touched[j] = true
+    else
+      touched[j] = false
+    end
+  end
+
+  BlockSnapshots(array,touched)
+end
+
+function Arrays.return_cache(::typeof(get_initial_values),s::BlockSnapshots{S,N}) where {S,N}
+  cache = get_initial_values(testitem(s))
+  block_cache = Array{typeof(cache),N}(undef,size(s))
+  return block_cache
+end
+
+function get_initial_values(s::BlockSnapshots)
+  values = return_cache(get_initial_values,s)
+  for i in eachindex(s.touched)
+    if s.touched[i]
+      values[i] = get_initial_values(s[i])
+    end
+  end
+  return mortar(values)
+end
+
 # utils
 
 function RBSteady.Snapshots(

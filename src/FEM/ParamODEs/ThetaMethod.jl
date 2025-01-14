@@ -161,7 +161,7 @@ function Algebra.residual(
   dtθ = θ*dt
   x = copy(u)
   fill!(x,zero(eltype(x)))
-  us = (u,x)
+  us = (x,x)
 
   shift!(r,dt*(θ-1))
   b = residual(odeop,r,us)
@@ -182,7 +182,7 @@ function Algebra.jacobian(
   ws = (1,1)
   x = copy(u)
   fill!(x,zero(eltype(x)))
-  us = (u,x)
+  us = (x,x)
 
   shift!(r,dt*(θ-1))
   A = jacobian(odeop,r,us,ws)

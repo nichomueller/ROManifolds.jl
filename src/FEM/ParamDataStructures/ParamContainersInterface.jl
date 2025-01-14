@@ -119,7 +119,6 @@ struct ParamContainer{T,A<:AbstractVector{T}} <: AbstractParamContainer{T,1}
   data::A
 end
 
-ParamContainer(a::AbstractArray{<:Number}) = ParamNumber(a)
 ParamContainer(a::AbstractArray{<:AbstractArray}) = ParamArray(a)
 
 param_length(a::ParamContainer) = length(a.data)

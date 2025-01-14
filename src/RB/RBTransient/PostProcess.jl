@@ -39,7 +39,7 @@ function DrWatson.save(dir,op::LinearNonlinearTransientRBOperator;label="")
   RBSteady._save_trian_operator_parts(dir,op.op_nonlinear;label=RBSteady._get_label(label,"nonlinear"))
 end
 
-function RBSteady.load_operator(dir,feop::LinearNonlinearTransientRBOperator;label="")
+function RBSteady.load_operator(dir,feop::LinearNonlinearTransientParamFEOperator{SplitDomains};label="")
   trial,test = RBSteady._load_fixed_operator_parts(dir,feop.op_linear;label)
   odeop_lin,red_lhs_lin,red_rhs_lin = RBSteady._load_trian_operator_parts(
     dir,feop.op_linear,trial,test;label=RBSteady._get_label("linear",label))

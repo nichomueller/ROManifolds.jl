@@ -129,6 +129,7 @@ function run_test(dir::String,rbsolver::RBSolver,feop::ParamFEOperator,tols=[1e-
 
     x̂,rbstats = solve(rbsolver,rbop,μon,args...)
     perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
+    println(perf)
     push!(perfs,perf)
 
     plot_a_solution(plot_dir_tol,feop,rbop,x,x̂,μon)

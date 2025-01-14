@@ -135,8 +135,8 @@ Base.@propagate_inbounds function Base.setindex!(A::BlockParamArray{T,N},v,i::Bl
   setindex!(A.data,v,i.n...)
 end
 
-function Base.similar(A::BlockParamArray{T,N},::Type{<:AbstractArray{T′,N}}) where {T,T′,N}
-  BlockParamArray(map(a->similar(a,Array{T′,N}),blocks(A)),A.axes)
+function Base.similar(A::BlockParamArray)
+  BlockParamArray(map(similar,blocks(A)),A.axes)
 end
 
 function Base.similar(A::BlockParamArray{T,N},::Type{S},axes::Vararg{BlockArrays.AbstractBlockedUnitRange}) where {T,T′,N,S<:AbstractArray{T′,N}}
@@ -158,6 +158,25 @@ function Base.copyto!(A::BlockParamArray,B::BlockParamArray)
   @check size(A) == size(B) && innersize(A) == innersize(B)
   map(copyto!,A.data,B.data)
   A
+end
+
+for op in (:+,:-)
+  @eval begin
+    function ($op)(A::BlockParamArray,B::BlockParamArray)
+      @check size(A) == size(B)
+      AB = map($op,blocks(A),blocks(B))
+      BlockParamArray(AB,A.axes)
+    end
+  end
+end
+
+for op in (:*,:/)
+  @eval begin
+    function ($op)(A::BlockParamArray,b::Number)
+      Ab = map(a -> $op(a,b),blocks(A))
+      BlockParamArray(AB,A.axes)
+    end
+  end
 end
 
 for f in (:(Base.fill!),:(LinearAlgebra.fillstored!))

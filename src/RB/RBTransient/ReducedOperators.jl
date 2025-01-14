@@ -17,7 +17,7 @@ function RBSteady.reduced_operator(
   s::AbstractSnapshots,
   args...)
 
-  red_trial,red_test = reduced_fe_space(solver,feop,s,args...)
+  red_trial,red_test = reduced_fe_space(solver,feop,s)
   odeop = get_algebraic_operator(feop)
   reduced_operator(solver,odeop,red_trial,red_test,s)
 end
@@ -111,7 +111,7 @@ function Algebra.allocate_residual(
   us::Tuple{Vararg{AbstractParamVector}},
   rbcache::RBCache)
 
-  similar(rbcache.b)
+  copy(rbcache.b)
 end
 
 function Algebra.allocate_jacobian(
@@ -120,7 +120,7 @@ function Algebra.allocate_jacobian(
   us::Tuple{Vararg{AbstractParamVector}},
   rbcache::RBCache)
 
-  similar(rbcache.A)
+  copy(rbcache.A)
 end
 
 function Algebra.residual!(

@@ -144,7 +144,7 @@ function Algebra.allocate_residual(
   u::AbstractParamVector,
   rbcache::RBCache)
 
-  similar(rbcache.b)
+  copy(rbcache.b)
 end
 
 function Algebra.allocate_jacobian(
@@ -153,7 +153,7 @@ function Algebra.allocate_jacobian(
   u::AbstractParamVector,
   rbcache::RBCache)
 
-  similar(rbcache.A)
+  copy(rbcache.A)
 end
 
 function Algebra.residual!(

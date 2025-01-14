@@ -96,15 +96,15 @@ function Algebra.solve!(
   sysslvr = solver.sysslvr
   dt,θ = solver.dt,solver.θ
   ŷ = RBParamVector(x̂,x)
-  uθ = copy(x)
-  dut = copy(x)
+  uθ = copy(ŷ)
+  dut = copy(ŷ)
 
   function us(u::RBParamVector)
     inv_project!(u.fe_data,cache.rbcache.trial,u.data)
-    copyto!(uθ,u.fe_data)
-    shift!(uθ,x0,θ,1-θ)
-    copyto!(dut,u.fe_data)
-    shift!(dut,x0,1/dt,-1/dt)
+    copyto!(uθ.fe_data,u.fe_data)
+    shift!(uθ.fe_data,x0,θ,1-θ)
+    copyto!(dut.fe_data,u.fe_data)
+    shift!(dut.fe_data,x0,1/dt,-1/dt)
     (uθ,dut)
   end
 
