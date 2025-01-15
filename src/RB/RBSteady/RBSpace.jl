@@ -150,6 +150,8 @@ end
 
 convergence_step(r::RBSpace) = convergence_step(get_reduced_subspace(r))
 
+get_norm_matrix(r::RBSpace) = get_norm_matrix(get_reduced_subspace(r))
+
 function FESpaces.FEFunction(r::RBSpace,x̂::AbstractVector)
   x = inv_project(r,x̂)
   fe = get_fe_space(r)

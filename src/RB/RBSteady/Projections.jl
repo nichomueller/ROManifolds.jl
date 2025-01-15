@@ -10,6 +10,7 @@ Subtypes:
 
 - `PODBasis`
 - `TTSVDCores`
+- `NormedProjection`
 - `BlockProjection`
 - `InvProjection`
 - `ReducedProjection`
@@ -41,11 +42,21 @@ one `N`, returns `n`
 num_reduced_dofs(a::Projection) = @abstractmethod
 
 """
-    project(a::Projection,x::AbstractArray) -> AbstractArray
+    project(a::Projection,x::AbstractArray,args...) -> AbstractArray
 
 Projects a high-dimensional object `x` onto the subspace represented by `a`
 """
-project(a::Projection,x::AbstractArray) = @abstractmethod
+function project(a::Projection,x::AbstractArray)
+  basis = get_basis(a)
+  x̂ = basis'*x
+  return x̂
+end
+
+function project(a::Projection,x::AbstractArray,norm_matrix::AbstractMatrix)
+  basis = get_basis(a)
+  x̂ = basis'*norm_matrix*x
+  return x̂
+end
 
 """
     inv_project(a::Projection,x::AbstractArray) -> AbstractArray
@@ -53,7 +64,21 @@ project(a::Projection,x::AbstractArray) = @abstractmethod
 Recasts a low-dimensional object `x` onto the high-dimensional space in which `a`
 is immersed
 """
-inv_project(a::Projection,x::AbstractArray) = @abstractmethod
+function inv_project(a::Projection,x̂::AbstractArray)
+  basis = get_basis(a)
+  x = basis*x̂
+  return x
+end
+
+function Arrays.return_cache(::typeof(project),a::Projection,x::AbstractArray)
+  x̂ = zeros(eltype(x),num_reduced_dofs(a))
+  return x̂
+end
+
+function Arrays.return_cache(::typeof(inv_project),a::Projection,x̂::AbstractArray)
+  x = zeros(eltype(x̂),num_fe_dofs(a))
+  return x
+end
 
 """
     galerkin_projection(a::Projection,b::Projection) -> ReducedProjection
@@ -84,6 +109,8 @@ Sets the rank of the projection `a` to `rank`
 set_rank(a::Projection,rank...) = @abstractmethod
 
 convergence_step(a::Projection) = ceil(Int,num_reduced_dofs(a) / 10)
+
+get_norm_matrix(a::Projection) = I(num_fe_dofs(a))
 
 """
     union_bases(a::Projection,b::Projection,args...) -> Projection
@@ -124,26 +151,19 @@ function LinearAlgebra.mul!(x::ConsecutiveParamArray,b::Projection,y::Consecutiv
   mul!(x.data,get_basis(b),y.data,α,β)
 end
 
-function project(a::Projection,x::AbstractVector)
-  basis = get_basis(a)
-  x̂ = basis'*x
-  return x̂
+# constructors
+
+function projection(red::Reduction,s::AbstractArray)
+  Projection(red,s)
 end
 
-function inv_project(a::Projection,x̂::AbstractVector)
-  basis = get_basis(a)
-  x = basis*x̂
-  return x
+function projection(red::Reduction,s::AbstractArray,norm_matrix)
+  proj = Projection(red,s,norm_matrix)
+  NormedProjection(proj,norm_matrix)
 end
 
-function Arrays.return_cache(::typeof(project),a::Projection,x::AbstractVector)
-  x̂ = zeros(eltype(x),num_reduced_dofs(a))
-  return x̂
-end
-
-function Arrays.return_cache(::typeof(inv_project),a::Projection,x̂::AbstractVector)
-  x = zeros(eltype(x̂),num_fe_dofs(a))
-  return x
+function Projection(red::Reduction,s::AbstractArray,args...)
+  @abstractmethod
 end
 
 """
@@ -226,9 +246,9 @@ num_reduced_dofs(a::ReducedAlgebraicProjection) = size(get_basis(a),2)
 num_reduced_dofs_left_projector(a::ReducedAlgebraicProjection) = size(get_basis(a),1)
 num_reduced_dofs_right_projector(a::ReducedMatProjection) = size(get_basis(a),3)
 
-function projection(red::AffineReduction,s::AbstractMatrix,args...)
+function Projection(red::AffineReduction,s::AbstractMatrix,args...)
   podred = PODReduction(ReductionStyle(red),NormStyle(red))
-  projection(podred,s,args...)
+  Projection(podred,s,args...)
 end
 
 function set_rank(a::ReducedVecProjection,rank::Integer)
@@ -252,12 +272,12 @@ struct PODBasis <: Projection
   basis::AbstractMatrix
 end
 
-function projection(red::PODReduction,s::AbstractArray{<:Number},args...)
+function Projection(red::PODReduction,s::AbstractArray{<:Number},args...)
   basis = reduction(red,s,args...)
   PODBasis(basis)
 end
 
-function projection(red::PODReduction,s::SparseSnapshots,args...)
+function Projection(red::PODReduction,s::SparseSnapshots,args...)
   basis = reduction(red,s,args...)
   basis′ = recast(basis,s)
   PODBasis(basis′)
@@ -319,13 +339,13 @@ struct TTSVDCores <: Projection
   dof_map::AbstractDofMap
 end
 
-function projection(red::TTSVDReduction,s::AbstractArray{<:Number},args...)
+function Projection(red::TTSVDReduction,s::AbstractArray{<:Number},args...)
   cores = reduction(red,s,args...)
   dof_map = get_dof_map(s)
   TTSVDCores(cores,dof_map)
 end
 
-function projection(red::TTSVDReduction,s::SparseSnapshots,args...)
+function Projection(red::TTSVDReduction,s::SparseSnapshots,args...)
   cores = reduction(red,s,args...)
   cores′ = recast(cores,s)
   dof_map = get_dof_map(s)
@@ -335,11 +355,12 @@ end
 get_cores(a::Projection) = @notimplemented
 get_cores(a::TTSVDCores) = a.cores
 
+DofMaps.get_dof_map(a::Projection) = @notimplemented
+DofMaps.get_dof_map(a::TTSVDCores) = a.dof_map
+
 get_basis(a::TTSVDCores) = cores2basis(get_dof_map(a),get_cores(a)...)
 num_fe_dofs(a::TTSVDCores) = prod(map(c -> size(c,2),get_cores(a)))
 num_reduced_dofs(a::TTSVDCores) = size(last(get_cores(a)),3)
-
-DofMaps.get_dof_map(a::TTSVDCores) = a.dof_map
 
 function union_bases(a::TTSVDCores,b::TTSVDCores,args...)
   @check get_dof_map(a) == get_dof_map(b)
@@ -425,20 +446,90 @@ function rescale(op::Function,x::AbstractRankTensor{D},b::TTSVDCores) where D
   end
 end
 
+"""
+    struct NormedProjection <: Projection
+      projection::Projection
+      norm_matrix::AbstractMatrix
+    end
+
+Represents a `Projection` `projection` spanning a space equipped with an inner
+product represented by the quantity `norm_matrix`
+"""
+struct NormedProjection <: Projection
+  projection::Projection
+  norm_matrix::AbstractMatrix
+end
+
+get_norm_matrix(a::NormedProjection) = a.norm_matrix
+
+get_basis(a::NormedProjection) = get_basis(a.projection)
+num_fe_dofs(a::NormedProjection) = num_fe_dofs(a.projection)
+num_reduced_dofs(a::NormedProjection) = num_reduced_dofs(a.projection)
+
+get_cores(a::NormedProjection) = get_cores(a.projection)
+DofMaps.get_dof_map(a::NormedProjection) = get_dof_map(a.projection)
+
+function project(a::NormedProjection,x::AbstractArray)
+  project(a.projection,x,a.norm_matrix)
+end
+
+function union_bases(a::NormedProjection,b::NormedProjection,args...)
+  union_bases(a.projection,b.projection,args...)
+end
+
+function union_bases(a::NormedProjection,b::AbstractArray,args...)
+  union_bases(a.projection,b,args...)
+end
+
+function galerkin_projection(proj_left::NormedProjection,a::NormedProjection)
+  galerkin_projection(proj_left.projection,a.projection)
+end
+
+function galerkin_projection(proj_left::NormedProjection,a::NormedProjection,proj_right::NormedProjection)
+  galerkin_projection(proj_left.projection,a.projection,proj_right.projection)
+end
+
+function empirical_interpolation(a::NormedProjection)
+  empirical_interpolation(a.projection)
+end
+
+function set_rank(a::NormedProjection,rank::Integer)
+  projection′ = set_rank(a.projection,rank)
+  NormedProjection(projection′,a.norm_matrix)
+end
+
+function rescale(op::Function,x::Any,b::NormedProjection)
+  projection′ = rescale(op,x,b.projection)
+  NormedProjection(projection′,a.norm_matrix)
+end
+
 # multi field interface
 
-function Arrays.return_type(::typeof(projection),::PODReduction,s::Snapshots)
+function Arrays.return_type(::typeof(projection),::PODReduction,::Snapshots)
   PODBasis
 end
 
-function Arrays.return_type(::typeof(projection),::TTSVDReduction,s::Snapshots)
+function Arrays.return_type(::typeof(projection),::TTSVDReduction,::Snapshots)
   TTSVDCores
+end
+
+function Arrays.return_type(::typeof(projection),::Reduction,::Snapshots,norm_matrix)
+  NormedProjection
 end
 
 function Arrays.return_cache(::typeof(projection),red::Reduction,s::BlockSnapshots)
   i = findfirst(s.touched)
   @notimplementedif isnothing(i)
-  A = return_type(projection,red,blocks(s)[i])
+  A = return_type(projection,red,s[i])
+  block_basis = Array{A,ndims(s)}(undef,size(s))
+  touched = s.touched
+  return BlockProjection(block_basis,touched)
+end
+
+function Arrays.return_cache(::typeof(projection),red::Reduction,s::BlockSnapshots,norm_matrix)
+  i = findfirst(s.touched)
+  @notimplementedif isnothing(i)
+  A = return_type(projection,red,s[i],norm_matrix[Block(i,i)])
   block_basis = Array{A,ndims(s)}(undef,size(s))
   touched = s.touched
   return BlockProjection(block_basis,touched)
@@ -455,7 +546,7 @@ function projection(red::Reduction,s::BlockSnapshots)
 end
 
 function projection(red::Reduction,s::BlockSnapshots,norm_matrix)
-  basis = return_cache(projection,red,s)
+  basis = return_cache(projection,red,s,norm_matrix)
   for i in eachindex(basis)
     if basis.touched[i]
       basis[i] = projection(red,s[i],norm_matrix[Block(i,i)])

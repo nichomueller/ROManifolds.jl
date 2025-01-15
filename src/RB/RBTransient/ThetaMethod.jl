@@ -95,16 +95,17 @@ function Algebra.solve!(
 
   sysslvr = solver.sysslvr
   dt,θ = solver.dt,solver.θ
+  trial = cache.rbcache.trial
   ŷ = RBParamVector(x̂,x)
   uθ = copy(ŷ)
   dut = copy(ŷ)
 
   function us(u::RBParamVector)
-    inv_project!(u.fe_data,cache.rbcache.trial,u.data)
-    copyto!(uθ.fe_data,u.fe_data)
-    shift!(uθ.fe_data,x0,θ,1-θ)
-    copyto!(dut.fe_data,u.fe_data)
-    shift!(dut.fe_data,x0,1/dt,-1/dt)
+    inv_project!(u.fe_data,trial,u.data)
+    copyto!(uθ,u)
+    shift!(uθ,trial,x0,θ,1-θ)
+    copyto!(dut,u)
+    shift!(dut,trial,x0,1/dt,-1/dt)
     (uθ,dut)
   end
 
@@ -164,4 +165,9 @@ function ParamDataStructures.shift!(
   @inbounds for (ai,a0i) in zip(blocks(a),blocks(a0))
     ParamDataStructures.shift!(ai,a0i,α,β)
   end
+end
+
+function ParamDataStructures.shift!(a::RBParamVector,trial::RBSpace,args...)
+  ParamDataStructures.shift!(a.fe_data,args...)
+  RBSteady.project!(a.data,trial,a.fe_data)
 end

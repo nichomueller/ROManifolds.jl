@@ -409,7 +409,7 @@ end
 
 for (f,g) in zip((:pivoted_qr,:pivoted_qr!),(:qr,:qr!))
   @eval begin
-    function $f(A;tol=1e-10)
+    function $f(A,tol=1e-10)
       C = $g(A,ColumnNorm())
       r = findlast(abs.(diag(C.R)) .> tol)
       Q = C.Q[:,1:r]
@@ -417,9 +417,9 @@ for (f,g) in zip((:pivoted_qr,:pivoted_qr!),(:qr,:qr!))
       return Q,R
     end
 
-    $f(A,red_style::SearchSVDRank) = $f(A;tol=red_style.tol)
+    $f(A,red_style::SearchSVDRank) = $f(A,tol=red_style.tol)
     $f(A,red_style::FixedSVDRank) = $f(A)
-    $f(A,red_style::LRApproxRank) = $f(A;tol=red_style.opts.rtol)
+    $f(A,red_style::LRApproxRank) = $f(A,tol=red_style.opts.rtol)
     $f(A,red_style::TTSVDRanks) = $f(A,first(red_style.style))
   end
 end

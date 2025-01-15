@@ -341,6 +341,7 @@ export orth_projection
 export Projection
 export PODBasis
 export TTSVDCores
+export NormedProjection
 export BlockProjection
 export ReducedProjection
 export projection

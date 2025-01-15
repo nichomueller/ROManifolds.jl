@@ -30,12 +30,3 @@ function galerkin_projection(
 
   return proj_basis
 end
-
-function galerkin_projection(
-  basis_left::AbstractMatrix,
-  basis::AbstractMatrix,
-  norm_matrix::AbstractSparseMatrix)
-
-  proj_basis = basis_left'*norm_matrix*basis
-  return proj_basis
-end

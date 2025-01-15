@@ -110,6 +110,7 @@ include("BasisConstruction.jl")
 export Projection
 export PODBasis
 export TTSVDCores
+export NormedProjection
 export BlockProjection
 export ReducedProjection
 export projection

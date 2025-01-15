@@ -56,7 +56,6 @@ function Algebra.residual(
 
   u = state[1]
   dt,θ = solver.dt,solver.θ
-  dtθ = θ*dt
   x = copy(u)
   uθ = copy(u)
 
@@ -104,9 +103,6 @@ function allocate_odeparamcache(
 
   u0 = us0[1]
   us0N = (u0,u0)
-
-  dt,θ = solver.dt,solver.θ
-  dtθ = θ*dt
   ws = (1,1)
 
   paramcache = allocate_paramcache(odeop,r0,us0N)
@@ -158,7 +154,6 @@ function Algebra.residual(
 
   u = state[1]
   dt,θ = solver.dt,solver.θ
-  dtθ = θ*dt
   x = copy(u)
   fill!(x,zero(eltype(x)))
   us = (x,x)

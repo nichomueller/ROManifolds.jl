@@ -493,16 +493,13 @@ function Utils.compute_error(solver::RBSolver,op::RBOperator,s::AbstractSnapshot
   r1 = residual_snapshots(solver,op.op,s1;nparams=1)
   j1 = jacobian_snapshots(solver,op.op,s1;nparams=1)
 
-  trial = get_trial(op)
-  red = get_state_reduction(solver)
-  norm_matrix = assemble_matrix(feop,get_norm(red))
-
-  err_subspace = compute_error(get_trial(op),s1,norm_matrix)
+  err_subspace = compute_error(get_trial(op),s1)
   err_hypred = compute_error(op,j1,r1)
   ("Error subspace" => err_subspace,"Error hyper-reduction" => err_hypred)
 end
 
-function Utils.compute_error(r::RBSpace,s::AbstractSnapshots,args...)
+function Utils.compute_error(r::RBSpace,s::AbstractSnapshots)
   s′ = inv_project(r,project(r,s))
-  compute_relative_error(s,s′,args...)
+  norm_matrix = get_norm_matrix(r)
+  compute_relative_error(s,s′,norm_matrix)
 end
