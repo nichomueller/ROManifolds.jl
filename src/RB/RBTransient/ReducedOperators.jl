@@ -32,8 +32,8 @@ function RBSteady.reduced_operator(
   red_lhs,red_rhs = reduced_weak_form(solver,odeop,red_trial,red_test,s)
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
-  new_odeop = change_domains(odeop,trians_rhs,trians_lhs)
-  GenericTransientRBOperator(new_odeop,red_trial,red_test,red_lhs,red_rhs)
+  odeop′ = change_domains(odeop,trians_rhs,trians_lhs)
+  GenericTransientRBOperator(odeop′,red_trial,red_test,red_lhs,red_rhs)
 end
 
 function RBSteady.reduced_operator(
@@ -216,14 +216,6 @@ function RBSteady.fe_jacobian!(
   end
 end
 
-function RBSteady.set_rank(op::GenericTransientRBOperator,rank)
-  test_rank = set_rank(op.test,rank)
-  trial_rank = set_rank(op.trial,rank)
-  lhs_rank = map(lhs -> set_rank(lhs,rank,rank),op.lhs)
-  rhs_rank = set_rank(op.rhs,rank)
-  GenericTransientRBOperator(op.op,trial_rank,test_rank,lhs_rank,rhs_rank)
-end
-
 """
     struct LinearNonlinearTransientRBOperator <: TransientRBOperator{LinearNonlinearParamODE}
       op_linear::GenericTransientRBOperator{LinearParamODE}
@@ -314,21 +306,6 @@ function Algebra.jacobian!(
   axpy!(1.0,A_lin,A_nlin)
 
   return A_nlin
-end
-
-function RBSteady.set_rank(op::LinearNonlinearTransientRBOperator,rank)
-  test_rank = set_rank(get_test(op),rank)
-  trial_rank = set_rank(get_trial(op),rank)
-
-  lin_lhs_rank = map(lhs -> set_rank(lhs,rank,rank),op.op_linear.lhs)
-  lin_rhs_rank = set_rank(op.op_linear.rhs,rank)
-  op_lin_rank = GenericTransientRBOperator(op.op_linear.op,trial_rank,test_rank,lin_lhs_rank,lin_rhs_rank)
-
-  nlin_lhs_rank = map(lhs -> set_rank(lhs,rank,rank),op.op_nonlinear.lhs)
-  nlin_rhs_rank = set_rank(op.op_nonlinear.rhs,rank)
-  op_nlin_rank = GenericTransientRBOperator(op.op_nonlinear.op,trial_rank,test_rank,nlin_lhs_rank,nlin_rhs_rank)
-
-  LinearNonlinearTransientRBOperator(op_lin_rank,op_nlin_rank)
 end
 
 function Algebra.solve(

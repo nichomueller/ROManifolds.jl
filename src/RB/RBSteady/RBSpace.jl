@@ -142,14 +142,6 @@ function project(r1::RBSpace,x::Projection,r2::RBSpace)
   galerkin_projection(get_reduced_subspace(r1),x,get_reduced_subspace(r2))
 end
 
-function set_rank(r::RBSpace,rank...)
-  fe_space = get_fe_space(r)
-  fe_subspace_rank = set_rank(get_reduced_subspace(r),rank...)
-  fe_subspace(fe_space,fe_subspace_rank)
-end
-
-convergence_step(r::RBSpace) = convergence_step(get_reduced_subspace(r))
-
 get_norm_matrix(r::RBSpace) = get_norm_matrix(get_reduced_subspace(r))
 
 function FESpaces.FEFunction(r::RBSpace,x̂::AbstractVector)

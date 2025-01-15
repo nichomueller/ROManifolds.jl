@@ -103,32 +103,3 @@ tols = [1e-5]
 ExamplesInterface.run_test(dir,rbsolver,feop,tols,xh0μ)
 
 end
-
-fesnaps, = solution_snapshots(rbsolver,feop,xh0μ)
-rbop = reduced_operator(rbsolver,feop,fesnaps)
-μon = realization(feop;nparams=10,random=true)
-x̂,rbstats = solve(rbsolver,rbop,μon,xh0μ)
-x,festats = solution_snapshots(rbsolver,feop,μon,xh0μ)
-perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
-
-dir = datadir("transient_nstokes_pod")
-dir_tol = joinpath(dir,string(1e-4))
-create_dir(dir_tol)
-
-save(dir,fesnaps)
-save(dir,x;label="online")
-save(dir_tol,rbop)
-
-fesnaps = load_snapshots(dir)
-x = load_snapshots(dir;label="online")
-rbop = load_operator(dir_tol,feop)
-
-μon = get_realization(x)
-x̂,rbstats = solve(rbsolver,rbop,μon,xh0μ)
-perf = eval_performance(rbsolver,feop,rbop,x,x̂,rbstats,rbstats,μon)
-
-plot_dir_tol = joinpath(dir_tol,"plot")
-create_dir(plot_dir_tol)
-plot_a_solution(plot_dir_tol,feop,rbop,x,x̂,μon)
-
-perfs = eval_convergence(rbsolver,feop,rbop,x,rbstats,μon,xh0μ)

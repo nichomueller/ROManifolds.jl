@@ -249,60 +249,6 @@ function eval_performance(
   eval_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats,args...)
 end
 
-function eval_convergence(
-  rbsolver::RBSolver,
-  feop::ParamFEOperator,
-  rbop::ParamOperator,
-  fesnaps::Snapshots,
-  festats::CostTracker,
-  r::AbstractRealization,
-  args...)
-
-  test = get_test(rbop)
-  trial = get_trial(rbop)
-  n = num_free_dofs(test)
-  step = convergence_step(test)
-
-  perfs = ROMPerformance[]
-  for ntol = n:-step:1
-    rbop_ntol = set_rank(rbop,ntol)
-    x̂_ntol,rbstats_ntol = solve(rbsolver,rbop_ntol,r,args...)
-    perf_tol = eval_performance(rbsolver,feop,rbop_ntol,fesnaps,x̂_ntol,festats,rbstats_ntol,r)
-    push!(perfs,perf_tol)
-  end
-
-  return perfs
-end
-
-function eval_convergence(
-  rbsolver::RBSolver,
-  feop::ParamFEOperator,
-  rbop::ParamOperator,
-  fesnaps::BlockSnapshots,
-  festats::CostTracker,
-  r::AbstractRealization,
-  args...)
-
-  test = get_test(rbop)
-  trial = get_trial(rbop)
-  n = num_free_dofs(test)
-
-  map(1:num_fields(test)) do field
-    perfs = ROMPerformance[]
-    ntol = copy(n)
-    nfield = n[field]
-    stepfield = convergence_step(test[field])
-    for nfieldtol = nfield:-stepfield:1
-      ntol[field] = nfieldtol
-      rbop_ntol = set_rank(rbop,ntol)
-      x̂_ntol,rbstats_ntol = solve(rbsolver,rbop_ntol,r,args...)
-      perf_tol = eval_performance(rbsolver,feop,rbop_ntol,fesnaps,x̂_ntol,festats,rbstats_ntol,r)
-      push!(perfs,perf_tol)
-    end
-    return perfs
-  end
-end
-
 function DrWatson.save(dir,perf::ROMPerformance;label="")
   results_dir = get_filename(dir,"results",label)
   serialize(results_dir,perf)

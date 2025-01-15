@@ -19,7 +19,7 @@ end
 function reduced_operator(
   solver::RBSolver,
   feop::ParamFEOperator,
-  s)
+  s::AbstractSnapshots)
 
   red_trial,red_test = reduced_fe_space(solver,feop,s)
   op = get_algebraic_operator(feop)
@@ -31,7 +31,7 @@ function reduced_operator(
   op::ParamOperator,
   red_trial::RBSpace,
   red_test::RBSpace,
-  s)
+  s::AbstractSnapshots)
 
   red_lhs,red_rhs = reduced_weak_form(solver,op,red_trial,red_test,s)
   trians_rhs = get_domains(red_rhs)
@@ -45,7 +45,7 @@ function reduced_operator(
   op::ParamOperator{LinearNonlinearParamEq},
   red_trial::RBSpace,
   red_test::RBSpace,
-  s)
+  s::AbstractSnapshots)
 
   red_op_lin = reduced_operator(solver,get_linear_operator(op),red_trial,red_test,s)
   red_op_nlin = reduced_operator(solver,get_nonlinear_operator(op),red_trial,red_test,s)
@@ -249,14 +249,6 @@ function fe_residual!(
   return bi
 end
 
-function set_rank(op::GenericRBOperator,rank)
-  test_rank = set_rank(op.test,rank)
-  trial_rank = set_rank(op.trial,rank)
-  lhs_rank = set_rank(op.lhs,rank,rank)
-  rhs_rank = set_rank(op.rhs,rank)
-  GenericRBOperator(op.op,trial_rank,test_rank,lhs_rank,rhs_rank)
-end
-
 """
     struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}
       op_linear::GenericRBOperator{LinearParamEq}
@@ -370,21 +362,6 @@ function Algebra.jacobian!(
   axpy!(1.0,A_lin,A_nlin)
 
   return A_nlin
-end
-
-function set_rank(op::LinearNonlinearRBOperator,rank)
-  test_rank = set_rank(get_test(op),rank)
-  trial_rank = set_rank(get_trial(op),rank)
-
-  lin_lhs_rank = set_rank(op.op_linear.lhs,rank,rank)
-  lin_rhs_rank = set_rank(op.op_linear.rhs,rank)
-  op_lin_rank = GenericRBOperator(op.op_linear.op,trial_rank,test_rank,lin_lhs_rank,lin_rhs_rank)
-
-  nlin_lhs_rank = set_rank(op.op_nonlinear.lhs,rank,rank)
-  nlin_rhs_rank = set_rank(op.op_nonlinear.rhs,rank)
-  op_nlin_rank = GenericRBOperator(op.op_nonlinear.op,trial_rank,test_rank,nlin_lhs_rank,nlin_rhs_rank)
-
-  LinearNonlinearRBOperator(op_lin_rank,op_nlin_rank)
 end
 
 # Solve a POD-MDEIM problem

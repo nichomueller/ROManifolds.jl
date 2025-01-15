@@ -12,19 +12,6 @@ import Gridap.Helpers: @abstractmethod,@check
 import Gridap.MultiField: BlockMultiFieldStyle
 import ROM.RBSteady: solution_snapshots,get_state_reduction,get_residual_reduction,get_jacobian_reduction
 
-function try_loading_reduced_operator(dir,rbsolver,feop,args...;kwargs...)
-  try
-    rbop = load_operator(dir,feop)
-    println("Load reduced operator at $dir succeeded!")
-    return rbop
-  catch
-    println("Load reduced operator at $dir failed, must run offline phase")
-    rbop = reduced_operator(rbsolver,feop,args...;kwargs...)
-    save(dir,rbop)
-    return rbop
-  end
-end
-
 function try_loading_fe_snapshots(dir,rbsolver,feop,args...;kwargs...)
   try
     fesnaps = load_snapshots(dir)
@@ -35,6 +22,19 @@ function try_loading_fe_snapshots(dir,rbsolver,feop,args...;kwargs...)
     fesnaps, = solution_snapshots(rbsolver,feop,args...;kwargs...)
     save(dir,fesnaps)
     return fesnaps
+  end
+end
+
+function try_loading_reduced_operator(dir,rbsolver,feop,fesnaps,jac,res)
+  try
+    rbop = load_operator(dir,feop)
+    println("Load reduced operator at $dir succeeded!")
+    return rbop
+  catch
+    println("Load reduced operator at $dir failed, must run offline phase")
+    rbop = _reduced_operator(rbsolver,feop,fesnaps,jac,res)
+    save(dir,rbop)
+    return rbop
   end
 end
 
@@ -107,10 +107,73 @@ function update_solver(rbsolver::RBSolver,tol)
   RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction)
 end
 
-function run_test(dir::String,rbsolver::RBSolver,feop::ParamFEOperator,tols=[1e-1,1e-2,1e-3,1e-4,1e-5],args...)
+function _reduced_operator(rbsolver::RBSolver,op::ParamOperator,red_trial,red_test,jac,res)
+  jac_red = get_jacobian_reduction(rbsolver)
+  red_lhs = reduced_jacobian(jac_red,red_trial,red_test,jac)
+  res_red = get_residual_reduction(rbsolver)
+  red_rhs = reduced_residual(res_red,red_test,res)
+  trians_rhs = get_domains(red_rhs)
+  trians_lhs = get_domains(red_lhs)
+  op′ = change_domains(op,trians_rhs,trians_lhs)
+  GenericRBOperator(op′,red_trial,red_test,red_lhs,red_rhs)
+end
+
+function _reduced_operator(rbsolver::RBSolver,odeop::ODEParamOperator,red_trial,red_test,jac,res)
+  jac_red = get_jacobian_reduction(rbsolver)
+  red_lhs = reduced_jacobian(jac_red,red_trial,red_test,jac)
+  res_red = get_residual_reduction(rbsolver)
+  red_rhs = reduced_residual(res_red,red_test,res)
+  trians_rhs = get_domains(red_rhs)
+  trians_lhs = map(get_domains,red_lhs)
+  odeop′ = change_domains(odeop,trians_rhs,trians_lhs)
+  GenericTransientRBOperator(odeop′,red_trial,red_test,red_lhs,red_rhs)
+end
+
+function _reduced_operator(
+  rbsolver::RBSolver,
+  op::ParamOperator{LinearNonlinearParamEq},
+  red_trial,
+  red_test,
+  (jac_lin,jac_nlin),
+  (res_lin,res_nlin)
+  )
+
+  rbop_lin = _reduced_operator(rbsolver,get_linear_operator(op),red_trial,red_test,jac_lin,res_lin)
+  rbop_nlin = _reduced_operator(rbsolver,get_nonlinear_operator(op),red_trial,red_test,jac_nlin,res_nlin)
+  LinearNonlinearRBOperator(rbop_lin,rbop_nlin)
+end
+
+function _reduced_operator(
+  rbsolver::RBSolver,
+  op::ODEParamOperator{LinearNonlinearParamODE},
+  red_trial,
+  red_test,
+  (jac_lin,jac_nlin),
+  (res_lin,res_nlin)
+  )
+
+  rbop_lin = _reduced_operator(rbsolver,get_linear_operator(op),red_trial,red_test,jac_lin,res_lin)
+  rbop_nlin = _reduced_operator(rbsolver,get_nonlinear_operator(op),red_trial,red_test,jac_nlin,res_nlin)
+  LinearNonlinearTransientRBOperator(rbop_lin,rbop_nlin)
+end
+
+function _reduced_operator(rbsolver::RBSolver,feop::ParamFEOperator,sol::AbstractSnapshots,args...)
+  op = get_algebraic_operator(feop)
+  red_trial,red_test = reduced_fe_space(rbsolver,feop,sol)
+  _reduced_operator(rbsolver,op,red_trial,red_test,args...)
+end
+
+function run_test(
+  dir::String,rbsolver::RBSolver,feop::ParamFEOperator,tols=[1e-1,1e-2,1e-3,1e-4,1e-5],
+  args...;nparams=10)
+
   fesnaps = try_loading_fe_snapshots(dir,rbsolver,feop,args...)
 
-  μon = realization(feop;nparams=10,random=true)
+  op = get_algebraic_operator(feop)
+  res = residual_snapshots(rbsolver,op,fesnaps)
+  jac = jacobian_snapshots(rbsolver,op,fesnaps)
+
+  μon = realization(feop;nparams,random=true)
   x,festats = solution_snapshots(rbsolver,feop,μon,args...)
 
   perfs = ROMPerformance[]
@@ -125,7 +188,7 @@ function run_test(dir::String,rbsolver::RBSolver,feop::ParamFEOperator,tols=[1e-
     create_dir(plot_dir_tol)
 
     rbsolver = update_solver(rbsolver,tol)
-    rbop = try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps,args...)
+    rbop = try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps,jac,res)
 
     x̂,rbstats = solve(rbsolver,rbop,μon,args...)
     perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
@@ -141,6 +204,7 @@ function run_test(dir::String,rbsolver::RBSolver,feop::ParamFEOperator,tols=[1e-
   plot_errors(results_dir,tols,perfs)
   serialize(joinpath(results_dir,"performance.jld"),(tol => perf for (tol,perf) in zip(tols,perfs)))
 
+  return perfs
 end
 
 export DrWatson

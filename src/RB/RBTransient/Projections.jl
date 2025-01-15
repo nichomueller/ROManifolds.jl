@@ -132,15 +132,6 @@ function RBSteady.empirical_interpolation(a::TransientProjection)
   return (indices_space,indices_time),interp
 end
 
-function RBSteady.set_rank(a::TransientProjection,rank::Integer)
-  a_space = a.projection_space
-  rank_time = slow_index(rank,num_reduced_dofs(a_space))
-  a_time = set_rank(a.projection_time,rank_time)
-  TransientProjection(a_space,a_time)
-end
-
-RBSteady.convergence_step(a::TransientProjection) = num_reduced_dofs(a.projection_space)*RBSteady.convergence_step(a.projection_time)
-
 # tt interface
 
 get_cores_space(a::TTSVDCores) = get_cores(a)[1:end-1]

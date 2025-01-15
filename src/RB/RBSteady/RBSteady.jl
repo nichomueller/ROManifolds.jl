@@ -120,7 +120,6 @@ export num_reduced_dofs
 export get_cores
 export project
 export inv_project
-export set_rank
 export enrich!
 include("Projections.jl")
 

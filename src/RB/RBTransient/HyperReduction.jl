@@ -133,10 +133,6 @@ function RBSteady.inv_project!(
   return b̂
 end
 
-function RBSteady.set_rank(a::TupOfAffineContribution,rank::Int...)
-  map(ai -> set_rank(ai,rank...),a)
-end
-
 function RBSteady.allocate_hypred_cache(a::TupOfAffineContribution,r::TransientRealization)
   coeffs = map(ai -> RBSteady.allocate_coefficient(ai,r),a)
   hypred = RBSteady.allocate_hyper_reduction(first(a),r)

@@ -139,6 +139,17 @@ function residual_snapshots(
   return Snapshots(b,ib,r_res)
 end
 
+function residual_snapshots(
+  solver::RBSolver,
+  op::ParamOperator{LinearNonlinearParamEq},
+  s::AbstractSnapshots;
+  kwargs...)
+
+  res_lin = residual_snapshots(solver,get_linear_operator(op),s;kwargs...)
+  res_nlin = residual_snapshots(solver,get_nonlinear_operator(op),s;kwargs...)
+  return (res_lin,res_nlin)
+end
+
 """
     jacobian_snapshots(solver::RBSolver,op::ParamOperator,s::AbstractSnapshots;nparams) -> Contribution
     jacobian_snapshots(solver::RBSolver,op::ODEParamOperator,s::AbstractSnapshots;nparams) -> Tuple{Vararg{Contribution}}
@@ -178,4 +189,15 @@ function jacobian_snapshots(
   A = jacobian(op,r_jac,us_jac)
   iA = get_sparse_dof_map_at_domains(op)
   return Snapshots(A,iA,r_jac)
+end
+
+function jacobian_snapshots(
+  solver::RBSolver,
+  op::ParamOperator{LinearNonlinearParamEq},
+  s::AbstractSnapshots;
+  kwargs...)
+
+  jac_lin = jacobian_snapshots(solver,get_linear_operator(op),s;kwargs...)
+  jac_nlin = jacobian_snapshots(solver,get_nonlinear_operator(op),s;kwargs...)
+  return (jac_lin,jac_nlin)
 end

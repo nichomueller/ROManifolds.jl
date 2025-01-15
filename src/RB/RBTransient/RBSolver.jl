@@ -85,6 +85,17 @@ function RBSteady.residual_snapshots(
   return Snapshots(b,ib,r_res)
 end
 
+function RBSteady.residual_snapshots(
+  solver::RBSolver,
+  op::ODEParamOperator{LinearNonlinearParamODE},
+  s::AbstractSnapshots;
+  kwargs...)
+
+  res_lin = residual_snapshots(solver,get_linear_operator(op),s;kwargs...)
+  res_nlin = residual_snapshots(solver,get_nonlinear_operator(op),s;kwargs...)
+  return (res_lin,res_nlin)
+end
+
 function RBSteady.jacobian_snapshots(
   solver::RBSolver,
   odeop::ODEParamOperator,
@@ -105,4 +116,15 @@ function RBSteady.jacobian_snapshots(
     sA = (sA...,select_snapshots(sa,1:num_params(reda)))
   end
   return sA
+end
+
+function RBSteady.jacobian_snapshots(
+  solver::RBSolver,
+  op::ODEParamOperator{LinearNonlinearParamODE},
+  s::AbstractSnapshots;
+  kwargs...)
+
+  jac_lin = jacobian_snapshots(solver,get_linear_operator(op),s;kwargs...)
+  jac_nlin = jacobian_snapshots(solver,get_nonlinear_operator(op),s;kwargs...)
+  return (jac_lin,jac_nlin)
 end

@@ -204,11 +204,6 @@ function HyperReduction(
   return EmptyHyperReduction(red,basis)
 end
 
-function set_rank(a::EmptyHyperReduction,rank::Integer...)
-  basis_rank = set_rank(a.basis,rank...)
-  EmptyHyperReduction(a.reduction,basis_rank)
-end
-
 """
     struct MDEIM{A,B,C} <: HyperReduction{A,B,C}
       reduction::A
@@ -257,11 +252,6 @@ function HyperReduction(
   factor = lu(interp)
   domain = integration_domain(indices)
   return MDEIM(red,proj_basis,factor,domain)
-end
-
-function set_rank(a::MDEIM,rank::Integer...)
-  basis_rank = set_rank(a.basis,rank...)
-  MDEIM(a.reduction,basis_rank,a.interpolation,a.domain)
 end
 
 """
@@ -434,12 +424,6 @@ function inv_project!(
   return hypred
 end
 
-function set_rank(a::AffineContribution,rank...)
-  contribution(get_domains(a)) do trian
-    set_rank(a[trian],rank...)
-  end
-end
-
 function reduced_form(
   red::Reduction,
   args...)
@@ -459,12 +443,28 @@ function reduced_form(
 end
 
 """
-    reduced_residual(red::Reduction,test::RBSpace,c::ArrayContribution) -> AffineContribution
+    reduced_residual(
+      solver::RBSolver,
+      op::ParamOperator,
+      red_test::RBSpace,
+      s::AbstractSnapshots
+      ) -> AffineContribution
 
-Returns the `AffineContribution` obtained following the hyper-reduction
-of the `ArrayContribution` `c`, which contains a list of residual snapshots
-defined on a corresponding list of triangulations
+Reduces the residual contained in `op` via hyper-reduction. This function
+first builds the residual snapshots, which are then reduced according to the strategy
+`residual_reduction` specified in the reduced solver `solver`
 """
+function reduced_residual(
+  solver::RBSolver,
+  op::ParamOperator,
+  red_test::RBSpace,
+  s::AbstractSnapshots)
+
+  res = residual_snapshots(solver,op,s)
+  res_red = get_residual_reduction(solver)
+  reduced_residual(res_red,red_test,res)
+end
+
 function reduced_residual(red::Reduction,test::RBSpace,c::ArrayContribution)
   t = @timed begin
     a,trians = map(get_domains(c),get_values(c)) do trian,values
@@ -476,15 +476,32 @@ function reduced_residual(red::Reduction,test::RBSpace,c::ArrayContribution)
 end
 
 """
-    reduced_jacobian(red::Reduction,trial::RBSpace,test::RBSpace,c::ArrayContribution) -> AffineContribution
-    reduced_jacobian(red::Reduction,trial::RBSpace,test::RBSpace,c::Tuple) -> Tuple{Vararg{AffineContribution}}
+    reduced_jacobian(
+      solver::RBSolver,
+      op::ParamOperator,
+      red_trial::RBSpace,
+      red_test::RBSpace,
+      s::AbstractSnapshots
+      ) -> Union{AffineContribution,TupOfAffineContribution}
 
-Returns the `AffineContribution` obtained following the hyper-reduction
-of the `ArrayContribution` `c`, which contains a list of jacobian snapshots
-defined on a corresponding list of triangulations. In transient applications, `c`
-is a tuple of contributions, thus the output will correspondingly be a tuple of
-`AffineContribution`
+Reduces the jacobian contained in `op` via hyper-reduction. This function
+first builds the jacobian snapshots, which are then reduced according to the strategy
+`reduced_jacobian` specified in the reduced solver `solver`. In transient applications,
+the output is a tuple of length equal to the number of jacobians (i.e., equal to
+the order of the ODE plus one)
 """
+function reduced_jacobian(
+  solver::RBSolver,
+  op::ParamOperator,
+  red_trial::RBSpace,
+  red_test::RBSpace,
+  s::AbstractSnapshots)
+
+  jac = jacobian_snapshots(solver,op,s)
+  jac_red = get_jacobian_reduction(solver)
+  reduced_jacobian(jac_red,red_trial,red_test,jac)
+end
+
 function reduced_jacobian(red::Reduction,trial::RBSpace,test::RBSpace,c::ArrayContribution)
   t = @timed begin
     a,trians = map(get_domains(c),get_values(c)) do trian,values
@@ -496,19 +513,26 @@ function reduced_jacobian(red::Reduction,trial::RBSpace,test::RBSpace,c::ArrayCo
 end
 
 """
-    reduced_weak_form(solver::RBSolver,op,red_trial::RBSpace,red_test::RBSpace,s::AbstractArray)
+    reduced_weak_form(
+      solver::RBSolver,
+      op::ParamOperator,
+      red_trial::RBSpace,
+      red_test::RBSpace,
+      s::AbstractSnapshots
+      ) -> (AffineContribution,Union{AffineContribution,TupOfAffineContribution})
 
-Reduces the residual/jacobian contained in `op` via hyper-reduction. This function
-first builds the residual/jacobian snapshots, and then calls the functions
-`reduced_residual` and `reduced_jacobian`
+Reduces the residual/jacobian contained in `op` via hyper-reduction. Check the
+functions `reduced_residual` and `reduced_jacobian` for more details
 """
-function reduced_weak_form(solver::RBSolver,op,red_trial::RBSpace,red_test::RBSpace,s::AbstractArray)
-  jac = jacobian_snapshots(solver,op,s)
-  res = residual_snapshots(solver,op,s)
-  jac_red = get_jacobian_reduction(solver)
-  res_red = get_residual_reduction(solver)
-  red_jac = reduced_jacobian(jac_red,red_trial,red_test,jac)
-  red_res = reduced_residual(res_red,red_test,res)
+function reduced_weak_form(
+  solver::RBSolver,
+  op::ParamOperator,
+  red_trial::RBSpace,
+  red_test::RBSpace,
+  s::AbstractSnapshots)
+
+  red_jac = reduced_jacobian(solver,op,red_trial,red_test,s)
+  red_res = reduced_residual(solver,op,red_test,s)
   return red_jac,red_res
 end
 
@@ -588,15 +612,6 @@ for (T,S) in zip((:HyperReduction,:BlockHyperReduction,:AffineContribution),
       @notimplemented "Must provide cache in advance"
     end
   end
-end
-
-function set_rank(a::BlockHyperReduction{A},rank_trial,rank_test) where A
-  hyper_reds = Matrix{A}(undef,size(a))
-  for (i,j) in Iterators.product(1:length(rank_test),1:length(rank_trial))
-    hyper_reds[i,j] = set_rank(a.array[i,j],rank_trial[j],rank_test[i])
-  end
-  hyper_red = BlockProjection(hyper_reds,a.touched)
-  return hyper_red
 end
 
 function Arrays.return_cache(
