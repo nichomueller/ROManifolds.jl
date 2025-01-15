@@ -69,8 +69,6 @@ function RBSteady.allocate_rbcache(fesolver::ODESolver,op::RBOperator,args...)
   @abstractmethod
 end
 
-RBSteady.linear_jacobian(cache::LinearNonlinearRBCache{<:TupOfHRParamArray}) = sum(cache.A.hypred)
-
 """
     struct GenericTransientRBOperator{O} <: TransientRBOperator{O}
       op::ODEParamOperator{O}
@@ -124,7 +122,7 @@ function Algebra.allocate_jacobian(
 end
 
 function Algebra.residual!(
-  cache::AbstractHRParamArray,
+  cache::HRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
@@ -138,7 +136,7 @@ function Algebra.residual!(
 end
 
 function Algebra.residual!(
-  cache::AbstractHRParamArray,
+  cache::HRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{RBParamVector}},
@@ -152,7 +150,7 @@ function Algebra.residual!(
 end
 
 function Algebra.jacobian!(
-  cache::AbstractHRParamArray,
+  cache::HRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
@@ -167,7 +165,7 @@ function Algebra.jacobian!(
 end
 
 function Algebra.jacobian!(
-  cache::AbstractHRParamArray,
+  cache::HRParamArray,
   op::GenericTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{RBParamVector}},
@@ -221,7 +219,7 @@ end
 function RBSteady.set_rank(op::GenericTransientRBOperator,rank)
   test_rank = set_rank(op.test,rank)
   trial_rank = set_rank(op.trial,rank)
-  lhs_rank = set_rank(op.lhs,rank,rank)
+  lhs_rank = map(lhs -> set_rank(lhs,rank,rank),op.lhs)
   rhs_rank = set_rank(op.rhs,rank)
   GenericTransientRBOperator(op.op,trial_rank,test_rank,lhs_rank,rhs_rank)
 end
@@ -286,19 +284,16 @@ function Algebra.residual!(
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
-  rbcache::LinearNonlinearRBCache{<:TupOfHRParamArray})
-
-  @check length(rbcache.A) == length(us)
+  rbcache::LinearNonlinearRBCache)
 
   nlop = get_nonlinear_operator(op)
-  b_lin = RBSteady.linear_residual(rbcache)
+  A_lin = rbcache.A
+  b_lin = rbcache.b
   rbcache_nlin = rbcache.rbcache
 
   b_nlin = residual!(cache,nlop,r,us,rbcache_nlin)
   axpy!(1.0,b_lin,b_nlin)
-  for (A_lin,u) in zip(rbcache.A.hypred,us)
-    mul!(b_nlin,A_lin,u,true,true)
-  end
+  mul!(b_nlin,A_lin,us[end],true,true)
 
   return b_nlin
 end
@@ -312,7 +307,7 @@ function Algebra.jacobian!(
   rbcache::LinearNonlinearRBCache)
 
   nlop = get_nonlinear_operator(op)
-  A_lin = RBSteady.linear_jacobian(rbcache)
+  A_lin = rbcache.A
   rbcache_nlin = rbcache.rbcache
 
   A_nlin = jacobian!(cache,nlop,r,us,ws,rbcache_nlin)
@@ -322,8 +317,17 @@ function Algebra.jacobian!(
 end
 
 function RBSteady.set_rank(op::LinearNonlinearTransientRBOperator,rank)
-  op_lin_rank = set_rank(op.op_linear,rank)
-  op_nlin_rank = set_rank(op.op_nonlinear,rank)
+  test_rank = set_rank(get_test(op),rank)
+  trial_rank = set_rank(get_trial(op),rank)
+
+  lin_lhs_rank = map(lhs -> set_rank(lhs,rank,rank),op.op_linear.lhs)
+  lin_rhs_rank = set_rank(op.op_linear.rhs,rank)
+  op_lin_rank = GenericTransientRBOperator(op.op_linear.op,trial_rank,test_rank,lin_lhs_rank,lin_rhs_rank)
+
+  nlin_lhs_rank = map(lhs -> set_rank(lhs,rank,rank),op.op_nonlinear.lhs)
+  nlin_rhs_rank = set_rank(op.op_nonlinear.rhs,rank)
+  op_nlin_rank = GenericTransientRBOperator(op.op_nonlinear.op,trial_rank,test_rank,nlin_lhs_rank,nlin_rhs_rank)
+
   LinearNonlinearTransientRBOperator(op_lin_rank,op_nlin_rank)
 end
 
@@ -473,7 +477,7 @@ function RBSteady.select_at_indices(
   return ConsecutiveParamArray(entries)
 end
 
-function RBSteady.select_at_indices(s::AbstractParamArray,a::TransientHyperReduction,indices::Range2D)
+function RBSteady.select_at_indices(s::AbstractArray,a::TransientHyperReduction,indices::Range2D)
   ids_space = get_indices_space(a)
   ids_param = indices.axis1
   common_ids_time = indices.axis2

@@ -52,21 +52,18 @@ function reduced_operator(
   LinearNonlinearRBOperator(red_op_lin,red_op_nlin)
 end
 
-struct RBCache{Ta} <: AbstractParamCache
-  A::Ta
+struct RBCache <: AbstractParamCache
+  A::HRParamArray
   b::HRParamArray
   trial::RBSpace
   paramcache::ParamOpCache
 end
 
-struct LinearNonlinearRBCache{Ta} <: AbstractParamCache
+struct LinearNonlinearRBCache <: AbstractParamCache
   rbcache::RBCache
-  A::Ta
+  A::AbstractMatrix
   b::AbstractVector
 end
-
-linear_residual(cache::LinearNonlinearRBCache) = cache.b
-linear_jacobian(cache::LinearNonlinearRBCache) = cache.A
 
 """
     abstract type RBOperator{O} <: ParamOperator{O,SplitDomains} end
@@ -347,8 +344,8 @@ function Algebra.residual!(
   rbcache::LinearNonlinearRBCache)
 
   nlop = get_nonlinear_operator(op)
-  A_lin = linear_jacobian(rbcache)
-  b_lin = linear_residual(rbcache)
+  A_lin = rbcache.A
+  b_lin = rbcache.b
   rbcache_nlin = rbcache.rbcache
 
   b_nlin = residual!(cache,nlop,r,u,rbcache_nlin)
@@ -366,7 +363,7 @@ function Algebra.jacobian!(
   rbcache::LinearNonlinearRBCache)
 
   nlop = get_nonlinear_operator(op)
-  A_lin = linear_jacobian(rbcache)
+  A_lin = rbcache.A
   rbcache_nlin = rbcache.rbcache
 
   A_nlin = jacobian!(cache,nlop,r,u,rbcache_nlin)
@@ -376,8 +373,17 @@ function Algebra.jacobian!(
 end
 
 function set_rank(op::LinearNonlinearRBOperator,rank)
-  op_lin_rank = set_rank(op.op_linear,rank)
-  op_nlin_rank = set_rank(op.op_nonlinear,rank)
+  test_rank = set_rank(get_test(op),rank)
+  trial_rank = set_rank(get_trial(op),rank)
+
+  lin_lhs_rank = set_rank(op.op_linear.lhs,rank,rank)
+  lin_rhs_rank = set_rank(op.op_linear.rhs,rank)
+  op_lin_rank = GenericRBOperator(op.op_linear.op,trial_rank,test_rank,lin_lhs_rank,lin_rhs_rank)
+
+  nlin_lhs_rank = set_rank(op.op_nonlinear.lhs,rank,rank)
+  nlin_rhs_rank = set_rank(op.op_nonlinear.rhs,rank)
+  op_nlin_rank = GenericRBOperator(op.op_nonlinear.op,trial_rank,test_rank,nlin_lhs_rank,nlin_rhs_rank)
+
   LinearNonlinearRBOperator(op_lin_rank,op_nlin_rank)
 end
 

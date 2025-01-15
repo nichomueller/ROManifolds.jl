@@ -15,7 +15,7 @@ include("ExamplesInterface.jl")
 θ = 1.0
 dt = 0.0025
 t0 = 0.0
-tf = 10*dt
+tf = 30*dt
 
 pranges = fill([1.0,10.0],3)
 tdomain = t0:dt:tf
@@ -93,8 +93,8 @@ fesolver = ThetaMethod(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=tru
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 
 tol = 1e-4
-state_reduction = TransientReduction(coupling,tol,energy;nparams=10,sketch=:sprn)
-rbsolver = RBSolver(fesolver,state_reduction;nparams_res=5,nparams_jac=5,nparams_djac=1)
+state_reduction = TransientReduction(coupling,tol,energy;nparams=50,sketch=:sprn)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=40,nparams_jac=20,nparams_djac=1)
 
 dir = datadir("transient_nstokes_pod")
 create_dir(dir)
@@ -104,129 +104,31 @@ ExamplesInterface.run_test(dir,rbsolver,feop,tols,xh0μ)
 
 end
 
-using Gridap.CellData
-using SparseArrays
-using Gridap.Algebra
-using Gridap.FESpaces
-using Gridap.Geometry
-using Gridap.Algebra
-using Gridap.Arrays
-using Gridap.ODEs
-
-using ROM.Utils
-using ROM.DofMaps
-using ROM.RBSteady
-using ROM.RBTransient
-using ROM.ParamSteady
-using ROM.ParamDataStructures
-
-using BlockArrays
-using LinearAlgebra
-
-tol = 1e-4
-state_reduction = TransientReduction(tol,energy;nparams=10)
-rbsolver = RBSolver(fesolver,state_reduction;nparams_res=5,nparams_jac=5,nparams_djac=1)
-
-fesnaps = ExamplesInterface.try_loading_fe_snapshots(dir,rbsolver,feop,xh0μ)
+fesnaps, = solution_snapshots(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-μon = realization(feop;nparams=1,random=true)
+μon = realization(feop;nparams=10,random=true)
+x̂,rbstats = solve(rbsolver,rbop,μon,xh0μ)
+x,festats = solution_snapshots(rbsolver,feop,μon,xh0μ)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 
-r = μon
-op = rbop
+dir = datadir("transient_nstokes_pod")
+dir_tol = joinpath(dir,string(1e-4))
+create_dir(dir_tol)
 
-x̂ = zero_free_values(get_trial(op)(r))
-x = zero_free_values(get_fe_trial(op)(r))
-x0 = get_free_dof_values(xh0μ(get_params(r)))
-rbcache = allocate_rbcache(fesolver,op,r,x)
+save(dir,fesnaps)
+save(dir,x;label="online")
+save(dir_tol,rbop)
 
-sysslvr = fesolver.sysslvr
-ŷ = RBParamVector(x̂,x)
-uθ = copy(ŷ)
-dut = copy(ŷ)
-red_trial = get_trial(op)(r)
+fesnaps = load_snapshots(dir)
+x = load_snapshots(dir;label="online")
+rbop = load_operator(dir_tol,feop)
 
-function us(u::RBParamVector)
-  inv_project!(u.fe_data,rbcache.rbcache.trial,u.data)
-  # copyto!(uθ,u)
-  # shift!(uθ,red_trial,x0,θ,1-θ)
-  # copyto!(dut,u)
-  # shift!(dut,red_trial,x0,1/dt,-1/dt)
-  (u,u)
-end
+μon = get_realization(x)
+x̂,rbstats = solve(rbsolver,rbop,μon,xh0μ)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,rbstats,rbstats,μon)
 
-ws = (1,1)
-usx = us(ŷ)
+plot_dir_tol = joinpath(dir_tol,"plot")
+create_dir(plot_dir_tol)
+plot_a_solution(plot_dir_tol,feop,rbop,x,x̂,μon)
 
-Âcache = jacobian(op,r,usx,ws,rbcache)
-b̂cache = residual(op,r,usx,rbcache)
-
-Â_item = testitem(Âcache)
-x̂_item = testitem(x̂)
-dx̂ = allocate_in_domain(Â_item)
-fill!(dx̂,zero(eltype(dx̂)))
-ss = symbolic_setup(BackslashSolver(),Â_item)
-ns = numerical_setup(ss,Â_item,x̂_item)
-
-shift!(r,dt*(θ-1))
-nlop = ParamStageOperator(op,rbcache,r,us,ws)
-# Algebra._solve_nr!(ŷ,Âcache,b̂cache,dx̂,ns,sysslvr,nlop)
-
-rmul!(b̂cache,-1)
-xi = param_getindex(ŷ,1)
-Ai = param_getindex(Âcache,1)
-bi = param_getindex(b̂cache,1)
-numerical_setup!(ns,Ai)
-solve!(dx̂,ns,bi)
-xi .+= dx̂
-
-# residual!(b̂cache,nlop,ŷ)
-# jacobian!(Âcache,nlop,ŷ)
-
-cache = nlop.cache
-r = nlop.r
-usx = nlop.us(ŷ)
-b = b̂cache
-# residual!(b,nlop.op,r,usx,cache)
-nnlop = get_nonlinear_operator(nlop.op)
-b_lin = RBSteady.linear_residual(cache)
-rbcache_nlin = cache.rbcache
-
-b_nlin = residual!(b,nnlop,r,usx,rbcache_nlin)
-axpy!(1.0,b_lin,b_nlin)
-for (A_lin,u) in zip(cache.A.hypred,usx)
-  mul!(b_nlin,A_lin,u,true,true)
-end
-
-# odeop = get_algebraic_operator(feop.op_nonlinear)
-# # ress = residual_snapshots(rbsolver,odeop,fesnaps)
-# sres = fesnaps
-# us_res = (get_values(sres),)
-# us0_res = RBTransient.get_initial_values(sres)
-# r_res = get_realization(sres)
-# # residual(fesolver,odeop,r_res,us_res,us0_res)
-# u = get_values(sres)
-# x = copy(u)
-# uθ = copy(u)
-
-# shift!(r,dt*(θ-1))
-# shift!(uθ,us0_res,θ,1-θ)
-# shift!(x,us0_res,1/dt,-1/dt)
-# us = (uθ,x)
-# b = residual(odeop,r,us)
-
-
-inv_project!(ŷ.fe_data,rbcache.rbcache.trial,ŷ.data)
-copyto!(uθ.fe_data,u.fe_data)
-shift!(uθ.fe_data,x0,θ,1-θ)
-copyto!(dut.fe_data,u.fe_data)
-shift!(dut.fe_data,x0,1/dt,-1/dt)
-(uθ,dut)
-
-#
-
-s1 = flatten_snapshots(fesnaps[1])
-projection_space = projection(state_reduction.reduction_space,s1,norm_matrix[Block(1,1)])
-proj_s1 = project(projection_space,s1)
-proj_s2 = change_mode(proj_s1,num_params(s))
-projection_time = projection(get_reduction_time(red),proj_s2)
-TransientProjection(projection_space,projection_time)
+perfs = eval_convergence(rbsolver,feop,rbop,x,rbstats,μon,xh0μ)

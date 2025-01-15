@@ -250,12 +250,13 @@ function eval_performance(
 end
 
 function eval_convergence(
+  rbsolver::RBSolver,
   feop::ParamFEOperator,
   rbop::ParamOperator,
-  rbsolver::RBSolver,
   fesnaps::Snapshots,
   festats::CostTracker,
-  r::AbstractRealization)
+  r::AbstractRealization,
+  args...)
 
   test = get_test(rbop)
   trial = get_trial(rbop)
@@ -265,7 +266,7 @@ function eval_convergence(
   perfs = ROMPerformance[]
   for ntol = n:-step:1
     rbop_ntol = set_rank(rbop,ntol)
-    x̂_ntol,rbstats_ntol = solve(rbsolver,rbop_ntol,r)
+    x̂_ntol,rbstats_ntol = solve(rbsolver,rbop_ntol,r,args...)
     perf_tol = eval_performance(rbsolver,feop,rbop_ntol,fesnaps,x̂_ntol,festats,rbstats_ntol,r)
     push!(perfs,perf_tol)
   end
@@ -274,12 +275,13 @@ function eval_convergence(
 end
 
 function eval_convergence(
+  rbsolver::RBSolver,
   feop::ParamFEOperator,
   rbop::ParamOperator,
-  rbsolver::RBSolver,
   fesnaps::BlockSnapshots,
   festats::CostTracker,
-  r::AbstractRealization)
+  r::AbstractRealization,
+  args...)
 
   test = get_test(rbop)
   trial = get_trial(rbop)
@@ -293,7 +295,7 @@ function eval_convergence(
     for nfieldtol = nfield:-stepfield:1
       ntol[field] = nfieldtol
       rbop_ntol = set_rank(rbop,ntol)
-      x̂_ntol,rbstats_ntol = solve(rbsolver,rbop_ntol,r)
+      x̂_ntol,rbstats_ntol = solve(rbsolver,rbop_ntol,r,args...)
       perf_tol = eval_performance(rbsolver,feop,rbop_ntol,fesnaps,x̂_ntol,festats,rbstats_ntol,r)
       push!(perfs,perf_tol)
     end

@@ -593,9 +593,7 @@ end
 function set_rank(a::BlockHyperReduction{A},rank_trial,rank_test) where A
   hyper_reds = Matrix{A}(undef,size(a))
   for (i,j) in Iterators.product(1:length(rank_test),1:length(rank_trial))
-    if a.touched[i,j]
-      hyper_reds[i,j] = set_rank(a[i,j],rank_trial[j],rank_test[i])
-    end
+    hyper_reds[i,j] = set_rank(a.array[i,j],rank_trial[j],rank_test[i])
   end
   hyper_red = BlockProjection(hyper_reds,a.touched)
   return hyper_red

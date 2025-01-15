@@ -241,3 +241,41 @@ function ODEs.ode_march!(
   cache = (uθ,odeparamcache,sysslvrcache)
   (r,statef,cache)
 end
+
+
+# utils
+
+function ParamDataStructures.shift!(
+  a::ConsecutiveParamVector,
+  a0::ConsecutiveParamVector,
+  α::Number,
+  β::Number)
+
+  data = get_all_data(a)
+  data0 = get_all_data(a0)
+  data′ = copy(data)
+  np = param_length(a0)
+  for ipt = param_eachindex(a)
+    it = slow_index(ipt,np)
+    if it == 1
+      for is in axes(data,1)
+        data[is,ipt] = α*data[is,ipt] + β*data0[is,ipt]
+      end
+    else
+      for is in axes(data,1)
+        data[is,ipt] = α*data[is,ipt] + β*data′[is,ipt-np]
+      end
+    end
+  end
+end
+
+function ParamDataStructures.shift!(
+  a::BlockParamVector,
+  a0::BlockParamVector,
+  α::Number,
+  β::Number)
+
+  @inbounds for (ai,a0i) in zip(blocks(a),blocks(a0))
+    ParamDataStructures.shift!(ai,a0i,α,β)
+  end
+end

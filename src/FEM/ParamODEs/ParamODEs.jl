@@ -20,6 +20,7 @@ using ROM.ParamDataStructures
 using ROM.ParamFESpaces
 using ROM.ParamSteady
 
+import BlockArrays: blocks
 import Test: @test
 import UnPack: @unpack
 import Gridap.Algebra: residual!,jacobian!

@@ -137,35 +137,10 @@ function RBSteady.set_rank(a::TupOfAffineContribution,rank::Int...)
   map(ai -> set_rank(ai,rank...),a)
 end
 
-abstract type JacobianStyle end
-struct JointJacobian <: JacobianStyle end
-struct SplitJacobian <: JacobianStyle end
-
-function RBSteady.allocate_hypred_cache(
-  a::TupOfAffineContribution,
-  r::TransientRealization,
-  ::JointJacobian)
-
+function RBSteady.allocate_hypred_cache(a::TupOfAffineContribution,r::TransientRealization)
   coeffs = map(ai -> RBSteady.allocate_coefficient(ai,r),a)
   hypred = RBSteady.allocate_hyper_reduction(first(a),r)
   return coeffs,hypred
-end
-
-function RBSteady.allocate_hypred_cache(
-  a::TupOfAffineContribution,
-  r::TransientRealization,
-  ::SplitJacobian)
-
-  coeffs = map(ai -> RBSteady.allocate_coefficient(ai,r),a)
-  hypred = map(ai -> RBSteady.allocate_hyper_reduction(ai,r),a)
-  return coeffs,hypred
-end
-
-function RBSteady.allocate_hypred_cache(
-  a::TupOfAffineContribution,
-  r::TransientRealization)
-
-  allocate_hypred_cache(a,r,JointJacobian())
 end
 
 # multi field interface
