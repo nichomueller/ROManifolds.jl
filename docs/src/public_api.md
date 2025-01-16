@@ -91,7 +91,6 @@ BlockProjection
 ReducedProjection
 projection
 get_basis
-get_cores
 project
 inv_project
 galerkin_projection

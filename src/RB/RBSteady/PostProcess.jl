@@ -259,6 +259,29 @@ function Base.show(io::IO,perf::ROMPerformance)
   show(io,MIME"text/plain"(),perf)
 end
 
+"""
+    eval_performance(
+      solver::RBSolver,
+      feop::ParamFEOperator,
+      fesnaps::AbstractSnapshots,
+      rbsnaps::AbstractSnapshots,
+      festats::CostTracker,
+      rbstats::CostTracker,
+      args...
+      ) -> ROMPerformance
+
+Arguments:
+  - `solver`: solver for the reduced problem
+  - `feop`: FE operator representing the PDE
+  - `fesnaps`: online snapshots of the FE solution
+  - `rbsnaps`: reduced approximation of `fesnaps`
+  - `festats`: time and memory consumption needed to compute `fesnaps`
+  - `rbstats`: time and memory consumption needed to compute `rbsnaps`
+
+Returns the performance of the reduced algorithm, in terms of the (relative) error
+between `rbsnaps` and `fesnaps`, and the computational speedup between `rbstats`
+and `festats`
+"""
 function eval_performance(
   solver::RBSolver,
   feop::ParamFEOperator,
@@ -371,6 +394,18 @@ function plot_a_solution(dir,Ω,uh,ûh,r::Realization)
   writevtk(Ω,dir*".vtu",cellfields=["uh"=>uh1,"ûh"=>ûh1,"eh"=>eh1])
 end
 
+"""
+    plot_a_solution(
+      dir,
+      feop::ParamFEOperator,
+      sol::Snapshots,
+      sol_approx::Snapshots,
+      args...
+      ) -> Nothing
+
+Plots a single FE solution, RB solution, and the point-wise error between the two,
+by selecting the first FE snapshot in `sol` and the first reduced snapshot in `sol_approx`
+"""
 function plot_a_solution(
   dir,
   feop::ParamFEOperator,

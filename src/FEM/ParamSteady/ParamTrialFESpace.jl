@@ -130,7 +130,7 @@ Arrays.evaluate(U::FESpace,r) = U
 # Define the interface for MultiField
 
 """
-    const TransientMultiFieldParamFESpace = MultiFieldFESpace
+    const MultiFieldParamFESpace = MultiFieldFESpace
 """
 const MultiFieldParamFESpace = MultiFieldFESpace
 
