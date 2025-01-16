@@ -1,4 +1,4 @@
-module ElasticitySteady
+module NStokesTransientPOD
 
 using ROM
 using Gridap

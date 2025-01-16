@@ -34,6 +34,7 @@ import Base: +,-,*,\
 import UnPack: @unpack
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
+import ROM.RBSteady: _get_label
 
 export TransientReduction
 export TransientMDEIMReduction
@@ -63,7 +64,6 @@ export TransientEvalMultiFieldRBSpace
 include("RBSpace.jl")
 
 export TransientMDEIM
-export TransientAffineDecomposition
 include("HyperReduction.jl")
 
 include("HRParamArray.jl")

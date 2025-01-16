@@ -345,8 +345,6 @@ struct ParamFunction{F,P} <: AbstractParamFunction{P}
   params::P
 end
 
-const 𝑓ₚ = ParamFunction
-
 function ParamFunction(f::Function,p::AbstractArray)
   @notimplemented "Use a Realization as a parameter input"
 end
@@ -436,8 +434,6 @@ struct TransientParamFunction{F,P,T} <: AbstractParamFunction{P}
   params::P
   times::T
 end
-
-const 𝑓ₚₜ = TransientParamFunction
 
 function TransientParamFunction(f::Function,p::AbstractArray,t)
   @notimplemented "Use a Realization as a parameter input"

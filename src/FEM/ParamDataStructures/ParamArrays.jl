@@ -194,7 +194,14 @@ struct ConsecutiveParamArray{T,N,M,A<:AbstractArray{T,M}} <: ParamArray{T,N}
   end
 end
 
+"""
+    const ConsecutiveParamVector{T,A<:AbstractArray{T,2}} = ConsecutiveParamArray{T,1,2,A}
+"""
 const ConsecutiveParamVector{T,A<:AbstractArray{T,2}} = ConsecutiveParamArray{T,1,2,A}
+
+"""
+    const ConsecutiveParamMatrix{T,A<:AbstractArray{T,3}} = ConsecutiveParamArray{T,2,3,A}
+"""
 const ConsecutiveParamMatrix{T,A<:AbstractArray{T,3}} = ConsecutiveParamArray{T,2,3,A}
 
 param_length(A::ConsecutiveParamArray{T,N,M}) where {T,N,M} = size(A.data,M)

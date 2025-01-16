@@ -8,9 +8,13 @@ using Test
 
 using ROM
 
+import Gridap.CellData: get_domains
+import Gridap.FESpaces: get_algebraic_operator
 import Gridap.Helpers: @abstractmethod,@check
 import Gridap.MultiField: BlockMultiFieldStyle
-import ROM.RBSteady: solution_snapshots,get_state_reduction,get_residual_reduction,get_jacobian_reduction
+import ROM.ParamSteady: get_domains_res,get_domains_jac
+import ROM.RBSteady: get_state_reduction,get_residual_reduction,get_jacobian_reduction,
+                     load_residuals,load_jacobians
 
 function try_loading_fe_snapshots(dir,rbsolver,feop,args...;kwargs...)
   try
@@ -25,15 +29,27 @@ function try_loading_fe_snapshots(dir,rbsolver,feop,args...;kwargs...)
   end
 end
 
-function try_loading_reduced_operator(dir,rbsolver,feop,fesnaps,jac,res)
+function try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps)
   try
-    rbop = load_operator(dir,feop)
-    println("Load reduced operator at $dir succeeded!")
+    rbop = load_operator(dir_tol,feop)
+    println("Load reduced operator at $dir_tol succeeded!")
     return rbop
   catch
-    println("Load reduced operator at $dir failed, must run offline phase")
+    println("Load reduced operator at $dir_tol failed, must run offline phase")
+    op = get_algebraic_operator(feop)
+    dir = joinpath(splitpath(dir_tol)[1:end-1])
+    local res,jac
+    try
+      res = load_residuals(dir,feop)
+      jac = load_jacobians(dir,feop)
+    catch
+      res = residual_snapshots(rbsolver,op,fesnaps)
+      jac = jacobian_snapshots(rbsolver,op,fesnaps)
+      save(dir,res,feop;label="res")
+      save(dir,jac,feop;label="jac")
+    end
     rbop = _reduced_operator(rbsolver,feop,fesnaps,jac,res)
-    save(dir,rbop)
+    save(dir_tol,rbop)
     return rbop
   end
 end
@@ -159,7 +175,7 @@ end
 
 function _reduced_operator(rbsolver::RBSolver,feop::ParamFEOperator,sol::AbstractSnapshots,args...)
   op = get_algebraic_operator(feop)
-  red_trial,red_test = reduced_fe_space(rbsolver,feop,sol)
+  red_trial,red_test = reduced_spaces(rbsolver,feop,sol)
   _reduced_operator(rbsolver,op,red_trial,red_test,args...)
 end
 
@@ -168,10 +184,6 @@ function run_test(
   args...;nparams=10)
 
   fesnaps = try_loading_fe_snapshots(dir,rbsolver,feop,args...)
-
-  op = get_algebraic_operator(feop)
-  res = residual_snapshots(rbsolver,op,fesnaps)
-  jac = jacobian_snapshots(rbsolver,op,fesnaps)
 
   μon = realization(feop;nparams,random=true)
   x,festats = solution_snapshots(rbsolver,feop,μon,args...)
@@ -188,7 +200,7 @@ function run_test(
     create_dir(plot_dir_tol)
 
     rbsolver = update_solver(rbsolver,tol)
-    rbop = try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps,jac,res)
+    rbop = try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps)
 
     x̂,rbstats = solve(rbsolver,rbop,μon,args...)
     perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)

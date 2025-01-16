@@ -193,6 +193,12 @@ function ParamFEOperator(res::Function,jac::Function,pspace,trial,test)
     res,jac,pspace,assem,dof_maps,trial,test,domains)
 end
 
+"""
+  LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test
+    ) -> ParamFEOperator{LinearParamEq,TriangulationStyle}
+
+Returns a linear parametric FE operator
+"""
 function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test)
   jac′(μ,u,du,v) = jac(μ,du,v)
   assem = SparseMatrixAssembler(trial,test)

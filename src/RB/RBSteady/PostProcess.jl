@@ -12,26 +12,6 @@ function create_dir(dir::String)
   return
 end
 
-"""
-    load_solve(solver::RBSolver,feop::ParamFEOperator,dir::String;kwargs...) -> ROMPerformance
-    load_solve(solver::RBSolver,feop::TransientParamFEOperator,dir::String;kwargs...) -> ROMPerformance
-
-Loads the snapshots previously saved to file, loads the reduced operator
-previously saved to file, and returns the results. This function allows to entirely
-skip the RB's offline phase. The field `dir` should be the directory where the
-saved quantities can be found. Note that this function must be used after the test
-case has been run at least once!
-"""
-function load_solve(solver,feop,dir)
-  fe_sol = load_snapshots(dir)
-  fe_stats = load_stats(dir)
-  rbop = load_operator(dir,feop)
-  rb_sol,rb_stats,_ = solve(solver,rbop,fe_sol)
-  old_results = deserialize(get_results_filename(dir))
-  results = eval_performance(solver,rbop,fe_sol,rb_sol,rb_stats,fe_stats)
-  return results
-end
-
 function DrWatson.save(dir,args::Tuple)
   map(a->save(dir,a),args)
 end
@@ -60,12 +40,18 @@ function get_filename(dir::String,name::String,labels...;extension=".jld")
 end
 
 function DrWatson.save(dir,s::AbstractSnapshots;label="")
-  snaps_dir = get_filename(dir,"snapshots",label)
+  snaps_dir = get_filename(dir,"snaps",label)
   serialize(snaps_dir,s)
 end
 
+"""
+    load_snapshots(dir;label="") -> AbstractSnapshots
+
+Load the snapshots at the directory `dir`. Throws an error if the snapshots
+have not been previously saved to file
+"""
 function load_snapshots(dir;label="")
-  snaps_dir = get_filename(dir,"snapshots",label)
+  snaps_dir = get_filename(dir,"snaps",label)
   deserialize(snaps_dir)
 end
 
@@ -93,9 +79,9 @@ function DrWatson.save(dir,r::RBSpace;label="")
   save(dir,get_reduced_subspace(r);label)
 end
 
-function load_fe_subspace(dir,f::FESpace;label="")
+function load_reduced_subspace(dir,f::FESpace;label="")
   basis = load_projection(dir;label)
-  fe_subspace(f,basis)
+  reduced_subspace(f,basis)
 end
 
 for T in (:HyperReduction,:BlockHyperReduction)
@@ -112,16 +98,36 @@ function load_decomposition(dir;label="")
   deserialize(hr_dir)
 end
 
-function DrWatson.save(dir,contrib::AffineContribution;label::String="")
+function DrWatson.save(dir,contrib::Contribution;label="")
   for (i,c) in enumerate(get_values(contrib))
     save(dir,c;label=_get_label(label,i))
   end
 end
 
-function load_contribution(dir,trian,args...;label::String="")
+function load_contribution(
+  dir,
+  trian::Tuple{Vararg{Triangulation}};
+  f::Function=load_decomposition,
+  label="")
+
+  dec = ()
+  for (i,t) in enumerate(trian)
+    deci = f(dir;label=_get_label(label,i))
+    dec = (dec...,deci)
+  end
+  return Contribution(dec,trian)
+end
+
+function load_contribution(
+  dir,
+  trian::Tuple{Vararg{Triangulation}},
+  args::RBSpace...;
+  f::Function=load_decomposition,
+  label="")
+
   dec,redt = (),()
   for (i,t) in enumerate(trian)
-    deci = load_decomposition(dir;label=_get_label(label,i))
+    deci = f(dir;label=_get_label(label,i))
     redti = reduced_triangulation(t,deci,args...)
     if isa(redti,AbstractArray)
       redti = Utils.merge_triangulations(redti)
@@ -130,6 +136,36 @@ function load_contribution(dir,trian,args...;label::String="")
     redt = (redt...,redti)
   end
   return Contribution(dec,redt)
+end
+
+function DrWatson.save(dir,contrib::ArrayContribution,::SplitParamFEOperator;label="res")
+  save(dir,contrib;label)
+end
+
+function DrWatson.save(dir,contrib::TupOfArrayContribution,feop::LinearNonlinearParamFEOperator;label="res")
+  @check length(contrib) == 2
+  save(dir,first(contrib),get_linear_operator(feop);label=_get_label(label,"lin"))
+  save(dir,last(contrib),get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
+end
+
+function load_residuals(dir,feop::SplitParamFEOperator;label="res")
+  load_contribution(dir,get_domains_res(feop);load_snapshots,label)
+end
+
+function load_jacobians(dir,feop::SplitParamFEOperator;label="jac")
+  load_contribution(dir,get_domains_jac(feop);load_snapshots,label)
+end
+
+function load_residuals(dir,feop::LinearNonlinearParamFEOperator;label="res")
+  res_lin = load_residuals(dir,get_linear_operator(feop);label=_get_label(label,"lin"))
+  res_nlin = load_residuals(dir,get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
+  return (res_lin,res_nlin)
+end
+
+function load_jacobians(dir,feop::LinearNonlinearParamFEOperator;label="jac")
+  jac_lin = load_jacobians(dir,get_linear_operator(feop);label=_get_label(label,"lin"))
+  jac_nlin = load_jacobians(dir,get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
+  return (jac_lin,jac_nlin)
 end
 
 function _save_fixed_operator_parts(dir,op;label="")
@@ -148,14 +184,14 @@ function DrWatson.save(dir,op::GenericRBOperator;kwargs...)
 end
 
 function _load_fixed_operator_parts(dir,feop;label="")
-  test = load_fe_subspace(dir,get_test(feop);label=_get_label(label,"test"))
-  trial = load_fe_subspace(dir,get_trial(feop);label=_get_label(label,"trial"))
+  test = load_reduced_subspace(dir,get_test(feop);label=_get_label(label,"test"))
+  trial = load_reduced_subspace(dir,get_trial(feop);label=_get_label(label,"trial"))
   return trial,test
 end
 
 function _load_trian_operator_parts(dir,feop::SplitParamFEOperator,trial,test;label="")
-  trian_res = ParamSteady.get_domains_res(feop)
-  trian_jac = ParamSteady.get_domains_jac(feop)
+  trian_res = get_domains_res(feop)
+  trian_jac = get_domains_jac(feop)
   pop = get_algebraic_operator(feop)
   red_rhs = load_contribution(dir,trian_res,test;label=_get_label(label,"rhs"))
   red_lhs = load_contribution(dir,trian_jac,trial,test;label=_get_label(label,"lhs"))
@@ -165,6 +201,14 @@ function _load_trian_operator_parts(dir,feop::SplitParamFEOperator,trial,test;la
   return new_pop,red_lhs,red_rhs
 end
 
+"""
+    load_operator(dir,feop::SplitParamFEOperator;kwargs...) -> RBOperator
+    load_operator(dir,feop::SplitTransientParamFEOperator;kwargs...) -> TransientRBOperator
+
+Given a FE operator `feop`, load its reduced counterpart stored in the
+directory `dir`. Throws an error if the reduced operator has not been previously
+saved to file
+"""
 function load_operator(dir,feop::SplitParamFEOperator;kwargs...)
   trial,test = _load_fixed_operator_parts(dir,feop;kwargs...)
   pop,red_lhs,red_rhs = _load_trian_operator_parts(dir,feop,trial,test;kwargs...)
@@ -174,16 +218,16 @@ end
 
 function DrWatson.save(dir,op::LinearNonlinearRBOperator;label="")
   _save_fixed_operator_parts(dir,op.op_linear;label)
-  _save_trian_operator_parts(dir,op.op_linear;label=_get_label(label,"linear"))
-  _save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nonlinear"))
+  _save_trian_operator_parts(dir,op.op_linear;label=_get_label(label,"lin"))
+  _save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nlin"))
 end
 
 function load_operator(dir,feop::LinearNonlinearParamFEOperator{SplitDomains};label="")
   trial,test = _fixed_operator_parts(dir,feop.op_linear;label)
   pop_lin,red_lhs_lin,red_rhs_lin = _load_trian_operator_parts(
-    dir,feop.op_linear,trial,test;label=_get_label("linear",label))
+    dir,feop.op_linear,trial,test;label=_get_label("lin",label))
   pop_nlin,red_lhs_nlin,red_rhs_nlin = _load_trian_operator_parts(
-    dir,feop.op_nonlinear,trial,test;label=_get_label("nonlinear",label))
+    dir,feop.op_nonlinear,trial,test;label=_get_label("nlin",label))
   op_lin = GenericRBOperator(pop_lin,trial,test,red_lhs_lin,red_rhs_lin)
   op_nlin = GenericRBOperator(pop_nlin,trial,test,red_lhs_nlin,red_rhs_nlin)
   return LinearNonlinearRBOperator(op_lin,op_nlin)
@@ -254,6 +298,12 @@ function DrWatson.save(dir,perf::ROMPerformance;label="")
   serialize(results_dir,perf)
 end
 
+"""
+    load_results(dir;label="") -> ROMPerformance
+
+Load the results at the directory `dir`. Throws an error if the results
+have not been previously saved to file
+"""
 function load_results(dir;label="")
   results_dir = get_filename(dir,"results",label)
   deserialize(results_dir,perf)

@@ -1,24 +1,24 @@
 """
-    reduced_fe_space(solver::RBSolver,feop::ParamFEOperator,s::AbstractSnapshots
+    reduced_spaces(solver::RBSolver,feop::ParamFEOperator,s::AbstractSnapshots
       ) -> (RBSpace, RBSpace)
 
 Computes the subspace of the test, trial FE spaces contained in the FE operator
 `feop` by compressing the snapshots `s`
 """
-function reduced_fe_space(solver::RBSolver,feop::ParamFEOperator,s::AbstractSnapshots)
+function reduced_spaces(solver::RBSolver,feop::ParamFEOperator,s::AbstractSnapshots)
   red = get_state_reduction(solver)
   soff = select_snapshots(s,offline_params(solver))
-  reduced_fe_space(red,feop,soff)
+  reduced_spaces(red,feop,soff)
 end
 
-function reduced_fe_space(red::Reduction,feop::ParamFEOperator,s::AbstractSnapshots)
+function reduced_spaces(red::Reduction,feop::ParamFEOperator,s::AbstractSnapshots)
   t = @timed begin
     basis = reduced_basis(red,feop,s)
   end
   println(CostTracker(t,name="Basis construction"))
 
-  reduced_trial = fe_subspace(get_trial(feop),basis)
-  reduced_test = fe_subspace(get_test(feop),basis)
+  reduced_trial = reduced_subspace(get_trial(feop),basis)
+  reduced_test = reduced_subspace(get_test(feop),basis)
   return reduced_trial,reduced_test
 end
 
@@ -65,7 +65,7 @@ function reduced_basis(
   return basis
 end
 
-function fe_subspace(space::FESpace,basis)
+function reduced_subspace(space::FESpace,basis)
   @abstractmethod
 end
 
@@ -164,7 +164,7 @@ struct SingleFieldRBSpace <: RBSpace
   subspace::Projection
 end
 
-function fe_subspace(space::SingleFieldFESpace,basis::Projection)
+function reduced_subspace(space::SingleFieldFESpace,basis::Projection)
   SingleFieldRBSpace(space,basis)
 end
 
@@ -184,7 +184,7 @@ struct MultiFieldRBSpace <: RBSpace
   subspace::BlockProjection
 end
 
-function fe_subspace(space::MultiFieldFESpace,subspace::BlockProjection)
+function reduced_subspace(space::MultiFieldFESpace,subspace::BlockProjection)
   MultiFieldRBSpace(space,subspace)
 end
 
@@ -192,7 +192,7 @@ get_fe_space(r::MultiFieldRBSpace) = r.space
 get_reduced_subspace(r::MultiFieldRBSpace) = r.subspace
 
 function Base.getindex(r::MultiFieldRBSpace,i::Integer)
-  return fe_subspace(r.space.spaces[i],r.subspace[i])
+  return reduced_subspace(r.space.spaces[i],r.subspace[i])
 end
 
 function Base.iterate(r::MultiFieldRBSpace,i)
@@ -200,7 +200,7 @@ function Base.iterate(r::MultiFieldRBSpace,i)
   if isnothing(space)
     return
   end
-  ri = fe_subspace(space,r.subspace[i])
+  ri = reduced_subspace(space,r.subspace[i])
   return ri,i+1
 end
 
@@ -219,7 +219,7 @@ end
 
 function Arrays.evaluate(r::RBSpace,args...)
   space = evaluate(get_fe_space(r),args...)
-  subspace = fe_subspace(space,get_reduced_subspace(r))
+  subspace = reduced_subspace(space,get_reduced_subspace(r))
   EvalRBSpace(subspace,args...)
 end
 

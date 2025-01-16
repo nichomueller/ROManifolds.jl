@@ -35,8 +35,8 @@ export HaltonSampling
 export ParamSpace
 export TransientParamSpace
 export AbstractParamFunction
-export ParamFunction, 𝑓ₚ
-export TransientParamFunction, 𝑓ₚₜ
+export ParamFunction
+export TransientParamFunction
 export realization
 export get_params
 export get_times

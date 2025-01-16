@@ -17,7 +17,7 @@ function RBSteady.reduced_operator(
   s::AbstractSnapshots,
   args...)
 
-  red_trial,red_test = reduced_fe_space(solver,feop,s)
+  red_trial,red_test = reduced_spaces(solver,feop,s)
   odeop = get_algebraic_operator(feop)
   reduced_operator(solver,odeop,red_trial,red_test,s)
 end
@@ -55,7 +55,7 @@ Type representing reduced algebraic operators used within a reduced order modell
 framework in transient applications. A TransientRBOperator should contain the
 following information:
 
-- a reduced test and trial space, computed according to `reduced_fe_space`
+- a reduced test and trial space, computed according to `reduced_spaces`
 - a hyper-reduced residual and jacobian, computed according to `reduced_weak_form`
 
 Subtypes:

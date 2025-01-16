@@ -144,6 +144,11 @@ end
 
 # constructors
 
+"""
+    projection(red::Reduction,s::AbstractArray,args...) -> Projection
+
+Constructs a `Projection` from an array of snapshots `s`
+"""
 function projection(red::Reduction,s::AbstractArray)
   Projection(red,s)
 end

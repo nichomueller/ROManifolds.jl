@@ -65,7 +65,6 @@ export Snapshots
 export GenericSnapshots
 export SnapshotsAtIndices
 export SparseSnapshots
-export UnfoldingSteadySnapshots
 export BlockSnapshots
 export get_realization
 export flatten_snapshots
@@ -91,12 +90,10 @@ export cores2basis
 include("TTLinearAlgebra.jl")
 
 export RBSolver
-export RBOnlineCache
 export get_fe_solver
 export solution_snapshots
 export residual_snapshots
 export jacobian_snapshots
-export nonlinear_rb_solve!
 include("RBSolver.jl")
 
 export reduction
@@ -120,6 +117,7 @@ export num_reduced_dofs
 export get_cores
 export project
 export inv_project
+export union_bases
 export enrich!
 include("Projections.jl")
 
@@ -128,8 +126,8 @@ export SingleFieldRBSpace
 export MultiFieldRBSpace
 export EvalRBSpace
 export EvalMultiFieldRBSpace
-export fe_subspace
-export reduced_fe_space
+export reduced_subspace
+export reduced_spaces
 export reduced_basis
 include("RBSpace.jl")
 
@@ -174,8 +172,10 @@ export ROMPerformance
 export eval_performance
 export eval_convergence
 export create_dir
-export load_solve
 export load_snapshots
+export load_residuals
+export load_jacobians
+export load_contribution
 export load_operator
 export load_results
 export plot_a_solution

@@ -17,10 +17,24 @@ struct BlockParamArray{T,N,A<:AbstractArray{<:AbstractParamArray{T,N},N},B<:NTup
   axes::B
 end
 
+"""
+    const BlockParamVector{T,A,B} = BlockParamArray{T,1,A,B}
+"""
 const BlockParamVector{T,A,B} = BlockParamArray{T,1,A,B}
+
+"""
+    const BlockParamMatrix{T,A,B} = BlockParamArray{T,2,A,B}
+"""
 const BlockParamMatrix{T,A,B} = BlockParamArray{T,2,A,B}
 
+"""
+    const BlockConsecutiveParamVector{T,A<:Vector{<:ConsecutiveParamVector{T}},B} = BlockParamVector{T,A,B}
+"""
 const BlockConsecutiveParamVector{T,A<:Vector{<:ConsecutiveParamVector{T}},B} = BlockParamVector{T,A,B}
+
+"""
+    const BlockConsecutiveParamMatrix{T,A<:Matrix{<:ConsecutiveParamMatrix{T}},B} = BlockParamMatrix{T,A,B}
+"""
 const BlockConsecutiveParamMatrix{T,A<:Matrix{<:ConsecutiveParamMatrix{T}},B} = BlockParamMatrix{T,A,B}
 
 function BlockArrays._BlockArray(data::AbstractArray{<:AbstractParamArray,N},axes::NTuple{N,AbstractUnitRange{Int}}) where N

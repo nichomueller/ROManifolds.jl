@@ -52,8 +52,6 @@ export JointTransientParamFEOperator
 export TransientParamFEOpFromWeakForm
 export TransientParamLinearFEOperator
 export TransientParamLinearFEOpFromWeakForm
-export LinearTransientParamFEOperator
-export NonlinearTransientParamFEOperator
 include("TransientParamFEOperator.jl")
 
 export LinearNonlinearParamODE

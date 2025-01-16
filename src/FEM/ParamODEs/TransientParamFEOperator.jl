@@ -202,6 +202,12 @@ end
 
 const JointTransientParamLinearFEOpFromWeakForm = TransientParamLinearFEOpFromWeakForm{JointDomains}
 
+"""
+  TransientParamLinearFEOperator(forms::Tuple{Vararg{Function}},res::Function,
+    tpspace,trial,test;kwargs...) -> TransientParamLinearFEOpFromWeakForm{TriangulationStyle}
+
+Returns a linear parametric FE operator
+"""
 function TransientParamLinearFEOperator(
   forms::Tuple{Vararg{Function}},res::Function,tpspace,trial,test;
   constant_forms::Tuple{Vararg{Bool}}=ntuple(_ -> false,length(forms)))

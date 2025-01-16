@@ -233,7 +233,7 @@ The offline structures are completely contained in the variable `rbop`, which is
 # compute the solution snapshots 
 fesnaps, = solution_snapshots(rbsolver,feop) 
 # compute the reduced trial and test spaces 
-Û,V̂ = reduced_fe_space(rbsolver,feop,fesnaps)
+Û,V̂ = reduced_spaces(rbsolver,feop,fesnaps)
 # compute the hyper-reduction for LHS & RHS
 op = get_algebraic_operator(feop)
 â,l̂ = reduced_weak_form(rbsolver,op,Û,V̂,fesnaps)

@@ -25,6 +25,9 @@ struct UnEvalTrialFESpace{A,B} <: SingleFieldFESpace
   end
 end
 
+"""
+    const ParamTrialFESpace = UnEvalTrialFESpace
+"""
 const ParamTrialFESpace = UnEvalTrialFESpace
 
 function ParamTrialFESpace(space)
@@ -126,7 +129,10 @@ Arrays.evaluate(U::FESpace,r) = U
 
 # Define the interface for MultiField
 
-const ParamMultiFieldFESpace = MultiFieldFESpace
+"""
+    const TransientMultiFieldParamFESpace = MultiFieldFESpace
+"""
+const MultiFieldParamFESpace = MultiFieldFESpace
 
 function has_param(U::MultiFieldFESpace)
   any(space -> space isa UnEvalTrialFESpace,U.spaces)

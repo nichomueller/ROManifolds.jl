@@ -21,7 +21,7 @@ function reduced_operator(
   feop::ParamFEOperator,
   s::AbstractSnapshots)
 
-  red_trial,red_test = reduced_fe_space(solver,feop,s)
+  red_trial,red_test = reduced_spaces(solver,feop,s)
   op = get_algebraic_operator(feop)
   reduced_operator(solver,op,red_trial,red_test,s)
 end
@@ -71,7 +71,7 @@ end
 Type representing reduced algebraic operators used within a reduced order modelling
 framework in steady applications. A RBOperator should contain the following information:
 
-- a reduced test and trial space, computed according to `reduced_fe_space`
+- a reduced test and trial space, computed according to `reduced_spaces`
 - a hyper-reduced residual and jacobian, computed according to `reduced_weak_form`
 
 Subtypes:
@@ -467,22 +467,4 @@ function select_at_indices(s::ArrayContribution,a::AffineContribution)
   contribution(s.trians) do trian
     select_at_indices(s[trian],a[trian])
   end
-end
-
-# for testing purposes
-
-function Utils.compute_error(solver::RBSolver,op::RBOperator,s::AbstractSnapshots)
-  s1 = select_snapshots(s,1)
-  r1 = residual_snapshots(solver,op.op,s1;nparams=1)
-  j1 = jacobian_snapshots(solver,op.op,s1;nparams=1)
-
-  err_subspace = compute_error(get_trial(op),s1)
-  err_hypred = compute_error(op,j1,r1)
-  ("Error subspace" => err_subspace,"Error hyper-reduction" => err_hypred)
-end
-
-function Utils.compute_error(r::RBSpace,s::AbstractSnapshots)
-  s′ = inv_project(r,project(r,s))
-  norm_matrix = get_norm_matrix(r)
-  compute_relative_error(s,s′,norm_matrix)
 end

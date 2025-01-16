@@ -36,7 +36,6 @@ import ROM.Utils: CostTracker
 
 export UnEvalTrialFESpace
 export ParamTrialFESpace
-export ParamMultiFieldFESpace
 include("ParamTrialFESpace.jl")
 
 export UnEvalOperatorType

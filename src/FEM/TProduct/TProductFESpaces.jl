@@ -117,12 +117,16 @@ get_tp_dof_map(f::TProductFESpace) = f.tp_dof_map
 
 get_tp_triangulation(f::TProductFESpace) = f.trian
 
+"""
+"""
 function get_tp_fe_basis(f::TProductFESpace)
   basis = map(get_fe_basis,f.spaces_1d)
   trian = get_tp_triangulation(f)
   TProductFEBasis(basis,trian)
 end
 
+"""
+"""
 function get_tp_trial_fe_basis(f::TProductFESpace)
   basis = map(get_trial_fe_basis,f.spaces_1d)
   trian = get_tp_triangulation(f)
