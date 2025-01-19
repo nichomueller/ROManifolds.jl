@@ -20,5 +20,13 @@ We envision two main developments for the library. Firstly, the development of a
 Pages = [
   "Utils.md",
   "DofMaps.md",
+  "TProduct.md",
+  "ParamDataStructures.md",
+  "ParamAlgebra.md",
+  "ParamFESpaces.md",
+  "ParamSteady.md",
+  "ParamODEs.md",
+  "RBSteady.md",
+  "RBTransient.md",
   ]
 ```

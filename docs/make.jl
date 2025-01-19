@@ -3,17 +3,27 @@ using ROM
 
 makedocs(;
     modules=[ROM],
-    format=Documenter.HTML(),
+    format=Documenter.HTML(size_threshold=nothing),
     pages=[
-        "Introduction" => "index.md",
+        "Home" => "index.md",
         "Usage" => ["steady.md","transient.md"],
-        "Reference" => ["public_api.md","types.md","functions.md"],
+        "ROM.Utils" => "Utils.md",
+        "ROM.DofMaps" => "DofMaps.md",
+        "ROM.TProduct" => "TProduct.md",
+        "ROM.ParamDataStructures" => "ParamDataStructures.md",
+        "ROM.ParamAlgebra" => "ParamAlgebra.md",
+        "ROM.ParamFESpaces" => "ParamFESpaces.md",
+        "ROM.ParamSteady" => "ParamSteady.md",
+        "ROM.ParamODEs" => "ParamODEs.md",
+        "ROM.RBSteady" => "RBSteady.md",
+        "ROM.RBTransient" => "RBTransient.md",
     ],
     sitename="ROM.jl",
-    checkdocs=:exports
+    doctest = false,
+    warnonly = [:cross_references,:missing_docs],
+    checkdocs = :exports,
 )
 
 deploydocs(
   repo = "git@github.com:nichomueller/ROM.jl.git",
-  push_preview = true
 )
