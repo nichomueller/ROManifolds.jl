@@ -18,8 +18,8 @@ function RBSteady.projection(red::TransientReduction,s::TransientSnapshots)
   _projection(red,s)
 end
 
-function RBSteady.projection(red::TransientReduction,s::TransientSnapshots,norm_matrix)
-  _projection(red,s,norm_matrix)
+function RBSteady.projection(red::TransientReduction,s::TransientSnapshots,X::MatrixOrTensor)
+  _projection(red,s,X)
 end
 
 """
@@ -163,7 +163,11 @@ end
 
 # multfield interface
 
-function Arrays.return_type(::typeof(projection),::TransientReduction,::TransientSnapshots,args...)
+function Arrays.return_type(::typeof(projection),::TransientReduction,::TransientSnapshots)
+  TransientProjection
+end
+
+function Arrays.return_type(::typeof(projection),::TransientReduction,::TransientSnapshots,::MatrixOrTensor)
   TransientProjection
 end
 

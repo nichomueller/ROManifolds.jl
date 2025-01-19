@@ -155,6 +155,7 @@ export reduced_weak_form
 export RBOperator
 export reduced_operator
 
+export ROMPerformance
 export create_dir
 export eval_performance
 export plot_a_solution

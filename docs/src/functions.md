@@ -7,5 +7,5 @@ Pages = ["functions.md"]
 ```@autodocs
 Modules = [ROM]
 Public = false
-Order   = [:function]
+Order = [:function]
 ```

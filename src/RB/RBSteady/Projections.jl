@@ -145,17 +145,20 @@ end
 # constructors
 
 """
-    projection(red::Reduction,s::AbstractArray,args...) -> Projection
+    projection(red::Reduction,s::AbstractArray) -> Projection
+    projection(red::Reduction,s::AbstractArray,X::MatrixOrTensor) -> Projection
 
-Constructs a `Projection` from an array of snapshots `s`
+Constructs a `Projection` from a collection of snapshots `s`. An inner product
+represented by the quantity `X` can be provided, in which case the resulting
+`Projection` will be `X`-orthogonal
 """
 function projection(red::Reduction,s::AbstractArray)
   Projection(red,s)
 end
 
-function projection(red::Reduction,s::AbstractArray,norm_matrix)
-  proj = Projection(red,s,norm_matrix)
-  NormedProjection(proj,norm_matrix)
+function projection(red::Reduction,s::AbstractArray,X::MatrixOrTensor)
+  proj = Projection(red,s,X)
+  NormedProjection(proj,X)
 end
 
 function Projection(red::Reduction,s::AbstractArray,args...)
@@ -418,7 +421,7 @@ end
 """
     struct NormedProjection <: Projection
       projection::Projection
-      norm_matrix::AbstractMatrix
+      norm_matrix::MatrixOrTensor
     end
 
 Represents a `Projection` `projection` spanning a space equipped with an inner
@@ -426,9 +429,11 @@ product represented by the quantity `norm_matrix`
 """
 struct NormedProjection <: Projection
   projection::Projection
-  norm_matrix::AbstractMatrix
+  norm_matrix::MatrixOrTensor
 end
 
+get_projection(a::Projection) = a
+get_projection(a::NormedProjection) = a.projection
 get_norm_matrix(a::NormedProjection) = a.norm_matrix
 
 get_basis(a::NormedProjection) = get_basis(a.projection)
@@ -443,19 +448,21 @@ function project(a::NormedProjection,x::AbstractArray)
 end
 
 function union_bases(a::NormedProjection,b::NormedProjection,args...)
-  union_bases(a.projection,b.projection,args...)
+  projection′ = union_bases(a.projection,b.projection,args...)
+  NormedProjection(projection′,a.norm_matrix)
 end
 
 function union_bases(a::NormedProjection,b::AbstractArray,args...)
-  union_bases(a.projection,b,args...)
+  projection′ = union_bases(a.projection,b,args...)
+  NormedProjection(projection′,a.norm_matrix)
 end
 
-function galerkin_projection(proj_left::NormedProjection,a::NormedProjection)
-  galerkin_projection(proj_left.projection,a.projection)
+function galerkin_projection(proj_left::NormedProjection,a::Projection)
+  galerkin_projection(proj_left.projection,get_projection(a))
 end
 
-function galerkin_projection(proj_left::NormedProjection,a::NormedProjection,proj_right::NormedProjection)
-  galerkin_projection(proj_left.projection,a.projection,proj_right.projection)
+function galerkin_projection(proj_left::NormedProjection,a::Projection,proj_right::NormedProjection)
+  galerkin_projection(proj_left.projection,get_projection(a),proj_right.projection)
 end
 
 function empirical_interpolation(a::NormedProjection)
@@ -477,7 +484,7 @@ function Arrays.return_type(::typeof(projection),::TTSVDReduction,::Snapshots)
   TTSVDCores
 end
 
-function Arrays.return_type(::typeof(projection),::Reduction,::Snapshots,norm_matrix)
+function Arrays.return_type(::typeof(projection),::Reduction,::Snapshots,::MatrixOrTensor)
   NormedProjection
 end
 
@@ -490,10 +497,10 @@ function Arrays.return_cache(::typeof(projection),red::Reduction,s::BlockSnapsho
   return BlockProjection(block_basis,touched)
 end
 
-function Arrays.return_cache(::typeof(projection),red::Reduction,s::BlockSnapshots,norm_matrix)
+function Arrays.return_cache(::typeof(projection),red::Reduction,s::BlockSnapshots,X::MatrixOrTensor)
   i = findfirst(s.touched)
   @notimplementedif isnothing(i)
-  A = return_type(projection,red,s[i],norm_matrix[Block(i,i)])
+  A = return_type(projection,red,s[i],X[Block(i,i)])
   block_basis = Array{A,ndims(s)}(undef,size(s))
   touched = s.touched
   return BlockProjection(block_basis,touched)
@@ -509,11 +516,11 @@ function projection(red::Reduction,s::BlockSnapshots)
   return basis
 end
 
-function projection(red::Reduction,s::BlockSnapshots,norm_matrix)
-  basis = return_cache(projection,red,s,norm_matrix)
+function projection(red::Reduction,s::BlockSnapshots,X::MatrixOrTensor)
+  basis = return_cache(projection,red,s,X)
   for i in eachindex(basis)
     if basis.touched[i]
-      basis[i] = projection(red,s[i],norm_matrix[Block(i,i)])
+      basis[i] = projection(red,s[i],X[Block(i,i)])
     end
   end
   return basis
@@ -619,7 +626,11 @@ for f in (:project,:inv_project)
 end
 
 """
-    enrich!(red::SupremizerReduction,a::BlockProjection,norm_matrix,supr_matrix) -> Nothing
+    enrich!(
+    red::SupremizerReduction,
+    a::BlockProjection,
+    norm_matrix::MatrixOrTensor,
+    supr_matrix::MatrixOrTensor) -> Nothing
 
 In-place augmentation of the primal block of a `BlockProjection` `a`.
 This function has the purpose of stabilizing the reduced equations stemming from

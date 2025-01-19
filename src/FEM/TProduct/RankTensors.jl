@@ -253,6 +253,13 @@ function Base.getindex(a::BlockRankTensor{A,N},i::Block{N}) where {A,N}
   getindex(a.array,i.n...)
 end
 
+# wrapper
+
+"""
+    const MatrixOrTensor = Union{AbstractMatrix,AbstractRankTensor}
+"""
+const MatrixOrTensor = Union{AbstractMatrix,AbstractRankTensor,BlockRankTensor}
+
 # linear algebra
 
 function tpmul(a::Rank1Tensor{2},b::AbstractMatrix)

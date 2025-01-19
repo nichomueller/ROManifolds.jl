@@ -48,6 +48,7 @@ export AbstractRankTensor
 export Rank1Tensor
 export GenericRankTensor
 export BlockRankTensor
+export MatrixOrTensor
 export get_factors
 export get_decomposition
 include("RankTensors.jl")

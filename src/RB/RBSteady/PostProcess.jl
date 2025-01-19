@@ -376,12 +376,16 @@ function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnaps
   error
 end
 
-function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
+function Utils.compute_relative_error(
+  sol::BlockSnapshots,
+  sol_approx::BlockSnapshots,
+  X::MatrixOrTensor)
+
   @check sol.touched == sol_approx.touched
   error = zeros(size(sol))
   for i in eachindex(sol)
     if sol.touched[i]
-      error[i] = compute_relative_error(sol[i],sol_approx[i],norm_matrix[Block(i,i)])
+      error[i] = compute_relative_error(sol[i],sol_approx[i],X[Block(i,i)])
     end
   end
   error

@@ -1,3 +1,8 @@
+"""
+    const MultiFieldParamFESpace = MultiFieldFESpace
+"""
+const MultiFieldParamFESpace = MultiFieldFESpace
+
 function MultiFieldParamFESpace(
   spaces::Vector{<:SingleFieldParamFESpace};
   style = BlockMultiFieldStyle())
@@ -11,25 +16,23 @@ function MultiFieldParamFESpace(
   MultiFieldFESpace(PV,spaces,style)
 end
 
-function MultiFieldParamFESpace(
-  spaces::Vector{<:SingleFieldFESpace};
-  style = ConsecutiveMultiFieldStyle())
+#TODO the code does not compile when defining these functions
+# function MultiFieldParamFESpace(
+#   spaces::Vector{<:Union{<:SingleFieldFESpace,<:SingleFieldParamFESpace}};
+#   style = BlockMultiFieldStyle())
 
-  if any(isa.(spaces,SingleFieldParamFESpace))
-    spaces′ = ParamDataStructures.to_param_quantities(spaces...)
-    MultiFieldParamFESpace([spaces′...],style=style)
-  else
-    MultiFieldFESpace(spaces,style=style)
-  end
-end
+#   spaces′ = ParamDataStructures.to_param_quantities(spaces...)
+#   MultiFieldFESpace(spaces′,style=style)
+# end
 
-function MultiFieldParamFESpace(
-  ::Type{V},
-  spaces::Vector{<:SingleFieldFESpace};
-  style = ConsecutiveMultiFieldStyle()) where V
+# function MultiFieldParamFESpace(
+#   ::Type{V},
+#   spaces::Vector{<:Union{<:SingleFieldFESpace,<:SingleFieldParamFESpace}};
+#   style = BlockMultiFieldStyle()) where V
 
-  MultiFieldFESpace(V,spaces;style)
-end
+#   spaces′ = ParamDataStructures.to_param_quantities(spaces...)
+#   MultiFieldParamFESpace(spaces;style)
+# end
 
 FESpaces.get_dof_value_type(f::MultiFieldFESpace{MS,CS,<:ParamType{V}}) where {MS,CS,T,V<:AbstractParamArray{T}} = T
 

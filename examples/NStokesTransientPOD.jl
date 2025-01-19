@@ -79,7 +79,7 @@ test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet","d
 trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_0])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 test_p = TestFESpace(model,reffe_p;conformity=:H1)
-trial_p = TrialFESpace(test_p)
+trial_p = TransientTrialParamFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 
@@ -99,7 +99,7 @@ rbsolver = RBSolver(fesolver,state_reduction;nparams_res=40,nparams_jac=20,npara
 dir = datadir("transient_nstokes_pod")
 create_dir(dir)
 
-tols = [1e-5]
+tols = [1e-1,1e-2,1e-3,1e-4,1e-5]
 ExamplesInterface.run_test(dir,rbsolver,feop,tols,xh0μ)
 
 end

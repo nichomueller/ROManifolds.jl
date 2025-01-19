@@ -7,14 +7,16 @@ using Serialization
 using Test
 
 using ROM
+using ROM.RBSteady
+using ROM.RBTransient
 
 import Gridap.CellData: get_domains
 import Gridap.FESpaces: get_algebraic_operator
-import Gridap.Helpers: @abstractmethod,@check
+import Gridap.Helpers: @abstractmethod
 import Gridap.MultiField: BlockMultiFieldStyle
-import ROM.ParamSteady: get_domains_res,get_domains_jac
-import ROM.RBSteady: get_state_reduction,get_residual_reduction,get_jacobian_reduction,
-                     load_residuals,load_jacobians
+import ROM.ParamODEs: ODEParamOperator,LinearNonlinearParamODE
+import ROM.ParamSteady: ParamOperator,LinearNonlinearParamEq,change_domains
+import ROM.RBSteady: reduced_operator,get_state_reduction,get_residual_reduction,get_jacobian_reduction
 
 function try_loading_fe_snapshots(dir,rbsolver,feop,args...;kwargs...)
   try
@@ -48,7 +50,7 @@ function try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps)
       save(dir,res,feop;label="res")
       save(dir,jac,feop;label="jac")
     end
-    rbop = _reduced_operator(rbsolver,feop,fesnaps,jac,res)
+    rbop = reduced_operator(rbsolver,feop,fesnaps,jac,res)
     save(dir_tol,rbop)
     return rbop
   end
@@ -123,7 +125,7 @@ function update_solver(rbsolver::RBSolver,tol)
   RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction)
 end
 
-function _reduced_operator(rbsolver::RBSolver,op::ParamOperator,red_trial,red_test,jac,res)
+function reduced_operator(rbsolver::RBSolver,op::ParamOperator,red_trial,red_test,jac,res)
   jac_red = get_jacobian_reduction(rbsolver)
   red_lhs = reduced_jacobian(jac_red,red_trial,red_test,jac)
   res_red = get_residual_reduction(rbsolver)
@@ -134,7 +136,7 @@ function _reduced_operator(rbsolver::RBSolver,op::ParamOperator,red_trial,red_te
   GenericRBOperator(op′,red_trial,red_test,red_lhs,red_rhs)
 end
 
-function _reduced_operator(rbsolver::RBSolver,odeop::ODEParamOperator,red_trial,red_test,jac,res)
+function reduced_operator(rbsolver::RBSolver,odeop::ODEParamOperator,red_trial,red_test,jac,res)
   jac_red = get_jacobian_reduction(rbsolver)
   red_lhs = reduced_jacobian(jac_red,red_trial,red_test,jac)
   res_red = get_residual_reduction(rbsolver)
@@ -145,7 +147,7 @@ function _reduced_operator(rbsolver::RBSolver,odeop::ODEParamOperator,red_trial,
   GenericTransientRBOperator(odeop′,red_trial,red_test,red_lhs,red_rhs)
 end
 
-function _reduced_operator(
+function reduced_operator(
   rbsolver::RBSolver,
   op::ParamOperator{LinearNonlinearParamEq},
   red_trial,
@@ -154,12 +156,12 @@ function _reduced_operator(
   (res_lin,res_nlin)
   )
 
-  rbop_lin = _reduced_operator(rbsolver,get_linear_operator(op),red_trial,red_test,jac_lin,res_lin)
-  rbop_nlin = _reduced_operator(rbsolver,get_nonlinear_operator(op),red_trial,red_test,jac_nlin,res_nlin)
+  rbop_lin = reduced_operator(rbsolver,get_linear_operator(op),red_trial,red_test,jac_lin,res_lin)
+  rbop_nlin = reduced_operator(rbsolver,get_nonlinear_operator(op),red_trial,red_test,jac_nlin,res_nlin)
   LinearNonlinearRBOperator(rbop_lin,rbop_nlin)
 end
 
-function _reduced_operator(
+function reduced_operator(
   rbsolver::RBSolver,
   op::ODEParamOperator{LinearNonlinearParamODE},
   red_trial,
@@ -168,15 +170,15 @@ function _reduced_operator(
   (res_lin,res_nlin)
   )
 
-  rbop_lin = _reduced_operator(rbsolver,get_linear_operator(op),red_trial,red_test,jac_lin,res_lin)
-  rbop_nlin = _reduced_operator(rbsolver,get_nonlinear_operator(op),red_trial,red_test,jac_nlin,res_nlin)
+  rbop_lin = reduced_operator(rbsolver,get_linear_operator(op),red_trial,red_test,jac_lin,res_lin)
+  rbop_nlin = reduced_operator(rbsolver,get_nonlinear_operator(op),red_trial,red_test,jac_nlin,res_nlin)
   LinearNonlinearTransientRBOperator(rbop_lin,rbop_nlin)
 end
 
-function _reduced_operator(rbsolver::RBSolver,feop::ParamFEOperator,sol::AbstractSnapshots,args...)
+function reduced_operator(rbsolver::RBSolver,feop::ParamFEOperator,sol::AbstractSnapshots,args...)
   op = get_algebraic_operator(feop)
   red_trial,red_test = reduced_spaces(rbsolver,feop,sol)
-  _reduced_operator(rbsolver,op,red_trial,red_test,args...)
+  reduced_operator(rbsolver,op,red_trial,red_test,args...)
 end
 
 function run_test(

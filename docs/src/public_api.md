@@ -51,7 +51,6 @@ BlockConsecutiveParamVector
 BlockConsecutiveParamMatrix
 ParamTrialFESpace
 TrialParamFESpace
-MultiFieldParamFESpace
 ParamFEOperator
 LinearParamFEOperator
 LinearNonlinearParamFEOperator

@@ -129,11 +129,6 @@ Arrays.evaluate(U::FESpace,r) = U
 
 # Define the interface for MultiField
 
-"""
-    const MultiFieldParamFESpace = MultiFieldFESpace
-"""
-const MultiFieldParamFESpace = MultiFieldFESpace
-
 function has_param(U::MultiFieldFESpace)
   any(space -> space isa UnEvalTrialFESpace,U.spaces)
 end
