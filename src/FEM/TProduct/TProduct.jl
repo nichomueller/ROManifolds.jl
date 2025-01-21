@@ -66,4 +66,10 @@ export TProductSparseMatrixAssembler
 export TProductBlockSparseMatrixAssembler
 include("TProductAssembly.jl")
 
+export OrderedFESpace
+export OIdsToIds
+export DofsToODofs
+export add_ordered_entries!
+include("OrderedFESpaces.jl")
+
 end # module

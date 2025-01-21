@@ -461,8 +461,8 @@ function galerkin_projection(proj_left::NormedProjection,a::Projection)
   galerkin_projection(proj_left.projection,get_projection(a))
 end
 
-function galerkin_projection(proj_left::NormedProjection,a::Projection,proj_right::NormedProjection)
-  galerkin_projection(proj_left.projection,get_projection(a),proj_right.projection)
+function galerkin_projection(proj_left::NormedProjection,a::Projection,proj_right::NormedProjection,args...)
+  galerkin_projection(proj_left.projection,get_projection(a),proj_right.projection,args...)
 end
 
 function empirical_interpolation(a::NormedProjection)

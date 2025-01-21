@@ -24,9 +24,9 @@ add_tag_from_tags!(labels,"dirichlet",["inlet","walls"])
 Ω = Triangulation(model)
 Γn = BoundaryTriangulation(model,tags="neumann")
 
-a(x,μ,t) = 1+exp(sin(t)*x[1]/sum(μ))
-a(μ,t) = x->a(x,μ,t)
-aμt(μ,t) = TransientParamFunction(a,μ,t)
+ν(x,μ,t) = 1+exp(sin(t)*x[1]/sum(μ))
+ν(μ,t) = x->ν(x,μ,t)
+νμt(μ,t) = TransientParamFunction(ν,μ,t)
 
 f(x,μ,t) = 1.
 f(μ,t) = x->f(x,μ,t)
@@ -49,7 +49,7 @@ degree = 2*order+1
 dΩ = Measure(Ω,degree)
 dΓn = Measure(Γn,degree)
 
-stiffness(μ,t,u,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ
+stiffness(μ,t,u,v,dΩ) = ∫(νμt(μ,t)*∇(v)⋅∇(u))dΩ
 mass(μ,t,uₜ,v,dΩ) = ∫(v*uₜ)dΩ
 rhs(μ,t,v,dΩ,dΓn) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
 res(μ,t,u,v,dΩ,dΓn) = mass(μ,t,∂t(u),v,dΩ) + stiffness(μ,t,u,v,dΩ) - rhs(μ,t,v,dΩ,dΓn)

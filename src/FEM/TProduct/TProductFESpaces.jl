@@ -72,9 +72,9 @@ function univariate_spaces(
   vector_type=nothing,
   kwargs...)
 
-  add_1d_tags!(model,dirichlet_tags)
-  map((trian,cell_reffe) -> FESpace(trian,cell_reffe;dirichlet_tags,conformity,vector_type),
-    trian.trians_1d,cell_reffes)
+  diri_tags_1d = get_1d_tags(model,dirichlet_tags)
+  map((trian,cell_reffe,tags) -> FESpace(trian,cell_reffe;dirichlet_tags=tags,conformity,vector_type),
+    trian.trians_1d,cell_reffes,diri_tags_1d)
 end
 
 FESpaces.get_triangulation(f::TProductFESpace) = get_triangulation(f.space)

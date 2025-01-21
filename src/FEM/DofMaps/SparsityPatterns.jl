@@ -37,13 +37,33 @@ abstract type SparsityPattern end
 # constructors
 
 function SparsityPattern(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
+  msg = """\n
+  Cannot define a sparsity pattern object between the FE spaces given as input,
+  as they are defined on incompatible triangulations
+  """
+
+  trian_U = get_triangulation(U)
+  trian_V = get_triangulation(V)
+  sa_tV = is_change_possible(trian_U,trian_V)
+  sb_tU = is_change_possible(trian_V,trian_U)
+  if sa_tV && sb_tU
+    target_trian = best_target(trian_U,trian_V)
+  elseif !sa_tV && sb_tU
+    target_trian = trian_U
+  elseif sa_tV && !sb_tU
+    target_trian = trian_V
+  else
+    @notimplemented msg
+  end
+
   m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
-  cellidsrows = get_cell_dof_ids(V)
-  cellidscols = get_cell_dof_ids(U)
+  cellidsrows = get_cell_dof_ids(V,target_trian)
+  cellidscols = get_cell_dof_ids(U,target_trian)
   trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
   m2 = nz_allocation(m1)
   trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
   m3 = create_from_nz(m2)
+
   SparsityPattern(m3)
 end
 
@@ -210,9 +230,9 @@ get_unsorted_matrix(a::OrderedSparsity) = a.unsorted_matrix
 
 function CellData.change_domain(
   a::SparsityCSC{Tv,Ti},
-  row::AbstractDofMap{D},
-  col::AbstractDofMap{D}
-  ) where {Tv,Ti,D}
+  row::AbstractDofMap,
+  col::AbstractDofMap
+  ) where {Tv,Ti}
 
   dof_to_cell_row = get_dof_to_cell(row)
   dof_to_cell_col = get_dof_to_cell(col)
@@ -257,9 +277,9 @@ end
 
 function CellData.change_domain(
   a::OrderedSparsity,
-  row::AbstractDofMap{D},
-  col::AbstractDofMap{D}
-  ) where D
+  row::AbstractDofMap,
+  col::AbstractDofMap
+  )
 
   dof_to_cell_row = get_dof_to_cell(row)
   dof_to_cell_col = get_dof_to_cell(col)
@@ -442,9 +462,9 @@ end
 
 function CellData.change_domain(
   a::TProductSparsity,
-  row::AbstractDofMap{D,Ti},
-  col::AbstractDofMap{D,Ti}
-  ) where {D,Ti}
+  row::AbstractDofMap,
+  col::AbstractDofMap
+  )
 
   a′ = change_domain(a.sparsity,row,col)
   TProductSparsity(a′,a.sparsities_1d)
@@ -504,18 +524,18 @@ end
 
 function CellData.change_domain(
   a::SparsityToTProductSparsity,
-  row::DofMapPortion{D,Ti},
-  col::DofMapPortion{D,Ti}
-  ) where {D,Ti}
+  row::DofMapPortion,
+  col::DofMapPortion
+  )
 
   @notimplemented
 end
 
 function CellData.change_domain(
   a::SparsityToTProductSparsity{<:OrderedSparsityPattern},
-  row::DofMapPortion{D,Ti},
-  col::DofMapPortion{D,Ti}
-  ) where {D,Ti}
+  row::DofMapPortion,
+  col::DofMapPortion
+  )
 
   a′ = change_domain(a.sparsity,row.parent_map,col.parent_map)
   SparsityToTProductSparsity(a′,a.sparsities_1d,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)

@@ -64,21 +64,21 @@ function Arrays.return_cache(k::AddEntriesMap,A,vs::AbstractParamMatrix{T},is,js
   zeros(T,param_length(vs))
 end
 
-function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::AbstractParamVector{T},is) where T
-  add_entries!(cache,k.combine,A,vs,is)
-end
+# function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::AbstractParamVector{T},is) where T
+#   add_entries!(cache,k.combine,A,vs,is)
+# end
 
-function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::AbstractParamMatrix{T},is,js) where T
-  add_entries!(cache,k.combine,A,vs,is,js)
-end
+# function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::AbstractParamMatrix{T},is,js) where T
+#   add_entries!(cache,k.combine,A,vs,is,js)
+# end
 
-@inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamVector,is)
-  Algebra._add_entries!(cache,combine,A,vs,is)
-end
+# @inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamVector,is)
+#   Algebra._add_entries!(cache,combine,A,vs,is)
+# end
 
-@inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamMatrix,is,js)
-  Algebra._add_entries!(cache,combine,A,vs,is,js)
-end
+# @inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamMatrix,is,js)
+#   Algebra._add_entries!(cache,combine,A,vs,is,js)
+# end
 
 @inline function Algebra._add_entries!(
   vij,combine::Function,A,vs::AbstractParamMatrix,is,js)
@@ -96,12 +96,43 @@ end
   A
 end
 
+@inline function add_ordered_entries!(
+  vij,combine::Function,A,vs::AbstractParamMatrix,is::OIdsToIds,js::OIdsToIds)
+
+  for (lj,j) in enumerate(js)
+    if j>0
+      ljp = js.terms[lj]
+      for (li,i) in enumerate(is)
+        if i>0
+          lip = is.terms[li]
+          get_param_entry!(vij,vs,lip,ljp)
+          add_entry!(combine,A,vij,i,j)
+        end
+      end
+    end
+  end
+  A
+end
+
 @inline function Algebra._add_entries!(
   vi,combine::Function,A,vs::AbstractParamVector,is)
 
   for (li,i) in enumerate(is)
     if i>0
       get_param_entry!(vi,vs,li)
+      add_entry!(combine,A,vi,i)
+    end
+  end
+  A
+end
+
+@inline function add_ordered_entries!(
+  vi,combine::Function,A,vs::AbstractParamVector,is::OIdsToIds)
+
+  for (li,i) in enumerate(is)
+    if i>0
+      lip = is.terms[li]
+      get_param_entry!(vi,vs,lip)
       add_entry!(combine,A,vi,i)
     end
   end

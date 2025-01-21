@@ -23,6 +23,7 @@ using ROM.ParamDataStructures
 import UnPack: @unpack
 import ArraysOfArrays: innersize
 import PartitionedArrays: tuple_of_arrays
+import ROM.TProduct: OIdsToIds
 
 export ParamCounter
 export ParamInserterCSC

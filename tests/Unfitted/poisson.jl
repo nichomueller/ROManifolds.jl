@@ -30,7 +30,6 @@ bgmodel = TProductModel(pmin,pmax,partition)
 
 cutgeo = cut(bgmodel,geo)
 Ωbg = Triangulation(bgmodel)
-Ωact = Triangulation(cutgeo,ACTIVE)
 Ω = Triangulation(cutgeo,PHYSICAL)
 Ω_out = Triangulation(cutgeo,PHYSICAL_OUT)
 Γ = EmbeddedBoundary(cutgeo)

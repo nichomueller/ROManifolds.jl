@@ -34,12 +34,12 @@ function TProductModel(args...;kwargs...)
   TProductModel(model,models_1d)
 end
 
-function _axes_to_lower_dim_entities(coords::AbstractArray{VectorValue{D,T},D}) where {D,T}
+function _d_to_lower_dim_entities(coords::AbstractArray{VectorValue{D,T},D}) where {D,T}
   entities = Vector{Array{VectorValue{D,T},D-1}}[]
-  for ax = 1:D
-    range = axes(coords,ax)
-    bottom = selectdim(coords,ax,first(range))
-    top = selectdim(coords,ax,last(range))
+  for d = 1:D
+    range = axes(coords,d)
+    bottom = selectdim(coords,d,first(range))
+    top = selectdim(coords,d,last(range))
     push!(entities,[bottom,top])
   end
   return entities
@@ -59,59 +59,39 @@ function _tp_label_condition(intset,entity)
 end
 
 """
-    entities_1d_in_tag(coords::AbstractArray{VectorValue{D,T},D}, nodes_in_tag
-      ) where {D,T} -> (Vector{Int}, Vector{Int})
+    get_1d_tags(model::TProductModel,tags) -> Vector{Vector{Int8}}
 
-Given the node coordinates of a D-dimensional tensor product discrete model `coords`
-and the subset of nodes in a given tag `nodes_in_tag`, returns the vector of
-corresponding 1-D tags, and a vector of axes whose entries are ∈ {1, ..., D}
-specify the direction (i.e. dimension) of the tag
+Fetches the tags of the tensor product 1D models corresponding to the tags
+of the `D`-dimensional model `tags`. The length of the output is `D`
 """
-function entities_1d_in_tag(coords::AbstractArray{VectorValue{D,T},D},nodes_in_tag) where {D,T}
-  ax_to_entities = _axes_to_lower_dim_entities(coords)
-  vec_of_tags = Int[]
-  vec_of_axes = Int[]
-  for (axis,entities) in enumerate(ax_to_entities)
-    for (loc,entity) in enumerate(entities)
-      Iset = intersect(nodes_in_tag,entity)
-      if Iset == vec(entity)
-        push!(vec_of_tags,loc)
-        push!(vec_of_axes,axis)
-      else
-        msg = """The assigned boundary does not satisfy the tensor product condition:
-        it should occupy the whole side of the domain, rather than a side's portion"""
-        @check _tp_label_condition(Iset,entity) msg
-      end
-    end
-  end
-  return vec_of_tags,vec_of_axes
-end
+function get_1d_tags(model::TProductModel{D},tags) where D
+  isempty(tags) && return Vector{Vector{Int8}}(undef,D)
 
-"""
-    add_1d_tags!(model::TProductModel,name) -> Nothing
-
-Adds the tags corresponding to `name` (usually a String or Vector{String}), which
-encodes a set of tags on a D-dimensional TProductModel, to the vector of 1-D
-models
-"""
-function add_1d_tags!(model::TProductModel{D},name) where D
-  isempty(name) && return
   nodes = get_node_coordinates(model)
   labeling = get_face_labeling(model)
-  face_to_tag = get_face_tag_index(labeling,name,0)
+  face_to_tag = get_face_tag_index(labeling,tags,0)
 
-  nodes_in_tag = nodes[findall(face_to_tag.==one(Int8))]
-  tags_1d,axs = entities_1d_in_tag(nodes,nodes_in_tag)
-  for ax in 1:D
-    label1d = get_face_labeling(model.models_1d[ax])
-    name in label1d.tag_to_name && continue
-    tags_at_ax = (ax in axs) ? tags_1d[findall(axs.==ax)] : Int[]
-    add_tag_from_tags!(label1d,name,tags_at_ax)
+  d_to_entities = _d_to_lower_dim_entities(nodes)
+  nodes_in_tag = nodes[findall(!iszero,face_to_tag)]
+
+  msg = """
+  The assigned boundary does not satisfy the tensor product condition:
+  it should occupy the whole side of the domain, rather than a side's portion
+  """
+
+  map(1:D) do d
+    tags = Int8[]
+    entities = d_to_entities[d]
+    for (tag1d,entity1d) in enumerate(entities)
+      iset = intersect(nodes_in_tag,entity1d)
+      if iset == vec(entity1d)
+        push!(tags,tag1d)
+      else
+        @check _tp_label_condition(iset,entity1d) msg
+      end
+    end
+    tags
   end
-end
-
-function add_1d_tags!(model::TProductModel,names::AbstractVector)
-  map(name->add_1d_tags!(model,name),names)
 end
 
 """

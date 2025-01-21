@@ -75,6 +75,7 @@ export get_univariate_dof_map
 export get_dirichlet_entities
 export cell_reffe_to_reffe
 export get_polynomial_order
+export get_polynomial_orders
 export get_tface_to_mask
 export get_dof_to_constraints
 include("DofMapsBuilders.jl")

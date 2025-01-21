@@ -10,8 +10,6 @@ end
 
 FESpaces.get_fe_space(f::TrivialParamFESpace) = f.space
 
-FESpaces.ConstraintStyle(::Type{<:TrivialParamFESpace{S}}) where S = ConstraintStyle(S)
-
 ParamDataStructures.param_length(f::TrivialParamFESpace) = f.plength
 ParamDataStructures.to_param_quantity(f::SingleFieldParamFESpace,plength::Integer) = f
 ParamDataStructures.to_param_quantity(f::SingleFieldFESpace,plength::Integer) = TrivialParamFESpace(f,plength)

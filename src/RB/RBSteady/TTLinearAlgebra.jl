@@ -428,12 +428,12 @@ function get_basis_indices(
   )::Vector{Vector{Ti}} where {Ti,Ti′,D,N}
 
   Iprev...,Icurr = cores_indices
-  basis_indices = zeros(Ti,length(Icurr),ninds)
+  basis_indices = zeros(Ti,length(Icurr),N)
   o = one(Ti)
   for (k,ik) in enumerate(Icurr)
     indices_k = basis_index(ik,cores_indices)
     basis_indices[k,1] = max(o,dof_map[CartesianIndex(indices_k[1:D])])
-    for (il,l) in enumerate(D+1:L)
+    for (il,l) in enumerate(D+1:N+D-1)
       basis_indices[k,1+il] = indices_k[l]
     end
   end
@@ -443,9 +443,9 @@ end
 
 function get_basis_indices(cores_indices::Vector{<:Vector},dof_map::AbstractArray{Ti,D}) where {Ti,D}
   L = length(cores_indices)
-  ninds = L - D + 1
-  @check ninds > 0
-  return get_basis_indices(Val(ninds),cores_indices,dof_map)
+  N = L - D + 1
+  @check N > 0
+  return get_basis_indices(Val(N),cores_indices,dof_map)
 end
 
 function get_basis_indices(cores_indices::Vector{<:Vector},dof_map::SparseDofMap)

@@ -21,6 +21,8 @@ Subtypes:
 """
 abstract type SingleFieldParamFESpace{S} <: SingleFieldFESpace end
 
+FESpaces.ConstraintStyle(::Type{<:SingleFieldParamFESpace{S}}) where S = ConstraintStyle(S)
+
 FESpaces.get_fe_space(f::SingleFieldParamFESpace) = @abstractmethod
 
 FESpaces.get_free_dof_ids(f::SingleFieldParamFESpace) = get_free_dof_ids(get_fe_space(f))
@@ -83,7 +85,7 @@ function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   V = get_vector_type(get_fe_space(f))
   L = param_length(f)
   PV = consecutive_param_array(V(),L)
-  param_typeof(PV)
+  typeof(PV)
 end
 
 function FESpaces.FEFunction(

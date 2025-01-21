@@ -280,8 +280,7 @@ function get_sparse_dof_map(
   sparsity::TProductSparsityPattern)
 
   trian = get_triangulation(trial)
-  model = get_background_model(trian)
-  @check model === get_background_model(get_triangulation(test))
+  @notimplementedif num_cell_dims(trian) != num_cell_dims(get_triangulation(test))
 
   rows = get_dof_map(test)
   cols = get_dof_map(trial)
@@ -437,6 +436,20 @@ function get_polynomial_order(basis)
   get_order(shapefun.fields)
 end
 
+"""
+    get_polynomial_orders(fs::FESpace) -> Integer
+
+Retrieves the polynomial order of `fs` for every dimension
+"""
+get_polynomial_orders(fs::SingleFieldFESpace) = get_polynomial_orders(get_fe_basis(fs))
+get_polynomial_orders(fs::MultiFieldFESpace) = maximum.(map(get_polynomial_orders,fs.spaces))
+
+function get_polynomial_orders(basis)
+  cell_basis = get_data(basis)
+  shapefun = testitem(cell_basis)
+  get_orders(shapefun.fields)
+end
+
 get_dof_type(b) = @abstractmethod
 get_dof_type(b::LagrangianDofBasis{P,V}) where {P,V} = change_eltype(V,Float64)
 get_dof_type(dof::CellDof) = get_dof_type(testitem(get_data(dof)))
@@ -505,6 +518,12 @@ function _get_terms(p::Polytope,orders)
   _nodes, = Gridap.ReferenceFEs._compute_nodes(p,orders)
   terms = Gridap.ReferenceFEs._coords_to_terms(_nodes,orders)
   return terms
+end
+
+function _get_linear_terms(p::Polytope,orders)
+  terms = _get_terms(p,orders)
+  linids = LinearIndices(orders.+1)
+  return view(linids,terms)
 end
 
 function _get_cell_dof_comp_ids(cell_dof_ids,dofs)
