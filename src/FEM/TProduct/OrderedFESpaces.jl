@@ -63,67 +63,118 @@ Base.size(a::OIdsToIds) = size(a.indices)
 Base.getindex(a::OIdsToIds,i::Integer) = getindex(a.indices,i)
 Base.setindex!(a::OIdsToIds,v,i::Integer) = setindex!(a.indices,v,i)
 
-struct DofsToODofs{D,T,A} <: Map
-  fe_dof_basis::A
-  node_and_comps_to_odof::Array{T,D}
+struct DofsToODofs{D,P,V} <: Map
+  b::LagrangianDofBasis{P,V}
+  pdof_to_dof::Vector{Int32}
+  node_and_comps_to_odof::Array{V,D}
   orders::NTuple{D,Int}
 end
 
-function Arrays.return_cache(k::DofsToODofs{D},cell::CartesianIndex{D},icell::Int) where D
-  b = k.fe_dof_basis[icell]
-  pdof_to_dof = _local_pdof_to_dof(b,k.orders)
-  local_ndofs = length(b)
-  odofs = OIdsToIds(zeros(Int32,local_ndofs),pdof_to_dof)
-  return odofs,b
+function DofsToODofs(
+  b::LagrangianDofBasis,
+  node_and_comps_to_odof::AbstractArray,
+  orders::Tuple)
+
+  pdof_to_dof = _local_pdof_to_dof(b,orders)
+  DofsToODofs(b,pdof_to_dof,node_and_comps_to_odof,orders)
 end
 
-function Arrays.evaluate!(cache,k::DofsToODofs{D},cell::CartesianIndex{D},icell::Int) where D
-  odofs,b = cache
+function DofsToODofs(fe_dof_basis::Fill{<:LagrangianDofBasis},args...)
+  DofsToODofs(testitem(fe_dof_basis),args...)
+end
+
+function DofsToODofs(fe_dof_basis::AbstractVector{<:Dof},args...)
+  @notimplemented "This function is only implemented for Lagrangian dof bases"
+end
+
+function get_ndofs(k::DofsToODofs{D,P}) where {D,P}
+  ncomps = num_components(P)
+  nnodes = length(k.node_and_comps_to_odof)
+  ncomps*nnodes
+end
+
+function Arrays.return_cache(k::DofsToODofs{D},cell::CartesianIndex{D}) where D
+  local_ndofs = length(k.pdof_to_dof)
+  odofs = OIdsToIds(zeros(Int32,local_ndofs),k.pdof_to_dof)
+  return odofs
+end
+
+function Arrays.evaluate!(cache,k::DofsToODofs{D},cell::CartesianIndex{D}) where D
   first_new_node = k.orders .* (Tuple(cell) .- 1) .+ 1
   onodes_range = map(enumerate(first_new_node)) do (i,ni)
     ni:ni+k.orders[i]
   end
   local_comps_to_odofs = view(k.node_and_comps_to_odof,onodes_range...)
-  local_nnodes = length(b.node_and_comp_to_dof)
+  local_nnodes = length(k.b.node_and_comp_to_dof)
   for (node,comps_to_odof) in enumerate(local_comps_to_odofs)
-    for comp in b.dof_to_comp
+    for comp in k.b.dof_to_comp
       odof = comps_to_odof[comp]
-      odofs[node+(comp-1)*local_nnodes] = odof
+      cache[node+(comp-1)*local_nnodes] = odof
     end
   end
-  return odofs
+  return cache
 end
 
-struct RowColToNnzIndices{D,Tr,Ar,Tc,Ac} <: Map
-  rows::DofsToODofs{D,Tr,Ar}
-  cols::DofsToODofs{D,Tc,Ac}
-  local_nrows::NTuple{D,Int}
-  local_ncols::NTuple{D,Int}
+struct LocalNnzIdsToGlobaNnzIds{D,Pgr,Pgc,Plr,Plc,Vgr,Vgc} <: Map
+  global_rows::DofsToODofs{D,Pgr,Vgr}
+  global_cols::DofsToODofs{D,Pgc,Vgc}
+  local_rows::NTuple{D,DofsToODofs{1,Plr,Int}}
+  local_cols::NTuple{D,DofsToODofs{1,Plc,Int}}
 end
 
-function Arrays.return_cache(k::RowColToNnzIndex{D},cell::CartesianIndex{D},icell::Int) where D
-  odofs_row,b_row = return_cache(k.rows,cell,icell)
-  odofs_col,b_col = return_cache(k.cols,cell,icell)
-  local_nrows = length(b_row)
-  local_ncols = length(b_col)
-  global_nnz_index = zeros(Int,local_nrows,local_ncols)
-  local_nnz_indices = zeros(VectorValue{D,Int},local_nrows,local_ncols)
-  return global_nnz_index,local_nnz_indices,(odofs_row,b_row),(odofs_col,b_col)
+get_global_nrows(k::LocalNnzIdsToGlobaNnzIds) = get_ndofs(k.global_rows)
+get_global_ncols(k::LocalNnzIdsToGlobaNnzIds) = get_ndofs(k.global_cols)
+
+get_local_nrows(k::LocalNnzIdsToGlobaNnzIds) = map(get_ndofs,k.local_rows)
+get_local_ncols(k::LocalNnzIdsToGlobaNnzIds) = map(get_ndofs,k.local_cols)
+
+function Arrays.return_cache(k::LocalNnzIdsToGlobaNnzIds{D,Pgr,Pgc},cell::CartesianIndex{D}) where {D,Pgr,Pgc}
+  gcache_rows = return_cache(k.global_rows,cell)
+  gcache_cols = return_cache(k.global_cols,cell)
+  lcaches_rows = map(return_cache,k.local_rows,CartesianIndex.(cell.I))
+  lcaches_cols = map(return_cache,k.local_cols,CartesianIndex.(cell.I))
+
+  ncomps = num_components(Pgr)*num_components(Pgr)
+  rows_no_comps = get_local_nrows(k)
+  cols_no_comps = get_local_ncols(k)
+  lnrows_no_comps = prod(length.(lcaches_rows))
+  lncols_no_comps = prod(length.(lcaches_cols))
+
+  gnnz_index = zeros(Int,lnrows_no_comps,lncols_no_comps,ncomps)
+  lnnz_indices = zeros(VectorValue{D,Int},lnrows_no_comps,lncols_no_comps,ncomps)
+  return (gnnz_index,lnnz_indices,gcache_rows,gcache_cols,lcaches_rows,lcaches_cols,
+    rows_no_comps,cols_no_comps)
 end
 
-function Arrays.evaluate!(cache,k::RowColToNnzIndex{D},cell::CartesianIndex{D},icell::Int) where D
-  global_nnz_index,local_nnz_indices,cache_row,cache_col = cache
-  odofs_row = evaluate!(cache_row,k.rows,cell,icell)
-  odofs_col = evaluate!(cache_col,k.cols,cell,icell)
-  global_nrows = prod(k.local_nrows)
-  for (row,odof_row) in enumerate(odofs_row)
-    for (col,odof_col) in enumerate(odofs_col)
-      g_nnz_i = odof_row + (odof_col-1)*global_nrows
-      global_nnz_index[row,col] = g_nnz_i
-      local_nnz_indices[row,col] = _index_to_d_indices(g_nnz_i)
+function Arrays.evaluate!(cache,k::LocalNnzIdsToGlobaNnzIds{D,Pgr,Pgc},cell::CartesianIndex{D}) where {D,Pgr,Pgc}
+  (gnnz_index,lnnz_indices,gcache_rows,gcache_cols,lcaches_rows,lcaches_cols,
+    rows_no_comps,cols_no_comps) = cache
+  godofs_row = evaluate!(gcache_rows,k.global_rows,cell)
+  godofs_col = evaluate!(gcache_cols,k.global_cols,cell)
+  lodofs_rows = map(evaluate!,lcaches_rows,k.local_rows,CartesianIndex.(cell.I))
+  lodofs_cols = map(evaluate!,lcaches_cols,k.local_cols,CartesianIndex.(cell.I))
+  nrows_no_comps = prod(rows_no_comps)
+  ncols_no_comps = prod(cols_no_comps)
+  ncomps_row = num_components(Pgr)
+  ncomps_col = num_components(Pgr)
+  lnrows_no_comps = size(gnnz_index,1)
+  lncols_no_comps = size(gnnz_index,2)
+  for (row,godof_row) in enumerate(godofs_row)
+    row_no_comp = fast_index(row,lnrows_no_comps)
+    gnode_row,comp_row = _fast_and_slow_index(godof_row,nrows_no_comps)
+    lnodes_row = _index_to_d_indices(gnode_row,rows_no_comps)
+    for (col,godof_col) in enumerate(godofs_col)
+      col_no_comp = fast_index(col,lncols_no_comps)
+      gnode_col,comp_col = _fast_and_slow_index(godof_col,ncols_no_comps)
+      lnodes_col = _index_to_d_indices(gnode_col,cols_no_comps)
+      g_nnz_i = gnode_row + (gnode_col-1)*nrows_no_comps
+      l_nnz_i = lnodes_row .+ (lnodes_col.-1).*rows_no_comps
+      comp = comp_row+(comp_col-1)*ncomps_row
+      gnnz_index[row_no_comp,col_no_comp,comp] = g_nnz_i
+      lnnz_indices[row_no_comp,col_no_comp,comp] = VectorValue(l_nnz_i)
     end
   end
-  return global_nnz_index,local_nnz_indices
+  return gnnz_index,lnnz_indices
 end
 
 # Assembly-related functions
@@ -197,15 +248,13 @@ function get_ordered_cell_dof_ids(
   desc = get_cartesian_descriptor(model)
   periodic = desc.isperiodic
   ncells = desc.partition
-
-  onodes = LinearIndices(orders .* ncells .+ 1 .- periodic)
-
   cells = CartesianIndices(ncells)
   tcells = view(cells,tface_to_mface)
-  node_and_comps_to_odof = get_ordered_dof_ids(cell_dofs_ids,fe_dof_basis,cells,onodes,orders)
+  onodes = LinearIndices(orders .* ncells .+ 1 .- periodic)
 
+  node_and_comps_to_odof = get_ordered_dof_ids(cell_dofs_ids,fe_dof_basis,cells,onodes,orders)
   k = DofsToODofs(fe_dof_basis,node_and_comps_to_odof,orders)
-  lazy_map(k,tcells,tface_to_mface)
+  lazy_map(k,tcells)
 end
 
 function get_ordered_cell_dof_ids(model::DiscreteModel,args...)
@@ -218,7 +267,7 @@ cubic_polytope(::Val{2}) = QUAD
 cubic_polytope(::Val{3}) = HEX
 
 function get_ordered_dof_ids(args...)
-  @notimplemented
+  @notimplemented "This function is only implemented for Lagrangian dof bases"
 end
 
 function get_ordered_dof_ids(
@@ -243,7 +292,7 @@ function get_ordered_dof_ids(
   nnodes = length(onodes)
   ncomps = num_components(V)
   ndofs = nnodes*ncomps
-  vec_odofs = zeros(Int32,ndofs)
+  vec_odofs = zeros(eltype(V),ndofs)
   for (icell,cell) in enumerate(cells)
     first_new_node = orders .* (Tuple(cell) .- 1) .+ 1
     onodes_range = map(enumerate(first_new_node)) do (i,ni)
@@ -315,8 +364,8 @@ function _get_node_and_comps_to_odof(
   return odofs
 end
 
-function _local_pdof_to_dof(args...)
-  @notimplemented
+function _local_pdof_to_dof(fe_dof_basis::AbstractVector{<:Dof},args...)
+  @notimplemented "This function is only implemented for Lagrangian dof bases"
 end
 
 function _local_pdof_to_dof(fe_dof_basis::Fill{<:LagrangianDofBasis},orders::NTuple{D,Int}) where D
@@ -387,14 +436,16 @@ function _d_rows_columns_to_index(
   findfirst(id==all_id_d)
 end
 
+function _fast_and_slow_index(i::Integer,s::Integer)
+  fast_index(i,s),slow_index(i,s)
+end
+
 function _index_to_d_indices(i::Integer,s2::NTuple{2,Integer})
-  i1 = fast_index(i,s2)
-  i2 = slow_index(i,s2)
-  return i1,i2
+  _fast_and_slow_index(i,s2[1])
 end
 
 function _index_to_d_indices(i::Integer,sD::NTuple{D,Integer}) where D
-  sD_minus_1 = sD[2:end-1]
+  sD_minus_1 = sD[1:end-1]
   nD_minus_1 = prod(sD_minus_1)
   iD = slow_index(i,nD_minus_1)
   (_index_to_d_indices(i,sD_minus_1)...,iD)

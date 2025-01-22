@@ -176,7 +176,7 @@ form(u,v) = ∫(u⋅v)dΩ
 A = assemble_matrix(form,space,space)
 A′ = assemble_matrix(form,space′,space′)
 
-dmap = get_dof_map(model,space,[false false
+dmap = get_dof_map(model.model,space,[false false
   true false])
 A11 = A[dmap[:,:,1][:],dmap[:,:,1][:]]
 A21 = A[dmap[:,:,2][:],dmap[:,:,1][:]]
@@ -323,17 +323,95 @@ s1d = size(A1) .* size(A2)
 
 all_ids = map((i,j)->map(CartesianIndex,i,j),(I1,I2),(J1,J2))
 
-function _index_d(rows_1d,cols_1d,d)::Int
-  all_id_d = all_ids[d]
-  id = CartesianIndex((rows_1d[d],cols_1d[d]))
-  findfirst(id==all_id_d)
+function _index_d(i::Integer,s2::NTuple{2,Integer})
+  TProduct._fast_and_slow_index(i,s2[1])
 end
 
+function _index_d(i::Integer,sD::NTuple{D,Integer}) where D
+  sD_minus_1 = sD[1:end-1]
+  nD_minus_1 = prod(sD_minus_1)
+  iD = slow_index(i,nD_minus_1)
+  (_index_d(i,sD_minus_1)...,iD)
+end
+
+import Gridap.Helpers: @unreachable
+
+function _row_col_pair_to_nz_index!(
+  cache,
+  rows_1d::NTuple{D,Int},
+  cols_1d::NTuple{D,Int},
+  nz_pairs_axes::NTuple{D,Vector{CartesianIndex{2}}}
+  ) where D
+
+  fill!(cache,0)
+  for d in 1:D
+    row_d = rows_1d[d]
+    col_d = cols_1d[d]
+    index_d = CartesianIndex((row_d,col_d))
+    nz_index_d = nz_pairs_axes[d]
+    for (i,nzi) in enumerate(nz_index_d)
+      if nzi == index_d
+        cache[d] = i
+        break
+      end
+    end
+  end
+  return cache
+end
+
+D = 2
+ok_ids = zeros(Int,D)
+
+ncomps_row = ncomps_col = 2
+nrows_no_comps = ncols_no_comps = 49
+ncomps = ncomps_row*ncomps_col
+
+M = zeros(Int,length(I1),length(I2),ncomps)
+
 for k in eachindex(I)
-  rows_1d,cols_1d = _split(I[k],J[k],s1d)
-  ok_ids_d = ntuple(d->_index_d(rows_1d,cols_1d,d),1:D)
-  M[ok_ids_d] = I[k]+(J[k]-1)*nrows
+  I_node,I_comp = TProduct._fast_and_slow_index(I[k],nrows_no_comps)
+  J_node,J_comp = TProduct._fast_and_slow_index(J[k],ncols_no_comps)
+  comp = I_comp+(J_comp-1)*ncomps_row
+  rows_1d = _index_d(I_node,rows_no_comps)
+  cols_1d = _index_d(J_node,cols_no_comps)
+  _row_col_pair_to_nz_index!(ok_ids,rows_1d,cols_1d,all_ids)
+  M[ok_ids...,comp] = I[k]+(J[k]-1)*nrows
 end
 
 sparse_indices = get_sparse_dof_map(osparsity,I,J,i,j)
 osparse_indices = order_sparse_dof_map(osparsity,sparse_indices,rows′′,cols′′)
+
+import ROM.TProduct:LocalNnzIdsToGlobaNnzIds
+
+gr = space′.cell_dofs_ids.maps[1]
+lr = space1′.cell_dofs_ids.maps[1]
+k = LocalNnzIdsToGlobaNnzIds(gr,gr,(lr,lr),(lr,lr))
+
+cells = vec(CartesianIndices((3,3)))
+cell = CartesianIndex((2,3))
+cache = return_cache(k,cell)
+gnnz_index,lnnz_indices = evaluate!(cache,k,cell)
+
+# gnnz_index,lnnz_indices = lazy_map(k,cells)
+
+(gnnz_index,lnnz_indices,gcache_rows,gcache_cols,lcaches_rows,lcaches_cols,
+  rows_no_comps,cols_no_comps) = cache
+godofs_row = evaluate!(gcache_rows,k.global_rows,cell)
+godofs_col = evaluate!(gcache_cols,k.global_cols,cell)
+lodofs_rows = map(evaluate!,lcaches_rows,k.local_rows,CartesianIndex.(cell.I))
+lodofs_cols = map(evaluate!,lcaches_cols,k.local_cols,CartesianIndex.(cell.I))
+nrows_no_comps = prod(rows_no_comps)
+ncols_no_comps = prod(cols_no_comps)
+
+row,col = 1,1
+godof_row,godof_col = godofs_row[row],godofs_col[col]
+gnode_row,comp_row = TProduct._fast_and_slow_index(godof_row,nrows_no_comps)
+lnodes_row = TProduct._index_to_d_indices(gnode_row,rows_no_comps)
+gnode_col,comp_col = TProduct._fast_and_slow_index(godof_col,ncols_no_comps)
+comp = comp_row*comp_col
+lnodes_col = TProduct._index_to_d_indices(gnode_col,cols_no_comps)
+g_nnz_i = gnode_row + (gnode_col-1)*nrows_no_comps
+l_nnz_i = lnodes_row .+ (lnodes_col.-1).*rows_no_comps
+
+innz_11 = gnnz_index[:,:,1]
+A′[innz_11]
