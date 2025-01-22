@@ -65,8 +65,6 @@ Fetches the tags of the tensor product 1D models corresponding to the tags
 of the `D`-dimensional model `tags`. The length of the output is `D`
 """
 function get_1d_tags(model::TProductModel{D},tags) where D
-  isempty(tags) && return Vector{Vector{Int8}}(undef,D)
-
   nodes = get_node_coordinates(model)
   labeling = get_face_labeling(model)
   face_to_tag = get_face_tag_index(labeling,tags,0)
@@ -81,13 +79,15 @@ function get_1d_tags(model::TProductModel{D},tags) where D
 
   map(1:D) do d
     tags = Int8[]
-    entities = d_to_entities[d]
-    for (tag1d,entity1d) in enumerate(entities)
-      iset = intersect(nodes_in_tag,entity1d)
-      if iset == vec(entity1d)
-        push!(tags,tag1d)
-      else
-        @check _tp_label_condition(iset,entity1d) msg
+    if !isempty(tags)
+      entities = d_to_entities[d]
+      for (tag1d,entity1d) in enumerate(entities)
+        iset = intersect(nodes_in_tag,entity1d)
+        if iset == vec(entity1d)
+          push!(tags,tag1d)
+        else
+          @check _tp_label_condition(iset,entity1d) msg
+        end
       end
     end
     tags

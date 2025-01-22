@@ -140,9 +140,11 @@ trian = Triangulation(model)
 dΩ = Measure(Ω,2)
 reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},2)
 space = FESpace(model.model,reffe;conformity=:H1,dirichlet_tags=[1,2,5])
-space′ = NewFESpace(trian,reffe;conformity=:H1,dirichlet_tags=[1,2,5])
+space′ = OrderedFESpace(space)
 
-# fe_dof_basis = get_data(get_fe_dof_basis(space))
+# cell_dofs_ids = get_cell_dof_ids(space)
+# cache = array_cache(cell_dofs_ids)
+# fe_dof_basis = get_data(get_fe_dof_basis(space))[1]
 # orders = get_polynomial_orders(space)
 # trian = get_triangulation(space)
 # model = get_background_model(trian)
@@ -151,8 +153,8 @@ space′ = NewFESpace(trian,reffe;conformity=:H1,dirichlet_tags=[1,2,5])
 # periodic = desc.isperiodic
 # ncells = desc.partition
 
-# inodes = LinearIndices(orders .* ncells .+ 1 .- periodic)
-
+# onodes = LinearIndices(orders .* ncells .+ 1 .- periodic)
+# cells = CartesianIndices(ncells)
 # cells = vec(CartesianIndices(ncells))
 # tcells = view(cells,tface_to_mface)
 # ordered_node_ids = TProduct.get_ordered_node_ids(inodes,diri_entities)
@@ -161,12 +163,21 @@ space′ = NewFESpace(trian,reffe;conformity=:H1,dirichlet_tags=[1,2,5])
 
 # cache = return_cache(k,tcells[1],tface_to_mface[1])
 # evaluate!(cache,k,tcells[1],tface_to_mface[1])
+# odofs = TProduct.get_ordered_dof_ids(cell_dofs_ids,fe_dof_basis,cells,onodes,orders)
+# k = DofsToODofs(get_data(get_fe_dof_basis(space)),odofs,orders)
+
+# cell,icell = CartesianIndex((1,1)),1
+# cache = return_cache(k,cell,icell)
+# evaluate!(cache,k,cell,icell)
+
+# evaluate!(cache,k,CartesianIndex((2,1)),2)
 
 form(u,v) = ∫(u⋅v)dΩ
 A = assemble_matrix(form,space,space)
 A′ = assemble_matrix(form,space′,space′)
 
-dmap = get_dof_map(model.model,space,get_dirichlet_entities(space′.spaces_1d))
+dmap = get_dof_map(model,space,[false false
+  true false])
 A11 = A[dmap[:,:,1][:],dmap[:,:,1][:]]
 A21 = A[dmap[:,:,2][:],dmap[:,:,1][:]]
 A12 = A[dmap[:,:,1][:],dmap[:,:,2][:]]
@@ -280,14 +291,49 @@ writevtk(Ω,"boh",cellfields=["err"=>uh-uh′])
 
 # SPARSE MAP ?
 
-A1 = assemble_matrix((u,v)->∫(u⋅v)*Measure(trian.trians_1d[1],2),space′.spaces_1d[1],space′.spaces_1d[1])
-A2 = assemble_matrix((u,v)->∫(u⋅v)*Measure(trian.trians_1d[2],2),space′.spaces_1d[2],space′.spaces_1d[2])
+model = TProductModel(pmin,pmax,partition)
+trian = Triangulation(model)
+reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},2)
+# tpspace = TProductFESpace(trian,reffe;conformity=:H1)
+
+basis,reffe_args,reffe_kwargs = reffe
+T,order = reffe_args
+cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
+space = FESpace(trian.trian,cell_reffe)
+cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
+spaces_1d = TProduct.univariate_spaces(model,trian,cell_reffes_1d)
+
+space′ = OrderedFESpace(space)
+space1′ = OrderedFESpace(spaces_1d[1])
+space2′ = OrderedFESpace(spaces_1d[2])
+
+A′ = assemble_matrix((u,v)->∫(u⋅v)*Measure(trian.trian,2),space′,space′)
+A1 = assemble_matrix((u,v)->∫(u⋅v)*Measure(trian.trians_1d[1],2),space1′,space1′)
+A2 = assemble_matrix((u,v)->∫(u⋅v)*Measure(trian.trians_1d[2],2),space2′,space2′)
 
 using SparseArrays
 
-tp_dof_map = get_tp_dof_map(space′)
-
 I,J,V = findnz(A′)
-i,j,v = univariate_findnz(osparsity)
+I1,J1,V1 = findnz(A1)
+I2,J2,V2 = findnz(A2)
+
+nrows = size(A′,1)
+
+s1d = size(A1) .* size(A2)
+
+all_ids = map((i,j)->map(CartesianIndex,i,j),(I1,I2),(J1,J2))
+
+function _index_d(rows_1d,cols_1d,d)::Int
+  all_id_d = all_ids[d]
+  id = CartesianIndex((rows_1d[d],cols_1d[d]))
+  findfirst(id==all_id_d)
+end
+
+for k in eachindex(I)
+  rows_1d,cols_1d = _split(I[k],J[k],s1d)
+  ok_ids_d = ntuple(d->_index_d(rows_1d,cols_1d,d),1:D)
+  M[ok_ids_d] = I[k]+(J[k]-1)*nrows
+end
+
 sparse_indices = get_sparse_dof_map(osparsity,I,J,i,j)
 osparse_indices = order_sparse_dof_map(osparsity,sparse_indices,rows′′,cols′′)
