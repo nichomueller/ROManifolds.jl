@@ -448,6 +448,6 @@ function get_basis_indices(cores_indices::Vector{<:Vector},dof_map::AbstractArra
   return get_basis_indices(Val(N),cores_indices,dof_map)
 end
 
-function get_basis_indices(cores_indices::Vector{<:Vector},dof_map::SparseDofMap)
-  get_basis_indices(cores_indices,dof_map.indices_sparse)
+function get_basis_indices(cores_indices::Vector{<:Vector},dof_map::SparseMatrixDofMap)
+  get_basis_indices(cores_indices,dof_map.d_sparse_dofs_to_full_dofs)
 end

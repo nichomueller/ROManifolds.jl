@@ -1,4 +1,4 @@
-function DofMaps.recast(a::AbstractVector{<:AbstractArray{T,3}},i::SparseDofMap) where T
+function DofMaps.recast(a::AbstractVector{<:AbstractArray{T,3}},i::SparseMatrixDofMap) where T
   N = length(a)
   us = i.sparsity.sparsities_1d
   @check length(us) ≤ N

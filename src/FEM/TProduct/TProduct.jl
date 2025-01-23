@@ -31,9 +31,6 @@ import PartitionedArrays: tuple_of_arrays
 import SparseArrays: AbstractSparseMatrixCSC
 import UnPack: @unpack
 
-export get_tp_dof_map
-include("TProductDofMaps.jl")
-
 export TProductModel
 export TProductTriangulation
 export TProductMeasure
@@ -65,11 +62,5 @@ include("TProductCellData.jl")
 export TProductSparseMatrixAssembler
 export TProductBlockSparseMatrixAssembler
 include("TProductAssembly.jl")
-
-export OrderedFESpace
-export OIdsToIds
-export DofsToODofs
-export add_ordered_entries!
-include("OrderedFESpaces.jl")
 
 end # module

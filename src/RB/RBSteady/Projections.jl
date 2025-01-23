@@ -8,8 +8,8 @@ operator. The kernel of a Projection is `n`-dimensional, whereas its image is
 
 Subtypes:
 
-- `PODBasis`
-- `TTSVDCores`
+- `PODProjection`
+- `TTSVDProjection`
 - `NormedProjection`
 - `BlockProjection`
 - `InvProjection`
@@ -246,47 +246,47 @@ function Projection(red::AffineReduction,s::AbstractMatrix,args...)
 end
 
 """
-    struct PODBasis <: Projection
+    struct PODProjection <: Projection
       basis::AbstractMatrix
     end
 
 Projection stemming from a truncated proper orthogonal decomposition `tpod`
 """
-struct PODBasis <: Projection
+struct PODProjection <: Projection
   basis::AbstractMatrix
 end
 
 function Projection(red::PODReduction,s::AbstractArray{<:Number},args...)
   basis = reduction(red,s,args...)
-  PODBasis(basis)
+  PODProjection(basis)
 end
 
 function Projection(red::PODReduction,s::SparseSnapshots,args...)
   basis = reduction(red,s,args...)
   basis′ = recast(basis,s)
-  PODBasis(basis′)
+  PODProjection(basis′)
 end
 
-get_basis(a::PODBasis) = a.basis
-num_fe_dofs(a::PODBasis) = size(get_basis(a),1)
-num_reduced_dofs(a::PODBasis) = size(get_basis(a),2)
+get_basis(a::PODProjection) = a.basis
+num_fe_dofs(a::PODProjection) = size(get_basis(a),1)
+num_reduced_dofs(a::PODProjection) = size(get_basis(a),2)
 
-union_bases(a::PODBasis,b::PODBasis,args...) = union_bases(a,get_basis(b),args...)
+union_bases(a::PODProjection,b::PODProjection,args...) = union_bases(a,get_basis(b),args...)
 
-function union_bases(a::PODBasis,basis_b::AbstractMatrix,args...)
+function union_bases(a::PODProjection,basis_b::AbstractMatrix,args...)
   basis_a = get_basis(a)
   basis_ab, = gram_schmidt(basis_b,basis_a,args...)
-  PODBasis(basis_ab)
+  PODProjection(basis_ab)
 end
 
-function galerkin_projection(proj_left::PODBasis,a::PODBasis)
+function galerkin_projection(proj_left::PODProjection,a::PODProjection)
   basis_left = get_basis(proj_left)
   basis = get_basis(a)
   proj_basis = galerkin_projection(basis_left,basis)
   return ReducedProjection(proj_basis)
 end
 
-function galerkin_projection(proj_left::PODBasis,a::PODBasis,proj_right::PODBasis)
+function galerkin_projection(proj_left::PODProjection,a::PODProjection,proj_right::PODProjection)
   basis_left = get_basis(proj_left)
   basis = get_basis(a)
   basis_right = get_basis(proj_right)
@@ -294,18 +294,18 @@ function galerkin_projection(proj_left::PODBasis,a::PODBasis,proj_right::PODBasi
   return ReducedProjection(proj_basis)
 end
 
-function empirical_interpolation(a::PODBasis)
+function empirical_interpolation(a::PODProjection)
   empirical_interpolation(get_basis(a))
 end
 
-function rescale(op::Function,x::AbstractArray,b::PODBasis)
-  PODBasis(op(x,get_basis(b)))
+function rescale(op::Function,x::AbstractArray,b::PODProjection)
+  PODProjection(op(x,get_basis(b)))
 end
 
 # TT interface
 
 """
-    struct TTSVDCores <: Projection
+    struct TTSVDProjection <: Projection
       cores::AbstractVector{<:AbstractArray{T,3} where T}
       dof_map::AbstractDofMap
     end
@@ -313,7 +313,7 @@ end
 Projection stemming from a tensor train SVD `ttsvd`. For reindexing purposes
 a field `dof_map` is provided along with the tensor train cores `cores`
 """
-struct TTSVDCores <: Projection
+struct TTSVDProjection <: Projection
   cores::AbstractVector{<:AbstractArray{T,3} where T}
   dof_map::AbstractDofMap
 end
@@ -321,33 +321,33 @@ end
 function Projection(red::TTSVDReduction,s::AbstractArray{<:Number},args...)
   cores = reduction(red,s,args...)
   dof_map = get_dof_map(s)
-  TTSVDCores(cores,dof_map)
+  TTSVDProjection(cores,dof_map)
 end
 
 function Projection(red::TTSVDReduction,s::SparseSnapshots,args...)
   cores = reduction(red,s,args...)
   cores′ = recast(cores,s)
   dof_map = get_dof_map(s)
-  TTSVDCores(cores′,dof_map)
+  TTSVDProjection(cores′,dof_map)
 end
 
 get_cores(a::Projection) = @notimplemented
-get_cores(a::TTSVDCores) = a.cores
+get_cores(a::TTSVDProjection) = a.cores
 
 DofMaps.get_dof_map(a::Projection) = @notimplemented
-DofMaps.get_dof_map(a::TTSVDCores) = a.dof_map
+DofMaps.get_dof_map(a::TTSVDProjection) = a.dof_map
 
-get_basis(a::TTSVDCores) = cores2basis(get_dof_map(a),get_cores(a)...)
-num_fe_dofs(a::TTSVDCores) = prod(map(c -> size(c,2),get_cores(a)))
-num_reduced_dofs(a::TTSVDCores) = size(last(get_cores(a)),3)
+get_basis(a::TTSVDProjection) = cores2basis(get_dof_map(a),get_cores(a)...)
+num_fe_dofs(a::TTSVDProjection) = prod(map(c -> size(c,2),get_cores(a)))
+num_reduced_dofs(a::TTSVDProjection) = size(last(get_cores(a)),3)
 
-function union_bases(a::TTSVDCores,b::TTSVDCores,args...)
+function union_bases(a::TTSVDProjection,b::TTSVDProjection,args...)
   @check get_dof_map(a) == get_dof_map(b)
   union_bases(a,get_cores(b),args...)
 end
 
 function union_bases(
-  a::TTSVDCores,
+  a::TTSVDProjection,
   cores_b::AbstractVector{<:AbstractArray},
   args...
   )
@@ -357,7 +357,7 @@ function union_bases(
 end
 
 function union_bases(
-  a::TTSVDCores,
+  a::TTSVDProjection,
   cores_b::AbstractVector{<:AbstractArray},
   red_style::ReductionStyle,
   args...
@@ -368,17 +368,17 @@ function union_bases(
 
   cores_ab = block_cores([cores_a,cores_b])
   orthogonalize!(red_style,cores_ab,args...)
-  TTSVDCores(cores_ab,get_dof_map(a))
+  TTSVDProjection(cores_ab,get_dof_map(a))
 end
 
-function galerkin_projection(proj_left::TTSVDCores,a::TTSVDCores)
+function galerkin_projection(proj_left::TTSVDProjection,a::TTSVDProjection)
   cores_left = get_cores(proj_left)
   cores = get_cores(a)
   proj_basis = galerkin_projection(cores_left,cores)
   return ReducedProjection(proj_basis)
 end
 
-function galerkin_projection(proj_left::TTSVDCores,a::TTSVDCores,proj_right::TTSVDCores)
+function galerkin_projection(proj_left::TTSVDProjection,a::TTSVDProjection,proj_right::TTSVDProjection)
   cores_left = get_cores(proj_left)
   cores = get_cores(a)
   cores_right = get_cores(proj_right)
@@ -386,7 +386,7 @@ function galerkin_projection(proj_left::TTSVDCores,a::TTSVDCores,proj_right::TTS
   return ReducedProjection(proj_basis)
 end
 
-function empirical_interpolation(a::TTSVDCores)
+function empirical_interpolation(a::TTSVDProjection)
   local indices,interp
   cores = get_cores(a)
   dof_map = get_dof_map(a)
@@ -406,15 +406,15 @@ function empirical_interpolation(a::TTSVDCores)
   return indices,interp
 end
 
-function rescale(op::Function,x::AbstractRankTensor{D},b::TTSVDCores) where D
+function rescale(op::Function,x::AbstractRankTensor{D},b::TTSVDProjection) where D
   cores = get_cores(b)
   dof_map = get_dof_map(b)
   if D == ndims(dof_map)
-    TTSVDCores(op(x,cores),dof_map)
+    TTSVDProjection(op(x,cores),dof_map)
   else
     c1 = op(x,cores[1:D])
     c2 = cores[D+1:end]
-    TTSVDCores([c1...,c2...],dof_map)
+    TTSVDProjection([c1...,c2...],dof_map)
   end
 end
 
@@ -477,11 +477,11 @@ end
 # multi field interface
 
 function Arrays.return_type(::typeof(projection),::PODReduction,::Snapshots)
-  PODBasis
+  PODProjection
 end
 
 function Arrays.return_type(::typeof(projection),::TTSVDReduction,::Snapshots)
-  TTSVDCores
+  TTSVDProjection
 end
 
 function Arrays.return_type(::typeof(projection),::Reduction,::Snapshots,::MatrixOrTensor)

@@ -105,8 +105,8 @@ export orth_projection
 include("BasisConstruction.jl")
 
 export Projection
-export PODBasis
-export TTSVDCores
+export PODProjection
+export TTSVDProjection
 export NormedProjection
 export BlockProjection
 export ReducedProjection

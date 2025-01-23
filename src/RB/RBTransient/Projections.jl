@@ -1,7 +1,7 @@
 function _projection(red::TransientAffineReduction,s::TransientSnapshots,args...)
   s1 = flatten_snapshots(select_snapshots(s,1,1))
   projection_space = projection(get_reduction_space(red),s1,args...)
-  projection_time = PODBasis(I[1:num_times(s),1:1])
+  projection_time = PODProjection(I[1:num_times(s),1:1])
   TransientProjection(projection_space,projection_time)
 end
 
@@ -134,13 +134,13 @@ end
 
 # tt interface
 
-get_cores_space(a::TTSVDCores) = get_cores(a)[1:end-1]
-get_core_time(a::TTSVDCores) = get_cores(a)[end]
+get_cores_space(a::TTSVDProjection) = get_cores(a)[1:end-1]
+get_core_time(a::TTSVDProjection) = get_cores(a)[end]
 
 function RBSteady.galerkin_projection(
-  proj_left::TTSVDCores,
-  a::TTSVDCores,
-  proj_right::TTSVDCores,
+  proj_left::TTSVDProjection,
+  a::TTSVDProjection,
+  proj_right::TTSVDProjection,
   combine)
 
   # space

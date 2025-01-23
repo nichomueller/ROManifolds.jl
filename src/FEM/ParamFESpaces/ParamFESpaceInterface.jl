@@ -69,10 +69,6 @@ function DofMaps.get_dof_map(f::SingleFieldParamFESpace)
   get_dof_map(get_fe_space(f))
 end
 
-function DofMaps.get_univariate_dof_map(f::SingleFieldParamFESpace)
-  get_univariate_dof_map(get_fe_space(f))
-end
-
 function DofMaps.get_sparse_dof_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace)
   get_sparse_dof_map(get_fe_space(f),g)
 end

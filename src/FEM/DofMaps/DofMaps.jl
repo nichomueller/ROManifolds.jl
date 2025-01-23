@@ -25,7 +25,6 @@ import SparseArrays: AbstractSparseMatrix,AbstractSparseMatrixCSC
 import SparseMatricesCSR: SparseMatrixCSR
 
 export recast_indices
-export get_nonzero_indices
 export slow_index
 export fast_index
 include("IndexOperations.jl")
@@ -35,55 +34,42 @@ export range_1d
 export range_2d
 include("Ranges.jl")
 
-export AbstractDofMap
-export AbstractTrivialDofMap
-export TrivialDofMap
-export TrivialSparseDofMap
-export DofMap
-export ConstrainedDofMap
-export DofMapPortion
-export TProductDofMap
-export ConstrainedTProductDofMap
-export invert
-export vectorize
-include("DofMapsInterface.jl")
-
 export SparsityPattern
 export SparsityCSC
-export OrderedSparsity
-export TProductSparsityPattern
 export TProductSparsity
-export SparsityToTProductSparsity
 export get_background_sparsity
-export order_sparsity
 export recast
-export get_matrix_to_parent_matrix
+export get_d_sparse_dofs_to_full_dofs
 include("SparsityPatterns.jl")
 
-export SparseDofMapStyle
-export FullDofMapIndexing
-export SparseDofMapIndexing
-export TrivialSparseDofMap
-export SparseDofMap
-export get_sparsity
-include("SparseDofMaps.jl")
+export AbstractDofMap
+export TrivialDofMap
+export VectorDofMap
+export TrivialSparseMatrixDofMap
+export SparseMatrixDofMap
+export ConstrainedDofMap
+export invert
+export vectorize
+export flatten
+include("DofMapsInterface.jl")
 
 export get_dof_map
-export get_dof_type
 export get_sparse_dof_map
-export get_univariate_dof_map
-export get_dirichlet_entities
-export cell_reffe_to_reffe
 export get_polynomial_order
 export get_polynomial_orders
-export get_tface_to_mask
-export get_dof_to_constraints
 include("DofMapsBuilders.jl")
-
-export FEDofMap
-include("FEDofMaps.jl")
 
 export DofMapArray
 include("DofMapArrays.jl")
+
+export OIdsToIds
+export DofsToODofs
+export add_ordered_entries!
+include("OrderingMaps.jl")
+
+export OrderedFESpace
+export CartesianFESpace
+export get_ordered_cell_dof_ids
+include("OrderedFESpaces.jl")
 
 end # module

@@ -44,12 +44,6 @@ function FESpaces.get_trial(op::LinearNonlinearParamFEOperator)
   get_trial(op.op_linear)
 end
 
-function get_fe_dof_maps(op::LinearNonlinearParamFEOperator)
-  @check all(get_dof_map(op.op_linear) .== get_dof_map(op.op_nonlinear))
-  @check all(get_sparse_dof_map(op.op_linear) .== get_sparse_dof_map(op.op_nonlinear))
-  get_fe_dof_maps(op.op_linear)
-end
-
 function ParamDataStructures.realization(op::LinearNonlinearParamFEOperator;kwargs...)
   realization(op.op_linear;kwargs...)
 end

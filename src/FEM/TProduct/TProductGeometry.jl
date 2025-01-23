@@ -48,11 +48,21 @@ end
 _get_interior(entity::AbstractVector) = entity[2:end-1]
 _get_interior(entity::AbstractMatrix) = entity[2:end-1,2:end-1]
 
-function _tp_label_condition(intset,entity)
+function _throw_tp_error()
+  msg = """
+  The assigned boundary does not satisfy the tensor product condition:
+  it should occupy the whole side of the domain, rather than a side's portion. Try
+  imposing the Dirichlet condition weakly, e.g. with Nitsche's penalty method
+  """
+
+  @assert false msg
+end
+
+function _check_tp_label_condition(intset,entity)
   interior = _get_interior(entity)
   for i in intset
     if i ∈ interior
-      return false
+      return _throw_tp_error()
     end
   end
   return true
@@ -72,25 +82,20 @@ function get_1d_tags(model::TProductModel{D},tags) where D
   d_to_entities = _d_to_lower_dim_entities(nodes)
   nodes_in_tag = nodes[findall(!iszero,face_to_tag)]
 
-  msg = """
-  The assigned boundary does not satisfy the tensor product condition:
-  it should occupy the whole side of the domain, rather than a side's portion
-  """
-
   map(1:D) do d
-    tags = Int8[]
+    d_tags = Int8[]
     if !isempty(tags)
       entities = d_to_entities[d]
       for (tag1d,entity1d) in enumerate(entities)
         iset = intersect(nodes_in_tag,entity1d)
         if iset == vec(entity1d)
-          push!(tags,tag1d)
+          push!(d_tags,tag1d)
         else
-          @check _tp_label_condition(iset,entity1d) msg
+          _check_tp_label_condition(iset,entity1d)
         end
       end
     end
-    tags
+    d_tags
   end
 end
 

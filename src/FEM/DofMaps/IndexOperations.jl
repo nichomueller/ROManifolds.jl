@@ -1,48 +1,83 @@
 """
-    recast_indices(indices::AbstractVector,A::AbstractArray) -> AbstractVector
+    recast_indices(indices::AbstractVector,a::AbstractSparseMatrix) -> AbstractVector
 
-Recasts an array of indices ∈ {1,...,nnz(A)} to an array of entire_indices ∈ {1,...,length(A)}
-when A is a sparse matrix, and it returns the original vector itself when A is
-an ordinary array.
+Given a sparse matrix `a` of size (M,N) and a number of nonzero entries Nnz,
+recasts an array of indices ∈ {1,...,Nnz} to an array of entire_indices ∈ {1,...,M⋅N}
 """
-function recast_indices(indices::AbstractVector,A::AbstractArray)
+function recast_indices(indices::AbstractVector,a::AbstractSparseMatrix)
   indices′ = copy(indices)
-  nonzero_indices = get_nonzero_indices(A)
+  I,J, = findnz(a)
+  nrows = size(a,1)
   for (i,indi) in enumerate(indices′)
-    indices′[i] = nonzero_indices[indi]
+    indices′[i] = I[indi] + (J[indi]-1)*nrows
   end
   return indices′
 end
 
 """
-    sparsify_indices(indices::AbstractVector,A::AbstractArray) -> AbstractVector
+    sparsify_indices(indices::AbstractVector,a::AbstractSparseMatrix) -> AbstractVector
 
 Inverse map of recast_indices.
 """
-function sparsify_indices(indices::AbstractVector,A::AbstractArray)
+function sparsify_indices(indices::AbstractVector,a::AbstractSparseMatrix)
   indices′ = copy(indices)
-  nonzero_indices = get_nonzero_indices(A)
+  I,J, = findnz(a)
+  nrows = size(a,1)
   for (i,indi) in enumerate(indices′)
-    indices′[i] = findfirst(x->x==indi,nonzero_indices)
+    for k in nnz(a)
+      i′ = I[k] + (J[k]-1)*nrows
+      if i′ == indi
+        indices′[i] = k
+        break
+      end
+    end
   end
   return indices′
 end
 
-function get_nonzero_indices(A::AbstractArray)
-  @notimplemented
+"""
+    to_nz_index(i::AbstractArray,a::AbstractSparseMatrix) -> AbstractArray
+
+Given a sparse matrix `a` representing a M×N sparse matrix with Nnz nonzero
+entries, and a D-array of indices `i` with values in {1,...,MN}, returns the
+corresponding D-array of indices with values in {1,...,Nnz}. A -1 is placed
+whenever an entry of `i` corresponds to a zero entry of the sparse matrix
+"""
+function to_nz_index(i::AbstractArray,a::AbstractSparseMatrix)
+  i′ = copy(i)
+  to_nz_index!(i′,a)
+  return i′
 end
 
-function get_nonzero_indices(A::AbstractMatrix)
-  return axes(A,1)
+function to_nz_index!(i::AbstractArray,a::AbstractSparseMatrix)
+  @abstractmethod
 end
 
-function get_nonzero_indices(A::AbstractSparseMatrix)
-  i,j, = findnz(A)
-  return i .+ (j .- 1)*A.m
+function to_nz_index!(i::AbstractArray,a::SparseMatrixCSC)
+  nrows = size(a,1)
+  for (j,index) in enumerate(i)
+    if index > 0
+      irow = fast_index(index,nrows)
+      icol = slow_index(index,nrows)
+      i[j] = nz_index(a,irow,icol)
+    end
+  end
 end
 
-function get_nonzero_indices(A::AbstractArray{T,3} where T)
-  return axes(A,2)
+# to_nz_index in case we don't provide a sparse matrix
+
+function to_nz_index(i::AbstractArray)
+  i′ = similar(i)
+  nz_sortperm!(i′,i)
+  i′
+end
+
+function nz_sortperm!(i′::AbstractArray,i::AbstractArray)
+  fill!(i′,zero(eltype(i′)))
+  inz = findall(!iszero,i)
+  anz = sortperm(i[inz])
+  inds = LinearIndices(size(anz))
+  i′[inz[anz]] = inds
 end
 
 """

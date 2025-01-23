@@ -20,7 +20,6 @@ using ROM.DofMaps
 export TProductModel
 export TProductTriangulation
 export TProductFESpace
-export get_tp_dof_map
 export get_tp_fe_basis
 export get_tp_trial_fe_basis
 
@@ -130,8 +129,8 @@ export gram_schmidt
 export orth_projection
 
 export Projection
-export PODBasis
-export TTSVDCores
+export PODProjection
+export TTSVDProjection
 export NormedProjection
 export BlockProjection
 export ReducedProjection

@@ -36,11 +36,6 @@ function ParamSteady.get_param_space(op::LinearNonlinearTransientParamFEOperator
   get_param_space(op.op_linear)
 end
 
-function ParamSteady.get_fe_dof_maps(op::LinearNonlinearTransientParamFEOperator)
-  @check all(get_sparse_dof_map(op.op_linear) .== get_sparse_dof_map(op.op_nonlinear))
-  get_fe_dof_maps(op.op_linear)
-end
-
 function Polynomials.get_order(op::LinearNonlinearTransientParamFEOperator)
   return max(get_order(op.op_linear),get_order(op.op_nonlinear))
 end

@@ -96,7 +96,7 @@ end
   A
 end
 
-@inline function add_ordered_entries!(
+@inline function DofMaps.add_ordered_entries!(
   vij,combine::Function,A,vs::AbstractParamMatrix,is::OIdsToIds,js::OIdsToIds)
 
   for (lj,j) in enumerate(js)
@@ -126,7 +126,7 @@ end
   A
 end
 
-@inline function add_ordered_entries!(
+@inline function DofMaps.add_ordered_entries!(
   vi,combine::Function,A,vs::AbstractParamVector,is::OIdsToIds)
 
   for (li,i) in enumerate(is)

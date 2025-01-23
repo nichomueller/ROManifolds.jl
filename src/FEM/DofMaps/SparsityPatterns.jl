@@ -1,3 +1,130 @@
+"""
+    abstract type SparsityPattern end
+
+Type used to represent the sparsity pattern of a sparse matrix, usually the
+jacobian in a FE problem.
+
+Subtypes:
+- `SparsityCSC`
+- `TProductSparsity`
+"""
+abstract type SparsityPattern end
+
+function SparsityPattern(
+  U::FESpace,
+  V::FESpace,
+  trian=_get_common_domain(U,V)
+  )
+
+  a = SparseMatrixAssembler(U,V)
+  m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
+  cellidsrows = get_cell_dof_ids(V,trian)
+  cellidscols = get_cell_dof_ids(U,trian)
+  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
+  m2 = nz_allocation(m1)
+  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
+  m3 = create_from_nz(m2)
+  SparsityPattern(m3)
+end
+
+get_background_matrix(a::SparsityPattern) = @abstractmethod
+get_background_sparsity(a::SparsityPattern) = SparsityPattern(get_background_matrix(a))
+
+num_rows(a::SparsityPattern) = size(get_background_matrix(a),1)
+num_cols(a::SparsityPattern) = size(get_background_matrix(a),2)
+SparseArrays.findnz(a::SparsityPattern) = findnz(get_background_matrix(a))
+SparseArrays.nnz(a::SparsityPattern) = nnz(get_background_matrix(a))
+SparseArrays.nonzeros(a::SparsityPattern) = nonzeros(get_background_matrix(a))
+SparseArrays.nzrange(a::SparsityPattern,row::Integer) = nzrange(get_background_matrix(a),row)
+Algebra.nz_index(a::SparsityPattern,row::Integer,col::Integer) = nz_index(get_background_matrix(a),row,col)
+
+function to_nz_index(i::AbstractArray,a::SparsityPattern)
+  to_nz_index(i,get_background_matrix(i))
+end
+
+function get_sparse_dof_map(a::SparsityPattern)
+  TrivialSparseMatrixDofMap(a)
+end
+
+"""
+    struct SparsityCSC{Tv,Ti} <: SparsityPattern
+      matrix::SparseMatrixCSC{Tv,Ti}
+    end
+"""
+struct SparsityCSC{Tv,Ti} <: SparsityPattern
+  matrix::SparseMatrixCSC{Tv,Ti}
+end
+
+function SparsityPattern(a::SparseMatrixCSC)
+  SparsityCSC(a)
+end
+
+get_background_matrix(a::SparsityCSC) = a.matrix
+
+"""
+    struct TProductSparsity{A<:SparsityPattern} <: SparsityPattern
+      sparsity::A
+      sparsities_1d::Vector{A}
+    end
+
+Used to represent a sparsity pattern of a matrix obtained by integrating a
+bilinear form on a triangulation that can be obtained as the tensor product of a
+1-d triangulations. For example, this can be done when the mesh is Cartesian, and
+the discretizing elements are cubes
+"""
+struct TProductSparsity{A<:SparsityPattern} <: SparsityPattern
+  sparsity::A
+  sparsities_1d::Vector{A}
+end
+
+get_background_matrix(a::TProductSparsity) = get_background_matrix(a.sparsity)
+
+univariate_num_rows(a::TProductSparsity) = Tuple(num_rows.(a.sparsities_1d))
+univariate_num_cols(a::TProductSparsity) = Tuple(num_cols.(a.sparsities_1d))
+univariate_findnz(a::TProductSparsity) = tuple_of_arrays(findnz.(a.sparsities_1d))
+univariate_nnz(a::TProductSparsity) = Tuple(nnz.(a.sparsities_1d))
+
+function get_sparse_dof_map(a::TProductSparsity)
+  full_ids = get_d_sparse_dofs_to_full_dofs(a)
+  sparse_ids = to_nz_index(full_ids)
+  SparseMatrixDofMap(sparse_ids,full_ids,a)
+end
+
+function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity)
+  I,J, = findnz(a)
+  i,j, = univariate_findnz(a)
+  d_to_nz_pairs = map((id,jd)->map(CartesianIndex,id,jd),i,j)
+
+  nrows = num_rows(a)
+  ncols = num_cols(a)
+  nnz_sizes = univariate_nnz(a)
+  rows_no_comps = univariate_num_rows(a)
+  cols_no_comps = univariate_num_cols(a)
+  nrows_no_comps = prod(rows_no_comps)
+  ncols_no_comps = prod(cols_no_comps)
+  ncomps_row = Int(nrows / nrows_no_comps)
+  ncomps_col = Int(ncols / ncols_no_comps)
+  ncomps = ncomps_row*ncomps_col
+
+  D = length(a.sparsities_1d)
+  cache = zeros(Int,D)
+  dsd2sd = zeros(Int,nnz_sizes...,ncomps)
+
+  for k in eachindex(I)
+    I_node,I_comp = _fast_and_slow_index(I[k],nrows_no_comps)
+    J_node,J_comp = _fast_and_slow_index(J[k],ncols_no_comps)
+    comp = I_comp+(J_comp-1)*ncomps_row
+    rows_1d = _index_to_d_indices(I_node,rows_no_comps)
+    cols_1d = _index_to_d_indices(J_node,cols_no_comps)
+    _row_col_pair_to_nz_index!(cache,rows_1d,cols_1d,d_to_nz_pairs)
+    dsd2sd[cache...,comp] = I[k]+(J[k]-1)*nrows
+  end
+
+  return dsd2sd
+end
+
+# utils
+
 function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
   mat1 = nothing
   rows_cache = array_cache(cellidsrows)
@@ -14,29 +141,7 @@ function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
   return A
 end
 
-abstract type SparsityOrderStyle end
-struct OrderedSparsityStyle <: SparsityOrderStyle end
-struct DefaultSparsityStyle <: SparsityOrderStyle end
-
-is_ordered(::OrderedSparsityStyle) = true
-is_ordered(::DefaultSparsityStyle) = false
-
-"""
-    abstract type SparsityPattern end
-
-Type used to represent the sparsity pattern of a sparse matrix, usually the
-jacobian in a FE problem.
-
-Subtypes:
-- `SparsityCSC`
-- `OrderedSparsityPattern`
-- `TProductSparsityPattern`
-"""
-abstract type SparsityPattern end
-
-# constructors
-
-function SparsityPattern(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
+function _get_common_domain(U::FESpace,V::FESpace)
   msg = """\n
   Cannot define a sparsity pattern object between the FE spaces given as input,
   as they are defined on incompatible triangulations
@@ -55,587 +160,44 @@ function SparsityPattern(a::SparseMatrixAssembler,U::FESpace,V::FESpace)
   else
     @notimplemented msg
   end
-
-  m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
-  cellidsrows = get_cell_dof_ids(V,target_trian)
-  cellidscols = get_cell_dof_ids(U,target_trian)
-  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
-  m2 = nz_allocation(m1)
-  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
-  m3 = create_from_nz(m2)
-
-  SparsityPattern(m3)
 end
 
-function SparsityPattern(U::FESpace,V::FESpace)
-  a = SparseMatrixAssembler(U,V)
-  SparsityPattern(a,U,V)
-end
+function _row_col_pair_to_nz_index!(
+  cache,
+  rows_1d::NTuple{D,Int},
+  cols_1d::NTuple{D,Int},
+  d_to_nz_pairs::Vector{Vector{CartesianIndex{2}}}
+  ) where D
 
-SparsityOrderStyle(a::SparsityPattern) = DefaultSparsityStyle()
-
-is_ordered(a::SparsityPattern) = is_ordered(SparsityOrderStyle(a))
-
-get_background_matrix(a::SparsityPattern) = @abstractmethod
-get_background_sparsity(a::SparsityPattern) = SparsityPattern(get_background_matrix(a))
-
-num_rows(a::SparsityPattern) = size(get_background_matrix(a),1)
-num_cols(a::SparsityPattern) = size(get_background_matrix(a),2)
-SparseArrays.findnz(a::SparsityPattern) = findnz(get_background_matrix(a))
-SparseArrays.nnz(a::SparsityPattern) = nnz(get_background_matrix(a))
-SparseArrays.nonzeros(a::SparsityPattern) = nonzeros(get_background_matrix(a))
-SparseArrays.nzrange(a::SparsityPattern,row::Integer) = nzrange(get_background_matrix(a),row)
-Algebra.nz_index(a::SparsityPattern,row::Integer,col::Integer) = nz_index(get_background_matrix(a),row,col)
-get_nonzero_indices(a::SparsityPattern) = get_nonzero_indices(get_background_matrix(a))
-
-# if CSC trait
-SparseArrays.rowvals(a::SparsityPattern) = rowvals(get_background_matrix(a))
-SparseArrays.getcolptr(a::SparsityPattern) = SparseArrays.getcolptr(get_background_matrix(a))
-
-recast(v::AbstractVector,A::AbstractSparseMatrix) = @abstractmethod
-recast(v::AbstractVector,A::SparseMatrixCSC) = SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,v)
-recast(v::AbstractVector,A::SparseMatrixCSR{Bi}) where Bi = SparseMatrixCSR{Bi}(A.m,A.n,A.rowptr,A.colval,v)
-recast(A::AbstractArray,a::SparsityPattern) = recast(A,get_background_matrix(a))
-
-"""
-    to_nz_index(i::AbstractArray,a::SparsityPattern) -> AbstractArray
-
-Given a sparsity pattern `a` representing a M×N sparse matrix with Nnz nonzero
-entries, and a D-array of indices `i` with values in {1,...,MN}, returns the
-corresponding D-array of indices with values in {1,...,Nnz}. A -1 is placed
-whenever an entry of `i` corresponds to a zero entry of the sparse matrix
-"""
-function to_nz_index(i::AbstractArray,a::SparsityPattern)
-  i′ = copy(i)
-  to_nz_index!(i′,a)
-  return i′
-end
-
-function to_nz_index!(i::AbstractArray,a::SparsityPattern)
-  to_nz_index!(i,get_background_matrix(a))
-end
-
-function to_nz_index!(i::AbstractArray,a::AbstractSparseMatrix)
-  @abstractmethod
-end
-
-function to_nz_index!(i::AbstractArray,a::SparseMatrixCSC)
-  nrows = size(a,1)
-  for (j,index) in enumerate(i)
-    if index > 0
-      irow = fast_index(index,nrows)
-      icol = slow_index(index,nrows)
-      i[j] = nz_index(a,irow,icol)
-    end
-  end
-end
-
-function order_sparsity(a::SparsityPattern,U::FESpace,V::FESpace)
-  rows = get_dof_map(V)
-  cols = get_dof_map(U)
-  order_sparsity(a,rows,cols)
-end
-
-function CellData.change_domain(
-  a::AbstractMatrix{<:SparsityPattern},
-  rows::AbstractVector{<:AbstractDofMap},
-  cols::AbstractVector{<:AbstractDofMap}
-  )
-
-  @check size(a,1) == length(rows)
-  @check size(a,2) == length(cols)
-  map(Iterators.product(1:length(rows),1:length(cols))) do (i,j)
-    change_domain(a[i,j],rows[i],cols[j])
-  end
-end
-
-function CellData.change_domain(
-  a::SparsityPattern,
-  rows::ArrayContribution,
-  cols::ArrayContribution)
-
-  @check all( ( tr === tc for (tr,tc) in zip(get_domains(rows),get_domains(cols)) ) )
-
-  trians = get_domains(rows)
-  contribution(trians) do trian
-    rows_t = get_component(trian,rows[trian];to_scalar=true)
-    cols_t = get_component(trian,cols[trian];to_scalar=true)
-    change_domain(a,rows_t,cols_t)
-  end
-end
-
-function Utils.Contribution(
-  v::Tuple{Vararg{SparsityPattern}},
-  t::Tuple{Vararg{Triangulation}})
-
-  matrix = get_background_matrix(first(v))
-  Tv = eltype(matrix)
-  ArrayContribution{Tv,2}(v,t)
-end
-
-"""
-"""
-struct SparsityCSC{Tv,Ti} <: SparsityPattern
-  matrix::SparseMatrixCSC{Tv,Ti}
-end
-
-function SparsityPattern(a::SparseMatrixCSC)
-  SparsityCSC(a)
-end
-
-get_background_matrix(a::SparsityCSC) = a.matrix
-
-"""
-    order_sparsity(a::SparsityPattern,i,j) -> SparsityPattern
-
-Permutes a sparsity pattern according to indices specified by `i` and `j`,
-representing the rows and columns respectively
-"""
-function order_sparsity(a::SparsityCSC,i::AbstractArray,j::AbstractArray)
-  unsorted_matrix = a.matrix
-  matrix = unsorted_matrix[i,j]
-  OrderedSparsity(matrix,unsorted_matrix)
-end
-
-"""
-    abstract type OrderedSparsityPattern <: SparsityPattern end
-
-Type used to represent an ordered sparsity pattern, obtained by calling the
-function `order_sparsity` on an unordered sparsity pattern.
-
-Subtypes:
-- `OrderedSparsity`
-"""
-abstract type OrderedSparsityPattern <: SparsityPattern end
-
-get_unsorted_matrix(a::OrderedSparsityPattern) = @abstractmethod
-
-#TODO because of code shortcomings, this sparsity pattern should already be ordered;
-# to be changed in future versions
-function order_sparsity(a::OrderedSparsityPattern,i::AbstractArray,j::AbstractArray)
-  a
-end
-
-"""
-"""
-struct OrderedSparsity{A} <: OrderedSparsityPattern
-  matrix::A
-  unsorted_matrix::A
-end
-
-SparsityOrderStyle(a::OrderedSparsity) = OrderedSparsityStyle()
-
-get_background_matrix(a::OrderedSparsity) = a.matrix
-get_unsorted_matrix(a::OrderedSparsity) = a.unsorted_matrix
-
-function CellData.change_domain(
-  a::SparsityCSC{Tv,Ti},
-  row::AbstractDofMap,
-  col::AbstractDofMap
-  ) where {Tv,Ti}
-
-  dof_to_cell_row = get_dof_to_cell(row)
-  dof_to_cell_col = get_dof_to_cell(col)
-
-  m = num_rows(a)
-  n = num_cols(a)
-  rowval = copy(rowvals(a))
-  colptr = copy(SparseArrays.getcolptr(a))
-  nzval = copy(nonzeros(a))
-  colnnz = zeros(Ti,n)
-  entries_to_delete = fill(true,nnz(a))
-
-  cache_row = array_cache(dof_to_cell_row)
-  cache_col = array_cache(dof_to_cell_col)
-  for j in col
-    if j > 0
-      cells_col = getindex!(cache_col,dof_to_cell_col,j)
-      for i in row
-        if i > 0
-          cells_row = getindex!(cache_row,dof_to_cell_row,i)
-          if _cell_intersection(row,col,cells_row,cells_col)
-            k = nz_index(a,i,j)
-            entries_to_delete[k] = false
-            colnnz[j] += 1
-          end
-        end
+  for d in 1:D
+    index = 0
+    row_d = rows_1d[d]
+    col_d = cols_1d[d]
+    index_d = CartesianIndex((row_d,col_d))
+    nz_pairs = d_to_nz_pairs[d]
+    for (i,nzi) in enumerate(nz_pairs)
+      if nzi == index_d
+        index = i
+        break
       end
     end
+    @assert !iszero(index) "Could not build sparse dof mapping"
+    cache[d] = index
   end
-
-  @inbounds for j in 1:n
-    colptr[j+1] = colnnz[j]
-  end
-  length_to_ptrs!(colptr)
-
-  deleteat!(rowval,entries_to_delete)
-  deleteat!(nzval,entries_to_delete)
-  matrix = SparseMatrixCSC(m,n,colptr,rowval,nzval)
-
-  return SparsityCSC(matrix)
+  return cache
 end
 
-function CellData.change_domain(
-  a::OrderedSparsity,
-  row::AbstractDofMap,
-  col::AbstractDofMap
-  )
-
-  dof_to_cell_row = get_dof_to_cell(row)
-  dof_to_cell_col = get_dof_to_cell(col)
-
-  m = num_rows(a)
-  n = num_cols(a)
-  rowval = copy(rowvals(a))
-  colptr = copy(SparseArrays.getcolptr(a))
-  nzval = copy(nonzeros(a))
-  colnnz = zeros(eltype(rowval),n)
-  entries_to_delete = fill(true,nnz(a))
-
-  cache_row = array_cache(dof_to_cell_row)
-  cache_col = array_cache(dof_to_cell_col)
-  for (ij,j) in enumerate(col)
-    if j > 0
-      cells_col = getindex!(cache_col,dof_to_cell_col,j)
-      for (ii,i) in enumerate(row)
-        if i > 0
-          cells_row = getindex!(cache_row,dof_to_cell_row,i)
-          if _cell_intersection(row,col,cells_row,cells_col)
-            k = nz_index(a,ii,ij)
-            entries_to_delete[k] = false
-            colnnz[ij] += 1
-          end
-        end
-      end
-    end
-  end
-
-  @inbounds for j in 1:n
-    colptr[j+1] = colnnz[j]
-  end
-  length_to_ptrs!(colptr)
-
-  deleteat!(rowval,entries_to_delete)
-  deleteat!(nzval,entries_to_delete)
-  matrix = SparseMatrixCSC(m,n,colptr,rowval,nzval)
-
-  return OrderedSparsity(matrix,get_unsorted_matrix(a))
+function _fast_and_slow_index(i::Integer,s::Integer)
+  fast_index(i,s),slow_index(i,s)
 end
 
-function _cell_intersection(row::AbstractDofMap,col::AbstractDofMap,cells_row,cells_col)
-  tface_to_mask_row = get_tface_to_mask(row)
-  tface_to_mask_col = get_tface_to_mask(col)
-  check = false
-  for cell_row in cells_row
-    if !tface_to_mask_row[cell_row]
-      for cell_col in cells_col
-        if !tface_to_mask_col[cell_col]
-          if cell_row == cell_col
-            check = true
-            break
-          end
-        end
-      end
-    end
-  end
-  return check
+function _index_to_d_indices(i::Integer,s2::NTuple{2,Integer})
+  _fast_and_slow_index(i,s2[1])
 end
 
-"""
-    abstract type TProductSparsityPattern <: SparsityPattern end
-
-Type used to represent a sparsity pattern of a matrix obtained by integrating a
-bilinear form on a triangulation that can be obtained as the tensor product of a
-1-d triangulations. For example, this can be done when the mesh is Cartesian, and
-the discretizing elements are cubes. Subtypes of TProductSparsityPattern can be
-used to build a non-trivial sparse dof map with `get_sparse_dof_map`.
-
-Subtypes:
-- `TProductSparsity`
-- `SparsityToTProductSparsity`
-"""
-abstract type TProductSparsityPattern <: SparsityPattern end
-
-get_univariate_sparsities(a::TProductSparsityPattern) = @abstractmethod
-univariate_num_rows(a::TProductSparsityPattern) = Tuple(num_rows.(get_univariate_sparsities(a)))
-univariate_num_cols(a::TProductSparsityPattern) = Tuple(num_cols.(get_univariate_sparsities(a)))
-univariate_findnz(a::TProductSparsityPattern) = tuple_of_arrays(findnz.(get_univariate_sparsities(a)))
-univariate_nnz(a::TProductSparsityPattern) = Tuple(nnz.(get_univariate_sparsities(a)))
-
-"""
-    get_sparse_dof_map(a::TProductSparsityPattern,I,J,i,j) -> AbstractArray
-
-Fields:
-- `a`: the underlying (tensor-product) sparsity
-- `I`: the nonzero rows of the underlying (tensor-product) sparse matrix
-- `J`: the nonzero cols of the underlying (tensor-product) sparse matrix
-- `i`: a vector of nonzero rows of each of the D 1-dimensional sparse matrices
-- `j`: a vector of nonzero cols of each of the D 1-dimensional sparse matrices
-
-We call Nnz_1,...,Nnz_D the number of nonzero entries of each of the D 1-dimensional
-sparse matrices. We call (M,N) the size of the (tensor-product) sparse matrix. This
-function returns a map `sparse_dof_map: Nnz_1 ×... × Nnz_D ⟶ MN` that associates
-to each nonzero entry of the 1-D matrices an entry of the tensor product matrix.
-Calling this function assumes that both the tensor-product sparsity and the 1-D
-sparsities have been reordered in advance, otherwise the function will fail
-"""
-function get_sparse_dof_map(a::TProductSparsityPattern,I,J,i,j)
-  nrows = num_rows(a)
-
-  uids = map((ii,ji)->CartesianIndex.(ii,ji),i,j)
-  unrows = univariate_num_rows(a)
-  uncols = univariate_num_cols(a)
-  unnz = univariate_nnz(a)
-
-  tprows = CartesianIndices(unrows)
-  tpcols = CartesianIndices(uncols)
-
-  sparse_dof_map = zeros(Int,unnz...)
-  uid = zeros(Int,length(uids))
-  @inbounds for k = eachindex(I)
-    Ik = I[k]
-    Jk = J[k]
-    (iszero(Ik) || iszero(Jk)) && continue
-    IJk = Ik + (Jk - 1)*nrows
-    irows = tprows[Ik]
-    icols = tpcols[Jk]
-    fill!(uid,0)
-    @inbounds for d in eachindex(uids)
-      uidd = uids[d]
-      idd = CartesianIndex((irows.I[d],icols.I[d]))
-      @inbounds for (l,uiddl) in enumerate(uidd)
-        if uiddl == idd
-          uid[d] = l
-          break
-        end
-      end
-    end
-    sparse_dof_map[uid...] = IJk
-  end
-
-  return sparse_dof_map
-end
-
-"""
-    order_sparse_dof_map(a::TProductSparsityPattern,sparse_dof_map,I,J) -> AbstractArray
-
-Orders the sparse dof map defined in `get_sparse_dof_map`. Note that the
-function returns exactly the input if the interpolation order is 1, and in all other
-cases the output differs from the input
-"""
-function order_sparse_dof_map(a::TProductSparsityPattern,sparse_dof_map,I,J)
-  nrows = num_rows(a)
-  IJ = range_2d(vectorize(I),vectorize(J),nrows)
-  sparse_odof_map = copy(sparse_dof_map)
-  @inbounds for (k,dofk) in enumerate(sparse_dof_map)
-    if dofk > 0
-      sparse_odof_map[k] = IJ[dofk]
-    end
-  end
-  return sparse_odof_map
-end
-
-"""
-    struct TProductSparsity{A,B} <: TProductSparsityPattern
-      sparsity::A
-      sparsities_1d::B
-    end
-"""
-struct TProductSparsity{A,B} <: TProductSparsityPattern
-  sparsity::A
-  sparsities_1d::B
-end
-
-SparsityOrderStyle(a::TProductSparsity) = SparsityOrderStyle(a.sparsity)
-
-get_background_matrix(a::TProductSparsity) = get_background_matrix(a.sparsity)
-
-get_univariate_sparsities(a::TProductSparsity) = a.sparsities_1d
-
-function order_sparsity(a::TProductSparsity,i::Tuple,j::Tuple)
-  is,is_1d = i
-  js,js_1d = j
-  a′ = order_sparsity(a.sparsity,is,js)
-  a′_1d = map(order_sparsity,a.sparsities_1d,is_1d,js_1d)
-  TProductSparsity(a′,a′_1d)
-end
-
-function CellData.change_domain(
-  a::TProductSparsity,
-  row::AbstractDofMap,
-  col::AbstractDofMap
-  )
-
-  a′ = change_domain(a.sparsity,row,col)
-  TProductSparsity(a′,a.sparsities_1d)
-end
-
-"""
-    struct SparsityToTProductSparsity{A,B,C,D} <: TProductSparsityPattern
-      sparsity::A
-      sparsities_1d::B
-      dof_to_parent_dof_row::C
-      dof_to_parent_dof_col::D
-    end
-
-To be used when the underlying trial and test spaces are defined on a grid portion
-"""
-struct SparsityToTProductSparsity{A,B,C,D} <: TProductSparsityPattern
-  sparsity::A
-  sparsities_1d::B
-  dof_to_parent_dof_row::C
-  dof_to_parent_dof_col::D
-end
-
-SparsityOrderStyle(a::SparsityToTProductSparsity) = SparsityOrderStyle(a.sparsity)
-
-get_background_matrix(a::SparsityToTProductSparsity) = get_background_matrix(a.sparsity)
-
-get_univariate_sparsities(a::SparsityToTProductSparsity) = a.sparsities_1d
-
-function order_sparsity(a::SparsityToTProductSparsity,i::Tuple,j::Tuple)
-  is_ordered(a) && return a
-  is,is_1d = i
-  js,js_1d = j
-  tp_matrix = get_parent_matrix(a)
-  a′ = order_sparsity(SparsityPattern(tp_matrix),get_parent_map(is),get_parent_map(js))
-  a′_1d = map(order_sparsity,get_univariate_sparsities(a),is_1d,js_1d)
-  SparsityToTProductSparsity(a′,a′_1d,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
-end
-
-function order_sparse_dof_map(a::SparsityToTProductSparsity,sparse_dof_map,I,J)
-  nrows = num_rows(a)
-  onrows = maximum(Int,a.dof_to_parent_dof_row)
-  IJ = range_2d(vectorize(get_parent_map(I)),vectorize(get_parent_map(J)),nrows)
-  sparse_odof_map = copy(sparse_dof_map)
-  fill!(sparse_odof_map,zero(eltype(sparse_odof_map)))
-  @inbounds for (k,dofk) in enumerate(sparse_dof_map)
-    if dofk > 0
-      IJk = IJ[dofk]
-      Ik = fast_index(IJk,nrows)
-      Jk = slow_index(IJk,nrows)
-      ik = a.dof_to_parent_dof_row[Ik]
-      jk = a.dof_to_parent_dof_col[Jk]
-      sparse_odof_map[k] = ik + (jk-1)*onrows
-    end
-  end
-  return sparse_odof_map
-end
-
-function CellData.change_domain(
-  a::SparsityToTProductSparsity,
-  row::DofMapPortion,
-  col::DofMapPortion
-  )
-
-  @notimplemented
-end
-
-function CellData.change_domain(
-  a::SparsityToTProductSparsity{<:OrderedSparsityPattern},
-  row::DofMapPortion,
-  col::DofMapPortion
-  )
-
-  a′ = change_domain(a.sparsity,row.parent_map,col.parent_map)
-  SparsityToTProductSparsity(a′,a.sparsities_1d,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
-end
-
-function recast(A::AbstractArray,a::SparsityToTProductSparsity)
-  recast(A,get_parent_matrix(a))
-end
-
-function get_parent_matrix(a::SparsityToTProductSparsity)
-  I,J,V = get_parent_findnz(a)
-  m = length(a.dof_to_parent_dof_row)
-  n = length(a.dof_to_parent_dof_col)
-  sparse(I,J,V,m,n)
-end
-
-function get_parent_matrix(a::SparsityToTProductSparsity{<:OrderedSparsityPattern})
-  get_background_matrix(a)
-end
-
-function get_parent_findnz(a::SparsityToTProductSparsity)
-  A = get_background_matrix(a)
-  get_parent_findnz(A,a.dof_to_parent_dof_row,a.dof_to_parent_dof_col)
-end
-
-function get_parent_findnz(
-  A::SparseMatrixCSC{Tv,Ti},
-  dof_to_parent_dof_row::AbstractArray,
-  dof_to_parent_dof_col::AbstractArray
-  ) where {Tv,Ti}
-
-  I,J,V = findnz(A)
-  l2pl_row = get_parent_locations(dof_to_parent_dof_row)
-  l2pl_col = get_parent_locations(dof_to_parent_dof_col)
-
-  for k in eachindex(I)
-    I[k] = l2pl_row[I[k]]
-    J[k] = l2pl_col[J[k]]
-  end
-
-  return I,J,V
-end
-
-# utils
-
-function Base.getindex(
-  A::AbstractSparseMatrixCSC{Tv,Ti},
-  I::AbstractDofMap,
-  J::AbstractDofMap
-  ) where {Tv,Ti<:Integer}
-
-  I′ = vectorize(I)
-  J′ = vectorize(J)
-
-  fill!(A.nzval,one(Tv))
-  k = findfirst(iszero,A)
-  fill!(A.nzval,zero(Tv))
-  iz,jz = Tuple(k)
-
-  for (ii,i) in enumerate(I′)
-    if i == 0
-      I′[ii] = iz
-    end
-  end
-
-  for (ij,j) in enumerate(J′)
-    if j == 0
-      J′[ij] = jz
-    end
-  end
-
-  return A[I′,J′]
-end
-
-# to_nz_index in case we don't provide a sparsity pattern
-
-function to_nz_index(i::AbstractArray)
-  nz_sortperm(i)
-end
-
-function nz_sortperm(a::AbstractArray)
-  a′ = similar(a)
-  nz_sortperm!(a′,a)
-  a′
-end
-
-function nz_sortperm!(a′::AbstractArray,a::AbstractArray)
-  fill!(a′,zero(eltype(a′)))
-  inz = findall(!iszero,a)
-  anz = sortperm(a[inz])
-  inds = LinearIndices(size(anz))
-  a′[inz[anz]] = inds
-end
-
-function get_parent_locations(a::AbstractArray{Ti}) where Ti
-  inds = LinearIndices(a)
-  anz = inds[findall(!iszero,a)]
-  l2pl = zeros(Ti,length(anz))
-  for (inz,anzi) in enumerate(anz)
-    l2pl[inz] = anzi
-  end
-  return l2pl
+function _index_to_d_indices(i::Integer,sD::NTuple{D,Integer}) where D
+  sD_minus_1 = sD[1:end-1]
+  nD_minus_1 = prod(sD_minus_1)
+  iD = slow_index(i,nD_minus_1)
+  (_index_to_d_indices(i,sD_minus_1)...,iD)
 end

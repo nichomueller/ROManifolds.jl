@@ -6,8 +6,6 @@ a standard TransientFEOperator, there are the following novelties:
 
 - a TransientParamSpace is provided, so that parametric realizations can be extracted
   directly from the TransientParamFEOperator
-- a FEDofMap is provided, to allow a reindexing of the `ParamFEFunction`]
-  representing the problem's solution
 - a function representing a norm matrix is provided, so that errors in the
   desired norm can be automatically computed
 
@@ -50,22 +48,19 @@ function Polynomials.get_order(op::TransientParamFEOperator)
 end
 
 function ParamSteady.get_sparse_dof_map_at_domains(op::TransientParamFEOperator)
-  domains_jacs = get_domains_jac(op)
   trial = get_trial(op)
   test = get_test(op)
-  dof_map_rows = get_dof_map(test)
-  dof_map_cols = get_dof_map(trial)
-  sparse_dof_map = get_sparse_dof_map(op)
-  sparsity = get_sparsity(sparse_dof_map)
-  sparse_dof_maps = ()
-  for domains_jac in domains_jacs
-    dof_map_rows′ = change_domain(dof_map_rows,domains_jac)
-    dof_map_cols′ = change_domain(dof_map_cols,domains_jac)
-    sparsity′ = change_domain(sparsity,dof_map_rows′,dof_map_cols′)
-    sparse_dof_map′ = get_sparse_dof_map(trial,test,sparsity′)
-    sparse_dof_maps = (sparse_dof_maps...,sparse_dof_map′)
+  domains_jacs = ParamSteady.get_domains_jac(op)
+
+  map(domains_jacs) do domains_jac
+    sparse_dof_map_at_domains = ()
+    for trian in domains_jac
+      sparsity = SparsityPattern(trial,test,trian)
+      sparse_dof_map = get_sparse_dof_map(trial,test,sparsity)
+      sparse_dof_map_at_domains = (sparse_dof_map_at_domains...,sparse_dof_map)
+    end
+    Contribution(sparse_dof_map_at_domains,domains_jac)
   end
-  return sparse_dof_maps
 end
 
 """
@@ -74,7 +69,6 @@ end
       jacs::Tuple{Vararg{Function}}
       tpspace::TransientParamSpace
       assem::Assembler
-      dof_maps::FEDofMap
       trial::FESpace
       test::FESpace
       domains::FEDomains
@@ -89,7 +83,6 @@ struct TransientParamFEOpFromWeakForm{T} <: TransientParamFEOperator{NonlinearPa
   jacs::Tuple{Vararg{Function}}
   tpspace::TransientParamSpace
   assem::Assembler
-  dof_maps::FEDofMap
   trial::FESpace
   test::FESpace
   domains::FEDomains
@@ -104,10 +97,9 @@ function TransientParamFEOperator(
 
   order = length(jacs) - 1
   assem = SparseMatrixAssembler(trial,test)
-  dof_maps = FEDofMap(trial,test)
   domains = FEDomains()
   TransientParamFEOpFromWeakForm{JointDomains}(
-    res,jacs,tpspace,assem,dof_maps,trial,test,domains,order)
+    res,jacs,tpspace,assem,trial,test,domains,order)
 end
 
 function TransientParamFEOperator(
@@ -116,9 +108,8 @@ function TransientParamFEOperator(
   order = length(jacs) - 1
   res′,jacs′ = _set_domains(res,jacs,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
-  dof_maps = FEDofMap(trial,test)
   TransientParamFEOpFromWeakForm{SplitDomains}(
-    res′,jacs′,tpspace,assem,dof_maps,trial,test,domains,order)
+    res′,jacs′,tpspace,assem,trial,test,domains,order)
 end
 
 function TransientParamFEOperator(
@@ -166,7 +157,6 @@ Polynomials.get_order(op::TransientParamFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamFEOpFromWeakForm) = op.assem
-ParamSteady.get_fe_dof_maps(op::TransientParamFEOpFromWeakForm) = op.dof_maps
 ParamSteady.get_param_space(op::TransientParamFEOpFromWeakForm) = op.tpspace
 CellData.get_domains(op::TransientParamFEOpFromWeakForm) = op.domains
 
@@ -177,7 +167,6 @@ CellData.get_domains(op::TransientParamFEOpFromWeakForm) = op.domains
       constant_forms::Tuple{Vararg{Bool}}
       tpspace::TransientParamSpace
       assem::Assembler
-      dof_maps::FEDofMap
       trial::FESpace
       test::FESpace
       domains::FEDomains
@@ -193,7 +182,6 @@ struct TransientParamLinearFEOpFromWeakForm{T} <: TransientParamFEOperator{Linea
   constant_forms::Tuple{Vararg{Bool}}
   tpspace::TransientParamSpace
   assem::Assembler
-  dof_maps::FEDofMap
   trial::FESpace
   test::FESpace
   domains::FEDomains
@@ -215,7 +203,6 @@ function TransientParamLinearFEOperator(
   order = length(forms)-1
   jacs = ntuple(k -> ((μ,t,u,duk,v) -> forms[k](μ,t,duk,v)),length(forms))
   assem = SparseMatrixAssembler(trial,test)
-  dof_maps = FEDofMap(trial,test)
   domains = FEDomains()
   TransientParamLinearFEOpFromWeakForm{JointDomains}(
     res,jacs,constant_forms,tpspace,assem,dof_maps,trial,test,domains,order)
@@ -231,7 +218,6 @@ function TransientParamLinearFEOperator(
   jacs = ntuple(k -> ((μ,t,u,duk,v,args...) -> forms[k](μ,t,duk,v,args...)),length(forms))
   res′,jacs′ = _set_domains(res,jacs,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
-  dof_maps = FEDofMap(trial,test)
   TransientParamLinearFEOpFromWeakForm{SplitDomains}(
     res′,jacs′,constant_forms,tpspace,assem,dof_maps,trial,test,domains,order)
 end
@@ -262,7 +248,6 @@ ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
 ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer) = op.constant_forms[k]
-ParamSteady.get_fe_dof_maps(op::TransientParamLinearFEOpFromWeakForm) = op.dof_maps
 ParamSteady.get_param_space(op::TransientParamLinearFEOpFromWeakForm) = op.tpspace
 CellData.get_domains(op::TransientParamLinearFEOpFromWeakForm) = op.domains
 

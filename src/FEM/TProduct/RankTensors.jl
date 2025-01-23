@@ -85,40 +85,21 @@ function LinearAlgebra.cholesky(a::GenericRankTensor{D,K}) where {D,K}
   end
 end
 
-function _sort!(a::AbstractVector{<:AbstractVector},i::Tuple{<:AbstractDofMap})
-  irow, = i
-  irow1d = DofMaps.get_univariate_dof_map(irow)
-  for (i,(ai,irowi)) in enumerate(zip(a,irow1d))
-    a[i] = ai[vec(irowi)]
-  end
-end
-
-function _sort!(a::AbstractVector{<:AbstractMatrix},i::Tuple{<:AbstractDofMap,<:AbstractDofMap})
-  irow,icol = i
-  irow1d = DofMaps.get_univariate_dof_map(irow)
-  icol1d = DofMaps.get_univariate_dof_map(icol)
-  for (i,(ai,irowi,icoli)) in enumerate(zip(a,irow1d,icol1d))
-    a[i] = ai[vec(irowi),vec(icoli)]
-  end
-end
-
 """
-    tproduct_array(arrays_1d::Vector{<:AbstractArray},dof_map) -> Rank1Tensor
-    tproduct_array(op,arrays_1d::Vector{<:AbstractArray},gradients_1d::Vector{<:AbstractArray},dof_map,args...) -> GenericRankTensor
+    tproduct_array(arrays_1d::Vector{<:AbstractArray}) -> Rank1Tensor
+    tproduct_array(op,arrays_1d::Vector{<:AbstractArray},gradients_1d::Vector{<:AbstractArray},args...) -> GenericRankTensor
 
 Returns a AbstractRankTensor storing the arrays `arrays_1d` (usually matrices)
 arising from an integration routine on D 1-d triangulations whose tensor product
-gives a D-dimensional triangulation. The argument `dof_map` is a reindexing map
-for the input. In the absence of the field `gradients_1d`, the output is a `Rank1Tensor`;
-when provided, the output is a `GenericRankTensor`
+gives a D-dimensional triangulation. In the absence of the field `gradients_1d`,
+the output is a `Rank1Tensor`; when provided, the output is a `GenericRankTensor`
 
-    tproduct_array(arrays_1d::Vector{<:BlockArray},dof_map) -> BlockRankTensor
-    tproduct_array(op,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},dof_map,args...) -> BlockRankTensor
+    tproduct_array(arrays_1d::Vector{<:BlockArray}) -> BlockRankTensor
+    tproduct_array(op,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},args...) -> BlockRankTensor
 
 Generalization of the previous functions to multi-field scenarios
 """
-function tproduct_array(arrays_1d::Vector{<:AbstractArray},dof_map)
-  _sort!(arrays_1d,dof_map)
+function tproduct_array(arrays_1d::Vector{<:AbstractArray})
   Rank1Tensor(arrays_1d)
 end
 
@@ -126,21 +107,17 @@ function tproduct_array(
   ::Nothing,
   arrays_1d::Vector{<:AbstractArray},
   gradients_1d::Vector{<:AbstractArray},
-  dof_map,
   summation=nothing)
 
-  tproduct_array(arrays_1d,dof_map)
+  tproduct_array(arrays_1d)
 end
 
 function tproduct_array(
   ::typeof(gradient),
   arrays_1d::Vector{<:AbstractArray},
   gradients_1d::Vector{<:AbstractArray},
-  dof_map,
   summation=nothing)
 
-  _sort!(arrays_1d,dof_map)
-  _sort!(gradients_1d,dof_map)
   decompositions = _find_decompositions(summation,arrays_1d,gradients_1d)
   GenericRankTensor(decompositions)
 end
@@ -149,11 +126,8 @@ function tproduct_array(
   ::PartialDerivative{N},
   arrays_1d::Vector{<:AbstractArray},
   gradients_1d::Vector{<:AbstractArray},
-  dof_map,
   args...) where N
 
-  _sort!(arrays_1d,dof_map)
-  _sort!(gradients_1d,dof_map)
   arrays_1d[N] = gradients_1d[N]
   Rank1Tensor(arrays_1d)
 end
@@ -162,11 +136,8 @@ function tproduct_array(
   ::Utils.∂ₙ,
   arrays_1d::Vector{<:AbstractArray},
   gradients_1d::Vector{<:AbstractArray},
-  dof_map,
   args...)
 
-  _sort!(arrays_1d,dof_map)
-  _sort!(gradients_1d,dof_map)
   decompositions = _find_decompositions(nothing,arrays_1d,gradients_1d)
   GenericRankTensor(decompositions)
 end
@@ -204,27 +175,25 @@ struct BlockRankTensor{A<:AbstractRankTensor,N} <: AbstractArray{A,N}
   array::Array{A,N}
 end
 
-function tproduct_array(arrays_1d::Vector{<:BlockArray},dof_map)
+function tproduct_array(arrays_1d::Vector{<:BlockArray})
   s_blocks = blocksize(first(arrays_1d))
   arrays = map(CartesianIndices(s_blocks)) do i
     iblock = Block(Tuple(i))
     arrays_1d_i = getindex.(arrays_1d,iblock)
-    dof_map_i = getindex.(dof_map,Tuple(i))
-    tproduct_array(arrays_1d_i,dof_map_i)
+    tproduct_array(arrays_1d_i)
   end
   BlockRankTensor(arrays)
 end
 
-function tproduct_array(op::ArrayBlock,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},dof_map,s::ArrayBlock)
+function tproduct_array(op::ArrayBlock,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},s::ArrayBlock)
   s_blocks = blocksize(first(arrays_1d))
   arrays = map(CartesianIndices(s_blocks)) do i
     iblock = Block(Tuple(i))
     arrays_1d_i = getindex.(arrays_1d,iblock)
     gradients_1d_i = getindex.(gradients_1d,iblock)
-    dof_map_i = getindex.(dof_map,Tuple(i))
     op_i = op[Tuple(i)...]
     s_i = s[Tuple(i)...]
-    tproduct_array(op_i,arrays_1d_i,gradients_1d_i,dof_map_i,s_i)
+    tproduct_array(op_i,arrays_1d_i,gradients_1d_i,s_i)
   end
   BlockRankTensor(arrays)
 end

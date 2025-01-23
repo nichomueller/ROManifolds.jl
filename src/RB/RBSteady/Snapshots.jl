@@ -83,10 +83,10 @@ end
 """
     flatten_snapshots(s::Snapshots) -> Snapshots
 
-The output snapshots are indexed according to a `AbstractTrivialDofMap`
+The output snapshots are indexed according to a `TrivialDofMap`
 """
 function flatten_snapshots(s::Snapshots)
-  i′ = TrivialDofMap(get_dof_map(s))
+  i′ = flatten(get_dof_map(s))
   Snapshots(get_values(s),i′,get_realization(s))
 end
 
