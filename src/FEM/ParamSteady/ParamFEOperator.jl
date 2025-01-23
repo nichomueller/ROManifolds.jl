@@ -110,8 +110,7 @@ function get_sparse_dof_map_at_domains(op::ParamFEOperator)
 
   sparse_dof_map_at_domains = ()
   for trian in domains_jac
-    sparsity = SparsityPattern(trial,test,trian)
-    sparse_dof_map = get_sparse_dof_map(trial,test,sparsity)
+    sparse_dof_map = get_sparse_dof_map(trial,test,trian)
     sparse_dof_map_at_domains = (sparse_dof_map_at_domains...,sparse_dof_map)
   end
 

@@ -2,8 +2,6 @@ abstract type OrderedFESpace{S} <: SingleFieldFESpace end
 
 # FESpace interface
 
-get_ordered_dof_ids(f::OrderedFESpace) = @abstractmethod
-
 FESpaces.get_fe_space(f::OrderedFESpace) = @abstractmethod
 
 FESpaces.ConstraintStyle(::Type{<:OrderedFESpace{S}}) where S = ConstraintStyle(S)
@@ -51,13 +49,17 @@ function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv)
   gather_free_and_dirichlet_values!(fv,dv,get_fe_space(f),cv)
 end
 
-function get_dof_map(trial::OrderedFESpace)
-  get_dof_map(get_fe_space(f))
+# Local functions
+
+function get_cell_dof_ids_with_zeros(f::OrderedFESpace)
+  get_ordered_cell_dof_ids_with_zeros(f)
 end
 
-function get_sparse_dof_map(f::OrderedFESpace,test::SingleFieldFESpace,args...)
-  get_sparse_dof_map(get_fe_space(f),test,args...)
-end
+# Ordering functions
+
+get_ordered_dof_ids(f::OrderedFESpace) = @abstractmethod
+
+get_ordered_cell_dof_ids_with_zeros(f::OrderedFESpace) = @abstractmethod
 
 # Constructors
 
@@ -73,23 +75,12 @@ function OrderedFESpace(trian::Grid,args...;kwargs...)
 end
 
 function OrderedFESpace(
-  act_model::CartesianDiscreteModel,
+  act_model::DiscreteModel,
   bg_model::CartesianDiscreteModel,
   args...;kwargs...)
 
   f = FESpace(act_model,args...;kwargs...)
   CartesianFESpace(f)
-end
-
-function OrderedFESpace(
-  act_model::DiscreteModel,
-  bg_model::CartesianDiscreteModel,
-  args...;kwargs...)
-
-  f_bg = OrderedFESpace(bg_model,args...;kwargs...)
-  f_act = FESpace(act_model,args...;kwargs...)
-  node_map = d_act_dof_to_bg_odof(f_act,f_bg)
-  GenericOrderedFESpace(f_act,node_map)
 end
 
 function OrderedFESpace(::DiscreteModel,::DiscreteModel,args...;kwargs...)
@@ -107,9 +98,54 @@ function OrderedFESpace(f::SingleFieldFESpace)
   CartesianFESpace(f,ordered_cell_dofs_ids)
 end
 
-FESpaces.get_fe_space(f::OrderedFESpace) = f.space
+FESpaces.get_fe_space(f::CartesianFESpace) = f.space
 
-get_ordered_cell_dof_ids(f::OrderedFESpace) = f.ordered_cell_dofs_ids
+get_ordered_cell_dof_ids(f::CartesianFESpace) = f.ordered_cell_dofs_ids
+
+# struct GenericOrderedFESpace{S<:SingleFieldFESpace} <: SingleFieldFESpace
+#   active_space::S
+#   background_space::CartesianFESpace{S}
+# end
+
+# FESpaces.get_fe_space(f::GenericOrderedFESpace) = f.active_space
+
+function get_bg_cell_to_act_cell(f::OrderedFESpace)
+  trian = get_triangulation(f.space)
+  bg_model = get_background_model(trian)
+  bg_cells = fill(false,num_cells(bg_model))
+  act_cell_to_bg_cell = get_tface_to_mface(trian)
+  for bg_cell in act_cell_to_bg_cell
+    bg_cells[bg_cell] = true
+  end
+  return bg_cells
+end
+
+function get_cell_dof_ids_with_zeros(f::OrderedFESpace)
+  cellids = get_cell_dof_ids_with_zeros(f)
+  bg_cell_to_act_cell = get_bg_cell_to_act_cell(f)
+  bg_cell_to_mask = map(!,bg_cell_to_act_cell)
+  lazy_map(AddZeroCellIdsMap(bg_cell_to_mask),cellids)
+end
+
+# function get_bg_dof_to_mask(f::OrderedFESpace)
+#   act_cell_to_bg_cell = get_active_cell_to_bg_cell(f)
+#   bg_cellids = get_cell_dof_ids(f.background_space)
+#   cache = array_cache(act_cellids)
+#   bg_dof_to_mask = fill(true,num_free_dofs(f.background_space))
+#   for cell in act_cell_to_bg_cell
+#     bg_dofs_cell = getindex!(cache,bg_cellids,cell)
+#     for bg_dof in bg_dofs
+#       bg_dof_to_mask[bg_dof] = false
+#     end
+#   end
+#   bg_dof_to_mask
+# end
+
+function get_dof_map(f::GenericOrderedFESpace)
+  bg_dof_to_mask = get_bg_dof_to_mask(f)
+  bg_dof_map = get_dof_map(f.background_space)
+  return MaskedDofMap(bg_dof_map,bg_dof_to_mask)
+end
 
 # dof reordering
 
@@ -141,7 +177,7 @@ function get_ordered_cell_dof_ids(
   tcells = view(cells,tface_to_mface)
   onodes = LinearIndices(orders .* ncells .+ 1 .- periodic)
 
-  node_and_comps_to_odof = get_ordered_dof_ids(cell_dofs_ids,fe_dof_basis,cells,onodes,orders)
+  node_and_comps_to_odof = get_ordered_dof_ids(cell_dofs_ids,fe_dof_basis,tcells,onodes,orders)
   k = DofsToODofs(fe_dof_basis,node_and_comps_to_odof,orders)
   lazy_map(k,tcells)
 end
@@ -168,7 +204,7 @@ end
 function get_ordered_dof_ids(
   cell_dofs_ids::AbstractArray,
   fe_dof_basis::LagrangianDofBasis{P,V},
-  cells::CartesianIndices{D},
+  cells::AbstractVector{CartesianIndex{D}},
   onodes::LinearIndices{D},
   orders::NTuple{D,Int}
   ) where {D,P,V}

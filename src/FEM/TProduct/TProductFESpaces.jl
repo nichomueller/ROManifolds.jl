@@ -109,12 +109,11 @@ FESpaces.get_dirichlet_dof_tag(f::TProductFESpace) = get_dirichlet_dof_tag(f.spa
 
 FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-function DofMaps.SparsityPattern(U::TProductFESpace,V::TProductFESpace,args...)
+function DofMaps.get_sparsity(U::TProductFESpace,V::TProductFESpace,args...)
   @check length(U.spaces_1d) == length(V.spaces_1d)
-  sparsity = SparsityPattern(U.space,V.space,args...)
-  sparsities_1d = Vector{typeof(sparsity)}(undef,length(U.spaces_1d))
-  for d in eachindex(sparsities_1d)
-    sparsities_1d[d] = SparsityPattern(U.spaces_1d[d],V.spaces_1d[d])
+  sparsity = get_sparsity(U.space,V.space,args...)
+  sparsities_1d = map(1:length(U.spaces_1d)) do d
+    get_sparsity(U.spaces_1d[d],V.spaces_1d[d])
   end
   return TProductSparsity(sparsity,sparsities_1d)
 end

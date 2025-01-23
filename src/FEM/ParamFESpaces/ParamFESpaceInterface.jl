@@ -69,8 +69,8 @@ function DofMaps.get_dof_map(f::SingleFieldParamFESpace)
   get_dof_map(get_fe_space(f))
 end
 
-function DofMaps.get_sparse_dof_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace)
-  get_sparse_dof_map(get_fe_space(f),g)
+function DofMaps.get_sparse_dof_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace,args...)
+  get_sparse_dof_map(get_fe_space(f),g,args...)
 end
 
 get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(get_fe_space(f))

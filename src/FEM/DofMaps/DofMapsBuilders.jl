@@ -7,30 +7,6 @@ function get_dof_map(f::MultiFieldFESpace)
   map(get_dof_map,f.spaces)
 end
 
-# spaces with constraints
-
-function get_dof_map(f::FESpaceWithLinearConstraints)
-  space = f.space
-  ndofs = num_free_dofs(space)
-  sdof_to_bdof = setdiff(1:ndofs,f.mDOF_to_DOF)
-  dof_to_constraints = get_dof_to_constraints(sdof_to_bdof,ndofs)
-  dof_map = get_dof_map(space)
-  return ConstrainedDofMap(dof_map,dof_to_constraints)
-end
-
-function get_dof_map(f::FESpaceWithConstantFixed)
-  space = f.space
-  ndofs = num_free_dofs(space)
-  dof_to_constraints = get_dof_to_constraints(f.dof_to_fix,ndofs)
-  dof_map = get_dof_map(space)
-  return ConstrainedDofMap(dof_map,dof_to_constraints)
-end
-
-function get_dof_map(f::ZeroMeanFESpace)
-  space = f.space
-  get_dof_map(space)
-end
-
 # sparse interface
 
 """
@@ -41,8 +17,8 @@ is a `TrivialSparseMatrixDofMap`; when the trial and test spaces are of type
 `TProductFESpace`, a `SparseMatrixDofMap` is returned.
 """
 function get_sparse_dof_map(trial::SingleFieldFESpace,test::SingleFieldFESpace,args...)
-  sparsity = SparsityPattern(trial,test,args...)
-  get_sparse_dof_map(sparsity)
+  sparsity = get_sparsity(trial,test,args...)
+  get_sparse_dof_map(sparsity,trial,test,args...)
 end
 
 function get_sparse_dof_map(trial::MultiFieldFESpace,test::MultiFieldFESpace,args...)
@@ -55,14 +31,38 @@ end
 
 # utils
 
-function get_dof_to_constraints(constrained_dofs,ndofs::Int)
-  dof_to_constraint = fill(true,ndofs)
-  for dof in eachindex(dof_to_constraint)
-    if !(dof ∈ constrained_dofs)
-      dof_to_constraint[dof] = false
-    end
+function get_dof_to_mask(f::FESpace)
+  @abstractmethod
+end
+
+function get_dof_to_mask(f::SingleFieldFESpace)
+  fill(false,num_free_dofs(f))
+end
+
+function get_dof_to_mask(f::FESpaceWithLinearConstraints)
+  space = f.space
+  ndofs = num_free_dofs(space)
+  sdof_to_bdof = setdiff(1:ndofs,f.mDOF_to_DOF)
+  get_dof_to_mask(sdof_to_bdof,ndofs)
+end
+
+function get_dof_to_mask(f::FESpaceWithConstantFixed)
+  space = f.space
+  ndofs = num_free_dofs(space)
+  get_dof_to_mask(f.dof_to_fix,ndofs)
+end
+
+function get_dof_to_mask(f::ZeroMeanFESpace)
+  space = f.space
+  get_dof_to_mask(space)
+end
+
+function get_dof_to_mask(masked_dofs,ndofs::Int)
+  dof_to_mask = fill(false,ndofs)
+  for dof in masked_dofs
+    dof_to_mask[dof] = true
   end
-  return dof_to_constraint
+  return dof_to_mask
 end
 
 """

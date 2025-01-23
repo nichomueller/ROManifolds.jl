@@ -65,3 +65,33 @@ CIAO
 # vcat(u1,u2) ≈ u′
 
 # writevtk(Ω,"boh",cellfields=["err"=>uh-uh′])
+
+using Gridap
+using GridapEmbedded
+using Gridap.MultiField
+using DrWatson
+using Serialization
+
+using ROM
+
+R = 0.2
+pmin = Point(0,0)
+pmax = Point(1,1)
+n = 10
+partition = (n,n)
+
+geo1 = disk(R,x0=Point(0.5,0.5))
+geo2 = ! geo1
+
+bgmodel = TProductModel(pmin,pmax,partition)
+cutgeo = cut(bgmodel,geo2)
+
+Ωbg = Triangulation(bgmodel)
+Ωact = Triangulation(cutgeo,ACTIVE)
+
+order = 1
+reffe = ReferenceFE(lagrangian,Float64,order)
+test = FESpace(Ωbg.trian,reffe;conformity=:H1)
+testact = FESpace(Ωact,reffe;conformity=:H1)
+
+test0 = FESpace(Ωbg.trian,reffe;conformity=:H1,constraint=:zeromean)

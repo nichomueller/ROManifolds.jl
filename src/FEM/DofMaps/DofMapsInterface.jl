@@ -6,7 +6,7 @@ Type representing an indexing strategy. Subtypes:
 - `VectorDofMap`
 - `TrivialSparseMatrixDofMap`
 - `SparseMatrixDofMap`
-- `ConstrainedDofMap`
+- `MaskedDofMap`
 """
 abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
 
@@ -17,32 +17,36 @@ const TrivialDofMap{Ti} = AbstractDofMap{1,Ti}
 
 Base.IndexStyle(i::AbstractDofMap) = IndexLinear()
 
-FESpaces.ConstraintStyle(i::I) where I<:AbstractDofMap = ConstraintStyle(I)
-FESpaces.ConstraintStyle(::Type{<:AbstractDofMap}) = UnConstrained()
+abstract type MaskedStyle end
+struct Masked <: MaskedStyle end
+struct UnMasked <: MaskedStyle end
 
-function remove_constrained_dofs(i::AbstractDofMap)
-  remove_constrained_dofs(i,ConstraintStyle(i))
+MaskedStyle(::Type{<:AbstractDofMap}) = UnMasked()
+MaskedStyle(::T) where T<:AbstractDofMap = MaskedStyle(T)
+
+function remove_masked_dofs(i::AbstractDofMap)
+  remove_masked_dofs(i,MaskedStyle(i))
 end
 
-function remove_constrained_dofs(i::AbstractDofMap,::UnConstrained)
+function remove_masked_dofs(i::AbstractDofMap,::UnConstrained)
   collect(i)
 end
 
-function remove_constrained_dofs(i::AbstractDofMap{Ti},::Constrained) where Ti
+function remove_masked_dofs(i::AbstractDofMap{Ti},::Constrained) where Ti
   i′ = collect(vec(i))
-  deleteat!(i′,get_dof_to_constraints(i))
+  deleteat!(i′,get_dof_to_mask(i))
   i′
 end
 
-get_dof_to_constraints(i::AbstractDofMap) = @abstractmethod
+get_dof_to_mask(i::AbstractDofMap) = @abstractmethod
 
 """
     vectorize(i::AbstractDofMap) -> AbstractVector
 
-Reshapes `i` as a vector, and removes the constrained dofs in `i` (if any)
+Reshapes `i` as a vector, and removes the masked dofs in `i` (if any)
 """
 function vectorize(i::AbstractDofMap)
-  vec(remove_constrained_dofs(i))
+  vec(remove_masked_dofs(i))
 end
 
 """
@@ -52,7 +56,7 @@ Calls the function `invperm` on the nonzero entries of `i`, and places
 zeros on the remaining zero entries of `i`. The output has the same size as `i`
 """
 function invert(i::AbstractDofMap)
-  invert(i,ConstraintStyle(i))
+  invert(i,MaskedStyle(i))
 end
 
 function invert(i::AbstractArray,::UnConstrained)
@@ -63,7 +67,7 @@ function invert(i::AbstractArray,::UnConstrained)
 end
 
 function invert(i::AbstractDofMap,::Constrained)
-  i′ = remove_constrained_dofs(i)
+  i′ = remove_masked_dofs(i)
   invert(i′,UnConstrained())
 end
 
@@ -211,42 +215,41 @@ function recast(a::AbstractArray,i::SparseMatrixDofMap)
 end
 
 """
-    struct ConstrainedDofMap{D,Ti,I<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
+    struct MaskedDofMap{D,Ti,I<:AbstractArray{Ti,D}} <: AbstractDofMap{D,Ti}
       indices::I
-      dof_to_constraint_mask::Vector{Bool}
+      dof_to_mask::Vector{Bool}
     end
 
-Contains an additional field `dof_to_constraint_mask`
-which tracks the constrained dofs. If a dof is constrained, a zero is shown at its
-place
+Contains an additional field `dof_to_mask`, which tracks the masked dofs. If a
+dof is masked, a zero is shown at its place
 """
-struct ConstrainedDofMap{D,Ti,I<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
+struct MaskedDofMap{D,Ti,I<:AbstractArray{Ti,D}} <: AbstractDofMap{D,Ti}
   indices::I
-  dof_to_constraint_mask::Vector{Bool}
+  dof_to_mask::Vector{Bool}
 end
 
-FESpaces.ConstraintStyle(::Type{<:ConstrainedDofMap}) = Constrained()
+MaskedStyle(::Type{<:MaskedDofMap}) = Constrained()
 
-get_dof_to_constraints(i::ConstrainedDofMap) = i.dof_to_constraint_mask
+get_dof_to_mask(i::MaskedDofMap) = i.dof_to_mask
 
-Base.size(i::ConstrainedDofMap) = size(i.indices)
+Base.size(i::MaskedDofMap) = size(i.indices)
 
-function Base.getindex(i::ConstrainedDofMap,j::Integer)
-  i.dof_to_constraint_mask[j] ? zero(eltype(i)) : getindex(i.indices,j)
+function Base.getindex(i::MaskedDofMap,j::Integer)
+  i.dof_to_mask[j] ? zero(eltype(i)) : getindex(i.indices,j)
 end
 
-function Base.setindex!(i::ConstrainedDofMap,v,j::Integer)
-  !i.dof_to_constraint_mask[j] && setindex!(i.indices,v,j)
+function Base.setindex!(i::MaskedDofMap,v,j::Integer)
+  !i.dof_to_mask[j] && setindex!(i.indices,v,j)
 end
 
-function Base.reshape(i::ConstrainedDofMap,s::Int...)
-  ConstrainedDofMap(reshape(i.indices,s...),i.dof_to_constraint_mask)
+function Base.reshape(i::MaskedDofMap,s::Int...)
+  MaskedDofMap(reshape(i.indices,s...),i.dof_to_mask)
 end
 
-function flatten(i::ConstrainedDofMap)
-  ConstrainedDofMap(flatten(i.indices),i.dof_to_constraint_mask)
+function flatten(i::MaskedDofMap)
+  MaskedDofMap(flatten(i.indices),i.dof_to_mask)
 end
 
-function recast(a::AbstractArray,i::ConstrainedDofMap)
+function recast(a::AbstractArray,i::MaskedDofMap)
   recast(a,i.indices)
 end

@@ -7,6 +7,11 @@ Base.size(a::OIdsToIds) = size(a.indices)
 Base.getindex(a::OIdsToIds,i::Integer) = getindex(a.indices,i)
 Base.setindex!(a::OIdsToIds,v,i::Integer) = setindex!(a.indices,v,i)
 
+function Base.similar(a::OIdsToIds{T},::Type{T′},s::Dims{1}) where {T,T′}
+  indices′ = similar(a.indices,T′,s...)
+  OIdsToIds(indices′,a.terms)
+end
+
 struct DofsToODofs{D,P,V} <: Map
   b::LagrangianDofBasis{P,V}
   pdof_to_dof::Vector{Int32}
@@ -106,4 +111,82 @@ end
     end
   end
   A
+end
+
+struct TouchEntriesWithZerosMap <: Map end
+
+function Arrays.evaluate!(cache,k::TouchEntriesWithZerosMap,A,v,i,j)
+  _add_entries_with_zeros!(+,A,nothing,i,j)
+end
+
+function Arrays.evaluate!(cache,k::TouchEntriesWithZerosMap,A,v,i)
+  _add_entries_with_zeros!(+,A,nothing,i)
+end
+
+@inline function _add_entries_with_zeros!(combine::Function,A,vs::Nothing,is,js)
+  for (lj,j) in enumerate(js)
+    if j≥0
+      for (li,i) in enumerate(is)
+        if i≥0
+          add_entry!(combine,A,nothing,i,j)
+        end
+      end
+    end
+  end
+  A
+end
+
+@inline function _add_entries_with_zeros!(combine::Function,A,vs::Nothing,is)
+  for (li,i) in enumerate(is)
+    if i≥0
+      add_entry!(A,nothing,i)
+    end
+  end
+  A
+end
+
+function get_cell_dof_ids_with_zeros(f::FESpace)
+  @abstractmethod
+end
+
+function get_cell_dof_ids_with_zeros(f::SingleFieldFESpace)
+  cellids = get_cell_dof_ids(f)
+  dof_mask = get_dof_to_mask(f)
+  lazy_map(MaskEntryMap(dof_mask),cellids)
+end
+
+function get_cell_dof_ids_with_zeros(f::FESpace,ttrian::Triangulation)
+  FESpaces.get_cell_fe_data(get_cell_dof_ids_with_zeros,f,ttrian)
+end
+
+struct MaskEntryMap{T} <: Map
+  dof_mask::Vector{T}
+end
+
+function Arrays.return_cache(k::MaskEntryMap,dofs::AbstractVector)
+  CachedArray(dofs)
+end
+
+function Arrays.evaluate!(cache,k::MaskEntryMap,dofs::AbstractVector{T}) where T
+  setsize!(cache,size(dofs))
+  r = cache.array
+  for (i,dof) in eachindex(dofs)
+    r[i] = k.dof_mask[dof] ? zero(T) : dof
+  end
+  r
+end
+
+struct AddZeroCellIdsMap{A} <: Map
+  cell_to_mask::Vector{Bool}
+  cell_dofs_ids::A
+end
+
+function Arrays.return_cache(k::AddZeroCellIdsMap,cell::Int)
+  array_cache(k.cell_dofs_ids)
+end
+
+function Arrays.evaluate!(cache,k::AddZeroCellIdsMap,cell::Int)
+  dofs = getindex!(cache,k.cell_dofs_ids,cell)
+  k.cell_to_mask[cell] && fill!(dofs,zero(eltype(dofs)))
+  dofs
 end

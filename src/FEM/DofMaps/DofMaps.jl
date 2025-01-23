@@ -34,9 +34,17 @@ export range_1d
 export range_2d
 include("Ranges.jl")
 
+export OIdsToIds
+export DofsToODofs
+export MaskEntryMap
+export get_cell_dof_ids_with_zeros
+export add_ordered_entries!
+include("OrderingMaps.jl")
+
 export SparsityPattern
 export SparsityCSC
 export TProductSparsity
+export get_sparsity
 export get_background_sparsity
 export recast
 export get_d_sparse_dofs_to_full_dofs
@@ -47,7 +55,7 @@ export TrivialDofMap
 export VectorDofMap
 export TrivialSparseMatrixDofMap
 export SparseMatrixDofMap
-export ConstrainedDofMap
+export MaskedDofMap
 export invert
 export vectorize
 export flatten
@@ -61,11 +69,6 @@ include("DofMapsBuilders.jl")
 
 export DofMapArray
 include("DofMapArrays.jl")
-
-export OIdsToIds
-export DofsToODofs
-export add_ordered_entries!
-include("OrderingMaps.jl")
 
 export OrderedFESpace
 export CartesianFESpace
