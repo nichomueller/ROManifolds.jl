@@ -36,8 +36,6 @@ include("Ranges.jl")
 
 export OIdsToIds
 export DofsToODofs
-export MaskEntryMap
-export get_cell_dof_ids_with_zeros
 export add_ordered_entries!
 include("OrderingMaps.jl")
 

@@ -51,21 +51,6 @@ function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv)
   gather_free_and_dirichlet_values!(fv,dv,get_fe_space(f),cv)
 end
 
-# Local functions
-
-get_bg_dof_to_act_dof(f::OrderedFESpace) = get_bg_dof_to_act_dof(get_fe_space(f))
-
-function get_cell_dof_ids_with_zeros(f::OrderedFESpace)
-  cellids = get_cell_dof_ids(f)
-  dof_mask = get_bg_dof_to_mask(f)
-  cellids_mask = lazy_map(MaskEntryMap(dof_mask),cellids)
-  bg_cell_to_mask = _get_bg_cell_to_mask(f)
-  bg_cells = LinearIndices(bg_cell_to_mask)
-  lazy_map(AddZeroCellIdsMap(cellids_mask,bg_cell_to_mask),bg_cells)
-end
-
-get_bg_dofs_to_act_dofs(f::OrderedFESpace) = get_free_dof_ids(f)
-
 function get_dof_map(f::OrderedFESpace)
   bg_dof_to_mask = get_bg_dof_to_mask(f)
   bg_ndofs = length(bg_dof_to_mask)
@@ -91,9 +76,8 @@ function OrderedFESpace(
 
   act_f = CartesianFESpace(act_model,args...;kwargs...)
   bg_f = CartesianFESpace(bg_model,args...;kwargs...)
-  act_cell_ids = get_cell_dof_ids_with_zeros(act_f)
-  act_dofs = _get_bg_dofs_to_act_dofs(bg_f,act_f)
-  CartesianFESpacePortion(act_f,act_cell_ids,act_dofs)
+  act_dofs = _get_bg_dof_to_act_dof(bg_f,act_f)
+  CartesianFESpace(act_f.space,act_f.ordered_cell_dofs_ids,act_dofs)
 end
 
 function OrderedFESpace(::DiscreteModel,::DiscreteModel,args...;kwargs...)
@@ -103,11 +87,13 @@ end
 struct CartesianFESpace{S<:SingleFieldFESpace} <: OrderedFESpace{S}
   space::S
   ordered_cell_dofs_ids::AbstractArray
+  bg_dofs_to_act_dofs::AbstractVector
 end
 
 function CartesianFESpace(f::SingleFieldFESpace)
   ordered_cell_dofs_ids = get_ordered_cell_dof_ids(f)
-  CartesianFESpace(f,ordered_cell_dofs_ids)
+  bg_dofs_to_act_dofs = get_bg_dof_to_act_dof(f)
+  CartesianFESpace(f,ordered_cell_dofs_ids,bg_dofs_to_act_dofs)
 end
 
 function CartesianFESpace(model::DiscreteModel,args...;kwargs...)
@@ -123,22 +109,25 @@ FESpaces.get_fe_space(f::CartesianFESpace) = f.space
 
 get_ordered_dof_ids(f::CartesianFESpace) = f.ordered_cell_dofs_ids
 
-struct CartesianFESpacePortion{S<:SingleFieldFESpace} <: OrderedFESpace{S}
-  active_space::CartesianFESpace{S}
-  bg_cell_ids_to_act_cell_ids::AbstractArray
-  bg_dofs_to_act_dofs::AbstractVector
-end
-
-FESpaces.get_fe_space(f::CartesianFESpacePortion) = get_fe_space(f.active_space)
-
-get_ordered_dof_ids(f::CartesianFESpacePortion) = get_ordered_dof_ids(f.active_space)
-
-get_cell_dof_ids_with_zeros(f::CartesianFESpacePortion) = f.bg_cell_ids_to_act_cell_ids
-
-get_bg_dof_to_act_dof(f::CartesianFESpacePortion) = f.bg_dofs_to_act_dofs
+get_bg_dof_to_act_dof(f::CartesianFESpace) = f.bg_dofs_to_act_dofs
 
 # this works because the dofs are sorted lexicographically
-get_act_dof_to_bg_dof(f::CartesianFESpacePortion) = findall(!iszero,get_bg_dof_to_act_dof(f))
+get_act_dof_to_bg_dof(f::CartesianFESpace) = findall(!iszero,f.bg_dofs_to_act_dofs)
+
+function get_sparsity(f::CartesianFESpace,g::CartesianFESpace,args...)
+  sparsity = get_sparsity(get_fe_space(f),get_fe_space(g),args...)
+  CartesianSparsity(sparsity,get_bg_dof_to_act_dof(f),get_bg_dof_to_act_dof(g))
+end
+
+function get_sparsity(f::CartesianFESpace,g::SingleFieldFESpace,args...)
+  sparsity = get_sparsity(get_fe_space(f),g,args...)
+  CartesianSparsity(sparsity,get_bg_dof_to_act_dof(f),get_bg_dof_to_act_dof(g))
+end
+
+function get_sparsity(f::SingleFieldFESpace,g::CartesianFESpace,args...)
+  sparsity = get_sparsity(f,get_fe_space(g),args...)
+  CartesianSparsity(sparsity,get_bg_dof_to_act_dof(f),get_bg_dof_to_act_dof(g))
+end
 
 # dof reordering
 
@@ -154,12 +143,11 @@ end
 
 function get_ordered_cell_dof_ids(model::DiscreteModel,args...)
   parent = _get_parent_model(model)
-  get_ordered_cell_dof_ids(parent,args...)
-  # try parent = _get_parent_model(model)
-  #   get_ordered_cell_dof_ids(parent,args...)
-  # catch
-  #   @notimplemented "Background model must be cartesian the selected dof reordering"
-  # end
+  try parent = _get_parent_model(model)
+    get_ordered_cell_dof_ids(parent,args...)
+  catch
+    @notimplemented "Background model must be cartesian the selected dof reordering"
+  end
 end
 
 function get_ordered_cell_dof_ids(
@@ -356,7 +344,7 @@ function _get_bg_cell_to_act_cell(grid::GridPortion)
   grid.cell_to_parent_cell
 end
 
-function _get_bg_dofs_to_act_dofs(bg_f::CartesianFESpace,act_f::CartesianFESpace)
+function _get_bg_dof_to_act_dof(bg_f::CartesianFESpace,act_f::CartesianFESpace)
   bg_dof_to_act_dof = zeros(Int,num_free_dofs(bg_f))
   bg_cell_ids = get_cell_dof_ids(bg_f)
   act_cell_ids = get_cell_dof_ids(act_f)
@@ -371,7 +359,7 @@ function _get_bg_dofs_to_act_dofs(bg_f::CartesianFESpace,act_f::CartesianFESpace
     end
   end
   # add potential underlying constraints
-  bg_dof_to_bg_dof_to_act_dof = get_bg_dofs_to_act_dofs(bg_f)
+  bg_dof_to_bg_dof_to_act_dof = get_bg_dof_to_act_dof(bg_f)
   for bg_dof in 1:length(bg_dof_to_act_dof)
     if iszero(bg_dof_to_bg_dof_to_act_dof[bg_dof])
       bg_dof_to_act_dof[bg_dof] = 0
@@ -379,3 +367,8 @@ function _get_bg_dofs_to_act_dofs(bg_f::CartesianFESpace,act_f::CartesianFESpace
   end
   return bg_dof_to_act_dof
 end
+
+_get_parent_model(model::DiscreteModel) = @abstractmethod
+_get_parent_model(model::MappedDiscreteModel) = model.model
+_get_parent_model(model::DiscreteModelPortion) = model.parent_model
+_get_parent_model(model::CartesianDiscreteModel) = model

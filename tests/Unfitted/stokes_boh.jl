@@ -90,6 +90,7 @@ cutgeo = cut(bgmodel,geo2)
 
 Ωbg = Triangulation(bgmodel)
 Ωact = Triangulation(cutgeo,ACTIVE)
+Ω = Triangulation(cutgeo,PHYSICAL_IN)
 
 order = 1
 reffe = ReferenceFE(lagrangian,Float64,order)
@@ -113,18 +114,7 @@ A_act = get_sparsity(tpV_act,tpV_act)
 
 smap_act = get_sparse_dof_map(A_act,tpV_act,tpV_act)
 
-# A_act_0 = DofMaps.get_masked_sparsity(tpV_act,tpV_act)
-using Gridap.Algebra
-import ROM.DofMaps: trivial_symbolic_loop_matrix!,TouchEntriesWithZerosMap
-
-U,V = tpV_act.space,tpV_act.space
-
-a = SparseMatrixAssembler(U,V)
-m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
-cellidsrows = get_cell_dof_ids_with_zeros(V)
-cellidscols = get_cell_dof_ids_with_zeros(U)
-trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols,TouchEntriesWithZerosMap())
-m2 = nz_allocation(m1)
-trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols,TouchEntriesWithZerosMap())
-m3 = create_from_nz(m2)
-SparsityPattern(m3)
+dΩ = Measure(Ω,2)
+form(u,v) = ∫(u⋅v)dΩ
+M = assemble_matrix(form,tpV_act.space,tpV_act.space)
+# A =

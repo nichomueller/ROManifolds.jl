@@ -60,22 +60,24 @@ end
 
 get_background_matrix(a::SparsityCSC) = a.matrix
 
-struct CartesianPortionSparsity{A<:SparsityPattern,B,C} <: SparsityPattern
+struct CartesianSparsity{A<:SparsityPattern,B,C} <: SparsityPattern
   sparsity::A
   bg_rows_to_act_rows::B
   bg_cols_to_act_cols::C
 end
 
-get_background_matrix(a::CartesianPortionSparsity) = get_background_matrix(a.sparsity)
+const IdentityCartesianSparsity{A} = CartesianSparsity{A,<:IdentityVector,<:IdentityVector}
 
-num_bg_rows(a::CartesianPortionSparsity) = length(a.bg_rows_to_act_rows)
-num_bg_cols(a::CartesianPortionSparsity) = length(a.bg_cols_to_act_cols)
+get_background_matrix(a::CartesianSparsity) = get_background_matrix(a.sparsity)
 
-function bg_findnz(a::CartesianPortionSparsity)
+num_bg_rows(a::CartesianSparsity) = length(a.bg_rows_to_act_rows)
+num_bg_cols(a::CartesianSparsity) = length(a.bg_cols_to_act_cols)
+
+function bg_findnz(a::CartesianSparsity)
   I,J,V = findnz(a.sparsity)
   bg_rows = findall(!iszero,a.bg_rows_to_act_rows)
   bg_cols = findall(!iszero,a.bg_cols_to_act_cols)
-  for k in eachindex(I,J)
+  for k in eachindex(I)
     I[k] = bg_rows[I[k]]
     J[k] = bg_cols[J[k]]
   end
@@ -106,29 +108,38 @@ univariate_findnz(a::TProductSparsity) = tuple_of_arrays(findnz.(a.sparsities_1d
 univariate_nnz(a::TProductSparsity) = Tuple(nnz.(a.sparsities_1d))
 
 function get_sparse_dof_map(a::TProductSparsity,U::FESpace,V::FESpace,args...)
-  # if _mask_dof_condition(U,V)
-  #   a_mask = get_masked_sparsity(U,V,args...)
-  #   full_ids = get_d_sparse_dofs_to_full_dofs(a_mask)
-  # else
-  #   full_ids = get_d_sparse_dofs_to_full_dofs(a)
-  # end
   full_ids = get_d_sparse_dofs_to_full_dofs(a)
   sparse_ids = to_nz_index(full_ids)
   SparseMatrixDofMap(sparse_ids,full_ids,a)
 end
 
-function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity)
-  I,J, = findnz(a)
-  nrows = num_rows(a)
-  ncols = num_cols(a)
-  get_d_sparse_dofs_to_full_dofs(a,I,J,nrows,ncols)
+for T in (:Any,:IdentityCartesianSparsity)
+  @eval begin
+    function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity{<:$T})
+      I,J, = findnz(a)
+      nrows = num_rows(a)
+      ncols = num_cols(a)
+      get_d_sparse_dofs_to_full_dofs(a,I,J,nrows,ncols)
+    end
+  end
 end
 
-function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity{<:CartesianPortionSparsity})
-  I,J, = bg_findnz(a)
-  nrows = bg_num_rows(a)
-  ncols = bg_num_cols(a)
-  get_d_sparse_dofs_to_full_dofs(a,I,J,nrows,ncols)
+function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity{<:CartesianSparsity})
+  I_bg,J_bg, = bg_findnz(a.sparsity)
+  nrows_bg = num_bg_rows(a.sparsity)
+  ncols_bg = num_bg_cols(a.sparsity)
+  nrows = num_rows(a)
+  dsd2sd = get_d_sparse_dofs_to_full_dofs(a,I_bg,J_bg,nrows_bg,ncols_bg)
+  for (k,sdk) in enumerate(dsd2sd)
+    if sdk > 0
+      Ik_bg = fast_index(sdk,nrows_bg)
+      Jk_bg = slow_index(sdk,nrows_bg)
+      Ik = a.sparsity.bg_rows_to_act_rows[Ik_bg]
+      Jk = a.sparsity.bg_cols_to_act_cols[Ik_bg]
+      dsd2sd[k] = Ik+(Jk-1)*nrows
+    end
+  end
+  return dsd2sd
 end
 
 function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity,I,J,nrows,ncols)
@@ -244,25 +255,3 @@ function _index_to_d_indices(i::Integer,sD::NTuple{D,Integer}) where D
   iD = slow_index(i,nD_minus_1)
   (_index_to_d_indices(i,sD_minus_1)...,iD)
 end
-
-function _mask_dof_condition(U::FESpace,V::FESpace)
-  _mask_dof_condition(U) || _mask_dof_condition(V)
-end
-
-function _mask_dof_condition(f::FESpace)
-  _constraint_condition(f) || _domain_condition(f)
-end
-
-_constraint_condition(f::FESpace) = ConstraintStyle(f)==Constrained()
-
-function _domain_condition(f::FESpace)
-  trian = get_triangulation(f)
-  act_model = get_background_model(trian)
-  bg_model = _get_parent_model(act_model)
-  act_model !== bg_model
-end
-
-_get_parent_model(model::DiscreteModel) = @abstractmethod
-_get_parent_model(model::MappedDiscreteModel) = model.model
-_get_parent_model(model::DiscreteModelPortion) = model.parent_model
-_get_parent_model(model::CartesianDiscreteModel) = model
