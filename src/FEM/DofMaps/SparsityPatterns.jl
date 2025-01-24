@@ -10,28 +10,26 @@ Subtypes:
 """
 abstract type SparsityPattern end
 
-function get_sparsity(U::FESpace,V::FESpace,args...)
-  SparsityPattern(U,V,args...)
+function get_sparsity(U::FESpace,V::FESpace,trian=_get_common_domain(U,V))
+  a = SparseMatrixAssembler(U,V)
+  m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
+  cellidsrows = get_cell_dof_ids(V,trian)
+  cellidscols = get_cell_dof_ids(U,trian)
+  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
+  m2 = nz_allocation(m1)
+  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
+  m3 = create_from_nz(m2)
+  SparsityPattern(m3)
 end
 
 function get_masked_sparsity(U::FESpace,V::FESpace,trian::Triangulation=_get_common_domain(U,V))
-  SparsityPattern(U,V,trian,get_cell_dof_ids_with_zeros,TouchEntriesWithZerosMap())
-end
-
-function SparsityPattern(
-  U::FESpace,
-  V::FESpace,
-  trian::Triangulation=_get_common_domain(U,V),
-  fcell_ids::Function=get_cell_dof_ids,
-  touch::Map=FESpaces.TouchEntriesMap())
-
   a = SparseMatrixAssembler(U,V)
   m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
-  cellidsrows = fcell_ids(V,trian)
-  cellidscols = fcell_ids(U,trian)
-  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols,touch)
+  cellidsrows = get_cell_dof_ids_with_zeros(V,trian)
+  cellidscols = get_cell_dof_ids_with_zeros(U,trian)
+  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols,TouchEntriesWithZerosMap())
   m2 = nz_allocation(m1)
-  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols,touch)
+  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols,TouchEntriesWithZerosMap())
   m3 = create_from_nz(m2)
   SparsityPattern(m3)
 end
@@ -154,7 +152,12 @@ function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols,touch=FESpaces.
   touch_cache = return_cache(touch,A,mat1,rows1,cols1)
   caches = touch_cache,rows_cache,cols_cache
 
-  FESpaces._symbolic_loop_matrix!(A,caches,cellidsrows,cellidscols,mat1)
+  for cell in 1:length(cellidscols)
+    rows = getindex!(rows_cache,cellidsrows,cell)
+    cols = getindex!(cols_cache,cellidscols,cell)
+    evaluate!(touch_cache,touch,A,mat1,rows,cols)
+  end
+
   return A
 end
 
@@ -231,7 +234,12 @@ _constraint_condition(f::FESpace) = ConstraintStyle(f)==Constrained()
 
 function _domain_condition(f::FESpace)
   trian = get_triangulation(f)
-  act_model = get_active_model(trian)
-  bg_model = get_background_model(trian)
+  act_model = get_background_model(trian)
+  bg_model = _get_parent_model(act_model)
   act_model !== bg_model
 end
+
+_get_parent_model(model::DiscreteModel) = @abstractmethod
+_get_parent_model(model::MappedDiscreteModel) = model.model
+_get_parent_model(model::DiscreteModelPortion) = model.parent_model
+_get_parent_model(model::CartesianDiscreteModel) = model

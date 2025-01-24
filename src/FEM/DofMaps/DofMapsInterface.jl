@@ -6,7 +6,6 @@ Type representing an indexing strategy. Subtypes:
 - `VectorDofMap`
 - `TrivialSparseMatrixDofMap`
 - `SparseMatrixDofMap`
-- `MaskedDofMap`
 """
 abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
 
@@ -17,28 +16,11 @@ const TrivialDofMap{Ti} = AbstractDofMap{1,Ti}
 
 Base.IndexStyle(i::AbstractDofMap) = IndexLinear()
 
-abstract type MaskedStyle end
-struct Masked <: MaskedStyle end
-struct UnMasked <: MaskedStyle end
-
-MaskedStyle(::Type{<:AbstractDofMap}) = UnMasked()
-MaskedStyle(::T) where T<:AbstractDofMap = MaskedStyle(T)
-
 function remove_masked_dofs(i::AbstractDofMap)
-  remove_masked_dofs(i,MaskedStyle(i))
-end
-
-function remove_masked_dofs(i::AbstractDofMap,::UnConstrained)
-  collect(i)
-end
-
-function remove_masked_dofs(i::AbstractDofMap{Ti},::Constrained) where Ti
   i′ = collect(vec(i))
-  deleteat!(i′,get_dof_to_mask(i))
+  deleteat!(i′,findall(iszero,i′))
   i′
 end
-
-get_dof_to_mask(i::AbstractDofMap) = @abstractmethod
 
 """
     vectorize(i::AbstractDofMap) -> AbstractVector
@@ -46,40 +28,20 @@ get_dof_to_mask(i::AbstractDofMap) = @abstractmethod
 Reshapes `i` as a vector, and removes the masked dofs in `i` (if any)
 """
 function vectorize(i::AbstractDofMap)
-  vec(remove_masked_dofs(i))
+  remove_masked_dofs(i)
 end
 
 """
-    invert(i::AbstractDofMap;kwargs...) -> AbstractArray
+    invert(i::AbstractDofMap) -> AbstractArray
 
 Calls the function `invperm` on the nonzero entries of `i`, and places
 zeros on the remaining zero entries of `i`. The output has the same size as `i`
 """
 function invert(i::AbstractDofMap)
-  invert(i,MaskedStyle(i))
-end
-
-function invert(i::AbstractArray,::UnConstrained)
-  i′ = similar(i)
-  inz = findall(!iszero,i)
+  i′ = remove_masked_dofs(i)
+  inz = findall(!iszero,i′)
   i′[inz] = invperm(i[inz])
   i′
-end
-
-function invert(i::AbstractDofMap,::Constrained)
-  i′ = remove_masked_dofs(i)
-  invert(i′,UnConstrained())
-end
-
-# i1 ∘ i2
-function compose_maps(i1::AbstractArray{Ti,D},i2::AbstractArray{Ti,D}) where {Ti,D}
-  @assert size(i1) == size(i2)
-  i12 = zeros(Ti,size(i1))
-  for (i,m2i) in enumerate(i2)
-    iszero(m2i) && continue
-    i12[i] = i1[m2i]
-  end
-  return i12
 end
 
 """
@@ -91,23 +53,58 @@ function flatten(i::AbstractDofMap)
   @abstractmethod
 end
 
+"""
+    struct VectorDofMap{D} <: AbstractDofMap{D,Int32}
+      size::Dims{D}
+      dof_to_mask::Vector{Bool}
+      cumulative_masks::Vector{Int}
+    end
+
+Dof map intended for FE vectors (e.g. solutions or residuals). The field `size`
+denotes the shape of the vector, and `dof_to_mask` tracks the dofs to hide, and
+`cumulative_masks` simply enables the correct indexing of the map
+"""
 struct VectorDofMap{D} <: AbstractDofMap{D,Int32}
-  size::NTuple{D,Int}
+  size::Dims{D}
+  dof_to_mask::Vector{Bool}
+  cumulative_masks::Vector{Int}
 end
 
-VectorDofMap(l::Integer) = VectorDofMap((l,))
+function VectorDofMap(s::Dims{D},dof_to_mask::Vector{Bool}=fill(false,prod(s))) where D
+  @check length(dof_to_mask) == prod(s)
+  cumulative_masks = cumsum(dof_to_mask)
+  VectorDofMap(s,dof_to_mask,cumulative_masks)
+end
+
+VectorDofMap(i::VectorDofMap) = i
+VectorDofMap(l::Integer,args...) = VectorDofMap((l,),args...)
+
+function VectorDofMap(i::VectorDofMap,_mask_to_add::Vector{Bool})
+  @check length(i) == length(_mask_to_add)
+  dof_to_mask = copy(i.dof_to_mask)
+  for j in eachindex(i)
+    dof_to_mask[j] = dof_to_mask[j] || _mask_to_add[j]
+  end
+  VectorDofMap(i.size,dof_to_mask)
+end
 
 Base.size(i::VectorDofMap) = i.size
-Base.getindex(i::VectorDofMap,j::Integer) = j
-Base.setindex!(i::VectorDofMap,v,j::Integer) = v
 
-function Base.reshape(i::VectorDofMap,s::Int...)
+function Base.getindex(i::VectorDofMap,j::Integer)
+  i.dof_to_mask[j] ? zero(eltype(i)) : j-i.cumulative_masks[j]
+end
+
+function Base.setindex!(i::VectorDofMap,v,j::Integer)
+  !i.dof_to_mask[j] && j-i.cumulative_masks[j]
+end
+
+function Base.reshape(i::VectorDofMap,s::Vararg{Int})
   @assert prod(s) == length(i)
-  VectorDofMap(s)
+  VectorDofMap(s,i.dof_to_mask,i.cumulative_masks)
 end
 
 function flatten(i::VectorDofMap)
-  VectorDofMap((prod(i.size),))
+  VectorDofMap((prod(i.size),),i.dof_to_mask,i.cumulative_masks)
 end
 
 abstract type SparseDofMapStyle end
@@ -214,42 +211,15 @@ function recast(a::AbstractArray,i::SparseMatrixDofMap)
   recast(a,i.sparsity)
 end
 
-"""
-    struct MaskedDofMap{D,Ti,I<:AbstractArray{Ti,D}} <: AbstractDofMap{D,Ti}
-      indices::I
-      dof_to_mask::Vector{Bool}
-    end
+# utils
 
-Contains an additional field `dof_to_mask`, which tracks the masked dofs. If a
-dof is masked, a zero is shown at its place
-"""
-struct MaskedDofMap{D,Ti,I<:AbstractArray{Ti,D}} <: AbstractDofMap{D,Ti}
-  indices::I
-  dof_to_mask::Vector{Bool}
-end
-
-MaskedStyle(::Type{<:MaskedDofMap}) = Constrained()
-
-get_dof_to_mask(i::MaskedDofMap) = i.dof_to_mask
-
-Base.size(i::MaskedDofMap) = size(i.indices)
-
-function Base.getindex(i::MaskedDofMap,j::Integer)
-  i.dof_to_mask[j] ? zero(eltype(i)) : getindex(i.indices,j)
-end
-
-function Base.setindex!(i::MaskedDofMap,v,j::Integer)
-  !i.dof_to_mask[j] && setindex!(i.indices,v,j)
-end
-
-function Base.reshape(i::MaskedDofMap,s::Int...)
-  MaskedDofMap(reshape(i.indices,s...),i.dof_to_mask)
-end
-
-function flatten(i::MaskedDofMap)
-  MaskedDofMap(flatten(i.indices),i.dof_to_mask)
-end
-
-function recast(a::AbstractArray,i::MaskedDofMap)
-  recast(a,i.indices)
+# i1 ∘ i2
+function compose_maps(i1::AbstractArray{Ti,D},i2::AbstractArray{Ti,D}) where {Ti,D}
+  @assert size(i1) == size(i2)
+  i12 = zeros(Ti,size(i1))
+  for (i,m2i) in enumerate(i2)
+    iszero(m2i) && continue
+    i12[i] = i1[m2i]
+  end
+  return i12
 end

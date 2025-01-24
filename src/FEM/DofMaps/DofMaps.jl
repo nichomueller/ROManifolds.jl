@@ -45,6 +45,7 @@ export SparsityPattern
 export SparsityCSC
 export TProductSparsity
 export get_sparsity
+export get_masked_sparsity
 export get_background_sparsity
 export recast
 export get_d_sparse_dofs_to_full_dofs
@@ -55,7 +56,6 @@ export TrivialDofMap
 export VectorDofMap
 export TrivialSparseMatrixDofMap
 export SparseMatrixDofMap
-export MaskedDofMap
 export invert
 export vectorize
 export flatten

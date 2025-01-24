@@ -14,7 +14,7 @@ function FESpaces.SparseMatrixAssembler(
   test::TProductFESpace,
   strategy::AssemblyStrategy=DefaultAssemblyStrategy())
 
-  assems_1d = map(trial.spaces_1d,test.spaces_1d) do (U,V)
+  assems_1d = map(trial.spaces_1d,test.spaces_1d) do U,V
     SparseMatrixAssembler(mat,vec,U,V,strategy)
   end
   TProductSparseMatrixAssembler(assems_1d)

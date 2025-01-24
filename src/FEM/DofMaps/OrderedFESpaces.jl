@@ -4,6 +4,8 @@ abstract type OrderedFESpace{S} <: SingleFieldFESpace end
 
 FESpaces.get_fe_space(f::OrderedFESpace) = @abstractmethod
 
+get_ordered_dof_ids(f::OrderedFESpace) = @abstractmethod
+
 FESpaces.ConstraintStyle(::Type{<:OrderedFESpace{S}}) where S = ConstraintStyle(S)
 
 FESpaces.get_free_dof_ids(f::OrderedFESpace) = get_free_dof_ids(get_fe_space(f))
@@ -51,24 +53,32 @@ end
 
 # Local functions
 
+get_dof_to_mask(f::OrderedFESpace) = get_dof_to_mask(get_fe_space(f))
+
 function get_cell_dof_ids_with_zeros(f::OrderedFESpace)
-  get_ordered_cell_dof_ids_with_zeros(f)
+  cellids = get_cell_dof_ids(f)
+  dof_mask = get_dof_to_mask(f)
+  cellids_mask = lazy_map(MaskEntryMap(dof_mask),cellids)
+  bg_cell_to_mask = _get_bg_cell_to_mask(f)
+  bg_cells = LinearIndices(bg_cell_to_mask)
+  lazy_map(AddZeroCellIdsMap(cellids_mask,bg_cell_to_mask),bg_cells)
 end
 
-# Ordering functions
+get_bg_dofs_to_act_dofs(f::OrderedFESpace) = get_free_dof_ids(f)
 
-get_ordered_dof_ids(f::OrderedFESpace) = @abstractmethod
-
-get_ordered_cell_dof_ids_with_zeros(f::OrderedFESpace) = @abstractmethod
+function get_dof_map(f::OrderedFESpace)
+  bg_dof_to_mask = get_dof_to_mask(f)
+  bg_ndofs = length(bg_dof_to_mask)
+  return VectorDofMap(bg_ndofs,bg_dof_to_mask)
+end
 
 # Constructors
 
-function OrderedFESpace(args...;kwargs...)
-  f = FESpace(args...;kwargs...)
-  OrderedFESpace(f)
+function OrderedFESpace(model::CartesianDiscreteModel,args...;kwargs...)
+  CartesianFESpace(model,args...;kwargs...)
 end
 
-function OrderedFESpace(trian::Grid,args...;kwargs...)
+function OrderedFESpace(trian::Triangulation,args...;kwargs...)
   act_model = get_active_model(trian)
   bg_model = get_background_model(trian)
   OrderedFESpace(act_model,bg_model,args...;kwargs...)
@@ -79,72 +89,66 @@ function OrderedFESpace(
   bg_model::CartesianDiscreteModel,
   args...;kwargs...)
 
-  f = FESpace(act_model,args...;kwargs...)
-  CartesianFESpace(f)
+  act_f = CartesianFESpace(act_model,args...;kwargs...)
+  bg_f = CartesianFESpace(bg_model,args...;kwargs...)
+  act_cell_ids = get_cell_dof_ids_with_zeros(act_f)
+  act_dofs = _get_bg_dofs_to_act_dofs(bg_f,act_f)
+  CartesianFESpacePortion(act_f,act_cell_ids,act_dofs)
 end
 
 function OrderedFESpace(::DiscreteModel,::DiscreteModel,args...;kwargs...)
-  @notimplemented "Background model must be cartesian for dof reordering. If the
-  Triangulation on which the FE space is defined "
+  @notimplemented "Background model must be cartesian for the selected dof reordering"
 end
 
-struct CartesianFESpace{S<:SingleFieldFESpace} <: SingleFieldFESpace
+struct CartesianFESpace{S<:SingleFieldFESpace} <: OrderedFESpace{S}
   space::S
   ordered_cell_dofs_ids::AbstractArray
 end
 
-function OrderedFESpace(f::SingleFieldFESpace)
+function CartesianFESpace(f::SingleFieldFESpace)
   ordered_cell_dofs_ids = get_ordered_cell_dof_ids(f)
   CartesianFESpace(f,ordered_cell_dofs_ids)
 end
 
+function CartesianFESpace(model::DiscreteModel,args...;kwargs...)
+  f = FESpace(model,args...;kwargs...)
+  CartesianFESpace(f)
+end
+
+function CartesianFESpace(trian::Triangulation,args...;kwargs...)
+  OrderedFESpace(trian,args...;kwargs...)
+end
+
 FESpaces.get_fe_space(f::CartesianFESpace) = f.space
 
-get_ordered_cell_dof_ids(f::CartesianFESpace) = f.ordered_cell_dofs_ids
+get_ordered_dof_ids(f::CartesianFESpace) = f.ordered_cell_dofs_ids
 
-# struct GenericOrderedFESpace{S<:SingleFieldFESpace} <: SingleFieldFESpace
-#   active_space::S
-#   background_space::CartesianFESpace{S}
-# end
+struct CartesianFESpacePortion{S<:SingleFieldFESpace} <: OrderedFESpace{S}
+  active_space::CartesianFESpace{S}
+  bg_cell_ids_to_act_cell_ids::AbstractArray
+  bg_dofs_to_act_dofs::AbstractVector
+end
 
-# FESpaces.get_fe_space(f::GenericOrderedFESpace) = f.active_space
+FESpaces.get_fe_space(f::CartesianFESpacePortion) = get_fe_space(f.active_space)
 
-function get_bg_cell_to_act_cell(f::OrderedFESpace)
-  trian = get_triangulation(f.space)
-  bg_model = get_background_model(trian)
-  bg_cells = fill(false,num_cells(bg_model))
-  act_cell_to_bg_cell = get_tface_to_mface(trian)
-  for bg_cell in act_cell_to_bg_cell
-    bg_cells[bg_cell] = true
+get_ordered_dof_ids(f::CartesianFESpacePortion) = get_ordered_dof_ids(f.active_space)
+
+get_cell_dof_ids_with_zeros(f::CartesianFESpacePortion) = f.bg_cell_ids_to_act_cell_ids
+
+get_bg_dofs_to_act_dofs(f::CartesianFESpacePortion) = f.bg_dofs_to_act_dofs
+
+function get_dof_to_mask(f::CartesianFESpacePortion)
+  act_dof_to_mask = get_dof_to_mask(f.active_space)
+  bg_dof_to_act_dofs = get_bg_dofs_to_act_dofs(f)
+  bg_dof_to_mask = zeros(Bool,length(bg_dof_to_act_dofs))
+  for (bg_dof,act_dof) in enumerate(bg_dof_to_act_dofs)
+    if iszero(act_dof)
+      bg_dof_to_mask[bg_dof] = true
+    else
+      bg_dof_to_mask[bg_dof] = act_dof_to_mask[act_dof]
+    end
   end
-  return bg_cells
-end
-
-function get_cell_dof_ids_with_zeros(f::OrderedFESpace)
-  cellids = get_cell_dof_ids_with_zeros(f)
-  bg_cell_to_act_cell = get_bg_cell_to_act_cell(f)
-  bg_cell_to_mask = map(!,bg_cell_to_act_cell)
-  lazy_map(AddZeroCellIdsMap(bg_cell_to_mask),cellids)
-end
-
-# function get_bg_dof_to_mask(f::OrderedFESpace)
-#   act_cell_to_bg_cell = get_active_cell_to_bg_cell(f)
-#   bg_cellids = get_cell_dof_ids(f.background_space)
-#   cache = array_cache(act_cellids)
-#   bg_dof_to_mask = fill(true,num_free_dofs(f.background_space))
-#   for cell in act_cell_to_bg_cell
-#     bg_dofs_cell = getindex!(cache,bg_cellids,cell)
-#     for bg_dof in bg_dofs
-#       bg_dof_to_mask[bg_dof] = false
-#     end
-#   end
-#   bg_dof_to_mask
-# end
-
-function get_dof_map(f::GenericOrderedFESpace)
-  bg_dof_to_mask = get_bg_dof_to_mask(f)
-  bg_dof_map = get_dof_map(f.background_space)
-  return MaskedDofMap(bg_dof_map,bg_dof_to_mask)
+  return bg_dof_to_mask
 end
 
 # dof reordering
@@ -153,33 +157,39 @@ function get_ordered_cell_dof_ids(space::SingleFieldFESpace)
   cell_dofs_ids = get_cell_dof_ids(space)
   fe_dof_basis = get_data(get_fe_dof_basis(space))
   orders = get_polynomial_orders(space)
+  cell_to_parent_cell = _get_bg_cell_to_act_cell(space)
   trian = get_triangulation(space)
   model = get_background_model(trian)
-  tface_to_mface = get_tface_to_mface(trian)
-  get_ordered_cell_dof_ids(model,cell_dofs_ids,fe_dof_basis,tface_to_mface,orders)
+  get_ordered_cell_dof_ids(model,cell_dofs_ids,fe_dof_basis,cell_to_parent_cell,orders)
 end
 
 function get_ordered_cell_dof_ids(model::DiscreteModel,args...)
-  @notimplemented "Background model must be cartesian for dof reordering"
+  parent = _get_parent_model(model)
+  get_ordered_cell_dof_ids(parent,args...)
+  # try parent = _get_parent_model(model)
+  #   get_ordered_cell_dof_ids(parent,args...)
+  # catch
+  #   @notimplemented "Background model must be cartesian the selected dof reordering"
+  # end
 end
 
 function get_ordered_cell_dof_ids(
   model::CartesianDiscreteModel,
   cell_dofs_ids::AbstractArray,
   fe_dof_basis::AbstractArray,
-  tface_to_mface::AbstractVector,
+  cell_to_parent_cell::AbstractVector,
   orders::Tuple)
 
   desc = get_cartesian_descriptor(model)
   periodic = desc.isperiodic
   ncells = desc.partition
   cells = CartesianIndices(ncells)
-  tcells = view(cells,tface_to_mface)
+  pcells = view(cells,cell_to_parent_cell)
   onodes = LinearIndices(orders .* ncells .+ 1 .- periodic)
 
-  node_and_comps_to_odof = get_ordered_dof_ids(cell_dofs_ids,fe_dof_basis,tcells,onodes,orders)
+  node_and_comps_to_odof = get_ordered_dof_ids(cell_dofs_ids,fe_dof_basis,pcells,onodes,orders)
   k = DofsToODofs(fe_dof_basis,node_and_comps_to_odof,orders)
-  lazy_map(k,tcells)
+  lazy_map(k,pcells)
 end
 
 # utils
@@ -319,4 +329,57 @@ function _local_node_to_pnode(p::Polytope,orders)
   _nodes, = Gridap.ReferenceFEs._compute_nodes(p,orders)
   pnodes = Gridap.ReferenceFEs._coords_to_terms(_nodes,orders)
   return pnodes
+end
+
+for f in (:_get_bg_cell_to_mask,:_get_bg_cell_to_act_cell)
+  @eval begin
+    function $f(f::SingleFieldFESpace)
+      trian = get_triangulation(f)
+      model = get_background_model(trian)
+      grid = get_grid(model)
+      $f(grid)
+    end
+
+    function $f(grid::Grid)
+      @abstractmethod
+    end
+  end
+end
+
+function _get_bg_cell_to_mask(grid::CartesianGrid)
+  fill(true,num_cells(grid))
+end
+
+function _get_bg_cell_to_act_cell(grid::CartesianGrid)
+  IdentityVector(num_cells(grid))
+end
+
+function _get_bg_cell_to_mask(grid::GridPortion)
+  bg_grid = grid.parent
+  mask = ones(Bool,num_cells(bg_grid))
+  for bg_cell in grid.cell_to_parent_cell
+    mask[bg_cell] = false
+  end
+  return mask
+end
+
+function _get_bg_cell_to_act_cell(grid::GridPortion)
+  grid.cell_to_parent_cell
+end
+
+function _get_bg_dofs_to_act_dofs(bg_f::CartesianFESpace,act_f::CartesianFESpace)
+  bg_dof_to_act_dof = zeros(Int,num_free_dofs(bg_f))
+  bg_cell_ids = get_cell_dof_ids(bg_f)
+  act_cell_ids = get_cell_dof_ids(act_f)
+  bg_cache = array_cache(bg_cell_ids)
+  act_cache = array_cache(act_cell_ids)
+  act_to_bg_cell = _get_bg_cell_to_act_cell(act_f)
+  for (act_cell,bg_cell) in enumerate(act_to_bg_cell)
+    bg_dofs = getindex!(bg_cache,bg_cell_ids,bg_cell)
+    act_dofs = getindex!(act_cache,act_cell_ids,act_cell)
+    for (bg_dof,act_dof) in zip(bg_dofs,act_dofs)
+      bg_dof_to_act_dof[bg_dof] = act_dof
+    end
+  end
+  return bg_dof_to_act_dof
 end

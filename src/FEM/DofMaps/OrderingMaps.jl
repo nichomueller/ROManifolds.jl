@@ -159,6 +159,14 @@ function get_cell_dof_ids_with_zeros(f::FESpace,ttrian::Triangulation)
   FESpaces.get_cell_fe_data(get_cell_dof_ids_with_zeros,f,ttrian)
 end
 
+function get_free_dof_ids_with_zeros(f::FESpace)
+  num_bg_free_dof_ids(f)
+end
+
+function num_bg_free_dof_ids(f::FESpace)
+  @abstractmethod
+end
+
 struct MaskEntryMap{T} <: Map
   dof_mask::Vector{T}
 end
@@ -170,15 +178,21 @@ end
 function Arrays.evaluate!(cache,k::MaskEntryMap,dofs::AbstractVector{T}) where T
   setsize!(cache,size(dofs))
   r = cache.array
-  for (i,dof) in eachindex(dofs)
+  for (i,dof) in enumerate(dofs)
     r[i] = k.dof_mask[dof] ? zero(T) : dof
   end
   r
 end
 
 struct AddZeroCellIdsMap{A} <: Map
-  cell_to_mask::Vector{Bool}
   cell_dofs_ids::A
+  cell_to_mask::Vector{Bool}
+  cumulative_masks::Vector{Int}
+end
+
+function AddZeroCellIdsMap(cell_dofs_ids::AbstractArray,cell_to_mask::Vector{Bool})
+  cumulative_masks = cumsum(cell_to_mask)
+  AddZeroCellIdsMap(cell_dofs_ids,cell_to_mask,cumulative_masks)
 end
 
 function Arrays.return_cache(k::AddZeroCellIdsMap,cell::Int)
@@ -186,7 +200,8 @@ function Arrays.return_cache(k::AddZeroCellIdsMap,cell::Int)
 end
 
 function Arrays.evaluate!(cache,k::AddZeroCellIdsMap,cell::Int)
-  dofs = getindex!(cache,k.cell_dofs_ids,cell)
+  cell′ = cell - k.cumulative_masks[cell]
+  dofs = getindex!(cache,k.cell_dofs_ids,cell′)
   k.cell_to_mask[cell] && fill!(dofs,zero(eltype(dofs)))
   dofs
 end

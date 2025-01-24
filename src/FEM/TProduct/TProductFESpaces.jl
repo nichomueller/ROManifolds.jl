@@ -28,7 +28,7 @@ function TProductFESpace(
   cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
   space = OrderedFESpace(model.model,cell_reffe;kwargs...)
   cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
-  spaces_1d = univariate_spaces(model,trian,cell_reffes_1d;kwargs...)
+  spaces_1d = univariate_spaces(model,cell_reffes_1d;kwargs...)
 
   TProductFESpace(space,spaces_1d,trian)
 end
@@ -46,18 +46,17 @@ function TProductFESpace(
   basis,reffe_args,reffe_kwargs = reffe
   T,order = reffe_args
 
-  model = get_background_model(trian)
+  model = get_background_model(tptrian)
   cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
   space = OrderedFESpace(trian,cell_reffe;kwargs...)
   cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
-  spaces_1d = univariate_spaces(model,trian,cell_reffes_1d;kwargs...)
+  spaces_1d = univariate_spaces(model,cell_reffes_1d;kwargs...)
 
-  TProductFESpace(space,spaces_1d,trian)
+  TProductFESpace(space,spaces_1d,tptrian)
 end
 
 function univariate_spaces(
   model::TProductModel,
-  trian::TProductTriangulation,
   cell_reffes;
   dirichlet_tags=Int[],
   dirichlet_masks=nothing,
@@ -72,8 +71,8 @@ function univariate_spaces(
   end
 
   diri_tags_1d = get_1d_tags(model,dirichlet_tags)
-  map(trian.trians_1d,cell_reffes,diri_tags_1d) do trian,cell_reffe,tags
-    OrderedFESpace(trian,cell_reffe;dirichlet_tags=tags,conformity,vector_type)
+  map(model.models_1d,cell_reffes,diri_tags_1d) do model,cell_reffe,tags
+    OrderedFESpace(model,cell_reffe;dirichlet_tags=tags,conformity,vector_type)
   end
 end
 
@@ -109,19 +108,24 @@ FESpaces.get_dirichlet_dof_tag(f::TProductFESpace) = get_dirichlet_dof_tag(f.spa
 
 FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-function DofMaps.get_sparsity(U::TProductFESpace,V::TProductFESpace,args...)
-  @check length(U.spaces_1d) == length(V.spaces_1d)
-  sparsity = get_sparsity(U.space,V.space,args...)
-  sparsities_1d = map(1:length(U.spaces_1d)) do d
-    get_sparsity(U.spaces_1d[d],V.spaces_1d[d])
+for f in (:(DofMaps.get_sparsity),:(DofMaps.get_masked_sparsity))
+  @eval begin
+    function $f(U::TProductFESpace,V::TProductFESpace,args...)
+      @check length(U.spaces_1d) == length(V.spaces_1d)
+      sparsity = $f(U.space,V.space,args...)
+      sparsities_1d = map(1:length(U.spaces_1d)) do d
+        get_sparsity(U.spaces_1d[d],V.spaces_1d[d])
+      end
+      return TProductSparsity(sparsity,sparsities_1d)
+    end
   end
-  return TProductSparsity(sparsity,sparsities_1d)
 end
 
 function DofMaps.get_dof_map(V::TProductFESpace)
   dof_map = get_dof_map(V.space)
-  s = map(num_free_dofs,V.spaces_1d)
-  reshape(dof_map,s...)
+  nnodes_1d = map(num_free_dofs,V.spaces_1d)
+  ncomps = Int(length(dof_map)/prod(nnodes_1d))
+  reshape(dof_map,nnodes_1d...,ncomps)
 end
 
 get_tp_triangulation(f::TProductFESpace) = f.trian

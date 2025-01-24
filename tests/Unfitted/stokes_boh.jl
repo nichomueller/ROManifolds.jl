@@ -73,8 +73,10 @@ using DrWatson
 using Serialization
 
 using ROM
+using ROM.DofMaps
+using ROM.TProduct
 
-R = 0.2
+R = 0.3
 pmin = Point(0,0)
 pmax = Point(1,1)
 n = 10
@@ -94,4 +96,35 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 test = FESpace(Ωbg.trian,reffe;conformity=:H1)
 testact = FESpace(Ωact,reffe;conformity=:H1)
 
-test0 = FESpace(Ωbg.trian,reffe;conformity=:H1,constraint=:zeromean)
+# test0 = FESpace(Ωbg.trian,reffe;conformity=:H1,constraint=:zeromean)
+
+V = OrderedFESpace(test)
+Vact = OrderedFESpace(testact)
+
+# a = get_cell_dof_ids_with_zeros(Vact)
+
+tpV = TProductFESpace(Ωbg,reffe;conformity=:H1)
+A = get_sparsity(tpV,tpV)
+
+smap = get_sparse_dof_map(A,tpV,tpV)
+
+tpV_act = TProductFESpace(Ωact,Ωbg,reffe;conformity=:H1)
+A_act = get_sparsity(tpV_act,tpV_act)
+
+smap_act = get_sparse_dof_map(A_act,tpV_act,tpV_act)
+
+# A_act_0 = DofMaps.get_masked_sparsity(tpV_act,tpV_act)
+using Gridap.Algebra
+import ROM.DofMaps: trivial_symbolic_loop_matrix!,TouchEntriesWithZerosMap
+
+U,V = tpV_act.space,tpV_act.space
+
+a = SparseMatrixAssembler(U,V)
+m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
+cellidsrows = get_cell_dof_ids_with_zeros(V)
+cellidscols = get_cell_dof_ids_with_zeros(U)
+trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols,TouchEntriesWithZerosMap())
+m2 = nz_allocation(m1)
+trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols,TouchEntriesWithZerosMap())
+m3 = create_from_nz(m2)
+SparsityPattern(m3)
