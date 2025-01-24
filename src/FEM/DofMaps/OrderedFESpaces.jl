@@ -53,11 +53,11 @@ end
 
 # Local functions
 
-get_dof_to_mask(f::OrderedFESpace) = get_dof_to_mask(get_fe_space(f))
+get_bg_dof_to_act_dof(f::OrderedFESpace) = get_bg_dof_to_act_dof(get_fe_space(f))
 
 function get_cell_dof_ids_with_zeros(f::OrderedFESpace)
   cellids = get_cell_dof_ids(f)
-  dof_mask = get_dof_to_mask(f)
+  dof_mask = get_bg_dof_to_mask(f)
   cellids_mask = lazy_map(MaskEntryMap(dof_mask),cellids)
   bg_cell_to_mask = _get_bg_cell_to_mask(f)
   bg_cells = LinearIndices(bg_cell_to_mask)
@@ -67,7 +67,7 @@ end
 get_bg_dofs_to_act_dofs(f::OrderedFESpace) = get_free_dof_ids(f)
 
 function get_dof_map(f::OrderedFESpace)
-  bg_dof_to_mask = get_dof_to_mask(f)
+  bg_dof_to_mask = get_bg_dof_to_mask(f)
   bg_ndofs = length(bg_dof_to_mask)
   return VectorDofMap(bg_ndofs,bg_dof_to_mask)
 end
@@ -135,21 +135,10 @@ get_ordered_dof_ids(f::CartesianFESpacePortion) = get_ordered_dof_ids(f.active_s
 
 get_cell_dof_ids_with_zeros(f::CartesianFESpacePortion) = f.bg_cell_ids_to_act_cell_ids
 
-get_bg_dofs_to_act_dofs(f::CartesianFESpacePortion) = f.bg_dofs_to_act_dofs
+get_bg_dof_to_act_dof(f::CartesianFESpacePortion) = f.bg_dofs_to_act_dofs
 
-function get_dof_to_mask(f::CartesianFESpacePortion)
-  act_dof_to_mask = get_dof_to_mask(f.active_space)
-  bg_dof_to_act_dofs = get_bg_dofs_to_act_dofs(f)
-  bg_dof_to_mask = zeros(Bool,length(bg_dof_to_act_dofs))
-  for (bg_dof,act_dof) in enumerate(bg_dof_to_act_dofs)
-    if iszero(act_dof)
-      bg_dof_to_mask[bg_dof] = true
-    else
-      bg_dof_to_mask[bg_dof] = act_dof_to_mask[act_dof]
-    end
-  end
-  return bg_dof_to_mask
-end
+# this works because the dofs are sorted lexicographically
+get_act_dof_to_bg_dof(f::CartesianFESpacePortion) = findall(!iszero,get_bg_dof_to_act_dof(f))
 
 # dof reordering
 
@@ -379,6 +368,13 @@ function _get_bg_dofs_to_act_dofs(bg_f::CartesianFESpace,act_f::CartesianFESpace
     act_dofs = getindex!(act_cache,act_cell_ids,act_cell)
     for (bg_dof,act_dof) in zip(bg_dofs,act_dofs)
       bg_dof_to_act_dof[bg_dof] = act_dof
+    end
+  end
+  # add potential underlying constraints
+  bg_dof_to_bg_dof_to_act_dof = get_bg_dofs_to_act_dofs(bg_f)
+  for bg_dof in 1:length(bg_dof_to_act_dof)
+    if iszero(bg_dof_to_bg_dof_to_act_dof[bg_dof])
+      bg_dof_to_act_dof[bg_dof] = 0
     end
   end
   return bg_dof_to_act_dof

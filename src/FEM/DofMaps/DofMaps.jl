@@ -45,7 +45,6 @@ export SparsityPattern
 export SparsityCSC
 export TProductSparsity
 export get_sparsity
-export get_masked_sparsity
 export get_background_sparsity
 export recast
 export get_d_sparse_dofs_to_full_dofs
@@ -73,6 +72,7 @@ include("DofMapArrays.jl")
 export OrderedFESpace
 export CartesianFESpace
 export get_ordered_cell_dof_ids
+export get_bg_dof_to_mask
 include("OrderedFESpaces.jl")
 
 end # module

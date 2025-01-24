@@ -108,17 +108,13 @@ FESpaces.get_dirichlet_dof_tag(f::TProductFESpace) = get_dirichlet_dof_tag(f.spa
 
 FESpaces.scatter_free_and_dirichlet_values(f::TProductFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-for f in (:(DofMaps.get_sparsity),:(DofMaps.get_masked_sparsity))
-  @eval begin
-    function $f(U::TProductFESpace,V::TProductFESpace,args...)
-      @check length(U.spaces_1d) == length(V.spaces_1d)
-      sparsity = $f(U.space,V.space,args...)
-      sparsities_1d = map(1:length(U.spaces_1d)) do d
-        get_sparsity(U.spaces_1d[d],V.spaces_1d[d])
-      end
-      return TProductSparsity(sparsity,sparsities_1d)
-    end
+function DofMaps.get_sparsity(U::TProductFESpace,V::TProductFESpace,args...)
+  @check length(U.spaces_1d) == length(V.spaces_1d)
+  sparsity = get_sparsity(U.space,V.space,args...)
+  sparsities_1d = map(1:length(U.spaces_1d)) do d
+    get_sparsity(U.spaces_1d[d],V.spaces_1d[d])
   end
+  return TProductSparsity(sparsity,sparsities_1d)
 end
 
 function DofMaps.get_dof_map(V::TProductFESpace)

@@ -22,18 +22,6 @@ function get_sparsity(U::FESpace,V::FESpace,trian=_get_common_domain(U,V))
   SparsityPattern(m3)
 end
 
-function get_masked_sparsity(U::FESpace,V::FESpace,trian::Triangulation=_get_common_domain(U,V))
-  a = SparseMatrixAssembler(U,V)
-  m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
-  cellidsrows = get_cell_dof_ids_with_zeros(V,trian)
-  cellidscols = get_cell_dof_ids_with_zeros(U,trian)
-  trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols,TouchEntriesWithZerosMap())
-  m2 = nz_allocation(m1)
-  trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols,TouchEntriesWithZerosMap())
-  m3 = create_from_nz(m2)
-  SparsityPattern(m3)
-end
-
 function SparsityPattern(a::AbstractSparseMatrix)
   @abstractmethod
 end
@@ -72,6 +60,28 @@ end
 
 get_background_matrix(a::SparsityCSC) = a.matrix
 
+struct CartesianPortionSparsity{A<:SparsityPattern,B,C} <: SparsityPattern
+  sparsity::A
+  bg_rows_to_act_rows::B
+  bg_cols_to_act_cols::C
+end
+
+get_background_matrix(a::CartesianPortionSparsity) = get_background_matrix(a.sparsity)
+
+num_bg_rows(a::CartesianPortionSparsity) = length(a.bg_rows_to_act_rows)
+num_bg_cols(a::CartesianPortionSparsity) = length(a.bg_cols_to_act_cols)
+
+function bg_findnz(a::CartesianPortionSparsity)
+  I,J,V = findnz(a.sparsity)
+  bg_rows = findall(!iszero,a.bg_rows_to_act_rows)
+  bg_cols = findall(!iszero,a.bg_cols_to_act_cols)
+  for k in eachindex(I,J)
+    I[k] = bg_rows[I[k]]
+    J[k] = bg_cols[J[k]]
+  end
+  return I,J,V
+end
+
 """
     struct TProductSparsity{A<:SparsityPattern,B<:SparsityPattern} <: SparsityPattern
       sparsity::A
@@ -96,23 +106,32 @@ univariate_findnz(a::TProductSparsity) = tuple_of_arrays(findnz.(a.sparsities_1d
 univariate_nnz(a::TProductSparsity) = Tuple(nnz.(a.sparsities_1d))
 
 function get_sparse_dof_map(a::TProductSparsity,U::FESpace,V::FESpace,args...)
-  if _mask_dof_condition(U,V)
-    a_mask = get_masked_sparsity(U,V,args...)
-    full_ids = get_d_sparse_dofs_to_full_dofs(a_mask)
-  else
-    full_ids = get_d_sparse_dofs_to_full_dofs(a)
-  end
+  # if _mask_dof_condition(U,V)
+  #   a_mask = get_masked_sparsity(U,V,args...)
+  #   full_ids = get_d_sparse_dofs_to_full_dofs(a_mask)
+  # else
+  #   full_ids = get_d_sparse_dofs_to_full_dofs(a)
+  # end
+  full_ids = get_d_sparse_dofs_to_full_dofs(a)
   sparse_ids = to_nz_index(full_ids)
   SparseMatrixDofMap(sparse_ids,full_ids,a)
 end
 
 function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity)
   I,J, = findnz(a)
-  i,j, = univariate_findnz(a)
-  d_to_nz_pairs = map((id,jd)->map(CartesianIndex,id,jd),i,j)
-
   nrows = num_rows(a)
   ncols = num_cols(a)
+  get_d_sparse_dofs_to_full_dofs(a,I,J,nrows,ncols)
+end
+
+function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity{<:CartesianPortionSparsity})
+  I,J, = bg_findnz(a)
+  nrows = bg_num_rows(a)
+  ncols = bg_num_cols(a)
+  get_d_sparse_dofs_to_full_dofs(a,I,J,nrows,ncols)
+end
+
+function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity,I,J,nrows,ncols)
   nnz_sizes = univariate_nnz(a)
   rows_no_comps = univariate_num_rows(a)
   cols_no_comps = univariate_num_cols(a)
@@ -121,6 +140,9 @@ function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity)
   ncomps_row = Int(nrows / nrows_no_comps)
   ncomps_col = Int(ncols / ncols_no_comps)
   ncomps = ncomps_row*ncomps_col
+
+  i,j, = univariate_findnz(a)
+  d_to_nz_pairs = map((id,jd)->map(CartesianIndex,id,jd),i,j)
 
   D = length(a.sparsities_1d)
   cache = zeros(Int,D)
@@ -141,7 +163,7 @@ end
 
 # utils
 
-function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols,touch=FESpaces.TouchEntriesMap())
+function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
   mat1 = nothing
   rows_cache = array_cache(cellidsrows)
   cols_cache = array_cache(cellidscols)
@@ -149,13 +171,14 @@ function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols,touch=FESpaces.
   rows1 = getindex!(rows_cache,cellidsrows,1)
   cols1 = getindex!(cols_cache,cellidscols,1)
 
-  touch_cache = return_cache(touch,A,mat1,rows1,cols1)
+  touch! = FESpaces.TouchEntriesMap()
+  touch_cache = return_cache(touch!,A,mat1,rows1,cols1)
   caches = touch_cache,rows_cache,cols_cache
 
   for cell in 1:length(cellidscols)
     rows = getindex!(rows_cache,cellidsrows,cell)
     cols = getindex!(cols_cache,cellidscols,cell)
-    evaluate!(touch_cache,touch,A,mat1,rows,cols)
+    evaluate!(touch_cache,touch!,A,mat1,rows,cols)
   end
 
   return A

@@ -1,10 +1,9 @@
 function DofMaps.recast(a::AbstractVector{<:AbstractArray{T,3}},i::SparseMatrixDofMap) where T
   N = length(a)
-  us = i.sparsity.sparsities_1d
   @check length(us) ≤ N
   a′ = Vector{AbstractArray{T,3}}(undef,N)
   for n in eachindex(a)
-    a′[n] = n ≤ length(us) ? SparseCore(a[n],us[n]) : a[n]
+    a′[n] = n ≤ length(us) ? SparseCore(a[n],i.sparsity.sparsities_1d[n]) : a[n]
   end
   return a′
 end

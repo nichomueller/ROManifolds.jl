@@ -113,58 +113,18 @@ end
   A
 end
 
-struct TouchEntriesWithZerosMap <: Map end
-
-function Arrays.evaluate!(cache,k::TouchEntriesWithZerosMap,A,v,i,j)
-  _add_entries_with_zeros!(+,A,nothing,i,j)
-end
-
-function Arrays.evaluate!(cache,k::TouchEntriesWithZerosMap,A,v,i)
-  _add_entries_with_zeros!(+,A,nothing,i)
-end
-
-@inline function _add_entries_with_zeros!(combine::Function,A,vs::Nothing,is,js)
-  for (lj,j) in enumerate(js)
-    if j≥0
-      for (li,i) in enumerate(is)
-        if i≥0
-          add_entry!(combine,A,nothing,i,j)
-        end
-      end
-    end
-  end
-  A
-end
-
-@inline function _add_entries_with_zeros!(combine::Function,A,vs::Nothing,is)
-  for (li,i) in enumerate(is)
-    if i≥0
-      add_entry!(A,nothing,i)
-    end
-  end
-  A
-end
-
 function get_cell_dof_ids_with_zeros(f::FESpace)
   @abstractmethod
 end
 
 function get_cell_dof_ids_with_zeros(f::SingleFieldFESpace)
   cellids = get_cell_dof_ids(f)
-  dof_mask = get_dof_to_mask(f)
+  dof_mask = get_bg_dof_to_mask(f)
   lazy_map(MaskEntryMap(dof_mask),cellids)
 end
 
 function get_cell_dof_ids_with_zeros(f::FESpace,ttrian::Triangulation)
   FESpaces.get_cell_fe_data(get_cell_dof_ids_with_zeros,f,ttrian)
-end
-
-function get_free_dof_ids_with_zeros(f::FESpace)
-  num_bg_free_dof_ids(f)
-end
-
-function num_bg_free_dof_ids(f::FESpace)
-  @abstractmethod
 end
 
 struct MaskEntryMap{T} <: Map

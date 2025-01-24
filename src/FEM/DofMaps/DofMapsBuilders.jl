@@ -31,38 +31,42 @@ end
 
 # utils
 
-function get_dof_to_mask(f::FESpace)
+function get_bg_dof_to_act_dof(f::FESpace)
   @abstractmethod
 end
 
-function get_dof_to_mask(f::SingleFieldFESpace)
-  fill(false,num_free_dofs(f))
+function get_bg_dof_to_mask(f::FESpace)
+  map(iszero,get_bg_dof_to_act_dof(f))
 end
 
-function get_dof_to_mask(f::FESpaceWithLinearConstraints)
-  space = f.space
-  ndofs = num_free_dofs(space)
+function get_bg_dof_to_act_dof(f::SingleFieldFESpace)
+  IdentityVector(num_free_dofs(f))
+end
+
+function get_bg_dof_to_act_dof(f::FESpaceWithLinearConstraints)
+  bg_space = f.space
+  ndofs = num_free_dofs(bg_space)
   sdof_to_bdof = setdiff(1:ndofs,f.mDOF_to_DOF)
-  get_dof_to_mask(sdof_to_bdof,ndofs)
+  get_bg_dof_to_act_dof(sdof_to_bdof,ndofs)
 end
 
-function get_dof_to_mask(f::FESpaceWithConstantFixed)
-  space = f.space
-  ndofs = num_free_dofs(space)
-  get_dof_to_mask(f.dof_to_fix,ndofs)
+function get_bg_dof_to_act_dof(f::FESpaceWithConstantFixed)
+  bg_space = f.space
+  ndofs = num_free_dofs(bg_space)
+  get_bg_dof_to_act_dof(f.dof_to_fix,ndofs)
 end
 
-function get_dof_to_mask(f::ZeroMeanFESpace)
-  space = f.space
-  get_dof_to_mask(space)
+function get_bg_dof_to_act_dof(f::ZeroMeanFESpace)
+  bg_space = f.space
+  get_bg_dof_to_act_dof(bg_space)
 end
 
-function get_dof_to_mask(masked_dofs,ndofs::Int)
-  dof_to_mask = fill(false,ndofs)
+function get_bg_dof_to_act_dof(masked_dofs,ndofs::Int)
+  bg_dof_to_act_dof = collect(1:ndofs)
   for dof in masked_dofs
-    dof_to_mask[dof] = true
+    bg_dof_to_act_dof[dof] = 0
   end
-  return dof_to_mask
+  return bg_dof_to_act_dof
 end
 
 """
