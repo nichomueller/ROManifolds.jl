@@ -281,3 +281,36 @@ function ODEs.jacobian_add!(
   axpy!(1,A_lin,A)
   A
 end
+
+# utils
+
+# like collect_cell_matrix, but for a fixed triangulation `strian`
+function collect_cell_matrix_for_trian(
+  trial::FESpace,
+  test::FESpace,
+  a::DomainContribution,
+  strian::Triangulation)
+
+  scell_mat = get_contribution(a,strian)
+  cell_mat,trian = move_contributions(scell_mat,strian)
+  @assert ndims(eltype(cell_mat)) == 2
+  cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
+  cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
+  rows = get_cell_dof_ids(test,trian)
+  cols = get_cell_dof_ids(trial,trian)
+  [cell_mat_rc],[rows],[cols]
+end
+
+# like collect_cell_vector, but for a fixed triangulation `strian`
+function collect_cell_vector_for_trian(
+  test::FESpace,
+  a::DomainContribution,
+  strian::Triangulation)
+
+  scell_vec = get_contribution(a,strian)
+  cell_vec,trian = move_contributions(scell_vec,strian)
+  @assert ndims(eltype(cell_vec)) == 1
+  cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
+  rows = get_cell_dof_ids(test,trian)
+  [cell_vec_r],[rows]
+end

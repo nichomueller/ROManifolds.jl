@@ -5,55 +5,17 @@ function ODEs.time_derivative(r::RBSpace)
 end
 
 function RBSteady.project(r1::RBSpace,x::Projection,r2::RBSpace,combine::Function)
-  galerkin_projection(RBSteady.get_reduced_subspace(r1),x,RBSteady.get_reduced_subspace(r2),combine)
+  galerkin_projection(get_reduced_subspace(r1),x,get_reduced_subspace(r2),combine)
 end
 
-const TransientEvalRBSpace{A<:RBSpace} = EvalRBSpace{A,<:TransientRealization}
+const TransientSingleFieldParamRBSpace = SingleFieldParamRBSpace{<:TransientProjection}
 
-function _change_length(::PType{T,L},r::TransientRealization) where {T,L}
-  ParamType{T,Int(L/num_times(r))}
+function num_time_dofs(r::TransientSingleFieldParamRBSpace)
+  num_reduced_dofs(get_projection_time(get_reduced_subspace(r)))
 end
 
-function FESpaces.get_vector_type(r::TransientEvalRBSpace)
-  V = get_vector_type(r.subspace)
-  return _change_length(V,r.realization)
-end
-
-function RBSteady.project!(x̂,r::TransientEvalRBSpace,x::ConsecutiveParamVector)
-  np = num_params(r.realization)
-  nt = num_times(r.realization)
-  rsub = RBSteady.get_reduced_subspace(r)
-  @inbounds for ip in eachindex(x̂)
-    ipt = ip:np:np*nt
-    xpt = vec(x.data[:,ipt])
-    x̂[ip] = project(rsub,xpt)
-  end
-  return x̂
-end
-
-function RBSteady.inv_project!(x,r::TransientEvalRBSpace,x̂::AbstractParamVector)
-  np = num_params(r.realization)
-  nt = num_times(r.realization)
-  rsub = RBSteady.get_reduced_subspace(r)
-  @inbounds for ip in eachindex(x̂)
-    Xip = inv_project(rsub,x̂[ip])
-    Xipt = reshape(Xip,:,nt)
-    for it in 1:nt
-      x[ip+(it-1)*np] = Xipt[:,it]
-    end
-  end
-  return x
-end
-
-const TransientEvalMultiFieldRBSpace = EvalMultiFieldRBSpace{<:TransientRealization}
-
-for S in (:BlockVector,:BlockParamVector), f! in (:(RBSteady.project!),:(RBSteady.inv_project!))
-  @eval begin
-    function $f!(y::$S,r::TransientEvalMultiFieldRBSpace,x::$S)
-      for i in 1:blocklength(x)
-        $f!(y[Block(i)],r[i],x[Block(i)])
-      end
-      return y
-    end
-  end
+function ParamDataStructures.param_length(r::TransientSingleFieldParamRBSpace)
+  nt = num_time_dofs(r)
+  npt = param_length(get_fe_space(r))
+  Int(npt / nt)
 end

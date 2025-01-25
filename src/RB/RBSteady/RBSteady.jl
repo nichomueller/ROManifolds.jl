@@ -116,7 +116,9 @@ export num_fe_dofs
 export num_reduced_dofs
 export get_cores
 export project
+export project!
 export inv_project
+export inv_project!
 export union_bases
 export enrich!
 include("Projections.jl")
@@ -124,11 +126,12 @@ include("Projections.jl")
 export RBSpace
 export SingleFieldRBSpace
 export MultiFieldRBSpace
-export EvalRBSpace
-export EvalMultiFieldRBSpace
+export SingleFieldParamRBSpace
 export reduced_subspace
 export reduced_spaces
 export reduced_basis
+export get_fe_space
+export get_reduced_subspace
 include("RBSpace.jl")
 
 export RBParamVector

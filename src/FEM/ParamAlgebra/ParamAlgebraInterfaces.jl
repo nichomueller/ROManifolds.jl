@@ -6,54 +6,34 @@ function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamVec
   consecutive_param_array(vector,1)
 end
 
-function Algebra.allocate_vector(::PType{V,L},n::Integer) where {V<:AbstractParamVector,L}
-  vector = allocate_vector(eltype(V),n)
-  consecutive_param_array(vector,L)
-end
+for f in (:(Algebra.allocate_in_range),:(Algebra.allocate_in_domain))
+  @eval begin
+    function $f(::Type{PV},matrix::AbstractParamMatrix) where PV<:AbstractParamVector
+      V = Vector{T}
+      item = testitem(matrix)
+      plength = param_length(matrix)
+      v = $f(V,item)
+      consecutive_param_array(v,plength)
+    end
 
-function Algebra.allocate_vector(::Type{<:BlockParamVector{T}},indices::BlockArrays.AbstractBlockedUnitRange) where T
-  V = ConsecutiveParamVector{T}
-  mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
-end
+    function $f(::Type{PV},matrix::BlockParamMatrix) where PV<:BlockParamVector
+      V = BlockVector{T,Vector{Vector{T}}}
+      item = testitem(matrix)
+      plength = param_length(matrix)
+      v = $f(V,item)
+      consecutive_param_array(v,plength)
+    end
 
-function Algebra.allocate_vector(::PType{<:BlockParamVector{T},L},indices::BlockArrays.AbstractBlockedUnitRange) where {T,L}
-  V = ConsecutiveParamVector{T}
-  PV = ParamType{V,L}
-  mortar(map(ids -> allocate_vector(PV,ids),blocks(indices)))
-end
+    function $f(matrix::AbstractParamMatrix{T}) where T
+      V = ConsecutiveParamVector{T}
+      $f(V,matrix)
+    end
 
-function Algebra.allocate_in_range(::Type{V},matrix::AbstractParamMatrix) where V<:AbstractParamVector
-  rows = ParamDataStructures.inneraxes(matrix)[1]
-  L = param_length(matrix)
-  PV = ParamType{V,L}
-  allocate_vector(PV,rows)
-end
-
-function Algebra.allocate_in_range(matrix::AbstractParamMatrix{T}) where T
-  V = ConsecutiveParamVector{T}
-  allocate_in_range(V,matrix)
-end
-
-function Algebra.allocate_in_range(matrix::BlockParamMatrix{T}) where T
-  V = BlockConsecutiveParamVector{T}
-  allocate_in_range(V,matrix)
-end
-
-function Algebra.allocate_in_domain(::Type{V},matrix::AbstractParamMatrix) where V<:AbstractParamVector
-  cols = ParamDataStructures.inneraxes(matrix)[2]
-  L = param_length(matrix)
-  PV = ParamType{V,L}
-  allocate_vector(PV,cols)
-end
-
-function Algebra.allocate_in_domain(matrix::AbstractParamMatrix{T}) where T
-  V = ConsecutiveParamVector{T}
-  allocate_in_domain(V,matrix)
-end
-
-function Algebra.allocate_in_domain(matrix::BlockParamMatrix{T}) where T
-  V = BlockConsecutiveParamVector{T}
-  allocate_in_domain(V,matrix)
+    function $f(matrix::BlockParamMatrix{T}) where T
+      V = BlockConsecutiveParamVector{T}
+      $f(V,matrix)
+    end
+  end
 end
 
 function Arrays.return_cache(k::AddEntriesMap,A,vs::AbstractParamVector{T},is) where T
@@ -213,9 +193,13 @@ end
   A
 end
 
-function Algebra.is_entry_stored(::PType{T},i,j) where T
-  is_entry_stored(eltype(T),i,j)
+struct ParamBuilder{A} <: GridapType
+  builder::A
+  plength::Int
 end
+
+ParamDataStructures.param_length(b::ParamBuilder) = b.plength
+Algebra.get_array_type(b::ParamBuilder) = Algebra.get_array_type(b.builder)
 
 # sparse functionalities
 

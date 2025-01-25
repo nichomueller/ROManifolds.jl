@@ -181,7 +181,7 @@ function ParamFEOperator(res::Function,jac::Function,pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   domains = FEDomains()
   ParamFEOpFromWeakForm{NonlinearParamEq,JointDomains}(
-    res,jac,pspace,assem,dof_maps,trial,test,domains)
+    res,jac,pspace,assem,trial,test,domains)
 end
 
 """
@@ -195,14 +195,14 @@ function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   domains = FEDomains()
   ParamFEOpFromWeakForm{LinearParamEq,JointDomains}(
-    res,jac′,pspace,assem,dof_maps,trial,test,domains)
+    res,jac′,pspace,assem,trial,test,domains)
 end
 
 function ParamFEOperator(res::Function,jac::Function,pspace,trial,test,domains)
   res′,jac′ = _set_domains(res,jac,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
   ParamFEOpFromWeakForm{NonlinearParamEq,SplitDomains}(
-    res′,jac′,pspace,assem,dof_maps,trial,test,domains)
+    res′,jac′,pspace,assem,trial,test,domains)
 end
 
 function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test,domains)
@@ -210,7 +210,7 @@ function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test,dom
   res′,jac′′ = _set_domains(res,jac′,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
   ParamFEOpFromWeakForm{LinearParamEq,SplitDomains}(
-    res′,jac′′,pspace,assem,dof_maps,trial,test,domains)
+    res′,jac′′,pspace,assem,trial,test,domains)
 end
 
 FESpaces.get_test(op::ParamFEOpFromWeakForm) = op.test
@@ -256,7 +256,7 @@ for f in (:set_domains,:change_domains)
       res′,jac′ = _set_domains(op.res,op.jac,op.trial,op.test,trian_res′,trian_jac′)
       domains′ = FEDomains(trian_res′,trian_jac′)
       ParamFEOpFromWeakForm{O,$T}(
-        res′,jac′,op.pspace,op.assem,op.dof_maps,op.trial,op.test,domains′)
+        res′,jac′,op.pspace,op.assem,op.trial,op.test,domains′)
     end
   end
 end

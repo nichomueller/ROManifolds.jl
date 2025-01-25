@@ -40,6 +40,8 @@ struct TransientProjection <: Projection
   projection_time::Projection
 end
 
+get_projection_space(a::TransientProjection) = a.projection_space
+get_projection_time(a::TransientProjection) = a.projection_time
 get_basis_space(a::TransientProjection) = get_basis(a.projection_space)
 get_basis_time(a::TransientProjection) = get_basis(a.projection_time)
 
@@ -47,32 +49,56 @@ RBSteady.get_basis(a::TransientProjection) = kron(get_basis_time(a),get_basis_sp
 RBSteady.num_fe_dofs(a::TransientProjection) = num_fe_dofs(a.projection_space)*num_fe_dofs(a.projection_time)
 RBSteady.num_reduced_dofs(a::TransientProjection) = num_reduced_dofs(a.projection_space)*num_reduced_dofs(a.projection_time)
 
-function RBSteady.project(a::TransientProjection,X::AbstractMatrix)
-  basis_space = get_basis(a.projection_space)
-  basis_time = get_basis(a.projection_time)
-  X̂ = basis_space'*X*basis_time
-  return X̂
-end
-
-function RBSteady.inv_project(a::TransientProjection,X̂::AbstractMatrix)
-  basis_space = get_basis(a.projection_space)
-  basis_time = get_basis(a.projection_time)
-  X = basis_space*X̂*basis_time'
-  return X
-end
-
-function RBSteady.project(a::TransientProjection,y::AbstractVector)
-  ns = num_fe_dofs(a.projection_space)
-  nt = num_fe_dofs(a.projection_time)
-  Y = reshape(y,ns,nt)
-  vec(project(a,Y))
-end
-
-function RBSteady.inv_project(a::TransientProjection,y::AbstractVector)
+function RBSteady.project!(x̂::AbstractVector,a::TransientProjection,x::AbstractVector)
   ns = num_reduced_dofs(a.projection_space)
   nt = num_reduced_dofs(a.projection_time)
-  Y = reshape(y,ns,nt)
-  vec(inv_project(a,Y))
+  X̂ = reshape(x̂,ns,nt)
+
+  Ns = num_fe_dofs(a.projection_space)
+  Nt = num_fe_dofs(a.projection_time)
+  X = reshape(x,Ns,Nt)
+
+  basis_time = get_basis(a.projection_time)
+
+  project!(X̂,a.projection_space,X*basis_time)
+end
+
+function RBSteady.inv_project!(x::AbstractVector,a::TransientProjection,x̂::AbstractVector)
+  Ns = num_fe_dofs(a.projection_space)
+  Nt = num_fe_dofs(a.projection_time)
+  X = reshape(x,Ns,Nt)
+
+  ns = num_reduced_dofs(a.projection_space)
+  nt = num_reduced_dofs(a.projection_time)
+  X̂ = reshape(x̂,ns,nt)
+
+  basis_time = get_basis(a.projection_time)
+
+  inv_project!(X,a.projection_space,X̂*basis_time')
+end
+
+function RBSteady.project!(x̂::ConsecutiveParamVector,a::TransientProjection,x::ConsecutiveParamVector)
+  nt = num_reduced_dofs(a.projection_time)
+  @check Int(param_length(x) / param_length(x̂)) == nt
+  np = param_length(x̂)
+  @inbounds for ip in eachindex(x̂)
+    ipt = ip:np:np*nt
+    xpt = vec(x.data[:,ipt])
+    x̂p = x̂[ip]
+    project!(x̂p,a,xpt)
+  end
+end
+
+function RBSteady.inv_project!(x::AbstractParamVector,a::TransientProjection,x̂::AbstractParamVector)
+  nt = num_time_dofs(r)
+  @check Int(param_length(x) / param_length(x̂)) == nt
+  np = param_length(x̂)
+  @inbounds for ip in eachindex(x̂)
+    ipt = ip:np:np*nt
+    xpt = vec(x.data[:,ipt])
+    x̂p = x̂[ip]
+    inv_project!(xpt,a,x̂p)
+  end
 end
 
 function RBSteady.galerkin_projection(

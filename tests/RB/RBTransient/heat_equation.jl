@@ -17,8 +17,12 @@ tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
 # geometry
-model_dir = datadir(joinpath("models","elasticity_3cyl2D.json"))
+model_dir = datadir(joinpath("models","model_circle_h007.json"))
 model = DiscreteModelFromFile(model_dir)
+labels = get_face_labeling(model)
+add_tag_from_tags!(labels,"neumann",["outlet"])
+add_tag_from_tags!(labels,"dirichlet",["inlet","walls"])
+
 order = 1
 degree = 2*order
 Ω = Triangulation(model)

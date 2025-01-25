@@ -116,7 +116,6 @@ get_cell_odof_ids(f::CartesianFESpace) = f.cell_odofs_ids
 
 get_bg_dof_to_act_dof(f::CartesianFESpace) = f.bg_odofs_to_act_odofs
 
-# this works because the dofs are sorted lexicographically
 get_act_dof_to_bg_dof(f::CartesianFESpace) = findall(!iszero,f.bg_odofs_to_act_odofs)
 
 function get_sparsity(f::CartesianFESpace,g::CartesianFESpace,args...)
@@ -389,30 +388,3 @@ _remove_constraint(f::SingleFieldFESpace) = f
 _remove_constraint(f::FESpaceWithLinearConstraints) = f.space
 _remove_constraint(f::FESpaceWithConstantFixed) = f.space
 _remove_constraint(f::ZeroMeanFESpace) = _remove_constraint(f.space)
-
-# function _constrained_dofs_locations(cs::SingleFieldFESpace)
-#   cells = Int[]
-#   ldofs = Int[]
-#   ConstraintStyle(cs) == UnConstrained() && return cells,ldofs
-
-#   fs = _remove_constraint(cs)
-#   @check ConstraintStyle(fs) == UnConstrained()
-
-#   fcellids = get_cell_dof_ids(fs)
-#   ccellids = get_cell_dof_ids(cs)
-#   fcache = array_cache(fcellids)
-#   ccache = array_cache(ccellids)
-
-#   for cell = 1:length(fcache)
-#     fdofs = getindex(fcache,fcellids,cell)
-#     cdofs = getindex(ccache,ccellids,cell)
-#     for (i,(fdof,cdof)) in enumerate(zip(fdofs,cdofs))
-#       if fdof > 0 && cdof < 0
-#         push!(cells,cell)
-#         push!(ldofs,i)
-#       end
-#     end
-#   end
-
-#   return cells,ldofs
-# end

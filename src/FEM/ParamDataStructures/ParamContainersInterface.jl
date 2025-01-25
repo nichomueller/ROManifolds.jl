@@ -74,8 +74,6 @@ function to_param_quantities(a...;plength=find_param_length(a...))
   return pa
 end
 
-param_typeof(a) = typeof(a)
-
 """
     abstract type AbstractParamContainer{T,N} <: AbstractArray{T,N} end
 
@@ -94,17 +92,6 @@ function to_param_quantity(a::AbstractParamContainer,plength::Integer)
   return a
 end
 
-"""
-    param_typeof(a::AbstractParamContainer) -> Any
-
-Returns a type-like structure thanks to which we can access the parametric
-length of `a`` without `a` itself
-"""
-param_typeof(a::AbstractParamContainer) = ParamType{typeof(a),param_length(a)}
-
-abstract type ParamType{T<:AbstractParamContainer,L} <: Core.Any end
-
-const PType{T,L} = Union{ParamType{T,L},Type{ParamType{T,L}}}
 Base.eltype(::PType{T,L}) where {T,L} = eltype(T)
 param_length(::PType{T,L}) where {T,L} = L
 

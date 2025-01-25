@@ -10,8 +10,17 @@ Subtypes:
 """
 abstract type SparsityPattern end
 
-function get_sparsity(U::FESpace,V::FESpace,args...)
-  SparsityPattern(U,V,args...)
+function get_sparsity(U::FESpace,V::FESpace,trian=_get_common_domain(U,V))
+  strian = _get_common_domain(U,V)
+  sparsity = SparsityPattern(U,V,strian)
+  if !(strian ≈ ttrian)
+    row_ids = get_cell_dof_ids(V,ttrian)
+    col_ids = get_cell_dof_ids(U,ttrian)
+    bg_rows_to_act_rows = get_bg_rows_to_act_rows(U,row_ids)
+    bg_cols_to_act_cols = get_bg_rows_to_act_rows(U,row_ids)
+    sparsity = CartesianSparsity(sparsity,bg_rows_to_act_rows,bg_cols_to_act_cols)
+  end
+  return sparsity
 end
 
 function SparsityPattern(U::FESpace,V::FESpace,trian=_get_common_domain(U,V))

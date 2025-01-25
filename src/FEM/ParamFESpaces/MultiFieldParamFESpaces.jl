@@ -11,9 +11,7 @@ function MultiFieldParamFESpace(
   style = BlockMultiFieldStyle(style,spaces)
   fv = mortar(map(zero_free_values,spaces))
   V = typeof(fv)
-  L = param_length(fv)
-  PV = ParamType{V,L}
-  MultiFieldFESpace(PV,spaces,style)
+  MultiFieldFESpace(V,spaces,style)
 end
 
 #TODO the code does not compile when defining these functions
@@ -33,8 +31,6 @@ end
 #   spaces′ = ParamDataStructures.to_param_quantities(spaces...)
 #   MultiFieldParamFESpace(spaces;style)
 # end
-
-FESpaces.get_dof_value_type(f::MultiFieldFESpace{MS,CS,<:ParamType{V}}) where {MS,CS,T,V<:AbstractParamArray{T}} = T
 
 function MultiField._restrict_to_field(
   f,

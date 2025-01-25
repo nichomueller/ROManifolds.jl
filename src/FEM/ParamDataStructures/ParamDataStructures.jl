@@ -48,7 +48,6 @@ export shift!
 include("ParamSpace.jl")
 
 export AbstractParamContainer
-export ParamType
 export PType
 export ParamContainer
 export ParamNumber
@@ -59,7 +58,6 @@ export param_getindex
 export param_setindex!
 export get_param_entry
 export get_param_entry!
-export param_typeof
 include("ParamContainersInterface.jl")
 
 export ParamField

@@ -78,7 +78,6 @@ Subtypes:
 
 - `SingleFieldRBSpace`
 - `MultiFieldRBSpace`
-- `EvalRBSpace`
 """
 abstract type RBSpace <: FESpace end
 
@@ -86,6 +85,11 @@ abstract type RBSpace <: FESpace end
 
 get_fe_space(r::RBSpace) = @abstractmethod
 get_reduced_subspace(r::RBSpace) = @abstractmethod
+
+function Arrays.evaluate(r::FESpace,args...)
+  space = evaluate(get_fe_space(r),args...)
+  reduced_subspace(space,get_reduced_subspace(r))
+end
 
 get_basis(r::RBSpace) = get_basis(get_reduced_subspace(r))
 num_fe_dofs(r::RBSpace) = num_fe_dofs(get_fe_space(r))
@@ -104,32 +108,27 @@ function Algebra.allocate_in_range(r::RBSpace)
   zero_free_values(get_fe_space(r))
 end
 
-function Arrays.return_cache(::typeof(project),r::RBSpace,x::AbstractVector)
-  allocate_in_domain(r)
-end
+for (f,f!,g) in zip(
+  (:project,:inv_project),
+  (:project!,:inv_project!),
+  (:(Algebra.allocate_in_domain),:(Algebra.allocate_in_range)))
 
-function Arrays.return_cache(::typeof(inv_project),r::RBSpace,x::AbstractVector)
-  allocate_in_range(r)
-end
-
-for (f,f!) in zip((:project,:inv_project),(:project!,:inv_project!))
   @eval begin
     function $f(r::RBSpace,x::AbstractVector)
-      y = return_cache($f,r,x)
+      y = $g(r,x)
       $f!(y,r,x)
       return y
     end
 
     function $f!(y,r::RBSpace,x::AbstractVector)
-      y .= $f(get_reduced_subspace(r),x)
-      return y
+      $f!(y,get_reduced_subspace(r),x)
     end
 
     function $f!(y,r::RBSpace,x::AbstractParamVector)
       @inbounds for ip in eachindex(x)
-        y[ip] = $f(get_reduced_subspace(r),x[ip])
+        yip = y[ip]
+        $f!(yip,get_reduced_subspace(r),x[ip])
       end
-      return y
     end
   end
 end
@@ -152,16 +151,16 @@ function FESpaces.FEFunction(r::RBSpace,x̂::AbstractVector)
 end
 
 """
-    struct SingleFieldRBSpace <: RBSpace
-      space::SingleFieldFESpace
-      subspace::Projection
+    struct SingleFieldRBSpace{S,P} <: RBSpace
+      space::S
+      subspace::P
     end
 
 Reduced basis subspace of a `SingleFieldFESpace` in `Gridap`
 """
-struct SingleFieldRBSpace <: RBSpace
-  space::SingleFieldFESpace
-  subspace::Projection
+struct SingleFieldRBSpace{S<:SingleFieldFESpace,P} <: RBSpace
+  space::S
+  subspace::P
 end
 
 function reduced_subspace(space::SingleFieldFESpace,basis::Projection)
@@ -170,6 +169,18 @@ end
 
 get_fe_space(r::SingleFieldRBSpace) = r.space
 get_reduced_subspace(r::SingleFieldRBSpace) = r.subspace
+
+const SingleFieldParamRBSpace{P} = SingleFieldRBSpace{<:SingleFieldParamFESpace,P}
+
+ParamDataStructures.param_length(r::SingleFieldParamRBSpace) = param_length(r.space)
+
+function FESpaces.zero_free_values(r::SingleFieldParamRBSpace)
+  PV = get_vector_type(r)
+  V = eltype(PV)
+  fv = allocate_vector(V,get_free_dof_ids(r))
+  L = param_length(r)
+  consecutive_param_array(fv,L)
+end
 
 """
     struct MultiFieldRBSpace <: RBSpace
@@ -204,87 +215,28 @@ function Base.iterate(r::MultiFieldRBSpace,i)
   return ri,i+1
 end
 
-for f in (:project,:inv_project)
+MultiField.MultiFieldStyle(r::MultiFieldRBSpace) = MultiFieldStyle(get_fe_space(r))
+MultiField.num_fields(r::MultiFieldRBSpace) = num_fields(get_fe_space(r))
+
+function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace)
+  get_free_dof_ids(r,MultiFieldStyle(r))
+end
+
+function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace,::ConsecutiveMultiFieldStyle)
+  @notimplemented
+end
+
+function FESpaces.get_free_dof_ids(r::MultiFieldRBSpace,::BlockMultiFieldStyle{NB}) where NB
+  block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
+  return BlockArrays.blockedrange(block_num_dofs)
+end
+
+for f in (:(Algebra.allocate_in_domain),:(Algebra.allocate_in_range))
   @eval begin
-    function Arrays.return_cache(::typeof($f),r::MultiFieldRBSpace,x::Union{BlockVector,BlockParamVector})
-      cache = return_cache($f,r[1],x[Block(1)])
+    function $f(r::MultiFieldRBSpace,x::Union{BlockVector,BlockParamVector})
+      cache = $f(r[1],x[Block(1)])
       block_cache = Vector{typeof(cache)}(undef,num_fields(r))
       return mortar(block_cache)
-    end
-  end
-end
-
-# conceptually this part is not needed, but it helps dispatching on the steady-unsteady
-# cases
-
-function Arrays.evaluate(r::RBSpace,args...)
-  space = evaluate(get_fe_space(r),args...)
-  subspace = reduced_subspace(space,get_reduced_subspace(r))
-  EvalRBSpace(subspace,args...)
-end
-
-"""
-"""
-struct EvalRBSpace{A<:RBSpace,B<:AbstractRealization} <: RBSpace
-  subspace::A
-  realization::B
-end
-
-get_fe_space(r::EvalRBSpace) = get_fe_space(r.subspace)
-get_reduced_subspace(r::EvalRBSpace) = get_reduced_subspace(r.subspace)
-
-FESpaces.get_free_dof_ids(r::EvalRBSpace) = get_free_dof_ids(r.subspace)
-
-const EvalMultiFieldRBSpace{B<:AbstractRealization} = EvalRBSpace{<:MultiFieldRBSpace,B}
-
-function Base.getindex(r::EvalMultiFieldRBSpace,i)
-  spacei = getindex(r.subspace,i)
-  EvalRBSpace(spacei,r.realization)
-end
-
-function Base.iterate(r::EvalMultiFieldRBSpace,i)
-  subspace = iterate(r.subspace,i)
-  if isnothing(subspace)
-    return
-  end
-  ri = EvalRBSpace(subspace,r.realization)
-  return ri,i+1
-end
-
-for T in (:MultiFieldRBSpace,:EvalMultiFieldRBSpace)
-  @eval begin
-
-    MultiField.MultiFieldStyle(r::$T) = MultiFieldStyle(get_fe_space(r))
-    MultiField.num_fields(r::$T) = num_fields(get_fe_space(r))
-
-    function FESpaces.get_free_dof_ids(r::$T)
-      get_free_dof_ids(r,MultiFieldStyle(r))
-    end
-
-    function FESpaces.get_free_dof_ids(r::$T,::ConsecutiveMultiFieldStyle)
-      @notimplemented
-    end
-
-    function FESpaces.get_free_dof_ids(r::$T,::BlockMultiFieldStyle{NB}) where NB
-      block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
-      return BlockArrays.blockedrange(block_num_dofs)
-    end
-  end
-end
-
-for (S,T) in zip((:BlockVector,:BlockParamVector),(:MultiFieldRBSpace,:EvalMultiFieldRBSpace))
-  for f! in (:project!,:inv_project!)
-    @eval begin
-      function $f!(
-        y::$S,
-        r::$T,
-        x::$S)
-
-        for i in 1:blocklength(x)
-          $f!(y[Block(i)],r[i],x[Block(i)])
-        end
-        return y
-      end
     end
   end
 end

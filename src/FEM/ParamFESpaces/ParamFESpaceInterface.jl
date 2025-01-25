@@ -84,6 +84,18 @@ function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   typeof(PV)
 end
 
+function FESpaces.zero_free_values(f::SingleFieldParamFESpace)
+  fv = zero_free_values(get_fe_space(f))
+  L = param_length(f)
+  consecutive_param_array(fv,L)
+end
+
+function FESpaces.zero_dirichlet_values(f::SingleFieldParamFESpace)
+  fv = zero_dirichlet_values(get_fe_space(f))
+  L = param_length(f)
+  consecutive_param_array(fv,L)
+end
+
 function FESpaces.FEFunction(
   pf::SingleFieldParamFESpace{<:ZeroMeanFESpace},
   free_values::AbstractParamVector,

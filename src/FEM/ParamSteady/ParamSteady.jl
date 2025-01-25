@@ -82,6 +82,8 @@ include("LinearNonlinearParamFEOperator.jl")
 export ParamOpFromFEOp
 export JointParamOpFromFEOp
 export SplitParamOpFromFEOp
+export collect_cell_matrix_for_trian
+export collect_cell_vector_for_trian
 include("ParamOpFromFEOp.jl")
 
 include("ParamSolutions.jl")

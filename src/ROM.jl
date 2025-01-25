@@ -72,6 +72,9 @@ export BlockConsecutiveParamMatrix
 include("FEM/ParamDataStructures/ParamDataStructures.jl")
 using ROM.ParamDataStructures
 
+include("FEM/ParamReferenceFEs/ParamReferenceFEs.jl")
+using ROM.ParamReferenceFEs
+
 include("FEM/ParamGeometry/ParamGeometry.jl")
 using ROM.ParamGeometry
 

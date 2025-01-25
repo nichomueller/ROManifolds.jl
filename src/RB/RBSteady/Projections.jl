@@ -46,16 +46,20 @@ num_reduced_dofs(a::Projection) = @abstractmethod
 
 Projects a high-dimensional object `x` onto the subspace represented by `a`
 """
-function project(a::Projection,x::AbstractArray)
-  basis = get_basis(a)
-  x̂ = basis'*x
+function project(a::Projection,x::AbstractArray,args...)
+  x̂ = allocate_in_domain(a,x)
+  project!(x̂,a,x,args...)
   return x̂
 end
 
-function project(a::Projection,x::AbstractArray,norm_matrix::AbstractMatrix)
+function project!(x̂::AbstractArray,a::Projection,x::AbstractArray)
   basis = get_basis(a)
-  x̂ = basis'*norm_matrix*x
-  return x̂
+  mul!(x̂,basis',x)
+end
+
+function project!(x̂::AbstractArray,a::Projection,x::AbstractArray,norm_matrix::AbstractMatrix)
+  basis = get_basis(a)
+  mul!(x̂,basis'*norm_matrix,x)
 end
 
 """
@@ -65,19 +69,34 @@ Recasts a low-dimensional object `x` onto the high-dimensional space in which `a
 is immersed
 """
 function inv_project(a::Projection,x̂::AbstractArray)
-  basis = get_basis(a)
-  x = basis*x̂
+  x = allocate_in_range(a,x̂)
+  inv_project!(x,a,x̂)
   return x
 end
 
-function Arrays.return_cache(::typeof(project),a::Projection,x::AbstractArray)
-  x̂ = zeros(eltype(x),num_reduced_dofs(a))
+function inv_project!(x::AbstractArray,a::Projection,x̂::AbstractArray)
+  basis = get_basis(a)
+  mul!(x,basis,x̂)
+end
+
+function Algebra.allocate_in_domain(a::Projection,x::V) where V<:AbstractVector
+  x̂ = allocate_vector(V,num_reduced_dofs(a))
   return x̂
 end
 
-function Arrays.return_cache(::typeof(inv_project),a::Projection,x̂::AbstractArray)
-  x = zeros(eltype(x̂),num_fe_dofs(a))
+function Algebra.allocate_in_range(a::Projection,x̂::V) where V<:AbstractVector
+  x = allocate_vector(V,num_fe_dofs(a))
   return x
+end
+
+function Algebra.allocate_in_domain(a::Projection,x::V) where V<:AbstractParamVector
+  x̂ = allocate_vector(eltype(V),num_reduced_dofs(a))
+  return consecutive_param_array(x̂,param_length(x))
+end
+
+function Algebra.allocate_in_range(a::Projection,x̂::V) where V<:AbstractParamVector
+  x̂ = allocate_vector(eltype(V),num_fe_dofs(a))
+  return consecutive_param_array(x,param_length(x̂))
 end
 
 """
@@ -181,8 +200,8 @@ Base.adjoint(a::Projection) = InvProjection(a)
 get_basis(a::InvProjection) = get_basis(a)
 num_fe_dofs(a::InvProjection) = num_fe_dofs(a)
 num_reduced_dofs(a::InvProjection) = num_reduced_dofs(a)
-project(a::InvProjection,x::AbstractArray) = inv_project(a.projection,x)
-inv_project(a::InvProjection,x::AbstractArray) = project(a.projection,x)
+project!(x::AbstractArray,a::InvProjection,x̂::AbstractArray) = inv_project!(x,a.projection,x̂)
+inv_project!(x̂::AbstractArray,a::InvProjection,x::AbstractArray) = project!(x̂,a.projection,x)
 
 """
     abstract type ReducedProjection{A<:AbstractArray} <: Projection end
@@ -199,14 +218,13 @@ abstract type ReducedProjection{A<:AbstractArray} <: Projection end
 const ReducedVecProjection = ReducedProjection{<:AbstractMatrix}
 const ReducedMatProjection = ReducedProjection{<:AbstractArray{T,3} where T}
 
-function project(a::ReducedProjection,x::AbstractVector)
+function project!(x̂::AbstractVector,a::ReducedProjection,x::AbstractVector)
   @notimplemented
 end
 
-function inv_project(a::ReducedMatProjection,x̂::AbstractVector)
+function inv_project!(x::AbstractVector,a::ReducedMatProjection,x̂::AbstractVector)
   basis = get_basis(a)
-  x = contraction(basis,x̂)
-  return x
+  contraction!(x,basis,x̂)
 end
 
 function LinearAlgebra.mul!(
@@ -443,8 +461,8 @@ num_reduced_dofs(a::NormedProjection) = num_reduced_dofs(a.projection)
 get_cores(a::NormedProjection) = get_cores(a.projection)
 DofMaps.get_dof_map(a::NormedProjection) = get_dof_map(a.projection)
 
-function project(a::NormedProjection,x::AbstractArray)
-  project(a.projection,x,a.norm_matrix)
+function project!(x̂::AbstractArray,a::NormedProjection,x::AbstractArray)
+  project!(x̂,a.projection,x,a.norm_matrix)
 end
 
 function union_bases(a::NormedProjection,b::NormedProjection,args...)
@@ -594,33 +612,33 @@ function num_reduced_dofs(a::BlockProjection)
   return dofs
 end
 
-for f in (:project,:inv_project)
+for f in (:(Algebra.allocate_in_domain),:(Algebra.allocate_in_range))
   @eval begin
-    function Arrays.return_cache(
-      ::typeof($f),
-      a::BlockProjection,
-      x::Union{BlockVector,BlockParamVector})
-
+    function $f(a::BlockProjection,x::Union{BlockVector,BlockParamVector})
       @check size(a) == nblocks(x)
+      @notimplementedif !all(a.touched)
       y = Vector{eltype(x)}(undef,nblocks(a))
       for i in eachindex(a)
-        if a.touched[i]
-          y[Block(i)] = return_cache($f,a[i],blocks(x)[i])
-        else
-          y[Block(i)] = blocks(x)[i]
-        end
+        y[Block(i)] = $f(a[i],x[Block(i)])
       end
       return mortar(y)
     end
+  end
+end
 
-    function $f(a::BlockProjection,x::Union{BlockArray,BlockParamArray})
-      y = return_cache($f,a,x)
+for f in (:project!,:inv_project!)
+  @eval begin
+    function $f(
+      y::Union{BlockArray,BlockParamArray},
+      a::BlockProjection,
+      x::Union{BlockArray,BlockParamArray})
+
       for i in eachindex(a)
         if a.touched[i]
-          y[Block(i)] = $f(a[i],blocks(x)[i])
+          yi = y[Block(i)]
+          $f(yi,a[i],x[Block(i)])
         end
       end
-      return y
     end
   end
 end

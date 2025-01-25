@@ -204,7 +204,7 @@ function TransientParamLinearFEOperator(
   assem = SparseMatrixAssembler(trial,test)
   domains = FEDomains()
   TransientParamLinearFEOpFromWeakForm{JointDomains}(
-    res,jacs,constant_forms,tpspace,assem,dof_maps,trial,test,domains,order)
+    res,jacs,constant_forms,tpspace,assem,trial,test,domains,order)
 end
 
 const SplitTransientParamLinearFEOpFromWeakForm = TransientParamLinearFEOpFromWeakForm{SplitDomains}
@@ -218,7 +218,7 @@ function TransientParamLinearFEOperator(
   res′,jacs′ = _set_domains(res,jacs,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
   TransientParamLinearFEOpFromWeakForm{SplitDomains}(
-    res′,jacs′,constant_forms,tpspace,assem,dof_maps,trial,test,domains,order)
+    res′,jacs′,constant_forms,tpspace,assem,trial,test,domains,order)
 end
 
 function TransientParamLinearFEOperator(
@@ -261,7 +261,7 @@ for f in (:(ParamSteady.set_domains),:(ParamSteady.change_domains))
       res′,jacs′ = _set_domains(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
       domains′ = FEDomains(trian_res′,trian_jacs′)
       TransientParamFEOpFromWeakForm{$T}(
-        res′,jacs′,op.tpspace,op.assem,op.dof_maps,op.trial,op.test,domains′,op.order)
+        res′,jacs′,op.tpspace,op.assem,op.trial,op.test,domains′,op.order)
     end
 
     function $f(op::SplitTransientParamLinearFEOpFromWeakForm,trian_res,trian_jacs)
@@ -270,8 +270,7 @@ for f in (:(ParamSteady.set_domains),:(ParamSteady.change_domains))
       res′,jacs′ = _set_domains(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
       domains′ = FEDomains(trian_res′,trian_jacs′)
       TransientParamLinearFEOpFromWeakForm{$T}(
-        res′,jacs′,op.constant_forms,op.tpspace,
-        op.assem,op.dof_maps,op.trial,op.test,domains′,op.order)
+        res′,jacs′,op.constant_forms,op.tpspace,op.assem,op.trial,op.test,domains′,op.order)
     end
   end
 end

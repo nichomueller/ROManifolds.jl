@@ -59,8 +59,6 @@ include("GalerkinProjections.jl")
 export TransientProjection
 include("Projections.jl")
 
-export TransientRBSpace
-export TransientEvalMultiFieldRBSpace
 include("RBSpace.jl")
 
 export TransientMDEIM
