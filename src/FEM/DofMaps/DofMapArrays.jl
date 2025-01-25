@@ -21,8 +21,3 @@ function Base.setindex!(a::DofMapArray,v,i::Integer)
   i′ = a.dof_map[i]
   i′ != 0 && setindex!(a.array,v,i′)
 end
-
-function CellData.change_domain(a::DofMapArray,args...)
-  dof_map′ = change_domain(a.dof_map,args...)
-  DofMapArray(a.array,dof_map′)
-end

@@ -10,7 +10,11 @@ Subtypes:
 """
 abstract type SparsityPattern end
 
-function get_sparsity(U::FESpace,V::FESpace,trian=_get_common_domain(U,V))
+function get_sparsity(U::FESpace,V::FESpace,args...)
+  SparsityPattern(U,V,args...)
+end
+
+function SparsityPattern(U::FESpace,V::FESpace,trian=_get_common_domain(U,V))
   a = SparseMatrixAssembler(U,V)
   m1 = nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
   cellidsrows = get_cell_dof_ids(V,trian)
@@ -135,7 +139,7 @@ function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity{<:CartesianSparsity}
       Ik_bg = fast_index(sdk,nrows_bg)
       Jk_bg = slow_index(sdk,nrows_bg)
       Ik = a.sparsity.bg_rows_to_act_rows[Ik_bg]
-      Jk = a.sparsity.bg_cols_to_act_cols[Ik_bg]
+      Jk = a.sparsity.bg_cols_to_act_cols[Jk_bg]
       dsd2sd[k] = Ik+(Jk-1)*nrows
     end
   end

@@ -25,8 +25,7 @@ function TProductFESpace(
   T,order = reffe_args
 
   model = get_background_model(trian)
-  cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
-  space = OrderedFESpace(model.model,cell_reffe;kwargs...)
+  space = OrderedFESpace(model.model,reffe;kwargs...)
   cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
   spaces_1d = univariate_spaces(model,cell_reffes_1d;kwargs...)
 
@@ -47,8 +46,7 @@ function TProductFESpace(
   T,order = reffe_args
 
   model = get_background_model(tptrian)
-  cell_reffe = ReferenceFE(model.model,basis,T,order;reffe_kwargs...)
-  space = OrderedFESpace(trian,cell_reffe;kwargs...)
+  space = OrderedFESpace(trian,reffe;kwargs...)
   cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
   spaces_1d = univariate_spaces(model,cell_reffes_1d;kwargs...)
 

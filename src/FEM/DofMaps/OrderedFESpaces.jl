@@ -66,18 +66,23 @@ end
 function OrderedFESpace(trian::Triangulation,args...;kwargs...)
   act_model = get_active_model(trian)
   bg_model = get_background_model(trian)
-  OrderedFESpace(act_model,bg_model,args...;kwargs...)
+  OrderedFESpace(act_model,bg_model,trian,args...;kwargs...)
 end
 
 function OrderedFESpace(
   act_model::DiscreteModel,
   bg_model::CartesianDiscreteModel,
+  act_trian::Triangulation,
   args...;kwargs...)
 
-  act_f = CartesianFESpace(act_model,args...;kwargs...)
+  act_f = CartesianFESpace(act_model,args...;trian=act_trian,kwargs...)
   bg_f = CartesianFESpace(bg_model,args...;kwargs...)
-  act_dofs = _get_bg_dof_to_act_dof(bg_f,act_f)
+  act_dofs = _get_bg_odof_to_act_odof(bg_f,act_f)
   CartesianFESpace(act_f.space,act_f.ordered_cell_dofs_ids,act_dofs)
+end
+
+function OrderedFESpace(::DiscreteModel,args...;kwargs...)
+  @notimplemented "Background model must be cartesian for the selected dof reordering"
 end
 
 function OrderedFESpace(::DiscreteModel,::DiscreteModel,args...;kwargs...)
@@ -92,7 +97,7 @@ end
 
 function CartesianFESpace(f::SingleFieldFESpace)
   ordered_cell_dofs_ids = get_ordered_cell_dof_ids(f)
-  bg_dofs_to_act_dofs = get_bg_dof_to_act_dof(f)
+  bg_dofs_to_act_dofs = _get_bg_odof_to_act_odof(f,ordered_cell_dofs_ids)
   CartesianFESpace(f,ordered_cell_dofs_ids,bg_dofs_to_act_dofs)
 end
 
@@ -115,7 +120,7 @@ get_bg_dof_to_act_dof(f::CartesianFESpace) = f.bg_dofs_to_act_dofs
 get_act_dof_to_bg_dof(f::CartesianFESpace) = findall(!iszero,f.bg_dofs_to_act_dofs)
 
 function get_sparsity(f::CartesianFESpace,g::CartesianFESpace,args...)
-  sparsity = get_sparsity(get_fe_space(f),get_fe_space(g),args...)
+  sparsity = SparsityPattern(f,g,args...)
   CartesianSparsity(sparsity,get_bg_dof_to_act_dof(f),get_bg_dof_to_act_dof(g))
 end
 
@@ -142,12 +147,7 @@ function get_ordered_cell_dof_ids(space::SingleFieldFESpace)
 end
 
 function get_ordered_cell_dof_ids(model::DiscreteModel,args...)
-  parent = _get_parent_model(model)
-  try parent = _get_parent_model(model)
-    get_ordered_cell_dof_ids(parent,args...)
-  catch
-    @notimplemented "Background model must be cartesian the selected dof reordering"
-  end
+  @notimplemented "Background model must be cartesian the selected dof reordering"
 end
 
 function get_ordered_cell_dof_ids(
@@ -312,7 +312,7 @@ for f in (:_get_bg_cell_to_mask,:_get_bg_cell_to_act_cell)
   @eval begin
     function $f(f::SingleFieldFESpace)
       trian = get_triangulation(f)
-      model = get_background_model(trian)
+      model = get_active_model(trian)
       grid = get_grid(model)
       $f(grid)
     end
@@ -344,7 +344,8 @@ function _get_bg_cell_to_act_cell(grid::GridPortion)
   grid.cell_to_parent_cell
 end
 
-function _get_bg_dof_to_act_dof(bg_f::CartesianFESpace,act_f::CartesianFESpace)
+function _get_bg_odof_to_act_odof(bg_f::CartesianFESpace,act_f::CartesianFESpace)
+  bg_dof_to_bg_dof_to_act_dof = get_bg_dof_to_act_dof(bg_f) # potential underlying constraints
   bg_dof_to_act_dof = zeros(Int,num_free_dofs(bg_f))
   bg_cell_ids = get_cell_dof_ids(bg_f)
   act_cell_ids = get_cell_dof_ids(act_f)
@@ -355,17 +356,29 @@ function _get_bg_dof_to_act_dof(bg_f::CartesianFESpace,act_f::CartesianFESpace)
     bg_dofs = getindex!(bg_cache,bg_cell_ids,bg_cell)
     act_dofs = getindex!(act_cache,act_cell_ids,act_cell)
     for (bg_dof,act_dof) in zip(bg_dofs,act_dofs)
-      bg_dof_to_act_dof[bg_dof] = act_dof
-    end
-  end
-  # add potential underlying constraints
-  bg_dof_to_bg_dof_to_act_dof = get_bg_dof_to_act_dof(bg_f)
-  for bg_dof in 1:length(bg_dof_to_act_dof)
-    if iszero(bg_dof_to_bg_dof_to_act_dof[bg_dof])
-      bg_dof_to_act_dof[bg_dof] = 0
+      if bg_dof > 0
+        if !iszero(bg_dof_to_bg_dof_to_act_dof[bg_dof])
+          bg_dof_to_act_dof[bg_dof] = act_dof
+        end
+      end
     end
   end
   return bg_dof_to_act_dof
+end
+
+function _get_bg_odof_to_act_odof(
+  bg_f::SingleFieldFESpace,
+  cell_odofs_ids::LazyArray{<:Fill{<:DofsToODofs}})
+
+  bg_dofs_to_act_dofs = get_bg_dof_to_act_dof(bg_f)
+  bg_odof_to_act_odof = collect(1:length(bg_dofs_to_act_dofs))
+  k = testitem(cell_odofs_ids.maps)
+  for act_dof in bg_dofs_to_act_dofs
+    if iszero(act_dof)
+      bg_odof_to_act_odof[get_odof(k,act_dof)] = 0
+    end
+  end
+  return bg_odof_to_act_odof
 end
 
 _get_parent_model(model::DiscreteModel) = @abstractmethod
