@@ -4,7 +4,7 @@ abstract type OrderedFESpace{S} <: SingleFieldFESpace end
 
 FESpaces.get_fe_space(f::OrderedFESpace) = @abstractmethod
 
-get_ordered_dof_ids(f::OrderedFESpace) = @abstractmethod
+get_cell_odof_ids(f::OrderedFESpace) = @abstractmethod
 
 FESpaces.ConstraintStyle(::Type{<:OrderedFESpace{S}}) where S = ConstraintStyle(S)
 
@@ -14,7 +14,7 @@ FESpaces.get_triangulation(f::OrderedFESpace) = get_triangulation(get_fe_space(f
 
 FESpaces.get_dof_value_type(f::OrderedFESpace) = get_dof_value_type(get_fe_space(f))
 
-FESpaces.get_cell_dof_ids(f::OrderedFESpace) = get_ordered_dof_ids(f)
+FESpaces.get_cell_dof_ids(f::OrderedFESpace) = get_cell_odof_ids(f)
 
 FESpaces.get_fe_basis(f::OrderedFESpace) = get_fe_basis(get_fe_space(f))
 
@@ -78,7 +78,7 @@ function OrderedFESpace(
   act_f = CartesianFESpace(act_model,args...;trian=act_trian,kwargs...)
   bg_f = CartesianFESpace(bg_model,args...;kwargs...)
   act_dofs = _get_bg_odof_to_act_odof(bg_f,act_f)
-  CartesianFESpace(act_f.space,act_f.ordered_cell_dofs_ids,act_dofs)
+  CartesianFESpace(act_f.space,act_f.cell_odofs_ids,act_dofs)
 end
 
 function OrderedFESpace(::DiscreteModel,args...;kwargs...)
@@ -91,14 +91,13 @@ end
 
 struct CartesianFESpace{S<:SingleFieldFESpace} <: OrderedFESpace{S}
   space::S
-  ordered_cell_dofs_ids::AbstractArray
-  bg_dofs_to_act_dofs::AbstractVector
+  cell_odofs_ids::AbstractArray
+  bg_odofs_to_act_odofs::AbstractVector
 end
 
 function CartesianFESpace(f::SingleFieldFESpace)
-  ordered_cell_dofs_ids = get_ordered_cell_dof_ids(f)
-  bg_dofs_to_act_dofs = _get_bg_odof_to_act_odof(f,ordered_cell_dofs_ids)
-  CartesianFESpace(f,ordered_cell_dofs_ids,bg_dofs_to_act_dofs)
+  cell_odofs_ids,bg_odofs_to_act_odofs = _get_cell_odof_info(f)
+  CartesianFESpace(f,cell_odofs_ids,bg_odofs_to_act_odofs)
 end
 
 function CartesianFESpace(model::DiscreteModel,args...;kwargs...)
@@ -112,12 +111,12 @@ end
 
 FESpaces.get_fe_space(f::CartesianFESpace) = f.space
 
-get_ordered_dof_ids(f::CartesianFESpace) = f.ordered_cell_dofs_ids
+get_cell_odof_ids(f::CartesianFESpace) = f.cell_odofs_ids
 
-get_bg_dof_to_act_dof(f::CartesianFESpace) = f.bg_dofs_to_act_dofs
+get_bg_dof_to_act_dof(f::CartesianFESpace) = f.bg_odofs_to_act_odofs
 
 # this works because the dofs are sorted lexicographically
-get_act_dof_to_bg_dof(f::CartesianFESpace) = findall(!iszero,f.bg_dofs_to_act_dofs)
+get_act_dof_to_bg_dof(f::CartesianFESpace) = findall(!iszero,f.bg_odofs_to_act_odofs)
 
 function get_sparsity(f::CartesianFESpace,g::CartesianFESpace,args...)
   sparsity = SparsityPattern(f,g,args...)
@@ -136,24 +135,33 @@ end
 
 # dof reordering
 
-function get_ordered_cell_dof_ids(space::SingleFieldFESpace)
-  cell_dofs_ids = get_cell_dof_ids(space)
-  fe_dof_basis = get_data(get_fe_dof_basis(space))
-  orders = get_polynomial_orders(space)
-  cell_to_parent_cell = _get_bg_cell_to_act_cell(space)
-  trian = get_triangulation(space)
-  model = get_background_model(trian)
-  get_ordered_cell_dof_ids(model,cell_dofs_ids,fe_dof_basis,cell_to_parent_cell,orders)
+function get_cell_odof_ids(space::SingleFieldFESpace)
+  cell_odof_ids, = _get_cell_odof_info(space)
+  return cell_odof_ids
 end
 
-function get_ordered_cell_dof_ids(model::DiscreteModel,args...)
+# utils
+
+function _get_cell_odof_info(space::SingleFieldFESpace)
+  bg_dof_to_mask = get_bg_dof_to_mask(space)
+  cell_dofs_ids = get_cell_dof_ids(space)
+  cell_to_parent_cell = _get_bg_cell_to_act_cell(space)
+  fe_dof_basis = get_data(get_fe_dof_basis(space))
+  orders = get_polynomial_orders(space)
+  trian = get_triangulation(space)
+  model = get_background_model(trian)
+  _get_cell_odof_info(model,fe_dof_basis,bg_dof_to_mask,cell_dofs_ids,cell_to_parent_cell,orders)
+end
+
+function _get_cell_odof_info(model::DiscreteModel,args...)
   @notimplemented "Background model must be cartesian the selected dof reordering"
 end
 
-function get_ordered_cell_dof_ids(
+function _get_cell_odof_info(
   model::CartesianDiscreteModel,
-  cell_dofs_ids::AbstractArray,
   fe_dof_basis::AbstractArray,
+  bg_dof_to_mask::AbstractVector,
+  cell_dofs_ids::AbstractArray,
   cell_to_parent_cell::AbstractVector,
   orders::Tuple)
 
@@ -164,33 +172,24 @@ function get_ordered_cell_dof_ids(
   pcells = view(cells,cell_to_parent_cell)
   onodes = LinearIndices(orders .* ncells .+ 1 .- periodic)
 
-  node_and_comps_to_odof = get_ordered_dof_ids(cell_dofs_ids,fe_dof_basis,pcells,onodes,orders)
-  k = DofsToODofs(fe_dof_basis,node_and_comps_to_odof,orders)
-  lazy_map(k,pcells)
+  node_and_comps_to_odof,bg_odofs_to_act_odofs = _get_odof_maps(
+    fe_dof_basis,bg_dof_to_mask,cell_dofs_ids,pcells,onodes,orders)
+  cell_odof_ids = lazy_map(DofsToODofs(fe_dof_basis,node_and_comps_to_odof,orders),pcells)
+  return cell_odof_ids,bg_odofs_to_act_odofs
 end
 
-# utils
-
-cubic_polytope(::Val{d}) where d = @abstractmethod
-cubic_polytope(::Val{1}) = SEGMENT
-cubic_polytope(::Val{2}) = QUAD
-cubic_polytope(::Val{3}) = HEX
-
-function get_ordered_dof_ids(args...)
+function _get_odof_maps(fe_basis::AbstractVector{<:Dof},args...)
   @notimplemented "This function is only implemented for Lagrangian dof bases"
 end
 
-function get_ordered_dof_ids(
-  cell_dofs_ids::AbstractArray,
-  fe_dof_basis::Fill{<:LagrangianDofBasis},
-  args...)
-
-  get_ordered_dof_ids(cell_dofs_ids,testitem(fe_dof_basis),args...)
+function _get_odof_maps(fe_dof_basis::Fill{<:LagrangianDofBasis},args...)
+  _get_odof_maps(testitem(fe_dof_basis),args...)
 end
 
-function get_ordered_dof_ids(
-  cell_dofs_ids::AbstractArray,
+function _get_odof_maps(
   fe_dof_basis::LagrangianDofBasis{P,V},
+  bg_dof_to_mask::AbstractVector,
+  cell_dofs_ids::AbstractArray,
   cells::AbstractVector{CartesianIndex{D}},
   onodes::LinearIndices{D},
   orders::NTuple{D,Int}
@@ -202,7 +201,8 @@ function get_ordered_dof_ids(
   nnodes = length(onodes)
   ncomps = num_components(V)
   ndofs = nnodes*ncomps
-  vec_odofs = zeros(eltype(V),ndofs)
+  odofs = zeros(eltype(V),ndofs)
+  bg_odofs_to_act_odofs = collect(1:ndofs)
   for (icell,cell) in enumerate(cells)
     first_new_node = orders .* (Tuple(cell) .- 1) .+ 1
     onodes_range = map(enumerate(first_new_node)) do (i,ni)
@@ -217,32 +217,26 @@ function get_ordered_dof_ids(
       for comp in 1:ncomps
         dof = cell_dofs[comp_to_dof[comp]]
         odof = onode + (comp-1)*nnodes
-        vec_odofs[odof] = sign(dof)
+        bg_dof_to_mask[dof] && (bg_odofs_to_act_odofs[odof] = 0)
+        odofs[odof] = sign(dof)
       end
     end
   end
 
   nfree = 0
   ndiri = 0
-  for (i,odof) in enumerate(vec_odofs)
+  for (i,odof) in enumerate(odofs)
     if odof > 0
       nfree += 1
-      vec_odofs[i] = nfree
+      odofs[i] = nfree
     else
       ndiri -= 1
-      vec_odofs[i] = ndiri
+      odofs[i] = ndiri
     end
   end
 
-  _get_node_and_comps_to_odof(fe_dof_basis,vec_odofs,onodes)
-end
-
-function get_ordered_dof_ids(
-  cell_dofs_ids::AbstractArray,
-  fe_basis::AbstractVector{<:Dof},
-  args...)
-
-  @notimplemented "This function is only implemented for Lagrangian dof bases"
+  node_and_comps_to_odof = _get_node_and_comps_to_odof(fe_dof_basis,odofs,onodes)
+  return node_and_comps_to_odof,bg_odofs_to_act_odofs
 end
 
 function _get_node_and_comps_to_odof(
@@ -273,6 +267,11 @@ function _get_node_and_comps_to_odof(
   end
   return odofs
 end
+
+cubic_polytope(::Val{d}) where d = @abstractmethod
+cubic_polytope(::Val{1}) = SEGMENT
+cubic_polytope(::Val{2}) = QUAD
+cubic_polytope(::Val{3}) = HEX
 
 function _local_pdof_to_dof(fe_dof_basis::AbstractVector{<:Dof},args...)
   @notimplemented "This function is only implemented for Lagrangian dof bases"
@@ -373,9 +372,9 @@ function _get_bg_odof_to_act_odof(
   bg_dofs_to_act_dofs = get_bg_dof_to_act_dof(bg_f)
   bg_odof_to_act_odof = collect(1:length(bg_dofs_to_act_dofs))
   k = testitem(cell_odofs_ids.maps)
-  for act_dof in bg_dofs_to_act_dofs
+  for (bg_dof,act_dof) in enumerate(bg_dofs_to_act_dofs)
     if iszero(act_dof)
-      bg_odof_to_act_odof[get_odof(k,act_dof)] = 0
+      bg_odof_to_act_odof[get_odof(k,bg_dof)] = 0
     end
   end
   return bg_odof_to_act_odof
@@ -385,3 +384,45 @@ _get_parent_model(model::DiscreteModel) = @abstractmethod
 _get_parent_model(model::MappedDiscreteModel) = model.model
 _get_parent_model(model::DiscreteModelPortion) = model.parent_model
 _get_parent_model(model::CartesianDiscreteModel) = model
+
+function _constrained_dofs_locations(bg_space::SingleFieldFESpace)
+  Int[],Int[]
+end
+
+function _constrained_dofs_locations(act_space::FESpaceWithLinearConstraints)
+  bg_space = act_space.space
+  _constrained_dofs_locations(bg_space,act_space)
+end
+
+function _constrained_dofs_locations(act_space::FESpaceWithConstantFixed)
+  bg_space = f.space
+  _constrained_dofs_locations(bg_space,act_space)
+end
+
+function _constrained_dofs_locations(act_space::ZeroMeanFESpace)
+  _constrained_dofs_locations(act_space.space)
+end
+
+function _constrained_dofs_locations(fs::SingleFieldFESpace,cs::SingleFieldFESpace)
+  @check ConstraintStyle(fs) == UnConstrained()
+
+  fcellids = get_cell_dof_ids(fs)
+  ccellids = get_cell_dof_ids(cs)
+  fcache = array_cache(fcellids)
+  ccache = array_cache(ccellids)
+  cells = Int[]
+  ldofs = Int[]
+
+  for cell = 1:length(fcache)
+    fdofs = getindex(fcache,fcellids,cell)
+    cdofs = getindex(ccache,ccellids,cell)
+    for (i,(fdof,cdof)) in enumerate(zip(fdofs,cdofs))
+      if fdof > 0 && cdof < 0
+        push!(cells,cell)
+        push!(ldofs,i)
+      end
+    end
+  end
+
+  return cells,ldofs
+end

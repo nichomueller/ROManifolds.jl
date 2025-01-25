@@ -116,7 +116,7 @@ f_act = TProductFESpace(Ωact,Ωbg,reffe;conformity=:H1)
 smap = get_sparse_dof_map(f,f)
 smap_act = get_sparse_dof_map(f_act,f_act)
 
-M = assemble_matrix(form,f.space,f.space)
+M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
 norm(M) ≈ norm(smarray)
@@ -130,8 +130,10 @@ f_act = TProductFESpace(Ωact,Ωbg,reffe;conformity=:H1)
 smap = get_sparse_dof_map(f,f)
 smap_act = get_sparse_dof_map(f_act,f_act)
 
-M = assemble_matrix(form,f.space,f.space)
+M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
+
+norm(M) ≈ norm(smarray)
 
 # test 3
 
@@ -213,22 +215,39 @@ cols_1d = _index_to_d_indices(J_node,cols_no_comps)
 _row_col_pair_to_nz_index!(cache,rows_1d,cols_1d,d_to_nz_pairs)
 
 #
-bg_f = f.space.space
-act_cell_ids = get_cell_dof_ids(f)
-bg_dof_to_bg_dof_to_act_dof = DofMaps.get_bg_dof_to_act_dof(bg_f) # potential underlying constraints
-bg_dof_to_act_dof = zeros(Int,num_free_dofs(bg_f))
-bg_cell_ids = get_cell_dof_ids(bg_f)
-bg_cache = array_cache(bg_cell_ids)
-act_cache = array_cache(act_cell_ids)
-act_to_bg_cell = 1:length(bg_cell_ids)
-for (act_cell,bg_cell) in enumerate(act_to_bg_cell)
-  bg_dofs = getindex!(bg_cache,bg_cell_ids,bg_cell)
-  act_dofs = getindex!(act_cache,act_cell_ids,act_cell)
-  for (bg_dof,act_dof) in zip(bg_dofs,act_dofs)
-    if bg_dof > 0
-      if !iszero(bg_dof_to_bg_dof_to_act_dof[bg_dof])
-        bg_dof_to_act_dof[bg_dof] = act_dof
-      end
+cell_odofs_ids = get_cell_dof_ids(f_act)
+bg_f = f_act.space.space
+bg_dofs_to_act_dofs = DofMaps.get_bg_dof_to_act_dof(bg_f)
+bg_odof_to_act_odof = collect(1:length(bg_dofs_to_act_dofs))
+k = testitem(cell_odofs_ids.maps)
+for (bg_dof,act_dof) in enumerate(bg_dofs_to_act_dofs)
+  if iszero(act_dof)
+    bg_odof_to_act_odof[get_odof(k,bg_dof)] = 0
+  end
+end
+
+for cell in 1:100
+  k = cell_odofs_ids.maps[cell]
+  bg_dofs = getindex!(bg_cache,bg_cell_ids,cell)
+  act_dofs = getindex!(act_cache,act_cell_ids,cell)
+  for (i,(bg_dof,act_dof)) in enumerate(zip(bg_dofs,act_dofs))
+    if bg_mask[bg_dof]
+
+      bg_odof_to_act_odof[k.pdof_to_dof[i]] = 0
     end
+  end
+  # act_dofs = getindex!(act_cache,act_cell_ids,cell)
+end
+
+using Gridap.Fields
+
+function _find_constraint_cell_and_ldof(cellids,dof_mask)
+  # cellmasks = lazy_map(Broadcasting(PosNegReindex(fv,dv)),cellids)
+  cells = Vector{Int}(undef,length(dof_mask))
+  ldofs = Vector{Int}(undef,length(dof_mask))
+  cache = array_cache(cellids)
+  for cell in 1:length(cellids)
+    dofs = getindex!(cache,cellids,cell)
+
   end
 end
