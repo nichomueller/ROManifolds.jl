@@ -96,7 +96,8 @@ struct CartesianFESpace{S<:SingleFieldFESpace} <: OrderedFESpace{S}
 end
 
 function CartesianFESpace(f::SingleFieldFESpace)
-  cell_odofs_ids,bg_odofs_to_act_odofs = _get_cell_odof_info(f)
+  cell_odofs_ids = get_cell_odof_ids(f)
+  bg_odofs_to_act_odofs = _get_bg_odof_to_act_odof(f,cell_odofs_ids)
   CartesianFESpace(f,cell_odofs_ids,bg_odofs_to_act_odofs)
 end
 
@@ -136,22 +137,16 @@ end
 # dof reordering
 
 function get_cell_odof_ids(space::SingleFieldFESpace)
-  cell_odof_ids, = _get_cell_odof_info(space)
-  return cell_odof_ids
-end
-
-# utils
-
-function _get_cell_odof_info(space::SingleFieldFESpace)
-  bg_dof_to_mask = get_bg_dof_to_mask(space)
   cell_dofs_ids = get_cell_dof_ids(space)
   cell_to_parent_cell = _get_bg_cell_to_act_cell(space)
   fe_dof_basis = get_data(get_fe_dof_basis(space))
   orders = get_polynomial_orders(space)
   trian = get_triangulation(space)
   model = get_background_model(trian)
-  _get_cell_odof_info(model,fe_dof_basis,bg_dof_to_mask,cell_dofs_ids,cell_to_parent_cell,orders)
+  _get_cell_odof_info(model,fe_dof_basis,cell_dofs_ids,cell_to_parent_cell,orders)
 end
+
+# utils
 
 function _get_cell_odof_info(model::DiscreteModel,args...)
   @notimplemented "Background model must be cartesian the selected dof reordering"
@@ -160,7 +155,6 @@ end
 function _get_cell_odof_info(
   model::CartesianDiscreteModel,
   fe_dof_basis::AbstractArray,
-  bg_dof_to_mask::AbstractVector,
   cell_dofs_ids::AbstractArray,
   cell_to_parent_cell::AbstractVector,
   orders::Tuple)
@@ -172,10 +166,9 @@ function _get_cell_odof_info(
   pcells = view(cells,cell_to_parent_cell)
   onodes = LinearIndices(orders .* ncells .+ 1 .- periodic)
 
-  node_and_comps_to_odof,bg_odofs_to_act_odofs = _get_odof_maps(
-    fe_dof_basis,bg_dof_to_mask,cell_dofs_ids,pcells,onodes,orders)
+  node_and_comps_to_odof = _get_odof_maps(fe_dof_basis,cell_dofs_ids,pcells,onodes,orders)
   cell_odof_ids = lazy_map(DofsToODofs(fe_dof_basis,node_and_comps_to_odof,orders),pcells)
-  return cell_odof_ids,bg_odofs_to_act_odofs
+  return cell_odof_ids
 end
 
 function _get_odof_maps(fe_basis::AbstractVector{<:Dof},args...)
@@ -188,7 +181,6 @@ end
 
 function _get_odof_maps(
   fe_dof_basis::LagrangianDofBasis{P,V},
-  bg_dof_to_mask::AbstractVector,
   cell_dofs_ids::AbstractArray,
   cells::AbstractVector{CartesianIndex{D}},
   onodes::LinearIndices{D},
@@ -202,7 +194,6 @@ function _get_odof_maps(
   ncomps = num_components(V)
   ndofs = nnodes*ncomps
   odofs = zeros(eltype(V),ndofs)
-  bg_odofs_to_act_odofs = collect(1:ndofs)
   for (icell,cell) in enumerate(cells)
     first_new_node = orders .* (Tuple(cell) .- 1) .+ 1
     onodes_range = map(enumerate(first_new_node)) do (i,ni)
@@ -217,7 +208,6 @@ function _get_odof_maps(
       for comp in 1:ncomps
         dof = cell_dofs[comp_to_dof[comp]]
         odof = onode + (comp-1)*nnodes
-        bg_dof_to_mask[dof] && (bg_odofs_to_act_odofs[odof] = 0)
         odofs[odof] = sign(dof)
       end
     end
@@ -236,7 +226,7 @@ function _get_odof_maps(
   end
 
   node_and_comps_to_odof = _get_node_and_comps_to_odof(fe_dof_basis,odofs,onodes)
-  return node_and_comps_to_odof,bg_odofs_to_act_odofs
+  return node_and_comps_to_odof
 end
 
 function _get_node_and_comps_to_odof(
@@ -344,8 +334,9 @@ function _get_bg_cell_to_act_cell(grid::GridPortion)
 end
 
 function _get_bg_odof_to_act_odof(bg_f::CartesianFESpace,act_f::CartesianFESpace)
-  bg_dof_to_bg_dof_to_act_dof = get_bg_dof_to_act_dof(bg_f) # potential underlying constraints
-  bg_dof_to_act_dof = zeros(Int,num_free_dofs(bg_f))
+  bg_bg_dof_to_bg_dof = get_bg_dof_to_act_dof(bg_f) # potential underlying constraints
+  bg_dof_to_bg_bg_dof = findall(!iszero,bg_bg_dof_to_bg_dof)
+  bg_bg_dof_to_act_dof = zeros(Int,length(bg_bg_dof_to_bg_dof))
   bg_cell_ids = get_cell_dof_ids(bg_f)
   act_cell_ids = get_cell_dof_ids(act_f)
   bg_cache = array_cache(bg_cell_ids)
@@ -356,27 +347,36 @@ function _get_bg_odof_to_act_odof(bg_f::CartesianFESpace,act_f::CartesianFESpace
     act_dofs = getindex!(act_cache,act_cell_ids,act_cell)
     for (bg_dof,act_dof) in zip(bg_dofs,act_dofs)
       if bg_dof > 0
-        if !iszero(bg_dof_to_bg_dof_to_act_dof[bg_dof])
-          bg_dof_to_act_dof[bg_dof] = act_dof
-        end
+        bg_bg_dof = bg_dof_to_bg_bg_dof[bg_dof]
+        bg_bg_dof_to_act_dof[bg_bg_dof] = act_dof
       end
     end
   end
-  return bg_dof_to_act_dof
+  return bg_bg_dof_to_act_dof
 end
 
-function _get_bg_odof_to_act_odof(
-  bg_f::SingleFieldFESpace,
-  cell_odofs_ids::LazyArray{<:Fill{<:DofsToODofs}})
+function _get_bg_odof_to_act_odof(f::SingleFieldFESpace,act_cellids::AbstractArray)
+  f′ = _remove_constraint(f)
+  bg_odof_to_act_odof = collect(get_free_dof_ids(f′))
+  isa(f,UnconstrainedFESpace) && return bg_odof_to_act_odof
 
-  bg_dofs_to_act_dofs = get_bg_dof_to_act_dof(bg_f)
-  bg_odof_to_act_odof = collect(1:length(bg_dofs_to_act_dofs))
-  k = testitem(cell_odofs_ids.maps)
-  for (bg_dof,act_dof) in enumerate(bg_dofs_to_act_dofs)
-    if iszero(act_dof)
-      bg_odof_to_act_odof[get_odof(k,bg_dof)] = 0
+  @check ConstraintStyle(f′) == UnConstrained()
+  bg_cellids = get_cell_odof_ids(f′)
+  act_cache = array_cache(act_cellids)
+  bg_cache = array_cache(bg_cellids)
+
+  for cell = 1:length(act_cellids)
+    act_dofs = getindex!(act_cache,act_cellids,cell)
+    bg_dofs = getindex!(bg_cache,bg_cellids,cell)
+    for (act_dof,bg_dof) in zip(act_dofs,bg_dofs)
+      if act_dof<0 && bg_dof>0
+        bg_odof_to_act_odof[bg_dof] = 0
+      elseif bg_dof>0
+        bg_odof_to_act_odof[bg_dof] = act_dof
+      end
     end
   end
+
   return bg_odof_to_act_odof
 end
 
@@ -385,44 +385,34 @@ _get_parent_model(model::MappedDiscreteModel) = model.model
 _get_parent_model(model::DiscreteModelPortion) = model.parent_model
 _get_parent_model(model::CartesianDiscreteModel) = model
 
-function _constrained_dofs_locations(bg_space::SingleFieldFESpace)
-  Int[],Int[]
-end
+_remove_constraint(f::SingleFieldFESpace) = f
+_remove_constraint(f::FESpaceWithLinearConstraints) = f.space
+_remove_constraint(f::FESpaceWithConstantFixed) = f.space
+_remove_constraint(f::ZeroMeanFESpace) = _remove_constraint(f.space)
 
-function _constrained_dofs_locations(act_space::FESpaceWithLinearConstraints)
-  bg_space = act_space.space
-  _constrained_dofs_locations(bg_space,act_space)
-end
+# function _constrained_dofs_locations(cs::SingleFieldFESpace)
+#   cells = Int[]
+#   ldofs = Int[]
+#   ConstraintStyle(cs) == UnConstrained() && return cells,ldofs
 
-function _constrained_dofs_locations(act_space::FESpaceWithConstantFixed)
-  bg_space = f.space
-  _constrained_dofs_locations(bg_space,act_space)
-end
+#   fs = _remove_constraint(cs)
+#   @check ConstraintStyle(fs) == UnConstrained()
 
-function _constrained_dofs_locations(act_space::ZeroMeanFESpace)
-  _constrained_dofs_locations(act_space.space)
-end
+#   fcellids = get_cell_dof_ids(fs)
+#   ccellids = get_cell_dof_ids(cs)
+#   fcache = array_cache(fcellids)
+#   ccache = array_cache(ccellids)
 
-function _constrained_dofs_locations(fs::SingleFieldFESpace,cs::SingleFieldFESpace)
-  @check ConstraintStyle(fs) == UnConstrained()
+#   for cell = 1:length(fcache)
+#     fdofs = getindex(fcache,fcellids,cell)
+#     cdofs = getindex(ccache,ccellids,cell)
+#     for (i,(fdof,cdof)) in enumerate(zip(fdofs,cdofs))
+#       if fdof > 0 && cdof < 0
+#         push!(cells,cell)
+#         push!(ldofs,i)
+#       end
+#     end
+#   end
 
-  fcellids = get_cell_dof_ids(fs)
-  ccellids = get_cell_dof_ids(cs)
-  fcache = array_cache(fcellids)
-  ccache = array_cache(ccellids)
-  cells = Int[]
-  ldofs = Int[]
-
-  for cell = 1:length(fcache)
-    fdofs = getindex(fcache,fcellids,cell)
-    cdofs = getindex(ccache,ccellids,cell)
-    for (i,(fdof,cdof)) in enumerate(zip(fdofs,cdofs))
-      if fdof > 0 && cdof < 0
-        push!(cells,cell)
-        push!(ldofs,i)
-      end
-    end
-  end
-
-  return cells,ldofs
-end
+#   return cells,ldofs
+# end
