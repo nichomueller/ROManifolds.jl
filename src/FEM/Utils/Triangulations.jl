@@ -70,11 +70,60 @@ end
 
 get_parent(i::LazyArray{<:Fill{<:Reindex}}) = i.maps.value.values
 
+# We use the symbol ≈ can between two grids `t` and `s` in the following
+# sense: if `t` and `s` store the same information but have a different UID, then
+# this function returns true; otherwise, it returns false
+
+function Base.:(==)(a::Geometry.CartesianCoordinates,b::Geometry.CartesianCoordinates)
+  false
+end
+
+function Base.:(==)(a::T,b::T) where T<:Geometry.CartesianCoordinates
+  (
+    a.data.origin == b.data.origin &&
+    a.data.sizes == b.data.sizes &&
+    a.data.partition == b.data.partition
+  )
+end
+
+function Base.:(==)(a::Geometry.CartesianCellNodes,b::Geometry.CartesianCellNodes)
+  a.partition == b.partition
+end
+
+function Base.:(==)(a::Table,b::Table)
+  a.data == b.data && a.ptrs == b.ptrs
+end
+
 function Base.isapprox(t::Grid,s::Grid)
   false
 end
 
-function Base.isapprox(t::T,s::T) where {T<:UnstructuredGrid}
+function Base.isapprox(t::T,s::T) where T<:Grid
+  @notimplemented "Implementation needed"
+end
+
+function Base.isapprox(t::T,s::T) where T<:Geometry.CartesianGrid
+  (
+    t.cell_node_ids == s.cell_node_ids &&
+    t.cell_type == s.cell_type &&
+    t.node_coords == s.node_coords
+  )
+end
+
+function Base.isapprox(t::T,s::T) where T<:Geometry.GridPortion
+  (
+    t.parent ≈ s.parent &&
+    t.cell_to_parent_cell == s.cell_to_parent_cell &&
+    t.node_to_parent_node == s.node_to_parent_node &&
+    t.cell_to_nodes == s.cell_to_nodes
+  )
+end
+
+function Base.isapprox(t::T,s::T) where T<:Geometry.GridView
+  t.parent ≈ s.parent && t.cell_to_parent_cell == s.cell_to_parent_cell
+end
+
+function Base.isapprox(t::T,s::T) where T<:UnstructuredGrid
   (
     t.cell_node_ids == s.cell_node_ids &&
     t.cell_types == s.cell_types &&
@@ -82,8 +131,16 @@ function Base.isapprox(t::T,s::T) where {T<:UnstructuredGrid}
   )
 end
 
-function Base.isapprox(t::T,s::T) where {T<:Geometry.GridView}
-  t.parent ≈ s.parent
+function Base.isapprox(t::T,s::T) where T<:Geometry.AppendedGrid
+  t.a ≈ s.a && t.b ≈ s.b
+end
+
+function Base.isapprox(t::T,s::T) where T<:Triangulation
+  get_grid(t) ≈ get_grid(s)
+end
+
+function isapprox_parent(tparent::Triangulation,tchild::Triangulation)
+  tparent ≈ get_parent(tchild)
 end
 
 get_tface_to_mface(t::Geometry.BodyFittedTriangulation) = t.tface_to_mface
@@ -101,34 +158,6 @@ function get_tface_to_mface(t::Geometry.CompositeTriangulation)
   rface_to_mface = get_tface_to_mface(t.rtrian)
   dface_to_rface = get_tface_to_mface(t.dtrian)
   dface_to_mface = collect(lazy_map(Reindex(rface_to_mface),dface_to_rface))
-end
-
-# We use the symbol ≈ can between two triangulations `t` and `s` in the following
-# sense: if `t` and `s` store the same information but have a different UID, then
-# this function returns true; otherwise, it returns false
-function Base.isapprox(t::T,s::S) where {T<:Triangulation,S<:Triangulation}
-  false
-end
-
-function Base.isapprox(t::T,s::T) where {T<:Triangulation}
-  get_tface_to_mface(t) == get_tface_to_mface(s) && get_grid(t) ≈ get_grid(s)
-end
-
-function Base.isapprox(t::T,s::T) where {T<:Geometry.TriangulationView}
-  get_view_indices(t) == get_view_indices(s) && get_parent(t) ≈ get_parent(s)
-end
-
-function Base.isapprox(t::T,s::T) where {T<:BoundaryTriangulation}
-  (
-    t.trian.tface_to_mface == s.trian.tface_to_mface &&
-    t.trian.grid.parent.cell_node_ids == s.trian.grid.parent.cell_node_ids &&
-    t.trian.grid.parent.cell_types == s.trian.grid.parent.cell_types &&
-    t.trian.grid.parent.node_coordinates == s.trian.grid.parent.node_coordinates
-  )
-end
-
-function isapprox_parent(tparent::Triangulation,tchild::Triangulation)
-  tparent ≈ get_parent(tchild)
 end
 
 """

@@ -46,6 +46,7 @@ export get_sparsity
 export get_background_sparsity
 export recast
 export get_d_sparse_dofs_to_full_dofs
+export get_dof_type
 include("SparsityPatterns.jl")
 
 export AbstractDofMap

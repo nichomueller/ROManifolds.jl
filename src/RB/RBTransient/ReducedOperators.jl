@@ -314,13 +314,15 @@ function Algebra.solve(
   r::TransientRealization,
   xh0::Union{Function,AbstractVector})
 
-  fe_trial = get_fe_trial(op)(r)
+  r0 = ParamDataStructures.get_at_time(r,:initial)
   x0 = get_free_dof_values(xh0(get_params(r)))
-  x = zero_free_values(fe_trial)
-  solve(solver,op,r,x,x0)
+  x = zero_free_values(get_fe_trial(op)(r))
+  x̂ = zero_free_values(get_trial(op)(r0))
+  solve!(x̂,solver,op,r,x,x0)
 end
 
-function Algebra.solve(
+function Algebra.solve!(
+  x̂::AbstractParamVector,
   solver::RBSolver,
   op::TransientRBOperator,
   r::TransientRealization,
@@ -328,9 +330,6 @@ function Algebra.solve(
   x0::AbstractParamVector)
 
   fesolver = get_fe_solver(solver)
-  trial = get_trial(op)(r)
-  x̂ = zero_free_values(trial)
-
   rbcache = allocate_rbcache(fesolver,op,r,x)
 
   t = @timed solve!(x̂,fesolver,op,r,x,x0,rbcache)

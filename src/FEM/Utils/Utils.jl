@@ -43,7 +43,6 @@ include("PartialFunctions.jl")
 export get_values
 export get_parent
 export order_domains
-export get_tface_to_mface
 include("Triangulations.jl")
 
 export Contribution

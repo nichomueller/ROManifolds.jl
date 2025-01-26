@@ -60,10 +60,12 @@ other time steps.
 """
 abstract type TransientRealization{P<:Realization,T<:Real} <: AbstractRealization end
 
+get_params(r::TransientRealization) = @abstractmethod
+_get_params(r::TransientRealization) = @abstractmethod
+get_times(r::TransientRealization) = @abstractmethod
+
 Base.length(r::TransientRealization) = num_params(r)*num_times(r)
-get_params(r::TransientRealization) = get_params(r.params)
-_get_params(r::TransientRealization) = _get_params(r.params)
-num_params(r::TransientRealization) = num_params(r.params)
+num_params(r::TransientRealization) = num_params(get_params(r))
 num_times(r::TransientRealization) = length(get_times(r))
 
 """
@@ -81,6 +83,10 @@ struct GenericTransientRealization{P,T,A} <: TransientRealization{P,T}
   t0::T
 end
 
+get_params(r::GenericTransientRealization) = get_params(r.params)
+_get_params(r::GenericTransientRealization) = _get_params(r.params)
+get_times(r::GenericTransientRealization) = r.times
+
 function TransientRealization(params::Realization,times::AbstractVector{<:Real},t0::Real)
   GenericTransientRealization(params,times,t0)
 end
@@ -93,9 +99,6 @@ function TransientRealization(params::Realization,times::AbstractVector{<:Real})
   t0,inner_times... = times
   TransientRealization(params,inner_times,t0)
 end
-
-get_initial_time(r::GenericTransientRealization) = r.t0
-get_times(r::GenericTransientRealization) = r.times
 
 function Base.getindex(r::GenericTransientRealization,i,j)
   TransientRealization(
@@ -113,6 +116,7 @@ function Base.zero(r::GenericTransientRealization)
   GenericTransientRealization(zero(get_params(r)),get_times(r),get_initial_time(r))
 end
 
+get_initial_time(r::GenericTransientRealization) = r.t0
 get_final_time(r::GenericTransientRealization) = last(get_times(r))
 get_midpoint_time(r::GenericTransientRealization) = (get_final_time(r) + get_initial_time(r)) / 2
 get_delta_time(r::GenericTransientRealization) = (get_final_time(r) - get_initial_time(r)) / num_times(r)
@@ -155,7 +159,8 @@ struct TransientRealizationAt{P,T} <: TransientRealization{P,T}
   t::Base.RefValue{T}
 end
 
-get_initial_time(r::TransientRealizationAt) = @notimplemented
+get_params(r::TransientRealizationAt) = get_params(r.params)
+_get_params(r::TransientRealizationAt) = _get_params(r.params)
 get_times(r::TransientRealizationAt) = r.t[]
 
 function Base.getindex(r::TransientRealizationAt,i,j)
@@ -345,8 +350,12 @@ struct ParamFunction{F,P} <: AbstractParamFunction{P}
   params::P
 end
 
-function ParamFunction(f::Function,p::AbstractArray)
+function ParamFunction(f::Function,p::Union{AbstractArray,TransientRealization})
   @notimplemented "Use a Realization as a parameter input"
+end
+
+function ParamFunction(f::Function,pt::TransientRealizationAt)
+  ParamFunction(f,get_params(pt))
 end
 
 get_params(f::ParamFunction) = get_params(f.params)
@@ -436,7 +445,11 @@ struct TransientParamFunction{F,P,T} <: AbstractParamFunction{P}
 end
 
 function TransientParamFunction(f::Function,p::AbstractArray,t)
-  @notimplemented "Use a Realization as a parameter input"
+  @notimplemented "Use a TransientRealization as a parameter input"
+end
+
+function TransientParamFunction(f::Function,r::Realization)
+  @notimplemented "Use a TransientRealization as a parameter input"
 end
 
 function TransientParamFunction(f::Function,r::TransientRealization)

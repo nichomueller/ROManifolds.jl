@@ -48,6 +48,8 @@ SparseArrays.findnz(a::SparsityPattern) = findnz(get_background_matrix(a))
 SparseArrays.nnz(a::SparsityPattern) = nnz(get_background_matrix(a))
 SparseArrays.nonzeros(a::SparsityPattern) = nonzeros(get_background_matrix(a))
 SparseArrays.nzrange(a::SparsityPattern,row::Integer) = nzrange(get_background_matrix(a),row)
+SparseArrays.rowvals(a::SparsityPattern) = rowvals(get_background_matrix(a))
+SparseArrays.getcolptr(a::SparsityPattern) = SparseArrays.getcolptr(get_background_matrix(a))
 Algebra.nz_index(a::SparsityPattern,row::Integer,col::Integer) = nz_index(get_background_matrix(a),row,col)
 
 function to_nz_index(i::AbstractArray,a::SparsityPattern)
@@ -126,28 +128,30 @@ univariate_findnz(a::TProductSparsity) = tuple_of_arrays(findnz.(a.sparsities_1d
 univariate_nnz(a::TProductSparsity) = Tuple(nnz.(a.sparsities_1d))
 
 function get_sparse_dof_map(a::TProductSparsity,U::FESpace,V::FESpace,args...)
-  full_ids = get_d_sparse_dofs_to_full_dofs(a)
+  Tu = get_dof_type(get_fe_dof_basis(U))
+  Tv = get_dof_type(get_fe_dof_basis(V))
+  full_ids = get_d_sparse_dofs_to_full_dofs(Tu,Tv,a)
   sparse_ids = to_nz_index(full_ids)
   SparseMatrixDofMap(sparse_ids,full_ids,a)
 end
 
 for T in (:Any,:IdentityCartesianSparsity)
   @eval begin
-    function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity{<:$T})
+    function get_d_sparse_dofs_to_full_dofs(Tu,Tv,a::TProductSparsity{<:$T})
       I,J, = findnz(a)
       nrows = num_rows(a)
       ncols = num_cols(a)
-      get_d_sparse_dofs_to_full_dofs(a,I,J,nrows,ncols)
+      get_d_sparse_dofs_to_full_dofs(Tu,Tv,a,I,J,nrows,ncols)
     end
   end
 end
 
-function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity{<:CartesianSparsity})
+function get_d_sparse_dofs_to_full_dofs(Tu,Tv,a::TProductSparsity{<:CartesianSparsity})
   I_bg,J_bg, = bg_findnz(a.sparsity)
   nrows_bg = num_bg_rows(a.sparsity)
   ncols_bg = num_bg_cols(a.sparsity)
   nrows = num_rows(a)
-  dsd2sd = get_d_sparse_dofs_to_full_dofs(a,I_bg,J_bg,nrows_bg,ncols_bg)
+  dsd2sd = get_d_sparse_dofs_to_full_dofs(Tu,Tv,a,I_bg,J_bg,nrows_bg,ncols_bg)
   for (k,sdk) in enumerate(dsd2sd)
     if sdk > 0
       Ik_bg = fast_index(sdk,nrows_bg)
@@ -160,14 +164,46 @@ function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity{<:CartesianSparsity}
   return dsd2sd
 end
 
-function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity,I,J,nrows,ncols)
+function get_d_sparse_dofs_to_full_dofs(
+  ::Type{<:Real},::Type{<:Real},a::TProductSparsity,I,J,nrows,ncols)
+  _scalar_d_sparse_dofs_to_full_dofs(a,I,J,nrows,ncols)
+end
+
+function get_d_sparse_dofs_to_full_dofs(
+  ::Type{Tu},::Type{Tv},a::TProductSparsity,I,J,nrows,ncols) where {Tu,Tv}
+  _multivalue_d_sparse_dofs_to_full_dofs(a,I,J,nrows,ncols,num_components(Tu),num_components(Tv))
+end
+
+function _scalar_d_sparse_dofs_to_full_dofs(a::TProductSparsity,I,J,nrows,ncols)
+  nnz_sizes = univariate_nnz(a)
+  rows = univariate_num_rows(a)
+  cols = univariate_num_cols(a)
+  nrows = num_rows(a)
+  ncols = num_cols(a)
+
+  i,j, = univariate_findnz(a)
+  d_to_nz_pairs = map((id,jd)->map(CartesianIndex,id,jd),i,j)
+
+  D = length(a.sparsities_1d)
+  cache = zeros(Int,D)
+  dsd2sd = zeros(Int,nnz_sizes...)
+
+  for k in eachindex(I)
+    rows_1d = _index_to_d_indices(I[k],rows)
+    cols_1d = _index_to_d_indices(J[k],cols)
+    _row_col_pair_to_nz_index!(cache,rows_1d,cols_1d,d_to_nz_pairs)
+    dsd2sd[cache...] = I[k]+(J[k]-1)*nrows
+  end
+
+  return dsd2sd
+end
+
+function _multivalue_d_sparse_dofs_to_full_dofs(a::TProductSparsity,I,J,nrows,ncols,ncomps_row,ncomps_col)
   nnz_sizes = univariate_nnz(a)
   rows_no_comps = univariate_num_rows(a)
   cols_no_comps = univariate_num_cols(a)
   nrows_no_comps = prod(rows_no_comps)
   ncols_no_comps = prod(cols_no_comps)
-  ncomps_row = Int(nrows / nrows_no_comps)
-  ncomps_col = Int(ncols / ncols_no_comps)
   ncomps = ncomps_row*ncomps_col
 
   i,j, = univariate_findnz(a)
@@ -191,6 +227,10 @@ function get_d_sparse_dofs_to_full_dofs(a::TProductSparsity,I,J,nrows,ncols)
 end
 
 # utils
+
+get_dof_type(b) = @abstractmethod
+get_dof_type(b::LagrangianDofBasis{P,V}) where {P,V} = change_eltype(V,Float64)
+get_dof_type(dof::CellDof) = get_dof_type(testitem(get_data(dof)))
 
 function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
   mat1 = nothing

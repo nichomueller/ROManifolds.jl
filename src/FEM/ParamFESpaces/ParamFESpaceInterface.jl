@@ -5,6 +5,7 @@ get_dirichlet_cells(f::FESpaceWithConstantFixed) = get_dirichlet_cells(f.space)
 get_dirichlet_cells(f::ZeroMeanFESpace) = get_dirichlet_cells(f.space)
 get_dirichlet_cells(f::TrialFESpace) = get_dirichlet_cells(f.space)
 get_dirichlet_cells(f::TProductFESpace) = get_dirichlet_cells(f.space)
+get_dirichlet_cells(f::CartesianFESpace) = get_dirichlet_cells(f.space)
 
 ParamDataStructures.param_length(f::FESpace) = 0
 

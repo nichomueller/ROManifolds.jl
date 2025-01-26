@@ -72,7 +72,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 tol = fill(1e-4,4)
 reduction = TTSVDReduction(tol,energy;nparams=50)
-rbsolver = RBSolver(fesolver,reduction;nparams_res=20,nparams_jac=20,nparams_djac=0)
+rbsolver = RBSolver(fesolver,reduction;nparams_res=20,nparams_jac=20,nparams_djac=1)
 test_dir = datadir(joinpath("heateq","test_tt_$(1e-4)"))
 create_dir(test_dir)
 
@@ -82,4 +82,10 @@ ronline = realization(feop;nparams=10,random=true)
 x̂,rbstats = solve(rbsolver,rbop,ronline,uh0μ)
 
 x,festats = solution_snapshots(rbsolver,feop,ronline,uh0μ)
-perf = eval_performance(rbsolver,rbop,x,x̂,festats,rbstats,ronline)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)
+
+# rbsnaps = RBSteady.to_snapshots(get_trial(rbop),x̂,r)
+# U = get_trial(rbop)(r)
+# # x = inv_project(U,x̂)
+# using Gridap.Algebra
+# x = allocate_in_range(U,x̂)

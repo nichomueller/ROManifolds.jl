@@ -116,6 +116,17 @@ function DofMaps.get_sparsity(U::TProductFESpace,V::TProductFESpace,args...)
 end
 
 function DofMaps.get_dof_map(V::TProductFESpace)
+  T = get_dof_type(get_fe_dof_basis(V))
+  get_tp_dof_map(T,V)
+end
+
+function get_tp_dof_map(::Type{T},V::TProductFESpace) where T
+  dof_map = get_dof_map(V.space)
+  nnodes_1d = map(num_free_dofs,V.spaces_1d)
+  reshape(dof_map,nnodes_1d...)
+end
+
+function get_tp_dof_map(::Type{T},V::TProductFESpace) where T<:MultiValue
   dof_map = get_dof_map(V.space)
   nnodes_1d = map(num_free_dofs,V.spaces_1d)
   ncomps = Int(length(dof_map)/prod(nnodes_1d))
