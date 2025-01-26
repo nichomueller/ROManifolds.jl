@@ -28,6 +28,9 @@ import PartitionedArrays: tuple_of_arrays
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 
+export get_param_assembler
+include("ParamAssemblers.jl")
+
 export SingleFieldParamFESpace
 include("ParamFESpaceInterface.jl")
 

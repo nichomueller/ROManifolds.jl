@@ -122,3 +122,11 @@ function FESpaces.interpolate_dirichlet(
   end
   MultiFieldFEFunction(free_values,fe,blocks)
 end
+
+function FESpaces.zero_free_values(f::MultiFieldParamFESpace{<:BlockMultiFieldStyle})
+  mortar(map(zero_free_values,f.spaces))
+end
+
+function FESpaces.zero_dirichlet_values(f::MultiFieldParamFESpace{<:BlockMultiFieldStyle})
+  mortar(map(zero_dirichlet_values,f.spaces))
+end

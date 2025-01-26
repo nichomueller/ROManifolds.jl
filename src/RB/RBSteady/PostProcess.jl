@@ -309,10 +309,7 @@ function eval_performance(
   r::AbstractRealization,
   args...)
 
-  Û = get_trial(rbop)(r)
-  x = inv_project(Û,x̂)
-  i = get_dof_map(fesnaps)
-  rbsnaps = Snapshots(x,i,r)
+  rbsnaps = to_snapshots(get_trial(rbop),x̂,r)
   eval_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats,args...)
 end
 
@@ -453,9 +450,6 @@ function plot_a_solution(
   x̂::AbstractParamVector,
   r::AbstractRealization)
 
-  Û = get_trial(rbop)(r)
-  x = inv_project(Û,x̂)
-  i = get_dof_map(fesnaps)
-  rbsnaps = Snapshots(x,i,r)
+  rbsnaps = to_snapshots(get_trial(rbop),x̂,r)
   plot_a_solution(dir,feop,fesnaps,rbsnaps)
 end

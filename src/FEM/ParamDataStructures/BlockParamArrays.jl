@@ -42,9 +42,6 @@ function BlockArrays._BlockArray(data::AbstractArray{<:AbstractParamArray,N},axe
   BlockParamArray(data,axes)
 end
 
-nblocks(A) = @abstractmethod
-nblocks(A::Union{BlockArrays.AbstractBlockedUnitRange,BlockArray,BlockParamArray}) = length(blocks(A))
-
 MemoryLayoutStyle(::Type{<:BlockParamArray{T,N,A}}) where {T,N,A} = MemoryLayoutStyle(eltype(A))
 
 param_length(A::BlockParamArray) = param_length(first(blocks(A)))

@@ -61,7 +61,7 @@ test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["diri0","diri1
 trial_u = ParamTrialFESpace(test_u,[gμ0,gμ])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 test_p = TestFESpace(model,reffe_p;conformity=:C0)
-trial_p = TrialFESpace(test_p)
+trial_p = ParamTrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 feop_lin = LinearParamFEOperator(res_lin,jac_lin,pspace,trial,test,domains)

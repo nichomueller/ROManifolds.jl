@@ -69,7 +69,7 @@ test_u = TestFESpace(model,reffe_u;conformity=:H1,
 trial_u = ParamTrialFESpace(test_u,[gμ_in,gμ_in,gμ_0])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 test_p = TestFESpace(model,reffe_p;conformity=:H1)
-trial_p = TrialFESpace(test_p)
+trial_p = ParamTrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 

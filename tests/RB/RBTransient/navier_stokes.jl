@@ -13,7 +13,7 @@ using ROM
 θ = 1.0
 dt = 0.0025
 t0 = 0.0
-tf = 60*dt
+tf = 10*dt
 
 pranges = fill([1.0,10.0],3)
 tdomain = t0:dt:tf
@@ -77,7 +77,7 @@ test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet","d
 trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_0])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 test_p = TestFESpace(model,reffe_p;conformity=:H1)
-trial_p = TrialFESpace(test_p)
+trial_p = TransientTrialParamFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 

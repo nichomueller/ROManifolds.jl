@@ -478,7 +478,7 @@ function ParamSteady.allocate_systemcache(
     iszero(w) && continue
     jac = jacs[k]
     trian_jac = trian_jacs[k]
-    dc = w * jac(μ,t,uh,du,v)
+    dc = w * jac(μ,t,uh0,du,v)
     Ak = contribution(trian_jac) do trian
       matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
       assemble_matrix(assem,matdata)

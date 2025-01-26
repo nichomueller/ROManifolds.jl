@@ -102,13 +102,20 @@ function TransientParamFEOperator(
 end
 
 function TransientParamFEOperator(
-  res::Function,jacs::Tuple{Vararg{Function}},tpspace,trial,test,domains)
+  res::Function,jacs::Tuple{Vararg{Function}},tpspace,trial,test,domains::FEDomains)
 
   order = length(jacs) - 1
   res′,jacs′ = _set_domains(res,jacs,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
   TransientParamFEOpFromWeakForm{SplitDomains}(
     res′,jacs′,tpspace,assem,trial,test,domains,order)
+end
+
+function TransientParamFEOperator(
+  res::Function,jacs::Tuple{Vararg{Function}},tpspace,trial,test,trians...)
+
+  domains = FEDomains(trians...)
+  TransientParamFEOperator(res,jacs,tpspace,trial,test,domains)
 end
 
 function TransientParamFEOperator(
@@ -210,7 +217,7 @@ end
 const SplitTransientParamLinearFEOpFromWeakForm = TransientParamLinearFEOpFromWeakForm{SplitDomains}
 
 function TransientParamLinearFEOperator(
-  forms::Tuple{Vararg{Function}},res::Function,tpspace,trial,test,domains;
+  forms::Tuple{Vararg{Function}},res::Function,tpspace,trial,test,domains::FEDomains;
   constant_forms::Tuple{Vararg{Bool}}=ntuple(_ -> false,length(forms)))
 
   order = length(forms) - 1
@@ -222,9 +229,16 @@ function TransientParamLinearFEOperator(
 end
 
 function TransientParamLinearFEOperator(
+  forms::Tuple{Vararg{Function}},res::Function,tpspace,trial,test,trians...;kwargs...)
+
+  domains = FEDomains(trians...)
+  TransientParamLinearFEOperator(forms,res,tpspace,trial,test,domains;kwargs...)
+end
+
+function TransientParamLinearFEOperator(
   mass::Function,res::Function,tpspace,trial,test,args...;kwargs...)
 
-  TransientParamLinearFEOperator((mass,),res,tpspace,trial,test;kwargs)
+  TransientParamLinearFEOperator((mass,),res,tpspace,trial,test,args...;kwargs...)
 end
 
 function TransientParamLinearFEOperator(

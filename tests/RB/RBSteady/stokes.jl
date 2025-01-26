@@ -50,7 +50,7 @@ test_u = TestFESpace(model,reffe_u;conformity=:H1,
 trial_u = ParamTrialFESpace(test_u,[gμ_0,gμ_in,gμ_in])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 test_p = TestFESpace(model,reffe_p;conformity=:C0)
-trial_p = TrialFESpace(test_p)
+trial_p = ParamTrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,domains)

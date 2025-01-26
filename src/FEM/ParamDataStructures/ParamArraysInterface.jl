@@ -138,6 +138,21 @@ end
 
 function LinearAlgebra.mul!(
   C::AbstractParamArray,
+  A::AbstractVecOrMat,
+  B::AbstractParamArray,
+  α::Number,β::Number)
+
+  @check param_length(C) == param_length(B)
+  @inbounds for i in param_eachindex(C)
+    ci = param_getindex(C,i)
+    bi = param_getindex(B,i)
+    mul!(ci,A,bi,α,β)
+  end
+  return C
+end
+
+function LinearAlgebra.mul!(
+  C::AbstractParamArray,
   A::AbstractParamArray,
   B::AbstractParamArray,
   α::Number,β::Number)

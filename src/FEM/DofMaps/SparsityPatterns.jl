@@ -10,7 +10,7 @@ Subtypes:
 """
 abstract type SparsityPattern end
 
-function get_sparsity(U::FESpace,V::FESpace,trian=_get_common_domain(U,V))
+function get_sparsity(U::FESpace,V::FESpace,ttrian=_get_common_domain(U,V))
   strian = _get_common_domain(U,V)
   sparsity = SparsityPattern(U,V,strian)
   if !(strian ≈ ttrian)
@@ -54,9 +54,14 @@ function to_nz_index(i::AbstractArray,a::SparsityPattern)
   to_nz_index(i,get_background_matrix(i))
 end
 
-function get_sparse_dof_map(a::SparsityPattern,U::FESpace,V::FESpace)
+function get_sparse_dof_map(a::SparsityPattern,U::FESpace,V::FESpace,args...)
   TrivialSparseMatrixDofMap(a)
 end
+
+recast(v::AbstractVector,A::AbstractSparseMatrix) = @abstractmethod
+recast(v::AbstractVector,A::SparseMatrixCSC) = SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,v)
+recast(v::AbstractVector,A::SparseMatrixCSR{Bi}) where Bi = SparseMatrixCSR{Bi}(A.m,A.n,A.rowptr,A.colval,v)
+recast(A::AbstractArray,a::SparsityPattern) = recast(A,get_background_matrix(a))
 
 """
     struct SparsityCSC{Tv,Ti} <: SparsityPattern

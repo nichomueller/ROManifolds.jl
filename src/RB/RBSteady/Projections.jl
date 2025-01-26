@@ -89,13 +89,23 @@ function Algebra.allocate_in_range(a::Projection,x̂::V) where V<:AbstractVector
   return x
 end
 
+function Algebra.allocate_in_domain(a::Projection,X::M) where M<:AbstractMatrix
+  X̂ = zeros(eltype(M),num_reduced_dofs(a),size(X,2))
+  return X̂
+end
+
+function Algebra.allocate_in_range(a::Projection,X̂::M) where M<:AbstractMatrix
+  X = allocate_vector(V,num_fe_dofs(a),size(X̂,2))
+  return X
+end
+
 function Algebra.allocate_in_domain(a::Projection,x::V) where V<:AbstractParamVector
   x̂ = allocate_vector(eltype(V),num_reduced_dofs(a))
   return consecutive_param_array(x̂,param_length(x))
 end
 
 function Algebra.allocate_in_range(a::Projection,x̂::V) where V<:AbstractParamVector
-  x̂ = allocate_vector(eltype(V),num_fe_dofs(a))
+  x = allocate_vector(eltype(V),num_fe_dofs(a))
   return consecutive_param_array(x,param_length(x̂))
 end
 
@@ -197,11 +207,9 @@ end
 
 Base.adjoint(a::Projection) = InvProjection(a)
 
-get_basis(a::InvProjection) = get_basis(a)
-num_fe_dofs(a::InvProjection) = num_fe_dofs(a)
-num_reduced_dofs(a::InvProjection) = num_reduced_dofs(a)
-project!(x::AbstractArray,a::InvProjection,x̂::AbstractArray) = inv_project!(x,a.projection,x̂)
-inv_project!(x̂::AbstractArray,a::InvProjection,x::AbstractArray) = project!(x̂,a.projection,x)
+get_basis(a::InvProjection) = adjoint(get_basis(a.projection))
+num_fe_dofs(a::InvProjection) = num_reduced_dofs(a.projection)
+num_reduced_dofs(a::InvProjection) = num_fe_dofs(a.projection)
 
 """
     abstract type ReducedProjection{A<:AbstractArray} <: Projection end
@@ -592,6 +600,9 @@ function Base.setindex!(a::BlockProjection,v,i...)
   a.array[i...] = v
 end
 
+Base.getindex(a::BlockProjection,i::Block) = getindex(a,i.n...)
+Base.setindex!(a::BlockProjection,v,i::Block) = setindex!(a,v,i.n...)
+
 function num_fe_dofs(a::BlockProjection)
   dofs = zeros(Int,length(a))
   for i in eachindex(a)
@@ -615,13 +626,9 @@ end
 for f in (:(Algebra.allocate_in_domain),:(Algebra.allocate_in_range))
   @eval begin
     function $f(a::BlockProjection,x::Union{BlockVector,BlockParamVector})
-      @check size(a) == nblocks(x)
+      @check length(a) == blocklength(x)
       @notimplementedif !all(a.touched)
-      y = Vector{eltype(x)}(undef,nblocks(a))
-      for i in eachindex(a)
-        y[Block(i)] = $f(a[i],x[Block(i)])
-      end
-      return mortar(y)
+      mortar(map(i -> $f(a[Block(i)],x[Block(i)]),eachindex(a)))
     end
   end
 end

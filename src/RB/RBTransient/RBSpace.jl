@@ -10,12 +10,9 @@ end
 
 const TransientSingleFieldParamRBSpace = SingleFieldParamRBSpace{<:TransientProjection}
 
-function num_time_dofs(r::TransientSingleFieldParamRBSpace)
-  num_reduced_dofs(get_projection_time(get_reduced_subspace(r)))
-end
-
 function ParamDataStructures.param_length(r::TransientSingleFieldParamRBSpace)
-  nt = num_time_dofs(r)
+  ptime = get_projection_time(get_reduced_subspace(r))
+  nt = num_fe_dofs(ptime)
   npt = param_length(get_fe_space(r))
   Int(npt / nt)
 end

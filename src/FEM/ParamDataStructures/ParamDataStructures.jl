@@ -48,7 +48,6 @@ export shift!
 include("ParamSpace.jl")
 
 export AbstractParamContainer
-export PType
 export ParamContainer
 export ParamNumber
 export get_param_data
@@ -107,7 +106,6 @@ export BlockParamVector
 export BlockParamMatrix
 export BlockConsecutiveParamVector
 export BlockConsecutiveParamMatrix
-export nblocks
 include("BlockParamArrays.jl")
 
 export ParamVectorWithEntryRemoved

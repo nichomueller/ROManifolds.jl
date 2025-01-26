@@ -44,21 +44,21 @@ function Arrays.return_cache(k::AddEntriesMap,A,vs::AbstractParamMatrix{T},is,js
   zeros(T,param_length(vs))
 end
 
-# function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::AbstractParamVector{T},is) where T
-#   add_entries!(cache,k.combine,A,vs,is)
-# end
+function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::AbstractParamVector{T},is) where T
+  add_entries!(cache,k.combine,A,vs,is)
+end
 
-# function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::AbstractParamMatrix{T},is,js) where T
-#   add_entries!(cache,k.combine,A,vs,is,js)
-# end
+function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::AbstractParamMatrix{T},is,js) where T
+  add_entries!(cache,k.combine,A,vs,is,js)
+end
 
-# @inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamVector,is)
-#   Algebra._add_entries!(cache,combine,A,vs,is)
-# end
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamVector,is)
+  Algebra._add_entries!(cache,combine,A,vs,is)
+end
 
-# @inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamMatrix,is,js)
-#   Algebra._add_entries!(cache,combine,A,vs,is,js)
-# end
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamMatrix,is,js)
+  Algebra._add_entries!(cache,combine,A,vs,is,js)
+end
 
 @inline function Algebra._add_entries!(
   vij,combine::Function,A,vs::AbstractParamMatrix,is,js)
@@ -193,35 +193,34 @@ end
   A
 end
 
+"""
+    struct ParamBuilder{A} <: GridapType
+      builder::A
+      plength::Int
+    end
+"""
 struct ParamBuilder{A} <: GridapType
   builder::A
   plength::Int
 end
 
 ParamDataStructures.param_length(b::ParamBuilder) = b.plength
+
 Algebra.get_array_type(b::ParamBuilder) = Algebra.get_array_type(b.builder)
 
-# sparse functionalities
-
-function Algebra.allocate_coo_vectors(::PType{T,L},n::Integer) where {Tv,Ti,T<:ParamSparseMatrix{Tv,Ti},L}
-  I = zeros(Ti,n)
-  J = zeros(Ti,n)
-  V = zeros(Tv,n)
-  PV = consecutive_param_array(V,L)
-  I,J,PV
-end
-
-@inline function Algebra.push_coo!(::PType{<:ParamSparseMatrix},I,J,V,i,j,v)
-  @notimplemented "Cannot push to ParamArray"
+function Algebra.nz_counter(b::ParamBuilder,axes)
+  counter = nz_counter(b.builder,axes)
+  ParamCounter(counter,b.plength)
 end
 
 """
-    ParamCounter{C}
-
-Extends the concept of a `counter` in `Gridap` to accommodate a parametric setting.
+    struct ParamCounter{A}
+      counter::C
+      plength::Int
+    end
 """
-struct ParamCounter{C}
-  counter::C
+struct ParamCounter{A}
+  counter::A
   plength::Int
 end
 
@@ -233,41 +232,13 @@ Algebra.LoopStyle(::Type{<:ParamCounter{C}}) where C = LoopStyle(C)
   add_entry!(+,a.counter,v,i,j)
 end
 
-function Algebra.nz_counter(builder::SparseMatrixBuilder{<:PType{T,L}},axes) where {T,L}
-  Tv = eltype(T)
-  counter = nz_counter(SparseMatrixBuilder(Tv),axes)
-  ParamCounter(counter,L)
+@inline function Algebra.add_entry!(::typeof(+),a::ParamCounter,v,i)
+  add_entry!(+,a.counter,v,i)
 end
 
-function Algebra.nz_allocation(a::Algebra.ArrayCounter{<:PType{T,L}}) where {T,L}
-  Tv = eltype(T)
-  v = similar(Tv,map(length,a.axes))
-  fill!(v,zero(eltype(v)))
-  consecutive_param_array(v,L)
-end
-
-# csc
-
-function Algebra.sparse_from_coo(::PType{<:ParamSparseMatrixCSC},I,J,V,m,n)
-  sparse(I,J,V,m,n)
-end
-
-@inline function Algebra.is_entry_stored(::PType{<:ParamSparseMatrixCSC},i,j)
-  true
-end
-
-function Algebra.finalize_coo!(::PType{<:ParamSparseMatrixCSC},I,J,V,m,n)
-  nothing
-end
-
-Base.@propagate_inbounds function Algebra.nz_index(A::ParamSparseMatrixCSC,i0::Integer,i1::Integer)
-  if !(1 <= i0 <= innersize(A,1) && 1 <= i1 <= innersize(A,2)); throw(BoundsError()); end
-  ptrs = SparseArrays.getcolptr(A)
-  r1 = Int(ptrs[i1])
-  r2 = Int(ptrs[i1+1]-1)
-  (r1 > r2) && return -1
-  r1 = searchsortedfirst(rowvals(A),i0,r1,r2,Base.Order.Forward)
-  ((r1 > r2) || (rowvals(A)[r1] != i0)) ? -1 : r1
+function Algebra.nz_allocation(a::ParamCounter{<:Algebra.ArrayCounter})
+  v = nz_allocation(a.counter)
+  consecutive_param_array(v,a.plength)
 end
 
 # alternative implementation
@@ -418,3 +389,15 @@ function Algebra.create_from_nz(a::ParamInserterCSC)
 end
 
 # csr/coo: implentation needed
+
+# utils
+
+Base.@propagate_inbounds function Algebra.nz_index(A::ParamSparseMatrixCSC,i0::Integer,i1::Integer)
+  if !(1 <= i0 <= innersize(A,1) && 1 <= i1 <= innersize(A,2)); throw(BoundsError()); end
+  ptrs = SparseArrays.getcolptr(A)
+  r1 = Int(ptrs[i1])
+  r2 = Int(ptrs[i1+1]-1)
+  (r1 > r2) && return -1
+  r1 = searchsortedfirst(rowvals(A),i0,r1,r2,Base.Order.Forward)
+  ((r1 > r2) || (rowvals(A)[r1] != i0)) ? -1 : r1
+end

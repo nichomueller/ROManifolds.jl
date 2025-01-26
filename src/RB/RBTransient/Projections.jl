@@ -78,27 +78,41 @@ function RBSteady.inv_project!(x::AbstractVector,a::TransientProjection,x̂::Abs
 end
 
 function RBSteady.project!(x̂::ConsecutiveParamVector,a::TransientProjection,x::ConsecutiveParamVector)
-  nt = num_reduced_dofs(a.projection_time)
+  nt = num_fe_dofs(a.projection_time)
   @check Int(param_length(x) / param_length(x̂)) == nt
   np = param_length(x̂)
   @inbounds for ip in eachindex(x̂)
     ipt = ip:np:np*nt
-    xpt = vec(x.data[:,ipt])
+    xpt = vec(view(x.data,:,ipt))
     x̂p = x̂[ip]
     project!(x̂p,a,xpt)
   end
 end
 
 function RBSteady.inv_project!(x::AbstractParamVector,a::TransientProjection,x̂::AbstractParamVector)
-  nt = num_time_dofs(r)
+  nt = num_fe_dofs(a.projection_time)
   @check Int(param_length(x) / param_length(x̂)) == nt
   np = param_length(x̂)
   @inbounds for ip in eachindex(x̂)
     ipt = ip:np:np*nt
-    xpt = vec(x.data[:,ipt])
+    xpt = vec(view(x.data,:,ipt))
     x̂p = x̂[ip]
     inv_project!(xpt,a,x̂p)
   end
+end
+
+function Algebra.allocate_in_domain(a::TransientProjection,x::V) where V<:AbstractParamVector
+  x̂ = allocate_vector(eltype(V),num_reduced_dofs(a))
+  nt = num_fe_dofs(a.projection_time)
+  np = Int(param_length(x) / nt)
+  return consecutive_param_array(x̂,np)
+end
+
+function Algebra.allocate_in_range(a::TransientProjection,x̂::V) where V<:AbstractParamVector
+  x = allocate_vector(eltype(V),num_fe_dofs(a.projection_space))
+  nt = num_fe_dofs(a.projection_time)
+  npt = param_length(x̂) * nt
+  return consecutive_param_array(x,npt)
 end
 
 function RBSteady.galerkin_projection(

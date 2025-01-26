@@ -130,7 +130,6 @@ export SingleFieldParamRBSpace
 export reduced_subspace
 export reduced_spaces
 export reduced_basis
-export get_fe_space
 export get_reduced_subspace
 include("RBSpace.jl")
 

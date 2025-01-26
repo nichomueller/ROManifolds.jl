@@ -70,7 +70,7 @@ test_u = TestFESpace(Ωₕ,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet","d
 trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_0])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 test_p = TestFESpace(Ωₕ,reffe_p;conformity=:H1)
-trial_p = TrialFESpace(test_p)
+trial_p = TransientTrialParamFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 ```

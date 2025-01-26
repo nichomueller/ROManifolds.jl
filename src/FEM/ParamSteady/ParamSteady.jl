@@ -32,6 +32,7 @@ import UnPack: @unpack
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ReferenceFEs: get_order
+import ROM.ParamReferenceFEs: get_dof_type
 import ROM.Utils: CostTracker
 
 export UnEvalTrialFESpace

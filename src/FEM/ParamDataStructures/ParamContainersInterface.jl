@@ -92,9 +92,6 @@ function to_param_quantity(a::AbstractParamContainer,plength::Integer)
   return a
 end
 
-Base.eltype(::PType{T,L}) where {T,L} = eltype(T)
-param_length(::PType{T,L}) where {T,L} = L
-
 """
     struct ParamContainer{T,A<:AbstractVector{T}} <: AbstractParamContainer{T,1}
       data::A

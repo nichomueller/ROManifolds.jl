@@ -85,6 +85,9 @@ CellData.get_domains(op::ParamFEOperator) = @abstractmethod
 get_domains_res(op::ParamFEOperator) = get_domains_res(get_domains(op))
 get_domains_jac(op::ParamFEOperator) = get_domains_jac(get_domains(op))
 
+DofMaps.get_dof_map(op::ParamFEOperator) = get_dof_map(get_trial(op))
+DofMaps.get_sparse_dof_map(op::ParamFEOperator) = get_sparse_dof_map(get_trial(op),get_test(op))
+
 """
     get_dof_map_at_domains(op::ParamFEOperator) -> Contribution
 
@@ -184,8 +187,15 @@ function ParamFEOperator(res::Function,jac::Function,pspace,trial,test)
     res,jac,pspace,assem,trial,test,domains)
 end
 
+function ParamFEOperator(res::Function,jac::Function,pspace,trial,test,domains::FEDomains)
+  res′,jac′ = _set_domains(res,jac,test,trial,domains)
+  assem = SparseMatrixAssembler(trial,test)
+  ParamFEOpFromWeakForm{NonlinearParamEq,SplitDomains}(
+    res′,jac′,pspace,assem,trial,test,domains)
+end
+
 """
-  LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test
+  LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test,args...
     ) -> ParamFEOperator{LinearParamEq,TriangulationStyle}
 
 Returns a linear parametric FE operator
@@ -198,19 +208,21 @@ function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test)
     res,jac′,pspace,assem,trial,test,domains)
 end
 
-function ParamFEOperator(res::Function,jac::Function,pspace,trial,test,domains)
-  res′,jac′ = _set_domains(res,jac,test,trial,domains)
-  assem = SparseMatrixAssembler(trial,test)
-  ParamFEOpFromWeakForm{NonlinearParamEq,SplitDomains}(
-    res′,jac′,pspace,assem,trial,test,domains)
-end
-
-function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test,domains)
+function LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test,domains::FEDomains)
   jac′(μ,u,du,v,args...) = jac(μ,du,v,args...)
   res′,jac′′ = _set_domains(res,jac′,test,trial,domains)
   assem = SparseMatrixAssembler(trial,test)
   ParamFEOpFromWeakForm{LinearParamEq,SplitDomains}(
     res′,jac′′,pspace,assem,trial,test,domains)
+end
+
+for f in (:ParamFEOperator,:LinearParamFEOperator)
+  @eval begin
+    function $f(res::Function,jac::Function,pspace,trial,test,trians...)
+      domains = FEDomains(trians...)
+      $f(res,jac,pspace,trial,test,domains)
+    end
+  end
 end
 
 FESpaces.get_test(op::ParamFEOpFromWeakForm) = op.test

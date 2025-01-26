@@ -25,13 +25,11 @@ import ArraysOfArrays: innersize
 import PartitionedArrays: tuple_of_arrays
 import ROM.DofMaps: OIdsToIds, add_ordered_entries!
 
+export ParamBuilder
 export ParamCounter
 export ParamInserterCSC
 export eltype2
 include("ParamAlgebraInterfaces.jl")
-
-export get_param_assembler
-include("ParamAssemblers.jl")
 
 include("ParamSolvers.jl")
 
