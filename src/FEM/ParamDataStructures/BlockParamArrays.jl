@@ -1,7 +1,7 @@
 ParamArray(A::AbstractArray{<:AbstractParamArray};kwargs...) = mortar(A)
 
 function param_array(a::BlockArray,l::Integer;kwargs...)
-  mortar(b -> param_array(b,l;kwargs...),blocks(a))
+  mortar(map(b -> param_array(b,l;kwargs...),blocks(a)))
 end
 
 """

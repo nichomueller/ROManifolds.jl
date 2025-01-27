@@ -78,6 +78,25 @@ get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(get_fe_spa
 
 # These functions allow us to use global ParamArrays
 
+get_underlying_vector_type(f::FESpace) = @abstractmethod
+get_underlying_vector_type(f::SingleFieldParamFESpace) = get_vector_type(get_fe_space(f))
+
+function param_zero_free_values(f::FESpace)
+  V = get_underlying_vector_type(f)
+  L = param_length(f)
+  v = allocate_vector(V,get_free_dof_ids(f))
+  pv = consecutive_param_array(v,L)
+  return pv
+end
+
+function param_zero_dirichlet_values(f::FESpace)
+  V = get_underlying_vector_type(f)
+  L = param_length(f)
+  v = allocate_vector(V,get_dirichlet_dof_ids(f))
+  pv = consecutive_param_array(v,L)
+  return pv
+end
+
 function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   V = get_vector_type(get_fe_space(f))
   L = param_length(f)
@@ -86,15 +105,11 @@ function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
 end
 
 function FESpaces.zero_free_values(f::SingleFieldParamFESpace)
-  fv = zero_free_values(get_fe_space(f))
-  L = param_length(f)
-  consecutive_param_array(fv,L)
+  param_zero_free_values(f)
 end
 
 function FESpaces.zero_dirichlet_values(f::SingleFieldParamFESpace)
-  fv = zero_dirichlet_values(get_fe_space(f))
-  L = param_length(f)
-  consecutive_param_array(fv,L)
+  param_zero_dirichlet_values(f)
 end
 
 function FESpaces.FEFunction(

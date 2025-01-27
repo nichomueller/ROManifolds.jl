@@ -32,6 +32,9 @@ export get_param_assembler
 include("ParamAssemblers.jl")
 
 export SingleFieldParamFESpace
+export get_underlying_vector_type
+export param_zero_free_values
+export param_zero_dirichlet_values
 include("ParamFESpaceInterface.jl")
 
 export MultiFieldParamFESpace

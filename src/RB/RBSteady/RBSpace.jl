@@ -93,11 +93,17 @@ num_reduced_dofs(r::RBSpace) = num_reduced_dofs(get_reduced_subspace(r))
 
 FESpaces.num_free_dofs(r::RBSpace) = num_reduced_dofs(r)
 
+FESpaces.num_dirichlet_dofs(r::RBSpace) = num_dirichlet_dofs(get_fe_space(r))
+
 FESpaces.get_free_dof_ids(r::RBSpace) = Base.OneTo(num_free_dofs(r))
+
+FESpaces.get_dirichlet_dof_ids(r::RBSpace) = Base.OneTo(num_dirichlet_dofs(r))
 
 FESpaces.get_vector_type(r::RBSpace) = get_vector_type(get_fe_space(r))
 
 ParamDataStructures.param_length(r::RBSpace) = param_length(get_fe_space(r))
+
+ParamFESpaces.get_underlying_vector_type(r::RBSpace) = get_underlying_vector_type(get_fe_space(r))
 
 for (f,f!,g) in zip(
   (:project,:inv_project),
@@ -203,18 +209,6 @@ get_reduced_subspace(r::EvalRBSpace) = get_reduced_subspace(r.space)
 
 ParamDataStructures.param_length(r::EvalRBSpace) = num_params(r.realization)
 
-for T in (:SingleFieldRBSpace,:(EvalRBSpace{SingleFieldRBSpace}))
-  @eval begin
-    function FESpaces.zero_free_values(r::$T)
-      PV = get_vector_type(r)
-      V = eltype(PV)
-      fv = allocate_vector(V,get_free_dof_ids(r))
-      L = param_length(r)
-      consecutive_param_array(fv,L)
-    end
-  end
-end
-
 for T in (:MultiFieldRBSpace,:(EvalRBSpace{MultiFieldRBSpace}))
   @eval begin
     function Base.getindex(r::$T,i::Integer)
@@ -249,15 +243,11 @@ for T in (:MultiFieldRBSpace,:(EvalRBSpace{MultiFieldRBSpace}))
       block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
       return BlockArrays.blockedrange(block_num_dofs)
     end
-
-    function FESpaces.zero_free_values(r::$T)
-      mortar(map(zero_free_values,r))
-    end
-
-    function FESpaces.zero_dirichlet_values(r::$T)
-      mortar(map(zero_dirichlet_values,r))
-    end
   end
+end
+
+function FESpaces.zero_free_values(r::EvalRBSpace)
+  param_zero_free_values(r)
 end
 
 # utils

@@ -130,3 +130,9 @@ end
 function FESpaces.zero_dirichlet_values(f::MultiFieldParamFESpace{<:BlockMultiFieldStyle})
   mortar(map(zero_dirichlet_values,f.spaces))
 end
+
+function get_underlying_vector_type(f::MultiFieldParamFESpace{<:BlockMultiFieldStyle})
+  V = get_vector_type(f)
+  T = eltype2(V)
+  BlockVector{T,Vector{Vector{T}}}
+end
