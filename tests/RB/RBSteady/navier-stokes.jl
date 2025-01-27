@@ -76,7 +76,7 @@ rbsolver = RBSolver(fesolver,state_reduction;nparams_res=10,nparams_jac=10)
 
 fesnaps,festats = solution_snapshots(rbsolver,feop)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-μon = realization(feop;nparams=10,random=true)
+μon = realization(feop;nparams=10,sampling=:uniform)
 x̂,rbstats = solve(rbsolver,rbop,μon)
 
 x,festats = solution_snapshots(rbsolver,feop,μon)

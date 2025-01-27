@@ -78,7 +78,7 @@ create_dir(test_dir)
 
 fesnaps,festats = solution_snapshots(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-ronline = realization(feop;nparams=10,random=true)
+ronline = realization(feop;nparams=10,sampling=:uniform)
 x̂,rbstats = solve(rbsolver,rbop,ronline,uh0μ)
 
 x,festats = solution_snapshots(rbsolver,feop,ronline,uh0μ)

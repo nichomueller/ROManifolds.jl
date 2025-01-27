@@ -193,13 +193,34 @@ abstract type SamplingStyle end
 """
 struct UniformSampling <: SamplingStyle end
 
+function generate_param(::UniformSampling,param_domain)
+  [rand(Uniform(first(d),last(d))) for d = param_domain]
+end
+
 """
 """
 struct NormalSampling <: SamplingStyle end
 
+function generate_param(::NormalSampling,param_domain)
+  [rand(Uniform(first(d),last(d))) for d = param_domain]
+end
+
 """
 """
 struct HaltonSampling <: SamplingStyle end
+
+function _generate_params(::HaltonSampling,param_domain,nparams;start=1,kwargs...)
+  d = length(param_domain)
+  hs = HaltonPoint(d;length=nparams,start=start)
+  hs′ = collect(hs)
+  for x in hs′
+    for (di,xdi) in enumerate(x)
+      a,b = param_domain[di]
+      x[di] = a + (b-a)*xdi
+    end
+  end
+  return hs′
+end
 
 """
     struct ParamSpace{P<:AbstractVector{<:AbstractVector},S<:SamplingStyle} <: AbstractSet{Realization}
@@ -217,7 +238,7 @@ struct ParamSpace{P<:AbstractVector{<:AbstractVector},S<:SamplingStyle} <: Abstr
   sampling_style::S
 end
 
-dimension(p::ParamSpace) = length(p.param_domain)
+get_sampling_style(p::ParamSpace) = p.sampling_style
 
 function ParamSpace(param_domain::AbstractVector{<:AbstractVector})
   sampling_style = HaltonSampling()
@@ -239,40 +260,32 @@ function Base.show(io::IO,::MIME"text/plain",p::ParamSpace)
   println(io,msg)
 end
 
-function _generate_param(p::ParamSpace{P,UniformSampling} where P)
-  [rand(Uniform(first(d),last(d))) for d = p.param_domain]
+function _generate_params(sampling::SamplingStyle,param_domain,nparams;kwargs...)
+  [generate_param(sampling,param_domain;kwargs...) for i = 1:nparams]
 end
 
-function _generate_param(p::ParamSpace{P,NormalSampling} where P)
-  [rand(Normal(first(d),last(d))) for d = p.param_domain]
-end
-
-"""
-    realization(p::ParamSpace;nparams=1,random=false,kwargs...) -> Realization
-    realization(p::TransientParamSpace;nparams=1,random=false,kwargs...) -> TransientRealization
-
-Extraction of a set of `nparams` parameters from a given parametric space
-according to the sampling strategy specified in `p`. However, if the keyword
-`random` is set to true, the sampling strategy is set to `UniformSampling`
-"""
-function realization(p::ParamSpace{P,S} where {P,S};nparams=1,kwargs...)
-  Realization([_generate_param(p) for i = 1:nparams])
-end
-
-function realization(
-  p::ParamSpace{P,HaltonSampling} where P;
-  nparams=1,
-  start=1,
-  random=false,
-  kwargs...)
-
-  if random
-    p′ = ParamSpace(p.param_domain,UniformSampling())
-    realization(p′;nparams)
+function _generate_params(sampling::Symbol,args...;kwargs...)
+  if sampling == :uniform
+    _generate_params(UniformSampling(),args...;kwargs...)
+  elseif sampling == :normal
+    _generate_params(NormalSampling(),args...;kwargs...)
+  elseif sampling == :halton
+    _generate_params(HaltonSampling(),args...;kwargs...)
   else
-    hs = shifted_halton(p;length=nparams,start=start)
-    Realization(hs)
+    @notimplemented "Need to implement more sampling strategies"
   end
+end
+
+"""
+    realization(p::ParamSpace;nparams=1,sampling=get_sampling_style(p),kwargs...) -> Realization
+    realization(p::TransientParamSpace;nparams=1,sampling=get_sampling_style(p),kwargs...) -> TransientRealization
+
+Extraction of a set of `nparams` parameters from a given parametric space, by
+default according to the sampling strategy specified in `p`.
+"""
+function realization(p::ParamSpace;nparams=1,sampling=get_sampling_style(p),kwargs...)
+  params = _generate_params(sampling,p.param_domain,nparams;kwargs...)
+  Realization(params)
 end
 
 """
@@ -534,19 +547,3 @@ Arrays.evaluate!(cache,f::AbstractParamFunction,x) = pteval(f,x)
 Arrays.evaluate!(cache,f::AbstractParamFunction,x::CellPoint) = CellField(f,get_triangulation(x))(x)
 
 (f::AbstractParamFunction)(x) = evaluate(f,x)
-
-# Halton utils
-
-function shifted_halton(p::ParamSpace;kwargs...)
-  domain = p.param_domain
-  d = dimension(p)
-  hs = HaltonPoint(d;kwargs...)
-  hs′ = collect(hs)
-  for x in hs′
-    for (di,xdi) in enumerate(x)
-      a,b = domain[di]
-      x[di] = a + (b-a)*xdi
-    end
-  end
-  return hs′
-end

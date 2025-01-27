@@ -314,10 +314,9 @@ function Algebra.solve(
   r::TransientRealization,
   xh0::Union{Function,AbstractVector})
 
-  r0 = ParamDataStructures.get_at_time(r,:initial)
   x0 = get_free_dof_values(xh0(get_params(r)))
   x = zero_free_values(get_fe_trial(op)(r))
-  x̂ = zero_free_values(get_trial(op)(r0))
+  x̂ = zero_free_values(get_trial(op)(r))
   solve!(x̂,solver,op,r,x,x0)
 end
 

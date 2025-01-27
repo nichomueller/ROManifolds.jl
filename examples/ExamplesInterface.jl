@@ -187,7 +187,7 @@ function run_test(
 
   fesnaps = try_loading_fe_snapshots(dir,rbsolver,feop,args...)
 
-  μon = realization(feop;nparams,random=true)
+  μon = realization(feop;nparams,sampling=:uniform)
   x,festats = solution_snapshots(rbsolver,feop,μon,args...)
 
   perfs = ROMPerformance[]

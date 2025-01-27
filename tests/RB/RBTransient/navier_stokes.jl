@@ -126,7 +126,7 @@ fesnaps,festats = solution_snapshots(rbsolver,feop,xh0μ)
 save(test_dir,fesnaps)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 save(test_dir,rbop)
-r = realization(feop;nparams=10,random=true)
+r = realization(feop;nparams=10,sampling=:uniform)
 x̂,rbstats = solve(rbsolver,rbop,r,xh0μ)
 
 x,festats = solution_snapshots(rbsolver,feop,r,xh0μ)
