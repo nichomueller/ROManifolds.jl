@@ -68,8 +68,8 @@ function join_operators(
   trial = get_trial(op_lin)
   test = get_test(op_lin)
 
-  res(μ,u,v) = op_lin.res(μ,u,v) + op_nlin.res(μ,u,v)
-  jac(μ,u,du,v) = op_lin.jac(μ,u,du,v) + op_nlin.jac(μ,u,du,v)
+  res(μ,u,v) = get_res(op_lin)(μ,u,v) + get_res(op_nlin)(μ,u,v)
+  jac(μ,u,du,v) = get_jac(op_lin)(μ,u,du,v) + get_jac(op_nlin)(μ,u,du,v)
   ParamFEOperator(res,jac,op_lin.pspace,trial,test)
 end
 

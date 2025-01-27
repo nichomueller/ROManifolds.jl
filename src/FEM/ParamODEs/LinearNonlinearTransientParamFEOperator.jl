@@ -65,7 +65,7 @@ function ParamSteady.join_operators(
   test = get_test(op_lin)
   order = max(get_order(op_lin),get_order(op_nlin))
 
-  res(μ,t,u,v) = op_lin.res(μ,t,u,v) + op_nlin.res(μ,t,u,v)
+  res(μ,t,u,v) = get_res(op_lin)(μ,t,u,v) + get_res(op_nlin)(μ,t,u,v)
 
   order_lin = get_order(op_lin)
   order_nlin = get_order(op_nlin)
@@ -74,11 +74,11 @@ function ParamSteady.join_operators(
   for i = 1:order+1
     function jac_i(μ,t,u,du,v)
       if i <= order_lin+1 && i <= order_nlin+1
-        op_lin.jacs[i](μ,t,u,du,v) + op_nlin.jacs[i](μ,t,u,du,v)
+        get_jacs(op_lin)[i](μ,t,u,du,v) + get_jacs(op_nlin)[i](μ,t,u,du,v)
       elseif i <= order_lin+1
-        op_lin.jacs[i](μ,t,u,du,v)
+        get_jacs(op_lin)[i](μ,t,u,du,v)
       else i <= order_nlin+1
-        op_nlin.jacs[i](μ,t,u,du,v)
+        get_jacs(op_nlin)[i](μ,t,u,du,v)
       end
     end
     jacs = (jacs...,jac_i)

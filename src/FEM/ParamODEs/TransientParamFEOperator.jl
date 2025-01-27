@@ -257,7 +257,7 @@ end
 FESpaces.get_test(op::TransientParamLinearFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamLinearFEOpFromWeakForm) = op.trial
 Polynomials.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
-ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
+ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = (μ,t,u,v,args...) -> op.res(μ,t,v,args...)
 ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem
 ODEs.is_form_constant(op::TransientParamLinearFEOpFromWeakForm,k::Integer) = op.constant_forms[k]
@@ -281,7 +281,7 @@ for f in (:(ParamSteady.set_domains),:(ParamSteady.change_domains))
     function $f(op::SplitTransientParamLinearFEOpFromWeakForm,trian_res,trian_jacs)
       trian_res′ = order_domains(get_domains_res(op),trian_res)
       trian_jacs′ = map(order_domains,get_domains_jac(op),trian_jacs)
-      res′,jacs′ = _set_domains(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
+      res′,jacs′ = _set_linear_domains(op.res,op.jacs,op.test,op.trial,trian_res′,trian_jacs′)
       domains′ = FEDomains(trian_res′,trian_jacs′)
       TransientParamLinearFEOpFromWeakForm{$T}(
         res′,jacs′,op.constant_forms,op.tpspace,op.assem,op.trial,op.test,domains′,op.order)
@@ -296,9 +296,9 @@ function _set_domain_jac(
 
   degree = 2*order
   meas = Measure.(trian,degree)
-  newjac(μ,t,u,du,v,args...) = jac(μ,t,u,du,v,args...)
-  newjac(μ,t,u,du,v) = newjac(μ,t,u,du,v,meas...)
-  return newjac
+  jac′(μ,t,u,du,v,args...) = jac(μ,t,u,du,v,args...)
+  jac′(μ,t,u,du,v) = jac′(μ,t,u,du,v,meas...)
+  return jac′
 end
 
 function _set_domain_jacs(
@@ -306,48 +306,65 @@ function _set_domain_jacs(
   trians::Tuple{Vararg{Tuple{Vararg{Triangulation}}}},
   order)
 
-  newjacs = ()
+  jacs′ = ()
   for (jac,trian) in zip(jacs,trians)
-    newjacs = (newjacs...,_set_domain_jac(jac,trian,order))
+    jacs′ = (jacs′...,_set_domain_jac(jac,trian,order))
   end
-  return newjacs
+  return jacs′
 end
 
-function _set_domain_form(
+function _set_domain_res(
   res::Function,
   trian::Tuple{Vararg{Triangulation}},
   order)
 
   degree = 2*order
   meas = Measure.(trian,degree)
-  newres(μ,t,u,v,args...) = res(μ,t,u,v,args...)
-  newres(μ,t,u,v) = newres(μ,t,u,v,meas...)
-  return newres
+  res′(μ,t,u,v,args...) = res(μ,t,u,v,args...)
+  res′(μ,t,u,v) = res′(μ,t,u,v,meas...)
+  return res′
 end
 
-function _set_domains(
+function _set_linear_domain_res(
   res::Function,
-  jacs::Tuple{Vararg{Function}},
-  test::FESpace,
-  trial::FESpace,
-  trian_res::Tuple{Vararg{Triangulation}},
-  trian_jacs::Tuple{Vararg{Tuple{Vararg{Triangulation}}}})
+  trian::Tuple{Vararg{Triangulation}},
+  order)
 
-  polyn_order = get_polynomial_order(test)
-  @check polyn_order == get_polynomial_order(trial)
-  res′ = _set_domain_form(res,trian_res,polyn_order)
-  jacs′ = _set_domain_jacs(jacs,trian_jacs,polyn_order)
-  return res′,jacs′
+  degree = 2*order
+  meas = Measure.(trian,degree)
+  res′(μ,t,v,args...) = res(μ,t,v,args...)
+  res′(μ,t,v) = res′(μ,t,v,meas...)
+  return res′
 end
 
-function _set_domains(
-  res::Function,
-  jacs::Tuple{Vararg{Function}},
-  test::FESpace,
-  trial::FESpace,
-  domains::FEDomains)
+for f in (:_set_domains,:_set_linear_domains)
+  fres = f==:_set_linear_domains ? :_set_domain_res : :_set_linear_domain_res
+  @eval begin
+    function $f(
+      res::Function,
+      jacs::Tuple{Vararg{Function}},
+      test::FESpace,
+      trial::FESpace,
+      trian_res::Tuple{Vararg{Triangulation}},
+      trian_jacs::Tuple{Vararg{Tuple{Vararg{Triangulation}}}})
 
-  trian_res = get_domains_res(domains)
-  trian_jacs = get_domains_jac(domains)
-  _set_domains(res,jacs,test,trial,trian_res,trian_jacs)
+      polyn_order = get_polynomial_order(test)
+      @check polyn_order == get_polynomial_order(trial)
+      res′ = $fres(res,trian_res,polyn_order)
+      jacs′ = _set_domain_jacs(jacs,trian_jacs,polyn_order)
+      return res′,jacs′
+    end
+
+    function $f(
+      res::Function,
+      jacs::Tuple{Vararg{Function}},
+      test::FESpace,
+      trial::FESpace,
+      domains::FEDomains)
+
+      trian_res = get_domains_res(domains)
+      trian_jacs = get_domains_jac(domains)
+      $f(res,jacs,test,trial,trian_res,trian_jacs)
+    end
+  end
 end

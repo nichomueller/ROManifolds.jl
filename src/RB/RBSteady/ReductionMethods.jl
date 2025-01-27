@@ -352,6 +352,10 @@ function Reduction(tolrank,args...;nparams=50,kwargs...)
   Reduction(red_style,args...;nparams)
 end
 
+function Reduction(red::Reduction,args...;kwargs...)
+  red
+end
+
 function Reduction(supr_op::Function,args...;kwargs...)
   SupremizerReduction(supr_op,args...;kwargs...)
 end
@@ -383,8 +387,8 @@ struct MDEIMReduction{A,R<:Reduction{A,EuclideanNorm}} <: AbstractMDEIMReduction
   reduction::R
 end
 
-function MDEIMReduction(red_style::ReductionStyle,args...;kwargs...)
-  reduction = Reduction(red_style,args...;kwargs...)
+function MDEIMReduction(args...;kwargs...)
+  reduction = Reduction(args...;kwargs...)
   MDEIMReduction(reduction)
 end
 
