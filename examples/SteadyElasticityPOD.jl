@@ -26,24 +26,19 @@ add_tag_from_tags!(labels,"neumann3",[26])
 λ(μ) = μ[1]*μ[2]/((1+μ[2])*(1-2*μ[2]))
 p(μ) = μ[1]/(2(1+μ[2]))
 
-σ(ε,μ) = λ(μ)*tr(ε)*one(ε) + 2*p(μ)*ε
-σ(μ) = ε -> σ(ε,μ)
+σ(μ) = ε -> λ(μ)*tr(ε)*one(ε) + 2*p(μ)*ε
 σμ(μ) = ParamFunction(σ,μ)
 
-h1(x,μ) = VectorValue(0.0,0.0,μ[3])
-h1(μ) = x -> h1(x,μ)
+h1(μ) = x -> VectorValue(0.0,0.0,μ[3])
 h1μ(μ) = ParamFunction(h1,μ)
 
-h2(x,μ) = VectorValue(0.0,μ[4],0.0)
-h2(μ) = x -> h2(x,μ)
+h2(μ) = x -> VectorValue(0.0,μ[4],0.0)
 h2μ(μ) = ParamFunction(h2,μ)
 
-h3(x,μ) = VectorValue(μ[5]*x[1],0.0,0.0)
-h3(μ) = x -> h3(x,μ)
+h3(μ) = x -> VectorValue(μ[5]*x[1],0.0,0.0)
 h3μ(μ) = ParamFunction(h3,μ)
 
-g(x,μ) = VectorValue(0.0,0.0,0.0)
-g(μ) = x -> g(x,μ)
+g(μ) = x -> VectorValue(0.0,0.0,0.0)
 gμ(μ) = ParamFunction(g,μ)
 
 order = 2

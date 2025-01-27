@@ -85,6 +85,7 @@ function param_zero_free_values(f::FESpace)
   V = get_underlying_vector_type(f)
   L = param_length(f)
   v = allocate_vector(V,get_free_dof_ids(f))
+  fill!(v,zero(eltype(V)))
   pv = consecutive_param_array(v,L)
   return pv
 end
@@ -93,6 +94,7 @@ function param_zero_dirichlet_values(f::FESpace)
   V = get_underlying_vector_type(f)
   L = param_length(f)
   v = allocate_vector(V,get_dirichlet_dof_ids(f))
+  fill!(v,zero(eltype(V)))
   pv = consecutive_param_array(v,L)
   return pv
 end

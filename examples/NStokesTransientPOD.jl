@@ -51,11 +51,9 @@ g_0(x,μ,t) = VectorValue(0.0,0.0)
 g_0(μ,t) = x->g_0(x,μ,t)
 gμt_0(μ,t) = TransientParamFunction(g_0,μ,t)
 
-u0(x,μ) = VectorValue(0.0,0.0)
-u0(μ) = x->u0(x,μ)
+u0(μ) = x -> VectorValue(0.0,0.0)
 u0μ(μ) = ParamFunction(u0,μ)
-p0(x,μ) = 0.0
-p0(μ) = x->p0(x,μ)
+p0(μ) = x -> 0.0
 p0μ(μ) = ParamFunction(p0,μ)
 
 stiffness(μ,t,(u,p),(v,q),dΩ) = ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ

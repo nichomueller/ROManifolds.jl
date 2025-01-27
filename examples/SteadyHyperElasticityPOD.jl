@@ -35,27 +35,29 @@ dE(∇du,∇u) = 0.5*( ∇du⋅F(∇u) + (∇du⋅F(∇u))' )
 C(F) = (F')⋅F
 
 # Constitutive law (Neo hookean)
-function S(∇u,μ)
-  Cinv = inv(C(F(∇u)))
-  p(μ)*(one(∇u)-Cinv) + λ(μ)*log(J(F(∇u)))*Cinv
+function S(μ)
+  function _S(∇u)
+    Cinv = inv(C(F(∇u)))
+    p(μ)*(one(∇u)-Cinv) + λ(μ)*log(J(F(∇u)))*Cinv
+  end
+  return _S
 end
-S(μ) = ∇u -> S(∇u,μ)
 Sμ(μ) = ParamFunction(S,μ)
 
-function dS(∇du,∇u,μ)
-  Cinv = inv(C(F(∇u)))
-  _dE = dE(∇du,∇u)
-  λ(μ)*(Cinv⊙_dE)*Cinv + 2*(p(μ)-λ(μ)*log(J(F(∇u))))*Cinv⋅_dE⋅(Cinv')
+function dS(μ)
+  function _dS((∇du,∇u))
+    Cinv = inv(C(F(∇u)))
+    _dE = dE(∇du,∇u)
+    λ(μ)*(Cinv⊙_dE)*Cinv + 2*(p(μ)-λ(μ)*log(J(F(∇u))))*Cinv⋅_dE⋅(Cinv')
+  end
+  return _dS
 end
-dS(μ) = (∇du,∇u) -> dS(∇du,∇u,μ)
 dSμ(μ) = ParamFunction(dS,μ)
 
-g(x,μ) = VectorValue(μ[3],0.0)
-g(μ) = x -> g(x,μ)
+g(μ) = x -> VectorValue(μ[3],0.0)
 gμ(μ) = ParamFunction(g,μ)
 
-g0(x,μ) = VectorValue(0.0,0.0)
-g0(μ) = x -> g0(x,μ)
+g0(μ) = x -> VectorValue(0.0,0.0)
 g0μ(μ) = ParamFunction(g0,μ)
 
 order = 1
@@ -68,7 +70,7 @@ dΩ = Measure(Ω,degree)
 
 res(μ,u,v,dΩ) = ∫( (dE∘(∇(v),∇(u))) ⊙ (Sμ(μ)∘∇(u)) )dΩ
 jac(μ,u,du,v,dΩ) = (
-  ∫( (dE∘(∇(v),∇(u))) ⊙ (dSμ(μ)∘(∇(du),∇(u))) )dΩ +
+  ∫( (dE∘(∇(v),∇(u))) ⊙ (dSμ(μ)∘((∇(du),∇(u)))) )dΩ +
   ∫( ∇(v) ⊙ ( (Sμ(μ)∘∇(u))⋅∇(du) ) )dΩ
   )
 

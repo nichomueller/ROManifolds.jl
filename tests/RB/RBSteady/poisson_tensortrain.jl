@@ -26,25 +26,17 @@ dΩ = Measure(Ω,degree)
 dΓn = Measure(Γn,degree)
 
 # weak formulation
-a(x,μ) = 1+exp(x[1]/sum(μ))
-a(μ) = x->a(x,μ)
+a(μ) = x -> 1+exp(x[1]/sum(μ))
 aμ(μ) = ParamFunction(a,μ)
 
-f(x,μ) = 1.
-f(μ) = x->f(x,μ)
+f(μ) = x -> 1.
 fμ(μ) = ParamFunction(f,μ)
 
-h(x,μ) = abs(cos(μ[3]))
-h(μ) = x->h(x,μ)
+h(μ) = x -> abs(cos(μ[3]))
 hμ(μ) = ParamFunction(h,μ)
 
-g(x,μ) = μ[1]*exp(-x[1]/μ[2])*abs(sin(μ[3]))
-g(μ) = x->g(x,μ)
+g(μ) = x -> μ[1]*exp(-x[1]/μ[2])*abs(sin(μ[3]))
 gμ(μ) = ParamFunction(g,μ)
-
-u0(x,μ) = 0
-u0(μ) = x->u0(x,μ)
-u0μ(μ) = ParamFunction(u0,μ)
 
 jac(μ,u,v,dΩ) = ∫(aμ(μ)*∇(v)⋅∇(u))dΩ
 rhs(μ,v,dΩ,dΓn) = ∫(fμ(μ)*v)dΩ + ∫(hμ(μ)*v)dΓn
@@ -57,7 +49,7 @@ domains = FEDomains(trian_res,trian_jac)
 energy(du,v) = ∫(∇(v)⋅∇(du))dΩ
 
 reffe = ReferenceFE(lagrangian,Float64,order)
-test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+test = TProductFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = ParamTrialFESpace(test,gμ)
 feop = LinearParamFEOperator(res,jac,pspace,trial,test,domains)
 
@@ -72,5 +64,5 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 ronline = realization(feop;nparams=10,sampling=:uniform)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 
-x,festats = solution_snapshots(rbsolver,feop,ronline,uh0μ)
-perf = eval_performance(rbsolver,rbop,x,x̂,festats,rbstats,ronline)
+x,festats = solution_snapshots(rbsolver,feop,ronline)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)

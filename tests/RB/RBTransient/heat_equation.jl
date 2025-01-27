@@ -31,24 +31,19 @@ dΩ = Measure(Ω,degree)
 dΓn = Measure(Γn,degree)
 
 # weak formulation
-a(x,μ,t) = 1+exp(-sin(t)^2*x[1]/sum(μ))
-a(μ,t) = x->a(x,μ,t)
+a(μ,t) = x -> 1+exp(-sin(t)^2*x[1]/sum(μ))
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
-f(x,μ,t) = 1.
-f(μ,t) = x->f(x,μ,t)
+f(μ,t) = x -> 1.
 fμt(μ,t) = TransientParamFunction(f,μ,t)
 
-h(x,μ,t) = abs(cos(t/μ[3]))
-h(μ,t) = x->h(x,μ,t)
+h(μ,t) = x -> abs(cos(t/μ[3]))
 hμt(μ,t) = TransientParamFunction(h,μ,t)
 
-g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
-g(μ,t) = x->g(x,μ,t)
+g(μ,t) = x -> μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
 gμt(μ,t) = TransientParamFunction(g,μ,t)
 
-u0(x,μ) = 0
-u0(μ) = x->u0(x,μ)
+u0(μ) = x -> 0.0
 u0μ(μ) = ParamFunction(u0,μ)
 
 stiffness(μ,t,u,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ

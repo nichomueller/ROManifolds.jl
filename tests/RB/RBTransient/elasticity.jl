@@ -56,28 +56,22 @@ dΓ3 = Measure(Γ3,degree)
 λ(μ) = μ[1]*μ[2]/((1+μ[2])*(1-2*μ[2]))
 p(μ) = μ[1]/(2(1+μ[2]))
 
-σ(ε,μ,t) = exp(sin(2*π*t/tf))*(λ(μ)*tr(ε)*one(ε) + 2*p(μ)*ε)
-σ(μ,t) = ε -> σ(ε,μ,t)
+σ(μ,t) = ε -> exp(sin(2*π*t/tf))*(λ(μ)*tr(ε)*one(ε) + 2*p(μ)*ε)
 σμt(μ,t) = TransientParamFunction(σ,μ,t)
 
-h1(x,μ,t) = VectorValue(0.0,0.0,μ[3]*exp(sin(2*π*t/tf)))
-h1(μ,t) = x->h1(x,μ,t)
+h1(μ,t) = x -> VectorValue(0.0,0.0,μ[3]*exp(sin(2*π*t/tf)))
 h1μt(μ,t) = TransientParamFunction(h1,μ,t)
 
-h2(x,μ,t) = VectorValue(0.0,μ[4]*exp(cos(2*π*t/tf)),0.0)
-h2(μ,t) = x->h2(x,μ,t)
+h2(μ,t) = x -> VectorValue(0.0,μ[4]*exp(cos(2*π*t/tf)),0.0)
 h2μt(μ,t) = TransientParamFunction(h2,μ,t)
 
-h3(x,μ,t) = VectorValue(μ[5]*(1+t),0.0,0.0)
-h3(μ,t) = x->h3(x,μ,t)
+h3(μ,t) = x -> VectorValue(μ[5]*(1+t),0.0,0.0)
 h3μt(μ,t) = TransientParamFunction(h3,μ,t)
 
-g(x,μ,t) = VectorValue(0.0,0.0,0.0)
-g(μ,t) = x->g(x,μ,t)
+g(μ,t) = x -> VectorValue(0.0,0.0,0.0)
 gμt(μ,t) = TransientParamFunction(g,μ,t)
 
-u0(x,μ) = VectorValue(0.0,0.0,0.0)
-u0(μ) = x->u0(x,μ)
+u0(μ) = x -> VectorValue(0.0,0.0,0.0)
 u0μ(μ) = ParamFunction(u0,μ)
 
 stiffness(μ,t,u,v,dΩ) = ∫( ε(v) ⊙ (σμt(μ,t)∘ε(u)) )*dΩ

@@ -1,25 +1,26 @@
 function ODEs.time_derivative(f::TransientParamFunction)
-  @unpack fun,params,times = f
-  function dfdt(x,μ,t)
-    z = zero(return_type(fun,x,μ,t))
-    ODEs._time_derivative(fun,x,μ,t,z)
+  function dfdt(μ,t)
+    fμt = f.fun(μ,t)
+    function dfdt_t(x)
+      T = return_type(fμt,x)
+      ODEs._time_derivative(T,f.fun,μ,t,x)
+    end
+    dfdt_t
   end
-  _dfdt(x,μ,t) = dfdt(x,μ,t)
-  _dfdt(x::VectorValue) = (μ,t) -> dfdt(x,μ,t)
-  _dfdt(μ,t) = x -> dfdt(x,μ,t)
-  _dfdt(x,r::TransientRealization) = dfdt(x,get_params(r),get_times(r))
-  _dfdt(r::TransientRealization) = x -> dfdt(x,get_params(r),get_times(r))
-  return TransientParamFunction(_dfdt,params,times)
+  TransientParamFunction(dfdt,f.params,f.times)
 end
 
-function ODEs._time_derivative(f,x,μ,t,::Any)
-  ForwardDiff.derivative(t->f(x,μ,t),t)
+function ODEs._time_derivative(T::Type{<:Real},f,μ,t,x)
+  partial(t) = f(μ,t)(x)
+  ForwardDiff.derivative(partial,t)
 end
 
-function ODEs._time_derivative(f,x,μ,t,::VectorValue)
-  VectorValue(ForwardDiff.derivative(t->get_array(f(x,μ,t)),t))
+function ODEs._time_derivative(T::Type{<:VectorValue},f,μ,t,x)
+  partial(t) = get_array(f(μ,t)(x))
+  VectorValue(ForwardDiff.derivative(partial,t))
 end
 
-function ODEs._time_derivative(f,x,μ,t,::TensorValue)
-  TensorValue(ForwardDiff.derivative(t->get_array(f(x,μ,t)),t))
+function ODEs._time_derivative(T::Type{<:TensorValue},f,μ,t,x)
+  partial(t) = get_array(f(μ,t)(x))
+  TensorValue(ForwardDiff.derivative(partial,t))
 end

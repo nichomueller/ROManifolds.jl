@@ -40,8 +40,7 @@ g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
 g(μ,t) = x->g(x,μ,t)
 gμt(μ,t) = TransientParamFunction(g,μ,t)
 
-u0(x,μ) = 0
-u0(μ) = x->u0(x,μ)
+u0(μ) = x -> 0.0
 u0μ(μ) = ParamFunction(u0,μ)
 
 order = 1

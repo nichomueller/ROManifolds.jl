@@ -34,16 +34,12 @@ function ParamTrialFESpace(space)
   dof = get_fe_dof_basis(space)
   T = get_dof_type(dof)
   function _param_zero(μ::Realization)
-    z(x,μ) = zero(T)
-    z(μ) = x -> z(x,μ)
-    zμ(μ) = ParamFunction(z,μ)
-    return zμ
+    z(μ) = x -> zero(T)
+    ParamFunction(z,μ)
   end
   function _param_zero(μ::Realization,t)
-    z(x,μ,t) = zero(T)
-    z(μ,t) = x -> z(x,μ,t)
-    zμt(μ,t) = TransientParamFunction(z,μ,t)
-    return zμt
+    z(μ,t) = x -> zero(T)
+    TransientParamFunction(z,μ,t)
   end
   UnEvalTrialFESpace(space,_param_zero)
 end

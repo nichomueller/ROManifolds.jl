@@ -28,24 +28,19 @@ degree = 2*(order)+1
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
 
-a(x,μ,t) = μ[1]*exp((sin(t)+cos(t))/sum(μ))
-a(μ,t) = x->a(x,μ,t)
+a(μ,t) = x -> μ[1]*exp((sin(t)+cos(t))/sum(μ))
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
 const W = 1.0
 inflow(μ,t) = abs(1-cos(9*π*t/(5*tf))+μ[3]*sin(μ[2]*9*π*t/(5*tf))/100)
-g_in(x,μ,t) = VectorValue(-x[2]*(W-x[2])*inflow(μ,t),0.0)
-g_in(μ,t) = x->g_in(x,μ,t)
+g_in(μ,t) = x -> VectorValue(-x[2]*(W-x[2])*inflow(μ,t),0.0)
 gμt_in(μ,t) = TransientParamFunction(g_in,μ,t)
-g_0(x,μ,t) = VectorValue(0.0,0.0)
-g_0(μ,t) = x->g_0(x,μ,t)
+g_0(μ,t) = x -> VectorValue(0.0,0.0)
 gμt_0(μ,t) = TransientParamFunction(g_0,μ,t)
 
-u0(x,μ) = VectorValue(0.0,0.0)
-u0(μ) = x->u0(x,μ)
+u0(μ) = x -> VectorValue(0.0,0.0)
 u0μ(μ) = ParamFunction(u0,μ)
-p0(x,μ) = 0.0
-p0(μ) = x->p0(x,μ)
+p0(μ) = x -> 0.0
 p0μ(μ) = ParamFunction(p0,μ)
 
 stiffness(μ,t,(u,p),(v,q),dΩ) = ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ

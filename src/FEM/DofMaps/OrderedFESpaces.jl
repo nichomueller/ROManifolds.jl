@@ -207,20 +207,17 @@ function _get_odof_maps(
       for comp in 1:ncomps
         dof = cell_dofs[comp_to_dof[comp]]
         odof = onode + (comp-1)*nnodes
-        odofs[odof] = sign(dof)
+        # change only location of free dofs
+        odofs[odof] = dof > 0 ? one(eltype(V)) : dof
       end
     end
   end
 
   nfree = 0
-  ndiri = 0
   for (i,odof) in enumerate(odofs)
     if odof > 0
       nfree += 1
       odofs[i] = nfree
-    else
-      ndiri -= 1
-      odofs[i] = ndiri
     end
   end
 

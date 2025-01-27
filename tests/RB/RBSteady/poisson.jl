@@ -16,20 +16,16 @@ dΩ = Measure(Ω,degree)
 Γn = BoundaryTriangulation(model,tags=["outlet"])
 dΓn = Measure(Γn,degree)
 
-a(x,μ) = 1+exp(-x[1]/sum(μ))
-a(μ) = x->a(x,μ)
+a(μ) = x -> 1+exp(-x[1]/sum(μ))
 aμ(μ) = ParamFunction(a,μ)
 
-f(x,μ) = 1.
-f(μ) = x->f(x,μ)
+f(μ) = x -> 1.
 fμ(μ) = ParamFunction(f,μ)
 
-h(x,μ) = abs(cos(μ[3]))
-h(μ) = x->h(x,μ)
+h(μ) = x -> abs(cos(μ[3]))
 hμ(μ) = ParamFunction(h,μ)
 
-g(x,μ) = μ[1]*exp(-x[1]/μ[2])*abs(sin(μ[3]))
-g(μ) = x->g(x,μ)
+g(μ) = x -> μ[1]*exp(-x[1]/μ[2])*abs(sin(μ[3]))
 gμ(μ) = ParamFunction(g,μ)
 
 stiffness(μ,u,v,dΩ) = ∫(aμ(μ)*∇(v)⋅∇(u))dΩ

@@ -347,6 +347,17 @@ abstract type AbstractParamFunction{P<:Realization} <: Function end
 param_length(f::AbstractParamFunction) = length(f)
 param_getindex(f::AbstractParamFunction,i::Integer) = getindex(f,i)
 Arrays.testitem(f::AbstractParamFunction) = param_getindex(f,1)
+Arrays.evaluate!(cache,f::AbstractParamFunction,x) = pteval(f,x)
+Arrays.evaluate!(cache,f::AbstractParamFunction,x::CellPoint) = CellField(f,get_triangulation(x))(x)
+(f::AbstractParamFunction)(x) = evaluate(f,x)
+
+function Arrays.return_cache(f::AbstractParamFunction,x)
+  v = return_value(f,x)
+  V = eltype(v)
+  plength = param_length(f)
+  cache = Vector{V}(undef,plength)
+  return cache
+end
 
 """
     struct ParamFunction{F,P} <: AbstractParamFunction{P}
@@ -378,51 +389,20 @@ Base.length(f::ParamFunction) = num_params(f)
 Base.getindex(f::ParamFunction,i::Integer) = f.fun(_get_params(f)[i])
 
 function Base.:*(f::ParamFunction,α::Number)
-  _fun(x,μ) = α*f.fun(x,μ)
-  _fun(μ) = x -> _fun(x,μ)
+  _fun(μ) = x -> α*f.fun(μ)(x)
   ParamFunction(_fun,f.params)
 end
 
 Base.:*(α::Number,f::ParamFunction) = f*α
 
-function Fields.gradient(f::ParamFunction)
-  function _gradient(x,μ)
-    gradient(f.fun(μ))(x)
+for op in (:(Fields.gradient),:(Fields.symmetric_gradient),:(Fields.divergence),
+  :(Fields.curl),:(Fields.laplacian))
+  @eval begin
+    function ($op)(f::ParamFunction)
+      _op(μ) = x -> $op(f.fun(μ))(x)
+      ParamFunction(_op,f.params)
+    end
   end
-  _gradient(μ) = x -> _gradient(x,μ)
-  ParamFunction(_gradient,f.params)
-end
-
-function Fields.symmetric_gradient(f::ParamFunction)
-  function _symmetric_gradient(x,μ)
-    symmetric_gradient(f.fun(μ))(x)
-  end
-  _symmetric_gradient(μ) = x -> _symmetric_gradient(x,μ)
-  ParamFunction(_symmetric_gradient,f.params)
-end
-
-function Fields.divergence(f::ParamFunction)
-  function _divergence(x,μ)
-    divergence(f.fun(μ))(x)
-  end
-  _divergence(μ) = x -> _divergence(x,μ)
-  ParamFunction(_divergence,f.params)
-end
-
-function Fields.curl(f::ParamFunction)
-  function _curl(x,μ)
-    curl(f.fun(μ))(x)
-  end
-  _curl(μ) = x -> _curl(x,μ)
-  ParamFunction(_curl,f.params)
-end
-
-function Fields.laplacian(f::ParamFunction)
-  function _laplacian(x,μ)
-    laplacian(f.fun(μ))(x)
-  end
-  _laplacian(μ) = x -> _laplacian(x,μ)
-  ParamFunction(_laplacian,f.params)
 end
 
 # when iterating over a ParamFunction{P}, we return return f(eltype(P)) ∀ index i
@@ -430,12 +410,12 @@ function pteval(f::ParamFunction,x)
   T = return_type(f,x)
   v = Vector{T}(undef,length(f))
   @inbounds for (i,μ) in enumerate(get_params(f))
-    v[i] = f.fun(x,μ)
+    v[i] = f.fun(μ)(x)
   end
   return v
 end
 
-Arrays.return_value(f::ParamFunction,x) = f.fun(x,testitem(_get_params(f)))
+Arrays.return_value(f::ParamFunction,x) = f.fun(testitem(_get_params(f)))(x)
 
 """
     struct TransientParamFunction{F,P,T} <: AbstractParamFunction{P}
@@ -483,51 +463,20 @@ function Base.getindex(f::TransientParamFunction,i::Integer)
 end
 
 function Base.:*(f::TransientParamFunction,α::Number)
-  _fun(x,μ,t) = α*f.fun(x,μ,t)
-  _fun(μ,t) = x -> _fun(x,μ,t)
+  _fun(μ,t) = x -> α*f.fun(μ,t)(x)
   TransientParamFunction(_fun,f.params,f.times)
 end
 
 Base.:*(α::Number,f::TransientParamFunction) = f*α
 
-function Fields.gradient(f::TransientParamFunction)
-  function _gradient(x,μ,t)
-    gradient(f.fun(μ,t))(x)
+for op in (:(Fields.gradient),:(Fields.symmetric_gradient),:(Fields.divergence),
+  :(Fields.curl),:(Fields.laplacian))
+  @eval begin
+    function ($op)(f::TransientParamFunction)
+      _op(μ,t) = x -> $op(f.fun(μ,t))(x)
+      TransientParamFunction(_op,f.params,f.times)
+    end
   end
-  _gradient(μ,t) = x -> _gradient(x,μ,t)
-  TransientParamFunction(_gradient,f.params,f.times)
-end
-
-function Fields.symmetric_gradient(f::TransientParamFunction)
-  function _symmetric_gradient(x,μ,t)
-    symmetric_gradient(f.fun(μ,t))(x)
-  end
-  _symmetric_gradient(μ,t) = x -> _symmetric_gradient(x,μ,t)
-  TransientParamFunction(_symmetric_gradient,f.params,f.times)
-end
-
-function Fields.divergence(f::TransientParamFunction)
-  function _divergence(x,μ,t)
-    divergence(f.fun(μ,t))(x)
-  end
-  _divergence(μ,t) = x -> _divergence(x,μ,t)
-  TransientParamFunction(_divergence,f.params,f.times)
-end
-
-function Fields.curl(f::TransientParamFunction)
-  function _curl(x,μ,t)
-    curl(f.fun(μ,t))(x)
-  end
-  _curl(μ,t) = x -> _curl(x,μ,t)
-  TransientParamFunction(_curl,f.params,f.times)
-end
-
-function Fields.laplacian(f::TransientParamFunction)
-  function _laplacian(x,μ,t)
-    laplacian(f.fun(μ,t))(x)
-  end
-  _laplacian(μ,t) = x -> _laplacian(x,μ,t)
-  TransientParamFunction(_laplacian,f.params,f.times)
 end
 
 function pteval(f::TransientParamFunction,x)
@@ -535,15 +484,9 @@ function pteval(f::TransientParamFunction,x)
   T = return_type(f,x)
   v = Vector{T}(undef,length(f))
   @inbounds for (i,(μ,t)) in enumerate(iterator)
-    v[i] = f.fun(x,μ,t)
+    v[i] = f.fun(μ,t)(x)
   end
   return v
 end
 
-Arrays.return_value(f::TransientParamFunction,x) = f.fun(x,testitem(_get_params(f)),testitem(get_times(f)))
-
-Arrays.evaluate!(cache,f::AbstractParamFunction,x) = pteval(f,x)
-
-Arrays.evaluate!(cache,f::AbstractParamFunction,x::CellPoint) = CellField(f,get_triangulation(x))(x)
-
-(f::AbstractParamFunction)(x) = evaluate(f,x)
+Arrays.return_value(f::TransientParamFunction,x) = f.fun(testitem(_get_params(f)),testitem(get_times(f)))(x)

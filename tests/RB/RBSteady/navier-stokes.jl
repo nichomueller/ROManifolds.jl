@@ -28,15 +28,12 @@ degree = 2*(order)+1
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
 
-a(x,μ) = 1
-a(μ) = x->a(x,μ)
+a(μ) = x -> 1
 aμ(μ) = ParamFunction(a,μ)
 
-g(x,μ) = VectorValue(-μ[1]*x[2]*(1-x[2]),0.0)
-g(μ) = x->g(x,μ)
+g(μ) = x -> VectorValue(-μ[1]*x[2]*(1-x[2]),0.0)
 gμ(μ) = ParamFunction(g,μ)
-g0(x,μ) = VectorValue(0.0,0.0)
-g0(μ) = x->g0(x,μ)
+g0(μ) = x -> VectorValue(0.0,0.0)
 gμ0(μ) = ParamFunction(g0,μ)
 
 const Re = 10.0

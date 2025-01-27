@@ -41,28 +41,22 @@ dΓ = Measure(Γ,degree)
 dΓn = Measure(Γn,degree)
 dΩ_out = Measure(Ω_out,degree)
 
-ν(x,μ) = μ[1]
-ν(μ) = x->ν(x,μ)
+ν(μ) = x -> μ[1]
 νμ(μ) = ParamFunction(ν,μ)
 
-u(x,μ) = VectorValue(-(μ[2]*x[2]+μ[3])*x[2]*(1.0-x[2]),0.0)
-u(μ) = x->u(x,μ)
+u(μ) = x -> VectorValue(-(μ[2]*x[2]+μ[3])*x[2]*(1.0-x[2]),0.0)
 uμ(μ) = ParamFunction(u,μ)
 
-p(x,μ) = μ[1]*x[1]-x[2]
-p(μ) = x->p(x,μ)
+p(μ) = x -> μ[1]*x[1]-x[2]
 pμ(μ) = ParamFunction(p,μ)
 
-f(x,μ) = - ν(x,μ)*Δ(u(μ))(x) + ∇(p(μ))(x)
-f(μ) = x->f(x,μ)
+f(μ) = x -> - ν(x,μ)*Δ(u(μ))(x) + ∇(p(μ))(x)
 fμ(μ) = ParamFunction(f,μ)
 
-g(x,μ) = (∇⋅u(μ))(x)
-g(μ) = x->g(x,μ)
+g(μ) = x -> (∇⋅u(μ))(x)
 gμ(μ) = ParamFunction(g,μ)
 
-g_0(x,μ) = VectorValue(0.0,0.0)
-g_0(μ) = x->g_0(x,μ)
+g_0(μ) = x -> VectorValue(0.0,0.0)
 gμ_0(μ) = ParamFunction(g_0,μ)
 
 a(μ,(u,p),(v,q),dΩ,dΩ_out,dΓ) = (

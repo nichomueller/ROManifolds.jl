@@ -17,18 +17,15 @@ pspace = ParamSpace(pranges)
 order = 2
 degree = 2*order+1
 
-const Re′ = 100.0
-a(x,μ) = μ[1]/Re′
-a(μ) = x->a(x,μ)
+const Re = 100.0
+a(μ) = x -> μ[1]/Re
 aμ(μ) = ParamFunction(a,μ)
 
 const W = 0.5
 inflow(μ) = abs(sin(μ[2]*μ[3]))
-g_in(x,μ) = VectorValue(-x[2]*(W-x[2])*inflow(μ),0.0,0.0)
-g_in(μ) = x->g_in(x,μ)
+g_in(μ) = x -> VectorValue(-x[2]*(W-x[2])*inflow(μ),0.0,0.0)
 gμ_in(μ) = ParamFunction(g_in,μ)
-g_0(x,μ) = VectorValue(0.0,0.0,0.0)
-g_0(μ) = x->g_0(x,μ)
+g_0(μ) = x -> VectorValue(0.0,0.0,0.0)
 gμ_0(μ) = ParamFunction(g_0,μ)
 
 conv(u,∇u) = (∇u')⋅u

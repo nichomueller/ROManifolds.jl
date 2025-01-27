@@ -22,15 +22,12 @@ degree = 2*(order)+1
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
 
-a(x,μ) = μ[1]*exp(-μ[2])
-a(μ) = x->a(x,μ)
+a(μ) = x -> μ[1]*exp(-μ[2])
 aμ(μ) = ParamFunction(a,μ)
 
-g_in(x,μ) = VectorValue(-x[2]*(1.0-x[2])*abs(μ[3]*sin(μ[2])/10),0.0,0.0)
-g_in(μ) = x->g_in(x,μ)
+g_in(μ) = x -> VectorValue(-x[2]*(1.0-x[2])*abs(μ[3]*sin(μ[2])/10),0.0,0.0)
 gμ_in(μ) = ParamFunction(g_in,μ)
-g_0(x,μ) = VectorValue(0.0,0.0,0.0)
-g_0(μ) = x->g_0(x,μ)
+g_0(μ) = x -> VectorValue(0.0,0.0,0.0)
 gμ_0(μ) = ParamFunction(g_0,μ)
 
 stiffness(μ,(u,p),(v,q),dΩ) = ∫(aμ(μ)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
