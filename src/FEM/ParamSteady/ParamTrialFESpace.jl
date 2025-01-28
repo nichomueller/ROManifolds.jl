@@ -88,6 +88,18 @@ for F in (:TrialFESpace,:TransientTrialFESpace,:UnEvalTrialFESpace)
     function DofMaps.get_sparse_dof_map(trial::$F,test::SingleFieldFESpace,args...)
       get_sparse_dof_map(trial.space,test,args...)
     end
+
+    function DofMaps.OrderedFEFunction(trial::$F,fv,dv)
+      OrderedFEFunction(trial.space,fv,dv)
+    end
+
+    function DofMaps.scatter_ordered_free_and_dirichlet_values(trial::$F,fv,dv)
+      scatter_ordered_free_and_dirichlet_values(trial.space,fv,dv)
+    end
+
+    function DofMaps.gather_ordered_free_and_dirichlet_values!(fv,dv,trial::$F,cv)
+      gather_ordered_free_and_dirichlet_values!(fv,dv,trial.space,cv)
+    end
   end
 end
 

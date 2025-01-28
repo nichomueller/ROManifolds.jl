@@ -443,30 +443,20 @@ function FESpaces._setup_mdof_to_val!(
 
 end
 
-function FESpaces.gather_free_and_dirichlet_values!(
-  free_vals::AbstractParamVector,
-  dirichlet_vals::AbstractParamVector,
-  f::SingleFieldParamFESpace{<:OrderedFESpace},
-  cell_vals)
-
-  cell_ovals = order_cell_values(get_fe_space(f),cell_vals)
-  cell_dofs = get_cell_dof_ids(f)
-  cache_vals = array_cache(cell_ovals)
-  cache_dofs = array_cache(cell_dofs)
-  cells = 1:length(cell_ovals)
-
-  FESpaces._free_and_dirichlet_values_fill!(
-    free_vals,
-    dirichlet_vals,
-    cache_vals,
-    cache_dofs,
-    cell_ovals,
-    cell_dofs,
-    cells)
-
-  (free_vals,dirichlet_vals)
-end
-
 # utils
 
 remove_layer(f::SingleFieldParamFESpace) = @abstractmethod
+
+function DofMaps.OrderedFEFunction(f::SingleFieldParamFESpace{<:OrderedFESpace},fv,dv)
+  cell_vals = scatter_ordered_free_and_dirichlet_values(f,fv,dv)
+  cell_field = CellField(f,cell_vals)
+  SingleFieldFEFunction(cell_field,cell_vals,fv,dv,f)
+end
+
+function DofMaps.scatter_ordered_free_and_dirichlet_values(f::SingleFieldParamFESpace{<:OrderedFESpace},fv,dv)
+  scatter_ordered_free_and_dirichlet_values(get_fe_space(f),fv,dv)
+end
+
+function DofMaps.gather_ordered_free_and_dirichlet_values!(fv,dv,f::SingleFieldParamFESpace{<:OrderedFESpace},cv)
+  gather_ordered_free_and_dirichlet_values!(fv,dv,get_fe_space(f),cv)
+end

@@ -72,9 +72,11 @@ include("DofMapArrays.jl")
 
 export OrderedFESpace
 export CartesianFESpace
+export OrderedFEFunction
 export get_ordered_cell_dof_ids
-export order_cell_values
 export get_bg_dof_to_mask
+export scatter_ordered_free_and_dirichlet_values
+export gather_ordered_free_and_dirichlet_values!
 include("OrderedFESpaces.jl")
 
 end # module

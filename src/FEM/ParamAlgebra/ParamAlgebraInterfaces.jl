@@ -60,6 +60,14 @@ end
   Algebra._add_entries!(cache,combine,A,vs,is,js)
 end
 
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamVector,is::OIdsToIds)
+  add_ordered_entries!(cache,combine,A,vs,is)
+end
+
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamMatrix,is::OIdsToIds,js::OIdsToIds)
+  add_ordered_entries!(cache,combine,A,vs,is,js)
+end
+
 @inline function Algebra._add_entries!(
   vij,combine::Function,A,vs::AbstractParamMatrix,is,js)
 
