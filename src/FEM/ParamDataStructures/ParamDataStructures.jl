@@ -24,7 +24,7 @@ import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
 import SparseArrays.getcolptr
 
-import ROM.DofMaps: fast_index,slow_index,recast
+import ROM.DofMaps: OReindex,fast_index,slow_index,recast
 
 export AbstractRealization
 export Realization

@@ -313,6 +313,15 @@ function eval_performance(
   eval_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats,args...)
 end
 
+function eval_performance(solver,feop,rbop,x::AbstractParamVector,x̂,festats,rbstats,r,args...)
+  fesnaps = to_snapshots(get_trial(feop),x,r)
+  eval_performance(solver,feop,rbop,fesnaps,x̂,festats,rbstats,r,args...)
+end
+
+function eval_performance(solver,feop,rbop,xh::ParamFEFunction,x̂,festats,rbstats,r,args...)
+  eval_performance(solver,feop,rbop,get_free_dof_values(xh),x̂,festats,rbstats,r,args...)
+end
+
 function DrWatson.save(dir,perf::ROMPerformance;label="")
   results_dir = get_filename(dir,"results",label)
   serialize(results_dir,perf)

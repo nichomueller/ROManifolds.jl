@@ -111,3 +111,20 @@ for T in (:ParamReindex,:PosNegParamReindex)
     end
   end
 end
+
+function Arrays.return_cache(k::OReindex,values::AbstractParamVector)
+  v = testitem(values)
+  c = return_cache(k,v)
+  a = evaluate!(c,k,v)
+  c = fill(c,param_length(values))
+  data = param_array(a,param_length(values);style=MemoryLayoutStyle(values))
+  c,data
+end
+
+function Arrays.evaluate!(cache,k::OReindex,values::AbstractParamVector)
+  c,data = cache
+  @inbounds for i = param_eachindex(values)
+    data[i] = evaluate!(c[i],k,param_getindex(values,i))
+  end
+  data
+end

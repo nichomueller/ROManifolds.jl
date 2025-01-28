@@ -78,16 +78,7 @@ function Algebra.residual!(
 
   # Residual
   res = get_res(odeop.op)
-  jacs = get_jacs(odeop.op)
-  dc = (-1)*res(μ,t,uh,v)
-  ∂tkuh = uh
-  for k in 1:get_order(odeop.op)+1
-    jac = jacs[k]
-    dc = dc + jac(μ,t,uh,∂tkuh,v)
-    if k < get_order(odeop.op)+1
-      ∂tkuh = ∂t(∂tkuh)
-    end
-  end
+  dc = res(μ,t,uh,v)
 
   vecdata = collect_cell_vector(test,dc)
   assemble_vector_add!(b,assem,vecdata)
@@ -246,10 +237,10 @@ function Algebra.allocate_residual(
   assem = get_param_assembler(odeop.op,r)
 
   μ,t = get_params(r),get_times(r)
+  trian_res = get_domains_res(odeop.op)
   res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
-  trian_res = get_domains_res(odeop.op)
   b = contribution(trian_res) do trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     allocate_vector(assem,vecdata)
@@ -274,10 +265,10 @@ function Algebra.residual!(
 
   μ,t = get_params(r),get_times(r)
 
+  trian_res = get_domains_res(odeop.op)
   res = get_res(odeop.op)
   dc = res(μ,t,uh,v)
 
-  trian_res = get_domains_res(odeop.op)
   map(b.values,trian_res) do values,trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     assemble_vector_add!(values,assem,vecdata)
@@ -299,19 +290,10 @@ function Algebra.residual(
   μ,t = get_params(r),get_times(r)
 
   # Residual
-  res = get_res(odeop.op)
-  jacs = get_jacs(odeop.op)
-  dc = (-1)*res(μ,t,uh,v)
-  ∂tkuh = uh
-  for k in 1:get_order(odeop.op)+1
-    jac = jacs[k]
-    dc = dc + jac(μ,t,uh,∂tkuh,v)
-    if k < get_order(odeop.op)+1
-      ∂tkuh = ∂t(∂tkuh)
-    end
-  end
-
   trian_res = get_domains_res(odeop.op)
+  res = get_res(odeop.op)
+  dc = res(μ,t,uh,v)
+
   contribution(trian_res) do trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     assemble_vector(assem,vecdata)

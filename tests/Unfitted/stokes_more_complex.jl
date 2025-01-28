@@ -41,20 +41,16 @@ dΩ = Measure(Ω,degree)
 dΓ = Measure(Γ,degree)
 dΩ_out = Measure(Ω_out,degree)
 
-ν(x,μ) = μ[1]
-ν(μ) = x->ν(x,μ)
+ν(μ) = x -> μ[1]
 νμ(μ) = ParamFunction(ν,μ)
 
-g(x,μ) = VectorValue(-(μ[2]*x[2]+μ[3])*x[2]*(1.0-x[2]),0.0)*(x[1]==0.0)
-g(μ) = x->g(x,μ)
+g(μ) = x -> VectorValue(-(μ[2]*x[2]+μ[3])*x[2]*(1.0-x[2]),0.0)*(x[1]==0.0)
 gμ(μ) = ParamFunction(g,μ)
 
-f(x,μ) = VectorValue(0.0,0.0)
-f(μ) = x->f(x,μ)
+f(μ) = x -> VectorValue(0.0,0.0)
 fμ(μ) = ParamFunction(f,μ)
 
-g_0(x,μ) = VectorValue(0.0,0.0)
-g_0(μ) = x->g_0(x,μ)
+g_0(μ) = x -> VectorValue(0.0,0.0)
 gμ_0(μ) = ParamFunction(g_0,μ)
 
 a(μ,(u,p),(v,q)) = (
@@ -77,12 +73,10 @@ coupling((du,dp),(v,q)) = ∫(dp*∂₁(v))dΩbg + ∫(dp*∂₂(v))dΩbg
 energy((du,dp),(v,q)) = ∫(du⋅v)dΩbg + ∫(∇(v)⊙∇(du))dΩbg + ∫(dp*q)dΩbg
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-# test_u = TProductFESpace(Ωbg,reffe_u;conformity=:H1)
-test_u = FESpace(Ωbg.trian,reffe_u;conformity=:H1,dirichlet_tags="dirichlet")
+test_u = TProductFESpace(Ωbg,reffe_u;conformity=:H1,dirichlet_tags="dirichlet")
 trial_u = ParamTrialFESpace(test_u,gμ)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-# test_p = TProductFESpace(Ωact,Ωbg,reffe_p;conformity=:H1)
-test_p = FESpace(Ωact,reffe_p;conformity=:H1)
+test_p = TProductFESpace(Ωact,Ωbg,reffe_p;conformity=:H1)
 trial_p = ParamTrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -94,6 +88,15 @@ tol = fill(1e-4,4)
 state_reduction = SupremizerReduction(coupling,tol,energy;nparams=100)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=50,nparams_jac=50)
 
+fesnaps,festats = solution_snapshots(rbsolver,feop)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+ronline = realization(feop;nparams=10,sampling=:uniform)
+x̂,rbstats = solve(rbsolver,rbop,ronline)
+
+x,festats = solution_snapshots(rbsolver,feop,ronline)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)
+
+
 x, = solution_snapshots(rbsolver,feop;nparams=1)
 u1 = flatten_snapshots(x[1])[:,1]
 p1 = flatten_snapshots(x[2])[:,1]
@@ -104,3 +107,111 @@ uh = FEFunction(U1,u1)
 ph = FEFunction(P1,p1)
 writevtk(Ω,datadir("plts/sol"),cellfields=["uh"=>uh,"ph"=>ph])
 writevtk(Ωbg.trian,datadir("plts/sol_bg"),cellfields=["uh"=>uh,"ph"=>ph])
+
+V = FESpace(Ωbg.trian,reffe_u;conformity=:H1,dirichlet_tags="dirichlet")
+U = ParamTrialFESpace(V,gμ)
+Q = FESpace(Ωact,reffe_p;conformity=:H1)
+P = ParamTrialFESpace(Q)
+Y = MultiFieldParamFESpace([V,Q];style=BlockMultiFieldStyle())
+X = MultiFieldParamFESpace([U,P];style=BlockMultiFieldStyle())
+ffeop = LinearParamFEOperator(l,a,pspace,X,Y)
+xx, = solution_snapshots(rbsolver,ffeop;nparams=1)
+
+using Gridap.FESpaces
+using Gridap.Algebra
+using ROM.ParamSteady
+
+r = realization(feop)
+UU = trial_u(r)
+uh = zero(UU)
+x = get_free_dof_values(uh)
+op = get_algebraic_operator(feop)
+nlop = ParamNonlinearOperator(op,r)
+
+b = residual(nlop,x)
+A = jacobian(nlop,x)
+
+##############################################################
+UUU = U(r)
+uuh = zero(UUU)
+xx = get_free_dof_values(uuh)
+oop = get_algebraic_operator(ffeop)
+nnlop = ParamNonlinearOperator(oop,r)
+
+bb = residual(nnlop,x)
+AA = jacobian(nnlop,x)
+
+# UNIVARIATE
+
+au(μ,u,v) = (∫( νμ(μ)*∇(v)⊙∇(u) )dΩ + ∫( ∇(v)⊙∇(u) )dΩ_out + ∫( - v⋅(n_Γ⋅∇(u))*νμ(μ) + (n_Γ⋅∇(v))⋅u*νμ(μ) )dΓ)
+lu(μ,u,v) = (∫( νμ(μ)*∇(v)⊙∇(u) )dΩ +∫( (n_Γ⋅∇(v))⋅gμ_0(μ)*νμ(μ) )dΓ)
+
+au_simple(μ,u,v) = ∫( νμ(μ)*∇(v)⊙∇(u) )dΩ #+ ∫( ∇(v)⊙∇(u) )dΩ_out
+lu_simple(μ,u,v) = ∫( νμ(μ)*∇(v)⊙∇(u) )dΩ
+
+feop_u = LinearParamFEOperator(lu_simple,au_simple,pspace,trial_u,test_u)
+UU = trial_u(r)
+uh = zero(UU)
+fill!(uh.free_values,1.0)
+x = get_free_dof_values(uh)
+op = get_algebraic_operator(feop_u)
+nlop = ParamNonlinearOperator(op,r)
+
+b = residual(nlop,x)
+A = jacobian(nlop,x)
+
+ffeop = LinearParamFEOperator(lu_simple,au_simple,pspace,U,V)
+UUU = U(r)
+uuh = zero(UUU)
+fill!(uuh.free_values,1.0)
+xx = get_free_dof_values(uuh)
+oop = get_algebraic_operator(ffeop)
+nnlop = ParamNonlinearOperator(oop,r)
+
+bb = residual(nnlop,x)
+AA = jacobian(nnlop,x)
+
+norm(param_getindex(b,1)) ≈ norm(param_getindex(bb,1))
+norm(param_getindex(A,1)) ≈ norm(param_getindex(AA,1))
+
+assem = SparseMatrixAssembler(trial_u,test_u)
+vecdata = collect_cell_vector(test_u,lu_simple(r,uh,get_fe_basis(test_u)))
+
+v1 = nz_counter(get_vector_builder(assem),(get_rows(assem),))
+symbolic_loop_vector!(v1,assem,vecdata)
+v2 = nz_allocation(v1)
+# numeric_loop_vector!(v2,assem,vecdata)
+cellvec = vecdata[1][1]
+cellids = vecdata[2][1]
+rows_cache = array_cache(cellids)
+vals_cache = array_cache(cellvec)
+add! = FESpaces.AddEntriesMap(+)
+cell = 312
+rows = getindex!(rows_cache,cellids,cell)
+vals = getindex!(vals_cache,cellvec,cell)
+evaluate!(nothing,add!,v2,vals,rows)
+
+#############
+aassem = SparseMatrixAssembler(U,V)
+vvecdata = collect_cell_vector(V,lu_simple(r,uuh,get_fe_basis(V)))
+
+vv1 = nz_counter(get_vector_builder(aassem),(get_rows(aassem),))
+symbolic_loop_vector!(vv1,aassem,vvecdata)
+vv2 = nz_allocation(vv1)
+# numeric_loop_vector!(v2,assem,vecdata)
+ccellvec = vvecdata[1][1]
+ccellids = vvecdata[2][1]
+rrows_cache = array_cache(ccellids)
+vvals_cache = array_cache(ccellvec)
+rrows = getindex!(rrows_cache,ccellids,cell)
+vvals = getindex!(vvals_cache,ccellvec,cell)
+evaluate!(nothing,add!,vv2,vvals,rrows)
+
+v = get_fe_basis(test_u)
+cf = ∇(uh)#∇(v)⊙∇(uh)
+x = get_cell_points(Ω)
+cfx = cf(x)
+
+vv = get_fe_basis(V)
+ccf = ∇(uuh)#∇(vv)⊙∇(uuh)
+ccfx = ccf(x)

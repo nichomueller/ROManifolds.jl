@@ -43,12 +43,35 @@ function FESpaces.scatter_free_and_dirichlet_values(f::OrderedFESpace,fv,dv)
   lazy_map(Broadcasting(PosNegReindex(fv,dv)),cell_dof_ids)
 end
 
-function FESpaces.gather_free_and_dirichlet_values(f::OrderedFESpace,cv)
-  gather_free_and_dirichlet_values(get_fe_space(f),cv)
+function FESpaces.gather_free_and_dirichlet_values!(
+  free_vals::AbstractVector,
+  dirichlet_vals::AbstractVector,
+  f::OrderedFESpace,
+  cell_vals)
+
+  cell_ovals = order_cell_values(get_fe_space(f),cell_vals)
+  cell_dofs = get_cell_dof_ids(f)
+  cache_vals = array_cache(cell_ovals)
+  cache_dofs = array_cache(cell_dofs)
+  cells = 1:length(cell_ovals)
+
+  FESpaces._free_and_dirichlet_values_fill!(
+    free_vals,
+    dirichlet_vals,
+    cache_vals,
+    cache_dofs,
+    cell_ovals,
+    cell_dofs,
+    cells)
+
+  (free_vals,dirichlet_vals)
 end
 
-function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv)
-  gather_free_and_dirichlet_values!(fv,dv,get_fe_space(f),cv)
+function order_cell_values(f::OrderedFESpace,cv)
+  cell_dof_ids = get_cell_dof_ids(f)
+  odof_to_dof = cell_dof_ids.maps[1].pdof_to_dof
+  dof_to_odof = invperm(odof_to_dof)
+  lazy_map(OReindex(dof_to_odof),cv)
 end
 
 function get_dof_map(f::OrderedFESpace)

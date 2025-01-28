@@ -71,6 +71,23 @@ function Arrays.evaluate!(cache,k::DofsToODofs{D},cell::CartesianIndex{D}) where
   return cache
 end
 
+function Arrays.return_value(k::Broadcasting{typeof(_sum_if_first_positive)},dofs::OIdsToIds,o::Integer)
+  evaluate(k,dofs,o)
+end
+
+function Arrays.return_cache(k::Broadcasting{typeof(_sum_if_first_positive)},dofs::OIdsToIds,o::Integer)
+  c = return_cache(k,dofs.indices,o)
+  odofs = OIdsToIds(evaluate(k,dofs.indices,o),dofs.terms)
+  c,odofs
+end
+
+function Arrays.evaluate!(cache,k::Broadcasting{typeof(_sum_if_first_positive)},dofs::OIdsToIds,o::Integer)
+  c,odofs = cache
+  r = evaluate!(c,k,dofs.indices,o)
+  copyto!(odofs.indices,r)
+  odofs
+end
+
 # Assembly-related functions
 
 @inline function Algebra.add_entries!(combine::Function,A,vs,is::OIdsToIds,js::OIdsToIds)
@@ -118,4 +135,24 @@ end
     end
   end
   A
+end
+
+struct OReindex{T<:Integer} <: Map
+  indices::Vector{T}
+end
+
+function Arrays.return_value(k::OReindex,values)
+  values
+end
+
+function Arrays.return_cache(k::OReindex,values::AbstractVector)
+  @check length(values) == length(k.indices)
+  similar(values)
+end
+
+function Arrays.evaluate!(cache,k::OReindex,values::AbstractVector)
+  for (i,oi) in enumerate(k.indices)
+    cache[oi] = values[i]
+  end
+  return cache
 end

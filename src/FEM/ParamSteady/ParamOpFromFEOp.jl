@@ -58,30 +58,6 @@ function Algebra.residual!(
   b
 end
 
-function Algebra.residual!(
-  b::AbstractVector,
-  op::JointParamOpFromFEOp{LinearParamEq},
-  μ::Realization,
-  u::AbstractVector,
-  paramcache;
-  add::Bool=false)
-
-  !add && fill!(b,zero(eltype(b)))
-
-  uh = EvaluationFunction(paramcache.trial,u)
-  test = get_test(op.op)
-  v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,μ)
-
-  res = get_res(op.op)
-  jac = get_jac(op.op)
-  dc = jac(μ,uh,uh,v) - res(μ,uh,v)
-  vecdata = collect_cell_vector(test,dc)
-  assemble_vector_add!(b,assem,vecdata)
-
-  b
-end
-
 function Algebra.allocate_jacobian(
   op::JointParamOpFromFEOp,
   μ::Realization,
@@ -164,34 +140,6 @@ function Algebra.residual!(
   trian_res = get_domains_res(op.op)
   res = get_res(op.op)
   dc = res(μ,uh,v)
-
-  map(b.values,trian_res) do values,trian
-    vecdata = collect_cell_vector_for_trian(test,dc,trian)
-    assemble_vector_add!(values,assem,vecdata)
-  end
-
-  b
-end
-
-function Algebra.residual!(
-  b::Contribution,
-  op::SplitParamOpFromFEOp{LinearParamEq},
-  μ::Realization,
-  u::AbstractVector,
-  paramcache;
-  add::Bool=false)
-
-  !add && fill!(b,zero(eltype(b)))
-
-  uh = EvaluationFunction(paramcache.trial,u)
-  test = get_test(op.op)
-  v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,μ)
-
-  trian_res = get_domains_res(op.op)
-  jac = get_jac(op.op)
-  res = get_res(op.op)
-  dc = jac(μ,uh,uh,v) - res(μ,uh,v)
 
   map(b.values,trian_res) do values,trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)

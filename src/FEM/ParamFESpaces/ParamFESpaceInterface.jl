@@ -256,29 +256,6 @@ function FESpaces.gather_free_and_dirichlet_values!(
   fmdof_to_val,dmdof_to_val
 end
 
-function FESpaces.gather_dirichlet_values!(
-  dirichlet_vals,
-  f::SingleFieldParamFESpace,
-  cell_vals)
-
-  cell_dofs = get_cell_dof_ids(f)
-  cache_vals = array_cache(cell_vals)
-  cache_dofs = array_cache(cell_dofs)
-  free_vals = zero_free_values(f)
-  cells = get_dirichlet_cells(f)
-
-  FESpaces._free_and_dirichlet_values_fill!(
-    free_vals,
-    dirichlet_vals,
-    cache_vals,
-    cache_dofs,
-    cell_vals,
-    cell_dofs,
-    cells)
-
-  dirichlet_vals
-end
-
 function FESpaces._fill_dirichlet_values_for_tag!(
   dirichlet_values::AbstractParamVector,
   dv::AbstractParamVector,
@@ -464,6 +441,30 @@ function FESpaces._setup_mdof_to_val!(
     end
   end
 
+end
+
+function FESpaces.gather_free_and_dirichlet_values!(
+  free_vals::AbstractParamVector,
+  dirichlet_vals::AbstractParamVector,
+  f::SingleFieldParamFESpace{<:OrderedFESpace},
+  cell_vals)
+
+  cell_ovals = order_cell_values(get_fe_space(f),cell_vals)
+  cell_dofs = get_cell_dof_ids(f)
+  cache_vals = array_cache(cell_ovals)
+  cache_dofs = array_cache(cell_dofs)
+  cells = 1:length(cell_ovals)
+
+  FESpaces._free_and_dirichlet_values_fill!(
+    free_vals,
+    dirichlet_vals,
+    cache_vals,
+    cache_dofs,
+    cell_ovals,
+    cell_dofs,
+    cells)
+
+  (free_vals,dirichlet_vals)
 end
 
 # utils

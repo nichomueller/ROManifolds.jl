@@ -20,6 +20,7 @@ using ROM
 using ROM.Utils
 
 import FillArrays: Fill
+import Gridap.MultiField: _sum_if_first_positive
 import PartitionedArrays: tuple_of_arrays
 import SparseArrays: AbstractSparseMatrix,AbstractSparseMatrixCSC
 import SparseMatricesCSR: SparseMatrixCSR
@@ -36,6 +37,7 @@ include("Ranges.jl")
 
 export OIdsToIds
 export DofsToODofs
+export OReindex
 export add_ordered_entries!
 include("OrderingMaps.jl")
 
@@ -71,6 +73,7 @@ include("DofMapArrays.jl")
 export OrderedFESpace
 export CartesianFESpace
 export get_ordered_cell_dof_ids
+export order_cell_values
 export get_bg_dof_to_mask
 include("OrderedFESpaces.jl")
 
