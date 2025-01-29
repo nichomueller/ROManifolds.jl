@@ -53,19 +53,15 @@ fμ(μ) = ParamFunction(f,μ)
 g_0(μ) = x -> VectorValue(0.0,0.0)
 gμ_0(μ) = ParamFunction(g_0,μ)
 
-a(μ,(u,p),(v,q)) = (
+a(μ,(u,p),(v,q),dΩ,dΩ_out,dΓ) = (
   ∫( νμ(μ)*∇(v)⊙∇(u) - p*(∇⋅(v)) - q*(∇⋅(u)) )dΩ +
   ∫( ∇(v)⊙∇(u) )dΩ_out +
   ∫( - v⋅(n_Γ⋅∇(u))*νμ(μ) + (n_Γ⋅∇(v))⋅u*νμ(μ) + (p*n_Γ)⋅v + (q*n_Γ)⋅u )dΓ
 )
 
-l(μ,(u,p),(v,q)) = (
-  ∫( νμ(μ)*∇(v)⊙∇(u) - p*(∇⋅(v)) - q*(∇⋅(u)) )dΩ +
-  ∫( ∇(v)⊙∇(gμ_0(μ)) )dΩ_out +
-  ∫( (n_Γ⋅∇(v))⋅gμ_0(μ)*νμ(μ) + (q*n_Γ)⋅gμ_0(μ) )dΓ
-)
+l(μ,(u,p),(v,q),dΩ) = ∫( νμ(μ)*∇(v)⊙∇(u) - p*(∇⋅(v)) - q*(∇⋅(u)) )dΩ
 
-trian_res = (Ω,Ω_out,Γ)
+trian_res = (Ω,)
 trian_jac = (Ω,Ω_out,Γ)
 domains = FEDomains(trian_res,trian_jac)
 
@@ -80,7 +76,7 @@ test_p = TProductFESpace(Ωact,Ωbg,reffe_p;conformity=:H1)
 trial_p = ParamTrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = LinearParamFEOperator(l,a,pspace,trial,test)
+feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
 
 fesolver = LinearFESolver(LUSolver())
 
@@ -94,11 +90,15 @@ ronline = realization(feop;nparams=10,sampling=:uniform)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 
 x,festats = solution_snapshots(rbsolver,feop,ronline)
-perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline,Ω)
 
-#
-U,V = trial_u(nothing),test_u
-get_sparse_dof_map(U,V)
+using ROM.RBSteady
 
-strian = DofMaps._get_common_domain(U,V)
-strian ≈ Ωbg.trian
+rbsnaps = RBSteady.to_snapshots(get_trial(rbop),x̂,ronline)
+rbsnaps_u = inv_project(get_trial(rbop)[1](ronline),x̂.data[1])
+rbsnaps_p = inv_project(get_trial(rbop)[2](ronline),x̂.data[2])
+
+cores_p = get_trial(rbop)[2].subspace.projection.cores
+coresD = RBSteady.sequential_product(cores_p...)
+dof_map = get_trial(rbop)[2].subspace.projection.dof_map
+invmap = invert(dof_map)

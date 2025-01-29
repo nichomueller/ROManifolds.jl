@@ -1,7 +1,7 @@
 """
-    abstract type PartialFunctions <: Map end
+    abstract type PartialFunctions <: Function end
 """
-abstract type PartialFunctions <: Map end
+abstract type PartialFunctions <: Function end
 
 """
     struct PartialDerivative{N} <: PartialFunctions end

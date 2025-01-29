@@ -13,6 +13,7 @@ export slow_index
 export fast_index
 export get_dof_map
 export get_sparse_dof_map
+export flatten
 
 include("FEM/DofMaps/DofMaps.jl")
 using ROM.DofMaps
@@ -117,7 +118,6 @@ export AdaptiveReduction
 
 export Snapshots
 export get_realization
-export flatten_snapshots
 export select_snapshots
 
 export RBSolver

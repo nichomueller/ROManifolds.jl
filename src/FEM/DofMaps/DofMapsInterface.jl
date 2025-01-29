@@ -38,7 +38,7 @@ Calls the function `invperm` on the nonzero entries of `i`, and places
 zeros on the remaining zero entries of `i`. The output has the same size as `i`
 """
 function invert(i::AbstractDofMap)
-  i′ = remove_masked_dofs(i)
+  i′ = copy(i)
   inz = findall(!iszero,i′)
   i′[inz] = invperm(i[inz])
   i′
@@ -51,6 +51,14 @@ Flattens `i`, the output will be a dof map with ndims == 1
 """
 function flatten(i::AbstractDofMap)
   @abstractmethod
+end
+
+function change_dof_map(i::AbstractDofMap,mask_to_add)
+  @abstractmethod
+end
+
+function change_dof_map(i::AbstractVector{<:AbstractDofMap},mask_to_add::AbstractVector{<:AbstractVector})
+  map(change_dof_map,i,mask_to_add)
 end
 
 """
@@ -79,11 +87,11 @@ end
 VectorDofMap(i::VectorDofMap) = i
 VectorDofMap(l::Integer,args...) = VectorDofMap((l,),args...)
 
-function VectorDofMap(i::VectorDofMap,_mask_to_add::Vector{Bool})
-  @check length(i) == length(_mask_to_add)
+function VectorDofMap(i::VectorDofMap,mask_to_add::Vector{Bool})
+  @check length(i) == length(mask_to_add)
   dof_to_mask = copy(i.dof_to_mask)
   for j in eachindex(i)
-    dof_to_mask[j] = dof_to_mask[j] || _mask_to_add[j]
+    dof_to_mask[j] = dof_to_mask[j] || mask_to_add[j]
   end
   VectorDofMap(i.size,dof_to_mask)
 end
@@ -105,6 +113,10 @@ end
 
 function flatten(i::VectorDofMap)
   VectorDofMap((prod(i.size),),i.dof_to_mask,i.cumulative_masks)
+end
+
+function change_dof_map(i::VectorDofMap,mask_to_add)
+  VectorDofMap(i,mask_to_add)
 end
 
 abstract type SparseDofMapStyle end

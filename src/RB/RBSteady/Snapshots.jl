@@ -75,17 +75,12 @@ function DofMaps.recast(a::AbstractArray,s::Snapshots)
   return recast(a,get_dof_map(s))
 end
 
-function CellData.change_domain(s::Snapshots,args...)
-  i′ = change_domain(get_dof_map(s),args...)
+function DofMaps.change_dof_map(s::Snapshots,args...)
+  i′ = change_dof_map(get_dof_map(s),args...)
   return Snapshots(get_values(s),i′,get_realization(s))
 end
 
-"""
-    flatten_snapshots(s::Snapshots) -> Snapshots
-
-The output snapshots are indexed according to a `TrivialDofMap`
-"""
-function flatten_snapshots(s::Snapshots)
+function DofMaps.flatten(s::Snapshots)
   i′ = flatten(get_dof_map(s))
   Snapshots(get_values(s),i′,get_realization(s))
 end
@@ -431,7 +426,7 @@ function get_indexed_data(s::BlockSnapshots)
   map(get_indexed_data,s.array)
 end
 
-for f in (:flatten_snapshots,:select_snapshots)
+for f in (:select_snapshots,:(DofMaps.flatten))
   @eval begin
     function Arrays.return_cache(::typeof($f),s::BlockSnapshots,args...;kwargs...)
       S = Snapshots
@@ -439,11 +434,7 @@ for f in (:flatten_snapshots,:select_snapshots)
       block_cache = Array{S,N}(undef,size(s))
       return block_cache
     end
-  end
-end
 
-for f in (:flatten_snapshots,:select_snapshots)
-  @eval begin
     function $f(s::BlockSnapshots,args...;kwargs...)
       array = return_cache($f,s,args...;kwargs...)
       touched = s.touched
@@ -455,6 +446,24 @@ for f in (:flatten_snapshots,:select_snapshots)
       return BlockSnapshots(array,touched)
     end
   end
+end
+
+function Arrays.return_cache(::typeof(change_dof_map),s::BlockSnapshots,i::AbstractArray{<:AbstractDofMap})
+  S = Snapshots
+  N = ndims(s)
+  block_cache = Array{S,N}(undef,size(s))
+  return block_cache
+end
+
+function DofMaps.change_dof_map(s::BlockSnapshots,i::AbstractArray{<:AbstractDofMap})
+  array = return_cache(change_dof_map,s,i)
+  touched = s.touched
+  for n in eachindex(touched)
+    if touched[n]
+      array[n] = change_dof_map(s[n],i[n])
+    end
+  end
+  return BlockSnapshots(array,touched)
 end
 
 # utils

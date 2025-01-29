@@ -59,6 +59,7 @@ export SparseMatrixDofMap
 export invert
 export vectorize
 export flatten
+export change_dof_map
 include("DofMapsInterface.jl")
 
 export get_dof_map

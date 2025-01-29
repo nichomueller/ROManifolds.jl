@@ -31,11 +31,15 @@ end
 
 # utils
 
-function get_bg_dof_to_act_dof(f::FESpace)
-  @abstractmethod
+for f in (:get_bg_dof_to_mask,:get_bg_dof_to_act_dof)
+  @eval begin
+    function $f(f::MultiFieldFESpace,args...)
+      map(space -> $f(space,args...),f.spaces)
+    end
+  end
 end
 
-function get_bg_dof_to_mask(f::FESpace,args...)
+function get_bg_dof_to_mask(f::SingleFieldFESpace,args...)
   map(iszero,get_bg_dof_to_act_dof(f,args...))
 end
 
@@ -76,9 +80,11 @@ function get_bg_dof_to_act_dof(f::FESpace,ttrian::Triangulation)
     for cell in 1:length(cellids)
       dofs = getindex!(cache,cellids,cell)
       for dof in dofs
-        bg_dof = bg_bg_dof_to_bg_dof[dof]
-        if bg_dof > 0
-          bg_dof_to_act_dof[bg_dof] = dof
+        if dof > 0
+          bg_dof = bg_bg_dof_to_bg_dof[dof]
+          if bg_dof > 0
+            bg_dof_to_act_dof[bg_dof] = dof
+          end
         end
       end
     end

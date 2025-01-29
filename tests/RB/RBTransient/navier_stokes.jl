@@ -131,7 +131,7 @@ println(perf)
 # # plotting
 
 # r = get_realization(fesnaps)
-# S′ = flatten_snapshots(fesnaps)
+# S′ = flatten(fesnaps)
 # S1 = S′[1][:,:,1]
 # r1 = r[1,:]
 # U1 = trial_u(r1)

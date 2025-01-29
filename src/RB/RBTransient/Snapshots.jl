@@ -204,10 +204,10 @@ Base.@propagate_inbounds function Base.setindex!(
   setindex!(s.snaps,v,ispace,itime′,iparam′)
 end
 
-function RBSteady.flatten_snapshots(s::TransientSnapshotsAtIndices)
+function DofMaps.flatten(s::TransientSnapshotsAtIndices)
   data = get_values(s)
   sbasic = Snapshots(data,get_dof_map(s),get_realization(s))
-  flatten_snapshots(sbasic)
+  flatten(sbasic)
 end
 
 function RBSteady.select_snapshots(s::TransientSnapshots,trange,prange)
@@ -380,7 +380,7 @@ function ModeTransientSnapshots(s::TransientSnapshots)
   ModeTransientSnapshots(s,get_mode(s))
 end
 
-function RBSteady.flatten_snapshots(s::TransientSnapshots)
+function RBSteady.flatten(s::TransientSnapshots)
   i′ = flatten(get_dof_map(s))
   s′ = Snapshots(get_values(s),i′,get_realization(s))
   ModeTransientSnapshots(s′)

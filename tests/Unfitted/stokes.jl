@@ -108,8 +108,8 @@ x̂,rbstats = solve(rbsolver,rbop,μon)
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 
-# u1 = flatten_snapshots(x[1])[:,1]
-# p1 = flatten_snapshots(x[2])[:,1]
+# u1 = flatten(x[1])[:,1]
+# p1 = flatten(x[2])[:,1]
 # r1 = get_realization(x[1])[1]
 # U1 = param_getindex(trial_u(r1),1)
 # P1 = trial_p(nothing)
@@ -119,8 +119,8 @@ perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
 # writevtk(Ωbg.trian,datadir("plts/sol_bg"),cellfields=["uh"=>uh,"ph"=>ph])
 
 # xrb = Snapshots(inv_project(get_trial(rbop)(μon),x̂),get_dof_map(feop),μon)
-# u1 = flatten_snapshots(xrb[1])[:,1]
-# p1 = flatten_snapshots(xrb[2])[:,1]
+# u1 = flatten(xrb[1])[:,1]
+# p1 = flatten(xrb[2])[:,1]
 # uh = FEFunction(U1,u1)
 # ph = FEFunction(trial_p,p1)
 # writevtk(Ω,datadir("plts/sol_approx"),cellfields=["uh"=>uh,"ph"=>ph])

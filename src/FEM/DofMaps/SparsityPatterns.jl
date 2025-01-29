@@ -183,7 +183,7 @@ function _scalar_d_sparse_dofs_to_full_dofs(a::TProductSparsity,I,J,nrows,ncols)
   return dsd2sd
 end
 
-function _multivalue_d_sparse_dofs_to_full_dofs(a::TProductSparsity,I,J,nrows,ncols,ncomps_row,ncomps_col)
+function _multivalue_d_sparse_dofs_to_full_dofs(a::TProductSparsity,I,J,nrows,ncols,ncomps_col,ncomps_row)
   nnz_sizes = univariate_nnz(a)
   rows_no_comps = univariate_num_rows(a)
   cols_no_comps = univariate_num_cols(a)
