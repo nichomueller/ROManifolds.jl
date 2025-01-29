@@ -90,15 +90,27 @@ ronline = realization(feop;nparams=10,sampling=:uniform)
 x̂,rbstats = solve(rbsolver,rbop,ronline)
 
 x,festats = solution_snapshots(rbsolver,feop,ronline)
-perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline,Ω)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)
 
-using ROM.RBSteady
+# TPOD
 
-rbsnaps = RBSteady.to_snapshots(get_trial(rbop),x̂,ronline)
-rbsnaps_u = inv_project(get_trial(rbop)[1](ronline),x̂.data[1])
-rbsnaps_p = inv_project(get_trial(rbop)[2](ronline),x̂.data[2])
+c((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩbg.measure
+e((du,dp),(v,q)) = ∫(du⋅v)dΩbg.measure + ∫(∇(v)⊙∇(du))dΩbg.measure + ∫(dp*q)dΩ
 
-cores_p = get_trial(rbop)[2].subspace.projection.cores
-coresD = RBSteady.sequential_product(cores_p...)
-dof_map = get_trial(rbop)[2].subspace.projection.dof_map
-invmap = invert(dof_map)
+V = FESpace(Ωbg.trian,reffe_u;conformity=:H1,dirichlet_tags="dirichlet")
+U = ParamTrialFESpace(V,gμ)
+Q = FESpace(Ωact,reffe_p;conformity=:H1)
+P = ParamTrialFESpace(Q)
+Y = MultiFieldParamFESpace([V,Q];style=BlockMultiFieldStyle())
+X = MultiFieldParamFESpace([U,P];style=BlockMultiFieldStyle())
+FF = LinearParamFEOperator(l,a,pspace,X,Y,domains)
+
+red = SupremizerReduction(c,1e-4,e;nparams=100)
+RR = RBSolver(fesolver,red;nparams_res=50,nparams_jac=50)
+
+SS,festats = solution_snapshots(RR,FF)
+OO = reduced_operator(RR,FF,SS)
+x̂,rbstats = solve(RR,OO,ronline)
+
+x,festats = solution_snapshots(RR,FF,ronline)
+eval_performance(RR,FF,OO,x,x̂,festats,rbstats,ronline)

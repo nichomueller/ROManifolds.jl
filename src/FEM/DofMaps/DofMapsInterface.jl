@@ -3,6 +3,7 @@
 
 Type representing an indexing strategy. Subtypes:
 
+- `InverseDofMap`
 - `VectorDofMap`
 - `TrivialSparseMatrixDofMap`
 - `SparseMatrixDofMap`
@@ -32,19 +33,6 @@ function vectorize(i::AbstractDofMap)
 end
 
 """
-    invert(i::AbstractDofMap) -> AbstractArray
-
-Calls the function `invperm` on the nonzero entries of `i`, and places
-zeros on the remaining zero entries of `i`. The output has the same size as `i`
-"""
-function invert(i::AbstractDofMap)
-  i′ = copy(i)
-  inz = findall(!iszero,i′)
-  i′[inz] = invperm(i[inz])
-  i′
-end
-
-"""
     flatten(i::AbstractDofMap) -> TrivialDofMap
 
 Flattens `i`, the output will be a dof map with ndims == 1
@@ -57,8 +45,56 @@ function change_dof_map(i::AbstractDofMap,mask_to_add)
   @abstractmethod
 end
 
-function change_dof_map(i::AbstractVector{<:AbstractDofMap},mask_to_add::AbstractVector{<:AbstractVector})
-  map(change_dof_map,i,mask_to_add)
+"""
+    struct InverseDofMap{D,Ti,I<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
+      dof_map::I
+    end
+
+Inverse dof map of a given AbstractDofMap object `dof_map`
+"""
+struct InverseDofMap{D,Ti,I<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
+  dof_map::I
+end
+
+Base.size(i::InverseDofMap) = size(i.dof_map)
+
+function Base.getindex(i::InverseDofMap,j::Integer)
+  index = i.dof_map[j]
+  iszero(index) ? index : j
+end
+
+function Base.setindex!(i::InverseDofMap,v,j::Integer)
+  index = i.dof_map[j]
+  !iszero(value) && setindex!(i.dof_map,v,index)
+end
+
+function Base.reshape(i::InverseDofMap,s::Vararg{Int})
+  InverseDofMap(reshape(i.dof_map,s...))
+end
+
+function flatten(i::InverseDofMap)
+  InverseDofMap(flatten(i.dof_map))
+end
+
+function change_dof_map(i::VectorDofMap,mask_to_add)
+  InverseDofMap(change_dof_map(i.dof_map,mask_to_add))
+end
+
+"""
+    invert(i::AbstractDofMap) -> InverseDofMap
+
+Retruns an InverseDofMap object out of an existing dof map `i`
+"""
+function invert(i::AbstractDofMap)
+  InverseDofMap(i)
+end
+
+for f in (:vectorize,:flatten,:invert,:change_dof_map)
+  @eval begin
+    function $f(i::AbstractVector{<:AbstractDofMap},args...)
+      map(i -> $f(i,args...),i)
+    end
+  end
 end
 
 """

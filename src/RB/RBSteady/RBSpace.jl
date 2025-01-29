@@ -253,7 +253,7 @@ end
 # utils
 
 function to_snapshots(f::FESpace,x::AbstractParamVector,r::AbstractRealization)
-  i = get_dof_map(f)
+  i = invert(get_dof_map(f))
   Snapshots(x,i,r)
 end
 

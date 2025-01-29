@@ -339,13 +339,7 @@ function load_results(dir;label="")
 end
 
 function Utils.compute_relative_error(norm_style::NormStyle,feop,sol,sol_approx,trian::Triangulation)
-  @check get_dof_map(sol) == get_dof_map(sol_approx)
-  trial = get_trial(feop)
-  dof_to_mask = DofMaps.get_bg_dof_to_mask(trial,trian)
-  dof_map = change_dof_map(get_dof_map(sol),dof_to_mask)
-  sol_trian = change_dof_map(sol,dof_map)
-  sol_approx_trian = change_dof_map(sol_approx,dof_map)
-  compute_relative_error(norm_style,feop,sol_trian,sol_approx_trian)
+  @notimplemented
 end
 
 function Utils.compute_relative_error(norm_style::EnergyNorm,feop,sol,sol_approx)

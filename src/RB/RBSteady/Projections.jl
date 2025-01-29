@@ -363,7 +363,7 @@ get_cores(a::TTSVDProjection) = a.cores
 DofMaps.get_dof_map(a::Projection) = @notimplemented
 DofMaps.get_dof_map(a::TTSVDProjection) = a.dof_map
 
-get_basis(a::TTSVDProjection) = cores2basis(get_dof_map(a),get_cores(a)...)
+get_basis(a::TTSVDProjection) = cores2basis(get_cores(a)...)
 num_fe_dofs(a::TTSVDProjection) = prod(map(c -> size(c,2),get_cores(a)))
 num_reduced_dofs(a::TTSVDProjection) = size(last(get_cores(a)),3)
 
@@ -471,6 +471,10 @@ DofMaps.get_dof_map(a::NormedProjection) = get_dof_map(a.projection)
 
 function project!(x̂::AbstractArray,a::NormedProjection,x::AbstractArray)
   project!(x̂,a.projection,x,a.norm_matrix)
+end
+
+function inv_project!(x::AbstractArray,a::NormedProjection,x̂::AbstractArray)
+  inv_project!(x,a.projection,x̂)
 end
 
 function union_bases(a::NormedProjection,b::NormedProjection,args...)

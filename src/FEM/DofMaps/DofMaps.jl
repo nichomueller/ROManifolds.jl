@@ -53,6 +53,7 @@ include("SparsityPatterns.jl")
 
 export AbstractDofMap
 export TrivialDofMap
+export InverseDofMap
 export VectorDofMap
 export TrivialSparseMatrixDofMap
 export SparseMatrixDofMap
