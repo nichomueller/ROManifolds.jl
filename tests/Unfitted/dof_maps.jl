@@ -144,3 +144,66 @@ M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
 norm(M) ≈ norm(smarray)
+
+# test 9
+
+Γ = EmbeddedBoundary(cutgeo)
+dΓ = Measure(Γ,2)
+formΓ(u,v) = ∫(u⋅v)dΓ
+
+reffe = ReferenceFE(lagrangian,Float64,2)
+f = TProductFESpace(Ωbg,reffe;conformity=:H1,dirichlet_tags=[1,2,5])
+f_act = TProductFESpace(Ωact,Ωbg,reffe;conformity=:H1,dirichlet_tags=[1,2,5])
+
+smap = get_sparse_dof_map(f,f,Γ)
+smap_act = get_sparse_dof_map(f_act,f_act,Γ)
+
+M = assemble_matrix(formΓ,f_act.space,f_act.space)
+smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
+
+norm(M) ≈ norm(smarray)
+
+# test 10
+
+reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},2)
+f = TProductFESpace(Ωbg,reffe;conformity=:H1,dirichlet_tags=[1,2,5])
+f_act = TProductFESpace(Ωact,Ωbg,reffe;conformity=:H1,dirichlet_tags=[1,2,5])
+
+smap = get_sparse_dof_map(f,f,Γ)
+smap_act = get_sparse_dof_map(f_act,f_act,Γ)
+
+M = assemble_matrix(formΓ,f_act.space,f_act.space)
+smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
+
+norm(M) ≈ norm(smarray)
+
+# test 11
+
+using Gridap.CellData
+using Gridap.FESpaces
+
+reffe = ReferenceFE(lagrangian,Float64,2)
+f = TProductFESpace(Ωbg,reffe;conformity=:H1,dirichlet_tags=[1,2,5])
+f_act = TProductFESpace(Ωbg,reffe;conformity=:H1,constraint=:zeromean,dirichlet_tags=[1,2,5])
+
+smap = get_sparse_dof_map(f,f,Γ)
+smap_act = get_sparse_dof_map(f_act,f_act,Γ)
+
+M = assemble_matrix(formΓ,f_act.space,f_act.space)
+smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
+
+norm(M) ≈ norm(smarray)
+
+# test 12
+
+reffe = ReferenceFE(lagrangian,Float64,2)
+f = TProductFESpace(Ωbg,reffe;conformity=:H1,dirichlet_tags=[1,2,5])
+f_act = TProductFESpace(Ωact,Ωbg,reffe;conformity=:H1,constraint=:zeromean,dirichlet_tags=[1,2,5])
+
+smap = get_sparse_dof_map(f,f,Γ)
+smap_act = get_sparse_dof_map(f_act,f_act,Γ)
+
+M = assemble_matrix(formΓ,f_act.space,f_act.space)
+smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
+
+norm(M) ≈ norm(smarray)

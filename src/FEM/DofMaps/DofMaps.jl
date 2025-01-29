@@ -74,7 +74,6 @@ export OrderedFESpace
 export CartesianFESpace
 export OrderedFEFunction
 export get_ordered_cell_dof_ids
-export get_bg_dof_to_mask
 export scatter_ordered_free_and_dirichlet_values
 export gather_ordered_free_and_dirichlet_values!
 include("OrderedFESpaces.jl")

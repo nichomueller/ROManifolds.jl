@@ -10,17 +10,8 @@ Subtypes:
 """
 abstract type SparsityPattern end
 
-function get_sparsity(U::FESpace,V::FESpace,ttrian=_get_common_domain(U,V))
-  strian = _get_common_domain(U,V)
-  sparsity = SparsityPattern(U,V,strian)
-  if !(strian ≈ ttrian)
-    row_ids = get_cell_dof_ids(V,ttrian)
-    col_ids = get_cell_dof_ids(U,ttrian)
-    bg_rows_to_act_rows = get_bg_rows_to_act_rows(U,row_ids)
-    bg_cols_to_act_cols = get_bg_rows_to_act_rows(U,row_ids)
-    sparsity = CartesianSparsity(sparsity,bg_rows_to_act_rows,bg_cols_to_act_cols)
-  end
-  return sparsity
+function get_sparsity(U::FESpace,V::FESpace,trian=_get_common_domain(U,V))
+  SparsityPattern(U,V,trian)
 end
 
 function SparsityPattern(U::FESpace,V::FESpace,trian=_get_common_domain(U,V))
@@ -86,7 +77,7 @@ struct CartesianSparsity{A<:SparsityPattern,B,C} <: SparsityPattern
   bg_cols_to_act_cols::C
 end
 
-const IdentityCartesianSparsity{A} = CartesianSparsity{A,<:IdentityVector,<:IdentityVector}
+CartesianSparsity(a::SparsityPattern,::IdentityVector,::IdentityVector) = a
 
 get_background_matrix(a::CartesianSparsity) = get_background_matrix(a.sparsity)
 
@@ -135,15 +126,11 @@ function get_sparse_dof_map(a::TProductSparsity,U::FESpace,V::FESpace,args...)
   SparseMatrixDofMap(sparse_ids,full_ids,a)
 end
 
-for T in (:Any,:IdentityCartesianSparsity)
-  @eval begin
-    function get_d_sparse_dofs_to_full_dofs(Tu,Tv,a::TProductSparsity{<:$T})
-      I,J, = findnz(a)
-      nrows = num_rows(a)
-      ncols = num_cols(a)
-      get_d_sparse_dofs_to_full_dofs(Tu,Tv,a,I,J,nrows,ncols)
-    end
-  end
+function get_d_sparse_dofs_to_full_dofs(Tu,Tv,a::TProductSparsity)
+  I,J, = findnz(a)
+  nrows = num_rows(a)
+  ncols = num_cols(a)
+  get_d_sparse_dofs_to_full_dofs(Tu,Tv,a,I,J,nrows,ncols)
 end
 
 function get_d_sparse_dofs_to_full_dofs(Tu,Tv,a::TProductSparsity{<:CartesianSparsity})
@@ -178,8 +165,6 @@ function _scalar_d_sparse_dofs_to_full_dofs(a::TProductSparsity,I,J,nrows,ncols)
   nnz_sizes = univariate_nnz(a)
   rows = univariate_num_rows(a)
   cols = univariate_num_cols(a)
-  nrows = num_rows(a)
-  ncols = num_cols(a)
 
   i,j, = univariate_findnz(a)
   d_to_nz_pairs = map((id,jd)->map(CartesianIndex,id,jd),i,j)

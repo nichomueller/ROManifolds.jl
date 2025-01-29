@@ -96,33 +96,9 @@ x̂,rbstats = solve(rbsolver,rbop,ronline)
 x,festats = solution_snapshots(rbsolver,feop,ronline)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)
 
+#
+U,V = trial_u(nothing),test_u
+get_sparse_dof_map(U,V)
 
-x, = solution_snapshots(rbsolver,feop;nparams=1)
-u1 = flatten_snapshots(x[1])[:,1]
-p1 = flatten_snapshots(x[2])[:,1]
-r1 = get_realization(x[1])[1]
-U1 = param_getindex(trial_u(r1),1)
-P1 = trial_p(nothing)
-uh = OrderedFEFunction(U1,u1)
-ph = OrderedFEFunction(P1,p1)
-writevtk(Ω,datadir("plts/sol"),cellfields=["uh"=>uh,"ph"=>ph])
-writevtk(Ωbg.trian,datadir("plts/sol_bg"),cellfields=["uh"=>uh,"ph"=>ph])
-
-V = FESpace(Ωbg.trian,reffe_u;conformity=:H1,dirichlet_tags="dirichlet")
-U = ParamTrialFESpace(V,gμ)
-Q = FESpace(Ωact,reffe_p;conformity=:H1)
-P = ParamTrialFESpace(Q)
-Y = MultiFieldParamFESpace([V,Q];style=BlockMultiFieldStyle())
-X = MultiFieldParamFESpace([U,P];style=BlockMultiFieldStyle())
-ffeop = LinearParamFEOperator(l,a,pspace,X,Y)
-xx, = solution_snapshots(rbsolver,ffeop;nparams=1)
-
-u1 = flatten_snapshots(xx[1])[:,1]
-p1 = flatten_snapshots(xx[2])[:,1]
-r1 = get_realization(xx[1])[1]
-U1 = param_getindex(U(r1),1)
-P1 = P(nothing)
-uh = FEFunction(U1,u1)
-ph = FEFunction(P1,p1)
-writevtk(Ω,datadir("plts/sol"),cellfields=["uh"=>uh,"ph"=>ph])
-writevtk(Ωbg.trian,datadir("plts/sol_bg"),cellfields=["uh"=>uh,"ph"=>ph])
+strian = DofMaps._get_common_domain(U,V)
+strian ≈ Ωbg.trian

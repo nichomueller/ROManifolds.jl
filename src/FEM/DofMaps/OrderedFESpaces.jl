@@ -119,17 +119,9 @@ get_act_dof_to_bg_dof(f::CartesianFESpace) = findall(!iszero,f.bg_odofs_to_act_o
 
 function get_sparsity(f::CartesianFESpace,g::CartesianFESpace,args...)
   sparsity = SparsityPattern(f,g,args...)
-  CartesianSparsity(sparsity,get_bg_dof_to_act_dof(f),get_bg_dof_to_act_dof(g))
-end
-
-function get_sparsity(f::CartesianFESpace,g::SingleFieldFESpace,args...)
-  sparsity = get_sparsity(get_fe_space(f),g,args...)
-  CartesianSparsity(sparsity,get_bg_dof_to_act_dof(f),get_bg_dof_to_act_dof(g))
-end
-
-function get_sparsity(f::SingleFieldFESpace,g::CartesianFESpace,args...)
-  sparsity = get_sparsity(f,get_fe_space(g),args...)
-  CartesianSparsity(sparsity,get_bg_dof_to_act_dof(f),get_bg_dof_to_act_dof(g))
+  bg_rows_to_act_rows = get_bg_dof_to_act_dof(g)
+  bg_cols_to_act_cols = get_bg_dof_to_act_dof(f)
+  CartesianSparsity(sparsity,bg_rows_to_act_rows,bg_cols_to_act_cols)
 end
 
 # dof reordering
@@ -258,15 +250,15 @@ cubic_polytope(::Val{1}) = SEGMENT
 cubic_polytope(::Val{2}) = QUAD
 cubic_polytope(::Val{3}) = HEX
 
-function _local_pdof_to_dof(fe_dof_basis::AbstractVector{<:Dof},args...)
+function _local_odof_to_dof(fe_dof_basis::AbstractVector{<:Dof},args...)
   @notimplemented "This function is only implemented for Lagrangian dof bases"
 end
 
-function _local_pdof_to_dof(fe_dof_basis::Fill{<:LagrangianDofBasis},orders::NTuple{D,Int}) where D
-  _local_pdof_to_dof(testitem(fe_dof_basis),orders)
+function _local_odof_to_dof(fe_dof_basis::Fill{<:LagrangianDofBasis},orders::NTuple{D,Int}) where D
+  _local_odof_to_dof(testitem(fe_dof_basis),orders)
 end
 
-function _local_pdof_to_dof(b::LagrangianDofBasis,orders::NTuple{D,Int}) where D
+function _local_odof_to_dof(b::LagrangianDofBasis,orders::NTuple{D,Int}) where D
   nnodes = length(b.node_and_comp_to_dof)
   ndofs = length(b.dof_to_comp)
 
@@ -275,57 +267,21 @@ function _local_pdof_to_dof(b::LagrangianDofBasis,orders::NTuple{D,Int}) where D
   node_to_pnode = Gridap.ReferenceFEs._coords_to_terms(_nodes,orders)
   node_to_pnode_linear = LinearIndices(orders.+1)[node_to_pnode]
 
-  pdof_to_dof = zeros(Int32,ndofs)
+  odof_to_dof = zeros(Int32,ndofs)
   for (inode,ipnode) in enumerate(node_to_pnode_linear)
     for icomp in b.dof_to_comp
       local_shift = (icomp-1)*nnodes
-      pdof_to_dof[local_shift+ipnode] = local_shift + inode
+      odof_to_dof[local_shift+ipnode] = local_shift + inode
     end
   end
 
-  return pdof_to_dof
+  return odof_to_dof
 end
 
 function _local_node_to_pnode(p::Polytope,orders)
   _nodes, = Gridap.ReferenceFEs._compute_nodes(p,orders)
   pnodes = Gridap.ReferenceFEs._coords_to_terms(_nodes,orders)
   return pnodes
-end
-
-for f in (:_get_bg_cell_to_mask,:_get_bg_cell_to_act_cell)
-  @eval begin
-    function $f(f::SingleFieldFESpace)
-      trian = get_triangulation(f)
-      model = get_active_model(trian)
-      grid = get_grid(model)
-      $f(grid)
-    end
-
-    function $f(grid::Grid)
-      @abstractmethod
-    end
-  end
-end
-
-function _get_bg_cell_to_mask(grid::CartesianGrid)
-  fill(true,num_cells(grid))
-end
-
-function _get_bg_cell_to_act_cell(grid::CartesianGrid)
-  IdentityVector(num_cells(grid))
-end
-
-function _get_bg_cell_to_mask(grid::GridPortion)
-  bg_grid = grid.parent
-  mask = ones(Bool,num_cells(bg_grid))
-  for bg_cell in grid.cell_to_parent_cell
-    mask[bg_cell] = false
-  end
-  return mask
-end
-
-function _get_bg_cell_to_act_cell(grid::GridPortion)
-  grid.cell_to_parent_cell
 end
 
 function _get_bg_odof_to_act_odof(bg_f::CartesianFESpace,act_f::CartesianFESpace)
@@ -400,11 +356,12 @@ end
 
 function scatter_ordered_free_and_dirichlet_values(f::OrderedFESpace,fv,dv)
   cell_dof_ids = get_cell_dof_ids(f)
-  lazy_map(Broadcasting(PosNegReindex(fv,dv)),cell_dof_ids)
+  cell_values = lazy_map(Broadcasting(PosNegReindex(fv,dv)),cell_dof_ids)
+  cell_ovalue_to_value(f,cell_values)
 end
 
 function gather_ordered_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv)
-  cell_ovals = order_cell_values(get_fe_space(f),cv)
+  cell_ovals = cell_value_to_ovalue(get_fe_space(f),cv)
   cell_dofs = get_cell_dof_ids(f)
   cache_vals = array_cache(cell_ovals)
   cache_dofs = array_cache(cell_dofs)
@@ -422,9 +379,15 @@ function gather_ordered_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv)
   (fv,dv)
 end
 
-function order_cell_values(f::OrderedFESpace,cv)
+function cell_ovalue_to_value(f::OrderedFESpace,cv)
   cell_dof_ids = get_cell_dof_ids(f)
-  odof_to_dof = cell_dof_ids.maps[1].pdof_to_dof
+  odof_to_dof = cell_dof_ids.maps[1].odof_to_dof
+  lazy_map(OReindex(odof_to_dof),cv)
+end
+
+function cell_value_to_ovalue(f::OrderedFESpace,cv)
+  cell_dof_ids = get_cell_dof_ids(f)
+  odof_to_dof = cell_dof_ids.maps[1].odof_to_dof
   dof_to_odof = invperm(odof_to_dof)
   lazy_map(OReindex(dof_to_odof),cv)
 end

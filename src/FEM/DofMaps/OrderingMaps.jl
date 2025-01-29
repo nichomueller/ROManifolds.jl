@@ -14,7 +14,7 @@ end
 
 struct DofsToODofs{D,P,V} <: Map
   b::LagrangianDofBasis{P,V}
-  pdof_to_dof::Vector{Int32}
+  odof_to_dof::Vector{Int32}
   node_and_comps_to_odof::Array{V,D}
   orders::NTuple{D,Int}
 end
@@ -24,8 +24,8 @@ function DofsToODofs(
   node_and_comps_to_odof::AbstractArray,
   orders::Tuple)
 
-  pdof_to_dof = _local_pdof_to_dof(b,orders)
-  DofsToODofs(b,pdof_to_dof,node_and_comps_to_odof,orders)
+  odof_to_dof = _local_odof_to_dof(b,orders)
+  DofsToODofs(b,odof_to_dof,node_and_comps_to_odof,orders)
 end
 
 function DofsToODofs(fe_dof_basis::Fill{<:LagrangianDofBasis},args...)
@@ -50,8 +50,8 @@ function get_odof(k::DofsToODofs{D,P},dof::Integer) where {D,P}
 end
 
 function Arrays.return_cache(k::DofsToODofs{D},cell::CartesianIndex{D}) where D
-  local_ndofs = length(k.pdof_to_dof)
-  odofs = OIdsToIds(zeros(Int32,local_ndofs),k.pdof_to_dof)
+  local_ndofs = length(k.odof_to_dof)
+  odofs = OIdsToIds(zeros(Int32,local_ndofs),k.odof_to_dof)
   return odofs
 end
 

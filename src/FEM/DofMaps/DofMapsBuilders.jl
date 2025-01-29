@@ -35,8 +35,8 @@ function get_bg_dof_to_act_dof(f::FESpace)
   @abstractmethod
 end
 
-function get_bg_dof_to_mask(f::FESpace)
-  map(iszero,get_bg_dof_to_act_dof(f))
+function get_bg_dof_to_mask(f::FESpace,args...)
+  map(iszero,get_bg_dof_to_act_dof(f,args...))
 end
 
 function get_bg_dof_to_act_dof(f::SingleFieldFESpace)
@@ -59,6 +59,31 @@ end
 function get_bg_dof_to_act_dof(f::ZeroMeanFESpace)
   bg_space = f.space
   get_bg_dof_to_act_dof(bg_space)
+end
+
+#TODO this is type unstable, but in practice this function is never called
+function get_bg_dof_to_act_dof(f::FESpace,ttrian::Triangulation)
+  strian = get_triangulation(f)
+  bg_bg_dof_to_bg_dof = get_bg_dof_to_act_dof(f)
+  if ttrian ≈ strian
+    bg_dof_to_act_dof = bg_bg_dof_to_bg_dof
+  else
+    T = eltype(bg_bg_dof_to_bg_dof)
+    n = length(bg_bg_dof_to_bg_dof)
+    bg_dof_to_act_dof = zeros(T,n)
+    cellids = get_cell_dof_ids(f,ttrian)
+    cache = array_cache(cellids)
+    for cell in 1:length(cellids)
+      dofs = getindex!(cache,cellids,cell)
+      for dof in dofs
+        bg_dof = bg_bg_dof_to_bg_dof[dof]
+        if bg_dof > 0
+          bg_dof_to_act_dof[bg_dof] = dof
+        end
+      end
+    end
+  end
+  return bg_dof_to_act_dof
 end
 
 function get_bg_dof_to_act_dof(masked_dofs,ndofs::Int)
@@ -95,4 +120,13 @@ function get_polynomial_orders(basis)
   cell_basis = get_data(basis)
   shapefun = testitem(cell_basis)
   get_orders(shapefun.fields)
+end
+
+function _get_bg_cell_to_act_cell(f::SingleFieldFESpace)
+  trian = get_triangulation(f)
+  _get_bg_cell_to_act_cell(trian)
+end
+
+function _get_bg_cell_to_act_cell(trian::Triangulation)
+  Utils.get_tface_to_mface(trian)
 end
