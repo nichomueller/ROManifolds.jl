@@ -95,7 +95,7 @@ to `AB` to an index belonging to `B`
 Returns a sparse matrix with values equal to `v`, and sparsity pattern equal to
 that of `a`
 """
-recast(v::AbstractVector,a::AbstractArray) = @abstractmethod
+recast(v::AbstractArray,a::AbstractArray) = @abstractmethod
 recast(v::AbstractVector,a::SparseMatrixCSC) = SparseMatrixCSC(a.m,a.n,a.colptr,a.rowval,v)
 recast(v::AbstractVector,a::SparseMatrixCSR{Bi}) where Bi = SparseMatrixCSR{Bi}(a.m,a.n,a.rowptr,a.colval,v)
 

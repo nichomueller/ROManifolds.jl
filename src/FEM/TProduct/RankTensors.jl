@@ -125,10 +125,22 @@ function tproduct_array(
   ::PartialDerivative{N},
   arrays_1d::Vector{<:AbstractArray},
   gradients_1d::Vector{<:AbstractArray},
-  args...) where N
+  args...
+  ) where N
 
   arrays_1d[N] = gradients_1d[N]
   Rank1Tensor(arrays_1d)
+end
+
+function tproduct_array(
+  ::Utils.MixedDerivative,
+  arrays_1d::Vector{<:AbstractArray},
+  gradients_1d::Vector{<:AbstractArray},
+  args...
+  )
+
+  decompositions = _find_decompositions(nothing,arrays_1d,gradients_1d)
+  GenericRankTensor(decompositions)
 end
 
 function _find_decompositions(::Nothing,arrays_1d,gradients_1d)

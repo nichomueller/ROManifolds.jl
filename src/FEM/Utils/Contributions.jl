@@ -3,7 +3,7 @@
 
 Represents quantitites whose values vary upon a triangulation. The values can
 be accessed by indexing a the corresponding triangulation. See DomainContribution
-in [`Gridap`](@ref) for more details.
+in `Gridap` for more details.
 """
 abstract type Contribution end
 

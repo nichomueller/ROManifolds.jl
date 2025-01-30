@@ -3,7 +3,7 @@
 
 Returns an assembler that also stores the parametric length of `r`. This function
 is to be used to assemble parametric residuals and jacobians. The assembly routines
-follow the same pipeline as in [`Gridap`](@ref)
+follow the same pipeline as in `Gridap`
 """
 function get_param_assembler(a::SparseMatrixAssembler,r::AbstractRealization)
   matrix_builder = get_param_matrix_builder(a,r)

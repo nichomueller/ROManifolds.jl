@@ -1,7 +1,7 @@
 """
     abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: ParamFEOperator{T} end
 
-Parametric extension of a `TransientFEOperator` in [`Gridap`](@ref). Compared to
+Parametric extension of a `TransientFEOperator` in `Gridap`. Compared to
 a standard TransientFEOperator, there are the following novelties:
 
 - a TransientParamSpace is provided, so that parametric realizations can be extracted

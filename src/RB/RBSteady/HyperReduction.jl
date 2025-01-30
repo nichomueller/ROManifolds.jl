@@ -41,9 +41,7 @@ end
 
 Type representing the set of interpolation rows of a `Projection` subjected
 to a EIM approximation with `empirical_interpolation`.
-
 Subtypes:
-
 - [`IntegrationDomain`](@ref)
 - [`TransientIntegrationDomain`](@ref)
 """
@@ -116,9 +114,7 @@ the reduced projection `Φrb`, where
 
 The output of this operation is a ReducedProjection. Therefore, a HyperReduction
 is completely characterized by the triplet (`Φrb`,`Φi`,`i`).
-
 Subtypes:
-
 - [`EmptyHyperReduction`](@ref)
 - [`MDEIM`](@ref)
 """

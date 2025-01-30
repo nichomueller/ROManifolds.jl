@@ -6,7 +6,7 @@
       jacobian_reduction::B
     end
 
-Wrapper around a FE solver (e.g. [`FESolver`](@ref) or [`ODESolver`](@ref)) with
+Wrapper around a FE solver (e.g. `FESolver` or `ODESolver` in `Gridap`) with
 additional information on the reduced basis (RB) method employed to solve a given
 problem dependent on a set of parameters. A RB method is a projection-based
 reduced order model where

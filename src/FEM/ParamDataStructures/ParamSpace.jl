@@ -2,9 +2,10 @@
     abstract type AbstractRealization end
 
 Type representing parametric realizations, i.e. samples extracted from a given
-parameter space. Two categories of such realizations are implemented:
-- `Realization`.
-- `TransientRealization`.
+parameter space.
+Subtypes:
+- [`Realization`](@ref)
+- [`TransientRealization`](@ref)
 """
 abstract type AbstractRealization end
 
