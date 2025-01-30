@@ -20,9 +20,9 @@ get_decomposition(a::AbstractRankTensor) = ntuple(k -> get_decomposition(a,k),Va
 
 For a tensor `a` of dimension `D` and rank `K` assuming the form
 
-a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k
+`a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k`
 
-returns the decomposition relative to the kth rank [a_1^k, ⋯, a_D^k]
+returns the decomposition relative to the `k`th rank `[a_1^k, ⋯, a_D^k]`
 """
 get_decomposition(a::AbstractRankTensor,k::Integer) = @abstractmethod
 
@@ -33,7 +33,7 @@ get_decomposition(a::AbstractRankTensor,k::Integer) = @abstractmethod
 
 Structure representing rank-1 tensors, i.e. assuming the form
 
-a = a_1 ⊗ ⋯ ⊗ a_D
+`a = a_1 ⊗ ⋯ ⊗ a_D`
 """
 struct Rank1Tensor{D,A<:AbstractArray} <: AbstractRankTensor{D,1}
   factors::Vector{A}
@@ -59,7 +59,7 @@ end
 
 Structure representing a generic rank-K tensor, i.e. assuming the form
 
-a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k
+`a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k`
 """
 struct GenericRankTensor{D,K,A<:AbstractArray} <: AbstractRankTensor{D,K}
   decompositions::Vector{Rank1Tensor{D,A}}
@@ -74,7 +74,6 @@ get_factor(a::GenericRankTensor,d::Integer,k::Integer) = get_factors(get_decompo
 Base.size(a::GenericRankTensor) = (rank(a),)
 Base.getindex(a::GenericRankTensor,k::Integer) = get_decomposition(a,k)
 
-#TODO will have to change this at some point
 function LinearAlgebra.cholesky(a::GenericRankTensor{D,K}) where {D,K}
   map(1:D) do d
     factor = get_factor(a,d,1)
@@ -169,7 +168,7 @@ end
       array::Array{A,N}
     end
 
-Multi-field version of a `AbstractRankTensor`
+Multi-field version of a [`AbstractRankTensor`](@ref)
 """
 struct BlockRankTensor{A<:AbstractRankTensor,N} <: AbstractArray{A,N}
   array::Array{A,N}

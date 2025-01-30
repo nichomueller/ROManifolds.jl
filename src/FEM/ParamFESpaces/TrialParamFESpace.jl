@@ -1,7 +1,7 @@
 """
     TrialParamFESpace{S} <: SingleFieldParamFESpace{S}
 
-Most standard implementation of a parametric trial FE space
+Trial FE space equipped with parametric dirichlet values
 """
 struct TrialParamFESpace{S} <: SingleFieldParamFESpace{S}
   dirichlet_values::AbstractParamVector
@@ -24,6 +24,12 @@ function TrialParamFESpace(space::SingleFieldFESpace,objects)
   TrialParamFESpace(ConsecutiveParamArray(dirichlet_values),space)
 end
 
+"""
+    TrialParamFESpace!(dir_values::AbstractParamVector,space::SingleFieldFESpace,objects
+      ) -> TrialParamFESpace
+
+Allows do-block syntax for the construction of a [`TrialParamFESpace`](@ref)
+"""
 function TrialParamFESpace!(dir_values::AbstractParamVector,space::SingleFieldFESpace,objects)
   dir_values_scratch = zero_dirichlet_values(space)
   dir_values = compute_dirichlet_values_for_tags!(dir_values,dir_values_scratch,space,objects)
@@ -51,9 +57,15 @@ function TrialParamFESpace!(f::Function,space::TrialParamFESpace)
   TrialParamFESpace!(space,f)
 end
 
-function HomogeneousTrialParamFESpace(U::SingleFieldFESpace,n::Int)
+"""
+    HomogeneousTrialParamFESpace(U::SingleFieldFESpace,plength::Int) -> TrialParamFESpace
+
+Returns a [`TrialParamFESpace`](@ref) equipped with homogeneous parametric
+dirichlet values
+"""
+function HomogeneousTrialParamFESpace(U::SingleFieldFESpace,plength::Int)
   dv = zero_dirichlet_values(U)
-  dirichlet_values = consecutive_param_array(dv,n)
+  dirichlet_values = consecutive_param_array(dv,plength)
   TrialParamFESpace(dirichlet_values,U)
 end
 

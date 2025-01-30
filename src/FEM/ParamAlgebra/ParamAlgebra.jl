@@ -20,15 +20,9 @@ using GridapSolvers.BlockSolvers
 
 using ROM.ParamDataStructures
 
-import UnPack: @unpack
 import ArraysOfArrays: innersize
-import PartitionedArrays: tuple_of_arrays
 import ROM.DofMaps: OIdsToIds, add_ordered_entries!
 
-export ParamBuilder
-export ParamCounter
-export ParamInserterCSC
-export eltype2
 include("ParamAlgebraInterfaces.jl")
 
 include("ParamSolvers.jl")

@@ -1,24 +1,35 @@
 """
     abstract type PartialFunctions <: Function end
+
+Subtypes:
+- [`PartialFunctions`](@ref)
+- [`PartialTrace`](@ref)
 """
 abstract type PartialFunctions <: Function end
 
 """
     struct PartialDerivative{N} <: PartialFunctions end
 
-Map that implements a partial derivative in `Gridap`
+Map that implements a partial derivative in [`Gridap`](@ref)
 """
 struct PartialDerivative{N} <: PartialFunctions end
 
 PartialDerivative{N}(f) where N = Operation(PartialTrace{N}())(∇(f))
 
+"""
+    const ∂₁ = PartialDerivative{1}
+"""
 const ∂₁ = PartialDerivative{1}
-const ∂₂ = PartialDerivative{2}
-const ∂₃ = PartialDerivative{3}
 
-const ∂₁₂ = PartialDerivative{(1,2)}
-const ∂₁₂₃ = PartialDerivative{(1,2,3)}
-const ∂ₙ = Union{∂₁₂,∂₁₂₃}
+"""
+    const ∂₂ = PartialDerivative{2}
+"""
+const ∂₂ = PartialDerivative{2}
+
+"""
+    const ∂₃ = PartialDerivative{3}
+"""
+const ∂₃ = PartialDerivative{3}
 
 function Arrays.evaluate!(cache,::Broadcasting{<:PartialDerivative{N}},f) where N
   Broadcasting(Operation(PartialTrace{N}()))(Broadcasting(∇)(f))
@@ -28,6 +39,8 @@ function PartialDerivative{N}(f::Function,x::Point,fx) where N
   PartialTrace{N}(gradient(f,x,fx))
 end
 
+"""
+"""
 struct PartialTrace{N} <: PartialFunctions end
 
 (f::PartialTrace{N})(x...) where N = evaluate(f,x...)

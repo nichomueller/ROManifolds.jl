@@ -3,16 +3,17 @@
 
 Represents quantitites whose values vary upon a triangulation. The values can
 be accessed by indexing a the corresponding triangulation. See DomainContribution
-in `Gridap` for more details.
-
-Subtypes:
-
-- `ArrayContribution`
-- `AffineContribution`
+in [`Gridap`](@ref) for more details.
 """
 abstract type Contribution end
 
 CellData.get_domains(a::Contribution) = a.trians
+
+"""
+    get_values(a::Contribution) -> Tuple
+
+Fetches the values of a [`Contribution`](@ref) `a`
+"""
 get_values(a::Contribution) = a.values
 
 Base.length(a::Contribution) = length(a.values)
@@ -21,7 +22,13 @@ Base.getindex(a::Contribution,i...) = a.values[i...]
 Base.setindex!(a::Contribution,v,i...) = a.values[i...] = v
 Base.eachindex(a::Contribution) = eachindex(a.values)
 
-# Allow do-block syntax
+"""
+    contribution(f,trians) -> Contribution
+
+Constructor of a [`Contribution`](@ref) that allows do-block syntax. `f` is a
+function such that `value[i] = f(trian[i]) for i...`. This constructor first builds
+the tuple of values, then builds the `Contribution` object from `values` and `trians`
+"""
 @inline function contribution(f,trians)
   values = map(f,trians)
   Contribution(values,trians)
@@ -62,7 +69,7 @@ end
       trians::K
     end
 
-Contribution whose `values` are AbstractArrays
+Contribution whose `values` are `AbstractArray`s
 """
 struct ArrayContribution{T,N,V,K} <: Contribution
   values::V
@@ -74,7 +81,14 @@ struct ArrayContribution{T,N,V,K} <: Contribution
   end
 end
 
+"""
+    const VectorContribution{T,V,K} = ArrayContribution{T,1,V,K}
+"""
 const VectorContribution{T,V,K} = ArrayContribution{T,1,V,K}
+
+"""
+    const MatrixContribution{T,V,K} = ArrayContribution{T,2,V,K}
+"""
 const MatrixContribution{T,V,K} = ArrayContribution{T,2,V,K}
 
 Base.eltype(::ArrayContribution{T}) where T = T
@@ -161,7 +175,11 @@ function Base.materialize!(a::ArrayContribution,c::ContributionBroadcast)
   a
 end
 
-# small hack, it allows to efficiently deal with jacobians in an unsteady setting
+"""
+    const TupOfArrayContribution{T} = Tuple{Vararg{ArrayContribution{T}}}
+
+Specifically allows to deal with tuples of Jacobians in unsteady settings
+"""
 const TupOfArrayContribution{T} = Tuple{Vararg{ArrayContribution{T}}}
 
 Base.eltype(::TupOfArrayContribution{T}) where T = T

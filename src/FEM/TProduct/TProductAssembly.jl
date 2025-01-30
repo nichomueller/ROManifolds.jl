@@ -1,7 +1,7 @@
 """
     TProductSparseMatrixAssembler{A<:SparseMatrixAssembler} <: SparseMatrixAssembler
 
-Assembly-related information when constructing a `AbstractRankTensor`](ref)
+Assembly-related information when constructing a [`AbstractRankTensor`](ref)
 """
 struct TProductSparseMatrixAssembler{A<:SparseMatrixAssembler} <: SparseMatrixAssembler
   assems_1d::Vector{A}
@@ -171,6 +171,12 @@ end
 
 # multi field
 
+"""
+    TProductBlockSparseMatrixAssembler(trial::MultiFieldFESpace,test::MultiFieldFESpace
+      ) -> TProductSparseMatrixAssembler
+
+Returns a [`TProductSparseMatrixAssembler`](@ref) in a MultiField scenario
+"""
 function TProductBlockSparseMatrixAssembler(trial::MultiFieldFESpace,test::MultiFieldFESpace)
   assems_1d = map(eachindex(test.spaces[1].spaces_1d)) do d
     trials_d = map(f->_remove_trial(f).spaces_1d[d],trial.spaces)

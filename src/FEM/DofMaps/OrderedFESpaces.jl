@@ -1,9 +1,19 @@
+"""
+    abstract type OrderedFESpace{S} <: SingleFieldFESpace end
+
+Interface for FE spaces that feature a DOF reordering
+"""
 abstract type OrderedFESpace{S} <: SingleFieldFESpace end
 
 # FESpace interface
 
 FESpaces.get_fe_space(f::OrderedFESpace) = @abstractmethod
 
+"""
+    get_cell_odof_ids(f::OrderedFESpace) -> AbstractArray
+
+Fetches the ordered cell dof ids
+"""
 get_cell_odof_ids(f::OrderedFESpace) = @abstractmethod
 
 FESpaces.ConstraintStyle(::Type{<:OrderedFESpace{S}}) where S = ConstraintStyle(S)
@@ -51,9 +61,9 @@ function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv)
 end
 
 function get_dof_map(f::OrderedFESpace)
-  bg_dof_to_mask = get_bg_dof_to_mask(f)
-  bg_ndofs = length(bg_dof_to_mask)
-  return VectorDofMap(bg_ndofs,bg_dof_to_mask)
+  bg_dof_to_act_dof = get_bg_dof_to_act_dof(f)
+  bg_ndofs = length(bg_dof_to_act_dof)
+  return VectorDofMap(bg_ndofs,bg_dof_to_act_dof)
 end
 
 # Constructors
@@ -341,8 +351,14 @@ _remove_constraint(f::FESpaceWithLinearConstraints) = f.space
 _remove_constraint(f::FESpaceWithConstantFixed) = f.space
 _remove_constraint(f::ZeroMeanFESpace) = _remove_constraint(f.space)
 
-# use the following are useful to plot the solutions correctly
+# use the following are useful to correctly visualize a function on a OrderedFESpace
 
+"""
+    OrderedFEFunction(f::OrderedFESpace,fv,dv) -> FEFunction
+
+Returns a FE function with correctly ordered values. Allows, for instance, to
+correctly visualize a solution belonging to `f`
+"""
 function OrderedFEFunction(f::OrderedFESpace,fv,dv)
   cell_vals = scatter_ordered_free_and_dirichlet_values(f,fv,dv)
   cell_field = CellField(f,cell_vals)
@@ -354,12 +370,22 @@ function OrderedFEFunction(f::SingleFieldFESpace,fv)
   OrderedFEFunction(f,fv,dv)
 end
 
+"""
+    scatter_ordered_free_and_dirichlet_values(f::OrderedFESpace,fv,dv) -> AbstractArray
+
+Scatters correctly ordered free and dirichlet values
+"""
 function scatter_ordered_free_and_dirichlet_values(f::OrderedFESpace,fv,dv)
   cell_dof_ids = get_cell_dof_ids(f)
   cell_values = lazy_map(Broadcasting(PosNegReindex(fv,dv)),cell_dof_ids)
   cell_ovalue_to_value(f,cell_values)
 end
 
+"""
+    gather_ordered_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv) -> Nothing
+
+Gathers correctly ordered free and dirichlet values
+"""
 function gather_ordered_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv)
   cell_ovals = cell_value_to_ovalue(get_fe_space(f),cv)
   cell_dofs = get_cell_dof_ids(f)

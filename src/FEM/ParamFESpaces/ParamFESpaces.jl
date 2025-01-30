@@ -24,7 +24,6 @@ using ROM.ParamAlgebra
 
 import Test: @test
 import ArraysOfArrays: _innerlength
-import PartitionedArrays: tuple_of_arrays
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 
@@ -32,7 +31,7 @@ export get_param_assembler
 include("ParamAssemblers.jl")
 
 export SingleFieldParamFESpace
-export get_underlying_vector_type
+export get_vector_type2
 export param_zero_free_values
 export param_zero_dirichlet_values
 include("ParamFESpaceInterface.jl")

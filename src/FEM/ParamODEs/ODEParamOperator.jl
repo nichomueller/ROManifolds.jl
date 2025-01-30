@@ -1,13 +1,13 @@
 """
     abstract type ODEParamOperatorType <: UnEvalOperatorType end
 
-Parametric extension of the type `ODEOperatorType` in `Gridap`.
+Parametric extension of the type `ODEOperatorType` in [`Gridap`](@ref).
 
 Subtypes:
 
-- `NonlinearParamODE`
-- `LinearParamODE`
-- `LinearNonlinearParamODE`
+- [`NonlinearParamODE`](@ref)
+- [`LinearParamODE`](@ref)
+- [`LinearNonlinearParamODE`](@ref)
 """
 abstract type ODEParamOperatorType <: UnEvalOperatorType end
 
@@ -29,16 +29,11 @@ struct LinearNonlinearParamODE <: ODEParamOperatorType end
 """
     abstract type ODEParamOperator{T<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T} end
 
-Parametric extension of the type `ODEOperator` in `Gridap`.
-
-Subtypes:
-- `ODEParamOpFromTFEOp`
-- `LinearNonlinearParamOpFromTFEOp`
-- `TransientRBOperator`
+Transient extension of the type [`ParamOperator`](@ref).
 """
 abstract type ODEParamOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T} end
 
-Polynomials.get_order(odeop::ODEParamOperator) = get_order(get_fe_operator(odeop))
+ReferenceFEs.get_order(odeop::ODEParamOperator) = get_order(get_fe_operator(odeop))
 ODEs.is_form_constant(odeop::ODEParamOperator,k::Integer) = is_form_constant(get_fe_operator(odeop),k)
 
 function Algebra.allocate_residual(
@@ -153,8 +148,7 @@ function ParamSteady.allocate_paramcache(
     trialk = evaluated ? evaluate(pttrials[k+1],r) : allocate_space(pttrials[k+1],r)
     trials = (trials...,trialk)
   end
-  feop_cache = allocate_feopcache(feop,r,us)
-  ParamOpCache(trials,pttrials,feop_cache)
+  ParamOpCache(trials,pttrials)
 end
 
 function ParamSteady.update_paramcache!(

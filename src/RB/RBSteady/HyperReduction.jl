@@ -44,8 +44,8 @@ to a EIM approximation with `empirical_interpolation`.
 
 Subtypes:
 
-- `IntegrationDomain`]
-- `TransientIntegrationDomain`]
+- [`IntegrationDomain`](@ref)
+- [`TransientIntegrationDomain`](@ref)
 """
 abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
 
@@ -96,7 +96,7 @@ end
       C<:AbstractIntegrationDomain
       } <: Projection end
 
-Subtype of a `Projection` dedicated to the outputd of a hyper-reduction
+Subtype of a [`Projection`](@ref) dedicated to the outputd of a hyper-reduction
 (e.g. an empirical interpolation method (EIM)) procedure applied on residual/jacobians
 of a differential problem. This procedure can be summarized in the following steps:
 
@@ -119,8 +119,8 @@ is completely characterized by the triplet (`Φrb`,`Φi`,`i`).
 
 Subtypes:
 
-- `EmptyHyperReduction`
-- `MDEIM`
+- [`EmptyHyperReduction`](@ref)
+- [`MDEIM`](@ref)
 """
 abstract type HyperReduction{A<:Reduction,B<:ReducedProjection,C<:AbstractIntegrationDomain} <: Projection end
 
@@ -129,7 +129,7 @@ HyperReduction(::Reduction,args...) = @abstractmethod
 """
     get_interpolation(a::HyperReduction) -> Factorization
 
-For a `HyperReduction` `a` represented by the triplet (`Φrb`,`Φi`,`i`),
+For a [`HyperReduction`](@ref) `a` represented by the triplet (`Φrb`,`Φi`,`i`),
 returns `Φi`, usually stored as a Factorization
 """
 get_interpolation(a::HyperReduction) = @abstractmethod
@@ -137,7 +137,7 @@ get_interpolation(a::HyperReduction) = @abstractmethod
 """
     get_integration_domain(a::HyperReduction) -> AbstractIntegrationDomain
 
-For a `HyperReduction` `a` represented by the triplet (`Φrb`,`Φi`,`i`),
+For a [`HyperReduction`](@ref) `a` represented by the triplet (`Φrb`,`Φi`,`i`),
 returns `i`
 """
 get_integration_domain(a::HyperReduction) = @abstractmethod
@@ -212,7 +212,7 @@ end
       domain::C
     end
 
-Hyper-reduction returned by a matrix-based empirical interpolation method
+[`HyperReduction`](@ref) returned by a matrix-based empirical interpolation method
 """
 struct MDEIM{A,B,C} <: HyperReduction{A,B,C}
   reduction::A
@@ -375,8 +375,8 @@ end
 
 Contribution whose `values` assume one of the following types:
 
-- HyperReduction for single field problems
-- BlockProjection{<:HyperReductions} for multi field problems
+- [`HyperReduction`](@ref) for single field problems
+- [`BlockProjection`](@ref) for multi field problems
 """
 struct AffineContribution{A<:Projection,V,K} <: Contribution
   values::V
@@ -404,6 +404,8 @@ function allocate_hyper_reduction(a::AffineContribution,r::AbstractRealization)
   allocate_hyper_reduction(first(get_values(a)),r)
 end
 
+"""
+"""
 function allocate_hypred_cache(a::AffineContribution,r::AbstractRealization)
   coeffs = allocate_coefficient(a,r)
   hypred = allocate_hyper_reduction(a,r)
@@ -522,7 +524,7 @@ end
       ) -> (AffineContribution,Union{AffineContribution,TupOfAffineContribution})
 
 Reduces the residual/jacobian contained in `op` via hyper-reduction. Check the
-functions `reduced_residual` and `reduced_jacobian` for more details
+functions [`reduced_residual`](@ref) and [`reduced_jacobian`](@ref) for more details
 """
 function reduced_weak_form(
   solver::RBSolver,
@@ -538,6 +540,9 @@ end
 
 # multi field interface
 
+"""
+    const BlockHyperReduction{A<:HyperReduction,N} = BlockProjection{A,N}
+"""
 const BlockHyperReduction{A<:HyperReduction,N} = BlockProjection{A,N}
 
 function Utils.Contribution(

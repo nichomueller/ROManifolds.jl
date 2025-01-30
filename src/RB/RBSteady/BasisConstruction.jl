@@ -143,11 +143,11 @@ end
     ttsvd(red_style::TTSVDRanks,A::AbstractArray) -> AbstractVector{<:AbstractArray}
     ttsvd(red_style::TTSVDRanks,A::AbstractArray,X::AbstractRankTensor) -> AbstractVector{<:AbstractArray}
 
-Tensor train SVD of `A`. When provided, `X` is a (symmetric, positive definite)
-norm tensor with respect to which the output is made orthogonal.
+Tensor train SVD of `A`. When provided, `X` is a norm tensor (representing a
+symmetric, positive definite matrix) with respect to which the output is made orthogonal.
 Note: if `ndims(A)` = N, the length of the ouptput is `N-1`, since we are not
-interested in reducing the axis of the parameters. Check https://arxiv.org/abs/2412.14460
-for more details
+interested in reducing the axis of the parameters. Check [this](https://arxiv.org/abs/2412.14460)
+reference for more details
 """
 function ttsvd(
   red_style::TTSVDRanks,
@@ -399,12 +399,19 @@ function orth_projection(
   proj
 end
 
+"""
+    orth_complement!(v::AbstractVector,basis::AbstractMatrix,args...) -> Nothing
+
+In-place orthogonal complement of `v` on the column space of `basis`. When a symmetric,
+positive definite matrix `X` is provided as an argument, the output is `X`-orthogonal,
+otherwise it is ℓ²-orthogonal
+"""
 function orth_complement!(
   v::AbstractVector,
   basis::AbstractMatrix,
   args...)
 
-  v .= v-orth_projection(v,basis,args...)
+  v .-= orth_projection(v,basis,args...)
 end
 
 for f in (:pivoted_qr,:pivoted_qr!)

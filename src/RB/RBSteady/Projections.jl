@@ -2,19 +2,19 @@
     abstract type Projection <: Map end
 
 Represents a basis for a `n`-dimensional vector subspace of a `N`-dimensional
-vector space (where `N` ≫ `n`), to be used as a (Petrov)-Galerkin projection
-operator. The kernel of a Projection is `n`-dimensional, whereas its image is
+vector space (where `N` ≫ `n`), to be used as a Galerkin projection operator.
+The kernel of a Projection is `n`-dimensional, whereas its image is
 `N`-dimensional.
 
 Subtypes:
 
-- `PODProjection`
-- `TTSVDProjection`
-- `NormedProjection`
-- `BlockProjection`
-- `InvProjection`
-- `ReducedProjection`
-- `HyperReduction`
+- [`PODProjection`](@ref)
+- [`TTSVDProjection`](@ref)
+- [`NormedProjection`](@ref)
+- [`BlockProjection`](@ref)
+- [`InvProjection`](@ref)
+- [`ReducedProjection`](@ref)
+- [`HyperReduction`](@ref)
 """
 abstract type Projection <: Map end
 
@@ -52,6 +52,11 @@ function project(a::Projection,x::AbstractArray,args...)
   return x̂
 end
 
+"""
+    project!(x̂::AbstractArray,a::Projection,x::AbstractArray,args...) -> Nothing
+
+In-place projection of a high-dimensional object `x` onto the subspace represented by `a`
+"""
 function project!(x̂::AbstractArray,a::Projection,x::AbstractArray)
   basis = get_basis(a)
   mul!(x̂,basis',x)
@@ -74,6 +79,12 @@ function inv_project(a::Projection,x̂::AbstractArray)
   return x
 end
 
+"""
+    inv_project!(x::AbstractArray,a::Projection,x̂::AbstractArray) -> Nothing
+
+In-place recasting of a low-dimensional object `x̂` the high-dimensional space
+in which `a` is immersed
+"""
 function inv_project!(x::AbstractArray,a::Projection,x̂::AbstractArray)
   basis = get_basis(a)
   mul!(x,basis,x̂)
@@ -130,18 +141,16 @@ the restricted basis on the set of interpolation rows `i`
 """
 empirical_interpolation(a::Projection) = @abstractmethod
 
-get_norm_matrix(a::Projection) = I(num_fe_dofs(a))
-
 """
     union_bases(a::Projection,b::Projection,args...) -> Projection
 
 Computes the projection corresponding to the union of `a` and `b`. In essence this
 operation performs as
 
-Φa = get_basis(a)
+`Φa = get_basis(a)
 Φb = get_basis(b)
 Φab = union(Φa,Φb)
-return gram_schmidt(Φab)
+return gram_schmidt(Φab)`
 """
 union_bases(a::Projection,b::Projection,args...) = @abstractmethod
 
@@ -177,7 +186,7 @@ end
     projection(red::Reduction,s::AbstractArray) -> Projection
     projection(red::Reduction,s::AbstractArray,X::MatrixOrTensor) -> Projection
 
-Constructs a `Projection` from a collection of snapshots `s`. An inner product
+Constructs a [`Projection`](@ref) from a collection of snapshots `s`. An inner product
 represented by the quantity `X` can be provided, in which case the resulting
 `Projection` will be `X`-orthogonal
 """
@@ -199,7 +208,7 @@ end
       projection::Projection
     end
 
-Represents the inverse map of a `Projection` `projection`
+Represents the inverse map of a [`Projection`](@ref) `projection`
 """
 struct InvProjection <: Projection
   projection::Projection
@@ -214,12 +223,12 @@ num_reduced_dofs(a::InvProjection) = num_fe_dofs(a.projection)
 """
     abstract type ReducedProjection{A<:AbstractArray} <: Projection end
 
-Type representing a (Petrov-)Galerkin projection of a `Projection` onto
-a reduced subspace represented by another `Projection`.
+Type representing a Galerkin projection of a [`Projection`](@ref) onto a reduced subspace
+represented by another `Projection`.
 
 Subtypes:
 
-- `ReducedAlgebraicProjection](@ref)
+- [`ReducedAlgebraicProjection`](@ref)
 """
 abstract type ReducedProjection{A<:AbstractArray} <: Projection end
 
@@ -276,7 +285,7 @@ end
       basis::AbstractMatrix
     end
 
-Projection stemming from a truncated proper orthogonal decomposition `tpod`
+Projection stemming from a truncated proper orthogonal decomposition [`tpod`](@ref)
 """
 struct PODProjection <: Projection
   basis::AbstractMatrix
@@ -336,7 +345,7 @@ end
       dof_map::AbstractDofMap
     end
 
-Projection stemming from a tensor train SVD `ttsvd`. For reindexing purposes
+Projection stemming from a tensor train SVD [`ttsvd`](@ref). For reindexing purposes
 a field `dof_map` is provided along with the tensor train cores `cores`
 """
 struct TTSVDProjection <: Projection
@@ -560,7 +569,7 @@ end
     struct BlockProjection{A,N} <: Projection end
 
 Block container for Projection of type `A` in a MultiField setting. This
-type is conceived similarly to `ArrayBlock` in `Gridap`
+type is conceived similarly to `ArrayBlock` in [`Gridap`](@ref)
 """
 struct BlockProjection{A<:Projection,N} <: Projection
   array::Array{A,N}
@@ -661,7 +670,7 @@ end
     norm_matrix::MatrixOrTensor,
     supr_matrix::MatrixOrTensor) -> Nothing
 
-In-place augmentation of the primal block of a `BlockProjection` `a`.
+In-place augmentation of the primal block of a [`BlockProjection`](@ref) `a`.
 This function has the purpose of stabilizing the reduced equations stemming from
 a saddle point problem
 """

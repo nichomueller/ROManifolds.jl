@@ -83,12 +83,12 @@ MDEIM struct employed in transient problems. The field `combine` is a function
 used to group the reductions relative to the various jacobians (in general, more
 than one in transient problems) in a smart way. We consider, for example, the ODE
 
-du/dt - νΔu = f in Ω × [0,T]
+`du/dt - νΔu = f in Ω × [0,T]`
 
 subject to initial/boundary conditions. Upon applying a FE discretization in space,
-and a θ method in time, one gets the space-time system Aθ * uθ = fθ, where
+and a `θ`-method in time, one gets the space-time system `Aθ * uθ = fθ`, where
 
-Aθ = [
+`Aθ = [
 A₁ + M / (θ*Δt)          0               0          ⋯          0            0
    - M / (θ*Δt)    A₂ + M / (θ*Δt)       0          ⋯          0            0
        0              - M / (θ*Δt)  A₃ + M / (θ*Δt)            0            0
@@ -97,35 +97,35 @@ A₁ + M / (θ*Δt)          0               0          ⋯          0          
                                                                                         ]
    = tridiag(- M/(θ*Δt), Aₖ + M/(θ*Δt), 0)
 uθ = [(1-θ)u₀ + θu₁, (1-θ)u₁ + θu₂ ⋯ (1-θ)uₙ₋₁ + θuₙ]
-fθ = [f₁, f₂  ⋯ fₙ]
+fθ = [f₁, f₂  ⋯ fₙ]`
 
-where Aₖ = A(tₖ₋₁ + θ*Δt) and fₖ = f(tₖ₋₁ + θ*Δt).
+where `Aₖ = A(tₖ₋₁ + θ*Δt) and fₖ = f(tₖ₋₁ + θ*Δt)`.
 
-Note: instead of multiplying Aθ by uθ, we multiply Ãθ by u, where
+Note: instead of multiplying `Aθ` by `uθ`, we multiply `Ãθ` by `u`, where
 
-Ãθ = tridiag((1-θ)Aₖ₋₁ - θM/(θ*Δt), θAₖ + θM/(θ*Δt))
-u = [u₁, u₂ ⋯ uₙ]
+`Ãθ = tridiag((1-θ)Aₖ₋₁ - θM/(θ*Δt), θAₖ + θM/(θ*Δt), 0)
+u = [u₁, u₂ ⋯ uₙ]`
 
 We now denote with Φ, Ψ the spatial and temporal basis obtained by reducing the
-snapshots associated to the state variable u. The Galerkin projection of the
-space-time system is equal to Âθ * û = f̂θ, where û is the unknown, and
+snapshots associated to the state variable `u`. The Galerkin projection of the
+space-time system is equal to `Âθ * û = f̂θ`, where `û` is the unknown, and
 
-Âθ = ∑ₖⁿ⁻¹ ( (1-θ)*ΦᵀAₖΦ - θ*ΦᵀMΦ / (θ*Δt) ) ⊗ Ψ[k-1,:]ᵀΨ[k,:]
+`Âθ = ∑ₖⁿ⁻¹ ( (1-θ)*ΦᵀAₖΦ - θ*ΦᵀMΦ / (θ*Δt) ) ⊗ Ψ[k-1,:]ᵀΨ[k,:]
    + ∑ₖⁿ   (     θ*ΦᵀAₖΦ + θ*ΦᵀMΦ / (θ*Δt) ) ⊗ Ψ[k,:]ᵀΨ[k,:]
-f̂θ = ∑ₖⁿ Φᵀfₖ ⊗ Ψ[k,:]
+f̂θ = ∑ₖⁿ Φᵀfₖ ⊗ Ψ[k,:]`
 
 We notice that the expression of Âθ can be written in a more general form as
 
-Âθ = combine_A(A shift back, A) + combine_M(M shift back, M)
+`Âθ = combine_A(A shift back, A) + combine_M(M shift back, M)`
 
 where combine_A and combine_M are two function specific to A and M:
 
-combine_A(x,y) = (1-θ)*x + θ*y
-combine_M(x,y) = -θ*x + θ*y
+`combine_A(x,y) = θ*y + (1-θ)*y
+combine_M(x,y) = (x - y) / Δt`
 
 The same can be said of any time marching scheme. This is the meaning of the
-function combine. Note that for a time marching with p interpolation points (e.g.
-for θ method, p = 2) the combine functions will have to accept p arguments.
+function combine. Note that for a time marching with `p` interpolation points (e.g.
+for `θ` method, `p = 2`) the combine functions will have to accept `p` arguments.
 """
 struct TransientMDEIMReduction{A,R<:Reduction{A,EuclideanNorm}} <: AbstractMDEIMReduction{A}
   reduction::R

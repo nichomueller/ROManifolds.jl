@@ -6,9 +6,9 @@
     end
 
 Struct representing trial FE spaces that are not evaluated yet. This may include
-FE spaces representing transient problems (although the implementation in `Gridap`
-differs), parametric problems, and a combination thereof. Could incorporate
-a `TransientTrialFESpace` in `Gridap` in future versions
+FE spaces representing transient problems (although the implementation in [`Gridap`](@ref),
+called [`TransientTrialFESpace`](@ref), does not fall into this category), parametric
+problems, and transient-parametric problems.
 """
 struct UnEvalTrialFESpace{A,B} <: SingleFieldFESpace
   space::A
@@ -32,7 +32,7 @@ const ParamTrialFESpace = UnEvalTrialFESpace
 
 function ParamTrialFESpace(space)
   dof = get_fe_dof_basis(space)
-  T = get_dof_type(dof)
+  T = get_dof_eltype(dof)
   function _param_zero(μ::Realization)
     z(μ) = x -> zero(T)
     ParamFunction(z,μ)

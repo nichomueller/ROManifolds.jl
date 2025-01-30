@@ -36,8 +36,8 @@ function TProductFESpace(
   TProductFESpace(space,spaces_1d,trian)
 end
 
-# The FE space is defined on a triangulation that isn't tensor-product, but which
-# admits a background tensor-product triangulation
+# The FE space is defined on a triangulation that isn't tensor-product, which
+# however admits a background tensor-product triangulation
 function TProductFESpace(
   trian::Triangulation,
   tptrian::TProductTriangulation,
@@ -120,7 +120,7 @@ function DofMaps.get_sparsity(U::TProductFESpace,V::TProductFESpace,args...)
 end
 
 function DofMaps.get_dof_map(V::TProductFESpace)
-  T = get_dof_type(get_fe_dof_basis(V))
+  T = get_dof_eltype(V)
   get_tp_dof_map(T,V)
 end
 
@@ -152,6 +152,7 @@ end
 get_tp_triangulation(f::TProductFESpace) = f.trian
 
 """
+    get_tp_fe_basis(f::TProductFESpace) -> TProductFEBasis
 """
 function get_tp_fe_basis(f::TProductFESpace)
   basis = map(get_fe_basis,f.spaces_1d)
@@ -160,6 +161,7 @@ function get_tp_fe_basis(f::TProductFESpace)
 end
 
 """
+    get_tp_trial_fe_basis(f::TProductFESpace) -> TProductFEBasis
 """
 function get_tp_trial_fe_basis(f::TProductFESpace)
   basis = map(get_trial_fe_basis,f.spaces_1d)

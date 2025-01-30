@@ -1,3 +1,11 @@
+"""
+    get_dof_map(space::FESpace) -> VectorDofMap
+
+Returns the dofs sorted by coordinate order, for every dimension. If `space` is a
+D-dimensional, scalar `FESpace`, the output index map will be a subtype of
+AbstractDofMap{<:Integer,D}. If `space` is a D-dimensional, vector-valued `FESpace`,
+the output index map will be a subtype of AbstractDofMap{D+1}.
+"""
 function get_dof_map(f::SingleFieldFESpace)
   n = num_free_dofs(f)
   VectorDofMap(n)
@@ -7,7 +15,17 @@ function get_dof_map(f::MultiFieldFESpace)
   map(get_dof_map,f.spaces)
 end
 
-# sparse interface
+function get_sparse_dof_map(a::SparsityPattern,U::FESpace,V::FESpace,args...)
+  TrivialSparseMatrixDofMap(a)
+end
+
+function get_sparse_dof_map(a::TProductSparsity,U::FESpace,V::FESpace,args...)
+  Tu = get_dof_eltype(U)
+  Tv = get_dof_eltype(V)
+  full_ids = get_d_sparse_dofs_to_full_dofs(Tu,Tv,a)
+  sparse_ids = sparsify_indices(full_ids)
+  SparseMatrixDofMap(sparse_ids,full_ids,a)
+end
 
 """
     get_sparse_dof_map(trial::FESpace,test::FESpace,args...) -> AbstractDofMap
@@ -39,6 +57,13 @@ for f in (:get_bg_dof_to_mask,:get_bg_dof_to_act_dof)
   end
 end
 
+"""
+    get_bg_dof_to_mask(f::SingleFieldFESpace,args...) -> Vector{Bool}
+
+Associates a boolean mask to each background DOF of a FE space `f`. If the DOF
+is active, the mask is `false`. If the DOF is inactive (e.g., because it is
+constrained), the mask is `true`
+"""
 function get_bg_dof_to_mask(f::SingleFieldFESpace,args...)
   map(iszero,get_bg_dof_to_act_dof(f,args...))
 end
@@ -47,17 +72,23 @@ function get_bg_dof_to_act_dof(f::SingleFieldFESpace)
   IdentityVector(num_free_dofs(f))
 end
 
+"""
+    get_bg_dof_to_act_dof(f::SingleFieldFESpace,args...) -> AbstractVector{<:Integer}
+
+Associates an active DOF to each background DOF of a FE space `f`. This is done
+by computing the cumulative sum of the output of [`get_bg_dof_to_mask`] on `f`
+"""
 function get_bg_dof_to_act_dof(f::FESpaceWithLinearConstraints)
   bg_space = f.space
   ndofs = num_free_dofs(bg_space)
   sdof_to_bdof = setdiff(1:ndofs,f.mDOF_to_DOF)
-  get_bg_dof_to_act_dof(sdof_to_bdof,ndofs)
+  get_mask_to_act_dof(sdof_to_bdof,ndofs)
 end
 
 function get_bg_dof_to_act_dof(f::FESpaceWithConstantFixed)
   bg_space = f.space
   ndofs = num_free_dofs(bg_space)
-  get_bg_dof_to_act_dof(f.dof_to_fix,ndofs)
+  get_mask_to_act_dof(f.dof_to_fix,ndofs)
 end
 
 function get_bg_dof_to_act_dof(f::ZeroMeanFESpace)
@@ -92,21 +123,40 @@ function get_bg_dof_to_act_dof(f::FESpace,ttrian::Triangulation)
   return bg_dof_to_act_dof
 end
 
-function get_bg_dof_to_act_dof(masked_dofs,ndofs::Int)
-  bg_dof_to_act_dof = collect(1:ndofs)
-  for dof in masked_dofs
-    bg_dof_to_act_dof[dof] = 0
+function get_mask_to_act_dof(masked_dofs::AbstractVector{<:Integer},ndofs::Int)
+  bg_dof_to_act_dof = ones(Int,ndofs)
+  _hide_masked_dofs!(bg_dof_to_act_dof,masked_dofs)
+  cumsum!(bg_dof_to_act_dof)
+  _hide_masked_dofs!(bg_dof_to_act_dof,masked_dofs)
+  return bg_dof_to_act_dof
+end
+
+function get_mask_to_act_dof(masked_dofs::AbstractVector{<:Bool},ndofs::Int)
+  @check length(masked_dofs) == ndofs
+  bg_dof_to_act_dof = zeros(Int,ndofs)
+  count = 0
+  for (dof,mask) in enumerate(masked_dofs)
+    if !mask
+      count += 1
+      bg_dof_to_act_dof[dof] = count
+    end
   end
   return bg_dof_to_act_dof
 end
 
-"""
-    get_polynomial_order(fs::FESpace) -> Integer
+function _hide_masked_dofs!(v,masked_dofs)
+  for dof in masked_dofs
+    v[dof] = 0
+  end
+end
 
-Retrieves the polynomial order of `fs`
 """
-get_polynomial_order(fs::SingleFieldFESpace) = get_polynomial_order(get_fe_basis(fs))
-get_polynomial_order(fs::MultiFieldFESpace) = maximum(map(get_polynomial_order,fs.spaces))
+    get_polynomial_order(f::FESpace) -> Integer
+
+Retrieves the polynomial order of `f`
+"""
+get_polynomial_order(f::SingleFieldFESpace) = get_polynomial_order(get_fe_basis(f))
+get_polynomial_order(f::MultiFieldFESpace) = maximum(map(get_polynomial_order,f.spaces))
 
 function get_polynomial_order(basis)
   cell_basis = get_data(basis)

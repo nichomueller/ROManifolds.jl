@@ -1,4 +1,9 @@
 """
+    struct ParamOpFromFEOp{O,T} <: ParamOperator{O,T}
+      op::ParamFEOperator{O,T}
+    end
+
+Wrapper that transforms a `ParamFEOperator` into an `ParamOperator`
 """
 struct ParamOpFromFEOp{O,T} <: ParamOperator{O,T}
   op::ParamFEOperator{O,T}
@@ -14,6 +19,9 @@ for f in (:set_domains,:change_domains)
   end
 end
 
+"""
+    const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointDomains}
+"""
 const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointDomains}
 
 function Algebra.allocate_residual(
@@ -100,6 +108,9 @@ function ODEs.jacobian_add!(
   A
 end
 
+"""
+    const SplitParamOpFromFEOp{O} = ParamOpFromFEOp{O,SplitDomains}
+"""
 const SplitParamOpFromFEOp{O} = ParamOpFromFEOp{O,SplitDomains}
 
 function Algebra.allocate_residual(
@@ -284,7 +295,14 @@ end
 
 # utils
 
-# like collect_cell_matrix, but for a fixed triangulation `strian`
+"""
+    function collect_cell_matrix_for_trian(
+      trial::FESpace,test::FESpace,a::DomainContribution,strian::Triangulation
+      ) -> Tuple{Vector{<:Any},Vector{<:Any},Vector{<:Any}}
+
+Interface for computing the matrix data to be sent to the assembler, for a given
+input triangulation `strian`
+"""
 function collect_cell_matrix_for_trian(
   trial::FESpace,
   test::FESpace,
@@ -301,7 +319,14 @@ function collect_cell_matrix_for_trian(
   [cell_mat_rc],[rows],[cols]
 end
 
-# like collect_cell_vector, but for a fixed triangulation `strian`
+"""
+    function collect_cell_vector_for_trian(
+      test::FESpace,a::DomainContribution,strian::Triangulation
+      ) -> Tuple{Vector{<:Any},Vector{<:Any}}
+
+Interface for computing the vector data to be sent to the assembler, for a given
+input triangulation `strian`
+"""
 function collect_cell_vector_for_trian(
   test::FESpace,
   a::DomainContribution,

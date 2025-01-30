@@ -6,7 +6,7 @@
       jacobian_reduction::B
     end
 
-Wrapper around a FE solver (e.g. `FESolver` or `ODESolver`) with
+Wrapper around a FE solver (e.g. [`FESolver`](@ref) or [`ODESolver`](@ref)) with
 additional information on the reduced basis (RB) method employed to solve a given
 problem dependent on a set of parameters. A RB method is a projection-based
 reduced order model where
@@ -30,7 +30,6 @@ In particular:
 - nparams_jac: number of snapshots considered when running MDEIM for the jacobian
 - nparams_test:  number of snapshots considered when computing the error the RB
   method commits with respect to the FE procedure
-
 """
 struct RBSolver{A<:GridapType,B}
   fesolver::A
@@ -51,6 +50,11 @@ function RBSolver(
   RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction)
 end
 
+"""
+    get_fe_solver(s::RBSolver) -> FESolver
+
+Returns the underlying [`FESolver`](@ref) from a [`RBSolver`](@ref) `s`
+"""
 get_fe_solver(s::RBSolver) = s.fesolver
 get_state_reduction(s::RBSolver) = s.state_reduction
 get_residual_reduction(s::RBSolver) = s.residual_reduction

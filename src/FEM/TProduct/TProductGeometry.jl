@@ -147,6 +147,15 @@ function CellData.get_cell_points(trian::TProductTriangulation)
   TProductCellPoint(point,single_points)
 end
 
+"""
+    struct TProductMeasure{A,B} <: Measure
+      measure::A
+      measures_1d::B
+    end
+
+Tensor product measure, storing a vector of 1-D measures `measures_1d` of length D,
+and the D-dimensional measure `measure` defined as their tensor product.
+"""
 struct TProductMeasure{A,B} <: Measure
   measure::A
   measures_1d::B

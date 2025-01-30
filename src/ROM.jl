@@ -3,7 +3,6 @@ module ROM
 export compute_speedup
 export compute_error
 export compute_relative_error
-export PartialDerivative
 export ∂₁, ∂₂, ∂₃
 
 include("FEM/Utils/Utils.jl")
@@ -20,6 +19,7 @@ using ROM.DofMaps
 
 export TProductModel
 export TProductTriangulation
+export TProductMeasure
 export TProductFESpace
 export get_tp_fe_basis
 export get_tp_trial_fe_basis
@@ -37,38 +37,13 @@ export TransientParamSpace
 export ParamFunction
 export TransientParamFunction
 export realization
-export get_params
-export get_times
-export num_params
-export num_times
-
-export get_param_data
-export param_length
-export param_eachindex
-export param_getindex
-export param_setindex!
 
 export ParamArray
-export TrivialParamArray
 export ConsecutiveParamArray
-export ConsecutiveParamVector
-export ConsecutiveParamMatrix
-export GenericParamVector
-export GenericParamMatrix
-
 export ParamSparseMatrix
-export ParamSparseMatrixCSC
-export ParamSparseMatrixCSR
-export ConsecutiveParamSparseMatrixCSC
-export GenericParamSparseMatrixCSC
-export ConsecutiveParamSparseMatrixCSR
-export GenericParamSparseMatrixCSR
-
 export BlockParamArray
-export BlockParamVector
-export BlockParamMatrix
-export BlockConsecutiveParamVector
-export BlockConsecutiveParamMatrix
+export Snapshots
+export select_snapshots
 
 include("FEM/ParamDataStructures/ParamDataStructures.jl")
 using ROM.ParamDataStructures
@@ -89,13 +64,10 @@ export MultiFieldParamFESpace
 include("FEM/ParamFESpaces/ParamFESpaces.jl")
 using ROM.ParamFESpaces
 
+export FEDomains
 export ParamFEOperator
 export LinearParamFEOperator
-export FEDomains
 export LinearNonlinearParamFEOperator
-export get_linear_operator
-export get_nonlinear_operator
-export join_operators
 
 include("FEM/ParamSteady/ParamSteady.jl")
 using ROM.ParamSteady
@@ -115,10 +87,6 @@ export TTSVDReduction
 export SupremizerReduction
 export MDEIMReduction
 export AdaptiveReduction
-
-export Snapshots
-export get_realization
-export select_snapshots
 
 export RBSolver
 export solution_snapshots

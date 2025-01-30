@@ -1,8 +1,9 @@
 """
     get_param_assembler(a::SparseMatrixAssembler,r::AbstractRealization) -> SparseMatrixAssembler
 
-Returns a parametric assembler, which assembles parametric residuals and jacobians.
-The consequent assembly routines remain the same as in `Gridap`
+Returns an assembler that also stores the parametric length of `r`. This function
+is to be used to assemble parametric residuals and jacobians. The assembly routines
+follow the same pipeline as in [`Gridap`](@ref)
 """
 function get_param_assembler(a::SparseMatrixAssembler,r::AbstractRealization)
   matrix_builder = get_param_matrix_builder(a,r)
@@ -35,13 +36,13 @@ end
 function get_param_matrix_builder(a::SparseMatrixAssembler,r::AbstractRealization)
   mat = get_matrix_builder(a)
   plength = length(r)
-  ParamBuilder(mat,plength)
+  ParamAlgebra.ParamBuilder(mat,plength)
 end
 
 function get_param_vector_builder(a::SparseMatrixAssembler,r::AbstractRealization)
   vec = get_vector_builder(a)
   plength = length(r)
-  ParamBuilder(vec,plength)
+  ParamAlgebra.ParamBuilder(vec,plength)
 end
 
 function get_param_matrix_builder(

@@ -41,8 +41,22 @@ function flatten(i::AbstractDofMap)
   @abstractmethod
 end
 
-function change_dof_map(i::AbstractDofMap,mask_to_add)
+"""
+    change_dof_map(i::AbstractDofMap,args...) -> AbstractDofMap
+
+Creates a new dof map from an old dof map `i`
+"""
+function change_dof_map(i::AbstractDofMap,args...)
   @abstractmethod
+end
+
+"""
+    invert(i::AbstractDofMap) -> InverseDofMap
+
+Retruns an InverseDofMap object out of an existing dof map `i`
+"""
+function invert(i::AbstractDofMap)
+  InverseDofMap(i)
 end
 
 """
@@ -76,17 +90,8 @@ function flatten(i::InverseDofMap)
   InverseDofMap(flatten(i.dof_map))
 end
 
-function change_dof_map(i::VectorDofMap,mask_to_add)
-  InverseDofMap(change_dof_map(i.dof_map,mask_to_add))
-end
-
-"""
-    invert(i::AbstractDofMap) -> InverseDofMap
-
-Retruns an InverseDofMap object out of an existing dof map `i`
-"""
-function invert(i::AbstractDofMap)
-  InverseDofMap(i)
+function change_dof_map(i::InverseDofMap,args...)
+  InverseDofMap(change_dof_map(i.dof_map,args...))
 end
 
 for f in (:vectorize,:flatten,:invert,:change_dof_map)
@@ -98,61 +103,68 @@ for f in (:vectorize,:flatten,:invert,:change_dof_map)
 end
 
 """
-    struct VectorDofMap{D} <: AbstractDofMap{D,Int32}
+    struct VectorDofMap{D,I<:AbstractVector{<:Integer}} <: AbstractDofMap{D,Int32}
       size::Dims{D}
-      dof_to_mask::Vector{Bool}
-      cumulative_masks::Vector{Int}
+      bg_dof_to_act_dof::I
     end
 
-Dof map intended for FE vectors (e.g. solutions or residuals). The field `size`
-denotes the shape of the vector, and `dof_to_mask` tracks the dofs to hide, and
-`cumulative_masks` simply enables the correct indexing of the map
+Dof map intended for the reindexing of FE vectors (e.g. solutions or residuals).
+Fields:
+  - `size`: denotes the shape of the array deriving from the reindexing of FE vectors
+  - `bg_dof_to_act_dof`: vector of size equals to `prod(size)` that has the following
+  purpose. When the FE mesh is Cartesian, `bg_dof_to_act_dof that` is the identity
+  map, i.e. `bg_dof_to_act_dof that[i] == i`. When the mesh is not Cartesian, the
+  field `size` denotes the size of a bounding (Cartesian) box, and `bg_dof_to_act_dof that`
+  creates a correspondence between the set of background DOFs (defined on the bounding box),
+  and the active ones (defined on the actual geometry). If the `i`th background DOF
+  is equal to the `j`th active DOF, then `bg_dof_to_act_dof that[i] == j`; if
+  instead it corresponds to an inactive DOF (e.g. situated in a hole), then
+  `bg_dof_to_act_dof that[i] == 0`. Custom data structures that are indexed
+  according to an `AbstractDofMap` are designed to return zero when indexed by a
+  zero index.
+
+---
+**NOTE**
+
+This map only returns the DOFs in lexicographical order. This means that the
+entries of the FE vector are not permuted in order, they are simply reshaped and,
+in non-Cartesian applications, expanded.
+
+---
 """
-struct VectorDofMap{D} <: AbstractDofMap{D,Int32}
+struct VectorDofMap{D,I<:AbstractVector{<:Integer}} <: AbstractDofMap{D,Int32}
   size::Dims{D}
-  dof_to_mask::Vector{Bool}
-  cumulative_masks::Vector{Int}
+  bg_dof_to_act_dof::I
 end
 
-function VectorDofMap(s::Dims{D},dof_to_mask::Vector{Bool}=fill(false,prod(s))) where D
-  @check length(dof_to_mask) == prod(s)
-  cumulative_masks = cumsum(dof_to_mask)
-  VectorDofMap(s,dof_to_mask,cumulative_masks)
+VectorDofMap(s::Dims{D}) = VectorDofMap(s,IdentityVector(prod(s)))
+VectorDofMap(l::Integer,args...) = VectorDofMap((l,),args...)
+
+function VectorDofMap(s::Dims{D},bg_dof_to_mask::AbstractVector{<:Bool})
+  bg_dof_to_act_dof = get_mask_to_act_dof(bg_dof_to_mask,prod(s))
+  VectorDofMap(s,bg_dof_to_act_dof)
 end
 
 VectorDofMap(i::VectorDofMap) = i
-VectorDofMap(l::Integer,args...) = VectorDofMap((l,),args...)
-
-function VectorDofMap(i::VectorDofMap,mask_to_add::Vector{Bool})
-  @check length(i) == length(mask_to_add)
-  dof_to_mask = copy(i.dof_to_mask)
-  for j in eachindex(i)
-    dof_to_mask[j] = dof_to_mask[j] || mask_to_add[j]
-  end
-  VectorDofMap(i.size,dof_to_mask)
-end
+VectorDofMap(i::VectorDofMap,args...) = VectorDofMap(i.size,args...)
 
 Base.size(i::VectorDofMap) = i.size
 
-function Base.getindex(i::VectorDofMap,j::Integer)
-  i.dof_to_mask[j] ? zero(eltype(i)) : j-i.cumulative_masks[j]
-end
+Base.getindex(i::VectorDofMap,j::Integer) = getindex(i.bg_dof_to_act_dof,j)
 
-function Base.setindex!(i::VectorDofMap,v,j::Integer)
-  !i.dof_to_mask[j] && j-i.cumulative_masks[j]
-end
+Base.setindex!(i::VectorDofMap,v,j::Integer) = setindex!(i.bg_dof_to_act_dof,v,j)
 
 function Base.reshape(i::VectorDofMap,s::Vararg{Int})
   @assert prod(s) == length(i)
-  VectorDofMap(s,i.dof_to_mask,i.cumulative_masks)
+  VectorDofMap(s,i.bg_dof_to_act_dof)
 end
 
 function flatten(i::VectorDofMap)
-  VectorDofMap((prod(i.size),),i.dof_to_mask,i.cumulative_masks)
+  VectorDofMap((prod(i.size),),i.bg_dof_to_act_dof)
 end
 
-function change_dof_map(i::VectorDofMap,mask_to_add)
-  VectorDofMap(i,mask_to_add)
+function change_dof_map(i::VectorDofMap,args...)
+  VectorDofMap(i,args...)
 end
 
 abstract type SparseDofMapStyle end
@@ -195,7 +207,9 @@ end
       index_style::B
     end
 
-Index map used to select the nonzero entries of a sparse matrix of sparsity `sparsity`
+Index map used to select the nonzero entries of a sparse matrix of sparsity `sparsity`.
+The nonzero entries are sorted according to the field `d_sparse_dofs_to_sparse_dofs`
+by default. For more details, check the function [`get_d_sparse_dofs_to_full_dofs`](@ref)
 """
 struct SparseMatrixDofMap{D,Ti,A<:SparsityPattern,B<:SparseDofMapStyle} <: AbstractDofMap{D,Ti}
   d_sparse_dofs_to_sparse_dofs::Array{Ti,D}

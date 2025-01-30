@@ -1,4 +1,12 @@
 """
+    eltype2(a) -> Type
+
+Returns the eltype of `eltype(a)`, i.e. it extracts the eltype of a parametric
+entry of `a`
+"""
+eltype2(x) = eltype(eltype(x))
+
+"""
     param_length(a) -> Int
 
 Returns the parametric length of `a`
@@ -79,9 +87,9 @@ end
 
 Type representing generic parametric quantities.
 Subtypes:
-- `ParamContainer`
-- `AbstractParamArray`
-- `AbstractSnapshots`
+- [`ParamContainer`](@ref)
+- [`AbstractParamArray`](@ref)
+- [`AbstractSnapshots`](@ref)
 """
 abstract type AbstractParamContainer{T,N} <: AbstractArray{T,N} end
 

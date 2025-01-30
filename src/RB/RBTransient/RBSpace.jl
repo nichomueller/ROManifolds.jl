@@ -10,14 +10,6 @@ end
 
 const TransientSingleFieldEvalRBSpace = EvalRBSpace{SingleFieldRBSpace,<:TransientRealization}
 
-for (f,g) in zip(
-  (:(Algebra.allocate_in_domain),:(Algebra.allocate_in_range)),
-  (:num_reduced_dofs,:num_fe_dofs))
-
-  @eval begin
-
-  end
-end
 function Algebra.allocate_in_domain(r::TransientSingleFieldEvalRBSpace,x::V) where V<:AbstractParamVector
   x̂ = allocate_vector(eltype(V),num_reduced_dofs(r))
   np = num_params(r.realization)

@@ -1,4 +1,3 @@
-
 abstract type PerformanceTracker end
 
 mutable struct CostTracker <: PerformanceTracker
@@ -58,25 +57,25 @@ function get_stats(t::CostTracker)
   return avg_time,avg_nallocs
 end
 
-struct SU <: PerformanceTracker
+struct Speedup <: PerformanceTracker
   name::String
   speedup_time::Float64
   speedup_memory::Float64
 end
 
-function Base.show(io::IO,k::MIME"text/plain",su::SU)
-  println(io," -------------------- SU($(su.name)) -------------------------")
+function Base.show(io::IO,k::MIME"text/plain",su::Speedup)
+  println(io," -------------------- Speedup($(su.name)) -------------------------")
   println(io," > speedup in time: $(su.speedup_time)")
   println(io," > speedup in memory: $(su.speedup_memory)")
   println(io," -------------------------------------------------------------")
 end
 
-function Base.show(io::IO,su::SU)
+function Base.show(io::IO,su::Speedup)
   show(io,MIME"text/plain"(),su)
 end
 
 """
-    compute_speedup(t1::CostTracker,t2::CostTracker) -> SU
+    compute_speedup(t1::CostTracker,t2::CostTracker) -> Speedup
 
 Computes the speedup the tracker `t2` achieves with respect to `t1`, in time and
 in memory footprint
@@ -87,7 +86,7 @@ function compute_speedup(t1::CostTracker,t2::CostTracker)
   avg_time2,avg_nallocs2 = get_stats(t2)
   speedup_time = avg_time1 / avg_time2
   speedup_memory = avg_nallocs1 / avg_nallocs2
-  return SU(name,speedup_time,speedup_memory)
+  return Speedup(name,speedup_time,speedup_memory)
 end
 
 induced_norm(v::AbstractVector) = norm(v)
@@ -96,14 +95,22 @@ induced_norm(v::AbstractVector,norm_matrix::AbstractMatrix) = sqrt(v'*norm_matri
 induced_norm(A::AbstractMatrix) = sqrt.(diag(A'*A))
 induced_norm(A::AbstractMatrix,norm_matrix::AbstractMatrix) = sqrt.(diag(A'*norm_matrix*A))
 
+"""
+    compute_error(sol::AbstractArray{T,N},sol_approx::AbstractArray{T,N},args...
+      ) where {T,N} -> Number
+
+Computes the error between `sol` and `sol_approx`, by default in the Euclidean
+norm. A different norm (usually represented by a sparse matrix) can be provided
+as an argument.
+"""
 function compute_error(
   sol::AbstractArray{T,N},
   sol_approx::AbstractArray{T,N},
-  args...;nruns=size(sol,N)
+  args...
   ) where {T,N}
 
   @check size(sol) == size(sol_approx)
-  errors = zeros(nruns)
+  errors = size(sol,N)
   @inbounds for i = 1:nruns
     soli = selectdim(sol,N,i)
     soli_approx = selectdim(sol_approx,N,i)
@@ -112,6 +119,14 @@ function compute_error(
   return mean(errors)
 end
 
+"""
+    compute_relative_error(sol::AbstractArray{T,N},sol_approx::AbstractArray{T,N},args...
+      ) where {T,N} -> Number
+
+Computes the relative error between `sol` and `sol_approx`, by default in the Euclidean
+norm. A different norm (usually represented by a sparse matrix) can be provided
+as an argument.
+"""
 function compute_relative_error(sol::AbstractArray,sol_approx::AbstractArray,args...)
   err_norm = induced_norm(sol-sol_approx,args...)
   sol_norm = induced_norm(sol,args...)

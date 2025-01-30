@@ -1,5 +1,8 @@
 """
-    TProductCellPoint{DS<:DomainStyle,A,B} <: CellDatum
+    struct TProductCellPoint{DS<:DomainStyle,A<:CellPoint{DS},B<:AbstractVector{<:CellPoint{DS}}} <: CellDatum
+      point::A
+      single_points::B
+    end
 """
 struct TProductCellPoint{DS<:DomainStyle,A<:CellPoint{DS},B<:AbstractVector{<:CellPoint{DS}}} <: CellDatum
   point::A
@@ -27,9 +30,8 @@ end
     abstract type TProductCellField <: CellField end
 
 Subtypes:
-- `GenericTProductCellField`
-- `TProductDiffCellField`
-
+- [`GenericTProductCellField`](@ref)
+- [`TProductDiffCellField`](@ref)
 """
 abstract type TProductCellField <: CellField end
 
@@ -44,7 +46,11 @@ get_tp_diff_data(f::AbstractVector{<:CellField}) = f
 get_tp_diff_data(f::TProductCellField) = @abstractmethod
 
 """
-    GenericTProductCellField{DS<:DomainStyle,A,B} <: TProductCellField
+    struct GenericTProductCellField{DS<:DomainStyle,A,B} <: TProductCellField
+      single_fields::A
+      trian::B
+      domain_style::DS
+    end
 """
 struct GenericTProductCellField{DS<:DomainStyle,A,B} <: TProductCellField
   single_fields::A
@@ -74,7 +80,12 @@ CellData.DomainStyle(::Type{<:GenericTProductCellField{DS}}) where DS = DS()
 abstract type TProductDiffCellField <: TProductCellField end
 
 """
-    GenericTProductDiffCellField{O,A,B,C} <: TProductDiffCellField
+    struct GenericTProductDiffCellField{O,A,B,C} <: TProductDiffCellField
+      op::O
+      cell_data::A
+      diff_cell_data::B
+      summation::C
+    end
 """
 struct GenericTProductDiffCellField{O,A,B,C} <: TProductDiffCellField
   op::O

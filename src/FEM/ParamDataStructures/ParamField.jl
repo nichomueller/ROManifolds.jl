@@ -1,11 +1,12 @@
 """
     abstract type ParamField <: Field end
 
-Represents a parametric field. Subtypes:
-- `TrivialParamField`
-- `GenericParamField`
-- `ParamFieldGradient`
-- `OperationParamField`
+Represents a parametric field.
+Subtypes:
+- [`TrivialParamField`](@ref)
+- [`GenericParamField`](@ref)
+- [`ParamFieldGradient`](@ref)
+- [`OperationParamField`](@ref)
 """
 abstract type ParamField <: Field end
 
@@ -29,32 +30,29 @@ to_param_quantity(f::Union{Field,AbstractArray{<:Field}},plength::Integer) = Tri
 
 """
     struct TrivialParamField{F} <: ParamField
-      data::Fill{F}
+      data::F
+      plength::Int
     end
 
-Wrapper for nonparametric fields that we wish assumed a parametric length.
+Wrapper for a non-parametric field `data` that we wish assumed a parametric length `plength`
 """
 struct TrivialParamField{F} <: ParamField
-  data::Fill{F}
-end
-
-function TrivialParamField(f::F,plength::Int) where {F<:Union{Field,AbstractArray{<:Field}}}
-  data = Fill(f,plength)
-  TrivialParamField(data)
+  data::F
+  plength::Int
 end
 
 TrivialParamField(f::ParamField,plength::Int) = f
 
-get_param_data(f::TrivialParamField) = f.data
+get_param_data(f::TrivialParamField) = Fill(f.data,f.plength)
 
-Arrays.evaluate(f::TrivialParamField,x::Point) = fill(evaluate(f.field,x),f.plength)
+Arrays.evaluate(f::TrivialParamField,x::Point) = fill(evaluate(f.data,x),f.plength)
 
 """
     struct GenericParamField{T<:GenericField} <: ParamField
       data::Vector{T}
     end
 
-Parametric extension of a GenericField in `Gridap`
+Parametric extension of a [`GenericField`](@ref) in [`Gridap`](@ref)
 """
 struct GenericParamField{T<:GenericField} <: ParamField
   data::Vector{T}
@@ -73,7 +71,7 @@ Arrays.evaluate!(cache,f::GenericParamField,x::Point) = map(o->evaluate!(cache,o
       object::F
     end
 
-Parametric extension of a FieldGradient in `Gridap`
+Parametric extension of a [`FieldGradient`](@ref) in [`Gridap`](@ref)
 """
 struct ParamFieldGradient{N,F} <: ParamField
   object::F
@@ -103,7 +101,7 @@ end
       data::Vector{T}
     end
 
-Parametric extension of a OperationField in `Gridap`
+Parametric extension of a [`OperationField`](@ref) in [`Gridap`](@ref)
 """
 struct OperationParamField{T<:Fields.OperationField} <: ParamField
   data::Vector{T}

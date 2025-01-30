@@ -1,7 +1,7 @@
 """
     create_dir(dir::String) -> Nothing
 
-Recursive creation of a directory `dir`
+Recursive creation of a directory `dir`; does not do anything if `dir` exists
 """
 function create_dir(dir::String)
   if !isdir(dir)
@@ -79,6 +79,8 @@ function DrWatson.save(dir,r::RBSpace;label="")
   save(dir,get_reduced_subspace(r);label)
 end
 
+"""
+"""
 function load_reduced_subspace(dir,f::FESpace;label="")
   basis = load_projection(dir;label)
   reduced_subspace(f,basis)
@@ -104,6 +106,8 @@ function DrWatson.save(dir,contrib::Contribution;label="")
   end
 end
 
+"""
+"""
 function load_contribution(
   dir,
   trian::Tuple{Vararg{Triangulation}};
@@ -148,10 +152,14 @@ function DrWatson.save(dir,contrib::TupOfArrayContribution,feop::LinearNonlinear
   save(dir,last(contrib),get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
 end
 
+"""
+"""
 function load_residuals(dir,feop::SplitParamFEOperator;label="res")
   load_contribution(dir,get_domains_res(feop);load_snapshots,label)
 end
 
+"""
+"""
 function load_jacobians(dir,feop::SplitParamFEOperator;label="jac")
   load_contribution(dir,get_domains_jac(feop);load_snapshots,label)
 end
@@ -328,10 +336,6 @@ function DrWatson.save(dir,perf::ROMPerformance;label="")
 end
 
 """
-    load_results(dir;label="") -> ROMPerformance
-
-Load the results at the directory `dir`. Throws an error if the results
-have not been previously saved to file
 """
 function load_results(dir;label="")
   results_dir = get_filename(dir,"results",label)

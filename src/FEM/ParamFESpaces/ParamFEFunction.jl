@@ -1,15 +1,21 @@
 """
     abstract type ParamFEFunction <: FEFunction end
 
-Parametric extension of a `FEFunction` in `Gridap`. Subtypes:
+Parametric extension of a `FEFunction` in [`Gridap`](@ref). Subtypes:
 
-- `SingleFieldParamFEFunction`
-- `MultiFieldParamFEFunction`
+- [`SingleFieldParamFEFunction`](@ref)
+- [`MultiFieldParamFEFunction`](@ref)
 """
 abstract type ParamFEFunction <: FEFunction end
 
 """
-    struct SingleFieldParamFEFunction{T<:CellField} <: ParamFEFunction end
+    struct SingleFieldParamFEFunction{T<:CellField} <: ParamFEFunction
+      cell_field::T
+      cell_dof_values::AbstractArray{<:AbstractParamVector{<:Number}}
+      free_values::AbstractParamVector{<:Number}
+      dirichlet_values::AbstractParamVector{<:Number}
+      fe_space::SingleFieldFESpace
+    end
 """
 struct SingleFieldParamFEFunction{T<:CellField} <: ParamFEFunction
   cell_field::T
@@ -73,7 +79,12 @@ function ParamDataStructures.param_getindex(f::SingleFieldParamFEFunction,index:
 end
 
 """
-    struct MultiFieldParamFEFunction{T<:MultiFieldCellField} <: ParamFEFunction end
+    struct MultiFieldParamFEFunction{T<:MultiFieldCellField} <: ParamFEFunction
+      single_fe_functions::Vector{<:SingleFieldParamFEFunction}
+      free_values::AbstractArray
+      fe_space::MultiFieldFESpace
+      multi_cell_field::T
+    end
 """
 struct MultiFieldParamFEFunction{T<:MultiFieldCellField} <: ParamFEFunction
   single_fe_functions::Vector{<:SingleFieldParamFEFunction}

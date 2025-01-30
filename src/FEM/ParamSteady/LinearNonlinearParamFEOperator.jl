@@ -75,6 +75,7 @@ end
 
 """
     join_operators(op::LinearNonlinearParamFEOperator) -> ParamFEOperator
+    join_operators(op::LinearNonlinearTransientParamFEOperator) -> TransientParamFEOperator
 
 Joins the linear/nonlinear parts of the operator and returns the resulting operator
 """

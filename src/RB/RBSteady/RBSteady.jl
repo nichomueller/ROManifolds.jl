@@ -34,10 +34,6 @@ using ROM.ParamSteady
 using ROM.ParamODEs
 
 import Base: +,-,*,\
-import UnPack: @unpack
-import ArraysOfArrays: innersize
-import Gridap.Algebra: allocate_matrix,allocate_vector,solve
-import PartitionedArrays: tuple_of_arrays
 
 export ReductionStyle
 export SearchSVDRank
@@ -60,18 +56,6 @@ export AdaptiveReduction
 export get_reduction
 include("ReductionMethods.jl")
 
-export AbstractSnapshots
-export Snapshots
-export GenericSnapshots
-export SnapshotsAtIndices
-export SparseSnapshots
-export BlockSnapshots
-export get_realization
-export select_snapshots
-export get_indexed_data
-export num_space_dofs
-include("Snapshots.jl")
-
 export galerkin_projection
 include("GalerkinProjections.jl")
 
@@ -81,7 +65,6 @@ export SparseCore
 export SparseCoreCSC
 include("TTCores.jl")
 
-export TTContraction
 export contraction
 export unbalanced_contractions
 export sequential_product
@@ -149,7 +132,6 @@ export reduced_triangulation
 export reduced_jacobian
 export reduced_residual
 export reduced_weak_form
-export inv_project!
 export allocate_hypred_cache
 include("HyperReduction.jl")
 
@@ -171,7 +153,6 @@ include("ReducedOperators.jl")
 
 export ROMPerformance
 export eval_performance
-export eval_convergence
 export create_dir
 export load_snapshots
 export load_residuals

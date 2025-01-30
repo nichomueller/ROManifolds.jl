@@ -60,8 +60,8 @@ following information:
 
 Subtypes:
 
-- `GenericTransientRBOperator`
-- `LinearNonlinearTransientRBOperator`
+- [`GenericTransientRBOperator`](@ref)
+- [`LinearNonlinearTransientRBOperator`](@ref)
 """
 abstract type TransientRBOperator{O} <: ODEParamOperator{O,SplitDomains} end
 
@@ -222,7 +222,7 @@ end
       op_nonlinear::GenericTransientRBOperator{NonlinearParamODE}
     end
 
-Extends the concept of `GenericTransientRBOperator` to accommodate the linear/nonlinear
+Extends the concept of [`GenericTransientRBOperator`](@ref) to accommodate the linear/nonlinear
 splitting of terms in nonlinear applications
 """
 struct LinearNonlinearTransientRBOperator <: TransientRBOperator{LinearNonlinearParamODE}
@@ -379,7 +379,7 @@ function select_slvrcache_at_indices(cache::TupOfArrayContribution,indices)
 end
 
 function select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveParamVector}},paramcache,indices)
-  @unpack trial,ptrial,feop_cache = paramcache
+  @unpack trial,ptrial = paramcache
   new_xhF = ()
   new_trial = ()
   for i = eachindex(trial)
@@ -387,12 +387,12 @@ function select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveParamVector}},p
     new_XhF_i = ConsecutiveParamArray(us[i].data[:,indices])
     new_xhF = (new_xhF...,new_XhF_i)
   end
-  new_odeopcache = ParamOpCache(new_trial,ptrial,feop_cache)
+  new_odeopcache = ParamOpCache(new_trial,ptrial)
   return new_xhF,new_odeopcache
 end
 
 function select_evalcache_at_indices(us::Tuple{Vararg{BlockConsecutiveParamVector}},paramcache,indices)
-  @unpack trial,ptrial,feop_cache = paramcache
+  @unpack trial,ptrial = paramcache
   new_xhF = ()
   new_trial = ()
   for i = eachindex(trial)
@@ -404,7 +404,7 @@ function select_evalcache_at_indices(us::Tuple{Vararg{BlockConsecutiveParamVecto
     new_XhF_i = mortar([ConsecutiveParamArray(us_i.data[:,indices]) for us_i in blocks(us[i])])
     new_xhF = (new_xhF...,new_XhF_i)
   end
-  new_odeopcache = ParamOpCache(new_trial,ptrial,feop_cache)
+  new_odeopcache = ParamOpCache(new_trial,ptrial)
   return new_xhF,new_odeopcache
 end
 

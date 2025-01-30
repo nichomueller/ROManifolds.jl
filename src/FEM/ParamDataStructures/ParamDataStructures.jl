@@ -40,17 +40,15 @@ export TransientParamFunction
 export realization
 export get_params
 export get_times
-export get_initial_time
-export get_final_time
+export get_at_time
 export num_params
 export num_times
 export shift!
 include("ParamSpace.jl")
 
 export AbstractParamContainer
-export ParamContainer
-export ParamNumber
 export get_param_data
+export eltype2
 export param_length
 export param_eachindex
 export param_getindex
@@ -112,10 +110,29 @@ export ParamVectorWithEntryRemoved
 export ParamVectorWithEntryInserted
 include("ParamVectorWithEntries.jl")
 
+export AbstractSnapshots
+export Snapshots
+export GenericSnapshots
+export SnapshotsAtIndices
+export SparseSnapshots
+export BlockSnapshots
+export get_realization
+export select_snapshots
+export get_indexed_data
+export num_space_dofs
+include("Snapshots.jl")
+
+export TransientSnapshots
+export TransientGenericSnapshots
+export TransientSparseSnapshots
+export TransientSnapshotsWithIC
+export UnfoldingTransientSnapshots
+export ModeTransientSnapshots
+export change_mode
+include("Snapshots.jl")
+
 include("ParamBroadcasts.jl")
 
-export ParamReindex
-export PosNegParamReindex
 include("ParamReindex.jl")
 
 end # module

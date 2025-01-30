@@ -2,14 +2,9 @@
     abstract type UnEvalOperatorType <: GridapType end
 
 Type representing operators that are not evaluated yet. This may include operators
-representing transient problems (although the implementation in `Gridap`
+representing transient problems (although the implementation in [`Gridap`](@ref)
 differs), parametric problems, and a combination thereof. Could become a supertype
-of `ODEOperatorType` in `Gridap`. Subtypes:
-
-- `LinearParamEq`
-- `NonlinearParamEq`
-- `LinearNonlinearParamEq`
-- `ODEParamOperatorType`
+of `ODEOperatorType` in [`Gridap`](@ref)
 """
 abstract type UnEvalOperatorType <: GridapType end
 
@@ -33,8 +28,8 @@ struct LinearNonlinearParamEq <: UnEvalOperatorType end
 
 Subtypes:
 
-- `JointDomains`
-- `SplitDomains`
+- [`JointDomains`](@ref)
+- [`SplitDomains`](@ref)
 """
 abstract type TriangulationStyle <: GridapType end
 
@@ -43,7 +38,7 @@ abstract type TriangulationStyle <: GridapType end
 
 Trait for a FE operator indicating that residuals/jacobians in this operator
 should be computed summing the contributions relative to each triangulation as
-occurs in `Gridap`
+occurs in [`Gridap`](@ref)
 """
 struct JointDomains <: TriangulationStyle end
 
@@ -58,18 +53,16 @@ struct SplitDomains <: TriangulationStyle end
 """
     abstract type ParamOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: NonlinearOperator end
 
-Type representing algebraic operators (i.e. `NonlinearOperator` in `Gridap`) when
-solving parametric differential problems.
-
-Subtypes:
-
-- `ParamOpFromFEOp`
-- `LinearNonlinearParamOpFromFEOp`
-- `ODEParamOperator`
-- `RBOperator`
+Type representing algebraic operators (i.e. `NonlinearOperator` in [`Gridap`](@ref)) when
+solving parametric differential problems
 """
 abstract type ParamOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: NonlinearOperator end
 
+"""
+    get_fe_operator(op::ParamOperator) -> ParamFEOperator
+
+Fetches the underlying FE operator of an algebraic operator `op`
+"""
 get_fe_operator(op::ParamOperator) = @abstractmethod
 
 function Algebra.allocate_residual(
@@ -163,7 +156,7 @@ get_sparse_dof_map_at_domains(op::ParamOperator) = get_sparse_dof_map_at_domains
     allocate_paramcache(op::ParamOperator,μ::Realization,u::AbstractVector
       ) -> ParamOpCache
 
-Similar to `allocate_odecache` in `Gridap`, when dealing with
+Similar to `allocate_odecache` in [`Gridap`](@ref), when dealing with
 parametric problems
 """
 function allocate_paramcache(
@@ -174,14 +167,13 @@ function allocate_paramcache(
   feop = get_fe_operator(op)
   ptrial = get_trial(feop)
   trial = evaluate(ptrial,μ)
-  fe_cache = allocate_feopcache(feop,μ,u)
-  ParamOpCache(trial,ptrial,fe_cache)
+  ParamOpCache(trial,ptrial)
 end
 
 """
-    update_paramcache!(paramcache, op::ParamOperator, μ::Realization) -> ParamOpCache
+    update_paramcache!(paramcache,op::ParamOperator,μ::Realization) -> ParamOpCache
 
-Similar to `update_odecache!` in `Gridap`, when dealing with
+Similar to `update_odecache!` in [`Gridap`](@ref), when dealing with
 parametric problems
 """
 function update_paramcache!(paramcache,op::ParamOperator,μ::Realization)
@@ -202,14 +194,29 @@ function allocate_systemcache(
   return A,b
 end
 
+"""
+    abstract type AbstractParamCache <: GridapType end
+"""
 abstract type AbstractParamCache <: GridapType end
 
+"""
+    mutable struct ParamOpCache <: AbstractParamCache
+      trial
+      ptrial
+    end
+"""
 mutable struct ParamOpCache <: AbstractParamCache
   trial
   ptrial
-  feop_cache
 end
 
+"""
+    struct ParamOpSysCache{Ta,Tb} <: AbstractParamCache
+      paramcache::ParamOpCache
+      A::Ta
+      b::Tb
+    end
+"""
 struct ParamOpSysCache{Ta,Tb} <: AbstractParamCache
   paramcache::ParamOpCache
   A::Ta

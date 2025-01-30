@@ -12,8 +12,8 @@ following information:
 
 Subtypes:
 
-- `Snapshots`
-- `BlockSnapshots`
+- [`Snapshots`](@ref)
+- [`BlockSnapshots`](@ref)
 """
 abstract type AbstractSnapshots{T,N} <: AbstractParamContainer{T,N} end
 
@@ -41,8 +41,8 @@ of arrays, subtypes of `Snapshots` are arrays of numbers.
 
 Subtypes:
 
-- `Snapshots`
-- `BlockSnapshots`
+- [`SteadySnapshots`](@ref)
+- [`TransientSnapshots`](@ref)
 """
 abstract type Snapshots{T,N,D,I<:AbstractDofMap{D},R<:AbstractRealization,A} <: AbstractSnapshots{T,N} end
 
@@ -56,7 +56,7 @@ get_indexed_data(s::Snapshots) = @abstractmethod
 
 DofMaps.get_dof_map(s::Snapshots) = @abstractmethod
 
-ParamDataStructures.param_length(s::Snapshots) = @notimplemented
+param_length(s::Snapshots) = @notimplemented
 
 """
     num_space_dofs(s::Snapshots{T,N,D}) where {T,N,D} -> NTuple{D,Integer}
@@ -65,7 +65,7 @@ Returns the spatial size of the snapshots
 """
 num_space_dofs(s::Snapshots) = size(get_dof_map(s))
 
-ParamDataStructures.num_params(s::Snapshots) = num_params(get_realization(s))
+num_params(s::Snapshots) = num_params(get_realization(s))
 
 function Snapshots(s::AbstractArray,i::AbstractDofMap,r::AbstractRealization)
   @abstractmethod
@@ -93,9 +93,9 @@ SteadySnapshots is equal to `D` + 1, where `D` represents the number of
 spatial axes, to which a parametric dimension is added.
 
 Subtypes:
-- `GenericSnapshots`
-- `SnapshotsAtIndices`
-- `ReshapedSnapshots`
+- [`GenericSnapshots`](@ref)
+- [`SnapshotsAtIndices`](@ref)
+- [`ReshapedSnapshots`](@ref)
 """
 abstract type SteadySnapshots{T,N,D,I,R<:Realization,A} <: Snapshots{T,N,D,I,R,A} end
 
@@ -108,7 +108,7 @@ Base.size(s::SteadySnapshots) = (num_space_dofs(s)...,num_params(s))
       realization::R
     end
 
-Most standard implementation of a SteadySnapshots
+Most standard implementation of a [`SteadySnapshots`](@ref)
 """
 struct GenericSnapshots{T,N,D,I,R,A} <: SteadySnapshots{T,N,D,I,R,A}
   data::A
@@ -129,7 +129,7 @@ function Snapshots(s::AbstractParamArray,i::AbstractDofMap,r::Realization)
   GenericSnapshots(s,i,r)
 end
 
-ParamDataStructures.get_all_data(s::GenericSnapshots) = get_all_data(s.data)
+get_all_data(s::GenericSnapshots) = get_all_data(s.data)
 Utils.get_values(s::GenericSnapshots) = s.data
 DofMaps.get_dof_map(s::GenericSnapshots) = s.dof_map
 get_realization(s::GenericSnapshots) = s.realization
@@ -204,8 +204,8 @@ function SnapshotsAtIndices(s::SnapshotsAtIndices,prange)
 end
 
 param_indices(s::SnapshotsAtIndices) = s.prange
-ParamDataStructures.num_params(s::SnapshotsAtIndices) = length(param_indices(s))
-ParamDataStructures.get_all_data(s::SnapshotsAtIndices) = get_all_data(s.snaps)
+num_params(s::SnapshotsAtIndices) = length(param_indices(s))
+get_all_data(s::SnapshotsAtIndices) = get_all_data(s.snaps)
 DofMaps.get_dof_map(s::SnapshotsAtIndices) = get_dof_map(s.snaps)
 
 _num_all_params(s::Snapshots) = num_params(s)
@@ -336,6 +336,9 @@ end
 const SimpleSparseSnapshots{T,N,D,I,R,A<:ParamSparseMatrix} = Snapshots{T,N,D,I,R,A}
 const CompositeSparseSnapshots{T,N,D,I,R,A<:SimpleSparseSnapshots} = Snapshots{T,N,D,I,R,A}
 const GenericSparseSnapshots{T,N,D,I,R,A<:CompositeSparseSnapshots} = Snapshots{T,N,D,I,R,A}
+
+"""
+"""
 const SparseSnapshots{T,N,D,I,R} = Union{
   SimpleSparseSnapshots{T,N,D,I,R},
   CompositeSparseSnapshots{T,N,D,I,R},

@@ -79,14 +79,19 @@ end
 
 Type representing parametric sparse matrices in CSC format.
 Subtypes:
-- `ConsecutiveParamSparseMatrixCSC`
-- `GenericParamSparseMatrixCSC`
-
+- [`ConsecutiveParamSparseMatrixCSC`](@ref)
+- [`GenericParamSparseMatrixCSC`](@ref)
 """
 abstract type ParamSparseMatrixCSC{Tv,Ti} <: ParamSparseMatrix{Tv,Ti,SparseMatrixCSC{Tv,Ti}} end
 
 """
-    struct ConsecutiveParamSparseMatrixCSC{Tv,Ti<:Integer} <: ParamSparseMatrixCSC{Tv,Ti} end
+    struct ConsecutiveParamSparseMatrixCSC{Tv,Ti<:Integer} <: ParamSparseMatrixCSC{Tv,Ti}
+      m::Int64
+      n::Int64
+      colptr::Vector{Ti}
+      rowval::Vector{Ti}
+      data::Matrix{Tv}
+    end
 
 Represents a vector of sparse matrices in CSC format, with entries stored
 consecutively in memory. For sake of coherence, an instance of
@@ -188,7 +193,14 @@ function Base.copyto!(A::ConsecutiveParamSparseMatrixCSC,B::ConsecutiveParamSpar
 end
 
 """
-    struct GenericParamSparseMatrixCSC{Tv,Ti<:Integer} <: ParamSparseMatrixCSC{Tv,Ti} end
+    struct GenericParamSparseMatrixCSC{Tv,Ti<:Integer} <: ParamSparseMatrixCSC{Tv,Ti}
+      m::Int64
+      n::Int64
+      colptr::Vector{Ti}
+      rowval::Vector{Ti}
+      data::Vector{Tv}
+      ptrs::Vector{Ti}
+    end
 
 Represents a vector of sparse matrices in CSC format, with entries stored
 non-consecutively in memory. For sake of coherence, an instance of
@@ -291,14 +303,19 @@ end
 
 Type representing parametric sparse matrices in CSR format.
 Subtypes:
-- `ConsecutiveParamSparseMatrixCSR`
-- `GenericParamSparseMatrixCSR`
-
+- [`ConsecutiveParamSparseMatrixCSR`](@ref)
+- [`GenericParamSparseMatrixCSR`](@ref)
 """
 abstract type ParamSparseMatrixCSR{Bi,Tv,Ti} <: ParamSparseMatrix{Tv,Ti,SparseMatrixCSR{Bi,Tv,Ti}} end
 
 """
-    struct ConsecutiveParamSparseMatrixCSR{Bi,Tv,Ti<:Integer} <: ParamSparseMatrixCSR{Bi,Tv,Ti} end
+    struct ConsecutiveParamSparseMatrixCSR{Bi,Tv,Ti<:Integer} <: ParamSparseMatrixCSR{Bi,Tv,Ti}
+      m::Int64
+      n::Int64
+      rowptr::Vector{Ti}
+      colval::Vector{Ti}
+      data::Matrix{Tv}
+    end
 
 Represents a vector of sparse matrices in CSR format, with entries stored
 consecutively in memory. For sake of coherence, an instance of
@@ -410,7 +427,14 @@ function Base.copyto!(A::ConsecutiveParamSparseMatrixCSR,B::ConsecutiveParamSpar
 end
 
 """
-    struct GenericParamSparseMatrixCSR{Bi,Tv,Ti<:Integer} <: ParamSparseMatrixCSR{Bi,Tv,Ti} end
+    struct GenericParamSparseMatrixCSR{Bi,Tv,Ti<:Integer} <: ParamSparseMatrixCSR{Bi,Tv,Ti}
+      m::Int64
+      n::Int64
+      rowptr::Vector{Ti}
+      colval::Vector{Ti}
+      data::Vector{Tv}
+      ptrs::Vector{Ti}
+    end
 
 Represents a vector of sparse matrices in CSR format, with entries stored
 non-consecutively in memory. For sake of coherence, an instance of

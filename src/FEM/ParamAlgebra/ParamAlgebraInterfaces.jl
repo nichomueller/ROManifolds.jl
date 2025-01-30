@@ -1,5 +1,3 @@
-eltype2(x) = eltype(eltype(x))
-
 function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamVector
   @warn "Allocating a vector of unit parametric length, will likely result in an error"
   vector = allocate_vector(eltype(V),n)
@@ -201,12 +199,6 @@ end
   A
 end
 
-"""
-    struct ParamBuilder{A} <: GridapType
-      builder::A
-      plength::Int
-    end
-"""
 struct ParamBuilder{A} <: GridapType
   builder::A
   plength::Int
@@ -221,12 +213,6 @@ function Algebra.nz_counter(b::ParamBuilder,axes)
   ParamCounter(counter,b.plength)
 end
 
-"""
-    struct ParamCounter{A}
-      counter::C
-      plength::Int
-    end
-"""
 struct ParamCounter{A}
   counter::A
   plength::Int
@@ -269,21 +255,6 @@ function Algebra.nz_allocation(a::ParamCounter{<:Algebra.CounterCSC{Tv,Ti}}) whe
   ParamInserterCSC(counter.nrows,counter.ncols,colptr,colnnz,rowval,nzval,plength)
 end
 
-"""
-    struct ParamInserterCSC{Tv,Ti}
-      nrows::Int
-      ncols::Int
-      colptr::Vector{Ti}
-      colnnz::Vector{Ti}
-      rowval::Vector{Ti}
-      nzval::Vector{Tv}
-      plength::Int
-    end
-
-Extends the concept of `InserterCSC` in `Gridap` to accommodate
-a parametric setting. Tv is the type of the parametric nonzero entries of the
-CSC matrices to be assembled.
-"""
 struct ParamInserterCSC{Tv,Ti}
   nrows::Int
   ncols::Int

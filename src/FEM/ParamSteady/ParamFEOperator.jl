@@ -33,7 +33,7 @@ get_domains_jac(d::FEDomains) = d.domains_jac
 """
     abstract type ParamFEOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: FEOperator end
 
-Parametric extension of a `FEOperator` in `Gridap`. Compared to
+Parametric extension of a `FEOperator` in [`Gridap`](@ref). Compared to
 a standard FEOperator, there are the following novelties:
 
 - a ParamSpace is provided, so that parametric realizations can be extracted
@@ -43,12 +43,20 @@ a standard FEOperator, there are the following novelties:
 
 Subtypes:
 
-- `ParamFEOpFromWeakForm`
-- `LinearNonlinearParamFEOperator`
-- `TransientParamFEOperator`
+- [`ParamFEOpFromWeakForm`](@ref)
+- [`LinearNonlinearParamFEOperator`](@ref)
+- [`TransientParamFEOperator`](@ref)
 """
 abstract type ParamFEOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: FEOperator end
+
+"""
+    const JointParamFEOperator{O<:UnEvalOperatorType} = ParamFEOperator{O,JointDomains}
+"""
 const JointParamFEOperator{O<:UnEvalOperatorType} = ParamFEOperator{O,JointDomains}
+
+"""
+    const SplitParamFEOperator{O<:UnEvalOperatorType} = ParamFEOperator{O,SplitDomains}
+"""
 const SplitParamFEOperator{O<:UnEvalOperatorType} = ParamFEOperator{O,SplitDomains}
 
 function FESpaces.get_test(feop::ParamFEOperator)
@@ -59,20 +67,18 @@ function FESpaces.get_trial(feop::ParamFEOperator)
   @abstractmethod
 end
 
+"""
+    get_param_space(feop::ParamFEOperator) -> ParamSpace
+    get_param_space(feop::TransientParamFEOperator) -> TransientParamSpace
+
+Returns the space of parameters contained in `feop`
+"""
 function get_param_space(feop::ParamFEOperator)
   @abstractmethod
 end
 
 function FESpaces.get_algebraic_operator(op::ParamFEOperator)
   ParamOpFromFEOp(op)
-end
-
-function allocate_feopcache(op::ParamFEOperator,r::Realization,u::AbstractVector)
-  nothing
-end
-
-function update_feopcache!(feop_cache,op::ParamFEOperator,u::AbstractVector)
-  feop_cache
 end
 
 ParamDataStructures.realization(op::ParamFEOperator;kwargs...) = realization(get_param_space(op);kwargs...)
@@ -239,7 +245,7 @@ CellData.get_domains(op::ParamFEOpFromWeakForm) = op.domains
     set_domains(op::ParamFEOperator,args...) -> JointParamFEOperator
 
 Fixes the triangulations for residual/jacobian; the resulting operator will have
-the trait `JointDomains` activated
+the trait [`JointDomains`](@ref) activated
 """
 set_domains(op::JointParamFEOperator,args...) = op
 
@@ -247,7 +253,7 @@ set_domains(op::JointParamFEOperator,args...) = op
     change_domains(op::ParamFEOperator,args...) -> ParamFEOperator
 
 Changes the triangulations for residual/jacobian; the resulting operator will have
-the same `TriangulationStyle` trait as the one of the input
+the same [`TriangulationStyle`](@ref) trait as the one of the input
 """
 change_domains(op::JointParamFEOperator,args...) = op
 

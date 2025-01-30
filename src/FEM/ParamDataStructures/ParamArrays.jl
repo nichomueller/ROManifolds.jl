@@ -97,7 +97,7 @@ end
       plength::Int
     end
 
-Wrapper for nonparametric arrays that we wish assumed a parametric length
+Wrapper for a non-parametric array `data` that we wish assumed a parametric `length`
 """
 struct TrivialParamArray{T<:Number,N,A<:AbstractArray{T,N}} <: ParamArray{T,N}
   data::A
@@ -325,6 +325,8 @@ end
       data::Vector{Tv}
       ptrs::Vector{Ti}
     end
+
+Parametric vector with entries stored non-consecutively in memory
 """
 struct GenericParamVector{Tv,Ti} <: ParamArray{Tv,1}
   data::Vector{Tv}
@@ -459,6 +461,8 @@ end
       ptrs::Vector{Ti}
       nrows::Vector{Ti}
     end
+
+Parametric matrix with entries stored non-consecutively in memory
 """
 struct GenericParamMatrix{Tv,Ti} <: ParamArray{Tv,2}
   data::Vector{Tv}

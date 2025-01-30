@@ -5,11 +5,19 @@ Type used to represent the sparsity pattern of a sparse matrix, usually the
 jacobian in a FE problem.
 
 Subtypes:
-- `SparsityCSC`
-- `TProductSparsity`
+
+- [`SparsityCSC`](@ref)
+- [`CartesianSparsity`](@ref)
+- [`TProductSparsity`](@ref)
 """
 abstract type SparsityPattern end
 
+"""
+    get_sparsity(U::FESpace,V::FESpace,trian=_get_common_domain(U,V)) -> SparsityPattern
+
+Builds a [`SparsityPattern`](@ref) from two FE spaces `U` and `V`, via integration
+on a triangulation `trian`
+"""
 function get_sparsity(U::FESpace,V::FESpace,trian=_get_common_domain(U,V))
   SparsityPattern(U,V,trian)
 end
@@ -43,23 +51,18 @@ SparseArrays.rowvals(a::SparsityPattern) = rowvals(get_background_matrix(a))
 SparseArrays.getcolptr(a::SparsityPattern) = SparseArrays.getcolptr(get_background_matrix(a))
 Algebra.nz_index(a::SparsityPattern,row::Integer,col::Integer) = nz_index(get_background_matrix(a),row,col)
 
-function to_nz_index(i::AbstractArray,a::SparsityPattern)
-  to_nz_index(i,get_background_matrix(i))
+function sparsify_indices(i::AbstractArray,a::SparsityPattern)
+  sparsify_indices(i,get_background_matrix(i))
 end
 
-function get_sparse_dof_map(a::SparsityPattern,U::FESpace,V::FESpace,args...)
-  TrivialSparseMatrixDofMap(a)
-end
-
-recast(v::AbstractVector,A::AbstractSparseMatrix) = @abstractmethod
-recast(v::AbstractVector,A::SparseMatrixCSC) = SparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,v)
-recast(v::AbstractVector,A::SparseMatrixCSR{Bi}) where Bi = SparseMatrixCSR{Bi}(A.m,A.n,A.rowptr,A.colval,v)
 recast(A::AbstractArray,a::SparsityPattern) = recast(A,get_background_matrix(a))
 
 """
     struct SparsityCSC{Tv,Ti} <: SparsityPattern
       matrix::SparseMatrixCSC{Tv,Ti}
     end
+
+Sparsity pattern associated to a compressed sparse column matrix `matrix`
 """
 struct SparsityCSC{Tv,Ti} <: SparsityPattern
   matrix::SparseMatrixCSC{Tv,Ti}
@@ -71,7 +74,25 @@ end
 
 get_background_matrix(a::SparsityCSC) = a.matrix
 
-struct CartesianSparsity{A<:SparsityPattern,B,C} <: SparsityPattern
+"""
+    struct CartesianSparsity{A<:SparsityPattern,B<:AbstractVector,C<:AbstractVector} <: SparsityPattern
+      sparsity::A
+      bg_rows_to_act_rows::B
+      bg_cols_to_act_cols::C
+    end
+
+Fields:
+  - `sparsity`: a [`SparsityPattern`](@ref) of a matrix assembled on a geometry that
+    is the child of a Cartesian geometry
+  - `bg_rows_to_act_rows`: a vector that maps a row of the Cartesian parent
+    geometry, to a row of the child geometry
+  - `bg_cols_to_act_cols`: a vector that maps a column of the Cartesian parent
+    geometry, to a column of the child geometry
+
+This type creates a map between `sparsity` and the `SparsityPattern` defined on
+the Cartesian parent geometry
+"""
+struct CartesianSparsity{A<:SparsityPattern,B<:AbstractVector,C<:AbstractVector} <: SparsityPattern
   sparsity::A
   bg_rows_to_act_rows::B
   bg_cols_to_act_cols::C
@@ -101,10 +122,15 @@ end
       sparsities_1d::Vector{B}
     end
 
-Used to represent a sparsity pattern of a matrix obtained by integrating a
-bilinear form on a triangulation that can be obtained as the tensor product of a
-1-d triangulations. For example, this can be done when the mesh is Cartesian, and
-the discretizing elements are cubes
+Fields:
+- `sparsity`: a [`SparsityPattern`](@ref) of a matrix assembled on a Cartesian
+  geometry of dimension `D`
+- `sparsities_1d`: a vector of `D` univariate sparsity patterns
+
+Structure used to represent a `SparsityPattern` of a matrix obtained by integrating a
+bilinear form on a triangulation that can be obtained as the tensor product of `D`
+1D triangulations. For example, this can be done on a Cartesian mesh composed of
+D-cubes
 """
 struct TProductSparsity{A<:SparsityPattern,B<:SparsityPattern} <: SparsityPattern
   sparsity::A
@@ -118,14 +144,23 @@ univariate_num_cols(a::TProductSparsity) = Tuple(num_cols.(a.sparsities_1d))
 univariate_findnz(a::TProductSparsity) = tuple_of_arrays(findnz.(a.sparsities_1d))
 univariate_nnz(a::TProductSparsity) = Tuple(nnz.(a.sparsities_1d))
 
-function get_sparse_dof_map(a::TProductSparsity,U::FESpace,V::FESpace,args...)
-  Tu = get_dof_type(get_fe_dof_basis(U))
-  Tv = get_dof_type(get_fe_dof_basis(V))
-  full_ids = get_d_sparse_dofs_to_full_dofs(Tu,Tv,a)
-  sparse_ids = to_nz_index(full_ids)
-  SparseMatrixDofMap(sparse_ids,full_ids,a)
-end
+"""
+    get_d_sparse_dofs_to_full_dofs(Tu,Tv,a::TProductSparsity) -> AbstractArray{<:Integer,D}
 
+Input:
+- `Tu`, `Tv`: DOF types of a trial FE space `U` and test FE space `V`, respecively
+- `a`: a [`TProductSparsity`](@ref) representing the sparsity of the matrix
+  assembled from `U` and `V`
+
+Output:
+- a D-array `d_sparse_dofs_to_full_dofs`, which represents a map from
+`Nnz_1 × … × Nnz_{D}` to `M⋅N`, where `Nnz_i` represents the number of
+nonzero entries of the `i`th univariate sparsity contained in `a`, and `M⋅N` is
+the total length of the tensor product sparse matrix in `a`. For vector-valued
+FE spaces, an additional axis is added to `d_sparse_dofs_to_full_dofs` representing
+the number of components. In particular, the component axis has a length equal to
+`num_components(Tu)⋅num_components(Tv)`
+"""
 function get_d_sparse_dofs_to_full_dofs(Tu,Tv,a::TProductSparsity)
   I,J, = findnz(a)
   nrows = num_rows(a)
@@ -213,9 +248,15 @@ end
 
 # utils
 
-get_dof_type(b) = @abstractmethod
-get_dof_type(b::LagrangianDofBasis{P,V}) where {P,V} = change_eltype(V,Float64)
-get_dof_type(dof::CellDof) = get_dof_type(testitem(get_data(dof)))
+"""
+    get_dof_eltype(f::FESpace) -> Type
+
+Fetches the DOF eltype for a FE space `f`
+"""
+get_dof_eltype(f::FESpace) = get_dof_eltype(get_fe_dof_basis(f))
+get_dof_eltype(b) = @abstractmethod
+get_dof_eltype(b::LagrangianDofBasis{P,V}) where {P,V} = change_eltype(V,Float64)
+get_dof_eltype(dof::CellDof) = get_dof_eltype(testitem(get_data(dof)))
 
 function trivial_symbolic_loop_matrix!(A,cellidsrows,cellidscols)
   mat1 = nothing

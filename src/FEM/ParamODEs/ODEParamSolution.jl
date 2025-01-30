@@ -32,8 +32,8 @@ end
     end
 
 Wrapper for the evolution of a differential problem represented by
-the field `odeop`, and solved by means of the ode solver `solver`. Parametric
-extension of the type `ODESolution` in `Gridap`
+the field `odeop`, and solved by means of the ode solver `solver`. It represents
+the parametric extension of the type `ODESolution` in [`Gridap`](@ref)
 """
 struct ODEParamSolution{V} <: ODESolution
   solver::ODESolver
@@ -54,7 +54,7 @@ function ODEParamSolution(
 end
 
 function Base.iterate(sol::ODEParamSolution)
-  r0 = ParamDataStructures.get_at_time(sol.r,:initial)
+  r0 = get_at_time(sol.r,:initial)
   cache = allocate_odeparamcache(sol.solver,sol.odeop,r0,sol.us0)
 
   state0,cache = ode_start(sol.solver,sol.odeop,r0,sol.us0,cache)
@@ -97,6 +97,11 @@ function Base.collect(sol::ODEParamSolution{V}) where V
   return free_values,sol.tracker
 end
 
+"""
+    collect_initial_values(sol::ODEParamSolution) -> AbstractParamVector
+
+Fetches the initial values of a [`ODEParamSolution`](@ref) `sol`
+"""
 function collect_initial_values(sol::ODEParamSolution)
   sol.us0[1]
 end

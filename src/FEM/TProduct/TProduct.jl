@@ -13,7 +13,6 @@ using Gridap.FESpaces
 using Gridap.Fields
 using Gridap.Geometry
 using Gridap.MultiField
-using Gridap.Polynomials
 using Gridap.ReferenceFEs
 using Gridap.TensorValues
 using Gridap.Helpers
@@ -27,9 +26,6 @@ using ROM.DofMaps
 import Base:+,-
 import FillArrays: Fill,fill
 import Gridap.ReferenceFEs: get_order
-import PartitionedArrays: tuple_of_arrays
-import SparseArrays: AbstractSparseMatrixCSC
-import UnPack: @unpack
 
 export TProductModel
 export TProductTriangulation
@@ -50,13 +46,6 @@ export get_factors
 export get_decomposition
 include("RankTensors.jl")
 
-export TProductCellPoint
-export TProductCellField
-export GenericTProductCellField
-export TProductFEBasis
-export GenericTProductDiffCellField
-export GenericTProductDiffEval
-export TProductCellDatum
 include("TProductCellData.jl")
 
 export TProductSparseMatrixAssembler

@@ -1,12 +1,3 @@
-"""
-    abstract type AbstractParamBroadcast end
-
-Represents a broadcast operation over parametric quantities. This allows to perform
-operations that are usually not allowed in a normal broadcasting setting, e.g.
-adding a scalar to an array of arrays. Subtypes:
-
-- `ParamBroadcast`]
-"""
 abstract type AbstractParamBroadcast end
 
 Base.size(A::AbstractParamBroadcast) = (param_length(A),)

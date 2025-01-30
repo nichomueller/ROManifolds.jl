@@ -12,13 +12,13 @@ ParamDataStructures.param_length(f::FESpace) = 0
 """
     abstract type SingleFieldParamFESpace{S} <: SingleFieldFESpace end
 
-Parametric extension of a `SingleFieldFESpace` in `Gridap`. The
+Parametric extension of a `SingleFieldFESpace` in [`Gridap`](@ref). The
 FE spaces inhereting are (trial) spaces on which we can easily define a
 `ParamFEFunction`.
 
 Subtypes:
-- TrivialParamFESpace{S} <: SingleFieldParamFESpace{S}
-- TrialParamFESpace{S} <: SingleFieldParamFESpace{S}
+- [`TrivialParamFESpace`](@ref)
+- [`TrialParamFESpace`](@ref)
 """
 abstract type SingleFieldParamFESpace{S} <: SingleFieldFESpace end
 
@@ -78,11 +78,21 @@ get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(get_fe_spa
 
 # These functions allow us to use global ParamArrays
 
-get_underlying_vector_type(f::FESpace) = @abstractmethod
-get_underlying_vector_type(f::SingleFieldParamFESpace) = get_vector_type(get_fe_space(f))
+"""
+    get_vector_type2(f::SingleFieldParamFESpace) -> Type
 
+Returns the vector type of the underlying un-parametric FESpace contained in `f`
+"""
+get_vector_type2(f::FESpace) = @abstractmethod
+get_vector_type2(f::SingleFieldParamFESpace) = get_vector_type(get_fe_space(f))
+
+"""
+    param_zero_free_values(f::FESpace) -> AbstractParamVector
+
+Parametric version of the function [`zero_free_values`](@ref) in [`Gridap`](@ref)
+"""
 function param_zero_free_values(f::FESpace)
-  V = get_underlying_vector_type(f)
+  V = get_vector_type2(f)
   L = param_length(f)
   v = allocate_vector(V,get_free_dof_ids(f))
   fill!(v,zero(eltype(V)))
@@ -90,8 +100,13 @@ function param_zero_free_values(f::FESpace)
   return pv
 end
 
+"""
+    param_zero_dirichlet_values(f::FESpace) -> AbstractParamVector
+
+Parametric version of the function [`zero_dirichlet_values`](@ref) in [`Gridap`](@ref)
+"""
 function param_zero_dirichlet_values(f::FESpace)
-  V = get_underlying_vector_type(f)
+  V = get_vector_type2(f)
   L = param_length(f)
   v = allocate_vector(V,get_dirichlet_dof_ids(f))
   fill!(v,zero(eltype(V)))

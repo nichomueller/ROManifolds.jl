@@ -1,4 +1,7 @@
 """
+    struct ODEOpFromTFEOp <: ODEOperator end
+
+Wrapper that transforms a `TransientParamFEOperator` into an `ODEParamOperator`
 """
 struct ODEParamOpFromTFEOp{O,T} <: ODEParamOperator{O,T}
   op::TransientParamFEOperator{O,T}

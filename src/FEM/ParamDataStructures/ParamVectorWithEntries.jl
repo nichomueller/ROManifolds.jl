@@ -1,6 +1,12 @@
 # these structs are only needed when dealing with a parametric version of a FE
 # space of type FESpaceWithConstantFixed
 
+"""
+    struct ParamVectorWithEntryRemoved{T,A} <: ParamVector{T}
+      a::A
+      index::Int
+    end
+"""
 struct ParamVectorWithEntryRemoved{T,A} <: ParamVector{T}
   a::A
   index::Int
@@ -31,6 +37,13 @@ function Base.sum(v::ParamVectorWithEntryRemoved)
   sum(data,dims=1) - data[v.index,:]
 end
 
+"""
+    struct ParamVectorWithEntryInserted{T,A} <: ParamVector{T}
+      a::A
+      index::Int
+      value::Vector{T}
+    end
+"""
 struct ParamVectorWithEntryInserted{T,A} <: ParamVector{T}
   a::A
   index::Int

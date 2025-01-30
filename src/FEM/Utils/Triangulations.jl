@@ -317,8 +317,8 @@ function CellData.change_domain(a::CellField,strian::Triangulation,::ReferenceDo
   if strian === ttrian
     return a
   end
-  parent = CellData.change_domain(a,strian,ReferenceDomain(),ttrian.parent,ReferenceDomain())
-  cell_data = lazy_map(Reindex(CellData.get_data(parent)),ttrian.cell_to_parent_cell)
+  parent = change_domain(a,strian,ReferenceDomain(),ttrian.parent,ReferenceDomain())
+  cell_data = lazy_map(Reindex(get_data(parent)),ttrian.cell_to_parent_cell)
   return CellData.similar_cell_field(a,cell_data,ttrian,ReferenceDomain())
 end
 
@@ -326,8 +326,8 @@ function CellData.change_domain(a::CellField,strian::Triangulation,::PhysicalDom
   if strian === ttrian
     return a
   end
-  parent = CellData.change_domain(a,strian,PhysicalDomain(),ttrian.parent,PhysicalDomain())
-  cell_data = lazy_map(Reindex(CellData.get_data(parent)),ttrian.cell_to_parent_cell)
+  parent = change_domain(a,strian,PhysicalDomain(),ttrian.parent,PhysicalDomain())
+  cell_data = lazy_map(Reindex(get_data(parent)),ttrian.cell_to_parent_cell)
   return CellData.similar_cell_field(a,cell_data,ttrian,PhysicalDomain())
 end
 

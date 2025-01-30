@@ -52,6 +52,14 @@ function reduced_operator(
   LinearNonlinearRBOperator(red_op_lin,red_op_nlin)
 end
 
+"""
+    struct RBCache <: AbstractParamCache
+      A::HRParamArray
+      b::HRParamArray
+      trial::RBSpace
+      paramcache::ParamOpCache
+    end
+"""
 struct RBCache <: AbstractParamCache
   A::HRParamArray
   b::HRParamArray
@@ -59,6 +67,13 @@ struct RBCache <: AbstractParamCache
   paramcache::ParamOpCache
 end
 
+"""
+    struct LinearNonlinearRBCache <: AbstractParamCache
+      rbcache::RBCache
+      A::AbstractMatrix
+      b::AbstractVector
+    end
+"""
 struct LinearNonlinearRBCache <: AbstractParamCache
   rbcache::RBCache
   A::AbstractMatrix
@@ -71,16 +86,21 @@ end
 Type representing reduced algebraic operators used within a reduced order modelling
 framework in steady applications. A RBOperator should contain the following information:
 
-- a reduced test and trial space, computed according to `reduced_spaces`
-- a hyper-reduced residual and jacobian, computed according to `reduced_weak_form`
+- a reduced test and trial space, computed according to [`reduced_spaces`](@ref)
+- a hyper-reduced residual and jacobian, computed according to [`reduced_weak_form`](@ref)
 
 Subtypes:
 
-- `GenericRBOperator`
-- `LinearNonlinearRBOperator`
+- [`GenericRBOperator`](@ref)
+- [`LinearNonlinearRBOperator`](@ref)
 """
 abstract type RBOperator{O} <: ParamOperator{O,SplitDomains} end
 
+"""
+    allocate_rbcache(op::NonlinearOperator,r::AbstractRealization,u::Any)
+
+Returns the caches needed to solve a problem with the RB method
+"""
 function allocate_rbcache(op::RBOperator,args...)
   @abstractmethod
 end
@@ -211,8 +231,8 @@ end
       u::Tuple{Vararg{AbstractParamVector}},ws::Tuple{Vararg{Real}},paramcache
       ) -> AbstractParamMatrix
 
-Full order jacobian computed via integration on the LHS AbstractIntegrationDomains
-stored in `op`
+Full order residual computed via integration on the [`AbstractIntegrationDomain`](ref)
+relative to the LHS defined in `op`
 """
 function fe_jacobian!(
   A,
@@ -234,8 +254,8 @@ end
       u::Tuple{Vararg{AbstractParamVector}},paramcache
       ) -> AbstractParamVector
 
-Full order residual computed via integration on the RHS AbstractIntegrationDomains
-stored in `op`
+Full order residual computed via integration on the [`AbstractIntegrationDomain`](ref)
+relative to the RHS defined in `op`
 """
 function fe_residual!(
   b,
@@ -255,7 +275,7 @@ end
       op_nonlinear::GenericRBOperator{NonlinearParamEq}
     end
 
-Extends the concept of `GenericRBOperator` to accommodate the linear/nonlinear
+Extends the concept of [`GenericRBOperator`](@ref) to accommodate the linear/nonlinear
 splitting of terms in nonlinear applications
 """
 struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}

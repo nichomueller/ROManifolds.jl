@@ -65,7 +65,13 @@ function reduced_basis(
   return basis
 end
 
-function reduced_subspace(space::FESpace,basis)
+"""
+    reduced_subspace(space::FESpace,basis::Projection) -> RBSpace
+
+Generic constructor of a [`RBSpace`](@ref) from a FE space `space` and a projection
+`basis`
+"""
+function reduced_subspace(space::FESpace,basis::Projection)
   @abstractmethod
 end
 
@@ -76,15 +82,21 @@ Represents a vector subspace of a FE space.
 
 Subtypes:
 
-- `SingleFieldRBSpace`
-- `MultiFieldRBSpace`
-- `EvalRBSpace`
+- [`SingleFieldRBSpace`](@ref)
+- [`MultiFieldRBSpace`](@ref)
+- [`EvalRBSpace`](@ref)
 """
 abstract type RBSpace <: FESpace end
 
 (U::RBSpace)(μ) = evaluate(U,μ)
 
 FESpaces.get_fe_space(r::RBSpace) = @abstractmethod
+
+"""
+    get_reduced_subspace(r::RBSpace) -> Projection
+
+Returns the [`Projection`](@ref) spanning the reduced subspace contained in `r`
+"""
 get_reduced_subspace(r::RBSpace) = @abstractmethod
 
 get_basis(r::RBSpace) = get_basis(get_reduced_subspace(r))
@@ -103,7 +115,7 @@ FESpaces.get_vector_type(r::RBSpace) = get_vector_type(get_fe_space(r))
 
 ParamDataStructures.param_length(r::RBSpace) = param_length(get_fe_space(r))
 
-ParamFESpaces.get_underlying_vector_type(r::RBSpace) = get_underlying_vector_type(get_fe_space(r))
+ParamFESpaces.get_vector_type2(r::RBSpace) = get_vector_type2(get_fe_space(r))
 
 for (f,f!,g) in zip(
   (:project,:inv_project),
@@ -135,8 +147,6 @@ function project(r1::RBSpace,x::Projection,r2::RBSpace)
   galerkin_projection(get_reduced_subspace(r1),x,get_reduced_subspace(r2))
 end
 
-get_norm_matrix(r::RBSpace) = get_norm_matrix(get_reduced_subspace(r))
-
 function FESpaces.FEFunction(r::RBSpace,x̂::AbstractVector)
   x = inv_project(r,x̂)
   fe = get_fe_space(r)
@@ -150,7 +160,7 @@ end
       subspace::Projection
     end
 
-Reduced basis subspace of a `SingleFieldFESpace` in `Gridap`
+Reduced basis subspace of a `SingleFieldFESpace` in [`Gridap`](@ref)
 """
 struct SingleFieldRBSpace <: RBSpace
   space::SingleFieldFESpace
@@ -170,7 +180,7 @@ get_reduced_subspace(r::SingleFieldRBSpace) = r.subspace
       subspace::BlockProjection
     end
 
-Reduced basis subspace of a `MultiFieldFESpace` in `Gridap`
+Reduced basis subspace of a `MultiFieldFESpace` in [`Gridap`](@ref)
 """
 struct MultiFieldRBSpace <: RBSpace
   space::MultiFieldFESpace

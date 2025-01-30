@@ -16,8 +16,8 @@ Type for nonstandard representations of tensor train cores.
 
 Subtypes:
 
-- `DofMapCore`
-- `SparseCore`
+- [`DofMapCore`](@ref)
+- [`SparseCore`](@ref)
 """
 abstract type AbstractTTCore{T,N} <: AbstractArray{T,N} end
 
@@ -53,13 +53,13 @@ Tensor train cores for sparse matrices.
 
 Subtypes:
 
-- `SparseCoreCSC`
-- `SparseCoreCSC4D`
+- [`SparseCoreCSC`](@ref)
+- [`SparseCoreCSC4D`](@ref)
 """
 abstract type SparseCore{T,N} <: AbstractTTCore{T,N} end
 
 function SparseCore(array::Array{T,3},sparsity::SparsityPattern) where T
-  sparsity′ = get_background_sparsity(sparsity)
+  sparsity′ = DofMaps.get_background_sparsity(sparsity)
   SparseCore(array,sparsity′)
 end
 
@@ -93,7 +93,7 @@ to_4d_core(a::SparseCoreCSC) = SparseCoreCSC4D(a)
       sparse_indexes::Vector{CartesianIndex{2}}
     end
 
-Tensor train cores for sparse matrices in CSC format, reshaped as 4-d arrays
+Tensor train cores for sparse matrices in CSC format, reshaped as 4D arrays
 """
 struct SparseCoreCSC4D{T,Ti} <: SparseCore{T,4}
   core::SparseCoreCSC{T,Ti}
@@ -175,18 +175,18 @@ end
 """
     block_cores(a::AbstractVector{<:AbstractArray{T,3}}...) -> AbstractVector{<:AbstractArray{T,3}}
 
-Given a series of tensor train decompositions a = (a1, ..., aN) such that
+Given a series of tensor train decompositions `a = (a1, ..., aN)` such that
 
-an = an1 ⋅ an2 ⋅ ⋯ ⋅ anD
+`an = an1 ⋅ an2 ⋅ ⋯ ⋅ anD`
 
-for any n ∈ {1,...,N}, returns the tensor train decomposition `b` such that
+for any `n ∈ {1,...,N}`, returns the tensor train decomposition `b` such that
 
-b1 = [a11, ..., aN1]
+`b1 = [a11, ..., aN1]
 b2 = diag(b12, ..., bN2)
  ⋮
-bD = diag(b1D, ..., bND)
+bD = diag(b1D, ..., bND)`
 
-Note that `b` represents the tensor train decomposition of a1 + ... + aN
+Note that `b` represents the tensor train decomposition of `a1 + ... + aN`
 """
 function block_cores(a::AbstractVector{<:AbstractVector{<:AbstractArray{T,3}}}) where T
   D = length(first(a))

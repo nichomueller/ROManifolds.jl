@@ -218,8 +218,8 @@ end
     cores2basis(cores::AbstractArray{T,3}...) -> AbstractMatrix
     cores2basis(dof_map::AbstractDofMap{D},cores::AbstractArray{T,3}...) -> AbstractMatrix
 
-Returns a basis in a matrix format from a list of tensor train cores. When also
-supplying the indexing strategy `dof_map`, the result is reindexed accordingly
+Returns a basis in a matrix format from a list of tensor train cores `cores`. When
+also supplying the indexing strategy `dof_map`, the result is reindexed accordingly
 """
 function cores2basis(core::AbstractArray{T,3}) where T
   reshape(core,:,size(core,3))

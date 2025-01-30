@@ -32,21 +32,11 @@ using ROM.RBSteady
 
 import Base: +,-,*,\
 import UnPack: @unpack
-import Gridap.Algebra: allocate_matrix,allocate_vector,solve
-import PartitionedArrays: tuple_of_arrays
 import ROM.RBSteady: _get_label
 
 export TransientReduction
 export TransientMDEIMReduction
 include("ReductionMethods.jl")
-
-export TransientSnapshots
-export TransientGenericSnapshots
-export TransientSparseSnapshots
-export TransientSnapshotsWithIC
-export UnfoldingTransientSnapshots
-export ModeTransientSnapshots
-include("Snapshots.jl")
 
 include("RBSolver.jl")
 
@@ -61,7 +51,6 @@ include("Projections.jl")
 
 include("RBSpace.jl")
 
-export TransientMDEIM
 include("HyperReduction.jl")
 
 include("HRParamArray.jl")

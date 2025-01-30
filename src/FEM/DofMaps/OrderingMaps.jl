@@ -1,3 +1,9 @@
+"""
+    struct OIdsToIds{T,A<:AbstractVector{<:Integer}} <: AbstractVector{T}
+      indices::Vector{T}
+      terms::A
+    end
+"""
 struct OIdsToIds{T,A<:AbstractVector{<:Integer}} <: AbstractVector{T}
   indices::Vector{T}
   terms::A
@@ -12,6 +18,16 @@ function Base.similar(a::OIdsToIds{T},::Type{T′},s::Dims{1}) where {T,T′}
   OIdsToIds(indices′,a.terms)
 end
 
+"""
+    struct DofsToODofs{D,P,V} <: Map
+      b::LagrangianDofBasis{P,V}
+      odof_to_dof::Vector{Int32}
+      node_and_comps_to_odof::Array{V,D}
+      orders::NTuple{D,Int}
+    end
+
+Map used to convert a DOF of a standard FE space to a lexicographically-ordered DOF
+"""
 struct DofsToODofs{D,P,V} <: Map
   b::LagrangianDofBasis{P,V}
   odof_to_dof::Vector{Int32}
@@ -102,6 +118,11 @@ for T in (:Any,:(Algebra.ArrayCounter))
   end
 end
 
+"""
+    add_ordered_entries!(combine::Function,A,vs,is::OIdsToIds,js::OIdsToIds)
+
+Adds several ordered entries only for positive input indices. Returns `A`
+"""
 @inline function add_ordered_entries!(combine::Function,A,vs::Nothing,is::OIdsToIds,js::OIdsToIds)
   Algebra._add_entries!(combine,A,vs,is.indices,js.indices)
 end
@@ -137,6 +158,13 @@ end
   A
 end
 
+"""
+    struct OReindex{T<:Integer} <: Map
+      indices::Vector{T}
+    end
+
+Map used to reindex according to the vector of integers `indices`
+"""
 struct OReindex{T<:Integer} <: Map
   indices::Vector{T}
 end

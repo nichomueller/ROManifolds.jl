@@ -28,7 +28,6 @@ using ROM.ParamAlgebra
 using ROM.ParamFESpaces
 
 import Test: @test
-import UnPack: @unpack
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ReferenceFEs: get_order
@@ -54,7 +53,6 @@ export ParamNonlinearOperator
 export allocate_paramcache
 export update_paramcache!
 export allocate_systemcache
-export allocate_feopcache
 export get_fe_operator
 include("ParamOperator.jl")
 

@@ -1,7 +1,7 @@
 """
     abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: ParamFEOperator{T} end
 
-Parametric extension of a `TransientFEOperator` in `Gridap`. Compared to
+Parametric extension of a `TransientFEOperator` in [`Gridap`](@ref). Compared to
 a standard TransientFEOperator, there are the following novelties:
 
 - a TransientParamSpace is provided, so that parametric realizations can be extracted
@@ -11,39 +11,31 @@ a standard TransientFEOperator, there are the following novelties:
 
 Subtypes:
 
-- `TransientParamFEOpFromWeakForm`
-- `TransientParamLinearFEOpFromWeakForm`
-- `LinearNonlinearTransientParamFEOperator`
+- [`TransientParamFEOpFromWeakForm`](@ref)
+- [`TransientParamLinearFEOpFromWeakForm`](@ref)
+- [`LinearNonlinearTransientParamFEOperator`](@ref)
 """
 abstract type TransientParamFEOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamFEOperator{O,T} end
+
+"""
+    const JointTransientParamFEOperator{O<:ODEParamOperatorType} = TransientParamFEOperator{O,JointDomains}
+"""
 const JointTransientParamFEOperator{O<:ODEParamOperatorType} = TransientParamFEOperator{O,JointDomains}
+
+"""
+    const SplitTransientParamFEOperator{O<:ODEParamOperatorType} = TransientParamFEOperator{O,SplitDomains}
+"""
 const SplitTransientParamFEOperator{O<:ODEParamOperatorType} = TransientParamFEOperator{O,SplitDomains}
 
 function FESpaces.get_algebraic_operator(op::TransientParamFEOperator)
   ODEParamOpFromTFEOp(op)
 end
 
-function ParamSteady.allocate_feopcache(
-  op::TransientParamFEOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}})
-
-  nothing
-end
-
-function ParamSteady.update_feopcache!(
-  feop_cache,
-  op::TransientParamFEOperator,
-  us::Tuple{Vararg{AbstractVector}})
-
-  feop_cache
-end
-
 ODEs.get_res(op::TransientParamFEOperator) = @abstractmethod
 
 ODEs.get_jacs(op::TransientParamFEOperator) = @abstractmethod
 
-function Polynomials.get_order(op::TransientParamFEOperator)
+function ReferenceFEs.get_order(op::TransientParamFEOperator)
   @abstractmethod
 end
 
@@ -74,7 +66,7 @@ end
       order::Integer
     end
 
-Instance of TransientParamFEOperator, to be used when the transient problem is
+Instance of [`TransientParamFEOperator`](@ref), to be used when the transient problem is
 nonlinear
 """
 struct TransientParamFEOpFromWeakForm{T} <: TransientParamFEOperator{NonlinearParamODE,T}
@@ -159,7 +151,7 @@ end
 
 FESpaces.get_test(op::TransientParamFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamFEOpFromWeakForm) = op.trial
-Polynomials.get_order(op::TransientParamFEOpFromWeakForm) = op.order
+ReferenceFEs.get_order(op::TransientParamFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamFEOpFromWeakForm) = op.assem
@@ -179,7 +171,7 @@ CellData.get_domains(op::TransientParamFEOpFromWeakForm) = op.domains
       order::Integer
     end
 
-Instance of TransientParamFEOperator, to be used when the transient problem is
+Instance of [`TransientParamFEOperator`](@ref), to be used when the transient problem is
 linear
 """
 struct TransientParamLinearFEOpFromWeakForm{T} <: TransientParamFEOperator{LinearParamODE,T}
@@ -256,7 +248,7 @@ end
 
 FESpaces.get_test(op::TransientParamLinearFEOpFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamLinearFEOpFromWeakForm) = op.trial
-Polynomials.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
+ReferenceFEs.get_order(op::TransientParamLinearFEOpFromWeakForm) = op.order
 ODEs.get_res(op::TransientParamLinearFEOpFromWeakForm) = op.res
 ODEs.get_jacs(op::TransientParamLinearFEOpFromWeakForm) = op.jacs
 ODEs.get_assembler(op::TransientParamLinearFEOpFromWeakForm) = op.assem

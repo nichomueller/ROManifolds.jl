@@ -8,7 +8,21 @@ parameter space. Two categories of such realizations are implemented:
 """
 abstract type AbstractRealization end
 
+"""
+    get_params(r::AbstractRealization) -> Realization
+"""
+get_params(r::AbstractRealization) = @abstractmethod
+
+# this function should stay local
+_get_params(r::AbstractRealization) = @abstractmethod
+
+"""
+    num_params(r::AbstractRealization) -> Int
+"""
+num_param(r::AbstractRealization) = length(_get_params(r))
+
 param_length(r::AbstractRealization) = length(r)
+
 param_getindex(r::AbstractRealization,i::Integer) = getindex(r,i)
 
 """
@@ -31,8 +45,9 @@ const TrivialRealization = Realization{<:AbstractVector{<:Real}}
 get_params(r::Realization) = r # we only want to deal with a Realization type
 _get_params(r::Realization) = r.params # this function should stay local
 _get_params(r::TrivialRealization) = [r.params] # this function should stay local
-num_params(r::Realization) = length(_get_params(r))
+
 Base.length(r::Realization) = num_params(r)
+
 Base.getindex(r::Realization,i) = Realization(getindex(_get_params(r),i))
 
 # when iterating over a Realization{P}, we return eltype(P) ∀ index i
@@ -60,13 +75,17 @@ other time steps.
 """
 abstract type TransientRealization{P<:Realization,T<:Real} <: AbstractRealization end
 
-get_params(r::TransientRealization) = @abstractmethod
-_get_params(r::TransientRealization) = @abstractmethod
+"""
+    get_times(r::TransientRealization) -> Any
+"""
 get_times(r::TransientRealization) = @abstractmethod
 
-Base.length(r::TransientRealization) = num_params(r)*num_times(r)
-num_params(r::TransientRealization) = num_params(get_params(r))
+"""
+    get_times(r::TransientRealization) -> Int
+"""
 num_times(r::TransientRealization) = length(get_times(r))
+
+Base.length(r::TransientRealization) = num_params(r)*num_times(r)
 
 """
     struct GenericTransientRealization{P,T,A} <: TransientRealization{P,T}
@@ -125,10 +144,22 @@ function change_time!(r::GenericTransientRealization{P,T} where P,time::T) where
   r.times .= time
 end
 
+"""
+    shift!(r::TransientRealization,δ::Real) -> Nothing
+
+In-place uniform shifting by a constant `δ` of the temporal domain in the
+realization `r`
+"""
 function shift!(r::GenericTransientRealization,δ::Real)
   r.times .+= δ
 end
 
+"""
+    get_at_time(r::GenericTransientRealization,time) -> TransientRealizationAt
+
+Returns a [`TransientRealizationAt`](@ref) from a [`GenericTransientRealization`](@ref)
+at a time instant specified by `time`
+"""
 function get_at_time(r::GenericTransientRealization,time=:initial)
   if time == :initial
     get_at_time(r,get_initial_time(r))
@@ -160,7 +191,9 @@ struct TransientRealizationAt{P,T} <: TransientRealization{P,T}
 end
 
 get_params(r::TransientRealizationAt) = get_params(r.params)
+
 _get_params(r::TransientRealizationAt) = _get_params(r.params)
+
 get_times(r::TransientRealizationAt) = r.t[]
 
 function Base.getindex(r::TransientRealizationAt,i,j)
@@ -183,9 +216,9 @@ end
     abstract type SamplingStyle end
 
 Subtypes:
-- `UniformSampling`
-- `NormalSampling`
-- `HaltonSampling`
+- [`UniformSampling`](@ref)
+- [`NormalSampling`](@ref)
+- [`HaltonSampling`](@ref)
 """
 abstract type SamplingStyle end
 
@@ -338,9 +371,9 @@ end
     abstract type AbstractParamFunction{P<:Realization} <: Function end
 
 Representation of parametric functions with domain a parametric space.
-Two categories of such functions are implemented:
-- `ParamFunction`.
-- `TransientParamFunction`.
+Subtypes:
+- [`ParamFunction`](@ref)
+- [`TransientParamFunction`](@ref)
 """
 abstract type AbstractParamFunction{P<:Realization} <: Function end
 

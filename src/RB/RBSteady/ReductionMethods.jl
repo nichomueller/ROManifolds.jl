@@ -5,10 +5,10 @@ Type indicating the reduction strategy to employ.
 
 Subtypes:
 
-- `SearchSVDRank`
-- `FixedSVDRank`
-- `LRApproxRank`
-- `TTSVDRanks`
+- [`SearchSVDRank`](@ref)
+- [`FixedSVDRank`](@ref)
+- [`LRApproxRank`](@ref)
+- [`TTSVDRanks`](@ref)
 """
 abstract type ReductionStyle end
 
@@ -20,8 +20,8 @@ ReductionStyle(args...;kwargs...) = @abstractmethod
     end
 
 Struct employed when the chosen reduction algorithm is a truncated POD at a
-tolerance `tol`. Check https://doi.org/10.1007/978-3-319-15431-2 for more details
-on the truncated POD algorithm
+tolerance `tol`. Check [this](https://doi.org/10.1007/978-3-319-15431-2) reference
+for more details on the truncated POD algorithm
 """
 struct SearchSVDRank <: ReductionStyle
   tol::Float64
@@ -33,8 +33,8 @@ end
     end
 
 Struct employed when the chosen reduction algorithm is a truncated POD at a
-rank `rank`. Check https://doi.org/10.1007/978-3-319-15431-2 for more details on
-the truncated POD algorithm
+rank `rank`. Check [this](https://doi.org/10.1007/978-3-319-15431-2) reference
+for more details on the truncated POD algorithm
 """
 struct FixedSVDRank <: ReductionStyle
   rank::Int
@@ -86,7 +86,7 @@ TTSVDStyle(unsafe::Val{true}) = UnsafeTTSVD()
 
 Struct employed when the chosen reduction algorithm is a TTSVD, with reduction
 algorithm at each step specified in the vector of reduction styles `style`. Check
-https://doi.org/10.1137/090752286 for more details on the TTSVD algorithm
+[this](https://doi.org/10.1137/090752286) reference for more details on the TTSVD algorithm
 """
 struct TTSVDRanks{T<:TTSVDStyle} <: ReductionStyle
   style::Vector{<:ReductionStyle}
@@ -116,8 +116,8 @@ Base.getindex(r::TTSVDRanks,i::Integer) = getindex(r.style,i)
 
 Subtypes:
 
-- `EuclideanNorm`
-- `EnergyNorm`
+- [`EuclideanNorm`](@ref)
+- [`EnergyNorm`](@ref)
 """
 abstract type NormStyle end
 
@@ -154,11 +154,11 @@ the norm with respect to which the reduction should occur.
 
 Subtypes:
 
-- `DirectReduction`
-- `GreedyReduction`
-- `SupremizerReduction`
-- `AbstractMDEIMReduction`
-- `TransientReduction`
+- [`DirectReduction`](ref)
+- [`GreedyReduction`](ref)
+- [`SupremizerReduction`](ref)
+- [`AbstractMDEIMReduction`](ref)
+- TransientReduction`
 """
 abstract type Reduction{A<:ReductionStyle,B<:NormStyle} end
 
@@ -169,9 +169,9 @@ Type representing direct reduction methods, e.g. truncated POD, TTSVD, etc.
 
 Subtypes:
 
-- `AffineReduction`
-- `PODReduction`
-- `TTSVDReduction`
+- [`AffineReduction`](ref)
+- [`PODReduction`](ref)
+- [`TTSVDReduction`](ref)
 """
 abstract type DirectReduction{A,B} <: Reduction{A,B} end
 abstract type GreedyReduction{A,B} <: Reduction{A,B} end
@@ -306,15 +306,15 @@ ParamDataStructures.num_params(r::TTSVDReduction) = r.nparams
     end
 
 Wrapper for reduction methods `reduction` that require an additional step of
-stabilization, by means of a supremizer enrichment. Check https://doi.org/10.1002/nme.4772
-for more details in a steady setting, and https://doi.org/10.1137/22M1509114 for
+stabilization, by means of a supremizer enrichment. Check [this](https://doi.org/10.1002/nme.4772)
+for more details in a steady setting, and [this](https://doi.org/10.1137/22M1509114) for
 more details in a transient setting. The fields `supr_op` and `supr_tol` (which
 is only needed only in transient applications) are respectively the supremizing
 operator and the tolerance involved in the enrichment. For a saddle point problem
 with a jacobian of the form
 
 [ A   Bᵀ
-  B   C ]
+  B   0 ]
 
 this operator is given by the bilinear form representing the matrix Bᵀ.
 """
@@ -364,14 +364,14 @@ end
     abstract type AbstractMDEIMReduction{A} <: Reduction{A,EuclideanNorm} end
 
 Type representing a hyper-reduction approximation by means of a MDEIM algorithm.
-Check https://doi.org/10.1016/j.jcp.2015.09.046 for more details on MDEIM. This
+Check [this](https://doi.org/10.1016/j.jcp.2015.09.046) for more details on MDEIM. This
 reduction strategy is usually employed only for the approximation of a residual
 and/or jacobian of a differential problem. Note that orthogonality with respect
 to a norm other than the euclidean is not required for this reduction type.
 
 Subtypes:
 
-- `MDEIMReduction`
+- [`MDEIMReduction`](@ref)
 - `TransientMDEIMReduction`
 """
 abstract type AbstractMDEIMReduction{A} <: Reduction{A,EuclideanNorm} end

@@ -8,8 +8,19 @@ Subtypes:
 """
 abstract type AbstractParamArray{T,N,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N} end
 
+"""
+    const AbstractParamVector{T} = AbstractParamArray{T,1,<:AbstractVector{T}}
+"""
 const AbstractParamVector{T} = AbstractParamArray{T,1,<:AbstractVector{T}}
+
+"""
+    const AbstractParamMatrix{T} = AbstractParamArray{T,2,<:AbstractMatrix{T}}
+"""
 const AbstractParamMatrix{T} = AbstractParamArray{T,2,<:AbstractMatrix{T}}
+
+"""
+    const AbstractParamArray3D{T} = AbstractParamArray{T,3,<:AbstractArray{T,3}}
+"""
 const AbstractParamArray3D{T} = AbstractParamArray{T,3,<:AbstractArray{T,3}}
 
 """
@@ -17,13 +28,30 @@ const AbstractParamArray3D{T} = AbstractParamArray{T,3,<:AbstractArray{T,3}}
 
 Type representing parametric arrays of type A.
 Subtypes:
-- `ParamArray`
-- `ConsecutiveParamArray`
-- `TrivialParamArray`
-- `BlockParamArray`
+- [`TrivialParamArray`](@ref)
+- [`ConsecutiveParamArray`](@ref)
+- [`GenericParamVector`](@ref)
+- [`GenericParamMatrix`](@ref)
+- [`ArrayOfArrays`](@ref)
+- [`BlockParamArray`](@ref)
+
+Also acts as a constructor according to the following rules:
+- ParamArray(A::AbstractArray{<:Number}) -> ParamNumber
+- ParamArray(A::AbstractArray{<:Number},plength::Int) -> TrivialParamArray
+- ParamArray(A::AbstractVector{<:AbstractArray}) -> ParamArray
+- ParamArray(A::AbstractVector{<:AbstractSparseMatrix}) -> ParamSparseMatrix
+- ParamArray(A::AbstractArray{<:ParamArray}) -> BlockParamArray
 """
 abstract type ParamArray{T,N} <: AbstractParamArray{T,N,Array{T,N}} end
+
+"""
+    const ParamVector{T} = ParamArray{T,1}
+"""
 const ParamVector{T} = ParamArray{T,1}
+
+"""
+    const ParamMatrix{T} = ParamArray{T,2}
+"""
 const ParamMatrix{T} = ParamArray{T,2}
 
 """
@@ -32,13 +60,17 @@ const ParamMatrix{T} = ParamArray{T,2}
 
 Type representing parametric abstract sparse matrices of type A.
 Subtypes:
-- `ParamSparseMatrixCSC`
-- `ParamSparseMatrixCSR`
+- [`ParamSparseMatrixCSC`](@ref)
+- [`ParamSparseMatrixCSR`](@ref)
 """
 abstract type ParamSparseMatrix{Tv,Ti,A<:AbstractSparseMatrix{Tv,Ti}} <: AbstractParamArray{Tv,2,A} end
 
 """
     abstract type MemoryLayoutStyle end
+
+Subtypes:
+- [`ConsecutiveMemory`](@ref)
+- [`NonConsecutiveMemory`](@ref)
 """
 abstract type MemoryLayoutStyle end
 
@@ -59,17 +91,23 @@ struct NonConsecutiveMemory <: MemoryLayoutStyle end
 MemoryLayoutStyle(A::T) where T = MemoryLayoutStyle(T)
 MemoryLayoutStyle(::Type{<:AbstractParamArray}) = ConsecutiveMemory()
 
-"""
-    ParamArray(A::AbstractArray{<:Number}) -> ParamNumber
-    ParamArray(A::AbstractArray{<:Number},plength::Int) -> TrivialParamArray
-    ParamArray(A::AbstractVector{<:AbstractArray}) -> ParamArray
-    ParamArray(A::AbstractVector{<:AbstractSparseMatrix}) -> ParamSparseMatrix
-    ParamArray(A::AbstractArray{<:ParamArray}) -> BlockParamArray
-
-Generic constructor of a AbstractParamArray
-"""
 ParamArray(args...;kwargs...) = @abstractmethod
+
+"""
+    param_array(a::AbstractArray,plength::Int;style=NonConsecutiveMemory()) -> ParamArray
+    param_array(a::BlockArray,plength::Int;style=NonConsecutiveMemory()) -> BlockParamArray
+
+Returns a [`AbstractParamArray`](@ref) of parametric length `plength` with entries
+equal to those of `a`
+"""
 param_array(args...;kwargs...) = @abstractmethod
+
+"""
+    consecutive_param_array(args...) -> ParamArray
+
+Biulds of a [`AbstractParamArray`](@ref) with entries stored consecutively
+in memory
+"""
 consecutive_param_array(args...) = param_array(args...;style=ConsecutiveMemory())
 
 ParamArray(A::AbstractArray{<:Number}) = ParamNumber(A)
@@ -259,7 +297,7 @@ end
 """
     param_return_value(f::Union{Function,Map},A...) -> Any
 
-Generalization of the `Gridap` function `return_value` to the parametric case
+Generalization of the [`Gridap`](@ref) function `return_value` to the parametric case
 """
 function param_return_value(f::Union{Function,Map},A...)
   pA = to_param_quantities(A...)
@@ -271,7 +309,7 @@ end
 """
     param_return_cache(f::Union{Function,Map},A...) -> Any
 
-Generalization of the `Gridap` function `return_cache` to the parametric case
+Generalization of the [`Gridap`](@ref) function `return_cache` to the parametric case
 """
 function param_return_cache(f::Union{Function,Map},A...)
   pA = to_param_quantities(A...)
@@ -290,7 +328,7 @@ end
 """
     param_evaluate!(C,f::Union{Function,Map},A...) -> Any
 
-Generalization of the `Gridap` function `evaluate!` to the parametric case
+Generalization of the [`Gridap`](@ref) function `evaluate!` to the parametric case
 """
 function param_evaluate!(C,f::Union{Function,Map},A...)
   cache,data = C
