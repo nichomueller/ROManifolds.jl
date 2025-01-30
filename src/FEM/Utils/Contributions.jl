@@ -10,11 +10,11 @@ abstract type Contribution end
 CellData.get_domains(a::Contribution) = a.trians
 
 """
-    get_values(a::Contribution) -> Tuple
+    get_contributions(a::Contribution) -> Tuple
 
 Fetches the values of a [`Contribution`](@ref) `a`
 """
-get_values(a::Contribution) = a.values
+get_contributions(a::Contribution) = a.values
 
 Base.length(a::Contribution) = length(a.values)
 Base.size(a::Contribution,i...) = size(a.values,i...)
@@ -193,10 +193,10 @@ function CellData.get_domains(a::TupOfArrayContribution)
   trians
 end
 
-function get_values(a::TupOfArrayContribution)
+function get_contributions(a::TupOfArrayContribution)
   values = ()
   for ai in a
-    values = (values...,get_values(ai))
+    values = (values...,get_contributions(ai))
   end
   values
 end

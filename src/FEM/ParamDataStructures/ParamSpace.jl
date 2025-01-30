@@ -19,7 +19,7 @@ _get_params(r::AbstractRealization) = @abstractmethod
 """
     num_params(r::AbstractRealization) -> Int
 """
-num_param(r::AbstractRealization) = length(_get_params(r))
+num_params(r::AbstractRealization) = length(_get_params(r))
 
 param_length(r::AbstractRealization) = length(r)
 
@@ -135,9 +135,18 @@ function Base.zero(r::GenericTransientRealization)
   GenericTransientRealization(zero(get_params(r)),get_times(r),get_initial_time(r))
 end
 
+"""
+    get_initial_time(r::GenericTransientRealization) -> Real
+"""
 get_initial_time(r::GenericTransientRealization) = r.t0
+
+"""
+    get_final_time(r::GenericTransientRealization) -> Real
+"""
 get_final_time(r::GenericTransientRealization) = last(get_times(r))
+
 get_midpoint_time(r::GenericTransientRealization) = (get_final_time(r) + get_initial_time(r)) / 2
+
 get_delta_time(r::GenericTransientRealization) = (get_final_time(r) - get_initial_time(r)) / num_times(r)
 
 function change_time!(r::GenericTransientRealization{P,T} where P,time::T) where T

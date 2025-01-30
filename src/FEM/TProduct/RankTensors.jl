@@ -131,16 +131,6 @@ function tproduct_array(
   Rank1Tensor(arrays_1d)
 end
 
-function tproduct_array(
-  ::Utils.∂ₙ,
-  arrays_1d::Vector{<:AbstractArray},
-  gradients_1d::Vector{<:AbstractArray},
-  args...)
-
-  decompositions = _find_decompositions(nothing,arrays_1d,gradients_1d)
-  GenericRankTensor(decompositions)
-end
-
 function _find_decompositions(::Nothing,arrays_1d,gradients_1d)
   @check length(arrays_1d) == length(gradients_1d)
   inds = LinearIndices(arrays_1d)

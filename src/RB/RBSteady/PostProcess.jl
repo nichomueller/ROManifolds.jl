@@ -101,7 +101,7 @@ function load_decomposition(dir;label="")
 end
 
 function DrWatson.save(dir,contrib::Contribution;label="")
-  for (i,c) in enumerate(get_values(contrib))
+  for (i,c) in enumerate(get_contributions(contrib))
     save(dir,c;label=_get_label(label,i))
   end
 end
@@ -431,8 +431,8 @@ function plot_a_solution(
   U = isa(trial,MultiFieldFESpace) ? trial[field] : trial
   Ω = get_triangulation(U)
 
-  uh = FEFunction(U,get_values(sol))
-  ûh = FEFunction(U,get_values(sol_approx))
+  uh = FEFunction(U,get_param_data(sol))
+  ûh = FEFunction(U,get_param_data(sol_approx))
   dirfield = joinpath(dir,"var$field")
 
   plot_a_solution(dirfield,Ω,uh,ûh,r)

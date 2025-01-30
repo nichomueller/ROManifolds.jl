@@ -36,7 +36,7 @@ function ParamSteady.get_param_space(op::LinearNonlinearTransientParamFEOperator
   get_param_space(op.op_linear)
 end
 
-function ReferenceFEs.get_order(op::LinearNonlinearTransientParamFEOperator)
+function get_order(op::LinearNonlinearTransientParamFEOperator)
   return max(get_order(op.op_linear),get_order(op.op_nonlinear))
 end
 

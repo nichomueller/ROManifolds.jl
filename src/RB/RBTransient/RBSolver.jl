@@ -77,8 +77,8 @@ function RBSteady.residual_snapshots(
 
   fesolver = get_fe_solver(solver)
   sres = select_snapshots(s,nparams)
-  us_res = (get_values(sres),)
-  us0_res = get_initial_values(sres)
+  us_res = (get_param_data(sres),)
+  us0_res = get_initial_data(sres)
   r_res = get_realization(sres)
   b = residual(fesolver,odeop,r_res,us_res,us0_res)
   ib = get_dof_map_at_domains(odeop)
@@ -104,8 +104,8 @@ function RBSteady.jacobian_snapshots(
 
   fesolver = get_fe_solver(solver)
   sjac = select_snapshots(s,nparams)
-  us_jac = (get_values(sjac),)
-  us0_jac = get_initial_values(sjac)
+  us_jac = (get_param_data(sjac),)
+  us0_jac = get_initial_data(sjac)
   r_jac = get_realization(sjac)
   A = jacobian(fesolver,odeop,r_jac,us_jac,us0_jac)
   iA = get_sparse_dof_map_at_domains(odeop)

@@ -49,8 +49,8 @@ get_indices_time(a::TransientHyperReduction) = RBSteady.get_indices(get_integrat
 union_indices_space(a::TransientHyperReduction...) = union(get_indices_space.(a)...)
 union_indices_time(a::TransientHyperReduction...) = union(get_indices_time.(a)...)
 
-union_indices_space(a::AffineContribution) = union_indices_space(get_values(a)...)
-union_indices_time(a::AffineContribution) = union_indices_time(get_values(a)...)
+union_indices_space(a::AffineContribution) = union_indices_space(get_contributions(a)...)
+union_indices_time(a::AffineContribution) = union_indices_time(get_contributions(a)...)
 
 function RBSteady.reduced_triangulation(trian::Triangulation,b::TransientHyperReduction,r::RBSpace...)
   indices = get_integration_domain_space(b)
@@ -126,7 +126,7 @@ function RBSteady.inv_project!(
   @check length(coeff) == length(a) == length(b)
   fill!(b̂,zero(eltype(b̂)))
   for (ai,bi,ci) in zip(a,b,coeff)
-    for (aval,bval,cval) in zip(get_values(ai),get_values(bi),get_values(ci))
+    for (aval,bval,cval) in zip(get_contributions(ai),get_contributions(bi),get_contributions(ci))
       inv_project!(b̂,cval,aval,bval)
     end
   end

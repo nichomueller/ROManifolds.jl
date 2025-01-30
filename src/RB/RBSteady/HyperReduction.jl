@@ -392,7 +392,7 @@ struct AffineContribution{A<:Projection,V,K} <: Contribution
   end
 end
 
-union_indices(a::AffineContribution) = union_indices(get_values(a)...)
+union_indices(a::AffineContribution) = union_indices(get_contributions(a)...)
 
 function allocate_coefficient(a::AffineContribution,r::AbstractRealization)
   contribution(get_domains(a)) do trian
@@ -401,7 +401,7 @@ function allocate_coefficient(a::AffineContribution,r::AbstractRealization)
 end
 
 function allocate_hyper_reduction(a::AffineContribution,r::AbstractRealization)
-  allocate_hyper_reduction(first(get_values(a)),r)
+  allocate_hyper_reduction(first(get_contributions(a)),r)
 end
 
 """
@@ -420,7 +420,7 @@ function inv_project!(
 
   @check length(coeff) == length(a) == length(b)
   fill!(hypred,zero(eltype(hypred)))
-  for (aval,bval,cval) in zip(get_values(a),get_values(b),get_values(coeff))
+  for (aval,bval,cval) in zip(get_contributions(a),get_contributions(b),get_contributions(coeff))
     inv_project!(hypred,cval,aval,bval)
   end
   return hypred
@@ -469,7 +469,7 @@ end
 
 function reduced_residual(red::Reduction,test::RBSpace,c::ArrayContribution)
   t = @timed begin
-    a,trians = map(get_domains(c),get_values(c)) do trian,values
+    a,trians = map(get_domains(c),get_contributions(c)) do trian,values
       reduced_form(red,values,trian,test)
     end |> tuple_of_arrays
   end
@@ -506,7 +506,7 @@ end
 
 function reduced_jacobian(red::Reduction,trial::RBSpace,test::RBSpace,c::ArrayContribution)
   t = @timed begin
-    a,trians = map(get_domains(c),get_values(c)) do trian,values
+    a,trians = map(get_domains(c),get_contributions(c)) do trian,values
       reduced_form(red,values,trian,trial,test)
     end |> tuple_of_arrays
   end

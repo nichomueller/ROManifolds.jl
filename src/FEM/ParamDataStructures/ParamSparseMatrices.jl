@@ -64,13 +64,13 @@ end
 # small hack
 Base.iszero(A::ParamSparseMatrix) = (nnz(A) == 0)
 
-function recast(a::AbstractMatrix,A::AbstractSparseMatrix)
+function DofMaps.recast(a::AbstractMatrix,A::AbstractSparseMatrix)
   @check size(a,1) == nnz(A)
   B = map(v -> recast(v,A),collect.(eachcol(a)))
   return ParamArray(B)
 end
 
-function recast(a::AbstractArray,A::ParamSparseMatrix)
+function DofMaps.recast(a::AbstractArray,A::ParamSparseMatrix)
   recast(a,param_getindex(A,1))
 end
 

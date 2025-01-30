@@ -45,7 +45,7 @@ export VectorContribution
 export MatrixContribution
 export TupOfArrayContribution
 export contribution
-export get_values
+export get_contributions
 include("Contributions.jl")
 
 end # module

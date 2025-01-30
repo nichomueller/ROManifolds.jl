@@ -19,7 +19,7 @@ num_times(s::TransientSnapshots) = num_times(get_realization(s))
 
 Base.size(s::TransientSnapshots) = (num_space_dofs(s)...,num_times(s),num_params(s))
 
-get_initial_values(s::TransientSnapshots) = @abstractmethod
+get_initial_data(s::TransientSnapshots) = @abstractmethod
 
 """
     struct TransientGenericSnapshots{T,N,D,I,R,A} <: TransientSnapshots{T,N,D,I,R,A}
@@ -48,7 +48,7 @@ function Snapshots(s::AbstractParamArray,i::AbstractDofMap,r::TransientRealizati
 end
 
 get_all_data(s::TransientGenericSnapshots) = get_all_data(s.data)
-Utils.get_values(s::TransientGenericSnapshots) = s.data
+get_param_data(s::TransientGenericSnapshots) = s.data
 DofMaps.get_dof_map(s::TransientGenericSnapshots) = s.dof_map
 get_realization(s::TransientGenericSnapshots) = s.realization
 
@@ -151,16 +151,15 @@ num_times(s::TransientSnapshotsAtIndices) = length(time_indices(s))
 param_indices(s::TransientSnapshotsAtIndices) = s.prange
 num_params(s::TransientSnapshotsAtIndices) = length(param_indices(s))
 
-_num_all_params(s::Snapshots) = num_params(s)
+_num_all_times(s::TransientSnapshots) = num_times(s)
 _num_all_params(s::TransientSnapshotsAtIndices) = _num_all_params(s.snaps)
-_num_all_times(s::Snapshots) = num_times(s)
 _num_all_times(s::TransientSnapshotsAtIndices) = _num_all_times(s.snaps)
 
 get_all_data(s::TransientSnapshotsAtIndices) = get_all_data(s.snaps)
 DofMaps.get_dof_map(s::TransientSnapshotsAtIndices) = get_dof_map(s.snaps)
 get_realization(s::TransientSnapshotsAtIndices) = get_realization(s.snaps)[s.prange,s.trange]
 
-function Utils.get_values(s::TransientSnapshotsAtIndices)
+function get_param_data(s::TransientSnapshotsAtIndices)
   prange = param_indices(s)
   trange = time_indices(s)
   np = _num_all_params(s)
@@ -205,7 +204,7 @@ Base.@propagate_inbounds function Base.setindex!(
 end
 
 function DofMaps.flatten(s::TransientSnapshotsAtIndices)
-  data = get_values(s)
+  data = get_param_data(s)
   sbasic = Snapshots(data,get_dof_map(s),get_realization(s))
   flatten(sbasic)
 end
@@ -276,8 +275,8 @@ end
 get_realization(s::TransientReshapedSnapshots) = get_realization(s.snaps)
 DofMaps.get_dof_map(s::TransientReshapedSnapshots) = get_dof_map(s.snaps)
 
-function Utils.get_values(s::TransientReshapedSnapshots)
-  v = get_values(s.snaps)
+function get_param_data(s::TransientReshapedSnapshots)
+  v = get_param_data(s.snaps)
   reshape(v.data,s.size)
 end
 
@@ -306,8 +305,8 @@ function Snapshots(s,s0::AbstractParamArray,i::AbstractDofMap,r::TransientRealiz
 end
 
 get_all_data(s::TransientSnapshotsWithIC) = get_all_data(s.snaps)
-get_initial_values(s::TransientSnapshotsWithIC) = s.initial_data
-Utils.get_values(s::TransientSnapshotsWithIC) = get_values(s.snaps)
+get_initial_data(s::TransientSnapshotsWithIC) = s.initial_data
+get_param_data(s::TransientSnapshotsWithIC) = get_param_data(s.snaps)
 DofMaps.get_dof_map(s::TransientSnapshotsWithIC) = get_dof_map(s.snaps)
 get_realization(s::TransientSnapshotsWithIC) = get_realization(s.snaps)
 get_indexed_data(s::TransientSnapshotsWithIC) = get_indexed_data(s.snaps)
@@ -382,15 +381,15 @@ function ModeTransientSnapshots(s::TransientSnapshots)
   ModeTransientSnapshots(s,get_mode(s))
 end
 
-function flatten(s::TransientSnapshots)
+function DofMaps.flatten(s::TransientSnapshots)
   i′ = flatten(get_dof_map(s))
-  s′ = Snapshots(get_values(s),i′,get_realization(s))
+  s′ = Snapshots(get_param_data(s),i′,get_realization(s))
   ModeTransientSnapshots(s′)
 end
 
 get_all_data(s::ModeTransientSnapshots) = get_all_data(s.snaps)
 num_space_dofs(s::ModeTransientSnapshots) = prod(num_space_dofs(s.snaps))
-Utils.get_values(s::ModeTransientSnapshots) = get_values(s.snaps)
+get_param_data(s::ModeTransientSnapshots) = get_param_data(s.snaps)
 get_realization(s::ModeTransientSnapshots) = get_realization(s.snaps)
 DofMaps.get_dof_map(s::ModeTransientSnapshots) = get_dof_map(s.snaps)
 
@@ -508,17 +507,17 @@ function Snapshots(
   BlockSnapshots(array,touched)
 end
 
-function Arrays.return_cache(::typeof(get_initial_values),s::BlockSnapshots{S,N}) where {S,N}
-  cache = get_initial_values(testitem(s))
+function Arrays.return_cache(::typeof(get_initial_data),s::BlockSnapshots{S,N}) where {S,N}
+  cache = get_initial_data(testitem(s))
   block_cache = Array{typeof(cache),N}(undef,size(s))
   return block_cache
 end
 
-function get_initial_values(s::BlockSnapshots)
-  values = return_cache(get_initial_values,s)
+function get_initial_data(s::BlockSnapshots)
+  values = return_cache(get_initial_data,s)
   for i in eachindex(s.touched)
     if s.touched[i]
-      values[i] = get_initial_values(s[i])
+      values[i] = get_initial_data(s[i])
     end
   end
   return mortar(values)

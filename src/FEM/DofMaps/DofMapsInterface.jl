@@ -137,10 +137,10 @@ struct VectorDofMap{D,I<:AbstractVector{<:Integer}} <: AbstractDofMap{D,Int32}
   bg_dof_to_act_dof::I
 end
 
-VectorDofMap(s::Dims{D}) = VectorDofMap(s,IdentityVector(prod(s)))
+VectorDofMap(s::Dims) = VectorDofMap(s,IdentityVector(prod(s)))
 VectorDofMap(l::Integer,args...) = VectorDofMap((l,),args...)
 
-function VectorDofMap(s::Dims{D},bg_dof_to_mask::AbstractVector{<:Bool})
+function VectorDofMap(s::Dims,bg_dof_to_mask::AbstractVector{<:Bool})
   bg_dof_to_act_dof = get_mask_to_act_dof(bg_dof_to_mask,prod(s))
   VectorDofMap(s,bg_dof_to_act_dof)
 end

@@ -16,6 +16,9 @@ using Gridap.Geometry
 using Gridap.CellData
 using Gridap.Helpers
 
+using ROM.Utils
+using ROM.DofMaps
+
 import Base:+,-,*,/,\
 import Distributions: Uniform,Normal
 import FillArrays: Fill
@@ -23,8 +26,6 @@ import Statistics: mean
 import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
 import SparseArrays.getcolptr
-
-import ROM.DofMaps: OReindex,fast_index,slow_index,recast
 
 export AbstractRealization
 export Realization
@@ -43,6 +44,8 @@ export get_times
 export get_at_time
 export num_params
 export num_times
+export get_initial_time
+export get_final_time
 export shift!
 include("ParamSpace.jl")
 
@@ -112,6 +115,7 @@ include("ParamVectorWithEntries.jl")
 
 export AbstractSnapshots
 export Snapshots
+export SteadySnapshots
 export GenericSnapshots
 export SnapshotsAtIndices
 export SparseSnapshots
@@ -128,8 +132,9 @@ export TransientSparseSnapshots
 export TransientSnapshotsWithIC
 export UnfoldingTransientSnapshots
 export ModeTransientSnapshots
+export get_initial_data
 export change_mode
-include("Snapshots.jl")
+include("TransientSnapshots.jl")
 
 include("ParamBroadcasts.jl")
 

@@ -120,7 +120,7 @@ function residual_snapshots(
 
   fesolver = get_fe_solver(solver)
   sres = select_snapshots(s,nparams)
-  us_res = get_values(sres)
+  us_res = get_param_data(sres)
   r_res = get_realization(sres)
   b = residual(op,r_res,us_res)
   ib = get_dof_map_at_domains(op)
@@ -135,7 +135,7 @@ function residual_snapshots(
 
   fesolver = get_fe_solver(solver)
   sres = select_snapshots(s,nparams)
-  us_res = get_values(sres) |> similar
+  us_res = get_param_data(sres) |> similar
   fill!(us_res,zero(eltype2(us_res)))
   r_res = get_realization(sres)
   b = residual(op,r_res,us_res)
@@ -172,7 +172,7 @@ function jacobian_snapshots(
 
   fesolver = get_fe_solver(solver)
   sjac = select_snapshots(s,nparams)
-  us_jac = get_values(sjac)
+  us_jac = get_param_data(sjac)
   r_jac = get_realization(sjac)
   A = jacobian(op,r_jac,us_jac)
   iA = get_sparse_dof_map_at_domains(op)
@@ -187,7 +187,7 @@ function jacobian_snapshots(
 
   fesolver = get_fe_solver(solver)
   sjac = select_snapshots(s,nparams)
-  us_jac = get_values(sjac) |> similar
+  us_jac = get_param_data(sjac) |> similar
   fill!(us_jac,zero(eltype2(us_jac)))
   r_jac = get_realization(sjac)
   A = jacobian(op,r_jac,us_jac)

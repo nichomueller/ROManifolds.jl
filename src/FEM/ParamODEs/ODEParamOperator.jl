@@ -33,7 +33,7 @@ Transient extension of the type [`ParamOperator`](@ref).
 """
 abstract type ODEParamOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T} end
 
-ReferenceFEs.get_order(odeop::ODEParamOperator) = get_order(get_fe_operator(odeop))
+get_order(odeop::ODEParamOperator) = get_order(get_fe_operator(odeop))
 ODEs.is_form_constant(odeop::ODEParamOperator,k::Integer) = is_form_constant(get_fe_operator(odeop),k)
 
 function Algebra.allocate_residual(

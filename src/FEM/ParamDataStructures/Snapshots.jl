@@ -17,8 +17,6 @@ Subtypes:
 """
 abstract type AbstractSnapshots{T,N} <: AbstractParamContainer{T,N} end
 
-Utils.get_values(s::AbstractSnapshots) = @abstractmethod
-
 """
     get_realization(s::AbstractSnapshots) -> AbstractRealization
 
@@ -77,12 +75,12 @@ end
 
 function DofMaps.change_dof_map(s::Snapshots,args...)
   i′ = change_dof_map(get_dof_map(s),args...)
-  return Snapshots(get_values(s),i′,get_realization(s))
+  return Snapshots(get_param_data(s),i′,get_realization(s))
 end
 
 function DofMaps.flatten(s::Snapshots)
   i′ = flatten(get_dof_map(s))
-  Snapshots(get_values(s),i′,get_realization(s))
+  Snapshots(get_param_data(s),i′,get_realization(s))
 end
 
 """
@@ -130,7 +128,7 @@ function Snapshots(s::AbstractParamArray,i::AbstractDofMap,r::Realization)
 end
 
 get_all_data(s::GenericSnapshots) = get_all_data(s.data)
-Utils.get_values(s::GenericSnapshots) = s.data
+get_param_data(s::GenericSnapshots) = s.data
 DofMaps.get_dof_map(s::GenericSnapshots) = s.dof_map
 get_realization(s::GenericSnapshots) = s.realization
 
@@ -211,7 +209,7 @@ DofMaps.get_dof_map(s::SnapshotsAtIndices) = get_dof_map(s.snaps)
 _num_all_params(s::Snapshots) = num_params(s)
 _num_all_params(s::SnapshotsAtIndices) = _num_all_params(s.snaps)
 
-function Utils.get_values(s::SnapshotsAtIndices)
+function get_param_data(s::SnapshotsAtIndices)
   data = get_all_data(s)
   v = view(data,:,param_indices(s))
   ConsecutiveParamArray(v)
@@ -321,8 +319,8 @@ end
 get_realization(s::ReshapedSnapshots) = get_realization(s.snaps)
 DofMaps.get_dof_map(s::ReshapedSnapshots) = get_dof_map(s.snaps)
 
-function Utils.get_values(s::ReshapedSnapshots)
-  v = get_values(s.snaps)
+function get_param_data(s::ReshapedSnapshots)
+  v = get_param_data(s.snaps)
   reshape(v.data,s.size)
 end
 
@@ -421,8 +419,8 @@ end
 DofMaps.get_dof_map(s::BlockSnapshots) = map(get_dof_map,s.array)
 get_realization(s::BlockSnapshots) = get_realization(testitem(s))
 
-function Utils.get_values(s::BlockSnapshots)
-  map(get_values,s.array) |> mortar
+function get_param_data(s::BlockSnapshots)
+  map(get_param_data,s.array) |> mortar
 end
 
 function get_indexed_data(s::BlockSnapshots)

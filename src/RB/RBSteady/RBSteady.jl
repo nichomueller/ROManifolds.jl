@@ -34,6 +34,7 @@ using ROM.ParamSteady
 using ROM.ParamODEs
 
 import Base: +,-,*,\
+import PartitionedArrays: tuple_of_arrays
 
 export ReductionStyle
 export SearchSVDRank
