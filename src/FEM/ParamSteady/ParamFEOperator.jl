@@ -45,7 +45,7 @@ Subtypes:
 
 - [`ParamFEOpFromWeakForm`](@ref)
 - [`LinearNonlinearParamFEOperator`](@ref)
-- [`TransientParamFEOperator`](@ref)
+- `TransientParamFEOperator`
 """
 abstract type ParamFEOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: FEOperator end
 

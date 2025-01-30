@@ -2,12 +2,12 @@
     abstract type AbstractRankTensor{D,K} end
 
 Type representing a tensor `a` of dimension `D` and rank `K`, i.e. assuming the form
-a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k.
+`a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k`.
 
 Subtypes:
 
-- `Rank1Tensor`
-- `GenericRankTensor`
+- [`Rank1Tensor`](@ref)
+- [`GenericRankTensor`](@ref)
 """
 abstract type AbstractRankTensor{D,K} end
 
@@ -88,7 +88,7 @@ end
     tproduct_array(arrays_1d::Vector{<:AbstractArray}) -> Rank1Tensor
     tproduct_array(op,arrays_1d::Vector{<:AbstractArray},gradients_1d::Vector{<:AbstractArray},args...) -> GenericRankTensor
 
-Returns a AbstractRankTensor storing the arrays `arrays_1d` (usually matrices)
+Returns a [`AbstractRankTensor`](@ref) storing the arrays `arrays_1d` (usually matrices)
 arising from an integration routine on D 1-d triangulations whose tensor product
 gives a D-dimensional triangulation. In the absence of the field `gradients_1d`,
 the output is a `Rank1Tensor`; when provided, the output is a `GenericRankTensor`

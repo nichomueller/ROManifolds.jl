@@ -158,7 +158,7 @@ Subtypes:
 - [`GreedyReduction`](ref)
 - [`SupremizerReduction`](ref)
 - [`AbstractMDEIMReduction`](ref)
-- TransientReduction`
+- `TransientReduction`
 """
 abstract type Reduction{A<:ReductionStyle,B<:NormStyle} end
 

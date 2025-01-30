@@ -43,7 +43,7 @@ Type representing the set of interpolation rows of a `Projection` subjected
 to a EIM approximation with `empirical_interpolation`.
 Subtypes:
 - [`IntegrationDomain`](@ref)
-- [`TransientIntegrationDomain`](@ref)
+- `TransientIntegrationDomain`
 """
 abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
 
