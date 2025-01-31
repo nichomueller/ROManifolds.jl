@@ -169,7 +169,8 @@ end
 function ttsvd(
   red_style::TTSVDRanks,
   A::AbstractArray{T,N},
-  X::AbstractRankTensor{D}) where {T,N,D}
+  X::AbstractRankTensor{D}
+  ) where {T,N,D}
 
   @check D ≤ N-1
   if D == N - 1
@@ -182,8 +183,8 @@ end
 function ttsvd(
   red_style::UnsafeTTSVDRanks,
   A::AbstractArray{T,N},
-  X::AbstractRankTensor
-  ) where {T,N}
+  X::AbstractRankTensor{D}
+  ) where {T,N,D}
 
   # compute euclidean tt cores
   cores,remainder = ttsvd(red_style,A)
@@ -349,15 +350,15 @@ end
 function ttnorm_array(X::AbstractRankTensor{D,K},WD) where {D,K}
   @check size(WD,1) == size(WD,3)
   @check size(WD,2) == K
-  @check all(size(X[1][D]) == size(X[k][D]) for k = 2:K)
+  @check all(size(get_factor(X,D,1)) == size(get_factor(X,D,k)) for k = 2:K)
 
-  s1 = size(WD,1)*size(X[1][D],1)
-  s2 = size(WD,3)*size(X[1][D],2)
+  s1 = size(WD,1)*size(get_factor(X,D,1),1)
+  s2 = size(WD,3)*size(get_factor(X,D,1),2)
   XW = zeros(s1,s2)
   cache = zeros(s1,s2)
 
   for k = 1:rank(X)
-    kron!(cache,X[k][D],WD[:,k,:])
+    kron!(cache,get_factor(X,D,k),WD[:,k,:])
     @. XW = XW + cache
   end
   @. XW = (XW+XW')/2 # needed to eliminate roundoff errors

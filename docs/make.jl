@@ -19,7 +19,7 @@ rom_interface = [
 
 makedocs(;
     modules=[ROM],
-    format=Documenter.HTML(),
+    format=Documenter.HTML(size_threshold=nothing),
     pages=[
         "Home" => "index.md",
         "Usage" => ["steady.md","transient.md"],
@@ -28,6 +28,7 @@ makedocs(;
         "Contributing" => "contributing.md",
     ],
     sitename="ROM.jl",
+    warnonly=[:cross_references,:missing_docs],
 )
 
 # deploydocs(

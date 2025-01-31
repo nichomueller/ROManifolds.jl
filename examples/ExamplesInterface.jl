@@ -14,8 +14,9 @@ import Gridap.CellData: get_domains
 import Gridap.FESpaces: get_algebraic_operator
 import Gridap.Helpers: @abstractmethod
 import Gridap.MultiField: BlockMultiFieldStyle
-import ROM.ParamODEs: ODEParamOperator,LinearNonlinearParamODE
+import ROM.ParamDataStructures: AbstractSnapshots
 import ROM.ParamSteady: ParamOperator,LinearNonlinearParamEq,change_domains
+import ROM.ParamODEs: ODEParamOperator,LinearNonlinearParamODE
 import ROM.RBSteady: reduced_operator,get_state_reduction,get_residual_reduction,get_jacobian_reduction
 
 function try_loading_fe_snapshots(dir,rbsolver,feop,args...;kwargs...)

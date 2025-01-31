@@ -35,6 +35,7 @@ using ROM.ParamODEs
 
 import Base: +,-,*,\
 import PartitionedArrays: tuple_of_arrays
+import ROM.TProduct: get_factor
 
 export ReductionStyle
 export SearchSVDRank

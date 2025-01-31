@@ -53,7 +53,7 @@ end
 """
     get_fe_solver(s::RBSolver) -> FESolver
 
-Returns the underlying [`FESolver`](@ref) from a [`RBSolver`](@ref) `s`
+Returns the underlying `FESolver` from a [`RBSolver`](@ref) `s`
 """
 get_fe_solver(s::RBSolver) = s.fesolver
 get_state_reduction(s::RBSolver) = s.state_reduction

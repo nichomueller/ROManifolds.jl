@@ -2,6 +2,7 @@ module SteadyStokesTTSVD
 
 using DrWatson
 using Gridap
+using GridapEmbedded
 using ROM
 
 import Gridap.MultiField: BlockMultiFieldStyle
@@ -20,6 +21,9 @@ geo1 = disk(R,x0=Point(0.5,0.5))
 geo2 = ! geo1
 
 bgmodel = TProductModel(pmin,pmax,partition)
+labels = get_face_labeling(bgmodel)
+add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,7])
+
 cutgeo = cut(bgmodel,geo2)
 
 Ωbg = Triangulation(bgmodel)
@@ -27,10 +31,8 @@ cutgeo = cut(bgmodel,geo2)
 Ω = Triangulation(cutgeo,PHYSICAL_IN)
 Ω_out = Triangulation(cutgeo,PHYSICAL_OUT)
 Γ = EmbeddedBoundary(cutgeo)
-Γn = BoundaryTriangulation(Ωact,tags="boundary")
 
 n_Γ = get_normal_vector(Γ)
-n_Γn = get_normal_vector(Γn)
 
 order = 2
 degree = 2*order
@@ -38,41 +40,26 @@ degree = 2*order
 dΩbg = Measure(Ωbg,degree)
 dΩ = Measure(Ω,degree)
 dΓ = Measure(Γ,degree)
-dΓn = Measure(Γn,degree)
 dΩ_out = Measure(Ω_out,degree)
 
 ν(μ) = x -> μ[1]
 νμ(μ) = ParamFunction(ν,μ)
 
-u(μ) = x -> VectorValue(-(μ[2]*x[2]+μ[3])*x[2]*(1.0-x[2]),0.0)
-uμ(μ) = ParamFunction(u,μ)
-
-p(μ) = x -> μ[1]*x[1]-x[2]
-pμ(μ) = ParamFunction(p,μ)
-
-f(μ) = x -> - ν(x,μ)*Δ(u(μ))(x) + ∇(p(μ))(x)
-fμ(μ) = ParamFunction(f,μ)
-
-g(μ) = x -> (∇⋅u(μ))(x)
+g(μ) = x -> VectorValue(-(μ[2]*x[2]+μ[3])*x[2]*(1.0-x[2]),0.0)*(x[1]==0.0)
 gμ(μ) = ParamFunction(g,μ)
 
-g_0(μ) = x -> VectorValue(0.0,0.0)
-gμ_0(μ) = ParamFunction(g_0,μ)
+f(μ) = x -> VectorValue(0.0,0.0)
+fμ(μ) = ParamFunction(f,μ)
 
 a(μ,(u,p),(v,q),dΩ,dΩ_out,dΓ) = (
   ∫( νμ(μ)*∇(v)⊙∇(u) - p*(∇⋅(v)) - q*(∇⋅(u)) )dΩ +
-  ∫( ∇(v)⊙∇(u) - p*q )dΩ_out +
+  ∫( ∇(v)⊙∇(u) )dΩ_out +
   ∫( - v⋅(n_Γ⋅∇(u))*νμ(μ) + (n_Γ⋅∇(v))⋅u*νμ(μ) + (p*n_Γ)⋅v + (q*n_Γ)⋅u )dΓ
 )
 
-l(μ,(u,p),(v,q),dΩ,dΩ_out,dΓ,dΓn) = (
-  ∫( v⋅fμ(μ) - q*gμ(μ) )dΩ +
-  ∫( ∇(v)⊙∇(uμ(μ)) - pμ(μ)*q )dΩ_out +
-  ∫( (n_Γ⋅∇(v))⋅uμ(μ)*νμ(μ) + (q*n_Γ)⋅uμ(μ) )dΓ +
-  ∫( v⋅(n_Γn⋅∇(uμ(μ)))*νμ(μ) - (n_Γn⋅v)*pμ(μ) )dΓn
-)
+l(μ,(u,p),(v,q),dΩ) = ∫( νμ(μ)*∇(v)⊙∇(u) - p*(∇⋅(v)) - q*(∇⋅(u)) )dΩ
 
-trian_res = (Ω,Ω_out,Γ,Γn)
+trian_res = (Ω,)
 trian_jac = (Ω,Ω_out,Γ)
 domains = FEDomains(trian_res,trian_jac)
 
@@ -80,10 +67,10 @@ coupling((du,dp),(v,q)) = ∫(dp*∂₁(v))dΩbg + ∫(dp*∂₂(v))dΩbg
 energy((du,dp),(v,q)) = ∫(du⋅v)dΩbg + ∫(∇(v)⊙∇(du))dΩbg + ∫(dp*q)dΩbg
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-test_u = TProductFESpace(Ωbg,reffe_u;conformity=:H1)
-trial_u = ParamTrialFESpace(test_u)
+test_u = TProductFESpace(Ωbg,reffe_u;conformity=:H1,dirichlet_tags="dirichlet")
+trial_u = ParamTrialFESpace(test_u,gμ)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TProductFESpace(Ωbg,reffe_p;conformity=:H1)
+test_p = TProductFESpace(Ωact,Ωbg,reffe_p;conformity=:H1)
 trial_p = ParamTrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -99,6 +86,6 @@ dir = datadir("stokes_ttsvd")
 create_dir(dir)
 
 tols = [1e-1,1e-2,1e-3,1e-4,1e-5]
-run_test(dir,rbsolver,feop,tols)
+ExamplesInterface.run_test(dir,rbsolver,feop,tols)
 
 end

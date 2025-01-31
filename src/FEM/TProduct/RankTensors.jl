@@ -44,6 +44,10 @@ struct Rank1Tensor{D,A<:AbstractArray} <: AbstractRankTensor{D,1}
 end
 
 get_factors(a::Rank1Tensor) = a.factors
+function get_factor(a::Rank1Tensor,d::Integer,k::Integer)
+  @check k==1
+  get_factors(a)[d]
+end
 get_decomposition(a::Rank1Tensor,k::Integer) = k == 1 ? a : error("Exceeded rank 1 with rank $k")
 Base.size(a::Rank1Tensor) = (dimension(a),)
 Base.getindex(a::Rank1Tensor,d::Integer) = get_factors(a)[d]
