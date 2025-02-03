@@ -469,6 +469,7 @@ end
 
 get_projection(a::Projection) = a
 get_projection(a::NormedProjection) = a.projection
+get_norm_matrix(a::Projection) = nothing
 get_norm_matrix(a::NormedProjection) = a.norm_matrix
 
 get_basis(a::NormedProjection) = get_basis(a.projection)

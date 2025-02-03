@@ -60,8 +60,8 @@ function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv)
   gather_free_and_dirichlet_values!(fv,dv,get_fe_space(f),cv)
 end
 
-function get_dof_map(f::OrderedFESpace)
-  bg_dof_to_act_dof = get_bg_dof_to_act_dof(f)
+function get_dof_map(f::OrderedFESpace,args...)
+  bg_dof_to_act_dof = get_bg_dof_to_act_dof(f,args...)
   bg_ndofs = length(bg_dof_to_act_dof)
   return VectorDofMap(bg_ndofs,bg_dof_to_act_dof)
 end
@@ -175,6 +175,20 @@ function _get_odof_maps(fe_basis::AbstractVector{<:Dof},args...)
   @notimplemented "This function is only implemented for Lagrangian dof bases"
 end
 
+function _get_odof_maps(fe_basis::AbstractVector{<:LagrangianDofBasis},args...)
+  function compare(b1::LagrangianDofBasis,b2::LagrangianDofBasis)
+    (b1.dof_to_node == b2.dof_to_node && b1.dof_to_comp == b2.dof_to_comp
+    && b1.node_and_comp_to_dof == b2.node_and_comp_to_dof)
+  end
+  b1 = testitem(fe_basis)
+  cmp = lazy_map(b2->compare(b1,b2),fe_basis)
+  if sum(cmp) == length(fe_basis)
+    _get_odof_maps(b1,args...)
+  else
+    @notimplemented "This function is only implemented for Lagrangian dof bases"
+  end
+end
+
 function _get_odof_maps(fe_dof_basis::Fill{<:LagrangianDofBasis},args...)
   _get_odof_maps(testitem(fe_dof_basis),args...)
 end
@@ -193,6 +207,7 @@ function _get_odof_maps(
   nnodes = length(onodes)
   ncomps = num_components(V)
   ndofs = nnodes*ncomps
+
   odofs = zeros(eltype(V),ndofs)
   for (icell,cell) in enumerate(cells)
     first_new_node = orders .* (Tuple(cell) .- 1) .+ 1
@@ -202,11 +217,12 @@ function _get_odof_maps(
     onodes_cell = view(onodes,onodes_range...)
     cell_dofs = getindex!(cache,cell_dofs_ids,icell)
     for node in 1:length(onodes_cell)
-      comp_to_dof = fe_dof_basis.node_and_comp_to_dof[node]
+      comp_to_idof = fe_dof_basis.node_and_comp_to_dof[node]
       i_onode = node_to_i_onode[node]
       onode = onodes_cell[i_onode]
       for comp in 1:ncomps
-        dof = cell_dofs[comp_to_dof[comp]]
+        idof = comp_to_idof[comp]
+        dof = cell_dofs[idof]
         odof = onode + (comp-1)*nnodes
         # change only location of free dofs
         odofs[odof] = dof > 0 ? one(eltype(V)) : dof
@@ -368,6 +384,14 @@ end
 function OrderedFEFunction(f::SingleFieldFESpace,fv)
   dv = get_dirichlet_dof_values(f)
   OrderedFEFunction(f,fv,dv)
+end
+
+function OrderedFEFunction(f::MultiFieldFESpace,fv)
+  blocks = map(1:length(f.spaces)) do i
+    fv_i = restrict_to_field(f,fv,i)
+    OrderedFEFunction(f.spaces[i],fv_i)
+  end
+  MultiFieldFEFunction(fv,f,blocks)
 end
 
 """

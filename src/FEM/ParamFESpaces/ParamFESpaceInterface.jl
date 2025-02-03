@@ -66,8 +66,8 @@ function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::SingleFieldParamFES
   gather_free_and_dirichlet_values!(fv,dv,remove_layer(f),cv)
 end
 
-function DofMaps.get_dof_map(f::SingleFieldParamFESpace)
-  get_dof_map(get_fe_space(f))
+function DofMaps.get_dof_map(f::SingleFieldParamFESpace,args...)
+  get_dof_map(get_fe_space(f),args...)
 end
 
 function DofMaps.get_sparse_dof_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace,args...)

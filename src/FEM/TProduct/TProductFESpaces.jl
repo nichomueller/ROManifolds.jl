@@ -45,12 +45,20 @@ function TProductFESpace(
   kwargs...)
 
   @check Utils.is_included(trian,tptrian.trian)
+  space = OrderedFESpace(trian,reffe;kwargs...)
+  TProductFESpace(space,tptrian,reffe;kwargs...)
+end
+
+function TProductFESpace(
+  space::FESpace,
+  tptrian::TProductTriangulation,
+  reffe::Tuple{<:ReferenceFEName,Any,Any};
+  kwargs...)
 
   basis,reffe_args,reffe_kwargs = reffe
   T,order = reffe_args
 
   model = get_background_model(tptrian)
-  space = OrderedFESpace(trian,reffe;kwargs...)
   cell_reffes_1d = map(model->ReferenceFE(model,basis,eltype(T),order;reffe_kwargs...),model.models_1d)
   spaces_1d = univariate_spaces(model,cell_reffes_1d;kwargs...)
 
@@ -119,9 +127,9 @@ function DofMaps.get_sparsity(U::TProductFESpace,V::TProductFESpace,args...)
   return TProductSparsity(sparsity,sparsities_1d)
 end
 
-function DofMaps.get_dof_map(V::TProductFESpace)
+function DofMaps.get_dof_map(V::TProductFESpace,args...)
   T = get_dof_eltype(V)
-  get_tp_dof_map(T,V)
+  get_tp_dof_map(T,V,args...)
 end
 
 function DofMaps.OrderedFEFunction(f::TProductFESpace,fv,dv)
@@ -136,14 +144,14 @@ function DofMaps.gather_ordered_free_and_dirichlet_values!(fv,dv,f::TProductFESp
   gather_ordered_free_and_dirichlet_values!(fv,dv,f.space,cv)
 end
 
-function get_tp_dof_map(::Type{T},V::TProductFESpace) where T
-  dof_map = get_dof_map(V.space)
+function get_tp_dof_map(::Type{T},V::TProductFESpace,args...) where T
+  dof_map = get_dof_map(V.space,args...)
   nnodes_1d = map(num_free_dofs,V.spaces_1d)
   reshape(dof_map,nnodes_1d...)
 end
 
-function get_tp_dof_map(::Type{T},V::TProductFESpace) where T<:MultiValue
-  dof_map = get_dof_map(V.space)
+function get_tp_dof_map(::Type{T},V::TProductFESpace,args...) where T<:MultiValue
+  dof_map = get_dof_map(V.space,args...)
   nnodes_1d = map(num_free_dofs,V.spaces_1d)
   ncomps = Int(length(dof_map)/prod(nnodes_1d))
   reshape(dof_map,nnodes_1d...,ncomps)

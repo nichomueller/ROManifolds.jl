@@ -6,13 +6,13 @@ D-dimensional, scalar `FESpace`, the output index map will be a subtype of
 AbstractDofMap{<:Integer,D}. If `space` is a D-dimensional, vector-valued `FESpace`,
 the output index map will be a subtype of AbstractDofMap{D+1}.
 """
-function get_dof_map(f::SingleFieldFESpace)
+function get_dof_map(f::SingleFieldFESpace,args...)
   n = num_free_dofs(f)
   VectorDofMap(n)
 end
 
-function get_dof_map(f::MultiFieldFESpace)
-  map(get_dof_map,f.spaces)
+function get_dof_map(f::MultiFieldFESpace,args...)
+  map(f -> get_dof_map(f,args...),f.spaces)
 end
 
 function get_sparse_dof_map(a::SparsityPattern,U::FESpace,V::FESpace,args...)
@@ -96,31 +96,58 @@ function get_bg_dof_to_act_dof(f::ZeroMeanFESpace)
   get_bg_dof_to_act_dof(bg_space)
 end
 
-#TODO this is type unstable, but in practice this function is never called
+# #TODO this is type unstable, but in practice this function is never called
+# function get_bg_dof_to_act_dof(f::FESpace,ttrian::Triangulation)
+#   strian = get_triangulation(f)
+#   bg_bg_dof_to_bg_dof = get_bg_dof_to_act_dof(f)
+#   if ttrian ≈ strian
+#     bg_dof_to_act_dof = bg_bg_dof_to_bg_dof
+#   else
+#     bg_dof_to_bg_bg_dof = findall(!iszero,bg_bg_dof_to_bg_dof)
+#     T = eltype(bg_bg_dof_to_bg_dof)
+#     n = length(bg_bg_dof_to_bg_dof)
+#     bg_dof_to_act_dof = zeros(T,n)
+#     cellids = get_cell_dof_ids(f,ttrian)
+#     cache = array_cache(cellids)
+#     for cell in 1:length(cellids)
+#       dofs = getindex!(cache,cellids,cell)
+#       for dof in dofs
+#         if dof > 0
+#           bg_bg_dof = bg_dof_to_bg_bg_dof[dof]
+#           if bg_bg_dof > 0
+#             bg_dof_to_act_dof[bg_bg_dof] = dof
+#           end
+#         end
+#       end
+#     end
+#   end
+#   return bg_dof_to_act_dof
+# end
 function get_bg_dof_to_act_dof(f::FESpace,ttrian::Triangulation)
   strian = get_triangulation(f)
-  bg_bg_dof_to_bg_dof = get_bg_dof_to_act_dof(f)
+  bg_bg_dof_to_bg_dof = get_bg_dof_to_act_dof(f) # potential underlying constraints
   if ttrian ≈ strian
     bg_dof_to_act_dof = bg_bg_dof_to_bg_dof
   else
-    T = eltype(bg_bg_dof_to_bg_dof)
-    n = length(bg_bg_dof_to_bg_dof)
-    bg_dof_to_act_dof = zeros(T,n)
-    cellids = get_cell_dof_ids(f,ttrian)
-    cache = array_cache(cellids)
-    for cell in 1:length(cellids)
-      dofs = getindex!(cache,cellids,cell)
-      for dof in dofs
-        if dof > 0
-          bg_dof = bg_bg_dof_to_bg_dof[dof]
-          if bg_dof > 0
-            bg_dof_to_act_dof[bg_dof] = dof
-          end
+    bg_dof_to_bg_bg_dof = findall(!iszero,bg_bg_dof_to_bg_dof)
+    bg_bg_dof_to_act_dof = zeros(Int,length(bg_bg_dof_to_bg_dof))
+    bg_cell_ids = get_cell_dof_ids(f)
+    act_cell_ids = get_cell_dof_ids(f,ttrian)
+    bg_cache = array_cache(bg_cell_ids)
+    act_cache = array_cache(act_cell_ids)
+    act_to_bg_cell = Utils.get_tface_to_mface(ttrian)
+    for (act_cell,bg_cell) in enumerate(act_to_bg_cell)
+      bg_dofs = getindex!(bg_cache,bg_cell_ids,bg_cell)
+      act_dofs = getindex!(act_cache,act_cell_ids,act_cell)
+      for (bg_dof,act_dof) in zip(bg_dofs,act_dofs)
+        if bg_dof > 0
+          bg_bg_dof = bg_dof_to_bg_bg_dof[bg_dof]
+          bg_bg_dof_to_act_dof[bg_bg_dof] = act_dof
         end
       end
     end
   end
-  return bg_dof_to_act_dof
+  return bg_bg_dof_to_act_dof
 end
 
 function get_mask_to_act_dof(masked_dofs::AbstractVector{<:Integer},ndofs::Int)
@@ -185,4 +212,12 @@ end
 
 function _get_bg_cell_to_act_cell(trian::Triangulation)
   Utils.get_tface_to_mface(trian)
+end
+
+function Base.cumsum!(a::AbstractVector{T}) where T
+  s = zero(T)
+  for (i,ai) in enumerate(a)
+    s += ai
+    a[i] = s
+  end
 end

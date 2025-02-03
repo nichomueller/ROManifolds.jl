@@ -29,11 +29,9 @@ export compute_relative_error
 export induced_norm
 include("PerformanceTrackers.jl")
 
-export PartialFunctions
 export PartialDerivative
-export PartialTrace
 export ∂₁, ∂₂, ∂₃
-include("PartialFunctions.jl")
+include("PartialDerivatives.jl")
 
 export get_parent
 export order_domains

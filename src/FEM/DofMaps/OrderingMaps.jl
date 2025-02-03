@@ -44,7 +44,7 @@ function DofsToODofs(
   DofsToODofs(b,odof_to_dof,node_and_comps_to_odof,orders)
 end
 
-function DofsToODofs(fe_dof_basis::Fill{<:LagrangianDofBasis},args...)
+function DofsToODofs(fe_dof_basis::AbstractVector{<:LagrangianDofBasis},args...)
   DofsToODofs(testitem(fe_dof_basis),args...)
 end
 

@@ -272,3 +272,13 @@ function to_snapshots(f::RBSpace,x̂::AbstractParamVector,r::AbstractRealization
   x = inv_project(fr,x̂)
   to_snapshots(get_fe_space(f),x,r)
 end
+
+function projection_error(f::RBSpace,x::AbstractParamVector,r::AbstractRealization)
+  fr = f(r)
+  a = get_reduced_subspace(f)
+  x̂ = project(fr,x)
+  x′ = inv_project(fr,x̂)
+  s = to_snapshots(get_fe_space(fr),x,r)
+  s′ = to_snapshots(get_fe_space(fr),x′,r)
+  return compute_relative_error(s,s′,get_norm_matrix(a))
+end

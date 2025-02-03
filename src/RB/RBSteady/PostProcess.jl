@@ -274,8 +274,7 @@ end
       fesnaps::AbstractSnapshots,
       rbsnaps::AbstractSnapshots,
       festats::CostTracker,
-      rbstats::CostTracker,
-      args...
+      rbstats::CostTracker
       ) -> ROMPerformance
 
 Arguments:
@@ -296,12 +295,12 @@ function eval_performance(
   fesnaps::AbstractSnapshots,
   rbsnaps::AbstractSnapshots,
   festats::CostTracker,
-  rbstats::CostTracker,
-  args...)
+  rbstats::CostTracker
+  )
 
   state_red = get_state_reduction(solver)
   norm_style = NormStyle(state_red)
-  error = compute_relative_error(norm_style,feop,fesnaps,rbsnaps,args...)
+  error = compute_relative_error(norm_style,feop,fesnaps,rbsnaps)
   speedup = compute_speedup(festats,rbstats)
   ROMPerformance(error,speedup)
 end
@@ -314,20 +313,20 @@ function eval_performance(
   x̂::AbstractParamVector,
   festats::CostTracker,
   rbstats::CostTracker,
-  r::AbstractRealization,
-  args...)
+  r::AbstractRealization
+  )
 
   rbsnaps = to_snapshots(get_trial(rbop),x̂,r)
-  eval_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats,args...)
+  eval_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats)
 end
 
-function eval_performance(solver,feop,rbop,x::AbstractParamVector,x̂,festats,rbstats,r,args...)
+function eval_performance(solver,feop,rbop,x::AbstractParamVector,x̂,festats,rbstats,r)
   fesnaps = to_snapshots(get_trial(feop),x,r)
-  eval_performance(solver,feop,rbop,fesnaps,x̂,festats,rbstats,r,args...)
+  eval_performance(solver,feop,rbop,fesnaps,x̂,festats,rbstats,r)
 end
 
-function eval_performance(solver,feop,rbop,xh::ParamFEFunction,x̂,festats,rbstats,r,args...)
-  eval_performance(solver,feop,rbop,get_free_dof_values(xh),x̂,festats,rbstats,r,args...)
+function eval_performance(solver,feop,rbop,xh::ParamFEFunction,x̂,festats,rbstats,r)
+  eval_performance(solver,feop,rbop,get_free_dof_values(xh),x̂,festats,rbstats,r)
 end
 
 function DrWatson.save(dir,perf::ROMPerformance;label="")
@@ -340,10 +339,6 @@ end
 function load_results(dir;label="")
   results_dir = get_filename(dir,"results",label)
   deserialize(results_dir,perf)
-end
-
-function Utils.compute_relative_error(norm_style::NormStyle,feop,sol,sol_approx,trian::Triangulation)
-  @notimplemented
 end
 
 function Utils.compute_relative_error(norm_style::EnergyNorm,feop,sol,sol_approx)
@@ -372,7 +367,11 @@ function Utils.compute_relative_error(
   return mean(errors)
 end
 
-function Utils.compute_relative_error(sol::BlockSnapshots,sol_approx::BlockSnapshots)
+function Utils.compute_relative_error(
+  sol::BlockSnapshots,
+  sol_approx::BlockSnapshots,
+  args...)
+
   @check sol.touched == sol_approx.touched
   T = eltype2(sol)
   error = Array{T,ndims(sol)}(undef,size(sol))

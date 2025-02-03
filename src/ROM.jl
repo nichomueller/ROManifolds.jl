@@ -8,6 +8,9 @@ export ∂₁, ∂₂, ∂₃
 include("FEM/Utils/Utils.jl")
 using ROM.Utils
 
+export OrderedFESpace
+export CartesianFESpace
+export OrderedFEFunction
 export slow_index
 export fast_index
 export get_dof_map
