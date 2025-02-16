@@ -6,7 +6,7 @@ This package provides a set of tools for the solution of parameterized partial d
 |:------------ |
 | [![docdev](https://img.shields.io/badge/docs-dev-blue.svg)](https://github.com:nichomueller/ROM.jl/dev) |
 | **Citation** |
-| [![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.jcp.2022.111162-blue)](https://doi.org/10.1016/j.jcp.2022.111162) |
+| [![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.jcp.2022.111162-blue)](https://github.com/nichomueller/rb_julia) |
 |**Build Status** |
 | [![CI](https://github.com:nichomueller/ROM.jl/workflows/CI/badge.svg)](https://github.com:nichomueller/ROM.jl/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/github.com:nichomueller/ROM.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/github.com:nichomueller/ROM.jl) |
 
