@@ -31,6 +31,6 @@ makedocs(;
     warnonly=[:cross_references,:missing_docs],
 )
 
-# deploydocs(
-#   repo = "github.com:nichomueller/ROM.jl.git",
-# )
+deploydocs(
+  repo = "github.com:nichomueller/ROM.jl.git",
+)

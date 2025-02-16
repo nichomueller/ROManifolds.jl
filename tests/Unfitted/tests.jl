@@ -143,3 +143,25 @@ rbop′ = reduced_operator(rbsolver′,feop′,fesnaps′)
 x̂′,rbstats′ = solve(rbsolver′,rbop′,ronline)
 x′,festats′ = solution_snapshots(rbsolver′,feop′,ronline)
 perf′ = eval_performance(rbsolver′,feop′,rbop′,x′,x̂′,festats′,rbstats′,ronline)
+
+plt_dir = datadir("plts")
+create_dir(plt_dir)
+
+r1 = get_realization(x′)[1]
+S1 = get_param_data(x′[1])[1]
+
+uh1 = OrderedFEFunction(param_getindex(trial_u′(r1),1),S1)
+# writevtk(Ω′,joinpath(plt_dir,"sol.vtu"),cellfields=["uh"=>uh1])
+# visualization_data(Ω′,joinpath(plt_dir,"sol.vtu");cellfields=["uh"=>uh1])
+trian = Ω′
+cellfields = ["uh"=>uh1]
+ref_grids = map((reffe) -> UnstructuredGrid(reffe), get_reffes(trian))
+visgrid = Visualization.VisualizationGrid(trian,ref_grids)
+
+cdata = Visualization._prepare_cdata(Dict(),visgrid.sub_cell_to_cell)
+pdata = Visualization._prepare_pdata(trian,cellfields,visgrid.cell_to_refpoints)
+
+using Gridap.CellData
+x = CellPoint(visgrid.cell_to_refpoints,trian,ReferenceDomain())
+_v = CellField(uh1,trian)
+evaluate(_v,x)

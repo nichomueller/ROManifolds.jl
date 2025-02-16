@@ -2,10 +2,13 @@
 
 This package provides a set of tools for the solution of parameterized partial differential equations (PDEs) with reduced order models (ROMs). The presence of parameters severely impacts the feasibility of running high-fidelity (HF) codes such as the finite element (FE) method, because typically the solution is required for many different values of the parameters. ROMs create surrogate models that approximate the solution manifold on a lower-dimensional manifold. These surrogates provide accurate solutions in a much shorter time and with much fewer computational resources. The library is developed in close collaboration with [Gridap.jl](https://github.com/gridap/Gridap.jl).
 
-<!-- [![docdev](https://img.shields.io/badge/docs-dev-blue.svg)](https://gridap.github.io/STLCutters.jl/dev) 
-[![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.jcp.2022.111162-blue)](https://doi.org/10.1016/j.jcp.2022.111162)
-[![CI](https://github.com/gridap/STLCutters.jl/workflows/CI/badge.svg)](https://github.com/gridap/STLCutters.jl/actions?query=workflow%3ACI)
-[![codecov](https://codecov.io/gh/gridap/STLCutters.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/gridap/STLCutters.jl) -->
+| **Documentation** |
+|:------------ |
+| [![docdev](https://img.shields.io/badge/docs-dev-blue.svg)](https://github.com:nichomueller/ROM.jl/dev) |
+| **Citation** |
+| [![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.jcp.2022.111162-blue)](https://doi.org/10.1016/j.jcp.2022.111162) |
+|**Build Status** |
+| [![CI](https://github.com:nichomueller/ROM.jl/workflows/CI/badge.svg)](https://github.com:nichomueller/ROM.jl/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/github.com:nichomueller/ROM.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/github.com:nichomueller/ROM.jl) |
 
 ## Installation
 
