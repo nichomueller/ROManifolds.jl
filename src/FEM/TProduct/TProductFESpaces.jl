@@ -5,10 +5,10 @@
       trian::TProductTriangulation
     end
 
-Tensor product single field FE space, storing a vector of 1-D FE spaces `spaces_1d`
-of length D, and the D-dimensional FE space `space` defined as their tensor product.
+Tensor product single field `FESpace`, storing a vector of 1-D `FESpace`s `spaces_1d`
+of length D, and the D-dimensional `FESpace` `space` defined as their tensor product.
 The tensor product triangulation `trian` is provided as a field to avoid
-incompatibility issues when passing to MultiField scenarios
+incompatibility issues when passing to `MultiField` scenarios
 """
 struct TProductFESpace{S} <: SingleFieldFESpace
   space::S

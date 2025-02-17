@@ -11,12 +11,12 @@ additional information on the reduced basis (RB) method employed to solve a give
 problem dependent on a set of parameters. A RB method is a projection-based
 reduced order model where
 
-1) a suitable subspace of a FESpace is sought, of dimension n ≪ Nₕ
-2) a matrix-based discrete empirical interpolation method (MDEIM) is performed
+1. a suitable subspace of a FESpace is sought, of dimension n ≪ Nₕ
+2. a matrix-based discrete empirical interpolation method (MDEIM) is performed
   to approximate the manifold of the parametric residuals and jacobians
-3) the EIM approximations are compressed with (Petrov-)Galerkin projections
+3. the EIM approximations are compressed with (Petrov-)Galerkin projections
   onto the subspace
-4) for every desired choice of parameters, numerical integration is performed, and
+4. for every desired choice of parameters, numerical integration is performed, and
   the resulting n × n system of equations is cheaply solved
 
 In particular:
@@ -158,11 +158,11 @@ end
     jacobian_snapshots(solver::RBSolver,op::ParamOperator,s::AbstractSnapshots;nparams) -> Contribution
     jacobian_snapshots(solver::RBSolver,op::ODEParamOperator,s::AbstractSnapshots;nparams) -> Tuple{Vararg{Contribution}}
 
-Returns a jacobian `Contribution` relative to the FE operator `op`. The
+Returns a Jacobian `Contribution` relative to the FE operator `op`. The
 quantity `s` denotes the solution snapshots in which we evaluate the jacobian. Note
 that we can select a smaller number of parameters `nparams` compared to the
 number of parameters used to compute `s`. In transient settings, the output is a
-tuple whose `n`th element is the jacobian relative to the `n`th temporal derivative
+tuple whose `n`th element is the Jacobian relative to the `n`th temporal derivative
 """
 function jacobian_snapshots(
   solver::RBSolver,

@@ -3,8 +3,8 @@
 
 Returns the dofs sorted by coordinate order, for every dimension. If `space` is a
 D-dimensional, scalar `FESpace`, the output index map will be a subtype of
-AbstractDofMap{<:Integer,D}. If `space` is a D-dimensional, vector-valued `FESpace`,
-the output index map will be a subtype of AbstractDofMap{D+1}.
+`AbstractDofMap{<:Integer,D}`. If `space` is a D-dimensional, vector-valued `FESpace`,
+the output index map will be a subtype of `AbstractDofMap{D+1}`.
 """
 function get_dof_map(f::SingleFieldFESpace,args...)
   n = num_free_dofs(f)
@@ -30,7 +30,7 @@ end
 """
     get_sparse_dof_map(trial::FESpace,test::FESpace,args...) -> AbstractDofMap
 
-Returns the index maps related to jacobians in a FE problem. The default output
+Returns the index maps related to Jacobiansin a FE problem. The default output
 is a `TrivialSparseMatrixDofMap`; when the trial and test spaces are of type
 `TProductFESpace`, a `SparseMatrixDofMap` is returned.
 """
@@ -58,9 +58,9 @@ for f in (:get_bg_dof_to_mask,:get_bg_dof_to_act_dof)
 end
 
 """
-    get_bg_dof_to_mask(f::SingleFieldFESpace,args...) -> Vector{Bool}
+    get_bg_dof_to_mask(f::FESpace,args...) -> Vector{Bool}
 
-Associates a boolean mask to each background DOF of a FE space `f`. If the DOF
+Associates a boolean mask to each background DOF of a `FESpace` `f`. If the DOF
 is active, the mask is `false`. If the DOF is inactive (e.g., because it is
 constrained), the mask is `true`
 """
@@ -73,10 +73,10 @@ function get_bg_dof_to_act_dof(f::SingleFieldFESpace)
 end
 
 """
-    get_bg_dof_to_act_dof(f::SingleFieldFESpace,args...) -> AbstractVector{<:Integer}
+    get_bg_dof_to_act_dof(f::FESpace,args...) -> AbstractVector{<:Integer}
 
-Associates an active DOF to each background DOF of a FE space `f`. This is done
-by computing the cumulative sum of the output of [`get_bg_dof_to_mask`] on `f`
+Associates an active DOF to each background DOF of a `FESpace` `f`. This is done
+by computing the cumulative sum of the output of [`get_bg_dof_to_mask`](@ref) on `f`
 """
 function get_bg_dof_to_act_dof(f::FESpaceWithLinearConstraints)
   bg_space = f.space
@@ -96,33 +96,6 @@ function get_bg_dof_to_act_dof(f::ZeroMeanFESpace)
   get_bg_dof_to_act_dof(bg_space)
 end
 
-# #TODO this is type unstable, but in practice this function is never called
-# function get_bg_dof_to_act_dof(f::FESpace,ttrian::Triangulation)
-#   strian = get_triangulation(f)
-#   bg_bg_dof_to_bg_dof = get_bg_dof_to_act_dof(f)
-#   if ttrian ≈ strian
-#     bg_dof_to_act_dof = bg_bg_dof_to_bg_dof
-#   else
-#     bg_dof_to_bg_bg_dof = findall(!iszero,bg_bg_dof_to_bg_dof)
-#     T = eltype(bg_bg_dof_to_bg_dof)
-#     n = length(bg_bg_dof_to_bg_dof)
-#     bg_dof_to_act_dof = zeros(T,n)
-#     cellids = get_cell_dof_ids(f,ttrian)
-#     cache = array_cache(cellids)
-#     for cell in 1:length(cellids)
-#       dofs = getindex!(cache,cellids,cell)
-#       for dof in dofs
-#         if dof > 0
-#           bg_bg_dof = bg_dof_to_bg_bg_dof[dof]
-#           if bg_bg_dof > 0
-#             bg_dof_to_act_dof[bg_bg_dof] = dof
-#           end
-#         end
-#       end
-#     end
-#   end
-#   return bg_dof_to_act_dof
-# end
 function get_bg_dof_to_act_dof(f::FESpace,ttrian::Triangulation)
   strian = get_triangulation(f)
   bg_bg_dof_to_bg_dof = get_bg_dof_to_act_dof(f) # potential underlying constraints

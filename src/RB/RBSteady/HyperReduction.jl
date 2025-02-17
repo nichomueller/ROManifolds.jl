@@ -43,7 +43,7 @@ Type representing the set of interpolation rows of a `Projection` subjected
 to a EIM approximation with `empirical_interpolation`.
 Subtypes:
 - [`IntegrationDomain`](@ref)
-- `TransientIntegrationDomain`
+- [`TransientIntegrationDomain`](@ref)
 """
 abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
 
@@ -98,22 +98,22 @@ Subtype of a [`Projection`](@ref) dedicated to the outputd of a hyper-reduction
 (e.g. an empirical interpolation method (EIM)) procedure applied on residual/jacobians
 of a differential problem. This procedure can be summarized in the following steps:
 
-1) compute a snapshots tensor `T`
-2) construct a `Projection` `Φ` by running the function `reduction` on `T`
-3) find the EIM quantities `i`,`Φi` by running the function `empirical_interpolation`
-on `Φ`
+1. compute a snapshots tensor `T`
+2. construct a `Projection` `Φ` by running the function `reduction` on `T`
+3. find the EIM quantities `i`,`Φi` by running the function `empirical_interpolation`
+  on `Φ`
 
 The triplet (`Φ`, `Φi`,`i`) represents the minimum information needed to run the
 online phase of the hyper-reduction. However, we recall that a RB method requires
-the (Petrov-)Galerkin projection of residuals/jacobians on a reduced subspace
+the (Petrov-)Galerkin projection of residuals/Jacobianson a reduced subspace
 built from solution snapshots, instead of providing the projection `Φ` we return
 the reduced projection `Φrb`, where
 
-- for residuals: Φrb = test_basis' * Φ
-- for jacobians: Φrb = test_basis' * Φ * trial_basis
+- for residuals: `Φrb = test_basis' * Φ`
+- for Jacobians: `Φrb = test_basis' * Φ * trial_basis`
 
 The output of this operation is a ReducedProjection. Therefore, a HyperReduction
-is completely characterized by the triplet (`Φrb`,`Φi`,`i`).
+is completely characterized by the triplet `(Φrb,Φi,i)`.
 Subtypes:
 - [`EmptyHyperReduction`](@ref)
 - [`MDEIM`](@ref)
@@ -125,7 +125,7 @@ HyperReduction(::Reduction,args...) = @abstractmethod
 """
     get_interpolation(a::HyperReduction) -> Factorization
 
-For a [`HyperReduction`](@ref) `a` represented by the triplet (`Φrb`,`Φi`,`i`),
+For a [`HyperReduction`](@ref) `a` represented by the triplet `(Φrb,Φi,i)`,
 returns `Φi`, usually stored as a Factorization
 """
 get_interpolation(a::HyperReduction) = @abstractmethod
@@ -133,7 +133,7 @@ get_interpolation(a::HyperReduction) = @abstractmethod
 """
     get_integration_domain(a::HyperReduction) -> AbstractIntegrationDomain
 
-For a [`HyperReduction`](@ref) `a` represented by the triplet (`Φrb`,`Φi`,`i`),
+For a [`HyperReduction`](@ref) `a` represented by the triplet `(Φrb,Φi,i)`,
 returns `i`
 """
 get_integration_domain(a::HyperReduction) = @abstractmethod
@@ -167,7 +167,7 @@ end
       basis::B
     end
 
-Trivial hyper-reduction returned whenever the residual/jacobian is zero
+Trivial hyper-reduction returned whenever the residual/Jacobian is zero
 """
 struct EmptyHyperReduction{A,B} <: HyperReduction{A,B,IntegrationDomain}
   reduction::A
@@ -256,7 +256,7 @@ end
       reduced_dofs::AbstractVector
       ) -> AbstractVector
 
-Returns the list of cells corresponding to the AbstractIntegrationDomain `reduced_dofs`
+Returns the list of cells corresponding to the [`AbstractIntegrationDomain`](@ref) `reduced_dofs`
 """
 function reduced_dofs_to_reduced_cells(
   cell_dof_ids::AbstractArray{<:AbstractArray},
@@ -482,10 +482,10 @@ end
       s::AbstractSnapshots
       ) -> Union{AffineContribution,TupOfAffineContribution}
 
-Reduces the jacobian contained in `op` via hyper-reduction. This function
-first builds the jacobian snapshots, which are then reduced according to the strategy
+Reduces the Jacobian contained in `op` via hyper-reduction. This function
+first builds the Jacobian snapshots, which are then reduced according to the strategy
 `reduced_jacobian` specified in the reduced solver `solver`. In transient applications,
-the output is a tuple of length equal to the number of jacobians (i.e., equal to
+the output is a tuple of length equal to the number of Jacobians(i.e., equal to
 the order of the ODE plus one)
 """
 function reduced_jacobian(
@@ -519,7 +519,7 @@ end
       s::AbstractSnapshots
       ) -> (AffineContribution,Union{AffineContribution,TupOfAffineContribution})
 
-Reduces the residual/jacobian contained in `op` via hyper-reduction. Check the
+Reduces the residual/Jacobian contained in `op` via hyper-reduction. Check the
 functions [`reduced_residual`](@ref) and [`reduced_jacobian`](@ref) for more details
 """
 function reduced_weak_form(

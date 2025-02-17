@@ -21,11 +21,7 @@ include("FEM/DofMaps/DofMaps.jl")
 using ROM.DofMaps
 
 export TProductModel
-export TProductTriangulation
-export TProductMeasure
 export TProductFESpace
-export get_tp_fe_basis
-export get_tp_trial_fe_basis
 
 include("FEM/TProduct/TProduct.jl")
 using ROM.TProduct

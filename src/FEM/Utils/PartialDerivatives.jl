@@ -1,7 +1,7 @@
 """
     struct PartialDerivative{N} <: Function end
 
-Map that implements a partial derivative in `Gridap`
+`Gridap` Map that implements a partial derivative
 """
 struct PartialDerivative{N} <: Function end
 
@@ -36,8 +36,6 @@ function PartialDerivative{N}(f::Function,x::Point,fx) where N
   Component{N}(gradient(f,x,fx))
 end
 
-"""
-"""
 struct Component{N} <: Function end
 
 (f::Component{N})(x...) where N = evaluate(f,x...)

@@ -10,7 +10,7 @@ _filter_domains(a::TProductTriangulation) = a.trian
 
 Fields:
 - `domains_res`: triangulations relative to the residual (nothing by default)
-- `domains_jac`: triangulations relative to the jacobian (nothing by default)
+- `domains_jac`: triangulations relative to the Jacobian (nothing by default)
 """
 struct FEDomains{A,B}
   domains_res::A
@@ -45,7 +45,7 @@ Subtypes:
 
 - [`ParamFEOpFromWeakForm`](@ref)
 - [`LinearNonlinearParamFEOperator`](@ref)
-- `TransientParamFEOperator`
+- [`TransientParamFEOperator`](@ref)
 """
 abstract type ParamFEOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: FEOperator end
 
@@ -110,7 +110,7 @@ end
 """
     get_sparse_dof_map_at_domains(op::ParamFEOperator) -> Contribution
 
-Returns the jacobian dof map restricted to every jacobian triangulation
+Returns the Jacobian dof map restricted to every Jacobian triangulation
 """
 function get_sparse_dof_map_at_domains(op::ParamFEOperator)
   trial = get_trial(op)
@@ -201,8 +201,8 @@ function ParamFEOperator(res::Function,jac::Function,pspace,trial,test,domains::
 end
 
 """
-  LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test,args...
-    ) -> ParamFEOperator{LinearParamEq,TriangulationStyle}
+    LinearParamFEOperator(res::Function,jac::Function,pspace,trial,test,args...
+      ) -> ParamFEOperator{LinearParamEq,TriangulationStyle}
 
 Returns a linear parametric FE operator
 """

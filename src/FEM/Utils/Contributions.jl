@@ -2,18 +2,13 @@
     abstract type Contribution end
 
 Represents quantitites whose values vary upon a triangulation. The values can
-be accessed by indexing a the corresponding triangulation. See DomainContribution
+be accessed by indexing a the corresponding triangulation. See `DomainContribution`
 in `Gridap` for more details.
 """
 abstract type Contribution end
 
 CellData.get_domains(a::Contribution) = a.trians
 
-"""
-    get_contributions(a::Contribution) -> Tuple
-
-Fetches the values of a [`Contribution`](@ref) `a`
-"""
 get_contributions(a::Contribution) = a.values
 
 Base.length(a::Contribution) = length(a.values)
@@ -26,8 +21,10 @@ Base.eachindex(a::Contribution) = eachindex(a.values)
     contribution(f,trians) -> Contribution
 
 Constructor of a [`Contribution`](@ref) that allows do-block syntax. `f` is a
-function such that `value[i] = f(trian[i]) for i...`. This constructor first builds
-the tuple of values, then builds the `Contribution` object from `values` and `trians`
+function such that
+  `values[i] = f(trians[i]) for i...`
+This constructor first builds the tuple of values, then builds the `Contribution`
+object from `values` and `trians`
 """
 @inline function contribution(f,trians)
   values = map(f,trians)
@@ -69,7 +66,7 @@ end
       trians::K
     end
 
-Contribution whose `values` are `AbstractArray`s
+[`Contribution`](@ref) whose field `values` are `AbstractArray`s
 """
 struct ArrayContribution{T,N,V,K} <: Contribution
   values::V

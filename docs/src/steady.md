@@ -1,4 +1,4 @@
-# Usage - steady problem
+# Usage - Steady problem
 
 ## Installation
 
@@ -27,35 +27,35 @@ using Gridap
 
 ## Manufactured solution 
 
-In this example we solve with a reduced order model a parameter dependent Poisson equation 
+In this example we solve a parameter dependent Poisson equation 
 
 ```julia
 -ν*Δu  = f in Ω
-ν*∇u⋅n = h in Γ
+ν*∇u⋅n = h in Γn
 ```
 
-where `Ω` is a sufficiently regular spatial domain, `ν` is a (positive) conductivity coefficient, `u` is the problem's unknown, `f` is a forcing term, and `h` a Neumann datum defined on the Neumann boundary `Γ`. In this problem, we consider `Ω = [0,1]^2` and `Γ` to be the right leg of the square. We consider the problem given by the following manufactured solution 
+where `Ω` is a sufficiently regular spatial domain, `ν` is a (positive) conductivity coefficient, `u` is the problem's unknown, `f` is a forcing term, and `h` a Neumann datum defined on the Neumann boundary `Γn`. In this problem, we consider `Ω = [0,1]^2` and `Γn` to be the right leg of the square. The remaining boundary is Dirichlet, and here we impose a manufactured, parameter-dependent solution. We consider the problem given by the following data: 
 
 ```julia
 ν(μ) = exp(-sum(μ))
-h(μ) = 1
-
-u(x,μ) = μ⋅x 
-f(x,μ) = -ν(μ)*Δ(u(x,μ))
+u(μ) = x -> μ[1]*x[1] + μ[2]*x[2]
+f(μ) = x -> -ν(μ)*Δ(u(x,μ))
+h(μ) = x -> 1
 ```
 
-Next, we parameterize `u` and `f` exclusively by `μ` in the following manner
+Next, we parameterize the data defined above exclusively by `μ` in the following manner:
 
 ```julia
-uₚ(μ) = ParamFunction(x->u(x,μ),μ)
-fₚ(μ) = ParamFunction(x->f(x,μ),μ)
+uₚ(μ) = ParamFunction(u,μ)
+fₚ(μ) = ParamFunction(f,μ)
+hₚ(μ) = ParamFunction(h,μ)
 ```
 
-A ParamFunction is a function that can be evaluated efficiently for any number of desired parameters. In a steady setting, it takes as argument a function (`u` and `f` in the cases above) and a parameter variable. In a transient setting, an additional time variable must be included. 
+A [`ParamFunction`](@ref) is a function that can be evaluated efficiently for any number of desired parameters. In a steady setting, it takes as argument a function (`u`, `f` and `h` in the cases above) and a parameter variable. In a transient setting, an additional time variable must be included (more details can be found in the following tutorial for transient problems).
 
 ## Geometry 
 
-Define the geometry of the problem using 
+We define the geometry of the problem using 
 
 ```julia
 Ω = (0,1,0,1)
@@ -74,7 +74,7 @@ V = TestFESpace(Ωₕ,reffe;dirichlet_tags=[1,3,5,6,7])
 U = TrialParamFESpace(V,uₚ)
 ```
 
-A `TrialParamFESpace` extends a traditional `TrialFESpace` in Gridap, as it allows to provide a `μ`-dependent Dirichlet datum. 
+A `TrialParamFESpace` extends a traditional `TrialFESpace` in Gridap, as it allows to provide a `μ`-dependent Dirichlet datum. The tags provided occupy the left, upper and bottom legs of the square (extrema excluded for the upper and bottom legs).
 
 ## Space of parameters 
 
@@ -84,16 +84,13 @@ We define a space of parameters, in this case `[1,10]^2`:
 D = ParamSpace((1,10,1,10))
 ```
 
-A parameter, in our case a 2-dimensional vector, is a single realization from `D`. By default, a parameter is sampled according to a [Halton](https://en.wikipedia.org/wiki/Halton_sequence) sequence. Other sampling methods include a uniform distribution, provided we define the space `D` as 
+A parameter, in our case a 2-dimensional vector, is a single realization from `D`. By default, a parameter is sampled according to a [Halton](https://en.wikipedia.org/wiki/Halton_sequence) sequence. Other sampling methods can be defined by providing appropriate keyword arguments: 
 
 ```julia
-D = ParamSpace((1,10,1,10),UniformSampling())
-```
-
-or a normal distribution, analogously defining `D` as 
-
-```julia
-ParamSpace((1,10,1,10),NormalSampling())
+ParamSpace((1,10,1,10),sampling=:latin_hypercube)
+ParamSpace((1,10,1,10),sampling=:normal)
+ParamSpace((1,10,1,10),sampling=:uniform)
+ParamSpace((1,10,1,10),sampling=:uniform_tensorial)
 ```
 
 A single parameter is sampled from `D` by calling
@@ -105,7 +102,7 @@ A single parameter is sampled from `D` by calling
 whereas a collection of 10 realizations can be obtained by running
 
 ```julia
-μ10 = realization(D;nparams=10)
+realization(D;nparams=10)
 ``` 
 
 ## Numerical integration 
@@ -128,14 +125,14 @@ Multiplying the Poisson equation by a test function `v ∈ V` and integrating by
 
 ```julia
 a(μ,u,v,dΩₕ) = ∫(ν(μ)*∇(v)⋅∇(u))dΩₕ 
-l(μ,v,dΩₕ,dΓₕ) = ∫(fₚ(μ)*v)dΩₕ + ∫(hₚ(μ)*v)dΓₕ
+l(μ,v,dΩₕ,dΓₕ) = a(μ,u,v,dΩₕ) - ∫(fₚ(μ)*v)dΩₕ - ∫(hₚ(μ)*v)dΓₕ
 ```
 
-Note that, in contrast to a traditional Gridap code, the measures involved in the forms are passed as arguments to the forms themselves. This is necessary in order to correctly run the subsequent steps of our algorithm.
+Note that, in contrast to a traditional Gridap code, the measures involved in the forms are passed as arguments to the forms themselves. (This prevents us from defining a FE operator just by defining a bilinear form for the LHS and a linear form for the RHS as in Gridap: we must actually write the full expression of the residual). 
 
 ## Parametric FE problem 
 
-At this point, we can build a FE operator representing the entire problem we aim to solve. 
+At this point, we can build a FE operator representing the Poisson equation: 
 
 ```julia 
 τₕ_l = (Ωₕ,Γₕ)
@@ -144,7 +141,7 @@ domains = FEDomains(τₕ_l,τₕ_a)
 feop = ParamLinearFEOperator(l,a,D,U,V,domains)
 ```
 
-The structure `FEDomains` collects the triangulations relative to the LHS & RHS. With respect to a traditional FE operator in Gridap, a `ParamLinearFEOperator` provides the aforementioned `FEDomains` for the LHS & RHS, as well as the parametric domain `D`.
+The structure [`FEDomains`](@ref) collects the triangulations relative to the LHS & RHS. With respect to a traditional FE operator in Gridap, a [`ParamLinearFEOperator`](@ref) provides the aforementioned `FEDomains` for the LHS & RHS, as well as the parametric domain `D`.
 
 ## FE solver 
 
@@ -157,7 +154,7 @@ solver = LinearFESolver(ls)
 
 ## RB solver
 
-Finally, we are ready to begin the ROM part. The first part consists in defining the problem's `RBSolver`, i.e. the reduced counterpart of a FE solver:
+Finally, we are ready to begin the ROM part. The first part consists in defining the problem's [`RBSolver`](@ref), i.e. the reduced counterpart of a FE solver:
 
 ```julia 
 tol = 1e-4
@@ -171,26 +168,29 @@ rbsolver = RBSolver(solver,reduction_sol,reduction_l,reduction_a)
 
 A `RBSolver` contains the following information: 
 
-* The FE solver 
+* The FE solver `solver`
 
-* The reduction strategy for the solution. This information is used to build a projection map representing a low-dimensional approximation subspace (i.e. a trial space) for our differential problem. In the case above, we use a truncated POD with tolerance `tol` on a set of 20 snapshots. The output is orthogonal with respect to the form `inner_prod`, i.e. the `H^1_0` product. Other reduction strategies include fixing the rank of the truncation
+* The reduction strategy for the solution `reduction_sol`. This information is used to build a projection map representing a low-dimensional approximation subspace (i.e. a trial space) for our differential problem. In the case above, we use a truncated POD with tolerance `tol` on a set of 20 snapshots. The output is orthogonal with respect to the form `inner_prod`, i.e. the `H^1_0` product. 
 
-```julia 
-rank = 5
-reduction_sol = PODReduction(rank,inner_prod;nparams=20)
-```
+* The hyper-reduction strategy for the residual `reduction_l`. This information is used to build a projection map representing a low-dimensional subspace for the residual, equipped with a reduced integration domain obtained via MDEIM, i.e. the matrix-based empirical interpolation method. A total of 10 residual snapshots is used to compute the output.
 
-and using randomized POD algorithms
+* Similarly, the hyper-reduction strategy for the Jacobian `reduction_a`.
 
-```julia 
-reduction_sol = PODReduction(tol,inner_prod;nparams=20,sketch=:sprn)
-```
+!!! note 
+    Other reduction strategies include fixing the rank of the truncation
 
-A comprehensive documentation on randomized POD algorithms can be found [here](https://github.com/JuliaLinearAlgebra/LowRankApprox.jl).
+    ```julia 
+        rank = 5
+        PODReduction(rank,inner_prod;nparams=20)
+    ```
 
-* The hyper-reduction strategy for the RHS. This information is used to build a projection map representing a low-dimensional subspace for the RHS, equipped with a reduced integration domain obtained via MDEIM, i.e. the matrix-based empirical interpolation method. A total of 10 residual snapshots is used to compute the output.
+    and using randomized POD algorithms
 
-* Similarly, the hyper-reduction strategy for the LHS.
+    ```julia 
+        PODReduction(tol,inner_prod;nparams=20,sketch=:sprn)
+    ```
+
+    A comprehensive documentation on randomized POD algorithms can be found [here](https://github.com/JuliaLinearAlgebra/LowRankApprox.jl).
 
 ## Offline phase 
 
@@ -240,7 +240,7 @@ â,l̂ = reduced_weak_form(rbsolver,op,Û,V̂,fesnaps)
 
 # fetch the reduced FEDomains
 τₕ_l̂,τₕ_â = get_domains(l̂),get_domains(â)
-# replace the original FEDomains with the new ones  
+# replace the original FEDomains with the reduced ones  
 op′ = change_domains(op,τₕ_l̂,τₕ_â)
 # definition of reduced operator 
 rbop = GenericRBOperator(op′,Û,V̂,â,l̂)

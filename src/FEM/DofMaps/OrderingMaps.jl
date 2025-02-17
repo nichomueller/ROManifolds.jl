@@ -26,7 +26,8 @@ end
       orders::NTuple{D,Int}
     end
 
-Map used to convert a DOF of a standard FE space to a lexicographically-ordered DOF
+Map used to convert a DOF of a standard `FESpace` in [`Gridap`](@ref) to a DOF
+belonging to a space whose DOFs are lexicographically-ordered
 """
 struct DofsToODofs{D,P,V} <: Map
   b::LagrangianDofBasis{P,V}

@@ -154,11 +154,11 @@ the norm with respect to which the reduction should occur.
 
 Subtypes:
 
-- [`DirectReduction`](ref)
-- [`GreedyReduction`](ref)
-- [`SupremizerReduction`](ref)
-- [`AbstractMDEIMReduction`](ref)
-- `TransientReduction`
+- [`DirectReduction`](@ref)
+- [`GreedyReduction`](@ref)
+- [`SupremizerReduction`](@ref)
+- [`AbstractMDEIMReduction`](@ref)
+- [`TransientReduction`](@ref)
 """
 abstract type Reduction{A<:ReductionStyle,B<:NormStyle} end
 
@@ -169,9 +169,9 @@ Type representing direct reduction methods, e.g. truncated POD, TTSVD, etc.
 
 Subtypes:
 
-- [`AffineReduction`](ref)
-- [`PODReduction`](ref)
-- [`TTSVDReduction`](ref)
+- [`AffineReduction`](@ref)
+- [`PODReduction`](@ref)
+- [`TTSVDReduction`](@ref)
 """
 abstract type DirectReduction{A,B} <: Reduction{A,B} end
 abstract type GreedyReduction{A,B} <: Reduction{A,B} end
@@ -311,7 +311,7 @@ for more details in a steady setting, and [this](https://doi.org/10.1137/22M1509
 more details in a transient setting. The fields `supr_op` and `supr_tol` (which
 is only needed only in transient applications) are respectively the supremizing
 operator and the tolerance involved in the enrichment. For a saddle point problem
-with a jacobian of the form
+with a Jacobian of the form
 
 [ A   Bᵀ
   B   0 ]
@@ -366,13 +366,13 @@ end
 Type representing a hyper-reduction approximation by means of a MDEIM algorithm.
 Check [this](https://doi.org/10.1016/j.jcp.2015.09.046) for more details on MDEIM. This
 reduction strategy is usually employed only for the approximation of a residual
-and/or jacobian of a differential problem. Note that orthogonality with respect
+and/or Jacobian of a differential problem. Note that orthogonality with respect
 to a norm other than the euclidean is not required for this reduction type.
 
 Subtypes:
 
 - [`MDEIMReduction`](@ref)
-- `TransientMDEIMReduction`
+- [`TransientMDEIMReduction`](@ref)
 """
 abstract type AbstractMDEIMReduction{A} <: Reduction{A,EuclideanNorm} end
 

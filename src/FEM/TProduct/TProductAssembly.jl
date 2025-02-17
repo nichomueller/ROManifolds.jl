@@ -1,7 +1,7 @@
 """
     TProductSparseMatrixAssembler{A<:SparseMatrixAssembler} <: SparseMatrixAssembler
 
-Assembly-related information when constructing a [`AbstractRankTensor`](ref)
+Assembly-related information when constructing a [`AbstractRankTensor`](@ref)
 """
 struct TProductSparseMatrixAssembler{A<:SparseMatrixAssembler} <: SparseMatrixAssembler
   assems_1d::Vector{A}

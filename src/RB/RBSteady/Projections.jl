@@ -137,7 +137,7 @@ Computes the EIM of `a`. The outputs are:
 
 - a vector of integers `i`, corresponding to a list of interpolation row indices
 - a matrix `Φi = view(Φ,i)`, where `Φ = get_basis(a)`. This quantity represents
-the restricted basis on the set of interpolation rows `i`
+  the restricted basis on the set of interpolation rows `i`
 """
 empirical_interpolation(a::Projection) = @abstractmethod
 
@@ -147,10 +147,7 @@ empirical_interpolation(a::Projection) = @abstractmethod
 Computes the projection corresponding to the union of `a` and `b`. In essence this
 operation performs as
 
-`Φa = get_basis(a)
-Φb = get_basis(b)
-Φab = union(Φa,Φb)
-return gram_schmidt(Φab)`
+  `gram_schmidt(union(get_basis(a),get_basis(b)))`
 """
 union_bases(a::Projection,b::Projection,args...) = @abstractmethod
 
@@ -569,7 +566,7 @@ end
 """
     struct BlockProjection{A,N} <: Projection end
 
-Block container for Projection of type `A` in a MultiField setting. This
+Block container for Projection of type `A` in a `MultiField` setting. This
 type is conceived similarly to `ArrayBlock` in `Gridap`
 """
 struct BlockProjection{A<:Projection,N} <: Projection
@@ -666,10 +663,10 @@ end
 
 """
     enrich!(
-    red::SupremizerReduction,
-    a::BlockProjection,
-    norm_matrix::MatrixOrTensor,
-    supr_matrix::MatrixOrTensor) -> Nothing
+      red::SupremizerReduction,
+      a::BlockProjection,
+      norm_matrix::MatrixOrTensor,
+      supr_matrix::MatrixOrTensor) -> Nothing
 
 In-place augmentation of the primal block of a [`BlockProjection`](@ref) `a`.
 This function has the purpose of stabilizing the reduced equations stemming from

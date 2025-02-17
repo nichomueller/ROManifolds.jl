@@ -231,7 +231,7 @@ end
       u::Tuple{Vararg{AbstractParamVector}},ws::Tuple{Vararg{Real}},paramcache
       ) -> AbstractParamMatrix
 
-Full order residual computed via integration on the [`AbstractIntegrationDomain`](ref)
+Full order residual computed via integration on the [`AbstractIntegrationDomain`](@ref)
 relative to the LHS defined in `op`
 """
 function fe_jacobian!(
@@ -254,7 +254,7 @@ end
       u::Tuple{Vararg{AbstractParamVector}},paramcache
       ) -> AbstractParamVector
 
-Full order residual computed via integration on the [`AbstractIntegrationDomain`](ref)
+Full order residual computed via integration on the [`AbstractIntegrationDomain`](@ref)
 relative to the RHS defined in `op`
 """
 function fe_residual!(

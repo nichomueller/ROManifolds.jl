@@ -177,14 +177,14 @@ end
 
 Given a series of tensor train decompositions `a = (a1, ..., aN)` such that
 
-`an = an1 ⋅ an2 ⋅ ⋯ ⋅ anD`
+  `an = an1 ⋅ an2 ⋅ ⋯ ⋅ anD`
 
 for any `n ∈ {1,...,N}`, returns the tensor train decomposition `b` such that
 
-`b1 = [a11, ..., aN1]
-b2 = diag(b12, ..., bN2)
- ⋮
-bD = diag(b1D, ..., bND)`
+  `b1 = [a11, ..., aN1]
+  b2 = diag(b12, ..., bN2)
+  ⋮
+  bD = diag(b1D, ..., bND)`
 
 Note that `b` represents the tensor train decomposition of `a1 + ... + aN`
 """

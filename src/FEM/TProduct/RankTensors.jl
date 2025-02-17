@@ -2,7 +2,8 @@
     abstract type AbstractRankTensor{D,K} end
 
 Type representing a tensor `a` of dimension `D` and rank `K`, i.e. assuming the form
-`a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k`.
+
+  `a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k`
 
 Subtypes:
 
@@ -20,7 +21,7 @@ get_decomposition(a::AbstractRankTensor) = ntuple(k -> get_decomposition(a,k),Va
 
 For a tensor `a` of dimension `D` and rank `K` assuming the form
 
-`a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k`
+  `a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k`
 
 returns the decomposition relative to the `k`th rank `[a_1^k, ⋯, a_D^k]`
 """
@@ -33,7 +34,7 @@ get_decomposition(a::AbstractRankTensor,k::Integer) = @abstractmethod
 
 Structure representing rank-1 tensors, i.e. assuming the form
 
-`a = a_1 ⊗ ⋯ ⊗ a_D`
+  `a = a_1 ⊗ ⋯ ⊗ a_D`
 """
 struct Rank1Tensor{D,A<:AbstractArray} <: AbstractRankTensor{D,1}
   factors::Vector{A}
@@ -63,7 +64,7 @@ end
 
 Structure representing a generic rank-K tensor, i.e. assuming the form
 
-`a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k`
+  `a = ∑_{k=1}^{K} a_1^k ⊗ ⋯ ⊗ a_D^k`
 """
 struct GenericRankTensor{D,K,A<:AbstractArray} <: AbstractRankTensor{D,K}
   decompositions::Vector{Rank1Tensor{D,A}}
@@ -95,7 +96,7 @@ end
 Returns a [`AbstractRankTensor`](@ref) storing the arrays `arrays_1d` (usually matrices)
 arising from an integration routine on D 1-d triangulations whose tensor product
 gives a D-dimensional triangulation. In the absence of the field `gradients_1d`,
-the output is a `Rank1Tensor`; when provided, the output is a `GenericRankTensor`
+the output is a [`Rank1Tensor`](@ref); when provided, the output is a [`GenericRankTensor`](@ref)
 
     tproduct_array(arrays_1d::Vector{<:BlockArray}) -> BlockRankTensor
     tproduct_array(op,arrays_1d::Vector{<:BlockArray},gradients_1d::Vector{<:BlockArray},args...) -> BlockRankTensor

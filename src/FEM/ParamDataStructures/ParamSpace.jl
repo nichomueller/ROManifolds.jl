@@ -229,10 +229,15 @@ Subtypes:
 - [`UniformSampling`](@ref)
 - [`NormalSampling`](@ref)
 - [`HaltonSampling`](@ref)
+- [`LatinHypercubeSampling`](@ref)
+- [`UniformTensorialSampling`](@ref)
 """
 abstract type SamplingStyle end
 
 """
+    struct UniformSampling <: SamplingStyle end
+
+Sampling according to a uniform distribution
 """
 struct UniformSampling <: SamplingStyle end
 
@@ -241,6 +246,9 @@ function generate_param(::UniformSampling,param_domain)
 end
 
 """
+    struct NormalSampling <: SamplingStyle end
+
+Sampling according to a normal distribution
 """
 struct NormalSampling <: SamplingStyle end
 
@@ -249,6 +257,14 @@ function generate_param(::NormalSampling,param_domain)
 end
 
 """
+    struct HaltonSampling <: SamplingStyle end
+
+Sampling according to a Halton sequence
+
+!!! note
+  Halton is a sequence, not a distribution, hence this sampling strategy repeats
+  realizations since the draws are not randomized; to draw different parameters,
+  one needs to provide a starting point in the sequence (start = 1 by default)
 """
 struct HaltonSampling <: SamplingStyle end
 
@@ -263,6 +279,81 @@ function _generate_params(::HaltonSampling,param_domain,nparams;start=1,kwargs..
     end
   end
   return hs′
+end
+
+"""
+    struct LatinHypercubeSampling <: SamplingStyle end
+
+Sampling according to a Latin HyperCube distribution
+"""
+struct LatinHypercubeSampling <: SamplingStyle end
+
+function _generate_params(::LatinHypercubeSampling,param_domain,nparams)
+  d = length(param_domain)
+  lhc = randomLHC(d,nparams)
+  scaled_lhc = scaleLHC(lhc,param_domain)
+  return scaled_lhc
+end
+
+"""
+    struct TensorialUniformSampling <: SamplingStyle end
+
+Sampling according to a tensorial uniform distribution
+"""
+struct TensorialUniformSampling <: SamplingStyle end
+
+struct TensorStencil{N,P} <: AbstractArray{AbstractVector{Float64},N}
+  domain::P
+  n::NTuple{N,Int}
+  dx::NTuple{N,Float64}
+  function TensorStencil(domain::P,n::NTuple{N,Int},dx::NTuple{N,Float64}) where {P,N}
+    @check length(domain) == length(n)
+    nv = n .+ 1 # number of vertices in the stencil
+    new{N,P}(domain,nv,dx)
+  end
+end
+
+function TensorStencil(domain,n::NTuple{N,Int}) where N
+  _dx(v::Vector,n::Int) = (v[2] - v[1]) / n
+  dx = Tuple(map(_dx,domain,n))
+  TensorStencil(domain,n,dx)
+end
+
+# this function works properly if domain is somewhat isotropic; if not, a tuple
+# of sizes should be provided
+function TensorStencil(domain,nparams::Int)
+  d = length(domain)
+  n = max(ceil(Int,log(d,nparams)),1) # in case nparams == 1
+  TensorStencil(domain,tfill(n,Val(d)))
+end
+
+Base.size(a::TensorStencil) = a.n
+Base.IndexStyle(::Type{<:TensorStencil}) = IndexCartesian()
+
+function Base.getindex(a::TensorStencil{N},i::Vararg{Int,N}) where N
+  cache = zeros(N)
+  getindex!(cache,a,i...)
+  cache
+end
+
+function Arrays.getindex!(cache,a::TensorStencil{N},i::Vararg{Int,N}) where N
+  for n in 1:N
+    cache[n] = a.domain[n][1] + (i[n]-1)*a.dx[n]
+  end
+  cache
+end
+
+function _generate_params(::TensorialUniformSampling,param_domain,nparams)
+  stencil = TensorStencil(param_domain,nparams)
+  params = Vector{Vector{Float64}}(undef,nparams)
+  cache = zeros(ndims(stencil))
+  randids = sample(1:length(stencil),nparams,replace=false)
+  idsC = eachindex(stencil)
+  for (k,idk) in enumerate(randids)
+    idCk = idsC[idk]
+    params[k] = getindex!(cache,stencil,idCk) |> copy
+  end
+  return params
 end
 
 """
@@ -314,6 +405,10 @@ function _generate_params(sampling::Symbol,args...;kwargs...)
     _generate_params(NormalSampling(),args...;kwargs...)
   elseif sampling == :halton
     _generate_params(HaltonSampling(),args...;kwargs...)
+  elseif sampling == :latin_hypercube
+    _generate_params(NormalSampling(),args...;kwargs...)
+  elseif sampling == :tensorial_uniform
+    _generate_params(TensorialUniformSampling(),args...;kwargs...)
   else
     @notimplemented "Need to implement more sampling strategies"
   end
@@ -409,8 +504,8 @@ end
     end
 
 Representation of parametric functions with domain a parametric space. Given a
-function `f` : Ω₁ × ... × Ωₙ × U+1D4DF, where U+1D4DF is a `ParamSpace`,
-the evaluation of `f` in `μ ∈ U+1D4DF` returns the restriction of `f` to Ω₁ × ... × Ωₙ
+function `f` : Ω₁ × ... × Ωₙ × D, where D is a `ParamSpace`,
+the evaluation of `f` in `μ ∈ D` returns the restriction of `f` to Ω₁ × ... × Ωₙ
 """
 struct ParamFunction{F,P} <: AbstractParamFunction{P}
   fun::F
@@ -468,11 +563,11 @@ Arrays.return_value(f::ParamFunction,x) = f.fun(testitem(_get_params(f)))(x)
     end
 
 Representation of parametric functions with domain a transient parametric space.
-Given a function `f` : Ω₁ × ... × Ωₙ × U+1D4DF × [t₁,t₂], where [t₁,t₂] is a
-temporal domain and U+1D4DF is a `ParamSpace`, or equivalently
-`f` : Ω₁ × ... × Ωₙ × U+1D4E3 U+1D4DF × [t₁,t₂], where U+1D4E3 U+1D4DF is a
-`TransientParamSpace`, the evaluation of `f` in `(μ,t) ∈ U+1D4E3 U+1D4DF × [t₁,t₂]`
-returns the restriction of `f` to Ω₁ × ... × Ωₙ
+Given a function `f : Ω₁ × ... × Ωₙ × D × [t₁,t₂]`, where `[t₁,t₂]` is a
+temporal domain and `D` is a `ParamSpace`, or equivalently
+`f : Ω₁ × ... × Ωₙ × D × [t₁,t₂]`, where `D` is a
+`TransientParamSpace`, the evaluation of `f` in `(μ,t) ∈ D × [t₁,t₂]`
+returns the restriction of `f` to `Ω₁ × ... × Ωₙ`
 """
 struct TransientParamFunction{F,P,T} <: AbstractParamFunction{P}
   fun::F

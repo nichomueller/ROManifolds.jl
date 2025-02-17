@@ -4,7 +4,7 @@ This package provides a set of tools for the solution of parameterized partial d
 
 | **Documentation** |
 |:------------ |
-| [![docdev](https://img.shields.io/badge/docs-dev-blue.svg)](https://github.com:nichomueller/ROM.jl/dev) |
+| [![docdev](https://img.shields.io/badge/docs-dev-blue.svg)](https://nichomueller.github.io/ROM.jl/dev/) |
 | **Citation** |
 | [![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.jcp.2022.111162-blue)](https://github.com/nichomueller/rb_julia) |
 |**Build Status** |

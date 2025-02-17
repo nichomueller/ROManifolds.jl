@@ -20,7 +20,7 @@ param_length(a::CellField) = param_length(testitem(get_data(a)))
 """
     get_param_data(a) -> Any
 
-Returns the parametric data of `a`, usually in the form of a AbstractVector or
+Returns the parametric data of `a`, usually in the form of a `AbstractVector` or
 a NTuple
 """
 get_param_data(a) = @abstractmethod

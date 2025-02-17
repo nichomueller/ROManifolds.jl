@@ -3,8 +3,8 @@
 
 Type representing parametric abstract arrays of type A.
 Subtypes:
-- `ParamArray`
-- `ParamSparseMatrix`
+- [`ParamArray`](@ref)
+- [`ParamSparseMatrix`](@ref)
 """
 abstract type AbstractParamArray{T,N,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N} end
 

@@ -18,15 +18,15 @@ We envision two main developments for the library. Firstly, the development of a
 
 ```@contents
 Pages = [
-  "Utils.md",
-  "DofMaps.md",
-  "TProduct.md",
-  "ParamDataStructures.md",
-  "ParamAlgebra.md",
-  "ParamFESpaces.md",
-  "ParamSteady.md",
-  "ParamODEs.md",
-  "RBSteady.md",
-  "RBTransient.md",
+  "utils.md",
+  "dof_maps.md",
+  "tproduct.md",
+  "param_data_structures.md",
+  "param_algebra.md",
+  "param_fe_spaces.md",
+  "param_steady.md",
+  "param_odes.md",
+  "rbsteady.md",
+  "rbtransient.md",
   ]
 ```

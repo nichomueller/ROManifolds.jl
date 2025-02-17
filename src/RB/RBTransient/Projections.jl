@@ -244,11 +244,11 @@ end
 
 Temporal supremizer enrichment. (Approximate) Procedure:
 
-- for every b_dual in basis_dual
-- compute Φ_primal_dual = get_basis(a_primal)'*get_basis(b_dual)
-- compute v = kernel(Φ_primal_dual)
-- compute v′ = orth_complement(v,a_primal)
-- enrich a_primal = [a_primal,v′]
+1. for every `b_dual ∈ Col(basis_dual)`
+2. compute `Φ_primal_dual = get_basis(a_primal)'*get_basis(b_dual)`
+3. compute `v = kernel(Φ_primal_dual)`
+4. compute `v′ = orth_complement(v,a_primal)`
+5. enrich `a_primal = [a_primal,v′]`
 """
 function time_enrichment(red::SupremizerReduction,a_primal::Projection,basis_dual)
   tol = RBSteady.get_supr_tol(red)

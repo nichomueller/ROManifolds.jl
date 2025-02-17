@@ -96,7 +96,10 @@ induced_norm(A::AbstractMatrix) = sqrt.(diag(A'*A))
 induced_norm(A::AbstractMatrix,norm_matrix::AbstractMatrix) = sqrt.(diag(A'*norm_matrix*A))
 
 """
-    compute_error(sol::AbstractArray{T,N},sol_approx::AbstractArray{T,N},args...
+    compute_error(
+      sol::AbstractArray{T,N},
+      sol_approx::AbstractArray{T,N},
+      args...
       ) where {T,N} -> Number
 
 Computes the error between `sol` and `sol_approx`, by default in the Euclidean
@@ -120,7 +123,10 @@ function compute_error(
 end
 
 """
-    compute_relative_error(sol::AbstractArray{T,N},sol_approx::AbstractArray{T,N},args...
+    compute_relative_error(
+      sol::AbstractArray{T,N},
+      sol_approx::AbstractArray{T,N},
+      args...
       ) where {T,N} -> Number
 
 Computes the relative error between `sol` and `sol_approx`, by default in the Euclidean

@@ -2,7 +2,7 @@
     abstract type SparsityPattern end
 
 Type used to represent the sparsity pattern of a sparse matrix, usually the
-jacobian in a FE problem.
+Jacobian in a FE problem.
 
 Subtypes:
 
@@ -15,7 +15,7 @@ abstract type SparsityPattern end
 """
     get_sparsity(U::FESpace,V::FESpace,trian=_get_common_domain(U,V)) -> SparsityPattern
 
-Builds a [`SparsityPattern`](@ref) from two FE spaces `U` and `V`, via integration
+Builds a [`SparsityPattern`](@ref) from two `FESpace`s `U` and `V`, via integration
 on a triangulation `trian`
 """
 function get_sparsity(U::FESpace,V::FESpace,trian=_get_common_domain(U,V))
@@ -82,15 +82,13 @@ get_background_matrix(a::SparsityCSC) = a.matrix
     end
 
 Fields:
-  - `sparsity`: a [`SparsityPattern`](@ref) of a matrix assembled on a geometry that
-    is the child of a Cartesian geometry
-  - `bg_rows_to_act_rows`: a vector that maps a row of the Cartesian parent
-    geometry, to a row of the child geometry
-  - `bg_cols_to_act_cols`: a vector that maps a column of the Cartesian parent
-    geometry, to a column of the child geometry
 
-This type creates a map between `sparsity` and the `SparsityPattern` defined on
-the Cartesian parent geometry
+  - `sparsity`: the [`SparsityPattern`](@ref) of a matrix assembled on an (active) geometry
+    which is either Cartesian, or it is defined from a (background) Cartesian geometry
+  - `bg_rows_to_act_rows`: a vector that maps a row of the Cartesian background
+    geometry, to a row of the active geometry
+  - `bg_cols_to_act_cols`: a vector that maps a column of the Cartesian background
+    geometry, to a column of the active geometry
 """
 struct CartesianSparsity{A<:SparsityPattern,B<:AbstractVector,C<:AbstractVector} <: SparsityPattern
   sparsity::A
@@ -125,7 +123,7 @@ end
 Fields:
 - `sparsity`: a [`SparsityPattern`](@ref) of a matrix assembled on a Cartesian
   geometry of dimension `D`
-- `sparsities_1d`: a vector of `D` univariate sparsity patterns
+- `sparsities_1d`: a vector of `D` 1D sparsity patterns
 
 Structure used to represent a `SparsityPattern` of a matrix obtained by integrating a
 bilinear form on a triangulation that can be obtained as the tensor product of `D`
@@ -148,18 +146,18 @@ univariate_nnz(a::TProductSparsity) = Tuple(nnz.(a.sparsities_1d))
     get_d_sparse_dofs_to_full_dofs(Tu,Tv,a::TProductSparsity) -> AbstractArray{<:Integer,D}
 
 Input:
-- `Tu`, `Tv`: DOF types of a trial FE space `U` and test FE space `V`, respecively
+- `Tu`, `Tv`: DOF types of a trial `FESpace` `U` and test `FESpace` `V`, respecively
 - `a`: a [`TProductSparsity`](@ref) representing the sparsity of the matrix
   assembled from `U` and `V`
 
 Output:
 - a D-array `d_sparse_dofs_to_full_dofs`, which represents a map from
-`Nnz_1 × … × Nnz_{D}` to `M⋅N`, where `Nnz_i` represents the number of
-nonzero entries of the `i`th univariate sparsity contained in `a`, and `M⋅N` is
-the total length of the tensor product sparse matrix in `a`. For vector-valued
-FE spaces, an additional axis is added to `d_sparse_dofs_to_full_dofs` representing
-the number of components. In particular, the component axis has a length equal to
-`num_components(Tu)⋅num_components(Tv)`
+  `Nnz_1 × … × Nnz_{D}` to `M⋅N`, where `Nnz_i` represents the number of
+  nonzero entries of the `i`th 1D sparsity contained in `a`, and `M⋅N` is
+  the total length of the tensor product sparse matrix in `a`. For vector-valued
+  `FESpace`s, an additional axis is added to `d_sparse_dofs_to_full_dofs` representing
+  the number of components. In particular, the component axis has a length equal to
+  `num_components(Tu)⋅num_components(Tv)`
 """
 function get_d_sparse_dofs_to_full_dofs(Tu,Tv,a::TProductSparsity)
   I,J, = findnz(a)
@@ -251,7 +249,7 @@ end
 """
     get_dof_eltype(f::FESpace) -> Type
 
-Fetches the DOF eltype for a FE space `f`
+Fetches the DOF eltype for a `FESpace` `f`
 """
 get_dof_eltype(f::FESpace) = get_dof_eltype(get_fe_dof_basis(f))
 get_dof_eltype(b) = @abstractmethod
@@ -281,7 +279,7 @@ end
 
 function _get_common_domain(U::FESpace,V::FESpace)
   msg = """\n
-  Cannot define a sparsity pattern object between the FE spaces given as input,
+  Cannot define a sparsity pattern object between the `FESpace`s given as input,
   as they are defined on incompatible triangulations
   """
 

@@ -4,7 +4,6 @@ using LinearAlgebra
 using ArraysOfArrays
 using BlockArrays
 using ForwardDiff
-using HaltonSequences
 using SparseArrays
 using SparseMatricesCSR
 
@@ -22,7 +21,9 @@ using ROM.DofMaps
 import Base:+,-,*,/,\
 import Distributions: Uniform,Normal
 import FillArrays: Fill
-import Statistics: mean
+import HaltonSequences: HaltonPoint
+import LatinHypercubeSampling: randomLHC,scaleLHC
+import StatsBase: sample
 import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
 import SparseArrays.getcolptr

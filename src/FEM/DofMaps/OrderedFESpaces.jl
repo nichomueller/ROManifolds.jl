@@ -12,7 +12,7 @@ FESpaces.get_fe_space(f::OrderedFESpace) = @abstractmethod
 """
     get_cell_odof_ids(f::OrderedFESpace) -> AbstractArray
 
-Fetches the ordered cell dof ids
+Fetches the ordered connectivity structure
 """
 get_cell_odof_ids(f::OrderedFESpace) = @abstractmethod
 
@@ -372,7 +372,7 @@ _remove_constraint(f::ZeroMeanFESpace) = _remove_constraint(f.space)
 """
     OrderedFEFunction(f::OrderedFESpace,fv,dv) -> FEFunction
 
-Returns a FE function with correctly ordered values. Allows, for instance, to
+Returns a `FEFunction` with correctly ordered values. Allows, for instance, to
 correctly visualize a solution belonging to `f`
 """
 function OrderedFEFunction(f::OrderedFESpace,fv,dv)

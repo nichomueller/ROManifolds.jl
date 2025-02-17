@@ -1,12 +1,13 @@
 """
     abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
 
-Type representing an indexing strategy. Subtypes:
+Type representing an indexing strategy for FE quantitites (e.g. FE vectors such as
+FE solutions and residuals, or FE sparse matrices such as FE Jacobians). Subtypes:
 
-- `InverseDofMap`
-- `VectorDofMap`
-- `TrivialSparseMatrixDofMap`
-- `SparseMatrixDofMap`
+- [`InverseDofMap`](@ref)
+- [`VectorDofMap`](@ref)
+- [`TrivialSparseMatrixDofMap`](@ref)
+- [`SparseMatrixDofMap`](@ref)
 """
 abstract type AbstractDofMap{D,Ti} <: AbstractArray{Ti,D} end
 
@@ -53,7 +54,7 @@ end
 """
     invert(i::AbstractDofMap) -> InverseDofMap
 
-Retruns an InverseDofMap object out of an existing dof map `i`
+Retruns an [`InverseDofMap`](@ref) object out of an existing dof map `i`
 """
 function invert(i::AbstractDofMap)
   InverseDofMap(i)
@@ -64,7 +65,7 @@ end
       dof_map::I
     end
 
-Inverse dof map of a given AbstractDofMap object `dof_map`
+Inverse dof map of a given [`AbstractDofMap`](@ref) object `dof_map`
 """
 struct InverseDofMap{D,Ti,I<:AbstractDofMap{D,Ti}} <: AbstractDofMap{D,Ti}
   dof_map::I
@@ -108,29 +109,27 @@ end
       bg_dof_to_act_dof::I
     end
 
-Dof map intended for the reindexing of FE vectors (e.g. solutions or residuals).
+Dof map intended for the reindexing of FE vectors (e.g. FE solutions or residuals).
+
 Fields:
-  - `size`: denotes the shape of the array deriving from the reindexing of FE vectors
-  - `bg_dof_to_act_dof`: vector of size equals to `prod(size)` that has the following
-  purpose. When the FE mesh is Cartesian, `bg_dof_to_act_dof that` is the identity
-  map, i.e. `bg_dof_to_act_dof that[i] == i`. When the mesh is not Cartesian, the
-  field `size` denotes the size of a bounding (Cartesian) box, and `bg_dof_to_act_dof that`
-  creates a correspondence between the set of background DOFs (defined on the bounding box),
-  and the active ones (defined on the actual geometry). If the `i`th background DOF
-  is equal to the `j`th active DOF, then `bg_dof_to_act_dof that[i] == j`; if
-  instead it corresponds to an inactive DOF (e.g. situated in a hole), then
-  `bg_dof_to_act_dof that[i] == 0`. Custom data structures that are indexed
-  according to an `AbstractDofMap` are designed to return zero when indexed by a
-  zero index.
 
----
-**NOTE**
+  - `size`: denotes the desired shape of the reindexed array
+  - `bg_dof_to_act_dof`: vector mapping a background DOF to an active DOF. A
+    background DOF lives on a `FESpace` defined on a background Cartesian mesh; an
+    active DOF lives on a `FESpace` defined on an active mesh, which must occupy
+    a portion of the background mesh. When the active mesh coincides with the
+    background one, `bg_dof_to_act_dof` represents simply an identity map. If not,
+    this means there are inactive DOFs in the background `FESpace`, which `bg_dof_to_act_dof`
+    is responsible of masking.
 
-This map only returns the DOFs in lexicographical order. This means that the
-entries of the FE vector are not permuted in order, they are simply reshaped and,
-in non-Cartesian applications, expanded.
+More in detail, if `size = (n1,...,nD)`, we can think of this mapping as a function
 
----
+  `n1 × ... × nD ⟶ {0,1,...,nact}`
+
+where `nact` is the number of active DOFs. The output of this map is an index according
+to which we reindex FE vectors. We follow the convention that, when indexed by zero,
+the FE vectors return a zero. This is acceptable, since the FE vector does not
+actually hold a value when indexed at an inactive DOF.
 """
 struct VectorDofMap{D,I<:AbstractVector{<:Integer}} <: AbstractDofMap{D,Int32}
   size::Dims{D}

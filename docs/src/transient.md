@@ -1,4 +1,4 @@
-# Usage - transient problem
+# Usage - Transient problem
 
 In this example we solve a more complicated problem, namely a parameter- and time-dependent version of the Navier-Stokes equations.
 
@@ -19,7 +19,7 @@ using ROM
 import Gridap.MultiField: BlockMultiFieldStyle
 ```
 
-Next, we load a `DiscreteModel` from file 
+Next, we load a `DiscreteModel` from file (which can be found among the assets of the repo)
 
 ```julia
 model_dir = datadir(joinpath("models","model_circle_2d.json"))
@@ -43,22 +43,19 @@ Dt = TransientParamSpace(pdomain,tdomain)
 
 The main difference with respect to the steady case is that we consider as realizations sets of tuples `(μ,t)`. This allows for a much cleaner representation of the `(μ,t)`-dependence in the problem. 
 
----
-**NOTE**
+!!! note
 
-Obviously, unless specified, times are not sampled from a `TransientParamSpace`, in the sense that we consider the sets `(μ,t) ∀ t ∈ t0:dt:tf`.
+  Times are not sampled from a [`TransientParamSpace`](@ref), in the sense that we consider the sets `(μ,t) ∀ t ∈ t0:dt:tf`, where `μ` is a sampled quantity.
 
----
-
-The way in which we simultaneously evaluate parameter- and time-dependent functions is with the structure `TransientParamFunction`, which generalizes a `ParamFunction` to the transient case. For example, we can consider the following Dirichlet datum for our problem
+The way in which we simultaneously evaluate parameter- and time-dependent functions is with the structure `TransientParamFunction`, which generalizes a [`ParamFunction`](@ref) to the transient case. For example, we can consider the following Dirichlet datum for our problem
 
 ```julia
 const W = 0.5
 inflow(μ,t) = abs(1-cos(2π*t/tf)+μ[3]*sin(μ[2]*2π*t/tf)/100)
-g_in(x,μ,t) = VectorValue(-x[2]*(W-x[2])*inflow(μ,t),0.0)
-gμt_in(μ,t) = TransientParamFunction(x->g_in(x,μ,t),μ,t)
-g_0(x,μ,t) = VectorValue(0.0,0.0)
-gμt_0(μ,t) = TransientParamFunction(x->g_0(x,μ,t),μ,t)
+g_in(μ,t) = x -> VectorValue(-x[2]*(W-x[2])*inflow(μ,t),0.0)
+gₚₜ_in(μ,t) = TransientParamFunction(g_in,μ,t)
+g_0(x,μ,t) = x -> VectorValue(0.0,0.0)
+gₚₜ_0(μ,t) = TransientParamFunction(g_0,μ,t)
 ```
 
 which we use to define the FE spaces. We employ the Inf-Sup stable `P2-P1` (Taylor-Hood) pair for velocity and pressure, respectively:
@@ -75,14 +72,11 @@ test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyl
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 ```
 
-A `TransientTrialParamFESpace` extends a traditional `TransientTrialFESpace` in Gridap, as it allows to provide a `(μ,t)`-dependent Dirichlet datum. The same holds for the multi-field version `TransientMultiFieldParamFESpace`. 
+A [`TransientTrialParamFESpace`](@ref) extends a traditional `TransientTrialFESpace` in Gridap, as it allows to provide a `(μ,t)`-dependent Dirichlet datum. The same holds for the multi-field version [`TransientMultiFieldParamFESpace`](@ref). 
 
----
-**NOTE**
+!!! note
 
-In the multi-field scenario, the `BlockMultiFieldStyle` style should always be used.
-
----
+  In the multi-field scenario, the `BlockMultiFieldStyle` style should always be used. Check the appropriate documentation of [Gridap](https://github.com/gridap/Gridap.jl) for more information.
 
 Now we introduce the information related to the numerical integration 
 
@@ -112,12 +106,9 @@ res(μ,t,(u,p),(v,q),dΩₕ) = ∫(v⋅∂t(u))dΩₕ + stiffness(μ,t,(u,p),(v,
 
 res_nlin(μ,t,(u,p),(v,q),dΩₕ) = c(u,v,dΩₕ)
 jac_nlin(μ,t,(u,p),(du,dp),(v,q),dΩₕ) = dc(u,du,v,dΩₕ)
-
-fesolver = ThetaMethod(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true),dt,θ)
-xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 ```
 
-Note that we have split the linear terms of the Navier-Stokes equations from the nonlinear convection terms, allowing us to increase efficiency of the algorithm. Now we introduce two FE operators, one for the linear terms and the other for the nonlinear ones 
+Note that we have split the linear terms of the Navier-Stokes equations from the nonlinear convection terms, allowing us to increase efficiency of the algorithm. Now we introduce two FE operators, one for the linear terms and the other for the nonlinear ones:
 
 ```julia
 trian_res = (τₕ,)
@@ -127,14 +118,14 @@ domains_lin = FEDomains(trian_res,(trian_jac,trian_jac_t))
 domains_nlin = FEDomains(trian_res,(trian_jac,))
 
 feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
-  trial,test,domains_lin;constant_forms=(false,true))
+  trial,test,domains_lin)
 feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,
   trial,test,domains_nlin)
 
 feop = LinearNonlinearTransientParamFEOperator(feop_lin,feop_nlin)
 ```
 
-and we wrap them in a `LinearNonlinearTransientParamFEOperator`. Next, we define the time marching scheme for our problem, along with a suitable initial condition 
+The two FE operators are wrapped together in a [`LinearNonlinearTransientParamFEOperator`](@ref) struct. Next, we define the time marching scheme for our problem, along with a suitable initial condition 
 
 ```julia 
 u0(x,μ) = VectorValue(0.0,0.0)
@@ -156,7 +147,7 @@ We finally discuss the code relative to the reduced part. As usual we start by d
 
 ```julia
 coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩₕ
-energy((du,dp),(v,q)) = ∫(du⋅v)dΩₕ + ∫(∇(v)⊙∇(du))dΩₕ + ∫(dp*q)dΩₕ
+energy((du,dp),(v,q)) = ∫(∇(v)⊙∇(du))dΩₕ + ∫(dp*q)dΩₕ
 
 tol = 1e-4
 state_reduction = TransientReduction(coupling,tol,energy;nparams=50,sketch=:sprn)
@@ -170,9 +161,9 @@ rbsolver = RBSolver(fesolver,state_reduction,reduction_l,reduction_am)
 
 The main novelty is the use of transient reduction techniques. In particular:
 
-* A `TransientReduction` provides the information related to a reduction in space, and a reduction in time. 
+* A [`TransientReduction`](@ref) provides the information related to a reduction in space, and a reduction in time. 
 
-* A `TransientMDEIMReduction` provides the information related to a hyper-reduction in space, and a hyper-reduction in time. 
+* A [`TransientMDEIMReduction`](@ref) provides the information related to a hyper-reduction in space, and a hyper-reduction in time. 
 
 * Whenever we provide a `coupling` variable in the reduction strategy, a reduction of type `SupremizerReduction` is returned. This type simply acts as a wrapper for a reduction strategy (of type `TransientReduction` in our case), and has the scope of performing a supremizer enrichment for the stabilization of the reduced problem. Check [this](https://doi.org/10.1002/nme.4772) reference for more details on supremizer stabilizations. They are useful, for e.g., when reducting saddle-point problems such as the Stokes or Navier-Stokes equations.
 

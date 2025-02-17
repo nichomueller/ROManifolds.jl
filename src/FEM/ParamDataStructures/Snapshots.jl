@@ -5,9 +5,9 @@ Type representing N-dimensional arrays of snapshots. Subtypes must contain the
 following information:
 
 - data: a (parametric) array
-- realization: a subtype of `AbstractRealization`, representing the points
+- realization: a subtype of [`AbstractRealization`](@ref), representing the points
   in the parameter space used to compute the array `data`
-- dof map: a subtype of `AbstractDofMap`, representing a reindexing strategy
+- dof map: a subtype of [`AbstractDofMap`](@ref), representing a reindexing strategy
   for the array `data`
 
 Subtypes:
@@ -48,7 +48,8 @@ abstract type Snapshots{T,N,D,I<:AbstractDofMap{D},R<:AbstractRealization,A} <: 
     get_indexed_data(s::Snapshots) -> AbstractArray
 
 Returns the data in `s` reindexed according to the indexing strategy provided in `s`.
-Note: this function is not lazy
+!!! note
+  This function is not lazy, and should be used with parsimony
 """
 get_indexed_data(s::Snapshots) = @abstractmethod
 
@@ -351,7 +352,7 @@ const SparseSnapshots{T,N,D,I,R} = Union{
       touched::Array{Bool,N}
     end
 
-Block container for Snapshots of type `S` in a MultiField setting. This
+Block container for Snapshots of type `S` in a `MultiField` setting. This
 type is conceived similarly to `ArrayBlock` in Gridap
 """
 struct BlockSnapshots{S<:Snapshots,N} <: AbstractSnapshots{S,N}

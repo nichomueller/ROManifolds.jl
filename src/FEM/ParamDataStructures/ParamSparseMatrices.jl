@@ -95,9 +95,9 @@ abstract type ParamSparseMatrixCSC{Tv,Ti} <: ParamSparseMatrix{Tv,Ti,SparseMatri
 
 Represents a vector of sparse matrices in CSC format, with entries stored
 consecutively in memory. For sake of coherence, an instance of
-`ConsecutiveParamSparseMatrixCSC` inherits from AbstractMatrix{<:SparseMatrixCSC{Tv,Ti}
-rather than AbstractVector{<:SparseMatrixCSC{Tv,Ti}, but should conceptually be
-thought as an AbstractVector{<:SparseMatrixCSC{Tv,Ti}.
+`ConsecutiveParamSparseMatrixCSC` inherits from `AbstractMatrix{<:SparseMatrixCSC{Tv,Ti}`
+rather than `AbstractVector{<:SparseMatrixCSC{Tv,Ti}`, but should conceptually be
+thought as an `AbstractVector{<:SparseMatrixCSC{Tv,Ti}`.
 """
 struct ConsecutiveParamSparseMatrixCSC{Tv,Ti<:Integer} <: ParamSparseMatrixCSC{Tv,Ti}
   m::Int64
@@ -204,9 +204,9 @@ end
 
 Represents a vector of sparse matrices in CSC format, with entries stored
 non-consecutively in memory. For sake of coherence, an instance of
-`GenericParamSparseMatrixCSC` inherits from AbstractMatrix{<:SparseMatrixCSC{Tv,Ti}
-rather than AbstractVector{<:SparseMatrixCSC{Tv,Ti}, but should conceptually be
-thought as an AbstractVector{<:SparseMatrixCSC{Tv,Ti}.
+`GenericParamSparseMatrixCSC` inherits from `AbstractMatrix{<:SparseMatrixCSC{Tv,Ti}`
+rather than `AbstractVector{<:SparseMatrixCSC{Tv,Ti}`, but should conceptually be
+thought as an `AbstractVector{<:SparseMatrixCSC{Tv,Ti}`.
 """
 struct GenericParamSparseMatrixCSC{Tv,Ti<:Integer} <: ParamSparseMatrixCSC{Tv,Ti}
   m::Int64
@@ -319,9 +319,9 @@ abstract type ParamSparseMatrixCSR{Bi,Tv,Ti} <: ParamSparseMatrix{Tv,Ti,SparseMa
 
 Represents a vector of sparse matrices in CSR format, with entries stored
 consecutively in memory. For sake of coherence, an instance of
-`ConsecutiveParamSparseMatrixCSR` inherits from AbstractMatrix{<:SparseMatrixCSR{Bi,Tv,Ti}
-rather than AbstractVector{<:SparseMatrixCSR{Bi,Tv,Ti}, but should conceptually be
-thought as an AbstractVector{<:SparseMatrixCSR{Bi,Tv,Ti}.
+`ConsecutiveParamSparseMatrixCSR` inherits from `AbstractMatrix{<:SparseMatrixCSR{Bi,Tv,Ti}`
+rather than `AbstractVector{<:SparseMatrixCSR{Bi,Tv,Ti}`, but should conceptually be
+thought as an `AbstractVector{<:SparseMatrixCSR{Bi,Tv,Ti}`.
 """
 struct ConsecutiveParamSparseMatrixCSR{Bi,Tv,Ti<:Integer} <: ParamSparseMatrixCSR{Bi,Tv,Ti}
   m::Int64
@@ -438,9 +438,9 @@ end
 
 Represents a vector of sparse matrices in CSR format, with entries stored
 non-consecutively in memory. For sake of coherence, an instance of
-`GenericParamSparseMatrixCSR` inherits from AbstractMatrix{<:SparseMatrixCSR{Bi,Tv,Ti}
-rather than AbstractVector{<:SparseMatrixCSR{Bi,Tv,Ti}, but should conceptually be
-thought as an AbstractVector{<:SparseMatrixCSR{Bi,Tv,Ti}.
+`GenericParamSparseMatrixCSR` inherits from `AbstractMatrix{<:SparseMatrixCSR{Bi,Tv,Ti}`
+rather than `AbstractVector{<:SparseMatrixCSR{Bi,Tv,Ti}`, but should conceptually be
+thought as an `AbstractVector{<:SparseMatrixCSR{Bi,Tv,Ti}`.
 """
 struct GenericParamSparseMatrixCSR{Bi,Tv,Ti<:Integer} <: ParamSparseMatrixCSR{Bi,Tv,Ti}
   m::Int64

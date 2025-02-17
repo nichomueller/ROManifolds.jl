@@ -2,7 +2,7 @@
     get_param_assembler(a::SparseMatrixAssembler,r::AbstractRealization) -> SparseMatrixAssembler
 
 Returns an assembler that also stores the parametric length of `r`. This function
-is to be used to assemble parametric residuals and jacobians. The assembly routines
+is to be used to assemble parametric residuals and Jacobians. The assembly routines
 follow the same pipeline as in `Gridap`
 """
 function get_param_assembler(a::SparseMatrixAssembler,r::AbstractRealization)

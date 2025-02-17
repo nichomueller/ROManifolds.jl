@@ -120,8 +120,8 @@ end
 
 Represents a [`TransientSnapshots`](@ref) `snaps` whose parametric and temporal ranges
 are restricted to the indices in `prange` and `trange`. This type essentially acts
-as a view for suptypes of TransientSnapshots, at every space location, on
-a selected number of parameter/time indices. An instance of TransientSnapshotsAtIndices
+as a view for suptypes of `TransientSnapshots`, at every space location, on
+a selected number of parameter/time indices. An instance of `TransientSnapshotsAtIndices`
 is created by calling the function `select_snapshots`
 """
 struct TransientSnapshotsAtIndices{T,N,D,I,R,A<:TransientSnapshots{T,N,D,I,R},B,C} <: TransientSnapshots{T,N,D,I,R,A}
@@ -357,20 +357,20 @@ change_mode(::Mode2Axes) = Mode1Axes()
     end
 
 Represents a [`TransientSnapshots`](@ref) with a [`TrivialDofMap`](@ref) indexing strategy
-as an AbstractMatrix with a system of mode-unfolding representations. Only two
+as an `AbstractMatrix` with a system of mode-unfolding representations. Only two
 mode-unfolding representations are considered:
 
 Mode1Axes:
 
-[u(x1,t1,μ1) ⋯ u(x1,t1,μP) u(x1,t2,μ1) ⋯ u(x1,t2,μP) u(x1,t3,μ1) ⋯ ⋯ u(x1,tT,μ1) ⋯ u(x1,tT,μP)]
-      ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
- u(xN,t1,μ1) ⋯ u(xN,t1,μP) u(xN,t2,μ1) ⋯ u(xN,t2,μP) u(xN,t3,μ1) ⋯ ⋯ u(xN,tT,μ1) ⋯ u(xN,tT,μP)]
+  ```[u(x1,t1,μ1) ⋯ u(x1,t1,μP) u(x1,t2,μ1) ⋯ u(x1,t2,μP) u(x1,t3,μ1) ⋯ ⋯ u(x1,tT,μ1) ⋯ u(x1,tT,μP)]
+        ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
+  u(xN,t1,μ1) ⋯ u(xN,t1,μP) u(xN,t2,μ1) ⋯ u(xN,t2,μP) u(xN,t3,μ1) ⋯ ⋯ u(xN,tT,μ1) ⋯ u(xN,tT,μP)]```
 
 Mode2Axes:
 
-[u(x1,t1,μ1) ⋯ u(x1,t1,μP) u(x2,t1,μ1) ⋯ u(x2,t1,μP) u(x3,t1,μ1) ⋯ ⋯ u(xN,t1,μ1) ⋯ u(xN,t1,μP)]
-      ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
- u(x1,tT,μ1) ⋯ u(x1,tT,μP) u(x2,tT,μ1) ⋯ u(x2,tT,μP) u(x3,tT,μ1) ⋯ ⋯ u(xN,tT,μ1) ⋯ u(xN,tT,μP)]
+  ```[u(x1,t1,μ1) ⋯ u(x1,t1,μP) u(x2,t1,μ1) ⋯ u(x2,t1,μP) u(x3,t1,μ1) ⋯ ⋯ u(xN,t1,μ1) ⋯ u(xN,t1,μP)]
+        ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
+  u(x1,tT,μ1) ⋯ u(x1,tT,μP) u(x2,tT,μ1) ⋯ u(x2,tT,μP) u(x3,tT,μ1) ⋯ ⋯ u(xN,tT,μ1) ⋯ u(xN,tT,μP)]```
 """
 struct ModeTransientSnapshots{M<:ModeAxes,T,I,R,A<:UnfoldingTransientSnapshots{T,I,R}} <: TransientSnapshots{T,2,1,I,R,A}
   snaps::A
@@ -397,7 +397,7 @@ DofMaps.get_dof_map(s::ModeTransientSnapshots) = get_dof_map(s.snaps)
     change_mode(s::ModeTransientSnapshots) -> ModeTransientSnapshots
 
 Returns the snapshots obtained by opposing the mode of `s`. The result is a
-subtype of AbstractMatrix with entries equal to those of `s`, but with swapped
+subtype of `AbstractMatrix` with entries equal to those of `s`, but with swapped
 spatial and temporal axes
 """
 change_mode(s::UnfoldingTransientSnapshots) = ModeTransientSnapshots(s,change_mode(get_mode(s)))

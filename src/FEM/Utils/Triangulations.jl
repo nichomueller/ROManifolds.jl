@@ -272,8 +272,10 @@ function find_trian_permutation(a,b)
 end
 
 """
-    order_domains(tparents::Tuple{Vararg{Triangulation}},
-      tchildren::Tuple{Vararg{Triangulation}}) -> Tuple{Vararg{Triangulation}}
+    order_domains(
+      tparents::Tuple{Vararg{Triangulation}},
+      tchildren::Tuple{Vararg{Triangulation}}
+      ) -> Tuple{Vararg{Triangulation}}
 
 Orders the triangulation children in the same way as the triangulation parents
 """
@@ -284,8 +286,10 @@ function order_domains(tparents,tchildren)
 end
 
 """
-    find_closest_view(tparents::Tuple{Vararg{Triangulation}},
-      tchild::Triangulation) -> (Integer, Triangulation)
+    find_closest_view(
+      tparents::Tuple{Vararg{Triangulation}},
+      tchild::Triangulation
+      ) -> (Integer, Triangulation)
 
 Finds the approximate parent of `tchild`; it returns the parent's index and its
 view in the same indices as `tchild` (which should be a triangulation view)

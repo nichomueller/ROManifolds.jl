@@ -36,7 +36,7 @@ abstract type TriangulationStyle <: GridapType end
 """
     struct JointDomains <: TriangulationStyle end
 
-Trait for a FE operator indicating that residuals/jacobians in this operator
+Trait for a FE operator indicating that residuals/Jacobiansin this operator
 should be computed summing the contributions relative to each triangulation as
 occurs in `Gridap`
 """
@@ -45,7 +45,7 @@ struct JointDomains <: TriangulationStyle end
 """
     struct SplitDomains <: TriangulationStyle end
 
-Trait for a FE operator indicating that residuals/jacobians in this operator
+Trait for a FE operator indicating that residuals/Jacobiansin this operator
 should be computed keeping the contributions relative to each triangulation separate
 """
 struct SplitDomains <: TriangulationStyle end

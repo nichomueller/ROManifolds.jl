@@ -8,13 +8,13 @@
 Parametric vector returned after the online phase of a hyper-reduction strategy.
 Fields:
 
-- `fe_quantity`: represents a parametric residual/jacobian computed via integration
-  on an AbstractIntegrationDomain
+- `fe_quantity`: represents a parametric residual/Jacobian computed via integration
+  on an [`AbstractIntegrationDomain`](@ref)
 - `coeff`: parameter-dependent coefficient computed during the online phase
-  according to the formula `coeff = Φi⁻¹ * fe_quantity[i,:]`, where (Φi,i) are
+  according to the formula `coeff = Φi⁻¹ * fe_quantity[i,:]`, where `(Φi,i)` are
   stored in a `HyperReduction` object
 - `hypred`: the ouptut of the online phase of a hyper-reduction strategy, acoording
-  to the formula `hypred = Φrb * coeff`, where Φrb is stored in a
+  to the formula `hypred = Φrb * coeff`, where `Φrb` is stored in a
   `HyperReduction` object
 """
 struct HRParamArray{T,N,A,B,C<:ParamArray{T,N}} <: ParamArray{T,N}

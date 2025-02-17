@@ -183,7 +183,7 @@ end
 
 Parametric array with entries stored consecutively in memory. It is
 characterized by an inner size equal to `size(data)[1:N]`, and parametric length
-equal to `size(data,N+1)`, where `data` is an AbstractArray of dimension M = N+1
+equal to `size(data,N+1)`, where `data` is an `AbstractArray` of dimension `M = N+1`
 """
 struct ConsecutiveParamArray{T,N,M,A<:AbstractArray{T,M}} <: ParamArray{T,N}
   data::A
@@ -598,7 +598,7 @@ end
 
 Parametric array with entries stored non-consecutively in memory. It is
 characterized by an inner size equal to `size(data[1])`, and parametric length
-equal to `length(data)`, where `data` is a Vector{<:AbstractArray}
+equal to `length(data)`, where `data` is a `Vector{<:AbstractArray}`
 """
 struct ArrayOfArrays{T,N,A<:AbstractArray{T,N}} <: ParamArray{T,N}
   data::Vector{A}

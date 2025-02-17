@@ -4,8 +4,8 @@
 Parametric extension of a `TransientFEOperator` in `Gridap`. Compared to
 a standard TransientFEOperator, there are the following novelties:
 
-- a TransientParamSpace is provided, so that parametric realizations can be extracted
-  directly from the TransientParamFEOperator
+- a [`TransientParamSpace`](@ref) is provided, so that parametric realizations can be extracted
+  directly from the `TransientParamFEOperator`
 - a function representing a norm matrix is provided, so that errors in the
   desired norm can be automatically computed
 

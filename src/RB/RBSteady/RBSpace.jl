@@ -2,7 +2,7 @@
     reduced_spaces(solver::RBSolver,feop::ParamFEOperator,s::AbstractSnapshots
       ) -> (RBSpace, RBSpace)
 
-Computes the subspace of the test, trial FE spaces contained in the FE operator
+Computes the subspace of the test, trial `FESpace`s contained in the FE operator
 `feop` by compressing the snapshots `s`
 """
 function reduced_spaces(solver::RBSolver,feop::ParamFEOperator,s::AbstractSnapshots)
@@ -23,10 +23,9 @@ function reduced_spaces(red::Reduction,feop::ParamFEOperator,s::AbstractSnapshot
 end
 
 """
-    reduced_basis(red::Reduction,s::AbstractSnapshots,args...) -> (Projection, Projection)
+    reduced_basis(red::Reduction,s::AbstractSnapshots,args...) -> Projection
 
-Computes the bases spanning the subspace of test, trial FE spaces by compressing
-the snapshots `s`
+Computes the basis by compressing the snapshots `s`
 """
 function reduced_basis(
   red::Reduction,
@@ -68,7 +67,7 @@ end
 """
     reduced_subspace(space::FESpace,basis::Projection) -> RBSpace
 
-Generic constructor of a [`RBSpace`](@ref) from a FE space `space` and a projection
+Generic constructor of a [`RBSpace`](@ref) from a `FESpace` `space` and a projection
 `basis`
 """
 function reduced_subspace(space::FESpace,basis::Projection)
@@ -78,7 +77,7 @@ end
 """
     abstract type RBSpace <: FESpace end
 
-Represents a vector subspace of a FE space.
+Represents a vector subspace of a `FESpace`.
 
 Subtypes:
 
