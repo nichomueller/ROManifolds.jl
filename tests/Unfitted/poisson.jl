@@ -7,8 +7,8 @@ using GridapEmbedded
 
 using ROM
 
-pranges = fill([1,10],3)
-pspace = ParamSpace(pranges)
+pdomain = fill([1,10],3)
+pspace = ParamSpace(pdomain)
 
 R = 0.5
 L = 0.8*(2*R)
@@ -26,7 +26,7 @@ dp = pmax - pmin
 
 n = 30
 partition = (n,n)
-bgmodel = TProductModel(pmin,pmax,partition)
+bgmodel = TProductDiscreteModel(pmin,pmax,partition)
 
 cutgeo = cut(bgmodel,geo)
 Ωbg = Triangulation(bgmodel)

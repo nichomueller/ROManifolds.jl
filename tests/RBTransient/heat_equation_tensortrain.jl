@@ -12,15 +12,15 @@ t0 = 0.0
 tf = 0.1
 
 # parametric space
-pranges = fill([1,10],3)
+pdomain = fill([1,10],3)
 tdomain = t0:dt:tf
-ptspace = TransientParamSpace(pranges,tdomain)
+ptspace = TransientParamSpace(pdomain,tdomain)
 
 # geometry
 n = 10
 domain = (0,1,0,1)
 partition = (n,n)
-model = TProductModel(domain,partition)
+model = TProductDiscreteModel(domain,partition)
 labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet","boundary")
 

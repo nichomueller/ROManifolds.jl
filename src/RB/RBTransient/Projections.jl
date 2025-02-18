@@ -159,7 +159,7 @@ function RBSteady.galerkin_projection(
   proj_basis = zeros(nleft,n,nright)
   @inbounds for is = 1:ns, it = 1:nt
     ist = (it-1)*ns+is
-    proj_basis[:,ist,:] = kron(proj_basis_time[:,it,:],proj_basis_space[:,is,:])
+    @views proj_basis[:,ist,:] = kron(proj_basis_time[:,it,:],proj_basis_space[:,is,:])
   end
 
   return ReducedProjection(proj_basis)
@@ -269,13 +269,16 @@ function time_enrichment(basis_primal,basis_dual,tol)
 
   i = 1
   while i ≤ size(basis_pd,2)
-    proj = i == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,i],basis_pd[:,1:i-1])
-    dist = norm(basis_pd[:,i]-proj)
+    basis_pd_start = view(basis_pd,:,1:i-1)
+    basis_pd_i = view(basis_pd,:,i)
+    basis_d_i = view(basis_dual,:,i)
+    proj = i == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd_i,basis_pd_start)
+    dist = norm(basis_pd_i-proj)
     if dist ≤ tol
-      basis_primal,basis_pd = enrich!(basis_primal,basis_pd,basis_dual[:,i])
+      basis_primal,basis_pd = enrich!(basis_primal,basis_pd,basis_d_i)
       i = 0
     else
-      basis_pd[:,i] .-= proj
+      basis_pd_i .-= proj
     end
     i += 1
   end

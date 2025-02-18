@@ -290,9 +290,25 @@ struct LatinHypercubeSampling <: SamplingStyle end
 
 function _generate_params(::LatinHypercubeSampling,param_domain,nparams)
   d = length(param_domain)
-  lhc = randomLHC(d,nparams)
+  lhc = randomLHC(nparams,d)
   scaled_lhc = scaleLHC(lhc,param_domain)
   return scaled_lhc
+end
+
+function scaleLHC(LHC::Matrix{T},scale_range::Vector{<:AbstractVector}) where T
+  scaledLHC = Vector{Vector{Float64}}(undef,size(LHC,1))
+  cache = zeros(size(LHC,2))
+  @check length(scale_range) == length(cache)
+  for i in axes(LHC,1)
+    for j in axes(LHC,2)
+      @views LHCcol = LHC[:,j]
+      old_min,old_max = extrema(LHCcol)
+      new_min,new_max = scale_range[j]
+      cache[j] = (((LHC[i,j] - old_min) * (new_max - new_min)) / (old_max - old_min)) + new_min
+    end
+    scaledLHC[i] = copy(cache)
+  end
+  return scaledLHC
 end
 
 """
@@ -308,13 +324,12 @@ struct TensorStencil{N,P} <: AbstractArray{AbstractVector{Float64},N}
   dx::NTuple{N,Float64}
   function TensorStencil(domain::P,n::NTuple{N,Int},dx::NTuple{N,Float64}) where {P,N}
     @check length(domain) == length(n)
-    nv = n .+ 1 # number of vertices in the stencil
-    new{N,P}(domain,nv,dx)
+    new{N,P}(domain,n,dx)
   end
 end
 
 function TensorStencil(domain,n::NTuple{N,Int}) where N
-  _dx(v::Vector,n::Int) = (v[2] - v[1]) / n
+  _dx(v::Vector,n::Int) = (v[2] - v[1]) / (n - 1)
   dx = Tuple(map(_dx,domain,n))
   TensorStencil(domain,n,dx)
 end
@@ -323,7 +338,7 @@ end
 # of sizes should be provided
 function TensorStencil(domain,nparams::Int)
   d = length(domain)
-  n = max(ceil(Int,log(d,nparams)),1) # in case nparams == 1
+  n = max(ceil(Int,nparams^(1/d)),1) # in case nparams == 1
   TensorStencil(domain,tfill(n,Val(d)))
 end
 
@@ -356,6 +371,22 @@ function _generate_params(::TensorialUniformSampling,param_domain,nparams)
   return params
 end
 
+function _sampling_to_style(sampling::Symbol=:halton)
+  if sampling == :uniform
+    UniformSampling()
+  elseif sampling == :normal
+    NormalSampling()
+  elseif sampling == :halton
+    HaltonSampling()
+  elseif sampling == :latin_hypercube
+    LatinHypercubeSampling()
+  elseif sampling == :tensorial_uniform
+    TensorialUniformSampling()
+  else
+    @notimplemented "Need to implement more sampling strategies"
+  end
+end
+
 """
     struct ParamSpace{P<:AbstractVector{<:AbstractVector},S<:SamplingStyle} <: AbstractSet{Realization}
       param_domain::P
@@ -374,9 +405,9 @@ end
 
 get_sampling_style(p::ParamSpace) = p.sampling_style
 
-function ParamSpace(param_domain::AbstractVector{<:AbstractVector})
-  sampling_style = HaltonSampling()
-  ParamSpace(param_domain,sampling_style)
+function ParamSpace(param_domain::AbstractVector{<:AbstractVector},sampling::Symbol)
+  style = _sampling_to_style(sampling)
+  ParamSpace(param_domain,style)
 end
 
 function ParamSpace(domain_tuple::NTuple{N,T},args...) where {N,T}
@@ -389,6 +420,11 @@ function ParamSpace(domain_tuple::NTuple{N,T},args...) where {N,T}
   ParamSpace(param_domain,args...)
 end
 
+function ParamSpace(param_domain;sampling=:halton)
+  style = _sampling_to_style(sampling)
+  ParamSpace(param_domain,style)
+end
+
 function Base.show(io::IO,::MIME"text/plain",p::ParamSpace)
   msg = "Set of parameters in $(p.param_domain), sampled with $(p.sampling_style)"
   println(io,msg)
@@ -399,19 +435,8 @@ function _generate_params(sampling::SamplingStyle,param_domain,nparams;kwargs...
 end
 
 function _generate_params(sampling::Symbol,args...;kwargs...)
-  if sampling == :uniform
-    _generate_params(UniformSampling(),args...;kwargs...)
-  elseif sampling == :normal
-    _generate_params(NormalSampling(),args...;kwargs...)
-  elseif sampling == :halton
-    _generate_params(HaltonSampling(),args...;kwargs...)
-  elseif sampling == :latin_hypercube
-    _generate_params(NormalSampling(),args...;kwargs...)
-  elseif sampling == :tensorial_uniform
-    _generate_params(TensorialUniformSampling(),args...;kwargs...)
-  else
-    @notimplemented "Need to implement more sampling strategies"
-  end
+  style = _sampling_to_style(sampling)
+  _generate_params(style,args...;kwargs...)
 end
 
 """

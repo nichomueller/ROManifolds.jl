@@ -115,11 +115,9 @@ function Utils.compute_relative_error(
   sol_norm = zeros(num_times(sol))
   errors = zeros(num_params(sol))
   @inbounds for ip = 1:num_params(sol)
-    solip = selectdim(sol,N,ip)
-    solip_approx = selectdim(sol_approx,N,ip)
     for it in 1:num_times(sol)
-      solitp = selectdim(solip,N-1,it)
-      solitp_approx = selectdim(solip_approx,N-1,it)
+      solitp = select_snapshots(sol,it,ip)
+      solitp_approx = select_snapshots(sol_approx,it,ip)
       err_norm[it] = induced_norm(solitp-solitp_approx,args...)
       sol_norm[it] = induced_norm(solitp,args...)
     end

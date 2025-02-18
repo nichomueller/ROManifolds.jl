@@ -27,7 +27,7 @@ import Base:+,-
 import FillArrays: Fill,fill
 import Gridap.ReferenceFEs: get_order
 
-export TProductModel
+export TProductDiscreteModel
 export TProductTriangulation
 export TProductMeasure
 include("TProductGeometry.jl")

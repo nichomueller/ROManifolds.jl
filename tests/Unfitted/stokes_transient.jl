@@ -11,9 +11,9 @@ dt = 0.0025
 t0 = 0.0
 tf = 30*dt
 
-pranges = fill([1,10],3)
+pdomain = fill([1,10],3)
 tdomain = t0:dt:tf
-ptspace = TransientParamSpace(pranges,tdomain)
+ptspace = TransientParamSpace(pdomain,tdomain)
 
 R = 0.3
 pmin = Point(0,0)
@@ -24,7 +24,7 @@ partition = (n,n)
 geo1 = disk(R,x0=Point(0.5,0.5))
 geo2 = ! geo1
 
-bgmodel = TProductModel(pmin,pmax,partition)
+bgmodel = TProductDiscreteModel(pmin,pmax,partition)
 cutgeo = cut(bgmodel,geo2)
 
 Ωbg = Triangulation(bgmodel)

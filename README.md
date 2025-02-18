@@ -8,7 +8,7 @@ This package provides a set of tools for the solution of parameterized partial d
 | **Citation** |
 | [![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.jcp.2022.111162-blue)](https://github.com/nichomueller/rb_julia) |
 |**Build Status** |
-| [![CI](https://github.com:nichomueller/ROM.jl/workflows/CI/badge.svg)](https://github.com:nichomueller/ROM.jl/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/github.com:nichomueller/ROM.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/github.com:nichomueller/ROM.jl) |
+| [![CI](https://github.com/nichomueller/ROM.jl/workflows/CI/badge.svg)](https://github.com:nichomueller/ROM.jl/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/github.com:nichomueller/ROM.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/github.com:nichomueller/ROM.jl) |
 
 ## Installation
 
@@ -19,50 +19,78 @@ pkg> add ROM
 
 ## Examples
 
-### Sub-triangulation examples
+Before running the following examples, it is necessary to import from file some geometries saved to `.msh` file. They can be found in the [assets](https://nichomueller.github.io/ROM.jl/docs/assets) directory of this repo, in the zipped file named `models.tar.gz`. The geometries must be unzipped and moved to a directory where the numerical experiments are ran. This directory should be placed inside the `data` directory of the `Julia` project which is being used to run these experiments. To find this directory, first add the package `DrWatson` with 
 
-Use a test geometry, e.g., `47076.stl` (Chichen Itza)
 ```julia
-julia> include("examples/SubTriangulation.jl")
-julia> filename = "test/data/47076.stl"
-julia> SubTriangulation.main(filename,n=50,output="example1")
+# Type ] to enter package mode
+pkg> add DrWatson
+```
+
+and call
+
+```julia
+julia> dir = datadir()
+```
+
+Now we can unzip the compressed folder in `dir` with 
+
+```julia
+# Type ; to enter shell mode
+shell> tar -xvzf models.tar.gz -C dir
+```
+
+### Test 1 
+
+Solve a steady elasticity problem with a proper orthogonal decomposition algorithm
+
+```julia
+julia> include("examples/SteadyElasticityPOD.jl")
 ```
 ![Example 1](examples/example1.png)
 
-Download a geometry directly from [Thingi10k](https://ten-thousand-models.appspot.com/), e.g, [37384](https://ten-thousand-models.appspot.com/detail.html?file_id=37384). Please check whether the geometry is *solid* and *manifold* in Thingi10k metadata.
+### Test 2
+
+Do the same, but with a tensor-train decomposition approach
+
 ```julia
-julia> include("examples/SubTriangulation.jl")
-julia> filename = SubTriangulation.download(37384)
-julia> SubTriangulation.main(filename,n=50,output="example2")
+julia> include("examples/SteadyElasticityTTSVD.jl")
 ```
 ![Example 2](examples/example2.png)
 
-### Finite Elements examples
+### Test 3
 
-Solve a **Poisson** equation on a test geometry, e.g., `293137.stl` (Low-Poly Bunny)
- ```julia
-julia> include("examples/Poisson.jl")
-julia> filename = "test/data/293137.stl"
-julia> Poisson.main(filename,n=20,output="example3")
-```
+Solve a steady Stokes equation with a proper orthogonal decomposition algorithm
 
 ![Example 3](examples/example3.png)
 
-Solve a **Linear Elasticity** problem on a test geometry, e.g., `550964.stl` (Eiffel Tower in a 5 degree slope)
- ```julia
-julia> include("examples/LinearElasticity.jl")
-julia> filename = "test/data/550964.stl"
-julia> LinearElasticity.main(filename,n=50,force=(tand(5),0,-1),output="example4")
+```julia
+julia> include("examples/SteadyStokesPOD.jl")
 ```
+
+### Test 4 
 
 ![Example 4](examples/example4.png)
 
-Solve an **Incompressible Flow** problem on a test geometry, e.g., `47076.stl` (Chichen Itza)
- ```julia
-julia> # ENV["ENABLE_MKL"] = "" ## Uncomment if GridapPardiso.jl requirements are fulfilled
-julia> include("examples/Stokes.jl")
-julia> filename = "test/data/47076.stl"
-julia> Stokes.main(filename,n=10,output="example5")
+```julia
+julia> include("examples/SteadyStokesTTSVD.jl")
+```
+
+### Test 5 
+
+Moving to transient applications, we first solve a heat equation with a space-time RB method
+
+```julia
+julia> include("examples/HeatEquationSTRB.jl")
 ```
 
 ![Example 5](examples/example5.png)
+
+### Test 6
+
+Lastly, we solve a Navier-Stokes equation with a space-time RB method
+
+```julia
+julia> include("examples/NStokesTransientSTRB.jl")
+```
+
+![Example 6](examples/example6.png)

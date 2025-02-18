@@ -6,12 +6,12 @@ using ROM
 
 include("ExamplesInterface.jl")
 
-pranges = (1e10,9*1e10,0.25,0.42,-4*1e5,4*1e5,-4*1e5,4*1e5,-4*1e5,4*1e5)
-pspace = ParamSpace(pranges)
+pdomain = (1e10,9*1e10,0.25,0.42,-4*1e5,4*1e5,-4*1e5,4*1e5,-4*1e5,4*1e5)
+pspace = ParamSpace(pdomain)
 
 domain = (0,1,0,0.5,0,0.25)
 partition = (20,10,5)
-model = TProductModel(domain,partition)
+model = TProductDiscreteModel(domain,partition)
 labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet",[1,3,5,7,13,15,17,19,25])
 add_tag_from_tags!(labels,"neumann1",[22])

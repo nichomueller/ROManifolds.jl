@@ -1,20 +1,20 @@
 """
-    TProductModel{D,A,B} <: DiscreteModel{D,D} end
+    TProductDiscreteModel{D,A,B} <: DiscreteModel{D,D} end
 
 Tensor product discrete model, storing a vector of 1-D models `models_1d` of length D,
 and the D-dimensional model `model` defined as their tensor product.
 """
-struct TProductModel{D,A<:CartesianDiscreteModel{D},B<:AbstractVector{<:CartesianDiscreteModel}} <: DiscreteModel{D,D}
+struct TProductDiscreteModel{D,A<:CartesianDiscreteModel{D},B<:AbstractVector{<:CartesianDiscreteModel}} <: DiscreteModel{D,D}
   model::A
   models_1d::B
 end
 
-Geometry.get_grid(model::TProductModel) = get_grid(model.model)
-Geometry.get_grid_topology(model::TProductModel) = get_grid_topology(model.model)
-Geometry.get_face_labeling(model::TProductModel) = get_face_labeling(model.model)
+Geometry.get_grid(model::TProductDiscreteModel) = get_grid(model.model)
+Geometry.get_grid_topology(model::TProductDiscreteModel) = get_grid_topology(model.model)
+Geometry.get_face_labeling(model::TProductDiscreteModel) = get_face_labeling(model.model)
 
-get_model(model::TProductModel) = model.model
-get_1d_models(model::TProductModel) = model.models_1d
+get_model(model::TProductDiscreteModel) = model.model
+get_1d_models(model::TProductDiscreteModel) = model.models_1d
 
 function _split_cartesian_descriptor(desc::CartesianDescriptor{D}) where D
   origin,sizes,partition,cmap,isperiodic = desc.origin,desc.sizes,desc.partition,desc.map,desc.isperiodic
@@ -26,12 +26,12 @@ function _split_cartesian_descriptor(desc::CartesianDescriptor{D}) where D
   return descs
 end
 
-function TProductModel(args...;kwargs...)
+function TProductDiscreteModel(args...;kwargs...)
   desc = CartesianDescriptor(args...;kwargs...)
   descs_1d = _split_cartesian_descriptor(desc)
   model = CartesianDiscreteModel(desc)
   models_1d = CartesianDiscreteModel.(descs_1d)
-  TProductModel(model,models_1d)
+  TProductDiscreteModel(model,models_1d)
 end
 
 function _d_to_lower_dim_entities(coords::AbstractArray{VectorValue{D,T},D}) where {D,T}
@@ -69,12 +69,12 @@ function _check_tp_label_condition(intset,entity)
 end
 
 """
-    get_1d_tags(model::TProductModel,tags) -> Vector{Vector{Int8}}
+    get_1d_tags(model::TProductDiscreteModel,tags) -> Vector{Vector{Int8}}
 
 Fetches the tags of the tensor product 1D models corresponding to the tags
 of the `D`-dimensional model `tags`. The length of the output is `D`
 """
-function get_1d_tags(model::TProductModel{D},tags) where D
+function get_1d_tags(model::TProductDiscreteModel{D},tags) where D
   nodes = get_node_coordinates(model)
   labeling = get_face_labeling(model)
   face_to_tag = get_face_tag_index(labeling,tags,0)
@@ -106,7 +106,7 @@ Tensor product triangulation, storing a tensor product model, a vector of 1-D
 triangulations `trians_1d` of length D, and the D-dimensional triangulation `trian`
 defined as their tensor product.
 """
-struct TProductTriangulation{Dt,Dp,A<:TProductModel,B<:BodyFittedTriangulation{Dt,Dp},C<:AbstractVector{<:Triangulation}} <: Triangulation{Dt,Dp}
+struct TProductTriangulation{Dt,Dp,A<:TProductDiscreteModel,B<:BodyFittedTriangulation{Dt,Dp},C<:AbstractVector{<:Triangulation}} <: Triangulation{Dt,Dp}
   model::A
   trian::B
   trians_1d::C
@@ -115,7 +115,7 @@ end
 function TProductTriangulation(trian::Triangulation,trians_1d::AbstractVector{<:Triangulation})
   model = get_background_model(trian)
   models_1d = map(get_background_model,trians_1d)
-  tpmodel = TProductModel(model,models_1d)
+  tpmodel = TProductDiscreteModel(model,models_1d)
   TProductTriangulation(tpmodel,trian,trians_1d)
 end
 
@@ -123,7 +123,7 @@ Geometry.get_background_model(trian::TProductTriangulation) = trian.model
 Geometry.get_grid(trian::TProductTriangulation) = get_grid(trian.trian)
 Geometry.get_glue(trian::TProductTriangulation{Dt},::Val{Dt}) where Dt = get_glue(trian.trian,Val{Dt}())
 
-function Geometry.Triangulation(model::TProductModel;kwargs...)
+function Geometry.Triangulation(model::TProductDiscreteModel;kwargs...)
   trian = Triangulation(model.model;kwargs...)
   trians_1d = map(Triangulation,model.models_1d)
   TProductTriangulation(model,trian,trians_1d)
@@ -132,7 +132,7 @@ end
 for T in (:(AbstractVector{<:Integer}),:(AbstractVector{Bool}))
   @eval begin
     function Geometry.BoundaryTriangulation(
-      model::TProductModel,
+      model::TProductDiscreteModel,
       face_to_bgface::$T,
       bgface_to_lcell::AbstractVector{<:Integer})
 
@@ -181,6 +181,6 @@ end
 
 # unfitted elements
 
-function GridapEmbedded.cut(cutter::LevelSetCutter,background::TProductModel,geom)
+function GridapEmbedded.cut(cutter::LevelSetCutter,background::TProductDiscreteModel,geom)
   cut(cutter,background.model,geom)
 end

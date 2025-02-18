@@ -11,9 +11,9 @@ dt = 0.0025
 t0 = 0.0
 tf = 10*dt
 
-pranges = fill([1,10],3)
+pdomain = fill([1,10],3)
 tdomain = t0:dt:tf
-ptspace = TransientParamSpace(pranges,tdomain)
+ptspace = TransientParamSpace(pdomain,tdomain)
 
 n = 10
 domain = (0,1,0,1)

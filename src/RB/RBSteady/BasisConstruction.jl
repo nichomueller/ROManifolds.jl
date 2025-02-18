@@ -21,8 +21,9 @@ function reduction(red::TTSVDReduction,A::AbstractArray,args...)
   return cores
 end
 
+# somewhat arbitrary
 function _size_cond(A::AbstractMatrix)
-  length(A) > 1e6 && (size(A,1) > 1e2*size(A,2) || size(A,2) > 1e2*size(A,1)) #false #
+  length(A) > 1e6 && (size(A,1) > 1e2*size(A,2) || size(A,2) > 1e2*size(A,1))
 end
 
 function _cholesky_decomp(X::AbstractSparseMatrix)
@@ -30,6 +31,40 @@ function _cholesky_decomp(X::AbstractSparseMatrix)
   L = sparse(C.L)
   p = C.p
   return L,p
+end
+
+function _forward_cholesky(A::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector)
+  Base.permuterows!(A,p)
+  Ã = L'*A
+  Base.invpermuterows!(A,p)
+  return Ã
+end
+
+function _backward_cholesky(Ã::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector)
+  A = L'\Ã
+  Base.invpermuterows!(A,p)
+  return A
+end
+
+function _truncate!(A::AbstractMatrix,rank)
+  nrows = size(A,1)
+  inds = nrows*rank+1:length(A)
+  v = vec(A)
+  Base.deleteat!(v,inds)
+  reshape(v,nrows,:)
+end
+
+function _truncate!(v::AbstractVector,rank)
+  Base.deleteat!(v,rank+1:length(v))
+  v
+end
+
+function _truncate_row!(A::AbstractMatrix,rank)
+  nrows = size(A,1)
+  inds = range_1d(rank+1:nrows,axes(A,2),nrows)
+  v = vec(A)
+  Base.deleteat!(v,inds)
+  reshape(v,rank,:)
 end
 
 function select_rank(red_style::ReductionStyle,args...)
@@ -47,14 +82,20 @@ function truncated_svd(red_style::SearchSVDRank,A::AbstractMatrix;issquare=false
   U,S,V = svd(A)
   if issquare S = sqrt.(S) end
   rank = select_rank(red_style,S)
-  return U[:,1:rank],S[1:rank],V[:,1:rank]
+  Ur = _truncate!(U,rank)
+  Sr = _truncate!(S,rank)
+  Vr = _truncate_row!(V',rank)
+  return Ur,Sr,Vr'
 end
 
 function truncated_svd(red_style::FixedSVDRank,A::AbstractMatrix;issquare=false)
   U,S,V = svd(A)
   if issquare S = sqrt.(S) end
   rank = red_style.rank
-  return U[:,1:rank],S[1:rank],V[:,1:rank]
+  Ur = _truncate!(U,rank)
+  Sr = _truncate!(S,rank)
+  Vr = _truncate_row!(V',rank)
+  return Ur,Sr,Vr'
 end
 
 function truncated_svd(red_style::LRApproxRank,A::AbstractMatrix;kwargs...)
@@ -71,49 +112,74 @@ is made orthogonal. If `X` is not provided, the output is orthogonal with respec
 to the euclidean norm
 """
 function tpod(red_style::ReductionStyle,A::AbstractMatrix,X::AbstractSparseMatrix)
-  tpod(red_style,A,_cholesky_decomp(X)...)
+  L,p = _cholesky_decomp(X)
+  if _size_cond(A)
+    massive_tpod(red_style,A,L,p)
+  else
+    tpod(red_style,A,L,p)
+  end
 end
 
 function tpod(red_style::ReductionStyle,A::AbstractMatrix)
-  truncated_svd(red_style,A)
+  if _size_cond(A)
+    massive_tpod(red_style,A)
+  else
+    truncated_svd(red_style,A)
+  end
 end
 
 function tpod(red_style::ReductionStyle,A::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
-  XA = L'*A[p,:]
+  XA = _forward_cholesky(A,L,p)
   Ũr,Sr,Vr = truncated_svd(red_style,XA)
-  Ur = (L'\Ũr)[invperm(p),:]
+  Ur = _backward_cholesky(Ũr,L,p)
   return Ur,Sr,Vr
+end
+
+function massive_tpod(red_style::ReductionStyle,A::AbstractMatrix,args...)
+  if size(A,1) > size(A,2)
+    massive_rows_tpod(red_style,A,args...)
+  else
+    massive_cols_tpod(red_style,A,args...)
+  end
+end
+
+function massive_tpod(red_style::LRApproxRank,A::AbstractMatrix)
+  truncated_svd(red_style,A)
+end
+
+function massive_tpod(red_style::LRApproxRank,A::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector)
+  tpod(red_style,A,L,p)
 end
 
 function massive_rows_tpod(red_style::ReductionStyle,A::AbstractMatrix)
   AA = A'*A
   _,Sr,Vr = truncated_svd(red_style,AA;issquare=true)
-  Ur = (A*Vr)*inv(Diagonal(Sr).+eps())
+  Ur = (A*Vr)/Diagonal(Sr)
   return Ur,Sr,Vr
 end
 
 function massive_rows_tpod(red_style::ReductionStyle,A::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
-  XA = L'*A[p,:]
+  XA = _forward_cholesky(A,L,p)
   AXA = XA'*XA
   _,Sr,Vr = truncated_svd(red_style,AXA;issquare=true)
-  Ũr = (XA*Vr)*inv(Diagonal(Sr).+eps())
-  Ur = (L'\Ũr)[invperm(p),:]
+  Ũr = (XA*Vr)/Diagonal(Sr)
+  Ur = _backward_cholesky(Ũr,L,p)
   return Ur,Sr,Vr
 end
 
 function massive_cols_tpod(red_style::ReductionStyle,A::AbstractMatrix)
   AA = A*A'
   Ur,Sr,_ = truncated_svd(red_style,AA;issquare=true)
-  Vr = inv(Diagonal(Sr).+eps())*(Ur'A)
+  Vr = Diagonal(Sr)\(Ur'A)
   return Ur,Sr,Vr'
 end
 
 function massive_cols_tpod(red_style::ReductionStyle,A::AbstractMatrix,L::AbstractSparseMatrix,p::AbstractVector{Int})
-  XA = L'*A[p,:]
+  XA = _forward_cholesky(A,L,p)
   AXA = XA*XA'
   Ũr,Sr,_ = truncated_svd(red_style,AXA;issquare=true)
-  Vr = inv(Diagonal(Sr).+eps())*(Ũr'XA)
-  Ur = (L'\Ũr)[invperm(p),:]
+  Vr = Diagonal(Sr)\(Ũr'XA)
+  Ur = _backward_cholesky(Ũr,L,p)
   return Ur,Sr,Vr'
 end
 
@@ -338,11 +404,11 @@ function weight_array(prev_weight,core,X)
 
   @inbounds for k = 1:K
     Xk = X[k]
-    Wk_prev = prev_weight[:,k,:]
+    @views Wk_prev = prev_weight[:,k,:]
     mul!(cache_right,Xk,core2D)
     mul!(cache_left,core2D',cache_right)
     resh_weight = reshape(permutedims(reshape(cache_left,rank_prev,rank,rank_prev,rank),(2,4,1,3)),rank^2,:)
-    cur_weight[:,k,:] = reshape(resh_weight*vec(Wk_prev),rank,rank)
+    @views cur_weight[:,k,:] = reshape(resh_weight*vec(Wk_prev),rank,rank)
   end
   return cur_weight
 end
@@ -358,7 +424,8 @@ function ttnorm_array(X::AbstractRankTensor{D,K},WD) where {D,K}
   cache = zeros(s1,s2)
 
   for k = 1:rank(X)
-    kron!(cache,get_factor(X,D,k),WD[:,k,:])
+    @views WDk = WD[:,k,:]
+    kron!(cache,get_factor(X,D,k),WDk)
     @. XW = XW + cache
   end
   @. XW = (XW+XW')/2 # needed to eliminate roundoff errors
@@ -421,9 +488,10 @@ for f in (:pivoted_qr,:pivoted_qr!)
     function $f(A,tol=1e-10)
       C = $g(A,ColumnNorm())
       r = findlast(abs.(diag(C.R)) .> tol)
-      Q = C.Q[:,1:r]
-      R = C.R[1:r,invperm(C.jpvt)]
-      return Q,R
+      Qr = C.Q[:,1:r]
+      Rr = _truncate_row!(C.R,r)
+      Base.invpermutecols!(Rr,C.jpvt)
+      return Qr,Rr
     end
 
     $f(A,red_style::SearchSVDRank) = $f(A,red_style.tol)
@@ -452,9 +520,9 @@ for (f,g) in zip((:gram_schmidt,:gram_schmidt!),(:pivoted_qr,:pivoted_qr!))
 
     function $f(A::AbstractMatrix,X::AbstractSparseMatrix,args...)
       L,p = _cholesky_decomp(X)
-      XA = L'*A[p,:]
+      XA = _forward_cholesky(A,L,p)
       Q̃,R = $g(XA,args...)
-      Q = (L'\Q̃)[invperm(p),:]
+      Q = _backward_cholesky(Q̃,L,p)
       return Q,R
     end
   end

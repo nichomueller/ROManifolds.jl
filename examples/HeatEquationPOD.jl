@@ -11,9 +11,9 @@ dt = 0.0025
 t0 = 0.0
 tf = 40*dt
 
-pranges = fill([1,10],3)
+pdomain = fill([1,10],3)
 tdomain = t0:dt:tf
-ptspace = TransientParamSpace(pranges,tdomain)
+ptspace = TransientParamSpace(pdomain,tdomain)
 
 model_dir = datadir(joinpath("models","model_circle_h007.json"))
 model = DiscreteModelFromFile(model_dir)

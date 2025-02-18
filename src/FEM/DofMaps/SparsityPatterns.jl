@@ -335,5 +335,6 @@ function _index_to_d_indices(i::Integer,sD::NTuple{D,Integer}) where D
   sD_minus_1 = sD[1:end-1]
   nD_minus_1 = prod(sD_minus_1)
   iD = slow_index(i,nD_minus_1)
-  (_index_to_d_indices(i,sD_minus_1)...,iD)
+  i′ = fast_index(i,nD_minus_1)
+  (_index_to_d_indices(i′,sD_minus_1)...,iD)
 end

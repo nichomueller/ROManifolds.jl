@@ -242,14 +242,9 @@ function PODReduction(red_style::ReductionStyle,norm_op::Function;kwargs...)
   PODReduction(red_style,norm_style;kwargs...)
 end
 
-function PODReduction(tol::Float64,args...;kwargs...)
-  red_style = SearchSVDRank(tol)
-  PODReduction(red_style,args...;kwargs...)
-end
-
-function PODReduction(rank::Int,args...;kwargs...)
-  red_style = FixedSVDRank(rank)
-  PODReduction(red_style,args...;kwargs...)
+function PODReduction(tolrank::Union{Float64,Int},args...;nparams=50,kwargs...)
+  red_style = ReductionStyle(tolrank;kwargs...)
+  PODReduction(red_style,args...;nparams)
 end
 
 ReductionStyle(r::PODReduction) = r.red_style

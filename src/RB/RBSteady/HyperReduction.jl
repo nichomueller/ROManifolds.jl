@@ -3,13 +3,13 @@ function empirical_interpolation!(cache,A::AbstractMatrix)
   m,n = size(A)
   resize!(res,m)
   resize!(I,n)
-  I[1] = argmax(abs.(A[:,1]))
+  @views I[1] = argmax(abs.(A[:,1]))
   if n > 1
     @inbounds for i = 2:n
-      Bi = A[:,1:i-1]
+      @views Bi = A[:,1:i-1]
       Ci = A[I[1:i-1],1:i-1]
       Di = A[I[1:i-1],i]
-      res .= A[:,i] - Bi*(Ci \ Di)
+      @views res = A[:,i] - Bi*(Ci \ Di)
       I[i] = argmax(abs.(res))
     end
   end

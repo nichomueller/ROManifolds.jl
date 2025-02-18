@@ -14,9 +14,9 @@ t0 = 0.0
 tf = 0.2
 
 # parametric space
-pranges = fill([1,10],3)
+pdomain = fill([1,10],3)
 tdomain = t0:dt:tf
-ptspace = TransientParamSpace(pranges,tdomain)
+ptspace = TransientParamSpace(pdomain,tdomain)
 
 R = 0.5
 L = 0.8*(2*R)
@@ -34,7 +34,7 @@ dp = pmax - pmin
 
 n = 20
 partition = (n,n)
-bgmodel = TProductModel(pmin,pmax,partition)
+bgmodel = TProductDiscreteModel(pmin,pmax,partition)
 
 cutgeo = cut(bgmodel,geo)
 Ωbg = Triangulation(bgmodel)

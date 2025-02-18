@@ -20,7 +20,7 @@ export flatten
 include("FEM/DofMaps/DofMaps.jl")
 using ROM.DofMaps
 
-export TProductModel
+export TProductDiscreteModel
 export TProductFESpace
 
 include("FEM/TProduct/TProduct.jl")

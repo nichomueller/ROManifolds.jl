@@ -134,12 +134,8 @@ DofMaps.get_dof_map(s::GenericSnapshots) = s.dof_map
 get_realization(s::GenericSnapshots) = s.realization
 
 function get_indexed_data(s::GenericSnapshots{T}) where T
-  vi = vectorize(get_dof_map(s))
-  data = get_all_data(s)
-  if isnothing(findfirst(iszero,vi))
-    return view(data,vi,:)
-  end
   i = get_dof_map(s)
+  data = get_all_data(s)
   idata = zeros(T,size(data))
   for (j,ij) in enumerate(i)
     for k in 1:num_params(s)
@@ -241,7 +237,7 @@ Base.@propagate_inbounds function Base.setindex!(
   ) where {T,N}
 
   @boundscheck checkbounds(s,i...)
-  ispace...,iparam
+  ispace...,iparam = i
   iparam′ = getindex(param_indices(s),iparam)
   setindex!(s.snaps,v,ispace...,iparam′)
 end

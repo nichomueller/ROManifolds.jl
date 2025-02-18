@@ -348,16 +348,16 @@ function select_fe_space_at_indices(fs::TrivialParamFESpace,indices)
 end
 
 function select_fe_space_at_indices(fs::TrialParamFESpace,indices)
-  dvi = ConsecutiveParamArray(fs.dirichlet_values.data[:,indices])
+  dvi = ConsecutiveParamArray(view(fs.dirichlet_values.data,:,indices))
   TrialParamFESpace(dvi,fs.space)
 end
 
 function select_slvrcache_at_indices(b::ConsecutiveParamArray,indices)
-  ConsecutiveParamArray(b.data[:,indices])
+  ConsecutiveParamArray(view(b.data,:,indices))
 end
 
 function select_slvrcache_at_indices(A::ConsecutiveParamSparseMatrixCSC,indices)
-  ConsecutiveParamSparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,A.data[:,indices])
+  ConsecutiveParamSparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,view(A.data,:,indices))
 end
 
 function select_slvrcache_at_indices(A::BlockParamArray,indices)
@@ -384,7 +384,7 @@ function select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveParamVector}},p
   new_trial = ()
   for i = eachindex(trial)
     new_trial = (new_trial...,select_fe_space_at_indices(trial[i],indices))
-    new_XhF_i = ConsecutiveParamArray(us[i].data[:,indices])
+    new_XhF_i = ConsecutiveParamArray(view(us[i].data,:,indices))
     new_xhF = (new_xhF...,new_XhF_i)
   end
   new_odeopcache = ParamOpCache(new_trial,ptrial)
@@ -401,7 +401,7 @@ function select_evalcache_at_indices(us::Tuple{Vararg{BlockConsecutiveParamVecto
     style = spacei.multi_field_style
     spacesi = [select_fe_space_at_indices(spaceij,indices) for spaceij in spacei]
     new_trial = (new_trial...,MultiFieldFESpace(VT,spacesi,style))
-    new_XhF_i = mortar([ConsecutiveParamArray(us_i.data[:,indices]) for us_i in blocks(us[i])])
+    new_XhF_i = mortar([ConsecutiveParamArray(view(us_i.data,:,indices)) for us_i in blocks(us[i])])
     new_xhF = (new_xhF...,new_XhF_i)
   end
   new_odeopcache = ParamOpCache(new_trial,ptrial)
@@ -446,7 +446,7 @@ function RBSteady.select_at_indices(
     for (i,it) in enumerate(ids_time)
       ipt = ip+(it-1)*length(ids_param)
       v = get_entry(a,ids_space,ipt)
-      entries[:,i,ip] = v
+      @views entries[:,i,ip] = v
     end
   end
   return ConsecutiveParamArray(entries)

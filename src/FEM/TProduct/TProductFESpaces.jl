@@ -66,7 +66,7 @@ function TProductFESpace(
 end
 
 function univariate_spaces(
-  model::TProductModel,
+  model::TProductDiscreteModel,
   cell_reffes;
   dirichlet_tags=Int[],
   dirichlet_masks=nothing,

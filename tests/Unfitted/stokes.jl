@@ -6,8 +6,8 @@ using Serialization
 
 using ROM
 
-pranges = (1,10,-1,5,1,2)
-pspace = ParamSpace(pranges)
+pdomain = (1,10,-1,5,1,2)
+pspace = ParamSpace(pdomain)
 
 R = 0.3
 pmin = Point(0,0)
@@ -18,7 +18,7 @@ partition = (n,n)
 geo1 = disk(R,x0=Point(0.5,0.5))
 geo2 = ! geo1
 
-bgmodel = TProductModel(pmin,pmax,partition)
+bgmodel = TProductDiscreteModel(pmin,pmax,partition)
 labels = get_face_labeling(bgmodel)
 add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,7])
 

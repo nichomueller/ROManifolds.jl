@@ -25,7 +25,7 @@ function galerkin_projection(
 
   proj_basis = zeros(nleft,n,nright)
   @inbounds for i = 1:n
-    proj_basis[:,i,:] = basis_left'*param_getindex(basis,i)*basis_right
+    @views proj_basis[:,i,:] = basis_left'*param_getindex(basis,i)*basis_right
   end
 
   return proj_basis

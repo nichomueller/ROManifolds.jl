@@ -20,8 +20,15 @@ function RBSteady.galerkin_projection(
   proj_basis′ = copy(proj_basis)
 
   @inbounds for i = 1:nleft, k = 1:n, j = 1:nright
-    proj_basis[i,k,j] = sum(basis_left[:,i].*basis[:,k].*basis_right[:,j])
-    proj_basis′[i,k,j] = sum(basis_left[2:end,i].*basis[2:end,k].*basis_right[1:end-1,j])
+    s,s′ = 0,0
+    for α = axis(basis,1)
+      s += basis_left[α,i]*basis[α,k]*basis_right[α,j]
+      if α < size(basis,1)
+        s′ += basis_left[α+1,i]*basis[α+1,k]*basis_right[α,j]
+      end
+    end
+    proj_basis[i,k,j] = s
+    proj_basis′[i,k,j] = s′
   end
 
   combine(proj_basis,proj_basis′)

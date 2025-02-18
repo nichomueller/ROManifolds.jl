@@ -9,8 +9,8 @@ import Gridap.MultiField: BlockMultiFieldStyle
 
 include("ExamplesInterface.jl")
 
-pranges = (1,10,-1,5,1,2)
-pspace = ParamSpace(pranges)
+pdomain = (1,10,-1,5,1,2)
+pspace = ParamSpace(pdomain)
 
 R = 0.3
 pmin = Point(0,0)

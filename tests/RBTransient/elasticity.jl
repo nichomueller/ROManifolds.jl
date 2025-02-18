@@ -26,14 +26,14 @@ dt = 0.0025
 t0 = 0.0
 tf = 60*dt
 
-pranges = [[1,9]*1e10,[0.25,0.42],[-4,4]*1e5,[-4,4]*1e5,[-4,4]*1e5]
+pdomain = [[1,9]*1e10,[0.25,0.42],[-4,4]*1e5,[-4,4]*1e5,[-4,4]*1e5]
 tdomain = t0:dt:tf
-ptspace = TransientParamSpace(pranges,tdomain)
+ptspace = TransientParamSpace(pdomain,tdomain)
 
 n = 12
 domain = (0,1,0,1/3,0,1/3)
 partition = (n,floor(Int,n/3),floor(Int,n/3))
-model = TProductModel(domain,partition)
+model = TProductDiscreteModel(domain,partition)
 labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"dirichlet",[1,3,5,7,13,15,17,19,25])
 add_tag_from_tags!(labels,"neumann1",[22])

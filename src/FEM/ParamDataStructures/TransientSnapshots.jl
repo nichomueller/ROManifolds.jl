@@ -53,12 +53,8 @@ DofMaps.get_dof_map(s::TransientGenericSnapshots) = s.dof_map
 get_realization(s::TransientGenericSnapshots) = s.realization
 
 function get_indexed_data(s::TransientGenericSnapshots{T}) where T
-  vi = vectorize(get_dof_map(s))
-  data = get_all_data(s)
-  if isnothing(findfirst(iszero,vi))
-    return view(data,vi,:)
-  end
   i = get_dof_map(s)
+  data = get_all_data(s)
   idata = zeros(T,size(data))
   for (j,ij) in enumerate(i)
     for k in 1:num_params(s)*num_times(s)
