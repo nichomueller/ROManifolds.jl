@@ -1,12 +1,11 @@
+module DofMapTests
+
 using Gridap
 using GridapEmbedded
-using Gridap.MultiField
-using DrWatson
-using Serialization
-
 using ROM
 using ROM.DofMaps
 using ROM.TProduct
+using Test
 
 R = 0.3
 pmin = Point(0,0)
@@ -39,7 +38,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 2
 
@@ -53,7 +52,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 3
 
@@ -70,7 +69,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 4
 
@@ -84,7 +83,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 5
 
@@ -98,7 +97,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 6
 
@@ -112,7 +111,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 7
 
@@ -129,7 +128,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 8
 
@@ -143,7 +142,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 9
 
@@ -161,7 +160,7 @@ smap_act = get_sparse_dof_map(f_act,f_act,Γ)
 M = assemble_matrix(formΓ,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 10
 
@@ -175,7 +174,7 @@ smap_act = get_sparse_dof_map(f_act,f_act,Γ)
 M = assemble_matrix(formΓ,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 11
 
@@ -192,7 +191,7 @@ smap_act = get_sparse_dof_map(f_act,f_act,Γ)
 M = assemble_matrix(formΓ,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 12
 
@@ -206,7 +205,7 @@ smap_act = get_sparse_dof_map(f_act,f_act,Γ)
 M = assemble_matrix(formΓ,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # 3D
 
@@ -240,7 +239,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 2
 
@@ -254,7 +253,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 3
 
@@ -271,7 +270,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 4
 
@@ -285,7 +284,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 5
 
@@ -299,7 +298,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 6
 
@@ -313,7 +312,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 7
 
@@ -330,7 +329,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 8
 
@@ -344,7 +343,7 @@ smap_act = get_sparse_dof_map(f_act,f_act)
 M = assemble_matrix(form,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 9
 
@@ -362,7 +361,7 @@ smap_act = get_sparse_dof_map(f_act,f_act,Γ)
 M = assemble_matrix(formΓ,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 10
 
@@ -376,7 +375,7 @@ smap_act = get_sparse_dof_map(f_act,f_act,Γ)
 M = assemble_matrix(formΓ,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 11
 
@@ -393,7 +392,7 @@ smap_act = get_sparse_dof_map(f_act,f_act,Γ)
 M = assemble_matrix(formΓ,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
 
 # test 12
 
@@ -407,4 +406,6 @@ smap_act = get_sparse_dof_map(f_act,f_act,Γ)
 M = assemble_matrix(formΓ,f_act.space,f_act.space)
 smarray = DofMapArray(M,smap_act.d_sparse_dofs_to_full_dofs)
 
-norm(M) ≈ norm(smarray)
+@test norm(M) ≈ norm(smarray)
+
+end # module

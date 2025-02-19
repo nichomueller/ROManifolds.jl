@@ -23,7 +23,7 @@ end
 
 # somewhat arbitrary
 function _size_cond(A::AbstractMatrix)
-  length(A) > 1e6 && (size(A,1) > 1e2*size(A,2) || size(A,2) > 1e2*size(A,1))
+  length(A) > 1e5 && (size(A,1) > 1e2*size(A,2) || size(A,2) > 1e2*size(A,1))
 end
 
 function _cholesky_decomp(X::AbstractSparseMatrix)
@@ -99,7 +99,7 @@ function truncated_svd(red_style::FixedSVDRank,A::AbstractMatrix;issquare=false)
 end
 
 function truncated_svd(red_style::LRApproxRank,A::AbstractMatrix;kwargs...)
-  psvd(A,red_style.opts)
+  iszero(A) ? truncated_svd(FixedSVDRank(1),A;kwargs...) : psvd(A,red_style.opts)
 end
 
 """
@@ -226,7 +226,8 @@ function ttsvd(
   for d in 1:N-1
     cur_core,cur_remainder = ttsvd_loop(red_style[d],remainder)
     oldrank = size(cur_core,3)
-    remainder::Array{T,3} = reshape(cur_remainder,oldrank,size(A,d+1),:)
+    # remainder::Array{T,3} = reshape(cur_remainder,oldrank,size(A,d+1),:)
+    remainder = reshape(cur_remainder,oldrank,size(A,d+1),:)
     push!(cores,cur_core)
   end
   return cores,remainder

@@ -166,13 +166,27 @@ function get_param_data(s::TransientSnapshotsAtIndices)
 end
 
 function get_indexed_data(s::TransientSnapshotsAtIndices{T}) where T
-  prange = param_indices(s)
-  trange = time_indices(s)
-  np = _num_all_params(s)
-  ptrange = range_1d(prange,trange,np)
-  idata = get_indexed_data(s.snaps)
-  vidata = view(idata,:,ptrange)
-  ConsecutiveParamArray(vidata)
+  # prange = param_indices(s)
+  # trange = time_indices(s)
+  # np = _num_all_params(s)
+  # ptrange = range_1d(prange,trange,np)
+  # idata = get_indexed_data(s.snaps)
+  # vidata = view(idata,:,ptrange)
+  # ConsecutiveParamArray(vidata)
+  i = get_dof_map(s)
+  data = get_all_data(s)
+  idata = zeros(T,num_space_dofs(s),num_times(s)*num_params(s))
+  for kp in param_indices(s)
+    for kt in time_indices(s)
+      k = (kt-1)*np+kp
+      for (j,ij) in enumerate(i)
+        if ij > 0
+          @inbounds idata[ij,k] = data[j,k]
+        end
+      end
+    end
+  end
+  return idata
 end
 
 Base.@propagate_inbounds function Base.getindex(
@@ -252,6 +266,10 @@ end
 
 Base.size(s::TransientReshapedSnapshots) = s.size
 
+function Base.reshape(s::TransientReshapedSnapshots,dims::Dims)
+  reshape(s.snaps,dims)
+end
+
 function Base.reshape(s::TransientSnapshots,dims::Dims)
   n = length(s)
   prod(dims) == n || DimensionMismatch()
@@ -296,6 +314,7 @@ end
 
 function get_indexed_data(s::TransientReshapedSnapshots)
   v = get_indexed_data(s.snaps)
+  println(which(get_indexed_data,typeof.((s.snaps,))))
   vr = reshape(v.data,s.size)
   ConsecutiveParamArray(vr)
 end

@@ -213,9 +213,17 @@ function get_param_data(s::SnapshotsAtIndices)
 end
 
 function get_indexed_data(s::SnapshotsAtIndices)
-  idata = get_indexed_data(s.snaps)
-  vidata = view(idata,:,param_indices(s))
-  ConsecutiveParamArray(vidata)
+  i = get_dof_map(s)
+  data = get_all_data(s)
+  idata = zeros(T,num_space_dofs(s),num_params(s))
+  for (j,ij) in enumerate(i)
+    for k in param_indices(s)
+      if ij > 0
+        @inbounds idata[ij,k] = data[j,k]
+      end
+    end
+  end
+  return idata
 end
 
 get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
@@ -287,6 +295,10 @@ end
 
 Base.size(s::ReshapedSnapshots) = s.size
 
+function Base.reshape(s::ReshapedSnapshots,dims::Dims)
+  reshape(s.snaps,dims)
+end
+
 function Base.reshape(s::Snapshots,dims::Dims)
   n = length(s)
   prod(dims) == n || DimensionMismatch()
@@ -331,8 +343,7 @@ end
 
 function get_indexed_data(s::ReshapedSnapshots)
   v = get_indexed_data(s.snaps)
-  vr = reshape(v.data,s.size)
-  ConsecutiveParamArray(vr)
+  reshape(v.data,s.size)
 end
 
 # sparse interface

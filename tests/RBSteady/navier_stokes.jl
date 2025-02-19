@@ -4,7 +4,6 @@ using Gridap
 using Gridap.MultiField
 using GridapSolvers
 using GridapSolvers.NonlinearSolvers
-
 using ROM
 
 import Gridap.FESpaces: NonlinearFESolver

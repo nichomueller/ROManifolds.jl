@@ -337,7 +337,7 @@ function Reduction(red_style::TTSVDRanks,args...;kwargs...)
   TTSVDReduction(red_style,args...;kwargs...)
 end
 
-function Reduction(tolrank,args...;nparams=50,kwargs...)
+function Reduction(tolrank::Union{Float64,Int,AbstractVector},args...;nparams=50,kwargs...)
   red_style = ReductionStyle(tolrank;kwargs...)
   Reduction(red_style,args...;nparams)
 end
