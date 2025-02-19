@@ -21,7 +21,7 @@ function RBSteady.galerkin_projection(
 
   @inbounds for i = 1:nleft, k = 1:n, j = 1:nright
     s,s′ = 0,0
-    for α = axis(basis,1)
+    for α = axes(basis,1)
       s += basis_left[α,i]*basis[α,k]*basis_right[α,j]
       if α < size(basis,1)
         s′ += basis_left[α+1,i]*basis[α+1,k]*basis_right[α,j]

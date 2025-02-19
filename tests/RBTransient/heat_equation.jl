@@ -1,4 +1,4 @@
-module PoissonEquation
+module HeatEquation
 
 using Gridap
 using Test
@@ -14,7 +14,7 @@ tol_or_rank(tol,rank::Int) = rank
 function main(
   method=:pod;
   tol=1e-4,rank=nothing,nparams=50,nparams_res=floor(Int,nparams/3),
-  nparams_jac=floor(Int,nparams/4),sketch=:sprn
+  nparams_jac=floor(Int,nparams/4),nparams_djac=1,sketch=:sprn,unsafe=false
   )
 
   @assert method ∈ (:pod,:ttsvd) "Unrecognized reduction method! Should be one of (:pod,:ttsvd)"
@@ -29,15 +29,12 @@ function main(
   end
 
   order = 1
-  degree = 2
+  degree = 2*order
 
   Ω = Triangulation(model)
   dΩ = Measure(Ω,degree)
   Γn = BoundaryTriangulation(model,tags=[8])
   dΓn = Measure(Γn,degree)
-
-  order = 1
-  degree = 2*order
 
   a(μ,t) = x -> 1+exp(-sin(t)^2*x[1]/sum(μ))
   aμt(μ,t) = TransientParamFunction(a,μ,t)
@@ -74,28 +71,29 @@ function main(
 
   tolrank = tol_or_rank(tol,rank)
   if method == :pod
-    state_reduction = PODReduction(tolrank,energy;nparams,sketch)
+    state_reduction = TransientReduction(tolrank,energy;nparams,sketch)
   else method == :ttsvd
-    tolranks = fill(tolrank,3)
-    state_reduction = Reduction(tolranks,energy;nparams)
+    tolranks = fill(tolrank,4)
+    state_reduction = TTSVDReduction(tolranks,energy;nparams,unsafe)
   end
 
   θ = 0.5
   dt = 0.01
   t0 = 0.0
   tf = 10*dt
+  tdomain = t0:dt:tf
 
   fesolver = ThetaMethod(LUSolver(),dt,θ)
-  rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
+  rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac,nparams_djac)
 
-  pspace_uniform = ParamSpace(pdomain;sampling=:uniform)
+  ptspace_uniform = TransientParamSpace(pdomain,tdomain;sampling=:uniform)
   feop_uniform = TransientParamLinearFEOperator((stiffness,mass),res,ptspace_uniform,trial,test,domains)
   μon = realization(feop_uniform;nparams=10)
   x,festats = solution_snapshots(rbsolver,feop_uniform,μon,uh0μ)
 
   for sampling in (:uniform,:halton,:latin_hypercube,:tensorial_uniform)
     println("Running $method test with sampling strategy $sampling")
-    pspace = ParamSpace(pdomain;sampling)
+    ptspace = TransientParamSpace(pdomain,tdomain;sampling)
     feop = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,trial,test,domains)
 
     fesnaps, = solution_snapshots(rbsolver,feop,uh0μ)

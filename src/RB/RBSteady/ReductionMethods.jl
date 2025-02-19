@@ -54,12 +54,12 @@ struct LRApproxRank <: ReductionStyle
 end
 
 function LRApproxRank(tol::Float64;maxdet_tol=0.,sketch_randn_niter=1,sketch=:sprn,kwargs...)
-  opts = LRAOptions(;rtol=tol,maxdet_tol,sketch_randn_niter,sketch,kwargs...)
+  opts = LRAOptions(;rtol=tol,maxdet_tol,sketch_randn_niter,sketch)
   return LRApproxRank(opts)
 end
 
 function LRApproxRank(rank::Int;maxdet_tol=0.,sketch_randn_niter=1,sketch=:sprn,kwargs...)
-  opts = LRAOptions(;rank=rank,maxdet_tol,sketch_randn_niter,sketch,kwargs...)
+  opts = LRAOptions(;rank=rank,maxdet_tol,sketch_randn_niter,sketch)
   return LRApproxRank(opts)
 end
 
@@ -97,7 +97,7 @@ const SafeTTSVDRanks = TTSVDRanks{SafeTTSVD}
 const UnsafeTTSVDRanks = TTSVDRanks{UnsafeTTSVD}
 
 function TTSVDRanks(tolranks::Vector{<:Union{Float64,Int}},args...;unsafe=false,kwargs...)
-  style = map(tolrank -> ReductionStyle(tolrank,args...;kwargs...),tolranks)
+  style = map(tolrank -> ReductionStyle(tolrank,args...),tolranks)
   TTSVDRanks(style,TTSVDStyle(Val(unsafe)))
 end
 
@@ -271,19 +271,14 @@ function TTSVDReduction(red_style::ReductionStyle,norm_style::NormStyle=Euclidea
   TTSVDReduction(red_style,norm_style,nparams)
 end
 
-function TTSVDReduction(red_style::ReductionStyle,norm_op::Function;kwargs...)
+function TTSVDReduction(red_style::ReductionStyle,norm_op::Function;nparams=50,kwargs...)
   norm_style = EnergyNorm(norm_op)
-  TTSVDReduction(red_style,norm_style;kwargs...)
+  TTSVDReduction(red_style,norm_style;nparams)
 end
 
-function TTSVDReduction(tolranks::Union{Vector{Float64},Vector{Int}},args...;kwargs...)
-  red_style = TTSVDRanks(tolranks)
-  TTSVDReduction(red_style,args...;kwargs...)
-end
-
-function TTSVDReduction(tolrank::Union{Float64,Int},args...;D=3,kwargs...)
-  red_style = TTSVDRanks(tolrank;D)
-  TTSVDReduction(red_style,args...;kwargs...)
+function TTSVDReduction(tolrank,args...;nparams=50,kwargs...)
+  red_style = TTSVDRanks(tolrank;kwargs...)
+  TTSVDReduction(red_style,args...;nparams)
 end
 
 Base.size(r::TTSVDReduction) = (length(r.tols),)

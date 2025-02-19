@@ -471,9 +471,10 @@ end
 function TransientParamSpace(
   param_domain::Union{Tuple,AbstractVector},
   temporal_domain::AbstractVector{<:Real},
-  args...)
+  args...;
+  kwargs...)
 
-  parametric_space = ParamSpace(param_domain,args...)
+  parametric_space = ParamSpace(param_domain,args...;kwargs...)
   TransientParamSpace(parametric_space,temporal_domain)
 end
 

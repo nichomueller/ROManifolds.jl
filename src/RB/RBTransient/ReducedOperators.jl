@@ -357,7 +357,7 @@ function select_slvrcache_at_indices(b::ConsecutiveParamArray,indices)
 end
 
 function select_slvrcache_at_indices(A::ConsecutiveParamSparseMatrixCSC,indices)
-  ConsecutiveParamSparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,view(A.data,:,indices))
+  ConsecutiveParamSparseMatrixCSC(A.m,A.n,A.colptr,A.rowval,A.data[:,indices])
 end
 
 function select_slvrcache_at_indices(A::BlockParamArray,indices)

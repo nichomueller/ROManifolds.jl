@@ -171,7 +171,8 @@ function get_indexed_data(s::TransientSnapshotsAtIndices{T}) where T
   np = _num_all_params(s)
   ptrange = range_1d(prange,trange,np)
   idata = get_indexed_data(s.snaps)
-  view(idata,:,ptrange)
+  vidata = view(idata,:,ptrange)
+  ConsecutiveParamArray(vidata)
 end
 
 Base.@propagate_inbounds function Base.getindex(
@@ -213,6 +214,23 @@ end
 
 function select_snapshots(s::TransientSnapshots,prange;trange=1:num_times(s))
   select_snapshots(s,trange,prange)
+end
+
+# trivial dimensions
+
+function select_snapshots(s::TransientSnapshots{T,N},trange::Integer,prange) where {T,N}
+  srange = select_snapshots(s,format_range(trange,num_times(s)),prange)
+  dropdims(srange;dims=N-1)
+end
+
+function select_snapshots(s::TransientSnapshots{T,N},trange,prange::Integer) where {T,N}
+  srange = select_snapshots(s,trange,format_range(prange,num_params(s)))
+  dropdims(srange;dims=N)
+end
+
+function select_snapshots(s::TransientSnapshots{T,N},trange::Integer,prange::Integer) where {T,N}
+  srange = select_snapshots(s,format_range(trange,num_times(s)),format_range(prange,num_params(s)))
+  dropdims(srange;dims=(N-1,N))
 end
 
 """

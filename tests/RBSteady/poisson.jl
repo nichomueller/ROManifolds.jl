@@ -14,7 +14,7 @@ tol_or_rank(tol,rank::Int) = rank
 function main(
   method=:pod;
   tol=1e-4,rank=nothing,nparams=50,nparams_res=floor(Int,nparams/3),
-  nparams_jac=floor(Int,nparams/4),sketch=:sprn
+  nparams_jac=floor(Int,nparams/4),sketch=:sprn,unsafe=false
   )
 
   @assert method ∈ (:pod,:ttsvd) "Unrecognized reduction method! Should be one of (:pod,:ttsvd)"
@@ -29,15 +29,12 @@ function main(
   end
 
   order = 1
-  degree = 2
+  degree = 2*order
 
   Ω = Triangulation(model)
   dΩ = Measure(Ω,degree)
   Γn = BoundaryTriangulation(model,tags=[8])
   dΓn = Measure(Γn,degree)
-
-  order = 1
-  degree = 2*order
 
   a(μ) = x -> exp(-x[1]/sum(μ))
   aμ(μ) = ParamFunction(a,μ)
@@ -70,7 +67,7 @@ function main(
     state_reduction = PODReduction(tolrank,energy;nparams,sketch)
   else method == :ttsvd
     tolranks = fill(tolrank,3)
-    state_reduction = Reduction(tolranks,energy;nparams)
+    state_reduction = Reduction(tolranks,energy;nparams,unsafe)
   end
 
   fesolver = LinearFESolver(LUSolver())

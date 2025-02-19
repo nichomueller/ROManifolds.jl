@@ -214,7 +214,8 @@ end
 
 function get_indexed_data(s::SnapshotsAtIndices)
   idata = get_indexed_data(s.snaps)
-  view(idata,:,param_indices(s))
+  vidata = view(idata,:,param_indices(s))
+  ConsecutiveParamArray(vidata)
 end
 
 get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
@@ -258,6 +259,13 @@ entries intact. The restriction operation is lazy.
 function select_snapshots(s::SteadySnapshots,prange)
   prange = format_range(prange,num_params(s))
   SnapshotsAtIndices(s,prange)
+end
+
+# trivial dimensions
+
+function select_snapshots(s::SteadySnapshots{T,N},prange::Integer) where {T,N}
+  srange = SnapshotsAtIndices(s,format_range(prange,num_params(s)))
+  dropdims(srange;dims=N)
 end
 
 """
@@ -323,7 +331,8 @@ end
 
 function get_indexed_data(s::ReshapedSnapshots)
   v = get_indexed_data(s.snaps)
-  reshape(v,s.size)
+  vr = reshape(v.data,s.size)
+  ConsecutiveParamArray(vr)
 end
 
 # sparse interface
