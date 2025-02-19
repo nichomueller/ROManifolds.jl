@@ -132,18 +132,6 @@ function DofMaps.get_dof_map(V::TProductFESpace,args...)
   get_tp_dof_map(T,V,args...)
 end
 
-function DofMaps.OrderedFEFunction(f::TProductFESpace,fv,dv)
-  OrderedFEFunction(f.space,fv,dv)
-end
-
-function DofMaps.scatter_ordered_free_and_dirichlet_values(f::TProductFESpace,fv,dv)
-  scatter_ordered_free_and_dirichlet_values(f.space,fv,dv)
-end
-
-function DofMaps.gather_ordered_free_and_dirichlet_values!(fv,dv,f::TProductFESpace,cv)
-  gather_ordered_free_and_dirichlet_values!(fv,dv,f.space,cv)
-end
-
 function get_tp_dof_map(::Type{T},V::TProductFESpace,args...) where T
   dof_map = get_dof_map(V.space,args...)
   nnodes_1d = map(num_free_dofs,V.spaces_1d)

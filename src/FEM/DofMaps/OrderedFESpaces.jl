@@ -48,16 +48,16 @@ FESpaces.get_dirichlet_dof_tag(f::OrderedFESpace) = get_dirichlet_dof_tag(get_fe
 
 FESpaces.get_vector_type(f::OrderedFESpace) = get_vector_type(get_fe_space(f))
 
-# the cell values are not reordered in a OrderedFESpace; for reordered cell values,
-# use the function scatter_ordered_free_and_dirichlet_values
 function FESpaces.scatter_free_and_dirichlet_values(f::OrderedFESpace,fv,dv)
-  scatter_free_and_dirichlet_values(get_fe_space(f),fv,dv)
+  scatter_ordered_free_and_dirichlet_values(f,fv,dv)
 end
 
-# the cell values are not reordered in a OrderedFESpace; for reordered cell values,
-# use the function gather_ordered_free_and_dirichlet_values!
 function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv)
-  gather_free_and_dirichlet_values!(fv,dv,get_fe_space(f),cv)
+  gather_ordered_free_and_dirichlet_values!(fv,dv,f,cv)
+end
+
+function FESpaces.FEFunction(f::OrderedFESpace,fv::AbstractVector,dv::AbstractVector)
+  OrderedFEFunction(f,fv,dv)
 end
 
 function get_dof_map(f::OrderedFESpace,args...)
@@ -367,31 +367,15 @@ _remove_constraint(f::FESpaceWithLinearConstraints) = f.space
 _remove_constraint(f::FESpaceWithConstantFixed) = f.space
 _remove_constraint(f::ZeroMeanFESpace) = _remove_constraint(f.space)
 
-# use the following are useful to correctly visualize a function on a OrderedFESpace
-
 """
     OrderedFEFunction(f::OrderedFESpace,fv,dv) -> FEFunction
 
-Returns a `FEFunction` with correctly ordered values. Allows, for instance, to
-correctly visualize a solution belonging to `f`
+Returns a `FEFunction` with correctly ordered values
 """
 function OrderedFEFunction(f::OrderedFESpace,fv,dv)
   cell_vals = scatter_ordered_free_and_dirichlet_values(f,fv,dv)
   cell_field = CellField(f,cell_vals)
   SingleFieldFEFunction(cell_field,cell_vals,fv,dv,f)
-end
-
-function OrderedFEFunction(f::SingleFieldFESpace,fv)
-  dv = get_dirichlet_dof_values(f)
-  OrderedFEFunction(f,fv,dv)
-end
-
-function OrderedFEFunction(f::MultiFieldFESpace,fv)
-  blocks = map(1:length(f.spaces)) do i
-    fv_i = restrict_to_field(f,fv,i)
-    OrderedFEFunction(f.spaces[i],fv_i)
-  end
-  MultiFieldFEFunction(fv,f,blocks)
 end
 
 """
@@ -411,7 +395,7 @@ end
 Gathers correctly ordered free and dirichlet values
 """
 function gather_ordered_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv)
-  cell_ovals = cell_value_to_ovalue(get_fe_space(f),cv)
+  cell_ovals = cell_value_to_ovalue(f,cv)
   cell_dofs = get_cell_dof_ids(f)
   cache_vals = array_cache(cell_ovals)
   cache_dofs = array_cache(cell_dofs)

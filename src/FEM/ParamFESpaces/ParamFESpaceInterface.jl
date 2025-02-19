@@ -218,21 +218,7 @@ function FESpaces.gather_free_and_dirichlet_values!(
   f::SingleFieldParamFESpace{<:UnconstrainedFESpace},
   cell_vals)
 
-  cell_dofs = get_cell_dof_ids(f)
-  cache_vals = array_cache(cell_vals)
-  cache_dofs = array_cache(cell_dofs)
-  cells = 1:length(cell_vals)
-
-  FESpaces._free_and_dirichlet_values_fill!(
-    free_vals,
-    dirichlet_vals,
-    cache_vals,
-    cache_dofs,
-    cell_vals,
-    cell_dofs,
-    cells)
-
-  (free_vals,dirichlet_vals)
+  gather_free_and_dirichlet_values!(free_vals,dirichlet_vals,get_fe_space(f),cell_vals)
 end
 
 function FESpaces.gather_free_and_dirichlet_values!(
@@ -458,20 +444,144 @@ function FESpaces._setup_mdof_to_val!(
 
 end
 
+# ordered spaces
+
+get_fe_space2(pf::SingleFieldParamFESpace{<:OrderedFESpace}) = get_fe_space(get_fe_space(pf))
+
+function FESpaces.FEFunction(
+  pf::SingleFieldParamFESpace{<:OrderedFESpace{<:ZeroMeanFESpace}},
+  free_values::AbstractParamVector,
+  dirichlet_values::AbstractParamVector)
+
+  f = get_fe_space2(pf)
+  pf′ = remove_layer(pf)
+  c = FESpaces._compute_new_fixedval(
+    free_values,
+    dirichlet_values,
+    f.vol_i,
+    f.vol,
+    f.space.dof_to_fix
+  )
+  fv = free_values + c
+  dv = dirichlet_values + c
+  FEFunction(pf′,fv,dv)
+end
+
+function FESpaces.EvaluationFunction(
+  pf::SingleFieldParamFESpace{<:OrderedFESpace{<:ZeroMeanFESpace}},
+  free_values::AbstractParamVector)
+
+  pf′ = remove_layer(pf)
+  FEFunction(pf′,free_values)
+end
+
+function FESpaces.scatter_free_and_dirichlet_values(
+  of::OrderedFESpace{<:FESpaceWithConstantFixed{FESpaces.FixConstant}},
+  fv::AbstractParamVector,
+  dv::AbstractParamVector
+  )
+
+  @assert innerlength(dv) == 1
+  f = get_fe_space(of)
+  of′ = remove_layer(of)
+  _dv = similar(dv,eltype(dv),0)
+  _fv = ParamVectorWithEntryInserted(fv,f.dof_to_fix,get_param_entry(dv,1))
+  scatter_free_and_dirichlet_values(of′,_fv,_dv)
+end
+
+function FESpaces.scatter_free_and_dirichlet_values(
+  of::OrderedFESpace{<:FESpaceWithConstantFixed{FESpaces.DoNotFixConstant}},
+  fv::AbstractParamVector,
+  dv::AbstractParamVector
+  )
+
+  @assert innerlength(dv) == 0
+  of′ = remove_layer(of)
+  scatter_free_and_dirichlet_values(of′,fv,dv)
+end
+
+function FESpaces.scatter_free_and_dirichlet_values(
+  pf::SingleFieldParamFESpace{<:OrderedFESpace{<:FESpaceWithLinearConstraints}},
+  fmdof_to_val::AbstractParamVector,
+  dmdof_to_val::AbstractParamVector)
+
+  f = get_fe_space2(pf)
+  pf′ = remove_layer(pf)
+  fdof_to_val = zero_free_values(pf′)
+  ddof_to_val = zero_dirichlet_values(pf′)
+  FESpaces._setup_dof_to_val!(
+    fdof_to_val,
+    ddof_to_val,
+    fmdof_to_val,
+    dmdof_to_val,
+    f.DOF_to_mDOFs,
+    f.DOF_to_coeffs,
+    f.n_fdofs,
+    f.n_fmdofs)
+  scatter_free_and_dirichlet_values(pf′,fdof_to_val,ddof_to_val)
+end
+
+function FESpaces.gather_free_and_dirichlet_values(
+  pf::SingleFieldParamFESpace{<:OrderedFESpace{<:FESpaceWithConstantFixed{T}}},
+  cv) where T<:FESpaces.FixConstant
+
+  f = get_fe_space2(pf)
+  pf′ = remove_layer(pf)
+  _fv,_dv = gather_free_and_dirichlet_values(pf′,cv)
+  @assert innerlength(_dv) == 0
+  fv = ParamVectorWithEntryRemoved(_fv,f.dof_to_fix)
+  dv = get_param_entry(_fv,f.dof_to_fix:f.dof_to_fix)
+  (fv,dv)
+end
+
+function FESpaces.gather_free_and_dirichlet_values!(
+  free_vals::AbstractParamVector,
+  dirichlet_vals::AbstractParamVector,
+  f::SingleFieldParamFESpace{<:OrderedFESpace},
+  cell_vals)
+
+  gather_free_and_dirichlet_values!(free_vals,dirichlet_vals,get_fe_space(f),cell_vals)
+end
+
+function FESpaces.gather_free_and_dirichlet_values!(
+  fv::AbstractParamVector,
+  dv::AbstractParamVector,
+  pf::SingleFieldParamFESpace{<:OrderedFESpace{<:FESpaceWithConstantFixed{T}}},
+  cv) where T<:FESpaces.FixConstant
+
+  @assert innerlength(dv) == 1
+  f = get_fe_space2(pf)
+  pf′ = remove_layer(pf)
+  _dv = similar(dv,eltype(dv),0)
+  _fv = ParamVectorWithEntryInserted(fv,f.dof_to_fix,zeros(eltype2(fv),param_length(fv)))
+  gather_free_and_dirichlet_values!(_fv,_dv,pf′,cv)
+  dv.data[1,:] = _fv.value
+  (fv,dv)
+end
+
+function FESpaces.gather_free_and_dirichlet_values!(
+  fmdof_to_val,
+  dmdof_to_val,
+  pf::SingleFieldParamFESpace{<:OrderedFESpace{<:FESpaceWithLinearConstraints}},
+  cell_to_ludof_to_val)
+
+  f = get_fe_space2(pf)
+  pf′ = remove_layer(pf)
+  fdof_to_val,ddof_to_val = gather_free_and_dirichlet_values(pf′,cell_to_ludof_to_val)
+  FESpaces._setup_mdof_to_val!(
+    fmdof_to_val,
+    dmdof_to_val,
+    fdof_to_val,
+    ddof_to_val,
+    f.mDOF_to_DOF,
+    f.n_fdofs,
+    f.n_fmdofs)
+  fmdof_to_val,dmdof_to_val
+end
+
 # utils
 
-remove_layer(f::SingleFieldParamFESpace) = @abstractmethod
-
-function DofMaps.OrderedFEFunction(f::SingleFieldParamFESpace{<:OrderedFESpace},fv,dv)
-  cell_vals = scatter_ordered_free_and_dirichlet_values(f,fv,dv)
-  cell_field = CellField(f,cell_vals)
-  SingleFieldFEFunction(cell_field,cell_vals,fv,dv,f)
-end
-
-function DofMaps.scatter_ordered_free_and_dirichlet_values(f::SingleFieldParamFESpace{<:OrderedFESpace},fv,dv)
-  scatter_ordered_free_and_dirichlet_values(get_fe_space(f),fv,dv)
-end
-
-function DofMaps.gather_ordered_free_and_dirichlet_values!(fv,dv,f::SingleFieldParamFESpace{<:OrderedFESpace},cv)
-  gather_ordered_free_and_dirichlet_values!(fv,dv,get_fe_space(f),cv)
-end
+remove_layer(f::SingleFieldFESpace) = @abstractmethod
+remove_layer(f::SingleFieldParamFESpace{<:UnconstrainedFESpace}) = f
+remove_layer(f::SingleFieldParamFESpace{<:CartesianFESpace{<:UnconstrainedFESpace}}) = f
+remove_layer(f::CartesianFESpace) = CartesianFESpace(f.space.space,f.cell_odofs_ids,f.bg_odofs_to_act_odofs)

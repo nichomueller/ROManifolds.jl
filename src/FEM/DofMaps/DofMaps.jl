@@ -71,9 +71,6 @@ include("OrderingMaps.jl")
 export OrderedFESpace
 export CartesianFESpace
 export OrderedFEFunction
-export get_cell_odof_ids
-export scatter_ordered_free_and_dirichlet_values
-export gather_ordered_free_and_dirichlet_values!
 include("OrderedFESpaces.jl")
 
 end # module

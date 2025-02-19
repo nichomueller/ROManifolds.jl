@@ -116,9 +116,12 @@ function Arrays.return_cache(k::OReindex,values::AbstractParamVector)
   v = testitem(values)
   c = return_cache(k,v)
   a = evaluate!(c,k,v)
-  c = fill(c,param_length(values))
   data = param_array(a,param_length(values);style=MemoryLayoutStyle(values))
-  c,data
+  cache = Vector{typeof(c)}(undef,param_length(values))
+  for i = param_eachindex(values)
+    cache[i] = return_cache(k,param_getindex(values,i))
+  end
+  cache,data
 end
 
 function Arrays.evaluate!(cache,k::OReindex,values::AbstractParamVector)

@@ -88,4 +88,4 @@ end
 # utils
 
 remove_layer(f::TrialParamFESpace) = TrialParamFESpace(f.dirichlet_values,f.space.space)
-remove_layer(f::TrialParamFESpace{<:UnconstrainedFESpace}) = f
+remove_layer(f::TrialParamFESpace{<:OrderedFESpace}) = TrialParamFESpace(f.dirichlet_values,remove_layer(f))
