@@ -193,6 +193,22 @@ end
 FESpaces.get_fe_space(r::MultiFieldRBSpace) = r.space
 get_reduced_subspace(r::MultiFieldRBSpace) = r.subspace
 
+function Base.getindex(r::MultiFieldRBSpace,i::Integer)
+  mfe = get_fe_space(r)
+  rsp = get_reduced_subspace(r)
+  return reduced_subspace(mfe.spaces[i],rsp[i])
+end
+
+function Base.iterate(r::MultiFieldRBSpace,state=1)
+  if state > num_fields(r)
+    return nothing
+  end
+  mfe = get_fe_space(r)
+  rsp = get_reduced_subspace(r)
+  ri = reduced_subspace(mfe[state],rsp[state])
+  return ri,state+1
+end
+
 function Arrays.evaluate(r::RBSpace,args...)
   space = evaluate(get_fe_space(r),args...)
   subspace = reduced_subspace(space,get_reduced_subspace(r))
@@ -218,24 +234,18 @@ get_reduced_subspace(r::EvalRBSpace) = get_reduced_subspace(r.space)
 
 ParamDataStructures.param_length(r::EvalRBSpace) = num_params(r.realization)
 
+Base.getindex(r::EvalRBSpace{MultiFieldRBSpace},i::Integer) = EvalRBSpace(r.space[i],r.realization)
+
+function Base.iterate(r::EvalRBSpace{MultiFieldRBSpace},state=1)
+  if state > num_fields(r)
+    return nothing
+  end
+  ri = EvalRBSpace(iterate(r.space,state),r.realization)
+  return ri,state+1
+end
+
 for T in (:MultiFieldRBSpace,:(EvalRBSpace{MultiFieldRBSpace}))
   @eval begin
-    function Base.getindex(r::$T,i::Integer)
-      mfe = get_fe_space(r)
-      rsp = get_reduced_subspace(r)
-      return reduced_subspace(mfe.spaces[i],rsp[i])
-    end
-
-    function Base.iterate(r::$T,state=1)
-      mfe = get_fe_space(r)
-      rsp = get_reduced_subspace(r)
-      if state > num_fields(r)
-        return nothing
-      end
-      ri = reduced_subspace(mfe[state],rsp[state])
-      return ri,state+1
-    end
-
     MultiField.MultiFieldStyle(r::$T) = MultiFieldStyle(get_fe_space(r))
     MultiField.num_fields(r::$T) = num_fields(get_fe_space(r))
     Base.length(r::$T) = num_fields(r)

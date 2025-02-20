@@ -83,8 +83,6 @@ end
 Base.size(a::SparseCoreCSC) = size(a.array)
 Base.getindex(a::SparseCoreCSC,i::Vararg{Integer,3}) = getindex(a.array,i...)
 
-num_space_dofs(a::SparseCoreCSC) = DofMaps.num_rows(a.sparsity)*DofMaps.num_cols(a.sparsity)
-
 to_4d_core(a::SparseCoreCSC) = SparseCoreCSC4D(a)
 
 """

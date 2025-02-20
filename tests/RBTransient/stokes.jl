@@ -55,10 +55,10 @@ function main(
   energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6,7])
+  test_u = TestFESpace(Ω,reffe_u;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6,7])
   trial_u = TransientTrialParamFESpace(test_u,gμt)
   reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-  test_p = TestFESpace(model,reffe_p;conformity=:C0)
+  test_p = TestFESpace(Ω,reffe_p;conformity=:H1)
   trial_p = TransientTrialParamFESpace(test_p)
   test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
   trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -104,7 +104,7 @@ function main(
 
 end
 
-main(:pod)
+# main(:pod)
 main(:ttsvd)
 
 end

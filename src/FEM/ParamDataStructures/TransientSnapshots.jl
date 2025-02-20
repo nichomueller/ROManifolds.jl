@@ -17,7 +17,7 @@ abstract type TransientSnapshots{T,N,D,I,R<:TransientRealization,A} <: Snapshots
 
 num_times(s::TransientSnapshots) = num_times(get_realization(s))
 
-Base.size(s::TransientSnapshots) = (num_space_dofs(s)...,num_times(s),num_params(s))
+Base.size(s::TransientSnapshots) = (space_dofs(s)...,num_times(s),num_params(s))
 
 get_initial_data(s::TransientSnapshots) = @abstractmethod
 
@@ -56,10 +56,10 @@ function get_indexed_data(s::TransientGenericSnapshots{T}) where T
   i = get_dof_map(s)
   data = get_all_data(s)
   idata = zeros(T,size(data))
-  for (j,ij) in enumerate(i)
-    for k in 1:num_params(s)*num_times(s)
-      if ij > 0
-        @inbounds idata[ij,k] = data[j,k]
+  for ipt in 1:num_params(s)*num_times(s)
+    for (ij,j) in enumerate(i)
+      if j > 0
+        @inbounds idata[ij,ipt] = data[j,ipt]
       end
     end
   end
@@ -166,22 +166,16 @@ function get_param_data(s::TransientSnapshotsAtIndices)
 end
 
 function get_indexed_data(s::TransientSnapshotsAtIndices{T}) where T
-  # prange = param_indices(s)
-  # trange = time_indices(s)
-  # np = _num_all_params(s)
-  # ptrange = range_1d(prange,trange,np)
-  # idata = get_indexed_data(s.snaps)
-  # vidata = view(idata,:,ptrange)
-  # ConsecutiveParamArray(vidata)
   i = get_dof_map(s)
   data = get_all_data(s)
   idata = zeros(T,num_space_dofs(s),num_times(s)*num_params(s))
-  for kp in param_indices(s)
-    for kt in time_indices(s)
-      k = (kt-1)*np+kp
-      for (j,ij) in enumerate(i)
-        if ij > 0
-          @inbounds idata[ij,k] = data[j,k]
+  for (it,t) in enumerate(time_indices(s))
+    for (ip,p) in enumerate(param_indices(s))
+      ipt = (it-1)*num_params(s)+ip
+      pt = (t-1)*_num_all_params(s)+p
+      for (ij,j) in enumerate(i)
+        if j > 0
+          @inbounds idata[ij,ipt] = data[j,pt]
         end
       end
     end
@@ -314,9 +308,7 @@ end
 
 function get_indexed_data(s::TransientReshapedSnapshots)
   v = get_indexed_data(s.snaps)
-  println(which(get_indexed_data,typeof.((s.snaps,))))
-  vr = reshape(v.data,s.size)
-  ConsecutiveParamArray(vr)
+  reshape(v,s.size)
 end
 
 """
@@ -421,7 +413,6 @@ function DofMaps.flatten(s::TransientSnapshots)
 end
 
 get_all_data(s::ModeTransientSnapshots) = get_all_data(s.snaps)
-num_space_dofs(s::ModeTransientSnapshots) = prod(num_space_dofs(s.snaps))
 get_param_data(s::ModeTransientSnapshots) = get_param_data(s.snaps)
 get_realization(s::ModeTransientSnapshots) = get_realization(s.snaps)
 DofMaps.get_dof_map(s::ModeTransientSnapshots) = get_dof_map(s.snaps)

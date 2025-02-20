@@ -58,11 +58,13 @@ DofMaps.get_dof_map(s::Snapshots) = @abstractmethod
 param_length(s::Snapshots) = @notimplemented
 
 """
-    num_space_dofs(s::Snapshots{T,N,D}) where {T,N,D} -> NTuple{D,Integer}
+    space_dofs(s::Snapshots{T,N,D}) where {T,N,D} -> NTuple{D,Integer}
 
 Returns the spatial size of the snapshots
 """
-num_space_dofs(s::Snapshots) = size(get_dof_map(s))
+space_dofs(s::Snapshots) = size(get_dof_map(s))
+
+num_space_dofs(s::Snapshots) = length(get_dof_map(s))
 
 num_params(s::Snapshots) = num_params(get_realization(s))
 
@@ -98,7 +100,7 @@ Subtypes:
 """
 abstract type SteadySnapshots{T,N,D,I,R<:Realization,A} <: Snapshots{T,N,D,I,R,A} end
 
-Base.size(s::SteadySnapshots) = (num_space_dofs(s)...,num_params(s))
+Base.size(s::SteadySnapshots) = (space_dofs(s)...,num_params(s))
 
 """
     struct GenericSnapshots{T,N,D,I,R,A} <: SteadySnapshots{T,N,D,I,R,A}
@@ -137,10 +139,10 @@ function get_indexed_data(s::GenericSnapshots{T}) where T
   i = get_dof_map(s)
   data = get_all_data(s)
   idata = zeros(T,size(data))
-  for (j,ij) in enumerate(i)
-    for k in 1:num_params(s)
-      if ij > 0
-        @inbounds idata[ij,k] = data[j,k]
+  for ip in 1:num_params(s)
+    for (ij,j) in enumerate(i)
+      if j > 0
+        @inbounds idata[ij,ip] = data[j,ip]
       end
     end
   end
@@ -216,10 +218,10 @@ function get_indexed_data(s::SnapshotsAtIndices)
   i = get_dof_map(s)
   data = get_all_data(s)
   idata = zeros(T,num_space_dofs(s),num_params(s))
-  for (j,ij) in enumerate(i)
-    for k in param_indices(s)
-      if ij > 0
-        @inbounds idata[ij,k] = data[j,k]
+  for (ip,p) in enumerate(param_indices(s))
+    for (ij,j) in enumerate(i)
+      if j > 0
+        @inbounds idata[ij,ip] = data[j,p]
       end
     end
   end
@@ -343,7 +345,7 @@ end
 
 function get_indexed_data(s::ReshapedSnapshots)
   v = get_indexed_data(s.snaps)
-  reshape(v.data,s.size)
+  reshape(v,s.size)
 end
 
 # sparse interface

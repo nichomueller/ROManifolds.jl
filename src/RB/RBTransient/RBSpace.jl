@@ -47,3 +47,21 @@ function RBSteady.inv_project!(x::AbstractParamVector,r::TransientSingleFieldEva
     inv_project!(xpt,rsb,x̂p)
   end
 end
+
+const TransientMultiFieldEvalRBSpace = EvalRBSpace{MultiFieldRBSpace,<:TransientRealization}
+
+for f in (:(Algebra.allocate_in_domain),:(Algebra.allocate_in_range))
+  @eval begin
+    function $f(r::TransientMultiFieldEvalRBSpace,x::Union{BlockVector,BlockParamVector})
+      mortar(map(i -> $f(r[i],x[Block(i)]),1:length(r)))
+    end
+  end
+end
+
+for f! in (:(RBSteady.project!),:(RBSteady.inv_project!))
+  @eval begin
+    function $f!(x::AbstractParamVector,r::TransientMultiFieldEvalRBSpace,x̂::AbstractParamVector)
+      map(i -> $f!(x[Block(i)],r[i],x̂[Block(i)]),1:length(r))
+    end
+  end
+end
