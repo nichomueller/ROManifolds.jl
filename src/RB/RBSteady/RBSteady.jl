@@ -104,6 +104,7 @@ export project!
 export inv_project
 export inv_project!
 export union_bases
+export get_norm_matrix
 export enrich!
 include("Projections.jl")
 

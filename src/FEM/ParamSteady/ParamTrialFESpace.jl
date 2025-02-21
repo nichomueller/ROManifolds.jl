@@ -85,6 +85,10 @@ for F in (:TrialFESpace,:TransientTrialFESpace,:UnEvalTrialFESpace)
       get_dof_map(trial.space,args...)
     end
 
+    function DofMaps.get_internal_dof_map(trial::$F,args...)
+      get_internal_dof_map(trial.space,args...)
+    end
+
     function DofMaps.get_sparse_dof_map(trial::$F,test::SingleFieldFESpace,args...)
       get_sparse_dof_map(trial.space,test,args...)
     end

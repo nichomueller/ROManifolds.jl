@@ -166,6 +166,10 @@ function change_dof_map(i::VectorDofMap,args...)
   VectorDofMap(i,args...)
 end
 
+function change_dof_map(i::VectorDofMap,i′::VectorDofMap)
+  i′
+end
+
 abstract type SparseDofMapStyle end
 struct SparseDofMapIndexing <: SparseDofMapStyle end
 struct FullDofMapIndexing <: SparseDofMapStyle end

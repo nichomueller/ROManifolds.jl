@@ -153,6 +153,8 @@ union_bases(a::Projection,b::Projection,args...) = @abstractmethod
 
 gram_schmidt(a::Projection,b::Projection,args...) = gram_schmidt(get_basis(a),get_basis(b),args...)
 
+get_norm_matrix(a::Projection) = I(num_fe_dofs(a))
+
 rescale(op::Function,x::AbstractArray,b::Projection) = @abstractmethod
 
 Base.:+(a::Projection,b::Projection) = union_bases(a,b)
@@ -216,6 +218,7 @@ Base.adjoint(a::Projection) = InvProjection(a)
 get_basis(a::InvProjection) = adjoint(get_basis(a.projection))
 num_fe_dofs(a::InvProjection) = num_reduced_dofs(a.projection)
 num_reduced_dofs(a::InvProjection) = num_fe_dofs(a.projection)
+get_norm_matrix(a::InvProjection) = get_norm_matrix(a.projection)
 
 """
     abstract type ReducedProjection{A<:AbstractArray} <: Projection end
@@ -466,7 +469,6 @@ end
 
 get_projection(a::Projection) = a
 get_projection(a::NormedProjection) = a.projection
-get_norm_matrix(a::Projection) = nothing
 get_norm_matrix(a::NormedProjection) = a.norm_matrix
 
 get_basis(a::NormedProjection) = get_basis(a.projection)
@@ -659,6 +661,24 @@ for f in (:project!,:inv_project!)
       end
     end
   end
+end
+
+function Arrays.return_cache(::typeof(get_norm_matrix),a::BlockProjection)
+  i = findfirst(s.touched)
+  @notimplementedif isnothing(i)
+  A = typeof(get_norm_matrix(a[i]))
+  norm_matrix = Array{A,ndims(s)}(undef,size(s))
+  return norm_matrix
+end
+
+function get_norm_matrix(a::BlockProjection)
+  norm_matrix = return_cache(get_norm_matrix,a)
+  for i in eachindex(a)
+    if a.touched[i]
+      norm_matrix[Block(i,i)] = get_norm_matrix(a[i])
+    end
+  end
+  return norm_matrix
 end
 
 """

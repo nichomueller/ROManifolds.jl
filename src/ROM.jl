@@ -53,9 +53,6 @@ using ROM.ParamAlgebra
 include("FEM/ParamReferenceFEs/ParamReferenceFEs.jl")
 using ROM.ParamReferenceFEs
 
-export NODES_IN
-export NODES_OUT
-
 include("FEM/ParamGeometry/ParamGeometry.jl")
 using ROM.ParamGeometry
 

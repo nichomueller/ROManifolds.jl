@@ -15,12 +15,6 @@ using ROM.ParamDataStructures
 
 import FillArrays: Fill
 
-export NODES_IN
-export NODES_OUT
-export TriangulationFilter
-export get_nodes_to_cut_mask
-include("EmbeddedUtils.jl")
-
 function Geometry.pos_neg_data(
   ipos_to_val::AbstractArray{<:AbstractParamArray{<:Number}},
   i_to_iposneg::PosNegPartition)

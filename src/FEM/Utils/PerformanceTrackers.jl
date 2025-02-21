@@ -92,7 +92,7 @@ end
 induced_norm(v::AbstractVector) = norm(v)
 induced_norm(v::AbstractVector,norm_matrix::AbstractMatrix) = sqrt(v'*(norm_matrix*v))
 
-induced_norm(A::AbstractMatrix) = sqrt.(diag(A'*A))
+induced_norm(A::AbstractMatrix) = sqrt(sum(diag(A'*A)))
 induced_norm(A::AbstractMatrix,norm_matrix::AbstractMatrix) = sqrt(sum(diag(A'*(norm_matrix*A))))
 
 """

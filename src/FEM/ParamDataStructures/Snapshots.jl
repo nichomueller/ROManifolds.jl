@@ -76,8 +76,8 @@ function DofMaps.recast(a::AbstractArray,s::Snapshots)
   return recast(a,get_dof_map(s))
 end
 
-function DofMaps.change_dof_map(s::Snapshots,args...)
-  i′ = change_dof_map(get_dof_map(s),args...)
+function DofMaps.change_dof_map(s::Snapshots,i::AbstractDofMap)
+  i′ = change_dof_map(get_dof_map(s),i)
   return Snapshots(get_param_data(s),i′,get_realization(s))
 end
 

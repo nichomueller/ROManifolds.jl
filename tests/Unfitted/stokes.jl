@@ -12,17 +12,16 @@ pspace = ParamSpace(pdomain)
 R = 0.3
 pmin = Point(0,0)
 pmax = Point(1,1)
-n = 40
+n = 20
 partition = (n,n)
 
-geo1 = disk(R,x0=Point(0.5,0.5))
-geo2 = ! geo1
+geo = !disk(R,x0=Point(0.5,0.5))
 
 bgmodel = TProductDiscreteModel(pmin,pmax,partition)
 labels = get_face_labeling(bgmodel)
 add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,7])
 
-cutgeo = cut(bgmodel,geo2)
+cutgeo = cut(bgmodel,geo)
 
 Ωbg = Triangulation(bgmodel)
 Ωact = Triangulation(cutgeo,ACTIVE)
@@ -62,13 +61,15 @@ trian_jac = (Ω,Γ)
 domains = FEDomains(trian_res,trian_jac)
 
 coupling((du,dp),(v,q)) = ∫(dp*∂₁(v))dΩbg + ∫(dp*∂₂(v))dΩbg
-energy((du,dp),(v,q)) = ∫(du⋅v)dΩbg + ∫(∇(v)⊙∇(du))dΩbg + ∫(dp*q)dΩbg
+energy((du,dp),(v,q)) = ∫(du⋅v)dΩbg  + ∫(dp*q)dΩbg + ∫(∇(v)⊙∇(du))dΩbg
+
+bgcell_to_inoutcut = compute_bgcell_to_inoutcut(bgmodel,geo)
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-test_u = TProductFESpace(Ωact,Ωbg,reffe_u;conformity=:H1,dirichlet_tags="dirichlet")
+test_u = TProductFESpace(Ωact,Ωbg,bgcell_to_inoutcut,reffe_u;conformity=:H1,dirichlet_tags="dirichlet")
 trial_u = ParamTrialFESpace(test_u,gμ)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TProductFESpace(Ωact,Ωbg,reffe_p;conformity=:H1)
+test_p = TProductFESpace(Ωact,Ωbg,bgcell_to_inoutcut,reffe_p;conformity=:H1)
 trial_p = ParamTrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -77,7 +78,7 @@ feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
 fesolver = LinearFESolver(LUSolver())
 
 tol = fill(1e-4,4)
-state_reduction = SupremizerReduction(coupling,tol,energy;nparams=100)
+state_reduction = SupremizerReduction(coupling,tol,energy;nparams=100,unsafe=true)
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res=50,nparams_jac=50)
 
 dir = datadir("stokes_ttsvd_temp_temp")
@@ -93,3 +94,36 @@ save(dir,rbop)
 
 x,festats = solution_snapshots(rbsolver,feop,ronline)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,ronline)
+
+reffe_u1 = ReferenceFE(lagrangian,Float64,order)
+Vall = OrderedFESpace(bgmodel.model,reffe_u1;conformity=:H1,dirichlet_tags="dirichlet")
+
+in_dof_map = Float64.(vec(get_internal_dof_map(feop)[1][:,:,1]))
+in_dof_map[findall(!iszero,in_dof_map)] .= 1
+uhin = FEFunction(Vall,in_dof_map)
+
+dof_map = Float64.(vec(get_dof_map(feop)[1][:,:,1]))
+dof_map[findall(!iszero,dof_map)] .= 1
+uh = FEFunction(Vall,dof_map)
+
+writevtk(Ωbg.trian,joinpath(plt_dir,"sol.vtu"),cellfields=["uhin"=>uhin,"uh"=>uh])
+
+using ROM.RBSteady
+rbsnaps = RBSteady.to_snapshots(rbop.trial,x̂,ronline)
+
+V = OrderedFESpace(bgmodel.model,reffe_u;conformity=:H1,dirichlet_tags="dirichlet")
+Q = OrderedFESpace(bgmodel.model,reffe_p;conformity=:H1)
+Y = MultiFieldParamFESpace([V,Q];style=BlockMultiFieldStyle())
+X = assemble_matrix(energy,Y,Y)
+Xu = X[Block(1,1)]
+v = vec(x[1][:,:,:,1])
+v̂ = vec(rbsnaps[1][:,:,:,1])
+ev = v-v̂
+sqrt(sum(ev'*Xu*ev)) / sqrt(sum(v'*Xu*v))
+
+in_dof_map = get_internal_dof_map(feop)
+inv_in_dof_map = invert(in_dof_map[1])
+vin = vec(change_dof_map(x[1],in_dof_map[1])[:,:,:,1])
+v̂in = vec(change_dof_map(rbsnaps[1],inv_in_dof_map)[:,:,:,1])
+evin = vin-v̂in
+sqrt(sum(evin'*Xu*evin)) / sqrt(sum(vin'*Xu*vin))

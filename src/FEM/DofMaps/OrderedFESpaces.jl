@@ -61,6 +61,12 @@ function FESpaces.FEFunction(f::OrderedFESpace,fv::AbstractVector,dv::AbstractVe
 end
 
 function get_dof_map(f::OrderedFESpace,args...)
+  bg_dof_to_act_dof = get_bg_dof_to_act_dof(f,args...)
+  bg_ndofs = length(bg_dof_to_act_dof)
+  return VectorDofMap(bg_ndofs,bg_dof_to_act_dof)
+end
+
+function get_internal_dof_map(f::OrderedFESpace,args...)
   bg_dof_to_act_dof = get_bg_dof_to_in_dof(f,args...)
   bg_ndofs = length(bg_dof_to_act_dof)
   return VectorDofMap(bg_ndofs,bg_dof_to_act_dof)
@@ -372,7 +378,7 @@ function _get_bg_cutout_odof(bg_ndofs,bg_cellids,bg_cell_to_inoutcut)
     if inoutcut == OUT
       bg_dofs = getindex!(dof_cache,bg_cellids,bg_cell)
       for dof in bg_dofs
-        if !touched[dof]
+        if dof>0 && !touched[dof]
           touched[dof] = true
           bg_dof_to_mask[dof] = true
         end
@@ -380,7 +386,7 @@ function _get_bg_cutout_odof(bg_ndofs,bg_cellids,bg_cell_to_inoutcut)
     elseif inoutcut == CUT
       bg_dofs = getindex!(dof_cache,bg_cellids,bg_cell)
       for dof in bg_dofs
-        if !touched[dof]
+        if dof>0 && !touched[dof]
           bg_cells = getindex!(cell_cache,bg_dof_to_cells,dof)
           mark = true
           for cell in bg_cells

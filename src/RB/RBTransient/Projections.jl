@@ -48,6 +48,7 @@ get_basis_time(a::TransientProjection) = get_basis(a.projection_time)
 RBSteady.get_basis(a::TransientProjection) = kron(get_basis_time(a),get_basis_space(a))
 RBSteady.num_fe_dofs(a::TransientProjection) = num_fe_dofs(a.projection_space)*num_fe_dofs(a.projection_time)
 RBSteady.num_reduced_dofs(a::TransientProjection) = num_reduced_dofs(a.projection_space)*num_reduced_dofs(a.projection_time)
+RBSteady.get_norm_matrix(a::TransientProjection) = get_norm_matrix(a.projection_space)
 
 function RBSteady.project!(x̂::AbstractVector,a::TransientProjection,x::AbstractVector)
   ns = num_reduced_dofs(a.projection_space)

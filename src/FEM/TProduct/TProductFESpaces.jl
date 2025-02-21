@@ -128,20 +128,23 @@ function DofMaps.get_sparsity(U::TProductFESpace,V::TProductFESpace,args...)
   return TProductSparsity(sparsity,sparsities_1d)
 end
 
-function DofMaps.get_dof_map(V::TProductFESpace,args...)
-  T = get_dof_eltype(V)
-  get_tp_dof_map(T,V,args...)
+for f in (:(DofMaps.get_dof_map),:(DofMaps.get_internal_dof_map))
+  @eval begin
+    function $f(V::TProductFESpace,args...)
+      T = get_dof_eltype(V)
+      dof_map = $f(V.space,args...)
+      get_tp_dof_map(T,V.spaces_1d,dof_map)
+    end
+  end
 end
 
-function get_tp_dof_map(::Type{T},V::TProductFESpace,args...) where T
-  dof_map = get_dof_map(V.space,args...)
-  nnodes_1d = map(num_free_dofs,V.spaces_1d)
+function get_tp_dof_map(::Type{T},spaces_1d,dof_map) where T
+  nnodes_1d = map(num_free_dofs,spaces_1d)
   reshape(dof_map,nnodes_1d...)
 end
 
-function get_tp_dof_map(::Type{T},V::TProductFESpace,args...) where T<:MultiValue
-  dof_map = get_dof_map(V.space,args...)
-  nnodes_1d = map(num_free_dofs,V.spaces_1d)
+function get_tp_dof_map(::Type{T},spaces_1d,dof_map) where T<:MultiValue
+  nnodes_1d = map(num_free_dofs,spaces_1d)
   ncomps = Int(length(dof_map)/prod(nnodes_1d))
   reshape(dof_map,nnodes_1d...,ncomps)
 end

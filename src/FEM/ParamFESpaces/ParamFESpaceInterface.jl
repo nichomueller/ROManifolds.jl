@@ -70,6 +70,10 @@ function DofMaps.get_dof_map(f::SingleFieldParamFESpace,args...)
   get_dof_map(get_fe_space(f),args...)
 end
 
+function DofMaps.get_internal_dof_map(f::SingleFieldParamFESpace,args...)
+  get_internal_dof_map(get_fe_space(f),args...)
+end
+
 function DofMaps.get_sparse_dof_map(f::SingleFieldParamFESpace,g::SingleFieldFESpace,args...)
   get_sparse_dof_map(get_fe_space(f),g,args...)
 end
