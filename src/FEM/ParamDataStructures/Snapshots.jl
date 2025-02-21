@@ -214,7 +214,7 @@ function get_param_data(s::SnapshotsAtIndices)
   ConsecutiveParamArray(v)
 end
 
-function get_indexed_data(s::SnapshotsAtIndices)
+function get_indexed_data(s::SnapshotsAtIndices{T}) where T
   i = get_dof_map(s)
   data = get_all_data(s)
   idata = zeros(T,num_space_dofs(s),num_params(s))

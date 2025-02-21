@@ -185,3 +185,60 @@ function Arrays.evaluate!(cache,k::OReindex,values::AbstractVector)
   end
   return cache
 end
+
+"""
+    struct DofToCell{A} <: Map
+      cellids::A
+    end
+
+Inverse map of a standard connectivity structure: providing an input dof, returns
+a list of all the cells containing the dof
+"""
+struct DofToCell{A} <: Map
+  cellids::A
+end
+
+function Arrays.return_cache(k::DofToCell,dof::Int)
+  array_cache(k.cellids)
+end
+
+function Arrays.evaluate!(cache,k::DofToCell,dof::Int)
+  cells = Int32[]
+  for cell in 1:length(k.cellids)
+    cell_dofs = getindex!(cache,k.cellids,cell)
+    if dof ∈ cell_dofs
+      append!(cells,cell)
+    end
+  end
+  cells
+end
+
+# utils
+
+function _local_odof_to_dof(fe_dof_basis::AbstractVector{<:Dof},args...)
+  @notimplemented "This function is only implemented for Lagrangian dof bases"
+end
+
+function _local_odof_to_dof(fe_dof_basis::Fill{<:LagrangianDofBasis},orders::NTuple{D,Int}) where D
+  _local_odof_to_dof(testitem(fe_dof_basis),orders)
+end
+
+function _local_odof_to_dof(b::LagrangianDofBasis,orders::NTuple{D,Int}) where D
+  nnodes = length(b.node_and_comp_to_dof)
+  ndofs = length(b.dof_to_comp)
+
+  p = cubic_polytope(Val(D))
+  _nodes, = Gridap.ReferenceFEs._compute_nodes(p,orders)
+  node_to_pnode = Gridap.ReferenceFEs._coords_to_terms(_nodes,orders)
+  node_to_pnode_linear = LinearIndices(orders.+1)[node_to_pnode]
+
+  odof_to_dof = zeros(Int32,ndofs)
+  for (inode,ipnode) in enumerate(node_to_pnode_linear)
+    for icomp in b.dof_to_comp
+      local_shift = (icomp-1)*nnodes
+      odof_to_dof[local_shift+ipnode] = local_shift + inode
+    end
+  end
+
+  return odof_to_dof
+end

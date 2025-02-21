@@ -6,10 +6,20 @@ using Gridap.Arrays
 using Gridap.Geometry
 using Gridap.Helpers
 
+using GridapEmbedded
+using GridapEmbedded.Interfaces
+using GridapEmbedded.LevelSetCutters
+
 using ROM.Utils
 using ROM.ParamDataStructures
 
 import FillArrays: Fill
+
+export NODES_IN
+export NODES_OUT
+export TriangulationFilter
+export get_nodes_to_cut_mask
+include("EmbeddedUtils.jl")
 
 function Geometry.pos_neg_data(
   ipos_to_val::AbstractArray{<:AbstractParamArray{<:Number}},

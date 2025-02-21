@@ -41,11 +41,12 @@ end
 function TProductFESpace(
   trian::Triangulation,
   tptrian::TProductTriangulation,
+  bg_cell_to_inoutcut::AbstractVector,
   reffe::Tuple{<:ReferenceFEName,Any,Any};
   kwargs...)
 
   @check Utils.is_included(trian,tptrian.trian)
-  space = OrderedFESpace(trian,reffe;kwargs...)
+  space = OrderedFESpace(trian,bg_cell_to_inoutcut,reffe;kwargs...)
   TProductFESpace(space,tptrian,reffe;kwargs...)
 end
 

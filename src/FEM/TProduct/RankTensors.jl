@@ -237,8 +237,15 @@ const MatrixOrTensor = Union{AbstractMatrix,AbstractRankTensor,BlockRankTensor}
 
 # linear algebra
 
+Base.:*(a::AbstractRankTensor,b::AbstractArray) = tpmul(a,b)
+Base.:*(a::AbstractArray,b::AbstractRankTensor) = tpmul(a,b)
+
 function tpmul(a::Rank1Tensor{2},b::AbstractMatrix)
   return a[1]*b*a[2]'
+end
+
+function tpmul(a::AbstractMatrix,b::Rank1Tensor{2})
+  return b[1]*a*b[2]'
 end
 
 function tpmul(a::Rank1Tensor{3},b::AbstractArray{T,3} where T)
@@ -249,8 +256,12 @@ function tpmul(a::AbstractRankTensor{D,K},b::AbstractArray) where {D,K}
   sum(map(k -> tpmul(get_decomposition(a,k),b),1:K))
 end
 
+function tpmul(a::AbstractArray,b::AbstractRankTensor{D,K}) where {D,K}
+  sum(map(k -> tpmul(a,get_decomposition(b,k)),1:K))
+end
+
 function Utils.induced_norm(a::AbstractArray{T,D},X::AbstractRankTensor{D}) where {T,D}
-  sqrt(dot(vec(a),vec(tpmul(X,a))))
+  sqrt(dot(vec(a),vec(X*a)))
 end
 
 function Utils.induced_norm(a::AbstractArray{T,D′},X::AbstractRankTensor{D}) where {T,D,D′}

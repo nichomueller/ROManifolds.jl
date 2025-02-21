@@ -104,7 +104,7 @@ function main(
 
 end
 
-# main(:pod)
+main(:pod)
 main(:ttsvd)
 
 end
