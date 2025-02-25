@@ -20,22 +20,22 @@ using GridapSolvers.LinearSolvers
 using GridapSolvers.BlockSolvers
 using GridapSolvers.MultilevelTools
 
-using ROM.Utils
-using ROM.DofMaps
-using ROM.TProduct
-using ROM.ParamDataStructures
-using ROM.ParamAlgebra
-using ROM.ParamFESpaces
+using ROManifolds.Utils
+using ROManifolds.DofMaps
+using ROManifolds.TProduct
+using ROManifolds.ParamDataStructures
+using ROManifolds.ParamAlgebra
+using ROManifolds.ParamFESpaces
 
 import Test: @test
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ReferenceFEs: get_order
-import ROM.Utils: CostTracker
+import ROManifolds.Utils: CostTracker
 
 export UnEvalTrialFESpace
 export ParamTrialFESpace
-include("ParamTrialFESpace.jl")
+include("ParamTrialFESpaces.jl")
 
 export UnEvalOperatorType
 export NonlinearParamEq
@@ -54,7 +54,7 @@ export allocate_paramcache
 export update_paramcache!
 export allocate_systemcache
 export get_fe_operator
-include("ParamOperator.jl")
+include("ParamOperators.jl")
 
 export ParamFEOperator
 export SplitParamFEOperator
@@ -70,20 +70,20 @@ export set_domains
 export change_domains
 export get_dof_map_at_domains
 export get_sparse_dof_map_at_domains
-include("ParamFEOperator.jl")
+include("ParamFEOperators.jl")
 
 export LinearNonlinearParamFEOperator
 export get_linear_operator
 export get_nonlinear_operator
 export join_operators
-include("LinearNonlinearParamFEOperator.jl")
+include("LinearNonlinearParamFEOperators.jl")
 
 export ParamOpFromFEOp
 export JointParamOpFromFEOp
 export SplitParamOpFromFEOp
 export collect_cell_matrix_for_trian
 export collect_cell_vector_for_trian
-include("ParamOpFromFEOp.jl")
+include("ParamOpFromFEOps.jl")
 
 include("ParamSolutions.jl")
 

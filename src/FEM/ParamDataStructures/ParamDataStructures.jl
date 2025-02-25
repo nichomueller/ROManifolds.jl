@@ -15,8 +15,8 @@ using Gridap.Geometry
 using Gridap.CellData
 using Gridap.Helpers
 
-using ROM.Utils
-using ROM.DofMaps
+using ROManifolds.Utils
+using ROManifolds.DofMaps
 
 import Base:+,-,*,/,\
 import Distributions: Uniform,Normal
@@ -49,7 +49,7 @@ export num_times
 export get_initial_time
 export get_final_time
 export shift!
-include("ParamSpace.jl")
+include("ParamSpaces.jl")
 
 export AbstractParamContainer
 export get_param_data
@@ -66,7 +66,7 @@ export ParamField
 export ParamFieldGradient
 export GenericParamField
 export OperationParamField
-include("ParamField.jl")
+include("ParamFields.jl")
 
 export AbstractParamArray
 export AbstractParamVector

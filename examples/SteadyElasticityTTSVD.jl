@@ -2,7 +2,7 @@ module SteadyElasticityTTSVD
 
 using DrWatson
 using Gridap
-using ROM
+using ROManifolds
 
 include("ExamplesInterface.jl")
 

@@ -4,7 +4,7 @@ using Gridap.MultiField
 using DrWatson
 using Serialization
 
-using ROM
+using ROManifolds
 
 θ = 1.0
 dt = 0.0025

@@ -4,7 +4,7 @@ using Gridap.MultiField
 using DrWatson
 using Serialization
 
-using ROM
+using ROManifolds
 
 pdomain = (1,10,-1,5,1,2)
 pspace = ParamSpace(pdomain)
@@ -109,8 +109,8 @@ det(B'*B)
 B̂ = Φu'*B*Φp
 sqrt(det(B̂'*B̂))
 
-using ROM.RBSteady
-using ROM.ParamDataStructures
+using ROManifolds.RBSteady
+using ROManifolds.ParamDataStructures
 
 # energy′((du,dp),(v,q)) = ∫(du⋅v)dΩbg.measure + ∫(∇(v)⊙∇(du))dΩbg.measure + ∫(dp*q)dΩbg.measure
 # coupling′((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩbg.measure

@@ -1,8 +1,8 @@
 ```@meta
-CurrentModule = ROM.RBTransient
+CurrentModule = ROManifolds.RBTransient
 ```
 
-# ROM.RBTransient 
+# ROManifolds.RBTransient 
 
 ```@autodocs
 Modules = [RBTransient,]

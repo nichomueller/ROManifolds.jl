@@ -17,10 +17,10 @@ using Gridap.ReferenceFEs
 using Gridap.TensorValues
 using Gridap.Helpers
 
-using ROM.DofMaps
-using ROM.TProduct
-using ROM.ParamDataStructures
-using ROM.ParamAlgebra
+using ROManifolds.DofMaps
+using ROManifolds.TProduct
+using ROManifolds.ParamDataStructures
+using ROManifolds.ParamAlgebra
 
 import Test: @test
 import ArraysOfArrays: _innerlength
@@ -39,16 +39,16 @@ export MultiFieldParamFESpace
 include("MultiFieldParamFESpaces.jl")
 
 export TrivialParamFESpace
-include("TrivialParamFESpace.jl")
+include("TrivialParamFESpaces.jl")
 
 export TrialParamFESpace
 export TrialParamFESpace!
 export HomogeneousTrialParamFESpace
-include("TrialParamFESpace.jl")
+include("TrialParamFESpaces.jl")
 
 export ParamFEFunction
 export SingleFieldParamFEFunction
 export MultiFieldParamFEFunction
-include("ParamFEFunction.jl")
+include("ParamFEFunctions.jl")
 
 end # module

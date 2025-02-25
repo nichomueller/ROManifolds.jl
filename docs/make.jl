@@ -1,5 +1,5 @@
 using Documenter
-using ROM
+using ROManifolds
 
 fem_interface = [
   "utils.md",
@@ -18,19 +18,19 @@ rom_interface = [
 ]
 
 makedocs(;
-    modules=[ROM],
+    modules=[ROManifolds],
     format=Documenter.HTML(size_threshold=nothing),
     pages=[
         "Home" => "index.md",
         "Usage" => ["steady.md","transient.md"],
         "FEM Interface" => fem_interface,
-        "ROM Interface" => rom_interface,
+        "ROManifolds Interface" => rom_interface,
         "Contributing" => "contributing.md",
     ],
-    sitename="ROM.jl",
+    sitename="ROManifolds.jl",
     warnonly=[:cross_references,:missing_docs],
 )
 
 deploydocs(
-  repo = "github.com:nichomueller/ROM.jl.git",
+  repo = "github.com:nichomueller/ROManifolds.jl.git",
 )

@@ -1,8 +1,8 @@
 ```@meta
-CurrentModule = ROM.ParamFESpaces
+CurrentModule = ROManifolds.ParamFESpaces
 ```
 
-# ROM.ParamFESpaces 
+# ROManifolds.ParamFESpaces 
 
 ```@autodocs
 Modules = [ParamFESpaces,]

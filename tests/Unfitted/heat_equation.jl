@@ -5,7 +5,7 @@ using Serialization
 
 using GridapEmbedded
 
-using ROM
+using ROManifolds
 
 # time marching
 θ = 1
@@ -100,7 +100,7 @@ x,festats = solution_snapshots(rbsolver,feop,μon,uh0μ)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon,Ω)
 
 # plotting
-using ROM.ParamDataStructures
+using ROManifolds.ParamDataStructures
 r = μon
 r1 = r[1,:]
 S1 = get_all_data(x)[:,1:10:end]
@@ -155,7 +155,7 @@ perf′ = eval_performance(rbsolver,feop,rbop′,x′,x̂′,festats′,rbstats�
 # plotting
 xrb = Snapshots(inv_project(rbop′.trial(ronline),x̂′),get_dof_map(feop),ronline)
 
-using ROM.ParamDataStructures
+using ROManifolds.ParamDataStructures
 r = ronline
 r1 = r[1,:]
 S1 = get_all_data(x′)

@@ -24,18 +24,18 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers
 using GridapSolvers.NonlinearSolvers
 
-using ROM.Utils
-using ROM.DofMaps
-using ROM.TProduct
-using ROM.ParamDataStructures
-using ROM.ParamAlgebra
-using ROM.ParamFESpaces
-using ROM.ParamSteady
-using ROM.ParamODEs
+using ROManifolds.Utils
+using ROManifolds.DofMaps
+using ROManifolds.TProduct
+using ROManifolds.ParamDataStructures
+using ROManifolds.ParamAlgebra
+using ROManifolds.ParamFESpaces
+using ROManifolds.ParamSteady
+using ROManifolds.ParamODEs
 
 import Base: +,-,*,\
 import PartitionedArrays: tuple_of_arrays
-import ROM.TProduct: get_factor
+import ROManifolds.TProduct: get_factor
 
 export ReductionStyle
 export SearchSVDRank
@@ -78,7 +78,7 @@ export get_fe_solver
 export solution_snapshots
 export residual_snapshots
 export jacobian_snapshots
-include("RBSolver.jl")
+include("RBSolvers.jl")
 
 export reduction
 export tpod
@@ -86,7 +86,7 @@ export ttsvd
 export gram_schmidt
 export orth_complement!
 export orth_projection
-include("BasisConstruction.jl")
+include("BasesConstruction.jl")
 
 export Projection
 export PODProjection
@@ -116,10 +116,10 @@ export reduced_subspace
 export reduced_spaces
 export reduced_basis
 export get_reduced_subspace
-include("RBSpace.jl")
+include("RBSpaces.jl")
 
 export RBParamVector
-include("RBParamVector.jl")
+include("RBParamVectors.jl")
 
 export AbstractIntegrationDomain
 export IntegrationDomain
@@ -136,10 +136,10 @@ export reduced_jacobian
 export reduced_residual
 export reduced_weak_form
 export allocate_hypred_cache
-include("HyperReduction.jl")
+include("HyperReductions.jl")
 
 export HRParamArray
-include("HRParamArray.jl")
+include("HRParamArrays.jl")
 
 export RBOperator
 export GenericRBOperator

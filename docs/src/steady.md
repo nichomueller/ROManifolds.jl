@@ -2,11 +2,11 @@
 
 ## Installation
 
-ROM is a registered package. You can install it by running:
+ROManifolds is a registered package. You can install it by running:
 
 ```julia
 # Use ] to enter the Pkg REPL mode
-pkg> add ROM
+pkg> add ROManifolds
 ```
 
 ## Load package
@@ -14,7 +14,7 @@ pkg> add ROM
 Load the package normally with
 
 ```julia
-using ROM
+using ROManifolds
 ```
 
 ## Workflow 
@@ -154,7 +154,7 @@ solver = LinearFESolver(ls)
 
 ## RB solver
 
-Finally, we are ready to begin the ROM part. The first part consists in defining the problem's [`RBSolver`](@ref), i.e. the reduced counterpart of a FE solver:
+Finally, we are ready to begin the ROManifolds part. The first part consists in defining the problem's [`RBSolver`](@ref), i.e. the reduced counterpart of a FE solver:
 
 ```julia 
 tol = 1e-4
@@ -248,7 +248,7 @@ rbop = GenericRBOperator(op′,Û,V̂,â,l̂)
 
 ## Online phase 
 
-This step consists in computing the ROM approximation for any desired parameter. We consider, for e.g., 10 parameters distributed uniformly on `D`
+This step consists in computing the ROManifolds approximation for any desired parameter. We consider, for e.g., 10 parameters distributed uniformly on `D`
 
 ```julia
 μon = realization(D;nparams=10,rand=true)

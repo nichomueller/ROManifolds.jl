@@ -16,8 +16,8 @@ using Gridap.Helpers
 using GridapEmbedded
 using GridapEmbedded.Interfaces
 
-using ROM
-using ROM.Utils
+using ROManifolds
+using ROManifolds.Utils
 
 import FillArrays: Fill
 import Gridap.MultiField: MultiFieldFEFunction,restrict_to_field,_sum_if_first_positive

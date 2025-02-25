@@ -1,6 +1,6 @@
-# ROM.jl 
+# ROManifolds.jl 
 
-Welcome to the documentation for ROM. 
+Welcome to the documentation for ROManifolds. 
 
 !!! note 
 

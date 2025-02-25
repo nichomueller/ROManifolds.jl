@@ -19,41 +19,41 @@ using Gridap.ODEs
 using Gridap.TensorValues
 using Gridap.Helpers
 
-using ROM.Utils
-using ROM.DofMaps
-using ROM.TProduct
-using ROM.ParamDataStructures
-using ROM.ParamAlgebra
-using ROM.ParamFESpaces
-using ROM.ParamSteady
-using ROM.ParamODEs
+using ROManifolds.Utils
+using ROManifolds.DofMaps
+using ROManifolds.TProduct
+using ROManifolds.ParamDataStructures
+using ROManifolds.ParamAlgebra
+using ROManifolds.ParamFESpaces
+using ROManifolds.ParamSteady
+using ROManifolds.ParamODEs
 
-using ROM.RBSteady
+using ROManifolds.RBSteady
 
 import Base: +,-,*,\
 import UnPack: @unpack
-import ROM.RBSteady: _get_label
+import ROManifolds.RBSteady: _get_label
 
 export TransientReduction
 export TransientMDEIMReduction
 include("ReductionMethods.jl")
 
-include("RBSolver.jl")
+include("RBSolvers.jl")
 
 include("TTLinearAlgebra.jl")
 
-include("BasisConstruction.jl")
+include("BasisConstructions.jl")
 
 include("GalerkinProjections.jl")
 
 export TransientProjection
 include("Projections.jl")
 
-include("RBSpace.jl")
+include("RBSpaces.jl")
 
-include("HyperReduction.jl")
+include("HyperReductions.jl")
 
-include("HRParamArray.jl")
+include("HRParamArrays.jl")
 
 export TransientRBOperator
 export GenericTransientRBOperator

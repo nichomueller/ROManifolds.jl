@@ -4,8 +4,8 @@ using Gridap.Arrays
 using Gridap.ReferenceFEs
 using Gridap.TensorValues
 
-using ROM.ParamDataStructures
-using ROM.ParamAlgebra
+using ROManifolds.ParamDataStructures
+using ROManifolds.ParamAlgebra
 
 ReferenceFEs.num_components(::Type{<:AbstractArray{T}}) where T = num_components(T)
 ReferenceFEs.num_indep_components(::Type{<:AbstractArray{T}}) where T = num_indep_components(T)

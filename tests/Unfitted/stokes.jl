@@ -4,7 +4,7 @@ using Gridap.MultiField
 using DrWatson
 using Serialization
 
-using ROM
+using ROManifolds
 
 pdomain = (1,10,-1,5,1,2)
 pspace = ParamSpace(pdomain)
@@ -108,7 +108,7 @@ uh = FEFunction(Vall,dof_map)
 
 writevtk(Ωbg.trian,joinpath(plt_dir,"sol.vtu"),cellfields=["uhin"=>uhin,"uh"=>uh])
 
-using ROM.RBSteady
+using ROManifolds.RBSteady
 rbsnaps = RBSteady.to_snapshots(rbop.trial,x̂,ronline)
 
 V = OrderedFESpace(bgmodel.model,reffe_u;conformity=:H1,dirichlet_tags="dirichlet")

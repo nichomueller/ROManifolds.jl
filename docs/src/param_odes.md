@@ -1,8 +1,8 @@
 ```@meta
-CurrentModule = ROM.ParamODEs
+CurrentModule = ROManifolds.ParamODEs
 ```
 
-# ROM.ParamODEs 
+# ROManifolds.ParamODEs 
 
 ```@autodocs
 Modules = [ParamODEs,]

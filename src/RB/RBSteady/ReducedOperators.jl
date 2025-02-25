@@ -5,13 +5,17 @@
 Computes a RB operator from the FE operator `feop`
 """
 function reduced_operator(
+  dir::String,
   solver::RBSolver,
   feop::ParamFEOperator,
   args...;
   kwargs...)
 
   fesnaps,festats = solution_snapshots(solver,feop,args...;kwargs...)
-  reduced_operator(solver,feop,fesnaps)
+  rbop = reduced_operator(solver,feop,fesnaps)
+  save(dir,fesnaps)
+  save(dir,rbop)
+  rbop
 end
 
 function reduced_operator(

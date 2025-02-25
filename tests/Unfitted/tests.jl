@@ -4,7 +4,7 @@ using Gridap.MultiField
 using DrWatson
 using Serialization
 
-using ROM
+using ROManifolds
 
 pdomain = (1,10,-1,5,1,2)
 pspace = ParamSpace(pdomain)

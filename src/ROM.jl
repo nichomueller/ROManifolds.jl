@@ -1,4 +1,4 @@
-module ROM
+module ROManifolds
 
 export compute_speedup
 export compute_error
@@ -6,7 +6,7 @@ export compute_relative_error
 export ∂₁, ∂₂, ∂₃
 
 include("FEM/Utils/Utils.jl")
-using ROM.Utils
+using ROManifolds.Utils
 
 export OrderedFESpace
 export CartesianFESpace
@@ -18,13 +18,13 @@ export get_sparse_dof_map
 export flatten
 
 include("FEM/DofMaps/DofMaps.jl")
-using ROM.DofMaps
+using ROManifolds.DofMaps
 
 export TProductDiscreteModel
 export TProductFESpace
 
 include("FEM/TProduct/TProduct.jl")
-using ROM.TProduct
+using ROManifolds.TProduct
 
 export Realization
 export TransientRealization
@@ -46,23 +46,23 @@ export Snapshots
 export select_snapshots
 
 include("FEM/ParamDataStructures/ParamDataStructures.jl")
-using ROM.ParamDataStructures
+using ROManifolds.ParamDataStructures
 
 include("FEM/ParamAlgebra/ParamAlgebra.jl")
-using ROM.ParamAlgebra
+using ROManifolds.ParamAlgebra
 
 include("FEM/ParamReferenceFEs/ParamReferenceFEs.jl")
-using ROM.ParamReferenceFEs
+using ROManifolds.ParamReferenceFEs
 
 include("FEM/ParamGeometry/ParamGeometry.jl")
-using ROM.ParamGeometry
+using ROManifolds.ParamGeometry
 
 export ParamTrialFESpace
 export TrialParamFESpace
 export MultiFieldParamFESpace
 
 include("FEM/ParamFESpaces/ParamFESpaces.jl")
-using ROM.ParamFESpaces
+using ROManifolds.ParamFESpaces
 
 export FEDomains
 export ParamFEOperator
@@ -70,7 +70,7 @@ export LinearParamFEOperator
 export LinearNonlinearParamFEOperator
 
 include("FEM/ParamSteady/ParamSteady.jl")
-using ROM.ParamSteady
+using ROManifolds.ParamSteady
 
 export TransientTrialParamFESpace
 export TransientMultiFieldParamFESpace
@@ -79,7 +79,7 @@ export TransientParamLinearFEOperator
 export LinearNonlinearTransientParamFEOperator
 
 include("FEM/ParamODEs/ParamODEs.jl")
-using ROM.ParamODEs
+using ROManifolds.ParamODEs
 
 export Reduction
 export PODReduction
@@ -134,7 +134,7 @@ export load_operator
 export load_results
 
 include("RB/RBSteady/RBSteady.jl")
-using ROM.RBSteady
+using ROManifolds.RBSteady
 
 export TransientReduction
 export TransientMDEIMReduction
@@ -142,5 +142,5 @@ export TransientProjection
 export TransientRBOperator
 
 include("RB/RBTransient/RBTransient.jl")
-using ROM.RBTransient
+using ROManifolds.RBTransient
 end

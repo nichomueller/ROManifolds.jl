@@ -1,8 +1,8 @@
 ```@meta
-CurrentModule = ROM.Utils
+CurrentModule = ROManifolds.Utils
 ```
 
-# ROM.Utils 
+# ROManifolds.Utils 
 
 ```@autodocs
 Modules = [Utils,]

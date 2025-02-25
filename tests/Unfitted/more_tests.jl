@@ -1,6 +1,6 @@
 using Gridap
 using GridapEmbedded
-using ROM
+using ROManifolds
 
 pdomain = (1,10,1,10,1,10)
 pspace = ParamSpace(pdomain)
@@ -151,14 +151,14 @@ b̂′ = residual(op′,r,y′,rbcache′)
 x̂1′ = param_getindex(Â′,1) \ param_getindex(b̂′,1)
 
 STOP
-# using ROM.RBSteady
+# using ROManifolds.RBSteady
 # rbsnaps = RBSteady.to_snapshots(rbop.trial,x̂,μon)
 
 # v = x[:,:,1]
 # x̂ = project(rbop.test.subspace,v)
 
 # using DrWatson
-# using ROM.ParamDataStructures
+# using ROManifolds.ParamDataStructures
 # r1 = get_realization(x)[1]
 # S1 = get_param_data(x)[1]
 # Ŝ1 = get_param_data(rbsnaps)[1]
@@ -183,7 +183,7 @@ cores, = ttsvd(red_style,A,X)
 Φ = cores2basis(cores...)
 maximum(abs.(v - Φ*Φ'*Xmat*v))
 
-using ROM
+using ROManifolds
 using Gridap
 using DrWatson
 
@@ -193,7 +193,7 @@ parts = (10,10)
 Ωₕ = CartesianDiscreteModel(Ω,parts)
 τₕ = Triangulation(Ωₕ)
 
-# time scheme
+# temporal grid
 θ = 0.5
 dt = 0.01
 t0 = 0.0
@@ -241,21 +241,16 @@ slvr = ThetaMethod(LUSolver(),dt,θ)
 tol = 1e-4
 inner_prod(u,v) = ∫(∇(v)⋅∇(u))dΩₕ
 red_sol = TransientReduction(tol,inner_prod;nparams=20)
-rbslvr = RBSolver(slvr,red_sol;nparams_jac=1,nparams_res=1)
+rbslvr = RBSolver(slvr,red_sol;nparams_jac=1,nparams_res=20)
 
 dir = datadir("heat_equation")
 create_dir(dir)
 
-try # try loading offline quantities
-    rbop = load_operator(dir,feop)
+rbop = try # try loading offline quantities
+    load_operator(dir,feop)
 catch # offline phase
-    rbop = reduced_operator(rbslvr,feop,uh₀ₚ)
-    save(dir,rbop)
+    reduced_operator(dir,rbslvr,feop,uh₀ₚ)
 end
-
-rbop = reduced_operator(rbslvr,feop,uh₀ₚ)
-save(dir,rbop)
-rbop = load_operator(dir,feop)
 
 # online phase
 μₒₙ = realization(feop;nparams=10,sampling=:uniform)

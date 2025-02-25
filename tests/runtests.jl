@@ -1,4 +1,4 @@
-module ROMTests
+module ROManifoldsTests
 
 using Test
 

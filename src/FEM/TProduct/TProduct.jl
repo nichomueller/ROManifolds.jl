@@ -20,8 +20,8 @@ using Gridap.Helpers
 using GridapEmbedded
 using GridapEmbedded.Interfaces
 
-using ROM.Utils
-using ROM.DofMaps
+using ROManifolds.Utils
+using ROManifolds.DofMaps
 
 import Base:+,-
 import FillArrays: Fill,fill

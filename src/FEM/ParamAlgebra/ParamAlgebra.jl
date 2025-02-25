@@ -18,10 +18,10 @@ using GridapSolvers.NonlinearSolvers
 using GridapSolvers.MultilevelTools
 using GridapSolvers.BlockSolvers
 
-using ROM.ParamDataStructures
+using ROManifolds.ParamDataStructures
 
 import ArraysOfArrays: innersize
-import ROM.DofMaps: OIdsToIds, add_ordered_entries!
+import ROManifolds.DofMaps: OIdsToIds, add_ordered_entries!
 
 include("ParamAlgebraInterfaces.jl")
 

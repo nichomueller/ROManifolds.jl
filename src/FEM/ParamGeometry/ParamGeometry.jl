@@ -10,8 +10,8 @@ using GridapEmbedded
 using GridapEmbedded.Interfaces
 using GridapEmbedded.LevelSetCutters
 
-using ROM.Utils
-using ROM.ParamDataStructures
+using ROManifolds.Utils
+using ROManifolds.ParamDataStructures
 
 import FillArrays: Fill
 

@@ -1,8 +1,8 @@
 ```@meta
-CurrentModule = ROM.RBSteady
+CurrentModule = ROManifolds.RBSteady
 ```
 
-# ROM.RBSteady 
+# ROManifolds.RBSteady 
 
 ```@autodocs
 Modules = [RBSteady,]
