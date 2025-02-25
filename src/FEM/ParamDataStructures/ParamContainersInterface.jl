@@ -50,7 +50,9 @@ param_eachindex(a) = Base.OneTo(param_length(a))
     to_param_quantity(a,plength::Integer) -> Any
 
 Returns a quantity with parametric length `plength` from `a`. When `a` already
-possesses a parametric length, i.e. it is a parametrized quantity, it returns `a`
+possesses a parametric length, i.e. it is a parametrized quantity, it returns `a`.
+In contrast to [`parameterize`](@ref), this function does not allocate the space
+for (new) parametric entries, it simply acts as a parametric fill.
 """
 to_param_quantity(a,plength::Integer) = @abstractmethod
 
@@ -95,7 +97,7 @@ abstract type AbstractParamContainer{T,N} <: AbstractArray{T,N} end
 
 get_param_data(a::AbstractParamContainer) = (param_getindex(a,i) for i in param_eachindex(a))
 
-function to_param_quantity(a::AbstractParamContainer,plength::Integer)
+function parameterize(a::AbstractParamContainer,plength::Integer)
   @check param_length(a) == plength
   return a
 end
@@ -118,6 +120,7 @@ param_getindex(a::ParamContainer,i::Integer) = getindex(a,i)
 param_getindex(a::ParamContainer,v,i::Integer) = setindex!(a,v,i)
 
 to_param_quantity(a::Union{Function,Map,Nothing},plength::Integer) = ParamContainer(Fill(a,plength))
+parameterize(a::Union{Function,Map,Nothing},plength::Integer) = ParamContainer(Fill(a,plength))
 
 Base.size(a::ParamContainer) = (param_length(a),)
 Base.getindex(a::ParamContainer,i::Integer) = getindex(a.data,i)
@@ -125,7 +128,8 @@ Base.setindex!(a::ParamContainer,v,i::Integer) = setindex!(a.data,v,i)
 
 const ParamNumber = ParamContainer
 
-to_param_quantity(a::Number,plength::Integer) = ParamNumber(fill(a,plength))
+to_param_quantity(a::Number,plength::Integer) = ParamNumber(Fill(a,plength))
+parameterize(a::Number,plength::Integer) = ParamNumber(fill(a,plength))
 
 for op in (:+,:-)
   @eval begin

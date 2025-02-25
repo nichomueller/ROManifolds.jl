@@ -1,7 +1,7 @@
 function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamVector
   @warn "Allocating a vector of unit parametric length, will likely result in an error"
   vector = allocate_vector(eltype(V),n)
-  consecutive_param_array(vector,1)
+  consecutive_parameterize(vector,1)
 end
 
 for f in (:(Algebra.allocate_in_range),:(Algebra.allocate_in_domain))
@@ -11,7 +11,7 @@ for f in (:(Algebra.allocate_in_range),:(Algebra.allocate_in_domain))
       item = testitem(matrix)
       plength = param_length(matrix)
       v = $f(V,item)
-      consecutive_param_array(v,plength)
+      consecutive_parameterize(v,plength)
     end
 
     function $f(::Type{PV},matrix::BlockParamMatrix) where PV<:BlockParamVector
@@ -19,7 +19,7 @@ for f in (:(Algebra.allocate_in_range),:(Algebra.allocate_in_domain))
       item = testitem(matrix)
       plength = param_length(matrix)
       v = $f(V,item)
-      consecutive_param_array(v,plength)
+      consecutive_parameterize(v,plength)
     end
 
     function $f(matrix::AbstractParamMatrix{T}) where T
@@ -204,6 +204,14 @@ struct ParamBuilder{A} <: GridapType
   plength::Int
 end
 
+for T in (:(Algebra.SparseMatrixBuilder),:(Algebra.ArrayBuilder))
+  @eval begin
+    function ParamDataStructures.parameterize(a::$T,r::AbstractRealization)
+      ParamAlgebra.ParamBuilder(a,param_length(r))
+    end
+  end
+end
+
 ParamDataStructures.param_length(b::ParamBuilder) = b.plength
 
 Algebra.get_array_type(b::ParamBuilder) = Algebra.get_array_type(b.builder)
@@ -232,7 +240,7 @@ end
 
 function Algebra.nz_allocation(a::ParamCounter{<:Algebra.ArrayCounter})
   v = nz_allocation(a.counter)
-  consecutive_param_array(v,a.plength)
+  consecutive_parameterize(v,a.plength)
 end
 
 # alternative implementation

@@ -27,6 +27,7 @@ Arrays.return_value(b::Broadcasting{<:Function},f::ParamField,x...) = evaluate(b
 
 to_param_quantity(f::ParamField,plength::Integer) = f
 to_param_quantity(f::Union{Field,AbstractArray{<:Field}},plength::Integer) = TrivialParamField(f,plength)
+parameterize(f::ParamField,plength::Integer) = f
 
 """
     struct TrivialParamField{F} <: ParamField
@@ -64,7 +65,7 @@ get_param_data(f::GenericParamField) = f.data
 
 Arrays.return_value(f::GenericParamField,x::Point) = fill(return_value(f.data[1],x),param_length(f))
 Arrays.return_cache(f::GenericParamField,x::Point) = fill(return_cache(f.data[1],x),param_length(f))
-Arrays.evaluate!(cache,f::GenericParamField,x::Point) = map(o->evaluate!(cache,o,x),f.data)
+Arrays.evaluate!(cache,f::GenericParamField,x::Point) = map((c,d)->evaluate!(c,d,x),cache,f.data)
 
 """
     struct ParamFieldGradient{N,F} <: ParamField
@@ -108,6 +109,7 @@ struct OperationParamField{T<:Fields.OperationField} <: ParamField
 end
 
 function Fields.OperationField(op,fields::Tuple{Vararg{Any}})
+  opfield(op,fields) = Fields.OperationField{typeof(op),typeof(fields)}(op,fields)
   T = Union{ParamField,ParamContainer{<:Field}}
   if any(isa.(fields,T)) || isa(op,T)
     pop,pfields... = to_param_quantities(op,fields...)
@@ -115,11 +117,11 @@ function Fields.OperationField(op,fields::Tuple{Vararg{Any}})
     data = map(1:plength) do i
       op = param_getindex(pop,i)
       field = map(f->param_getindex(f,i),pfields)
-      Fields.OperationField(op,field)
+      opfield(op,field)
     end
     OperationParamField(data)
   else
-    Fields.OperationField{typeof(op),typeof(fields)}(op,fields)
+    opfield(op,fields)
   end
 end
 
@@ -146,7 +148,7 @@ function Arrays.return_cache(f::ParamField,x::AbstractArray{<:Point})
   li = return_cache(fi,x)
   fix = evaluate!(li,fi,x)
   l = Vector{typeof(li)}(undef,param_length(f))
-  g = param_array(fix,param_length(f))
+  g = parameterize(fix,param_length(f))
   for i in param_eachindex(f)
     l[i] = return_cache(param_getindex(f,i),x)
   end

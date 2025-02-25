@@ -112,12 +112,12 @@ end
 
 function Algebra.allocate_in_domain(a::Projection,x::V) where V<:AbstractParamVector
   x̂ = allocate_vector(eltype(V),num_reduced_dofs(a))
-  return consecutive_param_array(x̂,param_length(x))
+  return consecutive_parameterize(x̂,param_length(x))
 end
 
 function Algebra.allocate_in_range(a::Projection,x̂::V) where V<:AbstractParamVector
   x = allocate_vector(eltype(V),num_fe_dofs(a))
-  return consecutive_param_array(x,param_length(x̂))
+  return consecutive_parameterize(x,param_length(x̂))
 end
 
 """
@@ -167,7 +167,7 @@ Base.:*(x::AbstractArray,b::Projection) = rescale(*,x,b)
 function Base.:*(b::Projection,y::ConsecutiveParamArray)
   item = zeros(num_reduced_dofs(b))
   plength = param_length(y)
-  x = consecutive_param_array(item,plength)
+  x = consecutive_parameterize(item,plength)
   mul!(x,b,y)
 end
 

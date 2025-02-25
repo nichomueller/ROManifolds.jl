@@ -8,11 +8,9 @@ function reduced_operator(
   solver::RBSolver,
   feop::ParamFEOperator,
   args...;
-  dir=datadir(),
   kwargs...)
 
   fesnaps,festats = solution_snapshots(solver,feop,args...;kwargs...)
-  save(dir,fesnaps)
   reduced_operator(solver,feop,fesnaps)
 end
 

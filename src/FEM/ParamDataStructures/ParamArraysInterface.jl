@@ -102,16 +102,22 @@ equal to those of `a`
 """
 param_array(args...;kwargs...) = @abstractmethod
 
+parameterize(a::AbstractArray,plength::Integer;kwargs...) = param_array(a,plength;kwargs...)
+
 """
-    consecutive_param_array(args...) -> ParamArray
+    consecutive_parameterize(args...) -> ParamArray
 
 Biulds of a [`AbstractParamArray`](@ref) with entries stored consecutively
 in memory
 """
-consecutive_param_array(args...) = param_array(args...;style=ConsecutiveMemory())
+consecutive_parameterize(args...) = parameterize(args...;style=ConsecutiveMemory())
 
-ParamArray(A::AbstractArray{<:Number}) = ParamNumber(A)
-ParamArray(A::AbstractParamArray) = A
+for f in (:param_array,:ParamArray)
+  @eval begin
+    $f(A::AbstractArray{<:Number};kwargs...) = ParamNumber(A)
+    $f(A::AbstractParamArray;kwargs...) = A
+  end
+end
 
 function param_array(a::Union{Number,AbstractArray{<:Number,0}},l::Integer;kwargs...)
   ParamNumber(fill(a,l))
@@ -277,13 +283,13 @@ Arrays.testitem(A::AbstractParamArray) = param_getindex(A,1)
 function Arrays.testvalue(A::AbstractParamArray{T,N}) where {T,N}
   tv = testvalue(Array{T,N})
   plength = param_length(A)
-  param_array(tv,plength;style=MemoryLayoutStyle(A))
+  parameterize(tv,plength;style=MemoryLayoutStyle(A))
 end
 
 function Arrays.testvalue(::Type{A}) where {T,N,A<:AbstractParamArray{T,N}}
   tv = testvalue(Array{T,N})
   plength = one(Int)
-  param_array(tv,plength;style=MemoryLayoutStyle(A))
+  parameterize(tv,plength;style=MemoryLayoutStyle(A))
 end
 
 function Arrays.CachedArray(A::AbstractParamArray)
@@ -302,7 +308,7 @@ Generalization of the `Gridap` function `return_value` to the parametric case
 function param_return_value(f::Union{Function,Map},A...)
   pA = to_param_quantities(A...)
   c = return_value(f,map(testitem,pA)...)
-  data = param_array(c,param_length(first(pA)))
+  data = parameterize(c,param_length(first(pA)))
   return data
 end
 
@@ -318,7 +324,7 @@ function param_return_cache(f::Union{Function,Map},A...)
   c = return_cache(f,item...)
   d = evaluate!(c,f,item...)
   cache = Vector{typeof(c)}(undef,param_length(pA1))
-  data = param_array(d,param_length(pA1))
+  data = parameterize(d,param_length(pA1))
   @inbounds for i in param_eachindex(pA1)
     cache[i] = return_cache(f,map(a -> param_getindex(a,i),pA)...)
   end
@@ -541,7 +547,7 @@ function param_return_value(F::ParamMap,A...)
   fitem = testitem(F)
   pA = to_param_quantities(A...;plength)
   c = return_value(fitem,map(testitem,pA)...)
-  data = param_array(c,plength)
+  data = parameterize(c,plength)
   return data
 end
 
@@ -553,7 +559,7 @@ function param_return_cache(F::ParamMap,A...)
   c = return_cache(fitem,item...)
   d = evaluate!(c,fitem,item...)
   cache = Vector{typeof(c)}(undef,plength)
-  data = param_array(d,plength)
+  data = parameterize(d,plength)
   @inbounds for i in 1:plength
     fi = param_getindex(F,i)
     cache[i] = return_cache(fi,map(a -> param_getindex(a,i),pA)...)
@@ -1436,7 +1442,7 @@ for T in (:(ForwardDiff.GradientConfig),:(ForwardDiff.JacobianConfig))
 
       @check length(ydual) == param_length(x)
       vi = return_value(f,testitem(ydual),testitem(x),cfg)
-      A = param_array(vi,length(ydual))
+      A = parameterize(vi,length(ydual))
       return A
     end
 
@@ -1448,7 +1454,7 @@ for T in (:(ForwardDiff.GradientConfig),:(ForwardDiff.JacobianConfig))
 
       @check length(ydual) == param_length(x)
       ci = return_cache(f,testitem(ydual),testitem(x),cfg)
-      A = param_array(ci,length(ydual))
+      A = parameterize(ci,length(ydual))
       return A
     end
 

@@ -36,6 +36,7 @@ export TransientParamSpace
 export ParamFunction
 export TransientParamFunction
 export realization
+export parameterize
 
 export ParamArray
 export ConsecutiveParamArray

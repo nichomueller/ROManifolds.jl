@@ -1,23 +1,32 @@
 # generic constructors
+# rule: within Gridap lazy maps (i.e. we deal with cell-wise arrays), we use the
+# NonConsecutiveMemory style; otherwise, when dealing with global arrays, we use
+# the ConsecutiveMemory style
 
 ParamArray(a::AbstractArray{<:Number},l::Integer;kwargs...) = TrivialParamArray(a,l)
 
-# Within Gridap lazy maps (i.e. we deal with cell-wise arrays), we use the
-# NonConsecutiveMemory style; otherwise, when dealing with global arrays, we use
-# the ConsecutiveMemory style
-function ParamArray(a::AbstractArray{<:AbstractArray};style=NonConsecutiveMemory())
-  if style==ConsecutiveMemory()
-    ConsecutiveParamArray(a)
-  else
-    ArrayOfArrays(a)
-  end
-end
-
-function param_array(a::AbstractArray{<:Number,N},l::Integer;style=NonConsecutiveMemory()) where N
+function param_array(a::AbstractArray{<:Number},l::Integer;style=NonConsecutiveMemory())
   if style==ConsecutiveMemory()
     ConsecutiveParamArray(a,l)
   else
     ArrayOfArrays(a,l)
+  end
+end
+
+for f in (:param_array,:ParamArray)
+  @eval begin
+    function $f(A::AbstractArray{<:AbstractArray},l::Integer;kwargs...)
+      @assert length(A) == l
+      $f(A;kwargs...)
+    end
+
+    function $f(A::AbstractArray{<:AbstractArray};style=NonConsecutiveMemory())
+      if style==ConsecutiveMemory()
+        ConsecutiveParamArray(A)
+      else
+        ArrayOfArrays(A)
+      end
+    end
   end
 end
 

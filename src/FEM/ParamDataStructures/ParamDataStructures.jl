@@ -40,6 +40,7 @@ export AbstractParamFunction
 export ParamFunction
 export TransientParamFunction
 export realization
+export parameterize
 export get_params
 export get_times
 export get_at_time
@@ -76,8 +77,7 @@ export ParamMatrix
 export MemoryLayoutStyle
 export ConsecutiveMemory
 export NonConsecutiveMemory
-export param_array
-export consecutive_param_array
+export consecutive_parameterize
 export innersize
 export innerlength
 export inneraxes

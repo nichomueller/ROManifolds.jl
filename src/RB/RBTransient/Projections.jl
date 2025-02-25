@@ -106,14 +106,14 @@ function Algebra.allocate_in_domain(a::TransientProjection,x::V) where V<:Abstra
   x̂ = allocate_vector(eltype(V),num_reduced_dofs(a))
   nt = num_fe_dofs(a.projection_time)
   np = Int(param_length(x) / nt)
-  return consecutive_param_array(x̂,np)
+  return consecutive_parameterize(x̂,np)
 end
 
 function Algebra.allocate_in_range(a::TransientProjection,x̂::V) where V<:AbstractParamVector
   x = allocate_vector(eltype(V),num_fe_dofs(a.projection_space))
   nt = num_fe_dofs(a.projection_time)
   npt = param_length(x̂) * nt
-  return consecutive_param_array(x,npt)
+  return consecutive_parameterize(x,npt)
 end
 
 function RBSteady.galerkin_projection(

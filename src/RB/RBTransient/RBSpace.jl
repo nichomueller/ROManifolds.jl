@@ -13,13 +13,13 @@ const TransientSingleFieldEvalRBSpace = EvalRBSpace{SingleFieldRBSpace,<:Transie
 function Algebra.allocate_in_domain(r::TransientSingleFieldEvalRBSpace,x::V) where V<:AbstractParamVector
   x̂ = allocate_vector(eltype(V),num_reduced_dofs(r))
   np = num_params(r.realization)
-  return consecutive_param_array(x̂,np)
+  return consecutive_parameterize(x̂,np)
 end
 
 function Algebra.allocate_in_range(r::TransientSingleFieldEvalRBSpace,x̂::V) where V<:AbstractParamVector
   x = allocate_vector(eltype(V),num_fe_dofs(r))
   ntp = length(r.realization)
-  return consecutive_param_array(x,ntp)
+  return consecutive_parameterize(x,ntp)
 end
 
 function RBSteady.project!(x̂::ConsecutiveParamVector,r::TransientSingleFieldEvalRBSpace,x::ConsecutiveParamVector)

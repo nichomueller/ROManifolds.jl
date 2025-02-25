@@ -11,8 +11,6 @@ end
 FESpaces.get_fe_space(f::TrivialParamFESpace) = f.space
 
 ParamDataStructures.param_length(f::TrivialParamFESpace) = f.plength
-ParamDataStructures.to_param_quantity(f::SingleFieldParamFESpace,plength::Integer) = f
-ParamDataStructures.to_param_quantity(f::SingleFieldFESpace,plength::Integer) = TrivialParamFESpace(f,plength)
 ParamDataStructures.param_getindex(f::TrivialParamFESpace,index::Integer) = f.space
 
 function FESpaces.TrialFESpace(tf::TrivialParamFESpace)

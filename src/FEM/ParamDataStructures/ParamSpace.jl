@@ -546,6 +546,29 @@ function ParamFunction(f::Function,pt::TransientRealizationAt)
   ParamFunction(f,get_params(pt))
 end
 
+"""
+    parameterize(a,plength::Integer) -> Any
+
+Returns a quantity with parametric length `plength` from `a`. When `a` already
+possesses a parametric length, i.e. it is a parametrized quantity, it returns `a`
+"""
+parameterize(a,plength::Integer) = @abstractmethod
+
+function parameterize(a::AbstractParamFunction,plength::Integer)
+  @check param_length(a) == plength
+  return a
+end
+
+"""
+    parameterize(f::Function,r::Realization) -> ParamFunction
+    parameterize(f::Function,r::TransientRealization) -> TransientParamFunction
+
+Method that parameterizes an input quantity by a realization `r`
+"""
+function parameterize(f::Function,p::Realization)
+  ParamFunction(f,p)
+end
+
 get_params(f::ParamFunction) = get_params(f.params)
 _get_params(f::ParamFunction) = _get_params(f.params)
 num_params(f::ParamFunction) = length(_get_params(f))
@@ -611,6 +634,14 @@ end
 
 function TransientParamFunction(f::Function,r::TransientRealization)
   TransientParamFunction(f,get_params(r),get_times(r))
+end
+
+function parameterize(f::Function,p::Realization,t)
+  TransientParamFunction(f,p,t)
+end
+
+function parameterize(f::Function,r::TransientRealization)
+  TransientParamFunction(f,r)
 end
 
 get_params(f::TransientParamFunction) = get_params(f.params)

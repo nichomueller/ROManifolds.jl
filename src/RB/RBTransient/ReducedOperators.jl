@@ -2,12 +2,9 @@ function RBSteady.reduced_operator(
   solver::RBSolver,
   feop::TransientParamFEOperator,
   args...;
-  dir=datadir(),
   kwargs...)
 
   fesnaps,festats = solution_snapshots(solver,feop,args...;kwargs...)
-  save(fesnaps,dir)
-  save(festats,dir;label="fe")
   reduced_operator(solver,feop,fesnaps)
 end
 

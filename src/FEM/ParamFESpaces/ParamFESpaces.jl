@@ -27,7 +27,6 @@ import ArraysOfArrays: _innerlength
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 
-export get_param_assembler
 include("ParamAssemblers.jl")
 
 export SingleFieldParamFESpace

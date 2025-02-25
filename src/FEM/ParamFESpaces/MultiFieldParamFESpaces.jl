@@ -14,24 +14,6 @@ function MultiFieldParamFESpace(
   MultiFieldFESpace(V,spaces,style)
 end
 
-#TODO the code does not compile when defining these functions
-# function MultiFieldParamFESpace(
-#   spaces::Vector{<:Union{<:SingleFieldFESpace,<:SingleFieldParamFESpace}};
-#   style = BlockMultiFieldStyle())
-
-#   spaces′ = ParamDataStructures.to_param_quantities(spaces...)
-#   MultiFieldFESpace(spaces′,style=style)
-# end
-
-# function MultiFieldParamFESpace(
-#   ::Type{V},
-#   spaces::Vector{<:Union{<:SingleFieldFESpace,<:SingleFieldParamFESpace}};
-#   style = BlockMultiFieldStyle()) where V
-
-#   spaces′ = ParamDataStructures.to_param_quantities(spaces...)
-#   MultiFieldParamFESpace(spaces;style)
-# end
-
 function MultiField._restrict_to_field(
   f,
   ::Union{<:ConsecutiveMultiFieldStyle,<:BlockMultiFieldStyle},

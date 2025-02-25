@@ -4,6 +4,8 @@ function param_array(a::BlockArray,l::Integer;kwargs...)
   mortar(map(b -> param_array(b,l;kwargs...),blocks(a)))
 end
 
+param_array(A::AbstractArray{<:AbstractParamArray},l::Integer;kwargs...) = ParamArray(A;kwargs...)
+
 """
     struct BlockParamArray{T,N,A<:AbstractArray{<:AbstractParamArray{T,N},N},B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N}
       data::A

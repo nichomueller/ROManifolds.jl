@@ -1,5 +1,6 @@
 ParamArray(A::AbstractVector{<:SparseMatrixCSC};kwargs...) = ConsecutiveParamSparseMatrixCSC(A)
 ParamArray(A::AbstractVector{<:SparseMatrixCSR};kwargs...) = ConsecutiveParamSparseMatrixCSR(A)
+param_array(A::AbstractArray{<:AbstractSparseMatrix},l::Integer;kwargs...) = ParamArray(A;kwargs...)
 
 function SparseArrays.sparse(
   m::Int,

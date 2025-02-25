@@ -1,25 +1,25 @@
 """
-    get_param_assembler(a::SparseMatrixAssembler,r::AbstractRealization) -> SparseMatrixAssembler
+    parameterize(a::SparseMatrixAssembler,r::AbstractRealization) -> SparseMatrixAssembler
 
 Returns an assembler that also stores the parametric length of `r`. This function
 is to be used to assemble parametric residuals and Jacobians. The assembly routines
 follow the same pipeline as in `Gridap`
 """
-function get_param_assembler(a::SparseMatrixAssembler,r::AbstractRealization)
-  matrix_builder = get_param_matrix_builder(a,r)
-  vector_builder = get_param_vector_builder(a,r)
+function ParamDataStructures.parameterize(a::SparseMatrixAssembler,r::AbstractRealization)
+  matrix_builder = parameterize(get_matrix_builder(a),r)
+  vector_builder = parameterize(get_vector_builder(a),r)
   rows = FESpaces.get_rows(a)
   cols = FESpaces.get_cols(a)
   strategy = FESpaces.get_assembly_strategy(a)
   GenericSparseMatrixAssembler(matrix_builder,vector_builder,rows,cols,strategy)
 end
 
-function get_param_assembler(
+function ParamDataStructures.parameterize(
   a::MultiField.BlockSparseMatrixAssembler{NB,NV,SB,P},
   r::AbstractRealization) where {NB,NV,SB,P}
 
-  matrix_builder = get_param_matrix_builder(a,r)
-  vector_builder = get_param_vector_builder(a,r)
+  matrix_builder = parameterize(_getfirst(get_matrix_builder(a)),r)
+  vector_builder = parameterize(_getfirst(get_vector_builder(a)),r)
   rows = FESpaces.get_rows(a)
   cols = FESpaces.get_cols(a)
   strategy = FESpaces.get_assembly_strategy(a)
@@ -33,33 +33,8 @@ function get_param_assembler(
   MultiField.BlockSparseMatrixAssembler{NB,NV,SB,P}(block_assemblers)
 end
 
-function get_param_matrix_builder(a::SparseMatrixAssembler,r::AbstractRealization)
-  mat = get_matrix_builder(a)
-  plength = length(r)
-  ParamAlgebra.ParamBuilder(mat,plength)
-end
-
-function get_param_vector_builder(a::SparseMatrixAssembler,r::AbstractRealization)
-  vec = get_vector_builder(a)
-  plength = length(r)
-  ParamAlgebra.ParamBuilder(vec,plength)
-end
-
-function get_param_matrix_builder(
-  a::MultiField.BlockSparseMatrixAssembler,
-  r::AbstractRealization)
-
-  assem = first(a.block_assemblers)
-  get_param_matrix_builder(assem,r)
-end
-
-function get_param_vector_builder(
-  a::MultiField.BlockSparseMatrixAssembler,
-  r::AbstractRealization)
-
-  assem = first(a.block_assemblers)
-  get_param_vector_builder(assem,r)
-end
+_getfirst(a::Fields.ArrayBlock) = a[findfirst(a.touched)]
+_getfirst(a::Fields.ArrayBlockView) = _getfirst(a.array)
 
 function FESpaces.assemble_vector_add!(
   b::BlockParamVector,

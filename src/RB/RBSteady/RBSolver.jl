@@ -70,32 +70,40 @@ res_params(s::RBSolver) = 1:num_res_params(s)
 jac_params(s::RBSolver) = 1:num_jac_params(s)
 
 """
-    solution_snapshots(solver::RBSolver,op::ParamFEOperator;nparams,r) -> SteadySnapshots
-    solution_snapshots(solver::RBSolver,op::TransientParamFEOperator,u0;nparams,r) -> TransientSnapshots
+    solution_snapshots(solver::FESolver,op::ParamFEOperator,r::Realization) -> SteadySnapshots
+    solution_snapshots(solver::ODESolver,op::TransientParamFEOperator,r::TransientRealization,u0) -> TransientSnapshots
 
 The problem encoded in the FE operator `op` is solved several times, and the solution
 snapshots are returned along with the information related to the computational
 cost of the FE method. In transient settings, an initial condition `u0` should be
-provided. The keyword arguments are
-
-- `nparams`: number of parameters for which the snapshots should be computed
-- `r`: realization (i.e. set of parameters) for which the snapshots should be computed
+provided.
 """
 function solution_snapshots(
   solver::RBSolver,
-  op::ParamFEOperator;
+  op::ParamFEOperator,
+  args...;
   nparams=num_offline_params(solver),
   r=realization(op;nparams))
 
-  solution_snapshots(solver,op,r)
+  fesolver = get_fe_solver(solver)
+  solution_snapshots(fesolver,op,r,args...)
 end
 
 function solution_snapshots(
   solver::RBSolver,
   op::ParamFEOperator,
-  r::Realization)
+  r::AbstractRealization,
+  args...)
 
   fesolver = get_fe_solver(solver)
+  solution_snapshots(fesolver,op,r,args...)
+end
+
+function solution_snapshots(
+  fesolver::FESolver,
+  op::ParamFEOperator,
+  r::Realization)
+
   dof_map = get_dof_map(op)
   uh,stats = solve(fesolver,op,r)
   values = get_free_dof_values(uh)
@@ -113,12 +121,11 @@ that we can select a smaller number of parameters `nparams` compared to the
 number of parameters used to compute `s`
 """
 function residual_snapshots(
-  solver::RBSolver,
+  solver::FESolver,
   op::ParamOperator,
   s::AbstractSnapshots;
   nparams=res_params(solver))
 
-  fesolver = get_fe_solver(solver)
   sres = select_snapshots(s,nparams)
   us_res = get_param_data(sres)
   r_res = get_realization(sres)
@@ -143,14 +150,9 @@ function residual_snapshots(
   return Snapshots(b,ib,r_res)
 end
 
-function residual_snapshots(
-  solver::RBSolver,
-  op::ParamOperator{LinearNonlinearParamEq},
-  s::AbstractSnapshots;
-  kwargs...)
-
-  res_lin = residual_snapshots(solver,get_linear_operator(op),s;kwargs...)
-  res_nlin = residual_snapshots(solver,get_nonlinear_operator(op),s;kwargs...)
+function residual_snapshots(solver,op::ParamOperator{LinearNonlinearParamEq},args...;kwargs...)
+  res_lin = residual_snapshots(solver,get_linear_operator(op),args...;kwargs...)
+  res_nlin = residual_snapshots(solver,get_nonlinear_operator(op),args...;kwargs...)
   return (res_lin,res_nlin)
 end
 

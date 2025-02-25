@@ -80,7 +80,25 @@ x̂,rbstats = solve(rbsolver,rbop,μon)
 
 # test
 x,festats = solution_snapshots(rbsolver,feop,μon)
-perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon;internal_nodes=false)
+
+# last attempt
+Ωincut = Ω.a
+dΩincut = Measure(Ωincut,degree)
+a(μ,u,v,dΩ,dΩincut,dΓ) = ∫( νμ(μ)*∇(v)⋅∇(u) )dΩ + ∫( νμ(μ)*∇(v)⋅∇(u) )dΩincut - ∫( νμ(μ)*v*(nΓ⋅∇(u)) - νμ(μ)*(nΓ⋅∇(v))*u )dΓ
+b(μ,u,v,dΩ,dΓ) = a(μ,u,v,dΩ,dΓ) - ∫( v*fμ(μ) )dΩ - ∫( νμ(μ)*(nΓ⋅∇(v))*gμ(μ) )dΓ
+domains = FEDomains((Ω,Γ),(Ω,Ωincut,Γ))
+bgcell_to_inoutcut = compute_bgcell_to_inoutcut(bgmodel,geo)
+test = TProductFESpace(Ωact,Ωbg,bgcell_to_inoutcut,reffe;conformity=:H1)
+trial = ParamTrialFESpace(test,gμ)
+feop = LinearParamFEOperator(b,a,pspace,trial,test,domains)
+fesnaps, = solution_snapshots(rbsolver,feop)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+μon = realization(feop;nparams=10,sampling=:uniform)
+x̂,rbstats = solve(rbsolver,rbop,μon)
+x,festats = solution_snapshots(rbsolver,feop,μon)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon;internal_nodes=false)
+#
 
 rbsnaps = RBSteady.to_snapshots(rbop.trial,x̂,μon)
 i′ = get_internal_dof_map(feop)
@@ -164,3 +182,85 @@ Xmat = kron(X)
 cores, = ttsvd(red_style,A,X)
 Φ = cores2basis(cores...)
 maximum(abs.(v - Φ*Φ'*Xmat*v))
+
+using ROM
+using Gridap
+using DrWatson
+
+# geometry
+Ω = (0,1,0,1)
+parts = (10,10)
+Ωₕ = CartesianDiscreteModel(Ω,parts)
+τₕ = Triangulation(Ωₕ)
+
+# time scheme
+θ = 0.5
+dt = 0.01
+t0 = 0.0
+tf = 10*dt
+tdomain = t0:dt:tf
+
+# parametric quantities
+pdomain = (1,5,1,5)
+D  = TransientParamSpace(pdomain,tdomain)
+u(μ,t) = x -> t*(μ[1]*x[1]^2 + μ[2]*x[2]^2)
+uₚₜ(μ,t) = parameterize(u,μ,t)
+f(μ,t) = x -> -Δ(u(μ,t))(x)
+fₚₜ(μ,t) = parameterize(f,μ,t)
+
+# numerical integration
+order = 1
+dΩₕ = Measure(τₕ,2order)
+
+# weak form
+a(μ,t,du,v,dΩₕ) = ∫(∇(v)⋅∇(du))dΩₕ
+m(μ,t,du,v,dΩₕ) = ∫(v*du)dΩₕ
+r(μ,t,u,v,dΩₕ) = m(μ,t,∂t(u),v,dΩₕ) + a(μ,t,u,v,dΩₕ) - ∫(fₚₜ(μ,t)*v)dΩₕ
+
+# triangulation information
+τₕ_a = (τₕ,)
+τₕ_m = (τₕ,)
+τₕ_r = (τₕ,)
+domains = FEDomains(τₕ_r,(τₕ_a,τₕ_m))
+
+# FE interpolation
+reffe = ReferenceFE(lagrangian,Float64,order)
+V = TestFESpace(Ωₕ,reffe;dirichlet_tags="boundary")
+U = TransientTrialParamFESpace(V,uₚₜ)
+feop = TransientParamLinearFEOperator((a,m),r,D,U,V,domains)
+
+# initial condition
+u₀(μ) = x -> 0.0
+u₀ₚ(μ) = parameterize(u₀,μ)
+uh₀ₚ(μ) = interpolate_everywhere(u₀ₚ(μ),U(μ,t0))
+
+# FE solver
+slvr = ThetaMethod(LUSolver(),dt,θ)
+
+# RB solver
+tol = 1e-4
+inner_prod(u,v) = ∫(∇(v)⋅∇(u))dΩₕ
+red_sol = TransientReduction(tol,inner_prod;nparams=20)
+rbslvr = RBSolver(slvr,red_sol;nparams_jac=1,nparams_res=1)
+
+dir = datadir("heat_equation")
+create_dir(dir)
+
+try # try loading offline quantities
+    rbop = load_operator(dir,feop)
+catch # offline phase
+    rbop = reduced_operator(rbslvr,feop,uh₀ₚ)
+    save(dir,rbop)
+end
+
+rbop = reduced_operator(rbslvr,feop,uh₀ₚ)
+save(dir,rbop)
+rbop = load_operator(dir,feop)
+
+# online phase
+μₒₙ = realization(feop;nparams=10,sampling=:uniform)
+x̂,rbstats = solve(rbslvr,rbop,μₒₙ,uh₀ₚ)
+
+# post process
+x,stats = solution_snapshots(slvr,feop,μₒₙ,uh₀ₚ)
+eval_performance(rbslvr,feop,rbop,x,x̂,stats,rbstats)

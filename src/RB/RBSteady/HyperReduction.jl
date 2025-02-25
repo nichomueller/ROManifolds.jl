@@ -333,7 +333,7 @@ function allocate_coefficient(a::HyperReduction,r::AbstractRealization)
   n = num_reduced_dofs(a)
   np = num_params(r)
   coeffvec = allocate_vector(Vector{Float64},n)
-  coeff = consecutive_param_array(coeffvec,np)
+  coeff = consecutive_parameterize(coeffvec,np)
   return coeff
 end
 
@@ -344,7 +344,7 @@ function allocate_hyper_reduction(
   nrows = num_reduced_dofs_left_projector(a)
   np = num_params(r)
   b = allocate_vector(Vector{Float64},nrows)
-  hypred = consecutive_param_array(b,np)
+  hypred = consecutive_parameterize(b,np)
   fill!(hypred,zero(eltype(hypred)))
   return hypred
 end
@@ -357,7 +357,7 @@ function allocate_hyper_reduction(
   ncols = num_reduced_dofs_right_projector(a)
   np = num_params(r)
   M = allocate_matrix(Matrix{Float64},nrows,ncols)
-  hypred = consecutive_param_array(M,np)
+  hypred = consecutive_parameterize(M,np)
   fill!(hypred,zero(eltype(hypred)))
   return hypred
 end
@@ -621,7 +621,7 @@ function Arrays.return_cache(
   r::AbstractRealization)
 
   coeffvec = testvalue(Vector{Float64})
-  consecutive_param_array(coeffvec,num_params(r))
+  consecutive_parameterize(coeffvec,num_params(r))
 end
 
 function Arrays.return_cache(
@@ -652,7 +652,7 @@ function Arrays.return_cache(
   r::AbstractRealization)
 
   hypvec = testvalue(Vector{Float64})
-  consecutive_param_array(hypvec,num_params(r))
+  consecutive_parameterize(hypvec,num_params(r))
 end
 
 function Arrays.return_cache(
@@ -661,7 +661,7 @@ function Arrays.return_cache(
   r::AbstractRealization)
 
   hypvec = testvalue(Matrix{Float64})
-  consecutive_param_array(hypvec,num_params(r))
+  consecutive_parameterize(hypvec,num_params(r))
 end
 
 function Arrays.return_cache(

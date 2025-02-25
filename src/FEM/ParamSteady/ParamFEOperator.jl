@@ -83,9 +83,7 @@ end
 
 ParamDataStructures.realization(op::ParamFEOperator;kwargs...) = realization(get_param_space(op);kwargs...)
 
-function ParamFESpaces.get_param_assembler(op::ParamFEOperator,r::AbstractRealization)
-  get_param_assembler(get_assembler(op),r)
-end
+get_param_assembler(op::ParamFEOperator,r::AbstractRealization) = parameterize(get_assembler(op),r)
 
 CellData.get_domains(op::ParamFEOperator) = @abstractmethod
 get_domains_res(op::ParamFEOperator) = get_domains_res(get_domains(op))
