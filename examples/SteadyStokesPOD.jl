@@ -11,7 +11,7 @@ include("ExamplesInterface.jl")
 
 pdomain = (1,10,-1,5,1,2)
 pspace = ParamSpace(pdomain)
--
+
 R = 0.3
 pmin = Point(0,0)
 pmax = Point(1,1)

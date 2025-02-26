@@ -78,23 +78,22 @@ function OrderedFESpace(model::CartesianDiscreteModel,args...;kwargs...)
   CartesianFESpace(model,args...;kwargs...)
 end
 
-function OrderedFESpace(trian::Triangulation,bg_cell_to_inoutcut::AbstractVector,args...;kwargs...)
+function OrderedFESpace(trian::Triangulation,args...;kwargs...)
   act_model = get_active_model(trian)
   bg_model = get_background_model(trian)
-  OrderedFESpace(act_model,bg_model,trian,bg_cell_to_inoutcut,args...;kwargs...)
+  OrderedFESpace(act_model,bg_model,trian,args...;kwargs...)
 end
 
 function OrderedFESpace(
   act_model::DiscreteModel,
   bg_model::CartesianDiscreteModel,
   act_trian::Triangulation,
-  bg_cell_to_inoutcut::AbstractVector,
   args...;kwargs...)
 
   act_f = CartesianFESpace(act_model,args...;trian=act_trian,kwargs...)
   bg_f = CartesianFESpace(bg_model,args...;kwargs...)
   act_odofs = _get_bg_odof_to_act_odof(bg_f,act_f)
-  in_odofs = _get_bg_odof_to_in_odof(bg_f,bg_cell_to_inoutcut,act_odofs)
+  in_odofs = act_odofs#_get_bg_odof_to_in_odof(bg_f,bg_cell_to_inoutcut,act_odofs)
   CartesianFESpace(act_f.space,act_f.cell_odofs_ids,act_odofs,in_odofs)
 end
 

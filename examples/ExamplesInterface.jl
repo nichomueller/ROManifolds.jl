@@ -63,16 +63,17 @@ function plot_errors(dir,tols,perfs::Vector{ROMPerformance})
   errs = map(get_error,perfs)
   n = length(first(errs))
   errvec = map(i -> getindex.(errs,i),1:n)
-  labvec = ["variable $i" for i in 1:n]
+  labvec = n==1 ? "Error" : ["Error $i" for i in 1:n]
 
-  plot_dir = joinpath(dir,"convergence.pdf")
-  p = plot(tols,tols,lw=3,label="ϵ")
+  file = joinpath(dir,"convergence.pdf")
+  p = plot(tols,tols,lw=3,label="Tol.")
   scatter!(tols,errvec,lw=3,label=labvec)
-  xlabel!("ϵ")
+  plot!(xscale=:log10,yscale=:log10)
+  xlabel!("Tolerance")
   ylabel!("Error")
   title!("Average relative error")
 
-  savefig(p,plot_dir)
+  savefig(p,file)
 end
 
 update_redstyle(rs::SearchSVDRank,tol) = SearchSVDRank(tol)
@@ -206,7 +207,7 @@ function run_test(
     rbop = try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps)
 
     x̂,rbstats = solve(rbsolver,rbop,μon,args...)
-    perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
+    perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
     println(perf)
     push!(perfs,perf)
 

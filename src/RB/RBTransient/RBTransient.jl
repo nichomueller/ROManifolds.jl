@@ -42,7 +42,7 @@ include("RBSolvers.jl")
 
 include("TTLinearAlgebra.jl")
 
-include("BasisConstructions.jl")
+include("BasesConstruction.jl")
 
 include("GalerkinProjections.jl")
 

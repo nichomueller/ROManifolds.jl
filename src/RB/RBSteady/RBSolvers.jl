@@ -121,7 +121,7 @@ that we can select a smaller number of parameters `nparams` compared to the
 number of parameters used to compute `s`
 """
 function residual_snapshots(
-  solver::FESolver,
+  solver::RBSolver,
   op::ParamOperator,
   s::AbstractSnapshots;
   nparams=res_params(solver))
@@ -140,7 +140,6 @@ function residual_snapshots(
   s::AbstractSnapshots;
   nparams=res_params(solver))
 
-  fesolver = get_fe_solver(solver)
   sres = select_snapshots(s,nparams)
   us_res = get_param_data(sres) |> similar
   fill!(us_res,zero(eltype2(us_res)))
@@ -150,7 +149,7 @@ function residual_snapshots(
   return Snapshots(b,ib,r_res)
 end
 
-function residual_snapshots(solver,op::ParamOperator{LinearNonlinearParamEq},args...;kwargs...)
+function residual_snapshots(solver::RBSolver,op::ParamOperator{LinearNonlinearParamEq},args...;kwargs...)
   res_lin = residual_snapshots(solver,get_linear_operator(op),args...;kwargs...)
   res_nlin = residual_snapshots(solver,get_nonlinear_operator(op),args...;kwargs...)
   return (res_lin,res_nlin)

@@ -16,7 +16,9 @@ end
 for f in (:param_array,:ParamArray)
   @eval begin
     function $f(A::AbstractArray{<:AbstractArray},l::Integer;kwargs...)
-      @assert length(A) == l
+      plength(A) = length(A)
+      plength(A::AbstractParamArray) = param_length(A)
+      @assert plength(A) == l
       $f(A;kwargs...)
     end
 

@@ -1,10 +1,6 @@
-module StokesEquation
+module PoissonEquation
 
 using Gridap
-using Gridap.MultiField
-using Test
-using DrWatson
-
 using ROManifolds
 
 tol_or_rank(tol,rank) = @assert false "Provide either a tolerance or a rank for the reduction step"
@@ -19,7 +15,7 @@ function main(
   )
 
   @assert method ∈ (:pod,:ttsvd) "Unrecognized reduction method! Should be one of (:pod,:ttsvd)"
-  pdomain = (1,10,-1,5,1,2)
+  pdomain = (1,10,1,10,1,10)
 
   domain = (0,1,0,1)
   partition = (20,20)
@@ -29,44 +25,46 @@ function main(
     model = CartesianDiscreteModel(domain,partition)
   end
 
-  order = 2
+  order = 1
   degree = 2*order
 
   Ω = Triangulation(model)
   dΩ = Measure(Ω,degree)
+  Γn = BoundaryTriangulation(model,tags=[8])
+  dΓn = Measure(Γn,degree)
 
-  a(μ) = x -> μ[1]*exp(-x[1])
+  a(μ) = x -> exp(-x[1]/sum(μ))
   aμ(μ) = ParamFunction(a,μ)
 
-  g(μ) = x -> VectorValue(-(μ[2]*x[2]+μ[3])*x[2]*(1.0-x[2]),0.0)*(x[1]==0.0)
+  f(μ) = x -> 1.
+  fμ(μ) = ParamFunction(f,μ)
+
+  g(μ) = x -> μ[1]*exp(-x[1]/μ[2])
   gμ(μ) = ParamFunction(g,μ)
 
-  stiffness(μ,(u,p),(v,q),dΩ) = ∫(aμ(μ)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
-  res(μ,(u,p),(v,q),dΩ) = stiffness(μ,(u,p),(v,q),dΩ)
+  h(μ) = x -> abs(cos(μ[3]*x[2]))
+  hμ(μ) = ParamFunction(h,μ)
 
-  trian_res = (Ω,)
+  stiffness(μ,u,v,dΩ) = ∫(aμ(μ)*∇(v)⋅∇(u))dΩ
+  rhs(μ,v,dΩ,dΓn) = ∫(fμ(μ)*v)dΩ + ∫(hμ(μ)*v)dΓn
+  res(μ,u,v,dΩ,dΓn) = stiffness(μ,u,v,dΩ) - rhs(μ,v,dΩ,dΓn)
+
+  trian_res = (Ω,Γn)
   trian_stiffness = (Ω,)
   domains = FEDomains(trian_res,trian_stiffness)
 
-  energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
+  energy(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
 
-  reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-  test_u = TestFESpace(Ω,reffe_u;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6,7])
-  trial_u = ParamTrialFESpace(test_u,gμ)
-  reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-  test_p = TestFESpace(Ω,reffe_p;conformity=:H1)
-  trial_p = ParamTrialFESpace(test_p)
-  test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
-  trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
+  reffe = ReferenceFE(lagrangian,Float64,order)
+  test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=[1,3,7])
+  trial = ParamTrialFESpace(test,gμ)
 
   tolrank = tol_or_rank(tol,rank)
   if method == :pod
-    coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
-    state_reduction = SupremizerReduction(coupling,tolrank,energy;nparams,sketch)
+    state_reduction = PODReduction(tolrank,energy;nparams,sketch)
   else method == :ttsvd
-    tolranks = fill(tolrank,4)
-    ttcoupling((du,dp),(v,q)) = ∫(dp*∂₁(v))dΩ + ∫(dp*∂₂(v))dΩ
-    state_reduction = SupremizerReduction(ttcoupling,tolranks,energy;nparams,unsafe)
+    tolranks = fill(tolrank,3)
+    state_reduction = Reduction(tolranks,energy;nparams,unsafe)
   end
 
   fesolver = LinearFESolver(LUSolver())
@@ -85,7 +83,7 @@ function main(
     fesnaps, = solution_snapshots(rbsolver,feop)
     rbop = reduced_operator(rbsolver,feop,fesnaps)
     x̂,rbstats = solve(rbsolver,rbop,μon)
-    perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
+    perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
 
     println(perf)
   end

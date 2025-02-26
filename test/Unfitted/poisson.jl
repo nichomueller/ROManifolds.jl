@@ -10,7 +10,7 @@ tol_or_rank(tol::Real,rank::Int) = tol
 tol_or_rank(tol,rank::Int) = rank
 
 function main(
-  n=20,method=:pod;
+  method=:pod,n=20;
   tol=1e-4,rank=nothing,nparams=50,nparams_res=floor(Int,nparams/3),
   nparams_jac=floor(Int,nparams/4),sketch=:sprn,unsafe=false
   )
@@ -34,12 +34,11 @@ function main(
   pmax = p1+t*R
   dp = pmax - pmin
 
-  domain = (0,1,0,1)
   partition = (n,n)
   if method==:ttsvd
-    bgmodel = TProductDiscreteModel(domain,partition)
+    bgmodel = TProductDiscreteModel(pmin,pmax,partition)
   else
-    bgmodel = CartesianDiscreteModel(domain,partition)
+    bgmodel = CartesianDiscreteModel(pmin,pmax,partition)
   end
 
   order = 1
@@ -51,15 +50,19 @@ function main(
   Ω = Triangulation(cutgeo,PHYSICAL)
   Γ = EmbeddedBoundary(cutgeo)
 
+  dΩbg = Measure(Ωbg,degree)
+  dΩ = Measure(Ω,degree)
+  dΓ = Measure(Γ,degree)
+
   nΓ = get_normal_vector(Γ)
 
-  ν(μ) = x->sum(μ)
+  ν(μ) = x->μ[3]
   νμ(μ) = ParamFunction(ν,μ)
 
   f(μ) = x->μ[1]*x[1] - μ[2]*x[2]
   fμ(μ) = ParamFunction(f,μ)
 
-  g(μ) = x->μ[3]*sum(x)
+  g(μ) = x->0
   gμ(μ) = ParamFunction(g,μ)
 
   # non-symmetric formulation
@@ -71,22 +74,22 @@ function main(
   trian_b = (Ω,Γ)
   domains = FEDomains(trian_b,trian_a)
 
-  energy(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
-
   reffe = ReferenceFE(lagrangian,Float64,order)
 
   tolrank = tol_or_rank(tol,rank)
   if method == :pod
     test = TestFESpace(Ωact,reffe;conformity=:H1)
+    energy(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
     state_reduction = PODReduction(tolrank,energy;nparams,sketch)
   else method == :ttsvd
     test = TProductFESpace(Ωact,Ωbg,reffe;conformity=:H1)
     tolranks = fill(tolrank,3)
-    state_reduction = Reduction(tolranks,energy;nparams,unsafe)
+    ttenergy(du,v) = ∫(v*du)dΩbg + ∫(∇(v)⋅∇(du))dΩbg
+    state_reduction = Reduction(tolranks,ttenergy;nparams,unsafe)
   end
 
   trial = ParamTrialFESpace(test)
-  feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,domains)
+  feop = LinearParamFEOperator(b,a,pspace,trial,test,domains)
 
   fesolver = LinearFESolver(LUSolver())
   rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
@@ -101,7 +104,7 @@ function main(
 
   # test
   x,festats = solution_snapshots(rbsolver,feop,μon)
-  perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
+  perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
   println(perf)
 end
 

@@ -187,6 +187,6 @@ end
 x̂on,rbstats = solve(rbsolver,rbop,μon)
 
 xon,festats = solve(rbsolver,feop,μon)
-perf = eval_performance(rbsolver,feop,rbop,xon,x̂on,festats,rbstats,μon)
+perf = eval_performance(rbsolver,feop,rbop,xon,x̂on,festats,rbstats)
 println(perf)
 ```

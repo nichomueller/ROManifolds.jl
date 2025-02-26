@@ -118,7 +118,7 @@ function main(
     fesnaps, = solution_snapshots(rbsolver,feop,xh0μ)
     rbop = reduced_operator(rbsolver,feop,fesnaps)
     x̂,rbstats = solve(rbsolver,rbop,μon,xh0μ)
-    perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats,μon)
+    perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
 
     println(perf)
   end
