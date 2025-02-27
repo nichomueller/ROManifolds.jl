@@ -65,7 +65,7 @@ function plot_errors(dir,tols,perfs::Vector{ROMPerformance})
   errvec = map(i -> getindex.(errs,i),1:n)
   labvec = n==1 ? "Error" : ["Error $i" for i in 1:n]
 
-  file = joinpath(dir,"convergence.pdf")
+  file = joinpath(dir,"convergence.png")
   p = plot(tols,tols,lw=3,label="Tol.")
   scatter!(tols,errvec,lw=3,label=labvec)
   plot!(xscale=:log10,yscale=:log10)
