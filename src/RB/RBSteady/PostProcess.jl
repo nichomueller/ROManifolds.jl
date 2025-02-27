@@ -404,61 +404,71 @@ function plot_a_solution(dir,Ω,uh,ûh,r::Realization)
   writevtk(Ω,dir*".vtu",cellfields=["uh"=>uh1,"ûh"=>ûh1,"eh"=>eh1])
 end
 
+function plot_a_solution(
+  dir::String,
+  trial::UnEvalTrialFESpace,
+  sol::Snapshots,
+  sol_approx::Snapshots;
+  trian=get_triangulation(trial),
+  field=1)
+
+  r = get_realization(sol)
+  Ur = trial(r)
+  uh = FEFunction(Ur,get_param_data(sol))
+  ûh = FEFunction(Ur,get_param_data(sol_approx))
+  dirfield = joinpath(dir,"var$field")
+  plot_a_solution(dirfield,trian,uh,ûh,r)
+end
+
 """
     plot_a_solution(
-      dir,
+      dir::String,
       feop::ParamFEOperator,
-      sol::Snapshots,
-      sol_approx::Snapshots,
-      args...
+      sol::AbstractSnapshots,
+      sol_approx::AbstractSnapshots,
+      args...;
+      kwargs...
       ) -> Nothing
 
 Plots a single FE solution, RB solution, and the point-wise error between the two,
 by selecting the first FE snapshot in `sol` and the first reduced snapshot in `sol_approx`
 """
 function plot_a_solution(
-  dir,
+  dir::String,
   feop::ParamFEOperator,
   sol::Snapshots,
-  sol_approx::Snapshots,
-  field=1)
+  sol_approx::Snapshots;
+  kwargs...)
 
-  r = get_realization(sol)
-
-  trial = get_trial(feop)(r)
-  U = isa(trial,MultiFieldFESpace) ? trial[field] : trial
-  Ω = get_triangulation(U)
-
-  uh = FEFunction(U,get_param_data(sol))
-  ûh = FEFunction(U,get_param_data(sol_approx))
-  dirfield = joinpath(dir,"var$field")
-
-  plot_a_solution(dirfield,Ω,uh,ûh,r)
+  trial = get_trial(feop)
+  plot_a_solution(dir,trial,sol,sol_approx;kwargs...)
 end
 
 function plot_a_solution(
-  dir,
+  dir::String,
   feop::ParamFEOperator,
   sol::BlockSnapshots,
-  sol_approx::BlockSnapshots,
-  args...)
+  sol_approx::BlockSnapshots;
+  kwargs...)
 
   @check sol.touched == sol_approx.touched
+  trials = get_trial(feop)
   for i in eachindex(sol)
     if sol.touched[i]
-      plot_a_solution(dir,feop,sol[i],sol_approx[i],i)
+      plot_a_solution(dir,trials[i],sol[i],sol_approx[i];field=i,kwargs...)
     end
   end
 end
 
 function plot_a_solution(
-  dir,
+  dir::String,
   feop::ParamFEOperator,
   rbop::ParamOperator,
   fesnaps::AbstractSnapshots,
   x̂::AbstractParamVector,
-  r::AbstractRealization)
+  r::AbstractRealization;
+  kwargs...)
 
   rbsnaps = to_snapshots(get_trial(rbop),x̂,r)
-  plot_a_solution(dir,feop,fesnaps,rbsnaps)
+  plot_a_solution(dir,feop,fesnaps,rbsnaps;kwargs...)
 end
