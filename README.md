@@ -62,7 +62,7 @@ julia> include("examples/SteadyElasticityTTSVD.jl")
 ```
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png" alt="drawing" style="width:100%; height:100%;"/>  |  <img src="docs/src/assets/results/elasticity_ttsvd/results/convergence.png" alt="drawing" style="width:80%; height:100%;"/>
+<img src="docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png" alt="drawing" style="width:400px; height:250px;"/>  |  <img src="docs/src/assets/results/elasticity_ttsvd/results/convergence.png" alt="drawing" style="width:400px; height:250px;"/>
 
 ### Test 3
 
@@ -74,7 +74,7 @@ julia> include("examples/SteadyStokesPOD.jl")
 
 Solution-velocity          |  Solution-pressure        |  Convergence
 :-------------------------:|:-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/stokes_pod/plot/rbvel.png" alt="drawing" style="width:100%; height:100%;"/>  |  <img src="docs/src/assets/results/stokes_pod/plot/rbpress.png" alt="drawing" style="width:100%; height:100%;"/>  |  <img src="docs/src/assets/results/stokes_pod/results/convergence.png" alt="drawing" style="width:200%; height:300%;"/> 
+<img src="docs/src/assets/results/stokes_pod/plot/rbvel.png" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/stokes_pod/plot/rbpress.png" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/stokes_pod/results/convergence.png" alt="drawing" style="width:275px; height:250px;"/> 
 
 ### Test 4 
 
@@ -86,7 +86,7 @@ julia> include("examples/HeatEquationSTRB.jl")
 
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/heateq_pod/plot/rbsol.gif" alt="drawing" style="width:120%; height:120%;"/>  |  <img src="docs/src/assets/results/heateq_pod/results/convergence.png" alt="drawing" style="width:80%; height:100%;"/> 
+<img src="docs/src/assets/results/heateq_pod/plot/rbsol.gif" alt="drawing" style="width:400px; height:250px;"/>  |  <img src="docs/src/assets/results/heateq_pod/results/convergence.png" alt="drawing" style="width:400px; height:250px;"/> 
 
 ### Test 5
 
