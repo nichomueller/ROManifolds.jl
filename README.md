@@ -61,7 +61,7 @@ julia> include("examples/SteadyElasticityTTSVD.jl")
 ```
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-![Example 2 solution](docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png)  |  ![Example 2 convergence](docs/src/assets/results/elasticity_ttsvd/results/convergence.pdf)
+<img src="docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png" alt="drawing" height="100" width="100"/>  |  <img src="docs/src/assets/results/elasticity_ttsvd/results/convergence.pdf" alt="drawing" height="100" width="100"/>
 
 ### Test 3
 
