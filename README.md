@@ -50,7 +50,7 @@ julia> include("examples/SteadyElasticityPOD.jl")
 ```
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-![Example 1 solution](docs/src/assets/results/elasticity_pod/plot/rbsol.png)  |  ![Example 1 convergence](docs/src/assets/results/elasticity_pod/results/convergence.pdf)
+![Example 1 solution](docs/src/assets/results/elasticity_pod/plot/rbsol.png)  |  ![Example 1 convergence](docs/src/assets/results/results/elasticity_pod/results/convergence.pdf)
 
 ### Test 2
 
@@ -75,7 +75,7 @@ julia> include("examples/SteadyStokesPOD.jl")
 
 Solution-velocity          |  Solution-pressure        |  Convergence
 :-------------------------:|:-------------------------:|:-------------------------:
-![Example 3 velocity](docs/src/assets/results/stokes_pod/plot/rbvel.png) | ![Example 3 pressure](docs/src/assets/results/stokes_pod/plot/rbpress.png)  |  ![Example 3 convergence](docs/src/assets/results/stokes_pod/results/convergence.pdf)
+![Example 3 velocity](docs/src/assets/results/stokes_pod/plot/rbvel.png) | ![Example 3 pressure](docs/src/assets/results/stokes_pod/plot/rbpress.png)  |  ![Example 3 convergence](docs/src/assets/results/stokes_pod/results/results/convergence.pdf)
 
 ### Test 4 
 
@@ -87,7 +87,7 @@ julia> include("examples/HeatEquationSTRB.jl")
 
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-![Example 2 solution](docs/src/assets/results/heateq_pod/plot/rbsol.gif)  |  ![Example 2 convergence](docs/src/assets/results/heateq_pod/results/convergence.pdf)
+![Example 2 solution](docs/src/assets/results/heateq_pod/plot/rbsol.gif)  |  ![Example 2 convergence](docs/src/assets/results/heateq_pod/results/results/convergence.pdf)
 
 ### Test 5
 
