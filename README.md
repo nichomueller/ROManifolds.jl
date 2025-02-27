@@ -19,7 +19,7 @@ pkg> add ROManifolds
 
 ## Examples
 
-Before running the following examples, it is necessary to import from file some geometries saved to `.msh` file. They can be found in the [assets](https://nichomueller.github.io/ROManifolds.jl/docs/assets) directory of this repo, in the zipped file named `models.tar.gz`. The geometries must be unzipped and moved to a directory where the numerical experiments are ran. This directory should be placed inside the `data` directory of the `Julia` project which is being used to run these experiments. To find this directory, first add the package `DrWatson` with 
+Before running the following examples, it is necessary to import from file some geometries which can be found [here](https://nichomueller.github.io/ROManifolds.jl/docs/assets). The file name is `models.zip`. The geometries must be unzipped and moved to a directory where the numerical experiments are ran. This directory should be placed inside the `data` directory of the `Julia` project which is being used to run these experiments. To find this directory, first add the package `DrWatson` with 
 
 ```julia
 # Type ] to enter package mode
@@ -29,17 +29,18 @@ pkg> add DrWatson
 and call
 
 ```julia
-julia> dir = datadir()
+julia> test_dir = datadir()
 ```
 
 Now we can unzip the compressed folder in `dir` with 
 
 ```julia
+julia> model_dir = joinpath(@__DIR__,"docs/src/assets")
 # Type ; to enter shell mode
-shell> tar -xvzf models.tar.gz -C dir
+shell> unzip $model_dir/models.zip -d $test_dir
 ```
 
-In the following numerical examples, we provide a plot of the convergence errors for a series of tolerances (which determine the accuracy of the method), and a plot solution obtained with a fixed tolerance of `1e-5`.
+In the following numerical examples, we provide a plot of the convergence errors for a series of tolerances (which determine the accuracy of the method), and a solution plot obtained with a fixed tolerance of `1e-5`.
 
 ### Test 1 
 
@@ -50,7 +51,7 @@ julia> include("examples/SteadyElasticityPOD.jl")
 ```
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-![Example 1 solution](docs/src/assets/results/elasticity_pod/plot/rbsol.png)  |  ![Example 1 convergence](docs/src/assets/results/results/elasticity_pod/results/convergence.pdf)
+<img src="docs/src/assets/results/elasticity_pod/plot/rbsol.png" alt="drawing" height="200" width="200"/>  |  <img src="docs/src/assets/results/elasticity_pod/results/convergence.png" alt="drawing" height="200" width="200"/>
 
 ### Test 2
 
@@ -61,7 +62,7 @@ julia> include("examples/SteadyElasticityTTSVD.jl")
 ```
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png" alt="drawing" height="100" width="100"/>  |  <img src="docs/src/assets/results/elasticity_ttsvd/results/convergence.pdf" alt="drawing" height="100" width="100"/>
+<img src="docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png" alt="drawing" height="200" width="200"/>  |  <img src="docs/src/assets/results/elasticity_ttsvd/results/convergence.png" alt="drawing" height="200" width="200"/>
 
 ### Test 3
 
@@ -75,7 +76,7 @@ julia> include("examples/SteadyStokesPOD.jl")
 
 Solution-velocity          |  Solution-pressure        |  Convergence
 :-------------------------:|:-------------------------:|:-------------------------:
-![Example 3 velocity](docs/src/assets/results/stokes_pod/plot/rbvel.png) | ![Example 3 pressure](docs/src/assets/results/stokes_pod/plot/rbpress.png)  |  ![Example 3 convergence](docs/src/assets/results/stokes_pod/results/results/convergence.pdf)
+<img src="docs/src/assets/results/stokes_pod/plot/rbvel.png" alt="drawing" height="200" width="200"/>  |  <img src="docs/src/assets/results/stokes_pod/plot/rbpress" alt="drawing" height="200" width="200"/>  |  <img src="docs/src/assets/results/stokes_pod/results/convergence.png" alt="drawing" height="200" width="200"/> 
 
 ### Test 4 
 
@@ -87,7 +88,7 @@ julia> include("examples/HeatEquationSTRB.jl")
 
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-![Example 2 solution](docs/src/assets/results/heateq_pod/plot/rbsol.gif)  |  ![Example 2 convergence](docs/src/assets/results/heateq_pod/results/results/convergence.pdf)
+<img src="docs/src/assets/results/heateq_pod/plot/rbsol.gif" alt="drawing" height="200" width="200"/>  |  <img src="docs/src/assets/results/heateq_pod/results/convergence.png" alt="drawing" height="200" width="200"/> 
 
 ### Test 5
 
@@ -97,4 +98,4 @@ Lastly, we solve a Navier-Stokes equation with a space-time RB method.
 julia> include("examples/NStokesTransientSTRB.jl")
 ```
 
-<!-- |![Example 3 velocity](docs/src/assets/results/transient_nstokes_pod/plot/rbvel.gif) ![Example 3 pressure](docs/src/assets/results/transient_nstokes_pod/plot/rbpress.gif) ![Example 3 convergence](docs/src/assets/results/transient_nstokes_pod/results/convergence.pdf)|  -->
+<!-- |![Example 3 velocity](docs/src/assets/results/transient_nstokes_pod/plot/rbvel.gif) ![Example 3 pressure](docs/src/assets/results/transient_nstokes_pod/plot/rbpress.gif) ![Example 3 convergence](docs/src/assets/results/transient_nstokes_pod/results/convergence.png)|  -->
