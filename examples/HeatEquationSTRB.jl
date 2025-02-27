@@ -1,4 +1,4 @@
-module HeatEquationPOD
+module HeatEquationSTRB
 
 using DrWatson
 using Gridap

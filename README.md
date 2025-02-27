@@ -39,27 +39,29 @@ Now we can unzip the compressed folder in `dir` with
 shell> tar -xvzf models.tar.gz -C dir
 ```
 
+In the following numerical examples, we provide a plot of the convergence errors for a series of tolerances (which determine the accuracy of the method), and a plot solution obtained with a fixed tolerance of `1e-5`.
+
 ### Test 1 
 
-Solve a steady elasticity problem with a proper orthogonal decomposition algorithm
+Solve a steady elasticity problem with a proper orthogonal decomposition algorithm. 
 
 ```julia
 julia> include("examples/SteadyElasticityPOD.jl")
 ```
-![Example 1](examples/example1.png)
+|![Example 1 solution](docs/src/assets/results/elasticity_pod/plot/rbsol.png) ![Example 1 convergence](docs/src/assets/results/elasticity_pod/results/convergence.pdf)| 
 
 ### Test 2
 
-Do the same, but with a tensor-train decomposition approach
+Do the same, but with a tensor-train decomposition approach.
 
 ```julia
 julia> include("examples/SteadyElasticityTTSVD.jl")
 ```
-![Example 2](examples/example2.png)
+|![Example 2 solution](docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png) ![Example 2 convergence](docs/src/assets/results/elasticity_ttsvd/results/convergence.pdf)| 
 
 ### Test 3
 
-Solve a steady Stokes equation with a proper orthogonal decomposition algorithm
+Solve a steady Stokes equation with a proper orthogonal decomposition algorithm.
 
 ![Example 3](examples/example3.png)
 
@@ -67,30 +69,24 @@ Solve a steady Stokes equation with a proper orthogonal decomposition algorithm
 julia> include("examples/SteadyStokesPOD.jl")
 ```
 
+|![Example 3 velocity](docs/src/assets/results/stokes_pod/plot/rbvel.png) ![Example 3 pressure](docs/src/assets/results/stokes_pod/plot/rbpress.png) ![Example 3 convergence](docs/src/assets/results/stokes_pod/results/convergence.pdf)| 
+
 ### Test 4 
 
-![Example 4](examples/example4.png)
-
-```julia
-julia> include("examples/SteadyStokesTTSVD.jl")
-```
-
-### Test 5 
-
-Moving to transient applications, we first solve a heat equation with a space-time RB method
+Moving to transient applications, we first solve a heat equation with a space-time RB method.
 
 ```julia
 julia> include("examples/HeatEquationSTRB.jl")
 ```
 
-![Example 5](examples/example5.png)
+|![Example 4 solution](docs/src/assets/results/heateq_pod/plot/rbsol.gif) ![Example 4 convergence](docs/src/assets/results/heateq_pod/results/convergence.pdf)| 
 
-### Test 6
+### Test 5
 
-Lastly, we solve a Navier-Stokes equation with a space-time RB method
+Lastly, we solve a Navier-Stokes equation with a space-time RB method.
 
 ```julia
 julia> include("examples/NStokesTransientSTRB.jl")
 ```
 
-![Example 6](examples/example6.png)
+<!-- |![Example 3 velocity](docs/src/assets/results/transient_nstokes_pod/plot/rbvel.gif) ![Example 3 pressure](docs/src/assets/results/transient_nstokes_pod/plot/rbpress.gif) ![Example 3 convergence](docs/src/assets/results/transient_nstokes_pod/results/convergence.pdf)|  -->
