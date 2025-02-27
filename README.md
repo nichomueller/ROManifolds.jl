@@ -48,7 +48,9 @@ Solve a steady elasticity problem with a proper orthogonal decomposition algorit
 ```julia
 julia> include("examples/SteadyElasticityPOD.jl")
 ```
-|![Example 1 solution](docs/src/assets/results/elasticity_pod/plot/rbsol.png) ![Example 1 convergence](docs/src/assets/results/elasticity_pod/results/convergence.pdf)| 
+Solution             |  Convergence
+:-------------------------:|:-------------------------:
+![Example 1 solution](docs/src/assets/results/elasticity_pod/plot/rbsol.png)  |  ![Example 1 convergence](docs/src/assets/results/elasticity_pod/results/convergence.pdf)
 
 ### Test 2
 
@@ -57,7 +59,9 @@ Do the same, but with a tensor-train decomposition approach.
 ```julia
 julia> include("examples/SteadyElasticityTTSVD.jl")
 ```
-|![Example 2 solution](docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png) ![Example 2 convergence](docs/src/assets/results/elasticity_ttsvd/results/convergence.pdf)| 
+Solution             |  Convergence
+:-------------------------:|:-------------------------:
+![Example 2 solution](docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png)  |  ![Example 2 convergence](docs/src/assets/results/elasticity_ttsvd/results/convergence.pdf)
 
 ### Test 3
 
@@ -69,7 +73,9 @@ Solve a steady Stokes equation with a proper orthogonal decomposition algorithm.
 julia> include("examples/SteadyStokesPOD.jl")
 ```
 
-|![Example 3 velocity](docs/src/assets/results/stokes_pod/plot/rbvel.png) ![Example 3 pressure](docs/src/assets/results/stokes_pod/plot/rbpress.png) ![Example 3 convergence](docs/src/assets/results/stokes_pod/results/convergence.pdf)| 
+Solution-velocity          |  Solution-pressure        |  Convergence
+:-------------------------:|:-------------------------:|:-------------------------:
+![Example 3 velocity](docs/src/assets/results/stokes_pod/plot/rbvel.png) | ![Example 3 pressure](docs/src/assets/results/stokes_pod/plot/rbpress.png)  |  ![Example 3 convergence](docs/src/assets/results/stokes_pod/results/convergence.pdf)
 
 ### Test 4 
 
@@ -79,7 +85,9 @@ Moving to transient applications, we first solve a heat equation with a space-ti
 julia> include("examples/HeatEquationSTRB.jl")
 ```
 
-|![Example 4 solution](docs/src/assets/results/heateq_pod/plot/rbsol.gif) ![Example 4 convergence](docs/src/assets/results/heateq_pod/results/convergence.pdf)| 
+Solution             |  Convergence
+:-------------------------:|:-------------------------:
+![Example 2 solution](docs/src/assets/results/heateq_pod/plot/rbsol.gif)  |  ![Example 2 convergence](docs/src/assets/results/heateq_pod/results/convergence.pdf)
 
 ### Test 5
 
