@@ -68,8 +68,6 @@ Solution             |  Convergence
 
 Solve a steady Stokes equation with a proper orthogonal decomposition algorithm.
 
-![Example 3](examples/example3.png)
-
 ```julia
 julia> include("examples/SteadyStokesPOD.jl")
 ```
