@@ -51,7 +51,7 @@ julia> include("examples/SteadyElasticityPOD.jl")
 ```
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/elasticity_pod/plot/rbsol.png" alt="drawing" style="width:50%; height:50%;"/>  |  <img src="docs/src/assets/results/elasticity_pod/results/convergence.png" alt="drawing" style="width:50%; height:50%;"/>
+<img src="docs/src/assets/results/elasticity_pod/plot/rbsol.png" alt="drawing" style="width:100%; height:80%;"/>  |  <img src="docs/src/assets/results/elasticity_pod/results/convergence.png" alt="drawing" style="width:100%; height:100%;"/>
 
 ### Test 2
 
@@ -62,7 +62,7 @@ julia> include("examples/SteadyElasticityTTSVD.jl")
 ```
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png" alt="drawing" style="width:50%; height:50%;"/>  |  <img src="docs/src/assets/results/elasticity_ttsvd/results/convergence.png" alt="drawing" style="width:50%; height:50%;"/>
+<img src="docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png" alt="drawing" style="width:100%; height:80%;"/>  |  <img src="docs/src/assets/results/elasticity_ttsvd/results/convergence.png" alt="drawing" style="width:100%; height:100%;"/>
 
 ### Test 3
 
@@ -76,7 +76,7 @@ julia> include("examples/SteadyStokesPOD.jl")
 
 Solution-velocity          |  Solution-pressure        |  Convergence
 :-------------------------:|:-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/stokes_pod/plot/rbvel.png" alt="drawing" style="width:50%; height:50%;"/>  |  <img src="docs/src/assets/results/stokes_pod/plot/rbpress" alt="drawing" style="width:50%; height:50%;"/>  |  <img src="docs/src/assets/results/stokes_pod/results/convergence.png" alt="drawing" style="width:50%; height:50%;"/> 
+<img src="docs/src/assets/results/stokes_pod/plot/rbvel.png" alt="drawing" style="width:100%; height:100%;"/>  |  <img src="docs/src/assets/results/stokes_pod/plot/rbpress.png" alt="drawing" style="width:100%; height:100%;"/>  |  <img src="docs/src/assets/results/stokes_pod/results/convergence.png" alt="drawing" style="width:200%; height:200%;"/> 
 
 ### Test 4 
 
@@ -88,7 +88,7 @@ julia> include("examples/HeatEquationSTRB.jl")
 
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/heateq_pod/plot/rbsol.gif" alt="drawing" style="width:50%; height:50%;"/>  |  <img src="docs/src/assets/results/heateq_pod/results/convergence.png" alt="drawing" style="width:50%; height:50%;"/> 
+<img src="docs/src/assets/results/heateq_pod/plot/rbsol.gif" alt="drawing" style="width:100%; height:100%;"/>  |  <img src="docs/src/assets/results/heateq_pod/results/convergence.png" alt="drawing" style="width:100%; height:100%;"/> 
 
 ### Test 5
 
