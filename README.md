@@ -51,7 +51,7 @@ julia> include("examples/SteadyElasticityPOD.jl")
 ```
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/elasticity_pod/plot/rbsol.png" alt="drawing" style="width:250px; height:250px;"/>  |  <img src="docs/src/assets/results/elasticity_pod/results/convergence.png" alt="drawing" style="width:250px; height:250px;"/>
+<img src="docs/src/assets/results/elasticity_pod/plot/rbsol.png" alt="drawing" style="width:400px; height:250px;"/>  |  <img src="docs/src/assets/results/elasticity_pod/results/convergence.png" alt="drawing" style="width:400px; height:250px;"/>
 
 ### Test 2
 
