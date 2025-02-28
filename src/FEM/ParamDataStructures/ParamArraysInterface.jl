@@ -1058,18 +1058,50 @@ function Arrays.evaluate!(
   return array
 end
 
-for T in (:AbstractVector,:AbstractMatrix,:AbstractArray)
-  @eval begin
-    function Arrays.return_value(f::LinearCombinationMap{<:Integer},A::AbstractParamArray,b::$T)
-      param_return_value(f,A,b)
-    end
+for Q in (:Integer,:Colon)
+  F = Q==:Integer ? :(LinearCombinationMap{<:Integer}) : :(LinearCombinationMap{Colon})
+  for T in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamArray3D)
+    for S in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamArray3D)
+      @eval begin
+        function Arrays.return_value(f::$F,A::$S,b::$T)
+          param_return_value(f,A,b)
+        end
 
-    function Arrays.return_cache(f::LinearCombinationMap{<:Integer},A::AbstractParamArray,b::$T)
-      param_return_cache(f,A,b)
-    end
+        function Arrays.return_cache(f::$F,A::$S,b::$T)
+          param_return_cache(f,A,b)
+        end
 
-    function Arrays.evaluate!(C,f::LinearCombinationMap{<:Integer},A::AbstractParamArray,b::$T)
-      param_evaluate!(C,f,A,b)
+        function Arrays.evaluate!(C,f::$F,A::$S,b::$T)
+          param_evaluate!(C,f,A,b)
+        end
+      end
+    end
+    for S in (:AbstractVector,:AbstractMatrix,:AbstractArray)
+      @eval begin
+        function Arrays.return_value(f::$F,A::$S,b::$T)
+          param_return_value(f,A,b)
+        end
+
+        function Arrays.return_cache(f::$F,A::$S,b::$T)
+          param_return_cache(f,A,b)
+        end
+
+        function Arrays.evaluate!(C,f::$F,A::$S,b::$T)
+          param_evaluate!(C,f,A,b)
+        end
+
+        function Arrays.return_value(f::$F,a::$T,B::$S)
+          param_return_value(f,a,B)
+        end
+
+        function Arrays.return_cache(f::$F,a::$T,B::$S)
+          param_return_cache(f,a,B)
+        end
+
+        function Arrays.evaluate!(C,f::$F,a::$T,B::$S)
+          param_evaluate!(C,f,a,B)
+        end
+      end
     end
   end
 end

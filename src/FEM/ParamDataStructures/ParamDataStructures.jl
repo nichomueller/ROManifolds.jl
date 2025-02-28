@@ -66,7 +66,11 @@ export ParamField
 export ParamFieldGradient
 export GenericParamField
 export OperationParamField
+export ConstantParamField
 include("ParamFields.jl")
+
+export AffineParamField
+include("AffineParamMaps.jl")
 
 export AbstractParamArray
 export AbstractParamVector

@@ -18,70 +18,70 @@ param_getindex(k::PosNegParamReindex,i::Integer) = PosNegReindex(param_getindex(
 Arrays.testitem(k::PosNegParamReindex) = param_getindex(k,1)
 Arrays.testargs(k::PosNegParamReindex,i...) = testargs(testitem(k),i...)
 
-function Arrays.return_value(
-  f::Broadcasting{<:PosNegParamReindex},
-  x::Union{Number,AbstractArray{<:Number}}...)
-
-  v = return_value(Broadcasting(testitem(f.f)),x...)
-  array = Vector{typeof(v)}(undef,param_length(f.f))
-  @inbounds for i = param_eachindex(f.f)
-    array[i] = return_value(Broadcasting(param_getindex(f.f,i)),x...)
-  end
-  ParamArray(array)
-end
-
-function Arrays.return_cache(
-  f::Broadcasting{<:PosNegParamReindex},
-  x::Union{Number,AbstractArray{<:Number}}...)
-
-  c = return_cache(Broadcasting(testitem(f.f)),x...)
-  a = evaluate!(c,Broadcasting(testitem(f.f)),x...)
-  cache = Vector{typeof(c)}(undef,param_length(f.f))
-  data = parameterize(a,param_length(f.f))
-  @inbounds for i = param_eachindex(f.f)
-    cache[i] = return_cache(Broadcasting(param_getindex(f.f,i)),x...)
-  end
-  cache,data
-end
-
-function Arrays.evaluate!(
-  cache,
-  f::Broadcasting{<:PosNegParamReindex},
-  x::Union{Number,AbstractArray{<:Number}}...)
-
-  cx,array = cache
-  @inbounds for i = param_eachindex(f.f)
-    array[i] = evaluate!(cx[i],Broadcasting(param_getindex(f.f,i)),x...)
-  end
-  array
-end
-
-function Arrays.evaluate!(
-  cache,
-  f::Broadcasting{<:PosNegParamReindex},
-  x::AbstractArray{<:Number})
-
-  cx,array = cache
-  @inbounds for i = param_eachindex(f.f)
-    array[i] = evaluate!(cx[i],Broadcasting(param_getindex(f.f,i)),x)
-  end
-  array
-end
-
-function Arrays.evaluate!(
-  cache,
-  f::Broadcasting{<:PosNegParamReindex},
-  x::Number...)
-
-  cx,array = cache
-  @inbounds for i = param_eachindex(f.f)
-    array[i] = evaluate!(cx[i],Broadcasting(param_getindex(f.f,i)),x...)
-  end
-  array
-end
-
 for T in (:ParamReindex,:PosNegParamReindex)
   @eval begin
+    function Arrays.return_value(
+      f::Broadcasting{<:$T},
+      x::Union{Number,AbstractArray{<:Number}}...)
+
+      v = return_value(Broadcasting(testitem(f.f)),x...)
+      array = Vector{typeof(v)}(undef,param_length(f.f))
+      @inbounds for i = param_eachindex(f.f)
+        array[i] = return_value(Broadcasting(param_getindex(f.f,i)),x...)
+      end
+      ParamArray(array)
+    end
+
+    function Arrays.return_cache(
+      f::Broadcasting{<:$T},
+      x::Union{Number,AbstractArray{<:Number}}...)
+
+      c = return_cache(Broadcasting(testitem(f.f)),x...)
+      a = evaluate!(c,Broadcasting(testitem(f.f)),x...)
+      cache = Vector{typeof(c)}(undef,param_length(f.f))
+      data = parameterize(a,param_length(f.f))
+      @inbounds for i = param_eachindex(f.f)
+        cache[i] = return_cache(Broadcasting(param_getindex(f.f,i)),x...)
+      end
+      cache,data
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::Broadcasting{<:$T},
+      x::Union{Number,AbstractArray{<:Number}}...)
+
+      cx,array = cache
+      @inbounds for i = param_eachindex(f.f)
+        array[i] = evaluate!(cx[i],Broadcasting(param_getindex(f.f,i)),x...)
+      end
+      array
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::Broadcasting{<:$T},
+      x::AbstractArray{<:Number})
+
+      cx,array = cache
+      @inbounds for i = param_eachindex(f.f)
+        array[i] = evaluate!(cx[i],Broadcasting(param_getindex(f.f,i)),x)
+      end
+      array
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::Broadcasting{<:$T},
+      x::Number...)
+
+      cx,array = cache
+      @inbounds for i = param_eachindex(f.f)
+        array[i] = evaluate!(cx[i],Broadcasting(param_getindex(f.f,i)),x...)
+      end
+      array
+    end
+
     function Arrays.return_value(k::$T,j::Integer)
       v = return_value(testitem(k),j)
       array = Vector{typeof(v)}(undef,param_length(k))

@@ -117,7 +117,7 @@ ParamContainer(a::AbstractArray{<:AbstractArray}) = ParamArray(a)
 
 param_length(a::ParamContainer) = length(a.data)
 param_getindex(a::ParamContainer,i::Integer) = getindex(a,i)
-param_getindex(a::ParamContainer,v,i::Integer) = setindex!(a,v,i)
+param_setindex!(a::ParamContainer,v,i::Integer) = setindex!(a,v,i)
 
 to_param_quantity(a::Union{Function,Map,Nothing},plength::Integer) = ParamContainer(Fill(a,plength))
 parameterize(a::Union{Function,Map,Nothing},plength::Integer) = ParamContainer(Fill(a,plength))

@@ -354,6 +354,18 @@ function Base.view(trian::Geometry.AppendedTriangulation,ids::AbstractArray)
   isempty(ids1) ? trian2 : (isempty(ids2) ? trian1 : lazy_append(trian1,trian2))
 end
 
+function Geometry.Grid(::Type{ReferenceFE{d}},model::MappedDiscreteModel) where d
+  node_coordinates = collect1d(get_node_coordinates(model))
+  cell_to_nodes = Table(get_face_nodes(model,d))
+  cell_to_type = collect1d(get_face_type(model,d))
+  reffes = get_reffaces(ReferenceFE{d},model)
+  UnstructuredGrid(node_coordinates,cell_to_nodes,reffes,cell_to_type)
+end
+
+function Geometry.Grid(::Type{ReferenceFE{d}},model::MappedDiscreteModel{d}) where d
+  get_grid(model)
+end
+
 # utils
 
 function splat_tuple(t::Any)

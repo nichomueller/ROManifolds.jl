@@ -7,6 +7,8 @@ Subtypes:
 - [`GenericParamField`](@ref)
 - [`ParamFieldGradient`](@ref)
 - [`OperationParamField`](@ref)
+- [`OperationParamField`](@ref)
+- [`AffineParamField`](@ref)
 """
 abstract type ParamField <: Field end
 
@@ -130,6 +132,34 @@ get_param_data(f::OperationParamField) = f.data
 function Fields.gradient(f::OperationParamField)
   @notimplemented
 end
+
+struct ConstantParamField{T<:ConstantField} <: ParamField
+  data::Vector{T}
+end
+
+Fields.ConstantField(data::AbstractVector{<:Number}) = ConstantParamField(data)
+
+get_param_data(f::ConstantParamField) = f.data
+
+function Base.zero(::Type{<:ConstantParamField})
+  @notimplemented "Must provide a parametric length"
+end
+
+function Arrays.evaluate!(c,f::ConstantParamField,x::Point)
+  f.data
+end
+
+function Arrays.return_cache(f::ParamFieldGradient{N,<:ConstantParamField},x::Point) where N
+  fi = testitem(f)
+  vi = return_value(fi,x)
+  array = Vector{typeof(vi)}(undef,param_length(f))
+  for i in param_eachindex(f)
+    array[i] = return_value(param_getindex(f,i),x)
+  end
+  ParamArray(array)
+end
+
+Arrays.evaluate!(c,f::ParamFieldGradient{N,<:ConstantParamField},x::Point) where N = c
 
 # lazy maps
 
