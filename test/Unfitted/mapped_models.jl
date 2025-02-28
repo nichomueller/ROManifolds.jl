@@ -6,6 +6,8 @@ using Gridap.Fields
 using Gridap.Helpers
 using ROManifolds
 using ROManifolds.ParamDataStructures
+using Test
+using FillArrays
 
 domain = (0,1,0,1)
 partition = (5,5)
@@ -79,119 +81,67 @@ mmodel = MappedDiscreteModel(model,ϕμ(μ))
 Ωm = Triangulation(mmodel)
 Γm = BoundaryTriangulation(mmodel,tags=8)
 
-glue = get_glue(Γm,Val(1))
-@test glue.tface_to_mface === Γm.glue.face_to_bgface
-glue = get_glue(Γm,Val(2))
-@test glue.tface_to_mface === Γm.glue.face_to_cell
-face_s_q = glue.tface_to_mface_map
+dΩm = Measure(Ωm,4)
+dΓm = Measure(Γm,4)
 
-s1 = Point(0.0)
-s2 = Point(0.5)
-s = [s1,s2]
-face_to_s = Fill(s,length(face_s_q))
+g(μ) = x->x[1]+μ[1]*x[2]
+gμ(μ) = parameterize(g,μ)
 
-face_to_q = lazy_map(evaluate,face_s_q,face_to_s)
-@test isa(face_to_q,Geometry.FaceCompressedVector)
+reffe = ReferenceFE(lagrangian,Float64,2)
+Vm = TestFESpace(mmodel,reffe;conformity=:H1,dirichlet_tags=[1,3,7])
+Um = ParamTrialFESpace(Vm,gμ)
 
-cell_grid = get_grid(get_background_model(Γm))
-cell_shapefuns = get_cell_shapefuns(cell_grid)
-cell_grad_shapefuns = lazy_map(Broadcasting(∇),cell_shapefuns)
+Umμ = Um(μ)
+using Gridap.FESpaces
+using Gridap.ODEs
 
-face_shapefuns = lazy_map(Reindex(cell_shapefuns),glue.tface_to_mface)
-face_grad_shapefuns = lazy_map(Reindex(cell_grad_shapefuns),glue.tface_to_mface)
+objects = gμ(μ)
+space = allocate_space(Um,μ)
+dir_values = get_dirichlet_dof_values(space)
+dir_values_scratch = zero_dirichlet_values(space)
+# dir_values = compute_dirichlet_values_for_tags!(dir_values,dir_values_scratch,space,objects)
+dirichlet_dof_to_tag = get_dirichlet_dof_tag(space)
+cell_vals = FESpaces._cell_vals(space,objects)
+FESpaces.gather_dirichlet_values!(dir_values_scratch,space,cell_vals)
+free_values = zero_free_values(space)
 
-face_shapefuns_q = lazy_map(evaluate,face_shapefuns,face_to_q)
-test_array(face_shapefuns_q,collect(face_shapefuns_q))
-@test isa(face_shapefuns_q,Geometry.FaceCompressedVector)
+using Gridap.CellData
+s = get_fe_dof_basis(space)
+trian = get_triangulation(s)
+cf = CellField(objects,trian,DomainStyle(s))
+b = change_domain(cf,s.domain_style)
+# lazy_map(evaluate,get_data(s),get_data(b))
+# cache = return_cache(get_data(s)[1],get_data(b)[1])
+# ye = evaluate!(cache,get_data(s)[1],get_data(b)[1])
+field = get_data(b)[1]
+basis = get_data(s)[1]
+c = return_cache(field,basis.nodes)
+vals = evaluate!(c,field,basis.nodes)
+ndofs = length(basis.dof_to_node)
+r = _lagr_dof_cache(vals,ndofs)
 
-face_grad_shapefuns_q = lazy_map(evaluate,face_grad_shapefuns,face_to_q)
-test_array(face_grad_shapefuns_q,collect(face_grad_shapefuns_q))
-@test isa(face_grad_shapefuns_q,Geometry.FaceCompressedVector)
 
-face_to_nvec = get_facet_normal(Γm)
-face_to_nvec_s = lazy_map(evaluate,face_to_nvec,face_to_s)
-test_array(face_to_nvec_s,collect(face_to_nvec_s))
 
-glue = Γm.glue
-cell_grid = get_grid(get_background_model(Γm.trian))
 
-## Reference normal
-function f(r)
-  p = get_polytope(r)
-  lface_to_n = get_facet_normal(p)
-  lface_to_pindex_to_perm = get_face_vertex_permutations(p,num_cell_dims(p)-1)
-  nlfaces = length(lface_to_n)
-  lface_pindex_to_n = [ fill(lface_to_n[lface],length(lface_to_pindex_to_perm[lface])) for lface in 1:nlfaces ]
-  lface_pindex_to_n
-end
-ctype_lface_pindex_to_nref = map(f, get_reffes(cell_grid))
-face_to_nref = Geometry.FaceCompressedVector(ctype_lface_pindex_to_nref,glue)
-face_s_nref = lazy_map(constant_field,face_to_nref)
+ν(x) = exp(-x[1])
+f(x) = x[2]
 
-# Inverse of the Jacobian transpose
-cell_q_x = get_cell_map(cell_grid)
-cell_q_Jt = lazy_map(∇,cell_q_x)
-cell_q_invJt = lazy_map(Operation(pinvJt),cell_q_Jt)
+a(u,v) = ∫(ν*∇(v)⋅∇(u))dΩm
+b(v) = ∫(f*v)dΩm + ∫(f*v)dΓm
 
-d = 1
-node_coords = get_node_coordinates(mmodel)
-cell_node_ids = Table(get_face_nodes(mmodel,d))
-cell_ctype = collect1d(get_face_type(mmodel,d))
-ctype_reffe = get_reffaces(ReferenceFE{d},mmodel)
+op = AffineFEOperator(a,b,Um,Vm)
+uhm = solve(opm)
 
-cell_coords = lazy_map(Broadcasting(Reindex(node_coords)),cell_node_ids)
-ctype_shapefuns = map(get_shapefuns,ctype_reffe)
-cell_shapefuns = expand_cell_data(ctype_shapefuns,cell_ctype)
-default_cell_map = lazy_map(linear_combination,cell_coords,cell_shapefuns)
-ctype_poly = map(get_polytope,ctype_reffe)
-ctype_q0 = map(p->zero(first(get_vertex_coordinates(p))),ctype_poly)
-cell_q0 = expand_cell_data(ctype_q0,cell_ctype)
-default_cell_grad = lazy_map(∇,default_cell_map)
-origins = lazy_map(evaluate,default_cell_map,cell_q0)
-# i_to_values = default_cell_map.args[1]
-# i_to_basis = default_cell_map.args[2]
-# i_to_basis_x = lazy_map(evaluate,i_to_basis,cell_q0)
-# # lazy_map(Fields.LinearCombinationMap(:),i_to_values,i_to_basis_x)
-# k = Fields.LinearCombinationMap(:)
-# cache = return_cache(k,i_to_values[1],i_to_basis_x[1])
-# # @which evaluate!(cache,Fields.LinearCombinationMap(1),i_to_values[1],i_to_basis_x[1])
-# evaluate!(cache,k,i_to_values[1],i_to_basis_x[1])
-gradients = lazy_map(evaluate,default_cell_grad,cell_q0)
-cell_map = lazy_map(Fields.affine_map,gradients,origins)
 
-h = cell_map[1]
-x1 = Point(0,)
-x2 = Point(1,)
-x3 = Point(2,)
-x = [x1,x2,x3]
-h(x)
-∇(h)(x)
+cell_map = get_cell_map(get_triangulation(cf))
+cell_field_phys = get_data(cf)
+cell_field_ref = lazy_map(Broadcasting(∘),cell_field_phys,cell_map)
+return_value(Broadcasting(∘),cell_field_phys[1],cell_map[1])
 
-origin = Point(1,1)
-g1 = TensorValue(2,0,0,2)
-h1 = AffineField(g1,origin)
-hx = h1(x)
-
-CIAO
-# node_coords = get_node_coordinates(model)
-# cell_node_ids = Table(get_face_nodes(model,d))
-# cell_ctype = collect1d(get_face_type(model,d))
-# ctype_reffe = get_reffaces(ReferenceFE{d},model)
-# cell_coords = lazy_map(Broadcasting(Reindex(node_coords)),cell_node_ids)
-# ctype_shapefuns = map(get_shapefuns,ctype_reffe)
-# cell_shapefuns = expand_cell_data(ctype_shapefuns,cell_ctype)
-# default_cell_map = lazy_map(linear_combination,cell_coords,cell_shapefuns)
-# ctype_poly = map(get_polytope,ctype_reffe)
-# ctype_q0 = map(p->zero(first(get_vertex_coordinates(p))),ctype_poly)
-# cell_q0 = expand_cell_data(ctype_q0,cell_ctype)
-# default_cell_grad = lazy_map(∇,default_cell_map)
-# # origins = lazy_map(evaluate,default_cell_map,cell_q0)
-# i_to_values = default_cell_map.args[1]
-# i_to_basis = default_cell_map.args[2]
-# i_to_basis_x = lazy_map(evaluate,i_to_basis,cell_q0)
-# # lazy_map(Fields.LinearCombinationMap(:),i_to_values,i_to_basis_x)
-# k = Fields.LinearCombinationMap(:)
-# cache = return_cache(k,i_to_values[1],i_to_basis_x[1])
-# evaluate!(cache,k,i_to_values[1],i_to_basis_x[1])
-# # gradients = lazy_map(evaluate,default_cell_grad,cell_q0)
-# # cell_map = lazy_map(Fields.affine_map,gradients,origins)
+Ω = Triangulation(model)
+cf′ = CellField(x->x[1],Ω)
+cell_map′ = get_cell_map(get_triangulation(cf′))
+cell_field_phys′ = get_data(cf′)
+lazy_map(Broadcasting(∘),cell_field_phys′,cell_map′)
+c′ = return_cache(Broadcasting(∘),cell_field_phys′[1],cell_map′[1])
+evaluate!(c′,Broadcasting(∘),cell_field_phys′[1],cell_map′[1])

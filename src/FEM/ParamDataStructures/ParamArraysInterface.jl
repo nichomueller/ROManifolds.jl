@@ -1023,41 +1023,6 @@ for T in (:AbstractParamArray,:Number)
   end
 end
 
-function Fields.linear_combination(A::AbstractParamArray,b::AbstractVector{<:Field})
-  ab = linear_combination(testitem(A),b)
-  data = Vector{typeof(ab)}(undef,param_length(A))
-  @inbounds for i in param_eachindex(A)
-    data[i] = linear_combination(param_getindex(A,i),b)
-  end
-  ParamContainer(data)
-end
-
-function Arrays.return_cache(
-  f::ParamContainer{<:Union{Field,ParamField,AbstractArray{<:Field}}},
-  x::AbstractArray{<:Point})
-
-  ci = return_cache(testitem(f),x)
-  bi = evaluate!(ci,testitem(f),x)
-  cache = Vector{typeof(ci)}(undef,param_length(f))
-  array = Vector{typeof(bi)}(undef,param_length(f))
-  @inbounds for i = param_eachindex(f)
-    cache[i] = return_cache(param_getindex(f,i),x)
-  end
-  cache,ParamArray(array)
-end
-
-function Arrays.evaluate!(
-  cache,
-  f::ParamContainer{<:Union{Field,ParamField,AbstractArray{<:Field}}},
-  x::AbstractArray{<:Point})
-
-  cx,array = cache
-  @inbounds for i = param_eachindex(array)
-    array[i] = evaluate!(cx[i],param_getindex(f,i),x)
-  end
-  return array
-end
-
 for Q in (:Integer,:Colon)
   F = Q==:Integer ? :(LinearCombinationMap{<:Integer}) : :(LinearCombinationMap{Colon})
   for T in (:AbstractParamVector,:AbstractParamMatrix,:AbstractParamArray3D)

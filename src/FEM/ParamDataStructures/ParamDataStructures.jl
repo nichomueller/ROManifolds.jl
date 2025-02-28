@@ -62,16 +62,6 @@ export get_param_entry
 export get_param_entry!
 include("ParamContainersInterface.jl")
 
-export ParamField
-export ParamFieldGradient
-export GenericParamField
-export OperationParamField
-export ConstantParamField
-include("ParamFields.jl")
-
-export AffineParamField
-include("AffineParamMaps.jl")
-
 export AbstractParamArray
 export AbstractParamVector
 export AbstractParamMatrix
@@ -141,6 +131,11 @@ export change_mode
 include("TransientSnapshots.jl")
 
 include("ParamBroadcasts.jl")
+
+export ParamField
+export TrivialParamField
+export GenericParamField
+include("ParamFields.jl")
 
 include("ParamReindex.jl")
 

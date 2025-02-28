@@ -126,6 +126,8 @@ Base.size(a::ParamContainer) = (param_length(a),)
 Base.getindex(a::ParamContainer,i::Integer) = getindex(a.data,i)
 Base.setindex!(a::ParamContainer,v,i::Integer) = setindex!(a.data,v,i)
 
+(a::ParamContainer{<:Map})(x) = evaluate(a,x)
+
 const ParamNumber = ParamContainer
 
 to_param_quantity(a::Number,plength::Integer) = ParamNumber(Fill(a,plength))
