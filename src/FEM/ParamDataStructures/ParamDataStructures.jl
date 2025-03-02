@@ -23,9 +23,11 @@ import Distributions: Uniform,Normal
 import FillArrays: Fill
 import HaltonSequences: HaltonPoint
 import LatinHypercubeSampling: randomLHC,scaleLHC
+import LinearAlgebra: ⋅
 import StatsBase: sample
 import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
+import Gridap.TensorValues: ⊗, ⊙
 import SparseArrays.getcolptr
 
 export AbstractRealization

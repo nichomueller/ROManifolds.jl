@@ -1,11 +1,14 @@
 using Gridap
 using Gridap.Geometry
 using Gridap.ReferenceFEs
+using Gridap.FESpaces
+using Gridap.CellData
 using Gridap.Arrays
 using Gridap.Fields
 using Gridap.Helpers
 using ROManifolds
 using ROManifolds.ParamDataStructures
+using ROManifolds.ParamSteady
 using Test
 using FillArrays
 
@@ -72,6 +75,11 @@ compare = lazy_map(≈,jcellm,mappedj)
 
 #
 
+domain = (0,1,0,1)
+partition = (5,5)
+model = CartesianDiscreteModel(domain,partition)
+
+pspace = ParamSpace((3.0,4.0))
 
 μ = Realization([[3.0],[4.0]])
 ϕ(μ) = x->VectorValue(x[2],μ[1]*x[1])
@@ -92,56 +100,34 @@ Vm = TestFESpace(mmodel,reffe;conformity=:H1,dirichlet_tags=[1,3,7])
 Um = ParamTrialFESpace(Vm,gμ)
 
 Umμ = Um(μ)
-using Gridap.FESpaces
-using Gridap.ODEs
 
-objects = gμ(μ)
-space = allocate_space(Um,μ)
-dir_values = get_dirichlet_dof_values(space)
-dir_values_scratch = zero_dirichlet_values(space)
-# dir_values = compute_dirichlet_values_for_tags!(dir_values,dir_values_scratch,space,objects)
-dirichlet_dof_to_tag = get_dirichlet_dof_tag(space)
-cell_vals = FESpaces._cell_vals(space,objects)
-FESpaces.gather_dirichlet_values!(dir_values_scratch,space,cell_vals)
-free_values = zero_free_values(space)
+ν(μ) = x->x[1]+μ[1]*x[2]
+νμ(μ) = parameterize(ν,μ)
+f(μ) = x->x[1]+μ[1]*x[2]
+fμ(μ) = parameterize(f,μ)
 
-using Gridap.CellData
-s = get_fe_dof_basis(space)
-trian = get_triangulation(s)
-cf = CellField(objects,trian,DomainStyle(s))
-b = change_domain(cf,s.domain_style)
-# lazy_map(evaluate,get_data(s),get_data(b))
-# cache = return_cache(get_data(s)[1],get_data(b)[1])
-# ye = evaluate!(cache,get_data(s)[1],get_data(b)[1])
-field = get_data(b)[1]
-basis = get_data(s)[1]
-c = return_cache(field,basis.nodes)
-vals = evaluate!(c,field,basis.nodes)
-ndofs = length(basis.dof_to_node)
-r = _lagr_dof_cache(vals,ndofs)
+am(μ,u,v) = ∫(νμ(μ)*∇(v)⋅∇(u))dΩm
+bm(μ,u,v) = ∫(fμ(μ)*v)dΩm + ∫(fμ(μ)*v)dΓm
 
+opm = LinearParamFEOperator(bm,am,pspace,Um,Vm)
+# uhm = solve(opm)
 
+u = zero(Um(μ))
+x = get_free_dof_values(u)
+op = get_algebraic_operator(opm)
+nlop = ParamNonlinearOperator(op,μ)
+solve!(x,LUSolver(),nlop)
 
+v = get_fe_basis(Vm)
+u = get_trial_fe_basis(Vm)
+νμ(μ)*∇(v)⋅∇(u)
 
-ν(x) = exp(-x[1])
-f(x) = x[2]
-
-a(u,v) = ∫(ν*∇(v)⋅∇(u))dΩm
-b(v) = ∫(f*v)dΩm + ∫(f*v)dΓm
-
-op = AffineFEOperator(a,b,Um,Vm)
-uhm = solve(opm)
-
-
-cell_map = get_cell_map(get_triangulation(cf))
-cell_field_phys = get_data(cf)
-cell_field_ref = lazy_map(Broadcasting(∘),cell_field_phys,cell_map)
-return_value(Broadcasting(∘),cell_field_phys[1],cell_map[1])
-
-Ω = Triangulation(model)
-cf′ = CellField(x->x[1],Ω)
-cell_map′ = get_cell_map(get_triangulation(cf′))
-cell_field_phys′ = get_data(cf′)
-lazy_map(Broadcasting(∘),cell_field_phys′,cell_map′)
-c′ = return_cache(Broadcasting(∘),cell_field_phys′[1],cell_map′[1])
-evaluate!(c′,Broadcasting(∘),cell_field_phys′[1],cell_map′[1])
+cell_∇a = lazy_map(Broadcasting(∇),get_data(v))
+cell_map = get_cell_map(get_triangulation(v))
+# lazy_map(Broadcasting(push_∇),cell_∇a,cell_map)
+cell_Jt = lazy_map(∇,cell_map)
+cell_invJt = lazy_map(Operation(pinvJt),cell_Jt)
+k = Broadcasting(Operation(⋅))
+args = cell_invJt,cell_∇a
+fi = map(testitem,args)
+T = return_type(k,fi...)

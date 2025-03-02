@@ -19,8 +19,6 @@ Base.getindex(f::ParamField,i::Integer) = param_getindex(f,i)
 Base.iterate(f::ParamField,i...) = iterate(get_param_data(f),i...)
 
 Arrays.testitem(f::ParamField) = param_getindex(f,1)
-# Arrays.testargs(f::ParamField,x::Point) = testargs(testitem(f),x)
-# Arrays.testargs(f::ParamField,x::AbstractArray{<:Point}) = testargs(testitem(f),x)
 
 to_param_quantity(f::ParamField,plength::Integer) = f
 to_param_quantity(f::Union{Field,AbstractArray{<:Field}},plength::Integer) = TrivialParamField(f,plength)
@@ -68,31 +66,75 @@ Fields.∇∇(f::GenericParamField) = GenericParamField(map(∇∇,f.field))
 
 Fields.GenericField(f::AbstractParamFunction) = GenericParamField(map(i -> GenericField(f[i]),1:length(f)))
 
-function _is_any_param(op,fields)
-  T = Union{ParamField,ParamContainer{<:Field}}
-  isa(op,T) && return true
-  for f in fields
-    isa(f,T) && return true
-  end
-  return false
+for op in (:+,:-,:*,:/,:⋅,:⊙,:⊗)
+  @eval ($op)(a::ParamField,b::Field) = Operation($op)(a,TrivialParamField(b,param_length(a)))
+  @eval ($op)(a::Field,b::ParamField) = Operation($op)(TrivialParamField(a,param_length(b)),b)
 end
 
-function Fields.OperationField(op,fields::Tuple{Vararg{Any}})
-  opfield(op,fields) = Fields.OperationField{typeof(op),typeof(fields)}(op,fields)
-  if _is_any_param(op,fields)
-    pop,pfields... = to_param_quantities(op,fields...)
-    plength = find_param_length(pop,pfields...)
-    T = typeof(opfield(testitem(pop),map(testitem,pfields)))
-    data = Vector{T}(undef,plength)
-    for i in 1:plength
-      op = param_getindex(pop,i)
-      field = map(f->param_getindex(f,i),pfields)
-      data[i] = opfield(op,field)
-    end
-    GenericParamField(data)
-  else
-    opfield(op,fields)
+function Arrays.return_value(k::Operation,fields::ParamField...)
+  plength = find_param_length(fields...)
+  fi = map(testitem,fields)
+  vi = return_value(k,fi...)
+  v = Vector{typeof(vi)}(undef,plength)
+  for i in 1:plength
+    fi = map(f -> param_getindex(f,i),fields)
+    v[i] = return_value(k,fi...)
   end
+  return GenericParamField(v)
+end
+
+function Arrays.return_cache(k::Operation,fields::ParamField...)
+  v = return_value(k,fields...)
+  c = copy(v.data)
+  return c,v
+end
+
+function Arrays.evaluate!(cache,k::Operation,fields::ParamField...)
+  c,v = cache
+  @inbounds for i in 1:param_length(v)
+    fi = map(f -> param_getindex(f,i),fields)
+    v.data[i] = evaluate!(c[i],k,fi...)
+  end
+  v
+end
+
+const ParamOperation = Operation{<:ParamField}
+
+param_length(k::ParamOperation) = param_length(k.op)
+param_getindex(k::ParamOperation,i::Integer) = Operation(param_getindex(k.op,i))
+Arrays.testitem(k::ParamOperation) = param_getindex(k,1)
+
+function Arrays.return_value(k::ParamOperation,fields::Field...)
+  plength = param_length(k)
+  pfields = to_param_quantities(fields...;plength)
+  ki = testitem(k)
+  fi = map(testitem,pfields)
+  vi = return_value(ki,fi...)
+  v = Vector{typeof(vi)}(undef,plength)
+  for i in 1:plength
+    ki = param_getindex(k,i)
+    fi = map(f -> param_getindex(f,i),pfields)
+    v[i] = return_value(ki,fi...)
+  end
+  return GenericParamField(v)
+end
+
+function Arrays.return_cache(k::ParamOperation,fields::Field...)
+  v = return_value(k,fields...)
+  c = copy(v.data)
+  return c,v
+end
+
+function Arrays.evaluate!(cache,k::ParamOperation,fields::Field...)
+  c,v = cache
+  plength = param_length(k)
+  pfields = to_param_quantities(fields...;plength)
+  @inbounds for i in 1:param_length(v)
+    ki = param_getindex(k,i)
+    fi = map(f -> param_getindex(f,i),pfields)
+    v.data[i] = evaluate!(c[i],ki,fi...)
+  end
+  v
 end
 
 for T in (:(Fields.ZeroField),:(Fields.ConstantField),:(Fields.VoidField),:(Fields.InverseField))
@@ -123,13 +165,32 @@ function Fields.inverse_map(f::AffineParamField)
   AffineParamField(map(inverse_map,f.data))
 end
 
-function Fields.linear_combination(A::AbstractParamArray,b::AbstractVector{<:Field})
+function Fields.linear_combination(A::AbstractParamVector,b::AbstractVector{<:Field})
+  ab = linear_combination(testitem(A),b)
+  data = Vector{typeof(ab)}(undef,param_length(A))
+  @inbounds for i in param_eachindex(A)
+    data[i] = linear_combination(param_getindex(A,i),b)
+  end
+  GenericParamField(data)
+end
+
+# parametric field arrays
+
+function Fields.linear_combination(A::AbstractParamMatrix,b::AbstractVector{<:Field})
   ab = linear_combination(testitem(A),b)
   data = Vector{typeof(ab)}(undef,param_length(A))
   @inbounds for i in param_eachindex(A)
     data[i] = linear_combination(param_getindex(A,i),b)
   end
   ParamContainer(data)
+end
+
+for op in (:(Fields.∇),:(Fields.∇∇))
+  @eval begin
+    function $op(A::ParamContainer)
+      ParamContainer(map($op,get_param_data(A)))
+    end
+  end
 end
 
 # lazy maps
@@ -292,6 +353,28 @@ for F in (:ParamField,:ParamContainer)
 
 end
 
+for T in (:∇,:∇∇)
+  @eval begin
+    function Arrays.return_value(k::Broadcasting{typeof($T)},A::ParamContainer)
+      v = return_value(k,testitem(A))
+      pv = Vector{typeof(v)}(undef,param_length(A))
+      ParamContainer(pv)
+    end
+
+    function Arrays.return_cache(k::Broadcasting{typeof($T)},A::ParamContainer)
+      return_value(k,A)
+    end
+
+    function Arrays.evaluate!(cache,k::Broadcasting{typeof($T)},A::ParamContainer)
+      for i in param_eachindex(A)
+        value = evaluate(k,param_getindex(A,i))
+        param_setindex!(cache,value,i)
+      end
+      cache
+    end
+  end
+end
+
 function Arrays.lazy_map(
   k::Broadcasting{typeof(Fields.push_∇∇)},
   cell_∇∇a::AbstractArray,
@@ -313,28 +396,62 @@ function Arrays.lazy_map(
   cell_∇∇bt
 end
 
-# function Arrays.return_value(b::Broadcasting{<:Function},f::ParamField,x...)
-#   println(length(x))
-#   error("stop")
-#   evaluate(b.f,f,x...)
-# end
-
-function Arrays.return_value(k::Operation,args::Union{Field,ParamContainer{<:Field}}...)
-  pargs = to_param_quantities(args...)
-  Fields.OperationField(k.op,pargs)
+function Arrays.return_value(k::Broadcasting{<:Operation},args::Union{ParamField,ParamContainer}...)
+  plength = find_param_length(args...)
+  ai = map(testitem,args)
+  vi = return_value(k,ai...)
+  v = Vector{typeof(vi)}(undef,plength)
+  for i in 1:plength
+    ai = map(a -> param_getindex(a,i),args)
+    v[i] = return_value(k,fi...)
+  end
+  return ParamContainer(v)
 end
 
-function Arrays.evaluate!(cache,k::Operation,args::Union{Field,ParamContainer{<:Field}}...)
-  pargs = to_param_quantities(args...)
-  Fields.OperationField(k.op,pargs)
+function Arrays.return_cache(k::Broadcasting{<:Operation},args::Union{ParamField,ParamContainer}...)
+  v = return_value(k,args...)
+  c = copy(v.data)
+  return c,v
 end
 
-function Arrays.return_value(k::Broadcasting{<:Operation},args::Union{Field,ParamContainer{<:Field}}...)
-  pargs = to_param_quantities(args...)
-  Fields.OperationField(k.f.op,pargs)
+function Arrays.evaluate!(cache,k::Broadcasting{<:Operation},args::Union{ParamField,ParamContainer}...)
+  c,v = cache
+  @inbounds for i in 1:param_length(v)
+    ai = map(a -> param_getindex(a,i),args)
+    v.data[i] = evaluate!(c[i],k,ai...)
+  end
+  v
 end
 
-function Arrays.evaluate!(cache,k::Broadcasting{<:Operation},args::Union{Field,ParamContainer{<:Field}}...)
-  pargs = to_param_quantities(args...)
-  Fields.OperationField(k.f.op,pargs)
+function Arrays.return_value(k::Broadcasting{<:ParamOperation},args::Union{Field,AbstractArray{<:Field}}...)
+  plength = param_length(k)
+  pfields = to_param_quantities(args...;plength)
+  ki = testitem(k)
+  ai = map(testitem,pfields)
+  vi = return_value(ki,ai...)
+  v = Vector{typeof(vi)}(undef,plength)
+  for i in 1:plength
+    ki = param_getindex(k,i)
+    ai = map(a -> param_getindex(a,i),args)
+    v[i] = return_value(ki,ai...)
+  end
+  return GenericParamField(v)
+end
+
+function Arrays.return_cache(k::Broadcasting{<:ParamOperation},args::Union{Field,AbstractArray{<:Field}}...)
+  v = return_value(k,args...)
+  c = copy(v.data)
+  return c,v
+end
+
+function Arrays.evaluate!(cache,k::Broadcasting{<:ParamOperation},args::Union{Field,AbstractArray{<:Field}}...)
+  c,v = cache
+  plength = param_length(k)
+  pfields = to_param_quantities(args...;plength)
+  @inbounds for i in 1:param_length(v)
+    ki = param_getindex(k,i)
+    ai = map(a -> param_getindex(a,i),pfields)
+    v.data[i] = evaluate!(c[i],ki,ai...)
+  end
+  v
 end
