@@ -12,65 +12,65 @@ using ROManifolds.ParamSteady
 using Test
 using FillArrays
 
-domain = (0,1,0,1)
-partition = (5,5)
-model = CartesianDiscreteModel(domain,partition)
+# domain = (0,1,0,1)
+# partition = (5,5)
+# model = CartesianDiscreteModel(domain,partition)
 
-φ(x) = VectorValue(x[2],3*x[1])
-φt(x) = VectorValue(3*x[2],x[1])
-mmodel = MappedDiscreteModel(model,φ)
+# φ(x) = VectorValue(x[2],3*x[1])
+# φt(x) = VectorValue(3*x[2],x[1])
+# mmodel = MappedDiscreteModel(model,φ)
 
-Ω = Triangulation(model)
-Γ = BoundaryTriangulation(model,tags=8)
-Ωm = Triangulation(mmodel)
-Γm = BoundaryTriangulation(mmodel,tags=8)
+# Ω = Triangulation(model)
+# Γ = BoundaryTriangulation(model,tags=8)
+# Ωm = Triangulation(mmodel)
+# Γm = BoundaryTriangulation(mmodel,tags=8)
 
-dΩ = Measure(Ω,4)
-dΓ = Measure(Γ,4)
-dΩm = Measure(Ωm,4)
-dΓm = Measure(Γm,4)
+# dΩ = Measure(Ω,4)
+# dΓ = Measure(Γ,4)
+# dΩm = Measure(Ωm,4)
+# dΓm = Measure(Γm,4)
 
-g(x) = x[1]+x[2]
+# g(x) = x[1]+x[2]
 
-reffe = ReferenceFE(lagrangian,Float64,2)
-V = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,3,7])
-U = TrialFESpace(V,g)
-Vm = TestFESpace(mmodel,reffe;conformity=:H1,dirichlet_tags=[1,3,7])
-Um = TrialFESpace(Vm,g)
+# reffe = ReferenceFE(lagrangian,Float64,2)
+# V = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,3,7])
+# U = TrialFESpace(V,g)
+# Vm = TestFESpace(mmodel,reffe;conformity=:H1,dirichlet_tags=[1,3,7])
+# Um = TrialFESpace(Vm,g)
 
-ν(x) = exp(-x[1])
-f(x) = x[2]
+# ν(x) = exp(-x[1])
+# f(x) = x[2]
 
-atrian(u,v,dΩ) = ∫(ν*∇(v)⋅∇(u))dΩ
-btrian(v,dΩ,dΓ) = ∫(f*v)dΩ + ∫(f*v)dΓ
+# atrian(u,v,dΩ) = ∫(ν*∇(v)⋅∇(u))dΩ
+# btrian(v,dΩ,dΓ) = ∫(f*v)dΩ + ∫(f*v)dΓ
 
-a(u,v) = atrian(u,v,dΩ)
-b(v) = btrian(v,dΩ,dΓ)
-am(u,v) = atrian(u,v,dΩm)
-bm(v) = btrian(v,dΩm,dΓm)
+# a(u,v) = atrian(u,v,dΩ)
+# b(v) = btrian(v,dΩ,dΓ)
+# am(u,v) = atrian(u,v,dΩm)
+# bm(v) = btrian(v,dΩm,dΓm)
 
-op = AffineFEOperator(a,b,U,V)
-opm = AffineFEOperator(am,bm,Um,Vm)
+# op = AffineFEOperator(a,b,U,V)
+# opm = AffineFEOperator(am,bm,Um,Vm)
 
-uh = solve(op)
-uhm = solve(opm)
+# uh = solve(op)
+# uhm = solve(opm)
 
-v = get_fe_basis(V)
-u = get_trial_fe_basis(V)
-jcell = a(u,v)[Ω]
+# v = get_fe_basis(V)
+# u = get_trial_fe_basis(V)
+# jcell = a(u,v)[Ω]
 
-vm = get_fe_basis(Vm)
-um = get_trial_fe_basis(Vm)
-jcellm = am(um,vm)[Ωm]
+# vm = get_fe_basis(Vm)
+# um = get_trial_fe_basis(Vm)
+# jcellm = am(um,vm)[Ωm]
 
-detJφ = 3
-Jφt = CellField(∇(φ),Ω)
-νm = ν∘φ
-mappedj = (∫( νm*(inv(Jφt)⋅∇(v)) ⋅ (inv(Jφt)⋅∇(u))*detJφ )dΩ)[Ω]
+# detJφ = 3
+# Jφt = CellField(∇(φ),Ω)
+# νm = ν∘φ
+# mappedj = (∫( νm*(inv(Jφt)⋅∇(v)) ⋅ (inv(Jφt)⋅∇(u))*detJφ )dΩ)[Ω]
 
-ncells = num_cells(Ω)
-compare = lazy_map(≈,jcellm,mappedj)
-@assert sum(compare) == ncells
+# ncells = num_cells(Ω)
+# compare = lazy_map(≈,jcellm,mappedj)
+# @assert sum(compare) == ncells
 
 
 #

@@ -313,6 +313,11 @@ function param_getindex(A::ConsecutiveParamArray{T,N},i::Integer) where {T,N}
   view(A.data,ArraysOfArrays._ncolons(Val{N}())...,i)
 end
 
+function param_setindex!(A::ConsecutiveParamArray{T,N},v,i::Integer) where {T,N}
+  @views A.data[ArraysOfArrays._ncolons(Val{N}())...,i] = v
+  v
+end
+
 function get_param_entry!(v::AbstractVector{T},A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
   data = get_all_data(A)
   for j in eachindex(v)

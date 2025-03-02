@@ -89,6 +89,7 @@ Parametric objects with this trait do not store their values consecutively
 struct NonConsecutiveMemory <: MemoryLayoutStyle end
 
 MemoryLayoutStyle(A::T) where T = MemoryLayoutStyle(T)
+MemoryLayoutStyle(::DataType) = @abstractmethod
 MemoryLayoutStyle(::Type{<:AbstractParamArray}) = ConsecutiveMemory()
 
 ParamArray(args...;kwargs...) = @abstractmethod
