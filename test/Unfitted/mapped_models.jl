@@ -131,3 +131,5 @@ k = Broadcasting(Operation(⋅))
 args = cell_invJt,cell_∇a
 fi = map(testitem,args)
 T = return_type(k,fi...)
+
+∇(v)⋅∇(u)

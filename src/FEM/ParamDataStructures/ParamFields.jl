@@ -193,6 +193,10 @@ for op in (:(Fields.∇),:(Fields.∇∇))
   end
 end
 
+function Fields.TransposeFieldIndices(A::AbstractParamMatrix)
+  ParamContainer(map(Fields.TransposeFieldIndices,A.data))
+end
+
 # lazy maps
 
 for T in (:Point,:(AbstractArray{<:Point}))
@@ -396,31 +400,96 @@ function Arrays.lazy_map(
   cell_∇∇bt
 end
 
-function Arrays.return_value(k::Broadcasting{<:Operation},args::Union{ParamField,ParamContainer}...)
-  plength = find_param_length(args...)
-  ai = map(testitem,args)
+function return_param_value(k::Broadcasting{<:Operation},args...)
+  pargs = to_param_quantities(args...)
+  plength = param_length(first(pargs))
+  ai = map(testitem,pargs)
   vi = return_value(k,ai...)
   v = Vector{typeof(vi)}(undef,plength)
   for i in 1:plength
-    ai = map(a -> param_getindex(a,i),args)
-    v[i] = return_value(k,fi...)
+    ai = map(a -> param_getindex(a,i),pargs)
+    v[i] = return_value(k,ai...)
   end
   return ParamContainer(v)
 end
 
-function Arrays.return_cache(k::Broadcasting{<:Operation},args::Union{ParamField,ParamContainer}...)
-  v = return_value(k,args...)
+function return_param_cache(k::Broadcasting{<:Operation},args...)
+  v = return_param_value(k,args...)
   c = copy(v.data)
   return c,v
 end
 
-function Arrays.evaluate!(cache,k::Broadcasting{<:Operation},args::Union{ParamField,ParamContainer}...)
+function param_evaluate!(cache,k::Broadcasting{<:Operation},args...)
   c,v = cache
+  pargs = to_param_quantities(args...)
   @inbounds for i in 1:param_length(v)
-    ai = map(a -> param_getindex(a,i),args)
+    ai = map(a -> param_getindex(a,i),pargs)
     v.data[i] = evaluate!(c[i],k,ai...)
   end
   v
+end
+
+for (f,g) in zip(
+  (:(Arrays.return_value),:(Arrays.return_cache)),
+  (:return_param_value,:return_param_cache))
+  @eval begin
+    function $f(
+      k::Broadcasting{<:Operation},
+      A::Union{ParamField,ParamContainer},
+      B::Union{Field,AbstractArray{<:Field}}...)
+
+      $g(k,A,B...)
+    end
+
+    function $f(
+      k::Broadcasting{<:Operation},
+      A::Union{Field,AbstractArray{<:Field}},
+      B::Union{ParamField,ParamContainer},
+      C::Union{Field,AbstractArray{<:Field}}...)
+
+      $g(k,A,B,C...)
+    end
+
+    function $f(
+      k::Broadcasting{<:Operation},
+      A::Union{Field,AbstractArray{<:Field}},
+      B::Union{Field,AbstractArray{<:Field}},
+      C::Union{ParamField,ParamContainer},
+      D::Union{Field,AbstractArray{<:Field}}...)
+
+      $g(k,A,B,C,D...)
+    end
+  end
+end
+
+function Arrays.evaluate!(
+  cache,
+  k::Broadcasting{<:Operation},
+  A::Union{ParamField,ParamContainer},
+  B::Union{Field,AbstractArray{<:Field}}...)
+
+  param_evaluate!(cache,k,A,B...)
+end
+
+function Arrays.evaluate!(
+  cache,
+  k::Broadcasting{<:Operation},
+  A::Union{Field,AbstractArray{<:Field}},
+  B::Union{ParamField,ParamContainer},
+  C::Union{Field,AbstractArray{<:Field}}...)
+
+  param_evaluate!(cache,k,A,B,C...)
+end
+
+function Arrays.evaluate!(
+  cache,
+  k::Broadcasting{<:Operation},
+  A::Union{Field,AbstractArray{<:Field}},
+  B::Union{Field,AbstractArray{<:Field}},
+  C::Union{ParamField,ParamContainer},
+  D::Union{Field,AbstractArray{<:Field}}...)
+
+  param_evaluate!(cache,k,A,B,C,D...)
 end
 
 function Arrays.return_value(k::Broadcasting{<:ParamOperation},args::Union{Field,AbstractArray{<:Field}}...)

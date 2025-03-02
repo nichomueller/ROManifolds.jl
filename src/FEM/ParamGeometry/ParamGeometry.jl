@@ -99,7 +99,7 @@ struct ParamMappedGrid{Dc,Dp,T,M,L} <: Grid{Dc,Dp}
   node_coords::L
 end
 
-function Geometry.MappedGrid(grid::Grid,phys_map::AbstractVector{<:GenericParamField})
+function Geometry.MappedGrid(grid::Grid,phys_map::AbstractVector{<:ParamUnit})
 
   @assert length(phys_map) == num_cells(grid)
 
