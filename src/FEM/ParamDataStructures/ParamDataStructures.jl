@@ -1,7 +1,6 @@
 module ParamDataStructures
 
 using LinearAlgebra
-using ArraysOfArrays
 using BlockArrays
 using ForwardDiff
 using SparseArrays
@@ -18,6 +17,7 @@ using Gridap.Helpers
 using ROManifolds.Utils
 using ROManifolds.DofMaps
 
+import ArraysOfArrays: front_tuple,innersize,_ncolons
 import Base:+,-,*,/,\
 import Distributions: Uniform,Normal
 import FillArrays: Fill

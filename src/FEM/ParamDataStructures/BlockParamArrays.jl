@@ -47,7 +47,7 @@ param_length(A::BlockParamArray) = param_length(first(blocks(A)))
 @inline Base.size(A::BlockParamArray) = map(length,axes(A))
 Base.axes(A::BlockParamArray) = A.axes
 
-@inline function ArraysOfArrays.innersize(A::BlockParamArray)
+@inline function innersize(A::BlockParamArray)
   map(innersize,A.data)
 end
 

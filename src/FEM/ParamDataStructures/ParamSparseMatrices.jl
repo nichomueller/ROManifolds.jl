@@ -153,7 +153,7 @@ function ParamArray(a::SparseMatrixCSC,l::Integer;kwargs...)
   ConsecutiveParamSparseMatrixCSC(m,n,colptr,rowval,data)
 end
 
-ArraysOfArrays.innersize(A::ConsecutiveParamSparseMatrixCSC) = (A.m,A.n)
+innersize(A::ConsecutiveParamSparseMatrixCSC) = (A.m,A.n)
 
 Base.@propagate_inbounds function Base.getindex(A::ConsecutiveParamSparseMatrixCSC,i::Integer,j::Integer)
   @boundscheck checkbounds(A,i,j)
@@ -242,7 +242,7 @@ function GenericParamSparseMatrixCSC(a::AbstractVector{<:SparseMatrixCSC{Tv}}) w
   GenericParamSparseMatrixCSC(m,n,colptr,rowval,data,ptrs)
 end
 
-ArraysOfArrays.innersize(A::GenericParamSparseMatrixCSC) = (A.m,A.n)
+innersize(A::GenericParamSparseMatrixCSC) = (A.m,A.n)
 
 Base.@propagate_inbounds function Base.getindex(A::GenericParamSparseMatrixCSC{Tv},i::Integer,j::Integer) where Tv
   @boundscheck checkbounds(A,i,j)
@@ -385,7 +385,7 @@ function ParamArray(a::SparseMatrixCSR,l::Integer;kwargs...)
   ConsecutiveParamSparseMatrixCSR{1}(m,n,rowptr,colval,data)
 end
 
-ArraysOfArrays.innersize(A::ConsecutiveParamSparseMatrixCSR) = (A.m,A.n)
+innersize(A::ConsecutiveParamSparseMatrixCSR) = (A.m,A.n)
 
 Base.@propagate_inbounds function Base.getindex(A::ConsecutiveParamSparseMatrixCSR{Bi},i::Integer,j::Integer) where Bi
   @boundscheck checkbounds(A,i,j)
@@ -485,7 +485,7 @@ function GenericParamSparseMatrixCSR(a::AbstractVector{<:SparseMatrixCSR{Bi,Tv}}
   GenericParamSparseMatrixCSR{1}(m,n,rowptr,colval,data,ptrs)
 end
 
-ArraysOfArrays.innersize(A::GenericParamSparseMatrixCSR) = (A.m,A.n)
+innersize(A::GenericParamSparseMatrixCSR) = (A.m,A.n)
 
 Base.@propagate_inbounds function Base.getindex(A::GenericParamSparseMatrixCSR{Bi,Tv},i::Integer,j::Integer) where {Bi,Tv}
   @boundscheck checkbounds(A,i,j)

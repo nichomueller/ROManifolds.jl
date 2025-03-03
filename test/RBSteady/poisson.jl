@@ -95,7 +95,6 @@ main(:ttsvd)
 
 end
 
-
 pdomain = (1,10,1,10,1,10)
 
 domain = (0,1,0,1)
@@ -148,27 +147,17 @@ v,q = get_fe_basis(U)
 du,dp = get_trial_fe_basis(U)
 u,p = zero(U)
 
-dcmat = (∫(aμ(μ)*∇(v)⋅∇(du))dΩ)[Ω]
-dcvec = (∫(aμ(μ)*∇(v)⊙∇(u))dΩ)[Ω]
+m1 = ∫(aμ(μ)*∇(v)⊙∇(du))dΩ
+m2 = ∫(dp*(∇⋅(v)))dΩ
+m3 = ∫(q*(∇⋅(du)))dΩ
 
-(∫(p*(∇⋅(v)))dΩ)[Ω][1]
-(∫(q*(∇⋅(u)))dΩ + ∫(p*(∇⋅(v)))dΩ)[Ω][1]
-(∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ)[Ω][1]
-()[Ω][1]
+(m1 + m2 + m3)[Ω][1]
 
-dc1 = ∫(aμ(μ)*∇(v)⋅∇(du))dΩ
-dc2 = ∫(dp*(∇⋅(v)))dΩ
-dc3 = ∫(q*(∇⋅(du)))dΩ
+v1 = ∫(aμ(μ)*∇(v)⊙∇(u))dΩ
+v2 = ∫(p*(∇⋅(v)))dΩ
+v3 = ∫(q*(∇⋅(u)))dΩ
 
-(dc1 + dc2)[Ω][1]
-(dc1 + dc2 + dc3)[Ω][1]
-
-dc1 = ∫(aμ(μ)*∇(v)⋅∇(u))dΩ
-dc2 = ∫(p*(∇⋅(v)))dΩ
-dc3 = ∫(q*(∇⋅(u)))dΩ
-
-(dc1 + dc2)[Ω][1]
-(dc1 + dc3)[Ω][1]
+(v1 + v2 + v3)[Ω][1]
 
 k = Broadcasting(+)
 α = dc1[Ω][1]
@@ -190,21 +179,6 @@ bb = Array{typeof(ci),N}(undef,size(α.array))
 zf = Array{typeof(return_cache(m,fi,gi))}(undef,size(α.array))
 zg = Array{typeof(return_cache(m,gi,fi))}(undef,size(α.array))
 t = map(|,α.touched,β.touched)
-# for i in eachindex(α.array)
-#   if α.touched[i] && β.touched[i]
-#     bb[i] = return_cache(k,α.array[i],β.array[i])
-#   elseif α.touched[i]
-#     _fi = α.array[i]
-#     zg[i] = return_cache(m,gi,_fi)
-#     _gi = evaluate!(zg[i],m,gi,_fi)
-#     bb[i] = return_cache(k,_fi,_gi)
-#   elseif β.touched[i]
-#     _gi = β.array[i]
-#     zf[i] = return_cache(m,fi,_gi)
-#     _fi = evaluate!(zf[i],m,fi,_gi)
-#     bb[i] = return_cache(k,_fi,_gi)
-#   end
-# end
 
 i = 1
 _fi = α.array[i]
@@ -217,3 +191,14 @@ _gi = β.array[i]
 zf[i] = return_cache(m,fi,_gi)
 _fi = evaluate!(zf[i],m,fi,_gi)
 bb[i] = return_cache(k,_fi,_gi)
+
+# return_cache(m,gi,_fi) ok
+# return_cache(m,fi,_gi) not ok
+
+hh,ff = ParamDataStructures._parameterize(fi,_gi)
+hi = testitem(hh)
+fi = testitem(ff)
+ci = return_cache(m,hi,fi)
+ri = evaluate!(ci,m,hi,fi)
+c = Vector{typeof(ci)}(undef,param_length(f))
+data = Vector{typeof(ri)}(undef,param_length(f))

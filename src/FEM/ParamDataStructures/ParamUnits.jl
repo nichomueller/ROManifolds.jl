@@ -1,29 +1,23 @@
-abstract type ParamUnit{A,N} end
+abstract type ParamUnit{A} end
 
-Base.size(b::ParamUnit{A,N}) where {A,N} = tfill(param_length(b),Val{N}())
-Base.length(b::ParamUnit{A,N}) where {A,N} = param_length(b)^N
+Base.size(b::ParamUnit) = tfill(param_length(b),Val{ndims(b)}())
+Base.length(b::ParamUnit) = param_length(b)^ndims(b)
 Base.eltype(::Type{<:ParamUnit{A}}) where A = A
 Base.eltype(b::ParamUnit{A}) where A = A
-Base.ndims(b::ParamUnit{A,N}) where {A,N} = N
-Base.ndims(::Type{<:ParamUnit{A,N}}) where {A,N} = N
+Base.ndims(b::ParamUnit{A}) where A = ndims(A)
+Base.ndims(::Type{<:ParamUnit{A}}) where A = ndims(A)
+
+Arrays.testitem(b::ParamUnit) = param_getindex(b,1)
+
+innersize(b::ParamUnit) = size(testitem(b))
 innerlength(b::ParamUnit) = prod(innersize(b))
 
 function Base.:≈(a::AbstractArray{<:ParamUnit},b::AbstractArray{<:ParamUnit})
   all(z->z[1]≈z[2],zip(a,b))
 end
 
-# we should probably add a check such as @check all(ai->size(ai)==innersize,data)
-struct GenericParamUnit{A,N,S} <: ParamUnit{A,N}
+struct GenericParamUnit{A} <: ParamUnit{A}
   data::Vector{A}
-  innersize::S
-  function GenericParamUnit(data::Vector{A},innersize::S) where {A,N,S<:NTuple{N}}
-    new{A,N,S}(data,innersize)
-  end
-end
-
-function GenericParamUnit(data::AbstractVector)
-  innersize = size(first(data))
-  GenericParamUnit(data,innersize)
 end
 
 function Base.getindex(b::GenericParamUnit{A},i...) where A
@@ -46,7 +40,6 @@ get_param_data(b::GenericParamUnit) = b.data
 param_length(b::GenericParamUnit) = length(b.data)
 param_getindex(b::GenericParamUnit,i::Integer) = b.data[i]
 param_setindex!(b::GenericParamUnit,v,i::Integer) = (b.data[i]=v)
-ArraysOfArrays.innersize(b::GenericParamUnit) = b.innersize
 
 function get_param_entry!(v::AbstractVector,b::GenericParamUnit,i...)
   for k in eachindex(v)
@@ -55,7 +48,7 @@ function get_param_entry!(v::AbstractVector,b::GenericParamUnit,i...)
   v
 end
 
-Base.copy(a::GenericParamUnit) = GenericParamUnit(copy(a.data),a.innersize)
+Base.copy(a::GenericParamUnit) = GenericParamUnit(copy(a.data))
 
 function Base.copyto!(a::GenericParamUnit,b::GenericParamUnit)
   @check size(a) == size(b)
@@ -90,14 +83,8 @@ function Base.:(==)(a::GenericParamUnit,b::GenericParamUnit)
   true
 end
 
-function Arrays.testitem(a::GenericParamUnit{A}) where A
-  testitem(a.data)
-end
-
-function Arrays.testvalue(::Type{<:GenericParamUnit{A,N}}) where {A,N}
-  data = [testvalue(A)]
-  innersize = tfill(0,Val{N}())
-  GenericParamUnit(data,innersize)
+function Arrays.testvalue(::Type{GenericParamUnit{A}}) where A
+  GenericParamUnit([testvalue(A)])
 end
 
 function Arrays.CachedArray(a::GenericParamUnit)
@@ -107,7 +94,7 @@ function Arrays.CachedArray(a::GenericParamUnit)
   for i in eachindex(a.data)
     data[i] = CachedArray(a.data[i])
   end
-  GenericParamUnit(data,a.innersize)
+  GenericParamUnit(data)
 end
 
 function Fields.unwrap_cached_array(a::GenericParamUnit)
@@ -124,7 +111,7 @@ function Arrays.return_cache(::typeof(Fields.unwrap_cached_array),a::GenericPara
   for i in eachindex(a.data)
     c[i] = return_cache(Fields.unwrap_cached_array,a.data[i])
   end
-  GenericParamUnit(data,a.innersize),c
+  GenericParamUnit(data),c
 end
 
 function Arrays.evaluate!(cache,::typeof(Fields.unwrap_cached_array),a::GenericParamUnit)
@@ -137,18 +124,14 @@ end
 
 ###################### trivial case ######################
 
-struct TrivialParamUnit{A,N,S} <: ParamUnit{A,N}
+struct TrivialParamUnit{A} <: ParamUnit{A}
   data::A
-  innersize::S
   plength::Int
-  function TrivialParamUnit(data::A,innersize::S,plength::Int=1) where {A,N,S<:NTuple{N}}
-    new{A,N,S}(data,innersize,plength)
-  end
 end
 
-function TrivialParamUnit(data::Any,plength::Int=1)
-  innersize = size(data)
-  TrivialParamUnit(data,innersize,plength)
+function TrivialParamUnit(data::Any)
+  plength = 1
+  TrivialParamUnit(data,plength)
 end
 
 function Base.getindex(b::TrivialParamUnit{A},i...) where A
@@ -171,14 +154,13 @@ get_param_data(b::TrivialParamUnit) = Fill(b.data,b.plength)
 param_length(b::TrivialParamUnit) = b.plength
 param_getindex(b::TrivialParamUnit,i::Integer) = b.data
 param_setindex!(b::TrivialParamUnit,v,i::Integer) = copyto!(b.data,v)
-ArraysOfArrays.innersize(b::TrivialParamUnit) = b.innersize
 
 function get_param_entry!(v::AbstractVector,b::TrivialParamUnit,i...)
   vk = b.data[k][i...]
   fill!(v,vk)
 end
 
-Base.copy(a::TrivialParamUnit) = TrivialParamUnit(copy(a.data),a.innersize,a.plength)
+Base.copy(a::TrivialParamUnit) = TrivialParamUnit(copy(a.data),a.plength)
 
 Base.copyto!(a::TrivialParamUnit,b::TrivialParamUnit) = copyto!(a.data,b.data)
 
@@ -196,23 +178,16 @@ function Base.:(==)(a::TrivialParamUnit,b::TrivialParamUnit)
   a.data == b.data
 end
 
-function Arrays.testitem(a::TrivialParamUnit{A}) where A
-  a.data
-end
-
-function Arrays.testvalue(::Type{<:TrivialParamUnit{A,N}}) where {A,N}
-  data = [testvalue(A)]
-  innersize = tfill(0,Val{N}())
-  plength = 1
-  TrivialParamUnit(data,innersize,plength)
+function Arrays.testvalue(::Type{TrivialParamUnit{A}}) where A
+  TrivialParamUnit(testvalue(A),1)
 end
 
 function Arrays.CachedArray(a::TrivialParamUnit)
-  TrivialParamUnit(CachedArray(a.data),a.innersize,a.plength)
+  TrivialParamUnit(CachedArray(a.data),a.plength)
 end
 
 function Fields.unwrap_cached_array(a::TrivialParamUnit)
-  TrivialParamUnit(Fields.unwrap_cached_array(a.data),a.innersize,a.plength)
+  TrivialParamUnit(Fields.unwrap_cached_array(a.data),a.plength)
 end
 
 ###################### trivial case ######################
@@ -226,7 +201,7 @@ function Arrays.return_cache(f::GenericParamUnit,x)
   for i in eachindex(f.data)
     l[i] = return_cache(f.data[i],x)
   end
-  GenericParamUnit(g,size(fix)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,f::GenericParamUnit,x)
@@ -246,7 +221,7 @@ function Fields.linear_combination(u::GenericParamUnit,f::GenericParamUnit)
   for i in eachindex(f.data)
     g[i] = linear_combination(u.data[i],f.data[i])
   end
-  GenericParamUnit(g,size(ufi))
+  GenericParamUnit(g)
 end
 
 function Fields.linear_combination(u::GenericParamUnit,f::AbstractVector{<:Field})
@@ -255,7 +230,7 @@ function Fields.linear_combination(u::GenericParamUnit,f::AbstractVector{<:Field
   @inbounds for i in param_eachindex(u)
     g[i] = linear_combination(param_getindex(u,i),f)
   end
-  GenericParamUnit(g,size(ufi))
+  GenericParamUnit(g)
 end
 
 function Arrays.return_cache(k::LinearCombinationMap,u::GenericParamUnit,fx::AbstractArray)
@@ -267,7 +242,7 @@ function Arrays.return_cache(k::LinearCombinationMap,u::GenericParamUnit,fx::Abs
   for i in eachindex(u.data)
     l[i] = return_cache(k,u.data[i],fx)
   end
-  GenericParamUnit(g,size(ufxi)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,k::LinearCombinationMap,u::GenericParamUnit,fx::AbstractArray)
@@ -288,7 +263,7 @@ function Arrays.return_cache(k::LinearCombinationMap,u::GenericParamUnit,fx::Gen
   for i in eachindex(fx.data)
     l[i] = return_cache(k,u.data[i],fx.data[i])
   end
-  GenericParamUnit(g,size(ufxi)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,k::LinearCombinationMap,u::GenericParamUnit,fx::GenericParamUnit)
@@ -306,7 +281,7 @@ function Base.transpose(f::GenericParamUnit)
   for i in eachindex(f.data)
     g[i] = transpose(f.data[i])
   end
-  GenericParamUnit(g,size(fit))
+  GenericParamUnit(g)
 end
 
 function Arrays.return_cache(k::Fields.TransposeMap,f::GenericParamUnit)
@@ -318,7 +293,7 @@ function Arrays.return_cache(k::Fields.TransposeMap,f::GenericParamUnit)
   for i in eachindex(f.data)
     l[i] = return_cache(k,f.data[i])
   end
-  GenericParamUnit(g,size(fix)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,k::Fields.TransposeMap,f::GenericParamUnit)
@@ -336,7 +311,7 @@ function Fields.integrate(f::GenericParamUnit,args...)
   for i in eachindex(f.data)
     g[i] = integrate(f.data[i],args...)
   end
-  GenericParamUnit(g,size(intfi))
+  GenericParamUnit(g)
 end
 
 function Arrays.return_value(k::IntegrationMap,fx::GenericParamUnit,args...)
@@ -346,7 +321,7 @@ function Arrays.return_value(k::IntegrationMap,fx::GenericParamUnit,args...)
   for i in eachindex(fx.data)
     g[i] = return_value(k,fx.data[i],args...)
   end
-  GenericParamUnit(g,size(ufxi))
+  GenericParamUnit(g)
 end
 
 function Arrays.return_cache(k::IntegrationMap,fx::GenericParamUnit,args...)
@@ -358,7 +333,7 @@ function Arrays.return_cache(k::IntegrationMap,fx::GenericParamUnit,args...)
   for i in eachindex(fx.data)
     l[i] = return_cache(k,fx.data[i],args...)
   end
-  GenericParamUnit(g,size(ufxi)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,k::IntegrationMap,fx::GenericParamUnit,args...)
@@ -376,7 +351,7 @@ function Arrays.return_value(k::Broadcasting,f::GenericParamUnit)
   for i in eachindex(f.data)
     g[i] = return_value(k,f.data[i])
   end
-  GenericParamUnit(g,size(fix))
+  GenericParamUnit(g)
 end
 
 function Arrays.return_cache(k::Broadcasting,f::GenericParamUnit)
@@ -388,7 +363,7 @@ function Arrays.return_cache(k::Broadcasting,f::GenericParamUnit)
   for i in eachindex(f.data)
     l[i] = return_cache(k,f.data[i])
   end
-  GenericParamUnit(g,size(fix)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,k::Broadcasting,f::GenericParamUnit)
@@ -406,7 +381,7 @@ function Arrays.return_value(k::Broadcasting{typeof(∘)},f::GenericParamUnit,h:
   for i in eachindex(f.data)
     g[i] = return_value(k,f.data[i],h)
   end
-  GenericParamUnit(g,size(fix))
+  GenericParamUnit(g)
 end
 
 function Arrays.return_cache(k::Broadcasting{typeof(∘)},f::GenericParamUnit,h::Field)
@@ -418,7 +393,7 @@ function Arrays.return_cache(k::Broadcasting{typeof(∘)},f::GenericParamUnit,h:
   for i in eachindex(f.data)
     l[i] = return_cache(k,f.data[i],h)
   end
-  GenericParamUnit(g,size(fix)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,k::Broadcasting{typeof(∘)},f::GenericParamUnit,h::Field)
@@ -436,7 +411,7 @@ function Arrays.return_value(k::Broadcasting{<:Operation},f::GenericParamUnit,h:
   for i in eachindex(f.data)
     g[i] = return_value(k,f.data[i],h)
   end
-  GenericParamUnit(g,size(fix))
+  GenericParamUnit(g)
 end
 
 function Arrays.return_cache(k::Broadcasting{<:Operation},f::GenericParamUnit,h::Field)
@@ -448,7 +423,7 @@ function Arrays.return_cache(k::Broadcasting{<:Operation},f::GenericParamUnit,h:
   for i in eachindex(f.data)
     l[i] = return_cache(k,f.data[i],h)
   end
-  GenericParamUnit(g,size(fix)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,k::Broadcasting{<:Operation},f::GenericParamUnit,h::Field)
@@ -466,7 +441,7 @@ function Arrays.return_value(k::Broadcasting{<:Operation},h::Field,f::GenericPar
   for i in eachindex(f.data)
     g[i] = return_value(k,h,f.data[i])
   end
-  GenericParamUnit(g,size(fix))
+  GenericParamUnit(g)
 end
 
 function Arrays.return_cache(k::Broadcasting{<:Operation},h::Field,f::GenericParamUnit)
@@ -478,7 +453,7 @@ function Arrays.return_cache(k::Broadcasting{<:Operation},h::Field,f::GenericPar
   for i in eachindex(f.data)
     l[i] = return_cache(k,h,f.data[i])
   end
-  GenericParamUnit(g,size(fix)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,k::Broadcasting{<:Operation},h::Field,f::GenericParamUnit)
@@ -498,7 +473,7 @@ function Arrays.return_value(k::Broadcasting{<:Operation},h::GenericParamUnit,f:
   for i in eachindex(f.data)
     g[i] = return_value(k,h.data[i],f.data[i])
   end
-  GenericParamUnit(g,size(fix))
+  GenericParamUnit(g)
 end
 
 function Arrays.return_cache(k::Broadcasting{<:Operation},h::GenericParamUnit,f::GenericParamUnit)
@@ -512,7 +487,7 @@ function Arrays.return_cache(k::Broadcasting{<:Operation},h::GenericParamUnit,f:
   for i in eachindex(f.data)
     l[i] = return_cache(k,h.data[i],f.data[i])
   end
-  GenericParamUnit(g,size(fix)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,k::Broadcasting{<:Operation},h::GenericParamUnit,f::GenericParamUnit)
@@ -538,7 +513,7 @@ function Arrays.return_value(k::Broadcasting{<:ParamOperation},f::GenericParamUn
   for i in eachindex(f.data)
     g[i] = return_value(param_getindex(k,i),f.data[i],h)
   end
-  GenericParamUnit(g,size(fix))
+  GenericParamUnit(g)
 end
 
 function Arrays.return_cache(k::Broadcasting{<:ParamOperation},f::GenericParamUnit,h::Field)
@@ -552,7 +527,7 @@ function Arrays.return_cache(k::Broadcasting{<:ParamOperation},f::GenericParamUn
   for i in eachindex(f.data)
     l[i] = return_cache(param_getindex(k,i),f.data[i],h)
   end
-  GenericParamUnit(g,size(fix)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,k::Broadcasting{<:ParamOperation},f::GenericParamUnit,h::Field)
@@ -572,7 +547,7 @@ function Arrays.return_value(k::Broadcasting{<:ParamOperation},h::Field,f::Gener
   for i in eachindex(f.data)
     g[i] = return_value(param_getindex(k,i),h,f.data[i])
   end
-  GenericParamUnit(g,size(fix))
+  GenericParamUnit(g)
 end
 
 function Arrays.return_cache(k::Broadcasting{<:ParamOperation},h::Field,f::GenericParamUnit)
@@ -586,7 +561,7 @@ function Arrays.return_cache(k::Broadcasting{<:ParamOperation},h::Field,f::Gener
   for i in eachindex(f.data)
     l[i] = return_cache(param_getindex(k,i),h,f.data[i])
   end
-  GenericParamUnit(g,size(fix)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,k::Broadcasting{<:ParamOperation},h::Field,f::GenericParamUnit)
@@ -607,7 +582,7 @@ function Arrays.return_value(k::Broadcasting{<:ParamOperation},h::GenericParamUn
   for i in eachindex(f.data)
     g[i] = return_value(param_getindex(k,i),h.data[i],f.data[i])
   end
-  GenericParamUnit(g,size(fix))
+  GenericParamUnit(g)
 end
 
 function Arrays.return_cache(k::Broadcasting{<:ParamOperation},h::GenericParamUnit,f::GenericParamUnit)
@@ -622,7 +597,7 @@ function Arrays.return_cache(k::Broadcasting{<:ParamOperation},h::GenericParamUn
   for i in eachindex(f.data)
     l[i] = return_cache(param_getindex(k,i),h.data[i],f.data[i])
   end
-  GenericParamUnit(g,size(fix)),l
+  GenericParamUnit(g),l
 end
 
 function Arrays.evaluate!(cache,k::Broadcasting{<:ParamOperation},h::GenericParamUnit,f::GenericParamUnit)
@@ -640,7 +615,7 @@ function Arrays.return_value(k::BroadcastingFieldOpMap,f::GenericParamUnit,g::Ab
   for i in eachindex(f.data)
     h[i] = return_value(k,f.data[i],g)
   end
-  GenericParamUnit(h,size(fix))
+  GenericParamUnit(h)
 end
 
 function Arrays.return_cache(k::BroadcastingFieldOpMap,f::GenericParamUnit,g::AbstractArray)
@@ -652,7 +627,7 @@ function Arrays.return_cache(k::BroadcastingFieldOpMap,f::GenericParamUnit,g::Ab
   for i in eachindex(f.data)
     l[i] = return_cache(k,f.data[i],g)
   end
-  GenericParamUnit(h,size(fix)),l
+  GenericParamUnit(h),l
 end
 
 function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,f::GenericParamUnit,g::AbstractArray)
@@ -670,7 +645,7 @@ function Arrays.return_value(k::BroadcastingFieldOpMap,g::AbstractArray,f::Gener
   for i in eachindex(f.data)
     h[i] = return_value(k,g,f.data[i])
   end
-  GenericParamUnit(h,size(fix))
+  GenericParamUnit(h)
 end
 
 function Arrays.return_cache(k::BroadcastingFieldOpMap,g::AbstractArray,f::GenericParamUnit)
@@ -682,7 +657,7 @@ function Arrays.return_cache(k::BroadcastingFieldOpMap,g::AbstractArray,f::Gener
   for i in eachindex(f.data)
     l[i] = return_cache(k,g,f.data[i])
   end
-  GenericParamUnit(h,size(fix)),l
+  GenericParamUnit(h),l
 end
 
 function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,g::AbstractArray,f::GenericParamUnit)
@@ -718,7 +693,7 @@ function Arrays.return_value(k::Broadcasting{typeof(*)},f::Number,g::GenericPara
   for i in eachindex(g.data)
     data[i] = return_value(k,f,g.data[i])
   end
-  GenericParamUnit(data,size(hi))
+  GenericParamUnit(data)
 end
 
 function Arrays.return_cache(k::Broadcasting{typeof(*)},f::Number,g::GenericParamUnit)
@@ -730,7 +705,7 @@ function Arrays.return_cache(k::Broadcasting{typeof(*)},f::Number,g::GenericPara
   for i in eachindex(g.data)
     c[i] = return_cache(k,f,g.data[i])
   end
-  GenericParamUnit(data,size(hi)),c
+  GenericParamUnit(data),c
 end
 
 function Arrays.evaluate!(cache,k::Broadcasting{typeof(*)},f::Number,g::GenericParamUnit)
@@ -763,7 +738,7 @@ function Arrays.return_cache(k::BroadcastingFieldOpMap,a::TrivialParamUnit...)
   ais = map(ai->ai.data,a)
   ai = return_cache(k,ais...)
   bi = evaluate!(ci,k,ais...)
-  TrivialParamUnit(bi,size(bi),a1.plength),ai
+  TrivialParamUnit(bi,a1.plength),ai
 end
 
 function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,a::TrivialParamUnit...)
@@ -782,7 +757,7 @@ function Arrays.return_value(k::BroadcastingFieldOpMap,f::ParamUnit,g::ParamUnit
   hi = return_value(k,fi,gi)
   a = Vector{typeof(hi)}(undef,param_length(f))
   fill!(a,hi)
-  GenericParamUnit(a,size(hi))
+  GenericParamUnit(a)
 end
 
 function Arrays.return_cache(k::BroadcastingFieldOpMap,f::ParamUnit,g::ParamUnit)
@@ -796,7 +771,7 @@ function Arrays.return_cache(k::BroadcastingFieldOpMap,f::ParamUnit,g::ParamUnit
   for i in param_eachindex(f)
     b[i] = return_cache(k,param_getindex(f,i),param_getindex(g,i))
   end
-  GenericParamUnit(a,size(hi)),b
+  GenericParamUnit(a),b
 end
 
 function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,f::ParamUnit,g::ParamUnit)
@@ -820,7 +795,7 @@ function Arrays.return_cache(k::BroadcastingFieldOpMap,a::ParamUnit...)
     _ais = map(ai->ai.data[i],a)
     c[i] = return_cache(k,_ais...)
   end
-  GenericParamUnit(data,size(bi)),c
+  GenericParamUnit(data),c
 end
 
 function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,a::ParamUnit...)
@@ -859,8 +834,8 @@ for op in (:+,:-)
 
     function $op(a::TrivialParamUnit,b::TrivialParamUnit)
       @check size(a) == size(b)
-      c = TrivialParamUnit($op(a.data,b.data))
-      TrivialParamUnit(c,size(c),a.plength)
+      c = $op(a.data,b.data)
+      TrivialParamUnit(c,a.plength)
     end
   end
 end
@@ -872,22 +847,21 @@ function Base.:*(a::Number,b::GenericParamUnit)
   for i in eachindex(b.data)
     data[i] = a*b.data[i]
   end
-  GenericParamUnit(data,b.innersize)
+  GenericParamUnit(data)
 end
 
 function Base.:*(a::Number,b::TrivialParamUnit)
-  TrivialParamUnit(a*b.data,b.innersize,b.plength)
+  TrivialParamUnit(a*b.data,b.plength)
 end
 
 function Base.:*(a::ParamUnit,b::Number)
   b*a
 end
 
-function Base.:*(a::TrivialParamUnit{A,2},b::TrivialParamUnit{B}) where {A,B}
-  @check size(a.data,2) == size(b.data,1)
-  @check a.plength == b.plength
+function Base.:*(a::TrivialParamUnit,b::TrivialParamUnit)
+  @check param_length(a) == param_length(b)
   c = a.data*b.data
-  TrivialParamUnit(c,size(c),a.plength)
+  TrivialParamUnit(c,a.plength)
 end
 
 function LinearAlgebra.mul!(c::TrivialParamUnit,a::TrivialParamUnit,b::TrivialParamUnit)
@@ -914,7 +888,7 @@ function Arrays.evaluate!(cache,::typeof(*),a::TrivialParamUnit,b::TrivialParamU
 end
 
 function Base.:*(a::ParamUnit,b::ParamUnit)
-  @check param_length(a) == param_length(b) &&  a.innersize[2] == b.innersize[1]
+  @check param_length(a) == param_length(b)
   ai = testitem(a)
   bi = testitem(b)
   ri = ai*bi
@@ -923,16 +897,16 @@ function Base.:*(a::ParamUnit,b::ParamUnit)
   for i in 2:param_length(a)
     data[i] = param_getindex(a,i)*param_getindex(b,i)
   end
-  GenericParamUnit(data,size(ri))
+  GenericParamUnit(data)
 end
 
-function Arrays.return_value(::typeof(*),a::ParamUnit{A,2},b::ParamUnit{B}) where {A,B}
+function Arrays.return_value(::typeof(*),a::ParamUnit,b::ParamUnit)
   @check param_length(a) == param_length(b)
   ai = testitem(a)
   bi = testitem(b)
   ri = return_value(*,ai,bi)
   data = Vector{typeof(ri)}(undef,param_length(a))
-  GenericParamUnit(data,size(ri))
+  GenericParamUnit(data)
 end
 
 function LinearAlgebra.rmul!(a::GenericParamUnit,β)
@@ -1014,14 +988,14 @@ end
 
 # Autodiff related
 
-function Arrays.return_cache(k::Arrays.ConfigMap{typeof(ForwardDiff.gradient)},x::GenericParamUnit{A,1}) where A
+function Arrays.return_cache(k::Arrays.ConfigMap{typeof(ForwardDiff.gradient)},x::GenericParamUnit)
   xi = testitem(x)
   fi = return_cache(k,xi)
   data = Vector{typeof(fi)}(undef,length(x.data))
   for i in eachindex(x.data)
     data[i] = return_cache(k,x.data[i])
   end
-  GenericParamUnit(data,size(fi))
+  GenericParamUnit(data)
 end
 
 function Arrays.return_cache(k::Arrays.ConfigMap{typeof(ForwardDiff.jacobian)},x::GenericParamUnit)
@@ -1031,7 +1005,7 @@ function Arrays.return_cache(k::Arrays.ConfigMap{typeof(ForwardDiff.jacobian)},x
   for i in eachindex(x.data)
     data[i] = return_cache(k,x.data[i])
   end
-  GenericParamUnit(data,size(fi))
+  GenericParamUnit(data)
 end
 
 function Arrays.return_cache(k::Arrays.DualizeMap,x::GenericParamUnit)
@@ -1040,7 +1014,7 @@ function Arrays.return_cache(k::Arrays.DualizeMap,x::GenericParamUnit)
   cfgi = testitem(cfg)
   xidual = evaluate!(cfgi,k,xi)
   data = Vector{typeof(xidual)}(undef,length(x.data))
-  cfg,GenericParamUnit(data,size(xidual))
+  cfg,GenericParamUnit(data)
 end
 
 function Arrays.evaluate!(cache,k::Arrays.DualizeMap,x::GenericParamUnit)
@@ -1062,7 +1036,7 @@ function Arrays.return_cache(k::Arrays.AutoDiffMap,ydual::GenericParamUnit,x,cfg
   for i in eachindex(ydual.data)
     c[i] = return_cache(k,ydual.data[i],x.data[i],cfg.data[i])
   end
-  GenericParamUnit(data,size(ri)),c
+  GenericParamUnit(data),c
 end
 
 function Arrays.evaluate!(cache,k::Arrays.AutoDiffMap,ydual::GenericParamUnit,x,cfg::GenericParamUnit)
@@ -1076,7 +1050,7 @@ end
 function Arrays.return_cache(k::CellData.ZeroVectorMap,a::TrivialParamUnit)
   c = return_cache(k,a.data)
   data = evaluate!(ci,k,a.data)
-  TrivialParamUnit(data,size(v)),c
+  TrivialParamUnit(data,v.plength),c
 end
 
 function Arrays.evaluate!(cache,k::CellData.ZeroVectorMap,a::TrivialParamUnit)
@@ -1094,7 +1068,7 @@ function Arrays.return_cache(k::CellData.ZeroVectorMap,a::GenericParamUnit)
   for i in 1:param_length(a)
     c[i] = return_cache(k,param_getindex(a,i))
   end
-  GenericParamUnit(data,size(vi)),c
+  GenericParamUnit(data),c
 end
 
 function Arrays.evaluate!(cache,k::CellData.ZeroVectorMap,a::GenericParamUnit)
@@ -1161,7 +1135,7 @@ function Geometry._addto_compress!(a::ParamUnit,b::ParamUnit)
 end
 
 function Geometry._similar_empty(val::TrivialParamUnit)
-  TrivialParamUnit(Geometry._similar_empty(val.data))
+  TrivialParamUnit(Geometry._similar_empty(val.data),val.plength)
 end
 
 function Geometry._similar_empty(val::GenericParamUnit)
@@ -1192,7 +1166,7 @@ function Arrays.return_cache(b::LagrangianDofBasis,f::GenericParamUnit)
   for i in eachindex(f.data)
     c[i] = return_cache(b,f.data[i])
   end
-  GenericParamUnit(data,f.innersize),c
+  GenericParamUnit(data),c
 end
 
 function Arrays.evaluate!(cache,b::LagrangianDofBasis,f::GenericParamUnit)
@@ -1447,43 +1421,23 @@ for A in (:ArrayBlock,:AbstractArray)
   end
 end
 
-_is_testitem(f::ParamUnit) = param_length(f)==1 && innerlength(f)==0
-
-function _parameterize(_h::ParamUnit,_f::ParamUnit)
-  isitem_h = _is_testitem(_h)
-  isitem_f = _is_testitem(_f)
-  if isitem_h==isitem_f
-    h,f = _h,_f
-  elseif !isitem_h && isitem_f
-    h,f = _h,TrivialParamUnit(_f.data,param_length(_h))
-  elseif isitem_h && !isitem_f
-    h,f = TrivialParamUnit(_h.data,param_length(_f)),_f
+for T in (:ParamUnit,:AbstractArray,:Nothing), S in (:ParamUnit,:AbstractArray)
+  (T∈(:AbstractArray,:Nothing) && S==:AbstractArray) && continue
+  @eval begin
+    function Arrays.return_cache(k::Fields.ZeroBlockMap,_h::$T,_f::$S)
+      h,f = _parameterize(_h,_f)
+      hi = testitem(h)
+      fi = testitem(f)
+      ci = return_cache(k,hi,fi)
+      ri = evaluate!(ci,k,hi,fi)
+      c = Vector{typeof(ci)}(undef,param_length(f))
+      data = Vector{typeof(ri)}(undef,param_length(f))
+      for i in param_eachindex(f)
+        c[i] = return_cache(k,param_getindex(h,i),param_getindex(f,i))
+      end
+      GenericParamUnit(data),c
+    end
   end
-  return h,f
-end
-
-function Arrays.return_cache(k::Fields.ZeroBlockMap,_h::ParamUnit,_f::ParamUnit)
-  h,f = _parameterize(_h,_f)
-  hi = testitem(h)
-  fi = testitem(f)
-  ci = return_cache(k,hi,fi)
-  ri = evaluate!(ci,k,hi,fi)
-  c = Vector{typeof(ci)}(undef,param_length(f))
-  data = Vector{typeof(ri)}(undef,param_length(f))
-  for i in param_eachindex(f)
-    c[i] = return_cache(k,param_getindex(h,i),param_getindex(f,i))
-  end
-  GenericParamUnit(data,f.innersize),c
-end
-
-function Arrays.return_cache(k::Fields.ZeroBlockMap,h::ParamUnit,f::AbstractArray)
-  g = lazy_parameterize(f,param_length(h))
-  return_cache(k,h,g)
-end
-
-function Arrays.return_cache(k::Fields.ZeroBlockMap,f::AbstractArray,h::ParamUnit)
-  g = lazy_parameterize(f,param_length(h))
-  return_cache(k,g,h)
 end
 
 function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,f,h::AbstractArray)
@@ -1494,24 +1448,28 @@ function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,f,h::AbstractArray
   g
 end
 
-function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,f::ParamUnit,h::AbstractArray)
+function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,_f::ParamUnit,h::AbstractArray)
   g,l = cache
+  f = _parameterize(_f,length(g.data))
   for i in eachindex(g.data)
     g.data[i] = evaluate!(l[i],k,param_getindex(f,i),h)
   end
   g
 end
 
-function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,f,h::ParamUnit)
+function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,f,_h::ParamUnit)
   g,l = cache
+  h = _parameterize(_h,length(g.data))
   for i in eachindex(g.data)
     g.data[i] = evaluate!(l[i],k,f,param_getindex(h,i))
   end
   g
 end
 
-function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,f::ParamUnit,h::ParamUnit)
+function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,_f::ParamUnit,_h::ParamUnit)
   g,l = cache
+  f = _parameterize(_f,length(g.data))
+  h = _parameterize(_h,length(g.data))
   for i in eachindex(g.data)
     g.data[i] = evaluate!(l[i],k,param_getindex(f,i),param_getindex(h,i))
   end
@@ -1520,11 +1478,15 @@ end
 
 # constructors
 
-function lazy_parameterize(a::Union{AbstractArray{<:Number},Field,AbstractArray{<:Field}},plength::Integer)
+function lazy_parameterize(a::ParamUnit,plength::Integer=param_length(a))
+  TrivialParamUnit(testitem(a),plength)
+end
+
+function lazy_parameterize(a::Union{AbstractArray{<:Number},Nothing,Field,AbstractArray{<:Field}},plength::Integer)
   TrivialParamUnit(a,plength)
 end
 
-function local_parameterize(a::Union{AbstractArray{<:Number},Field,AbstractArray{<:Field}},plength::Integer)
+function local_parameterize(a::Union{AbstractArray{<:Number},Nothing,Field,AbstractArray{<:Field}},plength::Integer)
   data = Vector{typeof(a)}(undef,plength)
   @inbounds for i in 1:plength
     data[i] = copy(a)
@@ -1567,5 +1529,39 @@ for T in (:ParamUnit,:(ArrayBlock{<:ParamUnit}))
       end
       a
     end
+  end
+end
+
+# utils
+
+_is_testvalue(f::ParamUnit) = param_length(f)==1 && innerlength(f)==0
+
+function _parameterize(_h::ParamUnit,_f::ParamUnit)
+  istest_h = _is_testvalue(_h)
+  istest_f = _is_testvalue(_f)
+  if istest_h==istest_f
+    h,f = _h,_f
+  elseif !istest_h && istest_f
+    h,f = _h,lazy_parameterize(_f,param_length(_h))
+  elseif istest_h && !istest_f
+    h,f = lazy_parameterize(_h,param_length(_f)),_f
+  end
+  return h,f
+end
+
+function _parameterize(_h::ParamUnit,_f)
+  _h,lazy_parameterize(_f,param_length(_h))
+end
+
+function _parameterize(_h,_f::ParamUnit)
+  lazy_parameterize(_h,param_length(_f)),_f
+end
+
+function _parameterize(_f::ParamUnit,plength::Int)
+  if param_length(_f) == plength
+    return _f
+  else
+    @check param_length(_f) == 1
+    return lazy_parameterize(_f,plength)
   end
 end
