@@ -83,6 +83,16 @@ function Base.:(==)(a::GenericParamUnit,b::GenericParamUnit)
   true
 end
 
+function Arrays.testvalue(a::GenericParamUnit{A}) where A
+  v = testvalue(A)
+  data = Vector{typeof(v)}(undef,param_length(a))
+  for i in 1:param_length(a)
+    data[i] = copy(v)
+  end
+  GenericParamUnit(data)
+end
+
+# this one misses the param length
 function Arrays.testvalue(::Type{GenericParamUnit{A}}) where A
   GenericParamUnit([testvalue(A)])
 end
@@ -178,6 +188,11 @@ function Base.:(==)(a::TrivialParamUnit,b::TrivialParamUnit)
   a.data == b.data
 end
 
+function Arrays.testvalue(a::TrivialParamUnit{A}) where A
+  TrivialParamUnit(testvalue(A),param_length(a))
+end
+
+# this one misses the param length
 function Arrays.testvalue(::Type{TrivialParamUnit{A}}) where A
   TrivialParamUnit(testvalue(A),1)
 end
@@ -736,9 +751,9 @@ function Arrays.return_cache(k::BroadcastingFieldOpMap,a::TrivialParamUnit...)
   a1 = first(a)
   @notimplementedif any(ai->param_length(ai)!=param_length(a1),a)
   ais = map(ai->ai.data,a)
-  ai = return_cache(k,ais...)
+  ci = return_cache(k,ais...)
   bi = evaluate!(ci,k,ais...)
-  TrivialParamUnit(bi,a1.plength),ai
+  TrivialParamUnit(bi,a1.plength),ci
 end
 
 function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,a::TrivialParamUnit...)
@@ -777,7 +792,7 @@ end
 function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,f::ParamUnit,g::ParamUnit)
   @notimplementedif param_length(f) != param_length(g)
   a,b = cache
-  for i in eachindex(f.data)
+  for i in param_eachindex(f)
     a.data[i] = evaluate!(b[i],k,param_getindex(f,i),param_getindex(g,i))
   end
   a
@@ -789,10 +804,10 @@ function Arrays.return_cache(k::BroadcastingFieldOpMap,a::ParamUnit...)
   ais = map(testitem,a)
   ci = return_cache(k,ais...)
   bi = evaluate!(ci,k,ais...)
-  c = Vector{typeof(ci)}(undef,length(a1.data))
-  data = Vector{typeof(bi)}(undef,length(a1.data))
-  for i in eachindex(a1.data)
-    _ais = map(ai->ai.data[i],a)
+  c = Vector{typeof(ci)}(undef,param_length(a1))
+  data = Vector{typeof(bi)}(undef,param_length(a1))
+  for i in param_eachindex(a1)
+    _ais = map(ai->param_getindex(ai,i),a)
     c[i] = return_cache(k,_ais...)
   end
   GenericParamUnit(data),c
@@ -802,8 +817,8 @@ function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,a::ParamUnit...)
   a1 = first(a)
   @notimplementedif any(ai->param_length(ai)!=param_length(a1),a)
   r,c = cache
-  for i in eachindex(a1.data)
-    ais = map(ai->ai.data[i],a)
+  for i in param_eachindex(a1)
+    ais = map(ai->param_getindex(ai,i),a)
     r.data[i] = evaluate!(c[i],k,ais...)
   end
   r
@@ -1253,124 +1268,131 @@ function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,h::ParamUnit,f::ArrayB
   g
 end
 
-# for S in (:ParamUnit,:AbstractArray)
-#   for T in (:ParamUnit,:AbstractArray)
-#     (S == :AbstractArray && T == :AbstractArray) && continue
-#     @eval begin
-#       function Arrays.return_cache(
-#         k::BroadcastingFieldOpMap,
-#         f::ArrayBlock{<:$S,N},
-#         g::ArrayBlock{<:$T,N}
-#         ) where N
+for S in (:ParamUnit,:AbstractArray)
+  for T in (:ParamUnit,:AbstractArray)
+    (S == :AbstractArray && T == :AbstractArray) && continue
+    @eval begin
+      function Arrays.return_cache(
+        k::BroadcastingFieldOpMap,
+        f::ArrayBlock{<:$S,N},
+        g::ArrayBlock{<:$T,N}
+        ) where N
 
-#         @notimplementedif size(f) != size(g)
-#         fi = testvalue(testitem(f))
-#         gi = testvalue(testitem(g))
-#         ci = return_cache(k,fi,gi)
-#         hi = evaluate!(ci,k,fi,gi)
-#         m = Fields.ZeroBlockMap()
-#         a = Array{typeof(hi),N}(undef,size(f.array))
-#         b = Array{typeof(ci),N}(undef,size(f.array))
-#         zf = Array{typeof(return_cache(m,fi,gi))}(undef,size(f.array))
-#         zg = Array{typeof(return_cache(m,gi,fi))}(undef,size(f.array))
-#         t = map(|,f.touched,g.touched)
-#         for i in eachindex(f.array)
-#           if f.touched[i] && g.touched[i]
-#             b[i] = return_cache(k,f.array[i],g.array[i])
-#           elseif f.touched[i]
-#             _fi = f.array[i]
-#             zg[i] = return_cache(m,gi,_fi)
-#             _gi = evaluate!(zg[i],m,gi,_fi)
-#             b[i] = return_cache(k,_fi,_gi)
-#           elseif g.touched[i]
-#             _gi = g.array[i]
-#             zf[i] = return_cache(m,fi,_gi)
-#             _fi = evaluate!(zf[i],m,fi,_gi)
-#             b[i] = return_cache(k,_fi,_gi)
-#           end
-#         end
-#         ArrayBlock(a,t),b,zf,zg
-#       end
+        @notimplementedif size(f) != size(g)
+        fi,gi = _test_item_values(f,g)
+        ci = return_cache(k,fi,gi)
+        hi = evaluate!(ci,k,fi,gi)
+        m = Fields.ZeroBlockMap()
+        a = Array{typeof(hi),N}(undef,size(f.array))
+        b = Array{typeof(ci),N}(undef,size(f.array))
+        zf = Array{typeof(return_cache(m,fi,gi))}(undef,size(f.array))
+        zg = Array{typeof(return_cache(m,gi,fi))}(undef,size(f.array))
+        t = map(|,f.touched,g.touched)
+        for i in eachindex(f.array)
+          if f.touched[i] && g.touched[i]
+            b[i] = return_cache(k,f.array[i],g.array[i])
+          elseif f.touched[i]
+            _fi = f.array[i]
+            zg[i] = return_cache(m,gi,_fi)
+            _gi = evaluate!(zg[i],m,gi,_fi)
+            b[i] = return_cache(k,_fi,_gi)
+          elseif g.touched[i]
+            _gi = g.array[i]
+            zf[i] = return_cache(m,fi,_gi)
+            _fi = evaluate!(zf[i],m,fi,_gi)
+            b[i] = return_cache(k,_fi,_gi)
+          end
+        end
+        ArrayBlock(a,t),b,zf,zg
+      end
 
-#       function Arrays.return_cache(
-#         k::BroadcastingFieldOpMap,
-#         f::ArrayBlock{<:$S,1},
-#         g::ArrayBlock{<:$T,2}
-#         )
+      function Arrays.return_cache(
+        k::BroadcastingFieldOpMap,
+        f::ArrayBlock{<:$S,1},
+        g::ArrayBlock{<:$T,2}
+        )
 
-#         fi = testvalue(testitem(f))
-#         gi = testvalue(testitem(g))
-#         ci = return_cache(k,fi,gi)
-#         hi = evaluate!(ci,k,fi,gi)
-#         @check size(g.array,1) == 1 || size(g.array,2) == 0
-#         s = (size(f.array,1),size(g.array,2))
-#         a = Array{typeof(hi),2}(undef,s)
-#         b = Array{typeof(ci),2}(undef,s)
-#         t = fill(false,s)
-#         for j in 1:s[2]
-#           for i in 1:s[1]
-#             if f.touched[i] && g.touched[1,j]
-#               t[i,j] = true
-#               b[i,j] = return_cache(k,f.array[i],g.array[1,j])
-#             end
-#           end
-#         end
-#         ArrayBlock(a,t),b
-#       end
+        fi,gi = _test_item_values(f,g)
+        ci = return_cache(k,fi,gi)
+        hi = evaluate!(ci,k,fi,gi)
+        @check size(g.array,1) == 1 || size(g.array,2) == 0
+        s = (size(f.array,1),size(g.array,2))
+        a = Array{typeof(hi),2}(undef,s)
+        b = Array{typeof(ci),2}(undef,s)
+        t = fill(false,s)
+        for j in 1:s[2]
+          for i in 1:s[1]
+            if f.touched[i] && g.touched[1,j]
+              t[i,j] = true
+              b[i,j] = return_cache(k,f.array[i],g.array[1,j])
+            end
+          end
+        end
+        ArrayBlock(a,t),b
+      end
 
-#       function Arrays.return_cache(
-#         k::BroadcastingFieldOpMap,
-#         f::ArrayBlock{<:$S,2},
-#         g::ArrayBlock{<:$T,1}
-#         )
+      function Arrays.return_cache(
+        k::BroadcastingFieldOpMap,
+        f::ArrayBlock{<:$S,2},
+        g::ArrayBlock{<:$T,1}
+        )
 
-#         fi = testvalue(testitem(f))
-#         gi = testvalue(testitem(g))
-#         ci = return_cache(k,fi,gi)
-#         hi = evaluate!(ci,k,fi,gi)
-#         @check size(f.array,1) == 1 || size(f.array,2) == 0
-#         s = (size(g.array,1),size(f.array,2))
-#         a = Array{typeof(hi),2}(undef,s)
-#         b = Array{typeof(ci),2}(undef,s)
-#         t = fill(false,s)
-#         for j in 1:s[2]
-#           for i in 1:s[1]
-#             if f.touched[1,j] && g.touched[i]
-#               t[i,j] = true
-#               b[i,j] = return_cache(k,f.array[1,j],g.array[i])
-#             end
-#           end
-#         end
-#         ArrayBlock(a,t),b
-#       end
-#     end
-#   end
-# end
+        fi,gi = _test_item_values(f,g)
+        ci = return_cache(k,fi,gi)
+        hi = evaluate!(ci,k,fi,gi)
+        @check size(f.array,1) == 1 || size(f.array,2) == 0
+        s = (size(g.array,1),size(f.array,2))
+        a = Array{typeof(hi),2}(undef,s)
+        b = Array{typeof(ci),2}(undef,s)
+        t = fill(false,s)
+        for j in 1:s[2]
+          for i in 1:s[1]
+            if f.touched[1,j] && g.touched[i]
+              t[i,j] = true
+              b[i,j] = return_cache(k,f.array[1,j],g.array[i])
+            end
+          end
+        end
+        ArrayBlock(a,t),b
+      end
+    end
+  end
+end
 
-for A in (:ArrayBlock,:AbstractArray)
-  for B in (:ArrayBlock,:AbstractArray)
-    for C in (:ArrayBlock,:AbstractArray)
+function Arrays.return_value(k::BroadcastingFieldOpMap,a::Union{ArrayBlock,ParamUnit}...)
+  evaluate(k,a...)
+end
+
+function Arrays.return_cache(k::BroadcastingFieldOpMap,a::Union{ArrayBlock,ParamUnit}...)
+  function _replace_nz_blocks(a::ArrayBlock,bi::ParamUnit)
+    N = ndims(a.array)
+    array = Array{typeof(bi),N}(undef,size(a))
+    for i in eachindex(a.array)
+      if a.touched[i]
+        array[i] = bi
+      end
+    end
+    ArrayBlock(array,a.touched)
+  end
+
+  function _replace_nz_blocks(a::ArrayBlock,bi::ArrayBlock)
+    bi
+  end
+
+  inds = findall(ai->isa(ai,ArrayBlock),a)
+  @notimplementedif length(inds) == 0
+  a1 = a[inds[1]]
+  b = map(ai->_replace_nz_blocks(a1,ai),a)
+  c = return_cache(k,b...)
+  c,b
+end
+
+for A in (:ArrayBlock,:ParamUnit)
+  for B in (:ArrayBlock,:ParamUnit)
+    for C in (:ArrayBlock,:ParamUnit)
       if !(A == B == C)
         @eval begin
-          function Arrays.evaluate!(cache,k::Fields.BroadcastingFieldOpMap,a::$A,b::$B,c::$C)
-            function _replace_nz_blocks!(cache::ArrayBlock,vali::AbstractArray)
-              for i in eachindex(cache.array)
-                if cache.touched[i]
-                  cache.array[i] = vali
-                end
-              end
-              cache
-            end
-
-            function _replace_nz_blocks!(cache::ArrayBlock,val::ArrayBlock)
-              for i in eachindex(cache.array)
-                if cache.touched[i]
-                  cache.array[i] = val.array[i]
-                end
-              end
-              cache
-            end
-
+          function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,a::$A,b::$B,c::$C)
             eval_cache,replace_cache = cache
             cachea,cacheb,cachec = replace_cache
 
@@ -1382,28 +1404,10 @@ for A in (:ArrayBlock,:AbstractArray)
           end
         end
       end
-      for D in (:ArrayBlock,:AbstractArray)
+      for D in (:ArrayBlock,:ParamUnit)
         if !(A == B == C == D)
           @eval begin
-            function Arrays.evaluate!(cache,k::Fields.BroadcastingFieldOpMap,a::$A,b::$B,c::$C,d::$D)
-              function _replace_nz_blocks!(cache::ArrayBlock,vali::AbstractArray)
-                for i in eachindex(cache.array)
-                  if cache.touched[i]
-                    cache.array[i] = vali
-                  end
-                end
-                cache
-              end
-
-              function _replace_nz_blocks!(cache::ArrayBlock,val::ArrayBlock)
-                for i in eachindex(cache.array)
-                  if cache.touched[i]
-                    cache.array[i] = val.array[i]
-                  end
-                end
-                cache
-              end
-
+            function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,a::$A,b::$B,c::$C,d::$D)
               eval_cache,replace_cache = cache
               cachea,cacheb,cachec,cached = replace_cache
 
@@ -1421,65 +1425,54 @@ for A in (:ArrayBlock,:AbstractArray)
   end
 end
 
-for T in (:ParamUnit,:AbstractArray,:Nothing), S in (:ParamUnit,:AbstractArray)
-  (T∈(:AbstractArray,:Nothing) && S==:AbstractArray) && continue
+function Arrays.return_cache(k::Fields.ZeroBlockMap,h::ParamUnit,f::ParamUnit)
+  @check param_length(h) == param_length(f)
+  hi = testitem(h)
+  fi = testitem(f)
+  ci = return_cache(k,hi,fi)
+  ri = evaluate!(ci,k,hi,fi)
+  c = Vector{typeof(ci)}(undef,param_length(f))
+  data = Vector{typeof(ri)}(undef,param_length(f))
+  for i in param_eachindex(f)
+    c[i] = return_cache(k,param_getindex(h,i),param_getindex(f,i))
+  end
+  GenericParamUnit(data),c
+end
+
+function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,h::ParamUnit,f::ParamUnit)
+  g,l = cache
+  for i in eachindex(g.data)
+    g.data[i] = evaluate!(l[i],k,param_getindex(h,i),param_getindex(f,i))
+  end
+  g
+end
+
+for T in (:AbstractArray,:Nothing)
   @eval begin
-    function Arrays.return_cache(k::Fields.ZeroBlockMap,_h::$T,_f::$S)
-      h,f = _parameterize(_h,_f)
-      hi = testitem(h)
-      fi = testitem(f)
-      ci = return_cache(k,hi,fi)
-      ri = evaluate!(ci,k,hi,fi)
-      c = Vector{typeof(ci)}(undef,param_length(f))
-      data = Vector{typeof(ri)}(undef,param_length(f))
-      for i in param_eachindex(f)
-        c[i] = return_cache(k,param_getindex(h,i),param_getindex(f,i))
-      end
-      GenericParamUnit(data),c
+    function Arrays.return_cache(k::Fields.ZeroBlockMap,h::ParamUnit,f::$T)
+      return_cache(k,h,lazy_parameterize(f,param_length(h)))
+    end
+    function Arrays.return_cache(k::Fields.ZeroBlockMap,h::$T,f::ParamUnit)
+      return_cache(k,lazy_parameterize(h,param_length(f)),f)
+    end
+    function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,h::ParamUnit,f::$T)
+      evaluate!(cache,k,h,lazy_parameterize(f,param_length(h)))
+    end
+    function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,h::$T,f::ParamUnit)
+      evaluate!(cache,k,lazy_parameterize(h,param_length(f)),f)
+    end
+    function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,h::$T,f::AbstractArray)
+      plength = param_length(cache[1])
+      evaluate!(cache,k,lazy_parameterize(h,plength),lazy_parameterize(f,plength))
     end
   end
-end
-
-function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,f,h::AbstractArray)
-  g,l = cache
-  for i in eachindex(g.data)
-    g.data[i] = evaluate!(l[i],k,f,h)
-  end
-  g
-end
-
-function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,_f::ParamUnit,h::AbstractArray)
-  g,l = cache
-  f = _parameterize(_f,length(g.data))
-  for i in eachindex(g.data)
-    g.data[i] = evaluate!(l[i],k,param_getindex(f,i),h)
-  end
-  g
-end
-
-function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,f,_h::ParamUnit)
-  g,l = cache
-  h = _parameterize(_h,length(g.data))
-  for i in eachindex(g.data)
-    g.data[i] = evaluate!(l[i],k,f,param_getindex(h,i))
-  end
-  g
-end
-
-function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,_f::ParamUnit,_h::ParamUnit)
-  g,l = cache
-  f = _parameterize(_f,length(g.data))
-  h = _parameterize(_h,length(g.data))
-  for i in eachindex(g.data)
-    g.data[i] = evaluate!(l[i],k,param_getindex(f,i),param_getindex(h,i))
-  end
-  g
 end
 
 # constructors
 
 function lazy_parameterize(a::ParamUnit,plength::Integer=param_length(a))
-  TrivialParamUnit(testitem(a),plength)
+  @check param_length(a) == plength
+  a
 end
 
 function lazy_parameterize(a::Union{AbstractArray{<:Number},Nothing,Field,AbstractArray{<:Field}},plength::Integer)
@@ -1534,34 +1527,41 @@ end
 
 # utils
 
-_is_testvalue(f::ParamUnit) = param_length(f)==1 && innerlength(f)==0
-
-function _parameterize(_h::ParamUnit,_f::ParamUnit)
-  istest_h = _is_testvalue(_h)
-  istest_f = _is_testvalue(_f)
-  if istest_h==istest_f
-    h,f = _h,_f
-  elseif !istest_h && istest_f
-    h,f = _h,lazy_parameterize(_f,param_length(_h))
-  elseif istest_h && !istest_f
-    h,f = lazy_parameterize(_h,param_length(_f)),_f
+function _replace_nz_blocks!(cache::ArrayBlock,val::ParamUnit)
+  for i in eachindex(cache.array)
+    if cache.touched[i]
+      cache.array[i] = val
+    end
   end
-  return h,f
+  cache
 end
 
-function _parameterize(_h::ParamUnit,_f)
-  _h,lazy_parameterize(_f,param_length(_h))
-end
-
-function _parameterize(_h,_f::ParamUnit)
-  lazy_parameterize(_h,param_length(_f)),_f
-end
-
-function _parameterize(_f::ParamUnit,plength::Int)
-  if param_length(_f) == plength
-    return _f
-  else
-    @check param_length(_f) == 1
-    return lazy_parameterize(_f,plength)
+function _replace_nz_blocks!(cache::ArrayBlock,val::ArrayBlock)
+  for i in eachindex(cache.array)
+    if cache.touched[i]
+      cache.array[i] = val.array[i]
+    end
   end
+  cache
+end
+
+function _test_values(h::ParamUnit,f::ParamUnit)
+  @check param_length(h) == param_length(f)
+  hi = testvalue(h)
+  fi = testvalue(f)
+  return hi,fi
+end
+
+function _test_values(h::ParamUnit,_f)
+  f = lazy_parameterize(_f,param_length(h))
+  _test_values(h,f)
+end
+
+function _test_values(_h,f::ParamUnit)
+  h = lazy_parameterize(_h,param_length(f))
+  _test_values(h,f)
+end
+
+function _test_item_values(h::ArrayBlock,f::ArrayBlock)
+  _test_values(testitem(h),testitem(f))
 end
