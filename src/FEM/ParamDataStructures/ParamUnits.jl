@@ -6,6 +6,7 @@ Base.eltype(::Type{<:ParamUnit{A}}) where A = A
 Base.eltype(b::ParamUnit{A}) where A = A
 Base.ndims(b::ParamUnit{A,N}) where {A,N} = N
 Base.ndims(::Type{<:ParamUnit{A,N}}) where {A,N} = N
+innerlength(b::ParamUnit) = prod(innersize(b))
 
 function Base.:≈(a::AbstractArray{<:ParamUnit},b::AbstractArray{<:ParamUnit})
   all(z->z[1]≈z[2],zip(a,b))
@@ -45,6 +46,7 @@ get_param_data(b::GenericParamUnit) = b.data
 param_length(b::GenericParamUnit) = length(b.data)
 param_getindex(b::GenericParamUnit,i::Integer) = b.data[i]
 param_setindex!(b::GenericParamUnit,v,i::Integer) = (b.data[i]=v)
+ArraysOfArrays.innersize(b::GenericParamUnit) = b.innersize
 
 function get_param_entry!(v::AbstractVector,b::GenericParamUnit,i...)
   for k in eachindex(v)
@@ -92,8 +94,8 @@ function Arrays.testitem(a::GenericParamUnit{A}) where A
   testitem(a.data)
 end
 
-function Arrays.testvalue(::Type{GenericParamUnit{A,N}}) where {A,N}
-  data = Vector{A}(undef,0)
+function Arrays.testvalue(::Type{<:GenericParamUnit{A,N}}) where {A,N}
+  data = [testvalue(A)]
   innersize = tfill(0,Val{N}())
   GenericParamUnit(data,innersize)
 end
@@ -169,6 +171,7 @@ get_param_data(b::TrivialParamUnit) = Fill(b.data,b.plength)
 param_length(b::TrivialParamUnit) = b.plength
 param_getindex(b::TrivialParamUnit,i::Integer) = b.data
 param_setindex!(b::TrivialParamUnit,v,i::Integer) = copyto!(b.data,v)
+ArraysOfArrays.innersize(b::TrivialParamUnit) = b.innersize
 
 function get_param_entry!(v::AbstractVector,b::TrivialParamUnit,i...)
   vk = b.data[k][i...]
@@ -197,10 +200,10 @@ function Arrays.testitem(a::TrivialParamUnit{A}) where A
   a.data
 end
 
-function Arrays.testvalue(::Type{TrivialParamUnit{A,N}}) where {A,N}
-  data = Vector{A}(undef,0)
+function Arrays.testvalue(::Type{<:TrivialParamUnit{A,N}}) where {A,N}
+  data = [testvalue(A)]
   innersize = tfill(0,Val{N}())
-  plength = 0
+  plength = 1
   TrivialParamUnit(data,innersize,plength)
 end
 
@@ -750,76 +753,42 @@ function Arrays.evaluate!(cache,k::Broadcasting{typeof(*)},f::GenericParamUnit,g
   evaluate!(cache,k,g,f)
 end
 
-function Arrays.return_value(k::BroadcastingFieldOpMap,f::GenericParamUnit,g::GenericParamUnit)
-  @check param_length(f) == param_length(g)
-  fi = testitem(f)
-  gi = testitem(g)
-  hi = return_value(k,fi,gi)
-  data = Vector{typeof(hi)}(undef,length(f.data))
-  for i in eachindex(f.data)
-    data[i] = return_value(k,f.data[i],g.data[i])
-  end
-  GenericParamUnit(data,size(hi))
-end
-
-function Arrays.return_cache(k::BroadcastingFieldOpMap,f::GenericParamUnit,g::GenericParamUnit)
-  @check param_length(f) == param_length(g)
-  fi = testitem(f)
-  gi = testitem(g)
-  ci = return_cache(k,fi,gi)
-  hi = return_value(k,fi,gi)
-  data = Vector{typeof(hi)}(undef,length(f.data))
-  c = Vector{typeof(ci)}(undef,length(f.data))
-  for i in eachindex(f.data)
-    c[i] = return_cache(k,f.data[i],g.data[i])
-  end
-  GenericParamUnit(data,size(hi)),c
-end
-
-function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,f::GenericParamUnit,g::GenericParamUnit)
-  r,c = cache
-  for i in eachindex(f.data)
-    r.data[i] = evaluate!(c[i],k,f.data[i],g.data[i])
-  end
-  r
-end
-
-function Arrays.return_value(k::BroadcastingFieldOpMap,a::(ParamUnit{A,N} where A)...) where N
+function Arrays.return_value(k::BroadcastingFieldOpMap,a::ParamUnit...)
   evaluate(k,a...)
 end
 
-function Arrays.return_cache(k::BroadcastingFieldOpMap,a::(TrivialParamUnit{A,N} where A)...) where N
+function Arrays.return_cache(k::BroadcastingFieldOpMap,a::TrivialParamUnit...)
   a1 = first(a)
-  @notimplementedif any(ai->size(ai)!=size(a1),a)
-  ais = map(ai->testvalue(eltype(ai)),a)
+  @notimplementedif any(ai->param_length(ai)!=param_length(a1),a)
+  ais = map(ai->ai.data,a)
   ai = return_cache(k,ais...)
   bi = evaluate!(ci,k,ais...)
   TrivialParamUnit(bi,size(bi),a1.plength),ai
 end
 
-function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,a::(TrivialParamUnit{A,N} where A)...) where N
+function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,a::TrivialParamUnit...)
   a1 = first(a)
-  @notimplementedif any(ai->size(ai)!=size(a1),a)
+  @notimplementedif any(ai->param_length(ai)!=param_length(a1),a)
   r,c = cache
   ais = map(ai->ai.data,a)
   copyto!(r.data,evaluate!(c,k,ais...))
   r
 end
 
-function Arrays.return_value(
-  k::BroadcastingFieldOpMap,f::ParamUnit{A,N},g::ParamUnit{B,N}) where {A,B,N}
-  fi = testvalue(A)
-  gi = testvalue(B)
+function Arrays.return_value(k::BroadcastingFieldOpMap,f::ParamUnit,g::ParamUnit)
+  @notimplementedif param_length(f) != param_length(g)
+  fi = testitem(f)
+  gi = testitem(g)
   hi = return_value(k,fi,gi)
   a = Vector{typeof(hi)}(undef,param_length(f))
   fill!(a,hi)
   GenericParamUnit(a,size(hi))
 end
 
-function Arrays.return_cache(k::BroadcastingFieldOpMap,f::ParamUnit{A,N},g::ParamUnit{B,N}) where {A,B,N}
-  @notimplementedif size(f) != size(g)
-  fi = testvalue(A)
-  gi = testvalue(B)
+function Arrays.return_cache(k::BroadcastingFieldOpMap,f::ParamUnit,g::ParamUnit)
+  @notimplementedif param_length(f) != param_length(g)
+  fi = testitem(f)
+  gi = testitem(g)
   ci = return_cache(k,fi,gi)
   hi = evaluate!(ci,k,fi,gi)
   a = Vector{typeof(hi)}(undef,param_length(f))
@@ -830,21 +799,19 @@ function Arrays.return_cache(k::BroadcastingFieldOpMap,f::ParamUnit{A,N},g::Para
   GenericParamUnit(a,size(hi)),b
 end
 
-function Arrays.evaluate!(
-  cache,k::BroadcastingFieldOpMap,f::GenericParamUnit{A,N},g::GenericParamUnit{B,N}) where {A,B,N}
+function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,f::ParamUnit,g::ParamUnit)
+  @notimplementedif param_length(f) != param_length(g)
   a,b = cache
-  @check size(f) == size(g)
-  @check size(a) == size(g)
   for i in eachindex(f.data)
     a.data[i] = evaluate!(b[i],k,param_getindex(f,i),param_getindex(g,i))
   end
   a
 end
 
-function Arrays.return_cache(k::BroadcastingFieldOpMap,a::(ParamUnit{A,N} where A)...) where N
+function Arrays.return_cache(k::BroadcastingFieldOpMap,a::ParamUnit...)
   a1 = first(a)
-  @notimplementedif any(ai->size(ai)!=size(a1),a)
-  ais = map(ai->testvalue(eltype(ai)),a)
+  @notimplementedif any(ai->param_length(ai)!=param_length(a1),a)
+  ais = map(testitem,a)
   ci = return_cache(k,ais...)
   bi = evaluate!(ci,k,ais...)
   c = Vector{typeof(ci)}(undef,length(a1.data))
@@ -856,27 +823,15 @@ function Arrays.return_cache(k::BroadcastingFieldOpMap,a::(ParamUnit{A,N} where 
   GenericParamUnit(data,size(bi)),c
 end
 
-function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,a::(ParamUnit{A,N} where A)...) where N
+function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,a::ParamUnit...)
   a1 = first(a)
-  @notimplementedif any(ai->size(ai)!=size(a1),a)
+  @notimplementedif any(ai->param_length(ai)!=param_length(a1),a)
   r,c = cache
   for i in eachindex(a1.data)
     ais = map(ai->ai.data[i],a)
     r.data[i] = evaluate!(c[i],k,ais...)
   end
   r
-end
-
-function Arrays.return_value(k::BroadcastingFieldOpMap,a::GenericParamUnit...)
-  evaluate(k,a...)
-end
-
-function Arrays.return_cache(k::BroadcastingFieldOpMap,a::GenericParamUnit...)
-  @notimplemented
-end
-
-function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,a::GenericParamUnit...)
-  @notimplemented
 end
 
 function Arrays.return_value(
@@ -891,7 +846,7 @@ function Arrays.return_cache(
 end
 
 function Arrays.evaluate!(
-  cache,k::BroadcastingFieldOpMap,a::Union{GenericParamUnit,AbstractArray}...)
+  cache,k::BroadcastingFieldOpMap,a::Union{ParamUnit,AbstractArray}...)
 
   evaluate!(cache,k,lazy_parameterize(a...)...)
 end
@@ -958,28 +913,26 @@ function Arrays.evaluate!(cache,::typeof(*),a::TrivialParamUnit,b::TrivialParamU
   r
 end
 
-function Base.:*(a::ParamUnit{A,2},b::ParamUnit{B}) where {A,B}
-  @check a.innersize[2] == b.innersize[1]
-  ai = testvalue(A)
-  bi = testvalue(B)
+function Base.:*(a::ParamUnit,b::ParamUnit)
+  @check param_length(a) == param_length(b) &&  a.innersize[2] == b.innersize[1]
+  ai = testitem(a)
+  bi = testitem(b)
   ri = ai*bi
   data = Vector{typeof(ri)}(undef,param_length(a))
-  for i in eachindex(b.data)
-    data[i] = a.data[i]*b.data[i]
+  data[1] = ri
+  for i in 2:param_length(a)
+    data[i] = param_getindex(a,i)*param_getindex(b,i)
   end
-  GenericParamUnit(data,size(data[1]))
+  GenericParamUnit(data,size(ri))
 end
-
-_prod_innersize(a::ParamUnit{A,2},b::ParamUnit{B,1}) where {A,B} = (a.innersize[1],)
-_prod_innersize(a::ParamUnit{A,2},b::ParamUnit{B,2}) where {A,B} = (a.innersize[1],b.innersize[2])
 
 function Arrays.return_value(::typeof(*),a::ParamUnit{A,2},b::ParamUnit{B}) where {A,B}
   @check param_length(a) == param_length(b)
-  ai = testvalue(A)
-  bi = testvalue(B)
+  ai = testitem(a)
+  bi = testitem(b)
   ri = return_value(*,ai,bi)
   data = Vector{typeof(ri)}(undef,param_length(a))
-  GenericParamUnit(data,_prod_innersize(a,b))
+  GenericParamUnit(data,size(ri))
 end
 
 function LinearAlgebra.rmul!(a::GenericParamUnit,β)
@@ -1252,7 +1205,7 @@ end
 
 # block map interface
 
-function Arrays.return_value(k::Map,f::ArrayBlock{A,N},h::ParamUnit) where {A,N}
+function Arrays.return_value(k::BroadcastingFieldOpMap,f::ArrayBlock{A,N},h::ParamUnit) where {A,N}
   fi = testitem(f)
   fix = return_value(k,fi,h)
   g = Array{typeof(fix),N}(undef,size(f.array))
@@ -1264,7 +1217,7 @@ function Arrays.return_value(k::Map,f::ArrayBlock{A,N},h::ParamUnit) where {A,N}
   ArrayBlock(g,f.touched)
 end
 
-function Arrays.return_cache(k::Map,f::ArrayBlock{A,N},h::ParamUnit) where {A,N}
+function Arrays.return_cache(k::BroadcastingFieldOpMap,f::ArrayBlock{A,N},h::ParamUnit) where {A,N}
   fi = testitem(f)
   li = return_cache(k,fi,h)
   fix = evaluate!(li,k,fi,h)
@@ -1278,7 +1231,7 @@ function Arrays.return_cache(k::Map,f::ArrayBlock{A,N},h::ParamUnit) where {A,N}
   ArrayBlock(g,f.touched),l
 end
 
-function Arrays.evaluate(cache,k::Map,f::ArrayBlock,h::ParamUnit)
+function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,f::ArrayBlock,h::ParamUnit)
   g,l = cache
   @check g.touched == f.touched
   for i in eachindex(f.array)
@@ -1289,7 +1242,7 @@ function Arrays.evaluate(cache,k::Map,f::ArrayBlock,h::ParamUnit)
   g
 end
 
-function Arrays.return_value(k::Map,h::ParamUnit,f::ArrayBlock{A,N}) where {A,N}
+function Arrays.return_value(k::BroadcastingFieldOpMap,h::ParamUnit,f::ArrayBlock{A,N}) where {A,N}
   fi = testitem(f)
   fix = return_value(k,fi,h)
   g = Array{typeof(fix),N}(undef,size(f.array))
@@ -1301,7 +1254,7 @@ function Arrays.return_value(k::Map,h::ParamUnit,f::ArrayBlock{A,N}) where {A,N}
   ArrayBlock(g,f.touched)
 end
 
-function Arrays.return_cache(k::Map,h::ParamUnit,f::ArrayBlock{A,N}) where {A,N}
+function Arrays.return_cache(k::BroadcastingFieldOpMap,h::ParamUnit,f::ArrayBlock{A,N}) where {A,N}
   fi = testitem(f)
   li = return_cache(k,fi,h)
   fix = evaluate!(li,k,fi,h)
@@ -1315,13 +1268,252 @@ function Arrays.return_cache(k::Map,h::ParamUnit,f::ArrayBlock{A,N}) where {A,N}
   ArrayBlock(g,f.touched),l
 end
 
-function Arrays.evaluate(cache,k::Map,h::ParamUnit,f::ArrayBlock)
+function Arrays.evaluate!(cache,k::BroadcastingFieldOpMap,h::ParamUnit,f::ArrayBlock)
   g,l = cache
   @check g.touched == f.touched
   for i in eachindex(f.array)
     if f.touched[i]
       g.array[i] = evaluate!(l[i],k,h,f.array[i])
     end
+  end
+  g
+end
+
+# for S in (:ParamUnit,:AbstractArray)
+#   for T in (:ParamUnit,:AbstractArray)
+#     (S == :AbstractArray && T == :AbstractArray) && continue
+#     @eval begin
+#       function Arrays.return_cache(
+#         k::BroadcastingFieldOpMap,
+#         f::ArrayBlock{<:$S,N},
+#         g::ArrayBlock{<:$T,N}
+#         ) where N
+
+#         @notimplementedif size(f) != size(g)
+#         fi = testvalue(testitem(f))
+#         gi = testvalue(testitem(g))
+#         ci = return_cache(k,fi,gi)
+#         hi = evaluate!(ci,k,fi,gi)
+#         m = Fields.ZeroBlockMap()
+#         a = Array{typeof(hi),N}(undef,size(f.array))
+#         b = Array{typeof(ci),N}(undef,size(f.array))
+#         zf = Array{typeof(return_cache(m,fi,gi))}(undef,size(f.array))
+#         zg = Array{typeof(return_cache(m,gi,fi))}(undef,size(f.array))
+#         t = map(|,f.touched,g.touched)
+#         for i in eachindex(f.array)
+#           if f.touched[i] && g.touched[i]
+#             b[i] = return_cache(k,f.array[i],g.array[i])
+#           elseif f.touched[i]
+#             _fi = f.array[i]
+#             zg[i] = return_cache(m,gi,_fi)
+#             _gi = evaluate!(zg[i],m,gi,_fi)
+#             b[i] = return_cache(k,_fi,_gi)
+#           elseif g.touched[i]
+#             _gi = g.array[i]
+#             zf[i] = return_cache(m,fi,_gi)
+#             _fi = evaluate!(zf[i],m,fi,_gi)
+#             b[i] = return_cache(k,_fi,_gi)
+#           end
+#         end
+#         ArrayBlock(a,t),b,zf,zg
+#       end
+
+#       function Arrays.return_cache(
+#         k::BroadcastingFieldOpMap,
+#         f::ArrayBlock{<:$S,1},
+#         g::ArrayBlock{<:$T,2}
+#         )
+
+#         fi = testvalue(testitem(f))
+#         gi = testvalue(testitem(g))
+#         ci = return_cache(k,fi,gi)
+#         hi = evaluate!(ci,k,fi,gi)
+#         @check size(g.array,1) == 1 || size(g.array,2) == 0
+#         s = (size(f.array,1),size(g.array,2))
+#         a = Array{typeof(hi),2}(undef,s)
+#         b = Array{typeof(ci),2}(undef,s)
+#         t = fill(false,s)
+#         for j in 1:s[2]
+#           for i in 1:s[1]
+#             if f.touched[i] && g.touched[1,j]
+#               t[i,j] = true
+#               b[i,j] = return_cache(k,f.array[i],g.array[1,j])
+#             end
+#           end
+#         end
+#         ArrayBlock(a,t),b
+#       end
+
+#       function Arrays.return_cache(
+#         k::BroadcastingFieldOpMap,
+#         f::ArrayBlock{<:$S,2},
+#         g::ArrayBlock{<:$T,1}
+#         )
+
+#         fi = testvalue(testitem(f))
+#         gi = testvalue(testitem(g))
+#         ci = return_cache(k,fi,gi)
+#         hi = evaluate!(ci,k,fi,gi)
+#         @check size(f.array,1) == 1 || size(f.array,2) == 0
+#         s = (size(g.array,1),size(f.array,2))
+#         a = Array{typeof(hi),2}(undef,s)
+#         b = Array{typeof(ci),2}(undef,s)
+#         t = fill(false,s)
+#         for j in 1:s[2]
+#           for i in 1:s[1]
+#             if f.touched[1,j] && g.touched[i]
+#               t[i,j] = true
+#               b[i,j] = return_cache(k,f.array[1,j],g.array[i])
+#             end
+#           end
+#         end
+#         ArrayBlock(a,t),b
+#       end
+#     end
+#   end
+# end
+
+for A in (:ArrayBlock,:AbstractArray)
+  for B in (:ArrayBlock,:AbstractArray)
+    for C in (:ArrayBlock,:AbstractArray)
+      if !(A == B == C)
+        @eval begin
+          function Arrays.evaluate!(cache,k::Fields.BroadcastingFieldOpMap,a::$A,b::$B,c::$C)
+            function _replace_nz_blocks!(cache::ArrayBlock,vali::AbstractArray)
+              for i in eachindex(cache.array)
+                if cache.touched[i]
+                  cache.array[i] = vali
+                end
+              end
+              cache
+            end
+
+            function _replace_nz_blocks!(cache::ArrayBlock,val::ArrayBlock)
+              for i in eachindex(cache.array)
+                if cache.touched[i]
+                  cache.array[i] = val.array[i]
+                end
+              end
+              cache
+            end
+
+            eval_cache,replace_cache = cache
+            cachea,cacheb,cachec = replace_cache
+
+            _replace_nz_blocks!(cachea,a)
+            _replace_nz_blocks!(cacheb,b)
+            _replace_nz_blocks!(cachec,c)
+
+            evaluate!(eval_cache,k,cachea,cacheb,cachec)
+          end
+        end
+      end
+      for D in (:ArrayBlock,:AbstractArray)
+        if !(A == B == C == D)
+          @eval begin
+            function Arrays.evaluate!(cache,k::Fields.BroadcastingFieldOpMap,a::$A,b::$B,c::$C,d::$D)
+              function _replace_nz_blocks!(cache::ArrayBlock,vali::AbstractArray)
+                for i in eachindex(cache.array)
+                  if cache.touched[i]
+                    cache.array[i] = vali
+                  end
+                end
+                cache
+              end
+
+              function _replace_nz_blocks!(cache::ArrayBlock,val::ArrayBlock)
+                for i in eachindex(cache.array)
+                  if cache.touched[i]
+                    cache.array[i] = val.array[i]
+                  end
+                end
+                cache
+              end
+
+              eval_cache,replace_cache = cache
+              cachea,cacheb,cachec,cached = replace_cache
+
+              _replace_nz_blocks!(cachea,a)
+              _replace_nz_blocks!(cacheb,b)
+              _replace_nz_blocks!(cachec,c)
+              _replace_nz_blocks!(cached,d)
+
+              evaluate!(eval_cache,k,cachea,cacheb,cachec,cached)
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+_is_testitem(f::ParamUnit) = param_length(f)==1 && innerlength(f)==0
+
+function _parameterize(_h::ParamUnit,_f::ParamUnit)
+  isitem_h = _is_testitem(_h)
+  isitem_f = _is_testitem(_f)
+  if isitem_h==isitem_f
+    h,f = _h,_f
+  elseif !isitem_h && isitem_f
+    h,f = _h,TrivialParamUnit(_f.data,param_length(_h))
+  elseif isitem_h && !isitem_f
+    h,f = TrivialParamUnit(_h.data,param_length(_f)),_f
+  end
+  return h,f
+end
+
+function Arrays.return_cache(k::Fields.ZeroBlockMap,_h::ParamUnit,_f::ParamUnit)
+  h,f = _parameterize(_h,_f)
+  hi = testitem(h)
+  fi = testitem(f)
+  ci = return_cache(k,hi,fi)
+  ri = evaluate!(ci,k,hi,fi)
+  c = Vector{typeof(ci)}(undef,param_length(f))
+  data = Vector{typeof(ri)}(undef,param_length(f))
+  for i in param_eachindex(f)
+    c[i] = return_cache(k,param_getindex(h,i),param_getindex(f,i))
+  end
+  GenericParamUnit(data,f.innersize),c
+end
+
+function Arrays.return_cache(k::Fields.ZeroBlockMap,h::ParamUnit,f::AbstractArray)
+  g = lazy_parameterize(f,param_length(h))
+  return_cache(k,h,g)
+end
+
+function Arrays.return_cache(k::Fields.ZeroBlockMap,f::AbstractArray,h::ParamUnit)
+  g = lazy_parameterize(f,param_length(h))
+  return_cache(k,g,h)
+end
+
+function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,f,h::AbstractArray)
+  g,l = cache
+  for i in eachindex(g.data)
+    g.data[i] = evaluate!(l[i],k,f,h)
+  end
+  g
+end
+
+function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,f::ParamUnit,h::AbstractArray)
+  g,l = cache
+  for i in eachindex(g.data)
+    g.data[i] = evaluate!(l[i],k,param_getindex(f,i),h)
+  end
+  g
+end
+
+function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,f,h::ParamUnit)
+  g,l = cache
+  for i in eachindex(g.data)
+    g.data[i] = evaluate!(l[i],k,f,param_getindex(h,i))
+  end
+  g
+end
+
+function Arrays.evaluate!(cache::Tuple,k::Fields.ZeroBlockMap,f::ParamUnit,h::ParamUnit)
+  g,l = cache
+  for i in eachindex(g.data)
+    g.data[i] = evaluate!(l[i],k,param_getindex(f,i),param_getindex(h,i))
   end
   g
 end

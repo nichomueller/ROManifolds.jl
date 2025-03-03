@@ -2,6 +2,7 @@ using Gridap
 using Gridap.Geometry
 using Gridap.ReferenceFEs
 using Gridap.FESpaces
+using Gridap.MultiField
 using Gridap.CellData
 using Gridap.Arrays
 using Gridap.Fields
@@ -12,6 +13,7 @@ using ROManifolds.ParamDataStructures
 using ROManifolds.ParamSteady
 using Test
 using FillArrays
+import Gridap.MultiField: BlockMultiFieldStyle
 
 # domain = (0,1,0,1)
 # partition = (5,5)
