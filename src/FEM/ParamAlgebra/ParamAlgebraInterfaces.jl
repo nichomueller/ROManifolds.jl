@@ -1,7 +1,7 @@
 function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamVector
   @warn "Allocating a vector of unit parametric length, will likely result in an error"
   vector = allocate_vector(eltype(V),n)
-  consecutive_parameterize(vector,1)
+  global_parameterize(vector,1)
 end
 
 for f in (:(Algebra.allocate_in_range),:(Algebra.allocate_in_domain))
@@ -11,7 +11,7 @@ for f in (:(Algebra.allocate_in_range),:(Algebra.allocate_in_domain))
       item = testitem(matrix)
       plength = param_length(matrix)
       v = $f(V,item)
-      consecutive_parameterize(v,plength)
+      global_parameterize(v,plength)
     end
 
     function $f(::Type{PV},matrix::BlockParamMatrix) where PV<:BlockParamVector
@@ -19,7 +19,7 @@ for f in (:(Algebra.allocate_in_range),:(Algebra.allocate_in_domain))
       item = testitem(matrix)
       plength = param_length(matrix)
       v = $f(V,item)
-      consecutive_parameterize(v,plength)
+      global_parameterize(v,plength)
     end
 
     function $f(matrix::AbstractParamMatrix{T}) where T
@@ -34,40 +34,36 @@ for f in (:(Algebra.allocate_in_range),:(Algebra.allocate_in_domain))
   end
 end
 
-function Arrays.return_cache(k::AddEntriesMap,A,vs::AbstractParamVector{T},is) where T
-  zeros(T,param_length(vs))
+function Arrays.return_cache(k::AddEntriesMap,A,vs::ParamUnit,args...)
+  zeros(eltype2(vs),param_length(vs))
 end
 
-function Arrays.return_cache(k::AddEntriesMap,A,vs::AbstractParamMatrix{T},is,js) where T
-  zeros(T,param_length(vs))
-end
-
-function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::AbstractParamVector{T},is) where T
+function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::ParamUnit,is)
   add_entries!(cache,k.combine,A,vs,is)
 end
 
-function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::AbstractParamMatrix{T},is,js) where T
+function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::ParamUnit,is,js)
   add_entries!(cache,k.combine,A,vs,is,js)
 end
 
-@inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamVector,is)
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::ParamUnit,is)
   Algebra._add_entries!(cache,combine,A,vs,is)
 end
 
-@inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamMatrix,is,js)
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::ParamUnit,is,js)
   Algebra._add_entries!(cache,combine,A,vs,is,js)
 end
 
-@inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamVector,is::OIdsToIds)
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::ParamUnit,is::OIdsToIds)
   add_ordered_entries!(cache,combine,A,vs,is)
 end
 
-@inline function Algebra.add_entries!(cache,combine::Function,A,vs::AbstractParamMatrix,is::OIdsToIds,js::OIdsToIds)
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::ParamUnit,is::OIdsToIds,js::OIdsToIds)
   add_ordered_entries!(cache,combine,A,vs,is,js)
 end
 
 @inline function Algebra._add_entries!(
-  vij,combine::Function,A,vs::AbstractParamMatrix,is,js)
+  vij,combine::Function,A,vs::ParamUnit,is,js)
 
   for (lj,j) in enumerate(js)
     if j>0
@@ -83,7 +79,7 @@ end
 end
 
 @inline function add_ordered_entries!(
-  vij,combine::Function,A,vs::AbstractParamMatrix,is::OIdsToIds,js::OIdsToIds)
+  vij,combine::Function,A,vs::ParamUnit,is::OIdsToIds,js::OIdsToIds)
 
   for (lj,j) in enumerate(js)
     if j>0
@@ -101,7 +97,7 @@ end
 end
 
 @inline function Algebra._add_entries!(
-  vi,combine::Function,A,vs::AbstractParamVector,is)
+  vi,combine::Function,A,vs::ParamUnit,is)
 
   for (li,i) in enumerate(is)
     if i>0
@@ -113,7 +109,7 @@ end
 end
 
 @inline function add_ordered_entries!(
-  vi,combine::Function,A,vs::AbstractParamVector,is::OIdsToIds)
+  vi,combine::Function,A,vs::ParamUnit,is::OIdsToIds)
 
   for (li,i) in enumerate(is)
     if i>0
@@ -240,7 +236,7 @@ end
 
 function Algebra.nz_allocation(a::ParamCounter{<:Algebra.ArrayCounter})
   v = nz_allocation(a.counter)
-  consecutive_parameterize(v,a.plength)
+  global_parameterize(v,a.plength)
 end
 
 # alternative implementation

@@ -547,19 +547,6 @@ function ParamFunction(f::Function,pt::TransientRealizationAt)
 end
 
 """
-    parameterize(a,plength::Integer) -> Any
-
-Returns a quantity with parametric length `plength` from `a`. When `a` already
-possesses a parametric length, i.e. it is a parametrized quantity, it returns `a`
-"""
-parameterize(a,plength::Integer) = @abstractmethod
-
-function parameterize(a::AbstractParamFunction,plength::Integer)
-  @check param_length(a) == plength
-  return a
-end
-
-"""
     parameterize(f::Function,r::Realization) -> ParamFunction
     parameterize(f::Function,r::TransientRealization) -> TransientParamFunction
 

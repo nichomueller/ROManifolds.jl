@@ -6,6 +6,7 @@ using Gridap.CellData
 using Gridap.Arrays
 using Gridap.Fields
 using Gridap.Helpers
+using Gridap.ODEs
 using ROManifolds
 using ROManifolds.ParamDataStructures
 using ROManifolds.ParamSteady

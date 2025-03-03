@@ -27,6 +27,7 @@ import LinearAlgebra: ⋅
 import StatsBase: sample
 import Test: @test
 import Gridap.Fields: BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
+import Gridap.ReferenceFEs: LagrangianDofBasis
 import Gridap.TensorValues: ⊗, ⊙
 import SparseArrays.getcolptr
 
@@ -42,7 +43,6 @@ export AbstractParamFunction
 export ParamFunction
 export TransientParamFunction
 export realization
-export parameterize
 export get_params
 export get_times
 export get_at_time
@@ -54,8 +54,11 @@ export shift!
 include("ParamSpaces.jl")
 
 export AbstractParamContainer
-export get_param_data
 export eltype2
+export parameterize
+export local_parameterize
+export global_parameterize
+export get_param_data
 export param_length
 export param_eachindex
 export param_getindex
@@ -70,10 +73,6 @@ export AbstractParamMatrix
 export ParamArray
 export ParamVector
 export ParamMatrix
-export MemoryLayoutStyle
-export ConsecutiveMemory
-export NonConsecutiveMemory
-export consecutive_parameterize
 export innersize
 export innerlength
 export inneraxes
@@ -133,11 +132,6 @@ export change_mode
 include("TransientSnapshots.jl")
 
 include("ParamBroadcasts.jl")
-
-# export ParamField
-# export TrivialParamField
-# export GenericParamField
-# include("ParamFields.jl")
 
 export ParamUnit
 export GenericParamUnit

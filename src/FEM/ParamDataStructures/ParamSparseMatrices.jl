@@ -1,6 +1,5 @@
-ParamArray(A::AbstractVector{<:SparseMatrixCSC};kwargs...) = ConsecutiveParamSparseMatrixCSC(A)
-ParamArray(A::AbstractVector{<:SparseMatrixCSR};kwargs...) = ConsecutiveParamSparseMatrixCSR(A)
-param_array(A::AbstractArray{<:AbstractSparseMatrix},l::Integer;kwargs...) = ParamArray(A;kwargs...)
+ParamArray(A::AbstractVector{<:SparseMatrixCSC}) = ConsecutiveParamSparseMatrixCSC(A)
+ParamArray(A::AbstractVector{<:SparseMatrixCSR}) = ConsecutiveParamSparseMatrixCSR(A)
 
 function SparseArrays.sparse(
   m::Int,
@@ -111,8 +110,6 @@ end
 param_length(A::ConsecutiveParamSparseMatrixCSC) = size(A.data,2)
 get_all_data(A::ConsecutiveParamSparseMatrixCSC) = A.data
 
-MemoryLayoutStyle(::Type{<:ConsecutiveParamSparseMatrixCSC}) = ConsecutiveMemory()
-
 SparseArrays.getcolptr(A::ConsecutiveParamSparseMatrixCSC) = A.colptr
 SparseArrays.rowvals(A::ConsecutiveParamSparseMatrixCSC) = A.rowval
 SparseArrays.nonzeros(A::ConsecutiveParamSparseMatrixCSC) = ConsecutiveParamArray(A.data)
@@ -146,7 +143,7 @@ function ConsecutiveParamSparseMatrixCSC(a::AbstractVector{<:SparseMatrixCSC{Tv}
   ConsecutiveParamSparseMatrixCSC(m,n,colptr,rowval,data)
 end
 
-function param_array(a::SparseMatrixCSC,l::Integer;kwargs...)
+function ParamArray(a::SparseMatrixCSC,l::Integer;kwargs...)
   outer = (1,1,l)
   data = repeat(nonzeros(a);outer)
   !copy && LinearAlgebra.fillstored!(data,zero(eltype(a)))
@@ -345,8 +342,6 @@ end
 param_length(A::ConsecutiveParamSparseMatrixCSR) = size(A.data,2)
 get_all_data(A::ConsecutiveParamSparseMatrixCSR) = A.data
 
-MemoryLayoutStyle(::Type{<:ConsecutiveParamSparseMatrixCSR}) = ConsecutiveMemory()
-
 SparseMatricesCSR.getrowptr(A::ConsecutiveParamSparseMatrixCSR) = A.rowptr
 SparseMatricesCSR.colvals(A::ConsecutiveParamSparseMatrixCSR) = A.colval
 SparseArrays.nonzeros(A::ConsecutiveParamSparseMatrixCSR) = ConsecutiveParamArray(A.data)
@@ -380,7 +375,7 @@ function ConsecutiveParamSparseMatrixCSR(a::AbstractVector{<:SparseMatrixCSR{Bi,
   ConsecutiveParamSparseMatrixCSR{1}(m,n,rowptr,colval,data)
 end
 
-function param_array(a::SparseMatrixCSR,l::Integer;kwargs...)
+function ParamArray(a::SparseMatrixCSR,l::Integer;kwargs...)
   outer = (1,1,l)
   data = repeat(nonzeros(a);outer)
   !copy && LinearAlgebra.fillstored!(data,zero(eltype(a)))

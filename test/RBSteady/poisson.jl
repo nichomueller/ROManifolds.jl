@@ -149,6 +149,7 @@ U = trial(μ)
 fv = zero_free_values(U)
 dv = zero_dirichlet_values(U)
 cell_vals = scatter_free_and_dirichlet_values(U,fv,dv)
+zero(U)
 
 cell_dof_ids = get_cell_dof_ids(U)
 # lazy_map(Broadcasting(PosNegReindex(free_values,dirichlet_values)),cell_dof_ids)

@@ -47,19 +47,43 @@ Returns the parametric range of `a` 1:`param_length(a)`
 param_eachindex(a) = Base.OneTo(param_length(a))
 
 """
-    to_param_quantity(a,plength::Integer) -> Any
+    parameterize(a,plength::Integer) -> Any
 
 Returns a quantity with parametric length `plength` from `a`. When `a` already
-possesses a parametric length, i.e. it is a parametrized quantity, it returns `a`.
-In contrast to [`parameterize`](@ref), this function does not allocate the space
-for (new) parametric entries, it simply acts as a parametric fill.
+possesses a parametric length, i.e. it is a parametrized quantity, it returns `a`
 """
-to_param_quantity(a,plength::Integer) = @abstractmethod
+parameterize(a,plength::Integer) = local_parameterize(a,plength)
 
-function to_param_quantity(a::AbstractParamFunction,plength::Integer)
+function parameterize(a...;plength=find_param_length(a...))
+  pa = map(f->parameterize(f,plength),a)
+  return pa
+end
+
+function parameterize(a::AbstractParamFunction,plength::Integer)
   @check param_length(a) == plength
   return a
 end
+
+"""
+    lazy_parameterize(a,plength::Integer) -> Any
+
+Lazy version of [`parameterize`](@ref), does not allocate
+"""
+lazy_parameterize(a,plength::Integer) = parameterize(a,plength)
+
+function lazy_parameterize(a...;plength=find_param_length(a...))
+  pa = map(f->lazy_parameterize(f,plength),a)
+  return pa
+end
+
+"""
+    local_parameterize(a,plength::Integer) -> Any
+
+Returns a quantity with parametric length `plength` from `a`. This parameterization
+involves quantities defined at the local (or cell) level. For global parameterizations,
+see the function [`global_parameterize`](@ref)
+"""
+local_parameterize(a,plength::Integer) = @abstractmethod
 
 """
     find_param_length(a...) -> Int
@@ -72,16 +96,6 @@ function find_param_length(a...)
   plengths::Tuple{Vararg{Int}} = filter(!iszero,param_length.(a))
   @check all(plengths .== first(plengths))
   return first(plengths)
-end
-
-"""
-    to_param_quantities(a...;plength=find_param_length(a...)) -> Any
-
-Converts the input quantities to parametric quantities
-"""
-function to_param_quantities(a...;plength=find_param_length(a...))
-  pa = map(f->to_param_quantity(f,plength),a)
-  return pa
 end
 
 """
@@ -119,9 +133,6 @@ param_length(a::ParamContainer) = length(a.data)
 param_getindex(a::ParamContainer,i::Integer) = getindex(a,i)
 param_setindex!(a::ParamContainer,v,i::Integer) = setindex!(a,v,i)
 
-to_param_quantity(a::Union{Function,Map,Nothing},plength::Integer) = ParamContainer(Fill(a,plength))
-parameterize(a::Union{Function,Map,Nothing},plength::Integer) = ParamContainer(Fill(a,plength))
-
 Base.size(a::ParamContainer) = (param_length(a),)
 Base.getindex(a::ParamContainer,i::Integer) = getindex(a.data,i)
 Base.setindex!(a::ParamContainer,v,i::Integer) = setindex!(a.data,v,i)
@@ -129,9 +140,6 @@ Base.setindex!(a::ParamContainer,v,i::Integer) = setindex!(a.data,v,i)
 (a::ParamContainer{<:Map})(x) = evaluate(a,x)
 
 const ParamNumber = ParamContainer
-
-to_param_quantity(a::Number,plength::Integer) = ParamNumber(Fill(a,plength))
-parameterize(a::Number,plength::Integer) = ParamNumber(fill(a,plength))
 
 for op in (:+,:-)
   @eval begin

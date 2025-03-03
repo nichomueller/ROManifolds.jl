@@ -1,35 +1,18 @@
 # generic constructors
-# rule: within Gridap lazy maps (i.e. we deal with cell-wise arrays), we use the
-# NonConsecutiveMemory style; otherwise, when dealing with global arrays, we use
-# the ConsecutiveMemory style
 
-ParamArray(a::AbstractArray{<:Number},l::Integer;kwargs...) = TrivialParamArray(a,l)
-
-function param_array(a::AbstractArray{<:Number},l::Integer;style=NonConsecutiveMemory())
-  if style==ConsecutiveMemory()
-    ConsecutiveParamArray(a,l)
-  else
-    ArrayOfArrays(a,l)
-  end
+function ParamArray(a::AbstractArray{<:Number,N},l::Integer) where N
+  ConsecutiveParamArray(a,l)
 end
 
-for f in (:param_array,:ParamArray)
-  @eval begin
-    function $f(A::AbstractArray{<:AbstractArray},l::Integer;kwargs...)
-      plength(A) = length(A)
-      plength(A::AbstractParamArray) = param_length(A)
-      @assert plength(A) == l
-      $f(A;kwargs...)
-    end
+function ParamArray(A::AbstractArray{<:AbstractArray},l::Integer)
+  plength(A) = length(A)
+  plength(A::AbstractParamArray) = param_length(A)
+  @assert plength(A) == l
+  ParamArray(A)
+end
 
-    function $f(A::AbstractArray{<:AbstractArray};style=NonConsecutiveMemory())
-      if style==ConsecutiveMemory()
-        ConsecutiveParamArray(A)
-      else
-        ArrayOfArrays(A)
-      end
-    end
-  end
+function ParamArray(A::AbstractArray{<:AbstractArray{T,N}}) where {T,N}
+  ConsecutiveParamArray(A)
 end
 
 """
@@ -629,8 +612,6 @@ function ArrayOfArrays(a::AbstractArray{<:Number},l::Integer)
   end
   ArrayOfArrays(data)
 end
-
-MemoryLayoutStyle(::Type{<:ArrayOfArrays}) = NonConsecutiveMemory()
 
 Base.size(A::ArrayOfArrays{T,N}) where {T,N} = tfill(param_length(A),Val{N}())
 

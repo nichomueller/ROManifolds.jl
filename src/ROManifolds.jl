@@ -51,9 +51,6 @@ using ROManifolds.ParamDataStructures
 include("FEM/ParamAlgebra/ParamAlgebra.jl")
 using ROManifolds.ParamAlgebra
 
-include("FEM/ParamReferenceFEs/ParamReferenceFEs.jl")
-using ROManifolds.ParamReferenceFEs
-
 include("FEM/ParamGeometry/ParamGeometry.jl")
 using ROManifolds.ParamGeometry
 
