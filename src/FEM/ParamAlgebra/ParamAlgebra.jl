@@ -32,6 +32,7 @@ export GenericParamNonlinearOperator
 export LazyParamNonlinearOperator
 export AbstractParamCache
 export ParamCache
+export LazyParamCache
 export SystemCache
 export lazy_residual
 export lazy_residual!

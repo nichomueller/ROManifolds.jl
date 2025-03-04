@@ -88,7 +88,7 @@ function collect_lazy_cell_matrix(
   c = []
   for strian in get_domains(a)
     scell_mat = get_contribution(a,strian)
-    cell_mat, trian = move_contributions(scell_mat,strian)
+    cell_mat,trian = move_contributions(scell_mat,strian)
     @assert ndims(eltype(cell_mat)) == 2
     cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
     cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
@@ -121,7 +121,7 @@ function collect_lazy_cell_vector(
   r = []
   for strian in get_domains(a)
     scell_vec = get_contribution(a,strian)
-    cell_vec, trian = move_contributions(scell_vec,strian)
+    cell_vec,trian = move_contributions(scell_vec,strian)
     @assert ndims(eltype(cell_vec)) == 1
     cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
     cell_vec_r_i = lazy_param_getindex(cell_vec_r,index)
@@ -138,15 +138,15 @@ function assemble_lazy_matrix_add!(A,a::SparseMatrixAssembler,matdata,index::Int
 end
 
 function assemble_lazy_vector_add!(b,a::SparseMatrixAssembler,vecdata,index::Int)
-  numeric_loop_lazy_vector!(b,a,vecdata)
+  numeric_loop_lazy_vector!(b,a,vecdata,index)
   create_from_nz(b)
 end
 
 function numeric_loop_lazy_matrix!(A,a::SparseMatrixAssembler,matdata,index::Int)
-  strategy = get_assembly_strategy(a)
+  strategy = FESpaces.get_assembly_strategy(a)
   for (cellmat,_cellidsrows,_cellidscols) in zip(matdata...)
-    cellidsrows = map_cell_rows(strategy,_cellidsrows)
-    cellidscols = map_cell_cols(strategy,_cellidscols)
+    cellidsrows = FESpaces.map_cell_rows(strategy,_cellidsrows)
+    cellidscols = FESpaces.map_cell_cols(strategy,_cellidscols)
     @assert length(cellidscols) == length(cellidsrows)
     @assert length(cellmat) == length(cellidsrows)
     if length(cellmat) > 0
@@ -167,19 +167,19 @@ function numeric_loop_lazy_matrix!(A,a::SparseMatrixAssembler,matdata,index::Int
 end
 
 function numeric_loop_lazy_vector!(b,a::SparseMatrixAssembler,vecdata,index::Int)
-  strategy = get_assembly_strategy(a)
-  for (cellvec, _cellids) in zip(vecdata...)
-    cellids = map_cell_rows(strategy,_cellids)
+  strategy = FESpaces.get_assembly_strategy(a)
+  for (cellvec,_cellids) in zip(vecdata...)
+    cellids = FESpaces.map_cell_rows(strategy,_cellids)
     if length(cellvec) > 0
       cellvec_i = lazy_param_getindex(cellvec,index)
       rows_cache = array_cache(cellids)
       vals_cache = array_cache(cellvec_i)
       vals1 = getindex!(vals_cache,cellvec_i,1)
       rows1 = getindex!(rows_cache,cellids,1)
-      add! = AddEntriesMap(+)
+      add! = FESpaces.AddEntriesMap(+)
       add_cache = return_cache(add!,b,vals1,rows1)
-      caches = add_cache, vals_cache, rows_cache
-      _numeric_loop_vector!(b,caches,cellvec_i,cellids)
+      caches = add_cache,vals_cache,rows_cache
+      FESpaces._numeric_loop_vector!(b,caches,cellvec_i,cellids)
     end
   end
   b

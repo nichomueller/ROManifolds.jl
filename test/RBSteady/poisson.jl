@@ -96,6 +96,7 @@ main(:ttsvd)
 end
 
 using Gridap
+using Gridap.Algebra
 using Gridap.Geometry
 using Gridap.ReferenceFEs
 using Gridap.FESpaces
@@ -124,7 +125,7 @@ unsafe=false
 pdomain = (1,10,1,10,1,10)
 
 domain = (0,1,0,1)
-partition = (20,20)
+partition = (50,50)
 if method==:ttsvd
   model = TProductDiscreteModel(domain,partition)
 else
@@ -172,16 +173,7 @@ rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
 
 pspace = ParamSpace(pdomain)
 feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,domains)
-μ = realization(feop;nparams=10)
+μ = realization(feop;nparams=50)
 
-x, = solution_snapshots(rbsolver,feop,μ)
-
-U = trial(μ)
-v = get_fe_basis(U)
-u = zero(U)
-dc = stiffness(μ,u,v,dΩ)[Ω]
-
-using ROManifolds.ParamFESpaces
-_fesolver = ParamFESolver(LUSolver())
-_rbsolver = RBSolver(_fesolver,state_reduction;nparams_res,nparams_jac)
-_x, = solution_snapshots(_rbsolver,feop,μ)
+x,stats = solution_snapshots(rbsolver,feop,μ)
+_x,_stats = solution_snapshots(_rbsolver,feop,μ)

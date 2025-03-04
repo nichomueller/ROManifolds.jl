@@ -16,16 +16,25 @@ function Algebra.solve!(
   b::AbstractParamVector)
 
   A_item = testitem(A)
+  x_item = testitem(x)
   ss = symbolic_setup(ls,A_item)
-  ns = numerical_setup(ss,A_item)
+  ns = numerical_setup(ss,A_item,x_item)
+  solve!(x,ns,A,b)
+end
+
+function Algebra.solve!(
+  x::AbstractParamVector,
+  ns::NumericalSetup,
+  A::AbstractParamMatrix,
+  b::AbstractParamVector)
 
   @inbounds for i in param_eachindex(x)
+    Ai = param_getindex(A,i)
     xi = param_getindex(x,i)
     bi = param_getindex(b,i)
-    solve!(xi,ns,bi)
-    i == param_length(x) && continue
-    Ai = param_getindex(A,i+1)
+    rmul!(bi,-1)
     numerical_setup!(ns,Ai)
+    solve!(xi,ns,bi)
   end
 
   ns
@@ -37,12 +46,23 @@ function Algebra.solve!(
   op::NonlinearOperator,
   cache::Nothing)
 
-  fill!(x,zero(eltype(x)))
-  b = residual(op,x)
-  rmul!(b,-1)
-  A = jacobian(op,x)
-  ns = solve!(x,ls,A,b)
+  b = allocate_residual(op,x)
+  A = allocate_jacobian(op,x)
+  cache = SystemCache(A,b)
+  solve!(x,ls,op,cache)
+end
 
+function Algebra.solve!(
+  x::AbstractParamVector,
+  ls::LinearSolver,
+  op::NonlinearOperator,
+  cache::SystemCache)
+
+  fill!(x,zero(eltype(x)))
+  @unpack A,b = cache
+  residual!(b,op,x)
+  jacobian!(A,op,x)
+  ns = solve!(x,ls,A,b)
   Algebra.LinearSolverCache(A,b,ns)
 end
 
@@ -53,12 +73,10 @@ function Algebra.solve!(
   cache::Algebra.LinearSolverCache)
 
   fill!(x,zero(eltype(x)))
-  b = cache.b
-  A = cache.A
-  ns = cache.ns
+  @unpack A,b,ns = cache
   residual!(b,op,x)
-  rmul!(b,-1)
-  ns = solve!(x,ls,A,b)
+  jacobian!(A,op,x)
+  solve!(x,ns,A,b)
   cache
 end
 
@@ -108,13 +126,12 @@ function Algebra._solve_nr!(
   done = LinearSolvers.init!(log,res)
 
   while !done
-    rmul!(b,-1)
-
     @inbounds for i in param_eachindex(x)
       xi = param_getindex(x,i)
       Ai = param_getindex(A,i)
       bi = param_getindex(b,i)
       numerical_setup!(ns,Ai)
+      rmul!(bi,-1)
       solve!(dx,ns,bi)
       xi .+= dx
     end
@@ -134,40 +151,82 @@ end
 
 # lazy iteration over the parameters
 
-function Algebra.numerical_setup(ss::SymbolicSetup,mat::AbstractMatrix,x::AbstractParamVector)
-  numerical_setup(ss,mat,testitem(x))
-end
-
 struct ParamSolver{S<:NonlinearSolver} <: NonlinearSolver
   solver::S
 end
 
+Algebra.symbolic_setup(nls::ParamSolver,A::AbstractMatrix) = symbolic_setup(nls.solver,A)
+
 ParamSolver() = ParamSolver(FESolver())
 
 const LinearParamSolver = ParamSolver{<:LinearSolver}
-const NonlinearParamSolver = ParamSolver{<:NonlinearSolver}
+
+function _lazy_solve!(
+  x::AbstractParamVector,
+  ls::LinearParamSolver,
+  op::NonlinearOperator,
+  A::AbstractMatrix,
+  b::AbstractVector)
+
+  x_item = testitem(x)
+  ss = symbolic_setup(ls,A)
+  ns = numerical_setup(ss,A,x_item)
+  _lazy_solve!(x,A,b,ns,ls,op)
+end
+
+function _lazy_solve!(x,A,b,ns,ls,op)
+  reset_index!(op)
+  @inbounds for i in param_eachindex(x)
+    xi = param_getindex(x,i)
+    residual!(b,op,x)
+    jacobian!(A,op,x)
+    rmul!(b,-1)
+    numerical_setup!(ns,A)
+    solve!(xi,ns,b)
+    next_index!(op)
+  end
+  empty_matvecdata!(op)
+  return ns
+end
 
 function Algebra.solve!(
   x::AbstractParamVector,
   ls::LinearParamSolver,
-  A::AbstractParamMatrix,
-  b::AbstractParamVector)
+  op::NonlinearOperator,
+  cache::Nothing)
 
-  A_item = testitem(A)
-  ss = symbolic_setup(ls,A_item)
-  ns = numerical_setup(ss,A_item)
-
-  @inbounds for i in param_eachindex(x)
-    xi = param_getindex(x,i)
-    bi = param_getindex(b,i)
-    solve!(xi,ns,bi)
-    i == param_length(x) && continue
-    Ai = param_getindex(A,i+1)
-    numerical_setup!(ns,Ai)
-  end
-
-  ns
+  b = allocate_residual(op,x)
+  A = allocate_jacobian(op,x)
+  cache = SystemCache(A,b)
+  solve!(x,ls,op,cache)
 end
+
+function Algebra.solve!(
+  x::AbstractParamVector,
+  ls::LinearParamSolver,
+  op::NonlinearOperator,
+  cache::SystemCache)
+
+  @unpack A,b = cache
+  residual!(b,op,x)
+  jacobian!(A,op,x)
+  _lazy_solve!(x,ls,op,A,b)
+end
+
+function Algebra.solve!(
+  x::AbstractParamVector,
+  ls::LinearParamSolver,
+  op::NonlinearOperator,
+  cache::Algebra.LinearSolverCache)
+
+  @unpack A,b,ns = cache
+  residual!(b,op,x)
+  jacobian!(A,op,x)
+  _lazy_solve!(x,A,b,ns,ls,op)
+  cache
+end
+
+const NonlinearParamSolver = ParamSolver{<:NonlinearSolver}
 
 function Algebra.solve!(
   x::AbstractParamVector,

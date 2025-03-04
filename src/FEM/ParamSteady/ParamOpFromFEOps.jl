@@ -138,7 +138,7 @@ function ParamAlgebra.lazy_residual!(
 
   !add && fill!(b,zero(eltype(b)))
 
-  if isstored_vecdata(paramcache)
+  if ParamAlgebra.isstored_vecdata(paramcache)
     vecdata = ParamAlgebra.get_vecdata(paramcache)
   else
     uh = EvaluationFunction(paramcache.trial,u)
@@ -186,7 +186,7 @@ function ParamAlgebra.lazy_jacobian_add!(
   u::AbstractVector,
   paramcache)
 
-  if isstored_matdata(paramcache)
+  if ParamAlgebra.isstored_matdata(paramcache)
     matdata = ParamAlgebra.get_matdata(paramcache)
   else
     uh = EvaluationFunction(paramcache.trial,u)

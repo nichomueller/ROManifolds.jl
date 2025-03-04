@@ -298,6 +298,10 @@ function update_paramcache!(paramcache::AbstractParamCache,nlop::NonlinearParamO
   @abstractmethod
 end
 
+reset_index!(nlop::NonlinearParamOperator) = @abstractmethod
+next_index!(nlop::NonlinearParamOperator) = @abstractmethod
+empty_matvecdata!(nlop::NonlinearParamOperator) = @abstractmethod
+
 """
     mutable struct ParamCache <: AbstractParamCache
       trial
@@ -422,7 +426,7 @@ Fields:
 struct LazyParamNonlinearOperator <: NonlinearParamOperator
   op::NonlinearParamOperator
   μ::Realization
-  paramcache::AbstractParamCache
+  paramcache::LazyParamCache
 end
 
 function ParamDataStructures.lazy_parameterize(op::NonlinearParamOperator,μ::Realization)
@@ -434,7 +438,7 @@ function Algebra.allocate_residual(
   nlop::LazyParamNonlinearOperator,
   x::AbstractVector)
 
-  allocate_lazy_residual(nlop,x)
+  allocate_lazy_residual(nlop.op,nlop.μ,x,nlop.paramcache)
 end
 
 function Algebra.residual!(
@@ -442,14 +446,14 @@ function Algebra.residual!(
   nlop::LazyParamNonlinearOperator,
   x::AbstractVector)
 
-  lazy_residual!(b,nlop,x)
+  lazy_residual!(b,nlop.op,nlop.μ,x,nlop.paramcache)
 end
 
 function Algebra.allocate_jacobian(
   nlop::LazyParamNonlinearOperator,
   x::AbstractVector)
 
-  allocate_lazy_jacobian(nlop,x)
+  allocate_lazy_jacobian(nlop.op,nlop.μ,x,nlop.paramcache)
 end
 
 function Algebra.jacobian!(
@@ -457,8 +461,12 @@ function Algebra.jacobian!(
   nlop::LazyParamNonlinearOperator,
   x::AbstractVector)
 
-  lazy_jacobian!(A,nlop,x)
+  lazy_jacobian!(A,nlop.op,nlop.μ,x,nlop.paramcache)
 end
+
+reset_index!(nlop::LazyParamNonlinearOperator) = reset_index!(nlop.paramcache)
+next_index!(nlop::LazyParamNonlinearOperator) = next_index!(nlop.paramcache)
+empty_matvecdata!(nlop::LazyParamNonlinearOperator) = empty_matvecdata!(nlop.paramcache)
 
 # system caches
 
@@ -473,21 +481,8 @@ struct SystemCache
   b
 end
 
-function allocate_systemcache(
-  nlop::NonlinearParamOperator,
-  μ::Realization,
-  x::AbstractVector,
-  paramcache)
-
-  A = allocate_jacobian(nlop,μ,x,paramcache)
-  b = allocate_residual(nlop,μ,x0,paramcache)
+function allocate_systemcache(nlop::NonlinearParamOperator,x::AbstractVector)
+  A = allocate_jacobian(nlop,x)
+  b = allocate_residual(nlop,x)
   return SystemCache(A,b)
-end
-
-function allocate_systemcache(nlop::GenericParamNonlinearOperator,x::AbstractVector)
-  allocate_systemcache(nlop.op,nlop.μ,x,nlop.paramcache)
-end
-
-function allocate_systemcache(nlop::LazyParamNonlinearOperator,x::AbstractVector)
-  allocate_systemcache(nlop.op,nlop.μ,x,nlop.paramcache)
 end
