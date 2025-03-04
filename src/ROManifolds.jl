@@ -57,7 +57,6 @@ using ROManifolds.ParamGeometry
 export ParamTrialFESpace
 export TrialParamFESpace
 export MultiFieldParamFESpace
-export ParamFESolver
 
 include("FEM/ParamFESpaces/ParamFESpaces.jl")
 using ROManifolds.ParamFESpaces

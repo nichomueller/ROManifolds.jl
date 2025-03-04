@@ -32,20 +32,8 @@ export GenericParamNonlinearOperator
 export LazyParamNonlinearOperator
 export AbstractParamCache
 export ParamCache
-export LazyParamCache
 export SystemCache
-export lazy_residual
-export lazy_residual!
-export allocate_lazy_residual
-export lazy_jacobian
-export lazy_jacobian!
-export lazy_jacobian_add!
-export allocate_lazy_jacobian
-export allocate_paramcache
-export allocate_lazy_paramcache
 export update_paramcache!
-export next_index!
-export reset_index!
 export allocate_systemcache
 include("NonlinearParamOperators.jl")
 

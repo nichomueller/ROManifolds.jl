@@ -78,11 +78,3 @@ function ParamAlgebra.allocate_paramcache(op::ParamOperator,μ::Realization)
   trial = evaluate(ptrial,μ)
   ParamCache(trial,ptrial)
 end
-
-function ParamAlgebra.allocate_lazy_paramcache(op::ParamOperator,μ::Realization)
-  index = 1
-  feop = get_fe_operator(op)
-  ptrial = get_trial(feop)
-  trial = evaluate(ptrial,μ)
-  LazyParamCache(trial,ptrial,index)
-end

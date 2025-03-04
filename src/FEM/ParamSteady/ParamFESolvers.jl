@@ -1,0 +1,34 @@
+function Algebra.solve!(u,solver::NonlinearFESolver,feop::ParamFEOperator,r::Realization)
+  x = get_free_dof_values(u)
+  op = get_algebraic_operator(feop)
+  nlop = parameterize(op,r)
+  syscache = allocate_systemcache(nlop,x)
+  t = @timed solve!(x,solver.nls,nlop,syscache)
+  stats = CostTracker(t,name="FEM";nruns=num_params(r))
+  trial = get_trial(feop)(r)
+  uh = FEFunction(trial,x)
+  uh,stats
+end
+
+function Algebra.solve!(u,solver::LinearFESolver,feop::ParamFEOperator,r::Realization)
+  x = get_free_dof_values(u)
+  op = get_algebraic_operator(feop)
+  nlop = parameterize(op,r)
+  syscache = allocate_systemcache(nlop,x)
+  t = @timed solve!(x,solver.ls,nlop,syscache)
+  stats = CostTracker(t,name="FEM";nruns=num_params(r))
+  trial = get_trial(feop)(r)
+  uh = FEFunction(trial,x)
+  uh,stats
+end
+
+function Algebra.solve(solver::FESolver,op::ParamFEOperator,r::Realization)
+  U = get_trial(op)(r)
+  uh = zero(U)
+  vh,stats = solve!(uh,solver,op,r)
+  vh,stats
+end
+
+function Algebra.solve(solver::FESolver,op::SplitParamFEOperator,r::Realization)
+  solve(solver,set_domains(op),r)
+end
