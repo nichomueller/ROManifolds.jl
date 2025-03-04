@@ -27,6 +27,10 @@ import ArraysOfArrays: _innerlength
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 
+export collect_lazy_cell_matrix
+export collect_lazy_cell_vector
+export numeric_loop_lazy_matrix!
+export numeric_loop_lazy_vector!
 include("ParamAssemblers.jl")
 
 export SingleFieldParamFESpace

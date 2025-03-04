@@ -22,8 +22,29 @@ using ROManifolds.ParamDataStructures
 
 import ArraysOfArrays: innersize
 import ROManifolds.DofMaps: OIdsToIds, add_ordered_entries!
+import UnPack: @unpack
 
 include("ParamAlgebraInterfaces.jl")
+
+export ParamNonlinearOperator
+export GenericParamNonlinearOperator
+export LazyParamNonlinearOperator
+export AbstractParamCache
+export ParamOpCache
+export LazyParamOpCache
+export ParamOpSysCache
+export lazy_residual
+export lazy_residual!
+export allocate_lazy_residual
+export lazy_jacobian
+export lazy_jacobian!
+export lazy_jacobian_add!
+export allocate_lazy_jacobian
+export allocate_paramcache
+export update_paramcache!
+export next_index!
+export allocate_systemcache
+include("NonlinearParamOperators.jl")
 
 include("ParamSolvers.jl")
 

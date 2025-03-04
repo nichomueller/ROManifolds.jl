@@ -88,14 +88,20 @@ function Algebra.solve!(
   op::NonlinearOperator,
   cache::NonlinearSolvers.NewtonCache)
 
-  A,b,dx,ns = cache.A,cache.b,cache.dx,cache.ns
+  @unpack A,b,dx,ns = cache
   residual!(b,op,x)
   jacobian!(A,op,x)
   Algebra._solve_nr!(x,A,b,dx,ns,nls,op)
   return cache
 end
 
-function Algebra._solve_nr!(x::AbstractParamVector,A,b,dx,ns,nls,op)
+function Algebra._solve_nr!(
+  x::AbstractParamVector,
+  A::AbstractParamMatrix,
+  b::AbstractParamVector,
+  dx::AbstractParamVector,
+  ns,nls,op)
+
   log = nls.log
 
   res = norm(b)
@@ -112,6 +118,60 @@ function Algebra._solve_nr!(x::AbstractParamVector,A,b,dx,ns,nls,op)
       solve!(dx,ns,bi)
       xi .+= dx
     end
+
+    residual!(b,op,x)
+    res  = norm(b)
+    done = LinearSolvers.update!(log,res)
+
+    if !done
+      jacobian!(A,op,x)
+    end
+  end
+
+  LinearSolvers.finalize!(log,res)
+  return x
+end
+
+# lazy iteration over the parameters
+
+function Algebra.numerical_setup(ss::SymbolicSetup,mat::AbstractMatrix,x::AbstractParamVector)
+  numerical_setup(ss,mat,testitem(x))
+end
+
+struct ParamSolver{S<:NonlinearSolver} <: NonlinearSolver
+  solver::S
+end
+
+function Algebra.solve!(
+  x::AbstractParamVector,
+  solver::ParamSolver,
+  op::NonlinearOperator,
+  cache::NonlinearSolvers.NewtonCache)
+
+  @unpack A,b,dx,ns = cache
+  nls = solver.nls
+  reset_index!(op)
+  lazy_residual!(b,op,x)
+  lazy_jacobian!(A,op,x)
+  @inbounds for i in param_eachindex(x)
+    _lazy_solve_nr!(x,A,b,dx,ns,nls,op,i)
+    next_index!(op)
+  end
+  return cache
+end
+
+function _lazy_solve_nr!(x,A,b,dx,ns,nls,op,i)
+  log = nls.log
+
+  res = norm(b)
+  done = LinearSolvers.init!(log,res)
+
+  xi = param_getindex(x,i)
+
+  while !done
+    rmul!(b,-1)
+    solve!(dx,ns,b)
+    xi .+= dx
 
     residual!(b,op,x)
     res  = norm(b)

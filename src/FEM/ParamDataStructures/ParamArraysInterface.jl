@@ -1,12 +1,12 @@
 """
-    abstract type AbstractParamArray{T,N,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N} end
+    abstract type AbstractParamArray{T,N,A<:AbstractArray{T,N}} <: AbstractParamData{A,N} end
 
 Type representing parametric abstract arrays of type A.
 Subtypes:
 - [`ParamArray`](@ref)
 - [`ParamSparseMatrix`](@ref)
 """
-abstract type AbstractParamArray{T,N,A<:AbstractArray{T,N}} <: AbstractParamContainer{A,N} end
+abstract type AbstractParamArray{T,N,A<:AbstractArray{T,N}} <: AbstractParamData{A,N} end
 
 """
     const AbstractParamVector{T} = AbstractParamArray{T,1,<:AbstractVector{T}}
@@ -206,7 +206,7 @@ function LinearAlgebra.ldiv!(A::AbstractParamArray,b::Factorization,C::AbstractP
   return A
 end
 
-function LinearAlgebra.ldiv!(A::AbstractParamArray,B::ParamContainer,C::AbstractParamArray)
+function LinearAlgebra.ldiv!(A::AbstractParamArray,B::ParamBlock,C::AbstractParamArray)
   @check param_length(A) == param_length(B) == param_length(C)
   @inbounds for i in param_eachindex(A)
     ai = param_getindex(A,i)

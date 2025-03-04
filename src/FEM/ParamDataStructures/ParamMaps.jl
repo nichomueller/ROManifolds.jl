@@ -1,4 +1,4 @@
-const ParamReindex = Union{Reindex{<:ParamUnit},Reindex{<:AbstractParamArray}}
+const ParamReindex = Union{Reindex{<:ParamBlock},Reindex{<:AbstractParamArray}}
 
 param_length(k::ParamReindex) = param_length(k.values)
 param_getindex(k::ParamReindex,i::Integer) = Reindex(param_getindex(k.values,i))
@@ -6,7 +6,7 @@ param_getindex(k::ParamReindex,i::Integer) = Reindex(param_getindex(k.values,i))
 Arrays.testitem(k::ParamReindex) = param_getindex(k,1)
 Arrays.testargs(k::ParamReindex,i...) = testargs(testitem(k),i...)
 
-const PosNegParamReindex = Union{PosNegReindex{<:ParamUnit,<:ParamUnit},PosNegReindex{<:AbstractParamArray,<:AbstractParamArray}}
+const PosNegParamReindex = Union{PosNegReindex{<:ParamBlock,<:ParamBlock},PosNegReindex{<:AbstractParamArray,<:AbstractParamArray}}
 
 function param_length(k::PosNegParamReindex)
   @check param_length(k.values_pos) == param_length(k.values_neg)
@@ -108,7 +108,7 @@ for T in (:ParamReindex,:PosNegParamReindex)
   end
 end
 
-function Arrays.return_cache(k::OReindex,values::Union{ParamUnit,AbstractParamVector})
+function Arrays.return_cache(k::OReindex,values::Union{ParamBlock,AbstractParamVector})
   v = testitem(values)
   c = return_cache(k,v)
   a = evaluate!(c,k,v)
@@ -120,11 +120,65 @@ function Arrays.return_cache(k::OReindex,values::Union{ParamUnit,AbstractParamVe
   cache,data
 end
 
-function Arrays.evaluate!(cache,k::OReindex,values::Union{ParamUnit,AbstractParamVector})
+function Arrays.evaluate!(cache,k::OReindex,values::Union{ParamBlock,AbstractParamVector})
   c,data = cache
   @inbounds for i = param_eachindex(values)
     vi = evaluate!(c[i],k,param_getindex(values,i))
     param_setindex!(data,vi,i)
   end
   data
+end
+
+struct FetchParam <: Map
+  index::Int
+end
+
+function Arrays.lazy_map(k::FetchParam,a::LazyArray{<:Fill{FetchParam}})
+  lazy_map(k,a.args...)
+end
+
+function lazy_param_getindex(a,index::Int)
+  lazy_map(FetchParam(index),a)
+end
+
+function lazy_testitem(a)
+  lazy_param_getindex(a,1)
+end
+
+function Arrays.return_cache(k::FetchParam,a::ParamBlock)
+  ai = testitem(a)
+  CachedArray(ai)
+end
+
+function Arrays.evaluate!(cache,k::FetchParam,a::ParamBlock)
+  ak = a.data[k.index]
+  setsize!(cache,size(ak))
+  r = cache.array
+  copyto!(r,ak)
+  r
+end
+
+function Arrays.return_cache(k::FetchParam,a::ArrayBlock{A,N}) where {A,N}
+  ai = testitem(a)
+  li = return_cache(k,ai)
+  fix = evaluate!(li,k,ai)
+  l = Array{typeof(li),N}(undef,size(a.array))
+  g = Array{typeof(fix),N}(undef,size(a.array))
+  for i in eachindex(a.array)
+    if a.touched[i]
+      a[i] = return_cache(k,a.array[i])
+    end
+  end
+  ArrayBlock(g,a.touched),l
+end
+
+function Arrays.evaluate!(cache,k::FetchParam,a::ArrayBlock{A,N}) where {A,N}
+  g,l = cache
+  @check g.touched == a.touched
+  for i in eachindex(a.array)
+    if a.touched[i]
+      g.array[i] = evaluate!(l[i],k,a.array[i])
+    end
+  end
+  g
 end

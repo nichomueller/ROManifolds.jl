@@ -99,47 +99,41 @@ function find_param_length(a...)
 end
 
 """
-    abstract type AbstractParamContainer{T,N} <: AbstractArray{T,N} end
+    abstract type AbstractParamData{T,N} <: AbstractArray{T,N} end
 
 Type representing generic parametric quantities.
 Subtypes:
-- [`ParamContainer`](@ref)
+- [`ParamNumber`](@ref)
 - [`AbstractParamArray`](@ref)
 - [`AbstractSnapshots`](@ref)
 """
-abstract type AbstractParamContainer{T,N} <: AbstractArray{T,N} end
+abstract type AbstractParamData{T,N} <: AbstractArray{T,N} end
 
-get_param_data(a::AbstractParamContainer) = (param_getindex(a,i) for i in param_eachindex(a))
+get_param_data(a::AbstractParamData) = (param_getindex(a,i) for i in param_eachindex(a))
 
-function parameterize(a::AbstractParamContainer,plength::Integer)
+function parameterize(a::AbstractParamData,plength::Integer)
   @check param_length(a) == plength
   return a
 end
 
 """
-    struct ParamContainer{T,A<:AbstractVector{T}} <: AbstractParamContainer{T,1}
+    struct ParamNumber{T<:Number,A<:AbstractVector{T}} <: AbstractParamData{T,1}
       data::A
     end
 
 Used as a wrapper for non-array structures, e.g. factorizations or numbers
 """
-struct ParamContainer{T,A<:AbstractVector{T}} <: AbstractParamContainer{T,1}
+struct ParamNumber{T<:Number,A<:AbstractVector{T}} <: AbstractParamData{T,1}
   data::A
 end
 
-ParamContainer(a::AbstractArray{<:AbstractArray}) = ParamArray(a)
+param_length(a::ParamNumber) = length(a.data)
+param_getindex(a::ParamNumber,i::Integer) = getindex(a,i)
+param_setindex!(a::ParamNumber,v,i::Integer) = setindex!(a,v,i)
 
-param_length(a::ParamContainer) = length(a.data)
-param_getindex(a::ParamContainer,i::Integer) = getindex(a,i)
-param_setindex!(a::ParamContainer,v,i::Integer) = setindex!(a,v,i)
-
-Base.size(a::ParamContainer) = (param_length(a),)
-Base.getindex(a::ParamContainer,i::Integer) = getindex(a.data,i)
-Base.setindex!(a::ParamContainer,v,i::Integer) = setindex!(a.data,v,i)
-
-(a::ParamContainer{<:Map})(x) = evaluate(a,x)
-
-const ParamNumber = ParamContainer
+Base.size(a::ParamNumber) = (param_length(a),)
+Base.getindex(a::ParamNumber,i::Integer) = getindex(a.data,i)
+Base.setindex!(a::ParamNumber,v,i::Integer) = setindex!(a.data,v,i)
 
 for op in (:+,:-)
   @eval begin

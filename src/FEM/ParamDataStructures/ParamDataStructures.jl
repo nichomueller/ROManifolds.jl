@@ -53,11 +53,12 @@ export get_final_time
 export shift!
 include("ParamSpaces.jl")
 
-export AbstractParamContainer
+export AbstractParamData
 export eltype2
 export parameterize
 export local_parameterize
 export global_parameterize
+export lazy_parameterize
 export get_param_data
 export param_length
 export param_eachindex
@@ -65,7 +66,12 @@ export param_getindex
 export param_setindex!
 export get_param_entry
 export get_param_entry!
-include("ParamContainersInterface.jl")
+include("ParamDataInterface.jl")
+
+export ParamBlock
+export GenericParamBlock
+export TrivialParamBlock
+include("ParamBlocks.jl")
 
 export AbstractParamArray
 export AbstractParamVector
@@ -133,11 +139,9 @@ include("TransientSnapshots.jl")
 
 include("ParamBroadcasts.jl")
 
-export ParamUnit
-export GenericParamUnit
-export TrivialParamUnit
-include("ParamUnits.jl")
-
-include("ParamReindex.jl")
+export FetchParam
+export lazy_param_getindex
+export lazy_testitem
+include("ParamMaps.jl")
 
 end # module

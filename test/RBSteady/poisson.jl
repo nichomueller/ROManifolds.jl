@@ -179,48 +179,13 @@ v = get_fe_basis(U)
 u = zero(U)
 dc = stiffness(μ,u,v,dΩ)[Ω]
 
-struct FetchParam{N} <: Map end
 
-function Arrays.return_cache(k::FetchParam{K},a::ParamUnit) where K
-  ai = testitem(a)
-  CachedArray(ai)
-end
-
-function Arrays.evaluate!(cache,k::FetchParam{K},a::ParamUnit) where K
-  setsize!(cache,size(a.data[K]))
-  r = cache.array
-  copyto!(r,a.data[K])
-  r
-end
-
-function Arrays.return_cache(k::FetchParam{K},a::ArrayBlock{A,N}) where {A,K,N}
-  ai = testitem(a)
-  li = return_cache(k,ai)
-  fix = evaluate!(li,k,ai)
-  l = Array{typeof(li),N}(undef,size(a.array))
-  g = Array{typeof(fix),N}(undef,size(a.array))
-  for i in eachindex(a.array)
-    if a.touched[i]
-      a[i] = return_cache(k,a.array[i])
-    end
-  end
-  ArrayBlock(g,a.touched),l
-end
-
-function Arrays.evaluate!(cache,k::FetchParam{K},a::ArrayBlock{A,N}) where {A,K,N}
-  g,l = cache
-  @check g.touched == a.touched
-  for i in eachindex(a.array)
-    if a.touched[i]
-      g.array[i] = evaluate!(l[i],k,a.array[i])
-    end
-  end
-  g
-end
-
-dc4 = lazy_map(FetchParam{4}(),dc)
+dc4 = lazy_map(FetchParam(4),dc)
 
 using BenchmarkTools
-k = FetchParam{4}()
+k = FetchParam(4)
 @btime lazy_map($k,$dc)
 @btime stiffness($μ,$u,$v,$dΩ)[$Ω]
+
+assem = get_assembler(feop)
+vecdata = collect_cell_vector(U,stiffness(μ,u,v,dΩ))

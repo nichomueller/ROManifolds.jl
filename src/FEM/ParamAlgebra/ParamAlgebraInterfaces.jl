@@ -34,36 +34,36 @@ for f in (:(Algebra.allocate_in_range),:(Algebra.allocate_in_domain))
   end
 end
 
-function Arrays.return_cache(k::AddEntriesMap,A,vs::ParamUnit,args...)
+function Arrays.return_cache(k::AddEntriesMap,A,vs::ParamBlock,args...)
   zeros(eltype2(vs),param_length(vs))
 end
 
-function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::ParamUnit,is)
+function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::ParamBlock,is)
   add_entries!(cache,k.combine,A,vs,is)
 end
 
-function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::ParamUnit,is,js)
+function Arrays.evaluate!(cache,k::AddEntriesMap,A,vs::ParamBlock,is,js)
   add_entries!(cache,k.combine,A,vs,is,js)
 end
 
-@inline function Algebra.add_entries!(cache,combine::Function,A,vs::ParamUnit,is)
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::ParamBlock,is)
   Algebra._add_entries!(cache,combine,A,vs,is)
 end
 
-@inline function Algebra.add_entries!(cache,combine::Function,A,vs::ParamUnit,is,js)
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::ParamBlock,is,js)
   Algebra._add_entries!(cache,combine,A,vs,is,js)
 end
 
-@inline function Algebra.add_entries!(cache,combine::Function,A,vs::ParamUnit,is::OIdsToIds)
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::ParamBlock,is::OIdsToIds)
   add_ordered_entries!(cache,combine,A,vs,is)
 end
 
-@inline function Algebra.add_entries!(cache,combine::Function,A,vs::ParamUnit,is::OIdsToIds,js::OIdsToIds)
+@inline function Algebra.add_entries!(cache,combine::Function,A,vs::ParamBlock,is::OIdsToIds,js::OIdsToIds)
   add_ordered_entries!(cache,combine,A,vs,is,js)
 end
 
 @inline function Algebra._add_entries!(
-  vij,combine::Function,A,vs::ParamUnit,is,js)
+  vij,combine::Function,A,vs::ParamBlock,is,js)
 
   for (lj,j) in enumerate(js)
     if j>0
@@ -79,7 +79,7 @@ end
 end
 
 @inline function add_ordered_entries!(
-  vij,combine::Function,A,vs::ParamUnit,is::OIdsToIds,js::OIdsToIds)
+  vij,combine::Function,A,vs::ParamBlock,is::OIdsToIds,js::OIdsToIds)
 
   for (lj,j) in enumerate(js)
     if j>0
@@ -97,7 +97,7 @@ end
 end
 
 @inline function Algebra._add_entries!(
-  vi,combine::Function,A,vs::ParamUnit,is)
+  vi,combine::Function,A,vs::ParamBlock,is)
 
   for (li,i) in enumerate(is)
     if i>0
@@ -109,7 +109,7 @@ end
 end
 
 @inline function add_ordered_entries!(
-  vi,combine::Function,A,vs::ParamUnit,is::OIdsToIds)
+  vi,combine::Function,A,vs::ParamBlock,is::OIdsToIds)
 
   for (li,i) in enumerate(is)
     if i>0

@@ -108,7 +108,7 @@ function ODEs.jacobian_add!(
   A
 end
 
-function allocate_lazy_residual(
+function ParamAlgebra.allocate_lazy_residual(
   op::JointParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
@@ -121,16 +121,14 @@ function allocate_lazy_residual(
 
   res = get_res(op.op)
   dc = res(μ,uh,v)
-  vecdata,veccache = collect_lazy_cell_vector(test,dc,paramcache.index)
-  veccache =
-  fill_vecdata!(paramcache,vecdata)
-  fill_veccache!(paramcache,veccache)
+  vecdata = collect_lazy_cell_vector(test,dc,paramcache.index)
+  ParamAlgebra.fill_vecdata!(paramcache,vecdata)
   b = allocate_vector(assem,vecdata)
 
   b
 end
 
-function lazy_residual!(
+function ParamAlgebra.lazy_residual!(
   b::AbstractVector,
   op::JointParamOpFromFEOp,
   μ::Realization,
@@ -141,28 +139,25 @@ function lazy_residual!(
   !add && fill!(b,zero(eltype(b)))
 
   if isstored_vecdata(paramcache)
-    vecdata,veccache = get_vec_data_cache(paramcache)
+    vecdata = ParamAlgebra.get_vecdata(paramcache)
   else
-    reset_index!(paramcache)
     uh = EvaluationFunction(paramcache.trial,u)
     test = get_test(op.op)
     v = get_fe_basis(test)
-    assem = get_param_assembler(op.op,μ)
+    assem = get_assembler(op.op)
 
     res = get_res(op.op)
     dc = res(μ,uh,v)
     vecdata = collect_lazy_cell_vector(test,dc,paramcache.index)
-    fill_vecdata!(paramcache,vecdata)
-    _,veccache = get_vec_data_cache(paramcache)
+    ParamAlgebra.fill_vecdata!(paramcache,vecdata)
   end
 
-  assemble_lazy_vector_add!(b,assem,(vecdata,veccache,paramcache.index))
-  next_index!(paramcache)
+  assemble_lazy_vector_add!(b,assem,vecdata,paramcache.index)
 
   b
 end
 
-function allocate_lazy_jacobian(
+function ParamAlgebra.allocate_lazy_jacobian(
   op::JointParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
@@ -173,36 +168,41 @@ function allocate_lazy_jacobian(
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,μ)
+  assem = get_assembler(op.op)
 
   jac = get_jac(op.op)
   dc = jac(μ,uh,du,v)
-  matdata,matcache = collect_lazy_cell_matrix(trial,test,dc,paramcache.index)
-  fill_matdata!(paramcache,matdata)
-  fill_matcache!(paramcache,matcache)
+  matdata = collect_lazy_cell_matrix(trial,test,dc,paramcache.index)
+  ParamAlgebra.fill_matdata!(paramcache,matdata)
   A = allocate_matrix(assem,matdata)
 
   A
 end
 
-function lazy_jacobian_add!(
+function ParamAlgebra.lazy_jacobian_add!(
   A::AbstractMatrix,
   op::JointParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
   paramcache)
 
-  uh = EvaluationFunction(paramcache.trial,u)
-  trial = evaluate(get_trial(op.op),nothing)
-  du = get_trial_fe_basis(trial)
-  test = get_test(op.op)
-  v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,μ)
+  if isstored_matdata(paramcache)
+    matdata = ParamAlgebra.get_matdata(paramcache)
+  else
+    uh = EvaluationFunction(paramcache.trial,u)
+    trial = evaluate(get_trial(op.op),nothing)
+    du = get_trial_fe_basis(trial)
+    test = get_test(op.op)
+    v = get_fe_basis(test)
+    assem = get_assembler(op.op)
 
-  jac = get_jac(op.op)
-  dc = jac(μ,uh,du,v)
-  matdata = collect_cell_matrix(trial,test,dc)
-  assemble_matrix_add!(A,assem,matdata)
+    jac = get_jac(op.op)
+    dc = jac(μ,uh,du,v)
+    matdata = collect_lazy_cell_matrix(trial,test,dc,paramcache.index)
+    ParamAlgebra.fill_matdata!(paramcache,matdata)
+  end
+
+  assemble_lazy_matrix_add!(A,assem,matdata,paramcache.index)
 
   A
 end
@@ -393,72 +393,6 @@ function ODEs.jacobian_add!(
 end
 
 # utils
-
-"""
-    function collect_lazy_cell_matrix(
-      trial::FESpace,
-      test::FESpace,
-      a::DomainContribution,
-      index::Int
-      ) -> Tuple{Vector{<:Any},Vector{<:Any},Vector{<:Any}}
-
-For parametric applications, returns the cell-wise data needed to assemble a
-global sparse matrix corresponding to the parameter #`index`
-"""
-function collect_lazy_cell_matrix(
-  trial::FESpace,
-  test::FESpace,
-  a::DomainContribution,
-  index::Int)
-
-  w = []
-  r = []
-  c = []
-  for strian in get_domains(a)
-    scell_mat = get_contribution(a,strian)
-    cell_mat, trian = move_contributions(scell_mat,strian)
-    @assert ndims(eltype(cell_mat)) == 2
-    cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
-    cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
-    cell_mat_rc_i = lazy_param_getindex(cell_mat_rc,index)
-    rows = get_cell_dof_ids(test,trian)
-    cols = get_cell_dof_ids(trial,trian)
-    push!(w,cell_mat_rc_i)
-    push!(r,rows)
-    push!(c,cols)
-  end
-  (w,r,c)
-end
-
-"""
-    function collect_lazy_cell_vector(
-      test::FESpace,
-      a::DomainContribution,
-      index::Int
-      ) -> Tuple{Vector{<:Any},Vector{<:Any}}
-
-For parametric applications, returns the cell-wise data needed to assemble a
-global vector corresponding to the parameter #`index`
-"""
-function collect_lazy_cell_vector(
-  test::FESpace,
-  a::DomainContribution,
-  index::Int)
-
-  w = []
-  r = []
-  for strian in get_domains(a)
-    scell_vec = get_contribution(a,strian)
-    cell_vec, trian = move_contributions(scell_vec,strian)
-    @assert ndims(eltype(cell_vec)) == 1
-    cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
-    cell_vec_r_i = lazy_param_getindex(cell_vec_r,index)
-    rows = get_cell_dof_ids(test,trian)
-    push!(w,cell_vec_r_i)
-    push!(r,rows)
-  end
-  (w,r)
-end
 
 """
     function collect_cell_matrix_for_trian(

@@ -46,22 +46,6 @@ export SplitDomains
 export JointDomains
 export ParamOperator
 export LinearNonlinearParamOpFromFEOp
-export AbstractParamCache
-export ParamOpCache
-export LazyParamOpCache
-export ParamOpSysCache
-export ParamNonlinearOperator
-export lazy_residual
-export lazy_residual!
-export allocate_lazy_residual
-export lazy_jacobian
-export lazy_jacobian!
-export lazy_jacobian_add!
-export allocate_lazy_jacobian
-export allocate_paramcache
-export update_paramcache!
-export next_index!
-export allocate_systemcache
 export get_fe_operator
 include("ParamOperators.jl")
 
