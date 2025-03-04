@@ -108,6 +108,105 @@ function ODEs.jacobian_add!(
   A
 end
 
+function allocate_lazy_residual(
+  op::JointParamOpFromFEOp,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  uh = EvaluationFunction(paramcache.trial,u)
+  test = get_test(op.op)
+  v = get_fe_basis(test)
+  assem = get_assembler(op.op)
+
+  res = get_res(op.op)
+  dc = res(μ,uh,v)
+  vecdata,veccache = collect_lazy_cell_vector(test,dc,paramcache.index)
+  veccache =
+  fill_vecdata!(paramcache,vecdata)
+  fill_veccache!(paramcache,veccache)
+  b = allocate_vector(assem,vecdata)
+
+  b
+end
+
+function lazy_residual!(
+  b::AbstractVector,
+  op::JointParamOpFromFEOp,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache::LazyParamOpCache;
+  add::Bool=false)
+
+  !add && fill!(b,zero(eltype(b)))
+
+  if isstored_vecdata(paramcache)
+    vecdata,veccache = get_vec_data_cache(paramcache)
+  else
+    reset_index!(paramcache)
+    uh = EvaluationFunction(paramcache.trial,u)
+    test = get_test(op.op)
+    v = get_fe_basis(test)
+    assem = get_param_assembler(op.op,μ)
+
+    res = get_res(op.op)
+    dc = res(μ,uh,v)
+    vecdata = collect_lazy_cell_vector(test,dc,paramcache.index)
+    fill_vecdata!(paramcache,vecdata)
+    _,veccache = get_vec_data_cache(paramcache)
+  end
+
+  assemble_lazy_vector_add!(b,assem,(vecdata,veccache,paramcache.index))
+  next_index!(paramcache)
+
+  b
+end
+
+function allocate_lazy_jacobian(
+  op::JointParamOpFromFEOp,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  uh = EvaluationFunction(paramcache.trial,u)
+  trial = evaluate(get_trial(op.op),nothing)
+  du = get_trial_fe_basis(trial)
+  test = get_test(op.op)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(op.op,μ)
+
+  jac = get_jac(op.op)
+  dc = jac(μ,uh,du,v)
+  matdata,matcache = collect_lazy_cell_matrix(trial,test,dc,paramcache.index)
+  fill_matdata!(paramcache,matdata)
+  fill_matcache!(paramcache,matcache)
+  A = allocate_matrix(assem,matdata)
+
+  A
+end
+
+function lazy_jacobian_add!(
+  A::AbstractMatrix,
+  op::JointParamOpFromFEOp,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  uh = EvaluationFunction(paramcache.trial,u)
+  trial = evaluate(get_trial(op.op),nothing)
+  du = get_trial_fe_basis(trial)
+  test = get_test(op.op)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(op.op,μ)
+
+  jac = get_jac(op.op)
+  dc = jac(μ,uh,du,v)
+  matdata = collect_cell_matrix(trial,test,dc)
+  assemble_matrix_add!(A,assem,matdata)
+
+  A
+end
+
 """
     const SplitParamOpFromFEOp{O} = ParamOpFromFEOp{O,SplitDomains}
 """
@@ -296,11 +395,80 @@ end
 # utils
 
 """
-    function collect_cell_matrix_for_trian(
-      trial::FESpace,test::FESpace,a::DomainContribution,strian::Triangulation
+    function collect_lazy_cell_matrix(
+      trial::FESpace,
+      test::FESpace,
+      a::DomainContribution,
+      index::Int
       ) -> Tuple{Vector{<:Any},Vector{<:Any},Vector{<:Any}}
 
-Interface for computing the matrix data to be sent to the assembler, for a given
+For parametric applications, returns the cell-wise data needed to assemble a
+global sparse matrix corresponding to the parameter #`index`
+"""
+function collect_lazy_cell_matrix(
+  trial::FESpace,
+  test::FESpace,
+  a::DomainContribution,
+  index::Int)
+
+  w = []
+  r = []
+  c = []
+  for strian in get_domains(a)
+    scell_mat = get_contribution(a,strian)
+    cell_mat, trian = move_contributions(scell_mat,strian)
+    @assert ndims(eltype(cell_mat)) == 2
+    cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
+    cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
+    cell_mat_rc_i = lazy_param_getindex(cell_mat_rc,index)
+    rows = get_cell_dof_ids(test,trian)
+    cols = get_cell_dof_ids(trial,trian)
+    push!(w,cell_mat_rc_i)
+    push!(r,rows)
+    push!(c,cols)
+  end
+  (w,r,c)
+end
+
+"""
+    function collect_lazy_cell_vector(
+      test::FESpace,
+      a::DomainContribution,
+      index::Int
+      ) -> Tuple{Vector{<:Any},Vector{<:Any}}
+
+For parametric applications, returns the cell-wise data needed to assemble a
+global vector corresponding to the parameter #`index`
+"""
+function collect_lazy_cell_vector(
+  test::FESpace,
+  a::DomainContribution,
+  index::Int)
+
+  w = []
+  r = []
+  for strian in get_domains(a)
+    scell_vec = get_contribution(a,strian)
+    cell_vec, trian = move_contributions(scell_vec,strian)
+    @assert ndims(eltype(cell_vec)) == 1
+    cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
+    cell_vec_r_i = lazy_param_getindex(cell_vec_r,index)
+    rows = get_cell_dof_ids(test,trian)
+    push!(w,cell_vec_r_i)
+    push!(r,rows)
+  end
+  (w,r)
+end
+
+"""
+    function collect_cell_matrix_for_trian(
+      trial::FESpace,
+      test::FESpace,
+      a::DomainContribution,
+      strian::Triangulation
+      ) -> Tuple{Vector{<:Any},Vector{<:Any},Vector{<:Any}}
+
+Computes the cell-wise data needed to assemble a global sparse matrix for a given
 input triangulation `strian`
 """
 function collect_cell_matrix_for_trian(
@@ -321,10 +489,12 @@ end
 
 """
     function collect_cell_vector_for_trian(
-      test::FESpace,a::DomainContribution,strian::Triangulation
+      test::FESpace,
+      a::DomainContribution,
+      strian::Triangulation
       ) -> Tuple{Vector{<:Any},Vector{<:Any}}
 
-Interface for computing the vector data to be sent to the assembler, for a given
+Computes the cell-wise data needed to assemble a global vector for a given
 input triangulation `strian`
 """
 function collect_cell_vector_for_trian(

@@ -94,3 +94,133 @@ main(:pod)
 main(:ttsvd)
 
 end
+
+using Gridap
+using Gridap.Geometry
+using Gridap.ReferenceFEs
+using Gridap.FESpaces
+using Gridap.MultiField
+using Gridap.CellData
+using Gridap.Arrays
+using Gridap.Fields
+using Gridap.Helpers
+using Gridap.ODEs
+using ROManifolds
+using ROManifolds.ParamDataStructures
+using ROManifolds.ParamSteady
+using Test
+using FillArrays
+import Gridap.MultiField: BlockMultiFieldStyle
+
+method=:pod
+tol=1e-4
+rank=nothing
+nparams=50
+nparams_res=floor(Int,nparams/3)
+nparams_jac=floor(Int,nparams/4)
+sketch=:sprn
+unsafe=false
+
+pdomain = (1,10,1,10,1,10)
+
+domain = (0,1,0,1)
+partition = (20,20)
+if method==:ttsvd
+  model = TProductDiscreteModel(domain,partition)
+else
+  model = CartesianDiscreteModel(domain,partition)
+end
+
+order = 1
+degree = 2*order
+
+Ω = Triangulation(model)
+dΩ = Measure(Ω,degree)
+Γn = BoundaryTriangulation(model,tags=[8])
+dΓn = Measure(Γn,degree)
+
+a(μ) = x -> exp(-x[1]/sum(μ))
+aμ(μ) = ParamFunction(a,μ)
+
+f(μ) = x -> 1.
+fμ(μ) = ParamFunction(f,μ)
+
+g(μ) = x -> μ[1]*exp(-x[1]/μ[2])
+gμ(μ) = ParamFunction(g,μ)
+
+h(μ) = x -> abs(cos(μ[3]*x[2]))
+hμ(μ) = ParamFunction(h,μ)
+
+stiffness(μ,u,v,dΩ) = ∫(aμ(μ)*∇(v)⋅∇(u))dΩ
+rhs(μ,v,dΩ,dΓn) = ∫(fμ(μ)*v)dΩ + ∫(hμ(μ)*v)dΓn
+res(μ,u,v,dΩ,dΓn) = stiffness(μ,u,v,dΩ) - rhs(μ,v,dΩ,dΓn)
+
+trian_res = (Ω,Γn)
+trian_stiffness = (Ω,)
+domains = FEDomains(trian_res,trian_stiffness)
+
+energy(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
+
+reffe = ReferenceFE(lagrangian,Float64,order)
+test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=[1,3,7])
+trial = ParamTrialFESpace(test,gμ)
+
+state_reduction = PODReduction(1e-4)
+
+fesolver = LinearFESolver(LUSolver())
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
+
+pspace = ParamSpace(pdomain)
+feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,domains)
+μ = realization(feop;nparams=10)
+
+U = trial(μ)
+v = get_fe_basis(U)
+u = zero(U)
+dc = stiffness(μ,u,v,dΩ)[Ω]
+
+struct FetchParam{N} <: Map end
+
+function Arrays.return_cache(k::FetchParam{K},a::ParamUnit) where K
+  ai = testitem(a)
+  CachedArray(ai)
+end
+
+function Arrays.evaluate!(cache,k::FetchParam{K},a::ParamUnit) where K
+  setsize!(cache,size(a.data[K]))
+  r = cache.array
+  copyto!(r,a.data[K])
+  r
+end
+
+function Arrays.return_cache(k::FetchParam{K},a::ArrayBlock{A,N}) where {A,K,N}
+  ai = testitem(a)
+  li = return_cache(k,ai)
+  fix = evaluate!(li,k,ai)
+  l = Array{typeof(li),N}(undef,size(a.array))
+  g = Array{typeof(fix),N}(undef,size(a.array))
+  for i in eachindex(a.array)
+    if a.touched[i]
+      a[i] = return_cache(k,a.array[i])
+    end
+  end
+  ArrayBlock(g,a.touched),l
+end
+
+function Arrays.evaluate!(cache,k::FetchParam{K},a::ArrayBlock{A,N}) where {A,K,N}
+  g,l = cache
+  @check g.touched == a.touched
+  for i in eachindex(a.array)
+    if a.touched[i]
+      g.array[i] = evaluate!(l[i],k,a.array[i])
+    end
+  end
+  g
+end
+
+dc4 = lazy_map(FetchParam{4}(),dc)
+
+using BenchmarkTools
+k = FetchParam{4}()
+@btime lazy_map($k,$dc)
+@btime stiffness($μ,$u,$v,$dΩ)[$Ω]

@@ -145,6 +145,161 @@ function Algebra.jacobian(
   A
 end
 
+"""
+    allocate_lazy_residual(
+      op::ParamOperator,
+      μ::Realization,
+      u::AbstractVector,
+      paramcache
+      ) -> AbstractVector
+
+Allocates a parametric residual in a lazy manner, one parameter at the time
+"""
+function allocate_lazy_residual(
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  @abstractmethod
+end
+
+"""
+    lazy_residual!(
+      b,
+      op::ParamOperator,
+      μ::Realization,
+      u::AbstractVector,
+      paramcache
+      ) -> Nothing
+
+Builds in-place a parametric residual in a lazy manner, one parameter at the time
+"""
+function lazy_residual!(
+  b,
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  @abstractmethod
+end
+
+"""
+    lazy_residual(
+      op::ParamOperator,
+      μ::Realization,
+      u::AbstractVector,
+      paramcache
+      ) -> AbstractVector
+
+Builds a parametric residual in a lazy manner, one parameter at the time
+"""
+function lazy_residual(
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector)
+
+  index = 1
+  paramcache = allocate_paramcache(op,μ,u,index)
+  residual(op,μ,u,paramcache)
+end
+
+function lazy_residual(
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  b = lazy_allocate_residual(op,μ,u,paramcache)
+  lazy_residual!(b,op,μ,u,paramcache)
+  b
+end
+
+"""
+    allocate_lazy_jacobian(
+      op::ParamOperator,
+      μ::Realization,
+      u::AbstractVector,
+      paramcache
+      ) -> AbstractVector
+
+Allocates a parametric Jacobian in a lazy manner, one parameter at the time
+"""
+function allocate_lazy_jacobian(
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  @abstractmethod
+end
+
+"""
+    lazy_jacobian_add!(
+      A,
+      op::ParamOperator,
+      μ::Realization,
+      u::AbstractVector,
+      paramcache
+      ) -> AbstractVector
+
+Adds in-place the values of a parametric Jacobian in a lazy manner, one parameter at the time
+"""
+function lazy_jacobian_add!(
+  A,
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  @abstractmethod
+end
+
+"""
+    lazy_jacobian!(
+      A,
+      op::ParamOperator,
+      μ::Realization,
+      u::AbstractVector,
+      paramcache
+      ) -> Nothing
+
+Builds in-place a parametric Jacobian in a lazy manner, one parameter at the time
+"""
+function lazy_jacobian!(
+  A,
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  LinearAlgebra.fillstored!(A,zero(eltype(A)))
+  lazy_jacobian_add!(A,op,μ,u,paramcache)
+  A
+end
+
+function lazy_jacobian(
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector)
+
+  index = 1
+  paramcache = allocate_paramcache(op,μ,u,index)
+  jacobian(op,μ,u,paramcache)
+end
+
+function lazy_jacobian(
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  A = lazy_allocate_jacobian(op,μ,u,paramcache)
+  lazy_jacobian!(A,op,μ,u,paramcache)
+  A
+end
+
 FESpaces.get_test(op::ParamOperator) = get_test(get_fe_operator(op))
 FESpaces.get_trial(op::ParamOperator) = get_trial(get_fe_operator(op))
 DofMaps.get_dof_map(op::ParamOperator) = get_dof_map(get_fe_operator(op))
@@ -152,6 +307,32 @@ DofMaps.get_internal_dof_map(op::ParamOperator) = get_internal_dof_map(get_fe_op
 DofMaps.get_sparse_dof_map(op::ParamOperator) = get_sparse_dof_map(get_fe_operator(op))
 get_dof_map_at_domains(op::ParamOperator) = get_dof_map_at_domains(get_fe_operator(op))
 get_sparse_dof_map_at_domains(op::ParamOperator) = get_sparse_dof_map_at_domains(get_fe_operator(op))
+
+"""
+    abstract type AbstractParamCache <: GridapType end
+"""
+abstract type AbstractParamCache <: GridapType end
+
+"""
+    update_paramcache!(paramcache::AbstractParamCache,op::ParamOperator,μ::AbstractRealization) -> AbstractParamCache
+
+Similar to `update_odecache!` in `Gridap`, when dealing with
+parametric problems
+"""
+function update_paramcache!(paramcache::AbstractParamCache,op::ParamOperator,μ::AbstractRealization)
+  @abstractmethod
+end
+
+"""
+    mutable struct ParamOpCache <: AbstractParamCache
+      trial
+      ptrial
+    end
+"""
+mutable struct ParamOpCache <: AbstractParamCache
+  trial
+  ptrial
+end
 
 """
     allocate_paramcache(op::ParamOperator,μ::Realization,u::AbstractVector
@@ -171,15 +352,103 @@ function allocate_paramcache(
   ParamOpCache(trial,ptrial)
 end
 
-"""
-    update_paramcache!(paramcache,op::ParamOperator,μ::Realization) -> ParamOpCache
-
-Similar to `update_odecache!` in `Gridap`, when dealing with
-parametric problems
-"""
-function update_paramcache!(paramcache,op::ParamOperator,μ::Realization)
+function update_paramcache!(paramcache::ParamOpCache,op::ParamOperator,μ::Realization)
   paramcache.trial = evaluate!(paramcache.trial,paramcache.ptrial,μ)
   paramcache
+end
+
+"""
+    mutable struct AssemCache{A,B}
+      matdata::A
+      vecdata::B
+      matcache
+      veccache
+    end
+"""
+mutable struct AssemCache{A,B}
+  matdata::A
+  vecdata::B
+  matcache
+  veccache
+end
+
+isstored_matdata(c::AssemCache) = isnothing(c.matdata)
+isstored_vecdata(c::AssemCache) = isnothing(c.vecdata)
+fill_matdata!(c::AssemCache,matdata) = (c.matdata=matdata)
+fill_vecdata!(c::AssemCache,vecdata) = (c.vecdata=vecdata)
+fill_matcache!(c::AssemCache,matcache) = (c.matcache=matcache)
+fill_veccache!(c::AssemCache,vecdcache) = (c.veccache=veccache)
+empty_matdata!(c::AssemCache) = (c.matdata=nothing)
+empty_vecdata!(c::AssemCache) = (c.vecdata=nothing)
+empty_matvecdata!(c::AssemCache) = empty_matdata!(c); empty_vecdata!(c)
+get_mat_data_cache(c::AssemCache) = (c.matdata,c.matcache)
+get_vec_data_cache(c::AssemCache) = (c.vecdata,c.veccache)
+
+"""
+    mutable struct LazyParamOpCache <: AbstractParamCache
+      index
+      trial
+      ptrial
+      assemcache
+    end
+"""
+mutable struct LazyParamOpCache <: AbstractParamCache
+  trial
+  ptrial
+  index
+  assemcache::AssemCache
+end
+
+"""
+    allocate_paramcache(op::ParamOperator,μ::Realization,u::AbstractVector
+      ) -> LazyParamOpCache
+
+Similar to `allocate_odecache` in `Gridap`, when dealing with
+parametric problems
+"""
+function allocate_paramcache(
+  op::ParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  index::Int)
+
+  feop = get_fe_operator(op)
+  ptrial = get_trial(feop)
+  trial = evaluate(ptrial,μ)
+  LazyParamOpCache(trial,ptrial,index)
+end
+
+function update_paramcache!(paramcache::LazyParamOpCache,op::ParamOperator,μ::Realization)
+  paramcache.trial = evaluate!(paramcache.trial,paramcache.ptrial,μ)
+  paramcache
+end
+
+isstored_matdata(c::LazyParamOpCache) = isstored_matdata(c.assemcache)
+isstored_vecdata(c::LazyParamOpCache) = isstored_vecdata(c.assemcache)
+fill_matdata!(c::LazyParamOpCache,matdata) = fill_matdata!(c.assemcache,matdata)
+fill_vecdata!(c::LazyParamOpCache,vecdata) = fill_vecdata!(c.assemcache,vecdata)
+fill_matcache!(c::LazyParamOpCache,matcache) = fill_matcache!(c.assemcache,matcache)
+fill_veccache!(c::LazyParamOpCache,vecdcache) = fill_veccache!(c.assemcache,veccache)
+empty_matdata!(c::LazyParamOpCache) = empty_matdata!(c.assemcache)
+empty_vecdata!(c::LazyParamOpCache) = empty_vecdata!(c.assemcache)
+empty_matvecdata!(c::LazyParamOpCache) = empty_matvecdata!(c.assemcache)
+get_mat_data_cache(c::LazyParamOpCache) = get_mat_data_cache(c.assemcache)
+get_vec_data_cache(c::LazyParamOpCache) = get_vec_data_cache(c.assemcache)
+
+next_index!(paramcache::LazyParamOpCache) = (paramcache.index += 1)
+reset_index!(paramcache::LazyParamOpCache) = (paramcache.index = 1)
+
+"""
+    struct ParamOpSysCache <: AbstractParamCache
+      paramcache
+      A
+      b
+    end
+"""
+struct ParamOpSysCache <: AbstractParamCache
+  paramcache
+  A
+  b
 end
 
 function allocate_systemcache(
@@ -195,33 +464,12 @@ function allocate_systemcache(
   return A,b
 end
 
-"""
-    abstract type AbstractParamCache <: GridapType end
-"""
-abstract type AbstractParamCache <: GridapType end
-
-"""
-    mutable struct ParamOpCache <: AbstractParamCache
-      trial
-      ptrial
-    end
-"""
-mutable struct ParamOpCache <: AbstractParamCache
-  trial
-  ptrial
+function update_paramcache!(paramcache::ParamOpSysCache,op::ParamOperator,μ::Realization)
+  update_paramcache!(paramcache.paramcache,op,μ)
 end
 
-"""
-    struct ParamOpSysCache{Ta,Tb} <: AbstractParamCache
-      paramcache::ParamOpCache
-      A::Ta
-      b::Tb
-    end
-"""
-struct ParamOpSysCache{Ta,Tb} <: AbstractParamCache
-  paramcache::ParamOpCache
-  A::Ta
-  b::Tb
+function next_index!(paramcache::ParamOpSysCache,op::ParamOperator,μ::Realization)
+  next_index!(paramcache.paramcache,op,μ)
 end
 
 """
@@ -277,4 +525,34 @@ function Algebra.jacobian!(
   x::AbstractVector)
 
   jacobian!(A,nlop.op,nlop.μ,x,nlop.paramcache)
+end
+
+function allocate_residual(
+  nlop::ParamNonlinearOperator,
+  x::AbstractVector)
+
+  allocate_lazy_residual(nlop.op,nlop.μ,x,nlop.paramcache)
+end
+
+function lazy_residual!(
+  b::AbstractVector,
+  nlop::ParamNonlinearOperator,
+  x::AbstractVector)
+
+  lazy_residual!(b,nlop.op,nlop.μ,x,nlop.paramcache)
+end
+
+function allocate_lazy_jacobian(
+  nlop::ParamNonlinearOperator,
+  x::AbstractVector)
+
+  allocate_lazy_jacobian(nlop.op,nlop.μ,x,nlop.paramcache)
+end
+
+function lazy_jacobian!(
+  A::AbstractMatrix,
+  nlop::ParamNonlinearOperator,
+  x::AbstractVector)
+
+  lazy_jacobian!(A,nlop.op,nlop.μ,x,nlop.paramcache)
 end
