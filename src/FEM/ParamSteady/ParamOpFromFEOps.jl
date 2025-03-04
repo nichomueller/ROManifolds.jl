@@ -73,7 +73,7 @@ function Algebra.allocate_jacobian(
   paramcache)
 
   uh = EvaluationFunction(paramcache.trial,u)
-  trial = evaluate(get_trial(op.op),nothing)
+  trial = get_trial(op.op)
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
@@ -94,7 +94,7 @@ function ODEs.jacobian_add!(
   paramcache)
 
   uh = EvaluationFunction(paramcache.trial,u)
-  trial = evaluate(get_trial(op.op),nothing)
+  trial = get_trial(op.op)
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
@@ -121,8 +121,9 @@ function ParamAlgebra.allocate_lazy_residual(
 
   res = get_res(op.op)
   dc = res(μ,uh,v)
-  vecdata = collect_lazy_cell_vector(test,dc,paramcache.index)
+  vecdata,veccache = collect_lazy_cell_vector(test,dc,paramcache.index)
   ParamAlgebra.fill_vecdata!(paramcache,vecdata)
+  ParamAlgebra.fill_veccache!(paramcache,veccache)
   b = allocate_vector(assem,vecdata)
 
   b
@@ -140,19 +141,21 @@ function ParamAlgebra.lazy_residual!(
 
   if ParamAlgebra.isstored_vecdata(paramcache)
     vecdata = ParamAlgebra.get_vecdata(paramcache)
+    veccache = ParamAlgebra.get_veccache(paramcache)
   else
     uh = EvaluationFunction(paramcache.trial,u)
     test = get_test(op.op)
     v = get_fe_basis(test)
-    assem = get_assembler(op.op)
 
     res = get_res(op.op)
     dc = res(μ,uh,v)
-    vecdata = collect_lazy_cell_vector(test,dc,paramcache.index)
+    vecdata,veccache = collect_lazy_cell_vector(test,dc,paramcache.index)
     ParamAlgebra.fill_vecdata!(paramcache,vecdata)
+    ParamAlgebra.fill_veccache!(paramcache,veccache)
   end
 
-  assemble_lazy_vector_add!(b,assem,vecdata,paramcache.index)
+  assem = get_assembler(op.op)
+  assemble_lazy_vector_add!(b,assem,vecdata,veccache,paramcache.index)
 
   b
 end
@@ -164,7 +167,7 @@ function ParamAlgebra.allocate_lazy_jacobian(
   paramcache)
 
   uh = EvaluationFunction(paramcache.trial,u)
-  trial = evaluate(get_trial(op.op),nothing)
+  trial = get_trial(op.op)
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
@@ -172,8 +175,9 @@ function ParamAlgebra.allocate_lazy_jacobian(
 
   jac = get_jac(op.op)
   dc = jac(μ,uh,du,v)
-  matdata = collect_lazy_cell_matrix(trial,test,dc,paramcache.index)
+  matdata,matcache = collect_lazy_cell_matrix(trial,test,dc,paramcache.index)
   ParamAlgebra.fill_matdata!(paramcache,matdata)
+  ParamAlgebra.fill_matcache!(paramcache,matcache)
   A = allocate_matrix(assem,matdata)
 
   A
@@ -188,21 +192,23 @@ function ParamAlgebra.lazy_jacobian_add!(
 
   if ParamAlgebra.isstored_matdata(paramcache)
     matdata = ParamAlgebra.get_matdata(paramcache)
+    matcache = ParamAlgebra.get_matcache(paramcache)
   else
     uh = EvaluationFunction(paramcache.trial,u)
-    trial = evaluate(get_trial(op.op),nothing)
+    trial = get_trial(op.op)
     du = get_trial_fe_basis(trial)
     test = get_test(op.op)
     v = get_fe_basis(test)
-    assem = get_assembler(op.op)
 
     jac = get_jac(op.op)
     dc = jac(μ,uh,du,v)
-    matdata = collect_lazy_cell_matrix(trial,test,dc,paramcache.index)
+    matdata,matcache = collect_lazy_cell_matrix(trial,test,dc,paramcache.index)
     ParamAlgebra.fill_matdata!(paramcache,matdata)
+    ParamAlgebra.fill_matcache!(paramcache,matcache)
   end
 
-  assemble_lazy_matrix_add!(A,assem,matdata,paramcache.index)
+  assem = get_assembler(op.op)
+  assemble_lazy_matrix_add!(A,assem,matdata,matcache,paramcache.index)
 
   A
 end
@@ -266,7 +272,7 @@ function Algebra.allocate_jacobian(
   paramcache)
 
   uh = EvaluationFunction(paramcache.trial,u)
-  trial = evaluate(get_trial(op.op),nothing)
+  trial = get_trial(op.op)
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
@@ -289,7 +295,7 @@ function ODEs.jacobian_add!(
   paramcache)
 
   uh = EvaluationFunction(paramcache.trial,u)
-  trial = evaluate(get_trial(op.op),nothing)
+  trial = get_trial(op.op)
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)

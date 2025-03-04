@@ -72,7 +72,7 @@ end
       test::FESpace,
       a::DomainContribution,
       index::Int
-      ) -> Tuple{Vector{<:Any},Vector{<:Any},Vector{<:Any}}
+      ) -> NTuple{2,Tuple{Vector{<:Any},Vector{<:Any},Vector{<:Any}}}
 
 For parametric applications, returns the cell-wise data needed to assemble a
 global sparse matrix corresponding to the parameter #`index`
@@ -83,9 +83,9 @@ function collect_lazy_cell_matrix(
   a::DomainContribution,
   index::Int)
 
-  w = []
-  r = []
-  c = []
+  w,wc = [],[]
+  r,rc = [],[]
+  c,cc = [],[]
   for strian in get_domains(a)
     scell_mat = get_contribution(a,strian)
     cell_mat,trian = move_contributions(scell_mat,strian)
@@ -95,11 +95,17 @@ function collect_lazy_cell_matrix(
     cell_mat_rc_i = lazy_param_getindex(cell_mat_rc,index)
     rows = get_cell_dof_ids(test,trian)
     cols = get_cell_dof_ids(trial,trian)
+    cell_mat_cache = array_cache(cell_mat_rc_i)
+    rows_cache = array_cache(rows)
+    cols_cache = array_cache(cols)
     push!(w,cell_mat_rc_i)
     push!(r,rows)
     push!(c,cols)
+    push!(wc,cell_mat_cache)
+    push!(rc,rows_cache)
+    push!(cc,cols_cache)
   end
-  (w,r,c)
+  (w,r,c),(wc,rc,cc)
 end
 
 """
@@ -107,7 +113,7 @@ end
       test::FESpace,
       a::DomainContribution,
       index::Int
-      ) -> Tuple{Vector{<:Any},Vector{<:Any}}
+      ) -> NTuple{2,Tuple{Vector{<:Any},Vector{<:Any}}}
 
 For parametric applications, returns the cell-wise data needed to assemble a
 global vector corresponding to the parameter #`index`
@@ -117,8 +123,8 @@ function collect_lazy_cell_vector(
   a::DomainContribution,
   index::Int)
 
-  w = []
-  r = []
+  w,wc = [],[]
+  r,rc = [],[]
   for strian in get_domains(a)
     scell_vec = get_contribution(a,strian)
     cell_vec,trian = move_contributions(scell_vec,strian)
@@ -126,34 +132,35 @@ function collect_lazy_cell_vector(
     cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
     cell_vec_r_i = lazy_param_getindex(cell_vec_r,index)
     rows = get_cell_dof_ids(test,trian)
+    cell_vec_cache = array_cache(cell_vec_r_i)
+    rows_cache = array_cache(rows)
     push!(w,cell_vec_r_i)
     push!(r,rows)
+    push!(wc,cell_vec_cache)
+    push!(rc,rows_cache)
   end
-  (w,r)
+  (w,r),(wc,rc)
 end
 
-function assemble_lazy_matrix_add!(A,a::SparseMatrixAssembler,matdata,index::Int)
-  numeric_loop_lazy_matrix!(A,a,matdata,index)
+function assemble_lazy_matrix_add!(A,a::SparseMatrixAssembler,matdata,matcache,index::Int)
+  numeric_loop_lazy_matrix!(A,a,matdata,matcache,index)
   create_from_nz(A)
 end
 
-function assemble_lazy_vector_add!(b,a::SparseMatrixAssembler,vecdata,index::Int)
-  numeric_loop_lazy_vector!(b,a,vecdata,index)
+function assemble_lazy_vector_add!(b,a::SparseMatrixAssembler,vecdata,veccache,index::Int)
+  numeric_loop_lazy_vector!(b,a,vecdata,veccache,index)
   create_from_nz(b)
 end
 
-function numeric_loop_lazy_matrix!(A,a::SparseMatrixAssembler,matdata,index::Int)
+function numeric_loop_lazy_matrix!(A,a::SparseMatrixAssembler,matdata,matcache,index::Int)
   strategy = FESpaces.get_assembly_strategy(a)
-  for (cellmat,_cellidsrows,_cellidscols) in zip(matdata...)
+  for ((cellmat,_cellidsrows,_cellidscols),(vals_cache,rows_cache,cols_cache)) in zip(zip(matdata...),zip(matcache...))
     cellidsrows = FESpaces.map_cell_rows(strategy,_cellidsrows)
     cellidscols = FESpaces.map_cell_cols(strategy,_cellidscols)
     @assert length(cellidscols) == length(cellidsrows)
     @assert length(cellmat) == length(cellidsrows)
     if length(cellmat) > 0
       cellmat_i = lazy_param_getindex(cellmat,index)
-      rows_cache = array_cache(cellidsrows)
-      cols_cache = array_cache(cellidscols)
-      vals_cache = array_cache(cellmat_i)
       mat1 = getindex!(vals_cache,cellmat_i,1)
       rows1 = getindex!(rows_cache,cellidsrows,1)
       cols1 = getindex!(cols_cache,cellidscols,1)
@@ -166,14 +173,12 @@ function numeric_loop_lazy_matrix!(A,a::SparseMatrixAssembler,matdata,index::Int
   A
 end
 
-function numeric_loop_lazy_vector!(b,a::SparseMatrixAssembler,vecdata,index::Int)
+function numeric_loop_lazy_vector!(b,a::SparseMatrixAssembler,vecdata,veccache,index::Int)
   strategy = FESpaces.get_assembly_strategy(a)
-  for (cellvec,_cellids) in zip(vecdata...)
+  for ((cellvec,_cellids),(vals_cache,rows_cache)) in zip(zip(vecdata...),zip(veccache...))
     cellids = FESpaces.map_cell_rows(strategy,_cellids)
     if length(cellvec) > 0
       cellvec_i = lazy_param_getindex(cellvec,index)
-      rows_cache = array_cache(cellids)
-      vals_cache = array_cache(cellvec_i)
       vals1 = getindex!(vals_cache,cellvec_i,1)
       rows1 = getindex!(rows_cache,cellids,1)
       add! = FESpaces.AddEntriesMap(+)

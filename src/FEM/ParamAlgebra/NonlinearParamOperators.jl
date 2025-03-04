@@ -332,17 +332,25 @@ mutable struct LazyParamCache <: AbstractParamCache
   ptrial
   matdata
   vecdata
+  matcache
+  veccache
   index
 end
 
-LazyParamCache(trial,ptrial,index::Int=1) = LazyParamCache(trial,ptrial,nothing,nothing,index)
+function LazyParamCache(trial,ptrial,index::Int=1)
+  LazyParamCache(trial,ptrial,nothing,nothing,nothing,nothing,index)
+end
 
 get_matdata(c::LazyParamCache) = c.matdata
 get_vecdata(c::LazyParamCache) = c.vecdata
-isstored_matdata(c::LazyParamCache) = isnothing(c.matdata)
-isstored_vecdata(c::LazyParamCache) = isnothing(c.vecdata)
+get_matcache(c::LazyParamCache) = c.matcache
+get_veccache(c::LazyParamCache) = c.veccache
+isstored_matdata(c::LazyParamCache) = !isnothing(c.matdata)
+isstored_vecdata(c::LazyParamCache) = !isnothing(c.vecdata)
 fill_matdata!(c::LazyParamCache,matdata) = c.matdata=matdata
 fill_vecdata!(c::LazyParamCache,vecdata) = c.vecdata=vecdata
+fill_matcache!(c::LazyParamCache,matcache) = c.matcache=matcache
+fill_veccache!(c::LazyParamCache,veccache) = c.veccache=veccache
 empty_matdata!(c::LazyParamCache) = c.matdata=nothing
 empty_vecdata!(c::LazyParamCache) = c.vecdata=nothing
 function empty_matvecdata!(c::LazyParamCache)

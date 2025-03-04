@@ -175,5 +175,45 @@ pspace = ParamSpace(pdomain)
 feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,domains)
 μ = realization(feop;nparams=50)
 
+_fesolver = ParamFESolver(LUSolver())
+_rbsolver = RBSolver(_fesolver,state_reduction;nparams_res,nparams_jac)
+
 x,stats = solution_snapshots(rbsolver,feop,μ)
 _x,_stats = solution_snapshots(_rbsolver,feop,μ)
+
+u = zero(trial(μ))
+x = get_free_dof_values(u)
+op = get_algebraic_operator(set_domains(feop))
+nlop = parameterize(op,μ)
+syscache = ParamSteady.allocate_systemcache(nlop,x)
+A = syscache.A
+jacobian!(A,nlop,x)
+
+_nlop = lazy_parameterize(op,μ)
+_syscache = ParamSteady.allocate_systemcache(_nlop,x)
+_A = _syscache.A
+jacobian!(_A,_nlop,x)
+
+# jacobian!(A,nlop,x)
+# jacobian!(A,nlop.op,nlop.μ,x,nlop.paramcache)
+# jacobian_add!(A,nlop.op,nlop.μ,x,nlop.paramcache)
+uh = EvaluationFunction(nlop.paramcache.trial,x)
+du = get_trial_fe_basis(trial)
+v = get_fe_basis(test)
+assem = get_param_assembler(nlop.op.op,μ)
+
+dc = nlop.op.op.jac(μ,uh,du,v)
+matdata = collect_cell_matrix(trial,test,dc)
+assemble_matrix_add!(A,assem,matdata)
+
+using ROManifolds.ParamFESpaces
+using ROManifolds.ParamAlgebra
+using ROManifolds.ParamSteady
+_matdata = ParamAlgebra.get_matdata(_nlop.paramcache)
+_matcache = ParamAlgebra.get_matcache(_nlop.paramcache)
+_assem = get_assembler(_nlop.op.op)
+ParamSteady.assemble_lazy_matrix_add!(_A,_assem,_matdata,_matcache,1)
+
+vc = _matcache[1][1]
+cellmat_i = lazy_param_getindex(_matdata[1][1],1)
+mat1 = getindex!(vc,cellmat_i,1)
