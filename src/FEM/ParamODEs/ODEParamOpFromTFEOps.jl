@@ -154,7 +154,7 @@ function ODEs.jacobian_add!(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
-  cache::ParamOpSysCache)
+  cache::SystemCache)
 
   paramcache = cache.paramcache
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
@@ -187,7 +187,7 @@ function ODEs.jacobian_add!(
   A
 end
 
-function ParamSteady.allocate_systemcache(
+function ParamAlgebra.allocate_systemcache(
   odeop::ODEParamOperator{LinearParamODE},
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
@@ -377,7 +377,7 @@ function ODEs.jacobian_add!(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}},
-  cache::ParamOpSysCache)
+  cache::SystemCache)
 
   paramcache = cache.paramcache
   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
@@ -448,7 +448,7 @@ function Algebra.jacobian(
   As
 end
 
-function ParamSteady.allocate_systemcache(
+function ParamAlgebra.allocate_systemcache(
   odeop::SplitODEParamOpFromTFEOp{LinearParamODE},
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
@@ -509,7 +509,7 @@ function ParamSteady.get_nonlinear_operator(op::LinearNonlinearParamOpFromTFEOp)
   get_algebraic_operator(get_nonlinear_operator(op.op))
 end
 
-function ParamSteady.allocate_paramcache(
+function ParamAlgebra.allocate_paramcache(
   op::LinearNonlinearParamOpFromTFEOp,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}},
@@ -521,10 +521,10 @@ function ParamSteady.allocate_paramcache(
   paramcache = allocate_paramcache(op_nlin,r,us)
   A_lin,b_lin = allocate_systemcache(op_lin,r,us,ws,paramcache)
 
-  return ParamOpSysCache(paramcache,A_lin,b_lin)
+  return SystemCache(paramcache,A_lin,b_lin)
 end
 
-function ParamSteady.update_paramcache!(
+function ParamAlgebra.update_paramcache!(
   cache,
   op::LinearNonlinearParamOpFromTFEOp,
   r::TransientRealization)

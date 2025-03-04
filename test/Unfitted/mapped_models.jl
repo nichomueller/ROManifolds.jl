@@ -118,7 +118,7 @@ opm = LinearParamFEOperator(bm,am,pspace,Um,Vm)
 u = zero(Um(μ))
 x = get_free_dof_values(u)
 op = get_algebraic_operator(opm)
-nlop = ParamNonlinearOperator(op,μ)
+nlop = NonlinearParamOperator(op,μ)
 solve!(x,LUSolver(),nlop)
 
 v = get_fe_basis(Vm)

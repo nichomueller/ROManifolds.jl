@@ -167,25 +167,21 @@ trial = ParamTrialFESpace(test,gμ)
 
 state_reduction = PODReduction(1e-4)
 
-fesolver = LinearFESolver(LUSolver())
+fesolver = LinearFESolver()
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
 
 pspace = ParamSpace(pdomain)
 feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,domains)
 μ = realization(feop;nparams=10)
 
+x, = solution_snapshots(rbsolver,feop,μ)
+
 U = trial(μ)
 v = get_fe_basis(U)
 u = zero(U)
 dc = stiffness(μ,u,v,dΩ)[Ω]
 
-
-dc4 = lazy_map(FetchParam(4),dc)
-
-using BenchmarkTools
-k = FetchParam(4)
-@btime lazy_map($k,$dc)
-@btime stiffness($μ,$u,$v,$dΩ)[$Ω]
-
-assem = get_assembler(feop)
-vecdata = collect_cell_vector(U,stiffness(μ,u,v,dΩ))
+using ROManifolds.ParamFESpaces
+_fesolver = ParamFESolver(LUSolver())
+_rbsolver = RBSolver(_fesolver,state_reduction;nparams_res,nparams_jac)
+_x, = solution_snapshots(_rbsolver,feop,μ)

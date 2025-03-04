@@ -1,177 +1,18 @@
-# caches
-
 """
-    abstract type AbstractParamCache <: GridapType end
+    abstract type NonlinearParamOperator <: NonlinearOperator end
 """
-abstract type AbstractParamCache <: GridapType end
-
-"""
-    update_paramcache!(paramcache::AbstractParamCache,op::ParamOperator,μ::AbstractRealization) -> AbstractParamCache
-
-Similar to `update_odecache!` in `Gridap`, when dealing with
-parametric problems
-"""
-function update_paramcache!(paramcache::AbstractParamCache,op::ParamOperator,μ::AbstractRealization)
-  @abstractmethod
-end
-
-"""
-    mutable struct ParamOpCache <: AbstractParamCache
-      trial
-      ptrial
-    end
-"""
-mutable struct ParamOpCache <: AbstractParamCache
-  trial
-  ptrial
-end
-
-"""
-    allocate_paramcache(op::ParamOperator,μ::Realization,u::AbstractVector
-      ) -> ParamOpCache
-
-Similar to `allocate_odecache` in `Gridap`, when dealing with
-parametric problems
-"""
-function allocate_paramcache(
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector)
-
-  feop = get_fe_operator(op)
-  ptrial = get_trial(feop)
-  trial = evaluate(ptrial,μ)
-  ParamOpCache(trial,ptrial)
-end
-
-function update_paramcache!(paramcache::ParamOpCache,op::ParamOperator,μ::Realization)
-  paramcache.trial = evaluate!(paramcache.trial,paramcache.ptrial,μ)
-  paramcache
-end
-
-"""
-    mutable struct AssemCache{A,B}
-      matdata::A
-      vecdata::B
-    end
-"""
-mutable struct AssemCache{A,B}
-  matdata::A
-  vecdata::B
-end
-
-get_matdata(c::AssemCache) = c.matdata
-get_vecdata(c::AssemCache) = c.vecdata
-isstored_matdata(c::AssemCache) = isnothing(c.matdata)
-isstored_vecdata(c::AssemCache) = isnothing(c.vecdata)
-fill_matdata!(c::AssemCache,matdata) = (c.matdata=matdata)
-fill_vecdata!(c::AssemCache,vecdata) = (c.vecdata=vecdata)
-empty_matdata!(c::AssemCache) = (c.matdata=nothing)
-empty_vecdata!(c::AssemCache) = (c.vecdata=nothing)
-empty_matvecdata!(c::AssemCache) = empty_matdata!(c); empty_vecdata!(c)
-
-"""
-    mutable struct LazyParamOpCache <: AbstractParamCache
-      index
-      trial
-      ptrial
-      assemcache
-    end
-"""
-mutable struct LazyParamOpCache <: AbstractParamCache
-  trial
-  ptrial
-  index
-  assemcache::AssemCache
-end
-
-"""
-    allocate_lazy_paramcache(op::ParamOperator,μ::Realization,u::AbstractVector
-      ) -> LazyParamOpCache
-
-Solves a parametric problem by lazily iterating over the parameters
-"""
-function allocate_lazy_paramcache(
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector)
-
-  index = 1
-  feop = get_fe_operator(op)
-  ptrial = get_trial(feop)
-  trial = evaluate(ptrial,μ)
-  LazyParamOpCache(trial,ptrial,index)
-end
-
-function update_paramcache!(paramcache::LazyParamOpCache,op::ParamOperator,μ::Realization)
-  paramcache.trial = evaluate!(paramcache.trial,paramcache.ptrial,μ)
-  paramcache
-end
-
-get_matdata(c::LazyParamOpCache) = get_matdata(c.assemcache)
-get_vecdata(c::LazyParamOpCache) = get_vecdata(c.assemcache)
-isstored_matdata(c::LazyParamOpCache) = isstored_matdata(c.assemcache)
-isstored_vecdata(c::LazyParamOpCache) = isstored_vecdata(c.assemcache)
-fill_matdata!(c::LazyParamOpCache,matdata) = fill_matdata!(c.assemcache,matdata)
-fill_vecdata!(c::LazyParamOpCache,vecdata) = fill_vecdata!(c.assemcache,vecdata)
-empty_matdata!(c::LazyParamOpCache) = empty_matdata!(c.assemcache)
-empty_vecdata!(c::LazyParamOpCache) = empty_vecdata!(c.assemcache)
-empty_matvecdata!(c::LazyParamOpCache) = empty_matvecdata!(c.assemcache)
-
-next_index!(paramcache::LazyParamOpCache) = (paramcache.index += 1)
-reset_index!(paramcache::LazyParamOpCache) = (paramcache.index = 1)
-
-"""
-    struct ParamOpSysCache <: AbstractParamCache
-      paramcache
-      A
-      b
-    end
-"""
-struct ParamOpSysCache <: AbstractParamCache
-  paramcache
-  A
-  b
-end
-
-function allocate_systemcache(
-  op::ParamOperator{LinearParamEq},
-  μ::Realization,
-  u::AbstractVector,
-  paramcache)
-
-  u0 = copy(u)
-  fill!(u0,zero(eltype(u0)))
-  A = jacobian(op,μ,u0,paramcache)
-  b = residual(op,μ,u0,paramcache)
-  return A,b
-end
-
-function update_paramcache!(paramcache::ParamOpSysCache,op::ParamOperator,μ::Realization)
-  update_paramcache!(paramcache.paramcache,op,μ)
-end
-
-function next_index!(paramcache::ParamOpSysCache,op::ParamOperator,μ::Realization)
-  next_index!(paramcache.paramcache,op,μ)
-end
-
-# operators
-
-"""
-    abstract type ParamNonlinearOperator <: NonlinearOperator end
-"""
-abstract type ParamNonlinearOperator <: NonlinearOperator end
+abstract type NonlinearParamOperator <: NonlinearOperator end
 
 """
     allocate_lazy_residual(
-      nlop::ParamNonlinearOperator,
+      nlop::NonlinearParamOperator,
       x::AbstractVector
       ) -> AbstractVector
 
 Allocates a parametric residual in a lazy manner, one parameter at the time
 """
 function allocate_lazy_residual(
-  nlop::ParamNonlinearOperator,
+  nlop::NonlinearParamOperator,
   x::AbstractVector)
 
   @abstractmethod
@@ -180,7 +21,7 @@ end
 """
     lazy_residual!(
       b::AbstractVector,
-      nlop::ParamNonlinearOperator,
+      nlop::NonlinearParamOperator,
       x::AbstractVector
       ) -> Nothing
 
@@ -188,7 +29,7 @@ Builds in-place a parametric residual in a lazy manner, one parameter at the tim
 """
 function lazy_residual!(
   b::AbstractVector,
-  nlop::ParamNonlinearOperator,
+  nlop::NonlinearParamOperator,
   x::AbstractVector)
 
   @abstractmethod
@@ -196,27 +37,27 @@ end
 
 """
     lazy_residual(
-      nlop::ParamNonlinearOperator,
+      nlop::NonlinearParamOperator,
       x::AbstractVector
       ) -> AbstractVector
 
 Builds a parametric residual in a lazy manner, one parameter at the time
 """
-function lazy_residual(nlop::ParamNonlinearOperator,x::AbstractVector)
+function lazy_residual(nlop::NonlinearParamOperator,x::AbstractVector)
   b = allocate_lazy_residual(nlop,x)
   lazy_residual!(b,nlop,x)
 end
 
 """
     allocate_lazy_jacobian(
-      nlop::ParamNonlinearOperator,
+      nlop::NonlinearParamOperator,
       x::AbstractVector
       ) -> AbstractMatrix
 
 Allocates a parametric Jacobian in a lazy manner, one parameter at the time
 """
 function allocate_lazy_jacobian(
-  nlop::ParamNonlinearOperator,
+  nlop::NonlinearParamOperator,
   x::AbstractVector)
 
   @abstractmethod
@@ -225,7 +66,7 @@ end
 """
     lazy_jacobian_add!(
       A::AbstractMatrix,
-      nlop::ParamNonlinearOperator,
+      nlop::NonlinearParamOperator,
       x::AbstractVector
       ) -> Nothing
 
@@ -233,7 +74,7 @@ Adds in-place the values of a parametric Jacobian in a lazy manner, one paramete
 """
 function lazy_jacobian!(
   A::AbstractMatrix,
-  nlop::ParamNonlinearOperator,
+  nlop::NonlinearParamOperator,
   x::AbstractVector)
 
   @abstractmethod
@@ -241,33 +82,299 @@ end
 
 """
     lazy_jacobian(
-      nlop::ParamNonlinearOperator,
+      nlop::NonlinearParamOperator,
       x::AbstractVector
       ) -> AbstractMatrix
 
 Builds a parametric Jacobian in a lazy manner, one parameter at the time
 """
-function lazy_jacobian(nlop::ParamNonlinearOperator,x::AbstractVector)
+function lazy_jacobian(nlop::NonlinearParamOperator,x::AbstractVector)
   A = allocate_lazy_jacobian(nlop,x)
   lazy_jacobian!(A,nlop,x)
 end
 
+function Algebra.allocate_residual(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  @abstractmethod
+end
+
+function Algebra.residual!(
+  b,
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  @abstractmethod
+end
+
+function Algebra.residual(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector)
+
+  paramcache = allocate_paramcache(nlop,μ,x)
+  residual(nlop,μ,x,paramcache)
+end
+
+function Algebra.residual(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  b = allocate_residual(nlop,μ,x,paramcache)
+  residual!(b,nlop,μ,x,paramcache)
+  b
+end
+
+function Algebra.allocate_jacobian(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  @abstractmethod
+end
+
+function Algebra.jacobian!(
+  A,
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  LinearAlgebra.fillstored!(A,zero(eltype(A)))
+  jacobian_add!(A,nlop,μ,x,paramcache)
+  A
+end
+
+function Algebra.jacobian(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector)
+
+  paramcache = allocate_paramcache(nlop,μ,x)
+  jacobian(nlop,μ,x,paramcache)
+end
+
+function Algebra.jacobian(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  A = allocate_jacobian(nlop,μ,x,paramcache)
+  jacobian!(A,nlop,μ,x,paramcache)
+  A
+end
+
+function allocate_lazy_residual(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  @abstractmethod
+end
+
+function lazy_residual!(
+  b,
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  @abstractmethod
+end
+
+function lazy_residual(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector)
+
+  paramcache = allocate_paramcache(nlop,μ,x)
+  lazy_residual(nlop,μ,x,paramcache)
+end
+
+function lazy_residual(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  b = allocate_lazy_residual(nlop,μ,x,paramcache)
+  lazy_residual!(b,nlop,μ,x,paramcache)
+  b
+end
+
+function allocate_lazy_jacobian(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  @abstractmethod
+end
+
+function lazy_jacobian_add!(
+  A,
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  @abstractmethod
+end
+
+function lazy_jacobian!(
+  A,
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  LinearAlgebra.fillstored!(A,zero(eltype(A)))
+  lazy_jacobian_add!(A,nlop,μ,x,paramcache)
+  A
+end
+
+function lazy_jacobian(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector)
+
+  paramcache = allocate_paramcache(nlop,μ,x)
+  lazy_jacobian(nlop,μ,x,paramcache)
+end
+
+function lazy_jacobian(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  A = allocate_lazy_jacobian(nlop,μ,x,paramcache)
+  lazy_jacobian!(A,nlop,μ,x,paramcache)
+  A
+end
+
+# caches
+
 """
-    struct GenericParamNonlinearOperator <: ParamNonlinearOperator
-      op::ParamOperator
+    abstract type AbstractParamCache <: GridapType end
+"""
+abstract type AbstractParamCache <: GridapType end
+
+"""
+    allocate_paramcache(paramcache::AbstractParamCache,nlop::NonlinearParamOperator,μ::AbstractRealization) -> AbstractParamCache
+
+Similar to `allocate_odecache` in `Gridap`, when dealing with parametric problems
+"""
+function allocate_paramcache(paramcache::AbstractParamCache,nlop::NonlinearParamOperator,μ::AbstractRealization)
+  @abstractmethod
+end
+
+"""
+    allocate_lazy_paramcache(paramcache::AbstractParamCache,nlop::NonlinearParamOperator,μ::AbstractRealization) -> AbstractParamCache
+
+Similar to [`allocate_lazy_paramcache`](@ref), the cache allows to solve lazily
+the parametric equation
+"""
+function allocate_lazy_paramcache(paramcache::AbstractParamCache,nlop::NonlinearParamOperator,μ::AbstractRealization)
+  @abstractmethod
+end
+
+"""
+    update_paramcache!(paramcache::AbstractParamCache,nlop::NonlinearParamOperator,μ::AbstractRealization) -> AbstractParamCache
+
+Similar to `update_odecache!` in `Gridap`, when dealing with parametric problems
+"""
+function update_paramcache!(paramcache::AbstractParamCache,nlop::NonlinearParamOperator,μ::AbstractRealization)
+  @abstractmethod
+end
+
+"""
+    mutable struct ParamCache <: AbstractParamCache
+      trial
+      ptrial
+    end
+"""
+mutable struct ParamCache <: AbstractParamCache
+  trial
+  ptrial
+end
+
+function update_paramcache!(c::ParamCache,nlop::NonlinearParamOperator,μ::Realization)
+  c.trial = evaluate!(c.trial,c.ptrial,μ)
+  c
+end
+
+"""
+    mutable struct LazyParamCache <: AbstractParamCache
+      trial
+      ptrial
+      matdata
+      vecdata
+      index
+    end
+"""
+mutable struct LazyParamCache <: AbstractParamCache
+  trial
+  ptrial
+  matdata
+  vecdata
+  index
+end
+
+LazyParamCache(trial,ptrial,index::Int=1) = LazyParamCache(trial,ptrial,nothing,nothing,index)
+
+get_matdata(c::LazyParamCache) = c.matdata
+get_vecdata(c::LazyParamCache) = c.vecdata
+isstored_matdata(c::LazyParamCache) = isnothing(c.matdata)
+isstored_vecdata(c::LazyParamCache) = isnothing(c.vecdata)
+fill_matdata!(c::LazyParamCache,matdata) = c.matdata=matdata
+fill_vecdata!(c::LazyParamCache,vecdata) = c.vecdata=vecdata
+empty_matdata!(c::LazyParamCache) = c.matdata=nothing
+empty_vecdata!(c::LazyParamCache) = c.vecdata=nothing
+function empty_matvecdata!(c::LazyParamCache)
+  empty_matdata!(c)
+  empty_vecdata!(c)
+end
+
+next_index!(c::LazyParamCache) = c.index+=1
+reset_index!(c::LazyParamCache) = c.index=1
+
+function update_paramcache!(c::LazyParamCache,nlop::NonlinearParamOperator,μ::Realization)
+  c.trial = evaluate!(c.trial,c.ptrial,μ)
+  c
+end
+
+"""
+    struct GenericParamNonlinearOperator <: NonlinearParamOperator
+      op::NonlinearParamOperator
       μ::Realization
-      paramcache::AbstractParamCache
+      paramcache::ParamCache
     end
 
 Fields:
-- `op`: `ParamOperator` representing a parametric differential problem
+- `op`: `NonlinearParamOperator` representing a parametric differential problem
 - `μ`: `Realization` representing the parameters at which the problem is solved
 - `paramcache`: cache of the problem
 """
-struct GenericParamNonlinearOperator <: ParamNonlinearOperator
-  op::ParamOperator
+struct GenericParamNonlinearOperator <: NonlinearParamOperator
+  op::NonlinearParamOperator
   μ::Realization
   paramcache::AbstractParamCache
+end
+
+function ParamDataStructures.parameterize(op::NonlinearParamOperator,μ::Realization)
+  paramcache = allocate_paramcache(op,μ)
+  GenericParamNonlinearOperator(op,μ,paramcache)
 end
 
 function Algebra.allocate_residual(
@@ -301,25 +408,27 @@ function Algebra.jacobian!(
 end
 
 """
-    struct LazyParamNonlinearOperator <: ParamNonlinearOperator
-      op::ParamOperator
+    struct LazyParamNonlinearOperator <: NonlinearParamOperator
+      op::NonlinearParamOperator
       μ::Realization
       paramcache::LazyParamCache
     end
 
 Fields:
-- `op`: `ParamOperator` representing a parametric differential problem
+- `op`: `NonlinearParamOperator` representing a parametric differential problem
 - `μ`: `Realization` representing the parameters at which the problem is solved
 - `paramcache`: cache of the problem
 """
-struct LazyParamNonlinearOperator <: ParamNonlinearOperator
-  op::ParamOperator
+struct LazyParamNonlinearOperator <: NonlinearParamOperator
+  op::NonlinearParamOperator
   μ::Realization
-  paramcache::LazyParamCache
+  paramcache::AbstractParamCache
 end
 
-next_index!(nlop::LazyParamNonlinearOperator) = next_index!(nlop.paramcache)
-reset_index!(nlop::LazyParamNonlinearOperator) = reset_index!(nlop.paramcache)
+function ParamDataStructures.lazy_parameterize(op::NonlinearParamOperator,μ::Realization)
+  paramcache = allocate_lazy_paramcache(op,μ)
+  LazyParamNonlinearOperator(op,μ,paramcache)
+end
 
 function Algebra.allocate_residual(
   nlop::LazyParamNonlinearOperator,
@@ -349,4 +458,36 @@ function Algebra.jacobian!(
   x::AbstractVector)
 
   lazy_jacobian!(A,nlop,x)
+end
+
+# system caches
+
+"""
+    struct SystemCache
+      A
+      b
+    end
+"""
+struct SystemCache
+  A
+  b
+end
+
+function allocate_systemcache(
+  nlop::NonlinearParamOperator,
+  μ::Realization,
+  x::AbstractVector,
+  paramcache)
+
+  A = allocate_jacobian(nlop,μ,x,paramcache)
+  b = allocate_residual(nlop,μ,x0,paramcache)
+  return SystemCache(A,b)
+end
+
+function allocate_systemcache(nlop::GenericParamNonlinearOperator,x::AbstractVector)
+  allocate_systemcache(nlop.op,nlop.μ,x,nlop.paramcache)
+end
+
+function allocate_systemcache(nlop::LazyParamNonlinearOperator,x::AbstractVector)
+  allocate_systemcache(nlop.op,nlop.μ,x,nlop.paramcache)
 end

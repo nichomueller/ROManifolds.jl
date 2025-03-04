@@ -131,7 +131,7 @@ function Algebra.jacobian(
   A
 end
 
-function ParamSteady.allocate_paramcache(
+function ParamAlgebra.allocate_paramcache(
   odeop::ODEParamOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}};
@@ -148,10 +148,10 @@ function ParamSteady.allocate_paramcache(
     trialk = evaluated ? evaluate(pttrials[k+1],r) : allocate_space(pttrials[k+1],r)
     trials = (trials...,trialk)
   end
-  ParamOpCache(trials,pttrials)
+  ParamCache(trials,pttrials)
 end
 
-function ParamSteady.update_paramcache!(
+function ParamAlgebra.update_paramcache!(
   paramcache,
   odeop::ODEParamOperator,
   r::TransientRealization)

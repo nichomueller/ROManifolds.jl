@@ -133,7 +133,7 @@ function ParamAlgebra.lazy_residual!(
   op::JointParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector,
-  paramcache::LazyParamOpCache;
+  paramcache::LazyParamCache;
   add::Bool=false)
 
   !add && fill!(b,zero(eltype(b)))
@@ -320,7 +320,7 @@ function get_nonlinear_operator(op::LinearNonlinearParamOpFromFEOp)
   get_algebraic_operator(get_nonlinear_operator(op.op))
 end
 
-function allocate_paramcache(
+function ParamAlgebra.allocate_paramcache(
   op::LinearNonlinearParamOpFromFEOp,
   μ::Realization,
   u::AbstractVector)
@@ -334,7 +334,7 @@ function allocate_paramcache(
   return ParamOpSysCache(paramcache,A_lin,b_lin)
 end
 
-function update_paramcache!(
+function ParamAlgebra.update_paramcache!(
   cache,
   op::LinearNonlinearParamOpFromFEOp,
   μ::Realization)

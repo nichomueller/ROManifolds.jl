@@ -384,7 +384,7 @@ function select_evalcache_at_indices(us::Tuple{Vararg{ConsecutiveParamVector}},p
     new_XhF_i = ConsecutiveParamArray(view(us[i].data,:,indices))
     new_xhF = (new_xhF...,new_XhF_i)
   end
-  new_odeopcache = ParamOpCache(new_trial,ptrial)
+  new_odeopcache = ParamCache(new_trial,ptrial)
   return new_xhF,new_odeopcache
 end
 
@@ -401,7 +401,7 @@ function select_evalcache_at_indices(us::Tuple{Vararg{BlockConsecutiveParamVecto
     new_XhF_i = mortar([ConsecutiveParamArray(view(us_i.data,:,indices)) for us_i in blocks(us[i])])
     new_xhF = (new_xhF...,new_XhF_i)
   end
-  new_odeopcache = ParamOpCache(new_trial,ptrial)
+  new_odeopcache = ParamCache(new_trial,ptrial)
   return new_xhF,new_odeopcache
 end
 

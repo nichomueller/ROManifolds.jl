@@ -78,6 +78,6 @@ export collect_cell_matrix_for_trian
 export collect_cell_vector_for_trian
 include("ParamOpFromFEOps.jl")
 
-include("ParamSolutions.jl")
+include("ParamFESolvers.jl")
 
 end # module

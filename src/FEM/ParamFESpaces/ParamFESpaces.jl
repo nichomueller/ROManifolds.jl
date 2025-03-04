@@ -55,4 +55,9 @@ export SingleFieldParamFEFunction
 export MultiFieldParamFEFunction
 include("ParamFEFunctions.jl")
 
+export ParamFESolver
+export LinearParamFESolver
+export NonlinearParamFESolver
+include("ParamFESolvers.jl")
+
 end # module

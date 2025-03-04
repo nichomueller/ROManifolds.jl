@@ -107,7 +107,7 @@ function allocate_odeparamcache(
 
   paramcache = allocate_paramcache(odeop,r0,us0N)
   A,b = allocate_systemcache(odeop,r0,us0N,ws,paramcache)
-  odeparamcache = ParamOpSysCache(paramcache,A,b)
+  odeparamcache = SystemCache(paramcache,A,b)
   sysslvrcache = nothing
 
   (odeparamcache,sysslvrcache)
@@ -201,7 +201,7 @@ function allocate_odeparamcache(
   lop = get_linear_operator(odeop)
   paramcache,sysslvrcache = allocate_odeparamcache(solver,lop,r0,us0)
   A,b = allocate_systemcache(lop,r0,us0,paramcache)
-  odeparamcache = ParamOpSysCache(paramcache,A,b)
+  odeparamcache = SystemCache(paramcache,A,b)
 
   (uθ,odeparamcache,sysslvrcache)
 end

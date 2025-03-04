@@ -59,14 +59,14 @@ end
       A::HRParamArray
       b::HRParamArray
       trial::RBSpace
-      paramcache::ParamOpCache
+      paramcache::ParamCache
     end
 """
 struct RBCache <: AbstractParamCache
   A::HRParamArray
   b::HRParamArray
   trial::RBSpace
-  paramcache::ParamOpCache
+  paramcache::ParamCache
 end
 
 """
@@ -443,7 +443,7 @@ function Algebra.solve!(
   ss = symbolic_setup(BackslashSolver(),Â_item)
   ns = numerical_setup(ss,Â_item,x̂_item)
 
-  nlop = ParamNonlinearOperator(op,r,rbcache)
+  nlop = NonlinearParamOperator(op,r,rbcache)
   Algebra._solve_nr!(ŷ,Âcache,b̂cache,dx̂,ns,nls,nlop)
 
   return x̂

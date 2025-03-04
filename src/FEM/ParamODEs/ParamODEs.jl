@@ -16,6 +16,7 @@ using ROManifolds.Utils
 using ROManifolds.DofMaps
 using ROManifolds.TProduct
 using ROManifolds.ParamDataStructures
+using ROManifolds.ParamAlgebra
 using ROManifolds.ParamFESpaces
 using ROManifolds.ParamSteady
 

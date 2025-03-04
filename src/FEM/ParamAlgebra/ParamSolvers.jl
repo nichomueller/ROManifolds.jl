@@ -142,9 +142,36 @@ struct ParamSolver{S<:NonlinearSolver} <: NonlinearSolver
   solver::S
 end
 
+ParamSolver() = ParamSolver(FESolver())
+
+const LinearParamSolver = ParamSolver{<:LinearSolver}
+const NonlinearParamSolver = ParamSolver{<:NonlinearSolver}
+
 function Algebra.solve!(
   x::AbstractParamVector,
-  solver::ParamSolver,
+  ls::LinearParamSolver,
+  A::AbstractParamMatrix,
+  b::AbstractParamVector)
+
+  A_item = testitem(A)
+  ss = symbolic_setup(ls,A_item)
+  ns = numerical_setup(ss,A_item)
+
+  @inbounds for i in param_eachindex(x)
+    xi = param_getindex(x,i)
+    bi = param_getindex(b,i)
+    solve!(xi,ns,bi)
+    i == param_length(x) && continue
+    Ai = param_getindex(A,i+1)
+    numerical_setup!(ns,Ai)
+  end
+
+  ns
+end
+
+function Algebra.solve!(
+  x::AbstractParamVector,
+  solver::NonlinearParamSolver,
   op::NonlinearOperator,
   cache::NonlinearSolvers.NewtonCache)
 
@@ -157,6 +184,7 @@ function Algebra.solve!(
     _lazy_solve_nr!(x,A,b,dx,ns,nls,op,i)
     next_index!(op)
   end
+  empty_matvecdata!(op)
   return cache
 end
 

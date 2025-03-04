@@ -21,18 +21,18 @@ using GridapSolvers.BlockSolvers
 using ROManifolds.ParamDataStructures
 
 import ArraysOfArrays: innersize
+import Gridap.ODEs: jacobian_add!
 import ROManifolds.DofMaps: OIdsToIds, add_ordered_entries!
 import UnPack: @unpack
 
 include("ParamAlgebraInterfaces.jl")
 
-export ParamNonlinearOperator
+export NonlinearParamOperator
 export GenericParamNonlinearOperator
 export LazyParamNonlinearOperator
 export AbstractParamCache
-export ParamOpCache
-export LazyParamOpCache
-export ParamOpSysCache
+export ParamCache
+export SystemCache
 export lazy_residual
 export lazy_residual!
 export allocate_lazy_residual
@@ -41,11 +41,16 @@ export lazy_jacobian!
 export lazy_jacobian_add!
 export allocate_lazy_jacobian
 export allocate_paramcache
+export allocate_lazy_paramcache
 export update_paramcache!
 export next_index!
+export reset_index!
 export allocate_systemcache
 include("NonlinearParamOperators.jl")
 
+export ParamSolver
+export LinearParamSolver
+export NonlinearParamSolver
 include("ParamSolvers.jl")
 
 include("ParamIterativeSolvers.jl")
