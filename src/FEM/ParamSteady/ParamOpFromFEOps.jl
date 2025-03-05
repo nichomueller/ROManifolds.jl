@@ -207,90 +207,20 @@ function ODEs.jacobian_add!(
   A
 end
 
-struct LinearNonlinearParamOpFromFEOp{T} <: ParamOperator{LinearNonlinearParamEq,T}
+struct LinearNonlinearParamOpFromFEOp{T} <: LinearNonlinearParamOperator
   op::LinearNonlinearParamFEOperator{T}
 end
 
 get_fe_operator(op::LinearNonlinearParamOpFromFEOp) = op.op
 
-function get_linear_operator(op::LinearNonlinearParamOpFromFEOp)
-  get_algebraic_operator(get_linear_operator(op.op))
+function ParamAlgebra.get_linear_operator(op::LinearNonlinearParamOpFromFEOp)
+  op_lin = get_linear_operator(op.op)
+  get_algebraic_operator(op_lin)
 end
 
-function get_nonlinear_operator(op::LinearNonlinearParamOpFromFEOp)
-  get_algebraic_operator(get_nonlinear_operator(op.op))
-end
-
-function ParamAlgebra.allocate_paramcache(
-  op::LinearNonlinearParamOpFromFEOp,
-  μ::Realization,
-  u::AbstractVector)
-
-  op_lin = get_linear_operator(op)
-  op_nlin = get_nonlinear_operator(op)
-
-  paramcache = allocate_paramcache(op_nlin,μ,u)
-  A_lin,b_lin = allocate_systemcache(op_lin,μ,u,paramcache)
-
-  return ParamOpSysCache(paramcache,A_lin,b_lin)
-end
-
-function ParamAlgebra.update_paramcache!(
-  cache,
-  op::LinearNonlinearParamOpFromFEOp,
-  μ::Realization)
-
-  update_paramcache!(cache.paramcache,get_nonlinear_operator(op),μ)
-end
-
-function Algebra.allocate_residual(
-  op::LinearNonlinearParamOpFromFEOp,
-  μ::Realization,
-  u::AbstractVector,
-  cache)
-
-  b_lin = cache.b
-  copy(b_lin)
-end
-
-function Algebra.allocate_jacobian(
-  op::LinearNonlinearParamOpFromFEOp,
-  μ::Realization,
-  u::AbstractVector,
-  cache)
-
-  A_lin = cache.A
-  copy(A_lin)
-end
-
-function Algebra.residual!(
-  b,
-  op::LinearNonlinearParamOpFromFEOp,
-  μ::Realization,
-  u::AbstractVector,
-  cache)
-
-  A_lin = cache.A
-  b_lin = cache.b
-  paramcache = cache.paramcache
-  residual!(b,get_nonlinear_operator(op),μ,u,paramcache)
-  mul!(b,A_lin,u,1,1)
-  axpy!(1,b_lin,b)
-  b
-end
-
-function ODEs.jacobian_add!(
-  A,
-  op::LinearNonlinearParamOpFromFEOp,
-  μ::Realization,
-  u::AbstractVector,
-  cache)
-
-  A_lin = cache.A
-  paramcache = cache.paramcache
-  jacobian_add!(A,get_nonlinear_operator(op),μ,u,paramcache)
-  axpy!(1,A_lin,A)
-  A
+function ParamAlgebra.get_nonlinear_operator(op::LinearNonlinearParamOpFromFEOp)
+  op_nlin = get_nonlinear_operator(op.op)
+  get_algebraic_operator(op_nlin)
 end
 
 # utils

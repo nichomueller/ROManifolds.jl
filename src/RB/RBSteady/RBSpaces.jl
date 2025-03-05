@@ -110,11 +110,13 @@ FESpaces.get_free_dof_ids(r::RBSpace) = Base.OneTo(num_free_dofs(r))
 
 FESpaces.get_dirichlet_dof_ids(r::RBSpace) = Base.OneTo(num_dirichlet_dofs(r))
 
-FESpaces.get_vector_type(r::RBSpace) = get_vector_type(get_fe_space(r))
-
 ParamDataStructures.param_length(r::RBSpace) = param_length(get_fe_space(r))
 
-ParamFESpaces.get_vector_type2(r::RBSpace) = get_vector_type2(get_fe_space(r))
+function FESpaces.zero_free_values(r::RBSpace)
+  x = zero_free_values(get_fe_space(r))
+  x̂ = project(r,x)
+  RBParamVector(x̂,x)
+end
 
 for (f,f!,g) in zip(
   (:project,:inv_project),
@@ -263,10 +265,6 @@ for T in (:MultiFieldRBSpace,:(EvalRBSpace{MultiFieldRBSpace}))
       return BlockArrays.blockedrange(block_num_dofs)
     end
   end
-end
-
-function FESpaces.zero_free_values(r::EvalRBSpace)
-  param_zero_free_values(r)
 end
 
 # utils

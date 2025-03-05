@@ -27,7 +27,7 @@ function Algebra.residual(
   μ::Realization,
   x::AbstractVector)
 
-  paramcache = allocate_paramcache(nlop,μ,x)
+  paramcache = allocate_paramcache(nlop,μ)
   residual(nlop,μ,x,paramcache)
 end
 
@@ -68,7 +68,7 @@ function Algebra.jacobian(
   μ::Realization,
   x::AbstractVector)
 
-  paramcache = allocate_paramcache(nlop,μ,x)
+  paramcache = allocate_paramcache(nlop,μ)
   jacobian(nlop,μ,x,paramcache)
 end
 
@@ -91,11 +91,11 @@ end
 abstract type AbstractParamCache <: GridapType end
 
 """
-    allocate_paramcache(paramcache::AbstractParamCache,nlop::NonlinearParamOperator,μ::AbstractRealization) -> AbstractParamCache
+    allocate_paramcache(nlop::NonlinearParamOperator,μ::AbstractRealization) -> AbstractParamCache
 
 Similar to `allocate_odecache` in `Gridap`, when dealing with parametric problems
 """
-function allocate_paramcache(paramcache::AbstractParamCache,nlop::NonlinearParamOperator,μ::AbstractRealization)
+function allocate_paramcache(nlop::NonlinearParamOperator,μ::AbstractRealization)
   @abstractmethod
 end
 
@@ -107,10 +107,6 @@ Similar to `update_odecache!` in `Gridap`, when dealing with parametric problems
 function update_paramcache!(paramcache::AbstractParamCache,nlop::NonlinearParamOperator,μ::AbstractRealization)
   @abstractmethod
 end
-
-reset_index!(nlop::NonlinearParamOperator) = @abstractmethod
-next_index!(nlop::NonlinearParamOperator) = @abstractmethod
-empty_matvecdata!(nlop::NonlinearParamOperator) = @abstractmethod
 
 """
     mutable struct ParamCache <: AbstractParamCache
@@ -129,6 +125,32 @@ function update_paramcache!(c::ParamCache,nlop::NonlinearParamOperator,μ::Reali
 end
 
 """
+    struct SystemCache <: AbstractParamCache
+      A
+      b
+    end
+"""
+struct SystemCache <: AbstractParamCache
+  A
+  b
+end
+
+Algebra.get_matrix(c::SystemCache) = c.A
+Algebra.get_vector(c::SystemCache) = c.b
+
+function allocate_systemcache(nlop::NonlinearParamOperator)
+  @abstractmethod
+end
+
+function allocate_systemcache(nlop::NonlinearParamOperator,x::AbstractVector)
+  A = allocate_jacobian(nlop,x)
+  b = allocate_residual(nlop,x)
+  return SystemCache(A,b)
+end
+
+Base.copy(c::SystemCache) = SystemCache(copy(c.A),copy(c.b))
+
+"""
     struct GenericParamNonlinearOperator <: NonlinearParamOperator
       op::NonlinearParamOperator
       μ::Realization
@@ -143,7 +165,7 @@ Fields:
 struct GenericParamNonlinearOperator <: NonlinearParamOperator
   op::NonlinearParamOperator
   μ::Realization
-  paramcache::AbstractParamCache
+  paramcache::ParamCache
 end
 
 function ParamDataStructures.parameterize(op::NonlinearParamOperator,μ::Realization)
@@ -181,21 +203,7 @@ function Algebra.jacobian!(
   jacobian!(A,nlop.op,nlop.μ,x,nlop.paramcache)
 end
 
-# system caches
-
-"""
-    struct SystemCache
-      A
-      b
-    end
-"""
-struct SystemCache
-  A
-  b
-end
-
-function allocate_systemcache(nlop::NonlinearParamOperator,x::AbstractVector)
-  A = allocate_jacobian(nlop,x)
-  b = allocate_residual(nlop,x)
-  return SystemCache(A,b)
+function allocate_systemcache(nlop::GenericParamNonlinearOperator)
+  x = zero(nlop.paramcache.trial)
+  allocate_systemcache(nlop,x)
 end

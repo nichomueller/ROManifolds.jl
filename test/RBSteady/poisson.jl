@@ -94,3 +94,98 @@ main(:pod)
 main(:ttsvd)
 
 end
+
+
+using Gridap
+using Gridap.Algebra
+using Gridap.Geometry
+using Gridap.ReferenceFEs
+using Gridap.FESpaces
+using Gridap.MultiField
+using Gridap.CellData
+using Gridap.Arrays
+using Gridap.Fields
+using Gridap.Helpers
+using Gridap.ODEs
+using ROManifolds
+using ROManifolds.ParamDataStructures
+using ROManifolds.ParamSteady
+using Test
+using FillArrays
+import Gridap.MultiField: BlockMultiFieldStyle
+
+method=:pod
+tol=1e-4
+rank=nothing
+nparams=50
+nparams_res=floor(Int,nparams/3)
+nparams_jac=floor(Int,nparams/4)
+sketch=:sprn
+unsafe=false
+
+pdomain = (1,10,-1,5,1,2)
+
+domain = (0,1,0,1)
+partition = (20,20)
+if method==:ttsvd
+  model = TProductDiscreteModel(domain,partition)
+else
+  model = CartesianDiscreteModel(domain,partition)
+end
+
+order = 2
+degree = 2*order
+
+Ω = Triangulation(model)
+dΩ = Measure(Ω,degree)
+
+Re = 100
+a(μ) = x -> μ[1]/Re*exp(-x[1])
+aμ(μ) = ParamFunction(a,μ)
+
+g(μ) = x -> VectorValue(-(μ[2]*x[2]+μ[3])*x[2]*(1.0-x[2]),0.0)*(x[1]==0.0)
+gμ(μ) = ParamFunction(g,μ)
+
+conv(u,∇u) = (∇u')⋅u
+dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
+c(u,v,dΩ) = ∫( v⊙(conv∘(u,∇(u))) )dΩ
+dc(u,du,v,dΩ) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )dΩ
+
+jac_lin(μ,(u,p),(v,q),dΩ) = ∫(aμ(μ)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
+res_lin(μ,(u,p),(v,q),dΩ) = jac_lin(μ,(u,p),(v,q),dΩ)
+
+res_nlin(μ,(u,p),(v,q),dΩ) = c(u,v,dΩ)
+jac_nlin(μ,(u,p),(du,dp),(v,q),dΩ) = dc(u,du,v,dΩ)
+
+trian_res = (Ω,)
+trian_jac = (Ω,)
+domains_lin = FEDomains(trian_res,trian_jac)
+domains_nlin = FEDomains(trian_res,trian_jac)
+
+energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
+
+reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
+test_u = TestFESpace(Ω,reffe_u;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6,7])
+trial_u = ParamTrialFESpace(test_u,gμ)
+reffe_p = ReferenceFE(lagrangian,Float64,order-1)
+test_p = TestFESpace(Ω,reffe_p;conformity=:H1)
+trial_p = ParamTrialFESpace(test_p)
+test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
+trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
+
+state_reduction = PODReduction(1e-4)
+
+fesolver = NonlinearFESolver(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true))
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
+
+pspace = ParamSpace(pdomain)
+feop_lin = LinearParamFEOperator(res_lin,jac_lin,pspace,trial,test,domains_lin)
+feop_nlin = ParamFEOperator(res_nlin,jac_nlin,pspace,trial,test,domains_nlin)
+feop = LinearNonlinearParamFEOperator(feop_lin,feop_nlin)
+
+fesnaps, = solution_snapshots(rbsolver,feop)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+μon = realization(feop;sampling=:uniform,nparams=10)
+x̂,rbstats = solve(rbsolver,rbop,μon)
+x,festats = solution_snapshots(rbsolver,feop,μon)
+perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)

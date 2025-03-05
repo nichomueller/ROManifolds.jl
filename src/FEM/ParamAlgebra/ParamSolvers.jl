@@ -46,9 +46,7 @@ function Algebra.solve!(
   op::NonlinearOperator,
   cache::Nothing)
 
-  b = allocate_residual(op,x)
-  A = allocate_jacobian(op,x)
-  cache = SystemCache(A,b)
+  cache = allocate_systemcache(op,x)
   solve!(x,ls,op,cache)
 end
 
@@ -88,14 +86,28 @@ function Algebra.solve!(
   op::NonlinearOperator,
   cache::Nothing)
 
-  b = residual(op,x)
-  A = jacobian(op,x)
+  cache = allocate_systemcache(op,x)
+  solve!(x,ls,op,cache)
+end
+
+function Algebra.solve!(
+  x::AbstractParamVector,
+  nls::NewtonSolver,
+  op::NonlinearOperator,
+  cache::SystemCache)
+
+  fill!(x,zero(eltype(x)))
+  @unpack A,b = cache
+  residual!(b,op,x)
+  jacobian!(A,op,x)
+
   A_item = testitem(A)
   x_item = testitem(x)
   dx = allocate_in_domain(A_item)
   fill!(dx,zero(eltype(dx)))
   ss = symbolic_setup(nls.ls,A_item)
   ns = numerical_setup(ss,A_item,x_item)
+
   Algebra._solve_nr!(x,A,b,dx,ns,nls,op)
   return NonlinearSolvers.NewtonCache(A,b,dx,ns)
 end

@@ -55,12 +55,12 @@ include("HyperReductions.jl")
 
 include("HRParamArrays.jl")
 
-export TransientRBOperator
-export GenericTransientRBOperator
-export LinearNonlinearTransientRBOperator
+# export TransientRBOperator
+# export GenericTransientRBOperator
+# export LinearNonlinearTransientRBOperator
 include("ReducedOperators.jl")
 
-include("ThetaMethod.jl")
+# include("ThetaMethod.jl")
 
 include("PostProcess.jl")
 

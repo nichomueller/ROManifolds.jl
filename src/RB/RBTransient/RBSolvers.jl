@@ -117,3 +117,18 @@ function RBSteady.jacobian_snapshots(
   jac_nlin = jacobian_snapshots(solver,get_nonlinear_operator(op),s;kwargs...)
   return (jac_lin,jac_nlin)
 end
+
+function Algebra.solve(
+  solver::RBSolver,
+  op::NonlinearOperator,
+  r::TransientRealization,
+  xh0::Union{Function,AbstractVector})
+
+  x0 = get_free_dof_values(xh0(get_params(r)))
+  trial = get_trial(op)(r)
+  x̂ = zero_free_values(trial)
+
+  nlop = parameterize(op,r)
+  syscache = allocate_systemcache(nlop,r)
+  solve!(x̂,solver,op,r,x,x0)
+end

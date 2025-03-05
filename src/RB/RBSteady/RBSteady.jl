@@ -108,6 +108,12 @@ export get_norm_matrix
 export enrich!
 include("Projections.jl")
 
+export RBParamVector
+include("RBParamVectors.jl")
+
+export HRParamArray
+include("HRParamArrays.jl")
+
 export RBSpace
 export SingleFieldRBSpace
 export MultiFieldRBSpace
@@ -118,18 +124,17 @@ export reduced_basis
 export get_reduced_subspace
 include("RBSpaces.jl")
 
-export RBParamVector
-include("RBParamVectors.jl")
-
-export AbstractIntegrationDomain
 export IntegrationDomain
+export VectorDomain
+export MatrixDomain
 export HyperReduction
 export EmptyHyperReduction
 export MDEIM
 export AffineContribution
 export BlockHyperReduction
 export empirical_interpolation
-export integration_domain
+export vector_domain
+export matrix_domain
 export get_integration_domain
 export reduced_triangulation
 export reduced_jacobian
@@ -138,8 +143,9 @@ export reduced_weak_form
 export allocate_hypred_cache
 include("HyperReductions.jl")
 
-export HRParamArray
-include("HRParamArrays.jl")
+export hr_jacobian!
+export hr_residual!
+include("HRAssemblers.jl")
 
 export RBOperator
 export GenericRBOperator
@@ -149,9 +155,6 @@ export LinearNonlinearRBCache
 export reduced_operator
 export get_fe_trial
 export get_fe_test
-export fe_jacobian!
-export fe_residual!
-export allocate_rbcache
 include("ReducedOperators.jl")
 
 export ROMPerformance

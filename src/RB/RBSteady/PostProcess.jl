@@ -132,7 +132,7 @@ function load_contribution(
   dec,redt = (),()
   for (i,t) in enumerate(trian)
     deci = f(dir;label=_get_label(label,i))
-    redti = reduced_triangulation(t,deci,args...)
+    redti = reduced_triangulation(t,deci)
     if isa(redti,AbstractArray)
       redti = Utils.merge_triangulations(redti)
     end

@@ -21,7 +21,7 @@ function RBSteady.allocate_rbcache(
   dt,θ = solver.dt,solver.θ
   shift!(r,dt*(θ-1))
 
-  paramcache = allocate_paramcache(op.op,r,us;evaluated=true)
+  paramcache = allocate_paramcache(op.op,r;evaluated=true)
 
   A = allocate_jacobian(op.op,r,us,paramcache)
   coeffA,Â = allocate_hypred_cache(op.lhs,r)
@@ -56,7 +56,6 @@ function Algebra.solve!(
   shift!(r,dt*(θ-1))
   Â = jacobian(op,r,usx,ws,rbcache)
   b̂ = residual(op,r,usx,rbcache)
-  rmul!(b̂,-1)
   solve!(x̂,sysslvr,Â,b̂)
   shift!(r,dt*(1-θ))
   return x̂

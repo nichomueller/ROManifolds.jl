@@ -113,7 +113,6 @@ function Algebra.solve!(
 
   fill!(x,zero(eltype(x)))
   b = residual(lop,x)
-  rmul!(b,-1)
   A = jacobian(lop,x)
   ns = solve!(x,ls,A,b)
 
@@ -131,7 +130,6 @@ function Algebra.solve!(
   A = cache.A
   ns = cache.ns
   residual!(b,lop,x)
-  rmul!(b,-1)
   jacobian!(A,lop,x)
   ns = solve!(x,ls,A,b)
   cache

@@ -7,9 +7,8 @@ function allocate_odeparamcache(
   us0::NTuple{1,AbstractVector})
 
   u0 = us0[1]
-  us0N = (u0,u0)
   uθ = copy(u0)
-  paramcache = allocate_paramcache(odeop,r0,us0N)
+  paramcache = allocate_paramcache(odeop,r0)
   sysslvrcache = nothing
   (uθ,paramcache,sysslvrcache)
 end
@@ -105,7 +104,7 @@ function allocate_odeparamcache(
   us0N = (u0,u0)
   ws = (1,1)
 
-  paramcache = allocate_paramcache(odeop,r0,us0N)
+  paramcache = allocate_paramcache(odeop,r0)
   A,b = allocate_systemcache(odeop,r0,us0N,ws,paramcache)
   odeparamcache = SystemCache(paramcache,A,b)
   sysslvrcache = nothing

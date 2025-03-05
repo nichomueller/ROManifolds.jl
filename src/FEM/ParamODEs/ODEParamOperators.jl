@@ -61,7 +61,7 @@ function Algebra.residual(
   r::TransientRealization,
   us::Tuple{Vararg{AbstractVector}})
 
-  paramcache = allocate_paramcache(odeop,r,us;evaluated=true)
+  paramcache = allocate_paramcache(odeop,r;evaluated=true)
   residual(odeop,r,us,paramcache)
 end
 
@@ -115,7 +115,7 @@ function Algebra.jacobian(
   us::Tuple{Vararg{AbstractVector}},
   ws::Tuple{Vararg{Real}})
 
-  paramcache = allocate_paramcache(odeop,r,us;evaluated=true)
+  paramcache = allocate_paramcache(odeop,r;evaluated=true)
   jacobian(odeop,r,us,ws,paramcache)
 end
 
@@ -133,8 +133,7 @@ end
 
 function ParamAlgebra.allocate_paramcache(
   odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}};
+  r::TransientRealization;
   evaluated=false)
 
   feop = get_fe_operator(odeop)

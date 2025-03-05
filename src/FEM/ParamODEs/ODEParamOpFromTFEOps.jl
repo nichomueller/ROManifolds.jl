@@ -501,14 +501,15 @@ end
 
 ParamSteady.get_fe_operator(op::LinearNonlinearParamOpFromTFEOp) = op.op
 
-function ParamSteady.get_linear_operator(op::LinearNonlinearParamOpFromTFEOp)
+function ParamAlgebra.get_linear_operator(op::LinearNonlinearParamOpFromTFEOp)
   get_algebraic_operator(get_linear_operator(op.op))
 end
 
-function ParamSteady.get_nonlinear_operator(op::LinearNonlinearParamOpFromTFEOp)
+function ParamAlgebra.get_nonlinear_operator(op::LinearNonlinearParamOpFromTFEOp)
   get_algebraic_operator(get_nonlinear_operator(op.op))
 end
 
+#TODO fix this!
 function ParamAlgebra.allocate_paramcache(
   op::LinearNonlinearParamOpFromTFEOp,
   r::TransientRealization,
@@ -518,7 +519,7 @@ function ParamAlgebra.allocate_paramcache(
   op_lin = get_linear_operator(op)
   op_nlin = get_nonlinear_operator(op)
 
-  paramcache = allocate_paramcache(op_nlin,r,us)
+  paramcache = allocate_paramcache(op_nlin,r)
   A_lin,b_lin = allocate_systemcache(op_lin,r,us,ws,paramcache)
 
   return SystemCache(paramcache,A_lin,b_lin)

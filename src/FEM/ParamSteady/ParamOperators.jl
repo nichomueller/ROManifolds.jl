@@ -78,3 +78,75 @@ function ParamAlgebra.allocate_paramcache(op::ParamOperator,μ::Realization)
   trial = evaluate(ptrial,μ)
   ParamCache(trial,ptrial)
 end
+
+const LinearNonlinearParamOperator = ParamOperator{LinearNonlinearParamEq,T}
+
+get_fe_operator(op::LinearNonlinearParamOperator) = get_fe_operator(get_nonlinear_operator(op))
+
+function ParamAlgebra.allocate_paramcache(op::LinearNonlinearParamOperator,μ::Realization)
+  op_nlin = get_nonlinear_operator(op)
+  allocate_paramcache(op_nlin,μ)
+end
+
+function ParamAlgebra.allocate_systemcache(op::LinearNonlinearParamOperator,u::AbstractVector)
+  op_nlin = get_nonlinear_operator(op)
+  allocate_systemcache(op_nlin,u)
+end
+
+function ParamAlgebra.update_paramcache!(
+  paramcache,
+  op::LinearNonlinearParamOperator,
+  μ::Realization)
+
+  op_nlin = get_nonlinear_operator(op)
+  update_paramcache!(paramcache,op_nlin,μ)
+end
+
+function Algebra.allocate_residual(
+  op::LinearNonlinearParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  @notimplemented "This is inefficient. Instead, assemble the nonlinear system
+  by defining a [`LinearNonlinearParamOperator`](@ref)"
+end
+
+function Algebra.allocate_jacobian(
+  op::LinearNonlinearParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  @notimplemented "This is inefficient. Instead, assemble the nonlinear system
+  by defining a [`LinearNonlinearParamOperator`](@ref)"
+end
+
+function Algebra.residual!(
+  b,
+  op::LinearNonlinearParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  @notimplemented "This is inefficient. Instead, assemble the nonlinear system
+  by defining a [`LinearNonlinearParamOperator`](@ref)"
+end
+
+function ODEs.jacobian_add!(
+  A,
+  op::LinearNonlinearParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  @notimplemented "This is inefficient. Instead, assemble the nonlinear system
+  by defining a [`LinearNonlinearParamOperator`](@ref)"
+end
+
+function ParamDataStructures.parameterize(op::LinearNonlinearParamOperator,μ::Realization)
+  op_lin = parameterize(get_linear_operator(op),μ)
+  op_nlin = parameterize(get_nonlinear_operator(op),μ)
+  syscache_lin = allocate_systemcache(op_lin)
+  LinNonlinParamOperator(op_lin,op_nlin,syscache_lin)
+end

@@ -14,8 +14,8 @@ struct LinearNonlinearTransientParamFEOperator{T} <: TransientParamFEOperator{Li
   op_nonlinear::TransientParamFEOperator{NonlinearParamODE,T}
 end
 
-ParamSteady.get_linear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_linear
-ParamSteady.get_nonlinear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_nonlinear
+ParamAlgebra.get_linear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_linear
+ParamAlgebra.get_nonlinear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_nonlinear
 
 function FESpaces.get_algebraic_operator(feop::LinearNonlinearTransientParamFEOperator)
   LinearNonlinearParamOpFromTFEOp(feop)

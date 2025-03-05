@@ -33,13 +33,18 @@ export LazyParamNonlinearOperator
 export AbstractParamCache
 export ParamCache
 export SystemCache
+export allocate_paramcache
 export update_paramcache!
 export allocate_systemcache
 include("NonlinearParamOperators.jl")
 
-export ParamSolver
-export LinearParamSolver
-export NonlinearParamSolver
+export LinearNonlinearParamOperator
+export LinNonlinParamOperator
+export get_linear_operator
+export get_nonlinear_operator
+export get_linear_systemcache
+include("LinearNonlinearParamOperators.jl")
+
 include("ParamSolvers.jl")
 
 include("ParamIterativeSolvers.jl")

@@ -99,15 +99,6 @@ Subtypes:
 abstract type RBOperator{O} <: ParamOperator{O,SplitDomains} end
 
 """
-    allocate_rbcache(op::NonlinearOperator,r::AbstractRealization,u::Any)
-
-Returns the caches needed to solve a problem with the RB method
-"""
-function allocate_rbcache(op::RBOperator,args...)
-  @abstractmethod
-end
-
-"""
     struct GenericRBOperator{O} <: RBOperator{O}
       op::ParamOperator{O}
       trial::RBSpace
@@ -124,11 +115,11 @@ Fields:
 - `lhs`: hyper-reduced left hand side
 - `rhs`: hyper-reduced right hand side
 """
-struct GenericRBOperator{O} <: RBOperator{O}
+struct GenericRBOperator{A,O} <: RBOperator{O}
   op::ParamOperator{O}
   trial::RBSpace
   test::RBSpace
-  lhs::AffineContribution
+  lhs::A
   rhs::AffineContribution
 end
 
@@ -137,139 +128,69 @@ FESpaces.get_test(op::GenericRBOperator) = op.test
 get_fe_trial(op::GenericRBOperator) = get_trial(op.op)
 get_fe_test(op::GenericRBOperator) = get_test(op.op)
 
-function allocate_rbcache(
-  op::GenericRBOperator,
-  r::Realization,
-  u::AbstractParamVector)
-
-  paramcache = allocate_paramcache(op.op,r,u)
-
-  A = allocate_jacobian(op.op,r,u,paramcache)
-  coeffA,Â = allocate_hypred_cache(op.lhs,r)
-  Acache = HRParamArray(A,coeffA,Â)
-
-  b = allocate_residual(op.op,r,u,paramcache)
-  coeffb,b̂ = allocate_hypred_cache(op.rhs,r)
-  bcache = HRParamArray(b,coeffb,b̂)
-
-  trial = evaluate(get_trial(op),r)
-
-  return RBCache(Acache,bcache,trial,paramcache)
-end
+ParamSteady.get_fe_operator(op::GenericRBOperator) = op.op
 
 function Algebra.allocate_residual(
   op::GenericRBOperator,
   r::Realization,
   u::AbstractParamVector,
-  rbcache::RBCache)
+  paramcache)
 
-  copy(rbcache.b)
+  allocate_hypred_cache(op.rhs,r)
 end
 
 function Algebra.allocate_jacobian(
   op::GenericRBOperator,
   r::Realization,
   u::AbstractParamVector,
-  rbcache::RBCache)
+  paramcache)
 
-  copy(rbcache.A)
+  allocate_hypred_cache(op.lhs,r)
 end
 
 function Algebra.residual!(
-  cache::HRParamArray,
-  op::GenericRBOperator,
-  r::Realization,
-  u::AbstractParamVector,
-  rbcache::RBCache)
-
-  b = cache.fe_quantity
-  paramcache = rbcache.paramcache
-
-  feb = fe_residual!(b,op,r,u,paramcache)
-  inv_project!(cache,op.rhs,feb)
-end
-
-function Algebra.residual!(
-  cache::HRParamArray,
-  op::GenericRBOperator,
-  r::Realization,
-  u::RBParamVector,
-  rbcache::RBCache)
-
-  inv_project!(u.fe_data,rbcache.trial,u.data)
-  residual!(cache,op,r,u.fe_data,rbcache)
-end
-
-function Algebra.jacobian!(
-  cache::HRParamArray,
-  op::GenericRBOperator,
-  r::Realization,
-  u::AbstractParamVector,
-  rbcache::RBCache)
-
-  A = cache.fe_quantity
-  paramcache = rbcache.paramcache
-
-  feA = fe_jacobian!(A,op,r,u,paramcache)
-  inv_project!(cache,op.lhs,feA)
-end
-
-function Algebra.jacobian!(
-  cache::HRParamArray,
-  op::GenericRBOperator,
-  r::Realization,
-  u::RBParamVector,
-  rbcache::RBCache)
-
-  inv_project!(u.fe_data,rbcache.trial,u.data)
-  jacobian!(cache,op,r,u.fe_data,rbcache)
-end
-
-"""
-    fe_jacobian!(A,op::RBOperator,r::Realization,u::AbstractParamVector,paramcache
-      ) -> AbstractParamMatrix
-    fe_jacobian!(
-      A,op::TransientRBOperator,r::TransientRealization,
-      u::Tuple{Vararg{AbstractParamVector}},ws::Tuple{Vararg{Real}},paramcache
-      ) -> AbstractParamMatrix
-
-Full order residual computed via integration on the [`AbstractIntegrationDomain`](@ref)
-relative to the LHS defined in `op`
-"""
-function fe_jacobian!(
-  A,
+  b::HRParamArray,
   op::GenericRBOperator,
   r::Realization,
   u::AbstractParamVector,
   paramcache)
 
-  jacobian!(A,op.op,r,u,paramcache)
-  Ai = select_at_indices(A,op.lhs)
-  return Ai
+  hr_residual!(b,op,r,u,paramcache)
+  inv_project!(b,op.rhs,feb)
 end
 
-"""
-    fe_residual!(A,op::RBOperator,r::Realization,u::AbstractParamVector,paramcache
-      ) -> AbstractParamVector
-    fe_residual!(
-      A,op::TransientRBOperator,r::TransientRealization,
-      u::Tuple{Vararg{AbstractParamVector}},paramcache
-      ) -> AbstractParamVector
+# function Algebra.residual!(
+#   b::HRParamArray,
+#   op::GenericRBOperator,
+#   r::Realization,
+#   u::RBParamVector,
+#   paramcache)
 
-Full order residual computed via integration on the [`AbstractIntegrationDomain`](@ref)
-relative to the RHS defined in `op`
-"""
-function fe_residual!(
-  b,
+#   inv_project!(u.fe_data,paramcache.trial,u.data)
+#   residual!(b,op,r,u.fe_data,paramcache)
+# end
+
+function Algebra.jacobian!(
+  A::HRParamArray,
   op::GenericRBOperator,
   r::Realization,
   u::AbstractParamVector,
   paramcache)
 
-  residual!(b,op.op,r,u,paramcache)
-  bi = select_at_indices(b,op.rhs)
-  return bi
+  hr_jacobian!(A,op,r,u,paramcache)
+  inv_project!(A,op.lhs)
 end
+
+# function Algebra.jacobian!(
+#   A::HRParamArray,
+#   op::GenericRBOperator,
+#   r::Realization,
+#   u::RBParamVector,
+#   paramcache)
+
+#   inv_project!(u.fe_data,paramcache.trial,u.data)
+#   jacobian!(A,op,r,u.fe_data,rbcache)
+# end
 
 """
     struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}
@@ -285,169 +206,8 @@ struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}
   op_nonlinear::GenericRBOperator{NonlinearParamEq}
 end
 
-ParamSteady.get_linear_operator(op::LinearNonlinearRBOperator) = op.op_linear
-ParamSteady.get_nonlinear_operator(op::LinearNonlinearRBOperator) = op.op_nonlinear
-
-function FESpaces.get_test(op::LinearNonlinearRBOperator)
-  @check get_test(op.op_linear) === get_test(op.op_nonlinear)
-  get_test(op.op_nonlinear)
-end
-
-function FESpaces.get_trial(op::LinearNonlinearRBOperator)
-  @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
-  get_trial(op.op_nonlinear)
-end
-
-function get_fe_trial(op::LinearNonlinearRBOperator)
-  @check get_fe_trial(op.op_linear) === get_fe_trial(op.op_nonlinear)
-  get_fe_trial(op.op_nonlinear)
-end
-
-function get_fe_test(op::LinearNonlinearRBOperator)
-  @check get_fe_test(op.op_linear) === get_fe_test(op.op_nonlinear)
-  get_fe_test(op.op_nonlinear)
-end
-
-function allocate_rbcache(
-  op::LinearNonlinearRBOperator,
-  r::Realization,
-  u::AbstractParamVector)
-
-  lop = get_linear_operator(op)
-  nlop = get_nonlinear_operator(op)
-
-  rbcache_lin = allocate_rbcache(lop,r,u)
-  rbcache_nlin = allocate_rbcache(nlop,r,u)
-  A_lin = jacobian(lop,r,u,rbcache_lin)
-  b_lin = residual(lop,r,u,rbcache_lin)
-
-  return LinearNonlinearRBCache(rbcache_nlin,A_lin,b_lin)
-end
-
-function allocate_rbcache(
-  op::LinearNonlinearRBOperator,
-  r::Realization,
-  u::RBParamVector)
-
-  allocate_rbcache(op,r,u.fe_data)
-end
-
-function Algebra.allocate_residual(
-  op::LinearNonlinearRBOperator,
-  r::Realization,
-  u::AbstractParamVector,
-  rbcache::LinearNonlinearRBCache)
-
-  allocate_residual(get_nonlinear_operator(op),r,u,rbcache.rbcache)
-end
-
-function Algebra.allocate_jacobian(
-  op::LinearNonlinearRBOperator,
-  r::Realization,
-  u::AbstractParamVector,
-  rbcache::LinearNonlinearRBCache)
-
-  allocate_jacobian(get_nonlinear_operator(op),r,u,rbcache.rbcache)
-end
-
-function Algebra.residual!(
-  cache::HRParamArray,
-  op::LinearNonlinearRBOperator,
-  r::Realization,
-  u::AbstractParamVector,
-  rbcache::LinearNonlinearRBCache)
-
-  nlop = get_nonlinear_operator(op)
-  A_lin = rbcache.A
-  b_lin = rbcache.b
-  rbcache_nlin = rbcache.rbcache
-
-  b_nlin = residual!(cache,nlop,r,u,rbcache_nlin)
-  axpy!(1.0,b_lin,b_nlin)
-  mul!(b_nlin,A_lin,u,true,true)
-
-  return b_nlin
-end
-
-function Algebra.jacobian!(
-  cache::HRParamArray,
-  op::LinearNonlinearRBOperator,
-  r::Realization,
-  u::AbstractParamVector,
-  rbcache::LinearNonlinearRBCache)
-
-  nlop = get_nonlinear_operator(op)
-  A_lin = rbcache.A
-  rbcache_nlin = rbcache.rbcache
-
-  A_nlin = jacobian!(cache,nlop,r,u,rbcache_nlin)
-  axpy!(1.0,A_lin,A_nlin)
-
-  return A_nlin
-end
-
-# Solve a POD-MDEIM problem
-
-function Algebra.solve(
-  solver::RBSolver,
-  op::RBOperator,
-  r::AbstractRealization)
-
-  fesolver = get_fe_solver(solver)
-  fe_trial = get_fe_trial(op)(r)
-  trial = get_trial(op)(r)
-  x = zero_free_values(fe_trial)
-  x̂ = zero_free_values(trial)
-
-  rbcache = allocate_rbcache(op,r,x)
-
-  t = @timed solve!(x̂,fesolver,op,r,x,rbcache)
-  stats = CostTracker(t,nruns=num_params(r),name="RB solver")
-
-  return x̂,stats
-end
-
-function Algebra.solve!(
-  x̂::AbstractVector,
-  fesolver::LinearFESolver,
-  op::RBOperator,
-  r::Realization,
-  x::AbstractVector,
-  rbcache::RBCache)
-
-  Â = jacobian(op,r,x,rbcache)
-  b̂ = residual(op,r,x,rbcache)
-  rmul!(b̂,-1)
-  solve!(x̂,fesolver.ls,Â,b̂)
-  return x̂
-end
-
-function Algebra.solve!(
-  x̂::AbstractVector,
-  fesolver::NonlinearFESolver,
-  op::LinearNonlinearRBOperator,
-  r::Realization,
-  x::AbstractVector,
-  rbcache::LinearNonlinearRBCache)
-
-  nls = fesolver.nls
-  ŷ = RBParamVector(x̂,x)
-
-  Âcache = jacobian(op,r,ŷ,rbcache)
-  b̂cache = residual(op,r,ŷ,rbcache)
-
-  Â_item = testitem(Âcache)
-  x̂_item = testitem(x̂)
-  dx̂ = allocate_in_domain(Â_item)
-  fill!(dx̂,zero(eltype(dx̂)))
-  ss = symbolic_setup(BackslashSolver(),Â_item)
-  ns = numerical_setup(ss,Â_item,x̂_item)
-
-  nlop = NonlinearParamOperator(op,r,rbcache)
-  Algebra._solve_nr!(ŷ,Âcache,b̂cache,dx̂,ns,nls,nlop)
-
-  return x̂
-end
+ParamAlgebra.get_linear_operator(op::LinearNonlinearRBOperator) = op.op_linear
+ParamAlgebra.get_nonlinear_operator(op::LinearNonlinearRBOperator) = op.op_nonlinear
 
 # cache utils
 

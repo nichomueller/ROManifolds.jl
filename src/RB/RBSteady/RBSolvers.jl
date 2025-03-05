@@ -1,5 +1,5 @@
 """
-    struct RBSolver{A<:GridapType,B}
+    struct RBSolver{A<:GridapType,B} <: GridapType
       fesolver::A
       state_reduction::Reduction
       residual_reduction::Reduction
@@ -31,7 +31,7 @@ In particular:
 - nparams_test:  number of snapshots considered when computing the error the RB
   method commits with respect to the FE procedure
 """
-struct RBSolver{A<:GridapType,B}
+struct RBSolver{A<:GridapType,B} <: GridapType
   fesolver::A
   state_reduction::Reduction
   residual_reduction::Reduction
@@ -85,8 +85,7 @@ function solution_snapshots(
   nparams=num_offline_params(solver),
   r=realization(op;nparams))
 
-  fesolver = get_fe_solver(solver)
-  solution_snapshots(fesolver,op,r,args...)
+  solution_snapshots(solver,op,r,args...)
 end
 
 function solution_snapshots(
@@ -96,9 +95,14 @@ function solution_snapshots(
   args...)
 
   fesolver = get_fe_solver(solver)
-  solution_snapshots(fesolver,op,r,args...)
+  dof_map = get_dof_map(op)
+  uh,stats = solve(fesolver,op,r)
+  values = get_free_dof_values(uh)
+  snaps = Snapshots(values,dof_map,r)
+  return snaps,stats
 end
 
+# not needed
 function solution_snapshots(
   fesolver::FESolver,
   op::ParamFEOperator,
@@ -205,4 +209,24 @@ function jacobian_snapshots(
   jac_lin = jacobian_snapshots(solver,get_linear_operator(op),s;kwargs...)
   jac_nlin = jacobian_snapshots(solver,get_nonlinear_operator(op),s;kwargs...)
   return (jac_lin,jac_nlin)
+end
+
+# Solve a POD-MDEIM problem
+
+function Algebra.solve(
+  solver::RBSolver,
+  op::NonlinearOperator,
+  r::AbstractRealization)
+
+  trial = get_trial(op)(r)
+  x̂ = zero_free_values(trial)
+
+  nlop = parameterize(op,r)
+  syscache = allocate_systemcache(nlop,r)
+
+  fesolver = get_fe_solver(solver)
+  t = @timed solve!(x̂,fesolver,nlop,syscache)
+  stats = CostTracker(t,nruns=num_params(r),name="RB")
+
+  return x̂,stats
 end

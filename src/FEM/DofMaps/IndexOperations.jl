@@ -22,6 +22,34 @@ function recast_indices(sids::AbstractArray,a::AbstractSparseMatrix)
 end
 
 """
+    recast_split_indices(fids::AbstractArray,a::AbstractSparseMatrix) -> (AbstractArray,AbstractArray)
+
+Input:
+  - a sparse matrix `a` of size `(M,N)` and a number of nonzero entries `Nnz`
+  - an array of indices `sids` with values `∈ {1,...,Nnz}` (sparse indices)
+Output:
+  - an array rows of indices `frows` with values `∈ {1,...,M}` (full rows), whose
+  entries are associated to those of `sids`. Zero entries are preserved
+  - an array rows of indices `fcols` with values `∈ {1,...,N}` (full cols), whose
+  entries are associated to those of `sids`. Zero entries are preserved
+"""
+function recast_split_indices(sids::AbstractArray,a::AbstractSparseMatrix)
+  frows = similar(sids)
+  fcols = similar(sids)
+  fill!(frows,zero(eltype(frows)))
+  fill!(fcols,zero(eltype(fcols)))
+  I,J, = findnz(a)
+  nrows = size(a,1)
+  for (i,nzi) in enumerate(sids)
+    if nzi > 0
+      frows[i] = I[nzi]
+      fcols[i] = J[nzi]
+    end
+  end
+  return frows,fcols
+end
+
+"""
     sparsify_indices(sids::AbstractArray,a::AbstractSparseMatrix) -> AbstractArray
 
 Input:

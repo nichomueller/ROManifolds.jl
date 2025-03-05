@@ -32,59 +32,127 @@ end
 
 function empirical_interpolation(A::ParamSparseMatrix)
   I,AI = empirical_interpolation(A.data)
-  I′ = recast_indices(I,param_getindex(A,1))
-  return I′,AI
+  R′,C′ = recast_split_indices(I,param_getindex(A,1))
+  return (R′,C′),AI
 end
 
 """
-    abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
+    get_dofs_to_cells(
+      cell_dof_ids::AbstractArray{<:AbstractArray},
+      dofs::AbstractVector
+      ) -> AbstractVector
+
+Returns the list of cells containing the dof ids `dofs`
+"""
+function get_dofs_to_cells(
+  cell_dof_ids::AbstractArray{<:AbstractArray},
+  dofs::AbstractVector)
+
+  cells = Int32[]
+  cache = array_cache(cell_dof_ids)
+  for cell = eachindex(cell_dof_ids)
+    celldofs = getindex!(cache,cell_dof_ids,cell)
+    if !isempty(intersect(dofs,celldofs))
+      append!(cells,cell)
+    end
+  end
+  return cells
+end
+
+function reduced_cells(
+  test::FESpace,
+  trian::Triangulation,
+  rows::AbstractVector)
+
+  cell_dof_ids = get_cell_dof_ids(test,trian)
+  cells = get_dofs_to_cells(cell_dof_ids,rows)
+  return cells
+end
+
+function reduced_cells(
+  trial::FESpace,
+  test::FESpace,
+  trian::Triangulation,
+  rows::AbstractVector,
+  cols::AbstractVector)
+
+  cell_dof_ids_trial = get_cell_dof_ids(trial,trian)
+  cell_dof_ids_test = get_cell_dof_ids(test,trian)
+  cells_trial = get_dofs_to_cells(cell_dof_ids_trial,cols)
+  cells_test = get_dofs_to_cells(cell_dof_ids_test,cols)
+  cells = union(cells_trial,cells_test)
+  return cells
+end
+
+"""
+    abstract type IntegrationDomain end
 
 Type representing the set of interpolation rows of a `Projection` subjected
 to a EIM approximation with `empirical_interpolation`.
 Subtypes:
-- [`IntegrationDomain`](@ref)
+- [`VectorDomain`](@ref)
 - [`TransientIntegrationDomain`](@ref)
 """
-abstract type AbstractIntegrationDomain{Ti} <: AbstractVector{Ti} end
-
-integration_domain(i::AbstractArray) = @abstractmethod
+abstract type IntegrationDomain end
 
 """
-    struct IntegrationDomain <: AbstractIntegrationDomain{Int}
-      indices::Vector{Int}
+    struct VectorDomain <: IntegrationDomain{Int,1}
+      rows::Vector{Int}
+      cells::Vector{Int32}
     end
 
-Integration domain for a projection operator in a steady context
+Integration domain for a projection vector operator in a steady problem
 """
-struct IntegrationDomain <: AbstractIntegrationDomain{Int}
-  indices::Vector{Int}
+struct VectorDomain <: IntegrationDomain
+  rows::Vector{Int}
+  cells::Vector{Int32}
 end
 
-integration_domain(i::AbstractVector{<:Number}) = IntegrationDomain(i)
-
-Base.size(i::IntegrationDomain) = size(i.indices)
-Base.getindex(i::IntegrationDomain,j::Integer) = getindex(i.indices,j)
-
-get_indices(i::IntegrationDomain) = i.indices
-union_indices(i::IntegrationDomain...) = union(get_indices.(i)...)
-function ordered_common_locations(i::IntegrationDomain,union_indices::AbstractVector)::Vector{Int}
-  filter(!isnothing,indexin(i,union_indices))
+function vector_domain(args...)
+  @abstractmethod
 end
 
-function Base.getindex(a::ConsecutiveParamVector,i::IntegrationDomain)
-  data = get_all_data(a)
-  ConsecutiveParamArray(data[i,:])
+function vector_domain(
+  test::FESpace,
+  trian::Triangulation,
+  rows::Vector{<:Number})
+
+  cells = reduced_cells(test,trian,rows)
+  VectorDomain(rows,cells)
 end
 
-function Base.getindex(a::ParamSparseMatrix,i::IntegrationDomain)
-  entries = zeros(eltype2(a),length(i),param_length(a))
-  @inbounds for ip = 1:param_length(a)
-    for (ii,is) in enumerate(i)
-      v = param_getindex(a,ip)[is]
-      entries[ii,ip] = v
+"""
+    struct MatrixDomain <: IntegrationDomain
+      rows::Vector{Int}
+      cols::Vector{Int}
+      cells::Vector{Int32}
     end
+
+Integration domain for a projection matrix operator in a steady problem
+"""
+struct MatrixDomain <: IntegrationDomain
+  rows::Vector{Int}
+  cols::Vector{Int}
+  cells::Vector{Int32}
+  function MatrixDomain(rows::Vector{Int},cols::Vector{Int},cells::Vector{Int32})
+    @check length(rows) == length(cols)
+    new(rows,cols,cells)
   end
-  return ConsecutiveParamArray(entries)
+end
+
+function matrix_domain(args...)
+  @abstractmethod
+end
+
+function matrix_domain(
+  trial::FESpace,
+  test::FESpace,
+  trian::Triangulation,
+  rows::Vector{<:Number},
+  cols::Vector{<:Number})
+
+  cells = reduced_cells(trial,test,trian,rows,cols)
+  MatrixDomain(rows,cols,cells)
 end
 
 """
@@ -141,12 +209,6 @@ get_integration_domain(a::HyperReduction) = @abstractmethod
 num_reduced_dofs(a::HyperReduction) = num_reduced_dofs(get_basis(a))
 num_reduced_dofs_left_projector(a::HyperReduction) = num_reduced_dofs_left_projector(get_basis(a))
 num_reduced_dofs_right_projector(a::HyperReduction) = num_reduced_dofs_right_projector(get_basis(a))
-
-get_indices(a::HyperReduction) = get_indices(get_integration_domain(a))
-union_indices(a::HyperReduction...) = union(get_indices.(a)...)
-function ordered_common_locations(a::HyperReduction,args...)
-  ordered_common_locations(get_integration_domain(a),args...)
-end
 
 function inv_project!(
   b̂::AbstractParamArray,
@@ -224,6 +286,7 @@ get_integration_domain(a::MDEIM) = a.domain
 function HyperReduction(
   red::AbstractMDEIMReduction,
   s::Snapshots,
+  trian::Triangulation,
   test::RBSpace)
 
   red = get_reduction(red)
@@ -231,13 +294,14 @@ function HyperReduction(
   proj_basis = project(test,basis)
   indices,interp = empirical_interpolation(basis)
   factor = lu(interp)
-  domain = integration_domain(indices)
+  domain = vector_domain(test,trian,indices)
   return MDEIM(red,proj_basis,factor,domain)
 end
 
 function HyperReduction(
   red::AbstractMDEIMReduction,
   s::Snapshots,
+  trian::Triangulation,
   trial::RBSpace,
   test::RBSpace)
 
@@ -246,93 +310,26 @@ function HyperReduction(
   proj_basis = project(test,basis,trial)
   indices,interp = empirical_interpolation(basis)
   factor = lu(interp)
-  domain = integration_domain(indices)
+  domain = matrix_domain(trial,test,trian,indices...)
   return MDEIM(red,proj_basis,factor,domain)
 end
 
 """
-    reduced_dofs_to_reduced_cells(
-      cell_dof_ids::AbstractArray{<:AbstractArray},
-      reduced_dofs::AbstractVector
-      ) -> AbstractVector
+    reduced_triangulation(trian::Triangulation,a::HyperReduction)
 
-Returns the list of cells corresponding to the [`AbstractIntegrationDomain`](@ref) `reduced_dofs`
+Returns the triangulation view of `trian` on the integration cells contained in `a`
 """
-function reduced_dofs_to_reduced_cells(
-  cell_dof_ids::AbstractArray{<:AbstractArray},
-  reduced_dofs::AbstractVector)
-
-  reduced_cells = Int32[]
-  cache = array_cache(cell_dof_ids)
-  for cell = eachindex(cell_dof_ids)
-    celldofs = getindex!(cache,cell_dof_ids,cell)
-    if !isempty(intersect(reduced_dofs,celldofs))
-      append!(reduced_cells,cell)
-    end
-  end
-  return reduced_cells
-end
-
-function reduced_dofs_to_reduced_cells(
-  trian::Triangulation,
-  ids::AbstractVector,
-  test::FESpace)
-
-  cell_dof_ids = get_cell_dof_ids(test,trian)
-  indices_space_rows = fast_index(ids,num_free_dofs(test))
-  red_integr_cells = reduced_dofs_to_reduced_cells(cell_dof_ids,indices_space_rows)
-  return red_integr_cells
-end
-
-function reduced_dofs_to_reduced_cells(
-  trian::Triangulation,
-  ids::AbstractVector,
-  trial::FESpace,
-  test::FESpace)
-
-  cell_dof_ids_trial = get_cell_dof_ids(trial,trian)
-  cell_dof_ids_test = get_cell_dof_ids(test,trian)
-  indices_space_cols = slow_index(ids,num_free_dofs(test))
-  indices_space_rows = fast_index(ids,num_free_dofs(test))
-  red_integr_cells_trial = reduced_dofs_to_reduced_cells(cell_dof_ids_trial,indices_space_cols)
-  red_integr_cells_test = reduced_dofs_to_reduced_cells(cell_dof_ids_test,indices_space_rows)
-  red_integr_cells = union(red_integr_cells_trial,red_integr_cells_test)
-  return red_integr_cells
-end
-
-"""
-    reduced_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,r::RBSpace...)
-
-Returns the triangulation view of `trian` on the cells containing `i`
-"""
-function reduced_triangulation(trian::Triangulation,i::AbstractIntegrationDomain,r::RBSpace...)
-  f = map(get_fe_space,r)
-  red_integr_cells = reduced_dofs_to_reduced_cells(trian,i,f...)
-  red_trian = view(trian,red_integr_cells)
+function reduced_triangulation(trian::Triangulation,a::HyperReduction)
+  i = get_integration_domain(a)
+  cells = get_cells(i)
+  red_trian = view(trian,cells)
   return red_trian
-end
-
-function reduced_triangulation(trian::SkeletonTriangulation,i::AbstractIntegrationDomain,r::RBSpace...)
-  f = map(get_fe_space,r)
-  red_integr_cells = reduced_dofs_to_reduced_cells(trian.plus,i,f...)
-  red_trian = view(trian,red_integr_cells)
-  return red_trian
-end
-
-function reduced_triangulation(trian::Triangulation,b::HyperReduction,r::RBSpace...)
-  indices = get_integration_domain(b)
-  reduced_triangulation(trian,indices,r...)
-end
-
-function Algebra.allocate_matrix(::Type{M},m::Integer,n::Integer) where M
-  T = eltype(M)
-  zeros(T,m,n)
 end
 
 function allocate_coefficient(a::HyperReduction,r::AbstractRealization)
   n = num_reduced_dofs(a)
   np = num_params(r)
-  coeffvec = allocate_vector(Vector{Float64},n)
+  coeffvec = zeros(n)
   coeff = global_parameterize(coeffvec,np)
   return coeff
 end
@@ -343,7 +340,7 @@ function allocate_hyper_reduction(
 
   nrows = num_reduced_dofs_left_projector(a)
   np = num_params(r)
-  b = allocate_vector(Vector{Float64},nrows)
+  b = zeros(nrows)
   hypred = global_parameterize(b,np)
   fill!(hypred,zero(eltype(hypred)))
   return hypred
@@ -356,7 +353,7 @@ function allocate_hyper_reduction(
   nrows = num_reduced_dofs_left_projector(a)
   ncols = num_reduced_dofs_right_projector(a)
   np = num_params(r)
-  M = allocate_matrix(Matrix{Float64},nrows,ncols)
+  M = zeros(nrows,ncols)
   hypred = global_parameterize(M,np)
   fill!(hypred,zero(eltype(hypred)))
   return hypred
@@ -388,8 +385,6 @@ struct AffineContribution{A<:Projection,V,K} <: Contribution
   end
 end
 
-union_indices(a::AffineContribution) = union_indices(get_contributions(a)...)
-
 function allocate_coefficient(a::AffineContribution,r::AbstractRealization)
   contribution(get_domains(a)) do trian
     allocate_coefficient(a[trian],r)
@@ -403,9 +398,10 @@ end
 """
 """
 function allocate_hypred_cache(a::AffineContribution,r::AbstractRealization)
+  fecache = allocate_coefficient(a,r)
   coeffs = allocate_coefficient(a,r)
   hypred = allocate_hyper_reduction(a,r)
-  return coeffs,hypred
+  return HRParamArray(fecache,coeffs,hypred)
 end
 
 function inv_project!(
@@ -435,8 +431,8 @@ function reduced_form(
   trian::Triangulation,
   args...)
 
-  hyper_red = HyperReduction(red,s,args...)
-  red_trian = reduced_triangulation(trian,hyper_red,args...)
+  hyper_red = HyperReduction(red,s,trian,args...)
+  red_trian = reduced_triangulation(trian,hyper_red)
   return hyper_red,red_trian
 end
 
@@ -548,7 +544,7 @@ function Utils.Contribution(
   AffineContribution(v,t)
 end
 
-for f in (:get_basis,:get_interpolation,:get_integration_domain,:get_indices)
+for f in (:get_basis,:get_interpolation,:get_integration_domain)
   @eval begin
     function Arrays.return_cache(::typeof($f),a::HyperReduction)
       cache = $f(a)
@@ -575,23 +571,6 @@ for f in (:get_basis,:get_interpolation,:get_integration_domain,:get_indices)
   end
 end
 
-function union_indices(a::BlockHyperReduction...)
-  @check all(ai.touched == a[1].touched for ai in a)
-  cache = return_cache(get_indices,first(a))
-  for ai in a
-    for i in eachindex(ai)
-      if ai.touched[i]
-        if isassigned(cache,i)
-          cache[i] = union(cache[i],get_indices(ai[i]))
-        else
-          cache[i] = get_indices(ai[i])
-        end
-      end
-    end
-  end
-  ArrayBlock(cache,a[1].touched)
-end
-
 function inv_project!(
   hypred::BlockParamArray,
   coeff::ArrayBlock,
@@ -606,11 +585,14 @@ function inv_project!(
   return hypred
 end
 
-for (T,S) in zip((:HyperReduction,:BlockHyperReduction,:AffineContribution),
-                 (:AbstractParamArray,:ArrayBlock,:ArrayContribution))
+for (T,S) in zip((:AffineContribution,:BlockHyperReduction),(:ArrayContribution,:ArrayBlock))
   @eval begin
     function inv_project(a::$T,b::$S)
       @notimplemented "Must provide cache in advance"
+    end
+
+    function inv_project!(cache::HRParamArray,a::$T,b::$S)
+      inv_project!(cache.hypred,cache.coeff,a,b)
     end
   end
 end
@@ -684,33 +666,11 @@ function allocate_hyper_reduction(a::BlockHyperReduction,r::AbstractRealization)
   return mortar(hypred)
 end
 
-function reduced_triangulation(
-  trian::Triangulation,
-  b::BlockHyperReduction,
-  test::MultiFieldRBSpace)
-
-  @check length(b) == num_fields(test)
+function reduced_triangulation(trian::Triangulation,b::BlockHyperReduction)
   red_trian = Triangulation[]
   for i in eachindex(b)
     if b.touched[i]
-      push!(red_trian,reduced_triangulation(trian,b[i],test[i]))
-    end
-  end
-  return red_trian
-end
-
-function reduced_triangulation(
-  trian::Triangulation,
-  b::BlockHyperReduction,
-  trial::MultiFieldRBSpace,
-  test::MultiFieldRBSpace)
-
-  @check size(b,1) == num_fields(test)
-  @check size(b,2) == num_fields(trial)
-  red_trian = Triangulation[]
-  for (i,j) in Iterators.product(axes(b)...)
-    if b.touched[i,j]
-      push!(red_trian,reduced_triangulation(trian,b[i,j],trial[j],test[i]))
+      push!(red_trian,reduced_triangulation(trian,b[i]))
     end
   end
   return red_trian

@@ -1,65 +1,55 @@
 """
-    struct TransientIntegrationDomain <: AbstractIntegrationDomain{AbstractVector{Int}}
-      indices_space::IntegrationDomain
-      indices_time::IntegrationDomain
+    struct TransientIntegrationDomain <: IntegrationDomain
+      domain_space::IntegrationDomain
+      indices_time::Vector{Int}
     end
 
-Integration domain for a projection operator in a transient context
+Integration domain for a projection operator in a transient problem
 """
-struct TransientIntegrationDomain <: AbstractIntegrationDomain{AbstractVector{Int}}
-  indices_space::IntegrationDomain
-  indices_time::IntegrationDomain
+struct TransientIntegrationDomain <: IntegrationDomain
+  domain_space::IntegrationDomain
+  indices_time::Vector{Int}
 end
 
-function TransientIntegrationDomain(ispace::AbstractVector,itime::AbstractVector)
-  indices_space = IntegrationDomain(ispace)
-  indices_time = IntegrationDomain(itime)
-  TransientIntegrationDomain(indices_space,indices_time)
-end
+function RBSteady.vector_domain(
+  test::FESpace,
+  trian::Triangulation,
+  indices::Union{Tuple,AbstractVector})
 
-function RBSteady.integration_domain(indices::Union{Tuple,AbstractVector{<:AbstractVector}})
   @check length(indices) == 2
-  TransientIntegrationDomain(indices...)
+  indices_space,indices_time = indices
+  domain_space = vector_domain(test,trian,indices_space)
+  TransientIntegrationDomain(domain_space,indices_time)
 end
 
-Base.size(i::TransientIntegrationDomain) = (2,)
-function Base.getindex(i::TransientIntegrationDomain,j::Integer)
-  j == 1 ? i.indices_space : i.indices_time
-end
+function RBSteady.matrix_domain(
+  trial::FESpace,
+  test::FESpace,
+  trian::Triangulation,
+  rows::AbstractVector,
+  cols::AbstractVector,
+  indices_time::AbstractVector)
 
-get_integration_domain_space(i::TransientIntegrationDomain) = i.indices_space
-get_integration_domain_time(i::TransientIntegrationDomain) = i.indices_time
-get_indices_space(i::TransientIntegrationDomain) = RBSteady.get_indices(i[1])
-union_indices_space(i::TransientIntegrationDomain...) = RBSteady.union_indices(getindex.(i,1)...)
-get_indices_time(i::TransientIntegrationDomain) = RBSteady.get_indices(i[2])
-union_indices_time(i::TransientIntegrationDomain...) = RBSteady.union_indices(getindex.(i,2)...)
-
-function Base.getindex(a::AbstractParamArray,i::TransientIntegrationDomain)
-  @notimplemented
+  domain_space = matrix_domain(trial,test,trian,rows,cols)
+  TransientIntegrationDomain(domain_space,indices_time)
 end
 
 const TransientHyperReduction{A<:Reduction,B<:ReducedProjection} = HyperReduction{A,B,TransientIntegrationDomain}
 
-get_integration_domain_space(a::TransientHyperReduction) = @abstractmethod
-get_integration_domain_time(a::TransientHyperReduction) = @abstractmethod
+function get_integration_domain_space(a::TransientHyperReduction)
+  i = get_integration_domain(a)
+  i.domain_space
+end
 
-get_indices_space(a::TransientHyperReduction) = RBSteady.get_indices(get_integration_domain_space(a))
-get_indices_time(a::TransientHyperReduction) = RBSteady.get_indices(get_integration_domain_time(a))
-
-union_indices_space(a::TransientHyperReduction...) = union(get_indices_space.(a)...)
-union_indices_time(a::TransientHyperReduction...) = union(get_indices_time.(a)...)
-
-union_indices_space(a::AffineContribution) = union_indices_space(get_contributions(a)...)
-union_indices_time(a::AffineContribution) = union_indices_time(get_contributions(a)...)
-
-function RBSteady.reduced_triangulation(trian::Triangulation,b::TransientHyperReduction,r::RBSpace...)
-  indices = get_integration_domain_space(b)
-  RBSteady.reduced_triangulation(trian,indices,r...)
+function get_indices_time(a::TransientHyperReduction)
+  i = get_integration_domain(a)
+  i.indices_time
 end
 
 function RBSteady.HyperReduction(
   red::TransientMDEIMReduction,
   s::Snapshots,
+  trian::Triangulation,
   trial::RBSpace,
   test::RBSpace)
 
@@ -68,14 +58,13 @@ function RBSteady.HyperReduction(
   proj_basis = project(test,basis,trial,get_combine(red))
   indices,interp = empirical_interpolation(basis)
   factor = lu(interp)
-  domain = integration_domain(indices)
+  domain = matrix_domain(trial,test,trian,indices...)
   return MDEIM(reduction,proj_basis,factor,domain)
 end
 
-const TransientMDEIM{A,B} = MDEIM{A,B,TransientIntegrationDomain}
-
-get_integration_domain_space(a::TransientMDEIM) = get_integration_domain_space(a.domain)
-get_integration_domain_time(a::TransientMDEIM) = get_integration_domain_time(a.domain)
+function RBSteady.reduced_triangulation(trian::Triangulation,a::TransientHyperReduction)
+  reduced_triangulation(trian,get_integration_domain_space(a))
+end
 
 function RBSteady.reduced_jacobian(
   red::Tuple{Vararg{Reduction}},
@@ -105,9 +94,6 @@ end
 
 const TupOfAffineContribution = Tuple{Vararg{AffineContribution}}
 
-union_indices_space(a::TupOfAffineContribution) = union(union_indices_space.(a)...)
-union_indices_time(a::TupOfAffineContribution) = union(union_indices_time.(a)...)
-
 function RBSteady.allocate_coefficient(a::TupOfAffineContribution,b::TupOfArrayContribution)
   @check length(a) == length(b)
   coeffs = ()
@@ -134,65 +120,8 @@ function RBSteady.inv_project!(
 end
 
 function RBSteady.allocate_hypred_cache(a::TupOfAffineContribution,r::TransientRealization)
+  fecache = map(ai -> RBSteady.allocate_coefficient(ai,r),a)
   coeffs = map(ai -> RBSteady.allocate_coefficient(ai,r),a)
   hypred = RBSteady.allocate_hyper_reduction(first(a),r)
-  return coeffs,hypred
-end
-
-# multi field interface
-
-for f in (:get_indices_space,:get_indices_time)
-  @eval begin
-    function Arrays.return_cache(::typeof($f),a::HyperReduction)
-      cache = $f(a)
-      return cache
-    end
-
-    function Arrays.return_cache(::typeof($f),a::BlockHyperReduction)
-      i = findfirst(a.touched)
-      @notimplementedif isnothing(i)
-      cache = return_cache($f,a[i])
-      block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
-      return block_cache
-    end
-
-    function $f(a::BlockHyperReduction)
-      cache = return_cache($f,a)
-      for i in eachindex(a)
-        if a.touched[i]
-          cache[i] = $f(a[i])
-        end
-      end
-      return ArrayBlock(cache,a.touched)
-    end
-  end
-end
-
-function union_indices_space(a::BlockHyperReduction...)
-  @check all(ai.touched == a[1].touched for ai in a)
-  cache = return_cache(get_indices_space,first(a))
-  for ai in a
-    for i in eachindex(ai)
-      if ai.touched[i]
-        if isassigned(cache,i)
-          cache[i] = union(cache[i],get_indices_space(ai[i]))
-        else
-          cache[i] = get_indices_space(ai[i])
-        end
-      end
-    end
-  end
-  ArrayBlock(cache,a[1].touched)
-end
-
-function union_indices_time(a::BlockHyperReduction...)
-  cache = Vector{Int}[]
-  for ai in a
-    for i in eachindex(ai)
-      if ai.touched[i]
-        push!(cache,get_indices_time(ai[i]))
-      end
-    end
-  end
-  union(cache...)
+  return HRParamArray(fecache,coeffs,hypred)
 end
