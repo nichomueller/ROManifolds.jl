@@ -9,7 +9,7 @@ Parametric vector returned after the online phase of a hyper-reduction strategy.
 Fields:
 
 - `fecache`: represents a parametric residual/Jacobian computed via integration
-  on an [`AbstractIntegrationDomain`](@ref)
+  on an [`IntegrationDomain`](@ref)
 - `coeff`: parameter-dependent coefficient computed during the online phase
   according to the formula `coeff = Φi⁻¹ * fecache[i,:]`, where `(Φi,i)` are
   stored in a `HyperReduction` object

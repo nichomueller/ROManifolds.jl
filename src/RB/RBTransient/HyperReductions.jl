@@ -1,51 +1,3 @@
-"""
-    struct TransientIntegrationDomain <: IntegrationDomain
-      domain_space::IntegrationDomain
-      indices_time::Vector{Int}
-    end
-
-Integration domain for a projection operator in a transient problem
-"""
-struct TransientIntegrationDomain <: IntegrationDomain
-  domain_space::IntegrationDomain
-  indices_time::Vector{Int}
-end
-
-function RBSteady.vector_domain(
-  test::FESpace,
-  trian::Triangulation,
-  indices::Union{Tuple,AbstractVector})
-
-  @check length(indices) == 2
-  indices_space,indices_time = indices
-  domain_space = vector_domain(test,trian,indices_space)
-  TransientIntegrationDomain(domain_space,indices_time)
-end
-
-function RBSteady.matrix_domain(
-  trial::FESpace,
-  test::FESpace,
-  trian::Triangulation,
-  rows::AbstractVector,
-  cols::AbstractVector,
-  indices_time::AbstractVector)
-
-  domain_space = matrix_domain(trial,test,trian,rows,cols)
-  TransientIntegrationDomain(domain_space,indices_time)
-end
-
-const TransientHyperReduction{A<:Reduction,B<:ReducedProjection} = HyperReduction{A,B,TransientIntegrationDomain}
-
-function get_integration_domain_space(a::TransientHyperReduction)
-  i = get_integration_domain(a)
-  i.domain_space
-end
-
-function get_indices_time(a::TransientHyperReduction)
-  i = get_integration_domain(a)
-  i.indices_time
-end
-
 function RBSteady.HyperReduction(
   red::TransientMDEIMReduction,
   s::Snapshots,
@@ -58,8 +10,20 @@ function RBSteady.HyperReduction(
   proj_basis = project(test,basis,trial,get_combine(red))
   indices,interp = empirical_interpolation(basis)
   factor = lu(interp)
-  domain = matrix_domain(trial,test,trian,indices...)
+  domain = matrix_domain(trian,trial,test,indices...)
   return MDEIM(reduction,proj_basis,factor,domain)
+end
+
+const TransientHyperReduction{A<:Reduction,B<:ReducedProjection} = HyperReduction{A,B,TransientIntegrationDomain}
+
+function get_integration_domain_space(a::TransientHyperReduction)
+  i = get_integration_domain(a)
+  i.domain_space
+end
+
+function get_indices_time(a::TransientHyperReduction)
+  i = get_integration_domain(a)
+  i.indices_time
 end
 
 function RBSteady.reduced_triangulation(trian::Triangulation,a::TransientHyperReduction)

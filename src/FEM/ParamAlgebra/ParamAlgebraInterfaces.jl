@@ -174,6 +174,25 @@ end
   A
 end
 
+@inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamMatrix,v::Number,i,j)
+  data = get_all_data(A)
+  @inbounds for k = param_eachindex(A)
+    aijk = data[i,j,k]
+    data[i,j,k] = combine(aijk,v)
+  end
+  A
+end
+
+@inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamMatrix,v::AbstractVector,i,j)
+  data = get_all_data(A)
+  @inbounds for k = param_eachindex(A)
+    aijk = data[i,j,k]
+    vk = v[k]
+    data[i,j,k] = combine(aijk,vk)
+  end
+  A
+end
+
 @inline function Algebra.add_entry!(combine::Function,A::ConsecutiveParamSparseMatrix,v::Number,i,j)
   l = nz_index(A,i,j)
   nz = get_all_data(nonzeros(A))

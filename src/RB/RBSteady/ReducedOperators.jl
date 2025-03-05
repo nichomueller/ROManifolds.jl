@@ -55,34 +55,6 @@ function reduced_operator(
 end
 
 """
-    struct RBCache <: AbstractParamCache
-      A::HRParamArray
-      b::HRParamArray
-      trial::RBSpace
-      paramcache::ParamCache
-    end
-"""
-struct RBCache <: AbstractParamCache
-  A::HRParamArray
-  b::HRParamArray
-  trial::RBSpace
-  paramcache::ParamCache
-end
-
-"""
-    struct LinearNonlinearRBCache <: AbstractParamCache
-      rbcache::RBCache
-      A::AbstractMatrix
-      b::AbstractVector
-    end
-"""
-struct LinearNonlinearRBCache <: AbstractParamCache
-  rbcache::RBCache
-  A::AbstractMatrix
-  b::AbstractVector
-end
-
-"""
     abstract type RBOperator{O} <: ParamOperator{O,SplitDomains} end
 
 Type representing reduced algebraic operators used within a reduced order modelling

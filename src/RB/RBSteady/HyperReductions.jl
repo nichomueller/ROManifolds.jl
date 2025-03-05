@@ -1,165 +1,8 @@
-function empirical_interpolation!(cache,A::AbstractMatrix)
-  I,res = cache
-  m,n = size(A)
-  resize!(res,m)
-  resize!(I,n)
-  @views I[1] = argmax(abs.(A[:,1]))
-  if n > 1
-    @inbounds for i = 2:n
-      @views Bi = A[:,1:i-1]
-      Ci = A[I[1:i-1],1:i-1]
-      Di = A[I[1:i-1],i]
-      @views res = A[:,i] - Bi*(Ci \ Di)
-      I[i] = argmax(abs.(res))
-    end
-  end
-  Ai = view(A,I,:)
-  return I,Ai
-end
-
-function eim_cache(A::AbstractMatrix)
-  m,n = size(A)
-  res = zeros(eltype(A),m)
-  I = zeros(Int,n)
-  return I,res
-end
-
-function empirical_interpolation(A::AbstractArray)
-  cache = eim_cache(A)
-  I,AI = empirical_interpolation!(cache,A)
-  return I,AI
-end
-
-function empirical_interpolation(A::ParamSparseMatrix)
-  I,AI = empirical_interpolation(A.data)
-  R′,C′ = recast_split_indices(I,param_getindex(A,1))
-  return (R′,C′),AI
-end
-
-"""
-    get_dofs_to_cells(
-      cell_dof_ids::AbstractArray{<:AbstractArray},
-      dofs::AbstractVector
-      ) -> AbstractVector
-
-Returns the list of cells containing the dof ids `dofs`
-"""
-function get_dofs_to_cells(
-  cell_dof_ids::AbstractArray{<:AbstractArray},
-  dofs::AbstractVector)
-
-  cells = Int32[]
-  cache = array_cache(cell_dof_ids)
-  for cell = eachindex(cell_dof_ids)
-    celldofs = getindex!(cache,cell_dof_ids,cell)
-    if !isempty(intersect(dofs,celldofs))
-      append!(cells,cell)
-    end
-  end
-  return cells
-end
-
-function reduced_cells(
-  test::FESpace,
-  trian::Triangulation,
-  rows::AbstractVector)
-
-  cell_dof_ids = get_cell_dof_ids(test,trian)
-  cells = get_dofs_to_cells(cell_dof_ids,rows)
-  return cells
-end
-
-function reduced_cells(
-  trial::FESpace,
-  test::FESpace,
-  trian::Triangulation,
-  rows::AbstractVector,
-  cols::AbstractVector)
-
-  cell_dof_ids_trial = get_cell_dof_ids(trial,trian)
-  cell_dof_ids_test = get_cell_dof_ids(test,trian)
-  cells_trial = get_dofs_to_cells(cell_dof_ids_trial,cols)
-  cells_test = get_dofs_to_cells(cell_dof_ids_test,cols)
-  cells = union(cells_trial,cells_test)
-  return cells
-end
-
-"""
-    abstract type IntegrationDomain end
-
-Type representing the set of interpolation rows of a `Projection` subjected
-to a EIM approximation with `empirical_interpolation`.
-Subtypes:
-- [`VectorDomain`](@ref)
-- [`TransientIntegrationDomain`](@ref)
-"""
-abstract type IntegrationDomain end
-
-"""
-    struct VectorDomain <: IntegrationDomain{Int,1}
-      rows::Vector{Int}
-      cells::Vector{Int32}
-    end
-
-Integration domain for a projection vector operator in a steady problem
-"""
-struct VectorDomain <: IntegrationDomain
-  rows::Vector{Int}
-  cells::Vector{Int32}
-end
-
-function vector_domain(args...)
-  @abstractmethod
-end
-
-function vector_domain(
-  test::FESpace,
-  trian::Triangulation,
-  rows::Vector{<:Number})
-
-  cells = reduced_cells(test,trian,rows)
-  VectorDomain(rows,cells)
-end
-
-"""
-    struct MatrixDomain <: IntegrationDomain
-      rows::Vector{Int}
-      cols::Vector{Int}
-      cells::Vector{Int32}
-    end
-
-Integration domain for a projection matrix operator in a steady problem
-"""
-struct MatrixDomain <: IntegrationDomain
-  rows::Vector{Int}
-  cols::Vector{Int}
-  cells::Vector{Int32}
-  function MatrixDomain(rows::Vector{Int},cols::Vector{Int},cells::Vector{Int32})
-    @check length(rows) == length(cols)
-    new(rows,cols,cells)
-  end
-end
-
-function matrix_domain(args...)
-  @abstractmethod
-end
-
-function matrix_domain(
-  trial::FESpace,
-  test::FESpace,
-  trian::Triangulation,
-  rows::Vector{<:Number},
-  cols::Vector{<:Number})
-
-  cells = reduced_cells(trial,test,trian,rows,cols)
-  MatrixDomain(rows,cols,cells)
-end
-
 """
     abstract type HyperReduction{
       A<:Reduction,
       B<:ReducedProjection,
-      C<:AbstractIntegrationDomain
+      C<:IntegrationDomain
       } <: Projection end
 
 Subtype of a [`Projection`](@ref) dedicated to the outputd of a hyper-reduction
@@ -186,7 +29,7 @@ Subtypes:
 - [`EmptyHyperReduction`](@ref)
 - [`MDEIM`](@ref)
 """
-abstract type HyperReduction{A<:Reduction,B<:ReducedProjection,C<:AbstractIntegrationDomain} <: Projection end
+abstract type HyperReduction{A<:Reduction,B<:ReducedProjection,C<:IntegrationDomain} <: Projection end
 
 HyperReduction(::Reduction,args...) = @abstractmethod
 
@@ -199,7 +42,7 @@ returns `Φi`, usually stored as a Factorization
 get_interpolation(a::HyperReduction) = @abstractmethod
 
 """
-    get_integration_domain(a::HyperReduction) -> AbstractIntegrationDomain
+    get_integration_domain(a::HyperReduction) -> IntegrationDomain
 
 For a [`HyperReduction`](@ref) `a` represented by the triplet `(Φrb,Φi,i)`,
 returns `i`
@@ -294,7 +137,7 @@ function HyperReduction(
   proj_basis = project(test,basis)
   indices,interp = empirical_interpolation(basis)
   factor = lu(interp)
-  domain = vector_domain(test,trian,indices)
+  domain = vector_domain(trian,test,indices)
   return MDEIM(red,proj_basis,factor,domain)
 end
 
@@ -310,7 +153,7 @@ function HyperReduction(
   proj_basis = project(test,basis,trial)
   indices,interp = empirical_interpolation(basis)
   factor = lu(interp)
-  domain = matrix_domain(trial,test,trian,indices...)
+  domain = matrix_domain(trian,trial,test,indices...)
   return MDEIM(red,proj_basis,factor,domain)
 end
 
@@ -321,7 +164,7 @@ Returns the triangulation view of `trian` on the integration cells contained in 
 """
 function reduced_triangulation(trian::Triangulation,a::HyperReduction)
   i = get_integration_domain(a)
-  cells = get_cells(i)
+  cells = get_integration_cells(i)
   red_trian = view(trian,cells)
   return red_trian
 end

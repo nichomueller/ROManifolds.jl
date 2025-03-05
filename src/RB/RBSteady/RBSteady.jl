@@ -127,14 +127,17 @@ include("RBSpaces.jl")
 export IntegrationDomain
 export VectorDomain
 export MatrixDomain
+export vector_domain
+export matrix_domain
+export empirical_interpolation
+export get_integration_cells
+include("IntegrationDomains.jl")
+
 export HyperReduction
 export EmptyHyperReduction
 export MDEIM
 export AffineContribution
 export BlockHyperReduction
-export empirical_interpolation
-export vector_domain
-export matrix_domain
 export get_integration_domain
 export reduced_triangulation
 export reduced_jacobian
@@ -150,8 +153,6 @@ include("HRAssemblers.jl")
 export RBOperator
 export GenericRBOperator
 export LinearNonlinearRBOperator
-export RBCache
-export LinearNonlinearRBCache
 export reduced_operator
 export get_fe_trial
 export get_fe_test
