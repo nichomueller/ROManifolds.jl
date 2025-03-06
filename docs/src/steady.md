@@ -148,8 +148,7 @@ The structure [`FEDomains`](@ref) collects the triangulations relative to the LH
 We define the FE solver for our Poisson problem: 
 
 ``` julia
-ls = LUSolver()
-solver = LinearFESolver(ls)
+solver = LUSolver()
 ```
 
 ## RB solver

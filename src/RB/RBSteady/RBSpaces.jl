@@ -1,17 +1,17 @@
 """
-    reduced_spaces(solver::RBSolver,feop::ParamFEOperator,s::AbstractSnapshots
+    reduced_spaces(solver::RBSolver,feop::ParamOperator,s::AbstractSnapshots
       ) -> (RBSpace, RBSpace)
 
 Computes the subspace of the test, trial `FESpace`s contained in the FE operator
 `feop` by compressing the snapshots `s`
 """
-function reduced_spaces(solver::RBSolver,feop::ParamFEOperator,s::AbstractSnapshots)
+function reduced_spaces(solver::RBSolver,feop::ParamOperator,s::AbstractSnapshots)
   red = get_state_reduction(solver)
   soff = select_snapshots(s,offline_params(solver))
   reduced_spaces(red,feop,soff)
 end
 
-function reduced_spaces(red::Reduction,feop::ParamFEOperator,s::AbstractSnapshots)
+function reduced_spaces(red::Reduction,feop::ParamOperator,s::AbstractSnapshots)
   t = @timed begin
     basis = reduced_basis(red,feop,s)
   end
@@ -37,7 +37,7 @@ end
 
 function reduced_basis(
   red::Reduction,
-  feop::ParamFEOperator,
+  feop::ParamOperator,
   s::AbstractSnapshots)
 
   reduced_basis(red,s)
@@ -45,7 +45,7 @@ end
 
 function reduced_basis(
   red::Reduction{<:ReductionStyle,EnergyNorm},
-  feop::ParamFEOperator,
+  feop::ParamOperator,
   s::AbstractSnapshots)
 
   norm_matrix = assemble_matrix(feop,get_norm(red))
@@ -54,7 +54,7 @@ end
 
 function reduced_basis(
   red::SupremizerReduction,
-  feop::ParamFEOperator,
+  feop::ParamOperator,
   s::AbstractSnapshots)
 
   norm_matrix = assemble_matrix(feop,get_norm(red))
@@ -102,20 +102,37 @@ get_basis(r::RBSpace) = get_basis(get_reduced_subspace(r))
 num_fe_dofs(r::RBSpace) = num_free_dofs(get_fe_space(r))
 num_reduced_dofs(r::RBSpace) = num_reduced_dofs(get_reduced_subspace(r))
 
-FESpaces.num_free_dofs(r::RBSpace) = num_reduced_dofs(r)
-
-FESpaces.num_dirichlet_dofs(r::RBSpace) = num_dirichlet_dofs(get_fe_space(r))
-
-FESpaces.get_free_dof_ids(r::RBSpace) = Base.OneTo(num_free_dofs(r))
-
-FESpaces.get_dirichlet_dof_ids(r::RBSpace) = Base.OneTo(num_dirichlet_dofs(r))
-
+FESpaces.get_triangulation(r::RBSpace) = get_triangulation(get_fe_space(r))
+FESpaces.get_free_dof_ids(r::RBSpace) = get_free_dof_ids(get_fe_space(r))
+FESpaces.get_dof_value_type(r::RBSpace) = get_dof_value_type(get_fe_space(r))
+FESpaces.get_cell_dof_ids(r::RBSpace) = get_cell_dof_ids(get_fe_space(r))
+FESpaces.get_fe_basis(r::RBSpace) = get_fe_basis(get_fe_space(r))
+FESpaces.get_trial_fe_basis(r::RBSpace) = get_trial_fe_basis(get_fe_space(r))
+FESpaces.get_fe_dof_basis(r::RBSpace) = get_fe_dof_basis(get_fe_space(r))
+FESpaces.ConstraintStyle(r::RBSpace) = ConstraintStyle(get_fe_space(r))
+FESpaces.get_cell_isconstrained(r::RBSpace) = get_cell_isconstrained(get_fe_space(r))
+FESpaces.get_cell_constraints(r::RBSpace) = get_cell_constraints(get_fe_space(r))
+FESpaces.get_vector_type(r::RBSpace) = typeof(zero_free_values(r))
+FESpaces.get_dirichlet_dof_ids(r::RBSpace) = get_dirichlet_dof_ids(get_fe_space(r))
+FESpaces.get_cell_is_dirichlet(r::RBSpace) = get_cell_is_dirichlet(get_fe_space(r))
+FESpaces.num_dirichlet_tags(r::RBSpace) = num_dirichlet_tags(get_fe_space(r))
+FESpaces.get_dirichlet_dof_tag(r::RBSpace) = get_dirichlet_dof_tag(get_fe_space(r))
 ParamDataStructures.param_length(r::RBSpace) = param_length(get_fe_space(r))
 
 function FESpaces.zero_free_values(r::RBSpace)
   x = zero_free_values(get_fe_space(r))
   x̂ = project(r,x)
   RBParamVector(x̂,x)
+end
+
+FESpaces.zero_dirichlet_values(r::RBSpace) = zero_dirichlet_values(get_fe_space(r))
+
+function FESpaces.scatter_free_and_dirichlet_values(r::RBSpace,fv,dv)
+  scatter_free_and_dirichlet_values(get_fe_space(r),fv.fe_data,dv)
+end
+
+function FESpaces.gather_free_and_dirichlet_values!(fv,dv,r::RBSpace,cv)
+  gather_free_and_dirichlet_values!(fv.fe_data,dv,get_fe_space(r),cv)
 end
 
 for (f,f!,g) in zip(
@@ -254,26 +271,9 @@ function Base.iterate(r::EvalRBSpace{MultiFieldRBSpace},state=1)
   return ri,state+1
 end
 
-for T in (:MultiFieldRBSpace,:(EvalRBSpace{MultiFieldRBSpace}))
-  @eval begin
-    MultiField.MultiFieldStyle(r::$T) = MultiFieldStyle(get_fe_space(r))
-    MultiField.num_fields(r::$T) = num_fields(get_fe_space(r))
-    Base.length(r::$T) = num_fields(r)
-
-    function FESpaces.get_free_dof_ids(r::$T)
-      get_free_dof_ids(r,MultiFieldStyle(r))
-    end
-
-    function FESpaces.get_free_dof_ids(r::$T,::ConsecutiveMultiFieldStyle)
-      @notimplemented
-    end
-
-    function FESpaces.get_free_dof_ids(r::$T,::BlockMultiFieldStyle{NB}) where NB
-      block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
-      return BlockArrays.blockedrange(block_num_dofs)
-    end
-  end
-end
+MultiField.MultiFieldStyle(r::RBSpace) = MultiFieldStyle(get_fe_space(r))
+MultiField.num_fields(r::RBSpace) = num_fields(get_fe_space(r))
+Base.length(r::RBSpace) = num_fields(r)
 
 # utils
 

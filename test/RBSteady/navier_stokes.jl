@@ -6,8 +6,6 @@ using GridapSolvers
 using GridapSolvers.NonlinearSolvers
 using ROManifolds
 
-import Gridap.FESpaces: NonlinearFESolver
-
 tol_or_rank(tol,rank) = @assert false "Provide either a tolerance or a rank for the reduction step"
 tol_or_rank(tol::Real,rank) = tol
 tol_or_rank(tol::Real,rank::Int) = tol
@@ -80,7 +78,7 @@ function main(
     state_reduction = SupremizerReduction(ttcoupling,tolranks,energy;nparams,unsafe)
   end
 
-  fesolver = NonlinearFESolver(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true))
+  fesolver = NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true)
   rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
 
   pspace_uniform = ParamSpace(pdomain;sampling=:uniform)

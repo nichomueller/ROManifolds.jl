@@ -177,14 +177,14 @@ end
 #   LinearNonlinearTransientRBOperator(rbop_lin,rbop_nlin)
 # end
 
-function reduced_operator(rbsolver::RBSolver,feop::ParamFEOperator,sol::AbstractSnapshots,args...)
+function reduced_operator(rbsolver::RBSolver,feop::ParamOperator,sol::AbstractSnapshots,args...)
   op = get_algebraic_operator(feop)
   red_trial,red_test = reduced_spaces(rbsolver,feop,sol)
   reduced_operator(rbsolver,op,red_trial,red_test,args...)
 end
 
 function run_test(
-  dir::String,rbsolver::RBSolver,feop::ParamFEOperator,tols=[1e-1,1e-2,1e-3,1e-4,1e-5],
+  dir::String,rbsolver::RBSolver,feop::ParamOperator,tols=[1e-1,1e-2,1e-3,1e-4,1e-5],
   args...;nparams=10,kwargs...)
 
   fesnaps = try_loading_fe_snapshots(dir,rbsolver,feop,args...)

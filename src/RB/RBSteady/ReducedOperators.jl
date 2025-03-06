@@ -1,13 +1,13 @@
 """
-    reduced_operator(solver::RBSolver,feop::ParamFEOperator,args...;kwargs...) -> RBOperator
-    reduced_operator(solver::RBSolver,feop::TransientParamFEOperator,args...;kwargs...) -> TransientRBOperator
+    reduced_operator(solver::RBSolver,feop::ParamOperator,args...;kwargs...) -> RBOperator
+    reduced_operator(solver::RBSolver,feop::TransientParamOperator,args...;kwargs...) -> TransientRBOperator
 
 Computes a RB operator from the FE operator `feop`
 """
 function reduced_operator(
   dir::String,
   solver::RBSolver,
-  feop::ParamFEOperator,
+  feop::ParamOperator,
   args...;
   kwargs...)
 
@@ -20,26 +20,25 @@ end
 
 function reduced_operator(
   solver::RBSolver,
-  feop::ParamFEOperator,
+  feop::ParamOperator,
   s::AbstractSnapshots)
 
   red_trial,red_test = reduced_spaces(solver,feop,s)
-  op = get_algebraic_operator(feop)
-  reduced_operator(solver,op,red_trial,red_test,s)
+  reduced_operator(solver,feop,red_trial,red_test,s)
 end
 
 function reduced_operator(
   solver::RBSolver,
-  op::ParamOperator,
+  feop::ParamOperator,
   red_trial::RBSpace,
   red_test::RBSpace,
   s::AbstractSnapshots)
 
-  red_lhs,red_rhs = reduced_weak_form(solver,op,red_trial,red_test,s)
+  red_lhs,red_rhs = reduced_weak_form(solver,feop,red_trial,red_test,s)
   trians_rhs = get_domains(red_rhs)
   trians_lhs = get_domains(red_lhs)
-  op′ = change_domains(op,trians_rhs,trians_lhs)
-  GenericRBOperator(op′,red_trial,red_test,red_lhs,red_rhs)
+  feop′ = change_domains(feop,trians_rhs,trians_lhs)
+  GenericRBOperator(feop′,red_trial,red_test,red_lhs,red_rhs)
 end
 
 function reduced_operator(
@@ -97,9 +96,6 @@ end
 
 FESpaces.get_trial(op::GenericRBOperator) = op.trial
 FESpaces.get_test(op::GenericRBOperator) = op.test
-get_fe_trial(op::GenericRBOperator) = get_trial(op.op)
-get_fe_test(op::GenericRBOperator) = get_test(op.op)
-
 ParamSteady.get_fe_operator(op::GenericRBOperator) = op.op
 
 function Algebra.allocate_residual(
@@ -127,20 +123,28 @@ function Algebra.residual!(
   u::AbstractParamVector,
   paramcache)
 
-  hr_residual!(b,op,r,u,paramcache)
-  inv_project!(b,op.rhs,feb)
+  uh = EvaluationFunction(paramcache.trial,u)
+  test = get_test(op.op)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(op.op,r)
+
+  trian_res = get_domains_res(op.op)
+  res = get_res(op.op)
+  dc = res(r,uh,v)
+
+  map(trian_res) do strian
+    b_trian = b.fecache[strian]
+    i_trian = get_integration_domain(op.rhs[strian])
+    scell_vec = get_contribution(dc,strian)
+    cell_vec,trian = move_contributions(scell_vec,strian)
+    @assert ndims(eltype(cell_vec)) == 1
+    cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
+    vecdata = [cell_vec_r],[i_trian.cell_irows]
+    assemble_hr_vector_add!(b_trian,assem,vecdata)
+  end
+
+  inv_project!(b,op.rhs)
 end
-
-# function Algebra.residual!(
-#   b::HRParamArray,
-#   op::GenericRBOperator,
-#   r::Realization,
-#   u::RBParamVector,
-#   paramcache)
-
-#   inv_project!(u.fe_data,paramcache.trial,u.data)
-#   residual!(b,op,r,u.fe_data,paramcache)
-# end
 
 function Algebra.jacobian!(
   A::HRParamArray,
@@ -149,20 +153,31 @@ function Algebra.jacobian!(
   u::AbstractParamVector,
   paramcache)
 
-  hr_jacobian!(A,op,r,u,paramcache)
+  uh = EvaluationFunction(paramcache.trial,u)
+  trial = get_trial(op.op)
+  du = get_trial_fe_basis(trial)
+  test = get_test(op.op)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(op.op,r)
+
+  trian_jac = get_domains_jac(op.op)
+  jac = get_jac(op.op)
+  dc = jac(r,uh,du,v)
+
+  map(trian_jac) do strian
+    A_trian = A.fecache[strian]
+    i_trian = get_integration_domain(op.lhs[strian])
+    scell_mat = get_contribution(dc,strian)
+    cell_mat,trian = move_contributions(scell_mat,strian)
+    @assert ndims(eltype(cell_mat)) == 2
+    cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
+    cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
+    matdata = [cell_mat_rc],[i_trian.cell_irows],[i_trian.cell_icols]
+    assemble_hr_matrix_add!(A_trian,assem,matdata)
+  end
+
   inv_project!(A,op.lhs)
 end
-
-# function Algebra.jacobian!(
-#   A::HRParamArray,
-#   op::GenericRBOperator,
-#   r::Realization,
-#   u::RBParamVector,
-#   paramcache)
-
-#   inv_project!(u.fe_data,paramcache.trial,u.data)
-#   jacobian!(A,op,r,u.fe_data,rbcache)
-# end
 
 """
     struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}

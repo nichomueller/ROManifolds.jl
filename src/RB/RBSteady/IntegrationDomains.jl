@@ -61,16 +61,16 @@ end
 
 function get_cells_to_idofs(
   cell_dof_ids::AbstractArray{<:AbstractArray},
-  dofs::AbstractVector,
-  cells::AbstractVector)
+  cells::AbstractVector,
+  dofs::AbstractVector)
 
   cache = array_cache(cell_dof_ids)
 
   ncells = length(cells)
   ptrs = Vector{Int32}(undef,ncells+1)
-  @inbounds for cell in cells
+  @inbounds for (icell,cell) in enumerate(cells)
     celldofs = getindex!(cache,cell_dof_ids,cell)
-    ptrs[i+1] = length(celldofs)
+    ptrs[icell+1] = length(celldofs)
   end
   length_to_ptrs!(ptrs)
 
@@ -80,7 +80,7 @@ function get_cells_to_idofs(
     for (idof,dof) in enumerate(dofs)
       for (icelldof,celldof) in enumerate(celldofs)
         if dof == celldof
-          data[ptrs[icell-1]+icelldof] = idof
+          data[ptrs[icell]-1+icelldof] = idof
         end
       end
     end

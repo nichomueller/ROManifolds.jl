@@ -6,7 +6,7 @@
       jacobian_reduction::B
     end
 
-Wrapper around a FE solver (e.g. `FESolver` or `ODESolver` in `Gridap`) with
+Wrapper around a FE solver (e.g. `NonlinearSolver` or `ODESolver` in `Gridap`) with
 additional information on the reduced basis (RB) method employed to solve a given
 problem dependent on a set of parameters. A RB method is a projection-based
 reduced order model where
@@ -51,9 +51,9 @@ function RBSolver(
 end
 
 """
-    get_fe_solver(s::RBSolver) -> FESolver
+    get_fe_solver(s::RBSolver) -> NonlinearSolver
 
-Returns the underlying `FESolver` from a [`RBSolver`](@ref) `s`
+Returns the underlying `NonlinearSolver` from a [`RBSolver`](@ref) `s`
 """
 get_fe_solver(s::RBSolver) = s.fesolver
 get_state_reduction(s::RBSolver) = s.state_reduction
@@ -70,47 +70,45 @@ res_params(s::RBSolver) = 1:num_res_params(s)
 jac_params(s::RBSolver) = 1:num_jac_params(s)
 
 """
-    solution_snapshots(solver::FESolver,op::ParamFEOperator,r::Realization) -> SteadySnapshots
-    solution_snapshots(solver::ODESolver,op::TransientParamFEOperator,r::TransientRealization,u0) -> TransientSnapshots
+    solution_snapshots(solver::NonlinearSolver,feop::ParamOperator,r::Realization) -> SteadySnapshots
+    solution_snapshots(solver::ODESolver,feop::TransientParamOperator,r::TransientRealization,u0) -> TransientSnapshots
 
-The problem encoded in the FE operator `op` is solved several times, and the solution
+The problem encoded in the FE operator `feop` is solved several times, and the solution
 snapshots are returned along with the information related to the computational
 cost of the FE method. In transient settings, an initial condition `u0` should be
 provided.
 """
 function solution_snapshots(
   solver::RBSolver,
-  op::ParamFEOperator,
+  feop::ParamOperator,
   args...;
   nparams=num_offline_params(solver),
-  r=realization(op;nparams))
+  r=realization(feop;nparams))
 
-  solution_snapshots(solver,op,r,args...)
+  solution_snapshots(solver,feop,r,args...)
 end
 
 function solution_snapshots(
   solver::RBSolver,
-  op::ParamFEOperator,
+  feop::ParamOperator,
   r::AbstractRealization,
   args...)
 
   fesolver = get_fe_solver(solver)
-  dof_map = get_dof_map(op)
-  uh,stats = solve(fesolver,op,r)
-  values = get_free_dof_values(uh)
+  dof_map = get_dof_map(feop)
+  values,stats = solve(fesolver,feop,r)
   snaps = Snapshots(values,dof_map,r)
   return snaps,stats
 end
 
 # not needed
 function solution_snapshots(
-  fesolver::FESolver,
-  op::ParamFEOperator,
+  fesolver::NonlinearSolver,
+  op::ParamOperator,
   r::Realization)
 
   dof_map = get_dof_map(op)
-  uh,stats = solve(fesolver,op,r)
-  values = get_free_dof_values(uh)
+  values,stats = solve(fesolver,op,r)
   snaps = Snapshots(values,dof_map,r)
   return snaps,stats
 end
@@ -222,7 +220,7 @@ function Algebra.solve(
   x̂ = zero_free_values(trial)
 
   nlop = parameterize(op,r)
-  syscache = allocate_systemcache(nlop,r)
+  syscache = allocate_systemcache(nlop,x̂)
 
   fesolver = get_fe_solver(solver)
   t = @timed solve!(x̂,fesolver,nlop,syscache)

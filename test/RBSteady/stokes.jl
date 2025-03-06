@@ -69,7 +69,7 @@ function main(
     state_reduction = SupremizerReduction(ttcoupling,tolranks,energy;nparams,unsafe)
   end
 
-  fesolver = LinearFESolver(LUSolver())
+  fesolver = LUSolver()
   rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
 
   pspace_uniform = ParamSpace(pdomain;sampling=:uniform)

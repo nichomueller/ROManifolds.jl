@@ -45,6 +45,8 @@ export TriangulationStyle
 export SplitDomains
 export JointDomains
 export ParamOperator
+export LinearParamOperator
+export LinearNonlinearParamOperator
 export LinearNonlinearParamOpFromFEOp
 export get_fe_operator
 include("ParamOperators.jl")
@@ -54,6 +56,7 @@ export SplitParamFEOperator
 export JointParamFEOperator
 export LinearParamFEOperator
 export FEDomains
+export get_jac
 export get_param_space
 export get_param_assembler
 export get_domains

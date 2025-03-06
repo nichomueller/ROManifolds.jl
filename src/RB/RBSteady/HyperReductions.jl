@@ -428,14 +428,10 @@ function inv_project!(
   return hypred
 end
 
-for (T,S) in zip((:AffineContribution,:BlockHyperReduction),(:ArrayContribution,:ArrayBlock))
+for T in (:AffineContribution,:BlockHyperReduction)
   @eval begin
-    function inv_project(a::$T,b::$S)
-      @notimplemented "Must provide cache in advance"
-    end
-
-    function inv_project!(cache::HRParamArray,a::$T,b::$S)
-      inv_project!(cache.hypred,cache.coeff,a,b)
+    function inv_project!(cache::HRParamArray,a::$T)
+      inv_project!(cache.hypred,cache.coeff,a,cache.fecache)
     end
   end
 end

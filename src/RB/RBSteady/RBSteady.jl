@@ -154,8 +154,6 @@ export RBOperator
 export GenericRBOperator
 export LinearNonlinearRBOperator
 export reduced_operator
-export get_fe_trial
-export get_fe_test
 include("ReducedOperators.jl")
 
 export ROMPerformance

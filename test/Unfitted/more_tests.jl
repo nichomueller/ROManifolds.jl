@@ -67,7 +67,7 @@ feop = LinearParamFEOperator(b,a,pspace,trial,test,domains)
 tol = 1e-4
 energy(du,v) = ∫(v*du)dΩbg + ∫(∇(v)⋅∇(du))dΩbg
 state_reduction = TTSVDReduction(tol,energy;nparams=100)
-fesolver = LinearFESolver(LUSolver())
+fesolver = LUSolver()
 rbsolver = RBSolver(fesolver,state_reduction)
 
 # offline

@@ -58,6 +58,16 @@ Type representing algebraic operators when solving parametric differential probl
 abstract type ParamOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: NonlinearParamOperator end
 
 """
+    const JointParamOperator{O} = ParamOperator{O,JointDomains}
+"""
+const JointParamOperator{O} = ParamOperator{O,JointDomains}
+
+"""
+    const SplitParamOperator{O} = ParamOperator{O,SplitDomains}
+"""
+const SplitParamOperator{O} = ParamOperator{O,SplitDomains}
+
+"""
     get_fe_operator(op::ParamOperator) -> ParamFEOperator
 
 Fetches the underlying FE operator of an algebraic operator `op`
@@ -66,11 +76,28 @@ get_fe_operator(op::ParamOperator) = @abstractmethod
 
 FESpaces.get_test(op::ParamOperator) = get_test(get_fe_operator(op))
 FESpaces.get_trial(op::ParamOperator) = get_trial(get_fe_operator(op))
+ODEs.get_res(op::ParamOperator) = ODEs.get_res(get_fe_operator(op))
+get_jac(op::ParamOperator) = get_jac(get_fe_operator(op))
+
 DofMaps.get_dof_map(op::ParamOperator) = get_dof_map(get_fe_operator(op))
 DofMaps.get_internal_dof_map(op::ParamOperator) = get_internal_dof_map(get_fe_operator(op))
 DofMaps.get_sparse_dof_map(op::ParamOperator) = get_sparse_dof_map(get_fe_operator(op))
 get_dof_map_at_domains(op::ParamOperator) = get_dof_map_at_domains(get_fe_operator(op))
 get_sparse_dof_map_at_domains(op::ParamOperator) = get_sparse_dof_map_at_domains(get_fe_operator(op))
+CellData.get_domains(op::ParamOperator) = get_domains(get_fe_operator(op))
+
+set_domains(op::ParamOperator) = set_domains(get_fe_operator(op))
+change_domains(op::ParamOperator) = change_domains(get_fe_operator(op))
+get_domains_res(op::ParamOperator) = get_domains_res(get_fe_operator(op))
+get_domains_jac(op::ParamOperator) = get_domains_jac(get_fe_operator(op))
+
+get_param_space(op::ParamOperator) = get_param_space(get_fe_operator(op))
+ParamDataStructures.realization(op::ParamOperator;kwargs...) = realization(get_fe_operator(op);kwargs...)
+
+get_param_assembler(op::ParamOperator,r::AbstractRealization) = get_param_assembler(get_fe_operator(op),r)
+FESpaces.assemble_matrix(op::ParamOperator,form::Function) = assemble_matrix(get_fe_operator(op),form)
+
+join_operators(op::ParamOperator) = join_operators(get_fe_operator(op))
 
 function ParamAlgebra.allocate_paramcache(op::ParamOperator,μ::Realization)
   feop = get_fe_operator(op)
@@ -149,4 +176,21 @@ function ParamDataStructures.parameterize(op::LinearNonlinearParamOperator,μ::R
   op_nlin = parameterize(get_nonlinear_operator(op),μ)
   syscache_lin = allocate_systemcache(op_lin)
   LinNonlinParamOperator(op_lin,op_nlin,syscache_lin)
+end
+
+# constructors
+
+function LinearParamOperator(args...;kwargs...)
+  feop = LinearParamFEOperator(args...;kwargs...)
+  get_algebraic_operator(feop)
+end
+
+function ParamOperator(args...;kwargs...)
+  feop = ParamFEOperator(args...;kwargs...)
+  get_algebraic_operator(feop)
+end
+
+function LinearNonlinearParamOperator(args...;kwargs...)
+  feop = LinearNonlinearParamFEOperator(args...;kwargs...)
+  get_algebraic_operator(feop)
 end

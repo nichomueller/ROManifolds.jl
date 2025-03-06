@@ -270,7 +270,7 @@ end
 """
     eval_performance(
       solver::RBSolver,
-      feop::ParamFEOperator,
+      feop::ParamOperator,
       fesnaps::AbstractSnapshots,
       rbsnaps::AbstractSnapshots,
       festats::CostTracker,
@@ -291,7 +291,7 @@ and `festats`
 """
 function eval_performance(
   solver::RBSolver,
-  feop::ParamFEOperator,
+  feop::ParamOperator,
   fesnaps::AbstractSnapshots,
   rbsnaps::AbstractSnapshots,
   festats::CostTracker,
@@ -314,8 +314,8 @@ end
 
 function eval_performance(
   solver::RBSolver,
-  feop::ParamFEOperator,
-  rbop::ParamOperator,
+  feop::ParamOperator,
+  rbop::RBOperator,
   fesnaps::AbstractSnapshots,
   x̂::AbstractParamVector,
   festats::CostTracker,
@@ -423,7 +423,7 @@ end
 """
     plot_a_solution(
       dir::String,
-      feop::ParamFEOperator,
+      feop::ParamOperator,
       sol::AbstractSnapshots,
       sol_approx::AbstractSnapshots,
       args...;
@@ -435,7 +435,7 @@ by selecting the first FE snapshot in `sol` and the first reduced snapshot in `s
 """
 function plot_a_solution(
   dir::String,
-  feop::ParamFEOperator,
+  feop::ParamOperator,
   sol::Snapshots,
   sol_approx::Snapshots;
   kwargs...)
@@ -446,7 +446,7 @@ end
 
 function plot_a_solution(
   dir::String,
-  feop::ParamFEOperator,
+  feop::ParamOperator,
   sol::BlockSnapshots,
   sol_approx::BlockSnapshots;
   kwargs...)
@@ -462,8 +462,8 @@ end
 
 function plot_a_solution(
   dir::String,
-  feop::ParamFEOperator,
-  rbop::ParamOperator,
+  feop::ParamOperator,
+  rbop::RBOperator,
   fesnaps::AbstractSnapshots,
   x̂::AbstractParamVector,
   r::AbstractRealization;

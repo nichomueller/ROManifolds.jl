@@ -91,7 +91,7 @@ function main(
   trial = ParamTrialFESpace(test)
   feop = LinearParamFEOperator(b,a,pspace,trial,test,domains)
 
-  fesolver = LinearFESolver(LUSolver())
+  fesolver = LUSolver()
   rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
 
   # offline

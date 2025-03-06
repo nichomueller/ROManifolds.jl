@@ -75,7 +75,7 @@ test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
 
-fesolver = LinearFESolver(LUSolver())
+fesolver = LUSolver()
 
 tol = 1e-4
 state_reduction = SupremizerReduction(coupling,tol,energy;nparams=100)

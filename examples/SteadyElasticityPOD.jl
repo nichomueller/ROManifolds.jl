@@ -59,7 +59,7 @@ trian_l,trian_a = (Γ1,Γ2,Γ3),(Ω,)
 domains = FEDomains(trian_l,trian_a)
 feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
 
-fesolver = LinearFESolver(LUSolver())
+fesolver = LUSolver()
 
 energy(du,v) = ∫(∇(v)⊙∇(du))dΩ
 

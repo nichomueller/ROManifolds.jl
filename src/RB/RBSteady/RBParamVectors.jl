@@ -1,4 +1,26 @@
 """
+    struct RBVector{T,A<:AbstractVector{T},B} <: AbstractVector{T}
+      data::A
+      fe_data::B
+    end
+
+Vector obtained by applying a [`Projection`](@ref) on a high-dimensional FE vector
+`fe_data`, which is stored (but mostly unused) for conveniency
+"""
+struct RBVector{T,A<:AbstractVector{T},B} <: AbstractVector{T}
+  data::A
+  fe_data::B
+end
+
+function RBVector(data::ParamVector,fe_data::ParamVector)
+  RBParamVector(data,fe_data)
+end
+
+Base.size(a::RBVector) = size(a.data)
+Base.getindex(a::RBVector,i::Integer) = getindex(a.data,i)
+Base.setindex!(a::RBVector,v,i::Integer) = setindex!(a.data,v,i)
+
+"""
     struct RBParamVector{T,A<:ParamVector{T},B} <: ParamArray{T,1}
       data::A
       fe_data::B
@@ -12,6 +34,10 @@ struct RBParamVector{T,A<:ParamVector{T},B} <: ParamArray{T,1}
   fe_data::B
 end
 
+function RBVector(data::AbstractVector,fe_data::AbstractVector)
+  RBVector(data,fe_data)
+end
+
 Base.size(a::RBParamVector) = size(a.data)
 Base.getindex(a::RBParamVector,i::Integer) = getindex(a.data,i)
 Base.setindex!(a::RBParamVector,v,i::Integer) = setindex!(a.data,v,i)
@@ -19,31 +45,47 @@ ParamDataStructures.param_length(a::RBParamVector) = param_length(a.data)
 ParamDataStructures.get_all_data(a::RBParamVector) = get_all_data(a.data)
 ParamDataStructures.param_getindex(a::RBParamVector,i::Integer) = param_getindex(a.data,i)
 
-function Base.copy(a::RBParamVector)
-  data′ = copy(a.data)
-  fe_data′ = copy(a.fe_data)
-  RBParamVector(data′,fe_data′)
+for T in (:RBParamVector,:RBVector)
+  @eval begin
+    function Base.copy(a::$T)
+      data′ = copy(a.data)
+      fe_data′ = copy(a.fe_data)
+      RBParamVector(data′,fe_data′)
+    end
+
+    function Base.similar(A::$T{R},::Type{S}) where {R,S<:AbstractVector}
+      data′ = similar(a.data,S)
+      fe_data′ = copy(a.fe_data)
+      $T(data′,fe_data′)
+    end
+
+    function Base.similar(A::$T{R},::Type{S},dims::Dims{1}) where {R,S<:AbstractVector}
+      data′ = similar(a.data,S,dims)
+      fe_data′ = similar(a.fe_data,S,dims)
+      $T(data′,fe_data′)
+    end
+
+    function Base.copyto!(a::$T,b::$T)
+      copyto!(a.data,b.data)
+      copyto!(a.fe_data,b.fe_data)
+      a
+    end
+
+    function Base.fill!(a::$T,b::Number)
+      fill!(a.data,b)
+      return a
+    end
+  end
 end
 
-function Base.similar(A::RBParamVector{T},::Type{S}) where {T,S<:AbstractVector}
-  data′ = similar(a.data,S)
-  fe_data′ = copy(a.fe_data)
-  RBParamVector(data′,fe_data′)
-end
+for (F,T) in zip((:SingleFieldParamFESpace,:SingleFieldFESpace),(:RBParamVector,:RBVector))
+  @eval begin
+    function FESpaces.scatter_free_and_dirichlet_values(f::$F,fv::$T,dv)
+      scatter_free_and_dirichlet_values(f,fv.fe_data,dv)
+    end
 
-function Base.similar(A::RBParamVector{T},::Type{S},dims::Dims{1}) where {T,S<:AbstractVector}
-  data′ = similar(a.data,S,dims)
-  fe_data′ = similar(a.fe_data,S,dims)
-  RBParamVector(data′,fe_data′)
-end
-
-function Base.copyto!(a::RBParamVector,b::RBParamVector)
-  copyto!(a.data,b.data)
-  copyto!(a.fe_data,b.fe_data)
-  a
-end
-
-function Base.fill!(a::RBParamVector,b::Number)
-  fill!(a.data,b)
-  return a
+    function FESpaces.gather_free_and_dirichlet_values!(fv::$T,dv,f::$F,cv)
+      gather_free_and_dirichlet_values!(fv.fe_data,dv,f,cv)
+    end
+  end
 end

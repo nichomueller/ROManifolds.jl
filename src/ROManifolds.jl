@@ -61,6 +61,9 @@ export MultiFieldParamFESpace
 include("FEM/ParamFESpaces/ParamFESpaces.jl")
 using ROManifolds.ParamFESpaces
 
+export ParamOperator
+export LinearParamOperator
+export LinearNonlinearParamOperator
 export FEDomains
 export ParamFEOperator
 export LinearParamFEOperator

@@ -103,7 +103,7 @@ function main(
   trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
   feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
 
-  fesolver = LinearFESolver(LUSolver())
+  fesolver = LUSolver()
   rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
 
   # offline

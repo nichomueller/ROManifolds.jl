@@ -1,34 +1,39 @@
-function Algebra.solve!(u,solver::NonlinearFESolver,feop::ParamFEOperator,r::Realization)
-  x = get_free_dof_values(u)
+for S in (:NonlinearSolver,:LinearSolver)
+  @eval begin
+    function Algebra.solve!(u::AbstractVector,solver::$S,op::JointParamOperator,r::Realization)
+      nlop = parameterize(op,r)
+      syscache = allocate_systemcache(nlop,u)
+      t = @timed solve!(u,solver,nlop,syscache)
+      stats = CostTracker(t,name="Solver";nruns=num_params(r))
+      stats
+    end
+
+    function Algebra.solve!(u::AbstractVector,solver::$S,op::SplitParamOperator,r::Realization)
+      solve!(u,solver,set_domains(op),r)
+    end
+  end
+end
+
+function Algebra.solve(solver::NonlinearSolver,op::ParamOperator,r::Realization)
+  U = get_trial(op)(r)
+  u = zero_free_values(U)
+  stats = solve!(u,solver,op,r)
+  u,stats
+end
+
+function Algebra.solve!(uh,fesolver::FESolver,feop::ParamFEOperator,r::Realization)
+  u = get_free_dof_values(uh)
+  solver = get_solver(fesolver)
   op = get_algebraic_operator(feop)
-  nlop = parameterize(op,r)
-  syscache = allocate_systemcache(nlop,x)
-  t = @timed solve!(x,solver.nls,nlop,syscache)
-  stats = CostTracker(t,name="FEM";nruns=num_params(r))
-  trial = get_trial(feop)(r)
-  uh = FEFunction(trial,x)
+  stats = solve!(uh,solver,op,r)
   uh,stats
 end
 
-function Algebra.solve!(u,solver::LinearFESolver,feop::ParamFEOperator,r::Realization)
-  x = get_free_dof_values(u)
-  op = get_algebraic_operator(feop)
-  nlop = parameterize(op,r)
-  syscache = allocate_systemcache(nlop,x)
-  t = @timed solve!(x,solver.ls,nlop,syscache)
-  stats = CostTracker(t,name="FEM";nruns=num_params(r))
-  trial = get_trial(feop)(r)
-  uh = FEFunction(trial,x)
-  uh,stats
-end
-
-function Algebra.solve(solver::FESolver,op::ParamFEOperator,r::Realization)
+function Algebra.solve(fesolver::FESolver,feop::ParamFEOperator,r::Realization)
   U = get_trial(op)(r)
   uh = zero(U)
-  vh,stats = solve!(uh,solver,op,r)
-  vh,stats
+  solve!(uh,fesolver,feop,r)
 end
 
-function Algebra.solve(solver::FESolver,op::SplitParamFEOperator,r::Realization)
-  solve(solver,set_domains(op),r)
-end
+get_solver(solver::LinearFESolver) = solver.ls
+get_solver(solver::NonlinearFESolver) = solver.nls
