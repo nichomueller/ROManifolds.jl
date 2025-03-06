@@ -57,6 +57,18 @@ function try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps)
   end
 end
 
+function _temp(dir_tol,rbsolver,feop,fesnaps)
+  dir = joinpath(splitpath(dir_tol)[1:end-1])
+  op = get_algebraic_operator(feop)
+  res = residual_snapshots(rbsolver,op,fesnaps)
+  jac = jacobian_snapshots(rbsolver,op,fesnaps)
+  save(dir,res,feop;label="res")
+  save(dir,jac,feop;label="jac")
+  rbop = reduced_operator(rbsolver,feop,fesnaps,jac,res)
+  save(dir_tol,rbop)
+  return rbop
+end
+
 get_error(perf::ROMPerformance) = perf.error
 
 function plot_errors(dir,tols,perfs::Vector{ROMPerformance})
@@ -204,7 +216,8 @@ function run_test(
     create_dir(plot_dir_tol)
 
     rbsolver = update_solver(rbsolver,tol)
-    rbop = try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps)
+    # rbop = try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps)
+    rbop = _temp(dir_tol,rbsolver,feop,fesnaps)
 
     x̂,rbstats = solve(rbsolver,rbop,μon,args...)
     perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
