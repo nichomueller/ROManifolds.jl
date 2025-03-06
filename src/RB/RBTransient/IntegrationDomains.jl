@@ -34,6 +34,6 @@ function RBSteady.matrix_domain(
   TransientIntegrationDomain(domain_space,indices_time)
 end
 
-function RBSteady.get_integration_cells(i::TransientIntegrationDomain)
-  RBSteady.get_integration_cells(i.domain_space)
-end
+RBSteady.get_integration_cells(i::TransientIntegrationDomain) = get_integration_cells(i.domain_space)
+RBSteady.get_cellids_rows(i::TransientIntegrationDomain) = get_cellids_rows(i.domain_space)
+RBSteady.get_cellids_cols(i::TransientIntegrationDomain) = get_cellids_cols(i.domain_space)

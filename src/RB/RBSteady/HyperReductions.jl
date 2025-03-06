@@ -49,6 +49,10 @@ returns `i`
 """
 get_integration_domain(a::HyperReduction) = @abstractmethod
 
+get_integration_cells(a::HyperReduction) = get_integration_cells(get_integration_domain(a))
+get_cellids_rows(a::HyperReduction) = get_cellids_rows(get_integration_domain(a))
+get_cellids_cols(a::HyperReduction) = get_cellids_cols(get_integration_domain(a))
+
 num_reduced_dofs(a::HyperReduction) = num_reduced_dofs(get_basis(a))
 num_reduced_dofs_left_projector(a::HyperReduction) = num_reduced_dofs_left_projector(get_basis(a))
 num_reduced_dofs_right_projector(a::HyperReduction) = num_reduced_dofs_right_projector(get_basis(a))
@@ -387,17 +391,12 @@ function Utils.Contribution(
   AffineContribution(v,t)
 end
 
-for f in (:get_basis,:get_interpolation,:get_integration_domain)
+for f in (:get_basis,:get_interpolation,:get_integration_domain,:get_cellids_rows,:get_cellids_cols)
   @eval begin
-    function Arrays.return_cache(::typeof($f),a::HyperReduction)
-      cache = $f(a)
-      return cache
-    end
-
     function Arrays.return_cache(::typeof($f),a::BlockHyperReduction)
       i = findfirst(a.touched)
       @notimplementedif isnothing(i)
-      cache = return_cache($f,a[i])
+      cache = $f(a[i])
       block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
       return block_cache
     end

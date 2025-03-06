@@ -122,6 +122,8 @@ Subtypes:
 abstract type IntegrationDomain end
 
 get_integration_cells(i::IntegrationDomain) = @abstractmethod
+get_cellids_rows(i::IntegrationDomain) = @abstractmethod
+get_cellids_cols(i::IntegrationDomain) = @abstractmethod
 
 """
     struct VectorDomain <: IntegrationDomain{Int,1}
@@ -137,6 +139,7 @@ struct VectorDomain <: IntegrationDomain
 end
 
 get_integration_cells(i::VectorDomain) = i.cells
+get_cellids_rows(i::VectorDomain) = i.cell_irows
 
 function vector_domain(args...)
   @abstractmethod
@@ -187,3 +190,5 @@ function matrix_domain(
 end
 
 get_integration_cells(i::MatrixDomain) = i.cells
+get_cellids_rows(i::MatrixDomain) = i.cell_irows
+get_cellids_cols(i::MatrixDomain) = i.cell_icols

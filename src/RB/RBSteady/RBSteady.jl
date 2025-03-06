@@ -131,6 +131,8 @@ export vector_domain
 export matrix_domain
 export empirical_interpolation
 export get_integration_cells
+export get_cellids_rows
+export get_cellids_cols
 include("IntegrationDomains.jl")
 
 export HyperReduction

@@ -71,14 +71,14 @@ function main(
   rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
 
   pspace_uniform = ParamSpace(pdomain;sampling=:uniform)
-  feop_uniform = LinearParamFEOperator(res,stiffness,pspace_uniform,trial,test,domains)
+  feop_uniform = LinearParamOperator(res,stiffness,pspace_uniform,trial,test,domains)
   μon = realization(feop_uniform;nparams=10)
   x,festats = solution_snapshots(rbsolver,feop_uniform,μon)
 
   for sampling in (:uniform,:halton,:latin_hypercube,:tensorial_uniform)
     println("Running $method test with sampling strategy $sampling")
     pspace = ParamSpace(pdomain;sampling)
-    feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,domains)
+    feop = LinearParamOperator(res,stiffness,pspace,trial,test,domains)
 
     fesnaps, = solution_snapshots(rbsolver,feop)
     rbop = reduced_operator(rbsolver,feop,fesnaps)
@@ -135,41 +135,38 @@ else
   model = CartesianDiscreteModel(domain,partition)
 end
 
-order = 1
+order = 2
 degree = 2*order
 
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
-Γn = BoundaryTriangulation(model,tags=[8])
-dΓn = Measure(Γn,degree)
 
-a(μ) = x -> exp(-x[1]/sum(μ))
+a(μ) = x -> μ[1]*exp(-x[1])
 aμ(μ) = ParamFunction(a,μ)
 
-f(μ) = x -> 1.
-fμ(μ) = ParamFunction(f,μ)
-
-g(μ) = x -> μ[1]*exp(-x[1]/μ[2])
+g(μ) = x -> VectorValue(-(μ[2]*x[2]+μ[3])*x[2]*(1.0-x[2]),0.0)*(x[1]==0.0)
 gμ(μ) = ParamFunction(g,μ)
 
-h(μ) = x -> abs(cos(μ[3]*x[2]))
-hμ(μ) = ParamFunction(h,μ)
+stiffness(μ,(u,p),(v,q),dΩ) = ∫(aμ(μ)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
+res(μ,(u,p),(v,q),dΩ) = stiffness(μ,(u,p),(v,q),dΩ)
 
-stiffness(μ,u,v,dΩ) = ∫(aμ(μ)*∇(v)⋅∇(u))dΩ
-rhs(μ,v,dΩ,dΓn) = ∫(fμ(μ)*v)dΩ + ∫(hμ(μ)*v)dΓn
-res(μ,u,v,dΩ,dΓn) = stiffness(μ,u,v,dΩ) - rhs(μ,v,dΩ,dΓn)
-
-trian_res = (Ω,Γn)
+trian_res = (Ω,)
 trian_stiffness = (Ω,)
 domains = FEDomains(trian_res,trian_stiffness)
 
-energy(du,v) = ∫(v*du)dΩ + ∫(∇(v)⋅∇(du))dΩ
+energy((du,dp),(v,q)) = ∫(du⋅v)dΩ + ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
 
-reffe = ReferenceFE(lagrangian,Float64,order)
-test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=[1,3,7])
-trial = ParamTrialFESpace(test,gμ)
+reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
+test_u = TestFESpace(Ω,reffe_u;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6,7])
+trial_u = ParamTrialFESpace(test_u,gμ)
+reffe_p = ReferenceFE(lagrangian,Float64,order-1)
+test_p = TestFESpace(Ω,reffe_p;conformity=:H1)
+trial_p = ParamTrialFESpace(test_p)
+test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
+trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 
-state_reduction = PODReduction(1e-4,energy;nparams=50,sketch=:sprn)
+coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
+state_reduction = SupremizerReduction(coupling,1e-4,energy;nparams=50,sketch=:sprn)
 
 fesolver = LUSolver()
 rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)

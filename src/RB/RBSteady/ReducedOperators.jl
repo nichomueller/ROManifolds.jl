@@ -134,12 +134,13 @@ function Algebra.residual!(
 
   map(trian_res) do strian
     b_trian = b.fecache[strian]
-    i_trian = get_integration_domain(op.rhs[strian])
+    rhs_trian = op.rhs[strian]
+    cell_irows = get_cellids_rows(rhs_trian)
     scell_vec = get_contribution(dc,strian)
     cell_vec,trian = move_contributions(scell_vec,strian)
     @assert ndims(eltype(cell_vec)) == 1
     cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
-    vecdata = [cell_vec_r],[i_trian.cell_irows]
+    vecdata = [cell_vec_r],[cell_irows]
     assemble_hr_vector_add!(b_trian,assem,vecdata)
   end
 
@@ -166,13 +167,15 @@ function Algebra.jacobian!(
 
   map(trian_jac) do strian
     A_trian = A.fecache[strian]
-    i_trian = get_integration_domain(op.lhs[strian])
+    lhs_trian = op.lhs[strian]
+    cell_irows = get_cellids_rows(lhs_trian)
+    cell_icols = get_cellids_cols(lhs_trian)
     scell_mat = get_contribution(dc,strian)
     cell_mat,trian = move_contributions(scell_mat,strian)
     @assert ndims(eltype(cell_mat)) == 2
     cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
     cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
-    matdata = [cell_mat_rc],[i_trian.cell_irows],[i_trian.cell_icols]
+    matdata = [cell_mat_rc],[cell_irows],[cell_icols]
     assemble_hr_matrix_add!(A_trian,assem,matdata)
   end
 

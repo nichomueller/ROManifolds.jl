@@ -75,6 +75,14 @@ for T in (:RBParamVector,:RBVector)
       fill!(a.data,b)
       return a
     end
+
+    # multi field
+
+    function MultiField.restrict_to_field(f::MultiFieldFESpace,fv::$T,i::Integer)
+      data_i = blocks(fv.data)[i]
+      fe_data_i = MultiField.restrict_to_field(f,fv.fe_data,i)
+      $T(data_i,fe_data_i)
+    end
   end
 end
 
