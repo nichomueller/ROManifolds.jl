@@ -57,14 +57,14 @@ function RBSteady.load_jacobians(dir,feop::LinearNonlinearTransientParamFEOperat
   return (jac_lin,jac_nlin)
 end
 
-function RBSteady._save_trian_operator_parts(dir,op::GenericTransientRBOperator;label="")
+function RBSteady._save_trian_operator_parts(dir,op::TransientRBOperator;label="")
   save(dir,op.rhs;label=_get_label(label,"rhs"))
   for (i,lhsi) in enumerate(op.lhs)
     save(dir,lhsi;label=_get_label(label,"lhs_$i"))
   end
 end
 
-function DrWatson.save(dir,op::GenericTransientRBOperator;kwargs...)
+function DrWatson.save(dir,op::TransientRBOperator;kwargs...)
   RBSteady._save_fixed_operator_parts(dir,op;kwargs...)
   RBSteady._save_trian_operator_parts(dir,op;kwargs...)
 end
@@ -84,26 +84,26 @@ end
 function RBSteady.load_operator(dir,feop::SplitTransientParamFEOperator;kwargs...)
   trial,test = RBSteady._load_fixed_operator_parts(dir,feop;kwargs...)
   odeop,red_lhs,red_rhs = RBSteady._load_trian_operator_parts(dir,feop,trial,test;kwargs...)
-  op = GenericTransientRBOperator(odeop,trial,test,red_lhs,red_rhs)
+  op = TransientRBOperator(odeop,trial,test,red_lhs,red_rhs)
   return op
 end
 
-function DrWatson.save(dir,op::LinearNonlinearTransientRBOperator;label="")
-  RBSteady._save_fixed_operator_parts(dir,op.op_linear;label)
-  RBSteady._save_trian_operator_parts(dir,op.op_linear;label=_get_label(label,"lin"))
-  RBSteady._save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nlin"))
-end
+# function DrWatson.save(dir,op::LinearNonlinearTransientRBOperator;label="")
+#   RBSteady._save_fixed_operator_parts(dir,op.op_linear;label)
+#   RBSteady._save_trian_operator_parts(dir,op.op_linear;label=_get_label(label,"lin"))
+#   RBSteady._save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nlin"))
+# end
 
-function RBSteady.load_operator(dir,feop::LinearNonlinearTransientParamFEOperator{SplitDomains};label="")
-  trial,test = RBSteady._load_fixed_operator_parts(dir,feop.op_linear;label)
-  odeop_lin,red_lhs_lin,red_rhs_lin = RBSteady._load_trian_operator_parts(
-    dir,feop.op_linear,trial,test;label=_get_label("lin",label))
-  odeop_nlin,red_lhs_nlin,red_rhs_nlin = RBSteady._load_trian_operator_parts(
-    dir,feop.op_nonlinear,trial,test;label=_get_label("nlin",label))
-  op_lin = GenericTransientRBOperator(odeop_lin,trial,test,red_lhs_lin,red_rhs_lin)
-  op_nlin = GenericTransientRBOperator(odeop_nlin,trial,test,red_lhs_nlin,red_rhs_nlin)
-  return LinearNonlinearTransientRBOperator(op_lin,op_nlin)
-end
+# function RBSteady.load_operator(dir,feop::LinearNonlinearTransientParamFEOperator{SplitDomains};label="")
+#   trial,test = RBSteady._load_fixed_operator_parts(dir,feop.op_linear;label)
+#   odeop_lin,red_lhs_lin,red_rhs_lin = RBSteady._load_trian_operator_parts(
+#     dir,feop.op_linear,trial,test;label=_get_label("lin",label))
+#   odeop_nlin,red_lhs_nlin,red_rhs_nlin = RBSteady._load_trian_operator_parts(
+#     dir,feop.op_nonlinear,trial,test;label=_get_label("nlin",label))
+#   op_lin = TransientRBOperator(odeop_lin,trial,test,red_lhs_lin,red_rhs_lin)
+#   op_nlin = TransientRBOperator(odeop_nlin,trial,test,red_lhs_nlin,red_rhs_nlin)
+#   return LinearNonlinearTransientRBOperator(op_lin,op_nlin)
+# end
 
 function Utils.compute_relative_error(
   sol::TransientSnapshots{T,N},

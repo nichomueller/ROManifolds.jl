@@ -148,7 +148,17 @@ function allocate_systemcache(nlop::NonlinearParamOperator,x::AbstractVector)
   return SystemCache(A,b)
 end
 
+function update_systemcache!(nlop::NonlinearParamOperator,x::AbstractVector)
+  @notimplemented "This operator does not store a system cache "
+end
+
+function update_systemcache!(c::SystemCache,nlop::NonlinearParamOperator,x::AbstractVector)
+  residual!(c.b,nlop,x)
+  jacobian!(c.A,nlop,x)
+end
+
 Base.copy(c::SystemCache) = SystemCache(copy(c.A),copy(c.b))
+Base.similar(c::SystemCache) = SystemCache(similar(c.A),similar(c.b))
 
 """
     struct GenericParamNonlinearOperator <: NonlinearParamOperator
@@ -204,6 +214,7 @@ function Algebra.jacobian!(
 end
 
 function allocate_systemcache(nlop::GenericParamNonlinearOperator)
-  x = zero(nlop.paramcache.trial)
+  xh = zero(nlop.paramcache.trial)
+  x = get_free_dof_values(xh)
   allocate_systemcache(nlop,x)
 end

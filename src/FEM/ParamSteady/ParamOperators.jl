@@ -79,7 +79,7 @@ function ParamAlgebra.allocate_paramcache(op::ParamOperator,μ::Realization)
   ParamCache(trial,ptrial)
 end
 
-const LinearNonlinearParamOperator = ParamOperator{LinearNonlinearParamEq,T}
+const LinearNonlinearParamOperator{T} = ParamOperator{LinearNonlinearParamEq,T}
 
 get_fe_operator(op::LinearNonlinearParamOperator) = get_fe_operator(get_nonlinear_operator(op))
 

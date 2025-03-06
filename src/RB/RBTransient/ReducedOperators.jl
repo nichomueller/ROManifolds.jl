@@ -45,8 +45,10 @@ function RBSteady.reduced_operator(
   LinearNonlinearRBOperator(red_op_lin,red_op_nlin)
 end
 
+const TransientRBOperator{O} = GenericRBOperator{TupOfAffineContribution,O}
+
 function Algebra.allocate_residual(
-  op::GenericTransientRBOperator,
+  op::TransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   paramcache)
@@ -55,7 +57,7 @@ function Algebra.allocate_residual(
 end
 
 function Algebra.allocate_jacobian(
-  op::GenericTransientRBOperator,
+  op::TransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   paramcache)
@@ -65,7 +67,7 @@ end
 
 function Algebra.residual!(
   b::HRParamArray,
-  op::GenericTransientRBOperator,
+  op::TransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   paramcache)
@@ -76,7 +78,7 @@ end
 
 function Algebra.jacobian!(
   A::HRParamArray,
-  op::GenericTransientRBOperator,
+  op::TransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   ws::Tuple{Vararg{Real}},
@@ -88,7 +90,7 @@ end
 
 function RBSteady.hr_residual!(
   b,
-  op::GenericTransientRBOperator,
+  op::TransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   paramcache)
@@ -105,7 +107,7 @@ end
 
 function RBSteady.hr_jacobian!(
   A,
-  op::GenericTransientRBOperator,
+  op::TransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}},
   ws::Tuple{Vararg{Real}},
@@ -125,16 +127,16 @@ end
 
 # """
 #     struct LinearNonlinearTransientRBOperator <: TransientRBOperator{LinearNonlinearParamODE}
-#       op_linear::GenericTransientRBOperator{LinearParamODE}
-#       op_nonlinear::GenericTransientRBOperator{NonlinearParamODE}
+#       op_linear::TransientRBOperator{LinearParamODE}
+#       op_nonlinear::TransientRBOperator{NonlinearParamODE}
 #     end
 
-# Extends the concept of [`GenericTransientRBOperator`](@ref) to accommodate the linear/nonlinear
+# Extends the concept of [`TransientRBOperator`](@ref) to accommodate the linear/nonlinear
 # splitting of terms in nonlinear applications
 # """
 # struct LinearNonlinearTransientRBOperator <: TransientRBOperator{LinearNonlinearParamODE}
-#   op_linear::GenericTransientRBOperator{LinearParamODE}
-#   op_nonlinear::GenericTransientRBOperator{NonlinearParamODE}
+#   op_linear::TransientRBOperator{LinearParamODE}
+#   op_nonlinear::TransientRBOperator{NonlinearParamODE}
 # end
 
 # ParamAlgebra.get_linear_operator(op::LinearNonlinearTransientRBOperator) = op.op_linear

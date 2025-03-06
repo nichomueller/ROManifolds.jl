@@ -146,7 +146,7 @@ function reduced_operator(rbsolver::RBSolver,odeop::ODEParamOperator,red_trial,r
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
   odeop′ = change_domains(odeop,trians_rhs,trians_lhs)
-  GenericTransientRBOperator(odeop′,red_trial,red_test,red_lhs,red_rhs)
+  TransientRBOperator(odeop′,red_trial,red_test,red_lhs,red_rhs)
 end
 
 function reduced_operator(
@@ -163,19 +163,19 @@ function reduced_operator(
   LinearNonlinearRBOperator(rbop_lin,rbop_nlin)
 end
 
-function reduced_operator(
-  rbsolver::RBSolver,
-  op::ODEParamOperator{LinearNonlinearParamODE},
-  red_trial,
-  red_test,
-  (jac_lin,jac_nlin),
-  (res_lin,res_nlin)
-  )
+# function reduced_operator(
+#   rbsolver::RBSolver,
+#   op::ODEParamOperator{LinearNonlinearParamODE},
+#   red_trial,
+#   red_test,
+#   (jac_lin,jac_nlin),
+#   (res_lin,res_nlin)
+#   )
 
-  rbop_lin = reduced_operator(rbsolver,get_linear_operator(op),red_trial,red_test,jac_lin,res_lin)
-  rbop_nlin = reduced_operator(rbsolver,get_nonlinear_operator(op),red_trial,red_test,jac_nlin,res_nlin)
-  LinearNonlinearTransientRBOperator(rbop_lin,rbop_nlin)
-end
+#   rbop_lin = reduced_operator(rbsolver,get_linear_operator(op),red_trial,red_test,jac_lin,res_lin)
+#   rbop_nlin = reduced_operator(rbsolver,get_nonlinear_operator(op),red_trial,red_test,jac_nlin,res_nlin)
+#   LinearNonlinearTransientRBOperator(rbop_lin,rbop_nlin)
+# end
 
 function reduced_operator(rbsolver::RBSolver,feop::ParamFEOperator,sol::AbstractSnapshots,args...)
   op = get_algebraic_operator(feop)

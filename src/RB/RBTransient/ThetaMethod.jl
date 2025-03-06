@@ -14,7 +14,7 @@ end
 
 function RBSteady.allocate_rbcache(
   solver::ThetaMethod,
-  op::GenericTransientRBOperator,
+  op::TransientRBOperator,
   r::TransientRealization,
   us::Tuple{Vararg{AbstractParamVector}})
 

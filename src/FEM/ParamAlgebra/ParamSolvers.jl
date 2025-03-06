@@ -97,6 +97,8 @@ function Algebra.solve!(
   cache::SystemCache)
 
   fill!(x,zero(eltype(x)))
+  update_systemcache!(op,x)
+
   @unpack A,b = cache
   residual!(b,op,x)
   jacobian!(A,op,x)
@@ -118,9 +120,12 @@ function Algebra.solve!(
   op::NonlinearOperator,
   cache::NonlinearSolvers.NewtonCache)
 
+  update_systemcache!(op,x)
+
   @unpack A,b,dx,ns = cache
   residual!(b,op,x)
   jacobian!(A,op,x)
+
   Algebra._solve_nr!(x,A,b,dx,ns,nls,op)
   return cache
 end
@@ -129,8 +134,7 @@ function Algebra._solve_nr!(
   x::AbstractParamVector,
   A::AbstractParamMatrix,
   b::AbstractParamVector,
-  dx::AbstractParamVector,
-  ns,nls,op)
+  dx,ns,nls,op)
 
   log = nls.log
 

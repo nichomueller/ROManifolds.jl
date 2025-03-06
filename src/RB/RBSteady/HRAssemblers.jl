@@ -51,7 +51,8 @@
 """
     hr_jacobian!(
       A::HRParamArray,
-      op::RBOperator,
+      op::ParamOperator,
+      a::AffineContribution,
       r::AbstractRealization,
       u,
       paramcache
@@ -62,7 +63,8 @@ relative to the LHS defined in `op`
 """
 function hr_jacobian!(
   A,
-  op::GenericRBOperator,
+  op::ParamOperator,
+  a::AffineContribution,
   r::Realization,
   u::AbstractParamVector,
   paramcache)
@@ -96,7 +98,8 @@ end
 """
     hr_residual!(
       b,
-      op::RBOperator,
+      op::ParamOperator,
+      a::AffineContribution,
       r::AbstractRealization,
       u,
       paramcache

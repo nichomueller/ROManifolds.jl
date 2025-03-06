@@ -47,11 +47,3 @@ function Base.fill!(a::RBParamVector,b::Number)
   fill!(a.data,b)
   return a
 end
-
-function project(r::RBSpace,a::RBParamVector)
-  project!(a.data,r,a.fe_data)
-end
-
-function inv_project(r::RBSpace,a::RBParamVector)
-  inv_project!(a.fe_data,r,a.data)
-end

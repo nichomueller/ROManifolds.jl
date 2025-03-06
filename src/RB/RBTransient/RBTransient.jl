@@ -51,15 +51,13 @@ include("Projections.jl")
 
 include("RBSpaces.jl")
 
-include("HyperReductions.jl")
-
 export TransientIntegrationDomain
 include("IntegrationDomains.jl")
 
-include("HRParamArrays.jl")
+include("HyperReductions.jl")
 
 # export TransientRBOperator
-# export GenericTransientRBOperator
+# export TransientRBOperator
 # export LinearNonlinearTransientRBOperator
 include("ReducedOperators.jl")
 

@@ -113,6 +113,8 @@ using ROManifolds.ParamSteady
 using Test
 using FillArrays
 import Gridap.MultiField: BlockMultiFieldStyle
+using GridapSolvers
+using GridapSolvers.NonlinearSolvers
 
 method=:pod
 tol=1e-4
@@ -189,3 +191,18 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 x̂,rbstats = solve(rbsolver,rbop,μon)
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
+
+using ROManifolds.ParamAlgebra
+using ROManifolds.ParamSteady
+μ = realization(feop)
+U = trial(μ)
+uh = zero(U)
+x = get_free_dof_values(uh)
+op = get_algebraic_operator(set_domains(feop))
+nlop = parameterize(op,μ)
+syscache = allocate_systemcache(nlop,x)
+
+# solve!(x,fesolver.nls,nlop,syscache)
+A,b = syscache.A,syscache.b
+residual!(b,nlop,x)
+jacobian!(A,nlop,x)

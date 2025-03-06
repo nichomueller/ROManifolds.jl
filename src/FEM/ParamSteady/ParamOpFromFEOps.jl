@@ -207,7 +207,7 @@ function ODEs.jacobian_add!(
   A
 end
 
-struct LinearNonlinearParamOpFromFEOp{T} <: LinearNonlinearParamOperator
+struct LinearNonlinearParamOpFromFEOp{T} <: LinearNonlinearParamOperator{T}
   op::LinearNonlinearParamFEOperator{T}
 end
 

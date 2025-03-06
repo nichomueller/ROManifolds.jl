@@ -140,6 +140,14 @@ for (f,f!,g) in zip(
   end
 end
 
+function project(r::RBSpace,a::RBParamVector)
+  project!(a.data,r,a.fe_data)
+end
+
+function inv_project(r::RBSpace,a::RBParamVector)
+  inv_project!(a.fe_data,r,a.data)
+end
+
 function project(r::RBSpace,x::Projection)
   galerkin_projection(get_reduced_subspace(r),x)
 end

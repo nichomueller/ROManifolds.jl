@@ -89,3 +89,13 @@ function RBSteady.allocate_hypred_cache(a::TupOfAffineContribution,r::TransientR
   hypred = RBSteady.allocate_hyper_reduction(first(a),r)
   return HRParamArray(fecache,coeffs,hypred)
 end
+
+function RBSteady.inv_project!(
+  cache::HRParamArray,
+  a::TupOfAffineContribution,
+  b::TupOfArrayContribution)
+
+  hypred = cache.hypred
+  coeff = cache.coeff
+  inv_project!(hypred,coeff,a,b)
+end

@@ -48,9 +48,9 @@ function allocate_paramcache(op::LinNonlinParamOperator,μ::Realization)
   allocate_paramcache(op_nlin,μ)
 end
 
-function allocate_systemcache(op::LinNonlinParamOperator,u::AbstractVector)
-  op_nlin = get_nonlinear_operator(op)
-  allocate_systemcache(op_nlin,u)
+function allocate_systemcache(op::LinNonlinParamOperator,x::AbstractVector)
+  cache_linear = get_linear_systemcache(op)
+  similar(cache_linear)
 end
 
 function update_paramcache!(
@@ -62,69 +62,58 @@ function update_paramcache!(
   update_paramcache!(paramcache,op_nlin,μ)
 end
 
-function Algebra.allocate_residual(
-  op::LinNonlinParamOperator,
-  μ::Realization,
-  u::AbstractVector,
-  paramcache)
-
+function update_systemcache!(op::LinNonlinParamOperator,x::AbstractVector)
   op_lin = get_linear_operator(op)
   syscache_lin = get_linear_systemcache(op)
+  update_systemcache!(syscache_lin,op_lin,x)
+end
+
+function Algebra.allocate_residual(
+  op::LinNonlinParamOperator,
+  x::AbstractVector)
+
+  syscache_lin = get_linear_systemcache(op)
   b_lin = get_vector(syscache_lin)
-  residual!(b_lin,op_lin,u,paramcache)
-  copy(b_lin)
+  similar(b_lin)
 end
 
 function Algebra.allocate_jacobian(
   op::LinNonlinParamOperator,
-  μ::Realization,
-  u::AbstractVector,
-  paramcache)
+  x::AbstractVector)
 
-  op_lin = get_linear_operator(op)
   syscache_lin = get_linear_systemcache(op)
   A_lin = get_matrix(syscache_lin)
-  jacobian!(A_lin,op_lin,u,paramcache)
-  copy(A_lin)
+  similar(A_lin)
 end
 
 function Algebra.residual!(
-  b,
+  b::AbstractVector,
   op::LinNonlinParamOperator,
-  μ::Realization,
-  u::AbstractVector,
-  paramcache)
+  x::AbstractVector)
 
   syscache_lin = get_linear_systemcache(op)
   A_lin = get_matrix(syscache_lin)
   b_lin = get_vector(syscache_lin)
 
   op_nlin = get_nonlinear_operator(op)
-  residual!(b,op_nlin,μ,u,paramcache)
-  mul!(b,A_lin,u,1,1)
+  residual!(b,op_nlin,x)
+  mul!(b,A_lin,x,1,1)
   axpy!(1,b_lin,b)
 
   b
 end
 
-function ODEs.jacobian_add!(
-  A,
+function Algebra.jacobian!(
+  A::AbstractMatrix,
   op::LinNonlinParamOperator,
-  μ::Realization,
-  u::AbstractVector,
-  paramcache)
+  x::AbstractVector)
 
   syscache_lin = get_linear_systemcache(op)
   A_lin = get_matrix(syscache_lin)
 
   op_nlin = get_nonlinear_operator(op)
-  jacobian_add!(A,op_nlin,μ,u,paramcache)
+  jacobian!(A,op_nlin,x)
   axpy!(1,A_lin,A)
 
   A
-end
-
-function allocate_systemcache(nlop::LinNonlinParamOperator)
-  cache_linear = get_linear_systemcache(op)
-  copy(cache_linear)
 end
