@@ -88,42 +88,42 @@ function Algebra.jacobian!(
   inv_project!(A,op.lhs,feA)
 end
 
-function RBSteady.hr_residual!(
-  b,
-  op::TransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}},
-  paramcache)
+# function RBSteady.hr_residual!(
+#   b,
+#   op::TransientRBOperator,
+#   r::TransientRealization,
+#   us::Tuple{Vararg{AbstractParamVector}},
+#   paramcache)
 
-  red_params = 1:num_params(r)
-  red_times = union_indices_time(op.rhs)
-  red_pt_indices = range_2d(red_params,red_times,num_params(r))
-  red_r = r[red_params,red_times]
+#   red_params = 1:num_params(r)
+#   red_times = union_indices_time(op.rhs)
+#   red_pt_indices = range_2d(red_params,red_times,num_params(r))
+#   red_r = r[red_params,red_times]
 
-  red_b,red_us,red_odeopcache = select_fe_quantities_at_indices(b,us,paramcache,vec(red_pt_indices))
-  residual!(red_b,op.op,red_r,red_us,red_odeopcache)
-  RBSteady.select_at_indices(red_b,op.rhs,red_pt_indices)
-end
+#   red_b,red_us,red_odeopcache = select_fe_quantities_at_indices(b,us,paramcache,vec(red_pt_indices))
+#   residual!(red_b,op.op,red_r,red_us,red_odeopcache)
+#   RBSteady.select_at_indices(red_b,op.rhs,red_pt_indices)
+# end
 
-function RBSteady.hr_jacobian!(
-  A,
-  op::TransientRBOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}},
-  ws::Tuple{Vararg{Real}},
-  paramcache)
+# function RBSteady.hr_jacobian!(
+#   A,
+#   op::TransientRBOperator,
+#   r::TransientRealization,
+#   us::Tuple{Vararg{AbstractParamVector}},
+#   ws::Tuple{Vararg{Real}},
+#   paramcache)
 
-  red_params = 1:num_params(r)
-  red_times = union_indices_time(op.lhs)
-  red_pt_indices = range_2d(red_params,red_times,num_params(r))
-  red_r = r[red_params,red_times]
+#   red_params = 1:num_params(r)
+#   red_times = union_indices_time(op.lhs)
+#   red_pt_indices = range_2d(red_params,red_times,num_params(r))
+#   red_r = r[red_params,red_times]
 
-  red_A,red_us,red_odeopcache = select_fe_quantities_at_indices(A,us,paramcache,vec(red_pt_indices))
-  jacobian!(red_A,op.op,red_r,red_us,ws,red_odeopcache)
-  map(red_A,op.lhs) do red_A,lhs
-    RBSteady.select_at_indices(red_A,lhs,red_pt_indices)
-  end
-end
+#   red_A,red_us,red_odeopcache = select_fe_quantities_at_indices(A,us,paramcache,vec(red_pt_indices))
+#   jacobian!(red_A,op.op,red_r,red_us,ws,red_odeopcache)
+#   map(red_A,op.lhs) do red_A,lhs
+#     RBSteady.select_at_indices(red_A,lhs,red_pt_indices)
+#   end
+# end
 
 # """
 #     struct LinearNonlinearTransientRBOperator <: TransientRBOperator{LinearNonlinearParamODE}

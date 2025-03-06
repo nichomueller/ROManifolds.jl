@@ -26,7 +26,7 @@ the reduced projection `Φrb`, where
 The output of this operation is a ReducedProjection. Therefore, a HyperReduction
 is completely characterized by the triplet `(Φrb,Φi,i)`.
 Subtypes:
-- [`EmptyHyperReduction`](@ref)
+- [`TrivialHyperReduction`](@ref)
 - [`MDEIM`](@ref)
 """
 abstract type HyperReduction{A<:Reduction,B<:ReducedProjection,C<:IntegrationDomain} <: Projection end
@@ -52,6 +52,7 @@ get_integration_domain(a::HyperReduction) = @abstractmethod
 get_integration_cells(a::HyperReduction) = get_integration_cells(get_integration_domain(a))
 get_cellids_rows(a::HyperReduction) = get_cellids_rows(get_integration_domain(a))
 get_cellids_cols(a::HyperReduction) = get_cellids_cols(get_integration_domain(a))
+get_owned_icells(a::HyperReduction,cells) =
 
 num_reduced_dofs(a::HyperReduction) = num_reduced_dofs(get_basis(a))
 num_reduced_dofs_left_projector(a::HyperReduction) = num_reduced_dofs_left_projector(get_basis(a))
@@ -71,42 +72,35 @@ function inv_project!(
 end
 
 """
-    struct EmptyHyperReduction{A,B} <: HyperReduction{A,B,IntegrationDomain}
+    struct TrivialHyperReduction{A,B} <: HyperReduction{A,B,IntegrationDomain}
       reduction::A
       basis::B
     end
 
 Trivial hyper-reduction returned whenever the residual/Jacobian is zero
 """
-struct EmptyHyperReduction{A,B} <: HyperReduction{A,B,IntegrationDomain}
+struct TrivialHyperReduction{A,B} <: HyperReduction{A,B,IntegrationDomain}
   reduction::A
   basis::B
 end
 
-get_basis(a::EmptyHyperReduction) = a.basis
-get_interpolation(a::EmptyHyperReduction) = @notimplemented
-get_integration_domain(a::EmptyHyperReduction) = @notimplemented
+get_basis(a::TrivialHyperReduction) = a.basis
+get_interpolation(a::TrivialHyperReduction) = @notimplemented
+get_integration_domain(a::TrivialHyperReduction) = @notimplemented
 
-function HyperReduction(
-  red::Reduction,
-  test::RBSpace)
-
+function HyperReduction(red::Reduction,s::Nothing,test::RBSpace)
   red = get_reduction(red)
   nrows = num_free_dofs(test)
   basis = ReducedProjection(zeros(nrows,1))
-  return EmptyHyperReduction(red,basis)
+  return TrivialHyperReduction(red,basis)
 end
 
-function HyperReduction(
-  red::Reduction,
-  trial::RBSpace,
-  test::RBSpace)
-
+function HyperReduction(red::Reduction,s::Nothing,trial::RBSpace,test::RBSpace)
   red = get_reduction(red)
   nrows = num_free_dofs(test)
   ncols = num_free_dofs(trial)
   basis = ReducedProjection(zeros(nrows,1,ncols))
-  return EmptyHyperReduction(red,basis)
+  return TrivialHyperReduction(red,basis)
 end
 
 """
@@ -159,6 +153,11 @@ function HyperReduction(
   factor = lu(interp)
   domain = matrix_domain(trian,trial,test,indices...)
   return MDEIM(red,proj_basis,factor,domain)
+end
+
+function reduced_triangulation(trian::Triangulation,a::TrivialHyperReduction)
+  red_trian = view(trian,[])
+  return red_trian
 end
 
 """
@@ -265,19 +264,7 @@ function inv_project!(
   return hypred
 end
 
-function reduced_form(
-  red::Reduction,
-  args...)
-
-  HyperReduction(red,args...)
-end
-
-function reduced_form(
-  red::Reduction,
-  s::Snapshots,
-  trian::Triangulation,
-  args...)
-
+function reduced_form(red::Reduction,s,trian::Triangulation,args...)
   hyper_red = HyperReduction(red,s,trian,args...)
   red_trian = reduced_triangulation(trian,hyper_red)
   return hyper_red,red_trian
@@ -391,12 +378,10 @@ function Utils.Contribution(
   AffineContribution(v,t)
 end
 
-for f in (:get_basis,:get_interpolation,:get_integration_domain,:get_cellids_rows,:get_cellids_cols)
+for f in (:get_basis,:get_interpolation)
   @eval begin
     function Arrays.return_cache(::typeof($f),a::BlockHyperReduction)
-      i = findfirst(a.touched)
-      @notimplementedif isnothing(i)
-      cache = $f(a[i])
+      cache = $f(testitem(a))
       block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
       return block_cache
     end
@@ -409,6 +394,45 @@ for f in (:get_basis,:get_interpolation,:get_integration_domain,:get_cellids_row
         end
       end
       return ArrayBlock(cache,a.touched)
+    end
+  end
+end
+
+function Arrays.return_cache(::typeof(get_integration_cells),a::BlockHyperReduction)
+  ntouched = length(findall(a.touched))
+  cache = get_integration_cells(testitem(a))
+  block_cache = Vector{typeof(cache)}(undef,ntouched)
+  return block_cache
+end
+
+function get_integration_cells(a::BlockHyperReduction)
+  cache = return_cache(get_integration_cells,a)
+  count = 0
+  for i in eachindex(a)
+    if a.touched[i]
+      count += 1
+      cache[count] = get_integration_cells(a[i])
+    end
+  end
+  return union(cache...)
+end
+
+function get_owned_icells(a::BlockHyperReduction)
+  cells = get_integration_cells(a)
+  get_owned_icells(a,cells)
+end
+
+function Arrays.return_cache(::typeof(get_owned_icells),a::BlockHyperReduction,cells)
+  cache = get_owned_icells(testitem(a),cells)
+  block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
+  return block_cache
+end
+
+function get_owned_icells(a::BlockHyperReduction,cells::AbstractVector)
+  cache = return_cache(get_owned_icells,a,cells)
+  for i in eachindex(a)
+    if a.touched[i]
+      cache[i] = get_owned_icells(a[i],cells)
     end
   end
 end
@@ -521,19 +545,14 @@ function reduced_form(
   test::MultiFieldRBSpace)
 
   hyper_reds = Vector{HyperReduction}(undef,size(s))
-  red_trians = Triangulation[]
   for i in eachindex(s)
-    if s.touched[i]
-      hyper_red,red_trian = reduced_form(red,s[i],trian,test[i])
-      hyper_reds[i] = hyper_red
-      push!(red_trians,red_trian)
-    else
-      hyper_reds[i] = reduced_form(red,test[i])
-    end
+    hyper_red, = reduced_form(red,s[i],trian,test[i])
+    hyper_reds[i] = hyper_red
   end
 
   hyper_red = BlockProjection(hyper_reds,s.touched)
-  red_trian = Utils.merge_triangulations(red_trians)
+  red_cells = get_integration_cells(hyper_red)
+  red_trian = view(trian,red_cells)
 
   return hyper_red,red_trian
 end
@@ -546,19 +565,14 @@ function reduced_form(
   test::MultiFieldRBSpace)
 
   hyper_reds = Matrix{HyperReduction}(undef,size(s))
-  red_trians = Triangulation[]
   for (i,j) in Iterators.product(axes(s)...)
-    if s.touched[i,j]
-      hyper_red,red_trian = reduced_form(red,s[i,j],trian,trial[j],test[i])
-      hyper_reds[i,j] = hyper_red
-      push!(red_trians,red_trian)
-    else
-      hyper_reds[i,j] = reduced_form(red,trial[j],test[i])
-    end
+    hyper_red, = reduced_form(red,s[i,j],trian,trial[j],test[i])
+    hyper_reds[i,j] = hyper_red
   end
 
   hyper_red = BlockProjection(hyper_reds,s.touched)
-  red_trian = Utils.merge_triangulations(red_trians)
+  red_cells = get_integration_cells(hyper_red)
+  red_trian = view(trian,red_cells)
 
   return hyper_red,red_trian
 end

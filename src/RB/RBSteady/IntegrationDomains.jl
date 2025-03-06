@@ -125,6 +125,11 @@ get_integration_cells(i::IntegrationDomain) = @abstractmethod
 get_cellids_rows(i::IntegrationDomain) = @abstractmethod
 get_cellids_cols(i::IntegrationDomain) = @abstractmethod
 
+function get_owned_icells(i::IntegrationDomain,cells::AbstractVector)::Vector{Int}
+  cellsi = get_integration_cells(i)
+  filter(!isnothing,indexin(cells,cellsi)) # it was indexin(cellsi,cells)
+end
+
 """
     struct VectorDomain <: IntegrationDomain{Int,1}
       cells::Vector{Int32}
@@ -183,7 +188,7 @@ function matrix_domain(
 
   cells_trial = reduced_cells(trial,trian,cols)
   cells_test = reduced_cells(test,trian,rows)
-  cells = unique(vcat(cells_trial,cells_test))
+  cells = union(cells_trial,cells_test)
   icols = reduced_idofs(trial,trian,cells,cols)
   irows = reduced_idofs(test,trian,cells,rows)
   MatrixDomain(cells,irows,icols)
@@ -192,3 +197,20 @@ end
 get_integration_cells(i::MatrixDomain) = i.cells
 get_cellids_rows(i::MatrixDomain) = i.cell_irows
 get_cellids_cols(i::MatrixDomain) = i.cell_icols
+
+# # common integration domains
+
+# function Arrays.return_cache(::typeof(get_integration_cells),i::IntegrationDomain...)
+#   i1 = testitem(i)
+#   cache = get_integration_cells(i1)
+#   block_cache = Vector{typeof(cache)}(undef,length(i))
+#   return block_cache
+# end
+
+# function get_integration_cells(i::IntegrationDomain...)
+#   cache = return_cache(get_integration_cells,i...)
+#   for k in eachindex(i)
+#     cache[k] = get_integration_cells(i[k])
+#   end
+#   return union(cache...)
+# end

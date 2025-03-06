@@ -126,22 +126,16 @@ function Algebra.residual!(
   uh = EvaluationFunction(paramcache.trial,u)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,r)
 
   trian_res = get_domains_res(op.op)
   res = get_res(op.op)
   dc = res(r,uh,v)
 
   map(trian_res) do strian
-    b_trian = b.fecache[strian]
-    rhs_trian = op.rhs[strian]
-    cell_irows = get_cellids_rows(rhs_trian)
-    scell_vec = get_contribution(dc,strian)
-    cell_vec,trian = move_contributions(scell_vec,strian)
-    @assert ndims(eltype(cell_vec)) == 1
-    cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
-    vecdata = [cell_vec_r],[cell_irows]
-    assemble_hr_vector_add!(b_trian,assem,vecdata)
+    b_strian = b.fecache[strian]
+    rhs_strian = op.rhs[strian]
+    vecdata = collect_cell_hr_vector(test,dc,rhs_strian,strian)
+    assemble_hr_vector_add!(b_strian,vecdata...)
   end
 
   inv_project!(b,op.rhs)
@@ -159,24 +153,16 @@ function Algebra.jacobian!(
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
-  assem = get_param_assembler(op.op,r)
 
   trian_jac = get_domains_jac(op.op)
   jac = get_jac(op.op)
   dc = jac(r,uh,du,v)
 
   map(trian_jac) do strian
-    A_trian = A.fecache[strian]
-    lhs_trian = op.lhs[strian]
-    cell_irows = get_cellids_rows(lhs_trian)
-    cell_icols = get_cellids_cols(lhs_trian)
-    scell_mat = get_contribution(dc,strian)
-    cell_mat,trian = move_contributions(scell_mat,strian)
-    @assert ndims(eltype(cell_mat)) == 2
-    cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
-    cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
-    matdata = [cell_mat_rc],[cell_irows],[cell_icols]
-    assemble_hr_matrix_add!(A_trian,assem,matdata)
+    A_strian = A.fecache[strian]
+    lhs_strian = op.lhs[strian]
+    matdata = collect_cell_hr_matrix(trial,test,dc,lhs_strian)
+    assemble_hr_matrix_add!(A_strian,matdata...)
   end
 
   inv_project!(A,op.lhs)

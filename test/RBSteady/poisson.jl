@@ -128,7 +128,7 @@ unsafe=false
 pdomain = (1,10,-1,5,1,2)
 
 domain = (0,1,0,1)
-partition = (20,20)
+partition = (10,10)
 if method==:ttsvd
   model = TProductDiscreteModel(domain,partition)
 else
@@ -180,3 +180,65 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 x̂,rbstats = solve(rbsolver,rbop,μon)
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
+
+using ROManifolds.ParamAlgebra
+r = μon
+op = rbop
+x̂ = zero_free_values(get_trial(op)(r))
+nlop = parameterize(op,r)
+syscache = allocate_systemcache(nlop,x̂)
+
+boh = copy(x̂.fe_data)
+fill!(boh,1.0)
+residual!(b,nlop,boh)
+
+uh = EvaluationFunction(nlop.paramcache.trial,boh)
+v = get_fe_basis(test)
+assem = get_param_assembler(nlop.op.op,r)
+
+trian_res = get_domains_res(nlop.op.op)
+dc = get_res(nlop.op.op)(r,uh,v)
+
+b = syscache.b
+strian = trian_res[1]
+b_trian = b.fecache[strian]
+rhs_trian = op.rhs[strian]
+cell_irows = RBSteady.get_cellids_rows(rhs_trian)
+scell_vec = get_contribution(dc,strian)
+cell_vec,trian = move_contributions(scell_vec,strian)
+@assert ndims(eltype(cell_vec)) == 1
+cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
+vecdata = cell_vec_r,cell_irows
+# RBSteady.assemble_hr_vector_add!(b_trian,assem,vecdata)
+cellvec,_cellidsrows = vecdata
+cellidsrows = FESpaces.map_cell_rows(RBSteady.HRAssemblyStrategy(),_cellidsrows)
+rows_cache = array_cache(cellidsrows)
+vals_cache = array_cache(cellvec)
+vals1 = getindex!(vals_cache,cellvec,1)
+rows1 = getindex!(rows_cache,cellidsrows,1)
+add! = RBSteady.AddHREntriesMap(+)
+add_cache = return_cache(add!,b,vals1,rows1)
+caches = add_cache,vals_cache,rows_cache
+RBSteady._numeric_loop_hr_vector!(b,caches,cellvec,cellidsrows)
+
+A = syscache.A
+jacobian!(A,nlop,boh)
+
+du = get_trial_fe_basis(trial)
+trian_jac = get_domains_jac(op.op)
+dc = get_jac(op.op)(r,uh,du,v)
+strian = trian_jac[1]
+A_trian = A.fecache[strian]
+lhs_trian = op.lhs[strian]
+cell_irows = RBSteady.get_cellids_rows(lhs_trian)
+cell_icols = RBSteady.get_cellids_cols(lhs_trian)
+scell_mat = get_contribution(dc,strian)
+cell_mat,trian = move_contributions(scell_mat,strian)
+@assert ndims(eltype(cell_mat)) == 2
+cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
+cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
+matdata = cell_mat_rc,cell_irows,cell_icols
+# assemble_hr_matrix_add!(A_trian,assem,matdata)
+cellmat,_cellidsrows,_cellidscols = matdata
+cellidsrows = FESpaces.map_cell_rows(RBSteady.HRAssemblyStrategy(),_cellidsrows)
+cellidscols = FESpaces.map_cell_rows(RBSteady.HRAssemblyStrategy(),_cellidscols)

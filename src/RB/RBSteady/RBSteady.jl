@@ -133,10 +133,11 @@ export empirical_interpolation
 export get_integration_cells
 export get_cellids_rows
 export get_cellids_cols
+export get_owned_icells
 include("IntegrationDomains.jl")
 
 export HyperReduction
-export EmptyHyperReduction
+export TrivialHyperReduction
 export MDEIM
 export AffineContribution
 export BlockHyperReduction
