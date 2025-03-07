@@ -52,7 +52,7 @@ get_integration_domain(a::HyperReduction) = @abstractmethod
 get_integration_cells(a::HyperReduction) = get_integration_cells(get_integration_domain(a))
 get_cellids_rows(a::HyperReduction) = get_cellids_rows(get_integration_domain(a))
 get_cellids_cols(a::HyperReduction) = get_cellids_cols(get_integration_domain(a))
-get_owned_icells(a::HyperReduction,cells) =
+get_owned_icells(a::HyperReduction,cells) = get_owned_icells(get_integration_domain(a),cells)
 
 num_reduced_dofs(a::HyperReduction) = num_reduced_dofs(get_basis(a))
 num_reduced_dofs_left_projector(a::HyperReduction) = num_reduced_dofs_left_projector(get_basis(a))
@@ -133,9 +133,9 @@ function HyperReduction(
   red = get_reduction(red)
   basis = projection(red,s)
   proj_basis = project(test,basis)
-  indices,interp = empirical_interpolation(basis)
+  rows,interp = empirical_interpolation(basis)
   factor = lu(interp)
-  domain = vector_domain(trian,test,indices)
+  domain = vector_domain(trian,test,rows)
   return MDEIM(red,proj_basis,factor,domain)
 end
 
@@ -149,9 +149,9 @@ function HyperReduction(
   red = get_reduction(red)
   basis = projection(red,s)
   proj_basis = project(test,basis,trial)
-  indices,interp = empirical_interpolation(basis)
+  (rows,cols),interp = empirical_interpolation(basis)
   factor = lu(interp)
-  domain = matrix_domain(trian,trial,test,indices...)
+  domain = matrix_domain(trian,trial,test,rows,cols)
   return MDEIM(red,proj_basis,factor,domain)
 end
 

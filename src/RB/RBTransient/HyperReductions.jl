@@ -2,15 +2,30 @@ function RBSteady.HyperReduction(
   red::TransientMDEIMReduction,
   s::Snapshots,
   trian::Triangulation,
+  test::RBSpace)
+
+  reduction = get_reduction(red)
+  basis = projection(reduction,s)
+  proj_basis = project(test,basis)
+  (rows,indices_time),interp = empirical_interpolation(basis)
+  factor = lu(interp)
+  domain = matrix_domain(trian,test,rows,indices_time)
+  return MDEIM(reduction,proj_basis,factor,domain)
+end
+
+function RBSteady.HyperReduction(
+  red::TransientMDEIMReduction,
+  s::Snapshots,
+  trian::Triangulation,
   trial::RBSpace,
   test::RBSpace)
 
   reduction = get_reduction(red)
   basis = projection(reduction,s)
   proj_basis = project(test,basis,trial,get_combine(red))
-  indices,interp = empirical_interpolation(basis)
+  ((rows,cols),indices_time),interp = empirical_interpolation(basis)
   factor = lu(interp)
-  domain = matrix_domain(trian,trial,test,indices...)
+  domain = matrix_domain(trian,trial,test,rows,cols,indices_time)
   return MDEIM(reduction,proj_basis,factor,domain)
 end
 

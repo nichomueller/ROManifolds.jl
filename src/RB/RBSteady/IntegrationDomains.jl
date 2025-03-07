@@ -1,33 +1,20 @@
-function empirical_interpolation!(cache,A::AbstractMatrix)
-  I,res = cache
+function empirical_interpolation(A::AbstractMatrix)
   m,n = size(A)
-  resize!(res,m)
-  resize!(I,n)
+  res = zeros(eltype(A),m)
+  I = zeros(Int,n)
   @views I[1] = argmax(abs.(A[:,1]))
   if n > 1
     @inbounds for i = 2:n
+      @views Ai = A[:,i]
       @views Bi = A[:,1:i-1]
-      Ci = A[I[1:i-1],1:i-1]
-      Di = A[I[1:i-1],i]
-      @views res = A[:,i] - Bi*(Ci \ Di)
-      I[i] = argmax(abs.(res))
+      @views Ci = A[I[1:i-1],1:i-1]
+      @views Di = A[I[1:i-1],i]
+      @views res = Ai - Bi*(Ci \ Di)
+      I[i] = argmax(map(abs,res))
     end
   end
   Ai = view(A,I,:)
   return I,Ai
-end
-
-function eim_cache(A::AbstractMatrix)
-  m,n = size(A)
-  res = zeros(eltype(A),m)
-  I = zeros(Int,n)
-  return I,res
-end
-
-function empirical_interpolation(A::AbstractArray)
-  cache = eim_cache(A)
-  I,AI = empirical_interpolation!(cache,A)
-  return I,AI
 end
 
 function empirical_interpolation(A::ParamSparseMatrix)
@@ -64,6 +51,9 @@ function get_cells_to_idofs(
   cells::AbstractVector,
   dofs::AbstractVector)
 
+  _correct_dof(is,li) = li
+  _correct_dof(is::OIdsToIds,li) = is.terms[li]
+
   cache = array_cache(cell_dof_ids)
 
   ncells = length(cells)
@@ -78,8 +68,9 @@ function get_cells_to_idofs(
   for (icell,cell) in enumerate(cells)
     celldofs = getindex!(cache,cell_dof_ids,cell)
     for (idof,dof) in enumerate(dofs)
-      for (icelldof,celldof) in enumerate(celldofs)
+      for (_icelldof,celldof) in enumerate(celldofs)
         if dof == celldof
+          icelldof = _correct_dof(celldofs,_icelldof)
           data[ptrs[icell]-1+icelldof] = idof
         end
       end

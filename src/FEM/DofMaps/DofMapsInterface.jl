@@ -198,10 +198,6 @@ function flatten(i::TrivialSparseMatrixDofMap)
   i
 end
 
-function recast(a::AbstractArray,i::TrivialSparseMatrixDofMap)
-  recast(a,i.sparsity)
-end
-
 """
     struct SparseMatrixDofMap{D,Ti,A<:SparsityPattern,B<:SparseDofMapStyle} <: AbstractDofMap{D,Ti}
       d_sparse_dofs_to_sparse_dofs::Array{Ti,D}
@@ -272,8 +268,14 @@ function flatten(i::SparseMatrixDofMap)
   TrivialSparseMatrixDofMap(i.sparsity)
 end
 
-function recast(a::AbstractArray,i::SparseMatrixDofMap)
-  recast(a,i.sparsity)
+get_sparsity(i::TrivialSparseMatrixDofMap) = i.sparsity
+get_sparsity(i::SparseMatrixDofMap) = i.sparsity
+for f in (:recast,:recast_indices,:recast_split_indices,:sparsify_indices)
+  for T in (:TrivialSparseMatrixDofMap,:SparseMatrixDofMap)
+    @eval begin
+      $f(A::AbstractArray,i::$T) = $f(A,get_sparsity(i))
+    end
+  end
 end
 
 # utils

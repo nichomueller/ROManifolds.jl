@@ -372,6 +372,14 @@ end
 
 # rescale a 3d-core by a (sparse) matrix
 
+function _sparse_rescaling(X::GenericRankTensor,cores::Vector{<:AbstractArray{T,3}}) where T
+  sum(map(k -> _sparse_rescaling(get_decomposition(X,k),cores),1:rank(X)))
+end
+
+function _sparse_rescaling(X::Rank1Tensor,cores::Vector{<:AbstractArray{T,3}}) where T
+  map(_sparse_rescaling,get_factors(X),cores)
+end
+
 function _sparse_rescaling(X::AbstractSparseMatrix,core::AbstractArray{T,3}) where T
   prev_rank = size(core,1)
   cur_size = size(core,2)
@@ -387,67 +395,80 @@ end
 
 # empirical interpolation
 
-function basis_index(i,cores_indices::Vector{Vector{Ti}}) where Ti
-  Iprevs...,Icurr = cores_indices
-  if length(Iprevs) == 0
-    return i
-  end
-  Iprevprevs...,Iprev = Iprevs
-  rankprev = length(Iprev)
+function basis_index(cores_indices::Table,i::Integer,l::Integer)
+  @assert l > 0
+  l == 1 && return i
+  lprev = l-1
+  pinilprev = cores_indices.ptrs[lprev]
+  pendlprev = cores_indices.ptrs[lprev+1]
+  rankprev = pendlprev-pinilprev
   icurr = slow_index(i,rankprev)
-  iprevs = basis_index(Iprev[fast_index(i,rankprev)],Iprevs)
+  iprev = cores_indices.data[pinilprev-1+fast_index(i,rankprev)]
+  iprevs = basis_index(cores_indices,iprev,lprev)
   return (iprevs...,icurr)
 end
 
-# We distinguish the case ::Val{1} from the others, since we must somehow dispatch on
-# steady / unsteady applications. However, from an implementation standpoint, these
-# two functions do exactly the same things. Note that, when the snapshots are zero,
-# the basis is the identity. In this case, the selected index is 1. However, we
-# might have dof_map[1] = 0, depending on the underlying triangulation. Therefore,
-# the function is modified to never return a zero.
-function get_basis_indices(
+# Depending on the underlying triangulation, we might have dof_map[1] = 0.
+# The function is modified to never return a zero.
+function _get_indices(
   ::Val{1},
-  cores_indices::Vector{Vector{Ti}},
-  dof_map::AbstractArray{Ti′,D}
-  )::Vector{Ti} where {Ti,Ti′,D}
+  cores_indices::Table,
+  dof_map::AbstractArray{Ti,D}
+  )::Vector{Ti} where {Ti,D}
 
-  Iprev...,Icurr = cores_indices
-  get_basis_indices = zeros(Ti,length(Icurr))
+  L = length(cores_indices)
+
   o = one(Ti)
-  for (k,ik) in enumerate(Icurr)
-    indices_k = basis_index(ik,cores_indices)
-    get_basis_indices[k] = max(o,dof_map[CartesianIndex(indices_k[1:D])])
-  end
-  return get_basis_indices
-end
-
-function get_basis_indices(
-  ::Val{N},
-  cores_indices::Vector{Vector{Ti}},
-  dof_map::AbstractArray{Ti′,D}
-  )::Vector{Vector{Ti}} where {Ti,Ti′,D,N}
-
-  Iprev...,Icurr = cores_indices
-  basis_indices = zeros(Ti,length(Icurr),N)
-  o = one(Ti)
-  for (k,ik) in enumerate(Icurr)
-    indices_k = basis_index(ik,cores_indices)
-    basis_indices[k,1] = max(o,dof_map[CartesianIndex(indices_k[1:D])])
-    for (il,l) in enumerate(D+1:N+D-1)
-      basis_indices[k,1+il] = indices_k[l]
-    end
+  piniL = cores_indices.ptrs[L]
+  pendL = cores_indices.ptrs[L+1]-1
+  space_indices = zeros(Ti,pendL-piniL+1)
+  for (k,pk) in enumerate(piniL:pendL)
+    ik = cores_indices.data[pk]
+    indices_space_k = basis_index(cores_indices,ik,L)
+    index_space_k = dof_map[CartesianIndex(indices_space_k)]
+    space_indices[k] = max(o,index_space_k)
   end
 
-  return collect.(eachcol(basis_indices))
+  return space_indices
 end
 
-function get_basis_indices(cores_indices::Vector{<:Vector},dof_map::AbstractArray{Ti,D}) where {Ti,D}
+function _get_indices(
+  ::Val{2},
+  cores_indices::Table,
+  dof_map::AbstractArray{Ti,D}
+  )::NTuple{2,Vector{Ti}} where {Ti,D}
+
+  L = length(cores_indices)
+  cache = array_cache(cores_indices)
+
+  o = one(Ti)
+  Icurr = getindex!(cache,cores_indices,L)
+  space_indices = zeros(Ti,length(Icurr))
+  time_indices = zeros(Ti,length(Icurr))
+  for (k,ik) in enumerate(Icurr)
+    indices_space_k...,index_time_k = basis_index!(cache,cores_indices,ik,L)
+    index_space_k = dof_map[CartesianIndex(indices_space_k)]
+    space_indices[k] = max(o,index_space_k)
+    time_indices[k] = index_time_k
+  end
+
+  return space_indices,time_indices
+end
+
+function _get_indices(k::Val{1},cores_indices::Table,dof_map::SparseMatrixDofMap)
+  space_indices = _get_indices(k,cores_indices,dof_map.d_sparse_dofs_to_sparse_dofs)
+  recast_split_indices(space_indices,dof_map)
+end
+
+function _get_indices(k::Val{2},cores_indices::Table,dof_map::SparseMatrixDofMap)
+  space_indices,time_indices = _get_indices(k,cores_indices,dof_map.d_sparse_dofs_to_sparse_dofs)
+  space_indices′ = recast_split_indices(space_indices,dof_map)
+  return space_indices′,time_indices
+end
+
+function get_basis_indices(cores_indices::Table,dof_map::AbstractArray{Ti,D}) where {Ti,D}
   L = length(cores_indices)
   N = L - D + 1
-  @check N > 0
-  return get_basis_indices(Val(N),cores_indices,dof_map)
-end
-
-function get_basis_indices(cores_indices::Vector{<:Vector},dof_map::SparseMatrixDofMap)
-  get_basis_indices(cores_indices,dof_map.d_sparse_dofs_to_full_dofs)
+  @check N ∈ (1,2)
+  _get_indices(Val{N}(),cores_indices,dof_map)
 end

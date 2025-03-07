@@ -51,11 +51,11 @@ SparseArrays.rowvals(a::SparsityPattern) = rowvals(get_background_matrix(a))
 SparseArrays.getcolptr(a::SparsityPattern) = SparseArrays.getcolptr(get_background_matrix(a))
 Algebra.nz_index(a::SparsityPattern,row::Integer,col::Integer) = nz_index(get_background_matrix(a),row,col)
 
-function sparsify_indices(i::AbstractArray,a::SparsityPattern)
-  sparsify_indices(i,get_background_matrix(i))
+for f in (:recast,:recast_indices,:recast_split_indices,:sparsify_indices)
+  @eval begin
+    $f(A::AbstractArray,a::SparsityPattern) = $f(A,get_background_matrix(a))
+  end
 end
-
-recast(A::AbstractArray,a::SparsityPattern) = recast(A,get_background_matrix(a))
 
 """
     struct SparsityCSC{Tv,Ti} <: SparsityPattern

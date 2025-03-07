@@ -24,7 +24,7 @@ function collect_cell_hr_vector(
   hr::Projection)
 
   cells = Utils.get_tface_to_mface(strian)
-  cell_irows = get_cellids_rows(rhs_trian)
+  cell_irows = get_cellids_rows(hr)
   scell_vec = get_contribution(a,strian)
   cell_vec,trian = move_contributions(scell_vec,strian)
   @assert ndims(eltype(cell_vec)) == 1
