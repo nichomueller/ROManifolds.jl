@@ -20,9 +20,9 @@ Returns the cache associated to the linear part of the operator `op`
 get_linear_systemcache(op::NonlinearParamOperator) = @abstractmethod
 
 """
-    struct LinNonlinParamOperator <: NonlinearParamOperator
-      op_linear::NonlinearParamOperator
-      op_nonlinear::NonlinearParamOperator
+    struct LinNonlinParamOperator{A,B} <: NonlinearParamOperator
+      op_linear::A
+      op_nonlinear::B
       cache_linear::AbstractParamCache
     end
 
@@ -33,9 +33,9 @@ Fields:
 - `op_nonlinear`: nonlinear part of the operator
 - `cache_linear`: cache related to the linear part of the operator
 """
-struct LinNonlinParamOperator <: NonlinearParamOperator
-  op_linear::NonlinearParamOperator
-  op_nonlinear::NonlinearParamOperator
+struct LinNonlinParamOperator{A,B} <: NonlinearParamOperator
+  op_linear::A
+  op_nonlinear::B
   cache_linear::AbstractParamCache
 end
 

@@ -70,11 +70,11 @@ Subtypes:
 abstract type RBOperator{O} <: ParamOperator{O,SplitDomains} end
 
 """
-    struct GenericRBOperator{O} <: RBOperator{O}
+    struct GenericRBOperator{O,A} <: RBOperator{O}
       op::ParamOperator{O}
       trial::RBSpace
       test::RBSpace
-      lhs::AffineContribution
+      lhs::A
       rhs::AffineContribution
     end
 
@@ -86,7 +86,7 @@ Fields:
 - `lhs`: hyper-reduced left hand side
 - `rhs`: hyper-reduced right hand side
 """
-struct GenericRBOperator{A,O} <: RBOperator{O}
+struct GenericRBOperator{O,A} <: RBOperator{O}
   op::ParamOperator{O}
   trial::RBSpace
   test::RBSpace
@@ -169,60 +169,31 @@ function Algebra.jacobian!(
 end
 
 """
-    struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}
-      op_linear::GenericRBOperator{LinearParamEq}
-      op_nonlinear::GenericRBOperator{NonlinearParamEq}
+    struct LinearNonlinearRBOperator{A} <: RBOperator{LinearNonlinearParamEq}
+      op_linear::GenericRBOperator{LinearParamEq,A}
+      op_nonlinear::GenericRBOperator{NonlinearParamEq,A}
     end
 
 Extends the concept of [`GenericRBOperator`](@ref) to accommodate the linear/nonlinear
 splitting of terms in nonlinear applications
 """
-struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}
-  op_linear::GenericRBOperator{LinearParamEq}
-  op_nonlinear::GenericRBOperator{NonlinearParamEq}
+struct LinearNonlinearRBOperator{A} <: RBOperator{LinearNonlinearParamEq}
+  op_linear::GenericRBOperator{LinearParamEq,A}
+  op_nonlinear::GenericRBOperator{NonlinearParamEq,A}
 end
 
 ParamAlgebra.get_linear_operator(op::LinearNonlinearRBOperator) = op.op_linear
 ParamAlgebra.get_nonlinear_operator(op::LinearNonlinearRBOperator) = op.op_nonlinear
+FESpaces.get_trial(op::LinearNonlinearRBOperator) = get_trial(get_nonlinear_operator(op))
+FESpaces.get_test(op::LinearNonlinearRBOperator) = get_test(get_nonlinear_operator(op))
 
-# cache utils
+const LinearNonlinearRBOperator = LinearNonlinearRBOperator{<:GenericRBOperator,<:GenericRBOperator}
 
-# selects the entries of the snapshots relevant to the reduced integration domain
-# in `a`
-function select_at_indices(s::AbstractArray,a::HyperReduction)
-  s[get_integration_domain(a)]
-end
-
-function Arrays.return_cache(::typeof(select_at_indices),s::AbstractArray,a::HyperReduction,args...)
-  select_at_indices(s,a,args...)
-end
-
-function Arrays.return_cache(
-  ::typeof(select_at_indices),
-  s::Union{BlockArray,BlockParamArray},
-  a::BlockHyperReduction,
-  args...)
-
-  @check size(blocks(s)) == size(a)
-  @notimplementedif isempty(findall(a.touched))
-  i = findfirst(a.touched)
-  cache = return_cache(select_at_indices,blocks(s)[i],a[i],args...)
-  block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
-  return block_cache
-end
-
-function select_at_indices(s::Union{BlockArray,BlockParamArray},a::BlockHyperReduction,args...)
-  s′ = return_cache(select_at_indices,s,a,args...)
-  for i = eachindex(a)
-    if a.touched[i]
-      s′[i] = select_at_indices(blocks(s)[i],a[i],args...)
-    end
-  end
-  return ArrayBlock(s′,a.touched)
-end
-
-function select_at_indices(s::ArrayContribution,a::AffineContribution)
-  contribution(s.trians) do trian
-    select_at_indices(s[trian],a[trian])
-  end
+function ParamAlgebra.allocate_systemcache(nlop::LinearNonlinearRBOperator,x::AbstractVector)
+  cache_linear = get_linear_systemcache(nlop)
+  trian_jac = get_domains_jac(nlop.op_nonlinear)
+  trian_res = get_domains_res(nlop.op_nonlinear)
+  A_nlin = similar_with_trian(cache_linear.A,trian_jac)
+  b_nlin = similar_with_trian(cache_linear.A,trian_jac)
+  SystemCache(A_nlin,b_nlin)
 end

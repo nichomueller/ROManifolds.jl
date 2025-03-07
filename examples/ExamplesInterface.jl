@@ -15,9 +15,10 @@ import Gridap.FESpaces: get_algebraic_operator
 import Gridap.Helpers: @abstractmethod
 import Gridap.MultiField: BlockMultiFieldStyle
 import ROManifolds.ParamDataStructures: AbstractSnapshots
-import ROManifolds.ParamSteady: ParamOperator,LinearNonlinearParamEq,change_domains
+import ROManifolds.ParamSteady: ParamOperator,LinearNonlinearParamEq
 import ROManifolds.ParamODEs: ODEParamOperator,LinearNonlinearParamODE
 import ROManifolds.RBSteady: reduced_operator,get_state_reduction,get_residual_reduction,get_jacobian_reduction
+import ROManifolds.Utils: change_domains
 
 function try_loading_fe_snapshots(dir,rbsolver,feop,args...;kwargs...)
   try

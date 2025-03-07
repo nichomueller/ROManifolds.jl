@@ -60,6 +60,23 @@ function Contribution(
   ArrayContribution{T,N}(v,t)
 end
 
+function change_domains(a::Contribution,trians::Tuple{Vararg{Triangulation}})
+  values = ()
+  for (i,trian) in enumerate(trians)
+    if i > num_domains(a)
+      valuei = similar(last(get_contributions(a)))
+    else
+      valuei = get_contributions(a)[i]
+    end
+    values = (values...,valuei)
+  end
+  Contribution(values,trians)
+end
+
+function set_domains(a::Contribution,trians::Tuple{Vararg{Triangulation}})
+  get_contributions(a)
+end
+
 """
     struct ArrayContribution{T,N,V,K} <: Contribution
       values::V
@@ -223,4 +240,20 @@ function Algebra.copy_entries!(a::TupOfArrayContribution,b::TupOfArrayContributi
     copy_entries!(a,b)
   end
   a
+end
+
+for f in (:change_domains,:set_domains)
+  @eval begin
+    function $f(
+      a::TupOfArrayContribution,
+      trians::Tuple{Vararg{Tuple{Vararg{Triangulation}}}})
+
+      @check length(a) == length(trians)
+      b = ()
+      for (ai,ti) in zip(a,trians)
+        b = (b...,$f(ai,ti))
+      end
+      b
+    end
+  end
 end

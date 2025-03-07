@@ -1,14 +1,14 @@
 """
     struct TransientIntegrationDomain <: IntegrationDomain
       domain_space::IntegrationDomain
-      indices_time::Vector{Int}
+      indices_time::Vector{Int32}
     end
 
 Integration domain for a projection operator in a transient problem
 """
 struct TransientIntegrationDomain <: IntegrationDomain
   domain_space::IntegrationDomain
-  indices_time::Vector{Int}
+  indices_time::Vector{Int32}
 end
 
 function RBSteady.vector_domain(

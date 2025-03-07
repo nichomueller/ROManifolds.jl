@@ -31,7 +31,7 @@ import Test: @test
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ReferenceFEs: get_order
-import ROManifolds.Utils: CostTracker
+import ROManifolds.Utils: CostTracker,change_domains,set_domains
 
 export UnEvalTrialFESpace
 export ParamTrialFESpace
@@ -62,8 +62,6 @@ export get_param_assembler
 export get_domains
 export get_domains_res
 export get_domains_jac
-export set_domains
-export change_domains
 export get_dof_map_at_domains
 export get_sparse_dof_map_at_domains
 include("ParamFEOperators.jl")

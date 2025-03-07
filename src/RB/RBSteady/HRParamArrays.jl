@@ -67,3 +67,22 @@ end
 function LinearAlgebra.norm(a::HRParamArray)
   norm(a.hypred)
 end
+
+# utils
+
+function Utils.change_domains(a::HRParamArray,trians)
+  fecache = change_domains(a.fecache)
+  coeff = change_domains(a.coeff)
+  hypred = a.hypred
+  HRParamArray(fecache,coeff,hypred)
+end
+
+function Base.similar(a::ArrayBlock{T,N}) where {T,N}
+  array = Array{T,N}(undef,size(a))
+  for i in eachindex(a)
+    if a.touched[i]
+      array[i] = similar(a.array[i])
+    end
+  end
+  ArrayBlock(array,a.touched)
+end

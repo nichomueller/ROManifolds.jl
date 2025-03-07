@@ -34,6 +34,8 @@ end
 
 get_all_data(A::ParamSparseMatrix) = @abstractmethod
 
+SparseArrays.findnz(A::ParamSparseMatrix) = findnz(param_getindex(A,1))
+
 function LinearAlgebra.fillstored!(A::ParamSparseMatrix,b::Number)
   fill!(get_all_data(A),b)
   return A
@@ -57,7 +59,13 @@ function LinearAlgebra.rmul!(A::ParamSparseMatrix,b::Number)
 end
 
 function LinearAlgebra.axpy!(α::Number,A::ParamSparseMatrix,B::ParamSparseMatrix)
-  axpy!(α,get_all_data(A),get_all_data(B))
+  iA,jA, = findnz(A)
+  iB,jB, = findnz(B)
+  if iB == iA && jA == jB
+    axpy!(α,get_all_data(A),get_all_data(B))
+  else
+    @notimplemented
+  end
   return B
 end
 
@@ -66,7 +74,7 @@ Base.iszero(A::ParamSparseMatrix) = (nnz(A) == 0)
 
 function DofMaps.recast(a::AbstractMatrix,A::AbstractSparseMatrix)
   @check size(a,1) == nnz(A)
-  B = map(v -> recast(v,A),collect.(eachcol(a)))
+  B = map(v -> recast(v,A),map(collect,eachcol(a)))
   return ParamArray(B)
 end
 

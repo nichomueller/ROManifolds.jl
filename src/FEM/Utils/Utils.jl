@@ -44,6 +44,8 @@ export MatrixContribution
 export TupOfArrayContribution
 export contribution
 export get_contributions
+export change_domains
+export set_domains
 include("Contributions.jl")
 
 end # module

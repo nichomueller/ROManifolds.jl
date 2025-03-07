@@ -51,8 +51,8 @@ function get_cells_to_idofs(
   cells::AbstractVector,
   dofs::AbstractVector)
 
-  _correct_dof(is,li) = li
-  _correct_dof(is::OIdsToIds,li) = is.terms[li]
+  _correct_idof(is,li) = li
+  _correct_idof(is::OIdsToIds,li) = is.terms[li]
 
   cache = array_cache(cell_dof_ids)
 
@@ -70,7 +70,7 @@ function get_cells_to_idofs(
     for (idof,dof) in enumerate(dofs)
       for (_icelldof,celldof) in enumerate(celldofs)
         if dof == celldof
-          icelldof = _correct_dof(celldofs,_icelldof)
+          icelldof = _correct_idof(celldofs,_icelldof)
           data[ptrs[icell]-1+icelldof] = idof
         end
       end
@@ -118,7 +118,7 @@ get_cellids_cols(i::IntegrationDomain) = @abstractmethod
 
 function get_owned_icells(i::IntegrationDomain,cells::AbstractVector)::Vector{Int}
   cellsi = get_integration_cells(i)
-  filter(!isnothing,indexin(cells,cellsi)) # it was indexin(cellsi,cells)
+  filter(!isnothing,indexin(cellsi,cells))
 end
 
 """

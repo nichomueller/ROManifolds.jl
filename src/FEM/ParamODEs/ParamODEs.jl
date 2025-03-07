@@ -39,6 +39,7 @@ include("TransientTrialParamFESpaces.jl")
 export ODEParamOperatorType
 export NonlinearParamODE
 export LinearParamODE
+export LinearNonlinearParamODE
 export ODEParamOperator
 include("ODEParamOperators.jl")
 
@@ -53,12 +54,11 @@ export TransientParamLinearFEOperator
 export TransientParamLinearFEOpFromWeakForm
 include("TransientParamFEOperators.jl")
 
-export LinearNonlinearParamODE
-export LinearNonlinearTransientParamFEOperator
-include("LinearNonlinearTransientParamFEOperators.jl")
+# export LinearNonlinearTransientParamFEOperator
+# include("LinearNonlinearTransientParamFEOperators.jl")
 
-export ODEParamOpFromTFEOp
-include("ODEParamOpFromTFEOps.jl")
+# export ODEParamOpFromTFEOp
+# include("ODEParamOpFromTFEOps.jl")
 
 include("ThetaMethod.jl")
 

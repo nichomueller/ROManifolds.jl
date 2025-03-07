@@ -45,7 +45,7 @@ function RBSteady.reduced_operator(
   LinearNonlinearRBOperator(red_op_lin,red_op_nlin)
 end
 
-const TransientRBOperator{O} = GenericRBOperator{TupOfAffineContribution,O}
+const TransientRBOperator{O} = GenericRBOperator{O,TupOfAffineContribution}
 
 function Algebra.allocate_residual(
   op::TransientRBOperator,

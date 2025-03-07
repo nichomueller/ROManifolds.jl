@@ -159,10 +159,12 @@ end
 
 function project(r::RBSpace,a::RBParamVector)
   project!(a.data,r,a.fe_data)
+  return a.data
 end
 
 function inv_project(r::RBSpace,a::RBParamVector)
   inv_project!(a.fe_data,r,a.data)
+  return a.fe_data
 end
 
 function project(r::RBSpace,x::Projection)

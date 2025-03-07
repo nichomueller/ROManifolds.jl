@@ -5,16 +5,15 @@ function collect_cell_hr_matrix(
   strian::Triangulation,
   hr::Projection)
 
-  cells = Utils.get_tface_to_mface(strian)
   cell_irows = get_cellids_rows(hr)
   cell_icols = get_cellids_cols(hr)
+  icells = get_owned_icells(hr)
   scell_mat = get_contribution(a,strian)
   cell_mat,trian = move_contributions(scell_mat,strian)
   @assert ndims(eltype(cell_mat)) == 2
   cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
   cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
-  cell_hr_mat_rc = separate_celldata(hr,cell_mat_rc,cells)
-  (cell_hr_mat_rc,cell_irows,cell_icols)
+  (cell_mat_rc,cell_irows,cell_icols,icells)
 end
 
 function collect_cell_hr_vector(
@@ -23,80 +22,109 @@ function collect_cell_hr_vector(
   strian::Triangulation,
   hr::Projection)
 
-  cells = Utils.get_tface_to_mface(strian)
   cell_irows = get_cellids_rows(hr)
+  icells = get_owned_icells(hr)
   scell_vec = get_contribution(a,strian)
   cell_vec,trian = move_contributions(scell_vec,strian)
   @assert ndims(eltype(cell_vec)) == 1
   cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
-  cell_hr_vec_r = separate_celldata(hr,cell_vec_r,cells)
-  (cell_hr_vec_r,cell_irows)
+  (cell_vec_r,cell_irows,icells)
 end
 
-function separate_celldata(
-  hr::HyperReduction,
-  celldata::AbstractArray,
-  cells::AbstractVector)
+# function separate_celldata(
+#   hr::BlockHyperReduction,
+#   celldata::AbstractArray,
+#   cells::AbstractVector)
 
-  celldata
+#   cells = get_integration_cells(hr)
+#   block_c = get_owned_icells(hr,cells)
+#   block_d = testitem(celldata)
+#   @assert block_c.touched == block_d.touched
+#   ki = SplitCellData(testitem(block_c))
+#   k = Array{typeof(ki),ndims(block_c)}(undef,size(block_c))
+#   for i in eachindex(block_c)
+#     if block_c.touched[i]
+#       k[i] = SplitCellData(block_c.array[i])
+#     end
+#   end
+#   lazy_map(ArrayBlock(k,block_c.touched),celldata)
+# end
+
+struct BlockReindex{A} <: Map
+  values::A
+  blockid::Int
 end
 
-function separate_celldata(
-  hr::BlockHyperReduction,
-  celldata::AbstractArray,
-  cells::AbstractVector)
-
-  block_c = get_owned_icells(hr,cells)
-  block_d = testitem(celldata)
-  @assert block_c.touched == block_d.touched
-  ki = SplitCellData(testitem(block_c))
-  k = Array{typeof(ki),ndims(block_c)}(undef,size(block_c))
-  for i in eachindex(block_c)
-    if block_c.touched[i]
-      k[i] = SplitCellData(block_c.array[i])
-    end
-  end
-  lazy_map(ArrayBlock(k,block_c.touched),celldata)
+function Arrays.return_cache(k::BlockReindex,i...)
+  array_cache(k.values)
 end
 
-struct SplitCellData{T<:Integer} <: Map
-  ids::Vector{T}
+function Arrays.evaluate!(cache,k::BlockReindex,i...)
+  a = getindex!(cache,k.values,i...)
+  a.array[k.blockid]
 end
 
-function Arrays.return_cache(k::SplitCellData,data::AbstractArray)
-  return_cache(Reindex(data),k.ids)
-end
+# function Arrays.lazy_map(k::BlockReindex{<:LazyArray},::Type{T},j_to_i::AbstractArray) where T
+#   i_to_maps = k.values.maps
+#   i_to_args = k.values.args
+#   j_to_maps = lazy_map(Reindex(i_to_maps),eltype(i_to_maps),j_to_i)
+#   j_to_args = map(i_to_fk->lazy_map(BlockReindex(i_to_fk,k.blockid),eltype(i_to_fk),j_to_i),i_to_args)
+#   LazyArray(T,j_to_maps,j_to_args...)
+# end
 
-function Arrays.evaluate!(cache,k::SplitCellData,data::AbstractArray)
-  evaluate!(cache,Reindex(data),k.ids)
-end
+# function Arrays.return_cache(k::SplitCellData,data::AbstractArray)
+#   return_cache(Reindex(data),k.ids)
+# end
 
-function Arrays.return_cache(k::ArrayBlock{<:SplitCellData,N},data::ArrayBlock{A,N}) where {A,N}
-  @check k.touched == data.touched
-  ki = testitem(k)
-  di = testitem(data)
-  ci = return_cache(ki,di)
-  vi = evaluate!(ci,ki,di)
-  cache = Array{typeof(ci),N}(undef,size(data))
-  array = Array{typeof(vi),N}(undef,size(data))
-  for i in eachindex(data.array)
-    if data.touched[i]
-      cache[i] = return_cache(k.array[i],data.array[i])
-    end
-  end
-  return ArrayBlock(array,data.touched),cache
-end
+# function Arrays.evaluate!(cache,k::SplitCellData,data::AbstractArray)
+#   evaluate!(cache,Reindex(data),k.ids)
+# end
 
-function Arrays.evaluate!(cache,k::ArrayBlock{<:SplitCellData,N},data::ArrayBlock{A,N}) where {A,N}
-  @check k.touched == data.touched
-  a,c = cache
-  for i in eachindex(data.array)
-    if data.touched[i]
-      a.array[i] = evaluate!(c[i],k.array[i],data.array[i])
-    end
-  end
-  a
-end
+# function Arrays.return_cache(k::SplitCellData,f::ParamBlock)
+#   di = testitem(f)
+#   ci = return_cache(k,di)
+#   vi = evaluate!(ci,k,di)
+#   cache = Vector{typeof(ci)}(undef,param_length(f))
+#   array = Vector{typeof(vi)}(undef,param_length(f))
+#   for i in param_eachindex(f)
+#     cache[i] = return_cache(k,param_getindex(f,i))
+#   end
+#   return GenericParamBlock(array),cache
+# end
+
+# function Arrays.evaluate!(cache,k::SplitCellData,f::ParamBlock)
+#   array,c = cache
+#   for i in param_eachindex(f)
+#     array.data[i] = evaluate!(c[i],k,param_getindex(f,i))
+#   end
+#   array
+# end
+
+# function Arrays.return_cache(k::SplitBlockCellData,data::ArrayBlock{A,N}) where {A,N}
+#   di = data.array[k.blockid]
+#   ki = Reindex(di)
+#   ci = return_cache(ki,k.ids)
+#   vi = evaluate!(ci,ki,k.ids)
+#   cache = Array{typeof(ci),N}(undef,size(data))
+#   array = Array{typeof(vi),N}(undef,size(data))
+#   for i in eachindex(data.array)
+#     if data.touched[i]
+#       cache[i] = return_cache(k.array[i],data.array[i])
+#     end
+#   end
+#   return ArrayBlock(array,data.touched),cache
+# end
+
+# function Arrays.evaluate!(cache,k::ArrayBlock{<:SplitCellData,N},data::ArrayBlock{A,N}) where {A,N}
+#   @check k.touched == data.touched
+#   a,c = cache
+#   for i in eachindex(data.array)
+#     if data.touched[i]
+#       a.array[i] = evaluate!(c[i],k.array[i],data.array[i])
+#     end
+#   end
+#   a
+# end
 
 struct AddHREntriesMap{F}
   combine::F
@@ -200,15 +228,17 @@ end
   A
 end
 
-function assemble_hr_vector_add!(b::BlockParamArray,cellvec::ArrayBlock,cellidsrows::ArrayBlock)
-  for i in eachindex(cellvec)
-    if cellvec.touched[i]
-      assemble_hr_vector_add!(blocks(b)[i],cellvec.array[i],cellidsrows.array[i])
+function assemble_hr_vector_add!(b::ArrayBlock,cellvec,cellidsrows::ArrayBlock,icells::ArrayBlock)
+  @check b.touched == cellidsrows.touched == icells.touched
+  for i in eachindex(cellidsrows)
+    if cellidsrows.touched[i]
+      cellveci = lazy_map(BlockReindex(cellvec,i),icells.array[i])
+      assemble_hr_vector_add!(b.array[i],cellveci,cellidsrows.array[i])
     end
   end
 end
 
-function assemble_hr_vector_add!(b,cellvec,cellidsrows)
+function assemble_hr_vector_add!(b,cellvec,cellidsrows,args...)
   if length(cellvec) > 0
     rows_cache = array_cache(cellidsrows)
     vals_cache = array_cache(cellvec)
@@ -227,11 +257,12 @@ end
 end
 
 function assemble_hr_matrix_add!(
-  A::BlockParamArray,cellmat::ArrayBlock,cellidsrows::ArrayBlock,cellidscols::ArrayBlock)
-  for i in eachindex(cellmat)
-    if cellmat.touched[i]
-      assemble_hr_matrix_add!(
-        blocks(A)[i],cellmat.array[i],cellidsrows.array[i],cellidscols.array[i])
+  A::ArrayBlock,cellmat,cellidsrows::ArrayBlock,cellidscols::ArrayBlock,icells::ArrayBlock)
+  @check A.touched == cellidsrows.touched == cellidscols.touched == icells.touched
+  for i in eachindex(cellidsrows)
+    if cellidsrows.touched[i]
+      cellmati = lazy_map(BlockReindex(cellmat,i),icells.array[i])
+      assemble_hr_matrix_add!(A.array[i],cellmati,cellidsrows.array[i],cellidscols.array[i])
     end
   end
 end
@@ -264,77 +295,3 @@ end
     evaluate!(add_cache,add!,mat,vals,rows,cols)
   end
 end
-
-# # utils
-
-# struct HRAssemblyStrategy <: AssemblyStrategy end
-
-# FESpaces.map_cell_rows(k::HRAssemblyStrategy,cell_ids) = cell_ids
-# FESpaces.map_cell_cols(k::HRAssemblyStrategy,cell_ids) = cell_ids
-# FESpaces.map_cell_rows(k::HRAssemblyStrategy,cell_ids::ArrayBlock) = LazyArrayBlock(cell_ids)
-# FESpaces.map_cell_cols(k::HRAssemblyStrategy,cell_ids::ArrayBlock) = LazyArrayBlock(cell_ids)
-
-# struct LazyArrayBlock{A,N,T} <: AbstractVector{ArrayBlock{T,N}}
-#   blocks::ArrayBlock{A,N}
-#   l::Int
-#   function LazyArrayBlock(blocks::ArrayBlock{A,N},l::Int) where {A,N}
-#     T = eltype(A)
-#     new{A,N,T}(blocks,l)
-#   end
-# end
-
-# function LazyArrayBlock(blocks::ArrayBlock)
-#   l = _max_length(blocks)
-#   LazyArrayBlock(blocks,l)
-# end
-
-# Base.size(b::LazyArrayBlock) = (b.l,)
-
-# function Base.getindex(b::LazyArrayBlock,j::Int)
-#   cache = array_cache(b)
-#   getindex!(cache,b,j)
-# end
-
-# function Arrays.array_cache(a::LazyArrayBlock{T,N}) where {T,N}
-#   blocks = a.blocks
-#   ai = testitem(blocks)
-#   ci = array_cache(ai)
-#   vi = getindex!(ci,ai,1)
-#   c = Array{typeof(ci),N}(undef,size(blocks))
-#   v = Array{typeof(vi),N}(undef,size(blocks))
-#   for i in eachindex(blocks)
-#     if blocks.touched[i]
-#       c[i] = array_cache(blocks.array[i])
-#     end
-#   end
-#   ArrayBlock(v,blocks.touched),c
-# end
-
-# function Arrays.getindex!(cache,a::LazyArrayBlock,j::Int)
-#   v,c = cache
-#   blocks = a.blocks
-#   for i in eachindex(blocks)
-#     if blocks.touched[i]
-#       bi = blocks.array[i]
-#       li = length(bi)
-#       if j <= li
-#         v[i] = getindex!(c[i],bi,j)
-#       else
-#         v0 = getindex!(c[i],bi,li)
-#         fill!(v0,zero(eltype(v0)))
-#         v[i] = v0
-#       end
-#     end
-#   end
-#   v
-# end
-
-# function _max_length(blocks::ArrayBlock)
-#   l = 0
-#   for i in eachindex(blocks)
-#     if blocks.touched[i]
-#       l = max(l,length(blocks.array[i]))
-#     end
-#   end
-#   l
-# end

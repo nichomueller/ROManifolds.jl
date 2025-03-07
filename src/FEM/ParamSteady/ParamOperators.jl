@@ -86,8 +86,8 @@ get_dof_map_at_domains(op::ParamOperator) = get_dof_map_at_domains(get_fe_operat
 get_sparse_dof_map_at_domains(op::ParamOperator) = get_sparse_dof_map_at_domains(get_fe_operator(op))
 CellData.get_domains(op::ParamOperator) = get_domains(get_fe_operator(op))
 
-set_domains(op::ParamOperator) = set_domains(get_fe_operator(op))
-change_domains(op::ParamOperator) = change_domains(get_fe_operator(op))
+set_domains(op::ParamOperator,args...) = get_algebraic_operator(set_domains(get_fe_operator(op),args...))
+change_domains(op::ParamOperator,args...) = get_algebraic_operator(change_domains(get_fe_operator(op),args...))
 get_domains_res(op::ParamOperator) = get_domains_res(get_fe_operator(op))
 get_domains_jac(op::ParamOperator) = get_domains_jac(get_fe_operator(op))
 
@@ -97,8 +97,6 @@ ParamDataStructures.realization(op::ParamOperator;kwargs...) = realization(get_f
 get_param_assembler(op::ParamOperator,r::AbstractRealization) = get_param_assembler(get_fe_operator(op),r)
 FESpaces.assemble_matrix(op::ParamOperator,form::Function) = assemble_matrix(get_fe_operator(op),form)
 
-join_operators(op::ParamOperator) = join_operators(get_fe_operator(op))
-
 function ParamAlgebra.allocate_paramcache(op::ParamOperator,μ::Realization)
   feop = get_fe_operator(op)
   ptrial = get_trial(feop)
@@ -106,9 +104,10 @@ function ParamAlgebra.allocate_paramcache(op::ParamOperator,μ::Realization)
   ParamCache(trial,ptrial)
 end
 
-const LinearNonlinearParamOperator{T} = ParamOperator{LinearNonlinearParamEq,T}
+const LinearNonlinearParamOperator{T<:TriangulationStyle} = ParamOperator{LinearNonlinearParamEq,T}
 
 get_fe_operator(op::LinearNonlinearParamOperator) = get_fe_operator(get_nonlinear_operator(op))
+join_operators(op::LinearNonlinearParamOperator) = get_algebraic_operator(join_operators(get_fe_operator(op)))
 
 function ParamAlgebra.allocate_paramcache(op::LinearNonlinearParamOperator,μ::Realization)
   op_nlin = get_nonlinear_operator(op)
@@ -190,7 +189,9 @@ function ParamOperator(args...;kwargs...)
   get_algebraic_operator(feop)
 end
 
-function LinearNonlinearParamOperator(args...;kwargs...)
-  feop = LinearNonlinearParamFEOperator(args...;kwargs...)
+function LinearNonlinearParamOperator(op_lin::ParamOperator,op_nlin::ParamOperator)
+  feop_lin = get_fe_operator(op_lin)
+  feop_nlin = get_fe_operator(op_nlin)
+  feop = LinearNonlinearParamFEOperator(feop_lin,feop_nlin)
   get_algebraic_operator(feop)
 end

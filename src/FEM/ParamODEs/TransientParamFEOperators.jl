@@ -258,8 +258,8 @@ CellData.get_domains(op::TransientParamLinearFEOpFromWeakForm) = op.domains
 
 # triangulation utils
 
-for f in (:(ParamSteady.set_domains),:(ParamSteady.change_domains))
-  T = f == :(ParamSteady.set_domains) ? :JointDomains : :SplitDomains
+for f in (:set_domains,:change_domains)
+  T = f == :set_domains ? :JointDomains : :SplitDomains
   @eval begin
     function $f(op::SplitTransientParamFEOpFromWeakForm,trian_res,trian_jacs)
       trian_res′ = order_domains(get_domains_res(op),trian_res)

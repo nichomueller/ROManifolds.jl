@@ -630,6 +630,12 @@ end
 Base.getindex(a::BlockProjection,i::Block) = getindex(a,i.n...)
 Base.setindex!(a::BlockProjection,v,i::Block) = setindex!(a,v,i.n...)
 
+function Arrays.testitem(a::BlockProjection)
+  i = findall(a.touched)
+  @notimplementedif length(i) == 0
+  a.array[first(i)]
+end
+
 function num_fe_dofs(a::BlockProjection)
   dofs = zeros(Int,length(a))
   for i in eachindex(a)

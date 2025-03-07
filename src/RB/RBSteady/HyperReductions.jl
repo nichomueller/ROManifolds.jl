@@ -52,6 +52,7 @@ get_integration_domain(a::HyperReduction) = @abstractmethod
 get_integration_cells(a::HyperReduction) = get_integration_cells(get_integration_domain(a))
 get_cellids_rows(a::HyperReduction) = get_cellids_rows(get_integration_domain(a))
 get_cellids_cols(a::HyperReduction) = get_cellids_cols(get_integration_domain(a))
+get_owned_icells(a::HyperReduction) = get_owned_icells(a,get_integration_cells(a))
 get_owned_icells(a::HyperReduction,cells) = get_owned_icells(get_integration_domain(a),cells)
 
 num_reduced_dofs(a::HyperReduction) = num_reduced_dofs(get_basis(a))
@@ -88,17 +89,17 @@ get_basis(a::TrivialHyperReduction) = a.basis
 get_interpolation(a::TrivialHyperReduction) = @notimplemented
 get_integration_domain(a::TrivialHyperReduction) = @notimplemented
 
-function HyperReduction(red::Reduction,s::Nothing,test::RBSpace)
+function HyperReduction(red::Reduction,s::Nothing,trian::Triangulation,test::RBSpace)
   red = get_reduction(red)
-  nrows = num_free_dofs(test)
+  nrows = num_reduced_dofs(test)
   basis = ReducedProjection(zeros(nrows,1))
   return TrivialHyperReduction(red,basis)
 end
 
-function HyperReduction(red::Reduction,s::Nothing,trial::RBSpace,test::RBSpace)
+function HyperReduction(red::Reduction,s::Nothing,trian::Triangulation,trial::RBSpace,test::RBSpace)
   red = get_reduction(red)
-  nrows = num_free_dofs(test)
-  ncols = num_free_dofs(trial)
+  nrows = num_reduced_dofs(test)
+  ncols = num_reduced_dofs(trial)
   basis = ReducedProjection(zeros(nrows,1,ncols))
   return TrivialHyperReduction(red,basis)
 end
@@ -156,7 +157,7 @@ function HyperReduction(
 end
 
 function reduced_triangulation(trian::Triangulation,a::TrivialHyperReduction)
-  red_trian = view(trian,[])
+  red_trian = view(trian,Int[])
   return red_trian
 end
 
@@ -378,7 +379,7 @@ function Utils.Contribution(
   AffineContribution(v,t)
 end
 
-for f in (:get_basis,:get_interpolation)
+for f in (:get_basis,:get_interpolation,:get_cellids_rows,:get_cellids_cols)
   @eval begin
     function Arrays.return_cache(::typeof($f),a::BlockHyperReduction)
       cache = $f(testitem(a))
@@ -435,6 +436,7 @@ function get_owned_icells(a::BlockHyperReduction,cells::AbstractVector)
       cache[i] = get_owned_icells(a[i],cells)
     end
   end
+  return ArrayBlock(cache,a.touched)
 end
 
 function inv_project!(

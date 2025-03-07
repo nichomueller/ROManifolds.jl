@@ -11,14 +11,6 @@ end
 
 get_fe_operator(op::ParamOpFromFEOp) = op.op
 
-for f in (:set_domains,:change_domains)
-  @eval begin
-    function $f(odeop::ParamOpFromFEOp,args...)
-      ParamOpFromFEOp($f(odeop.op,args...))
-    end
-  end
-end
-
 """
     const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointDomains}
 """
