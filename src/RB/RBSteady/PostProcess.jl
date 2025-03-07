@@ -197,47 +197,50 @@ function _load_fixed_operator_parts(dir,feop;label="")
   return trial,test
 end
 
-function _load_trian_operator_parts(dir,feop::SplitParamFEOperator,trial,test;label="")
+function _load_trian_operator_parts(dir,feop::SplitParamOperator,trial,test;label="")
   trian_res = get_domains_res(feop)
   trian_jac = get_domains_jac(feop)
-  pop = get_algebraic_operator(feop)
   red_rhs = load_contribution(dir,trian_res,test;label=_get_label(label,"rhs"))
   red_lhs = load_contribution(dir,trian_jac,trial,test;label=_get_label(label,"lhs"))
   trians_rhs = get_domains(red_rhs)
   trians_lhs = get_domains(red_lhs)
-  new_pop = change_domains(pop,trians_rhs,trians_lhs)
-  return new_pop,red_lhs,red_rhs
+  feop′ = change_domains(feop,trians_rhs,trians_lhs)
+  return feop′,red_lhs,red_rhs
 end
 
 """
-    load_operator(dir,feop::SplitParamFEOperator;kwargs...) -> RBOperator
-    load_operator(dir,feop::SplitTransientParamFEOperator;kwargs...) -> TransientRBOperator
+    load_operator(dir,feop::SplitParamOperator;kwargs...) -> RBOperator
+    load_operator(dir,feop::SplitTransientParamOperator;kwargs...) -> TransientRBOperator
 
 Given a FE operator `feop`, load its reduced counterpart stored in the
 directory `dir`. Throws an error if the reduced operator has not been previously
 saved to file
 """
-function load_operator(dir,feop::SplitParamFEOperator;kwargs...)
+function load_operator(dir,feop::SplitParamOperator;kwargs...)
   trial,test = _load_fixed_operator_parts(dir,feop;kwargs...)
   pop,red_lhs,red_rhs = _load_trian_operator_parts(dir,feop,trial,test;kwargs...)
   op = GenericRBOperator(pop,trial,test,red_lhs,red_rhs)
   return op
 end
 
-function DrWatson.save(dir,op::LinearNonlinearRBOperator;label="")
-  _save_fixed_operator_parts(dir,op.op_linear;label)
-  _save_trian_operator_parts(dir,op.op_linear;label=_get_label(label,"lin"))
-  _save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nlin"))
+function DrWatson.save(dir,feop::LinearNonlinearRBOperator;label="")
+  feop_lin = get_linear_operator(feop)
+  feop_nlin = get_nonlinear_operator(feop)
+  _save_fixed_operator_parts(dir,feop_lin;label)
+  _save_trian_operator_parts(dir,feop_lin;label=_get_label(label,"lin"))
+  _save_trian_operator_parts(dir,feop_nlin;label=_get_label(label,"nlin"))
 end
 
-function load_operator(dir,feop::LinearNonlinearParamFEOperator{SplitDomains};label="")
-  trial,test = _fixed_operator_parts(dir,feop.op_linear;label)
-  pop_lin,red_lhs_lin,red_rhs_lin = _load_trian_operator_parts(
-    dir,feop.op_linear,trial,test;label=_get_label("lin",label))
-  pop_nlin,red_lhs_nlin,red_rhs_nlin = _load_trian_operator_parts(
-    dir,feop.op_nonlinear,trial,test;label=_get_label("nlin",label))
-  op_lin = GenericRBOperator(pop_lin,trial,test,red_lhs_lin,red_rhs_lin)
-  op_nlin = GenericRBOperator(pop_nlin,trial,test,red_lhs_nlin,red_rhs_nlin)
+function load_operator(dir,feop::LinearNonlinearParamOperator{SplitDomains};label="")
+  feop_lin = get_linear_operator(feop)
+  feop_nlin = get_nonlinear_operator(feop)
+  trial,test = _fixed_operator_parts(dir,feop_lin;label)
+  feop_lin′,red_lhs_lin,red_rhs_lin = _load_trian_operator_parts(
+    dir,feop_lin,trial,test;label=_get_label("lin",label))
+  feop_nlin′,red_lhs_nlin,red_rhs_nlin = _load_trian_operator_parts(
+    dir,feop_nlin,trial,test;label=_get_label("nlin",label))
+  op_lin = GenericRBOperator(feop_lin′,trial,test,red_lhs_lin,red_rhs_lin)
+  op_nlin = GenericRBOperator(feop_nlin′,trial,test,red_lhs_nlin,red_rhs_nlin)
   return LinearNonlinearRBOperator(op_lin,op_nlin)
 end
 

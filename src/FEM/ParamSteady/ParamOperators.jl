@@ -58,14 +58,14 @@ Type representing algebraic operators when solving parametric differential probl
 abstract type ParamOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: NonlinearParamOperator end
 
 """
-    const JointParamOperator{O} = ParamOperator{O,JointDomains}
+    const JointParamOperator{O<:UnEvalOperatorType} = ParamOperator{O,JointDomains}
 """
-const JointParamOperator{O} = ParamOperator{O,JointDomains}
+const JointParamOperator{O<:UnEvalOperatorType} = ParamOperator{O,JointDomains}
 
 """
-    const SplitParamOperator{O} = ParamOperator{O,SplitDomains}
+    const SplitParamOperator{O<:UnEvalOperatorType} = ParamOperator{O,SplitDomains}
 """
-const SplitParamOperator{O} = ParamOperator{O,SplitDomains}
+const SplitParamOperator{O<:UnEvalOperatorType} = ParamOperator{O,SplitDomains}
 
 """
     get_fe_operator(op::ParamOperator) -> ParamFEOperator
@@ -109,7 +109,8 @@ const LinearNonlinearParamOperator{T<:TriangulationStyle} = ParamOperator{Linear
 get_fe_operator(op::LinearNonlinearParamOperator) = get_fe_operator(get_nonlinear_operator(op))
 join_operators(op::LinearNonlinearParamOperator) = get_algebraic_operator(join_operators(get_fe_operator(op)))
 
-function ParamAlgebra.allocate_paramcache(op::LinearNonlinearParamOperator,μ::Realization)
+# the following work in unsteady applications as well
+function ParamAlgebra.allocate_paramcache(op::LinearNonlinearParamOperator,μ::AbstractRealization)
   op_nlin = get_nonlinear_operator(op)
   allocate_paramcache(op_nlin,μ)
 end
@@ -122,10 +123,17 @@ end
 function ParamAlgebra.update_paramcache!(
   paramcache,
   op::LinearNonlinearParamOperator,
-  μ::Realization)
+  μ::AbstractRealization)
 
   op_nlin = get_nonlinear_operator(op)
   update_paramcache!(paramcache,op_nlin,μ)
+end
+
+function ParamDataStructures.parameterize(op::LinearNonlinearParamOperator,μ::AbstractRealization)
+  op_lin = parameterize(get_linear_operator(op),μ)
+  op_nlin = parameterize(get_nonlinear_operator(op),μ)
+  syscache_lin = allocate_systemcache(op_lin)
+  LinNonlinParamOperator(op_lin,op_nlin,syscache_lin)
 end
 
 function Algebra.allocate_residual(
@@ -168,13 +176,6 @@ function ODEs.jacobian_add!(
 
   @notimplemented "This is inefficient. Instead, assemble the nonlinear system
   by defining a [`LinearNonlinearParamOperator`](@ref)"
-end
-
-function ParamDataStructures.parameterize(op::LinearNonlinearParamOperator,μ::Realization)
-  op_lin = parameterize(get_linear_operator(op),μ)
-  op_nlin = parameterize(get_nonlinear_operator(op),μ)
-  syscache_lin = allocate_systemcache(op_lin)
-  LinNonlinParamOperator(op_lin,op_nlin,syscache_lin)
 end
 
 # constructors

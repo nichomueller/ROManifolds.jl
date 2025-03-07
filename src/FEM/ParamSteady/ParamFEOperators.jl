@@ -160,7 +160,7 @@ function _assemble_matrix(f,U::MultiFieldFESpace,V::MultiFieldFESpace)
 end
 
 """
-    struct ParamFEOpFromWeakForm{O,T} <: ParamFEOperator{O,T}
+    struct ParamFEOpFromWeakForm{O<:UnEvalOperatorType,T<:TriangulationStyle} <: ParamFEOperator{O,T}
       res::Function
       jac::Function
       pspace::ParamSpace
@@ -172,7 +172,7 @@ end
 
 Most standard instance of a parametric FE operator
 """
-struct ParamFEOpFromWeakForm{O,T} <: ParamFEOperator{O,T}
+struct ParamFEOpFromWeakForm{O<:UnEvalOperatorType,T<:TriangulationStyle} <: ParamFEOperator{O,T}
   res::Function
   jac::Function
   pspace::ParamSpace
@@ -182,8 +182,8 @@ struct ParamFEOpFromWeakForm{O,T} <: ParamFEOperator{O,T}
   domains::FEDomains
 end
 
-const JointParamFEOpFromWeakForm{O} = ParamFEOpFromWeakForm{O,JointDomains}
-const SplitParamFEOpFromWeakForm{O} = ParamFEOpFromWeakForm{O,SplitDomains}
+const JointParamFEOpFromWeakForm{O<:UnEvalOperatorType} = ParamFEOpFromWeakForm{O,JointDomains}
+const SplitParamFEOpFromWeakForm{O<:UnEvalOperatorType} = ParamFEOpFromWeakForm{O,SplitDomains}
 
 function ParamFEOperator(res::Function,jac::Function,pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)

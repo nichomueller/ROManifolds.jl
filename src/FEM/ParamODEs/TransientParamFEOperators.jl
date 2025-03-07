@@ -13,7 +13,6 @@ Subtypes:
 
 - [`TransientParamFEOpFromWeakForm`](@ref)
 - [`TransientParamLinearFEOpFromWeakForm`](@ref)
-- [`LinearNonlinearTransientParamFEOperator`](@ref)
 """
 abstract type TransientParamFEOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamFEOperator{O,T} end
 
@@ -28,7 +27,7 @@ const JointTransientParamFEOperator{O<:ODEParamOperatorType} = TransientParamFEO
 const SplitTransientParamFEOperator{O<:ODEParamOperatorType} = TransientParamFEOperator{O,SplitDomains}
 
 function FESpaces.get_algebraic_operator(op::TransientParamFEOperator)
-  ODEParamOpFromTFEOp(op)
+  ParamOpFromFEOp(op)
 end
 
 ODEs.get_res(op::TransientParamFEOperator) = @abstractmethod
@@ -342,4 +341,41 @@ function _set_domains(
   trian_res = get_domains_res(domains)
   trian_jacs = get_domains_jac(domains)
   _set_domains(res,jacs,test,trial,trian_res,trian_jacs)
+end
+
+function ParamSteady.join_operators(
+  op_lin::TransientParamFEOperator,
+  op_nlin::TransientParamFEOperator)
+
+  op_lin = set_domains(op_lin)
+  op_nlin = set_domains(op_nlin)
+
+  @check get_trial(op_lin) == get_trial(op_nlin)
+  @check get_test(op_lin) == get_test(op_nlin)
+  @check op_lin.tpspace === op_nlin.tpspace
+
+  trial = get_trial(op_lin)
+  test = get_test(op_lin)
+  order = max(get_order(op_lin),get_order(op_nlin))
+
+  res(μ,t,u,v) = get_res(op_lin)(μ,t,u,v) + get_res(op_nlin)(μ,t,u,v)
+
+  order_lin = get_order(op_lin)
+  order_nlin = get_order(op_nlin)
+
+  jacs = ()
+  for i = 1:order+1
+    function jac_i(μ,t,u,du,v)
+      if i <= order_lin+1 && i <= order_nlin+1
+        get_jacs(op_lin)[i](μ,t,u,du,v) + get_jacs(op_nlin)[i](μ,t,u,du,v)
+      elseif i <= order_lin+1
+        get_jacs(op_lin)[i](μ,t,u,du,v)
+      else i <= order_nlin+1
+        get_jacs(op_nlin)[i](μ,t,u,du,v)
+      end
+    end
+    jacs = (jacs...,jac_i)
+  end
+
+  TransientParamFEOperator(res,jacs,op_lin.tpspace,trial,test)
 end

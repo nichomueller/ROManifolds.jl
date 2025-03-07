@@ -27,109 +27,24 @@ struct LinearParamODE <: ODEParamOperatorType end
 struct LinearNonlinearParamODE <: ODEParamOperatorType end
 
 """
-    abstract type ODEParamOperator{T<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T} end
+    const ODEParamOperator{T<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T}
 
 Transient extension of the type [`ParamOperator`](@ref).
 """
-abstract type ODEParamOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T} end
+const ODEParamOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} = ParamOperator{O,T}
+
+"""
+    const JointODEParamOperator{O<:ODEParamOperatorType} = ODEParamOperator{O,JointDomains}
+"""
+const JointODEParamOperator{O<:ODEParamOperatorType} = ODEParamOperator{O,JointDomains}
+
+"""
+    const SplitODEParamOperator{O<:ODEParamOperatorType} = ODEParamOperator{O,SplitDomains}
+"""
+const SplitODEParamOperator{O<:ODEParamOperatorType} = ODEParamOperator{O,SplitDomains}
 
 get_order(odeop::ODEParamOperator) = get_order(get_fe_operator(odeop))
 ODEs.is_form_constant(odeop::ODEParamOperator,k::Integer) = is_form_constant(get_fe_operator(odeop),k)
-
-function Algebra.allocate_residual(
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  paramcache)
-
-  @abstractmethod
-end
-
-function Algebra.residual!(
-  b,
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  paramcache;
-  add::Bool=false)
-
-  @abstractmethod
-end
-
-function Algebra.residual(
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}})
-
-  paramcache = allocate_paramcache(odeop,r;evaluated=true)
-  residual(odeop,r,us,paramcache)
-end
-
-function Algebra.residual(
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  paramcache)
-
-  b = allocate_residual(odeop,r,us,paramcache)
-  residual!(b,odeop,r,us,paramcache)
-  b
-end
-
-function Algebra.allocate_jacobian(
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  paramcache)
-
-  @abstractmethod
-end
-
-function ODEs.jacobian_add!(
-  A,
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  ws::Tuple{Vararg{Real}},
-  paramcache)
-
-  @abstractmethod
-end
-
-function Algebra.jacobian!(
-  A,
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  ws::Tuple{Vararg{Real}},
-  paramcache)
-
-  LinearAlgebra.fillstored!(A,zero(eltype(A)))
-  jacobian_add!(A,odeop,r,us,ws,paramcache)
-  A
-end
-
-function Algebra.jacobian(
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  ws::Tuple{Vararg{Real}})
-
-  paramcache = allocate_paramcache(odeop,r;evaluated=true)
-  jacobian(odeop,r,us,ws,paramcache)
-end
-
-function Algebra.jacobian(
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  ws::Tuple{Vararg{Real}},
-  paramcache)
-
-  A = allocate_jacobian(odeop,r,us,paramcache)
-  jacobian!(A,odeop,r,us,ws,paramcache)
-  A
-end
 
 function ParamAlgebra.allocate_paramcache(
   odeop::ODEParamOperator,
@@ -161,4 +76,23 @@ function ParamAlgebra.update_paramcache!(
   end
   paramcache.trial = trials
   paramcache
+end
+
+# constructors
+
+function TransientParamLinearOperator(args...;kwargs...)
+  feop = TransientParamLinearFEOperator(args...;kwargs...)
+  get_algebraic_operator(feop)
+end
+
+function TransientParamOperator(args...;kwargs...)
+  feop = TransientParamFEOperator(args...;kwargs...)
+  get_algebraic_operator(feop)
+end
+
+function LinearNonlinearTransientParamOperator(op_lin::ParamOperator,op_nlin::ParamOperator)
+  feop_lin = get_fe_operator(op_lin)
+  feop_nlin = get_fe_operator(op_nlin)
+  feop = LinearNonlinearParamFEOperator(feop_lin,feop_nlin)
+  get_algebraic_operator(feop)
 end

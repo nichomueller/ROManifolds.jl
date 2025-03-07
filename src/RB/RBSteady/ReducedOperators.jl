@@ -168,6 +168,8 @@ function Algebra.jacobian!(
   inv_project!(A,op.lhs)
 end
 
+const ParamNonlinearRBOperator = GenericParamNonlinearOperator{<:RBOperator}
+
 """
     struct LinearNonlinearRBOperator{A} <: RBOperator{LinearNonlinearParamEq}
       op_linear::GenericRBOperator{LinearParamEq,A}
@@ -187,13 +189,14 @@ ParamAlgebra.get_nonlinear_operator(op::LinearNonlinearRBOperator) = op.op_nonli
 FESpaces.get_trial(op::LinearNonlinearRBOperator) = get_trial(get_nonlinear_operator(op))
 FESpaces.get_test(op::LinearNonlinearRBOperator) = get_test(get_nonlinear_operator(op))
 
-const LinearNonlinearRBOperator = LinearNonlinearRBOperator{<:GenericRBOperator,<:GenericRBOperator}
+const LinNonlinRBOperator = LinNonlinParamOperator{<:ParamNonlinearRBOperator,<:ParamNonlinearRBOperator}
 
-function ParamAlgebra.allocate_systemcache(nlop::LinearNonlinearRBOperator,x::AbstractVector)
-  cache_linear = get_linear_systemcache(nlop)
-  trian_jac = get_domains_jac(nlop.op_nonlinear)
-  trian_res = get_domains_res(nlop.op_nonlinear)
-  A_nlin = similar_with_trian(cache_linear.A,trian_jac)
-  b_nlin = similar_with_trian(cache_linear.A,trian_jac)
-  SystemCache(A_nlin,b_nlin)
-end
+# function ParamAlgebra.allocate_systemcache(nlop::LinNonlinRBOperator,x::AbstractVector)
+#   cache_linear = get_linear_systemcache(nlop)
+#   feop = get_fe_operator(nlop.op_nonlinear.op)
+#   trian_jac = get_domains_jac(feop)
+#   trian_res = get_domains_res(feop)
+#   A_nlin = change_domains(cache_linear.A,trian_jac)
+#   b_nlin = change_domains(cache_linear.b,trian_res)
+#   SystemCache(A_nlin,b_nlin)
+# end

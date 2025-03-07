@@ -43,20 +43,22 @@ get_linear_operator(op::LinNonlinParamOperator) = op.op_linear
 get_nonlinear_operator(op::LinNonlinParamOperator) = op.op_nonlinear
 get_linear_systemcache(op::LinNonlinParamOperator) = op.cache_linear
 
-function allocate_paramcache(op::LinNonlinParamOperator,μ::Realization)
+function allocate_paramcache(op::LinNonlinParamOperator,μ::AbstractRealization)
   op_nlin = get_nonlinear_operator(op)
   allocate_paramcache(op_nlin,μ)
 end
 
 function allocate_systemcache(op::LinNonlinParamOperator,x::AbstractVector)
   cache_linear = get_linear_systemcache(op)
-  similar(cache_linear)
+  op_nlin = get_nonlinear_operator(op)
+  cache_nonlinear = allocate_systemcache(op_nlin,x)
+  _compatible_cache(cache_nonlinear,cache_linear)
 end
 
 function update_paramcache!(
   paramcache,
   op::LinNonlinParamOperator,
-  μ::Realization)
+  μ::AbstractRealization)
 
   op_nlin = get_nonlinear_operator(op)
   update_paramcache!(paramcache,op_nlin,μ)
@@ -116,4 +118,34 @@ function Algebra.jacobian!(
   axpy!(1,A_lin,A)
 
   A
+end
+
+# utils
+
+function _compatible_cache(a::SystemCache,b::SystemCache)
+  A′ = _compatible_cache(a.A,b.A)
+  b′ = _compatible_cache(a.b,b.b)
+  SystemCache(A′,b′)
+end
+
+function _compatible_cache(a::AbstractParamArray,b::AbstractParamArray)
+  a
+end
+
+function _compatible_cache(a::ParamSparseMatrix,b::ParamSparseMatrix)
+  ia,ja,_ = findnz(a)
+  ib,jb,_ = findnz(b)
+  if ia == ib && ja == jb
+    a
+  else
+    copy(b)
+  end
+end
+
+function _compatible_cache(ba::BlockParamArray,bb::BlockParamArray)
+  @check size(ba) == size(bb)
+  ba′ = map(blocks(ba),blocks(bb)) do a,b
+    _compatible_cache(a,b)
+  end
+  mortar(ba′)
 end

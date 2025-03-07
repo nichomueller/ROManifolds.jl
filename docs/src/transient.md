@@ -125,7 +125,7 @@ feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,
 feop = LinearNonlinearTransientParamFEOperator(feop_lin,feop_nlin)
 ```
 
-The two FE operators are wrapped together in a [`LinearNonlinearTransientParamFEOperator`](@ref) struct. Next, we define the time marching scheme for our problem, along with a suitable initial condition 
+Next, we define the time marching scheme for our problem, along with a suitable initial condition 
 
 ```julia 
 u0(x,μ) = VectorValue(0.0,0.0)

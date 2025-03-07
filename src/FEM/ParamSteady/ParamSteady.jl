@@ -42,12 +42,13 @@ export NonlinearParamEq
 export LinearParamEq
 export LinearNonlinearParamEq
 export TriangulationStyle
-export SplitDomains
 export JointDomains
+export SplitDomains
 export ParamOperator
+export JointParamOperator
+export SplitParamOperator
 export LinearParamOperator
 export LinearNonlinearParamOperator
-export LinearNonlinearParamOpFromFEOp
 export get_fe_operator
 include("ParamOperators.jl")
 
@@ -75,6 +76,7 @@ include("LinearNonlinearParamFEOperators.jl")
 export ParamOpFromFEOp
 export JointParamOpFromFEOp
 export SplitParamOpFromFEOp
+export LinearNonlinearParamOpFromFEOp
 export collect_cell_matrix_for_trian
 export collect_cell_vector_for_trian
 include("ParamOpFromFEOps.jl")

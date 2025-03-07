@@ -71,18 +71,13 @@ end
 # utils
 
 function Utils.change_domains(a::HRParamArray,trians)
-  fecache = change_domains(a.fecache)
-  coeff = change_domains(a.coeff)
+  fecache = change_domains(a.fecache,trians)
+  coeff = change_domains(a.coeff,trians)
   hypred = a.hypred
   HRParamArray(fecache,coeff,hypred)
 end
 
-function Base.similar(a::ArrayBlock{T,N}) where {T,N}
-  array = Array{T,N}(undef,size(a))
-  for i in eachindex(a)
-    if a.touched[i]
-      array[i] = similar(a.array[i])
-    end
-  end
-  ArrayBlock(array,a.touched)
+function ParamAlgebra._compatible_cache(a::HRParamArray,b::HRParamArray)
+  hypred′ = ParamAlgebra._compatible_cache(a.hypred,b.hypred)
+  HRParamArray(a.fecache,a.coeff,hypred′)
 end

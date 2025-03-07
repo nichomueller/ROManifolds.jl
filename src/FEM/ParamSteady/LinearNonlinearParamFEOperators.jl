@@ -1,5 +1,5 @@
 """
-    struct LinearNonlinearParamFEOperator{A,B,T} <: ParamFEOperator{LinearNonlinearParamEq,T}
+    struct LinearNonlinearParamFEOperator{T<:TriangulationStyle,A,B} <: ParamFEOperator{LinearNonlinearParamEq,T}
       op_linear::A
       op_nonlinear::B
     end
@@ -9,7 +9,7 @@ a nonlinear problem. This allows to build and store once and for all linear
 residuals/Jacobians, and in the Newton-like iterations only evaluate and assemble
 only the nonlinear components
 """
-struct LinearNonlinearParamFEOperator{T,A,B} <: ParamFEOperator{LinearNonlinearParamEq,T}
+struct LinearNonlinearParamFEOperator{T<:TriangulationStyle,A,B} <: ParamFEOperator{LinearNonlinearParamEq,T}
   op_linear::A
   op_nonlinear::B
 
@@ -72,7 +72,6 @@ end
 
 """
     join_operators(op::LinearNonlinearParamFEOperator) -> ParamFEOperator
-    join_operators(op::LinearNonlinearTransientParamFEOperator) -> TransientParamFEOperator
 
 Joins the linear/nonlinear parts of the operator and returns the resulting operator
 """

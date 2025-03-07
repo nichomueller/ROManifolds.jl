@@ -119,7 +119,7 @@ mutable struct ParamCache <: AbstractParamCache
   ptrial
 end
 
-function update_paramcache!(c::ParamCache,nlop::NonlinearParamOperator,μ::Realization)
+function update_paramcache!(c::ParamCache,nlop::NonlinearParamOperator,μ::AbstractRealization)
   c.trial = evaluate!(c.trial,c.ptrial,μ)
   c
 end
@@ -161,24 +161,24 @@ Base.copy(c::SystemCache) = SystemCache(copy(c.A),copy(c.b))
 Base.similar(c::SystemCache) = SystemCache(similar(c.A),similar(c.b))
 
 """
-    struct GenericParamNonlinearOperator <: NonlinearParamOperator
-      op::NonlinearParamOperator
-      μ::Realization
+    struct GenericParamNonlinearOperator{A} <: NonlinearParamOperator
+      op::A
+      μ::AbstractRealization
       paramcache::ParamCache
     end
 
 Fields:
 - `op`: `NonlinearParamOperator` representing a parametric differential problem
-- `μ`: `Realization` representing the parameters at which the problem is solved
+- `μ`: `AbstractRealization` representing the parameters at which the problem is solved
 - `paramcache`: cache of the problem
 """
-struct GenericParamNonlinearOperator <: NonlinearParamOperator
-  op::NonlinearParamOperator
-  μ::Realization
+struct GenericParamNonlinearOperator{A} <: NonlinearParamOperator
+  op::A
+  μ::AbstractRealization
   paramcache::ParamCache
 end
 
-function ParamDataStructures.parameterize(op::NonlinearParamOperator,μ::Realization)
+function ParamDataStructures.parameterize(op::NonlinearParamOperator,μ::AbstractRealization)
   paramcache = allocate_paramcache(op,μ)
   GenericParamNonlinearOperator(op,μ,paramcache)
 end

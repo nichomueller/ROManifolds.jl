@@ -110,11 +110,11 @@ function Algebra.solve(
   solve(solver,set_domains(op),r,uh0)
 end
 
-function Algebra.solve(
-  solver::ODESolver,
-  op::LinearNonlinearTransientParamFEOperator,
-  r::TransientRealization,
-  uh0)
+# function Algebra.solve(
+#   solver::ODESolver,
+#   op::LinearNonlinearTransientParamFEOperator,
+#   r::TransientRealization,
+#   uh0)
 
-  TransientParamFESolution(solver,join_operators(op),r,uh0)
-end
+#   TransientParamFESolution(solver,join_operators(op),r,uh0)
+# end

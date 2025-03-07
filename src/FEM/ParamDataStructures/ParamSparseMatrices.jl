@@ -58,14 +58,10 @@ function LinearAlgebra.rmul!(A::ParamSparseMatrix,b::Number)
   return A
 end
 
+# Note: this function assumes the matrices have the same sparsity pattern. Will
+# result in an error if this is not the case
 function LinearAlgebra.axpy!(α::Number,A::ParamSparseMatrix,B::ParamSparseMatrix)
-  iA,jA, = findnz(A)
-  iB,jB, = findnz(B)
-  if iB == iA && jA == jB
-    axpy!(α,get_all_data(A),get_all_data(B))
-  else
-    @notimplemented
-  end
+  axpy!(α,get_all_data(A),get_all_data(B))
   return B
 end
 

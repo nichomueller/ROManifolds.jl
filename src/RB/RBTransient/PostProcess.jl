@@ -25,36 +25,13 @@ end
 
 function DrWatson.save(
   dir,
-  contribs::TupOfArrayContribution,
-  feop::LinearNonlinearTransientParamFEOperator{SplitDomains};
-  label="res")
-
-  @check length(contribs) == 2
-  save(dir,first(contribs),get_linear_operator(feop);label=_get_label(label,"lin"))
-  save(dir,last(contribs),get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
-end
-
-function DrWatson.save(
-  dir,
   contribs::Tuple{Vararg{TupOfArrayContribution}},
-  feop::LinearNonlinearTransientParamFEOperator{SplitDomains};
+  feop::LinearNonlinearParamFEOperator{SplitDomains};
   label="jac")
 
   @check length(contribs) == 2
   save(dir,first(contribs),get_linear_operator(feop);label=_get_label(label,"lin"))
   save(dir,last(contribs),get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
-end
-
-function RBSteady.load_residuals(dir,feop::LinearNonlinearTransientParamFEOperator{SplitDomains};label="res")
-  res_lin = load_residuals(dir,get_linear_operator(feop);label=_get_label(label,"lin"))
-  res_nlin = load_residuals(dir,get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
-  return (res_lin,res_nlin)
-end
-
-function RBSteady.load_jacobians(dir,feop::LinearNonlinearTransientParamFEOperator{SplitDomains};label="jac")
-  jac_lin = load_jacobians(dir,get_linear_operator(feop);label=_get_label(label,"lin"))
-  jac_nlin = load_jacobians(dir,get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
-  return (jac_lin,jac_nlin)
 end
 
 function RBSteady._save_trian_operator_parts(dir,op::TransientRBOperator;label="")

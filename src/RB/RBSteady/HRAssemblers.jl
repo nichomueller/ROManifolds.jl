@@ -229,7 +229,7 @@ end
 end
 
 function assemble_hr_vector_add!(b::ArrayBlock,cellvec,cellidsrows::ArrayBlock,icells::ArrayBlock)
-  @check b.touched == cellidsrows.touched == icells.touched
+  @check cellidsrows.touched == icells.touched
   for i in eachindex(cellidsrows)
     if cellidsrows.touched[i]
       cellveci = lazy_map(BlockReindex(cellvec,i),icells.array[i])
@@ -258,7 +258,7 @@ end
 
 function assemble_hr_matrix_add!(
   A::ArrayBlock,cellmat,cellidsrows::ArrayBlock,cellidscols::ArrayBlock,icells::ArrayBlock)
-  @check A.touched == cellidsrows.touched == cellidscols.touched == icells.touched
+  @check cellidsrows.touched == cellidscols.touched == icells.touched
   for i in eachindex(cellidsrows)
     if cellidsrows.touched[i]
       cellmati = lazy_map(BlockReindex(cellmat,i),icells.array[i])

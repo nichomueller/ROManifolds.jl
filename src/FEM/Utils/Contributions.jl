@@ -63,7 +63,7 @@ end
 function change_domains(a::Contribution,trians::Tuple{Vararg{Triangulation}})
   values = ()
   for (i,trian) in enumerate(trians)
-    if i > num_domains(a)
+    if i > length(a)
       valuei = similar(last(get_contributions(a)))
     else
       valuei = get_contributions(a)[i]

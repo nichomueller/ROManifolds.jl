@@ -1,20 +1,20 @@
 """
-    struct ParamOpFromFEOp{O,T} <: ParamOperator{O,T}
+    struct ParamOpFromFEOp{O<:UnEvalOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T}
       op::ParamFEOperator{O,T}
     end
 
 Wrapper that transforms a `ParamFEOperator` into an `ParamOperator`
 """
-struct ParamOpFromFEOp{O,T} <: ParamOperator{O,T}
+struct ParamOpFromFEOp{O<:UnEvalOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T}
   op::ParamFEOperator{O,T}
 end
 
 get_fe_operator(op::ParamOpFromFEOp) = op.op
 
 """
-    const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointDomains}
+    const JointParamOpFromFEOp{O<:UnEvalOperatorType} = ParamOpFromFEOp{O,JointDomains}
 """
-const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointDomains}
+const JointParamOpFromFEOp{O<:UnEvalOperatorType} = ParamOpFromFEOp{O,JointDomains}
 
 function Algebra.allocate_residual(
   op::JointParamOpFromFEOp,
@@ -101,9 +101,9 @@ function ODEs.jacobian_add!(
 end
 
 """
-    const SplitParamOpFromFEOp{O} = ParamOpFromFEOp{O,SplitDomains}
+    const SplitParamOpFromFEOp{O<:UnEvalOperatorType} = ParamOpFromFEOp{O,SplitDomains}
 """
-const SplitParamOpFromFEOp{O} = ParamOpFromFEOp{O,SplitDomains}
+const SplitParamOpFromFEOp{O<:UnEvalOperatorType} = ParamOpFromFEOp{O,SplitDomains}
 
 function Algebra.allocate_residual(
   op::SplitParamOpFromFEOp,
