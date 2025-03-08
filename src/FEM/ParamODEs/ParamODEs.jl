@@ -20,7 +20,7 @@ using ROManifolds.ParamAlgebra
 using ROManifolds.ParamFESpaces
 using ROManifolds.ParamSteady
 
-import BlockArrays: blocks
+import BlockArrays: blocks,blocklength
 import Test: @test
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
@@ -62,7 +62,8 @@ include("TransientParamFEOperators.jl")
 
 include("ODEParamOpFromFEOps.jl")
 
-include("ThetaMethod.jl")
+export ode_parameterize
+include("ParamTimeMarching.jl")
 
 export initial_condition
 include("ODEParamSolutions.jl")

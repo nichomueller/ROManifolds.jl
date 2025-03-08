@@ -56,7 +56,7 @@ function allocate_systemcache(op::LinNonlinParamOperator,x::AbstractVector)
 end
 
 function update_paramcache!(
-  paramcache,
+  paramcache::AbstractParamCache,
   op::LinNonlinParamOperator,
   μ::AbstractRealization)
 

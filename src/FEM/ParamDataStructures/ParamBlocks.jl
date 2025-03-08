@@ -419,64 +419,70 @@ function Arrays.evaluate!(cache,k::Broadcasting{typeof(∘)},f::GenericParamBloc
   g
 end
 
-function Arrays.return_value(k::Broadcasting{<:Operation},f::GenericParamBlock,h::Field)
-  fi = testitem(f)
-  fix = return_value(k,fi,h)
-  g = Vector{typeof(fix)}(undef,length(f.data))
-  for i in eachindex(f.data)
-    g[i] = return_value(k,f.data[i],h)
-  end
-  GenericParamBlock(g)
-end
+for F in (:Function,:Operation)
+  for T in (:Field,:AbstractArray)
+    @eval begin
+      function Arrays.return_value(k::Broadcasting{<:$F},f::GenericParamBlock,h::$T)
+        fi = testitem(f)
+        fix = return_value(k,fi,h)
+        g = Vector{typeof(fix)}(undef,length(f.data))
+        for i in eachindex(f.data)
+          g[i] = return_value(k,f.data[i],h)
+        end
+        GenericParamBlock(g)
+      end
 
-function Arrays.return_cache(k::Broadcasting{<:Operation},f::GenericParamBlock,h::Field)
-  fi = testitem(f)
-  li = return_cache(k,fi,h)
-  fix = evaluate!(li,k,fi,h)
-  l = Vector{typeof(li)}(undef,length(f.data))
-  g = Vector{typeof(fix)}(undef,length(f.data))
-  for i in eachindex(f.data)
-    l[i] = return_cache(k,f.data[i],h)
-  end
-  GenericParamBlock(g),l
-end
+      function Arrays.return_cache(k::Broadcasting{<:$F},f::GenericParamBlock,h::$T)
+        fi = testitem(f)
+        li = return_cache(k,fi,h)
+        fix = evaluate!(li,k,fi,h)
+        l = Vector{typeof(li)}(undef,length(f.data))
+        g = Vector{typeof(fix)}(undef,length(f.data))
+        for i in eachindex(f.data)
+          l[i] = return_cache(k,f.data[i],h)
+        end
+        GenericParamBlock(g),l
+      end
 
-function Arrays.evaluate!(cache,k::Broadcasting{<:Operation},f::GenericParamBlock,h::Field)
-  g,l = cache
-  for i in eachindex(f.data)
-    g.data[i] = evaluate!(l[i],k,f.data[i],h)
-  end
-  g
-end
+      function Arrays.evaluate!(cache,k::Broadcasting{<:$F},f::GenericParamBlock,h::$T)
+        g,l = cache
+        for i in eachindex(f.data)
+          g.data[i] = evaluate!(l[i],k,f.data[i],h)
+        end
+        g
+      end
 
-function Arrays.return_value(k::Broadcasting{<:Operation},h::Field,f::GenericParamBlock)
-  fi = testitem(f)
-  fix = return_value(k,h,fi)
-  g = Vector{typeof(fix)}(undef,length(f.data))
-  for i in eachindex(f.data)
-    g[i] = return_value(k,h,f.data[i])
-  end
-  GenericParamBlock(g)
-end
+      function Arrays.return_value(k::Broadcasting{<:$F},h::$T,f::GenericParamBlock)
+        fi = testitem(f)
+        fix = return_value(k,h,fi)
+        g = Vector{typeof(fix)}(undef,length(f.data))
+        for i in eachindex(f.data)
+          g[i] = return_value(k,h,f.data[i])
+        end
+        GenericParamBlock(g)
+      end
 
-function Arrays.return_cache(k::Broadcasting{<:Operation},h::Field,f::GenericParamBlock)
-  fi = testitem(f)
-  li = return_cache(k,h,fi)
-  fix = evaluate!(li,k,h,fi)
-  l = Vector{typeof(li)}(undef,length(f.data))
-  g = Vector{typeof(fix)}(undef,length(f.data))
-  for i in eachindex(f.data)
-    l[i] = return_cache(k,h,f.data[i])
-  end
-  GenericParamBlock(g),l
-end
+      function Arrays.return_cache(k::Broadcasting{<:$F},h::$T,f::GenericParamBlock)
+        fi = testitem(f)
+        li = return_cache(k,h,fi)
+        fix = evaluate!(li,k,h,fi)
+        l = Vector{typeof(li)}(undef,length(f.data))
+        g = Vector{typeof(fix)}(undef,length(f.data))
+        for i in eachindex(f.data)
+          l[i] = return_cache(k,h,f.data[i])
+        end
+        GenericParamBlock(g),l
+      end
 
-function Arrays.evaluate!(cache,k::Broadcasting{<:Operation},h::Field,f::GenericParamBlock)
-  g,l = cache
-  for i in eachindex(f.data)
-    g.data[i] = evaluate!(l[i],k,h,f.data[i])
+      function Arrays.evaluate!(cache,k::Broadcasting{<:$F},h::$T,f::GenericParamBlock)
+        g,l = cache
+        for i in eachindex(f.data)
+          g.data[i] = evaluate!(l[i],k,h,f.data[i])
+        end
+        g
+      end
+    end
   end
-  g
 end
 
 function Arrays.return_value(k::Broadcasting{<:Operation},h::GenericParamBlock,f::GenericParamBlock)

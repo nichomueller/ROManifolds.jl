@@ -66,7 +66,7 @@ function ParamAlgebra.allocate_paramcache(
 end
 
 function ParamAlgebra.update_paramcache!(
-  paramcache,
+  paramcache::ParamCache,
   odeop::ODEParamOperator,
   r::TransientRealization)
 
@@ -95,4 +95,128 @@ function LinearNonlinearTransientParamOperator(op_lin::ParamOperator,op_nlin::Pa
   feop_nlin = get_fe_operator(op_nlin)
   feop = LinearNonlinearParamFEOperator(feop_lin,feop_nlin)
   get_algebraic_operator(feop)
+end
+
+# compute space-time residuals/jacobians (no time marching)
+
+function Algebra.residual(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator,
+  r::TransientRealization,
+  u::AbstractParamVector,
+  u0::AbstractParamVector)
+
+  u = state[1]
+  dt,θ = solver.dt,solver.θ
+  x = copy(u)
+  uθ = copy(u)
+
+  shift!(r,dt*(θ-1))
+  shift!(uθ,u0,θ,1-θ)
+  shift!(x,u0,1/dt,-1/dt)
+  us = (uθ,x)
+  b = residual(odeop,r,us)
+  shift!(r,dt*(1-θ))
+
+  return b
+end
+
+function Algebra.jacobian(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator,
+  r::TransientRealization,
+  u::AbstractParamVector,
+  u0::AbstractParamVector)
+
+  u = state[1]
+  dt,θ = solver.dt,solver.θ
+  x = copy(u)
+  uθ = copy(u)
+
+  shift!(r,dt*(θ-1))
+  shift!(uθ,u0,θ,1-θ)
+  shift!(x,u0,1/dt,-1/dt)
+  us = (uθ,x)
+  ws = (1,1)
+
+  A = jacobian(odeop,r,us,ws)
+  shift!(r,dt*(1-θ))
+
+  return A
+end
+
+function Algebra.residual(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator{LinearParamODE},
+  r::TransientRealization,
+  u::AbstractParamVector,
+  u0::AbstractParamVector)
+
+  dt,θ = solver.dt,solver.θ
+  x = copy(u)
+  fill!(x,zero(eltype(x)))
+  us = (x,x)
+
+  shift!(r,dt*(θ-1))
+  b = residual(odeop,r,us)
+  shift!(r,dt*(1-θ))
+
+  return b
+end
+
+function Algebra.jacobian(
+  solver::ThetaMethod,
+  odeop::ODEParamOperator{LinearParamODE},
+  r::TransientRealization,
+  u::AbstractParamVector,
+  u0::AbstractParamVector)
+
+  dt,θ = solver.dt,solver.θ
+  ws = (1,1)
+  x = copy(u)
+  fill!(x,zero(eltype(x)))
+  us = (x,x)
+
+  shift!(r,dt*(θ-1))
+  A = jacobian(odeop,r,us,ws)
+  shift!(r,dt*(1-θ))
+
+  return A
+end
+
+# utils
+
+function ParamDataStructures.shift!(
+  a::ConsecutiveParamVector,
+  a0::ConsecutiveParamVector,
+  α::Number,
+  β::Number)
+
+  data = get_all_data(a)
+  data0 = get_all_data(a0)
+  data′ = copy(data)
+  np = param_length(a0)
+  for ipt = param_eachindex(a)
+    it = slow_index(ipt,np)
+    if it == 1
+      for is in axes(data,1)
+        data[is,ipt] = α*data[is,ipt] + β*data0[is,ipt]
+      end
+    else
+      for is in axes(data,1)
+        data[is,ipt] = α*data[is,ipt] + β*data′[is,ipt-np]
+      end
+    end
+  end
+end
+
+function ParamDataStructures.shift!(
+  a::BlockParamVector,
+  a0::BlockParamVector,
+  α::Number,
+  β::Number)
+
+  @inbounds for (ai,a0i) in zip(blocks(a),blocks(a0))
+    ParamDataStructures.shift!(ai,a0i,α,β)
+  end
 end

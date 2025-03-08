@@ -110,6 +110,8 @@ using Gridap.ODEs
 using ROManifolds
 using ROManifolds.ParamDataStructures
 using ROManifolds.ParamSteady
+using ROManifolds.ParamODEs
+using ROManifolds.Utils
 using Test
 using FillArrays
 import Gridap.MultiField: BlockMultiFieldStyle
@@ -201,3 +203,28 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 x̂,rbstats = solve(rbsolver,rbop,μon)
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
+
+using ROManifolds.ParamODEs
+r = realization(feop)
+params = get_params(r)
+w0 = get_free_dof_values(uh0μ(params))
+stageop = ode_parameterize(fesolver,set_domains(feop),r,w0)
+sol = ParamODEs.ODEParamSolution(fesolver,stageop,w0)
+
+ut,state = iterate(sol)
+ut,state = iterate(sol,state)
+
+A = allocate_jacobian(sol.stageop,w0)
+b = allocate_residual(sol.stageop,w0)
+
+nlopit = iterate(sol.stageop)
+nlop,nlopstate = nlopit
+
+usx = nlop.shift.state_update(w0)
+# allocate_residual(nlop.op,nlop.r,usx,nlop.paramcache)
+
+uh = ODEs._make_uh_from_us(nlop.op,usx,nlop.paramcache.trial)
+test = get_test(nlop.op.op)
+v = get_fe_basis(test)
+μ,t = get_params(nlop.r),get_times(nlop.r)
+get_res(nlop.op.op)(μ,t,uh,v)

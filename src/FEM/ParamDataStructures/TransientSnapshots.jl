@@ -91,22 +91,6 @@ Base.@propagate_inbounds function Base.setindex!(
   ispace′ != 0 && (data[ispace′,iparam+(itime-1)*num_params(s)] = v)
 end
 
-function Snapshots(s::Vector{<:AbstractParamArray},i::AbstractDofMap,r::TransientRealization)
-  item = testitem(first(s))
-  sflat = zeros(length(item),num_params(r)*num_times(r))
-  @inbounds for it in 1:num_times(r)
-    dit = get_all_data(s[it])
-    for ip in 1:num_params(r)
-      itp = (it-1)*num_params(r)+ip
-      for is in eachindex(item)
-        v = dit[is,ip]
-        sflat[is,itp] = v
-      end
-    end
-  end
-  Snapshots(ConsecutiveParamArray(sflat),i,r)
-end
-
 """
     struct TransientSnapshotsAtIndices{T,N,D,I,R,A<:TransientSnapshots{T,N,D,I,R},B,C} <: TransientSnapshots{T,N,D,I,R,A}
       snaps::A
@@ -480,48 +464,24 @@ get_indexed_data(s::Mode2TransientSnapshots) = collect(s)
 # block snapshots
 
 function Snapshots(
-  data::AbstractVector{<:BlockParamArray{T,N}},
+  data::BlockParamArray{T,N},
+  data0::BlockParamArray,
   i::AbstractArray{<:AbstractDofMap},
-  r::AbstractRealization) where {T,N}
+  r::AbstractRealization
+  ) where {T,N}
 
-  block_values = blocks.(data)
-  block_value1 = first(block_values)
-  s = size(block_value1)
-  @check s == size(i)
-
-  array = Array{Snapshots,N}(undef,s)
-  touched = Array{Bool,N}(undef,s)
-  for (j,data1j) in enumerate(block_value1)
-    if !iszero(data1j)
-      dataj = map(v->getindex(v,j),block_values)
-      array[j] = Snapshots(dataj,i[j],r)
-      touched[j] = true
-    else
-      touched[j] = false
-    end
-  end
-
-  BlockSnapshots(array,touched)
-end
-
-function Snapshots(
-  data::AbstractVector{<:BlockParamArray{T,N}},
-  data0::BlockParamArray{T,N},
-  i::AbstractArray{<:AbstractDofMap},
-  r::AbstractRealization) where {T,N}
-
-  block_values = blocks.(data)
+  block_values = blocks(data)
   block_value0 = blocks(data0)
-  block_value1 = first(block_values)
-  s = size(block_value0)
+  s = size(block_values)
   @check s == size(i)
 
   array = Array{Snapshots,N}(undef,s)
   touched = Array{Bool,N}(undef,s)
-  for (j,data1j) in enumerate(block_value1)
-    if !iszero(data1j)
-      dataj = map(v->getindex(v,j),block_values)
-      array[j] = Snapshots(dataj,block_value0[j],i[j],r)
+  for j in 1:length(block_values)
+    dataj = block_values[j]
+    data0j = block_value0[j]
+    if !iszero(dataj)
+      array[j] = Snapshots(dataj,data0j,i[j],r)
       touched[j] = true
     else
       touched[j] = false

@@ -2,53 +2,55 @@
     struct ODEParamSolution{V} <: ODESolution
       solver::ODESolver
       stageop::NonlinearParamOperator
-      u0::AbstractVector
+      u0::V
     end
 """
 struct ODEParamSolution{V} <: ODESolution
   solver::ODESolver
   stageop::NonlinearParamOperator
-  u0::AbstractVector
+  u0::V
 end
-
-initial_realization(sol::ODEParamSolution) = initial_realization(sol.stageop)
-initial_condition(sol::ODEParamSolution) = sol.u0
 
 ParamDataStructures.num_params(sol::ODEParamSolution) = num_params(sol.stageop)
 ParamDataStructures.num_times(sol::ODEParamSolution) = num_times(sol.stageop)
 
 function Base.iterate(sol::ODEParamSolution)
   # initialize
-  timeid = 0
-  nlop = sol.stageop[timeid]
+  nlopit = iterate(sol.stageop)
+  if isnothing(nlopit)
+    return nothing
+  end
+  nlop,nlopstate = nlopit
   state0,odecache = ode_start(sol.solver,nlop,sol.u0)
 
   # march
   statef = copy.(state0)
-  rf,statef = ode_march!(statef,sol.solver,nlop,state0,odecache)
+  statef = ode_march!(statef,sol.solver,nlop,state0,odecache)
 
   # finish
-  timeid += 1
   uf = copy(sol.u0)
   uf = ode_finish!(uf,sol.solver,nlop,statef,odecache)
 
-  state = (timeid,statef,state0,uf,odecache)
+  state = (nlopstate,statef,state0,uf,odecache)
   return uf,state
 end
 
 function Base.iterate(sol::ODEParamSolution,state)
-  timeid,state0,statef,uf,odecache = state
-  nlop = sol.stageop[timeid]
+  nlopstate,state0,statef,uf,odecache = state
 
-  if timeid >= get_final_time(nlop) - eps()
+  nlopit = iterate(sol.stageop,nlopstate)
+  if isnothing(nlopit)
     return nothing
   end
+  nlop,nlopstate = nlopit
 
+  # march
   statef = ode_march!(statef,sol.solver,nlop,state0,odecache)
 
+  # finish
   uf = ode_finish!(uf,sol.solver,nlop,statef,odecache)
 
-  state = (timeid,statef,state0,uf,odecache)
+  state = (nlopstate,statef,state0,uf,odecache)
   return uf,state
 end
 
@@ -66,7 +68,7 @@ function Algebra.solve(
   u0::AbstractVector)
 
   nlop = ode_parameterize(solver,odeop,r,u0)
-  ODEParamSolution(solver,nlop)
+  ODEParamSolution(solver,nlop,u0)
 end
 
 function Algebra.solve(
@@ -77,15 +79,6 @@ function Algebra.solve(
 
   solve(solver,set_domains(odeop),r,u0)
 end
-
-# function Algebra.solve(
-#   solver::ODESolver,
-#   odeop::LinearNonlinearParamFEOperator,
-#   r::TransientRealization,
-#   u0::AbstractVector)
-
-#   TransientParamFESolution(solver,join_operators(odeop),r,u0)
-# end
 
 function Algebra.solve(
   solver::ODESolver,
@@ -100,27 +93,45 @@ end
 
 # utils
 
+initial_condition(sol::ODEParamSolution) = sol.u0
+
+function _collect_param_solutions(sol)
+  @notimplemented
+end
+
 function _collect_param_solutions(sol::ODEParamSolution{<:ConsecutiveParamVector{T}}) where T
   u0item = testitem(sol.u0)
-  s = size(u0item,1),num_params(sol)*num_times(sol)
-  values = similar(u0item,T,s)
+  ncols = num_params(sol)*num_times(sol)
+  values = similar(u0item,T,(size(u0item,1),ncols))
   for (k,uk) in enumerate(sol)
     _collect_solutions!(values,uk,k)
   end
   return ConsecutiveParamArray(values)
 end
 
+function _collect_param_solutions(sol::ODEParamSolution{<:BlockParamVector{T}}) where T
+  u0item = testitem(sol.u0)
+  ncols = num_params(sol)*num_times(sol)
+  values = mortar(map(b -> similar(b,T,(size(b,1),ncols)),blocks(u0item)))
+  for (k,uk) in enumerate(sol)
+    for i in 1:blocklength(u0item)
+      _collect_solutions!(blocks(values)[i],blocks(uk)[i],k)
+    end
+  end
+  return BlockParamArray(map(ConsecutiveParamArray,blocks(values)))
+end
+
 function _collect_solutions!(
   values::AbstractMatrix,
-  uk::ConsecutiveParamVector,
-  k::Int)
+  ui::ConsecutiveParamVector,
+  it::Int)
 
-  datak = get_all_data(uk)
-  nparams = param_length(uk)
+  datai = get_all_data(ui)
+  nparams = param_length(ui)
   for ip in 1:nparams
     itp = (it-1)*nparams+ip
     for is in axes(values,1)
-      @inbounds v = datak[is,ip]
+      @inbounds v = datai[is,ip]
       @inbounds values[is,itp] = v
     end
   end

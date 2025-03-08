@@ -121,7 +121,7 @@ function ParamAlgebra.allocate_systemcache(op::LinearNonlinearParamOperator,u::A
 end
 
 function ParamAlgebra.update_paramcache!(
-  paramcache,
+  paramcache::AbstractParamCache,
   op::LinearNonlinearParamOperator,
   μ::AbstractRealization)
 

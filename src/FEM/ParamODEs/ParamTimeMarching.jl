@@ -1,3 +1,21 @@
+function stage_variable(solver::ODESolver,u0::AbstractVector)
+  @notimplemented "For now, only theta methods are implemented"
+end
+
+function stage_variable(solver::ThetaMethod,u0::AbstractVector)
+  return (copy(u0),)
+end
+
+function stage_weight(solver::ODESolver)
+  @notimplemented "For now, only theta methods are implemented"
+end
+
+function stage_weight(solver::ThetaMethod)
+  dt,θ = solver.dt,solver.θ
+  dtθ = θ*dt
+  return (dtθ,1)
+end
+
 function ode_parameterize(
   solver::ODESolver,
   odeop::ODEParamOperator,
@@ -17,13 +35,14 @@ function ode_parameterize(
   dtθ = θ*dt
   ws = (dtθ,1)
 
-  function us(x)
+  function state_update(x)
     copy!(uθ,u0)
     axpy!(dtθ,x,uθ)
     (uθ,x)
   end
+  shift = ShiftRules(solver,state_update)
 
-  ParamStageOperator(odeop,r,us,ws)
+  ParamStageOperator(odeop,r,shift,ws)
 end
 
 function ode_parameterize(
@@ -39,9 +58,18 @@ function ode_parameterize(
   x0 = copy(u0)
   fill!(x0,zero(eltype(x0)))
 
-  us(x) = (u0,x0)
+  state_update(x) = (u0,x0)
+  shift = ShiftRules(solver,state_update)
 
-  ParamStageOperator(odeop,r,us,ws)
+  ParamStageOperator(odeop,r,shift,ws)
+end
+
+function allocate_odesystemcache(
+  solver::ODESolver,
+  nlop::ParamStageOperator,
+  u0::AbstractVector)
+
+  @notimplemented "For now, only theta methods are implemented"
 end
 
 function allocate_odesystemcache(
@@ -59,7 +87,7 @@ function ODEs.ode_start(
   nlop::ParamStageOperator,
   u0::AbstractVector)
 
-  state0 = (copy(u0),)
+  state0 = stage_variable(solver,u0)
   odesyscache = allocate_odesystemcache(solver,nlop,u0)
   return state0,odesyscache
 end
@@ -73,12 +101,9 @@ function ODEs.ode_march!(
 
   x = statef[1]
   uθ,syscache = odecache
-  dt,θ = solver.dt,solver.θ
+  dt = solver.dt
 
-  shift!(nlop.r,θ*dt)
-  update_paramcache!(nlop.paramcache,nlop.op,nlop.r)
   solve!(x,solver.sysslvr,nlop,syscache)
-  shift!(nlop.r,dt*(1-θ))
 
   statef = ODEs._udate_theta!(statef,state0,dt,x)
   return statef
