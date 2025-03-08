@@ -62,7 +62,6 @@ include("TransientParamFEOperators.jl")
 
 include("ODEParamOpFromFEOps.jl")
 
-export ode_parameterize
 include("ParamTimeMarching.jl")
 
 export initial_condition
