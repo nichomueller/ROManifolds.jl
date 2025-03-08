@@ -46,6 +46,7 @@ export realization
 export get_params
 export get_times
 export get_at_time
+export get_at_timestep
 export num_params
 export num_times
 export get_initial_time

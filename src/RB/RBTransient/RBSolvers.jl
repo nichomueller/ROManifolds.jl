@@ -45,14 +45,15 @@ end
 RBSteady.num_jac_params(s::RBSolver{<:ODESolver}) = num_params(first(s.jacobian_reduction))
 
 function RBSteady.solution_snapshots(
-  fesolver::ODESolver,
-  feop::TransientParamFEOperator,
+  solver::RBSolver,
+  feop::ODEParamOperator,
   r::TransientRealization,
   args...)
 
+  fesolver = get_fe_solver(solver)
   sol = solve(fesolver,feop,r,args...)
-  values,stats = collect(sol.odesol)
-  initial_values = collect_initial_values(sol.odesol)
+  values,stats = collect(sol)
+  initial_values = initial_condition(sol)
   i = get_dof_map(feop)
   snaps = Snapshots(values,initial_values,i,r)
   return snaps,stats

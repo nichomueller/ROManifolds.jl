@@ -27,6 +27,7 @@ import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ODEs: TransientCellField
 import Gridap.ReferenceFEs: get_order
 import ROManifolds.ParamSteady: get_domains_res,get_domains_jac
+import ROManifolds.Utils: change_domains,set_domains
 
 include("TimeDerivatives.jl")
 
@@ -43,6 +44,9 @@ export NonlinearParamODE
 export LinearParamODE
 export LinearNonlinearParamODE
 export ODEParamOperator
+export TransientParamLinearOperator
+export TransientParamOperator
+export LinearNonlinearTransientParamOperator
 include("ODEParamOperators.jl")
 
 export ParamStageOperator
@@ -60,7 +64,7 @@ include("ODEParamOpFromFEOps.jl")
 
 include("ThetaMethod.jl")
 
-export collect_initial_values
+export initial_condition
 include("ODEParamSolutions.jl")
 
 include("TransientParamFESolutions.jl")

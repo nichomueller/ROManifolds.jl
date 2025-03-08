@@ -146,9 +146,7 @@ get_initial_time(r::GenericTransientRealization) = r.t0
 """
 get_final_time(r::GenericTransientRealization) = last(get_times(r))
 
-get_midpoint_time(r::GenericTransientRealization) = (get_final_time(r) + get_initial_time(r)) / 2
-
-get_delta_time(r::GenericTransientRealization) = (get_final_time(r) - get_initial_time(r)) / num_times(r)
+get_delta(r::GenericTransientRealization) = (get_final_time(r) - get_initial_time(r)) / num_times(r)
 
 function change_time!(r::GenericTransientRealization{P,T} where P,time::T) where T
   r.times .= time
@@ -173,8 +171,6 @@ at a time instant specified by `time`
 function get_at_time(r::GenericTransientRealization,time=:initial)
   if time == :initial
     get_at_time(r,get_initial_time(r))
-  elseif time == :midpoint
-    get_at_time(r,get_midpoint_time(r))
   elseif time == :final
     get_at_time(r,get_final_time(r))
   else
@@ -182,8 +178,13 @@ function get_at_time(r::GenericTransientRealization,time=:initial)
   end
 end
 
-function get_at_time(r::GenericTransientRealization{P,T} where P,time::T)  where T
+function get_at_time(r::GenericTransientRealization{P,T} where P,time::T) where T
   TransientRealizationAt(get_params(r),Ref(time))
+end
+
+function get_at_timestep(r::GenericTransientRealization,timestep::Int)
+  @check 0 <= timestep <= num_times(r)
+  timestep == 0 ? get_at_time(r,:initial) : get_at_time(r,r.times[timestep])
 end
 
 """

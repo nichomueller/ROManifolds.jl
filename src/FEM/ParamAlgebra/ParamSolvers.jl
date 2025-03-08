@@ -41,9 +41,9 @@ function Algebra.solve!(
 end
 
 function Algebra.solve!(
-  x::AbstractParamVector,
+  x::AbstractVector,
   ls::LinearSolver,
-  op::NonlinearOperator,
+  op::NonlinearParamOperator,
   cache::Nothing)
 
   cache = allocate_systemcache(op,x)
@@ -51,9 +51,9 @@ function Algebra.solve!(
 end
 
 function Algebra.solve!(
-  x::AbstractParamVector,
+  x::AbstractVector,
   ls::LinearSolver,
-  op::NonlinearOperator,
+  op::NonlinearParamOperator,
   cache::SystemCache)
 
   fill!(x,zero(eltype(x)))
@@ -65,9 +65,9 @@ function Algebra.solve!(
 end
 
 function Algebra.solve!(
-  x::AbstractParamVector,
+  x::AbstractVector,
   ls::LinearSolver,
-  op::NonlinearOperator,
+  op::NonlinearParamOperator,
   cache::Algebra.LinearSolverCache)
 
   fill!(x,zero(eltype(x)))
@@ -81,9 +81,9 @@ end
 # nonlinear interface
 
 function Algebra.solve!(
-  x::AbstractParamVector,
+  x::AbstractVector,
   nls::NewtonSolver,
-  op::NonlinearOperator,
+  op::NonlinearParamOperator,
   cache::Nothing)
 
   cache = allocate_systemcache(op,x)
@@ -93,7 +93,7 @@ end
 function Algebra.solve!(
   x::AbstractParamVector,
   nls::NewtonSolver,
-  op::NonlinearOperator,
+  op::NonlinearParamOperator,
   cache::SystemCache)
 
   fill!(x,zero(eltype(x)))
@@ -115,9 +115,9 @@ function Algebra.solve!(
 end
 
 function Algebra.solve!(
-  x::AbstractParamVector,
+  x::AbstractVector,
   nls::NewtonSolver,
-  op::NonlinearOperator,
+  op::NonlinearParamOperator,
   cache::NonlinearSolvers.NewtonCache)
 
   update_systemcache!(op,x)

@@ -1,26 +1,5 @@
 function RBSteady.reduced_operator(
   solver::RBSolver,
-  feop::TransientParamFEOperator,
-  args...;
-  kwargs...)
-
-  fesnaps,festats = solution_snapshots(solver,feop,args...;kwargs...)
-  reduced_operator(solver,feop,fesnaps)
-end
-
-function RBSteady.reduced_operator(
-  solver::RBSolver,
-  feop::TransientParamFEOperator,
-  s::AbstractSnapshots,
-  args...)
-
-  red_trial,red_test = reduced_spaces(solver,feop,s)
-  odeop = get_algebraic_operator(feop)
-  reduced_operator(solver,odeop,red_trial,red_test,s)
-end
-
-function RBSteady.reduced_operator(
-  solver::RBSolver,
   odeop::ODEParamOperator,
   red_trial::RBSpace,
   red_test::RBSpace,

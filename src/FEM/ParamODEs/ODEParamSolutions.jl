@@ -1,116 +1,127 @@
-function ODEs.ode_start(
-  solver::ODESolver,
-  odeop::ODEParamOperator,
-  r0::TransientRealization,
-  us0::Tuple{Vararg{AbstractVector}},
-  odeparamcache)
-
-  state0 = copy.(us0)
-  (state0,odeparamcache)
-end
-
-function ODEs.ode_finish!(
-  uF::AbstractVector,
-  solver::ODESolver,
-  odeop::ODEParamOperator,
-  r0::TransientRealization,
-  rf::TransientRealization,
-  statef::Tuple{Vararg{AbstractVector}},
-  odeparamcache)
-
-  copy!(uF,first(statef))
-  (uF,odeparamcache)
-end
-
 """
     struct ODEParamSolution{V} <: ODESolution
       solver::ODESolver
-      odeop::ODEParamOperator
-      r::TransientRealization
-      us0::Tuple{Vararg{V}}
-      tracker::CostTracker
+      stageop::NonlinearParamOperator
+      u0::AbstractVector
     end
-
-Wrapper for the evolution of a differential problem represented by
-the field `odeop`, and solved by means of the ode solver `solver`. It represents
-the parametric extension of the type `ODESolution` in `Gridap`
 """
 struct ODEParamSolution{V} <: ODESolution
   solver::ODESolver
-  odeop::ODEParamOperator
-  r::TransientRealization
-  us0::Tuple{Vararg{V}}
-  tracker::CostTracker
+  stageop::NonlinearParamOperator
+  u0::AbstractVector
 end
 
-function ODEParamSolution(
-  solver::ODESolver,
-  odeop::ODEParamOperator,
-  r::TransientRealization,
-  us0::Tuple{Vararg{V}}) where V
+initial_realization(sol::ODEParamSolution) = initial_realization(sol.stageop)
+initial_condition(sol::ODEParamSolution) = sol.u0
 
-  tracker = CostTracker(name="FEM time marching";nruns=num_params(r))
-  ODEParamSolution(solver,odeop,r,us0,tracker)
-end
+ParamDataStructures.num_params(sol::ODEParamSolution) = num_params(sol.stageop)
+ParamDataStructures.num_times(sol::ODEParamSolution) = num_times(sol.stageop)
 
 function Base.iterate(sol::ODEParamSolution)
-  r0 = get_at_time(sol.r,:initial)
-  cache = allocate_odeparamcache(sol.solver,sol.odeop,r0,sol.us0)
+  # initialize
+  timeid = 0
+  nlop = sol.stageop[timeid]
+  state0,odecache = ode_start(sol.solver,nlop,sol.u0)
 
-  state0,cache = ode_start(sol.solver,sol.odeop,r0,sol.us0,cache)
-
+  # march
   statef = copy.(state0)
-  t = @timed rf,statef,cache = ode_march!(statef,sol.solver,sol.odeop,r0,state0,cache)
-  update_tracker!(sol.tracker,t)
+  rf,statef = ode_march!(statef,sol.solver,nlop,state0,odecache)
 
-  uf = copy(first(sol.us0))
-  uf,cache = ode_finish!(uf,sol.solver,sol.odeop,r0,rf,statef,cache)
+  # finish
+  timeid += 1
+  uf = copy(sol.u0)
+  uf = ode_finish!(uf,sol.solver,nlop,statef,odecache)
 
-  state = (rf,statef,state0,uf,cache)
-  return (rf,uf),state
+  state = (timeid,statef,state0,uf,odecache)
+  return uf,state
 end
 
 function Base.iterate(sol::ODEParamSolution,state)
-  r0,state0,statef,uf,cache = state
+  timeid,state0,statef,uf,odecache = state
+  nlop = sol.stageop[timeid]
 
-  if get_times(r0) >= get_final_time(sol.r) - ODEs.ε
+  if timeid >= get_final_time(nlop) - eps()
     return nothing
   end
 
-  t = @timed rf,statef,cache = ode_march!(statef,sol.solver,sol.odeop,r0,state0,cache)
-  update_tracker!(sol.tracker,t)
+  statef = ode_march!(statef,sol.solver,nlop,state0,odecache)
 
-  uf,cache = ode_finish!(uf,sol.solver,sol.odeop,r0,rf,statef,cache)
+  uf = ode_finish!(uf,sol.solver,nlop,statef,odecache)
 
-  state = (rf,statef,state0,uf,cache)
-  return (rf,uf),state
+  state = (timeid,statef,state0,uf,odecache)
+  return uf,state
 end
 
 function Base.collect(sol::ODEParamSolution{V}) where V
-  ntimes = num_times(sol.r)
-
-  free_values = Vector{V}(undef,ntimes)
-  for (k,(rt,ut)) in enumerate(sol)
-    free_values[k] = copy(ut)
-  end
-
-  return free_values,sol.tracker
-end
-
-"""
-    collect_initial_values(sol::ODEParamSolution) -> AbstractParamVector
-
-Fetches the initial values of a [`ODEParamSolution`](@ref) `sol`
-"""
-function collect_initial_values(sol::ODEParamSolution)
-  sol.us0[1]
+  values = _collect_param_solutions(sol)
+  t = @timed values = _collect_param_solutions(sol)
+  tracker = CostTracker(t;name="FEM time marching",nruns=num_params(sol))
+  return values,tracker
 end
 
 function Algebra.solve(
   solver::ODESolver,
   odeop::ODEParamOperator,
   r::TransientRealization,
-  u0::T) where T
+  u0::AbstractVector)
 
-  ODEParamSolution(solver,odeop,r,u0)
+  nlop = ode_parameterize(solver,odeop,r,u0)
+  ODEParamSolution(solver,nlop)
+end
+
+function Algebra.solve(
+  solver::ODESolver,
+  odeop::SplitODEParamOperator,
+  r::TransientRealization,
+  u0::AbstractVector)
+
+  solve(solver,set_domains(odeop),r,u0)
+end
+
+# function Algebra.solve(
+#   solver::ODESolver,
+#   odeop::LinearNonlinearParamFEOperator,
+#   r::TransientRealization,
+#   u0::AbstractVector)
+
+#   TransientParamFESolution(solver,join_operators(odeop),r,u0)
+# end
+
+function Algebra.solve(
+  solver::ODESolver,
+  odeop::ODEParamOperator,
+  r::TransientRealization,
+  uh0::Function)
+
+  params = get_params(r)
+  u0 = get_free_dof_values(uh0(params))
+  solve(solver,odeop,r,u0)
+end
+
+# utils
+
+function _collect_param_solutions(sol::ODEParamSolution{<:ConsecutiveParamVector{T}}) where T
+  u0item = testitem(sol.u0)
+  s = size(u0item,1),num_params(sol)*num_times(sol)
+  values = similar(u0item,T,s)
+  for (k,uk) in enumerate(sol)
+    _collect_solutions!(values,uk,k)
+  end
+  return ConsecutiveParamArray(values)
+end
+
+function _collect_solutions!(
+  values::AbstractMatrix,
+  uk::ConsecutiveParamVector,
+  k::Int)
+
+  datak = get_all_data(uk)
+  nparams = param_length(uk)
+  for ip in 1:nparams
+    itp = (it-1)*nparams+ip
+    for is in axes(values,1)
+      @inbounds v = datak[is,ip]
+      @inbounds values[is,itp] = v
+    end
+  end
 end

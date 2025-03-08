@@ -72,6 +72,10 @@ export LinearNonlinearParamFEOperator
 include("FEM/ParamSteady/ParamSteady.jl")
 using ROManifolds.ParamSteady
 
+export ODEParamOperator
+export TransientParamLinearOperator
+export TransientParamOperator
+export LinearNonlinearTransientParamOperator
 export TransientTrialParamFESpace
 export TransientMultiFieldParamFESpace
 export TransientParamFEOperator

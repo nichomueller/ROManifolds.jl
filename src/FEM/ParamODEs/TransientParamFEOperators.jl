@@ -343,6 +343,13 @@ function _set_domains(
   _set_domains(res,jacs,test,trial,trian_res,trian_jacs)
 end
 
+function LinearNonlinearTransientParamFEOperator(
+  op_lin::TransientParamFEOperator,
+  op_nlin::TransientParamFEOperator)
+
+  LinearNonlinearParamFEOperator(op_lin,op_nlin)
+end
+
 function ParamSteady.join_operators(
   op_lin::TransientParamFEOperator,
   op_nlin::TransientParamFEOperator)
