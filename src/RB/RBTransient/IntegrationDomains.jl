@@ -12,13 +12,12 @@ struct TransientIntegrationDomain <: IntegrationDomain
 end
 
 function RBSteady.vector_domain(
-  test::FESpace,
   trian::Triangulation,
-  indices::Union{Tuple,AbstractVector})
+  test::FESpace,
+  rows::AbstractVector,
+  indices_time::AbstractVector)
 
-  @check length(indices) == 2
-  indices_space,indices_time = indices
-  domain_space = vector_domain(test,trian,indices_space)
+  domain_space = vector_domain(trian,test,rows)
   TransientIntegrationDomain(domain_space,indices_time)
 end
 
@@ -37,3 +36,10 @@ end
 RBSteady.get_integration_cells(i::TransientIntegrationDomain) = get_integration_cells(i.domain_space)
 RBSteady.get_cellids_rows(i::TransientIntegrationDomain) = get_cellids_rows(i.domain_space)
 RBSteady.get_cellids_cols(i::TransientIntegrationDomain) = get_cellids_cols(i.domain_space)
+get_integration_domain_space(i::TransientIntegrationDomain) = i.domain_space
+get_indices_time(i::TransientIntegrationDomain) = i.indices_time
+
+function get_owned_itimes(i::TransientIntegrationDomain,ids::AbstractVector)::Vector{Int}
+  idsi = i.indices_time
+  filter(!isnothing,indexin(idsi,ids))
+end

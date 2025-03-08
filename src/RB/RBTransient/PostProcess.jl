@@ -65,23 +65,6 @@ function RBSteady.load_operator(dir,feop::SplitTransientParamFEOperator;kwargs..
   return op
 end
 
-# function DrWatson.save(dir,op::LinearNonlinearTransientRBOperator;label="")
-#   RBSteady._save_fixed_operator_parts(dir,op.op_linear;label)
-#   RBSteady._save_trian_operator_parts(dir,op.op_linear;label=_get_label(label,"lin"))
-#   RBSteady._save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nlin"))
-# end
-
-# function RBSteady.load_operator(dir,feop::LinearNonlinearTransientParamFEOperator{SplitDomains};label="")
-#   trial,test = RBSteady._load_fixed_operator_parts(dir,feop.op_linear;label)
-#   odeop_lin,red_lhs_lin,red_rhs_lin = RBSteady._load_trian_operator_parts(
-#     dir,feop.op_linear,trial,test;label=_get_label("lin",label))
-#   odeop_nlin,red_lhs_nlin,red_rhs_nlin = RBSteady._load_trian_operator_parts(
-#     dir,feop.op_nonlinear,trial,test;label=_get_label("nlin",label))
-#   op_lin = TransientRBOperator(odeop_lin,trial,test,red_lhs_lin,red_rhs_lin)
-#   op_nlin = TransientRBOperator(odeop_nlin,trial,test,red_lhs_nlin,red_rhs_nlin)
-#   return LinearNonlinearTransientRBOperator(op_lin,op_nlin)
-# end
-
 function Utils.compute_relative_error(
   sol::TransientSnapshots{T,N},
   sol_approx::TransientSnapshots{T,N},

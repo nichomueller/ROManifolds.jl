@@ -204,27 +204,28 @@ x̂,rbstats = solve(rbsolver,rbop,μon)
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
 
-using ROManifolds.ParamODEs
-r = realization(feop)
-params = get_params(r)
-w0 = get_free_dof_values(uh0μ(params))
-stageop = ode_parameterize(fesolver,set_domains(feop),r,w0)
-sol = ParamODEs.ODEParamSolution(fesolver,stageop,w0)
+rhs1 = rbop.rhs[1]
+using BenchmarkTools
 
-ut,state = iterate(sol)
-ut,state = iterate(sol,state)
-
-A = allocate_jacobian(sol.stageop,w0)
-b = allocate_residual(sol.stageop,w0)
-
-nlopit = iterate(sol.stageop)
-nlop,nlopstate = nlopit
-
-usx = nlop.shift.state_update(w0)
-# allocate_residual(nlop.op,nlop.r,usx,nlop.paramcache)
-
-uh = ODEs._make_uh_from_us(nlop.op,usx,nlop.paramcache.trial)
-test = get_test(nlop.op.op)
+Ωv = rbop.rhs.trians[1]
+dΩv = Measure(Ωv,degree)
+μt = realization(feop;nparams=20)
+μ = get_params(μt)
+t = get_times(μt)
+U = trial(μt)
+uh = zero(U)
+u = TransientCellField(uh,(uh,))
 v = get_fe_basis(test)
-μ,t = get_params(nlop.r),get_times(nlop.r)
-get_res(nlop.op.op)(μ,t,uh,v)
+dcv = mass(μ,t,∂t(u),v,dΩv) + stiffness(μ,t,u,v,dΩv)
+
+@btime mass($μ,$t,∂t($u),$v,$dΩv) + stiffness($μ,$t,$u,$v,$dΩv)
+
+μtv = μt[:,[1,3,5]]
+μv = get_params(μtv)
+tv = get_times(μtv)
+Uv = trial(μtv)
+uhv = zero(Uv)
+uv = TransientCellField(uhv,(uhv,))
+dcvv = mass(μ,t,∂t(u),v,dΩv) + stiffness(μ,t,u,v,dΩv)
+
+@btime mass($μv,$tv,∂t($uv),$v,$dΩv) + stiffness($μv,$tv,$uv,$v,$dΩv)

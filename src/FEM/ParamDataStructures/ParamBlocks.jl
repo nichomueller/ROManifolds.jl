@@ -166,7 +166,7 @@ param_getindex(b::TrivialParamBlock,i::Integer) = b.data
 param_setindex!(b::TrivialParamBlock,v,i::Integer) = copyto!(b.data,v)
 
 function get_param_entry!(v::AbstractVector,b::TrivialParamBlock,i...)
-  vk = b.data[k][i...]
+  vk = b.data[i...]
   fill!(v,vk)
 end
 

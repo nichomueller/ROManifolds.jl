@@ -56,9 +56,9 @@ include("IntegrationDomains.jl")
 
 include("HyperReductions.jl")
 
-# export TransientRBOperator
-# export TransientRBOperator
-# export LinearNonlinearTransientRBOperator
+include("HRAssemblers.jl")
+
+export TransientRBOperator
 include("ReducedOperators.jl")
 
 # include("ThetaMethod.jl")

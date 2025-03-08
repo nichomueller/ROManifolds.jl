@@ -31,25 +31,6 @@ function collect_cell_hr_vector(
   (cell_vec_r,cell_irows,icells)
 end
 
-# function separate_celldata(
-#   hr::BlockHyperReduction,
-#   celldata::AbstractArray,
-#   cells::AbstractVector)
-
-#   cells = get_integration_cells(hr)
-#   block_c = get_owned_icells(hr,cells)
-#   block_d = testitem(celldata)
-#   @assert block_c.touched == block_d.touched
-#   ki = SplitCellData(testitem(block_c))
-#   k = Array{typeof(ki),ndims(block_c)}(undef,size(block_c))
-#   for i in eachindex(block_c)
-#     if block_c.touched[i]
-#       k[i] = SplitCellData(block_c.array[i])
-#     end
-#   end
-#   lazy_map(ArrayBlock(k,block_c.touched),celldata)
-# end
-
 struct BlockReindex{A} <: Map
   values::A
   blockid::Int
@@ -63,68 +44,6 @@ function Arrays.evaluate!(cache,k::BlockReindex,i...)
   a = getindex!(cache,k.values,i...)
   a.array[k.blockid]
 end
-
-# function Arrays.lazy_map(k::BlockReindex{<:LazyArray},::Type{T},j_to_i::AbstractArray) where T
-#   i_to_maps = k.values.maps
-#   i_to_args = k.values.args
-#   j_to_maps = lazy_map(Reindex(i_to_maps),eltype(i_to_maps),j_to_i)
-#   j_to_args = map(i_to_fk->lazy_map(BlockReindex(i_to_fk,k.blockid),eltype(i_to_fk),j_to_i),i_to_args)
-#   LazyArray(T,j_to_maps,j_to_args...)
-# end
-
-# function Arrays.return_cache(k::SplitCellData,data::AbstractArray)
-#   return_cache(Reindex(data),k.ids)
-# end
-
-# function Arrays.evaluate!(cache,k::SplitCellData,data::AbstractArray)
-#   evaluate!(cache,Reindex(data),k.ids)
-# end
-
-# function Arrays.return_cache(k::SplitCellData,f::ParamBlock)
-#   di = testitem(f)
-#   ci = return_cache(k,di)
-#   vi = evaluate!(ci,k,di)
-#   cache = Vector{typeof(ci)}(undef,param_length(f))
-#   array = Vector{typeof(vi)}(undef,param_length(f))
-#   for i in param_eachindex(f)
-#     cache[i] = return_cache(k,param_getindex(f,i))
-#   end
-#   return GenericParamBlock(array),cache
-# end
-
-# function Arrays.evaluate!(cache,k::SplitCellData,f::ParamBlock)
-#   array,c = cache
-#   for i in param_eachindex(f)
-#     array.data[i] = evaluate!(c[i],k,param_getindex(f,i))
-#   end
-#   array
-# end
-
-# function Arrays.return_cache(k::SplitBlockCellData,data::ArrayBlock{A,N}) where {A,N}
-#   di = data.array[k.blockid]
-#   ki = Reindex(di)
-#   ci = return_cache(ki,k.ids)
-#   vi = evaluate!(ci,ki,k.ids)
-#   cache = Array{typeof(ci),N}(undef,size(data))
-#   array = Array{typeof(vi),N}(undef,size(data))
-#   for i in eachindex(data.array)
-#     if data.touched[i]
-#       cache[i] = return_cache(k.array[i],data.array[i])
-#     end
-#   end
-#   return ArrayBlock(array,data.touched),cache
-# end
-
-# function Arrays.evaluate!(cache,k::ArrayBlock{<:SplitCellData,N},data::ArrayBlock{A,N}) where {A,N}
-#   @check k.touched == data.touched
-#   a,c = cache
-#   for i in eachindex(data.array)
-#     if data.touched[i]
-#       a.array[i] = evaluate!(c[i],k.array[i],data.array[i])
-#     end
-#   end
-#   a
-# end
 
 struct AddHREntriesMap{F}
   combine::F
@@ -140,62 +59,6 @@ end
 
 function Arrays.evaluate!(cache,k::AddHREntriesMap,A,vs,is,js)
   add_hr_entries!(cache,k.combine,A,vs,is,js)
-end
-
-function Arrays.return_cache(
-  k::AddHREntriesMap,A,v::MatrixBlock,I::VectorBlock,J::VectorBlock)
-
-  qs = findall(v.touched)
-  i,j = Tuple(first(qs))
-  cij = return_cache(k,A,v.array[i,j],I.array[i],J.array[j])
-  ni,nj = size(v.touched)
-  cache = Matrix{typeof(cij)}(undef,ni,nj)
-  for j in 1:nj
-    for i in 1:ni
-      if v.touched[i,j]
-        cache[i,j] = return_cache(k,A,v.array[i,j],I.array[i],J.array[j])
-      end
-    end
-  end
-  cache
-end
-
-function Arrays.evaluate!(
-  cache,k::AddHREntriesMap,A,v::MatrixBlock,I::VectorBlock,J::VectorBlock)
-  ni,nj = size(v.touched)
-  for j in 1:nj
-    for i in 1:ni
-      if v.touched[i,j]
-        evaluate!(cache[i,j],k,A,v.array[i,j],I.array[i],J.array[j])
-      end
-    end
-  end
-end
-
-function Arrays.return_cache(
-  k::AddHREntriesMap,A,v::VectorBlock,I::VectorBlock)
-
-  qs = findall(v.touched)
-  i = first(qs)
-  ci = return_cache(k,A,v.array[i],I.array[i])
-  ni = length(v.touched)
-  cache = Vector{typeof(ci)}(undef,ni)
-  for i in 1:ni
-    if v.touched[i]
-      cache[i] = return_cache(k,A,v.array[i],I.array[i])
-    end
-  end
-  cache
-end
-
-function Arrays.evaluate!(
-  cache,k::AddHREntriesMap,A,v::VectorBlock,I::VectorBlock)
-  ni = length(v.touched)
-  for i in 1:ni
-    if v.touched[i]
-      evaluate!(cache[i],k,A,v.array[i],I.array[i])
-    end
-  end
 end
 
 @inline function add_hr_entries!(
@@ -238,7 +101,7 @@ function assemble_hr_vector_add!(b::ArrayBlock,cellvec,cellidsrows::ArrayBlock,i
   end
 end
 
-function assemble_hr_vector_add!(b,cellvec,cellidsrows,args...)
+function assemble_hr_vector_add!(b,cellvec,cellidsrows)
   if length(cellvec) > 0
     rows_cache = array_cache(cellidsrows)
     vals_cache = array_cache(cellvec)

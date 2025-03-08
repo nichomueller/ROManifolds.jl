@@ -16,7 +16,7 @@ function RBSteady.allocate_rbcache(
   solver::ThetaMethod,
   op::TransientRBOperator,
   r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
+  us::Tuple{Vararg{AbstractVector}})
 
   dt,θ = solver.dt,solver.θ
   shift!(r,dt*(θ-1))
@@ -67,7 +67,7 @@ function RBSteady.allocate_rbcache(
   solver::ThetaMethod,
   op::LinearNonlinearTransientRBOperator,
   r::TransientRealization,
-  us::Tuple{Vararg{AbstractParamVector}})
+  us::Tuple{Vararg{AbstractVector}})
 
   ws = (1,1)
 

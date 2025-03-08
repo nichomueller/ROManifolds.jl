@@ -9,7 +9,7 @@ function RBSteady.HyperReduction(
   proj_basis = project(test,basis)
   (rows,indices_time),interp = empirical_interpolation(basis)
   factor = lu(interp)
-  domain = matrix_domain(trian,test,rows,indices_time)
+  domain = vector_domain(trian,test,rows,indices_time)
   return MDEIM(reduction,proj_basis,factor,domain)
 end
 
@@ -31,19 +31,13 @@ end
 
 const TransientHyperReduction{A<:Reduction,B<:ReducedProjection} = HyperReduction{A,B,TransientIntegrationDomain}
 
-function get_integration_domain_space(a::TransientHyperReduction)
-  i = get_integration_domain(a)
-  i.domain_space
+for f in (:get_integration_domain_space,:get_indices_time,:get_owned_itimes)
+  @eval begin
+    $f(a::TransientHyperReduction) = $f(get_integration_domain(a))
+  end
 end
 
-function get_indices_time(a::TransientHyperReduction)
-  i = get_integration_domain(a)
-  i.indices_time
-end
-
-function RBSteady.reduced_triangulation(trian::Triangulation,a::TransientHyperReduction)
-  reduced_triangulation(trian,get_integration_domain_space(a))
-end
+get_owned_itimes(a::TransientHyperReduction,args...) = get_owned_itimes(get_integration_domain(a),args...)
 
 function RBSteady.reduced_jacobian(
   red::Tuple{Vararg{Reduction}},
@@ -113,4 +107,86 @@ function RBSteady.inv_project!(
   hypred = cache.hypred
   coeff = cache.coeff
   inv_project!(hypred,coeff,a,b)
+end
+
+function get_common_time_domain(a::TransientHyperReduction...)
+  time_ids = ()
+  for ai in a
+    time_ids = (time_ids...,get_indices_time(ai))
+  end
+  union(time_ids)
+end
+
+function get_common_time_domain(a::AffineContribution)
+  get_common_time_domain(get_contributions(a)...)
+end
+
+function get_common_time_domain(a::TupOfAffineContribution)
+  union(map(get_common_time_domain,a)...)
+end
+
+function get_indices_locations(a::HyperReduction,common_ids::Range2D)
+  common_param_ids = common_ids.axis1
+  common_time_ids = common_ids.axis2
+  local_time_ids = get_indices_time(a)
+  indices = range_1d(common_param_ids,local_time_ids,length(common_param_ids))
+  local_itime_ids = get_owned_itimes(local_time_ids,common_time_ids)
+  locations = range_1d(common_param_ids,local_itime_ids,length(common_param_ids))
+  return indices,locations
+end
+
+function Arrays.return_cache(::typeof(get_indices_time),a::BlockHyperReduction)
+  cache = get_indices_time(testitem(a))
+  block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
+  return block_cache
+end
+
+function get_indices_time(a::BlockHyperReduction)
+  cache = return_cache(get_owned_itimes,a)
+  for i in eachindex(a)
+    if a.touched[i]
+      cache[i] = get_owned_itimes(a[i])
+    end
+  end
+  return ArrayBlock(cache,a.touched)
+end
+
+for f in (:get_owned_itimes,:get_indices_locations)
+  @eval begin
+    function Arrays.return_cache(::typeof($f),a::BlockHyperReduction,ids::AbstractVector)
+      cache = $f(testitem(a),ids)
+      block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
+      return block_cache
+    end
+
+    function $f(a::BlockHyperReduction,ids::AbstractVector)
+      cache = return_cache($f,a,ids)
+      for i in eachindex(a)
+        if a.touched[i]
+          cache[i] = $f(a[i],ids)
+        end
+      end
+      return ArrayBlock(cache,a.touched)
+    end
+  end
+end
+
+function get_common_time_domain(a::BlockHyperReduction...)
+  time_ids = ()
+  for ai in a
+    for i in eachindex(ai)
+      if ai.touched[i]
+        time_ids = (time_ids...,get_indices_time(ai[i]))
+      end
+    end
+  end
+  union(time_ids)
+end
+
+for T in (:HyperReduction,:BlockHyperReduction)
+  @eval begin
+    function get_indices_locations(a::$T,common_ids::Base.ReshapedArray{Int,1,Range2D})
+      get_indices_locations(a,common_ids.parent)
+    end
+  end
 end

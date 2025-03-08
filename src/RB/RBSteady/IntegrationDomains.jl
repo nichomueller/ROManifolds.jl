@@ -188,20 +188,3 @@ end
 get_integration_cells(i::MatrixDomain) = i.cells
 get_cellids_rows(i::MatrixDomain) = i.cell_irows
 get_cellids_cols(i::MatrixDomain) = i.cell_icols
-
-# # common integration domains
-
-# function Arrays.return_cache(::typeof(get_integration_cells),i::IntegrationDomain...)
-#   i1 = testitem(i)
-#   cache = get_integration_cells(i1)
-#   block_cache = Vector{typeof(cache)}(undef,length(i))
-#   return block_cache
-# end
-
-# function get_integration_cells(i::IntegrationDomain...)
-#   cache = return_cache(get_integration_cells,i...)
-#   for k in eachindex(i)
-#     cache[k] = get_integration_cells(i[k])
-#   end
-#   return union(cache...)
-# end
