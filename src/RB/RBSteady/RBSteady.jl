@@ -154,7 +154,6 @@ export collect_cell_hr_matrix
 export collect_cell_hr_vector
 export assemble_hr_matrix_add!
 export assemble_hr_vector_add!
-export add_hr_entries!
 include("HRAssemblers.jl")
 
 export RBOperator

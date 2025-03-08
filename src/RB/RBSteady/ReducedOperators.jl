@@ -101,7 +101,7 @@ ParamSteady.get_fe_operator(op::GenericRBOperator) = op.op
 function Algebra.allocate_residual(
   op::GenericRBOperator,
   r::Realization,
-  u::AbstractParamVector,
+  u::AbstractVector,
   paramcache)
 
   allocate_hypred_cache(op.rhs,r)
@@ -110,7 +110,7 @@ end
 function Algebra.allocate_jacobian(
   op::GenericRBOperator,
   r::Realization,
-  u::AbstractParamVector,
+  u::AbstractVector,
   paramcache)
 
   allocate_hypred_cache(op.lhs,r)
@@ -120,7 +120,7 @@ function Algebra.residual!(
   b::HRParamArray,
   op::GenericRBOperator,
   r::Realization,
-  u::AbstractParamVector,
+  u::AbstractVector,
   paramcache)
 
   uh = EvaluationFunction(paramcache.trial,u)
@@ -145,7 +145,7 @@ function Algebra.jacobian!(
   A::HRParamArray,
   op::GenericRBOperator,
   r::Realization,
-  u::AbstractParamVector,
+  u::AbstractVector,
   paramcache)
 
   uh = EvaluationFunction(paramcache.trial,u)
@@ -190,13 +190,3 @@ FESpaces.get_trial(op::LinearNonlinearRBOperator) = get_trial(get_nonlinear_oper
 FESpaces.get_test(op::LinearNonlinearRBOperator) = get_test(get_nonlinear_operator(op))
 
 const LinNonlinRBOperator = LinNonlinParamOperator{<:ParamNonlinearRBOperator,<:ParamNonlinearRBOperator}
-
-# function ParamAlgebra.allocate_systemcache(nlop::LinNonlinRBOperator,x::AbstractVector)
-#   cache_linear = get_linear_systemcache(nlop)
-#   feop = get_fe_operator(nlop.op_nonlinear.op)
-#   trian_jac = get_domains_jac(feop)
-#   trian_res = get_domains_res(feop)
-#   A_nlin = change_domains(cache_linear.A,trian_jac)
-#   b_nlin = change_domains(cache_linear.b,trian_res)
-#   SystemCache(A_nlin,b_nlin)
-# end

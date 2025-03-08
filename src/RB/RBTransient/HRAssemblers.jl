@@ -116,14 +116,14 @@ function Arrays.return_cache(k::AddPairedHREntriesMap,A,vs::ParamBlock,args...)
 end
 
 function Arrays.evaluate!(cache,k::AddPairedHREntriesMap,A,vs,is)
-  add_hr_entries!(cache,k.combine,A,vs,is,k.locations,k.indices)
+  add_paired_hr_entries!(cache,k.combine,A,vs,is,k.locations,k.indices)
 end
 
 function Arrays.evaluate!(cache,k::AddPairedHREntriesMap,A,vs,is,js)
-  add_hr_entries!(cache,k.combine,A,vs,is,js,k.locations,k.indices)
+  add_paired_hr_entries!(cache,k.combine,A,vs,is,js,k.locations,k.indices)
 end
 
-@inline function RBSteady.add_hr_entries!(
+@inline function add_paired_hr_entries!(
   vij,combine::Function,A::AbstractParamVector,vs::ParamBlock,is,js,lt,t)
 
   for (lj,j) in enumerate(js)
@@ -141,7 +141,7 @@ end
   A
 end
 
-@inline function RBSteady.add_hr_entries!(
+@inline function add_paired_hr_entries!(
   vi,combine::Function,A::AbstractParamVector,vs::ParamBlock,is,t)
 
   for (li,i) in enumerate(is)

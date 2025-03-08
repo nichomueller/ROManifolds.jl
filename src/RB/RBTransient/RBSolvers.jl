@@ -43,6 +43,7 @@ function RBSteady.RBSolver(
 end
 
 RBSteady.num_jac_params(s::RBSolver{<:ODESolver}) = num_params(first(s.jacobian_reduction))
+get_system_solver(s::RBSolver{<:ODESolver}) = s.fesolver.sysslvr
 
 function RBSteady.solution_snapshots(
   solver::RBSolver,
@@ -119,17 +120,23 @@ function RBSteady.jacobian_snapshots(
   return (jac_lin,jac_nlin)
 end
 
+# Solve a POD-MDEIM problem
+
 function Algebra.solve(
   solver::RBSolver,
   op::NonlinearOperator,
   r::TransientRealization,
   xh0::Union{Function,AbstractVector})
 
-  x0 = get_free_dof_values(xh0(get_params(r)))
   trial = get_trial(op)(r)
   x̂ = zero_free_values(trial)
 
   nlop = parameterize(op,r)
-  syscache = allocate_systemcache(nlop,r)
-  solve!(x̂,solver,op,r,x,x0)
+  syscache = allocate_systemcache(nlop,x̂)
+
+  fesolver = get_system_solver(solver)
+  t = @timed solve!(x̂,fesolver,nlop,syscache)
+  stats = CostTracker(t,nruns=num_params(r),name="RB")
+
+  return x̂,stats
 end

@@ -24,12 +24,12 @@ function RBSteady.reduced_operator(
   LinearNonlinearRBOperator(red_op_lin,red_op_nlin)
 end
 
-const TransientRBOperator{O} = GenericRBOperator{O,TupOfAffineContribution}
+const TransientRBOperator{O<:ODEParamOperatorType} = RBOperator{O}
 
 function Algebra.allocate_residual(
   op::TransientRBOperator,
   r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
+  u::AbstractVector,
   paramcache)
 
   allocate_hypred_cache(op.rhs,r)
@@ -38,7 +38,7 @@ end
 function Algebra.allocate_jacobian(
   op::TransientRBOperator,
   r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
+  u::AbstractVector,
   paramcache)
 
   allocate_hypred_cache(op.lhs,r)
@@ -48,14 +48,14 @@ function Algebra.residual!(
   b::HRParamArray,
   op::TransientRBOperator,
   r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
+  u::AbstractVector,
   paramcache
   )
 
   np = num_params(r)
   hr_time_ids = get_common_time_domain(op.rhs)
   hr_param_time_ids = range_1d(1:np,hr_time_ids,np)
-  hr_uh = _make_hr_uh_from_us(op.op,us,paramcache.trial,hr_param_time_ids)
+  hr_uh = _make_hr_uh_from_us(op.op,u,paramcache.trial,hr_param_time_ids)
 
   test = get_test(op.op)
   v = get_fe_basis(test)
@@ -80,15 +80,14 @@ function Algebra.jacobian!(
   A::HRParamArray,
   op::TransientRBOperator,
   r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  ws::Tuple{Vararg{Real}},
+  u::AbstractVector,
   paramcache
   )
 
   np = num_params(r)
   hr_time_ids = get_common_time_domain(op.rhs)
   hr_param_time_ids = range_1d(1:np,hr_time_ids,np)
-  hr_uh = _make_hr_uh_from_us(op.op,us,paramcache.trial,hr_param_time_ids)
+  hr_uh = _make_hr_uh_from_us(op.op,u,paramcache.trial,hr_param_time_ids)
 
   trial = get_trial(op.op)
   du = get_trial_fe_basis(trial)
@@ -113,63 +112,57 @@ end
 
 # utils
 
-function _make_hr_uh_from_us(
-  odeop::ODEParamOperator,
-  us::Tuple{Vararg{AbstractVector}},
-  trial::FESpace,
-  hr_param_time_ids)
-
-  hr_us,hr_trial = _reduce_arguments(us,trial,hr_param_time_ids)
-  ODEs._make_uh_from_us(odeop,hr_us,hr_trial)
+function _reduce_vector(u::ConsecutiveParamVector,hr_ids::AbstractVector)
+  ConsecutiveParamArray(view(u.data,:,hr_ids))
 end
 
-function _reduce_arguments(
-  fv::ConsecutiveParamVector,
-  trial::TrialParamFESpace,
-  hr_ids::AbstractVector)
+function _reduce_vector(u::BlockConsecutiveParamVector,hr_ids::AbstractVector)
+  mortar(map(b -> _reduce_vector(b,hr_ids),blocks(u)))
+end
 
+function _reduce_vector(u::RBParamVector,hr_ids::AbstractVector)
+  RBParamVector(u.data,_reduce_vector(u.fe_data,hr_ids))
+end
+
+function _reduce_trial(trial::TrialParamFESpace,hr_ids::AbstractVector)
   dv = trial.dirichlet_values
-  fv′ = ConsecutiveParamArray(view(fv.data,:,hr_ids))
-  dv′ = ConsecutiveParamArray(view(dv.data,:,hr_ids))
+  dv′ = _reduce_vector(trial.dirichlet_values,hr_ids)
   trial′ = TrialParamFESpace(dv′,trial.space)
-  return fv′,trial′
+  return trial′
 end
 
-function _reduce_arguments(
-  fv::ConsecutiveParamVector,
-  trial::TrivialParamFESpace,
-  hr_ids::AbstractVector)
-
-  fv′ = ConsecutiveParamArray(view(fv.data,:,hr_ids))
+function _reduce_trial(trial::TrivialParamFESpace,hr_ids::AbstractVector)
   trial′ = TrialParamFESpace(trial.space,length(hr_ids))
-  return fv′,trial′
+  return trial′
 end
 
-function _reduce_arguments(
-  fv::BlockConsecutiveParamVector,
-  trial::MultiFieldFESpace,
-  hr_ids::AbstractVector)
-
-  vec_fv′,vec_trial′ = map(blocks(fv),trial.spaces) do fv,trial
-    _reduce_arguments(fv,trial,hr_ids)
-  end |> tuple_of_arrays
-  fv′ = mortar(vec_fv′)
+function _reduce_trial(trial::MultiFieldFESpace,hr_ids::AbstractVector)
+  vec_trial′ = map(f -> _reduce_trial(b,hr_ids),trial.spaces)
   trial′ = MultiFieldFESpace(trial.vector_type,vec_trial′,trial.style)
-  return fv′,trial′
+  return trial′
 end
 
 function _reduce_arguments(
-  us::Tuple{Vararg{AbstractVector}},
+  u::AbstractVector,
   trial::Tuple{Vararg{FESpace}},
   hr_ids::AbstractVector)
 
-  @check length(us) == length(trial)
-  us′ = ()
+  N = length(trial)
+  u′ = _reduce_vector(u,hr_ids)
+  us′ = tfill(u′,Val{N}())
   trial′ = ()
-  for i = eachindex(us)
-    usi′,triali′ = _reduce_arguments(us[i],trial[i],hr_ids)
-    us′ = (us′...,usi′)
-    trial′ = (trial′...,triali′)
+  for i = eachindex(trial)
+    trial′ = (trial′...,_reduce_trial(trial[i],hr_ids))
   end
-  return us′,triali′
+  return us′,trial′
+end
+
+function _make_hr_uh_from_us(
+  odeop::ODEParamOperator,
+  u::AbstractVector,
+  trial::Tuple{Vararg{FESpace}},
+  hr_param_time_ids)
+
+  hr_us,hr_trial = _reduce_arguments(u,trial,hr_param_time_ids)
+  ODEs._make_uh_from_us(odeop,hr_us,hr_trial)
 end

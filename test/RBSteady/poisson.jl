@@ -199,33 +199,14 @@ feop = TransientParamLinearOperator((stiffness,mass),res,ptspace,trial,test,doma
 
 fesnaps, = solution_snapshots(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-μon = realization(feop;nparams=10)
-x̂,rbstats = solve(rbsolver,rbop,μon)
+μon = realization(feop;nparams=1)
+x̂,rbstats = solve(rbsolver,rbop,μon,uh0μ)
 x,festats = solution_snapshots(rbsolver,feop,μon)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
 
-rhs1 = rbop.rhs[1]
-using BenchmarkTools
+r = μon
+op = rbop
+x̂ = zero_free_values(get_trial(op)(r))
 
-Ωv = rbop.rhs.trians[1]
-dΩv = Measure(Ωv,degree)
-μt = realization(feop;nparams=20)
-μ = get_params(μt)
-t = get_times(μt)
-U = trial(μt)
-uh = zero(U)
-u = TransientCellField(uh,(uh,))
-v = get_fe_basis(test)
-dcv = mass(μ,t,∂t(u),v,dΩv) + stiffness(μ,t,u,v,dΩv)
-
-@btime mass($μ,$t,∂t($u),$v,$dΩv) + stiffness($μ,$t,$u,$v,$dΩv)
-
-μtv = μt[:,[1,3,5]]
-μv = get_params(μtv)
-tv = get_times(μtv)
-Uv = trial(μtv)
-uhv = zero(Uv)
-uv = TransientCellField(uhv,(uhv,))
-dcvv = mass(μ,t,∂t(u),v,dΩv) + stiffness(μ,t,u,v,dΩv)
-
-@btime mass($μv,$tv,∂t($uv),$v,$dΩv) + stiffness($μv,$tv,$uv,$v,$dΩv)
+nlop = parameterize(op,r)
+syscache = allocate_systemcache(nlop,r)
