@@ -66,7 +66,7 @@ function Algebra.residual!(
   res = get_res(op.op)
   dc = res(μ,hr_t,hr_uh,v)
 
-  map(trian_res) do strian
+  for strian in trian_res
     b_strian = b.fecache[strian]
     rhs_strian = op.rhs[strian]
     vecdata = collect_cell_hr_vector(test,dc,strian,rhs_strian,hr_param_time_ids)
@@ -94,17 +94,23 @@ function Algebra.jacobian!(
   test = get_test(op.op)
   v = get_fe_basis(test)
 
-  trian_jac = get_domains_jac(op.op)
+  trian_jacs = get_domains_jac(op.op)
   μ = get_params(r)
   hr_t = view(get_times(r),hr_time_ids)
-  jac = get_jac(op.op)
-  dc = jac(μ,t,uh,du,v)
+  jacs = get_jacs(op.op)
 
-  map(trian_jac) do strian
-    A_strian = A.fecache[strian]
-    lhs_strian = op.lhs[strian]
-    matdata = collect_cell_hr_matrix(trial,test,dc,strian,lhs_strian,hr_param_time_ids)
-    assemble_hr_matrix_add!(A_strian,matdata...)
+  for k in 1:get_order(op.op)+1
+    Ak = A.fecache[k]
+    lhs = op.lhs[k]
+    jac = jacs[k]
+    dc = jac(μ,hr_t,hr_uh,du,v)
+    trian_jac = trian_jacs[k]
+    for strian in trian_jac
+      A_strian = Ak[strian]
+      lhs_strian = lhs[strian]
+      matdata = collect_cell_hr_matrix(trial,test,dc,strian,lhs_strian,hr_param_time_ids)
+      assemble_hr_matrix_add!(A_strian,matdata...)
+    end
   end
 
   inv_project!(A,op.lhs)

@@ -92,6 +92,10 @@ function RBSteady.inv_project!(
   return b̂
 end
 
+function RBSteady.inv_project!(cache::HRParamArray,a::TupOfAffineContribution)
+  inv_project!(cache.hypred,cache.coeff,a,cache.fecache)
+end
+
 function RBSteady.allocate_hypred_cache(a::TupOfAffineContribution,r::TransientRealization)
   fecache = map(ai -> RBSteady.allocate_coefficient(ai,r),a)
   coeffs = map(ai -> RBSteady.allocate_coefficient(ai,r),a)
@@ -99,22 +103,12 @@ function RBSteady.allocate_hypred_cache(a::TupOfAffineContribution,r::TransientR
   return HRParamArray(fecache,coeffs,hypred)
 end
 
-function RBSteady.inv_project!(
-  cache::HRParamArray,
-  a::TupOfAffineContribution,
-  b::TupOfArrayContribution)
-
-  hypred = cache.hypred
-  coeff = cache.coeff
-  inv_project!(hypred,coeff,a,b)
-end
-
 function get_common_time_domain(a::TransientHyperReduction...)
   time_ids = ()
   for ai in a
     time_ids = (time_ids...,get_indices_time(ai))
   end
-  union(time_ids)
+  union(time_ids...)
 end
 
 function get_common_time_domain(a::AffineContribution)
@@ -180,7 +174,7 @@ function get_common_time_domain(a::BlockHyperReduction...)
       end
     end
   end
-  union(time_ids)
+  union(time_ids...)
 end
 
 for T in (:HyperReduction,:BlockHyperReduction)

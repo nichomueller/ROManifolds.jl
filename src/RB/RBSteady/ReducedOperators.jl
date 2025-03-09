@@ -131,7 +131,7 @@ function Algebra.residual!(
   res = get_res(op.op)
   dc = res(r,uh,v)
 
-  map(trian_res) do strian
+  for strian in trian_res
     b_strian = b.fecache[strian]
     rhs_strian = op.rhs[strian]
     vecdata = collect_cell_hr_vector(test,dc,strian,rhs_strian)
@@ -158,7 +158,7 @@ function Algebra.jacobian!(
   jac = get_jac(op.op)
   dc = jac(r,uh,du,v)
 
-  map(trian_jac) do strian
+  for strian in trian_jac
     A_strian = A.fecache[strian]
     lhs_strian = op.lhs[strian]
     matdata = collect_cell_hr_matrix(trial,test,dc,strian,lhs_strian)

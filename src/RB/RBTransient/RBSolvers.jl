@@ -1,5 +1,5 @@
 # check TransientMDEIMReduction for more details
-time_combinations(fesolver::ODESolver) = @notimplemented
+time_combinations(fesolver::ODESolver) = @notimplemented "For now, only theta methods are implemented"
 
 function time_combinations(fesolver::GeneralizedAlpha1)
   combine_res(x) = nothing
@@ -24,6 +24,25 @@ function time_combinations(fesolver::ThetaMethod)
   return combine_res,combine_jac,combine_djac
 end
 
+struct ShiftedSolver <: Function
+  sysslvr::NonlinearSolver
+  δ::Real
+end
+
+function ShiftedSolver(odesolver::ODESolver)
+  @notimplemented "For now, only theta methods are implemented"
+end
+
+function ShiftedSolver(odesolver::ThetaMethod)
+  dt,θ = odesolver.dt,odesolver.θ
+  δ = θ*dt
+  sysslvr = odesolver.sysslvr
+  ShiftedSolver(sysslvr,δ)
+end
+
+front_shift!(solver::ShiftedSolver,r::TransientRealization) = shift!(r,solver.δ)
+back_shift!(solver::ShiftedSolver,r::TransientRealization) = shift!(r,-solver.δ)
+
 function RBSteady.RBSolver(
   fesolver::ODESolver,
   state_reduction::Reduction;
@@ -43,7 +62,7 @@ function RBSteady.RBSolver(
 end
 
 RBSteady.num_jac_params(s::RBSolver{<:ODESolver}) = num_params(first(s.jacobian_reduction))
-get_system_solver(s::RBSolver{<:ODESolver}) = s.fesolver.sysslvr
+get_system_solver(s::RBSolver{<:ODESolver}) = ShiftedSolver(s.fesolver)
 
 function RBSteady.solution_snapshots(
   solver::RBSolver,
@@ -139,4 +158,20 @@ function Algebra.solve(
   stats = CostTracker(t,nruns=num_params(r),name="RB")
 
   return x̂,stats
+end
+
+function Algebra.solve!(
+  x̂::AbstractVector,
+  fesolver::ShiftedSolver,
+  nlop::NonlinearParamOperator,
+  syscache::SystemCache)
+
+  _get_realization(nlop::NonlinearParamOperator) = @abstractmethod
+  _get_realization(nlop::GenericParamNonlinearOperator) = nlop.μ
+  _get_realization(nlop::LinNonlinParamOperator) = _get_realization(nlop.op_nonlinear)
+
+  r = _get_realization(nlop)
+  front_shift!(fesolver,r)
+  solve!(x̂,fesolver.sysslvr,nlop,syscache)
+  front_shift!(fesolver,r)
 end

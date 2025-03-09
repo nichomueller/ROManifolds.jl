@@ -201,12 +201,36 @@ fesnaps, = solution_snapshots(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 μon = realization(feop;nparams=1)
 x̂,rbstats = solve(rbsolver,rbop,μon,uh0μ)
-x,festats = solution_snapshots(rbsolver,feop,μon)
+x,festats = solution_snapshots(rbsolver,feop,μon,uh0μ)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
+
+using ROManifolds.DofMaps
+using ROManifolds.ParamAlgebra
+using ROManifolds.RBSteady
+using ROManifolds.RBTransient
 
 r = μon
 op = rbop
 x̂ = zero_free_values(get_trial(op)(r))
 
 nlop = parameterize(op,r)
-syscache = allocate_systemcache(nlop,r)
+syscache = allocate_systemcache(nlop,x̂)
+
+u = x̂
+np = num_params(r)
+hr_time_ids = RBTransient.get_common_time_domain(op.rhs)
+hr_param_time_ids = range_1d(1:np,hr_time_ids,np)
+hr_uh = RBTransient._make_hr_uh_from_us(op.op,u,nlop.paramcache.trial,hr_param_time_ids)
+
+v = get_fe_basis(test)
+trian_res = get_domains_res(op.op)
+μ = get_params(r)
+hr_t = view(get_times(r),hr_time_ids)
+dc = get_res(op.op)(μ,hr_t,hr_uh,v)
+
+b = syscache.b
+strian = trian_res[1]
+b_strian = b.fecache[strian]
+rhs_strian = op.rhs[strian]
+vecdata = RBSteady.collect_cell_hr_vector(test,dc,strian,rhs_strian,hr_param_time_ids)
+assemble_hr_vector_add!(b_strian,vecdata...)

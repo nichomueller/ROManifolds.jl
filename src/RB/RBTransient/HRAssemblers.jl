@@ -1,10 +1,10 @@
-abstract type KroneckerHRStyle end
-struct IsKroneckerHR <: KroneckerHRStyle end
-struct IsLinearHR <: KroneckerHRStyle end
+abstract type TransientHRStyle end
+struct KroneckerTransientHR <: TransientHRStyle end
+struct LinearTransientHR <: TransientHRStyle end
 
-KroneckerHRStyle(hr::HyperReduction) = IsLinearHR()
-KroneckerHRStyle(hr::TransientHyperReduction) = IsKroneckerHR()
-KroneckerHRStyle(hr::BlockProjection) = KroneckerHRStyle(testitem(hr))
+TransientHRStyle(hr::HyperReduction) = LinearTransientHR()
+TransientHRStyle(hr::TransientHyperReduction) = KroneckerTransientHR()
+TransientHRStyle(hr::BlockProjection) = TransientHRStyle(testitem(hr))
 
 function RBSteady.collect_cell_hr_matrix(
   trial::FESpace,
@@ -14,11 +14,11 @@ function RBSteady.collect_cell_hr_matrix(
   hr::Projection,
   common_indices::AbstractVector)
 
-  _collect_cell_hr_matrix(KroneckerHRStyle(hr),trial,test,a,strian,hr,common_indices)
+  _collect_cell_hr_matrix(TransientHRStyle(hr),trial,test,a,strian,hr,common_indices)
 end
 
 function _collect_cell_hr_matrix(
-  ::KroneckerHRStyle,
+  ::TransientHRStyle,
   trial::FESpace,
   test::FESpace,
   a::DomainContribution,
@@ -30,7 +30,7 @@ function _collect_cell_hr_matrix(
 end
 
 function _collect_cell_hr_matrix(
-  ::IsLinearHR,
+  ::LinearTransientHR,
   trial::FESpace,
   test::FESpace,
   a::DomainContribution,
@@ -42,8 +42,6 @@ function _collect_cell_hr_matrix(
   cell_icols = get_cellids_cols(hr)
   icells = get_owned_icells(hr)
   indices,locations = get_indices_locations(hr,common_indices)
-  # times = get_indices_time(hr)
-  # itimes = get_owned_itimes(hr,indices)
 
   scell_mat = get_contribution(a,strian)
   cell_mat,trian = move_contributions(scell_mat,strian)
@@ -60,11 +58,11 @@ function RBSteady.collect_cell_hr_vector(
   hr::Projection,
   common_indices::AbstractVector)
 
-  _collect_cell_hr_vector(KroneckerHRStyle(hr),test,a,strian,hr,common_indices)
+  _collect_cell_hr_vector(TransientHRStyle(hr),test,a,strian,hr,common_indices)
 end
 
 function _collect_cell_hr_vector(
-  ::KroneckerHRStyle,
+  ::TransientHRStyle,
   test::FESpace,
   a::DomainContribution,
   strian::Triangulation,
@@ -75,7 +73,7 @@ function _collect_cell_hr_vector(
 end
 
 function _collect_cell_hr_vector(
-  ::IsLinearHR,
+  ::LinearTransientHR,
   test::FESpace,
   a::DomainContribution,
   strian::Triangulation,

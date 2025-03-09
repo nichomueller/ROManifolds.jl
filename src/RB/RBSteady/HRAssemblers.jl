@@ -54,11 +54,49 @@ function Arrays.return_cache(k::AddHREntriesMap,A,vs::ParamBlock,args...)
 end
 
 function Arrays.evaluate!(cache,k::AddHREntriesMap,A,vs,is)
-  add_hr_entries!(cache,k.combine,A,vs,is)
+  add_hr_entries!(k.combine,A,vs,is)
 end
 
 function Arrays.evaluate!(cache,k::AddHREntriesMap,A,vs,is,js)
+  add_hr_entries!(k.combine,A,vs,is,js)
+end
+
+function Arrays.evaluate!(cache,k::AddHREntriesMap,A,vs::ParamBlock,is)
+  add_hr_entries!(cache,k.combine,A,vs,is)
+end
+
+function Arrays.evaluate!(cache,k::AddHREntriesMap,A,vs::ParamBlock,is,js)
   add_hr_entries!(cache,k.combine,A,vs,is,js)
+end
+
+@inline function add_hr_entries!(
+  combine::Function,A::AbstractParamVector,vs,is,js)
+
+  for (lj,j) in enumerate(js)
+    if j>0
+      for (li,i) in enumerate(is)
+        if i>0
+          if i == j
+            vij = vs[li,lj]
+            add_entry!(combine,A,vij,i)
+          end
+        end
+      end
+    end
+  end
+  A
+end
+
+@inline function add_hr_entries!(
+  combine::Function,A::AbstractParamVector,vs,is)
+
+  for (li,i) in enumerate(is)
+    if i>0
+      vi = vs[li]
+      add_entry!(combine,A,vi,i)
+    end
+  end
+  A
 end
 
 @inline function add_hr_entries!(
@@ -101,7 +139,7 @@ function assemble_hr_vector_add!(b::ArrayBlock,cellvec,cellidsrows::ArrayBlock,i
   end
 end
 
-function assemble_hr_vector_add!(b,cellvec,cellidsrows)
+function assemble_hr_vector_add!(b,cellvec,cellidsrows,icells)
   if length(cellvec) > 0
     rows_cache = array_cache(cellidsrows)
     vals_cache = array_cache(cellvec)
@@ -130,7 +168,7 @@ function assemble_hr_matrix_add!(
   end
 end
 
-function assemble_hr_matrix_add!(A,cellmat,cellidsrows,cellidscols)
+function assemble_hr_matrix_add!(A,cellmat,cellidsrows,cellidscols,icells)
   @assert length(cellidscols) == length(cellidsrows)
   @assert length(cellmat) == length(cellidsrows)
   if length(cellmat) > 0
