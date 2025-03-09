@@ -123,9 +123,9 @@ function get_indices_locations(a::HyperReduction,common_ids::Range2D)
   common_param_ids = common_ids.axis1
   common_time_ids = common_ids.axis2
   local_time_ids = get_indices_time(a)
-  indices = range_1d(common_param_ids,local_time_ids,length(common_param_ids))
-  local_itime_ids = get_owned_itimes(local_time_ids,common_time_ids)
-  locations = range_1d(common_param_ids,local_itime_ids,length(common_param_ids))
+  indices = range_1d(local_time_ids,common_param_ids,length(common_time_ids))
+  local_itime_ids = get_owned_itimes(a,common_time_ids)
+  locations = range_1d(local_itime_ids,common_param_ids,length(local_itime_ids))
   return indices,locations
 end
 
@@ -179,7 +179,7 @@ end
 
 for T in (:HyperReduction,:BlockHyperReduction)
   @eval begin
-    function get_indices_locations(a::$T,common_ids::Base.ReshapedArray{Int,1,Range2D})
+    function get_indices_locations(a::$T,common_ids::Range1D)
       get_indices_locations(a,common_ids.parent)
     end
   end

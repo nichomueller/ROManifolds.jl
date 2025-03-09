@@ -64,6 +64,9 @@ include("ODEParamOpFromFEOps.jl")
 
 include("ParamTimeMarching.jl")
 
+export ShiftedSolver
+include("ShiftedSolvers.jl")
+
 export initial_condition
 include("ODEParamSolutions.jl")
 
