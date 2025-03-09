@@ -39,7 +39,7 @@ RBSteady.get_cellids_cols(i::TransientIntegrationDomain) = get_cellids_cols(i.do
 get_integration_domain_space(i::TransientIntegrationDomain) = i.domain_space
 get_indices_time(i::TransientIntegrationDomain) = i.indices_time
 
-function get_owned_itimes(i::TransientIntegrationDomain,ids::AbstractVector)::Vector{Int}
+function get_itimes(i::TransientIntegrationDomain,ids::AbstractVector)::Vector{Int}
   idsi = i.indices_time
   filter(!isnothing,indexin(idsi,ids))
 end
