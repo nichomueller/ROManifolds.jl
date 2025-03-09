@@ -124,7 +124,7 @@ function get_param_itimes(a::HyperReduction,common_ids::Range2D)
   common_time_ids = common_ids.axis2
   local_time_ids = get_indices_time(a)
   local_itime_ids = get_itimes(a,common_time_ids)
-  locations = range_1d(common_param_ids,local_itime_ids,length(common_param_ids))
+  locations = range_2d(common_param_ids,local_itime_ids,length(common_param_ids))
   return locations
 end
 
