@@ -9,7 +9,7 @@ function RBSteady.HyperReduction(
   proj_basis = project(test,basis)
   (rows,indices_time),interp = empirical_interpolation(basis)
   factor = lu(interp)
-  domain = vector_domain(trian,test,rows,indices_time)
+  domain = vector_domain(reduction,trian,test,rows,indices_time)
   return MDEIM(reduction,proj_basis,factor,domain)
 end
 
@@ -25,18 +25,13 @@ function RBSteady.HyperReduction(
   proj_basis = project(test,basis,trial,get_combine(red))
   ((rows,cols),indices_time),interp = empirical_interpolation(basis)
   factor = lu(interp)
-  domain = matrix_domain(trian,trial,test,rows,cols,indices_time)
+  domain = matrix_domain(reduction,trian,trial,test,rows,cols,indices_time)
   return MDEIM(reduction,proj_basis,factor,domain)
 end
 
 const TransientHyperReduction{A<:Reduction,B<:ReducedProjection} = HyperReduction{A,B,TransientIntegrationDomain}
 
-for f in (:get_indices_time,:get_itimes)
-  @eval begin
-    $f(a::TransientHyperReduction) = $f(get_integration_domain(a))
-  end
-end
-
+get_indices_time(a::TransientHyperReduction) = get_indices_time(get_integration_domain(a))
 get_itimes(a::TransientHyperReduction,args...) = get_itimes(get_integration_domain(a),args...)
 
 function RBSteady.reduced_jacobian(

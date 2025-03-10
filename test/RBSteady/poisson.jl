@@ -209,23 +209,109 @@ using ROManifolds.ParamAlgebra
 using ROManifolds.RBSteady
 using ROManifolds.RBTransient
 
+
 op,r = rbop,μon
 trial = get_trial(op)(r)
 x̂ = zero_free_values(trial)
+u = x̂
 
 nlop = parameterize(op,r)
 syscache = allocate_systemcache(nlop,x̂)
 paramcache = nlop.paramcache
+shift!(r,dt*(θ-1))
+update_paramcache!(paramcache,nlop.op,r)
+shift!(r,dt*(1-θ))
 
 np = num_params(r)
 hr_time_ids = RBTransient.get_common_time_domain(op.rhs)
 hr_param_time_ids = range_1d(1:np,hr_time_ids,np)
 hr_uh = RBTransient._make_hr_uh_from_us(op.op,u,paramcache.trial,hr_param_time_ids)
 
-test = get_test(op.op)
 v = get_fe_basis(test)
-
 trian_res = get_domains_res(op.op)
 μ = get_params(r)
 hr_t = view(get_times(r),hr_time_ids)
 dc = get_res(op.op)(μ,hr_t,hr_uh,v)
+
+strian = trian_res[2]
+rhs_strian = op.rhs[strian]
+vecdata = collect_cell_hr_vector(test,dc,strian,rhs_strian,hr_param_time_ids)
+cellvec,cellidsrows,icells,locations = vecdata
+style = RBTransient.TransientHRStyle(rhs_strian)
+
+b = syscache.b
+b_strian = b.fecache[strian]
+assemble_hr_vector_add!(b_strian,style,vecdata...)
+# add! = RBTransient.AddTransientHREntriesMap(style,locations)
+
+ress = residual_snapshots(rbsolver,feop,fesnaps)
+basis = projection(rbsolver.residual_reduction.reduction,ress[2])
+(rows,indices_time),interp = empirical_interpolation(basis)
+
+# #
+# cell_dof_ids = get_cell_dof_ids(test)
+# dofs = [15,101,15,64]
+# times = [1,10,8,3]
+
+# using ROManifolds.RBSteady
+# using ROManifolds.RBTransient
+
+# cells = RBSteady.reduced_cells(test,Ω.trian,dofs)
+
+# cache = array_cache(cell_dof_ids)
+
+# ncells = length(cells)
+# ptrs = Vector{Int32}(undef,ncells+1)
+# @inbounds for (icell,cell) in enumerate(cells)
+#   celldofs = getindex!(cache,cell_dof_ids,cell)
+#   ptrs[icell+1] = length(celldofs)
+# end
+# length_to_ptrs!(ptrs)
+
+# # count number of occurrences
+# iudof_to_idof = RBTransient.get_iudof_to_idof(dofs,times)
+# ucache = array_cache(iudof_to_idof)
+# N = RBTransient.get_max_offset(iudof_to_idof)
+
+# using ROManifolds.DofMaps
+# _correct_idof(is,li) = li
+# _correct_idof(is::OIdsToIds,li) = is.terms[li]
+
+# using Gridap.TensorValues
+
+# #z = zero(Mutable(VectorValue{N,Int32}))#zeros(Int32,N)
+# data = map(_ -> copy(zeros(Int32,N)),1:ptrs[end]-1) #fill(z,ptrs[end]-1)
+# for (icell,cell) in enumerate(cells)
+#   celldofs = getindex!(cache,cell_dof_ids,cell)
+#   for iudof in eachindex(iudof_to_idof)
+#     idofs = getindex!(ucache,iudof_to_idof,iudof)
+#     for (iuidof,idof) in enumerate(idofs)
+#       dof = dofs[idof]
+#       for (_icelldof,celldof) in enumerate(celldofs)
+#         if dof == celldof
+#           icelldof = _correct_idof(celldofs,_icelldof)
+#           vv = data[ptrs[icell]-1+icelldof]
+#           vv[iuidof] = idof
+#         end
+#       end
+#     end
+#   end
+# end
+# ye = Table(map(x->VectorValue(x),data),ptrs)
+
+# vv = zeros(Int32,N)
+# icell,cell = 5,cells[5]
+# celldofs = getindex!(cache,cell_dof_ids,cell)
+# iudof = 4
+# idofs = getindex!(ucache,iudof_to_idof,iudof)
+# for (iuidof,idof) in enumerate(idofs)
+#   dof = dofs[idof]
+#   for (_icelldof,celldof) in enumerate(celldofs)
+#     if dof == celldof
+#       icelldof = _correct_idof(celldofs,_icelldof)
+#       println(ptrs[icell]-1+icelldof)
+#       vv = data[ptrs[icell]-1+icelldof]
+#       vv[iuidof] = idof
+#     end
+#   end
+# end

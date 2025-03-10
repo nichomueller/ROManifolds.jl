@@ -51,6 +51,9 @@ function get_cells_to_idofs(
   cells::AbstractVector,
   dofs::AbstractVector)
 
+  @assert length(dofs) == length(unique(dofs)) "Something is wrong with EIM procedure,
+  two identical indices have been detected"
+
   _correct_idof(is,li) = li
   _correct_idof(is::OIdsToIds,li) = is.terms[li]
 
@@ -123,16 +126,16 @@ function get_owned_icells(i::IntegrationDomain,cells::AbstractVector)::Vector{In
 end
 
 """
-    struct VectorDomain <: IntegrationDomain{Int,1}
+    struct VectorDomain{T} <: IntegrationDomain
       cells::Vector{Int32}
-      cell_irows::Table{Int32,Vector{Int32},Vector{Int32}}
+      cell_irows::Table{T,Vector{T},Vector{Int32}}
     end
 
 Integration domain for a projection vector operator in a steady problem
 """
-struct VectorDomain <: IntegrationDomain
+struct VectorDomain{T} <: IntegrationDomain
   cells::Vector{Int32}
-  cell_irows::Table{Int32,Vector{Int32},Vector{Int32}}
+  cell_irows::Table{T,Vector{T},Vector{Int32}}
 end
 
 get_integration_cells(i::VectorDomain) = i.cells
@@ -153,18 +156,18 @@ function vector_domain(
 end
 
 """
-    struct MatrixDomain <: IntegrationDomain{Int,1}
+    struct MatrixDomain{T} <: IntegrationDomain{Int,1}
       cells::Vector{Int32}
-      cell_irows::Table{Int32,Vector{Int32},Vector{Int32}}
-      cell_icols::Table{Int32,Vector{Int32},Vector{Int32}}
+      cell_irows::Table{T,Vector{T},Vector{Int32}}
+      cell_icols::Table{T,Vector{T},Vector{Int32}}
     end
 
 Integration domain for a projection vector operator in a steady problem
 """
-struct MatrixDomain <: IntegrationDomain
+struct MatrixDomain{T} <: IntegrationDomain
   cells::Vector{Int32}
-  cell_irows::Table{Int32,Vector{Int32},Vector{Int32}}
-  cell_icols::Table{Int32,Vector{Int32},Vector{Int32}}
+  cell_irows::Table{T,Vector{T},Vector{Int32}}
+  cell_icols::Table{T,Vector{T},Vector{Int32}}
 end
 
 function matrix_domain(args...)
