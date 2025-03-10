@@ -98,22 +98,22 @@ function main(
   rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac,nparams_djac)
 
   ptspace_uniform = TransientParamSpace(pdomain,tdomain;sampling=:uniform)
-  feop_lin_uniform = TransientParamLinearFEOperator((stiffness,mass),res,ptspace_uniform,
+  feop_lin_uniform = TransientParamLinearOperator((stiffness,mass),res,ptspace_uniform,
     trial,test,domains_lin;constant_forms=(false,true))
-  feop_nlin_uniform = TransientParamFEOperator(res_nlin,jac_nlin,ptspace_uniform,
+  feop_nlin_uniform = TransientParamOperator(res_nlin,jac_nlin,ptspace_uniform,
     trial,test,domains_nlin)
-  feop_uniform = LinearNonlinearTransientParamFEOperator(feop_lin_uniform,feop_nlin_uniform)
+  feop_uniform = LinearNonlinearTransientParamOperator(feop_lin_uniform,feop_nlin_uniform)
   μon = realization(feop_uniform;nparams=10)
   x,festats = solution_snapshots(rbsolver,feop_uniform,μon,xh0μ)
 
   for sampling in (:uniform,:halton,:latin_hypercube,:tensorial_uniform)
     println("Running $method test with sampling strategy $sampling")
     ptspace = TransientParamSpace(pdomain,tdomain;sampling)
-    feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
+    feop_lin = TransientParamLinearOperator((stiffness,mass),res,ptspace,
       trial,test,domains_lin)
-    feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,
+    feop_nlin = TransientParamOperator(res_nlin,jac_nlin,ptspace,
       trial,test,domains_nlin)
-    feop = LinearNonlinearTransientParamFEOperator(feop_lin,feop_nlin)
+    feop = LinearNonlinearTransientParamOperator(feop_lin,feop_nlin)
 
     fesnaps, = solution_snapshots(rbsolver,feop,xh0μ)
     rbop = reduced_operator(rbsolver,feop,fesnaps)

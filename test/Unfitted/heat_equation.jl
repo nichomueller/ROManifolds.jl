@@ -80,7 +80,7 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 
 test = TProductFESpace(Ωbg,reffe,conformity=:H1)
 trial = TransientTrialParamFESpace(test)
-feop = TransientParamLinearFEOperator((a,m),b,ptspace,trial,test,domains)
+feop = TransientParamLinearOperator((a,m),b,ptspace,trial,test,domains)
 
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
@@ -135,7 +135,7 @@ domains = FEDomains((Ω,Ω_out,Γ),((Ω,Ω_out,Γ),(Ω,)))
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TestFESpace(Ωbg,reffe;conformity=:H1)
 trial = TransientTrialParamFESpace(test)
-feop = TransientParamLinearFEOperator((a,m),b,ptspace,trial,test,domains)
+feop = TransientParamLinearOperator((a,m),b,ptspace,trial,test,domains)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
 tol = 1e-4

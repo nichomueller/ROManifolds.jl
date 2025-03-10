@@ -75,7 +75,7 @@ test_p = TestFESpace(Ωact,reffe_p;conformity=:H1)
 trial_p = ParamTrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
+feop = LinearParamOperator(l,a,pspace,trial,test,domains)
 
 fesolver = LUSolver()
 

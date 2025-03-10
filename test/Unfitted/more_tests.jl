@@ -62,7 +62,7 @@ bgcell_to_inoutcut = compute_bgcell_to_inoutcut(bgmodel,geo)
 reffe = ReferenceFE(lagrangian,Float64,order)
 test = TProductFESpace(Ωbg,reffe;conformity=:H1)
 trial = ParamTrialFESpace(test,gμ)
-feop = LinearParamFEOperator(b,a,pspace,trial,test,domains)
+feop = LinearParamOperator(b,a,pspace,trial,test,domains)
 
 tol = 1e-4
 energy(du,v) = ∫(v*du)dΩbg + ∫(∇(v)⋅∇(du))dΩbg
@@ -91,7 +91,7 @@ domains = FEDomains((Ω,Γ),(Ω,Ωincut,Γ))
 bgcell_to_inoutcut = compute_bgcell_to_inoutcut(bgmodel,geo)
 test = TProductFESpace(Ωact,Ωbg,bgcell_to_inoutcut,reffe;conformity=:H1)
 trial = ParamTrialFESpace(test,gμ)
-feop = LinearParamFEOperator(b,a,pspace,trial,test,domains)
+feop = LinearParamOperator(b,a,pspace,trial,test,domains)
 fesnaps, = solution_snapshots(rbsolver,feop)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 μon = realization(feop;nparams=10,sampling=:uniform)
@@ -111,7 +111,7 @@ bgmodel′ = bgmodel.model
 dΩbg′ = dΩbg.measure
 test′ = TestFESpace(Ωact,reffe;conformity=:H1)
 trial′ = ParamTrialFESpace(test′,gμ)
-feop′ = LinearParamFEOperator(b,a,pspace,trial′,test′,domains)
+feop′ = LinearParamOperator(b,a,pspace,trial′,test′,domains)
 state_reduction′ = PODReduction(tol,energy;nparams=100)
 rbsolver′ = RBSolver(fesolver,state_reduction′)
 fesnaps′, = solution_snapshots(rbsolver′,feop′)
@@ -227,7 +227,7 @@ domains = FEDomains(τₕ_r,(τₕ_a,τₕ_m))
 reffe = ReferenceFE(lagrangian,Float64,order)
 V = TestFESpace(Ωₕ,reffe;dirichlet_tags="boundary")
 U = TransientTrialParamFESpace(V,uₚₜ)
-feop = TransientParamLinearFEOperator((a,m),r,D,U,V,domains)
+feop = TransientParamLinearOperator((a,m),r,D,U,V,domains)
 
 # initial condition
 u₀(μ) = x -> 0.0
