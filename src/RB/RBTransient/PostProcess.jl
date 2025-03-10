@@ -26,7 +26,7 @@ end
 function DrWatson.save(
   dir,
   contribs::Tuple{Vararg{TupOfArrayContribution}},
-  feop::LinearNonlinearParamFEOperator{SplitDomains};
+  feop::LinearNonlinearParamFEOperator;
   label="jac")
 
   @check length(contribs) == 2

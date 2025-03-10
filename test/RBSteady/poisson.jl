@@ -178,13 +178,14 @@ trial = TransientTrialParamFESpace(test,gμt)
 
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
-state_reduction = Reduction(fill(1e-4,3),energy;nparams=10)
+state_reduction = Reduction(fill(1e-4,3),energy;nparams=50)
+# state_reduction = TransientReduction(1e-4,energy;nparams=50)
 
 # coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 # state_reduction = SupremizerReduction(coupling,1e-4,energy;nparams=50,sketch=:sprn)
 # ttcoupling((du,dp),(v,q)) = ∫(dp*∂₁(v))dΩ + ∫(dp*∂₂(v))dΩ
 # state_reduction = SupremizerReduction(ttcoupling,fill(1e-4,4),energy;nparams=50)
-θ = 0.5
+θ = 1
 dt = 0.01
 t0 = 0.0
 tf = 10*dt
@@ -221,6 +222,9 @@ shift!(r,dt*(θ-1))
 update_paramcache!(paramcache,nlop.op,r)
 shift!(r,dt*(1-θ))
 
+# A = jacobian(nlop,x̂)
+# b = residual(nlop,x̂)
+
 np = num_params(r)
 hr_time_ids = RBTransient.get_common_time_domain(op.rhs)
 hr_param_time_ids = range_1d(1:np,hr_time_ids,np)
@@ -240,94 +244,61 @@ style = RBTransient.TransientHRStyle(rhs_strian)
 
 b = syscache.b
 b_strian = b.fecache[strian]
-# assemble_hr_vector_add!(b_strian,style,vecdata...)
+# assemble_hr_vector_add!(b_strian,style,cellvec,cellidsrows,icells,locations)
 
 cellvec,cellidsrows,icells,locations = vecdata
 add! = RBTransient.AddTransientHREntriesMap(style,locations)
-vals,rows = cellvec[1],cellidsrows[1]
 add_cache = return_cache(add!,b_strian,vals,rows)
+
+cell = 1
+vals,rows = cellvec[cell],cellidsrows[cell]
 
 li = 4
 i = rows[li]
 RBTransient.get_hr_param_entry!(add_cache,vals,locations,li)
-add_hr_entry!(combine,A,vi,locations,i)
-
-data = get_all_data(b_strian)
-np = size(locations,1)
-for it in i.data
-  if it > 0
-    for ip in 1:np
-      astp = data[it,ip]
-      data[it,ip] = combine(astp,v)
-    end
-  end
-end
+@assert add_cache ≈ map(x -> x[li],vals.data)
+RBTransient.add_hr_entry!(+,b_strian,add_cache,locations)
 
 CIAO
-# #
-# cell_dof_ids = get_cell_dof_ids(test)
-# dofs = [15,101,15,64]
-# times = [1,10,8,3]
+# op,r = rbop,μon
+# trial = get_trial(op)(r)
+# x̂ = zero_free_values(trial)
+# u = x̂
 
-# using ROManifolds.RBSteady
-# using ROManifolds.RBTransient
+# nlop = parameterize(op,r)
+# syscache = allocate_systemcache(nlop,x̂)
+# paramcache = nlop.paramcache
+# shift!(r,dt*(θ-1))
+# update_paramcache!(paramcache,nlop.op,r)
+# shift!(r,dt*(1-θ))
+# np = num_params(r)
+# hr_time_ids = RBTransient.get_common_time_domain(op.lhs)
+# hr_param_time_ids = range_1d(1:np,hr_time_ids,np)
+# hr_uh = RBTransient._make_hr_uh_from_us(op.op,u,paramcache.trial,hr_param_time_ids)
 
-# cells = RBSteady.reduced_cells(test,Ω.trian,dofs)
+# v = get_fe_basis(test)
+# du = get_trial_fe_basis(test)
+# trian_lhs = get_domains_jac(op.op)[2]
+# μ = get_params(r)
+# hr_t = view(get_times(r),hr_time_ids)
+# dc = get_jacs(op.op)[2](μ,hr_t,hr_uh,du,v)
 
-# cache = array_cache(cell_dof_ids)
+# strian = trian_lhs[1]
+# lhs_strian = op.lhs[2][strian]
+# matdata = collect_cell_hr_matrix(trial,test,dc,strian,lhs_strian,hr_param_time_ids)
+# cellmat,cellidsrows,cellidscols,icells,locations = matdata
+# style = RBTransient.TransientHRStyle(lhs_strian)
 
-# ncells = length(cells)
-# ptrs = Vector{Int32}(undef,ncells+1)
-# @inbounds for (icell,cell) in enumerate(cells)
-#   celldofs = getindex!(cache,cell_dof_ids,cell)
-#   ptrs[icell+1] = length(celldofs)
-# end
-# length_to_ptrs!(ptrs)
+# A = syscache.A
+# A_strian = A.fecache[2][strian]
 
-# # count number of occurrences
-# iudof_to_idof = RBTransient.get_iudof_to_idof(dofs,times)
-# ucache = array_cache(iudof_to_idof)
-# N = RBTransient.get_max_offset(iudof_to_idof)
+# assemble_hr_matrix_add!(A_strian,style,cellmat,cellidsrows,cellidscols,icells,locations)
 
-# using ROManifolds.DofMaps
-# _correct_idof(is,li) = li
-# _correct_idof(is::OIdsToIds,li) = is.terms[li]
-
-# using Gridap.TensorValues
-
-# #z = zero(Mutable(VectorValue{N,Int32}))#zeros(Int32,N)
-# data = map(_ -> copy(zeros(Int32,N)),1:ptrs[end]-1) #fill(z,ptrs[end]-1)
-# for (icell,cell) in enumerate(cells)
-#   celldofs = getindex!(cache,cell_dof_ids,cell)
-#   for iudof in eachindex(iudof_to_idof)
-#     idofs = getindex!(ucache,iudof_to_idof,iudof)
-#     for (iuidof,idof) in enumerate(idofs)
-#       dof = dofs[idof]
-#       for (_icelldof,celldof) in enumerate(celldofs)
-#         if dof == celldof
-#           icelldof = _correct_idof(celldofs,_icelldof)
-#           vv = data[ptrs[icell]-1+icelldof]
-#           vv[iuidof] = idof
-#         end
-#       end
-#     end
-#   end
-# end
-# ye = Table(map(x->VectorValue(x),data),ptrs)
-
-# vv = zeros(Int32,N)
-# icell,cell = 5,cells[5]
-# celldofs = getindex!(cache,cell_dof_ids,cell)
-# iudof = 4
-# idofs = getindex!(ucache,iudof_to_idof,iudof)
-# for (iuidof,idof) in enumerate(idofs)
-#   dof = dofs[idof]
-#   for (_icelldof,celldof) in enumerate(celldofs)
-#     if dof == celldof
-#       icelldof = _correct_idof(celldofs,_icelldof)
-#       println(ptrs[icell]-1+icelldof)
-#       vv = data[ptrs[icell]-1+icelldof]
-#       vv[iuidof] = idof
-#     end
-#   end
-# end
+U = TransientTrialParamFESpace(test,gμt)
+U1 = param_getindex(U(r),1)
+u = zero(U1)
+uh = TransientCellField(u,(u,))
+v = get_fe_basis(test)
+dΩv = Measure(strian,degree)
+_res(μ,t,u,v) = ∫(a(μ,t)*∇(v)⋅∇(u))dΩv + ∫(v*∂t(u))dΩv - ∫(f(μ,t)*v)dΩv - ∫(h(μ,t)*v)dΓn
+bvec = assemble_vector(_res(r.params[1].params,r.times[1],uh,v),test.space)

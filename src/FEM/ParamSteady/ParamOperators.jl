@@ -109,8 +109,7 @@ const LinearNonlinearParamOperator{T<:TriangulationStyle} = ParamOperator{Linear
 get_fe_operator(op::LinearNonlinearParamOperator) = get_fe_operator(get_nonlinear_operator(op))
 join_operators(op::LinearNonlinearParamOperator) = get_algebraic_operator(join_operators(get_fe_operator(op)))
 
-# the following work in unsteady applications as well
-function ParamAlgebra.allocate_paramcache(op::LinearNonlinearParamOperator,μ::AbstractRealization)
+function ParamAlgebra.allocate_paramcache(op::LinearNonlinearParamOperator,μ::Realization)
   op_nlin = get_nonlinear_operator(op)
   allocate_paramcache(op_nlin,μ)
 end
@@ -123,13 +122,13 @@ end
 function ParamAlgebra.update_paramcache!(
   paramcache::AbstractParamCache,
   op::LinearNonlinearParamOperator,
-  μ::AbstractRealization)
+  μ::Realization)
 
   op_nlin = get_nonlinear_operator(op)
   update_paramcache!(paramcache,op_nlin,μ)
 end
 
-function ParamDataStructures.parameterize(op::LinearNonlinearParamOperator,μ::AbstractRealization)
+function ParamDataStructures.parameterize(op::LinearNonlinearParamOperator,μ::Realization)
   op_lin = parameterize(get_linear_operator(op),μ)
   op_nlin = parameterize(get_nonlinear_operator(op),μ)
   syscache_lin = allocate_systemcache(op_lin)

@@ -77,7 +77,7 @@ function Utils.change_domains(a::HRParamArray,trians)
   HRParamArray(fecache,coeff,hypred)
 end
 
-function ParamAlgebra._compatible_cache(a::HRParamArray,b::HRParamArray)
-  hypred′ = ParamAlgebra._compatible_cache(a.hypred,b.hypred)
+function ParamAlgebra.compatible_cache(a::HRParamArray,b::HRParamArray)
+  hypred′ = compatible_cache(a.hypred,b.hypred)
   HRParamArray(a.fecache,a.coeff,hypred′)
 end

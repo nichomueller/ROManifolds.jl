@@ -147,7 +147,7 @@ function assemble_hr_vector_add!(b,cellvec,cellidsrows,icells)
     rows1 = getindex!(rows_cache,cellidsrows,1)
     add! = AddHREntriesMap(+)
     add_cache = return_cache(add!,b,vals1,rows1)
-    caches = add_cache,vals_cache,rows_cache
+    caches = add!,add_cache,vals_cache,rows_cache
     _numeric_loop_hr_vector!(b,caches,cellvec,cellidsrows)
   end
   b

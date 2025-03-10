@@ -91,6 +91,84 @@ function ParamAlgebra.allocate_systemcache(
   return SystemCache(A,b)
 end
 
+const LinearNonlinearODEParamOperator{T<:TriangulationStyle} = ODEParamOperator{LinearNonlinearParamODE,T}
+
+ParamSteady.get_fe_operator(op::LinearNonlinearODEParamOperator) = get_fe_operator(get_nonlinear_operator(op))
+ParamSteady.join_operators(op::LinearNonlinearODEParamOperator) = get_algebraic_operator(join_operators(get_fe_operator(op)))
+
+function ParamAlgebra.allocate_paramcache(op::LinearNonlinearODEParamOperator,r::TransientRealization)
+  op_nlin = get_nonlinear_operator(op)
+  allocate_paramcache(op_nlin,r)
+end
+
+function ParamAlgebra.allocate_systemcache(op::LinearNonlinearODEParamOperator,u::AbstractVector)
+  op_nlin = get_nonlinear_operator(op)
+  allocate_systemcache(op_nlin,u)
+end
+
+function ParamAlgebra.update_paramcache!(
+  paramcache::AbstractParamCache,
+  op::LinearNonlinearODEParamOperator,
+  r::TransientRealization)
+
+  op_nlin = get_nonlinear_operator(op)
+  update_paramcache!(paramcache,op_nlin,r)
+end
+
+function ParamDataStructures.parameterize(
+  op::LinearNonlinearODEParamOperator,
+  r::TransientRealization)
+
+  op_lin = parameterize(get_linear_operator(op),r)
+  op_nlin = parameterize(get_nonlinear_operator(op),r)
+  syscache_lin = allocate_systemcache(op_lin)
+  LinNonlinParamOperator(op_lin,op_nlin,syscache_lin)
+end
+
+function Algebra.allocate_residual(
+  op::LinearNonlinearODEParamOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  paramcache)
+
+  @notimplemented "This is inefficient. Instead, assemble the nonlinear system
+  by defining a [`LinearNonlinearParamOperator`](@ref)"
+end
+
+function Algebra.allocate_jacobian(
+  op::LinearNonlinearODEParamOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  paramcache)
+
+  @notimplemented "This is inefficient. Instead, assemble the nonlinear system
+  by defining a [`LinearNonlinearParamOperator`](@ref)"
+end
+
+function Algebra.residual!(
+  b,
+  op::LinearNonlinearODEParamOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  paramcache;
+  kwargs...)
+
+  @notimplemented "This is inefficient. Instead, assemble the nonlinear system
+  by defining a [`LinearNonlinearParamOperator`](@ref)"
+end
+
+function ODEs.jacobian_add!(
+  A,
+  op::LinearNonlinearODEParamOperator,
+  r::TransientRealization,
+  us::Tuple{Vararg{AbstractVector}},
+  ws::Tuple{Vararg{Real}},
+  paramcache)
+
+  @notimplemented "This is inefficient. Instead, assemble the nonlinear system
+  by defining a [`LinearNonlinearParamOperator`](@ref)"
+end
+
 # constructors
 
 function TransientParamLinearOperator(args...;kwargs...)
@@ -106,8 +184,16 @@ end
 function LinearNonlinearTransientParamOperator(op_lin::ParamOperator,op_nlin::ParamOperator)
   feop_lin = get_fe_operator(op_lin)
   feop_nlin = get_fe_operator(op_nlin)
-  feop = LinearNonlinearParamFEOperator(feop_lin,feop_nlin)
+  feop = LinearNonlinearTransientParamFEOperator(feop_lin,feop_nlin)
   get_algebraic_operator(feop)
+end
+
+const ODEParamNonlinearOperator = GenericParamNonlinearOperator{<:ODEParamOperator}
+
+function ParamAlgebra.allocate_systemcache(nlop::ODEParamNonlinearOperator)
+  xh = zero(first(nlop.paramcache.trial))
+  x = get_free_dof_values(xh)
+  allocate_systemcache(nlop,x)
 end
 
 # compute space-time residuals/jacobians (no time marching)
@@ -119,7 +205,6 @@ function Algebra.residual(
   u::AbstractParamVector,
   u0::AbstractParamVector)
 
-  u = state[1]
   dt,θ = solver.dt,solver.θ
   x = copy(u)
   uθ = copy(u)
@@ -141,7 +226,6 @@ function Algebra.jacobian(
   u::AbstractParamVector,
   u0::AbstractParamVector)
 
-  u = state[1]
   dt,θ = solver.dt,solver.θ
   x = copy(u)
   uθ = copy(u)

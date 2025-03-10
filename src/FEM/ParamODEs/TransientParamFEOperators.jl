@@ -1,5 +1,5 @@
 """
-    abstract type TransientParamFEOperator{T<:ODEParamOperatorType} <: ParamFEOperator{T} end
+    const TransientParamFEOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} = ParamFEOperator{O,T}
 
 Parametric extension of a `TransientFEOperator` in `Gridap`. Compared to
 a standard TransientFEOperator, there are the following novelties:
@@ -14,7 +14,7 @@ Subtypes:
 - [`TransientParamFEOpFromWeakForm`](@ref)
 - [`TransientParamLinearFEOpFromWeakForm`](@ref)
 """
-abstract type TransientParamFEOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} <: ParamFEOperator{O,T} end
+const TransientParamFEOperator{O<:ODEParamOperatorType,T<:TriangulationStyle} = ParamFEOperator{O,T}
 
 """
     const JointTransientParamFEOperator{O<:ODEParamOperatorType} = TransientParamFEOperator{O,JointDomains}
@@ -347,7 +347,25 @@ function LinearNonlinearTransientParamFEOperator(
   op_lin::TransientParamFEOperator,
   op_nlin::TransientParamFEOperator)
 
-  LinearNonlinearParamFEOperator(op_lin,op_nlin)
+  LinearNonlinearParamFEOperator{LinearNonlinearParamODE}(op_lin,op_nlin)
+end
+
+function ODEs.get_res(op::LinearNonlinearParamFEOperator{LinearNonlinearParamODE})
+  get_res(get_nonlinear_operator(op))
+end
+
+function ODEs.get_jacs(op::LinearNonlinearParamFEOperator{LinearNonlinearParamODE})
+  get_jacs(get_nonlinear_operator(op))
+end
+
+function get_order(op::LinearNonlinearParamFEOperator{LinearNonlinearParamODE})
+  get_order(get_nonlinear_operator(op))
+end
+
+function ParamSteady.set_domains(op::LinearNonlinearParamFEOperator{LinearNonlinearParamODE})
+  op_lin = set_domains(get_linear_operator(op))
+  op_nlin = set_domains(get_nonlinear_operator(op))
+  LinearNonlinearTransientParamFEOperator(op_lin,op_nlin)
 end
 
 function ParamSteady.join_operators(

@@ -20,7 +20,7 @@ using ROManifolds.ParamAlgebra
 using ROManifolds.ParamFESpaces
 using ROManifolds.ParamSteady
 
-import BlockArrays: blocks,blocklength
+import BlockArrays: blocks,blocklength,mortar
 import Test: @test
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction

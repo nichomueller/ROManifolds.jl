@@ -92,34 +92,30 @@ end
 end
 
 @inline function add_hr_entry!(
-  combine::Function,A::ConsecutiveParamVector,v::Number,hr_indices::Range2D,i::VectorValue)
+  combine::Function,A::ConsecutiveParamVector,v::Number,hr_indices::Range2D)
 
   data = get_all_data(A)
   np = size(hr_indices,1)
-  for it in i.data
-    if it > 0
-      for ip in 1:np
-        astp = data[it,ip]
-        data[it,ip] = combine(astp,v)
-      end
+  for it in eachindex(hr_indices.axis2)
+    for ip in eachindex(hr_indices.axis1)
+      astp = data[it,ip]
+      data[it,ip] = combine(astp,v)
     end
   end
   A
 end
 
 @inline function add_hr_entry!(
-  combine::Function,A::ConsecutiveParamVector,v::AbstractVector,hr_indices::Range2D,i::VectorValue)
+  combine::Function,A::ConsecutiveParamVector,v::AbstractVector,hr_indices::Range2D)
 
   data = get_all_data(A)
   np = size(hr_indices,1)
-  for it in i.data
-    if it > 0
-      for ip in 1:np
-        ipt = (it-1)*np + ip
-        vtp = v[ipt]
-        astp = data[it,ip]
-        data[it,ip] = combine(astp,vtp)
-      end
+  for it in eachindex(hr_indices.axis2)
+    for ip in eachindex(hr_indices.axis1)
+      ipt = (it-1)*np + ip
+      vtp = v[ipt]
+      astp = data[it,ip]
+      data[it,ip] = combine(astp,vtp)
     end
   end
   A
@@ -139,29 +135,23 @@ get_param_time_inds(k::AddTransientHREntriesMap) = k.locations
 get_param_inds(k::AddTransientHREntriesMap) = k.locations.axis1
 get_time_inds(k::AddTransientHREntriesMap) = k.locations.axis2
 
-# function Arrays.return_cache(k::AddTransientHREntriesMap{<:KroneckerTransientHR},A,vs::ParamBlock,args...)
-#   zeros(eltype2(vs),length(get_param_time_inds(k)))
-# end
-
-# function Arrays.return_cache(k::AddTransientHREntriesMap{<:LinearTransientHR},A,vs::ParamBlock,args...)
-#   zeros(eltype2(vs),length(get_param_inds(k)))
-# end
-
 function Arrays.return_cache(k::AddTransientHREntriesMap,A,vs::ParamBlock,args...)
   zeros(eltype2(vs),length(get_param_time_inds(k)))
 end
 
-function Arrays.evaluate!(cache,k::AddTransientHREntriesMap,A,vs,is)
-  add_hr_loc_entries!(cache,k.combine,A,vs,is,k.locations)
+for (T,f) in zip((:KroneckerTransientHR,:LinearTransientHR),(:add_hr_kron_entries!,:add_hr_lin_entries!))
+  @eval begin
+    function Arrays.evaluate!(cache,k::AddTransientHREntriesMap{$T},A,vs,is)
+      $f(cache,k.combine,A,vs,is,k.locations)
+    end
+
+    function Arrays.evaluate!(cache,k::AddTransientHREntriesMap{$T},A,vs,is,js)
+      $f(cache,k.combine,A,vs,is,js,k.locations)
+    end
+  end
 end
 
-function Arrays.evaluate!(cache,k::AddTransientHREntriesMap,A,vs,is,js)
-  add_hr_loc_entries!(cache,k.combine,A,vs,is,js,k.locations)
-end
-
-# kronecker case
-
-@inline function add_hr_loc_entries!(
+@inline function add_hr_kron_entries!(
   vij,combine::Function,A::AbstractParamVector,vs,is,js,loc)
 
   for (lj,j) in enumerate(js)
@@ -179,7 +169,7 @@ end
   A
 end
 
-@inline function add_hr_loc_entries!(
+@inline function add_hr_kron_entries!(
   vi,combine::Function,A::AbstractParamVector,vs,is,loc)
 
   for (li,i) in enumerate(is)
@@ -191,7 +181,7 @@ end
   A
 end
 
-@inline function add_hr_loc_entries!(
+@inline function add_hr_kron_entries!(
   vij,combine::Function,A::AbstractParamVector,vs::ParamBlock,is,js,loc)
 
   for (lj,j) in enumerate(js)
@@ -209,7 +199,7 @@ end
   A
 end
 
-@inline function add_hr_loc_entries!(
+@inline function add_hr_kron_entries!(
   vi,combine::Function,A::AbstractParamVector,vs::ParamBlock,is,loc)
 
   for (li,i) in enumerate(is)
@@ -221,21 +211,16 @@ end
   A
 end
 
-# linear case
-
-_ipos(v::VectorValue) = any(i>0 for i in v.data)
-_iseq(v::VectorValue{D},w::VectorValue{D}) where D = all(i==j for (i,j) in zip(v.data,w.data))
-
-@inline function add_hr_loc_entries!(
+@inline function add_hr_lin_entries!(
   vij,combine::Function,A::AbstractParamVector,vs,is,js,loc)
 
   for (lj,j) in enumerate(js)
-    if _ipos(j)
+    if j>0
       for (li,i) in enumerate(is)
-        if _ipos(i)
-          if _iseq(i,j)
+        if i>0
+          if i==j
             vij = vs[li,lj]
-            add_hr_entry!(combine,A,vij,loc,i)
+            add_hr_entry!(combine,A,vij,loc)
           end
         end
       end
@@ -244,28 +229,28 @@ _iseq(v::VectorValue{D},w::VectorValue{D}) where D = all(i==j for (i,j) in zip(v
   A
 end
 
-@inline function add_hr_loc_entries!(
+@inline function add_hr_lin_entries!(
   vi,combine::Function,A::AbstractParamVector,vs,is,loc)
 
   for (li,i) in enumerate(is)
-    if _ipos(i)
+    if i>0
       vi = vs[li]
-      add_hr_entry!(combine,A,vi,loc,i)
+      add_hr_entry!(combine,A,vi,loc)
     end
   end
   A
 end
 
-@inline function add_hr_loc_entries!(
+@inline function add_hr_lin_entries!(
   vij,combine::Function,A::AbstractParamVector,vs::ParamBlock,is,js,loc)
 
   for (lj,j) in enumerate(js)
-    if _ipos(j)
+    if j>0
       for (li,i) in enumerate(is)
-        if _ipos(i)
-          if _iseq(i,j)
+        if i>0
+          if i==j
             get_hr_param_entry!(vij,vs,loc,li,lj)
-            add_hr_entry!(combine,A,vij,loc,i)
+            add_hr_entry!(combine,A,vij,loc)
           end
         end
       end
@@ -274,13 +259,13 @@ end
   A
 end
 
-@inline function add_hr_loc_entries!(
+@inline function add_hr_lin_entries!(
   vi,combine::Function,A::AbstractParamVector,vs::ParamBlock,is,loc)
 
   for (li,i) in enumerate(is)
-    if _ipos(i)
+    if i>0
       get_hr_param_entry!(vi,vs,loc,li)
-      add_hr_entry!(combine,A,vi,loc,i)
+      add_hr_entry!(combine,A,vi,loc)
     end
   end
   A

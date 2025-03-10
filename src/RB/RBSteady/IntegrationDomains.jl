@@ -51,9 +51,6 @@ function get_cells_to_idofs(
   cells::AbstractVector,
   dofs::AbstractVector)
 
-  @assert length(dofs) == length(unique(dofs)) "Something is wrong with EIM procedure,
-  two identical indices have been detected"
-
   _correct_idof(is,li) = li
   _correct_idof(is::OIdsToIds,li) = is.terms[li]
 
