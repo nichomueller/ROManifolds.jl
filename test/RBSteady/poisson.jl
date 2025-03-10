@@ -178,7 +178,7 @@ trial = TransientTrialParamFESpace(test,gμt)
 
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
-state_reduction = Reduction(fill(1e-4,3),energy;nparams=50)
+state_reduction = Reduction(fill(1e-4,3),energy;nparams=10)
 
 # coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 # state_reduction = SupremizerReduction(coupling,1e-4,energy;nparams=50,sketch=:sprn)
@@ -209,7 +209,6 @@ using ROManifolds.ParamAlgebra
 using ROManifolds.RBSteady
 using ROManifolds.RBTransient
 
-
 op,r = rbop,μon
 trial = get_trial(op)(r)
 x̂ = zero_free_values(trial)
@@ -233,7 +232,7 @@ trian_res = get_domains_res(op.op)
 hr_t = view(get_times(r),hr_time_ids)
 dc = get_res(op.op)(μ,hr_t,hr_uh,v)
 
-strian = trian_res[2]
+strian = trian_res[1]
 rhs_strian = op.rhs[strian]
 vecdata = collect_cell_hr_vector(test,dc,strian,rhs_strian,hr_param_time_ids)
 cellvec,cellidsrows,icells,locations = vecdata
@@ -241,13 +240,30 @@ style = RBTransient.TransientHRStyle(rhs_strian)
 
 b = syscache.b
 b_strian = b.fecache[strian]
-assemble_hr_vector_add!(b_strian,style,vecdata...)
-# add! = RBTransient.AddTransientHREntriesMap(style,locations)
+# assemble_hr_vector_add!(b_strian,style,vecdata...)
 
-ress = residual_snapshots(rbsolver,feop,fesnaps)
-basis = projection(rbsolver.residual_reduction.reduction,ress[2])
-(rows,indices_time),interp = empirical_interpolation(basis)
+cellvec,cellidsrows,icells,locations = vecdata
+add! = RBTransient.AddTransientHREntriesMap(style,locations)
+vals,rows = cellvec[1],cellidsrows[1]
+add_cache = return_cache(add!,b_strian,vals,rows)
 
+li = 4
+i = rows[li]
+RBTransient.get_hr_param_entry!(add_cache,vals,locations,li)
+add_hr_entry!(combine,A,vi,locations,i)
+
+data = get_all_data(b_strian)
+np = size(locations,1)
+for it in i.data
+  if it > 0
+    for ip in 1:np
+      astp = data[it,ip]
+      data[it,ip] = combine(astp,v)
+    end
+  end
+end
+
+CIAO
 # #
 # cell_dof_ids = get_cell_dof_ids(test)
 # dofs = [15,101,15,64]
