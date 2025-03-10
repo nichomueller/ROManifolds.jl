@@ -108,6 +108,7 @@ Type representing the set of interpolation rows of a `Projection` subjected
 to a EIM approximation with `empirical_interpolation`.
 Subtypes:
 - [`VectorDomain`](@ref)
+- [`MatrixDomain`](@ref)
 - [`TransientIntegrationDomain`](@ref)
 """
 abstract type IntegrationDomain end

@@ -118,7 +118,7 @@ import Gridap.MultiField: BlockMultiFieldStyle
 using GridapSolvers
 using GridapSolvers.NonlinearSolvers
 
-method=:pod
+method=:ttsvd
 tol=1e-4
 rank=nothing
 nparams=50
@@ -178,7 +178,7 @@ trial = TransientTrialParamFESpace(test,gμt)
 
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
-state_reduction = TransientReduction(1e-4,energy;nparams=50)
+state_reduction = Reduction(fill(1e-4,3),energy;nparams=50)
 
 # coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
 # state_reduction = SupremizerReduction(coupling,1e-4,energy;nparams=50,sketch=:sprn)
@@ -203,3 +203,29 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 x̂,rbstats = solve(rbsolver,rbop,μon,uh0μ)
 x,festats = solution_snapshots(rbsolver,feop,μon,uh0μ)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
+
+using ROManifolds.DofMaps
+using ROManifolds.ParamAlgebra
+using ROManifolds.RBSteady
+using ROManifolds.RBTransient
+
+op,r = rbop,μon
+trial = get_trial(op)(r)
+x̂ = zero_free_values(trial)
+
+nlop = parameterize(op,r)
+syscache = allocate_systemcache(nlop,x̂)
+paramcache = nlop.paramcache
+
+np = num_params(r)
+hr_time_ids = RBTransient.get_common_time_domain(op.rhs)
+hr_param_time_ids = range_1d(1:np,hr_time_ids,np)
+hr_uh = RBTransient._make_hr_uh_from_us(op.op,u,paramcache.trial,hr_param_time_ids)
+
+test = get_test(op.op)
+v = get_fe_basis(test)
+
+trian_res = get_domains_res(op.op)
+μ = get_params(r)
+hr_t = view(get_times(r),hr_time_ids)
+dc = get_res(op.op)(μ,hr_t,hr_uh,v)

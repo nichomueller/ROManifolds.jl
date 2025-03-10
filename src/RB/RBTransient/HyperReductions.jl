@@ -31,7 +31,7 @@ end
 
 const TransientHyperReduction{A<:Reduction,B<:ReducedProjection} = HyperReduction{A,B,TransientIntegrationDomain}
 
-for f in (:get_integration_domain_space,:get_indices_time,:get_itimes)
+for f in (:get_indices_time,:get_itimes)
   @eval begin
     $f(a::TransientHyperReduction) = $f(get_integration_domain(a))
   end

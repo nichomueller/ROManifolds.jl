@@ -2,8 +2,8 @@ abstract type TransientHRStyle end
 struct KroneckerTransientHR <: TransientHRStyle end
 struct LinearTransientHR <: TransientHRStyle end
 
-TransientHRStyle(hr::HyperReduction) = LinearTransientHR()
 TransientHRStyle(hr::TransientHyperReduction) = KroneckerTransientHR()
+TransientHRStyle(hr::TransientHyperReduction{<:TTSVDReduction}) = LinearTransientHR()
 TransientHRStyle(hr::BlockProjection) = TransientHRStyle(testitem(hr))
 
 function RBSteady.collect_cell_hr_matrix(
@@ -186,7 +186,7 @@ function Arrays.evaluate!(cache,k::AddTransientHREntriesMap{<:LinearTransientHR}
 end
 
 @inline function add_linear_hr_entries!(
-  vij,combine::Function,A::AbstractParamVector,vs,is,js,loc)
+  vij,combine::Function,A::AbstractParamVector,vs,is,js,loc::Range2D)
 
   for (lj,j) in enumerate(js)
     if j>0
@@ -206,7 +206,7 @@ end
 end
 
 @inline function add_linear_hr_entries!(
-  vi,combine::Function,A::AbstractParamVector,vs,is,loc)
+  vi,combine::Function,A::AbstractParamVector,vs,is,loc::Range2D)
 
   for (li,i) in enumerate(is)
     if i>0
@@ -222,7 +222,7 @@ end
 end
 
 @inline function add_linear_hr_entries!(
-  vij,combine::Function,A::AbstractParamVector,vs::ParamBlock,is,js,loc)
+  vij,combine::Function,A::AbstractParamVector,vs::ParamBlock,is,js,loc::Range2D)
 
   for (lj,j) in enumerate(js)
     if j>0
@@ -230,7 +230,7 @@ end
         if i>0
           for (ll,l) in enumerate(loc.axis2)
             if i == j == l
-              get_param_entry!(vij,vs,view(loc,:,ll),li,lj)
+              get_hr_param_entry!(vij,vs,view(loc,:,ll),li,lj)
               add_entry!(combine,A,vij,i)
             end
           end
@@ -242,13 +242,13 @@ end
 end
 
 @inline function add_linear_hr_entries!(
-  vi,combine::Function,A::AbstractParamVector,vs::ParamBlock,is,loc)
+  vi,combine::Function,A::AbstractParamVector,vs::ParamBlock,is,loc::Range2D)
 
   for (li,i) in enumerate(is)
     if i>0
       for (ll,l) in enumerate(loc.axis2)
         if i == l
-          get_param_entry!(vi,vs,view(loc,:,ll),li)
+          get_hr_param_entry!(vi,vs,view(loc,:,ll),li)
           add_entry!(combine,A,vi,i)
         end
       end
