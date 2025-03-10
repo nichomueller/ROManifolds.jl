@@ -92,12 +92,12 @@ end
 end
 
 @inline function add_hr_entry!(
-  combine::Function,A::ConsecutiveParamVector,v::Number,hr_indices::Range2D)
+  combine::Function,A::ConsecutiveParamVector,v::Number,ids::Tuple)
 
   data = get_all_data(A)
-  np = size(hr_indices,1)
-  for it in eachindex(hr_indices.axis2)
-    for ip in eachindex(hr_indices.axis1)
+  np = param_length(A)
+  for it in ids
+    for ip in 1:np
       astp = data[it,ip]
       data[it,ip] = combine(astp,v)
     end
@@ -106,12 +106,12 @@ end
 end
 
 @inline function add_hr_entry!(
-  combine::Function,A::ConsecutiveParamVector,v::AbstractVector,hr_indices::Range2D)
+  combine::Function,A::ConsecutiveParamVector,v::AbstractVector,ids::Tuple)
 
   data = get_all_data(A)
-  np = size(hr_indices,1)
-  for it in eachindex(hr_indices.axis2)
-    for ip in eachindex(hr_indices.axis1)
+  np = param_length(A)
+  for it in ids
+    for ip in 1:np
       ipt = (it-1)*np + ip
       vtp = v[ipt]
       astp = data[it,ip]
@@ -211,16 +211,28 @@ end
   A
 end
 
+_ipos(v::VectorValue) = any(i>0 for i in v.data)
+_iseq(v::VectorValue{D},w::VectorValue{D}) where D = all(i==j for (i,j) in zip(v.data,w.data))
+@inline function _get_ids(v::VectorValue)
+  ids = ()
+  for vi in v.data
+    if vi > 0
+      ids = (ids...,vi)
+    end
+  end
+  return ids
+end
+
 @inline function add_hr_lin_entries!(
   vij,combine::Function,A::AbstractParamVector,vs,is,js,loc)
 
   for (lj,j) in enumerate(js)
-    if j>0
+    if _ipos(j)
       for (li,i) in enumerate(is)
-        if i>0
-          if i==j
+        if _ipos(i)
+          if _iseq(i,j)
             vij = vs[li,lj]
-            add_hr_entry!(combine,A,vij,loc)
+            add_hr_entry!(combine,A,vij,_get_ids(i))
           end
         end
       end
@@ -233,9 +245,9 @@ end
   vi,combine::Function,A::AbstractParamVector,vs,is,loc)
 
   for (li,i) in enumerate(is)
-    if i>0
+    if _ipos(i)
       vi = vs[li]
-      add_hr_entry!(combine,A,vi,loc)
+      add_hr_entry!(combine,A,vi,_get_ids(i))
     end
   end
   A
@@ -245,12 +257,12 @@ end
   vij,combine::Function,A::AbstractParamVector,vs::ParamBlock,is,js,loc)
 
   for (lj,j) in enumerate(js)
-    if j>0
+    if _ipos(j)
       for (li,i) in enumerate(is)
-        if i>0
-          if i==j
+        if _ipos(i)
+          if _iseq(i,j)
             get_hr_param_entry!(vij,vs,loc,li,lj)
-            add_hr_entry!(combine,A,vij,loc)
+            add_hr_entry!(combine,A,vij,_get_ids(i))
           end
         end
       end
@@ -263,9 +275,9 @@ end
   vi,combine::Function,A::AbstractParamVector,vs::ParamBlock,is,loc)
 
   for (li,i) in enumerate(is)
-    if i>0
+    if _ipos(i)
       get_hr_param_entry!(vi,vs,loc,li)
-      add_hr_entry!(combine,A,vi,loc)
+      add_hr_entry!(combine,A,vi,_get_ids(i))
     end
   end
   A

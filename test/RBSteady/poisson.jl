@@ -130,7 +130,7 @@ unsafe=false
 pdomain = (1,10,1,10,1,10)
 
 domain = (0,1,0,1)
-partition = (10,10)
+partition = (3,3)
 if method==:ttsvd
   model = TProductDiscreteModel(domain,partition)
 else
@@ -178,7 +178,7 @@ trial = TransientTrialParamFESpace(test,gμt)
 
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
-state_reduction = Reduction(fill(1e-4,3),energy;nparams=50)
+state_reduction = Reduction(fill(1e-4,3),energy;nparams=5)
 # state_reduction = TransientReduction(1e-4,energy;nparams=50)
 
 # coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
@@ -200,7 +200,7 @@ feop = TransientParamLinearOperator((stiffness,mass),res,ptspace,trial,test,doma
 
 fesnaps, = solution_snapshots(rbsolver,feop,uh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
-μon = realization(feop;nparams=10)
+μon = realization(feop;nparams=2)
 x̂,rbstats = solve(rbsolver,rbop,μon,uh0μ)
 x,festats = solution_snapshots(rbsolver,feop,μon,uh0μ)
 perf = eval_performance(rbsolver,feop,rbop,x,x̂,festats,rbstats)
@@ -211,8 +211,7 @@ using ROManifolds.RBSteady
 using ROManifolds.RBTransient
 
 op,r = rbop,μon
-trial = get_trial(op)(r)
-x̂ = zero_free_values(trial)
+x̂ = zero_free_values(get_trial(op)(r))
 u = x̂
 
 nlop = parameterize(op,r)
@@ -241,6 +240,19 @@ rhs_strian = op.rhs[strian]
 vecdata = collect_cell_hr_vector(test,dc,strian,rhs_strian,hr_param_time_ids)
 cellvec,cellidsrows,icells,locations = vecdata
 style = RBTransient.TransientHRStyle(rhs_strian)
+
+# U = param_getindex(trial(r),1)
+# w0 = zero(U)
+# wh0 = TransientCellField(w0,(w0,))
+# μ1,t1 = μon.params[1].params,10*dt
+# _dΩ = dΩ.measure
+# _res1(v) = ∫(a(μ1,t1)*∇(v)⋅∇(wh0))_dΩ + ∫(v*∂t(wh0))_dΩ - ∫(f(μ1,t1)*v)_dΩ - ∫(h(μ1,t1)*v)dΓn
+# B1 = assemble_vector(_res1,test.space)
+# t2 = dt
+# _res2(v) = ∫(a(μ1,t2)*∇(v)⋅∇(wh0))_dΩ + ∫(v*∂t(wh0))_dΩ - ∫(f(μ1,t2)*v)_dΩ - ∫(h(μ1,t2)*v)dΓn
+# B2 = assemble_vector(_res2,test.space)
+
+# Bselect = [B1[4],B1[5]]
 
 b = syscache.b
 b_strian = b.fecache[strian]
@@ -293,12 +305,3 @@ CIAO
 # A_strian = A.fecache[2][strian]
 
 # assemble_hr_matrix_add!(A_strian,style,cellmat,cellidsrows,cellidscols,icells,locations)
-
-U = TransientTrialParamFESpace(test,gμt)
-U1 = param_getindex(U(r),1)
-u = zero(U1)
-uh = TransientCellField(u,(u,))
-v = get_fe_basis(test)
-dΩv = Measure(strian,degree)
-_res(μ,t,u,v) = ∫(a(μ,t)*∇(v)⋅∇(u))dΩv + ∫(v*∂t(u))dΩv - ∫(f(μ,t)*v)dΩv - ∫(h(μ,t)*v)dΓn
-bvec = assemble_vector(_res(r.params[1].params,r.times[1],uh,v),test.space)

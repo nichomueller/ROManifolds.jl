@@ -3,9 +3,6 @@ function get_iudof_to_idof(
   dofs::AbstractVector,
   times::AbstractVector)
 
-  @assert length(times) == length(unique(times)) "Something is wrong with EIM procedure,
-  two identical indices have been detected"
-
   @assert length(dofs) == length(times) "For this integration domain to work, the
   number of spatial selected by the EIM procedure should be equal to the number of
   temporal entries selected by the EIM procedure"
@@ -119,6 +116,7 @@ struct TransientIntegrationDomain <: IntegrationDomain
 end
 
 function RBSteady.vector_domain(
+  ::TransientReduction,
   trian::Triangulation,
   test::FESpace,
   rows::AbstractVector,
@@ -129,6 +127,7 @@ function RBSteady.vector_domain(
 end
 
 function RBSteady.matrix_domain(
+  ::TransientReduction,
   trian::Triangulation,
   trial::FESpace,
   test::FESpace,
@@ -137,6 +136,37 @@ function RBSteady.matrix_domain(
   indices_time::AbstractVector)
 
   domain_space = matrix_domain(trian,trial,test,rows,cols)
+  TransientIntegrationDomain(domain_space,indices_time)
+end
+
+function RBSteady.vector_domain(
+  ::TTSVDReduction,
+  trian::Triangulation,
+  test::FESpace,
+  rows::AbstractVector,
+  indices_time::AbstractVector)
+
+  cells = reduced_cells(test,trian,rows)
+  irows = reduced_spacetime_idofs(test,trian,cells,rows,indices_time)
+  domain_space = VectorDomain(cells,irows)
+  TransientIntegrationDomain(domain_space,indices_time)
+end
+
+function RBSteady.matrix_domain(
+  ::TTSVDReduction,
+  trian::Triangulation,
+  trial::FESpace,
+  test::FESpace,
+  rows::AbstractVector,
+  cols::AbstractVector,
+  indices_time::AbstractVector)
+
+  cells_trial = reduced_cells(trial,trian,cols)
+  cells_test = reduced_cells(test,trian,rows)
+  cells = union(cells_trial,cells_test)
+  icols = reduced_spacetime_idofs(trial,trian,cells,cols,indices_time)
+  irows = reduced_spacetime_idofs(test,trian,cells,rows,indices_time)
+  domain_space = MatrixDomain(cells,irows,icols)
   TransientIntegrationDomain(domain_space,indices_time)
 end
 

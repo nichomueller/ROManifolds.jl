@@ -187,28 +187,28 @@ ParamAlgebra.get_nonlinear_operator(op::LinearNonlinearRBOperator) = op.op_nonli
 FESpaces.get_trial(op::LinearNonlinearRBOperator) = get_trial(get_nonlinear_operator(op))
 FESpaces.get_test(op::LinearNonlinearRBOperator) = get_test(get_nonlinear_operator(op))
 
-ParamSteady.get_fe_operator(op::LinearNonlinearParamOperator) = get_fe_operator(get_nonlinear_operator(op))
+ParamSteady.get_fe_operator(op::LinearNonlinearRBOperator) = get_fe_operator(get_nonlinear_operator(op))
 
-function ParamAlgebra.allocate_paramcache(op::LinearNonlinearParamOperator,μ::AbstractRealization)
+function ParamAlgebra.allocate_paramcache(op::LinearNonlinearRBOperator,μ::AbstractRealization)
   op_nlin = get_nonlinear_operator(op)
   allocate_paramcache(op_nlin,μ)
 end
 
-function ParamAlgebra.allocate_systemcache(op::LinearNonlinearParamOperator,u::AbstractVector)
+function ParamAlgebra.allocate_systemcache(op::LinearNonlinearRBOperator,u::AbstractVector)
   op_nlin = get_nonlinear_operator(op)
   allocate_systemcache(op_nlin,u)
 end
 
 function ParamAlgebra.update_paramcache!(
   paramcache::AbstractParamCache,
-  op::LinearNonlinearParamOperator,
+  op::LinearNonlinearRBOperator,
   μ::AbstractRealization)
 
   op_nlin = get_nonlinear_operator(op)
   update_paramcache!(paramcache,op_nlin,μ)
 end
 
-function ParamDataStructures.parameterize(op::LinearNonlinearParamOperator,μ::AbstractRealization)
+function ParamDataStructures.parameterize(op::LinearNonlinearRBOperator,μ::AbstractRealization)
   op_lin = parameterize(get_linear_operator(op),μ)
   op_nlin = parameterize(get_nonlinear_operator(op),μ)
   syscache_lin = allocate_systemcache(op_lin)
