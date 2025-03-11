@@ -72,6 +72,19 @@ function Algebra.solve(
   solve(solver,set_domains(odeop),r,u0)
 end
 
+# for T in (:JointDomains,:SplitDomains)
+#   @eval begin
+#     function Algebra.solve(
+#       solver::ODESolver,
+#       odeop::LinearNonlinearODEParamOperator{$T},
+#       r::TransientRealization,
+#       u0::AbstractVector)
+
+#       solve(solver,join_operators(odeop),r,u0)
+#     end
+#   end
+# end
+
 function Algebra.solve(
   solver::ODESolver,
   odeop::ODEParamOperator,
@@ -104,13 +117,13 @@ end
 function _collect_param_solutions(sol::ODEParamSolution{<:BlockParamVector{T}}) where T
   u0item = testitem(sol.u0)
   ncols = num_params(sol.r)*num_times(sol.r)
-  values = mortar(map(b -> similar(b,T,(size(b,1),ncols)),blocks(u0item)))
+  values = map(b -> ConsecutiveParamArray(similar(b,T,(size(b,1),ncols))),blocks(u0item))
   for (k,(rk,uk)) in enumerate(sol)
     for i in 1:blocklength(u0item)
-      _collect_solutions!(blocks(values)[i],blocks(uk)[i],k)
+      _collect_solutions!(values[i].data,blocks(uk)[i],k)
     end
   end
-  return BlockParamArray(map(ConsecutiveParamArray,blocks(values)))
+  return mortar(values)
 end
 
 function _collect_solutions!(

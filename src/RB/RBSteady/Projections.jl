@@ -376,10 +376,13 @@ get_basis(a::TTSVDProjection) = cores2basis(get_cores(a)...)
 num_fe_dofs(a::TTSVDProjection) = prod(map(c -> size(c,2),get_cores(a)))
 num_reduced_dofs(a::TTSVDProjection) = size(last(get_cores(a)),3)
 
+#TODO this needs to be fixed
 function project!(x̂::AbstractArray,a::TTSVDProjection,x::AbstractArray,norm_matrix::AbstractRankTensor)
-  a′ = rescale(_sparse_rescaling,norm_matrix,a)
-  basis′ = get_basis(a′)
-  mul!(x̂,basis′',x)
+  # a′ = rescale(_sparse_rescaling,norm_matrix,a)
+  # basis′ = get_basis(a′)
+  # mul!(x̂,basis′',x)
+  basis = get_basis(a)
+  mul!(x̂,basis',x)
 end
 
 function union_bases(a::TTSVDProjection,b::TTSVDProjection,args...)

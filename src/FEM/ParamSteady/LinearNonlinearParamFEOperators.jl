@@ -1,7 +1,7 @@
 """
-    struct LinearNonlinearParamFEOperator{T<:TriangulationStyle,A,B} <: ParamFEOperator{LinearNonlinearParamEq,T}
-      op_linear::A
-      op_nonlinear::B
+    struct LinearNonlinearParamFEOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: ParamFEOperator{O,T}
+      op_linear::ParamFEOperator
+      op_nonlinear::ParamFEOperator
     end
 
 Interface to accommodate the separation of terms depending on their linearity in
@@ -9,19 +9,24 @@ a nonlinear problem. This allows to build and store once and for all linear
 residuals/Jacobians, and in the Newton-like iterations only evaluate and assemble
 only the nonlinear components
 """
-struct LinearNonlinearParamFEOperator{T<:TriangulationStyle,A,B} <: ParamFEOperator{LinearNonlinearParamEq,T}
-  op_linear::A
-  op_nonlinear::B
+struct LinearNonlinearParamFEOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: ParamFEOperator{O,T}
+  op_linear::ParamFEOperator
+  op_nonlinear::ParamFEOperator
 
-  function LinearNonlinearParamFEOperator(
+  function LinearNonlinearParamFEOperator{O}(
     op_linear::ParamFEOperator{<:UnEvalOperatorType,T},
     op_nonlinear::ParamFEOperator{<:UnEvalOperatorType,T}
-    ) where T
+    ) where {O,T}
 
-    A = typeof(op_linear)
-    B = typeof(op_nonlinear)
-    new{T,A,B}(op_linear,op_nonlinear)
+    new{O,T}(op_linear,op_nonlinear)
   end
+end
+
+function LinearNonlinearParamFEOperator(
+  op_lin::ParamFEOperator,
+  op_nlin::ParamFEOperator)
+
+  LinearNonlinearParamFEOperator{LinearNonlinearParamEq}(op_lin,op_nlin)
 end
 
 ParamAlgebra.get_linear_operator(op::LinearNonlinearParamFEOperator) = op.op_linear

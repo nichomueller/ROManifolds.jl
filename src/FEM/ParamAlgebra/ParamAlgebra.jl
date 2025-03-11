@@ -43,6 +43,7 @@ export LinNonlinParamOperator
 export get_linear_operator
 export get_nonlinear_operator
 export get_linear_systemcache
+export compatible_cache
 include("LinearNonlinearParamOperators.jl")
 
 include("ParamSolvers.jl")

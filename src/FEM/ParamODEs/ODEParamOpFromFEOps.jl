@@ -131,44 +131,44 @@ function ODEs.jacobian_add!(
   A
 end
 
-function ODEs.jacobian_add!(
-  A::AbstractMatrix,
-  odeop::JointODEParamOpFromFEOp{LinearParamODE},
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  ws::Tuple{Vararg{Real}},
-  cache::SystemCache)
+# function ODEs.jacobian_add!(
+#   A::AbstractMatrix,
+#   odeop::JointODEParamOpFromFEOp{LinearParamODE},
+#   r::TransientRealization,
+#   us::Tuple{Vararg{AbstractVector}},
+#   ws::Tuple{Vararg{Real}},
+#   cache::SystemCache)
 
-  paramcache = cache.paramcache
-  uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
-  trial = evaluate(get_trial(odeop.op),nothing)
-  du = get_trial_fe_basis(trial)
-  test = get_test(odeop.op)
-  v = get_fe_basis(test)
-  assem = get_param_assembler(odeop.op,r)
+#   paramcache = cache.paramcache
+#   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
+#   trial = evaluate(get_trial(odeop.op),nothing)
+#   du = get_trial_fe_basis(trial)
+#   test = get_test(odeop.op)
+#   v = get_fe_basis(test)
+#   assem = get_param_assembler(odeop.op,r)
 
-  μ,t = get_params(r),get_times(r)
+#   μ,t = get_params(r),get_times(r)
 
-  jacs = get_jacs(odeop.op)
-  dc = DomainContribution()
-  for k in 1:get_order(odeop)+1
-    w = ws[k]
-    iszero(w) && continue
-    if is_form_constant(odeop,k)
-      axpy_entries!(w,cache.A[k],A)
-    else
-      jac = jacs[k]
-      dc = dc + w * jac(μ,t,uh,du,v)
-    end
-  end
+#   jacs = get_jacs(odeop.op)
+#   dc = DomainContribution()
+#   for k in 1:get_order(odeop)+1
+#     w = ws[k]
+#     iszero(w) && continue
+#     if is_form_constant(odeop,k)
+#       axpy_entries!(w,cache.A[k],A)
+#     else
+#       jac = jacs[k]
+#       dc = dc + w * jac(μ,t,uh,du,v)
+#     end
+#   end
 
-  if num_domains(dc) > 0
-    matdata = collect_cell_matrix(trial,test,dc)
-    assemble_matrix_add!(A,assem,matdata)
-  end
+#   if num_domains(dc) > 0
+#     matdata = collect_cell_matrix(trial,test,dc)
+#     assemble_matrix_add!(A,assem,matdata)
+#   end
 
-  A
-end
+#   A
+# end
 
 # function ParamAlgebra.allocate_systemcache(
 #   odeop::JointODEParamOpFromFEOp{LinearParamODE},
@@ -354,47 +354,47 @@ function ODEs.jacobian_add!(
   As
 end
 
-function ODEs.jacobian_add!(
-  As::TupOfArrayContribution,
-  odeop::SplitODEParamOpFromFEOp{LinearParamODE},
-  r::TransientRealization,
-  us::Tuple{Vararg{AbstractVector}},
-  ws::Tuple{Vararg{Real}},
-  cache::SystemCache)
+# function ODEs.jacobian_add!(
+#   As::TupOfArrayContribution,
+#   odeop::SplitODEParamOpFromFEOp{LinearParamODE},
+#   r::TransientRealization,
+#   us::Tuple{Vararg{AbstractVector}},
+#   ws::Tuple{Vararg{Real}},
+#   cache::SystemCache)
 
-  paramcache = cache.paramcache
-  uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
-  trial = evaluate(get_trial(odeop.op),nothing)
-  du = get_trial_fe_basis(trial)
-  test = get_test(odeop.op)
-  v = get_fe_basis(test)
-  assem = get_param_assembler(odeop.op,r)
+#   paramcache = cache.paramcache
+#   uh = ODEs._make_uh_from_us(odeop,us,paramcache.trial)
+#   trial = evaluate(get_trial(odeop.op),nothing)
+#   du = get_trial_fe_basis(trial)
+#   test = get_test(odeop.op)
+#   v = get_fe_basis(test)
+#   assem = get_param_assembler(odeop.op,r)
 
-  μ,t = get_params(r),get_times(r)
+#   μ,t = get_params(r),get_times(r)
 
-  trian_jacs = get_domains_jac(odeop.op)
-  jacs = get_jacs(odeop.op)
-  for k in 1:get_order(odeop)+1
-    A = As[k]
-    w = ws[k]
-    iszero(w) && continue
-    if is_form_constant(odeop,k)
-      axpy_entries!(w,cache.A[k],A)
-    else
-      jac = jacs[k]
-      trian_jac = trian_jacs[k]
-      dc = w * jac(μ,t,uh,du,v)
-      if num_domains(dc) > 0
-        map(A.values,trian_jac) do values,trian
-          matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
-          assemble_matrix_add!(values,assem,matdata)
-        end
-      end
-    end
-  end
+#   trian_jacs = get_domains_jac(odeop.op)
+#   jacs = get_jacs(odeop.op)
+#   for k in 1:get_order(odeop)+1
+#     A = As[k]
+#     w = ws[k]
+#     iszero(w) && continue
+#     if is_form_constant(odeop,k)
+#       axpy_entries!(w,cache.A[k],A)
+#     else
+#       jac = jacs[k]
+#       trian_jac = trian_jacs[k]
+#       dc = w * jac(μ,t,uh,du,v)
+#       if num_domains(dc) > 0
+#         map(A.values,trian_jac) do values,trian
+#           matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
+#           assemble_matrix_add!(values,assem,matdata)
+#         end
+#       end
+#     end
+#   end
 
-  As
-end
+#   As
+# end
 
 function Algebra.jacobian(
   odeop::SplitODEParamOpFromFEOp,
@@ -430,3 +430,6 @@ function Algebra.jacobian(
 
   As
 end
+
+
+const LinearNonlinearODEParamOpFromFEOp{T} = LinearNonlinearParamOpFromFEOp{LinearNonlinearParamODE,T}

@@ -69,8 +69,9 @@ function Algebra.residual!(
   for strian in trian_res
     b_strian = b.fecache[strian]
     rhs_strian = op.rhs[strian]
+    style = TransientHRStyle(rhs_strian)
     vecdata = collect_cell_hr_vector(test,dc,strian,rhs_strian,hr_param_time_ids)
-    assemble_hr_vector_add!(b_strian,vecdata...)
+    assemble_hr_vector_add!(b_strian,style,vecdata...)
   end
 
   inv_project!(b,op.rhs)
@@ -85,7 +86,7 @@ function Algebra.jacobian!(
   )
 
   np = num_params(r)
-  hr_time_ids = get_common_time_domain(op.rhs)
+  hr_time_ids = get_common_time_domain(op.lhs)
   hr_param_time_ids = range_1d(1:np,hr_time_ids,np)
   hr_uh = _make_hr_uh_from_us(op.op,u,paramcache.trial,hr_param_time_ids)
 
@@ -108,8 +109,9 @@ function Algebra.jacobian!(
     for strian in trian_jac
       A_strian = Ak[strian]
       lhs_strian = lhs[strian]
+      style = TransientHRStyle(lhs_strian)
       matdata = collect_cell_hr_matrix(trial,test,dc,strian,lhs_strian,hr_param_time_ids)
-      assemble_hr_matrix_add!(A_strian,matdata...)
+      assemble_hr_matrix_add!(A_strian,style,matdata...)
     end
   end
 
@@ -143,8 +145,8 @@ function _reduce_trial(trial::TrivialParamFESpace,hr_ids::AbstractVector)
 end
 
 function _reduce_trial(trial::MultiFieldFESpace,hr_ids::AbstractVector)
-  vec_trial′ = map(f -> _reduce_trial(b,hr_ids),trial.spaces)
-  trial′ = MultiFieldFESpace(trial.vector_type,vec_trial′,trial.style)
+  vec_trial′ = map(f -> _reduce_trial(f,hr_ids),trial.spaces)
+  trial′ = MultiFieldFESpace(trial.vector_type,vec_trial′,trial.multi_field_style)
   return trial′
 end
 

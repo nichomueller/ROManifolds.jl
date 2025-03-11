@@ -379,11 +379,30 @@ function Utils.Contribution(
   AffineContribution(v,t)
 end
 
-for f in (:get_basis,:get_interpolation,:get_cellids_rows,:get_cellids_cols)
+for f in (:get_basis,:get_interpolation)
   @eval begin
     function Arrays.return_cache(::typeof($f),a::BlockHyperReduction)
       cache = $f(testitem(a))
       block_cache = Array{typeof(cache),ndims(a)}(undef,size(a))
+      return block_cache
+    end
+
+    function $f(a::BlockHyperReduction)
+      cache = return_cache($f,a)
+      for i in eachindex(a)
+        if a.touched[i]
+          cache[i] = $f(a[i])
+        end
+      end
+      return ArrayBlock(cache,a.touched)
+    end
+  end
+end
+
+for f in (:get_cellids_rows,:get_cellids_cols)
+  @eval begin
+    function Arrays.return_cache(::typeof($f),a::BlockHyperReduction)
+      block_cache = Array{Table,ndims(a)}(undef,size(a))
       return block_cache
     end
 

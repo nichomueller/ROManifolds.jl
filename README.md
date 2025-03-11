@@ -72,7 +72,7 @@ Solve a steady Stokes equation with a proper orthogonal decomposition algorithm.
 julia> include("examples/SteadyStokesPOD.jl")
 ```
 
-Solution-velocity          |  Solution-pressure        |  Convergence
+Solution - velocity          |  Solution - pressure        |  Convergence
 :-------------------------:|:-------------------------:|:-------------------------:
 <img src="docs/src/assets/results/stokes_pod/plot/rbvel.png" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/stokes_pod/plot/rbpress.png" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/stokes_pod/results/convergence.png" alt="drawing" style="width:275px; height:250px;"/> 
 

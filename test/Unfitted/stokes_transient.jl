@@ -105,7 +105,7 @@ test_p = TProductFESpace(Ωbg,reffe_p;conformity=:H1)
 trial_p = TransientTrialParamFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = TransientParamLinearFEOperator((a,m),res,ptspace,trial,test,domains)
+feop = TransientParamLinearOperator((a,m),res,ptspace,trial,test,domains)
 
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))

@@ -416,9 +416,8 @@ function _get_indices(
   dof_map::AbstractArray{Ti,D}
   )::Vector{Ti} where {Ti,D}
 
-  L = length(cores_indices)
-
   o = one(Ti)
+  L = length(cores_indices)
   piniL = cores_indices.ptrs[L]
   pendL = cores_indices.ptrs[L+1]-1
   space_indices = zeros(Ti,pendL-piniL+1)
@@ -438,15 +437,15 @@ function _get_indices(
   dof_map::AbstractArray{Ti,D}
   )::NTuple{2,Vector{Ti}} where {Ti,D}
 
-  L = length(cores_indices)
-  cache = array_cache(cores_indices)
-
   o = one(Ti)
-  Icurr = getindex!(cache,cores_indices,L)
-  space_indices = zeros(Ti,length(Icurr))
-  time_indices = zeros(Ti,length(Icurr))
-  for (k,ik) in enumerate(Icurr)
-    indices_space_k...,index_time_k = basis_index!(cache,cores_indices,ik,L)
+  L = length(cores_indices)
+  piniL = cores_indices.ptrs[L]
+  pendL = cores_indices.ptrs[L+1]-1
+  space_indices = zeros(Ti,pendL-piniL+1)
+  time_indices = zeros(Ti,pendL-piniL+1)
+  for (k,pk) in enumerate(piniL:pendL)
+    ik = cores_indices.data[pk]
+    indices_space_k...,index_time_k = basis_index(cores_indices,ik,L)
     index_space_k = dof_map[CartesianIndex(indices_space_k)]
     space_indices[k] = max(o,index_space_k)
     time_indices[k] = index_time_k

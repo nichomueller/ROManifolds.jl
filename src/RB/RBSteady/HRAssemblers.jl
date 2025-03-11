@@ -45,7 +45,7 @@ function Arrays.evaluate!(cache,k::BlockReindex,i...)
   a.array[k.blockid]
 end
 
-struct AddHREntriesMap{F}
+struct AddHREntriesMap{F} <: Map
   combine::F
 end
 
@@ -134,7 +134,7 @@ function assemble_hr_vector_add!(b::ArrayBlock,cellvec,cellidsrows::ArrayBlock,i
   for i in eachindex(cellidsrows)
     if cellidsrows.touched[i]
       cellveci = lazy_map(BlockReindex(cellvec,i),icells.array[i])
-      assemble_hr_vector_add!(b.array[i],cellveci,cellidsrows.array[i])
+      assemble_hr_vector_add!(b.array[i],cellveci,cellidsrows.array[i],icells.array[i])
     end
   end
 end
@@ -147,14 +147,20 @@ function assemble_hr_vector_add!(b,cellvec,cellidsrows,icells)
     rows1 = getindex!(rows_cache,cellidsrows,1)
     add! = AddHREntriesMap(+)
     add_cache = return_cache(add!,b,vals1,rows1)
-    caches = add_cache,vals_cache,rows_cache
+    caches = add!,add_cache,vals_cache,rows_cache
     _numeric_loop_hr_vector!(b,caches,cellvec,cellidsrows)
   end
   b
 end
 
 @noinline function _numeric_loop_hr_vector!(vec,caches,cell_vals,cell_rows)
-  FESpaces._numeric_loop_vector!(vec,caches,cell_vals,cell_rows)
+  add!,add_cache,vals_cache,rows_cache = caches
+  @assert length(cell_vals) == length(cell_rows)
+  for cell in 1:length(cell_rows)
+    rows = getindex!(rows_cache,cell_rows,cell)
+    vals = getindex!(vals_cache,cell_vals,cell)
+    evaluate!(add_cache,add!,vec,vals,rows)
+  end
 end
 
 function assemble_hr_matrix_add!(
@@ -163,7 +169,8 @@ function assemble_hr_matrix_add!(
   for i in eachindex(cellidsrows)
     if cellidsrows.touched[i]
       cellmati = lazy_map(BlockReindex(cellmat,i),icells.array[i])
-      assemble_hr_matrix_add!(A.array[i],cellmati,cellidsrows.array[i],cellidscols.array[i])
+      assemble_hr_matrix_add!(
+        A.array[i],cellmati,cellidsrows.array[i],cellidscols.array[i],icells.array[i])
     end
   end
 end
@@ -180,15 +187,14 @@ function assemble_hr_matrix_add!(A,cellmat,cellidsrows,cellidscols,icells)
     cols1 = getindex!(cols_cache,cellidscols,1)
     add! = AddHREntriesMap(+)
     add_cache = return_cache(add!,A,mat1,rows1,cols1)
-    caches = add_cache,vals_cache,rows_cache,cols_cache
+    caches = add!,add_cache,vals_cache,rows_cache,cols_cache
     _numeric_loop_hr_matrix!(A,caches,cellmat,cellidsrows,cellidscols)
   end
   A
 end
 
 @noinline function _numeric_loop_hr_matrix!(mat,caches,cell_vals,cell_rows,cell_cols)
-  add_cache,vals_cache,rows_cache,cols_cache = caches
-  add! = AddHREntriesMap(+)
+  add!,add_cache,vals_cache,rows_cache,cols_cache = caches
   for cell in 1:length(cell_cols)
     rows = getindex!(rows_cache,cell_rows,cell)
     cols = getindex!(cols_cache,cell_cols,cell)

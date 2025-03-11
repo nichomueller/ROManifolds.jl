@@ -112,7 +112,7 @@ fμ(μ) = parameterize(f,μ)
 am(μ,u,v) = ∫(νμ(μ)*∇(v)⋅∇(u))dΩm
 bm(μ,u,v) = ∫(fμ(μ)*v)dΩm + ∫(fμ(μ)*v)dΓm
 
-opm = LinearParamFEOperator(bm,am,pspace,Um,Vm)
+opm = LinearParamOperator(bm,am,pspace,Um,Vm)
 # uhm = solve(opm)
 
 u = zero(Um(μ))

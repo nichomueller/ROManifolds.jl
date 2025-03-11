@@ -168,20 +168,18 @@ function Algebra.jacobian!(
   inv_project!(A,op.lhs)
 end
 
-const ParamNonlinearRBOperator = GenericParamNonlinearOperator{<:RBOperator}
-
 """
-    struct LinearNonlinearRBOperator{A} <: RBOperator{LinearNonlinearParamEq}
-      op_linear::GenericRBOperator{LinearParamEq,A}
-      op_nonlinear::GenericRBOperator{NonlinearParamEq,A}
+    struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}
+      op_linear::RBOperator
+      op_nonlinear::RBOperator
     end
 
 Extends the concept of [`GenericRBOperator`](@ref) to accommodate the linear/nonlinear
 splitting of terms in nonlinear applications
 """
-struct LinearNonlinearRBOperator{A} <: RBOperator{LinearNonlinearParamEq}
-  op_linear::GenericRBOperator{LinearParamEq,A}
-  op_nonlinear::GenericRBOperator{NonlinearParamEq,A}
+struct LinearNonlinearRBOperator <: RBOperator{LinearNonlinearParamEq}
+  op_linear::RBOperator
+  op_nonlinear::RBOperator
 end
 
 ParamAlgebra.get_linear_operator(op::LinearNonlinearRBOperator) = op.op_linear
@@ -189,4 +187,30 @@ ParamAlgebra.get_nonlinear_operator(op::LinearNonlinearRBOperator) = op.op_nonli
 FESpaces.get_trial(op::LinearNonlinearRBOperator) = get_trial(get_nonlinear_operator(op))
 FESpaces.get_test(op::LinearNonlinearRBOperator) = get_test(get_nonlinear_operator(op))
 
-const LinNonlinRBOperator = LinNonlinParamOperator{<:ParamNonlinearRBOperator,<:ParamNonlinearRBOperator}
+ParamSteady.get_fe_operator(op::LinearNonlinearRBOperator) = get_fe_operator(get_nonlinear_operator(op))
+
+function ParamAlgebra.allocate_paramcache(op::LinearNonlinearRBOperator,μ::AbstractRealization)
+  op_nlin = get_nonlinear_operator(op)
+  allocate_paramcache(op_nlin,μ)
+end
+
+function ParamAlgebra.allocate_systemcache(op::LinearNonlinearRBOperator,u::AbstractVector)
+  op_nlin = get_nonlinear_operator(op)
+  allocate_systemcache(op_nlin,u)
+end
+
+function ParamAlgebra.update_paramcache!(
+  paramcache::AbstractParamCache,
+  op::LinearNonlinearRBOperator,
+  μ::AbstractRealization)
+
+  op_nlin = get_nonlinear_operator(op)
+  update_paramcache!(paramcache,op_nlin,μ)
+end
+
+function ParamDataStructures.parameterize(op::LinearNonlinearRBOperator,μ::AbstractRealization)
+  op_lin = parameterize(get_linear_operator(op),μ)
+  op_nlin = parameterize(get_nonlinear_operator(op),μ)
+  syscache_lin = allocate_systemcache(op_lin)
+  LinNonlinParamOperator(op_lin,op_nlin,syscache_lin)
+end

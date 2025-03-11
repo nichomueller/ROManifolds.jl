@@ -80,11 +80,11 @@ trial_p = TransientTrialParamFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 
-feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
+feop_lin = TransientParamLinearOperator((stiffness,mass),res,ptspace,
   trial,test,domains_lin;constant_forms=(false,true))
-feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,
+feop_nlin = TransientParamOperator(res_nlin,jac_nlin,ptspace,
   trial,test,domains_nlin)
-feop = LinearNonlinearTransientParamFEOperator(feop_lin,feop_nlin)
+feop = LinearNonlinearTransientParamOperator(feop_lin,feop_nlin)
 
 fesolver = ThetaMethod(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true),dt,θ)
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))

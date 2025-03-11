@@ -149,7 +149,7 @@ function allocate_systemcache(nlop::NonlinearParamOperator,x::AbstractVector)
 end
 
 function update_systemcache!(nlop::NonlinearParamOperator,x::AbstractVector)
-  @notimplemented "This operator does not store a system cache "
+  nothing #"This operator does not store a system cache "
 end
 
 function update_systemcache!(c::SystemCache,nlop::NonlinearParamOperator,x::AbstractVector)

@@ -73,7 +73,7 @@ test_p = FESpace(Ωact,reffe_p;conformity=:H1)
 trial_p = ParamTrialFESpace(test_p)
 test = MultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = MultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
+feop = LinearParamOperator(l,a,pspace,trial,test,domains)
 
 fesolver = LUSolver()
 
@@ -133,7 +133,7 @@ test_p′ = TProductFESpace(Ωact′,Ωbg′,reffe_p;conformity=:H1)
 trial_p′ = ParamTrialFESpace(test_p′)
 test′ = MultiFieldParamFESpace([test_u′,test_p′];style=BlockMultiFieldStyle())
 trial′ = MultiFieldParamFESpace([trial_u′,trial_p′];style=BlockMultiFieldStyle())
-feop′ = LinearParamFEOperator(l′,a′,pspace,trial′,test′,domains′)
+feop′ = LinearParamOperator(l′,a′,pspace,trial′,test′,domains′)
 
 state_reduction′ = SupremizerReduction(coupling′,fill(1e-4,4),energy′;nparams=100)
 rbsolver′ = RBSolver(fesolver,state_reduction′;nparams_res=50,nparams_jac=50)
