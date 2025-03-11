@@ -1,3 +1,13 @@
+"""
+    abstract type ParamBlock{A} end
+
+Type representing cell-wise quantities defined during the integration routine.
+They are primarily used when lazily evaluating parametric quantities on the mesh.
+The implementation of the lazy interface mimics that of `ArrayBlock` in `Gridap`.
+Subtypes:
+-[`GenericParamBlock`](@ref)
+-[`TrivialParamBlock`](@ref)
+"""
 abstract type ParamBlock{A} end
 
 Base.size(b::ParamBlock) = tfill(param_length(b),Val{ndims(b)}())
@@ -16,6 +26,13 @@ function Base.:≈(a::AbstractArray{<:ParamBlock},b::AbstractArray{<:ParamBlock}
   all(z->z[1]≈z[2],zip(a,b))
 end
 
+"""
+    struct GenericParamBlock{A} <: ParamBlock{A}
+      data::Vector{A}
+    end
+
+Most standard implementation of a [`ParamBlock`](@ref)
+"""
 struct GenericParamBlock{A} <: ParamBlock{A}
   data::Vector{A}
 end
@@ -132,8 +149,17 @@ function Arrays.evaluate!(cache,::typeof(Fields.unwrap_cached_array),a::GenericP
   r
 end
 
-###################### trivial case ######################
+###################### start trivial case ######################
 
+"""
+    struct TrivialParamBlock{A} <: ParamBlock{A}
+      data::A
+      plength::Int
+    end
+
+Wrapper for a non-paramentric quantity `data` that we wish assumed a parametric
+length `plength`
+"""
 struct TrivialParamBlock{A} <: ParamBlock{A}
   data::A
   plength::Int
@@ -205,7 +231,27 @@ function Fields.unwrap_cached_array(a::TrivialParamBlock)
   TrivialParamBlock(Fields.unwrap_cached_array(a.data),a.plength)
 end
 
-###################### trivial case ######################
+###################### end trivial case ######################
+
+function Arrays.return_cache(f::Operation,x::ParamBlock)
+  xi = testitem(x)
+  li = return_cache(f,xi)
+  fix = evaluate!(li,f,xi)
+  l = Vector{typeof(li)}(undef,param_length(x))
+  g = Vector{typeof(fix)}(undef,param_length(x))
+  for i in param_eachindex(x)
+    l[i] = return_cache(f,param_getindex(x,i))
+  end
+  GenericParamBlock(g),l
+end
+
+function Arrays.evaluate!(cache,f::Operation,x::ParamBlock)
+  g,l = cache
+  for i in param_eachindex(x)
+    g.data[i] = evaluate!(l[i],f,param_getindex(x,i))
+  end
+  g
+end
 
 function Arrays.return_cache(f::ParamBlock,x)
   fi = testitem(f)
@@ -223,6 +269,29 @@ function Arrays.evaluate!(cache,f::ParamBlock,x)
   g,l = cache
   for i in param_eachindex(f)
     g.data[i] = evaluate!(l[i],param_getindex(f,i),x)
+  end
+  g
+end
+
+function Arrays.return_cache(f::ParamBlock,x::ParamBlock)
+  @check param_length(f) == param_length(x)
+  fi = testitem(f)
+  xi = testitem(x)
+  li = return_cache(fi,xi)
+  fix = evaluate!(li,fi,xi)
+  l = Vector{typeof(li)}(undef,param_length(f))
+  g = Vector{typeof(fix)}(undef,param_length(f))
+  for i in param_eachindex(f)
+    l[i] = return_cache(param_getindex(f,i),param_getindex(x,i))
+  end
+  GenericParamBlock(g),l
+end
+
+function Arrays.evaluate!(cache,f::ParamBlock,x::ParamBlock)
+  @check param_length(f) == param_length(x)
+  g,l = cache
+  for i in param_eachindex(f)
+    g.data[i] = evaluate!(l[i],param_getindex(f,i),param_getindex(x,i))
   end
   g
 end
@@ -306,7 +375,7 @@ function Arrays.return_cache(k::Fields.TransposeMap,f::ParamBlock)
   l = Vector{typeof(li)}(undef,param_length(f))
   g = Vector{typeof(fix)}(undef,param_length(f))
   for i in param_eachindex(f)
-    l[i] = return_cache(k,param_getindex(f.data,i))
+    l[i] = return_cache(k,param_getindex(f,i))
   end
   GenericParamBlock(g),l
 end
@@ -355,6 +424,71 @@ function Arrays.evaluate!(cache,k::IntegrationMap,fx::ParamBlock,args...)
   g,l = cache
   for i in param_eachindex(fx)
     g.data[i] = evaluate!(l[i],k,param_getindex(fx,i),args...)
+  end
+  g
+end
+
+function Arrays.return_value(k::IntegrationMap,fx,w,jx::ParamBlock)
+  jxi = testitem(jx)
+  ufxi = return_value(k,fx,w,jxi)
+  g = Vector{typeof(ufxi)}(undef,param_length(jx))
+  for i in param_eachindex(jx)
+    g[i] = return_value(k,fx,w,param_getindex(jx,i))
+  end
+  GenericParamBlock(g)
+end
+
+function Arrays.return_cache(k::IntegrationMap,fx,w,jx::ParamBlock)
+  jxi = testitem(jx)
+  li = return_cache(k,fx,w,jxi)
+  ufxi = evaluate!(li,k,fx,w,jxi)
+  l = Vector{typeof(li)}(undef,param_length(jx))
+  g = Vector{typeof(ufxi)}(undef,param_length(jx))
+  for i in param_eachindex(jx)
+    l[i] = return_cache(k,fx,w,param_getindex(jx,i))
+  end
+  GenericParamBlock(g),l
+end
+
+function Arrays.evaluate!(cache,k::IntegrationMap,fx,w,jx::ParamBlock)
+  g,l = cache
+  for i in param_eachindex(jx)
+    g.data[i] = evaluate!(l[i],k,fx,w,param_getindex(jx,i))
+  end
+  g
+end
+
+function Arrays.return_value(k::IntegrationMap,fx::ParamBlock,w,jx::ParamBlock)
+  @check param_length(fx) == param_length(jx)
+  fxi = testitem(fx)
+  jxi = testitem(jx)
+  ufxi = return_value(k,fxi,w,jxi)
+  g = Vector{typeof(ufxi)}(undef,param_length(fx))
+  for i in param_eachindex(fx)
+    g[i] = return_value(k,param_getindex(fx,i),w,param_getindex(jx,i))
+  end
+  GenericParamBlock(g)
+end
+
+function Arrays.return_cache(k::IntegrationMap,fx::ParamBlock,w,jx::ParamBlock)
+  @check param_length(fx) == param_length(jx)
+  fxi = testitem(fx)
+  jxi = testitem(jx)
+  li = return_cache(k,fxi,w,jxi)
+  ufxi = evaluate!(li,k,fxi,w,jxi)
+  l = Vector{typeof(li)}(undef,param_length(fx))
+  g = Vector{typeof(ufxi)}(undef,param_length(fx))
+  for i in param_eachindex(fx)
+    l[i] = return_cache(k,param_getindex(fx,i),w,param_getindex(jx,i))
+  end
+  GenericParamBlock(g),l
+end
+
+function Arrays.evaluate!(cache,k::IntegrationMap,fx::ParamBlock,w,jx::ParamBlock)
+  @check param_length(fx) == param_length(jx)
+  g,l = cache
+  for i in param_eachindex(fx)
+    g.data[i] = evaluate!(l[i],k,param_getindex(fx,i),w,param_getindex(jx,i))
   end
   g
 end
@@ -415,6 +549,41 @@ function Arrays.evaluate!(cache,k::Broadcasting{typeof(∘)},f::ParamBlock,h::Fi
   g,l = cache
   for i in param_eachindex(f)
     g.data[i] = evaluate!(l[i],k,param_getindex(f,i),h)
+  end
+  g
+end
+
+function Arrays.return_value(k::Broadcasting{typeof(∘)},f::ParamBlock,h::ParamBlock)
+  @check param_length(h) == param_length(f)
+  fi = testitem(f)
+  hi = testitem(h)
+  fix = return_value(k,fi,hi)
+  g = Vector{typeof(fix)}(undef,param_length(f))
+  for i in param_eachindex(f)
+    g[i] = return_value(k,param_getindex(f,i),param_getindex(h,i))
+  end
+  GenericParamBlock(g)
+end
+
+function Arrays.return_cache(k::Broadcasting{typeof(∘)},f::ParamBlock,h::ParamBlock)
+  @check param_length(h) == param_length(f)
+  fi = testitem(f)
+  hi = testitem(h)
+  li = return_cache(k,fi,hi)
+  fix = evaluate!(li,k,fi,hi)
+  l = Vector{typeof(li)}(undef,param_length(f))
+  g = Vector{typeof(fix)}(undef,param_length(f))
+  for i in param_eachindex(f)
+    l[i] = return_cache(k,param_getindex(f,i),param_getindex(h,i))
+  end
+  GenericParamBlock(g),l
+end
+
+function Arrays.evaluate!(cache,k::Broadcasting{typeof(∘)},f::ParamBlock,h::ParamBlock)
+  @check param_length(h) == param_length(f)
+  g,l = cache
+  for i in param_eachindex(f)
+    g.data[i] = evaluate!(l[i],k,param_getindex(f,i),param_getindex(h,i))
   end
   g
 end
@@ -1221,8 +1390,8 @@ end
 
 # cell datas
 
-function Geometry._cache_compress(data::ParamBlock)
-  c1 = CachedArray(deepcopy(data))
+function Geometry._cache_compress(a::ParamBlock)
+  c1 = CachedArray(a)
   c2 = return_cache(Fields.unwrap_cached_array,c1)
   c1,c2
 end

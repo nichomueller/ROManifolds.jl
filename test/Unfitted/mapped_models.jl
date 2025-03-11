@@ -110,29 +110,96 @@ f(μ) = x->x[1]+μ[1]*x[2]
 fμ(μ) = parameterize(f,μ)
 
 am(μ,u,v) = ∫(νμ(μ)*∇(v)⋅∇(u))dΩm
-bm(μ,u,v) = ∫(fμ(μ)*v)dΩm + ∫(fμ(μ)*v)dΓm
+bm(μ,u,v) = ∫(νμ(μ)*∇(v)⋅∇(u))dΩm - ∫(fμ(μ)*v)dΩm #+ ∫(fμ(μ)*v)dΓm
 
 opm = LinearParamOperator(bm,am,pspace,Um,Vm)
 # uhm = solve(opm)
 
-u = zero(Um(μ))
-x = get_free_dof_values(u)
-op = get_algebraic_operator(opm)
-nlop = NonlinearParamOperator(op,μ)
-solve!(x,LUSolver(),nlop)
+xm, = solve(LUSolver(),opm,μ)
 
-v = get_fe_basis(Vm)
-u = get_trial_fe_basis(Vm)
-νμ(μ)*∇(v)⋅∇(u)
+μ1 = 3.0
+mmodel1 = MappedDiscreteModel(model,ϕ(μ1))
+Ωm1 = Triangulation(mmodel1)
+dΩm1 = Measure(Ωm1,4)
+Vm1 = TestFESpace(mmodel1,reffe;conformity=:H1,dirichlet_tags=[1,3,7])
+Um1 = TrialFESpace(Vm1,g(μ1))
+am1(u,v) = ∫(ν(μ1)*∇(v)⋅∇(u))dΩm1
+bm1(v) = ∫(f(μ1)*v)dΩm1
+opm1 = AffineFEOperator(am1,bm1,Um1,Vm1)
+xm1 = solve(LUSolver(),opm1)
 
-cell_∇a = lazy_map(Broadcasting(∇),get_data(v))
-cell_map = get_cell_map(get_triangulation(v))
-# lazy_map(Broadcasting(push_∇),cell_∇a,cell_map)
-cell_Jt = lazy_map(∇,cell_map)
-cell_invJt = lazy_map(Operation(pinvJt),cell_Jt)
-k = Broadcasting(Operation(⋅))
-args = cell_invJt,cell_∇a
-fi = map(testitem,args)
-T = return_type(k,fi...)
+@assert xm[1] ≈ get_free_dof_values(xm1)
 
-∇(v)⋅∇(u)
+# v = get_fe_basis(Vm)
+# u = get_trial_fe_basis(Vm)
+# νμ(μ)*∇(v)⋅∇(u)
+
+# cell_∇a = lazy_map(Broadcasting(∇),get_data(v))
+# cell_map = get_cell_map(get_triangulation(v))
+# # lazy_map(Broadcasting(push_∇),cell_∇a,cell_map)
+# cell_Jt = lazy_map(∇,cell_map)
+# cell_invJt = lazy_map(Operation(pinvJt),cell_Jt)
+# k = Broadcasting(Operation(⋅))
+# args = cell_invJt,cell_∇a
+# fi = map(testitem,args)
+# T = return_type(k,fi...)
+
+# ∇(v)⋅∇(u)
+
+# trian = Ωm
+
+# degree = 2
+# quad = CellQuadrature(trian,degree)
+
+# x = get_cell_points(quad)
+# @test isa(x,CellPoint)
+
+# v = GenericCellField(get_cell_shapefuns(trian),trian,ReferenceDomain())
+# u = GenericCellField(lazy_map(transpose,get_data(v)),v.trian,v.domain_style)
+
+# m = ∇(v)⋅∇(u)
+# s = integrate(m,quad)
+# s = ∫( ∇(v)⋅∇(u) )*quad
+# s = ∫(1)*quad
+
+# trian_N = BoundaryTriangulation(mmodel)
+# quad_N = CellQuadrature(trian_N,degree)
+
+# x_N = get_cell_points(quad_N)
+
+# s = ∫( ∇(v)⋅∇(u) )*quad_N
+
+# s = ∫(1)*quad_N
+# s = ∫( x->1 )*quad_N
+
+# quad_N = CellQuadrature(trian_N,degree,T=Float32)
+# @test eltype(quad_N.cell_point) == Vector{Point{num_dims(trian_N),Float32}}
+# @test eltype(quad_N.cell_weight) == Vector{Float32}
+
+# s = ∫( ∇(v)⋅∇(u) )*quad_N
+# test_array(s,collect(s))
+
+# s = ∫(1)*quad_N
+# @test sum(s) ≈ 6
+# @test ∑(s) ≈ 6
+
+# s = ∫( x->1 )*quad_N
+# @test sum(s) ≈ 6
+# @test ∑(s) ≈ 6
+
+# cell_measure = get_cell_measure(trian)
+# cell_measure_N = get_cell_measure(trian_N,trian)
+# @test length(cell_measure) == num_cells(model)
+# @test length(cell_measure_N) == num_cells(model)
+# @test sum(cell_measure) ≈ 1
+# @test sum(cell_measure_N) ≈ 6
+
+# quad = CellQuadrature(trian,Quadrature(duffy,2))
+# s = ∫(1)*quad
+# @test sum(s) ≈ 1
+# @test ∑(s) ≈ 1
+
+# quad = CellQuadrature(trian,Quadrature(TET,duffy,2))
+# s = ∫(1)*quad
+# @test sum(s) ≈ 1
+# @test ∑(s) ≈ 1
