@@ -142,11 +142,11 @@ function load_contribution(
   return Contribution(dec,redt)
 end
 
-function DrWatson.save(dir,contrib::ArrayContribution,::SplitParamFEOperator;label="res")
+function DrWatson.save(dir,contrib::ArrayContribution,::SplitParamOperator;label="res")
   save(dir,contrib;label)
 end
 
-function DrWatson.save(dir,contrib::TupOfArrayContribution,feop::LinearNonlinearParamFEOperator;label="res")
+function DrWatson.save(dir,contrib::TupOfArrayContribution,feop::LinearNonlinearParamOperator;label="res")
   @check length(contrib) == 2
   save(dir,first(contrib),get_linear_operator(feop);label=_get_label(label,"lin"))
   save(dir,last(contrib),get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
@@ -154,23 +154,23 @@ end
 
 """
 """
-function load_residuals(dir,feop::SplitParamFEOperator;label="res")
+function load_residuals(dir,feop::SplitParamOperator;label="res")
   load_contribution(dir,get_domains_res(feop);load_snapshots,label)
 end
 
 """
 """
-function load_jacobians(dir,feop::SplitParamFEOperator;label="jac")
+function load_jacobians(dir,feop::SplitParamOperator;label="jac")
   load_contribution(dir,get_domains_jac(feop);load_snapshots,label)
 end
 
-function load_residuals(dir,feop::LinearNonlinearParamFEOperator;label="res")
+function load_residuals(dir,feop::LinearNonlinearParamOperator;label="res")
   res_lin = load_residuals(dir,get_linear_operator(feop);label=_get_label(label,"lin"))
   res_nlin = load_residuals(dir,get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
   return (res_lin,res_nlin)
 end
 
-function load_jacobians(dir,feop::LinearNonlinearParamFEOperator;label="jac")
+function load_jacobians(dir,feop::LinearNonlinearParamOperator;label="jac")
   jac_lin = load_jacobians(dir,get_linear_operator(feop);label=_get_label(label,"lin"))
   jac_nlin = load_jacobians(dir,get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
   return (jac_lin,jac_nlin)

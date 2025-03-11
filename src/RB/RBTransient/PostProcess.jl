@@ -15,7 +15,7 @@ end
 function DrWatson.save(
   dir,
   contribs::TupOfArrayContribution,
-  ::SplitTransientParamFEOperator;
+  ::SplitODEParamOperator;
   label="jac")
 
   for (i,contrib) in enumerate(contribs)
@@ -26,7 +26,7 @@ end
 function DrWatson.save(
   dir,
   contribs::Tuple{Vararg{TupOfArrayContribution}},
-  feop::LinearNonlinearParamFEOperator;
+  feop::LinearNonlinearODEParamOperator;
   label="jac")
 
   @check length(contribs) == 2
@@ -46,7 +46,7 @@ function DrWatson.save(dir,op::TransientRBOperator;kwargs...)
   RBSteady._save_trian_operator_parts(dir,op;kwargs...)
 end
 
-function RBSteady._load_trian_operator_parts(dir,feop::SplitTransientParamFEOperator,trial,test;label="")
+function RBSteady._load_trian_operator_parts(dir,feop::SplitODEParamOperator,trial,test;label="")
   trian_res = get_domains_res(feop)
   trian_jacs = get_domains_jac(feop)
   odeop = get_algebraic_operator(feop)
@@ -58,7 +58,7 @@ function RBSteady._load_trian_operator_parts(dir,feop::SplitTransientParamFEOper
   return new_odeop,red_lhs,red_rhs
 end
 
-function RBSteady.load_operator(dir,feop::SplitTransientParamFEOperator;kwargs...)
+function RBSteady.load_operator(dir,feop::SplitODEParamOperator;kwargs...)
   trial,test = RBSteady._load_fixed_operator_parts(dir,feop;kwargs...)
   odeop,red_lhs,red_rhs = RBSteady._load_trian_operator_parts(dir,feop,trial,test;kwargs...)
   op = TransientRBOperator(odeop,trial,test,red_lhs,red_rhs)

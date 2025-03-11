@@ -44,6 +44,9 @@ export NonlinearParamODE
 export LinearParamODE
 export LinearNonlinearParamODE
 export ODEParamOperator
+export JointODEParamOperator
+export SplitODEParamOperator
+export LinearNonlinearODEParamOperator
 export TransientParamLinearOperator
 export TransientParamOperator
 export LinearNonlinearTransientParamOperator
