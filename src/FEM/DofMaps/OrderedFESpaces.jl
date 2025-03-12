@@ -146,16 +146,16 @@ function _get_cell_odof_info(
   pcells = view(cells,cell_to_parent_cell)
   onodes = LinearIndices(orders .* ncells .+ 1 .- periodic)
 
-  node_and_comps_to_odof = _get_odof_maps(fe_dof_basis,cell_dofs_ids,pcells,onodes,orders)
+  node_and_comps_to_odof = _get_odof_map(fe_dof_basis,cell_dofs_ids,pcells,onodes,orders)
   cell_odof_ids = lazy_map(DofsToODofs(fe_dof_basis,node_and_comps_to_odof,orders),pcells)
   return cell_odof_ids
 end
 
-function _get_odof_maps(fe_basis::AbstractVector{<:Dof},args...)
+function _get_odof_map(fe_basis::AbstractVector{<:Dof},args...)
   @notimplemented "This function is only implemented for Lagrangian dof bases"
 end
 
-function _get_odof_maps(fe_basis::AbstractVector{<:LagrangianDofBasis},args...)
+function _get_odof_map(fe_basis::AbstractVector{<:LagrangianDofBasis},args...)
   function compare(b1::LagrangianDofBasis,b2::LagrangianDofBasis)
     (b1.dof_to_node == b2.dof_to_node && b1.dof_to_comp == b2.dof_to_comp
     && b1.node_and_comp_to_dof == b2.node_and_comp_to_dof)
@@ -163,17 +163,17 @@ function _get_odof_maps(fe_basis::AbstractVector{<:LagrangianDofBasis},args...)
   b1 = testitem(fe_basis)
   cmp = lazy_map(b2->compare(b1,b2),fe_basis)
   if sum(cmp) == length(fe_basis)
-    _get_odof_maps(b1,args...)
+    _get_odof_map(b1,args...)
   else
     @notimplemented "This function is only implemented for Lagrangian dof bases"
   end
 end
 
-function _get_odof_maps(fe_dof_basis::Fill{<:LagrangianDofBasis},args...)
-  _get_odof_maps(testitem(fe_dof_basis),args...)
+function _get_odof_map(fe_dof_basis::Fill{<:LagrangianDofBasis},args...)
+  _get_odof_map(testitem(fe_dof_basis),args...)
 end
 
-function _get_odof_maps(
+function _get_odof_map(
   fe_dof_basis::LagrangianDofBasis{P,V},
   cell_dofs_ids::AbstractArray,
   cells::AbstractVector{CartesianIndex{D}},
@@ -266,6 +266,30 @@ function _get_bg_odof_to_act_odof(f::SingleFieldFESpace,act_cellids::AbstractArr
   f′ = _remove_constraint(f)
   bg_odof_to_act_odof = collect(get_free_dof_ids(f′))
   isa(f,UnconstrainedFESpace) && return bg_odof_to_act_odof
+
+  @check ConstraintStyle(f′) == UnConstrained()
+  bg_cellids = get_cell_odof_ids(f′)
+  act_cache = array_cache(act_cellids)
+  bg_cache = array_cache(bg_cellids)
+
+  for cell = 1:length(act_cellids)
+    act_dofs = getindex!(act_cache,act_cellids,cell)
+    bg_dofs = getindex!(bg_cache,bg_cellids,cell)
+    for (act_dof,bg_dof) in zip(act_dofs,bg_dofs)
+      if act_dof<0 && bg_dof>0
+        bg_odof_to_act_odof[bg_dof] = 0
+      elseif bg_dof>0
+        bg_odof_to_act_odof[bg_dof] = act_dof
+      end
+    end
+  end
+
+  return bg_odof_to_act_odof
+end
+
+function _get_bg_odof_to_act_odof(f::FESpaceWithLinearConstraints,act_cellids::AbstractArray)
+  f′ = _remove_constraint(f)
+  bg_odof_to_act_odof = collect(get_free_dof_ids(f′))
 
   @check ConstraintStyle(f′) == UnConstrained()
   bg_cellids = get_cell_odof_ids(f′)

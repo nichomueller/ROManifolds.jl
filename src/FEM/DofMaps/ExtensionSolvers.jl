@@ -31,6 +31,16 @@ struct ZeroExtension <: Extension
   dof_ids::AbstractVector
 end
 
+function ZeroExtension(
+  f_bg::UnconstrainedFESpace,
+  f_ag::FESpaceWithLinearConstraints,
+  f_out::UnconstrainedFESpace,
+  args...)
+
+  dof_ids = get_ag_out_dof_to_bg_dof(f_bg,f_ag,f_out)
+  ZeroExtension(dof_ids)
+end
+
 get_extension_dof_ids(ext::ZeroExtension) = ext.dof_ids
 
 function Algebra.solve!(u_ext::AbstractVector,ext::ZeroExtension)
@@ -40,6 +50,18 @@ end
 struct FunctionalExtension <: Extension
   values::AbstractVector
   dof_ids::AbstractVector
+end
+
+function FunctionalExtension(
+  f_bg::UnconstrainedFESpace,
+  f_ag::FESpaceWithLinearConstraints,
+  f_out::UnconstrainedFESpace,
+  g::Function)
+
+  dof_ids = get_ag_out_dof_to_bg_dof(f_bg,f_ag,f_out)
+  gh = interpolate_everywhere(g,f_bg)
+  values = view(get_free_dof_values(gh),dof_ids)
+  FunctionalExtension(values,dof_ids)
 end
 
 get_extension_dof_ids(ext::FunctionalExtension) = ext.dof_ids
@@ -54,11 +76,41 @@ struct HarmonicExtension <: Extension
   ldof_ids::AbstractVector
 end
 
-function HarmonicExtension(laplacian::AbstractMatrix,residual::AbstractVector,dof_ids,ldof_ids)
+function HarmonicExtension(
+  laplacian::AbstractMatrix,
+  residual::AbstractVector,
+  dof_ids::AbstractVector,
+  ldof_ids::AbstractVector)
+
   fact = lu(laplacian)
   values = similar(residual)
   ldiv!(values,fact,residual)
   HarmonicExtension(values,dof_ids,ldof_ids)
+end
+
+function HarmonicExtension(
+  f_bg::UnconstrainedFESpace,
+  f_ag::FESpaceWithLinearConstraints,
+  f_out::UnconstrainedFESpace,
+  laplacian::AbstractMatrix,
+  residual::AbstractVector)
+
+  dof_ids = get_ag_out_dof_to_bg_dof(f_bg,f_ag,f_out)
+  ldof_ids = get_bg_dof_to_dof(f_bg,f_out,dof_ids)
+  HarmonicExtension(laplacian,residual,dof_ids,ldof_ids)
+end
+
+function HarmonicExtension(
+  f_bg::UnconstrainedFESpace,
+  f_ag::FESpaceWithLinearConstraints,
+  g_out::UnconstrainedFESpace,
+  f_out::UnconstrainedFESpace,
+  a::Function,
+  l::Function)
+
+  laplacian = assemble_matrix(a,g_out,f_out)
+  residual = assemble_vector(l,f_out)
+  HarmonicExtension(f_bg,f_ag,f_out,laplacian,residual)
 end
 
 get_extension_dof_ids(ext::HarmonicExtension) = ext.dof_ids
@@ -66,6 +118,21 @@ get_extension_dof_ids(ext::HarmonicExtension) = ext.dof_ids
 function Algebra.solve!(u_ext::AbstractVector,ext::HarmonicExtension)
   values = view(ext.values,ext.ldof_ids)
   copyto!(u_ext,values)
+end
+
+for f in (:ZeroExtension,:FunctionalExtension,:HarmonicExtension)
+  @eval begin
+    function $f(
+      bgmodel::CartesianDiscreteModel,
+      f_ag::FESpaceWithLinearConstraints,
+      f_out::UnconstrainedFESpace,
+      reffe,
+      args...;kwargs...)
+
+      f_bg = FESpace(bgmodel,reffe;kwargs...)
+      $f(f_bg,f_ag,f_out,args...)
+    end
+  end
 end
 
 struct ExtensionSolver <: NonlinearSolver
@@ -96,6 +163,19 @@ function Algebra.solve!(
   extend!(u,u_act,u_ext,ext_solver.ext)
   cache = (slvrcache,u_act,u_ext)
   u,cache
+end
+
+# utils
+
+function get_ag_out_dof_to_bg_dof(
+  f_bg::UnconstrainedFESpace,
+  f_ag::FESpaceWithLinearConstraints,
+  f_out::UnconstrainedFESpace)
+
+  ag_dof_to_bg_dof =  get_dof_to_bg_dof(f_bg,f_ag)
+  act_out_dof_to_bg_dof = get_dof_to_bg_dof(f_bg,f_out)
+  ag_out_dof_to_bg_dof = setdiff(act_out_dof_to_bg_dof,agg_dof_to_bg_dof)
+  return ag_out_dof_to_bg_dof
 end
 
 function get_bg_dof_to_dof(

@@ -83,9 +83,9 @@ export ZeroExtension
 export FunctionalExtension
 export HarmonicExtension
 export ExtensionSolver
-export ExtensionVector
+export zero_extension_values
 export zero_extended_free_values
-export cut_dofs
+export extend!
 include("ExtensionSolvers.jl")
 
 end # module
