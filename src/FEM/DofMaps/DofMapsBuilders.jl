@@ -11,24 +11,8 @@ function get_dof_map(f::SingleFieldFESpace,args...)
   VectorDofMap(n)
 end
 
-"""
-    get_internal_dof_map(space::FESpace) -> VectorDofMap
-
-Returns the internal dofs sorted by coordinate order, for every dimension. If `space` is a
-D-dimensional, scalar `FESpace`, the output index map will be a subtype of
-`AbstractDofMap{<:Integer,D}`. If `space` is a D-dimensional, vector-valued `FESpace`,
-the output index map will be a subtype of `AbstractDofMap{D+1}`.
-"""
-function get_internal_dof_map(f::SingleFieldFESpace,args...)
-  get_dof_map(f,args...)
-end
-
 function get_dof_map(f::MultiFieldFESpace,args...)
   map(f -> get_dof_map(f,args...),f.spaces)
-end
-
-function get_internal_dof_map(f::MultiFieldFESpace,args...)
-  map(f -> get_internal_dof_map(f,args...),f.spaces)
 end
 
 function get_sparse_dof_map(a::SparsityPattern,U::FESpace,V::FESpace,args...)

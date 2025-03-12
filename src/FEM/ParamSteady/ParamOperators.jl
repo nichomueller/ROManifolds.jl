@@ -80,7 +80,6 @@ ODEs.get_res(op::ParamOperator) = ODEs.get_res(get_fe_operator(op))
 get_jac(op::ParamOperator) = get_jac(get_fe_operator(op))
 
 DofMaps.get_dof_map(op::ParamOperator) = get_dof_map(get_fe_operator(op))
-DofMaps.get_internal_dof_map(op::ParamOperator) = get_internal_dof_map(get_fe_operator(op))
 DofMaps.get_sparse_dof_map(op::ParamOperator) = get_sparse_dof_map(get_fe_operator(op))
 get_dof_map_at_domains(op::ParamOperator) = get_dof_map_at_domains(get_fe_operator(op))
 get_sparse_dof_map_at_domains(op::ParamOperator) = get_sparse_dof_map_at_domains(get_fe_operator(op))

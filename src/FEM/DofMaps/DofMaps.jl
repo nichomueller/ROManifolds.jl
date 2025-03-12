@@ -59,7 +59,6 @@ export change_dof_map
 include("DofMapsInterface.jl")
 
 export get_dof_map
-export get_internal_dof_map
 export get_sparse_dof_map
 export get_polynomial_order
 export get_polynomial_orders
@@ -78,5 +77,15 @@ export OrderedFESpace
 export CartesianFESpace
 export OrderedFEFunction
 include("OrderedFESpaces.jl")
+
+export Extension
+export ZeroExtension
+export FunctionalExtension
+export HarmonicExtension
+export ExtensionSolver
+export ExtensionVector
+export zero_extended_free_values
+export cut_dofs
+include("ExtensionSolvers.jl")
 
 end # module

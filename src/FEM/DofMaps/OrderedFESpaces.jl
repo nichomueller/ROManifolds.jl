@@ -66,35 +66,10 @@ function get_dof_map(f::OrderedFESpace,args...)
   return VectorDofMap(bg_ndofs,bg_dof_to_act_dof)
 end
 
-function get_internal_dof_map(f::OrderedFESpace,args...)
-  bg_dof_to_act_dof = get_bg_dof_to_in_dof(f,args...)
-  bg_ndofs = length(bg_dof_to_act_dof)
-  return VectorDofMap(bg_ndofs,bg_dof_to_act_dof)
-end
-
 # Constructors
 
 function OrderedFESpace(model::CartesianDiscreteModel,args...;kwargs...)
   CartesianFESpace(model,args...;kwargs...)
-end
-
-function OrderedFESpace(trian::Triangulation,args...;kwargs...)
-  act_model = get_active_model(trian)
-  bg_model = get_background_model(trian)
-  OrderedFESpace(act_model,bg_model,trian,args...;kwargs...)
-end
-
-function OrderedFESpace(
-  act_model::DiscreteModel,
-  bg_model::CartesianDiscreteModel,
-  act_trian::Triangulation,
-  args...;kwargs...)
-
-  act_f = CartesianFESpace(act_model,args...;trian=act_trian,kwargs...)
-  bg_f = CartesianFESpace(bg_model,args...;kwargs...)
-  act_odofs = _get_bg_odof_to_act_odof(bg_f,act_f)
-  in_odofs = act_odofs#_get_bg_odof_to_in_odof(bg_f,bg_cell_to_inoutcut,act_odofs)
-  CartesianFESpace(act_f.space,act_f.cell_odofs_ids,act_odofs,in_odofs)
 end
 
 function OrderedFESpace(::DiscreteModel,args...;kwargs...)
@@ -109,16 +84,6 @@ struct CartesianFESpace{S<:SingleFieldFESpace} <: OrderedFESpace{S}
   space::S
   cell_odofs_ids::AbstractArray
   bg_odofs_to_act_odofs::AbstractVector
-  bg_odofs_to_in_odofs::AbstractVector
-end
-
-function CartesianFESpace(
-  f::SingleFieldFESpace,
-  cell_odofs_ids::AbstractArray,
-  bg_odofs_to_act_odofs::AbstractVector)
-
-  bg_odofs_to_in_odofs = bg_odofs_to_act_odofs
-  CartesianFESpace(f,cell_odofs_ids,bg_odofs_to_act_odofs,bg_odofs_to_in_odofs)
 end
 
 function CartesianFESpace(f::SingleFieldFESpace)
@@ -141,8 +106,6 @@ FESpaces.get_fe_space(f::CartesianFESpace) = f.space
 get_cell_odof_ids(f::CartesianFESpace) = f.cell_odofs_ids
 
 get_bg_dof_to_act_dof(f::CartesianFESpace) = f.bg_odofs_to_act_odofs
-
-get_bg_dof_to_in_dof(f::CartesianFESpace) = f.bg_odofs_to_in_odofs
 
 function get_sparsity(f::CartesianFESpace,g::CartesianFESpace,args...)
   sparsity = SparsityPattern(f,g,args...)
@@ -299,28 +262,6 @@ function _local_node_to_pnode(p::Polytope,orders)
   return pnodes
 end
 
-function _get_bg_odof_to_act_odof(bg_f::CartesianFESpace,act_f::CartesianFESpace)
-  bg_bg_dof_to_bg_dof = get_bg_dof_to_act_dof(bg_f) # potential underlying constraints
-  bg_dof_to_bg_bg_dof = findall(!iszero,bg_bg_dof_to_bg_dof)
-  bg_bg_dof_to_act_dof = zeros(Int,length(bg_bg_dof_to_bg_dof))
-  bg_cell_ids = get_cell_dof_ids(bg_f)
-  act_cell_ids = get_cell_dof_ids(act_f)
-  bg_cache = array_cache(bg_cell_ids)
-  act_cache = array_cache(act_cell_ids)
-  act_to_bg_cell = _get_bg_cell_to_act_cell(act_f)
-  for (act_cell,bg_cell) in enumerate(act_to_bg_cell)
-    bg_dofs = getindex!(bg_cache,bg_cell_ids,bg_cell)
-    act_dofs = getindex!(act_cache,act_cell_ids,act_cell)
-    for (bg_dof,act_dof) in zip(bg_dofs,act_dofs)
-      if bg_dof > 0
-        bg_bg_dof = bg_dof_to_bg_bg_dof[bg_dof]
-        bg_bg_dof_to_act_dof[bg_bg_dof] = act_dof
-      end
-    end
-  end
-  return bg_bg_dof_to_act_dof
-end
-
 function _get_bg_odof_to_act_odof(f::SingleFieldFESpace,act_cellids::AbstractArray)
   f′ = _remove_constraint(f)
   bg_odof_to_act_odof = collect(get_free_dof_ids(f′))
@@ -344,65 +285,6 @@ function _get_bg_odof_to_act_odof(f::SingleFieldFESpace,act_cellids::AbstractArr
   end
 
   return bg_odof_to_act_odof
-end
-
-function _get_bg_odof_to_in_odof(bg_f::CartesianFESpace,act_f::CartesianFESpace,bg_cell_to_inoutcut::AbstractVector)
-  bg_odof_to_act_odof = _get_bg_odof_to_act_odof(bg_f,act_f)
-  _get_bg_odof_to_in_odof(bg_f,bg_cell_to_inoutcut,bg_odof_to_act_odof)
-end
-
-function _get_bg_odof_to_in_odof(bg_f::CartesianFESpace,bg_cell_to_inoutcut::AbstractVector,bg_odof_to_act_odof::AbstractVector)
-  bg_odof_to_in_odof = copy(bg_odof_to_act_odof)
-  cutout_bg_odof = _get_bg_cutout_odof(bg_f,bg_cell_to_inoutcut)
-  for bg_odof in cutout_bg_odof
-    bg_odof_to_in_odof[bg_odof] = 0
-  end
-  return bg_odof_to_in_odof
-end
-
-function _get_bg_cutout_odof(bg_f::CartesianFESpace,bg_cell_to_inoutcut::AbstractVector)
-  bg_ndofs = num_free_dofs(bg_f)
-  bg_cellids = get_cell_dof_ids(bg_f)
-  _get_bg_cutout_odof(bg_ndofs,bg_cellids,bg_cell_to_inoutcut)
-end
-
-function _get_bg_cutout_odof(bg_ndofs,bg_cellids,bg_cell_to_inoutcut)
-  bg_dof_to_mask = fill(false,bg_ndofs)
-  touched = fill(false,bg_ndofs)
-  bg_cellids = Table(bg_cellids)
-  bg_dof_to_cells = lazy_map(DofToCell(bg_cellids),1:bg_ndofs)
-  dof_cache = array_cache(bg_cellids)
-  cell_cache = array_cache(bg_dof_to_cells)
-  for (bg_cell,inoutcut) in enumerate(bg_cell_to_inoutcut)
-    if inoutcut == OUT
-      bg_dofs = getindex!(dof_cache,bg_cellids,bg_cell)
-      for dof in bg_dofs
-        if dof>0 && !touched[dof]
-          touched[dof] = true
-          bg_dof_to_mask[dof] = true
-        end
-      end
-    elseif inoutcut == CUT
-      bg_dofs = getindex!(dof_cache,bg_cellids,bg_cell)
-      for dof in bg_dofs
-        if dof>0 && !touched[dof]
-          bg_cells = getindex!(cell_cache,bg_dof_to_cells,dof)
-          mark = true
-          for cell in bg_cells
-            if bg_cell_to_inoutcut[cell] == IN
-              mark = false
-              break
-            end
-          end
-          if mark
-            touched[dof] = true
-            bg_dof_to_mask[dof] = true
-          end
-        end
-      end
-    end
-  end
-  findall(bg_dof_to_mask)
 end
 
 _get_parent_model(model::DiscreteModel) = @abstractmethod

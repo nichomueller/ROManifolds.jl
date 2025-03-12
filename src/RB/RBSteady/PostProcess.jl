@@ -298,15 +298,8 @@ function eval_performance(
   fesnaps::AbstractSnapshots,
   rbsnaps::AbstractSnapshots,
   festats::CostTracker,
-  rbstats::CostTracker;
-  internal_nodes=false
+  rbstats::CostTracker
   )
-
-  if internal_nodes
-    dof_map_in = get_internal_dof_map(feop)
-    fesnaps = change_dof_map(fesnaps,dof_map_in)
-    rbsnaps = change_dof_map(rbsnaps,dof_map_in)
-  end
 
   state_red = get_state_reduction(solver)
   norm_style = NormStyle(state_red)
@@ -322,13 +315,12 @@ function eval_performance(
   fesnaps::AbstractSnapshots,
   x̂::AbstractParamVector,
   festats::CostTracker,
-  rbstats::CostTracker;
-  kwargs...
+  rbstats::CostTracker
   )
 
   r = get_realization(fesnaps)
   rbsnaps = to_snapshots(get_trial(rbop),x̂,r)
-  eval_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats;kwargs...)
+  eval_performance(solver,feop,fesnaps,rbsnaps,festats,rbstats)
 end
 
 function DrWatson.save(dir,perf::ROMPerformance;label="")
