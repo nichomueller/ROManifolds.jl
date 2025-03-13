@@ -67,6 +67,12 @@ include("DofMapsBuilders.jl")
 export DofMapArray
 include("DofMapArrays.jl")
 
+export get_bg_dof_to_dof
+export get_dof_to_bg_dof
+include("DofUtils.jl")
+
+include("ODofUtils.jl")
+
 export OIdsToIds
 export DofsToODofs
 export OReindex
@@ -75,7 +81,6 @@ include("OrderingMaps.jl")
 
 export OrderedFESpace
 export CartesianFESpace
-export OrderedFEFunction
 include("OrderedFESpaces.jl")
 
 export Extension

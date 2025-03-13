@@ -6,8 +6,6 @@ using ROManifolds.TProduct
 using DrWatson
 using Test
 
-import ROManifolds.DofMaps: get_dof_to_bg_dof, get_bg_dof_to_dof, get_mdof_to_dof
-
 R = 0.3
 pmin = Point(0,0)
 pmax = Point(1,1)
@@ -65,7 +63,7 @@ Uout = TrialFESpace(Vout,g)
 
 V = FESpace(model,reffe,conformity=:H1)
 
-agg_dof_to_bgdof =  get_dof_to_bg_dof(V,Vagg)
+agg_dof_to_bgdof = get_dof_to_bg_dof(V,Vagg)
 act_out_dof_to_bgdof = get_dof_to_bg_dof(V,Vout)
 agg_out_dof_to_bgdof = setdiff(act_out_dof_to_bgdof,agg_dof_to_bgdof)
 
@@ -90,8 +88,8 @@ writevtk(Ωbg,datadir("sol_0.vtu"),cellfields=["uh"=>uh])
 # harmonic extension
 A = assemble_matrix(aout,Uout,Vout)
 b = assemble_vector(lout,Vout)
-agg_out_dof_to_actdof = get_bg_dof_to_dof(V,Vout,agg_out_dof_to_bgdof)
-ext = HarmonicExtension(A,b,agg_out_dof_to_bgdof,agg_out_dof_to_actdof)
+agg_out_dof_to_act_out_dof = get_bg_dof_to_dof(V,Vout,agg_out_dof_to_bgdof)
+ext = HarmonicExtension(A,b,agg_out_dof_to_bgdof,agg_out_dof_to_act_out_dof)
 solver = ExtensionSolver(LUSolver(),ext)
 u = solve(solver,op.op)
 uh = FEFunction(V,u)

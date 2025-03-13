@@ -96,4 +96,6 @@ Lastly, we solve a Navier-Stokes equation with a space-time RB method.
 julia> include("examples/NStokesTransientSTRB.jl")
 ```
 
-<!-- |![Example 3 velocity](docs/src/assets/results/transient_nstokes_pod/plot/rbvel.gif) ![Example 3 pressure](docs/src/assets/results/transient_nstokes_pod/plot/rbpress.gif) ![Example 3 convergence](docs/src/assets/results/transient_nstokes_pod/results/convergence.png)|  -->
+Solution - velocity          |  Solution - pressure        |  Convergence
+:-------------------------:|:-------------------------:|:-------------------------:
+<img src="docs/src/assets/results/nstokes_strb/plot/rbvel.gif" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/nstokes_strb/plot/rbpress.gif" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/nstokes_strb/results/convergence.png" alt="drawing" style="width:275px; height:250px;"/> 

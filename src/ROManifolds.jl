@@ -10,7 +10,6 @@ using ROManifolds.Utils
 
 export OrderedFESpace
 export CartesianFESpace
-export OrderedFEFunction
 export slow_index
 export fast_index
 export get_dof_map

@@ -48,16 +48,31 @@ FESpaces.get_dirichlet_dof_tag(f::OrderedFESpace) = get_dirichlet_dof_tag(get_fe
 
 FESpaces.get_vector_type(f::OrderedFESpace) = get_vector_type(get_fe_space(f))
 
+# Scatters correctly ordered free and dirichlet values
 function FESpaces.scatter_free_and_dirichlet_values(f::OrderedFESpace,fv,dv)
-  scatter_ordered_free_and_dirichlet_values(f,fv,dv)
+  cell_dof_ids = get_cell_dof_ids(f)
+  cell_values = lazy_map(Broadcasting(PosNegReindex(fv,dv)),cell_dof_ids)
+  cell_ovalue_to_value(f,cell_values)
 end
 
+# Gathers correctly ordered free and dirichlet values
 function FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv)
-  gather_ordered_free_and_dirichlet_values!(fv,dv,f,cv)
-end
+  cell_ovals = cell_value_to_ovalue(f,cv)
+  cell_dofs = get_cell_dof_ids(f)
+  cache_vals = array_cache(cell_ovals)
+  cache_dofs = array_cache(cell_dofs)
+  cells = 1:length(cell_ovals)
 
-function FESpaces.FEFunction(f::OrderedFESpace,fv::AbstractVector,dv::AbstractVector)
-  OrderedFEFunction(f,fv,dv)
+  FESpaces._free_and_dirichlet_values_fill!(
+    fv,
+    dv,
+    cache_vals,
+    cache_dofs,
+    cell_ovals,
+    cell_dofs,
+    cells)
+
+  (fv,dv)
 end
 
 function get_dof_map(f::OrderedFESpace,args...)
@@ -68,44 +83,49 @@ end
 
 # Constructors
 
+function OrderedFESpace(trian::Triangulation,args...;kwargs...)
+  act_f = OrderedFESpace(get_active_model(trian),args...;trian=act_trian,kwargs...)
+  bg_f = OrderedFESpace(get_background_model(trian),args...;kwargs...)
+  CartesianFESpace(act_f,bg_f)
+end
+
 function OrderedFESpace(model::CartesianDiscreteModel,args...;kwargs...)
-  CartesianFESpace(model,args...;kwargs...)
+  CartesianFESpace(FESpace(model,args...;kwargs...))
 end
 
 function OrderedFESpace(::DiscreteModel,args...;kwargs...)
   @notimplemented "Background model must be cartesian for the selected dof reordering"
 end
 
-function OrderedFESpace(::DiscreteModel,::DiscreteModel,args...;kwargs...)
-  @notimplemented "Background model must be cartesian for the selected dof reordering"
-end
-
 struct CartesianFESpace{S<:SingleFieldFESpace} <: OrderedFESpace{S}
   space::S
   cell_odofs_ids::AbstractArray
-  bg_odofs_to_act_odofs::AbstractVector
+  odofs_to_bg_odofs::AbstractVector
+  bg_odofs_to_odofs::AbstractVector
 end
 
 function CartesianFESpace(f::SingleFieldFESpace)
   cell_odofs_ids = get_cell_odof_ids(f)
-  bg_odofs_to_act_odofs = _get_bg_odof_to_act_odof(f,cell_odofs_ids)
-  CartesianFESpace(f,cell_odofs_ids,bg_odofs_to_act_odofs)
+  odofs_to_bg_odofs = get_odof_to_bg_odof(f,cell_odofs_ids)
+  bg_odofs_to_odofs = get_bg_odof_to_odof(f,cell_odofs_ids)
+  CartesianFESpace(f,cell_odofs_ids,odofs_to_bg_odofs,bg_odofs_to_odofs)
 end
 
 function CartesianFESpace(model::DiscreteModel,args...;kwargs...)
-  f = FESpace(model,args...;kwargs...)
-  CartesianFESpace(f)
+  CartesianFESpace(FESpace(model,args...;kwargs...))
 end
 
-function CartesianFESpace(trian::Triangulation,args...;kwargs...)
-  OrderedFESpace(trian,args...;kwargs...)
+function CartesianFESpace()
+
 end
 
 FESpaces.get_fe_space(f::CartesianFESpace) = f.space
 
 get_cell_odof_ids(f::CartesianFESpace) = f.cell_odofs_ids
 
-get_bg_dof_to_act_dof(f::CartesianFESpace) = f.bg_odofs_to_act_odofs
+get_bg_dof_to_act_dof(f::CartesianFESpace) = f.bg_odofs_to_odofs
+
+get_act_dof_to_bg_dof(f::CartesianFESpace) = f.odofs_to_bg_odofs
 
 function get_sparsity(f::CartesianFESpace,g::CartesianFESpace,args...)
   sparsity = SparsityPattern(f,g,args...)
@@ -146,16 +166,16 @@ function _get_cell_odof_info(
   pcells = view(cells,cell_to_parent_cell)
   onodes = LinearIndices(orders .* ncells .+ 1 .- periodic)
 
-  node_and_comps_to_odof = _get_odof_map(fe_dof_basis,cell_dofs_ids,pcells,onodes,orders)
-  cell_odof_ids = lazy_map(DofsToODofs(fe_dof_basis,node_and_comps_to_odof,orders),pcells)
+  dofs_to_odofs = get_dof_to_odof(fe_dof_basis,cell_dofs_ids,pcells,onodes,orders)
+  cell_odof_ids = lazy_map(DofsToODofs(fe_dof_basis,dofs_to_odofs,orders),pcells)
   return cell_odof_ids
 end
 
-function _get_odof_map(fe_basis::AbstractVector{<:Dof},args...)
+function get_dof_to_odof(fe_basis::AbstractVector{<:Dof},args...)
   @notimplemented "This function is only implemented for Lagrangian dof bases"
 end
 
-function _get_odof_map(fe_basis::AbstractVector{<:LagrangianDofBasis},args...)
+function get_dof_to_odof(fe_basis::AbstractVector{<:LagrangianDofBasis},args...)
   function compare(b1::LagrangianDofBasis,b2::LagrangianDofBasis)
     (b1.dof_to_node == b2.dof_to_node && b1.dof_to_comp == b2.dof_to_comp
     && b1.node_and_comp_to_dof == b2.node_and_comp_to_dof)
@@ -163,17 +183,17 @@ function _get_odof_map(fe_basis::AbstractVector{<:LagrangianDofBasis},args...)
   b1 = testitem(fe_basis)
   cmp = lazy_map(b2->compare(b1,b2),fe_basis)
   if sum(cmp) == length(fe_basis)
-    _get_odof_map(b1,args...)
+    get_dof_to_odof(b1,args...)
   else
     @notimplemented "This function is only implemented for Lagrangian dof bases"
   end
 end
 
-function _get_odof_map(fe_dof_basis::Fill{<:LagrangianDofBasis},args...)
-  _get_odof_map(testitem(fe_dof_basis),args...)
+function get_dof_to_odof(fe_dof_basis::Fill{<:LagrangianDofBasis},args...)
+  get_dof_to_odof(testitem(fe_dof_basis),args...)
 end
 
-function _get_odof_map(
+function get_dof_to_odof(
   fe_dof_basis::LagrangianDofBasis{P,V},
   cell_dofs_ids::AbstractArray,
   cells::AbstractVector{CartesianIndex{D}},
@@ -251,122 +271,6 @@ function _get_node_and_comps_to_odof(
   return odofs
 end
 
-cubic_polytope(::Val{d}) where d = @abstractmethod
-cubic_polytope(::Val{1}) = SEGMENT
-cubic_polytope(::Val{2}) = QUAD
-cubic_polytope(::Val{3}) = HEX
-
-function _local_node_to_pnode(p::Polytope,orders)
-  _nodes, = Gridap.ReferenceFEs._compute_nodes(p,orders)
-  pnodes = Gridap.ReferenceFEs._coords_to_terms(_nodes,orders)
-  return pnodes
-end
-
-function _get_bg_odof_to_act_odof(f::SingleFieldFESpace,act_cellids::AbstractArray)
-  f′ = _remove_constraint(f)
-  bg_odof_to_act_odof = collect(get_free_dof_ids(f′))
-  isa(f,UnconstrainedFESpace) && return bg_odof_to_act_odof
-
-  @check ConstraintStyle(f′) == UnConstrained()
-  bg_cellids = get_cell_odof_ids(f′)
-  act_cache = array_cache(act_cellids)
-  bg_cache = array_cache(bg_cellids)
-
-  for cell = 1:length(act_cellids)
-    act_dofs = getindex!(act_cache,act_cellids,cell)
-    bg_dofs = getindex!(bg_cache,bg_cellids,cell)
-    for (act_dof,bg_dof) in zip(act_dofs,bg_dofs)
-      if act_dof<0 && bg_dof>0
-        bg_odof_to_act_odof[bg_dof] = 0
-      elseif bg_dof>0
-        bg_odof_to_act_odof[bg_dof] = act_dof
-      end
-    end
-  end
-
-  return bg_odof_to_act_odof
-end
-
-function _get_bg_odof_to_act_odof(f::FESpaceWithLinearConstraints,act_cellids::AbstractArray)
-  f′ = _remove_constraint(f)
-  bg_odof_to_act_odof = collect(get_free_dof_ids(f′))
-
-  @check ConstraintStyle(f′) == UnConstrained()
-  bg_cellids = get_cell_odof_ids(f′)
-  act_cache = array_cache(act_cellids)
-  bg_cache = array_cache(bg_cellids)
-
-  for cell = 1:length(act_cellids)
-    act_dofs = getindex!(act_cache,act_cellids,cell)
-    bg_dofs = getindex!(bg_cache,bg_cellids,cell)
-    for (act_dof,bg_dof) in zip(act_dofs,bg_dofs)
-      if act_dof<0 && bg_dof>0
-        bg_odof_to_act_odof[bg_dof] = 0
-      elseif bg_dof>0
-        bg_odof_to_act_odof[bg_dof] = act_dof
-      end
-    end
-  end
-
-  return bg_odof_to_act_odof
-end
-
-_get_parent_model(model::DiscreteModel) = @abstractmethod
-_get_parent_model(model::MappedDiscreteModel) = model.model
-_get_parent_model(model::DiscreteModelPortion) = model.parent_model
-_get_parent_model(model::CartesianDiscreteModel) = model
-
-_remove_constraint(f::SingleFieldFESpace) = f
-_remove_constraint(f::FESpaceWithLinearConstraints) = f.space
-_remove_constraint(f::FESpaceWithConstantFixed) = f.space
-_remove_constraint(f::ZeroMeanFESpace) = _remove_constraint(f.space)
-
-"""
-    OrderedFEFunction(f::OrderedFESpace,fv,dv) -> FEFunction
-
-Returns a `FEFunction` with correctly ordered values
-"""
-function OrderedFEFunction(f::OrderedFESpace,fv,dv)
-  cell_vals = scatter_ordered_free_and_dirichlet_values(f,fv,dv)
-  cell_field = CellField(f,cell_vals)
-  SingleFieldFEFunction(cell_field,cell_vals,fv,dv,f)
-end
-
-"""
-    scatter_ordered_free_and_dirichlet_values(f::OrderedFESpace,fv,dv) -> AbstractArray
-
-Scatters correctly ordered free and dirichlet values
-"""
-function scatter_ordered_free_and_dirichlet_values(f::OrderedFESpace,fv,dv)
-  cell_dof_ids = get_cell_dof_ids(f)
-  cell_values = lazy_map(Broadcasting(PosNegReindex(fv,dv)),cell_dof_ids)
-  cell_ovalue_to_value(f,cell_values)
-end
-
-"""
-    gather_ordered_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv) -> Nothing
-
-Gathers correctly ordered free and dirichlet values
-"""
-function gather_ordered_free_and_dirichlet_values!(fv,dv,f::OrderedFESpace,cv)
-  cell_ovals = cell_value_to_ovalue(f,cv)
-  cell_dofs = get_cell_dof_ids(f)
-  cache_vals = array_cache(cell_ovals)
-  cache_dofs = array_cache(cell_dofs)
-  cells = 1:length(cell_ovals)
-
-  FESpaces._free_and_dirichlet_values_fill!(
-    fv,
-    dv,
-    cache_vals,
-    cache_dofs,
-    cell_ovals,
-    cell_dofs,
-    cells)
-
-  (fv,dv)
-end
-
 function cell_ovalue_to_value(f::OrderedFESpace,cv)
   cell_dof_ids = get_cell_dof_ids(f)
   odof_to_dof = cell_dof_ids.maps[1].odof_to_dof
@@ -379,3 +283,19 @@ function cell_value_to_ovalue(f::OrderedFESpace,cv)
   dof_to_odof = invperm(odof_to_dof)
   lazy_map(OReindex(dof_to_odof),cv)
 end
+
+function _local_node_to_pnode(p::Polytope,orders)
+  _nodes, = Gridap.ReferenceFEs._compute_nodes(p,orders)
+  pnodes = Gridap.ReferenceFEs._coords_to_terms(_nodes,orders)
+  return pnodes
+end
+
+cubic_polytope(::Val{d}) where d = @abstractmethod
+cubic_polytope(::Val{1}) = SEGMENT
+cubic_polytope(::Val{2}) = QUAD
+cubic_polytope(::Val{3}) = HEX
+
+_get_parent_model(model::DiscreteModel) = @abstractmethod
+_get_parent_model(model::MappedDiscreteModel) = model.model
+_get_parent_model(model::DiscreteModelPortion) = model.parent_model
+_get_parent_model(model::CartesianDiscreteModel) = model
