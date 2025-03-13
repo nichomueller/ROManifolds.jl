@@ -96,6 +96,7 @@ rbsolver = RBSolver(fesolver,state_reduction;nparams_res=50,nparams_jac=20,npara
 dir = datadir("transient_nstokes_pod")
 create_dir(dir)
 
-tols = [1e-4,1e-5] #1e-1,1e-2,1e-3,
+tols = [1e-1,1e-2,1e-3,1e-4,1e-5]
 ExamplesInterface.run_test(dir,rbsolver,feop,tols,xh0μ;reuse_online=true)
+
 end
