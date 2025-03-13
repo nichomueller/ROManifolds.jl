@@ -1,3 +1,12 @@
+function extend(u_act::AbstractVector,u_ext::AbstractVector)
+  vcat(u_act,u_ext)
+end
+
+function extend(u_act::BlockVector,u_ext::BlockVector)
+  block = map(extend,blocks(u_act),blocks(u_ext))
+  mortar(block)
+end
+
 abstract type Extension end
 
 get_extension_dof_ids(ext::Extension) = @abstractmethod
@@ -43,8 +52,8 @@ end
 
 get_extension_dof_ids(ext::ZeroExtension) = ext.dof_ids
 
-function Algebra.solve!(u_ext::AbstractVector,ext::ZeroExtension)
-  fill!(u_ext,zero(eltype(u_ext)))
+function Algebra.solve!(vext::AbstractVector,ext::ZeroExtension)
+  fill!(vext,zero(eltype(vext)))
 end
 
 struct FunctionalExtension <: Extension
@@ -66,8 +75,8 @@ end
 
 get_extension_dof_ids(ext::FunctionalExtension) = ext.dof_ids
 
-function Algebra.solve!(u_ext::AbstractVector,ext::FunctionalExtension)
-  copyto!(u_ext,ext.values)
+function Algebra.solve!(vext::AbstractVector,ext::FunctionalExtension)
+  copyto!(vext,ext.values)
 end
 
 struct HarmonicExtension <: Extension
@@ -103,8 +112,8 @@ end
 function HarmonicExtension(
   f_bg::UnconstrainedFESpace,
   f_ag::FESpaceWithLinearConstraints,
-  g_out::UnconstrainedFESpace,
-  f_out::UnconstrainedFESpace,
+  g_out::SingleFieldFESpace,
+  f_out::SingleFieldFESpace,
   a::Function,
   l::Function)
 
@@ -115,9 +124,9 @@ end
 
 get_extension_dof_ids(ext::HarmonicExtension) = ext.dof_ids
 
-function Algebra.solve!(u_ext::AbstractVector,ext::HarmonicExtension)
+function Algebra.solve!(vext::AbstractVector,ext::HarmonicExtension)
   values = view(ext.values,ext.ldof_ids)
-  copyto!(u_ext,values)
+  copyto!(vext,values)
 end
 
 for f in (:ZeroExtension,:FunctionalExtension,:HarmonicExtension)
@@ -135,6 +144,28 @@ for f in (:ZeroExtension,:FunctionalExtension,:HarmonicExtension)
   end
 end
 
+# multi field interface; no constructors are provided for this type so far
+
+struct BlockExtension{A<:AbstractVector{<:Extension}} <: Extension
+  blocks::A
+end
+
+BlockArrays.blocks(ext::BlockExtension) = ext.blocks
+
+get_extension_dof_ids(ext::BlockExtension) = mortar(map(get_extension_dof_ids,blocks(ext)))
+
+function extend!(v::BlockVector,vact::BlockVector,vext::BlockVector,ext::BlockExtension)
+  map(extend!,blocks(vact),blocks(vext),blocks(ext))
+end
+
+function extend!(v::AbstractVector,ext::BlockExtension)
+  map(extend!,blocks(v),blocks(ext))
+end
+
+function Algebra.solve!(vext::BlockVector,ext::BlockExtension)
+  map(solve!,blocks(vext),blocks(ext))
+end
+
 struct ExtensionSolver <: NonlinearSolver
   solver::NonlinearSolver
   ext::Extension
@@ -146,7 +177,7 @@ function Algebra.solve(
 
   u_act = zero_initial_guess(op)
   u_ext = zero_extension_values(ext_solver.ext)
-  u = vcat(u_act,u_ext)
+  u = extend(u_act,u_ext)
   u,cache = solve!(u,u_act,u_ext,ext_solver,op)
   return u
 end
