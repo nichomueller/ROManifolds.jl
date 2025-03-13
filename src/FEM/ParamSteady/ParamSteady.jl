@@ -31,7 +31,7 @@ import Test: @test
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ReferenceFEs: get_order
-import ROManifolds.Utils: CostTracker
+import ROManifolds.Utils: CostTracker,change_domains,set_domains
 
 export UnEvalTrialFESpace
 export ParamTrialFESpace
@@ -42,17 +42,13 @@ export NonlinearParamEq
 export LinearParamEq
 export LinearNonlinearParamEq
 export TriangulationStyle
-export SplitDomains
 export JointDomains
+export SplitDomains
 export ParamOperator
-export LinearNonlinearParamOpFromFEOp
-export AbstractParamCache
-export ParamOpCache
-export ParamOpSysCache
-export ParamNonlinearOperator
-export allocate_paramcache
-export update_paramcache!
-export allocate_systemcache
+export JointParamOperator
+export SplitParamOperator
+export LinearParamOperator
+export LinearNonlinearParamOperator
 export get_fe_operator
 include("ParamOperators.jl")
 
@@ -61,30 +57,28 @@ export SplitParamFEOperator
 export JointParamFEOperator
 export LinearParamFEOperator
 export FEDomains
+export get_jac
 export get_param_space
 export get_param_assembler
 export get_domains
 export get_domains_res
 export get_domains_jac
-export set_domains
-export change_domains
 export get_dof_map_at_domains
 export get_sparse_dof_map_at_domains
 include("ParamFEOperators.jl")
 
 export LinearNonlinearParamFEOperator
-export get_linear_operator
-export get_nonlinear_operator
 export join_operators
 include("LinearNonlinearParamFEOperators.jl")
 
 export ParamOpFromFEOp
 export JointParamOpFromFEOp
 export SplitParamOpFromFEOp
+export LinearNonlinearParamOpFromFEOp
 export collect_cell_matrix_for_trian
 export collect_cell_vector_for_trian
 include("ParamOpFromFEOps.jl")
 
-include("ParamSolutions.jl")
+include("ParamFESolvers.jl")
 
 end # module

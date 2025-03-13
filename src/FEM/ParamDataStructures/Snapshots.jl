@@ -1,5 +1,5 @@
 """
-    abstract type AbstractSnapshots{T,N} <: AbstractParamContainer{T,N} end
+    abstract type AbstractSnapshots{T,N} <: AbstractParamData{T,N} end
 
 Type representing N-dimensional arrays of snapshots. Subtypes must contain the
 following information:
@@ -15,7 +15,7 @@ Subtypes:
 - [`Snapshots`](@ref)
 - [`BlockSnapshots`](@ref)
 """
-abstract type AbstractSnapshots{T,N} <: AbstractParamContainer{T,N} end
+abstract type AbstractSnapshots{T,N} <: AbstractParamData{T,N} end
 
 """
     get_realization(s::AbstractSnapshots) -> AbstractRealization

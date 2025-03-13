@@ -112,12 +112,12 @@ end
 
 function Algebra.allocate_in_domain(a::Projection,x::V) where V<:AbstractParamVector
   x̂ = allocate_vector(eltype(V),num_reduced_dofs(a))
-  return consecutive_parameterize(x̂,param_length(x))
+  return global_parameterize(x̂,param_length(x))
 end
 
 function Algebra.allocate_in_range(a::Projection,x̂::V) where V<:AbstractParamVector
   x = allocate_vector(eltype(V),num_fe_dofs(a))
-  return consecutive_parameterize(x,param_length(x̂))
+  return global_parameterize(x,param_length(x̂))
 end
 
 """
@@ -167,7 +167,7 @@ Base.:*(x::AbstractArray,b::Projection) = rescale(*,x,b)
 function Base.:*(b::Projection,y::ConsecutiveParamArray)
   item = zeros(num_reduced_dofs(b))
   plength = param_length(y)
-  x = consecutive_parameterize(item,plength)
+  x = global_parameterize(item,plength)
   mul!(x,b,y)
 end
 
@@ -376,6 +376,15 @@ get_basis(a::TTSVDProjection) = cores2basis(get_cores(a)...)
 num_fe_dofs(a::TTSVDProjection) = prod(map(c -> size(c,2),get_cores(a)))
 num_reduced_dofs(a::TTSVDProjection) = size(last(get_cores(a)),3)
 
+#TODO this needs to be fixed
+function project!(x̂::AbstractArray,a::TTSVDProjection,x::AbstractArray,norm_matrix::AbstractRankTensor)
+  # a′ = rescale(_sparse_rescaling,norm_matrix,a)
+  # basis′ = get_basis(a′)
+  # mul!(x̂,basis′',x)
+  basis = get_basis(a)
+  mul!(x̂,basis',x)
+end
+
 function union_bases(a::TTSVDProjection,b::TTSVDProjection,args...)
   @check get_dof_map(a) == get_dof_map(b)
   union_bases(a,get_cores(b),args...)
@@ -422,32 +431,40 @@ function galerkin_projection(proj_left::TTSVDProjection,a::TTSVDProjection,proj_
 end
 
 function empirical_interpolation(a::TTSVDProjection)
-  local indices,interp
   cores = get_cores(a)
   dof_map = get_dof_map(a)
-  c = cores2basis(first(cores))
-  cache = eim_cache(c)
-  vinds = Vector{Int}[]
+
+  ptrs = Vector{Int32}(undef,length(cores)+1)
+  for i in eachindex(cores)
+    ptrs[i+1] = size(cores[i],3)
+  end
+  length_to_ptrs!(ptrs)
+
+  interp = ones(1,1)
+  data = fill(zero(Int32),ptrs[end]-1)
   for i = eachindex(cores)
-    inds,interp = empirical_interpolation!(cache,c)
-    push!(vinds,copy(inds))
-    if i < length(cores)
-      interp_core = reshape(interp,1,size(interp)...)
-      c = cores2basis(interp_core,cores[i+1])
-    else
-      indices = get_basis_indices(vinds,dof_map)
+    interp_core = reshape(interp,1,size(interp)...)
+    c = cores2basis(interp_core,cores[i])
+    inds,interp = empirical_interpolation(c)
+    pini = ptrs[i]
+    pend = ptrs[i+1]-1
+    for (k,pk) in enumerate(pini:pend)
+      data[pk] = inds[k]
     end
   end
-  return indices,interp
+  linds = Table(data,ptrs)
+  ginds = get_basis_indices(linds,dof_map)
+
+  return ginds,interp
 end
 
-function rescale(op::Function,x::AbstractRankTensor{D},b::TTSVDProjection) where D
+function rescale(op::Function,X::AbstractRankTensor{D},b::TTSVDProjection) where D
   cores = get_cores(b)
   dof_map = get_dof_map(b)
   if D == ndims(dof_map)
-    TTSVDProjection(op(x,cores),dof_map)
+    TTSVDProjection(op(X,cores),dof_map)
   else
-    c1 = op(x,cores[1:D])
+    c1 = op(X,cores[1:D])
     c2 = cores[D+1:end]
     TTSVDProjection([c1...,c2...],dof_map)
   end
@@ -615,6 +632,12 @@ end
 
 Base.getindex(a::BlockProjection,i::Block) = getindex(a,i.n...)
 Base.setindex!(a::BlockProjection,v,i::Block) = setindex!(a,v,i.n...)
+
+function Arrays.testitem(a::BlockProjection)
+  i = findall(a.touched)
+  @notimplementedif length(i) == 0
+  a.array[first(i)]
+end
 
 function num_fe_dofs(a::BlockProjection)
   dofs = zeros(Int,length(a))

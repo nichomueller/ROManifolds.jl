@@ -117,15 +117,15 @@ trian_jac_t = (τₕ,)
 domains_lin = FEDomains(trian_res,(trian_jac,trian_jac_t))
 domains_nlin = FEDomains(trian_res,(trian_jac,))
 
-feop_lin = TransientParamLinearFEOperator((stiffness,mass),res,ptspace,
+feop_lin = TransientParamLinearOperator((stiffness,mass),res,ptspace,
   trial,test,domains_lin)
-feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,
+feop_nlin = TransientParamOperator(res_nlin,jac_nlin,ptspace,
   trial,test,domains_nlin)
 
-feop = LinearNonlinearTransientParamFEOperator(feop_lin,feop_nlin)
+feop = LinearNonlinearTransientParamOperator(feop_lin,feop_nlin)
 ```
 
-The two FE operators are wrapped together in a [`LinearNonlinearTransientParamFEOperator`](@ref) struct. Next, we define the time marching scheme for our problem, along with a suitable initial condition 
+Next, we define the time marching scheme for our problem, along with a suitable initial condition 
 
 ```julia 
 u0(x,μ) = VectorValue(0.0,0.0)

@@ -1,10 +1,8 @@
-ParamArray(A::AbstractArray{<:AbstractParamArray};kwargs...) = mortar(A)
+ParamArray(A::AbstractArray{<:AbstractParamArray}) = mortar(A)
 
-function param_array(a::BlockArray,l::Integer;kwargs...)
-  mortar(map(b -> param_array(b,l;kwargs...),blocks(a)))
+function ParamArray(a::BlockArray,l::Integer)
+  mortar(map(b -> ParamArray(b,l),blocks(a)))
 end
-
-param_array(A::AbstractArray{<:AbstractParamArray},l::Integer;kwargs...) = ParamArray(A;kwargs...)
 
 """
     struct BlockParamArray{T,N,A<:AbstractArray{<:AbstractParamArray{T,N},N},B<:NTuple{N,AbstractUnitRange{Int}}} <: ParamArray{T,N}
@@ -44,14 +42,12 @@ function BlockArrays._BlockArray(data::AbstractArray{<:AbstractParamArray,N},axe
   BlockParamArray(data,axes)
 end
 
-MemoryLayoutStyle(::Type{<:BlockParamArray{T,N,A}}) where {T,N,A} = MemoryLayoutStyle(eltype(A))
-
 param_length(A::BlockParamArray) = param_length(first(blocks(A)))
 
 @inline Base.size(A::BlockParamArray) = map(length,axes(A))
 Base.axes(A::BlockParamArray) = A.axes
 
-@inline function ArraysOfArrays.innersize(A::BlockParamArray)
+@inline function innersize(A::BlockParamArray)
   map(innersize,A.data)
 end
 

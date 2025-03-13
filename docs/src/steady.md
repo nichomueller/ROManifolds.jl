@@ -148,8 +148,7 @@ The structure [`FEDomains`](@ref) collects the triangulations relative to the LH
 We define the FE solver for our Poisson problem: 
 
 ``` julia
-ls = LUSolver()
-solver = LinearFESolver(ls)
+solver = LUSolver()
 ```
 
 ## RB solver
@@ -235,8 +234,7 @@ fesnaps, = solution_snapshots(rbsolver,feop)
 # compute the reduced trial and test spaces 
 Û,V̂ = reduced_spaces(rbsolver,feop,fesnaps)
 # compute the hyper-reduction for LHS & RHS
-op = get_algebraic_operator(feop)
-â,l̂ = reduced_weak_form(rbsolver,op,Û,V̂,fesnaps)
+â,l̂ = reduced_weak_form(rbsolver,feop,Û,V̂,fesnaps)
 
 # fetch the reduced FEDomains
 τₕ_l̂,τₕ_â = get_domains(l̂),get_domains(â)

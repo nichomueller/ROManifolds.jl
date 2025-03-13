@@ -51,9 +51,6 @@ using ROManifolds.ParamDataStructures
 include("FEM/ParamAlgebra/ParamAlgebra.jl")
 using ROManifolds.ParamAlgebra
 
-include("FEM/ParamReferenceFEs/ParamReferenceFEs.jl")
-using ROManifolds.ParamReferenceFEs
-
 include("FEM/ParamGeometry/ParamGeometry.jl")
 using ROManifolds.ParamGeometry
 
@@ -64,6 +61,9 @@ export MultiFieldParamFESpace
 include("FEM/ParamFESpaces/ParamFESpaces.jl")
 using ROManifolds.ParamFESpaces
 
+export ParamOperator
+export LinearParamOperator
+export LinearNonlinearParamOperator
 export FEDomains
 export ParamFEOperator
 export LinearParamFEOperator
@@ -72,6 +72,10 @@ export LinearNonlinearParamFEOperator
 include("FEM/ParamSteady/ParamSteady.jl")
 using ROManifolds.ParamSteady
 
+export ODEParamOperator
+export TransientParamLinearOperator
+export TransientParamOperator
+export LinearNonlinearTransientParamOperator
 export TransientTrialParamFESpace
 export TransientMultiFieldParamFESpace
 export TransientParamFEOperator

@@ -149,10 +149,10 @@ function LinearSolvers.get_solver_caches(solver::LinearSolvers.FGMRESSolver,A::A
   Z  = [allocate_in_domain(A) for i in 1:m]
   zl = allocate_in_domain(A)
 
-  H = consecutive_parameterize(zeros(m+1,m),plength)  # Hessenberg matrix
-  g = consecutive_parameterize(zeros(m+1),plength)    # Residual vector
-  c = consecutive_parameterize(zeros(m),plength)      # Givens rotation cosines
-  s = consecutive_parameterize(zeros(m),plength)      # Givens rotation sines
+  H = global_parameterize(zeros(m+1,m),plength)  # Hessenberg matrix
+  g = global_parameterize(zeros(m+1),plength)    # Residual vector
+  c = global_parameterize(zeros(m),plength)      # Givens rotation cosines
+  s = global_parameterize(zeros(m),plength)      # Givens rotation sines
   return (V,Z,zl,H,g,c,s)
 end
 

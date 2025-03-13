@@ -11,6 +11,7 @@ using Test
 @testset "unsteady stokes" begin include("RBTransient/stokes.jl") end
 @testset "unsteady navier-stokes" begin include("RBTransient/navier_stokes.jl") end
 
+@testset "dof maps" begin include("Unfitted/mapped_models.jl") end
 @testset "dof maps" begin include("Unfitted/dof_maps.jl") end
 @testset "poisson unfitted" begin include("Unfitted/poisson.jl") end
 @testset "stokes unfitted" begin include("Unfitted/stokes.jl") end

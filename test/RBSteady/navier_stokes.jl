@@ -6,8 +6,6 @@ using GridapSolvers
 using GridapSolvers.NonlinearSolvers
 using ROManifolds
 
-import Gridap.FESpaces: NonlinearFESolver
-
 tol_or_rank(tol,rank) = @assert false "Provide either a tolerance or a rank for the reduction step"
 tol_or_rank(tol::Real,rank) = tol
 tol_or_rank(tol::Real,rank::Int) = tol
@@ -80,22 +78,22 @@ function main(
     state_reduction = SupremizerReduction(ttcoupling,tolranks,energy;nparams,unsafe)
   end
 
-  fesolver = NonlinearFESolver(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true))
+  fesolver = NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=true)
   rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
 
   pspace_uniform = ParamSpace(pdomain;sampling=:uniform)
-  feop_lin_uniform = LinearParamFEOperator(res_lin,jac_lin,pspace_uniform,trial,test,domains_lin)
-  feop_nlin_uniform = ParamFEOperator(res_nlin,jac_nlin,pspace_uniform,trial,test,domains_nlin)
-  feop_uniform = LinearNonlinearParamFEOperator(feop_lin_uniform,feop_nlin_uniform)
+  feop_lin_uniform = LinearParamOperator(res_lin,jac_lin,pspace_uniform,trial,test,domains_lin)
+  feop_nlin_uniform = ParamOperator(res_nlin,jac_nlin,pspace_uniform,trial,test,domains_nlin)
+  feop_uniform = LinearNonlinearParamOperator(feop_lin_uniform,feop_nlin_uniform)
   μon = realization(feop_uniform;nparams=10)
   x,festats = solution_snapshots(rbsolver,feop_uniform,μon)
 
   for sampling in (:uniform,:halton,:latin_hypercube,:tensorial_uniform)
     println("Running $method test with sampling strategy $sampling")
     pspace = ParamSpace(pdomain;sampling)
-    feop_lin = LinearParamFEOperator(res_lin,jac_lin,pspace,trial,test,domains_lin)
-    feop_nlin = ParamFEOperator(res_nlin,jac_nlin,pspace,trial,test,domains_nlin)
-    feop = LinearNonlinearParamFEOperator(feop_lin,feop_nlin)
+    feop_lin = LinearParamOperator(res_lin,jac_lin,pspace,trial,test,domains_lin)
+    feop_nlin = ParamOperator(res_nlin,jac_nlin,pspace,trial,test,domains_nlin)
+    feop = LinearNonlinearParamOperator(feop_lin,feop_nlin)
 
     fesnaps, = solution_snapshots(rbsolver,feop)
     rbop = reduced_operator(rbsolver,feop,fesnaps)

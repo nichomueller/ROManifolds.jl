@@ -1,35 +1,18 @@
 # generic constructors
-# rule: within Gridap lazy maps (i.e. we deal with cell-wise arrays), we use the
-# NonConsecutiveMemory style; otherwise, when dealing with global arrays, we use
-# the ConsecutiveMemory style
 
-ParamArray(a::AbstractArray{<:Number},l::Integer;kwargs...) = TrivialParamArray(a,l)
-
-function param_array(a::AbstractArray{<:Number},l::Integer;style=NonConsecutiveMemory())
-  if style==ConsecutiveMemory()
-    ConsecutiveParamArray(a,l)
-  else
-    ArrayOfArrays(a,l)
-  end
+function ParamArray(a::AbstractArray{<:Number,N},l::Integer) where N
+  ConsecutiveParamArray(a,l)
 end
 
-for f in (:param_array,:ParamArray)
-  @eval begin
-    function $f(A::AbstractArray{<:AbstractArray},l::Integer;kwargs...)
-      plength(A) = length(A)
-      plength(A::AbstractParamArray) = param_length(A)
-      @assert plength(A) == l
-      $f(A;kwargs...)
-    end
+function ParamArray(A::AbstractArray{<:AbstractArray},l::Integer)
+  plength(A) = length(A)
+  plength(A::AbstractParamArray) = param_length(A)
+  @assert plength(A) == l
+  ParamArray(A)
+end
 
-    function $f(A::AbstractArray{<:AbstractArray};style=NonConsecutiveMemory())
-      if style==ConsecutiveMemory()
-        ConsecutiveParamArray(A)
-      else
-        ArrayOfArrays(A)
-      end
-    end
-  end
+function ParamArray(A::AbstractArray{<:AbstractArray{T,N}}) where {T,N}
+  ConsecutiveParamArray(A)
 end
 
 """
@@ -128,7 +111,7 @@ end
 
 Base.size(A::TrivialParamArray{T,N}) where {T,N} = tfill(A.plength,Val{N}())
 
-ArraysOfArrays.innersize(A::TrivialParamArray) = size(A.data)
+innersize(A::TrivialParamArray) = size(A.data)
 
 Base.@propagate_inbounds function Base.getindex(A::TrivialParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
@@ -240,13 +223,13 @@ end
 
 Base.size(A::ConsecutiveParamArray{T,N}) where {T,N} = tfill(param_length(A),Val{N}())
 
-ArraysOfArrays.innersize(A::ConsecutiveParamArray{T,N}) where {T,N} = ArraysOfArrays.front_tuple(size(get_all_data(A)),Val{N}())
+innersize(A::ConsecutiveParamArray{T,N}) where {T,N} = front_tuple(size(get_all_data(A)),Val{N}())
 
 Base.@propagate_inbounds function Base.getindex(A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
   if all(i.==iblock)
-    A.data[ArraysOfArrays._ncolons(Val{N}())...,iblock]
+    A.data[_ncolons(Val{N}())...,iblock]
   else
     fill(zero(T),innersize(A))
   end
@@ -256,7 +239,7 @@ Base.@propagate_inbounds function Base.setindex!(A::ConsecutiveParamArray{T,N},v
   @boundscheck checkbounds(A,i...)
   iblock = first(i)
   if all(i.==iblock)
-    A.data[ArraysOfArrays._ncolons(Val{N}())...,iblock] = v
+    A.data[_ncolons(Val{N}())...,iblock] = v
   end
 end
 
@@ -310,7 +293,12 @@ function Arrays.CachedArray(A::ConsecutiveParamArray)
 end
 
 function param_getindex(A::ConsecutiveParamArray{T,N},i::Integer) where {T,N}
-  view(A.data,ArraysOfArrays._ncolons(Val{N}())...,i)
+  view(A.data,_ncolons(Val{N}())...,i)
+end
+
+function param_setindex!(A::ConsecutiveParamArray{T,N},v,i::Integer) where {T,N}
+  @views A.data[_ncolons(Val{N}())...,i] = v
+  v
 end
 
 function get_param_entry!(v::AbstractVector{T},A::ConsecutiveParamArray{T,N},i::Vararg{Integer,N}) where {T,N}
@@ -368,7 +356,7 @@ end
 
 Base.size(A::GenericParamVector) = (length(A.ptrs)-1,)
 
-function ArraysOfArrays.innersize(A::GenericParamVector)
+function innersize(A::GenericParamVector)
   innerlength = ptrs[2]-ptrs[1]
   @check all(ptrs[i+1]-ptrs[i] == innerlength for i in 1:length(ptrs)-1)
   (innerlength,)
@@ -509,7 +497,7 @@ end
 
 Base.size(A::GenericParamMatrix) = (length(A.ptrs)-1,length(A.ptrs)-1)
 
-ArraysOfArrays.innersize(A::GenericParamMatrix) = @notimplemented
+innersize(A::GenericParamMatrix) = @notimplemented
 
 Base.@propagate_inbounds function Base.getindex(A::GenericParamMatrix{Tv},i::Integer,j::Integer) where Tv
   @boundscheck checkbounds(A,i,j)
@@ -625,11 +613,9 @@ function ArrayOfArrays(a::AbstractArray{<:Number},l::Integer)
   ArrayOfArrays(data)
 end
 
-MemoryLayoutStyle(::Type{<:ArrayOfArrays}) = NonConsecutiveMemory()
-
 Base.size(A::ArrayOfArrays{T,N}) where {T,N} = tfill(param_length(A),Val{N}())
 
-ArraysOfArrays.innersize(A::ArrayOfArrays{T,N}) where {T,N} = size(first(A.data))
+innersize(A::ArrayOfArrays{T,N}) where {T,N} = size(first(A.data))
 
 Base.@propagate_inbounds function Base.getindex(A::ArrayOfArrays{T,N},i::Vararg{Integer,N}) where {T,N}
   @boundscheck checkbounds(A,i...)

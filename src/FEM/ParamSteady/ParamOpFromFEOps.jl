@@ -1,28 +1,20 @@
 """
-    struct ParamOpFromFEOp{O,T} <: ParamOperator{O,T}
+    struct ParamOpFromFEOp{O<:UnEvalOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T}
       op::ParamFEOperator{O,T}
     end
 
 Wrapper that transforms a `ParamFEOperator` into an `ParamOperator`
 """
-struct ParamOpFromFEOp{O,T} <: ParamOperator{O,T}
+struct ParamOpFromFEOp{O<:UnEvalOperatorType,T<:TriangulationStyle} <: ParamOperator{O,T}
   op::ParamFEOperator{O,T}
 end
 
 get_fe_operator(op::ParamOpFromFEOp) = op.op
 
-for f in (:set_domains,:change_domains)
-  @eval begin
-    function $f(odeop::ParamOpFromFEOp,args...)
-      ParamOpFromFEOp($f(odeop.op,args...))
-    end
-  end
-end
-
 """
-    const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointDomains}
+    const JointParamOpFromFEOp{O<:UnEvalOperatorType} = ParamOpFromFEOp{O,JointDomains}
 """
-const JointParamOpFromFEOp{O} = ParamOpFromFEOp{O,JointDomains}
+const JointParamOpFromFEOp{O<:UnEvalOperatorType} = ParamOpFromFEOp{O,JointDomains}
 
 function Algebra.allocate_residual(
   op::JointParamOpFromFEOp,
@@ -73,7 +65,7 @@ function Algebra.allocate_jacobian(
   paramcache)
 
   uh = EvaluationFunction(paramcache.trial,u)
-  trial = evaluate(get_trial(op.op),nothing)
+  trial = get_trial(op.op)
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
@@ -94,7 +86,7 @@ function ODEs.jacobian_add!(
   paramcache)
 
   uh = EvaluationFunction(paramcache.trial,u)
-  trial = evaluate(get_trial(op.op),nothing)
+  trial = get_trial(op.op)
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
@@ -109,9 +101,9 @@ function ODEs.jacobian_add!(
 end
 
 """
-    const SplitParamOpFromFEOp{O} = ParamOpFromFEOp{O,SplitDomains}
+    const SplitParamOpFromFEOp{O<:UnEvalOperatorType} = ParamOpFromFEOp{O,SplitDomains}
 """
-const SplitParamOpFromFEOp{O} = ParamOpFromFEOp{O,SplitDomains}
+const SplitParamOpFromFEOp{O<:UnEvalOperatorType} = ParamOpFromFEOp{O,SplitDomains}
 
 function Algebra.allocate_residual(
   op::SplitParamOpFromFEOp,
@@ -167,7 +159,7 @@ function Algebra.allocate_jacobian(
   paramcache)
 
   uh = EvaluationFunction(paramcache.trial,u)
-  trial = evaluate(get_trial(op.op),nothing)
+  trial = get_trial(op.op)
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
@@ -190,7 +182,7 @@ function ODEs.jacobian_add!(
   paramcache)
 
   uh = EvaluationFunction(paramcache.trial,u)
-  trial = evaluate(get_trial(op.op),nothing)
+  trial = get_trial(op.op)
   du = get_trial_fe_basis(trial)
   test = get_test(op.op)
   v = get_fe_basis(test)
@@ -207,100 +199,33 @@ function ODEs.jacobian_add!(
   A
 end
 
-struct LinearNonlinearParamOpFromFEOp{T} <: ParamOperator{LinearNonlinearParamEq,T}
-  op::LinearNonlinearParamFEOperator{T}
+struct LinearNonlinearParamOpFromFEOp{O,T} <: ParamOperator{O,T}
+  op::LinearNonlinearParamFEOperator{O,T}
 end
 
 get_fe_operator(op::LinearNonlinearParamOpFromFEOp) = op.op
 
-function get_linear_operator(op::LinearNonlinearParamOpFromFEOp)
-  get_algebraic_operator(get_linear_operator(op.op))
+function ParamAlgebra.get_linear_operator(op::LinearNonlinearParamOpFromFEOp)
+  op_lin = get_linear_operator(op.op)
+  get_algebraic_operator(op_lin)
 end
 
-function get_nonlinear_operator(op::LinearNonlinearParamOpFromFEOp)
-  get_algebraic_operator(get_nonlinear_operator(op.op))
-end
-
-function allocate_paramcache(
-  op::LinearNonlinearParamOpFromFEOp,
-  μ::Realization,
-  u::AbstractVector)
-
-  op_lin = get_linear_operator(op)
-  op_nlin = get_nonlinear_operator(op)
-
-  paramcache = allocate_paramcache(op_nlin,μ,u)
-  A_lin,b_lin = allocate_systemcache(op_lin,μ,u,paramcache)
-
-  return ParamOpSysCache(paramcache,A_lin,b_lin)
-end
-
-function update_paramcache!(
-  cache,
-  op::LinearNonlinearParamOpFromFEOp,
-  μ::Realization)
-
-  update_paramcache!(cache.paramcache,get_nonlinear_operator(op),μ)
-end
-
-function Algebra.allocate_residual(
-  op::LinearNonlinearParamOpFromFEOp,
-  μ::Realization,
-  u::AbstractVector,
-  cache)
-
-  b_lin = cache.b
-  copy(b_lin)
-end
-
-function Algebra.allocate_jacobian(
-  op::LinearNonlinearParamOpFromFEOp,
-  μ::Realization,
-  u::AbstractVector,
-  cache)
-
-  A_lin = cache.A
-  copy(A_lin)
-end
-
-function Algebra.residual!(
-  b,
-  op::LinearNonlinearParamOpFromFEOp,
-  μ::Realization,
-  u::AbstractVector,
-  cache)
-
-  A_lin = cache.A
-  b_lin = cache.b
-  paramcache = cache.paramcache
-  residual!(b,get_nonlinear_operator(op),μ,u,paramcache)
-  mul!(b,A_lin,u,1,1)
-  axpy!(1,b_lin,b)
-  b
-end
-
-function ODEs.jacobian_add!(
-  A,
-  op::LinearNonlinearParamOpFromFEOp,
-  μ::Realization,
-  u::AbstractVector,
-  cache)
-
-  A_lin = cache.A
-  paramcache = cache.paramcache
-  jacobian_add!(A,get_nonlinear_operator(op),μ,u,paramcache)
-  axpy!(1,A_lin,A)
-  A
+function ParamAlgebra.get_nonlinear_operator(op::LinearNonlinearParamOpFromFEOp)
+  op_nlin = get_nonlinear_operator(op.op)
+  get_algebraic_operator(op_nlin)
 end
 
 # utils
 
 """
     function collect_cell_matrix_for_trian(
-      trial::FESpace,test::FESpace,a::DomainContribution,strian::Triangulation
+      trial::FESpace,
+      test::FESpace,
+      a::DomainContribution,
+      strian::Triangulation
       ) -> Tuple{Vector{<:Any},Vector{<:Any},Vector{<:Any}}
 
-Interface for computing the matrix data to be sent to the assembler, for a given
+Computes the cell-wise data needed to assemble a global sparse matrix for a given
 input triangulation `strian`
 """
 function collect_cell_matrix_for_trian(
@@ -321,10 +246,12 @@ end
 
 """
     function collect_cell_vector_for_trian(
-      test::FESpace,a::DomainContribution,strian::Triangulation
+      test::FESpace,
+      a::DomainContribution,
+      strian::Triangulation
       ) -> Tuple{Vector{<:Any},Vector{<:Any}}
 
-Interface for computing the vector data to be sent to the assembler, for a given
+Computes the cell-wise data needed to assemble a global vector for a given
 input triangulation `strian`
 """
 function collect_cell_vector_for_trian(

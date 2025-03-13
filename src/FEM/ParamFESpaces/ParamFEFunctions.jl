@@ -11,7 +11,7 @@ abstract type ParamFEFunction <: FEFunction end
 """
     struct SingleFieldParamFEFunction{T<:CellField} <: ParamFEFunction
       cell_field::T
-      cell_dof_values::AbstractArray{<:AbstractParamVector{<:Number}}
+      cell_dof_values::AbstractArray{<:ParamBlock}
       free_values::AbstractParamVector{<:Number}
       dirichlet_values::AbstractParamVector{<:Number}
       fe_space::SingleFieldFESpace
@@ -19,7 +19,7 @@ abstract type ParamFEFunction <: FEFunction end
 """
 struct SingleFieldParamFEFunction{T<:CellField} <: ParamFEFunction
   cell_field::T
-  cell_dof_values::AbstractArray{<:AbstractParamVector{<:Number}}
+  cell_dof_values::AbstractArray{<:ParamBlock}
   free_values::AbstractParamVector{<:Number}
   dirichlet_values::AbstractParamVector{<:Number}
   fe_space::SingleFieldFESpace
@@ -27,7 +27,7 @@ end
 
 function FESpaces.SingleFieldFEFunction(
   cell_field::T,
-  cell_dof_values::AbstractArray{<:AbstractParamVector{<:Number}},
+  cell_dof_values::AbstractArray{<:ParamBlock},
   free_values::AbstractParamVector{<:Number},
   dirichlet_values::AbstractParamVector{<:Number},
   fs::SingleFieldFESpace) where T

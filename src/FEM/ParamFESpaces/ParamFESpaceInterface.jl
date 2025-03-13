@@ -100,7 +100,7 @@ function param_zero_free_values(f::FESpace)
   L = param_length(f)
   v = allocate_vector(V,get_free_dof_ids(f))
   fill!(v,zero(eltype(V)))
-  pv = consecutive_parameterize(v,L)
+  pv = global_parameterize(v,L)
   return pv
 end
 
@@ -114,14 +114,14 @@ function param_zero_dirichlet_values(f::FESpace)
   L = param_length(f)
   v = allocate_vector(V,get_dirichlet_dof_ids(f))
   fill!(v,zero(eltype(V)))
-  pv = consecutive_parameterize(v,L)
+  pv = global_parameterize(v,L)
   return pv
 end
 
 function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   V = get_vector_type(get_fe_space(f))
   L = param_length(f)
-  PV = consecutive_parameterize(V(),L)
+  PV = global_parameterize(V(),L)
   typeof(PV)
 end
 
@@ -267,7 +267,6 @@ function FESpaces._fill_dirichlet_values_for_tag!(
   tag,
   dirichlet_dof_to_tag)
 
-  @check MemoryLayoutStyle(dirichlet_values) == MemoryLayoutStyle(dv) == ConsecutiveMemory()
   @check param_length(dirichlet_values) == param_length(dv)
   diri_data = get_all_data(dirichlet_values)
   dv_data = get_all_data(dv)
@@ -289,7 +288,6 @@ function FESpaces._free_and_dirichlet_values_fill!(
   cell_dofs,
   cells)
 
-  @check MemoryLayoutStyle(dirichlet_vals) == MemoryLayoutStyle(free_vals) == ConsecutiveMemory()
   @check param_length(free_vals) == param_length(dirichlet_vals)
   free_data = get_all_data(free_vals)
   diri_data = get_all_data(dirichlet_vals)

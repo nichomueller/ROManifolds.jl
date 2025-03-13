@@ -20,8 +20,6 @@ function Arrays.VectorWithEntryRemoved(a::AbstractParamVector,index::Int)
   ParamVectorWithEntryRemoved(a,index)
 end
 
-MemoryLayoutStyle(::Type{<:ParamVectorWithEntryRemoved}) = ConsecutiveMemory()
-
 get_all_data(v::ParamVectorWithEntryRemoved) = MatrixWithRowRemoved(get_all_data(v.a),v.index)
 
 param_length(v::ParamVectorWithEntryRemoved) = param_length(v.a)
@@ -57,8 +55,6 @@ end
 function Arrays.VectorWithEntryInserted(a::AbstractParamVector,index::Int,value::AbstractVector)
   ParamVectorWithEntryInserted(a,index,value)
 end
-
-MemoryLayoutStyle(::Type{<:ParamVectorWithEntryInserted}) = ConsecutiveMemory()
 
 get_all_data(v::ParamVectorWithEntryInserted) = MatrixWithRowInserted(get_all_data(v.a),v.index,v.value)
 

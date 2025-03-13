@@ -51,12 +51,21 @@ should be computed keeping the contributions relative to each triangulation sepa
 struct SplitDomains <: TriangulationStyle end
 
 """
-    abstract type ParamOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: NonlinearOperator end
+    abstract type ParamOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: NonlinearParamOperator end
 
-Type representing algebraic operators (i.e. `NonlinearOperator` in `Gridap`) when
-solving parametric differential problems
+Type representing algebraic operators when solving parametric differential problems
 """
-abstract type ParamOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: NonlinearOperator end
+abstract type ParamOperator{O<:UnEvalOperatorType,T<:TriangulationStyle} <: NonlinearParamOperator end
+
+"""
+    const JointParamOperator{O<:UnEvalOperatorType} = ParamOperator{O,JointDomains}
+"""
+const JointParamOperator{O<:UnEvalOperatorType} = ParamOperator{O,JointDomains}
+
+"""
+    const SplitParamOperator{O<:UnEvalOperatorType} = ParamOperator{O,SplitDomains}
+"""
+const SplitParamOperator{O<:UnEvalOperatorType} = ParamOperator{O,SplitDomains}
 
 """
     get_fe_operator(op::ParamOperator) -> ParamFEOperator
@@ -65,216 +74,124 @@ Fetches the underlying FE operator of an algebraic operator `op`
 """
 get_fe_operator(op::ParamOperator) = @abstractmethod
 
-function Algebra.allocate_residual(
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector,
-  paramcache)
-
-  @abstractmethod
-end
-
-function Algebra.residual!(
-  b,
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector,
-  paramcache)
-
-  @abstractmethod
-end
-
-function Algebra.residual(
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector)
-
-  paramcache = allocate_paramcache(op,μ,u)
-  residual(op,μ,u,paramcache)
-end
-
-function Algebra.residual(
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector,
-  paramcache)
-
-  b = allocate_residual(op,μ,u,paramcache)
-  residual!(b,op,μ,u,paramcache)
-  b
-end
-
-function Algebra.allocate_jacobian(
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector,
-  paramcache)
-
-  @abstractmethod
-end
-
-function Algebra.jacobian!(
-  A,
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector,
-  paramcache)
-
-  LinearAlgebra.fillstored!(A,zero(eltype(A)))
-  jacobian_add!(A,op,μ,u,paramcache)
-  A
-end
-
-function Algebra.jacobian(
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector)
-
-  paramcache = allocate_paramcache(op,μ,u)
-  jacobian(op,μ,u,paramcache)
-end
-
-function Algebra.jacobian(
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector,
-  paramcache)
-
-  A = allocate_jacobian(op,μ,u,paramcache)
-  jacobian!(A,op,μ,u,paramcache)
-  A
-end
-
 FESpaces.get_test(op::ParamOperator) = get_test(get_fe_operator(op))
 FESpaces.get_trial(op::ParamOperator) = get_trial(get_fe_operator(op))
+ODEs.get_res(op::ParamOperator) = ODEs.get_res(get_fe_operator(op))
+get_jac(op::ParamOperator) = get_jac(get_fe_operator(op))
+
 DofMaps.get_dof_map(op::ParamOperator) = get_dof_map(get_fe_operator(op))
 DofMaps.get_internal_dof_map(op::ParamOperator) = get_internal_dof_map(get_fe_operator(op))
 DofMaps.get_sparse_dof_map(op::ParamOperator) = get_sparse_dof_map(get_fe_operator(op))
 get_dof_map_at_domains(op::ParamOperator) = get_dof_map_at_domains(get_fe_operator(op))
 get_sparse_dof_map_at_domains(op::ParamOperator) = get_sparse_dof_map_at_domains(get_fe_operator(op))
+CellData.get_domains(op::ParamOperator) = get_domains(get_fe_operator(op))
 
-"""
-    allocate_paramcache(op::ParamOperator,μ::Realization,u::AbstractVector
-      ) -> ParamOpCache
+set_domains(op::ParamOperator,args...) = get_algebraic_operator(set_domains(get_fe_operator(op),args...))
+change_domains(op::ParamOperator,args...) = get_algebraic_operator(change_domains(get_fe_operator(op),args...))
+get_domains_res(op::ParamOperator) = get_domains_res(get_fe_operator(op))
+get_domains_jac(op::ParamOperator) = get_domains_jac(get_fe_operator(op))
 
-Similar to `allocate_odecache` in `Gridap`, when dealing with
-parametric problems
-"""
-function allocate_paramcache(
-  op::ParamOperator,
-  μ::Realization,
-  u::AbstractVector)
+get_param_space(op::ParamOperator) = get_param_space(get_fe_operator(op))
+ParamDataStructures.realization(op::ParamOperator;kwargs...) = realization(get_fe_operator(op);kwargs...)
 
+get_param_assembler(op::ParamOperator,r::AbstractRealization) = get_param_assembler(get_fe_operator(op),r)
+FESpaces.assemble_matrix(op::ParamOperator,form::Function) = assemble_matrix(get_fe_operator(op),form)
+
+function ParamAlgebra.allocate_paramcache(op::ParamOperator,μ::AbstractRealization)
   feop = get_fe_operator(op)
   ptrial = get_trial(feop)
   trial = evaluate(ptrial,μ)
-  ParamOpCache(trial,ptrial)
+  ParamCache(trial,ptrial)
 end
 
-"""
-    update_paramcache!(paramcache,op::ParamOperator,μ::Realization) -> ParamOpCache
+const LinearNonlinearParamOperator{T<:TriangulationStyle} = ParamOperator{LinearNonlinearParamEq,T}
 
-Similar to `update_odecache!` in `Gridap`, when dealing with
-parametric problems
-"""
-function update_paramcache!(paramcache,op::ParamOperator,μ::Realization)
-  paramcache.trial = evaluate!(paramcache.trial,paramcache.ptrial,μ)
-  paramcache
+get_fe_operator(op::LinearNonlinearParamOperator) = get_fe_operator(get_nonlinear_operator(op))
+join_operators(op::LinearNonlinearParamOperator) = get_algebraic_operator(join_operators(get_fe_operator(op)))
+
+function ParamAlgebra.allocate_paramcache(op::LinearNonlinearParamOperator,μ::AbstractRealization)
+  op_nlin = get_nonlinear_operator(op)
+  allocate_paramcache(op_nlin,μ)
 end
 
-function allocate_systemcache(
-  op::ParamOperator{LinearParamEq},
+function ParamAlgebra.allocate_systemcache(op::LinearNonlinearParamOperator,u::AbstractVector)
+  op_nlin = get_nonlinear_operator(op)
+  allocate_systemcache(op_nlin,u)
+end
+
+function ParamAlgebra.update_paramcache!(
+  paramcache::AbstractParamCache,
+  op::LinearNonlinearParamOperator,
+  μ::AbstractRealization)
+
+  op_nlin = get_nonlinear_operator(op)
+  update_paramcache!(paramcache,op_nlin,μ)
+end
+
+function ParamDataStructures.parameterize(op::LinearNonlinearParamOperator,μ::AbstractRealization)
+  op_lin = parameterize(get_linear_operator(op),μ)
+  op_nlin = parameterize(get_nonlinear_operator(op),μ)
+  syscache_lin = allocate_systemcache(op_lin)
+  LinNonlinParamOperator(op_lin,op_nlin,syscache_lin)
+end
+
+function Algebra.allocate_residual(
+  op::LinearNonlinearParamOperator,
   μ::Realization,
   u::AbstractVector,
   paramcache)
 
-  u0 = copy(u)
-  fill!(u0,zero(eltype(u0)))
-  A = jacobian(op,μ,u0,paramcache)
-  b = residual(op,μ,u0,paramcache)
-  return A,b
-end
-
-"""
-    abstract type AbstractParamCache <: GridapType end
-"""
-abstract type AbstractParamCache <: GridapType end
-
-"""
-    mutable struct ParamOpCache <: AbstractParamCache
-      trial
-      ptrial
-    end
-"""
-mutable struct ParamOpCache <: AbstractParamCache
-  trial
-  ptrial
-end
-
-"""
-    struct ParamOpSysCache{Ta,Tb} <: AbstractParamCache
-      paramcache::ParamOpCache
-      A::Ta
-      b::Tb
-    end
-"""
-struct ParamOpSysCache{Ta,Tb} <: AbstractParamCache
-  paramcache::ParamOpCache
-  A::Ta
-  b::Tb
-end
-
-"""
-    struct ParamNonlinearOperator <: NonlinearOperator
-      op::ParamOperator
-      μ::Realization
-      paramcache::AbstractParamCache
-    end
-
-Fields:
-- `op`: `ParamOperator` representing a parametric differential problem
-- `μ`: `Realization` representing the parameters at which the problem is solved
-- `paramcache`: cache of the problem
-"""
-struct ParamNonlinearOperator <: NonlinearOperator
-  op::ParamOperator
-  μ::Realization
-  paramcache::AbstractParamCache
-end
-
-function ParamNonlinearOperator(op::ParamOperator,μ::Realization)
-  trial = get_trial(op)(μ)
-  u = zero_free_values(trial)
-  paramcache = allocate_paramcache(op,μ,u)
-  ParamNonlinearOperator(op,μ,paramcache)
-end
-
-function Algebra.allocate_residual(
-  nlop::ParamNonlinearOperator,
-  x::AbstractVector)
-
-  allocate_residual(nlop.op,nlop.μ,x,nlop.paramcache)
-end
-
-function Algebra.residual!(
-  b::AbstractVector,
-  nlop::ParamNonlinearOperator,
-  x::AbstractVector)
-
-  residual!(b,nlop.op,nlop.μ,x,nlop.paramcache)
+  @notimplemented "This is inefficient. Instead, assemble the nonlinear system
+  by defining a [`LinearNonlinearParamOperator`](@ref)"
 end
 
 function Algebra.allocate_jacobian(
-  nlop::ParamNonlinearOperator,
-  x::AbstractVector)
+  op::LinearNonlinearParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
 
-  allocate_jacobian(nlop.op,nlop.μ,x,nlop.paramcache)
+  @notimplemented "This is inefficient. Instead, assemble the nonlinear system
+  by defining a [`LinearNonlinearParamOperator`](@ref)"
 end
 
-function Algebra.jacobian!(
-  A::AbstractMatrix,
-  nlop::ParamNonlinearOperator,
-  x::AbstractVector)
+function Algebra.residual!(
+  b,
+  op::LinearNonlinearParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
 
-  jacobian!(A,nlop.op,nlop.μ,x,nlop.paramcache)
+  @notimplemented "This is inefficient. Instead, assemble the nonlinear system
+  by defining a [`LinearNonlinearParamOperator`](@ref)"
+end
+
+function ODEs.jacobian_add!(
+  A,
+  op::LinearNonlinearParamOperator,
+  μ::Realization,
+  u::AbstractVector,
+  paramcache)
+
+  @notimplemented "This is inefficient. Instead, assemble the nonlinear system
+  by defining a [`LinearNonlinearParamOperator`](@ref)"
+end
+
+# constructors
+
+function LinearParamOperator(args...;kwargs...)
+  feop = LinearParamFEOperator(args...;kwargs...)
+  get_algebraic_operator(feop)
+end
+
+function ParamOperator(args...;kwargs...)
+  feop = ParamFEOperator(args...;kwargs...)
+  get_algebraic_operator(feop)
+end
+
+function LinearNonlinearParamOperator(op_lin::ParamOperator,op_nlin::ParamOperator)
+  feop_lin = get_fe_operator(op_lin)
+  feop_nlin = get_fe_operator(op_nlin)
+  feop = LinearNonlinearParamFEOperator(feop_lin,feop_nlin)
+  get_algebraic_operator(feop)
 end

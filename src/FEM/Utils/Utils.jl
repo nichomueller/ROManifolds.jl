@@ -11,7 +11,7 @@ using Gridap.FESpaces
 using Gridap.Fields
 using Gridap.Geometry
 using Gridap.Helpers
-using Gridap.MultiField
+using Gridap.ReferenceFEs
 using Gridap.TensorValues
 
 using GridapEmbedded.Interfaces
@@ -44,6 +44,8 @@ export MatrixContribution
 export TupOfArrayContribution
 export contribution
 export get_contributions
+export change_domains
+export set_domains
 include("Contributions.jl")
 
 end # module

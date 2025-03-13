@@ -1,6 +1,6 @@
 """
     struct HRParamArray{T,N,A,B,C<:ParamArray{T,N}} <: ParamArray{T,N}
-      fe_quantity::A
+      fecache::A
       coeff::B
       hypred::C
     end
@@ -8,17 +8,17 @@
 Parametric vector returned after the online phase of a hyper-reduction strategy.
 Fields:
 
-- `fe_quantity`: represents a parametric residual/Jacobian computed via integration
-  on an [`AbstractIntegrationDomain`](@ref)
+- `fecache`: represents a parametric residual/Jacobian computed via integration
+  on an [`IntegrationDomain`](@ref)
 - `coeff`: parameter-dependent coefficient computed during the online phase
-  according to the formula `coeff = Φi⁻¹ * fe_quantity[i,:]`, where `(Φi,i)` are
+  according to the formula `coeff = Φi⁻¹ * fecache[i,:]`, where `(Φi,i)` are
   stored in a `HyperReduction` object
 - `hypred`: the ouptut of the online phase of a hyper-reduction strategy, acoording
   to the formula `hypred = Φrb * coeff`, where `Φrb` is stored in a
   `HyperReduction` object
 """
 struct HRParamArray{T,N,A,B,C<:ParamArray{T,N}} <: ParamArray{T,N}
-  fe_quantity::A
+  fecache::A
   coeff::B
   hypred::C
 end
@@ -33,7 +33,7 @@ ParamDataStructures.param_getindex(a::HRParamArray,i::Integer) = param_getindex(
 for f in (:(Base.copy),:(Base.similar))
   @eval begin
     function $f(a::HRParamArray)
-      fe_quantity′ = $f(a.fe_quantity)
+      fe_quantity′ = $f(a.fecache)
       coeff′ = $f(a.coeff)
       hypred′ = $f(a.hypred)
       HRParamArray(fe_quantity′,coeff′,hypred′)
@@ -42,7 +42,7 @@ for f in (:(Base.copy),:(Base.similar))
 end
 
 function Base.copyto!(a::HRParamArray,b::HRParamArray)
-  copyto!(a.fe_quantity,b.fe_quantity)
+  copyto!(a.fecache,b.fecache)
   copyto!(a.coeff,b.coeff)
   copyto!(a.hypred,b.hypred)
   a
@@ -68,12 +68,16 @@ function LinearAlgebra.norm(a::HRParamArray)
   norm(a.hypred)
 end
 
-for (T,S) in zip((:AffineContribution,:BlockHyperReduction),(:ArrayContribution,:ArrayBlock))
-  @eval begin
-    function inv_project!(cache::HRParamArray,a::$T,b::$S)
-      hypred = cache.hypred
-      coeff = cache.coeff
-      inv_project!(hypred,coeff,a,b)
-    end
-  end
+# utils
+
+function Utils.change_domains(a::HRParamArray,trians)
+  fecache = change_domains(a.fecache,trians)
+  coeff = change_domains(a.coeff,trians)
+  hypred = a.hypred
+  HRParamArray(fecache,coeff,hypred)
+end
+
+function ParamAlgebra.compatible_cache(a::HRParamArray,b::HRParamArray)
+  hypred′ = compatible_cache(a.hypred,b.hypred)
+  HRParamArray(a.fecache,a.coeff,hypred′)
 end

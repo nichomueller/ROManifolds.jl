@@ -1,5 +1,5 @@
 # check TransientMDEIMReduction for more details
-time_combinations(fesolver::ODESolver) = @notimplemented
+time_combinations(fesolver::ODESolver) = @notimplemented "For now, only theta methods are implemented"
 
 function time_combinations(fesolver::GeneralizedAlpha1)
   combine_res(x) = nothing
@@ -43,16 +43,18 @@ function RBSteady.RBSolver(
 end
 
 RBSteady.num_jac_params(s::RBSolver{<:ODESolver}) = num_params(first(s.jacobian_reduction))
+get_system_solver(s::RBSolver{<:ODESolver}) = ShiftedSolver(s.fesolver)
 
 function RBSteady.solution_snapshots(
-  fesolver::ODESolver,
-  feop::TransientParamFEOperator,
+  solver::RBSolver,
+  feop::ODEParamOperator,
   r::TransientRealization,
   args...)
 
+  fesolver = get_fe_solver(solver)
   sol = solve(fesolver,feop,r,args...)
-  values,stats = collect(sol.odesol)
-  initial_values = collect_initial_values(sol.odesol)
+  values,stats = collect(sol)
+  initial_values = initial_condition(sol)
   i = get_dof_map(feop)
   snaps = Snapshots(values,initial_values,i,r)
   return snaps,stats
@@ -66,7 +68,7 @@ function RBSteady.residual_snapshots(
 
   fesolver = get_fe_solver(solver)
   sres = select_snapshots(s,nparams)
-  us_res = (get_param_data(sres),)
+  us_res = get_param_data(sres)
   us0_res = get_initial_data(sres)
   r_res = get_realization(sres)
   b = residual(fesolver,odeop,r_res,us_res,us0_res)
@@ -93,7 +95,7 @@ function RBSteady.jacobian_snapshots(
 
   fesolver = get_fe_solver(solver)
   sjac = select_snapshots(s,nparams)
-  us_jac = (get_param_data(sjac),)
+  us_jac = get_param_data(sjac)
   us0_jac = get_initial_data(sjac)
   r_jac = get_realization(sjac)
   A = jacobian(fesolver,odeop,r_jac,us_jac,us0_jac)
@@ -116,4 +118,25 @@ function RBSteady.jacobian_snapshots(
   jac_lin = jacobian_snapshots(solver,get_linear_operator(op),s;kwargs...)
   jac_nlin = jacobian_snapshots(solver,get_nonlinear_operator(op),s;kwargs...)
   return (jac_lin,jac_nlin)
+end
+
+# Solve a POD-MDEIM problem
+
+function Algebra.solve(
+  solver::RBSolver,
+  op::NonlinearOperator,
+  r::TransientRealization,
+  xh0::Union{Function,AbstractVector})
+
+  trial = get_trial(op)(r)
+  x̂ = zero_free_values(trial)
+
+  nlop = parameterize(op,r)
+  syscache = allocate_systemcache(nlop,x̂)
+
+  fesolver = get_system_solver(solver)
+  t = @timed solve!(x̂,fesolver,nlop,syscache)
+  stats = CostTracker(t,nruns=num_params(r),name="RB")
+
+  return x̂,stats
 end

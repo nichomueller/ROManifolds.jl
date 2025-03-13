@@ -57,9 +57,9 @@ l(μ,u,v,dΓ1,dΓ2,dΓ3) = ∫(v⋅h1μ(μ))dΓ1 + ∫(v⋅h2μ(μ))dΓ2 + ∫(v
 
 trian_l,trian_a = (Γ1,Γ2,Γ3),(Ω,)
 domains = FEDomains(trian_l,trian_a)
-feop = LinearParamFEOperator(l,a,pspace,trial,test,domains)
+feop = LinearParamOperator(l,a,pspace,trial,test,domains)
 
-fesolver = LinearFESolver(LUSolver())
+fesolver = LUSolver()
 
 tol = fill(1e-5,4)
 energy(du,v) = ∫(v⋅du)dΩ + ∫(∇(v)⊙∇(du))dΩ

@@ -1,12 +1,12 @@
 """
-    struct RBSolver{A<:GridapType,B}
+    struct RBSolver{A<:GridapType,B} <: GridapType
       fesolver::A
       state_reduction::Reduction
       residual_reduction::Reduction
       jacobian_reduction::B
     end
 
-Wrapper around a FE solver (e.g. `FESolver` or `ODESolver` in `Gridap`) with
+Wrapper around a FE solver (e.g. `NonlinearSolver` or `ODESolver` in `Gridap`) with
 additional information on the reduced basis (RB) method employed to solve a given
 problem dependent on a set of parameters. A RB method is a projection-based
 reduced order model where
@@ -31,7 +31,7 @@ In particular:
 - nparams_test:  number of snapshots considered when computing the error the RB
   method commits with respect to the FE procedure
 """
-struct RBSolver{A<:GridapType,B}
+struct RBSolver{A<:GridapType,B} <: GridapType
   fesolver::A
   state_reduction::Reduction
   residual_reduction::Reduction
@@ -51,9 +51,9 @@ function RBSolver(
 end
 
 """
-    get_fe_solver(s::RBSolver) -> FESolver
+    get_fe_solver(s::RBSolver) -> NonlinearSolver
 
-Returns the underlying `FESolver` from a [`RBSolver`](@ref) `s`
+Returns the underlying `NonlinearSolver` from a [`RBSolver`](@ref) `s`
 """
 get_fe_solver(s::RBSolver) = s.fesolver
 get_state_reduction(s::RBSolver) = s.state_reduction
@@ -70,43 +70,45 @@ res_params(s::RBSolver) = 1:num_res_params(s)
 jac_params(s::RBSolver) = 1:num_jac_params(s)
 
 """
-    solution_snapshots(solver::FESolver,op::ParamFEOperator,r::Realization) -> SteadySnapshots
-    solution_snapshots(solver::ODESolver,op::TransientParamFEOperator,r::TransientRealization,u0) -> TransientSnapshots
+    solution_snapshots(solver::NonlinearSolver,feop::ParamOperator,r::Realization) -> SteadySnapshots
+    solution_snapshots(solver::ODESolver,feop::TransientParamOperator,r::TransientRealization,u0) -> TransientSnapshots
 
-The problem encoded in the FE operator `op` is solved several times, and the solution
+The problem encoded in the FE operator `feop` is solved several times, and the solution
 snapshots are returned along with the information related to the computational
 cost of the FE method. In transient settings, an initial condition `u0` should be
 provided.
 """
 function solution_snapshots(
   solver::RBSolver,
-  op::ParamFEOperator,
+  feop::ParamOperator,
   args...;
   nparams=num_offline_params(solver),
-  r=realization(op;nparams))
+  r=realization(feop;nparams))
 
-  fesolver = get_fe_solver(solver)
-  solution_snapshots(fesolver,op,r,args...)
+  solution_snapshots(solver,feop,r,args...)
 end
 
 function solution_snapshots(
   solver::RBSolver,
-  op::ParamFEOperator,
+  feop::ParamOperator,
   r::AbstractRealization,
   args...)
 
   fesolver = get_fe_solver(solver)
-  solution_snapshots(fesolver,op,r,args...)
+  dof_map = get_dof_map(feop)
+  values,stats = solve(fesolver,feop,r)
+  snaps = Snapshots(values,dof_map,r)
+  return snaps,stats
 end
 
+# not needed
 function solution_snapshots(
-  fesolver::FESolver,
-  op::ParamFEOperator,
+  fesolver::NonlinearSolver,
+  op::ParamOperator,
   r::Realization)
 
   dof_map = get_dof_map(op)
-  uh,stats = solve(fesolver,op,r)
-  values = get_free_dof_values(uh)
+  values,stats = solve(fesolver,op,r)
   snaps = Snapshots(values,dof_map,r)
   return snaps,stats
 end
@@ -205,4 +207,69 @@ function jacobian_snapshots(
   jac_lin = jacobian_snapshots(solver,get_linear_operator(op),s;kwargs...)
   jac_nlin = jacobian_snapshots(solver,get_nonlinear_operator(op),s;kwargs...)
   return (jac_lin,jac_nlin)
+end
+
+# Solve a POD-MDEIM problem
+
+function Algebra.solve(
+  solver::RBSolver,
+  op::NonlinearOperator,
+  r::AbstractRealization)
+
+  trial = get_trial(op)(r)
+  x̂ = zero_free_values(trial)
+
+  nlop = parameterize(op,r)
+  syscache = allocate_systemcache(nlop,x̂)
+
+  fesolver = get_fe_solver(solver)
+  t = @timed solve!(x̂,fesolver,nlop,syscache)
+  stats = CostTracker(t,nruns=num_params(r),name="RB")
+
+  return x̂,stats
+end
+
+function Algebra._solve_nr!(
+  x::RBParamVector,
+  A::AbstractParamMatrix,
+  b::AbstractParamVector,
+  dx,ns,nls,op)
+
+  log = nls.log
+  change_tols!(log)
+
+  nlop = get_nonlinear_operator(op)
+  trial = get_trial(nlop.op)
+
+  res = norm(b)
+  done = LinearSolvers.init!(log,res)
+
+  while !done
+    @inbounds for i in param_eachindex(x)
+      xi = param_getindex(x,i)
+      Ai = param_getindex(A,i)
+      bi = param_getindex(b,i)
+      numerical_setup!(ns,Ai)
+      rmul!(bi,-1)
+      solve!(dx,ns,bi)
+      xi .+= dx
+    end
+
+    inv_project(trial,x)
+    residual!(b,op,x)
+    res  = norm(b)
+    done = LinearSolvers.update!(log,res)
+
+    if !done
+      jacobian!(A,op,x)
+    end
+  end
+
+  LinearSolvers.finalize!(log,res)
+  return x
+end
+
+function change_tols!(log::ConvergenceLog)
+  log.tols.rtol = 1e-5
+  log
 end

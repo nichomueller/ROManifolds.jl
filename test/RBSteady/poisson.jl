@@ -67,18 +67,18 @@ function main(
     state_reduction = Reduction(tolranks,energy;nparams,unsafe)
   end
 
-  fesolver = LinearFESolver(LUSolver())
+  fesolver = LUSolver()
   rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac)
 
   pspace_uniform = ParamSpace(pdomain;sampling=:uniform)
-  feop_uniform = LinearParamFEOperator(res,stiffness,pspace_uniform,trial,test,domains)
+  feop_uniform = LinearParamOperator(res,stiffness,pspace_uniform,trial,test,domains)
   μon = realization(feop_uniform;nparams=10)
   x,festats = solution_snapshots(rbsolver,feop_uniform,μon)
 
   for sampling in (:uniform,:halton,:latin_hypercube,:tensorial_uniform)
     println("Running $method test with sampling strategy $sampling")
     pspace = ParamSpace(pdomain;sampling)
-    feop = LinearParamFEOperator(res,stiffness,pspace,trial,test,domains)
+    feop = LinearParamOperator(res,stiffness,pspace,trial,test,domains)
 
     fesnaps, = solution_snapshots(rbsolver,feop)
     rbop = reduced_operator(rbsolver,feop,fesnaps)

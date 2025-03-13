@@ -23,6 +23,7 @@ using Gridap.Helpers
 using GridapSolvers
 using GridapSolvers.LinearSolvers
 using GridapSolvers.NonlinearSolvers
+using GridapSolvers.SolverInterfaces
 
 using ROManifolds.Utils
 using ROManifolds.DofMaps
@@ -60,6 +61,12 @@ include("ReductionMethods.jl")
 
 export galerkin_projection
 include("GalerkinProjections.jl")
+
+export RBParamVector
+include("RBParamVectors.jl")
+
+export HRParamArray
+include("HRParamArrays.jl")
 
 export AbstractTTCore
 export DofMapCore
@@ -118,18 +125,23 @@ export reduced_basis
 export get_reduced_subspace
 include("RBSpaces.jl")
 
-export RBParamVector
-include("RBParamVectors.jl")
-
-export AbstractIntegrationDomain
 export IntegrationDomain
+export VectorDomain
+export MatrixDomain
+export vector_domain
+export matrix_domain
+export empirical_interpolation
+export get_integration_cells
+export get_cellids_rows
+export get_cellids_cols
+export get_owned_icells
+include("IntegrationDomains.jl")
+
 export HyperReduction
-export EmptyHyperReduction
+export TrivialHyperReduction
 export MDEIM
 export AffineContribution
 export BlockHyperReduction
-export empirical_interpolation
-export integration_domain
 export get_integration_domain
 export reduced_triangulation
 export reduced_jacobian
@@ -138,20 +150,17 @@ export reduced_weak_form
 export allocate_hypred_cache
 include("HyperReductions.jl")
 
-export HRParamArray
-include("HRParamArrays.jl")
+export BlockReindex
+export collect_cell_hr_matrix
+export collect_cell_hr_vector
+export assemble_hr_matrix_add!
+export assemble_hr_vector_add!
+include("HRAssemblers.jl")
 
 export RBOperator
 export GenericRBOperator
 export LinearNonlinearRBOperator
-export RBCache
-export LinearNonlinearRBCache
 export reduced_operator
-export get_fe_trial
-export get_fe_test
-export fe_jacobian!
-export fe_residual!
-export allocate_rbcache
 include("ReducedOperators.jl")
 
 export ROMPerformance

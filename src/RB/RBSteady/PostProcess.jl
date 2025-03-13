@@ -110,7 +110,8 @@ end
 """
 function load_contribution(
   dir,
-  trian::Tuple{Vararg{Triangulation}};
+  trian::Tuple{Vararg{Triangulation}},
+  args...;
   f::Function=load_decomposition,
   label="")
 
@@ -132,21 +133,18 @@ function load_contribution(
   dec,redt = (),()
   for (i,t) in enumerate(trian)
     deci = f(dir;label=_get_label(label,i))
-    redti = reduced_triangulation(t,deci,args...)
-    if isa(redti,AbstractArray)
-      redti = Utils.merge_triangulations(redti)
-    end
+    redti = reduced_triangulation(t,deci)
     dec = (dec...,deci)
     redt = (redt...,redti)
   end
   return Contribution(dec,redt)
 end
 
-function DrWatson.save(dir,contrib::ArrayContribution,::SplitParamFEOperator;label="res")
+function DrWatson.save(dir,contrib::Contribution,::ParamOperator;label="res")
   save(dir,contrib;label)
 end
 
-function DrWatson.save(dir,contrib::TupOfArrayContribution,feop::LinearNonlinearParamFEOperator;label="res")
+function DrWatson.save(dir,contrib::Tuple{Vararg{Contribution}},feop::LinearNonlinearParamOperator;label="res")
   @check length(contrib) == 2
   save(dir,first(contrib),get_linear_operator(feop);label=_get_label(label,"lin"))
   save(dir,last(contrib),get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
@@ -154,23 +152,23 @@ end
 
 """
 """
-function load_residuals(dir,feop::SplitParamFEOperator;label="res")
+function load_residuals(dir,feop::ParamOperator;label="res")
   load_contribution(dir,get_domains_res(feop);load_snapshots,label)
 end
 
 """
 """
-function load_jacobians(dir,feop::SplitParamFEOperator;label="jac")
+function load_jacobians(dir,feop::ParamOperator;label="jac")
   load_contribution(dir,get_domains_jac(feop);load_snapshots,label)
 end
 
-function load_residuals(dir,feop::LinearNonlinearParamFEOperator;label="res")
+function load_residuals(dir,feop::LinearNonlinearParamOperator;label="res")
   res_lin = load_residuals(dir,get_linear_operator(feop);label=_get_label(label,"lin"))
   res_nlin = load_residuals(dir,get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
   return (res_lin,res_nlin)
 end
 
-function load_jacobians(dir,feop::LinearNonlinearParamFEOperator;label="jac")
+function load_jacobians(dir,feop::LinearNonlinearParamOperator;label="jac")
   jac_lin = load_jacobians(dir,get_linear_operator(feop);label=_get_label(label,"lin"))
   jac_nlin = load_jacobians(dir,get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
   return (jac_lin,jac_nlin)
@@ -182,8 +180,8 @@ function _save_fixed_operator_parts(dir,op;label="")
 end
 
 function _save_trian_operator_parts(dir,op::GenericRBOperator;label="")
-  save(dir,op.rhs;label=_get_label(label,"rhs"))
-  save(dir,op.lhs;label=_get_label(label,"lhs"))
+  save(dir,op.rhs,op.op;label=_get_label(label,"rhs"))
+  save(dir,op.lhs,op.op;label=_get_label(label,"lhs"))
 end
 
 function DrWatson.save(dir,op::GenericRBOperator;kwargs...)
@@ -197,47 +195,49 @@ function _load_fixed_operator_parts(dir,feop;label="")
   return trial,test
 end
 
-function _load_trian_operator_parts(dir,feop::SplitParamFEOperator,trial,test;label="")
+function _load_trian_operator_parts(dir,feop::ParamOperator,trial,test;label="")
   trian_res = get_domains_res(feop)
   trian_jac = get_domains_jac(feop)
-  pop = get_algebraic_operator(feop)
   red_rhs = load_contribution(dir,trian_res,test;label=_get_label(label,"rhs"))
   red_lhs = load_contribution(dir,trian_jac,trial,test;label=_get_label(label,"lhs"))
   trians_rhs = get_domains(red_rhs)
   trians_lhs = get_domains(red_lhs)
-  new_pop = change_domains(pop,trians_rhs,trians_lhs)
-  return new_pop,red_lhs,red_rhs
+  feop′ = change_domains(feop,trians_rhs,trians_lhs)
+  return feop′,red_lhs,red_rhs
 end
 
 """
-    load_operator(dir,feop::SplitParamFEOperator;kwargs...) -> RBOperator
-    load_operator(dir,feop::SplitTransientParamFEOperator;kwargs...) -> TransientRBOperator
+    load_operator(dir,feop::ParamOperator;kwargs...) -> RBOperator
 
 Given a FE operator `feop`, load its reduced counterpart stored in the
 directory `dir`. Throws an error if the reduced operator has not been previously
 saved to file
 """
-function load_operator(dir,feop::SplitParamFEOperator;kwargs...)
+function load_operator(dir,feop::ParamOperator;kwargs...)
   trial,test = _load_fixed_operator_parts(dir,feop;kwargs...)
   pop,red_lhs,red_rhs = _load_trian_operator_parts(dir,feop,trial,test;kwargs...)
   op = GenericRBOperator(pop,trial,test,red_lhs,red_rhs)
   return op
 end
 
-function DrWatson.save(dir,op::LinearNonlinearRBOperator;label="")
-  _save_fixed_operator_parts(dir,op.op_linear;label)
-  _save_trian_operator_parts(dir,op.op_linear;label=_get_label(label,"lin"))
-  _save_trian_operator_parts(dir,op.op_nonlinear;label=_get_label(label,"nlin"))
+function DrWatson.save(dir,feop::LinearNonlinearRBOperator;label="")
+  feop_lin = get_linear_operator(feop)
+  feop_nlin = get_nonlinear_operator(feop)
+  _save_fixed_operator_parts(dir,feop_lin;label)
+  _save_trian_operator_parts(dir,feop_lin;label=_get_label(label,"lin"))
+  _save_trian_operator_parts(dir,feop_nlin;label=_get_label(label,"nlin"))
 end
 
-function load_operator(dir,feop::LinearNonlinearParamFEOperator{SplitDomains};label="")
-  trial,test = _fixed_operator_parts(dir,feop.op_linear;label)
-  pop_lin,red_lhs_lin,red_rhs_lin = _load_trian_operator_parts(
-    dir,feop.op_linear,trial,test;label=_get_label("lin",label))
-  pop_nlin,red_lhs_nlin,red_rhs_nlin = _load_trian_operator_parts(
-    dir,feop.op_nonlinear,trial,test;label=_get_label("nlin",label))
-  op_lin = GenericRBOperator(pop_lin,trial,test,red_lhs_lin,red_rhs_lin)
-  op_nlin = GenericRBOperator(pop_nlin,trial,test,red_lhs_nlin,red_rhs_nlin)
+function load_operator(dir,feop::LinearNonlinearParamOperator;label="")
+  feop_lin = get_linear_operator(feop)
+  feop_nlin = get_nonlinear_operator(feop)
+  trial,test = _fixed_operator_parts(dir,feop_lin;label)
+  feop_lin′,red_lhs_lin,red_rhs_lin = _load_trian_operator_parts(
+    dir,feop_lin,trial,test;label=_get_label("lin",label))
+  feop_nlin′,red_lhs_nlin,red_rhs_nlin = _load_trian_operator_parts(
+    dir,feop_nlin,trial,test;label=_get_label("nlin",label))
+  op_lin = GenericRBOperator(feop_lin′,trial,test,red_lhs_lin,red_rhs_lin)
+  op_nlin = GenericRBOperator(feop_nlin′,trial,test,red_lhs_nlin,red_rhs_nlin)
   return LinearNonlinearRBOperator(op_lin,op_nlin)
 end
 
@@ -270,7 +270,7 @@ end
 """
     eval_performance(
       solver::RBSolver,
-      feop::ParamFEOperator,
+      feop::ParamOperator,
       fesnaps::AbstractSnapshots,
       rbsnaps::AbstractSnapshots,
       festats::CostTracker,
@@ -291,7 +291,7 @@ and `festats`
 """
 function eval_performance(
   solver::RBSolver,
-  feop::ParamFEOperator,
+  feop::ParamOperator,
   fesnaps::AbstractSnapshots,
   rbsnaps::AbstractSnapshots,
   festats::CostTracker,
@@ -314,8 +314,8 @@ end
 
 function eval_performance(
   solver::RBSolver,
-  feop::ParamFEOperator,
-  rbop::ParamOperator,
+  feop::ParamOperator,
+  rbop::RBOperator,
   fesnaps::AbstractSnapshots,
   x̂::AbstractParamVector,
   festats::CostTracker,
@@ -423,7 +423,7 @@ end
 """
     plot_a_solution(
       dir::String,
-      feop::ParamFEOperator,
+      feop::ParamOperator,
       sol::AbstractSnapshots,
       sol_approx::AbstractSnapshots,
       args...;
@@ -435,7 +435,7 @@ by selecting the first FE snapshot in `sol` and the first reduced snapshot in `s
 """
 function plot_a_solution(
   dir::String,
-  feop::ParamFEOperator,
+  feop::ParamOperator,
   sol::Snapshots,
   sol_approx::Snapshots;
   kwargs...)
@@ -446,7 +446,7 @@ end
 
 function plot_a_solution(
   dir::String,
-  feop::ParamFEOperator,
+  feop::ParamOperator,
   sol::BlockSnapshots,
   sol_approx::BlockSnapshots;
   kwargs...)
@@ -462,8 +462,8 @@ end
 
 function plot_a_solution(
   dir::String,
-  feop::ParamFEOperator,
-  rbop::ParamOperator,
+  feop::ParamOperator,
+  rbop::RBOperator,
   fesnaps::AbstractSnapshots,
   x̂::AbstractParamVector,
   r::AbstractRealization;

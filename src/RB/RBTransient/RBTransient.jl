@@ -31,8 +31,9 @@ using ROManifolds.ParamODEs
 using ROManifolds.RBSteady
 
 import Base: +,-,*,\
+import StatsBase: countmap
 import UnPack: @unpack
-import ROManifolds.RBSteady: _get_label
+import ROManifolds.RBSteady: reduced_cells,_get_label
 
 export TransientReduction
 export TransientMDEIMReduction
@@ -51,16 +52,15 @@ include("Projections.jl")
 
 include("RBSpaces.jl")
 
+export TransientIntegrationDomain
+include("IntegrationDomains.jl")
+
 include("HyperReductions.jl")
 
-include("HRParamArrays.jl")
+include("HRAssemblers.jl")
 
 export TransientRBOperator
-export GenericTransientRBOperator
-export LinearNonlinearTransientRBOperator
 include("ReducedOperators.jl")
-
-include("ThetaMethod.jl")
 
 include("PostProcess.jl")
 

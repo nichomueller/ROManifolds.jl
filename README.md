@@ -51,7 +51,7 @@ julia> include("examples/SteadyElasticityPOD.jl")
 ```
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/elasticity_pod/plot/rbsol.png" alt="drawing" style="width:50%; height:50%;"/>  |  <img src="docs/src/assets/results/elasticity_pod/results/convergence.png" alt="drawing" style="width:50%; height:50%;"/>
+<img src="docs/src/assets/results/elasticity_pod/plot/rbsol.png" alt="drawing" style="width:400px; height:250px;"/>  |  <img src="docs/src/assets/results/elasticity_pod/results/convergence.png" alt="drawing" style="width:400px; height:250px;"/>
 
 ### Test 2
 
@@ -62,21 +62,19 @@ julia> include("examples/SteadyElasticityTTSVD.jl")
 ```
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png" alt="drawing" style="width:50%; height:50%;"/>  |  <img src="docs/src/assets/results/elasticity_ttsvd/results/convergence.png" alt="drawing" style="width:50%; height:50%;"/>
+<img src="docs/src/assets/results/elasticity_ttsvd/plot/rbsol.png" alt="drawing" style="width:400px; height:250px;"/>  |  <img src="docs/src/assets/results/elasticity_ttsvd/results/convergence.png" alt="drawing" style="width:400px; height:250px;"/>
 
 ### Test 3
 
 Solve a steady Stokes equation with a proper orthogonal decomposition algorithm.
 
-![Example 3](examples/example3.png)
-
 ```julia
 julia> include("examples/SteadyStokesPOD.jl")
 ```
 
-Solution-velocity          |  Solution-pressure        |  Convergence
+Solution - velocity          |  Solution - pressure        |  Convergence
 :-------------------------:|:-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/stokes_pod/plot/rbvel.png" alt="drawing" style="width:50%; height:50%;"/>  |  <img src="docs/src/assets/results/stokes_pod/plot/rbpress" alt="drawing" style="width:50%; height:50%;"/>  |  <img src="docs/src/assets/results/stokes_pod/results/convergence.png" alt="drawing" style="width:50%; height:50%;"/> 
+<img src="docs/src/assets/results/stokes_pod/plot/rbvel.png" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/stokes_pod/plot/rbpress.png" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/stokes_pod/results/convergence.png" alt="drawing" style="width:275px; height:250px;"/> 
 
 ### Test 4 
 
@@ -88,7 +86,7 @@ julia> include("examples/HeatEquationSTRB.jl")
 
 Solution             |  Convergence
 :-------------------------:|:-------------------------:
-<img src="docs/src/assets/results/heateq_pod/plot/rbsol.gif" alt="drawing" style="width:50%; height:50%;"/>  |  <img src="docs/src/assets/results/heateq_pod/results/convergence.png" alt="drawing" style="width:50%; height:50%;"/> 
+<img src="docs/src/assets/results/heateq_pod/plot/rbsol.gif" alt="drawing" style="width:400px; height:250px;"/>  |  <img src="docs/src/assets/results/heateq_pod/results/convergence.png" alt="drawing" style="width:400px; height:250px;"/> 
 
 ### Test 5
 
@@ -98,4 +96,6 @@ Lastly, we solve a Navier-Stokes equation with a space-time RB method.
 julia> include("examples/NStokesTransientSTRB.jl")
 ```
 
-<!-- |![Example 3 velocity](docs/src/assets/results/transient_nstokes_pod/plot/rbvel.gif) ![Example 3 pressure](docs/src/assets/results/transient_nstokes_pod/plot/rbpress.gif) ![Example 3 convergence](docs/src/assets/results/transient_nstokes_pod/results/convergence.png)|  -->
+Solution - velocity          |  Solution - pressure        |  Convergence
+:-------------------------:|:-------------------------:|:-------------------------:
+<img src="docs/src/assets/results/nstokes_strb/plot/rbvel.gif" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/nstokes_strb/plot/rbpress.gif" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/nstokes_strb/results/convergence.png" alt="drawing" style="width:275px; height:250px;"/> 

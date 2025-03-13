@@ -26,6 +26,7 @@ import SparseArrays: AbstractSparseMatrix
 import SparseMatricesCSR: SparseMatrixCSR
 
 export recast_indices
+export recast_split_indices
 export sparsify_indices
 export slow_index
 export fast_index
@@ -33,6 +34,7 @@ export recast
 include("IndexOperations.jl")
 
 export Range2D
+export Range1D
 export range_1d
 export range_2d
 include("Ranges.jl")
