@@ -197,7 +197,7 @@ end
 
 function run_test(
   dir::String,rbsolver::RBSolver,feop::ParamFEOperator,tols=[1e-1,1e-2,1e-3,1e-4,1e-5],
-  args...;nparams=10)
+  args...;nparams=10,kwargs...)
 
   fesnaps = try_loading_fe_snapshots(dir,rbsolver,feop,args...)
 
@@ -224,7 +224,7 @@ function run_test(
     println(perf)
     push!(perfs,perf)
 
-    plot_a_solution(plot_dir_tol,feop,rbop,x,x̂,μon)
+    plot_a_solution(plot_dir_tol,feop,rbop,x,x̂,μon;kwargs...)
   end
 
   results_dir = joinpath(dir,"results")

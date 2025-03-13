@@ -1,4 +1,4 @@
-module NStokesTransientPOD
+module NStokesTransientSTRB
 
 using ROManifolds
 using Gridap
