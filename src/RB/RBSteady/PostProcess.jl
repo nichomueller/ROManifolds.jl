@@ -110,8 +110,7 @@ end
 """
 function load_contribution(
   dir,
-  trian::Tuple{Vararg{Triangulation}},
-  args...;
+  trian::Tuple{Vararg{Triangulation}};
   f::Function=load_decomposition,
   label="")
 
@@ -153,13 +152,13 @@ end
 """
 """
 function load_residuals(dir,feop::ParamOperator;label="res")
-  load_contribution(dir,get_domains_res(feop);load_snapshots,label)
+  load_contribution(dir,get_domains_res(feop);f=load_snapshots,label)
 end
 
 """
 """
 function load_jacobians(dir,feop::ParamOperator;label="jac")
-  load_contribution(dir,get_domains_jac(feop);load_snapshots,label)
+  load_contribution(dir,get_domains_jac(feop);f=load_snapshots,label)
 end
 
 function load_residuals(dir,feop::LinearNonlinearParamOperator;label="res")

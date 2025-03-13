@@ -2,11 +2,12 @@ function RBSteady.load_contribution(
   dir,
   trians::Tuple{Vararg{Tuple{Vararg{Triangulation}}}},
   args...;
-  label="")
+  label="",
+  kwargs...)
 
   c = ()
   for (i,trian) in enumerate(trians)
-    ci = load_contribution(dir,trian,args...;label=_get_label(label,i))
+    ci = load_contribution(dir,trian,args...;label=_get_label(label,i),kwargs...)
     c = (c...,ci)
   end
   return c

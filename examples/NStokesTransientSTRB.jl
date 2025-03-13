@@ -200,9 +200,60 @@ fesnaps, = ExamplesInterface.try_loading_fe_snapshots(dir,rbsolver,feop,xh0μ)
 x,festats,μon = ExamplesInterface.try_loading_online_fe_snapshots(
   dir,rbsolver,feop,xh0μ;reuse_online=true)
 
-rbop = reduced_operator(rbsolver,feop,fesnaps)
+# rbop = reduced_operator(rbsolver,feop,fesnaps)
 dir_tol = joinpath(dir,string(tol))
 create_dir(dir_tol)
-save(dir_tol,rbop)
+# save(dir_tol,rbop)
+rbop = load_operator(dir_tol,feop)
 
 x̂,rbstats = solve(rbsolver,rbop,μon,xh0μ)
+
+info_dir = joinpath(dir,"info")
+using Serialization
+cells_jac_lin = (deserialize(joinpath(info_dir,"cells_jac_1_1.jld")),
+  deserialize(joinpath(info_dir,"cells_jac_2_1.jld")))
+cells_jac_nlin = (deserialize(joinpath(info_dir,"cells_jac_nlin_1_1.jld")),)
+cells_res_lin = (deserialize(joinpath(info_dir,"cells_res_1.jld")),)
+cells_res_nlin = (deserialize(joinpath(info_dir,"cells_res_nlin_1.jld")),)
+inds_jac_lin = (deserialize(joinpath(info_dir,"inds_jac_1_1.jld")),
+  deserialize(joinpath(info_dir,"inds_jac_2_1.jld")))
+inds_jac_nlin = (deserialize(joinpath(info_dir,"inds_jac_nlin_1_1.jld")),)
+inds_res_lin = (deserialize(joinpath(info_dir,"inds_res_1.jld")),)
+inds_res_nlin = (deserialize(joinpath(info_dir,"inds_res_nlin_1.jld")),)
+interp_jac_lin = (deserialize(joinpath(info_dir,"interp_jac_1_1.jld")),
+  deserialize(joinpath(info_dir,"interp_jac_2_1.jld")))
+interp_jac_nlin = (deserialize(joinpath(info_dir,"interp_jac_nlin_1_1.jld")),)
+interp_res_lin = (deserialize(joinpath(info_dir,"interp_res_1.jld")),)
+interp_res_nlin = (deserialize(joinpath(info_dir,"interp_res_nlin_1.jld")),)
+
+rbop.op_linear.lhs[1][1][1].interpolation.U ≈ interp_jac_lin[1].U
+rbop.op_linear.lhs[2][1][1].interpolation.U ≈ interp_jac_lin[2].U
+rbop.op_nonlinear.lhs[1][1][1].interpolation.U ≈ interp_jac_nlin[1].U
+
+rbop.op_linear.rhs[1][1].interpolation.U ≈ interp_res_lin[1].U
+rbop.op_nonlinear.rhs[1][1].interpolation.U ≈ interp_res_nlin[1].U
+
+rbop.op_linear.lhs[1][1][1].interpolation.U ≈ interp_jac_lin[1].U
+rbop.op_linear.lhs[2][1][1].interpolation.U ≈ interp_jac_lin[2].U
+rbop.op_nonlinear.lhs[1][1][1].interpolation.U ≈ interp_jac_nlin[1].U
+
+rbop.op_linear.rhs[1][1].interpolation.U ≈ interp_res_lin[1].U
+rbop.op_nonlinear.rhs[1][1].interpolation.U ≈ interp_res_nlin[1].U
+
+using ROManifolds.Utils
+import ROManifolds.Utils: get_tface_to_mface
+get_tface_to_mface(rbop.op_linear.lhs[1].trians[1]) ≈ cells_jac_lin[1]
+get_tface_to_mface(rbop.op_linear.lhs[2].trians[1]) ≈ cells_jac_lin[2]
+get_tface_to_mface(rbop.op_linear.rhs.trians[1]) ≈ cells_res_lin[1]
+get_tface_to_mface(rbop.op_nonlinear.lhs[1].trians[1]) ≈ cells_jac_nlin[1]
+get_tface_to_mface(rbop.op_nonlinear.rhs.trians[1]) ≈ cells_res_nlin[1]
+
+using ROManifolds.RBSteady
+ress_lin,ress_nlin = load_residuals(dir,feop)
+jacs_lin,jacs_nlin = load_jacobians(dir,feop)
+
+bres = projection(rbsolver.residual_reduction.reduction,ress_nlin[1][1])
+(resrows,resindices_time),resinterp = empirical_interpolation(bres)
+
+bjac = projection(rbsolver.jacobian_reduction[1].reduction,jacs_nlin[1][1][1])
+((jacrows,jaccols),jacindices_time),jacinterp = empirical_interpolation(bjac)
