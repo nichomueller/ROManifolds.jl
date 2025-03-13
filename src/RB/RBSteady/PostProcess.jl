@@ -110,7 +110,8 @@ end
 """
 function load_contribution(
   dir,
-  trian::Tuple{Vararg{Triangulation}};
+  trian::Tuple{Vararg{Triangulation}},
+  args...;
   f::Function=load_decomposition,
   label="")
 
@@ -133,20 +134,17 @@ function load_contribution(
   for (i,t) in enumerate(trian)
     deci = f(dir;label=_get_label(label,i))
     redti = reduced_triangulation(t,deci)
-    if isa(redti,AbstractArray)
-      redti = Utils.merge_triangulations(redti)
-    end
     dec = (dec...,deci)
     redt = (redt...,redti)
   end
   return Contribution(dec,redt)
 end
 
-function DrWatson.save(dir,contrib::ArrayContribution,::SplitParamOperator;label="res")
+function DrWatson.save(dir,contrib::Contribution,::ParamOperator;label="res")
   save(dir,contrib;label)
 end
 
-function DrWatson.save(dir,contrib::TupOfArrayContribution,feop::LinearNonlinearParamOperator;label="res")
+function DrWatson.save(dir,contrib::Tuple{Vararg{Contribution}},feop::LinearNonlinearParamOperator;label="res")
   @check length(contrib) == 2
   save(dir,first(contrib),get_linear_operator(feop);label=_get_label(label,"lin"))
   save(dir,last(contrib),get_nonlinear_operator(feop);label=_get_label(label,"nlin"))
@@ -154,13 +152,13 @@ end
 
 """
 """
-function load_residuals(dir,feop::SplitParamOperator;label="res")
+function load_residuals(dir,feop::ParamOperator;label="res")
   load_contribution(dir,get_domains_res(feop);load_snapshots,label)
 end
 
 """
 """
-function load_jacobians(dir,feop::SplitParamOperator;label="jac")
+function load_jacobians(dir,feop::ParamOperator;label="jac")
   load_contribution(dir,get_domains_jac(feop);load_snapshots,label)
 end
 
@@ -182,8 +180,8 @@ function _save_fixed_operator_parts(dir,op;label="")
 end
 
 function _save_trian_operator_parts(dir,op::GenericRBOperator;label="")
-  save(dir,op.rhs;label=_get_label(label,"rhs"))
-  save(dir,op.lhs;label=_get_label(label,"lhs"))
+  save(dir,op.rhs,op.op;label=_get_label(label,"rhs"))
+  save(dir,op.lhs,op.op;label=_get_label(label,"lhs"))
 end
 
 function DrWatson.save(dir,op::GenericRBOperator;kwargs...)
@@ -197,7 +195,7 @@ function _load_fixed_operator_parts(dir,feop;label="")
   return trial,test
 end
 
-function _load_trian_operator_parts(dir,feop::SplitParamOperator,trial,test;label="")
+function _load_trian_operator_parts(dir,feop::ParamOperator,trial,test;label="")
   trian_res = get_domains_res(feop)
   trian_jac = get_domains_jac(feop)
   red_rhs = load_contribution(dir,trian_res,test;label=_get_label(label,"rhs"))
@@ -209,14 +207,13 @@ function _load_trian_operator_parts(dir,feop::SplitParamOperator,trial,test;labe
 end
 
 """
-    load_operator(dir,feop::SplitParamOperator;kwargs...) -> RBOperator
-    load_operator(dir,feop::SplitTransientParamOperator;kwargs...) -> TransientRBOperator
+    load_operator(dir,feop::ParamOperator;kwargs...) -> RBOperator
 
 Given a FE operator `feop`, load its reduced counterpart stored in the
 directory `dir`. Throws an error if the reduced operator has not been previously
 saved to file
 """
-function load_operator(dir,feop::SplitParamOperator;kwargs...)
+function load_operator(dir,feop::ParamOperator;kwargs...)
   trial,test = _load_fixed_operator_parts(dir,feop;kwargs...)
   pop,red_lhs,red_rhs = _load_trian_operator_parts(dir,feop,trial,test;kwargs...)
   op = GenericRBOperator(pop,trial,test,red_lhs,red_rhs)
@@ -231,7 +228,7 @@ function DrWatson.save(dir,feop::LinearNonlinearRBOperator;label="")
   _save_trian_operator_parts(dir,feop_nlin;label=_get_label(label,"nlin"))
 end
 
-function load_operator(dir,feop::LinearNonlinearParamOperator{SplitDomains};label="")
+function load_operator(dir,feop::LinearNonlinearParamOperator;label="")
   feop_lin = get_linear_operator(feop)
   feop_nlin = get_nonlinear_operator(feop)
   trial,test = _fixed_operator_parts(dir,feop_lin;label)

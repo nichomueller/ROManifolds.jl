@@ -167,9 +167,8 @@ end
 Returns the triangulation view of `trian` on the integration cells contained in `a`
 """
 function reduced_triangulation(trian::Triangulation,a::HyperReduction)
-  i = get_integration_domain(a)
-  cells = get_integration_cells(i)
-  red_trian = view(trian,cells)
+  red_cells = get_integration_cells(a)
+  red_trian = view(trian,red_cells)
   return red_trian
 end
 
@@ -480,6 +479,12 @@ for T in (:AffineContribution,:BlockHyperReduction)
   end
 end
 
+function reduced_triangulation(trian::Triangulation,a::BlockHyperReduction)
+  red_cells = get_integration_cells(a)
+  red_trian = view(trian,red_cells)
+  return red_trian
+end
+
 function Arrays.return_cache(
   ::typeof(allocate_coefficient),
   a::HyperReduction,
@@ -549,16 +554,6 @@ function allocate_hyper_reduction(a::BlockHyperReduction,r::AbstractRealization)
   return mortar(hypred)
 end
 
-function reduced_triangulation(trian::Triangulation,b::BlockHyperReduction)
-  red_trian = Triangulation[]
-  for i in eachindex(b)
-    if b.touched[i]
-      push!(red_trian,reduced_triangulation(trian,b[i]))
-    end
-  end
-  return red_trian
-end
-
 function reduced_form(
   red::Reduction,
   s::BlockSnapshots,
@@ -572,8 +567,7 @@ function reduced_form(
   end
 
   hyper_red = BlockProjection(hyper_reds,s.touched)
-  red_cells = get_integration_cells(hyper_red)
-  red_trian = view(trian,red_cells)
+  red_trian = reduced_triangulation(trian,hyper_red)
 
   return hyper_red,red_trian
 end
@@ -592,8 +586,7 @@ function reduced_form(
   end
 
   hyper_red = BlockProjection(hyper_reds,s.touched)
-  red_cells = get_integration_cells(hyper_red)
-  red_trian = view(trian,red_cells)
+  red_trian = reduced_triangulation(trian,hyper_red)
 
   return hyper_red,red_trian
 end

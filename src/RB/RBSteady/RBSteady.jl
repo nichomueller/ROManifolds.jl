@@ -23,6 +23,7 @@ using Gridap.Helpers
 using GridapSolvers
 using GridapSolvers.LinearSolvers
 using GridapSolvers.NonlinearSolvers
+using GridapSolvers.SolverInterfaces
 
 using ROManifolds.Utils
 using ROManifolds.DofMaps
@@ -60,6 +61,12 @@ include("ReductionMethods.jl")
 
 export galerkin_projection
 include("GalerkinProjections.jl")
+
+export RBParamVector
+include("RBParamVectors.jl")
+
+export HRParamArray
+include("HRParamArrays.jl")
 
 export AbstractTTCore
 export DofMapCore
@@ -107,12 +114,6 @@ export union_bases
 export get_norm_matrix
 export enrich!
 include("Projections.jl")
-
-export RBParamVector
-include("RBParamVectors.jl")
-
-export HRParamArray
-include("HRParamArrays.jl")
 
 export RBSpace
 export SingleFieldRBSpace

@@ -228,3 +228,48 @@ function Algebra.solve(
 
   return x̂,stats
 end
+
+function Algebra._solve_nr!(
+  x::RBParamVector,
+  A::AbstractParamMatrix,
+  b::AbstractParamVector,
+  dx,ns,nls,op)
+
+  log = nls.log
+  change_tols!(log)
+
+  nlop = get_nonlinear_operator(op)
+  trial = get_trial(nlop.op)
+
+  res = norm(b)
+  done = LinearSolvers.init!(log,res)
+
+  while !done
+    @inbounds for i in param_eachindex(x)
+      xi = param_getindex(x,i)
+      Ai = param_getindex(A,i)
+      bi = param_getindex(b,i)
+      numerical_setup!(ns,Ai)
+      rmul!(bi,-1)
+      solve!(dx,ns,bi)
+      xi .+= dx
+    end
+
+    inv_project(trial,x)
+    residual!(b,op,x)
+    res  = norm(b)
+    done = LinearSolvers.update!(log,res)
+
+    if !done
+      jacobian!(A,op,x)
+    end
+  end
+
+  LinearSolvers.finalize!(log,res)
+  return x
+end
+
+function change_tols!(log::ConvergenceLog)
+  log.tols.rtol = 1e-5
+  log
+end

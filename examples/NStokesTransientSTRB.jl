@@ -17,7 +17,7 @@ dt = 0.0025
 t0 = 0.0
 tf = 30*dt
 
-pdomain = (1,10,1,10,-10,5,-10,-2)
+pdomain = (1,10,1,10,1,2)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pdomain,tdomain)
 
@@ -43,7 +43,7 @@ dc(u,du,v,dΩ) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )dΩ
 const Lb = 0.2
 const Ub = 0.4
 inflow(μ,t) = abs(1-cos(2π*t/tf)+sin((2π*t/tf)/μ[2])/μ[2])
-g_in(x,μ,t) = VectorValue((μ[3]*x[2]+μ[4])*(Ub-x[2])*(x[2]-μ[2])*inflow(μ,t),0.0)
+g_in(x,μ,t) = VectorValue(μ[3]*(x[2]-Ub)*(x[2]-Lb)*inflow(μ,t),0.0)
 g_in(μ,t) = x->g_in(x,μ,t)
 gμt_in(μ,t) = TransientParamFunction(g_in,μ,t)
 g_0(x,μ,t) = VectorValue(0.0,0.0)
@@ -90,13 +90,12 @@ fesolver = ThetaMethod(NewtonSolver(LUSolver();rtol=1e-10,maxiter=20,verbose=tru
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 
 tol = 1e-4
-state_reduction = TransientReduction(coupling,tol,energy;nparams=50,sketch=:sprn)
-rbsolver = RBSolver(fesolver,state_reduction;nparams_res=40,nparams_jac=20,nparams_djac=1)
+state_reduction = TransientReduction(coupling,tol,energy;nparams=60,sketch=:sprn)
+rbsolver = RBSolver(fesolver,state_reduction;nparams_res=50,nparams_jac=20,nparams_djac=1)
 
 dir = datadir("transient_nstokes_pod")
 create_dir(dir)
 
-tols = [1e-1,1e-2,1e-3,1e-4,1e-5]
-ExamplesInterface.run_test(dir,rbsolver,feop,tols,xh0μ)
-
+tols = [1e-4,1e-5] #1e-1,1e-2,1e-3,
+ExamplesInterface.run_test(dir,rbsolver,feop,tols,xh0μ;reuse_online=true)
 end
