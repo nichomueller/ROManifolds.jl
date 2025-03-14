@@ -49,7 +49,19 @@ function Base.copyto!(a::HRParamArray,b::HRParamArray)
 end
 
 function Base.fill!(a::HRParamArray,b::Number)
+  fill!(a.fecache,b)
+  fill!(a.coeff,b)
   fill!(a.hypred,b)
+end
+
+# this correction is needed
+
+function Base.fill!(a::ArrayBlock,b::Number)
+  for i in eachindex(a)
+    if a.touched[i]
+      fill!(a.array[i],b)
+    end
+  end
 end
 
 function LinearAlgebra.rmul!(a::HRParamArray,b::Number)
