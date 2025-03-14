@@ -227,6 +227,13 @@ for f in (:(Base.copy),:(Base.similar))
   end
 end
 
+function Base.fill!(a::TupOfArrayContribution,v)
+  for ai in a
+    LinearAlgebra.fill!(ai,v)
+  end
+  a
+end
+
 function LinearAlgebra.fillstored!(a::TupOfArrayContribution,v)
   for ai in a
     LinearAlgebra.fillstored!(ai,v)
