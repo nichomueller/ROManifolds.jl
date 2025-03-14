@@ -13,7 +13,8 @@ using ROManifolds.RBTransient
 import Gridap.CellData: get_domains
 import Gridap.Helpers: @abstractmethod
 import Gridap.MultiField: BlockMultiFieldStyle
-import ROManifolds.ParamDataStructures: AbstractSnapshots
+import ROManifolds.ParamAlgebra: get_linear_operator,get_nonlinear_operator
+import ROManifolds.ParamDataStructures: AbstractSnapshots,get_realization
 import ROManifolds.ParamSteady: ParamOperator,LinearNonlinearParamEq
 import ROManifolds.ParamODEs: ODEParamOperator,LinearNonlinearParamODE
 import ROManifolds.RBSteady: reduced_operator,get_state_reduction,get_residual_reduction,get_jacobian_reduction,load_stats
@@ -29,7 +30,7 @@ function try_loading_fe_snapshots(dir,rbsolver,feop,args...;label="",kwargs...)
     println("Load snapshots at $dir failed, must compute them")
     fesnaps,festats = solution_snapshots(rbsolver,feop,args...;kwargs...)
     save(dir,fesnaps;label)
-    save(dir,fesnaps;label)
+    save(dir,festats;label)
     return fesnaps,festats
   end
 end
@@ -37,12 +38,15 @@ end
 function try_loading_online_fe_snapshots(
   dir,rbsolver,feop,args...;nparams=10,reuse_online=false,sampling=:uniform,label="",kwargs...)
 
+  label = "online"
   if reuse_online
-    x,festats = try_loading_fe_snapshots(dir,rbsolver,feop,args...;nparams,label="online")
+    x,festats = try_loading_fe_snapshots(dir,rbsolver,feop,args...;nparams,label)
     μon = get_realization(x)
   else
     μon = realization(feop;nparams,sampling=:uniform)
-    x,festats = solution_snapshots(rbsolver,feop,μon,args...;label="online")
+    x,festats = solution_snapshots(rbsolver,feop,μon,args...;kwargs...)
+    save(dir,x;label)
+    save(dir,festats;label)
   end
   return x,festats,μon
 end
@@ -160,7 +164,7 @@ function reduced_operator(rbsolver::RBSolver,odeop::ODEParamOperator,red_trial,r
   trians_rhs = get_domains(red_rhs)
   trians_lhs = map(get_domains,red_lhs)
   odeop′ = change_domains(odeop,trians_rhs,trians_lhs)
-  TransientRBOperator(odeop′,red_trial,red_test,red_lhs,red_rhs)
+  GenericRBOperator(odeop′,red_trial,red_test,red_lhs,red_rhs)
 end
 
 for T in (:LinearNonlinearParamEq,:LinearNonlinearParamODE)
@@ -191,7 +195,7 @@ function run_test(
   args...;nparams=10,reuse_online=false,sampling=:uniform,kwargs...)
 
   fesnaps, = try_loading_fe_snapshots(dir,rbsolver,feop,args...)
-  fesnaps,festats,μon = try_loading_online_fe_snapshots(
+  x,festats,μon = try_loading_online_fe_snapshots(
     dir,rbsolver,feop,args...;nparams,reuse_online,sampling)
 
   perfs = ROMPerformance[]

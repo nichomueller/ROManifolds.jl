@@ -68,8 +68,6 @@ export get_sparse_dof_map_at_domains
 include("ParamFEOperators.jl")
 
 export LinearNonlinearParamFEOperator
-export get_linear_operator
-export get_nonlinear_operator
 export join_operators
 include("LinearNonlinearParamFEOperators.jl")
 
