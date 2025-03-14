@@ -1,9 +1,9 @@
-function extend(u_act::AbstractVector,u_ext::AbstractVector)
+function extension(u_act::AbstractVector,u_ext::AbstractVector)
   vcat(u_act,u_ext)
 end
 
-function extend(u_act::BlockVector,u_ext::BlockVector)
-  block = map(extend,blocks(u_act),blocks(u_ext))
+function extension(u_act::BlockVector,u_ext::BlockVector)
+  block = map(extension,blocks(u_act),blocks(u_ext))
   mortar(block)
 end
 
@@ -12,7 +12,7 @@ abstract type Extension end
 get_extension_dof_ids(ext::Extension) = @abstractmethod
 num_extension_dofs(ext::Extension) = length(get_extension_dof_ids(ext))
 
-function extend!(v::AbstractVector,vact::AbstractVector,vext::AbstractVector,ext::Extension)
+function extension!(v::AbstractVector,vact::AbstractVector,vext::AbstractVector,ext::Extension)
   ext_ids = get_extension_dof_ids(ext)
   act_ids = setdiff(1:length(v),ext_ids)
   @views v[act_ids] = vact
@@ -20,7 +20,7 @@ function extend!(v::AbstractVector,vact::AbstractVector,vext::AbstractVector,ext
   v
 end
 
-function extend!(v::AbstractVector,ext::Extension)
+function extension!(v::AbstractVector,ext::Extension)
   n = length(v) + num_extension_dofs(ext)
   resize!(v,n)
   return v
@@ -28,7 +28,7 @@ end
 
 function zero_extended_free_values(f::FESpace,ext::Extension)
   v = zero_free_values(f)
-  extend!(v,ext)
+  extension!(v,ext)
   return v
 end
 
@@ -154,12 +154,12 @@ BlockArrays.blocks(ext::BlockExtension) = ext.blocks
 
 get_extension_dof_ids(ext::BlockExtension) = mortar(map(get_extension_dof_ids,blocks(ext)))
 
-function extend!(v::BlockVector,vact::BlockVector,vext::BlockVector,ext::BlockExtension)
-  map(extend!,blocks(vact),blocks(vext),blocks(ext))
+function extension!(v::BlockVector,vact::BlockVector,vext::BlockVector,ext::BlockExtension)
+  map(extension!,blocks(vact),blocks(vext),blocks(ext))
 end
 
-function extend!(v::AbstractVector,ext::BlockExtension)
-  map(extend!,blocks(v),blocks(ext))
+function extension!(v::AbstractVector,ext::BlockExtension)
+  map(extension!,blocks(v),blocks(ext))
 end
 
 function Algebra.solve!(vext::BlockVector,ext::BlockExtension)
@@ -177,7 +177,7 @@ function Algebra.solve(
 
   u_act = zero_initial_guess(op)
   u_ext = zero_extension_values(ext_solver.ext)
-  u = extend(u_act,u_ext)
+  u = extension(u_act,u_ext)
   u,cache = solve!(u,u_act,u_ext,ext_solver,op)
   return u
 end
@@ -191,7 +191,7 @@ function Algebra.solve!(
 
   slvrcache = solve!(u_act,ext_solver.solver,op)
   solve!(u_ext,ext_solver.ext)
-  extend!(u,u_act,u_ext,ext_solver.ext)
+  extension!(u,u_act,u_ext,ext_solver.ext)
   cache = (slvrcache,u_act,u_ext)
   u,cache
 end

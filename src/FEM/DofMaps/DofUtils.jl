@@ -83,10 +83,10 @@ function get_ag_out_dof_to_bg_dof(
   f_ag::FESpaceWithLinearConstraints,
   f_out::UnconstrainedFESpace)
 
-  ag_dof_to_bg_dof = get_dof_to_bg_dof(f_bg,f_ag)
+  agg_dof_to_bg_dof = get_dof_to_bg_dof(f_bg,f_ag)
   act_out_dof_to_bg_dof = get_dof_to_bg_dof(f_bg,f_out)
-  ag_out_dof_to_bg_dof = setdiff(act_out_dof_to_bg_dof,agg_dof_to_bg_dof)
-  return ag_out_dof_to_bg_dof
+  agg_out_dof_to_bg_dof = setdiff(act_out_dof_to_bg_dof,agg_dof_to_bg_dof)
+  return agg_out_dof_to_bg_dof
 end
 
 function get_dof_to_mdof(f::FESpaceWithLinearConstraints)

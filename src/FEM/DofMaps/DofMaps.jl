@@ -21,7 +21,6 @@ using ROManifolds
 using ROManifolds.Utils
 
 import FillArrays: Fill
-import Gridap.Geometry: extend
 import Gridap.MultiField: MultiFieldFEFunction,restrict_to_field,_sum_if_first_positive
 import PartitionedArrays: tuple_of_arrays
 import SparseArrays: AbstractSparseMatrix
@@ -93,7 +92,8 @@ export BlockExtension
 export ExtensionSolver
 export zero_extension_values
 export zero_extended_free_values
-export extend!
+export extension
+export extension!
 include("ExtensionSolvers.jl")
 
 end # module

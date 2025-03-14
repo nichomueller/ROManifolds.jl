@@ -53,13 +53,8 @@ CellData.get_triangulation(f::UnEvalTrialFESpace) = get_triangulation(f.space)
 FESpaces.get_cell_dof_ids(f::UnEvalTrialFESpace) = get_cell_dof_ids(f.space)
 FESpaces.get_fe_basis(f::UnEvalTrialFESpace) = get_fe_basis(f.space)
 FESpaces.get_fe_dof_basis(f::UnEvalTrialFESpace) = get_fe_dof_basis(f.space)
-function FESpaces.get_cell_constraints(f::UnEvalTrialFESpace,c::Constrained)
-  get_cell_constraints(f.space,c)
-end
-function FESpaces.get_cell_isconstrained(f::UnEvalTrialFESpace,c::Constrained)
-  get_cell_isconstrained(f.space,c)
-end
-
+FESpaces.get_cell_constraints(f::UnEvalTrialFESpace) = get_cell_constraints(f.space)
+FESpaces.get_cell_isconstrained(f::UnEvalTrialFESpace) = get_cell_isconstrained(f.space)
 FESpaces.get_dirichlet_dof_ids(f::UnEvalTrialFESpace) = get_dirichlet_dof_ids(f.space)
 FESpaces.num_dirichlet_tags(f::UnEvalTrialFESpace) = num_dirichlet_tags(f.space)
 FESpaces.get_dirichlet_dof_tag(f::UnEvalTrialFESpace) = get_dirichlet_dof_tag(f.space)

@@ -49,25 +49,29 @@ dΓ = Measure(Γ,degree)
 f(μ) = x->μ[1]*x[1] - μ[2]*x[2]
 fμ(μ) = ParamFunction(f,μ)
 
-g(μ) = x->0
+h(μ) = x->1
+hμ(μ) = ParamFunction(h,μ)
+
+g(μ) = x->μ[3]*x[1]-x[2]
 gμ(μ) = ParamFunction(g,μ)
 
 const γd = 10.0
 const hd = dp[1]/n
 
-a(u,v,dΩ,dΓ) = ∫(∇(v)⋅∇(u))dΩ + ∫( (γd/hd)*v*u  - v*(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))*u )dΓ
-l(u,v,dΩ,dΓ,dΓn) =  a(u,v,dΩ,dΓ) - ( ∫(f⋅v)dΩ + ∫(h⋅v)dΓn + ∫( (γd/hd)*v*g - (n_Γ⋅∇(v))*g )dΓ )
+a(μ,u,v,dΩ,dΓ) = ∫(νμ(μ)*∇(v)⋅∇(u))dΩ + ∫( (γd/hd)*v*u  - v*(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))*u )dΓ
+l(μ,v,dΩ,dΓ,dΓn) = ∫(fμ(μ)⋅v)dΩ + ∫(hμ(μ)⋅v)dΓn + ∫( (γd/hd)*v*gμ(μ) - (n_Γ⋅∇(v))*gμ(μ) )dΓ
+res(μ,u,v,dΩ,dΓ,dΓn) =  a(μ,u,v,dΩ,dΓ) - l(μ,v,dΩ,dΓ,dΓn)
 
 trian_a = (Ω,Γ)
-trian_l = (Ω,Γ,Γn)
-domains = FEDomains(trian_l,trian_a)
+trian_res = (Ω,Γ,Γn)
+domains = FEDomains(trian_res,trian_a)
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 Vact = FESpace(Ωact,reffe,conformity=:H1)
 Vagg = AgFEMSpace(Vact,aggregates)
 Uagg = ParamTrialFESpace(Vagg,gμ)
 
-feop = LinearParamOperator(l,a,pspace,Uagg,Vagg,domains)
+feop = LinearParamOperator(res,a,pspace,Uagg,Vagg,domains)
 
 aout(u,v) = ∫(∇(v)⋅∇(u))dΩout
 lout(μ,v) = ∫(∇(v)⋅∇(gμ(μ)))dΩout
@@ -81,6 +85,29 @@ act_out_dof_to_bgdof = get_dof_to_bg_dof(V,Vout)
 agg_out_dof_to_bgdof = setdiff(act_out_dof_to_bgdof,agg_dof_to_bgdof)
 agg_out_dof_to_act_out_dof = get_bg_dof_to_dof(V,Vout,agg_out_dof_to_bgdof)
 
-ext = HarmonicExtension(A,b,agg_out_dof_to_bgdof,agg_out_dof_to_act_out_dof,aout,lout,μ)
+using ROManifolds.ParamSteady
+using ROManifolds.Utils
+
+μ = realization(feop;nparams=2)
+ext = HarmonicExtension(V,Vagg,Uout,Vout,aout,lout,μ)
 solver = ExtensionSolver(LUSolver(),ext)
-u = solve(solver,op.op)
+nlop = parameterize(set_domains(feop),μ)
+u = solve(solver,nlop)
+
+for k in axes(vv,2)
+  for (ildof,ldof) in enumerate(ext.ldof_ids)
+    vv[ildof,k] = ww[ldof,k]
+  end
+end
+
+# gridap
+_μ = μ.params[1]
+_a(u,v) = ∫(ν(_μ)*∇(v)⋅∇(u))dΩ + ∫( (γd/hd)*v*u  - v*(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))*u )dΓ
+_l(v) = ∫(f(_μ)⋅v)dΩ + ∫(h(_μ)⋅v)dΓn + ∫( (γd/hd)*v*g(_μ) - (n_Γ⋅∇(v))*g(_μ) )dΓ
+_lout(v) = ∫(∇(v)⋅∇(g(_μ)))dΩout
+_op = AffineFEOperator(_a,_l,Uagg(nothing),Vagg)
+_ext = HarmonicExtension(V,Vagg,Uout,Vout,aout,_lout)
+_solver = ExtensionSolver(LUSolver(),_ext)
+_u = solve(_solver,_op.op)
+
+_u ≈ u[1]

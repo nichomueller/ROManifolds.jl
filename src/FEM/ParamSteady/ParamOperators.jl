@@ -103,6 +103,12 @@ function ParamAlgebra.allocate_paramcache(op::ParamOperator,μ::AbstractRealizat
   ParamCache(trial,ptrial)
 end
 
+function Algebra.zero_initial_guess(op::ParamOperator,μ::AbstractRealization)
+  ptrial = get_trial(op)
+  trial = evaluate(ptrial,μ)
+  zero_free_values(trial)
+end
+
 const LinearNonlinearParamOperator{T<:TriangulationStyle} = ParamOperator{LinearNonlinearParamEq,T}
 
 get_fe_operator(op::LinearNonlinearParamOperator) = get_fe_operator(get_nonlinear_operator(op))
