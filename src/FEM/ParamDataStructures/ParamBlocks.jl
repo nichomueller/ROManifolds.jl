@@ -16,6 +16,8 @@ Base.eltype(::Type{<:ParamBlock{A}}) where A = A
 Base.eltype(b::ParamBlock{A}) where A = A
 Base.ndims(b::ParamBlock{A}) where A = ndims(A)
 Base.ndims(::Type{<:ParamBlock{A}}) where A = ndims(A)
+Base.ndims(b::ParamBlock{<:Map}) = 0
+Base.ndims(::Type{<:ParamBlock{<:Map}}) = 0
 
 Arrays.testitem(b::ParamBlock) = param_getindex(b,1)
 
@@ -1149,22 +1151,36 @@ for op in (:+,:-)
   end
 end
 
-function Base.:*(a::Number,b::GenericParamBlock)
-  bi = testitem(b)
-  ci = a*bi
-  data = Vector{typeof(ci)}(undef,length(b.data))
-  for i in eachindex(b.data)
-    data[i] = a*b.data[i]
+for T in (:Number,:AbstractArray)
+  @eval begin
+    function Base.:*(a::$T,b::GenericParamBlock)
+      bi = testitem(b)
+      ci = a*bi
+      data = Vector{typeof(ci)}(undef,length(b.data))
+      for i in eachindex(b.data)
+        data[i] = a*b.data[i]
+      end
+      GenericParamBlock(data)
+    end
+
+    function Base.:*(a::GenericParamBlock,b::$T)
+      ai = testitem(a)
+      ci = ai*b
+      data = Vector{typeof(ci)}(undef,length(a.data))
+      for i in eachindex(a.data)
+        data[i] = a.data[i]*b
+      end
+      GenericParamBlock(data)
+    end
+
+    function Base.:*(a::$T,b::TrivialParamBlock)
+      TrivialParamBlock(a*b.data,b.plength)
+    end
+
+    function Base.:*(a::TrivialParamBlock,b::$T)
+      TrivialParamBlock(a.data*b,a.plength)
+    end
   end
-  GenericParamBlock(data)
-end
-
-function Base.:*(a::Number,b::TrivialParamBlock)
-  TrivialParamBlock(a*b.data,b.plength)
-end
-
-function Base.:*(a::ParamBlock,b::Number)
-  b*a
 end
 
 function Base.:*(a::TrivialParamBlock,b::TrivialParamBlock)
@@ -1181,21 +1197,6 @@ function LinearAlgebra.rmul!(a::TrivialParamBlock,β)
   rmul!(a.data,β)
 end
 
-function Arrays.return_value(::typeof(*),a::TrivialParamBlock,b::TrivialParamBlock)
-  evaluate(*,a,b)
-end
-
-function Arrays.return_cache(::typeof(*),a::TrivialParamBlock,b::TrivialParamBlock)
-  CachedArray(a*b)
-end
-
-function Arrays.evaluate!(cache,::typeof(*),a::TrivialParamBlock,b::TrivialParamBlock)
-  Fields._setsize_mul!(cache,a.data,b.data)
-  r = cache.data
-  mul!(r,a.data,b.data)
-  r
-end
-
 function Base.:*(a::ParamBlock,b::ParamBlock)
   @check param_length(a) == param_length(b)
   ai = testitem(a)
@@ -1206,15 +1207,6 @@ function Base.:*(a::ParamBlock,b::ParamBlock)
   for i in 2:param_length(a)
     data[i] = param_getindex(a,i)*param_getindex(b,i)
   end
-  GenericParamBlock(data)
-end
-
-function Arrays.return_value(::typeof(*),a::ParamBlock,b::ParamBlock)
-  @check param_length(a) == param_length(b)
-  ai = testitem(a)
-  bi = testitem(b)
-  ri = return_value(*,ai,bi)
-  data = Vector{typeof(ri)}(undef,param_length(a))
   GenericParamBlock(data)
 end
 
@@ -1230,9 +1222,41 @@ function Fields._zero_entries!(a::GenericParamBlock)
   end
 end
 
+function LinearAlgebra.mul!(c::ParamBlock,a::ParamBlock,b::AbstractArray)
+  Fields._zero_entries!(c)
+  mul!(c,a,b,1,0)
+end
+
+function LinearAlgebra.mul!(c::ParamBlock,a::AbstractArray,b::ParamBlock)
+  Fields._zero_entries!(c)
+  mul!(c,a,b,1,0)
+end
+
 function LinearAlgebra.mul!(c::ParamBlock,a::ParamBlock,b::ParamBlock)
   Fields._zero_entries!(c)
   mul!(c,a,b,1,0)
+end
+
+function LinearAlgebra.mul!(
+  c::ParamBlock,
+  a::ParamBlock,
+  b::AbstractArray,
+  α::Number,β::Number)
+
+  for i in eachindex(c.data)
+    mul!(param_getindex(c,i),param_getindex(a,i),b,α,β)
+  end
+end
+
+function LinearAlgebra.mul!(
+  c::ParamBlock,
+  a::AbstractArray,
+  b::ParamBlock,
+  α::Number,β::Number)
+
+  for i in eachindex(c.data)
+    mul!(param_getindex(c,i),a,param_getindex(b,i),α,β)
+  end
 end
 
 function LinearAlgebra.mul!(
@@ -1246,10 +1270,75 @@ function LinearAlgebra.mul!(
   end
 end
 
+function Fields._setsize_mul!(c,a::AbstractArray,b::ParamBlock)
+  for i in eachindex(c.data)
+    Fields._setsize_mul!(param_getindex(c,i),a,param_getindex(b,i))
+  end
+end
+
+function Fields._setsize_mul!(c,a::ParamBlock,b::AbstractArray)
+  for i in eachindex(c.data)
+    Fields._setsize_mul!(param_getindex(c,i),param_getindex(a,i),b)
+  end
+end
+
 function Fields._setsize_mul!(c,a::ParamBlock,b::ParamBlock)
   for i in eachindex(c.data)
     Fields._setsize_mul!(param_getindex(c,i),param_getindex(a,i),param_getindex(b,i))
   end
+end
+
+function Arrays.return_value(::typeof(*),a::AbstractArray,b::ParamBlock)
+  ai = testitem(a)
+  ri = return_value(*,ai,b)
+  data = Vector{typeof(ri)}(undef,param_length(a))
+  GenericParamBlock(data)
+end
+
+function Arrays.return_cache(::typeof(*),a::AbstractArray,b::ParamBlock)
+  c1 = CachedArray(a*b)
+  c2 = return_cache(Fields.unwrap_cached_array,c1)
+  (c1,c2)
+end
+
+function Arrays.evaluate!(cache,::typeof(*),a::AbstractArray,b::ParamBlock)
+  c1,c2 = cache
+  Fields._setsize_mul!(c1,a,b)
+  c = evaluate!(c2,Fields.unwrap_cached_array,c1)
+  mul!(c,a,b)
+  c
+end
+
+function Arrays.return_value(::typeof(*),a::ParamBlock,b::AbstractArray)
+  @check param_length(a) == param_length(b)
+  ai = testitem(a)
+  bi = testitem(b)
+  ri = return_value(*,ai,bi)
+  data = Vector{typeof(ri)}(undef,param_length(a))
+  GenericParamBlock(data)
+end
+
+function Arrays.return_cache(::typeof(*),a::ParamBlock,b::AbstractArray)
+  c1 = CachedArray(a*b)
+  c2 = return_cache(Fields.unwrap_cached_array,c1)
+  (c1,c2)
+end
+
+function Arrays.evaluate!(cache,::typeof(*),a::ParamBlock,b::AbstractArray)
+  c1,c2 = cache
+  Fields._setsize_mul!(c1,a,b)
+  c = evaluate!(c2,Fields.unwrap_cached_array,c1)
+  mul!(c,a,b)
+  c
+end
+
+function Arrays.return_value(::typeof(*),a::ParamBlock,b::ParamBlock)
+  @check param_length(a) == param_length(b)
+  ai = testitem(a)
+  bi = testitem(b)
+  ri = return_value(*,ai,bi)
+  data = Vector{typeof(ri)}(undef,param_length(a))
+  GenericParamBlock(data)
 end
 
 function Arrays.return_cache(::typeof(*),a::ParamBlock,b::ParamBlock)
@@ -1449,8 +1538,8 @@ end
 
 function Geometry._similar_empty(val::GenericParamBlock)
   a = deepcopy(val)
-  for i in eachindex(a)
-    a.data[i] = Geometry._similar_empty(a.data[i])
+  for i in param_eachindex(a)
+    a.data[i] = Geometry._similar_empty(val.data[i])
   end
   a
 end
@@ -1462,6 +1551,14 @@ function Geometry.pos_neg_data(
   void = Geometry._similar_empty(val)
   ineg_to_val = Fill(void,nineg)
   ipos_to_val,ineg_to_val
+end
+
+function Geometry.pos_neg_data(
+  ipos_to_val::AbstractArray{<:ParamBlock{<:Field}},i_to_iposneg::PosNegPartition)
+  nineg = length(i_to_iposneg.ineg_to_i)
+  ipos_to_v = lazy_map(VoidFieldMap(false),ipos_to_val)
+  ineg_to_v = Fill(VoidField(testitem(ipos_to_val),true),nineg)
+  ipos_to_v, ineg_to_v
 end
 
 # reference FEs

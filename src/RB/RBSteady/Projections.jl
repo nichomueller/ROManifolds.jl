@@ -381,8 +381,7 @@ function project!(x̂::AbstractArray,a::TTSVDProjection,x::AbstractArray,norm_ma
   # a′ = rescale(_sparse_rescaling,norm_matrix,a)
   # basis′ = get_basis(a′)
   # mul!(x̂,basis′',x)
-  basis = get_basis(a)
-  mul!(x̂,basis',x)
+  x̂
 end
 
 function union_bases(a::TTSVDProjection,b::TTSVDProjection,args...)

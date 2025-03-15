@@ -238,8 +238,7 @@ function Algebra._solve_nr!(
   log = nls.log
   change_tols!(log)
 
-  nlop = get_nonlinear_operator(op)
-  trial = get_trial(nlop.op)
+  trial = _get_trial(op)
 
   res = norm(b)
   done = LinearSolvers.init!(log,res)
@@ -267,6 +266,13 @@ function Algebra._solve_nr!(
 
   LinearSolvers.finalize!(log,res)
   return x
+end
+
+_get_trial(op) = @notimplemented
+
+function _get_trial(op::LinNonlinParamOperator)
+  μ = op.op_nonlinear.μ
+  evaluate(get_trial(op.op_nonlinear.op),μ)
 end
 
 function change_tols!(log::ConvergenceLog)
