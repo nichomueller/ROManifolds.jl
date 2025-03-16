@@ -498,27 +498,6 @@ function FESpaces.scatter_free_and_dirichlet_values(
   scatter_free_and_dirichlet_values(of′,fv,dv)
 end
 
-function FESpaces.scatter_free_and_dirichlet_values(
-  pf::SingleFieldParamFESpace{<:OrderedFESpace{<:FESpaceWithLinearConstraints}},
-  fmdof_to_val::AbstractParamVector,
-  dmdof_to_val::AbstractParamVector)
-
-  f = get_fe_space2(pf)
-  pf′ = remove_layer(pf)
-  fdof_to_val = zero_free_values(pf′)
-  ddof_to_val = zero_dirichlet_values(pf′)
-  FESpaces._setup_dof_to_val!(
-    fdof_to_val,
-    ddof_to_val,
-    fmdof_to_val,
-    dmdof_to_val,
-    f.DOF_to_mDOFs,
-    f.DOF_to_coeffs,
-    f.n_fdofs,
-    f.n_fmdofs)
-  scatter_free_and_dirichlet_values(pf′,fdof_to_val,ddof_to_val)
-end
-
 function FESpaces.gather_free_and_dirichlet_values(
   pf::SingleFieldParamFESpace{<:OrderedFESpace{<:FESpaceWithConstantFixed{T}}},
   cv) where T<:FESpaces.FixConstant
@@ -555,26 +534,6 @@ function FESpaces.gather_free_and_dirichlet_values!(
   gather_free_and_dirichlet_values!(_fv,_dv,pf′,cv)
   dv.data[1,:] = _fv.value
   (fv,dv)
-end
-
-function FESpaces.gather_free_and_dirichlet_values!(
-  fmdof_to_val,
-  dmdof_to_val,
-  pf::SingleFieldParamFESpace{<:OrderedFESpace{<:FESpaceWithLinearConstraints}},
-  cell_to_ludof_to_val)
-
-  f = get_fe_space2(pf)
-  pf′ = remove_layer(pf)
-  fdof_to_val,ddof_to_val = gather_free_and_dirichlet_values(pf′,cell_to_ludof_to_val)
-  FESpaces._setup_mdof_to_val!(
-    fmdof_to_val,
-    dmdof_to_val,
-    fdof_to_val,
-    ddof_to_val,
-    f.mDOF_to_DOF,
-    f.n_fdofs,
-    f.n_fmdofs)
-  fmdof_to_val,dmdof_to_val
 end
 
 # utils

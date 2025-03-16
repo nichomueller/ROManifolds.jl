@@ -1,18 +1,4 @@
-function get_bg_odof_to_odof(
-  bg_f::SingleFieldFESpace,
-  f::SingleFieldFESpace,
-  dof_to_bg_dof::AbstractVector
-  )
-
-  bg_dof_to_all_dof = get_bg_odof_to_odof(bg_f,f)
-  bg_dof_to_dof = similar(dof_to_bg_dof)
-  for (i,bg_dof) in enumerate(dof_to_bg_dof)
-    bg_dof_to_dof[i] = bg_dof_to_all_dof[bg_dof]
-  end
-  return bg_dof_to_dof
-end
-
-function get_bg_odof_to_odof(bg_f::SingleFieldFESpace,f::SingleFieldFESpace)
+function get_dof_to_odof(bg_f::SingleFieldFESpace,f::SingleFieldFESpace)
   bg_dof_to_dof = zeros(Int,num_unconstrained_free_dofs(bg_f))
   bg_cell_ids = get_cell_odof_ids(bg_f)
   cell_ids = get_cell_odof_ids(f)
@@ -33,24 +19,28 @@ end
 
 function get_bg_odof_to_odof(bg_f::SingleFieldFESpace,agg_f::FESpaceWithLinearConstraints)
   act_dof_to_agg_dof = get_dof_to_mdof(agg_f)
-  act_odof_to_agg_odof = get_dof_to_odof(agg_f,act_odof_to_agg_odof)
+  act_odof_to_agg_odof = get_dof_to_odof(bg_f,agg_f)
   bg_odof_to_act_odof = get_bg_dof_to_dof(bg_f,agg_f.space)
   bg_odof_to_agg_odof = compose_index(bg_dof_to_act_dof,act_dof_to_agg_dof)
   return bg_odof_to_agg_odof
 end
 
-function get_odof_to_bg_odof(
-  bg_f::SingleFieldFESpace,
-  f::SingleFieldFESpace,
-  bg_dof_to_dof::AbstractVector
-  )
+for f in (:get_bg_odof_to_odof,:get_odof_to_bg_odof)
+  @eval begin
+    function $f(
+      bg_f::SingleFieldFESpace,
+      f::SingleFieldFESpace,
+      i_to_bg_dof::AbstractVector
+      )
 
-  dof_to_all_bg_dof = get_odof_to_bg_odof(bg_f,f)
-  dof_to_bg_dof = similar(bg_dof_to_dof)
-  for (i,dof) in enumerate(bg_dof_to_dof)
-    dof_to_bg_dof[i] = dof_to_all_bg_dof[dof]
+      bg_dof_to_j = $f(bg_f,f)
+      i_to_j = similar(i_to_bg_dof)
+      for (i,bg_dof) in enumerate(i_to_bg_dof)
+        i_to_j[i] = bg_dof_to_j[bg_dof]
+      end
+      return i_to_j
+    end
   end
-  return dof_to_bg_dof
 end
 
 function get_odof_to_bg_odof(bg_f::SingleFieldFESpace,f::SingleFieldFESpace)
@@ -112,7 +102,7 @@ function reorder_dofs(f::FESpace,cell_odofs_ids::AbstractVector)
   return odof_to_dof
 end
 
-function invert_dof_map(dof2_to_dof1::AbstractVector,dofs2::AbstractVector)
+function reorder_dof_map(dof2_to_dof1::AbstractVector,dofs2::AbstractVector)
   dofs1 = similar(dofs2)
   for (i,dof2) in enumerate(dofs2)
     dofs1[i] = dof2_to_dof1[dof2]

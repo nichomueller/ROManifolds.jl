@@ -12,7 +12,7 @@ pspace = ParamSpace(pdomain)
 R = 0.3
 pmin = Point(0,0)
 pmax = Point(1,1)
-n = 10
+n = 4
 partition = (n,n)
 
 dp = pmax - pmin
@@ -94,20 +94,52 @@ solver = ExtensionSolver(LUSolver(),ext)
 nlop = parameterize(set_domains(feop),μ)
 u = solve(solver,nlop)
 
-for k in axes(vv,2)
-  for (ildof,ldof) in enumerate(ext.ldof_ids)
-    vv[ildof,k] = ww[ldof,k]
-  end
+act_odofs_ids = DofMaps.get_cell_odof_ids(Vout)
+odofs_ids = DofMaps.get_cell_odof_ids(V)
+dof_to_odof = DofMaps.reorder_dofs(V,odofs_ids)
+
+# agg_dof_to_bg_odof = DofMaps.get_odof_to_bg_odof(V,Vagg)
+# act_out_dof_to_bg_odof = get_dof_to_bg_dof(V,Vout)
+# agg_out_dof_to_bg_odof = setdiff(act_out_dof_to_bgdof,agg_dof_to_bgdof)
+# agg_out_dof_to_act_out_dof = get_bg_dof_to_dof(V,Vout,agg_out_dof_to_bgdof)
+
+
+# dof tests
+
+agg_dof_to_bgdof = get_dof_to_bg_dof(V,Vagg)
+bgdof_to_agg_dof = get_bg_dof_to_dof(V,Vagg)
+
+agg_dof_to_bgdof = get_dof_to_bg_dof(V,Vagg)
+agg_dof_to_bg_odof = DofMaps.reorder_dof_map(dof_to_odof,agg_dof_to_bgdof)
+act_out_dof_to_bgdof = get_dof_to_bg_dof(V,Vout)
+act_out_dof_to_bg_odof = DofMaps.reorder_dof_map(dof_to_odof,act_out_dof_to_bgdof)
+agg_out_dof_to_bgdof = setdiff(act_out_dof_to_bgdof,agg_dof_to_bgdof)
+agg_out_dof_to_bg_odof = setdiff(act_out_dof_to_bg_odof,agg_dof_to_bg_odof)
+
+bg_dof_to_act_out_dof = get_bg_dof_to_dof(V,Vout)
+
+@assert intersect(act_out_dof_to_bgdof,agg_out_dof_to_bgdof) == agg_out_dof_to_bgdof
+@assert intersect(act_out_dof_to_bg_odof,agg_out_dof_to_bg_odof) == agg_out_dof_to_bg_odof
+
+agg_out_dof_to_act_out_odof = zeros(Int32,length(agg_out_dof_to_bg_odof))
+for (iagg,bg_odof) in enumerate(agg_out_dof_to_bg_odof)
+  act_odof = findfirst(act_out_dof_to_bg_odof.==bg_odof)
+  agg_out_dof_to_act_out_odof[iagg] = act_odof
 end
 
-# gridap
-_μ = μ.params[1]
-_a(u,v) = ∫(ν(_μ)*∇(v)⋅∇(u))dΩ + ∫( (γd/hd)*v*u  - v*(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))*u )dΓ
-_l(v) = ∫(f(_μ)⋅v)dΩ + ∫(h(_μ)⋅v)dΓn + ∫( (γd/hd)*v*g(_μ) - (n_Γ⋅∇(v))*g(_μ) )dΓ
+_μ = [1,2,3]
 _lout(v) = ∫(∇(v)⋅∇(g(_μ)))dΩout
-_op = AffineFEOperator(_a,_l,Uagg(nothing),Vagg)
-_ext = HarmonicExtension(V,Vagg,Uout,Vout,aout,_lout)
-_solver = ExtensionSolver(LUSolver(),_ext)
-_u = solve(_solver,_op.op)
+cell_odofs_ids = DofMaps.get_cell_odof_ids(Vout)
+oVout = CartesianFESpace(Vout,cell_odofs_ids,[1,],[1,])
+A = assemble_matrix(aout,oVout,oVout)
+b = assemble_vector(_lout,oVout)
 
-_u ≈ u[1]
+ext = HarmonicExtension(A,b,agg_out_dof_to_bg_odof,agg_out_dof_to_act_out_odof)
+solver = ExtensionSolver(LUSolver(),ext)
+
+_a(u,v) = ∫(∇(v)⋅∇(u))dΩ + ∫( (γd/hd)*v*u  - v*(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))*u )dΓ
+_l(v) =  ∫(f(_μ)⋅v)dΩ + ∫(h(_μ)⋅v)dΓn + ∫( (γd/hd)*v*g(_μ) - (n_Γ⋅∇(v))*g(_μ) )dΓ
+
+op = AffineFEOperator(_a,_l,Vagg,oVout)
+u = solve(solver,op.op)
+uh = FEFunction(V,u)

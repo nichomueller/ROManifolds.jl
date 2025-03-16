@@ -67,6 +67,8 @@ end
 
 Base.copy(a::GenericParamBlock) = GenericParamBlock(copy(a.data))
 
+Base.similar(a::GenericParamBlock) = GenericParamBlock(similar(a.data))
+
 function Base.copyto!(a::GenericParamBlock,b::GenericParamBlock)
   @check size(a) == size(b)
   for i in eachindex(a.data)
@@ -197,6 +199,8 @@ function get_param_entry!(v::AbstractVector,b::TrivialParamBlock,i...)
 end
 
 Base.copy(a::TrivialParamBlock) = TrivialParamBlock(copy(a.data),a.plength)
+
+Base.similar(a::TrivialParamBlock) = TrivialParamBlock(similar(a.data),a.plength)
 
 Base.copyto!(a::TrivialParamBlock,b::TrivialParamBlock) = copyto!(a.data,b.data)
 

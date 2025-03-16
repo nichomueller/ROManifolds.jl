@@ -91,13 +91,16 @@ end
 
 function get_dof_to_mdof(f::FESpaceWithLinearConstraints)
   T = eltype(f.mDOF_to_DOF)
-  dof_to_mdof = zeros(T,f.n_fmdofs)
-  for mDOF in eachindex(n_fdofs)
-    DOF = f.mDOF_to_DOF[mDOF]
-    mdof = FESpaces._DOF_to_dof(mDOF,f.n_fmdofs)
+  dof_to_mdof = zeros(T,f.n_fdofs)
+  cache = array_cache(f.DOF_to_mDOFs)
+  for DOF in eachindex(dof_to_mdof)
+    mDOFs = getindex!(cache,f.DOF_to_mDOFs,DOF)
     dof = FESpaces._DOF_to_dof(DOF,f.n_fdofs)
-    if dof > 0
-      dof_to_mdof[dof] = mdof
+    for mDOF in mDOFs
+      mdof = FESpaces._DOF_to_dof(mDOF,f.n_fmdofs)
+      if dof > 0
+        dof_to_mdof[dof] = mdof
+      end
     end
   end
   return dof_to_mdof
@@ -119,10 +122,12 @@ end
 
 function compose_index(i1_to_i2,i2_to_i3)
   T_i3 = eltype(i2_to_i3)
-  n_i2 = length(i1_to_i2)
-  i1_to_i3 = zeros(T_i3,n_i2)
+  n_i1 = length(i1_to_i2)
+  i1_to_i3 = zeros(T_i3,n_i1)
   for (i1,i2) in enumerate(i1_to_i2)
-    i1_to_i3[i1] = i2_to_i3[i2]
+    if i2 > 0
+      i1_to_i3[i1] = i2_to_i3[i2]
+    end
   end
   return i1_to_i3
 end
