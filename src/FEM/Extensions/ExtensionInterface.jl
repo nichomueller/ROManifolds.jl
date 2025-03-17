@@ -10,14 +10,12 @@ struct GenericExtension{E<:ExtensionStyle} <: Extension{E}
   matrix::AbstractMatrix
   vector::AbstractVector
   values::FEFunction
-  cell_to_bg_cells::AbstractVector
   dof_to_bg_dofs::AbstractVector
 end
 
 function Extension(
   style::FunctionExtension,
   space::SingleFieldFESpace,
-  cell_to_bg_cells::AbstractVector,
   dof_to_bg_dofs::AbstractVector
   )
 
@@ -25,13 +23,12 @@ function Extension(
   vector = zero_free_values(space)
   values = zero_free_values(space)
   zh = FEFunction(space,values)
-  GenericExtension(style,matrix,vector,zh,cell_to_bg_cells,dof_to_bg_dofs)
+  GenericExtension(style,matrix,vector,zh,dof_to_bg_dofs)
 end
 
 function Extension(
   style::ZeroExtension,
   space::SingleFieldFESpace,
-  cell_to_bg_cells::AbstractVector,
   dof_to_bg_dofs::AbstractVector,
   f::Function
   )
@@ -39,13 +36,12 @@ function Extension(
   matrix = _build_mass_matrix(space)
   fh = interpolate_everywhere(f,space)
   vector = get_free_dof_values(fh)
-  GenericExtension(style,matrix,vector,fh,cell_to_bg_cells,dof_to_bg_dofs)
+  GenericExtension(style,matrix,vector,fh,dof_to_bg_dofs)
 end
 
 function Extension(
   style::HarmonicExtension,
   space::SingleFieldFESpace,
-  cell_to_bg_cells::AbstractVector,
   dof_to_bg_dofs::AbstractVector,
   a::Function,
   l::Function,
@@ -57,13 +53,12 @@ function Extension(
   values = similar(vector)
   ldiv!(values,factor,vector)
   vh = FEFunction(space,values)
-  GenericExtension(style,laplacian,vector,vh,cell_to_bg_cells,dof_to_bg_dofs)
+  GenericExtension(style,laplacian,vector,vh,dof_to_bg_dofs)
 end
 
 function Extension(style::ExtensionStyle,bg_space::SingleFieldFESpace,space::SingleFieldFESpace,args...)
-  cell_to_bg_cells = get_cell_to_bg_cell(space)
   dof_to_bg_dofs = get_dof_to_bg_dof(bg_space,space)
-  Extension(style,space,cell_to_bg_cells,dof_to_bg_dofs,args...)
+  Extension(style,space,dof_to_bg_dofs,args...)
 end
 
 function Extension(style::ExtensionStyle,args...)

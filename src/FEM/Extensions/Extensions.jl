@@ -12,6 +12,7 @@ using Gridap.Fields
 using Gridap.FESpaces
 using Gridap.Helpers
 using Gridap.MultiField
+using Gridap.ODEs
 
 using ROManifolds.Utils
 using ROManifolds.DofMaps
@@ -40,12 +41,10 @@ export ExtensionFESpace
 export ZeroExtensionFESpace
 export FunctionExtensionFESpace
 export HarmonicExtensionFESpace
-export get_internal_space
-export get_external_space
+export ParamZeroExtensionFESpace
+export ParamFunctionExtensionFESpace
+export ParamHarmonicExtensionFESpace
 include("ExtensionFESpaces.jl")
-
-# export ExtensionAssembler
-# include("ExtensionAssemblers.jl")
 
 export get_bg_dof_to_dof
 export get_dof_to_bg_dof

@@ -2,7 +2,6 @@ struct ExtensionFESpace{S<:SingleFieldFESpace,E<:Extension} <: SingleFieldFESpac
   space::S
   extension::E
   bg_space::SingleFieldFESpace
-  cell_to_bg_cells::AbstractVector
   dof_to_bg_dofs::AbstractVector
 end
 
@@ -11,9 +10,8 @@ function ExtensionFESpace(
   extension::Extension,
   bg_space::SingleFieldFESpace)
 
-  cell_to_bg_cells = get_cell_to_bg_cell(space)
   dofs_to_bg_dofs = get_dof_to_bg_dof(bg_space,space)
-  ExtensionFESpace(space,extension,bg_space,cell_to_bg_cells,dofs_to_bg_dofs)
+  ExtensionFESpace(space,extension,bg_space,dofs_to_bg_dofs)
 end
 
 function ZeroExtensionFESpace(
@@ -51,7 +49,7 @@ FESpaces.ConstraintStyle(::Type{<:ExtensionFESpace{S}}) where S = ConstraintStyl
 
 FESpaces.get_free_dof_ids(f::ExtensionFESpace) = get_free_dof_ids(f.space)
 
-FESpaces.get_triangulation(f::ExtensionFESpace) = get_triangulation(f.space)
+FESpaces.get_triangulation(f::ExtensionFESpace) = get_triangulation(f.bg_space)
 
 FESpaces.get_dof_value_type(f::ExtensionFESpace) = get_dof_value_type(f.space)
 
@@ -79,6 +77,10 @@ FESpaces.get_dirichlet_dof_tag(f::ExtensionFESpace) = get_dirichlet_dof_tag(f.sp
 
 FESpaces.get_vector_type(f::ExtensionFESpace) = get_vector_type(f.space)
 
+function CellData.CellField(f::ExtensionFESpace,cellvals)
+  CellField(f.bg_space,cellvals)
+end
+
 function FESpaces.scatter_free_and_dirichlet_values(f::ExtensionFESpace,fdof_to_val,ddof_to_val)
   incut_bg_cells = get_incut_cells_to_bg_cells(f)
   out_bg_cells = get_out_cells_to_bg_cells(f)
@@ -93,7 +95,9 @@ function FESpaces.scatter_free_and_dirichlet_values(f::ExtensionFESpace,fdof_to_
   lazy_map(Reindex(bg_cell_vals),sortperm(bg_cells))
 end
 
-function FESpaces.gather_free_and_dirichlet_values(f::ExtensionFESpace,cell_vals)
+function FESpaces.gather_free_and_dirichlet_values(f::ExtensionFESpace,bg_cell_vals)
+  incut_bg_cells = get_incut_cells_to_bg_cells(f)
+  cell_vals = lazy_map(Reindex(bg_cell_vals),incut_bg_cells)
   FESpaces.gather_free_and_dirichlet_values(f.space,cell_vals)
 end
 
@@ -101,17 +105,65 @@ function FESpaces.gather_free_and_dirichlet_values!(
   fdof_to_val,
   ddof_to_val,
   f::ExtensionFESpace,
-  cell_vals)
+  bg_cell_vals)
 
+  incut_bg_cells = get_incut_cells_to_bg_cells(f)
+  cell_vals = lazy_map(Reindex(bg_cell_vals),incut_bg_cells)
   gather_free_and_dirichlet_values!(fdof_to_val,ddof_to_val,f.space,cell_vals)
+end
+
+# param
+
+function ParamZeroExtensionFESpace(
+  bg_space::SingleFieldFESpace,
+  int_space::SingleFieldFESpace,
+  ext_space::SingleFieldFESpace)
+
+  ext = Extension(ParamExtension(ZeroExtension()),bg_space,ext_space,a,l)
+  ExtensionFESpace(int_space,ext,bg_space)
+end
+
+function ParamFunctionExtensionFESpace(
+  bg_space::SingleFieldFESpace,
+  int_space::SingleFieldFESpace,
+  ext_space::SingleFieldFESpace,
+  f::Function)
+
+  ext = Extension(ParamExtension(FunctionExtension()),bg_space,ext_space,f)
+  ExtensionFESpace(int_space,ext,bg_space)
+end
+
+function ParamHarmonicExtensionFESpace(
+  bg_space::SingleFieldFESpace,
+  int_space::SingleFieldFESpace,
+  ext_space::SingleFieldFESpace,
+  a::Function,
+  l::Function)
+
+  ext = Extension(ParamExtension(HarmonicExtension()),bg_space,ext_space,a,l)
+  ExtensionFESpace(int_space,ext,bg_space)
+end
+
+function Arrays.evaluate(f::ExtensionFESpace{S,ParamExtension{E}},args...) where {S,E}
+  extension = f.ext(args...)
+  ExtensionFESpace(f.space,extension,f.bg_space,f.dofs_to_bg_dofs)
+end
+
+function ODEs.allocate_space(U::UnEvalTrialFESpace{ExtensionFESpace},μ::Realization)
+  HomogeneousTrialParamFESpace(U.space(μ),length(μ))
+end
+
+function ODEs.allocate_space(U::UnEvalTrialFESpace{ExtensionFESpace},μ::Realization,t)
+  HomogeneousTrialParamFESpace(U.space(μ,t),length(μ)*length(t))
 end
 
 # utils
 
+get_incut_fe_space(f::ExtensionFESpace) = f.space
 get_outcut_fe_space(f::ExtensionFESpace) = f.extension.values.fe_space
 
 function get_incut_cells_to_bg_cells(f::ExtensionFESpace)
-  get_cell_to_bg_cell(f)
+  get_cell_to_bg_cell(get_incut_fe_space(f))
 end
 
 function get_outcut_cells_to_bg_cells(f::ExtensionFESpace)
@@ -137,7 +189,7 @@ function get_out_cells_to_bg_cells(f::ExtensionFESpace)
 end
 
 function get_bg_cells_to_incut_cells(f::ExtensionFESpace)
-  get_bg_cell_to_cell(f)
+  get_bg_cell_to_cell(get_incut_fe_space(f))
 end
 
 function get_in_cells_to_incut_cells(f::ExtensionFESpace)

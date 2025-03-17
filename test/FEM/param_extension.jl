@@ -58,13 +58,27 @@ aggregatesout = aggregate(strategy,cutgeoout)
 Voutact = FESpace(Ωactout,reffe,conformity=:H1)
 Voutagg = AgFEMSpace(Voutact,aggregatesout)
 
-g(x) = x[2]-x[1]
+ν(μ) = x->μ[3]
+νμ(μ) = ParamFunction(ν,μ)
+
+f(μ) = x->μ[1]*x[1] - μ[2]*x[2]
+fμ(μ) = ParamFunction(f,μ)
+
+h(μ) = x->1
+hμ(μ) = ParamFunction(h,μ)
+
+g(μ) = x->μ[3]*x[1]-x[2]
+gμ(μ) = ParamFunction(g,μ)
+
+const γd = 10.0
+const hd = dp[1]/n
+
+a(μ,u,v,dΩ,dΓ) = ∫(νμ(μ)*∇(v)⋅∇(u))dΩ + ∫( (γd/hd)*v*u  - v*(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))*u )dΓ
+l(μ,v,dΩ,dΓ,dΓn) = ∫(fμ(μ)⋅v)dΩ + ∫(hμ(μ)⋅v)dΓn + ∫( (γd/hd)*v*gμ(μ) - (n_Γ⋅∇(v))*gμ(μ) )dΓ
+res(μ,u,v,dΩ,dΓ,dΓn) =  a(μ,u,v,dΩ,dΓ) - l(μ,v,dΩ,dΓ,dΓn)
 
 aout(u,v) = ∫(∇(v)⋅∇(u))dΩout
-lout(v) = ∫(∇(v)⋅∇(g))dΩout
+lout(μ,v) = ∫(∇(v)⋅∇(gμ(μ)))dΩout
 
 V = FESpace(model,reffe,conformity=:H1)
-Vext = HarmonicExtensionFESpace(V,Vagg,Voutagg,aout,lout)
-
-gh = interpolate_everywhere(g,Vext)
-writevtk(Ωbg,datadir("plts/sol"),cellfields=["uh"=>gh])
+Vext = ParamHarmonicExtensionFESpace(V,Vagg,Voutagg,aout,lout)
