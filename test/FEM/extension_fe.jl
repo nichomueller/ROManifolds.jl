@@ -8,6 +8,7 @@ using ROManifolds.DofMaps
 using SparseArrays
 using DrWatson
 using Test
+using DrWatson
 
 pdomain = (1,10,1,10,1,10)
 pspace = ParamSpace(pdomain)
@@ -68,6 +69,30 @@ V = FESpace(model,reffe,conformity=:H1)
 
 Vext = HarmonicExtensionFESpace(V,Vagg,Voutagg,aout,lout)
 
+x = rand(num_free_dofs(Vext))
+xh = FEFunction(Vext,x)
+
+f = Vext
+cell_vals = FESpaces._cell_vals(Vext,g)
+fv,dv = FESpaces.gather_free_and_dirichlet_values(Vext,cell_vals)
+
+incut_bg_cells = Extensions.get_incut_cells_to_bg_cells(Vext)
+out_bg_cells = Extensions.get_out_cells_to_bg_cells(Vext)
+out_out_cells = Extensions.get_out_cells_to_outcut_cells(Vext)
+bg_cells = lazy_append(incut_bg_cells,out_bg_cells)
+
+incut_cell_vals = Extensions.scatter_free_and_dirichlet_values(Vext.space,fv,dv)
+outcut_cell_vals = get_cell_dof_values(Vext.extension.values)
+out_cell_vals = lazy_map(Reindex(outcut_cell_vals),out_out_cells)
+bg_cell_vals = lazy_append(incut_cell_vals,out_cell_vals)
+
+_bg_cells = invperm(bg_cells)
+lazy_map(Reindex(bg_cell_vals),_bg_cells)
+
+gh = interpolate_everywhere(g,Vext)
+writevtk(Ωbg,datadir("plts/sol"),cellfields=["uh"=>gh])
+
+CIAO
 # get_cell_dof_ids(Vext,Ωact)
 # get_cell_dof_ids(Vext,Ωactout)
 

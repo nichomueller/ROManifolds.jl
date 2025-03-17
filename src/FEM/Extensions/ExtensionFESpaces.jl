@@ -1,52 +1,19 @@
-struct SingleFieldExtensionFESpace{CS<:ConstraintStyle,E,V} <: SingleFieldFESpace
+struct ExtensionFESpace{S<:SingleFieldFESpace,E<:Extension} <: SingleFieldFESpace
+  space::S
   extension::E
-  vector_type::Type{V}
-  int_space::SingleFieldFESpace
-  ext_space::SingleFieldFESpace
-  int_dofs_to_bg_dofs::AbstractVector
-  ext_dofs_to_bg_dofs::AbstractVector
-
-  function SingleFieldExtensionFESpace(
-    extension::E,
-    vector_type::Type{V},
-    int_space::SingleFieldFESpace,
-    ext_space::SingleFieldFESpace,
-    int_dofs_to_bg_dofs::AbstractVector,
-    ext_dofs_to_bg_dofs::AbstractVector
-    ) where {E,V}
-
-    @check isempty(intersect(int_dofs_to_bg_dofs,ext_dofs_to_bg_dofs))
-    @check length(int_dofs_to_bg_dofs) == num_free_dofs(int_space)
-    @check length(ext_dofs_to_bg_dofs) == num_free_dofs(ext_space)
-    CS = typeof(ConstraintStyle(int_space))
-    new{CS,E,V}(extension,vector_type,int_space,ext_space,int_dofs_to_bg_dofs,ext_dofs_to_bg_dofs)
-  end
+  bg_space::SingleFieldFESpace
+  cell_to_bg_cells::AbstractVector
+  dof_to_bg_dofs::AbstractVector
 end
 
-function SingleFieldExtensionFESpace(
+function ExtensionFESpace(
+  space::SingleFieldFESpace,
   extension::Extension,
-  int_space::SingleFieldFESpace,
-  ext_space::SingleFieldFESpace,
-  int_dofs_to_bg_dofs::AbstractVector,
-  ext_dofs_to_bg_dofs::AbstractVector)
+  bg_space::SingleFieldFESpace)
 
-  zfiv = zero_free_values(int_space)
-  zfev = zero_free_values(ext_space)
-  zfv = mortar([zfiv,zfev])
-  vector_type = typeof(zfv)
-  SingleFieldExtensionFESpace(extension,vector_type,int_space,ext_space,
-    int_dofs_to_bg_dofs,ext_dofs_to_bg_dofs)
-end
-
-function SingleFieldExtensionFESpace(
-  extension::Extension,
-  bg_space::SingleFieldFESpace,
-  int_space::SingleFieldFESpace,
-  ext_space::SingleFieldFESpace)
-
-  int_dofs_to_bg_dofs = get_dof_to_bg_dof(bg_space,int_space)
-  ext_dofs_to_bg_dofs = get_dof_to_bg_dof(bg_space,ext_space)
-  SingleFieldExtensionFESpace(extension,int_space,ext_space,int_dofs_to_bg_dofs,ext_dofs_to_bg_dofs)
+  cell_to_bg_cells = get_cell_to_bg_cell(space)
+  dofs_to_bg_dofs = get_dof_to_bg_dof(bg_space,space)
+  ExtensionFESpace(space,extension,bg_space,cell_to_bg_cells,dofs_to_bg_dofs)
 end
 
 function ZeroExtensionFESpace(
@@ -55,8 +22,8 @@ function ZeroExtensionFESpace(
   ext_space::SingleFieldFESpace
   )
 
-  ext = ZeroExtension(num_free_dofs(ext_space))
-  SingleFieldExtensionFESpace(ext,bg_space,int_space,ext_space)
+  ext = Extension(ZeroExtension(),bg_space,ext_space)
+  ExtensionFESpace(int_space,ext,bg_space,ext_space)
 end
 
 function FunctionExtensionFESpace(
@@ -65,19 +32,8 @@ function FunctionExtensionFESpace(
   ext_space::SingleFieldFESpace,
   g::Function)
 
-  ext = FunctionExtension(g,ext_space)
-  SingleFieldExtensionFESpace(ext,bg_space,int_space,ext_space)
-end
-
-function HarmonicExtensionFESpace(
-  bg_space::SingleFieldFESpace,
-  int_space::SingleFieldFESpace,
-  ext_space::SingleFieldFESpace,
-  A::AbstractMatrix,
-  b::AbstractVector)
-
-  ext = HarmonicExtension(A,b)
-  SingleFieldExtensionFESpace(ext,bg_space,int_space,ext_space)
+  ext = Extension(FunctionExtension()ext_space,g)
+  ExtensionFESpace(int_space,ext,bg_space,ext_space)
 end
 
 function HarmonicExtensionFESpace(
@@ -87,170 +43,119 @@ function HarmonicExtensionFESpace(
   a::Function,
   l::Function)
 
-  ext = HarmonicExtension(a,l,ext_space)
-  SingleFieldExtensionFESpace(ext,bg_space,int_space,ext_space)
+  ext = Extension(HarmonicExtension(),bg_space,ext_space,a,l)
+  ExtensionFESpace(int_space,ext,bg_space)
 end
 
-get_extension(f::SingleFieldExtensionFESpace) = f.extension
-get_internal_space(f::SingleFieldExtensionFESpace) = f.int_space
-get_external_space(f::SingleFieldExtensionFESpace) = f.ext_space
+FESpaces.ConstraintStyle(::Type{<:ExtensionFESpace{S}}) where S = ConstraintStyle(S)
 
-Base.length(f::SingleFieldExtensionFESpace) = 2
+FESpaces.get_free_dof_ids(f::ExtensionFESpace) = get_free_dof_ids(f.space)
 
-function Base.getindex(f::SingleFieldExtensionFESpace,i)
-  if i == 1
-    f.int_space
-  else i == 2
-    f.ext_space
-  end
+FESpaces.get_triangulation(f::ExtensionFESpace) = get_triangulation(f.space)
+
+FESpaces.get_dof_value_type(f::ExtensionFESpace) = get_dof_value_type(f.space)
+
+FESpaces.get_cell_dof_ids(f::ExtensionFESpace) = get_cell_dof_ids(f.space)
+
+FESpaces.get_fe_basis(f::ExtensionFESpace) = get_fe_basis(f.space)
+
+FESpaces.get_trial_fe_basis(f::ExtensionFESpace) = get_trial_fe_basis(f.space)
+
+FESpaces.get_fe_dof_basis(f::ExtensionFESpace) = get_fe_dof_basis(f.bg_space)
+
+FESpaces.get_cell_isconstrained(f::ExtensionFESpace) = get_cell_isconstrained(f.space)
+
+FESpaces.get_cell_constraints(f::ExtensionFESpace) = get_cell_constraints(f.space)
+
+FESpaces.get_dirichlet_dof_ids(f::ExtensionFESpace) = get_dirichlet_dof_ids(f.space)
+
+FESpaces.get_cell_is_dirichlet(f::ExtensionFESpace) = get_cell_is_dirichlet(f.space)
+
+FESpaces.num_dirichlet_dofs(f::ExtensionFESpace) = num_dirichlet_dofs(f.space)
+
+FESpaces.num_dirichlet_tags(f::ExtensionFESpace) = num_dirichlet_tags(f.space)
+
+FESpaces.get_dirichlet_dof_tag(f::ExtensionFESpace) = get_dirichlet_dof_tag(f.space)
+
+FESpaces.get_vector_type(f::ExtensionFESpace) = get_vector_type(f.space)
+
+function FESpaces.scatter_free_and_dirichlet_values(f::ExtensionFESpace,fdof_to_val,ddof_to_val)
+  incut_bg_cells = get_incut_cells_to_bg_cells(f)
+  out_bg_cells = get_out_cells_to_bg_cells(f)
+  out_out_cells = get_out_cells_to_outcut_cells(f)
+  bg_cells = lazy_append(incut_bg_cells,out_bg_cells)
+
+  incut_cell_vals = scatter_free_and_dirichlet_values(f.space,fdof_to_val,ddof_to_val)
+  outcut_cell_vals = get_cell_dof_values(f.extension.values)
+  out_cell_vals = lazy_map(Reindex(outcut_cell_vals),out_out_cells)
+  bg_cell_vals = lazy_append(incut_cell_vals,out_cell_vals)
+
+  lazy_map(Reindex(bg_cell_vals),sortperm(bg_cells))
 end
 
-function FESpaces.get_triangulation(f::SingleFieldExtensionFESpace)
-  @warn "Fetching the triangulation of an SingleFieldExtensionFESpace will likely result in an error"
-  int_trian = get_triangulation(f.int_space)
-  ext_trian = get_triangulation(f.ext_space)
-  lazy_append(int_trian,ext_trian)
+function FESpaces.gather_free_and_dirichlet_values(f::ExtensionFESpace,cell_vals)
+  FESpaces.gather_free_and_dirichlet_values(f.space,cell_vals)
 end
 
-function FESpaces.num_free_dofs(f::SingleFieldExtensionFESpace)
-  num_free_dofs(f.int_space) + num_free_dofs(f.ext_space)
-end
+function FESpaces.gather_free_and_dirichlet_values!(
+  fdof_to_val,
+  ddof_to_val,
+  f::ExtensionFESpace,
+  cell_vals)
 
-function FESpaces.get_free_dof_ids(f::SingleFieldExtensionFESpace)
-  int_nf = num_free_dofs(f.int_space)
-  ext_nf = num_free_dofs(f.ext_space)
-  return BlockArrays.blockedrange([int_nf,ext_nf])
-end
-
-function FESpaces.zero_dirichlet_values(f::SingleFieldExtensionFESpace)
-  int_zdv = zero_dirichlet_values(f.int_space)
-  ext_zdv = zero_dirichlet_values(f.ext_space)
-  [int_zdv,ext_zdv]
-end
-
-FESpaces.get_dof_value_type(f::SingleFieldExtensionFESpace{CS,E,V}) where {CS,E,V} = eltype(V)
-
-FESpaces.get_vector_type(f::SingleFieldExtensionFESpace) = f.vector_type
-
-FESpaces.ConstraintStyle(::Type{SingleFieldExtensionFESpace{CS,E,V}}) where {CS,E,V} = CS()
-
-function FESpaces.get_fe_basis(f::SingleFieldExtensionFESpace)
-  int_b = get_fe_basis(f.int_space)
-  ext_b = get_fe_basis(f.ext_space)
-  int_b_comp = MultiField.MultiFieldFEBasisComponent(int_b,1,2)
-  ext_b_comp = MultiField.MultiFieldFEBasisComponent(ext_b,2,2)
-  MultiField.MultiFieldCellField([int_b_comp,ext_b_comp])
-end
-
-function FESpaces.get_trial_fe_basis(f::SingleFieldExtensionFESpace)
-  int_b = get_trial_fe_basis(f.int_space)
-  ext_b = get_trial_fe_basis(f.ext_space)
-  int_b_comp = MultiField.MultiFieldFEBasisComponent(int_b,1,2)
-  ext_b_comp = MultiField.MultiFieldFEBasisComponent(ext_b,2,2)
-  MultiField.MultiFieldCellField([int_b_comp,ext_b_comp])
-end
-
-function FESpaces.FEFunction(f::SingleFieldExtensionFESpace,fv)
-  int_ff = FEFunction(f.int_space,fv[Block(1)])
-  ext_ff = FEFunction(f.ext_space,fv[Block(2)])
-  MultiFieldFEFunction(fv,f,[int_ff,ext_ff])
-end
-
-function FESpaces.FEFunction(
-  f::SingleFieldExtensionFESpace,
-  fv::AbstractVector,
-  dv::Vector{<:AbstractVector}
-  )
-
-  @check length(dv) == 2
-  int_ff = FEFunction(f.int_space,fv[Block(1)],dv[1])
-  ext_ff = FEFunction(f.ext_space,fv[Block(2)],dv[2])
-  MultiFieldFEFunction(fv,f,[int_ff,ext_ff])
-end
-
-function FESpaces.EvaluationFunction(f::SingleFieldExtensionFESpace,fv)
-  int_ff = EvaluationFunction(f.int_space,fv[Block(1)])
-  ext_ff = EvaluationFunction(f.ext_space,fv[Block(2)])
-  MultiFieldFEFunction(fv,f,[int_ff,ext_ff])
-end
-
-function CellData.CellField(f::SingleFieldExtensionFESpace,cv)
-  int_cv = lazy_map(a->first(a.array),cv)
-  ext_cv = lazy_map(a->last(a.array),cv)
-  MultiFieldCellField([int_cv,ext_cv])
-end
-
-for f in (
-  :(FESpaces.get_cell_isconstrained),
-  :(FESpaces.get_cell_is_dirichlet),
-  :(FESpaces.get_cell_constraints),
-  :(FESpaces.get_cell_dof_ids))
-  @eval begin
-    function $f(f::SingleFieldExtensionFESpace)
-      msg = """\n
-      This method does not make sense for multi-field
-      since each field can be defined on a different triangulation.
-      Pass a triangulation in the second argument to get
-      the constrain flag for the corresponding cells.
-      """
-      @notimplemented msg
-    end
-
-    function $f(f::SingleFieldExtensionFESpace,trian::Triangulation)
-      $f(to_multi_field(f),trian)
-    end
-  end
-end
-
-function FESpaces.interpolate(objects,f::SingleFieldExtensionFESpace)
-  interpolate!(objects,zero_free_values(f),f)
-end
-
-function FESpaces.interpolate!(objects,fv::AbstractVector,f::SingleFieldExtensionFESpace)
-  int_uh = interpolate!(object[1],fv[Block(1)],f.int_space)
-  ext_uh = interpolate!(object[2],fv[Block(2)],f.ext_space)
-  MultiFieldFEFunction(fv,f,[int_uh,ext_uh])
-end
-
-function FESpaces.interpolate_everywhere(objects,f::SingleFieldExtensionFESpace)
-  fv = zero_free_values(f)
-  int_uh = interpolate_everywhere!(
-    object[1],fv[Block(1)],zero_dirichlet_values(f.int_space),f.int_space)
-  ext_uh = interpolate_everywhere!(
-    object[2],fv[Block(2)],zero_dirichlet_values(f.ext_space),f.ext_space)
-  MultiFieldFEFunction(fv,f,[int_uh,ext_uh])
-end
-
-function FESpaces.interpolate_everywhere!(objects,fv::AbstractVector,dv::Vector,f::SingleFieldExtensionFESpace)
-  fv = zero_free_values(f)
-  int_uh = interpolate_everywhere!(object[1],fv[Block(1)],dv[1],f.int_space)
-  ext_uh = interpolate_everywhere!(object[2],fv[Block(2)],dv[2],f.ext_space)
-  MultiFieldFEFunction(fv,f,[int_uh,ext_uh])
-end
-
-function FESpaces.interpolate_dirichlet(objects,f::SingleFieldExtensionFESpace)
-  fv = zero_free_values(f)
-  int_uh = interpolate_dirichlet!(
-    object[1],fv[Block(1)],zero_dirichlet_values(f.int_space),f.int_space)
-  ext_uh = interpolate_dirichlet!(
-    object[2],fv[Block(2)],zero_dirichlet_values(f.ext_space),f.ext_space)
-  MultiFieldFEFunction(fv,f,[int_uh,ext_uh])
+  gather_free_and_dirichlet_values!(fdof_to_val,ddof_to_val,f.space,cell_vals)
 end
 
 # utils
 
-function to_multi_field(f::SingleFieldExtensionFESpace{CS,E,V}) where {CS,E,V}
-  spaces = [f.int_space,f.ext_space]
-  multi_field_style = MultiField.BlockMultiFieldStyle(2)
-  MS = typeof(multi_field_style)
-  MultiFieldFESpace(V,spaces,multi_field_style)
+get_outcut_fe_space(f::ExtensionFESpace) = f.extension.values.fe_space
+
+function get_incut_cells_to_bg_cells(f::ExtensionFESpace)
+  get_cell_to_bg_cell(f)
 end
 
-function MultiField.MultiFieldFEFunction(
-  fv::AbstractVector,
-  f::SingleFieldExtensionFESpace,
-  single_fe_functions::Vector{<:SingleFieldFEFunction}
-  )
+function get_outcut_cells_to_bg_cells(f::ExtensionFESpace)
+  get_cell_to_bg_cell(get_outcut_fe_space(f))
+end
 
-  MultiFieldFEFunction(fv,to_multi_field(f),single_fe_functions)
+function get_cut_cells_to_bg_cells(f::ExtensionFESpace)
+  incut_bg_cells = get_incut_cells_to_bg_cells(f)
+  outcut_bg_cells = get_outcut_cells_to_bg_cells(f)
+  intersect(incut_bg_cells,outcut_bg_cells)
+end
+
+function get_in_cells_to_bg_cells(f::ExtensionFESpace)
+  incut_bg_cells = get_incut_cells_to_bg_cells(f)
+  cut_bg_cells = get_cut_cells_to_bg_cells(f)
+  setdiff(incut_bg_cells,cut_bg_cells)
+end
+
+function get_out_cells_to_bg_cells(f::ExtensionFESpace)
+  outcut_bg_cells = get_outcut_cells_to_bg_cells(f)
+  cut_bg_cells = get_cut_cells_to_bg_cells(f)
+  setdiff(outcut_bg_cells,cut_bg_cells)
+end
+
+function get_bg_cells_to_incut_cells(f::ExtensionFESpace)
+  get_bg_cell_to_cell(f)
+end
+
+function get_in_cells_to_incut_cells(f::ExtensionFESpace)
+  in_bg_cells = get_in_cells_to_bg_cells(f)
+  bg_incut_cells = get_bg_cells_to_incut_cells(f)
+  collect(lazy_map(Reindex(bg_incut_cells),in_bg_cells))
+end
+
+function get_bg_cells_to_outcut_cells(f::ExtensionFESpace)
+  get_bg_cell_to_cell(get_outcut_fe_space(f))
+end
+
+function get_out_cells_to_outcut_cells(f::ExtensionFESpace)
+  out_bg_cells = get_out_cells_to_bg_cells(f)
+  bg_outcut_cells = get_bg_cells_to_outcut_cells(f)
+  collect(lazy_map(Reindex(bg_outcut_cells),out_bg_cells))
+end
+
+function gather_free_and_extension_values(f::ExtensionFESpace,cell_vals)
+  gather_free_and_dirichlet_values(f.space,cell_vals)
 end
