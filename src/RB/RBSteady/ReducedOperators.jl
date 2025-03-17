@@ -123,6 +123,8 @@ function Algebra.residual!(
   u::AbstractVector,
   paramcache)
 
+  fill!(b,zero(eltype(b)))
+
   uh = EvaluationFunction(paramcache.trial,u)
   test = get_test(op.op)
   v = get_fe_basis(test)
@@ -147,6 +149,8 @@ function Algebra.jacobian!(
   r::Realization,
   u::AbstractVector,
   paramcache)
+
+  fill!(A,zero(eltype(A)))
 
   uh = EvaluationFunction(paramcache.trial,u)
   trial = get_trial(op.op)
