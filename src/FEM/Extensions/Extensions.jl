@@ -13,7 +13,13 @@ using Gridap.FESpaces
 using Gridap.Helpers
 using Gridap.MultiField
 
+using ROManifolds.Utils
 using ROManifolds.DofMaps
+using ROManifolds.TProduct
+using ROManifolds.ParamDataStructures
+using ROManifolds.ParamAlgebra
+using ROManifolds.ParamFESpaces
+using ROManifolds.ParamSteady
 
 export Extension
 export ZeroExtension
@@ -44,5 +50,7 @@ export get_dof_to_bg_dof
 include("DofUtils.jl")
 
 include("ODofUtils.jl")
+
+include("ParamExtension.jl")
 
 end # module

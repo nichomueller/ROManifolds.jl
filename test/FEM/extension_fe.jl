@@ -140,7 +140,10 @@ domains = FEDomains(trian_res,trian_a)
 aout(μ,u,v) = ∫(∇(v)⋅∇(u))dΩout
 lout(μ,v) = ∫(∇(v)⋅∇(gμ(μ)))dΩout
 
-Vext = HarmonicExtensionFESpace(V,Vagg,Voutagg,aout,lout)
+μ = realization(pspace;nparams=50)
+ext = HarmonicExtension(Voutagg,aout,lout,μ)
+
+Vext = Extensions.SingleFieldExtensionFESpace(ext,V,Vagg,Voutagg)
 Uext = ParamTrialFESpace(Vext,gμ)
 
-feop = LinearParamOperator(res,a,pspace,Vext,Uext,domains)
+feop = LinearParamOperator(res,a,pspace,Uext,Vext,domains)
