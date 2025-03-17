@@ -1,11 +1,11 @@
 struct MultiFieldExtensionFESpace{CS<:ConstraintStyle,V} <: FESpace
   vector_type::Type{V}
-  spaces::Vector{<:ExtensionFESpace}
+  spaces::Vector{<:SingleFieldExtensionFESpace}
   constraint_style::CS
 
   function MultiFieldExtensionFESpace(
     ::Type{V},
-    spaces::Vector{<:ExtensionFESpace}
+    spaces::Vector{<:SingleFieldExtensionFESpace}
     ) where V
 
     @assert length(spaces) > 0
@@ -20,7 +20,7 @@ struct MultiFieldExtensionFESpace{CS<:ConstraintStyle,V} <: FESpace
 end
 
 function MultiField.MultiFieldFESpace(
-  spaces::Vector{<:ExtensionFESpace};
+  spaces::Vector{<:SingleFieldExtensionFESpace};
   style=MultiField.BlockMultiFieldStyle()
   )
 
@@ -32,7 +32,7 @@ function MultiField.MultiFieldFESpace(
   MultiFieldExtensionFESpace(VT,spaces)
 end
 
-function MultiField.MultiFieldFESpace(::Type{V},spaces::Vector{<:ExtensionFESpace}) where V
+function MultiField.MultiFieldFESpace(::Type{V},spaces::Vector{<:SingleFieldExtensionFESpace}) where V
   MultiFieldExtensionFESpace(V,spaces)
 end
 
@@ -41,6 +41,16 @@ function MultiField.MultiFieldStyle(f::MultiFieldExtensionFESpace)
 end
 
 MultiField.MultiFieldStyle(::Type{<:MultiFieldExtensionFESpace}) = @notimplemented
+
+function get_internal_space(f::MultiFieldExtensionFESpace{CS,V}) where {CS,V}
+  spaces = map(get_internal_space,f.spaces)
+  MultiFieldFESpace(V,spaces,style=BlockMultiFieldStyle(num_fields(f)))
+end
+
+function get_external_space(f::MultiFieldExtensionFESpace{CS,V}) where {CS,V}
+  spaces = map(get_external_space,f.spaces)
+  MultiFieldFESpace(V,spaces,style=BlockMultiFieldStyle(num_fields(f)))
+end
 
 function MultiField.num_fields(f::MultiFieldExtensionFESpace)
   length(f.spaces)
@@ -88,7 +98,7 @@ function FESpaces.get_free_dof_ids(f::MultiFieldExtensionFESpace)
 end
 
 function FESpaces.get_free_dof_ids(f::MultiFieldExtensionFESpace,::BlockMultiFieldStyle{NB,SB,P}) where {NB,SB,P}
-  block_ranges = MultiField.get_block_ranges(0,0,0)
+  block_ranges = MultiField.get_block_ranges(NB,SB,P)
   block_num_dofs = map(range->sum(map(num_free_dofs,f[range])),block_ranges)
   return BlockArrays.blockedrange(block_num_dofs)
 end
@@ -101,7 +111,7 @@ FESpaces.get_dof_value_type(f::MultiFieldExtensionFESpace{CS,V}) where {CS,V} = 
 
 FESpaces.get_vector_type(f::MultiFieldExtensionFESpace) = f.vector_type
 
-FESpaces.ConstraintStyle(::Type{MultiFieldExtensionFESpace{CS,V}}) where {B,V} = CS()
+FESpaces.ConstraintStyle(::Type{MultiFieldExtensionFESpace{CS,V}}) where {CS,V} = CS()
 
 function FESpaces.get_fe_basis(f::MultiFieldExtensionFESpace)
   nspaces = length(f)

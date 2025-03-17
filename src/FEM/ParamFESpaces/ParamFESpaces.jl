@@ -23,7 +23,6 @@ using ROManifolds.ParamDataStructures
 using ROManifolds.ParamAlgebra
 
 import Test: @test
-import ArraysOfArrays: _innerlength
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 
@@ -50,7 +49,5 @@ export ParamFEFunction
 export SingleFieldParamFEFunction
 export MultiFieldParamFEFunction
 include("ParamFEFunctions.jl")
-
-include("ParamExtensionSolvers.jl")
 
 end # module

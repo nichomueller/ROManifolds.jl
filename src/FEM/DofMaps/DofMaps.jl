@@ -61,18 +61,13 @@ include("DofMapsInterface.jl")
 
 export get_dof_map
 export get_sparse_dof_map
+export get_bg_cell_to_act_cell
 export get_polynomial_order
 export get_polynomial_orders
 include("DofMapsBuilders.jl")
 
 export DofMapArray
 include("DofMapArrays.jl")
-
-export get_bg_dof_to_dof
-export get_dof_to_bg_dof
-include("DofUtils.jl")
-
-include("ODofUtils.jl")
 
 export OIdsToIds
 export DofsToODofs
@@ -83,17 +78,5 @@ include("OrderingMaps.jl")
 export OrderedFESpace
 export CartesianFESpace
 include("OrderedFESpaces.jl")
-
-export Extension
-export ZeroExtension
-export FunctionalExtension
-export HarmonicExtension
-export BlockExtension
-export ExtensionSolver
-export zero_extension_values
-export zero_extended_free_values
-export extension
-export extension!
-include("ExtensionSolvers.jl")
 
 end # module

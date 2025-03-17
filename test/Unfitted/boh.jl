@@ -1,3 +1,16 @@
+using Gridap
+using Gridap.FESpaces
+using GridapEmbedded
+using ROManifolds
+using ROManifolds.DofMaps
+using ROManifolds.TProduct
+using ROManifolds.Utils
+using ROManifolds.ParamAlgebra
+using ROManifolds.ParamSteady
+using ROManifolds.RBSteady
+using SparseArrays
+using DrWatson
+using Test
 
 pdomain = (1,10,1,10,1,10)
 pspace = ParamSpace(pdomain)
@@ -36,6 +49,27 @@ dΓn = Measure(Γn,degree)
 Γ = EmbeddedBoundary(cutgeo)
 n_Γ = get_normal_vector(Γ)
 dΓ = Measure(Γ,degree)
+
+reffe = ReferenceFE(lagrangian,Float64,1)
+
+Vact = FESpace(Ωact,reffe,conformity=:H1)
+Vagg = AgFEMSpace(Vact,aggregates)
+
+cutgeoout = cut(model,!geo2)
+aggregatesout = aggregate(strategy,cutgeoout)
+Voutact = FESpace(Ωactout,reffe,conformity=:H1)
+Voutagg = AgFEMSpace(Voutact,aggregatesout)
+
+g(x) = x[2]-x[1]
+
+Uagg = TrialFESpace(Vagg,g)
+
+aout(u,v) = ∫(∇(v)⋅∇(u))dΩout
+lout(v) = ∫(∇(v)⋅∇(g))dΩout
+
+V = FESpace(model,reffe,conformity=:H1)
+
+extfe = HarmonicExtensionFESpace(V,Vagg,Voutagg,aout,lout)
 
 ν(μ) = x->μ[3]
 νμ(μ) = ParamFunction(ν,μ)

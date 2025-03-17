@@ -19,6 +19,19 @@ export flatten
 include("FEM/DofMaps/DofMaps.jl")
 using ROManifolds.DofMaps
 
+export Extension
+export ZeroExtension
+export FunctionExtension
+export HarmonicExtension
+export ExtensionFESpace
+export ZeroExtensionFESpace
+export FunctionExtensionFESpace
+export HarmonicExtensionFESpace
+export MultiFieldExtensionFESpace
+
+include("FEM/Extensions/Extensions.jl")
+using ROManifolds.Extensions
+
 export TProductDiscreteModel
 export TProductFESpace
 
