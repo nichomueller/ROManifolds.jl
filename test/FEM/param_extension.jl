@@ -82,3 +82,7 @@ lout(μ,v) = ∫(∇(v)⋅∇(gμ(μ)))dΩout
 
 V = FESpace(model,reffe,conformity=:H1)
 Vext = ParamHarmonicExtensionFESpace(V,Vagg,Voutagg,aout,lout)
+Uext = ParamTrialFESpace(Vext,gμ)
+
+μ = realization(pspace)
+Uμ = Uext(μ)

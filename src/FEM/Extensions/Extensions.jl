@@ -22,6 +22,12 @@ using ROManifolds.ParamAlgebra
 using ROManifolds.ParamFESpaces
 using ROManifolds.ParamSteady
 
+export get_bg_dof_to_dof
+export get_dof_to_bg_dof
+include("DofUtils.jl")
+
+include("ODofUtils.jl")
+
 export Extension
 export GenericExtension
 export ZeroExtension
@@ -46,10 +52,9 @@ export ParamFunctionExtensionFESpace
 export ParamHarmonicExtensionFESpace
 include("ExtensionFESpaces.jl")
 
-export get_bg_dof_to_dof
-export get_dof_to_bg_dof
-include("DofUtils.jl")
-
-include("ODofUtils.jl")
+export ExtensionAssembler
+export InternalView
+export internal_view
+include("ExtensionAssemblers.jl")
 
 end # module

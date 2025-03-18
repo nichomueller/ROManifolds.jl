@@ -10,8 +10,8 @@ function ExtensionFESpace(
   extension::Extension,
   bg_space::SingleFieldFESpace)
 
-  dofs_to_bg_dofs = get_dof_to_bg_dof(bg_space,space)
-  ExtensionFESpace(space,extension,bg_space,dofs_to_bg_dofs)
+  dof_to_bg_dofs = get_dof_to_bg_dof(bg_space,space)
+  ExtensionFESpace(space,extension,bg_space,dof_to_bg_dofs)
 end
 
 function ZeroExtensionFESpace(
@@ -30,7 +30,7 @@ function FunctionExtensionFESpace(
   ext_space::SingleFieldFESpace,
   g::Function)
 
-  ext = Extension(FunctionExtension()ext_space,g)
+  ext = Extension(FunctionExtension(),bg_space,ext_space,g)
   ExtensionFESpace(int_space,ext,bg_space,ext_space)
 end
 
@@ -49,7 +49,7 @@ FESpaces.ConstraintStyle(::Type{<:ExtensionFESpace{S}}) where S = ConstraintStyl
 
 FESpaces.get_free_dof_ids(f::ExtensionFESpace) = get_free_dof_ids(f.space)
 
-FESpaces.get_triangulation(f::ExtensionFESpace) = get_triangulation(f.bg_space)
+FESpaces.get_triangulation(f::ExtensionFESpace) = get_triangulation(f.space)
 
 FESpaces.get_dof_value_type(f::ExtensionFESpace) = get_dof_value_type(f.space)
 
@@ -59,7 +59,7 @@ FESpaces.get_fe_basis(f::ExtensionFESpace) = get_fe_basis(f.space)
 
 FESpaces.get_trial_fe_basis(f::ExtensionFESpace) = get_trial_fe_basis(f.space)
 
-FESpaces.get_fe_dof_basis(f::ExtensionFESpace) = get_fe_dof_basis(f.bg_space)
+FESpaces.get_fe_dof_basis(f::ExtensionFESpace) = get_fe_dof_basis(f.space)
 
 FESpaces.get_cell_isconstrained(f::ExtensionFESpace) = get_cell_isconstrained(f.space)
 
@@ -76,6 +76,10 @@ FESpaces.num_dirichlet_tags(f::ExtensionFESpace) = num_dirichlet_tags(f.space)
 FESpaces.get_dirichlet_dof_tag(f::ExtensionFESpace) = get_dirichlet_dof_tag(f.space)
 
 FESpaces.get_vector_type(f::ExtensionFESpace) = get_vector_type(f.space)
+
+function FESpaces._cell_vals(f::ExtensionFESpace,object)
+  FESpaces._cell_vals(f.bg_space,object)
+end
 
 function CellData.CellField(f::ExtensionFESpace,cellvals)
   CellField(f.bg_space,cellvals)
@@ -112,6 +116,21 @@ function FESpaces.gather_free_and_dirichlet_values!(
   gather_free_and_dirichlet_values!(fdof_to_val,ddof_to_val,f.space,cell_vals)
 end
 
+function gather_extended_free_and_dirichlet_values(f::ExtensionFESpace,cell_vals)
+  bg_fdof_to_val = zero_free_values(f.bg_space)
+  bg_ddof_to_val = zero_dirichlet_values(f.bg_space)
+  gather_extended_free_and_dirichlet_values!(bg_fdof_to_val,bg_ddof_to_val,f,cell_vals)
+end
+
+function gather_extended_free_and_dirichlet_values!(
+  bg_fdof_to_val,
+  bg_ddof_to_val,
+  f::ExtensionFESpace,
+  cell_vals)
+
+  gather_free_and_dirichlet_values!(bg_fdof_to_val,bg_ddof_to_val,f.bg_space,cell_vals)
+end
+
 # param
 
 function ParamZeroExtensionFESpace(
@@ -144,16 +163,19 @@ function ParamHarmonicExtensionFESpace(
   ExtensionFESpace(int_space,ext,bg_space)
 end
 
-function Arrays.evaluate(f::ExtensionFESpace{S,ParamExtension{E}},args...) where {S,E}
-  extension = f.ext(args...)
-  ExtensionFESpace(f.space,extension,f.bg_space,f.dofs_to_bg_dofs)
+function Arrays.evaluate(f::ExtensionFESpace{S,UnEvalExtension{E}},args...) where {S,E}
+  extension = f.extension(args...)
+  ExtensionFESpace(f.space,extension,f.bg_space,f.dof_to_bg_dofs)
 end
 
-function ODEs.allocate_space(U::UnEvalTrialFESpace{ExtensionFESpace},μ::Realization)
+(space::ExtensionFESpace)(t) = evaluate(space,t)
+(space::ExtensionFESpace)(μ,t) = evaluate(space,t)
+
+function ODEs.allocate_space(U::UnEvalTrialFESpace{<:ExtensionFESpace},μ::Realization)
   HomogeneousTrialParamFESpace(U.space(μ),length(μ))
 end
 
-function ODEs.allocate_space(U::UnEvalTrialFESpace{ExtensionFESpace},μ::Realization,t)
+function ODEs.allocate_space(U::UnEvalTrialFESpace{<:ExtensionFESpace},μ::Realization,t)
   HomogeneousTrialParamFESpace(U.space(μ,t),length(μ)*length(t))
 end
 
@@ -208,6 +230,5 @@ function get_out_cells_to_outcut_cells(f::ExtensionFESpace)
   collect(lazy_map(Reindex(bg_outcut_cells),out_bg_cells))
 end
 
-function gather_free_and_extension_values(f::ExtensionFESpace,cell_vals)
-  gather_free_and_dirichlet_values(f.space,cell_vals)
-end
+get_out_dof_to_bg_dofs(f::ExtensionFESpace) = get_out_dof_to_bg_dofs(f.extension)
+get_in_dof_to_bg_dofs(f::ExtensionFESpace) = f.dof_to_bg_dofs

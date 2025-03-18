@@ -1,144 +1,192 @@
-const ExtensionFESpace = Union{SingleFieldExtensionFESpace,MultiFieldExtensionFESpace}
+get_extension(f::SingleFieldFESpace) = @notimplemented
+get_extension(f::ExtensionFESpace) = f.extension
+get_extension(f::UnEvalTrialFESpace{<:ExtensionFESpace}) = get_extension(f.space)
+get_extension(f::SingelFieldParamFESpace{<:ExtensionFESpace}) = get_extension(f.space)
+get_extension(f::MultiFieldFESpace) = map(get_extension,f.spaces)
 
-get_extension(f::ExtensionFESpace) = @abstractmethod
-get_internal_space(f::ExtensionFESpace) = @abstractmethod
-get_external_space(f::ExtensionFESpace) = @abstractmethod
+FESpaces.num_rows(ext::Extension) = num_free_dofs(get_fe_space(ext))
+FESpaces.num_cols(ext::Extension) = num_free_dofs(get_fe_space(ext))
 
 struct ExtensionAssembler <: SparseMatrixAssembler
-  int_assem::SparseMatrixAssembler
+  assem::SparseMatrixAssembler
   extension::Extension
 end
 
-function FESpaces.SparseMatrixAssembler(
-  mat,
-  vec,
-  trial::ExtensionFESpace,
-  test::ExtensionFESpace,
-  strategy::AssemblyStrategy=FESpaces.DefaultAssemblyStrategy()
-  )
-
-  int_trial = get_internal_space(trial)
-  int_test = get_internal_space(test)
-  int_assem = SparseMatrixAssembler(mat,vec,int_trial,int_test,strategy)
+function ExtensionAssembler(trial::FESpace,test::FESpace)
+  assem = SparseMatrixAssembler(trial,test)
   extension = get_extension(trial)
-  ExtensionAssembler(int_assem,extension)
+  ExtensionAssembler(assem,extension)
 end
 
-FESpaces.get_vector_type(a::ExtensionAssembler) = get_vector_type(a.int_assem)
-FESpaces.get_matrix_type(a::ExtensionAssembler) = get_matrix_type(a.int_assem)
-FESpaces.num_rows(a::ExtensionAssembler) = FESpaces.num_rows(a.int_assem) + FESpaces.num_rows(a.extension)
-FESpaces.num_cols(a::ExtensionAssembler) = FESpaces.num_cols(a.int_assem) + FESpaces.num_cols(a.extension)
+FESpaces.get_vector_type(a::ExtensionAssembler) = get_vector_type(a.assem)
+FESpaces.get_matrix_type(a::ExtensionAssembler) = get_matrix_type(a.assem)
+FESpaces.num_rows(a::ExtensionAssembler) = FESpaces.num_rows(a.assem) + FESpaces.num_rows(a.extension)
+FESpaces.num_cols(a::ExtensionAssembler) = FESpaces.num_cols(a.assem) + FESpaces.num_cols(a.extension)
+FESpaces.get_rows(a::ExtensionAssembler) = Base.OneTo(FESpaces.num_rows(a))
+FESpaces.get_cols(a::ExtensionAssembler) = Base.OneTo(FESpaces.num_cols(a))
+FESpaces.get_assembly_strategy(a::ExtensionAssembler) = get_assembly_strategy(a.assem)
+FESpaces.get_matrix_builder(a::ExtensionAssembler)= get_matrix_builder(a.assem)
+FESpaces.get_vector_builder(a::ExtensionAssembler) = get_vector_builder(a.assem)
 
-function FESpaces.get_rows(a::ExtensionAssembler)
-  @notimplemented
+function get_in_dof_to_bg_rows(a::ExtensionAssembler)
+  setdiff(FESpaces.get_rows(a),a.extension.dof_to_bg_dofs)
 end
 
-function FESpaces.get_cols(a::ExtensionAssembler)
-  @notimplemented
+function get_out_dof_to_bg_rows(a::ExtensionAssembler)
+  get_out_dof_to_bg_dofs(a.extension)
 end
 
-function FESpaces.get_assembly_strategy(a::ExtensionAssembler)
-  get_assembly_strategy(a.int_assem)
+function get_in_dof_to_bg_cols(a::ExtensionAssembler)
+  setdiff(FESpaces.get_cols(a),a.extension.dof_to_bg_dofs)
 end
 
-function FESpaces.get_matrix_builder(a::ExtensionAssembler)
-  get_matrix_builder(a.int_assem)
+function get_out_dof_to_bg_cols(a::ExtensionAssembler)
+  get_out_dof_to_bg_dofs(a.extension)
 end
 
-function FESpaces.get_vector_builder(a::ExtensionAssembler)
-  get_vector_builder(a.int_assem)
+function get_bg_dof_to_in_rows(a::ExtensionAssembler)
+  in_bg_rows = get_in_dof_to_bg_rows(a)
+  bg_in_rows = zeros(eltype(in_bg_rows),FESpaces.num_rows(a))
+  for (row,bg_row) in enumerate(in_bg_rows)
+    bg_in_rows[bg_row] = row
+  end
+  bg_in_rows
+end
+
+function get_bg_dof_to_out_rows(a::ExtensionAssembler)
+  out_bg_rows = get_out_dof_to_bg_rows(a)
+  bg_out_rows = zeros(eltype(out_bg_rows),FESpaces.num_rows(a))
+  for (row,bg_row) in enumerate(out_bg_rows)
+    bg_out_rows[bg_row] = row
+  end
+  bg_out_rows
+end
+
+function get_bg_dof_to_in_cols(a::ExtensionAssembler)
+  in_bg_cols = get_in_dof_to_bg_cols(a)
+  bg_in_cols = zeros(eltype(in_bg_cols),FESpaces.num_cols(a))
+  for (col,bg_col) in enumerate(in_bg_cols)
+    bg_in_cols[bg_col] = col
+  end
+  bg_in_cols
+end
+
+function get_bg_dof_to_out_cols(a::ExtensionAssembler)
+  out_bg_cols = get_out_dof_to_bg_cols(a)
+  bg_out_cols = zeros(eltype(out_bg_cols),FESpaces.num_cols(a))
+  for (col,bg_col) in enumerate(out_bg_cols)
+    bg_out_cols[bg_col] = col
+  end
+  bg_out_cols
 end
 
 function FESpaces.allocate_vector(a::ExtensionAssembler,vecdata)
-  int_v = allocate_vector(a.int_assem,vecdata)
-  ext_v = get_extension_vector(a.extension)
-  mortar([int_v,ext_v])
+  out_bg_rows = get_out_dof_to_bg_rows(a)
+  b = zeros(get_vector_type(a),num_rows(a))
+  out_b = a.extension.vector
+  for (dof,bg_dof) in enumerate(out_bg_rows)
+    b[bg_dof] = out_b[dof]
+  end
+  b
 end
 
 function FESpaces.assemble_vector!(b,a::ExtensionAssembler,vecdata)
-  assemble_vector!(b[Block(1)],a.int_assem,vecdata)
-  copyto!(b[Block(2)],get_extension_vector(a.extension))
+  in_bg_rows = get_in_dof_to_bg_rows(a)
+  in_b = internal_view(b,in_bg_rows)
+  assemble_vector!(in_b,a.assem,vecdata)
 end
 
 function FESpaces.assemble_vector_add!(b,a::ExtensionAssembler,vecdata)
-  assemble_vector_add!(b[Block(1)],a.int_assem,vecdata)
-  copyto!(b[Block(2)],get_extension_vector(a.extension))
-end
-
-function FESpaces.assemble_vector(a::ExtensionAssembler,vecdata)
-  int_v = assemble_vector(a.int_assem,vecdata)
-  ext_v = get_extension_vector(a.extension)
-  mortar([int_v,ext_v])
+  in_bg_rows = get_in_dof_to_bg_rows(a)
+  in_b = internal_view(b,in_bg_rows)
+  assemble_vector_add!(in_b,a.assem,vecdata)
 end
 
 function FESpaces.allocate_matrix(a::ExtensionAssembler,matdata)
-  m = Matrix{get_matrix_type(a)}(undef,2,2)
-  m[1,1] = allocate_matrix(a.int_assem,matdata)
-  m[2,1] = spzeros(FESpaces.num_cols(a.int_assem),FESpaces.num_rows(a.extension))
-  m[1,2] = spzeros(FESpaces.num_rows(a.int_assem),FESpaces.num_cols(a.extension))
-  m[2,2] = get_extension_matrix(a.extension)
-  mortar(m)
+  out_bg_rows = get_out_dof_to_bg_rows(a)
+  out_bg_cols = get_out_dof_to_bg_cols(a)
+  in_A = allocate_matrix(a.assem,matdata)
+  out_A = a.extension.matrix
+  ordered_blockdiag(in_A,out_A,a)
 end
 
-function FESpaces.assemble_matrix!(mat,a::ExtensionAssembler,matdata)
-  assemble_matrix!(mat[Block(1,1)],a.int_assem,matdata)
-  copyto!(mat[Block(2,2)],get_extension_matrix(a.extension))
+function FESpaces.assemble_matrix!(A,a::ExtensionAssembler,matdata)
+  in_bg_rows = get_in_dof_to_bg_rows(a)
+  in_bg_cols = get_in_dof_to_bg_cols(a)
+  in_A = internal_view(A,in_bg_rows,in_bg_cols)
+  assemble_matrix!(in_A,a.assem,matdata)
 end
 
-function FESpaces.assemble_matrix_add!(mat,a::ExtensionAssembler,matdata)
-  assemble_matrix_add!(mat[Block(1,1)],a.int_assem,matdata)
-  copyto!(mat[Block(2,2)],get_extension_matrix(a.extension))
+function FESpaces.assemble_matrix_add!(A,a::ExtensionAssembler,matdata)
+  in_bg_rows = get_in_dof_to_bg_rows(a)
+  in_bg_cols = get_in_dof_to_bg_cols(a)
+  in_A = internal_view(A,in_bg_rows,in_bg_cols)
+  assemble_matrix_add!(in_A,a.assem,matdata)
 end
 
-function FESpaces.assemble_matrix(a::ExtensionAssembler,matdata)
-  m = Matrix{get_matrix_type(a)}(undef,2,2)
-  m[1,1] = assemble_matrix(a.int_assem,matdata)
-  m[2,1] = spzeros(FESpaces.num_cols(a.int_assem),FESpaces.num_rows(a.extension))
-  m[1,2] = spzeros(FESpaces.num_rows(a.int_assem),FESpaces.num_cols(a.extension))
-  m[2,2] = get_extension_matrix(a.extension)
-  mortar(m)
+# utils
+
+internal_view(a::AbstractArray,i::AbstractVector...) = InternalView(a,i)
+
+struct InternalView{T,N,A<:AbstractArray{T,N},I<:AbstractVector} <: AbstractArray{T,N}
+  parent::A
+  i_to_parent_i::NTuple{N,I}
 end
 
-function FESpaces.allocate_matrix_and_vector(a::ExtensionAssembler,data)
-  int_A,int_b = allocate_matrix_and_vector(a.int_assem,data)
+Base.size(a::InternalView{T,N}) where {T,N} = ntuple(j->length(a.i_to_parent_i[j]),Val{N}())
 
-  A = Matrix{typeof(int_A)}(undef,2,2)
-  A[1,1] = int_A
-  A[2,1] = spzeros(FESpaces.num_cols(a.int_assem),FESpaces.num_rows(a.extension))
-  A[1,2] = spzeros(FESpaces.num_rows(a.int_assem),FESpaces.num_cols(a.extension))
-  A[2,2] = get_extension_matrix(a.extension)
-
-  b = Matrix{typeof(int_b)}(undef,2)
-  b[1] = ext_b
-  b[2] = get_extension_vector(a.extension)
-
-  mortar(A),mortar(b)
+function Base.getindex(a::InternalView{T,N},i::Vararg{Int,N}) where {T,N}
+  a.parent[Base.reindex(a.i_to_parent_i,i)...]
 end
 
-function FESpaces.assemble_matrix_and_vector!(A,b,a::ExtensionAssembler, data)
-  assemble_matrix_and_vector!(A[Block(1,1)],b[Block(1)],a.int_assem,data)
-  copyto!(A[Block(2,2)],get_extension_matrix(a.extension))
-  copyto!(b[Block(2)],get_extension_vector(a.extension))
+function Base.setindex!(a::InternalView{T,N},v,i::Vararg{Int,N}) where {T,N}
+  a.parent[Base.reindex(a.i_to_parent_i,i)...] = v
 end
 
-function FESpaces.assemble_matrix_and_vector_add!(A,b,a::ExtensionAssembler,data)
-  assemble_matrix_and_vector_add!(A[Block(1,1)],b[Block(1)],a.int_assem,data)
-  copyto!(A[Block(2,2)],get_extension_matrix(a.extension))
-  copyto!(b[Block(2)],get_extension_vector(a.extension))
+const InternalVectorView{T,I} = InternalView{T,1,Vector{T},I}
+const InternalSparseMatrixCSCView{T,I} = InternalView{T,2,SparseMatrixCSC{T,Int},I}
+
+function Algebra.add_entry!(combine::Function,A::InternalVectorView,v,i)
+  parent = A.parent
+  i_to_parent_i, = A.i_to_parent_i
+  parent_i = i_to_parent_i[i]
+  Algebra.add_entry!(combine,parent,v,parent_i)
 end
 
-function FESpaces.assemble_matrix_and_vector(a::ExtensionAssembler, data)
-  int_A,int_b = assemble_matrix_and_vector(a.int_assem,data)
+function Algebra.add_entry!(combine::Function,A::InternalSparseMatrixCSCView,v,i,j)
+  parent = A.parent
+  i_to_parent_i,j_to_parent_j = A.i_to_parent_i
+  parent_i = i_to_parent_i[i]
+  parent_j = j_to_parent_j[j]
+  Algebra.add_entry!(combine,parent,v,parent_i,parent_j)
+end
 
-  A = Matrix{typeof(int_A)}(undef,2,2)
-  A[1,1] = int_A
-  A[2,1] = spzeros(FESpaces.num_rows(a.extension),FESpaces.num_cols(a.int_assem))
-  A[1,2] = spzeros(FESpaces.num_rows(a.int_assem),FESpaces.num_cols(a.extension))
-  A[2,2] = get_extension_matrix(a.extension)
+const ParamInternalView{T,N,A<:AbstractParamArray{T,N},I<:AbstractVector} = InternalView{T,N,A,I}
 
-  b = Vector{typeof(int_b)}(undef,2)
-  b[1] = int_b
-  b[2] = get_extension_vector(a.extension)
+Base.size(a::ParamInternalView{T,N}) where {T,N} = size(a.parent)
 
-  mortar(A),mortar(b)
+function Base.getindex(a::ParamInternalView{T,N},i::Vararg{Int,N}) where {T,N}
+  getindex(a.parent,i...)
+end
+
+function Base.setindex!(a::ParamInternalView{T,N},v,i::Vararg{Int,N}) where {T,N}
+  setindex!(a.parent,v,i...)
+end
+
+const ParamInternalVectorView{T,I} = InternalView{T,1,<:ConsecutiveParamVector{T},I}
+const ParamInternalSparseMatrixCSCView{T,I} = InternalView{T,2,<:ConsecutiveParamSparseMatrix{T},I}
+
+function Algebra.add_entry!(combine::Function,A::ParamInternalVectorView,v,i)
+  parent = A.parent
+  i_to_parent_i, = A.i_to_parent_i
+  parent_i = i_to_parent_i[i]
+  Algebra.add_entry!(combine,parent,v,parent_i)
+end
+
+function Algebra.add_entry!(combine::Function,A::ParamInternalSparseMatrixCSCView,v,i)
+  parent = A.parent
+  i_to_parent_i,j_to_parent_j = A.i_to_parent_i
+  parent_i = i_to_parent_i[i]
+  parent_j = j_to_parent_j[j]
+  Algebra.add_entry!(combine,parent,v,parent_i,parent_j)
 end

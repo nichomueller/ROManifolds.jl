@@ -69,6 +69,8 @@ function FESpaces.gather_free_and_dirichlet_values(ext::GenericExtension)
   (ext.values.free_values,ext.values.dirichlet_values)
 end
 
+get_out_dof_to_bg_dofs(ext::GenericExtension) = ext.dof_to_bg_dofs
+
 function _build_mass_matrix(space::SingleFieldFESpace)
   Ω = get_triangulation(space)
   degree = 2*get_polynomial_order(space)
