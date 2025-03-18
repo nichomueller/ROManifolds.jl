@@ -65,6 +65,8 @@ function Extension(style::ExtensionStyle,args...)
   @abstractmethod
 end
 
+FESpaces.get_fe_space(ext::GenericExtension) = ext.values.fe_space
+
 function FESpaces.gather_free_and_dirichlet_values(ext::GenericExtension)
   (ext.values.free_values,ext.values.dirichlet_values)
 end

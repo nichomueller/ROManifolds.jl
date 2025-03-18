@@ -68,3 +68,23 @@ Vext = HarmonicExtensionFESpace(V,Vagg,Voutagg,aout,lout)
 
 gh = interpolate_everywhere(g,Vext)
 writevtk(Ωbg,datadir("plts/sol"),cellfields=["uh"=>gh])
+
+assem = SparseMatrixAssembler(Vext,Vext)
+
+ν(x) = x[2]-x[1]
+a(u,v) = ∫(ν*∇(v)⋅∇(u))dΩ + ∫( 100*v*u  - v*(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))*u )dΓ
+l(v) = ∫(ν*v)dΩ + ∫( 100*v*g - (n_Γ⋅∇(v))*g )dΓ
+@assert assemble_matrix(a,assem,Vext,Vext) ≈ assemble_matrix(a,assem,Vagg,Vagg)
+@assert assemble_vector(l,assem,Vext) ≈ assemble_vector(l,assem,Vagg)
+
+ext_assem = ExtensionAssembler(Vext,Vext)
+
+A = assemble_matrix(a,ext_assem,Vext,Vext)
+in_A = assemble_matrix(a,ext_assem.assem,Vagg,Vagg)
+out_A = ext_assem.extension.matrix
+norm(A)^2 ≈ norm(in_A)^2 + norm(out_A)^2
+
+b = assemble_vector(l,ext_assem,Vext)
+in_b = assemble_vector(l,ext_assem.assem,Vagg)
+out_b = ext_assem.extension.vector
+norm(b)^2 ≈ norm(in_b)^2 + norm(out_b)^2

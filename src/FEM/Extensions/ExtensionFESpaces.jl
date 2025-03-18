@@ -182,7 +182,7 @@ end
 # utils
 
 get_incut_fe_space(f::ExtensionFESpace) = f.space
-get_outcut_fe_space(f::ExtensionFESpace) = f.extension.values.fe_space
+get_outcut_fe_space(f::ExtensionFESpace) = get_fe_space(f.extension)
 
 function get_incut_cells_to_bg_cells(f::ExtensionFESpace)
   get_cell_to_bg_cell(get_incut_fe_space(f))

@@ -1,7 +1,7 @@
 get_extension(f::SingleFieldFESpace) = @notimplemented
 get_extension(f::ExtensionFESpace) = f.extension
 get_extension(f::UnEvalTrialFESpace{<:ExtensionFESpace}) = get_extension(f.space)
-get_extension(f::SingelFieldParamFESpace{<:ExtensionFESpace}) = get_extension(f.space)
+get_extension(f::SingleFieldParamFESpace{<:ExtensionFESpace}) = get_extension(f.space)
 get_extension(f::MultiFieldFESpace) = map(get_extension,f.spaces)
 
 FESpaces.num_rows(ext::Extension) = num_free_dofs(get_fe_space(ext))
@@ -24,7 +24,7 @@ FESpaces.num_rows(a::ExtensionAssembler) = FESpaces.num_rows(a.assem) + FESpaces
 FESpaces.num_cols(a::ExtensionAssembler) = FESpaces.num_cols(a.assem) + FESpaces.num_cols(a.extension)
 FESpaces.get_rows(a::ExtensionAssembler) = Base.OneTo(FESpaces.num_rows(a))
 FESpaces.get_cols(a::ExtensionAssembler) = Base.OneTo(FESpaces.num_cols(a))
-FESpaces.get_assembly_strategy(a::ExtensionAssembler) = get_assembly_strategy(a.assem)
+FESpaces.get_assembly_strategy(a::ExtensionAssembler) = FESpaces.get_assembly_strategy(a.assem)
 FESpaces.get_matrix_builder(a::ExtensionAssembler)= get_matrix_builder(a.assem)
 FESpaces.get_vector_builder(a::ExtensionAssembler) = get_vector_builder(a.assem)
 
@@ -82,32 +82,46 @@ end
 
 function FESpaces.allocate_vector(a::ExtensionAssembler,vecdata)
   out_bg_rows = get_out_dof_to_bg_rows(a)
-  b = zeros(get_vector_type(a),num_rows(a))
   out_b = a.extension.vector
-  for (dof,bg_dof) in enumerate(out_bg_rows)
-    b[bg_dof] = out_b[dof]
+  b = zeros(eltype(out_b),FESpaces.num_rows(a))
+  for (row,bg_row) in enumerate(out_bg_rows)
+    b[bg_row] = out_b[row]
   end
   b
+end
+
+function FESpaces.assemble_vector(a::ExtensionAssembler,vecdata)
+  b = allocate_vector(a,vecdata)
+  assemble_vector_add!(b,a,vecdata)
 end
 
 function FESpaces.assemble_vector!(b,a::ExtensionAssembler,vecdata)
   in_bg_rows = get_in_dof_to_bg_rows(a)
   in_b = internal_view(b,in_bg_rows)
   assemble_vector!(in_b,a.assem,vecdata)
+  b
 end
 
 function FESpaces.assemble_vector_add!(b,a::ExtensionAssembler,vecdata)
   in_bg_rows = get_in_dof_to_bg_rows(a)
   in_b = internal_view(b,in_bg_rows)
   assemble_vector_add!(in_b,a.assem,vecdata)
+  b
 end
 
 function FESpaces.allocate_matrix(a::ExtensionAssembler,matdata)
+  in_bg_rows = get_in_dof_to_bg_rows(a)
+  in_bg_cols = get_in_dof_to_bg_cols(a)
   out_bg_rows = get_out_dof_to_bg_rows(a)
   out_bg_cols = get_out_dof_to_bg_cols(a)
   in_A = allocate_matrix(a.assem,matdata)
   out_A = a.extension.matrix
-  ordered_blockdiag(in_A,out_A,a)
+  ordered_blockdiag(in_A,out_A,in_bg_rows,in_bg_cols,out_bg_rows,out_bg_cols)
+end
+
+function FESpaces.assemble_matrix(a::ExtensionAssembler,matdata)
+  A = allocate_matrix(a,matdata)
+  assemble_matrix_add!(A,a,matdata)
 end
 
 function FESpaces.assemble_matrix!(A,a::ExtensionAssembler,matdata)
@@ -115,6 +129,7 @@ function FESpaces.assemble_matrix!(A,a::ExtensionAssembler,matdata)
   in_bg_cols = get_in_dof_to_bg_cols(a)
   in_A = internal_view(A,in_bg_rows,in_bg_cols)
   assemble_matrix!(in_A,a.assem,matdata)
+  A
 end
 
 function FESpaces.assemble_matrix_add!(A,a::ExtensionAssembler,matdata)
@@ -122,9 +137,26 @@ function FESpaces.assemble_matrix_add!(A,a::ExtensionAssembler,matdata)
   in_bg_cols = get_in_dof_to_bg_cols(a)
   in_A = internal_view(A,in_bg_rows,in_bg_cols)
   assemble_matrix_add!(in_A,a.assem,matdata)
+  A
 end
 
 # utils
+
+#TODO fix this!
+function ordered_blockdiag(
+  A::SparseMatrixCSC{Tv,Ti},
+  B::SparseMatrixCSC{Tv,Ti},
+  row_A_to_row_AB::AbstractVector,
+  col_A_to_col_AB::AbstractVector,
+  row_B_to_row_AB::AbstractVector,
+  col_B_to_col_AB::AbstractVector
+  ) where {Tv,Ti}
+
+  row_AB = vcat(row_A_to_row_AB,row_B_to_row_AB)
+  col_AB = vcat(col_A_to_col_AB,col_B_to_col_AB)
+  AB = blockdiag(A,B)
+  AB[sortperm(row_AB),sortperm(col_AB)]
+end
 
 internal_view(a::AbstractArray,i::AbstractVector...) = InternalView(a,i)
 
@@ -160,6 +192,9 @@ function Algebra.add_entry!(combine::Function,A::InternalSparseMatrixCSCView,v,i
   parent_j = j_to_parent_j[j]
   Algebra.add_entry!(combine,parent,v,parent_i,parent_j)
 end
+
+Base.fill!(a::InternalView,v) = LinearAlgebra.fill!(a.parent,v)
+LinearAlgebra.fillstored!(a::InternalView,v) = LinearAlgebra.fillstored!(a.parent,v)
 
 const ParamInternalView{T,N,A<:AbstractParamArray{T,N},I<:AbstractVector} = InternalView{T,N,A,I}
 
