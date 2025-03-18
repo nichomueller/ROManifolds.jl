@@ -84,5 +84,24 @@ V = FESpace(model,reffe,conformity=:H1)
 Vext = ParamHarmonicExtensionFESpace(V,Vagg,Voutagg,aout,lout)
 Uext = ParamTrialFESpace(Vext,gμ)
 
-μ = realization(pspace)
+μ = realization(pspace;nparams=50)
 Uμ = Uext(μ)
+
+u = zero_free_values(Uμ)
+uh = FEFunction(Uμ,u)
+
+afun(u,v) = a(μ,u,v,dΩ,dΓ)
+lfun(v) = res(μ,uh,v,dΩ,dΓ,dΓn)
+
+solver = LUSolver()
+
+A = assemble_matrix(afun,Uμ,Vext)
+b = assemble_vector(lfun,Uμ)
+solve!(u,solver,A,b)
+uh = ExtendedFEFunction(Uμ,u)
+
+uext = extend_free_values(Uμ,u)
+
+norm(uext[1])^2 ≈ norm(u[1])^2 + norm(Uμ.space.extension.values.free_values[1])^2
+uext[1][Vext.dof_to_bg_dofs] ≈ u[1]
+uext[1][Vext.extension.dof_to_bg_dofs] ≈ Uμ.space.extension.values.free_values[1]

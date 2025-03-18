@@ -27,7 +27,7 @@ function Extension(
 end
 
 function Extension(
-  style::ZeroExtension,
+  style::FunctionExtension,
   space::SingleFieldFESpace,
   dof_to_bg_dofs::AbstractVector,
   f::Function

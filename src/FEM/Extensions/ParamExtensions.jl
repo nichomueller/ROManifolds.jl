@@ -62,3 +62,4 @@ end
 (ext::UnEvalExtension)(μ,t) = evaluate(ext,μ,t)
 
 get_out_dof_to_bg_dofs(ext::UnEvalExtension) = ext.dof_to_bg_dofs
+FESpaces.get_fe_space(f::UnEvalExtension) = f.space

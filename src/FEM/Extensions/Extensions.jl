@@ -50,6 +50,13 @@ export HarmonicExtensionFESpace
 export ParamZeroExtensionFESpace
 export ParamFunctionExtensionFESpace
 export ParamHarmonicExtensionFESpace
+export ExtendedFEFunction
+export extend_free_values
+export extend_dirichlet_values
+export extend_free_dirichlet_values
+export extended_interpolate
+export extended_interpolate_everywhere
+export extended_interpolate_dirichlet
 include("ExtensionFESpaces.jl")
 
 export ExtensionAssembler

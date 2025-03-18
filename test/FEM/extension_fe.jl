@@ -64,11 +64,17 @@ aout(u,v) = ∫(∇(v)⋅∇(u))dΩout
 lout(v) = ∫(∇(v)⋅∇(g))dΩout
 
 V = FESpace(model,reffe,conformity=:H1)
-Vext = HarmonicExtensionFESpace(V,Vagg,Voutagg,aout,lout)
+Vfun = FunctionExtensionFESpace(V,Vagg,Voutagg,g)
+Vharm = HarmonicExtensionFESpace(V,Vagg,Voutagg,aout,lout)
 
-gh = interpolate_everywhere(g,Vext)
-writevtk(Ωbg,datadir("plts/sol"),cellfields=["uh"=>gh])
+gh = interpolate_everywhere(g,V)
+gh_fun = Extensions.extended_interpolate_everywhere(g,Vfun)
+@assert gh_fun.free_values ≈ gh.free_values
 
+gh_harm = Extensions.extended_interpolate_everywhere(g,Vharm)
+writevtk(Ωbg,datadir("plts/sol_harm"),cellfields=["uh"=>gh_harm])
+
+Vext = Vharm
 assem = SparseMatrixAssembler(Vext,Vext)
 
 ν(x) = x[2]-x[1]
@@ -88,3 +94,15 @@ b = assemble_vector(l,ext_assem,Vext)
 in_b = assemble_vector(l,ext_assem.assem,Vagg)
 out_b = ext_assem.extension.vector
 norm(b)^2 ≈ norm(in_b)^2 + norm(out_b)^2
+
+solver = LUSolver()
+
+u = zero_free_values(Vext)
+A = assemble_matrix(a,Vext,Vext)
+b = assemble_vector(l,Vext)
+solve!(u,solver,A,b)
+uh = ExtendedFEFunction(Vext,u)
+uext = extend_free_values(Vext,u)
+
+@assert uext[Vext.dof_to_bg_dofs] ≈ u
+@assert uext[Vext.extension.dof_to_bg_dofs] ≈ Vext.extension.values.free_values

@@ -82,12 +82,9 @@ end
 
 function FESpaces.allocate_vector(a::ExtensionAssembler,vecdata)
   out_bg_rows = get_out_dof_to_bg_rows(a)
+  in_b = allocate_vector(a.assem,vecdata)
   out_b = a.extension.vector
-  b = zeros(eltype(out_b),FESpaces.num_rows(a))
-  for (row,bg_row) in enumerate(out_bg_rows)
-    b[bg_row] = out_b[row]
-  end
-  b
+  ordered_insert(in_b,out_b,out_bg_rows)
 end
 
 function FESpaces.assemble_vector(a::ExtensionAssembler,vecdata)
@@ -142,6 +139,40 @@ end
 
 # utils
 
+function ordered_insert(
+  A::AbstractVector,
+  B::AbstractVector,
+  row_B_to_row_AB::AbstractVector
+  )
+
+  AB = similar(A,(length(A)+length(B),))
+  fill!(AB,zero(eltype(AB)))
+  for (row_B,row_AB) in enumerate(row_B_to_row_AB)
+    AB[row_AB] = B[row_B]
+  end
+  AB
+end
+
+function ordered_insert(
+  A::ConsecutiveParamVector,
+  B::ConsecutiveParamVector,
+  row_B_to_row_AB::AbstractVector
+  )
+
+  @assert param_length(A) == param_length(B)
+  plength = param_length(A)
+  data_A = get_all_data(A)
+  data_B = get_all_data(B)
+  data_AB = similar(data_A,(size(data_A,1)+size(data_B,1),plength))
+  fill!(data_AB,zero(eltype(data_AB)))
+  for (row_B,row_AB) in enumerate(row_B_to_row_AB)
+    for k in 1:plength
+      data_AB[row_AB,k] = data_B[row_B,k]
+    end
+  end
+  ConsecutiveParamArray(data_AB)
+end
+
 #TODO fix this!
 function ordered_blockdiag(
   A::SparseMatrixCSC{Tv,Ti},
@@ -156,6 +187,17 @@ function ordered_blockdiag(
   col_AB = vcat(col_A_to_col_AB,col_B_to_col_AB)
   AB = blockdiag(A,B)
   AB[sortperm(row_AB),sortperm(col_AB)]
+end
+
+#TODO fix this!
+function ordered_blockdiag(
+  A::ConsecutiveParamSparseMatrixCSC,
+  B::ConsecutiveParamSparseMatrixCSC,
+  args...
+  )
+
+  @assert param_length(A) == param_length(B)
+  ParamArray(map(i -> ordered_blockdiag(param_getindex(A,i),param_getindex(B,i),args...),param_eachindex(A)))
 end
 
 internal_view(a::AbstractArray,i::AbstractVector...) = InternalView(a,i)
@@ -175,17 +217,14 @@ function Base.setindex!(a::InternalView{T,N},v,i::Vararg{Int,N}) where {T,N}
   a.parent[Base.reindex(a.i_to_parent_i,i)...] = v
 end
 
-const InternalVectorView{T,I} = InternalView{T,1,Vector{T},I}
-const InternalSparseMatrixCSCView{T,I} = InternalView{T,2,SparseMatrixCSC{T,Int},I}
-
-function Algebra.add_entry!(combine::Function,A::InternalVectorView,v,i)
+function Algebra.add_entry!(combine::Function,A::InternalView{T,1},v,i) where T
   parent = A.parent
   i_to_parent_i, = A.i_to_parent_i
   parent_i = i_to_parent_i[i]
   Algebra.add_entry!(combine,parent,v,parent_i)
 end
 
-function Algebra.add_entry!(combine::Function,A::InternalSparseMatrixCSCView,v,i,j)
+function Algebra.add_entry!(combine::Function,A::InternalView{T,2},v,i,j) where T
   parent = A.parent
   i_to_parent_i,j_to_parent_j = A.i_to_parent_i
   parent_i = i_to_parent_i[i]
@@ -196,7 +235,7 @@ end
 Base.fill!(a::InternalView,v) = LinearAlgebra.fill!(a.parent,v)
 LinearAlgebra.fillstored!(a::InternalView,v) = LinearAlgebra.fillstored!(a.parent,v)
 
-const ParamInternalView{T,N,A<:AbstractParamArray{T,N},I<:AbstractVector} = InternalView{T,N,A,I}
+const ParamInternalView{T,N,I<:AbstractVector} = InternalView{T,N,<:AbstractParamArray,I}
 
 Base.size(a::ParamInternalView{T,N}) where {T,N} = size(a.parent)
 
@@ -206,22 +245,4 @@ end
 
 function Base.setindex!(a::ParamInternalView{T,N},v,i::Vararg{Int,N}) where {T,N}
   setindex!(a.parent,v,i...)
-end
-
-const ParamInternalVectorView{T,I} = InternalView{T,1,<:ConsecutiveParamVector{T},I}
-const ParamInternalSparseMatrixCSCView{T,I} = InternalView{T,2,<:ConsecutiveParamSparseMatrix{T},I}
-
-function Algebra.add_entry!(combine::Function,A::ParamInternalVectorView,v,i)
-  parent = A.parent
-  i_to_parent_i, = A.i_to_parent_i
-  parent_i = i_to_parent_i[i]
-  Algebra.add_entry!(combine,parent,v,parent_i)
-end
-
-function Algebra.add_entry!(combine::Function,A::ParamInternalSparseMatrixCSCView,v,i)
-  parent = A.parent
-  i_to_parent_i,j_to_parent_j = A.i_to_parent_i
-  parent_i = i_to_parent_i[i]
-  parent_j = j_to_parent_j[j]
-  Algebra.add_entry!(combine,parent,v,parent_i,parent_j)
 end
