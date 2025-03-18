@@ -105,3 +105,14 @@ uext = extend_free_values(Uμ,u)
 norm(uext[1])^2 ≈ norm(u[1])^2 + norm(Uμ.space.extension.values.free_values[1])^2
 uext[1][Vext.dof_to_bg_dofs] ≈ u[1]
 uext[1][Vext.extension.dof_to_bg_dofs] ≈ Uμ.space.extension.values.free_values[1]
+
+dof_map = get_dof_map(V)
+fesnaps = Snapshots(uext,dof_map,μ)
+
+energy(u,v) = ∫(∇(v)⋅∇(u))dΩbg
+X = assemble_matrix(energy,V,V)
+
+state_reduction = PODReduction(1e-4,energy;nparams=50)
+basis = reduced_basis(state_reduction,fesnaps,X)
+
+jacs =

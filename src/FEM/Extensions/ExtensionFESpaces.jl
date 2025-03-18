@@ -379,7 +379,7 @@ end
 
 function extend_incut_cell_vals(f::ExtensionFESpace,cell_vals)
   out_out_cells = get_out_cells_to_outcut_cells(f)
-  outcut_cell_vals = get_cell_dof_values(f.extension.values)
+  outcut_cell_vals = scatter_free_and_dirichlet_values(f.extension)
   out_cell_vals = lazy_map(Reindex(outcut_cell_vals),out_out_cells)
   bg_cell_vals = lazy_append(cell_vals,out_cell_vals)
   return bg_cell_vals
@@ -427,4 +427,24 @@ function _free_and_diri_bg_vals!(
       bg_fdata[bg_fdof,k] = out_fdata[out_fdof,k]
     end
   end
+end
+
+function DofMaps.get_dof_map(f::ExtensionFESpace,args...)
+  get_dof_map(get_bg_fe_space(f),args...)
+end
+
+function DofMaps.get_sparsity(
+  f::SingleFieldFESpace,
+  g::ExtensionFESpace,
+  trian=DofMaps._get_common_domain(f,g))
+
+  if trian == DofMaps._get_common_domain(f,g)
+    ExtendedSparsityPattern(f,g,trian)
+  else
+    SparsityPattern(get_bg_fe_space(f),get_bg_fe_space(g),trian)
+  end
+end
+
+function ExtendedSparsityPattern()
+  matrix = allocate_matrix(assem,)
 end

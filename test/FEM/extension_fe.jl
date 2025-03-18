@@ -97,12 +97,17 @@ norm(b)^2 ≈ norm(in_b)^2 + norm(out_b)^2
 
 solver = LUSolver()
 
-u = zero_free_values(Vext)
-A = assemble_matrix(a,Vext,Vext)
-b = assemble_vector(l,Vext)
-solve!(u,solver,A,b)
-uh = ExtendedFEFunction(Vext,u)
-uext = extend_free_values(Vext,u)
+in_u = zero_free_values(Vext)
+in_A = assemble_matrix(a,Vext,Vext)
+in_b = assemble_vector(l,Vext)
+solve!(in_u,solver,in_A,in_b)
+uh = ExtendedFEFunction(Vext,in_u)
+u = extend_free_values(Vext,in_u)
 
-@assert uext[Vext.dof_to_bg_dofs] ≈ u
-@assert uext[Vext.extension.dof_to_bg_dofs] ≈ Vext.extension.values.free_values
+@assert u[Vext.dof_to_bg_dofs] ≈ in_u
+@assert u[Vext.extension.dof_to_bg_dofs] ≈ Vext.extension.values.free_values
+
+u_alg = similar(u)
+solve!(u_alg,solver,A,b)
+
+@assert u_alg ≈ u

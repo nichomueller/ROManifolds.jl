@@ -67,6 +67,11 @@ end
 
 FESpaces.get_fe_space(ext::GenericExtension) = ext.values.fe_space
 
+function FESpaces.scatter_free_and_dirichlet_values(ext::GenericExtension)
+  scatter_free_and_dirichlet_values(
+    get_fe_space(ext),ext.values.free_values,ext.values.dirichlet_values)
+end
+
 function FESpaces.gather_free_and_dirichlet_values(ext::GenericExtension)
   (ext.values.free_values,ext.values.dirichlet_values)
 end
