@@ -51,6 +51,7 @@ export ParamZeroExtensionFESpace
 export ParamFunctionExtensionFESpace
 export ParamHarmonicExtensionFESpace
 export ExtendedFEFunction
+export get_bg_cell_dof_ids
 export extend_free_values
 export extend_dirichlet_values
 export extend_free_dirichlet_values

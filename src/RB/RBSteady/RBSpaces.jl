@@ -85,7 +85,7 @@ Subtypes:
 - [`MultiFieldRBSpace`](@ref)
 - [`EvalRBSpace`](@ref)
 """
-abstract type RBSpace <: FESpace end
+abstract type RBSpace{S} <: FESpace end
 
 (U::RBSpace)(μ) = evaluate(U,μ)
 
@@ -183,15 +183,15 @@ function FESpaces.FEFunction(r::RBSpace,x̂::AbstractVector)
 end
 
 """
-    struct SingleFieldRBSpace <: RBSpace
-      space::SingleFieldFESpace
+    struct SingleFieldRBSpace{S<:SingleFieldFESpace} <: RBSpace{S}
+      space::S
       subspace::Projection
     end
 
 Reduced basis subspace of a `SingleFieldFESpace` in `Gridap`
 """
-struct SingleFieldRBSpace <: RBSpace
-  space::SingleFieldFESpace
+struct SingleFieldRBSpace{S<:SingleFieldFESpace} <: RBSpace{S}
+  space::S
   subspace::Projection
 end
 
@@ -203,14 +203,14 @@ FESpaces.get_fe_space(r::SingleFieldRBSpace) = r.space
 get_reduced_subspace(r::SingleFieldRBSpace) = r.subspace
 
 """
-    struct MultiFieldRBSpace <: RBSpace
+    struct MultiFieldRBSpace <: RBSpace{MultiFieldFESpace}
       space::MultiFieldFESpace
       subspace::BlockProjection
     end
 
 Reduced basis subspace of a `MultiFieldFESpace` in `Gridap`
 """
-struct MultiFieldRBSpace <: RBSpace
+struct MultiFieldRBSpace <: RBSpace{MultiFieldFESpace}
   space::MultiFieldFESpace
   subspace::BlockProjection
 end
@@ -253,7 +253,7 @@ end
 Conceptually this isn't needed, but it helps dispatching according to steady/transient
 cases
 """
-struct EvalRBSpace{A<:RBSpace,B<:AbstractRealization} <: RBSpace
+struct EvalRBSpace{S,A<:RBSpace{S},B<:AbstractRealization} <: RBSpace{S}
   space::A
   realization::B
 end

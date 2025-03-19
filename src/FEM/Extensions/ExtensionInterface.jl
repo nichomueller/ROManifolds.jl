@@ -81,10 +81,14 @@ function Extension(style::ExtensionStyle,args...)
   @abstractmethod
 end
 
+CellData.get_triangulation(ext::Extension) = get_triangulation(ext.values)
+
 FESpaces.get_dirichlet_dof_values(f::SingleFieldFEFunction) = f.dirichlet_values
 FESpaces.get_dirichlet_dof_values(f::SingleFieldParamFEFunction) = f.dirichlet_values
 
 FESpaces.get_fe_space(ext::Extension) = ext.values.fe_space
+
+FESpaces.get_cell_dof_ids(ext::Extension,args...) = get_cell_dof_ids(get_fe_space(ext),args...)
 
 function FESpaces.get_cell_dof_values(ext::Extension)
   get_cell_dof_values(ext.values)

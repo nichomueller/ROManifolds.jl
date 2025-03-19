@@ -200,6 +200,60 @@ function ExtendedFEFunction(
   FEFunction(f.space,zmfv,zmdv)
 end
 
+struct BGCellDofIds{A<:AbstractArray,FI<:AbstractVector,FD<:AbstractVector} <: Map
+  cell_dof_ids::A
+  fdof_to_bg_fdofs::FI
+  ddof_to_bg_ddofs::FD
+end
+
+function BGCellDofIds(cell_dof_ids::AbstractArray,fdof_to_bg_fdofs::AbstractArray)
+  nddof_approx = maximum(fdof_to_bg_fdofs)
+  ddof_to_bg_ddofs = IdentityVector(nddof_approx)
+  BGCellDofIds(cell_dof_ids,fdof_to_bg_fdofs,ddof_to_bg_ddofs)
+end
+
+function Arrays.return_cache(k::BGCellDofIds,i::Int)
+  array_cache(k.cell_dof_ids)
+end
+
+function Arrays.evaluate!(c,k::BGCellDofIds,i::Int)
+  ids = getindex!(c,k.cell_dof_ids,i)
+  for (j,idsj) in enumerate(ids)
+    if idsj > 0
+      ids[j] = k.fdof_to_bg_fdofs[idsj]
+    else
+      ids[j] = k.ddof_to_bg_ddofs[-idsj]
+    end
+  end
+  return ids
+end
+
+function get_bg_cell_dof_ids(ext::Extension,args...)
+  cell_ids = get_cell_dof_ids(ext,args...)
+  k = BGCellDofIds(cell_ids,ext.fdof_to_bg_fdofs,ext.ddof_to_bg_ddofs)
+  lazy_map(k,1:length(cell_ids))
+end
+
+function get_bg_cell_dof_ids(f::ExtensionFESpace,trian::Triangulation)
+  if is_related(trian,get_triangulation(f.extension))
+    get_bg_cell_dof_ids(f.extension,trian)
+  else
+    cell_ids = get_cell_dof_ids(f,trian)
+    k = BGCellDofIds(cell_ids,f.fdof_to_bg_fdofs,f.ddof_to_bg_ddofs)
+    lazy_map(k,1:length(cell_ids))
+  end
+end
+
+function get_bg_cell_dof_ids(f::ExtensionFESpace)
+  cell_ids = get_cell_dof_ids(f,trian)
+  k = BGCellDofIds(cell_ids,f.fdof_to_bg_fdofs,f.ddof_to_bg_ddofs)
+  lazy_map(k,1:length(cell_ids))
+end
+
+function get_bg_cell_dof_ids(f::SingleFieldFESpace,args...)
+  get_bg_cell_dof_ids(get_ext_space(f),args...)
+end
+
 function _extended_cell_values(f::SingleFieldFESpace,object)
   FESpaces._cell_vals(get_bg_fe_space(f),object)
 end
