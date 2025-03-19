@@ -45,19 +45,6 @@ Subtypes:
 abstract type Snapshots{T,N,D,I<:AbstractDofMap{D},R<:AbstractRealization,A} <: AbstractSnapshots{T,N} end
 
 """
-    get_indexed_data(s::Snapshots) -> AbstractArray
-
-Returns the data in `s` reindexed according to the indexing strategy provided in `s`.
-!!! note
-  This function is not lazy, and should be used with parsimony
-"""
-get_indexed_data(s::Snapshots) = @abstractmethod
-
-DofMaps.get_dof_map(s::Snapshots) = @abstractmethod
-
-param_length(s::Snapshots) = @notimplemented
-
-"""
     space_dofs(s::Snapshots{T,N,D}) where {T,N,D} -> NTuple{D,Integer}
 
 Returns the spatial size of the snapshots
@@ -76,14 +63,8 @@ function DofMaps.recast(a::AbstractArray,s::Snapshots)
   return recast(a,get_dof_map(s))
 end
 
-function DofMaps.change_dof_map(s::Snapshots,i::AbstractDofMap)
-  i′ = change_dof_map(get_dof_map(s),i)
-  return Snapshots(get_param_data(s),i′,get_realization(s))
-end
-
-function DofMaps.flatten(s::Snapshots)
-  i′ = flatten(get_dof_map(s))
-  Snapshots(get_param_data(s),i′,get_realization(s))
+function Base.reshape(s::Snapshots,dims::Dims)
+  reshape(get_all_data(s))
 end
 
 """
@@ -96,7 +77,6 @@ spatial axes, to which a parametric dimension is added.
 Subtypes:
 - [`GenericSnapshots`](@ref)
 - [`SnapshotsAtIndices`](@ref)
-- [`ReshapedSnapshots`](@ref)
 """
 abstract type SteadySnapshots{T,N,D,I,R<:Realization,A} <: Snapshots{T,N,D,I,R,A} end
 
@@ -134,20 +114,6 @@ get_all_data(s::GenericSnapshots) = get_all_data(s.data)
 get_param_data(s::GenericSnapshots) = s.data
 DofMaps.get_dof_map(s::GenericSnapshots) = s.dof_map
 get_realization(s::GenericSnapshots) = s.realization
-
-function get_indexed_data(s::GenericSnapshots{T}) where T
-  i = get_dof_map(s)
-  data = get_all_data(s)
-  idata = zeros(T,size(data))
-  for ip in 1:num_params(s)
-    for (ij,j) in enumerate(i)
-      if j > 0
-        @inbounds idata[ij,ip] = data[j,ip]
-      end
-    end
-  end
-  return idata
-end
 
 Base.@propagate_inbounds function Base.getindex(
   s::GenericSnapshots{T,N},
@@ -214,20 +180,6 @@ function get_param_data(s::SnapshotsAtIndices)
   ConsecutiveParamArray(v)
 end
 
-function get_indexed_data(s::SnapshotsAtIndices{T}) where T
-  i = get_dof_map(s)
-  data = get_all_data(s)
-  idata = zeros(T,num_space_dofs(s),num_params(s))
-  for (ip,p) in enumerate(param_indices(s))
-    for (ij,j) in enumerate(i)
-      if j > 0
-        @inbounds idata[ij,ip] = data[j,p]
-      end
-    end
-  end
-  return idata
-end
-
 get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
 
 Base.@propagate_inbounds function Base.getindex(
@@ -276,76 +228,6 @@ end
 function select_snapshots(s::SteadySnapshots{T,N},prange::Integer) where {T,N}
   srange = SnapshotsAtIndices(s,format_range(prange,num_params(s)))
   dropdims(srange;dims=N)
-end
-
-"""
-    struct ReshapedSnapshots{T,N,N′,D,I,R,A<:SteadySnapshots{T,N′,D,I,R},B} <: SteadySnapshots{T,N,D,I,R,A}
-      snaps::A
-      size::NTuple{N,Int}
-      mi::B
-    end
-
-Represents a SteadySnapshots `snaps` whose size is resized to `size`. This struct
-is equivalent to `ReshapedArray`, and is only used to make sure the result
-of this operation is still a subtype of SteadySnapshots
-"""
-struct ReshapedSnapshots{T,N,N′,D,I,R,A<:SteadySnapshots{T,N′,D,I,R},B} <: SteadySnapshots{T,N,D,I,R,A}
-  snaps::A
-  size::NTuple{N,Int}
-  mi::B
-end
-
-Base.size(s::ReshapedSnapshots) = s.size
-
-function Base.reshape(s::ReshapedSnapshots,dims::Dims)
-  reshape(s.snaps,dims)
-end
-
-function Base.reshape(s::Snapshots,dims::Dims)
-  n = length(s)
-  prod(dims) == n || DimensionMismatch()
-
-  strds = Base.front(Base.size_to_strides(map(length,axes(s))...,1))
-  strds1 = map(s->max(1,Int(s)),strds)
-  mi = map(Base.SignedMultiplicativeInverse,strds1)
-  ReshapedSnapshots(s,dims,reverse(mi))
-end
-
-Base.@propagate_inbounds function Base.getindex(
-  s::ReshapedSnapshots{T,N},
-  i::Vararg{Integer,N}
-  ) where {T,N}
-
-  @boundscheck checkbounds(s,i...)
-  ax = axes(s.snaps)
-  i′ = Base.offset_if_vec(Base._sub2ind(size(s),i...),ax)
-  i′′ = Base.ind2sub_rs(ax,s.mi,i′)
-  Base._unsafe_getindex_rs(s.snaps,i′′)
-end
-
-function Base.setindex!(
-  s::ReshapedSnapshots{T,N},
-  v,i::Vararg{Integer,N}
-  ) where {T,N}
-
-  @boundscheck checkbounds(s,i...)
-  ax = axes(s.snaps)
-  i′ = Base.offset_if_vec(Base._sub2ind(size(s),i...),ax)
-  s.snaps[Base.ind2sub_rs(ax,s.mi,i′)] = v
-  v
-end
-
-get_realization(s::ReshapedSnapshots) = get_realization(s.snaps)
-DofMaps.get_dof_map(s::ReshapedSnapshots) = get_dof_map(s.snaps)
-
-function get_param_data(s::ReshapedSnapshots)
-  v = get_param_data(s.snaps)
-  reshape(v.data,s.size)
-end
-
-function get_indexed_data(s::ReshapedSnapshots)
-  v = get_indexed_data(s.snaps)
-  reshape(v,s.size)
 end
 
 # sparse interface
@@ -442,10 +324,6 @@ function get_param_data(s::BlockSnapshots)
   map(get_param_data,s.array) |> mortar
 end
 
-function get_indexed_data(s::BlockSnapshots)
-  map(get_indexed_data,s.array)
-end
-
 for f in (:select_snapshots,:(DofMaps.flatten))
   @eval begin
     function Arrays.return_cache(::typeof($f),s::BlockSnapshots,args...;kwargs...)
@@ -503,73 +381,57 @@ end
 # linear algebra
 
 function Base.:*(A::Snapshots{T,2},B::Snapshots{S,2}) where {T,S}
-  consec_mul(get_indexed_data(A),get_indexed_data(B))
+  *(get_all_data(A),get_all_data(B))
 end
 
 function Base.:*(A::Snapshots{T,2},B::Adjoint{S,<:Snapshots}) where {T,S}
-  consec_mul(get_indexed_data(A),adjoint(get_indexed_data(B.parent)))
+  *(get_all_data(A),adjoint(get_all_data(B.parent)))
 end
 
 function Base.:*(A::Snapshots{T,2},B::AbstractMatrix{S}) where {T,S}
-  consec_mul(get_indexed_data(A),B)
+  *(get_all_data(A),B)
 end
 
 function Base.:*(A::Snapshots{T,2},B::Adjoint{T,<:AbstractMatrix{S}}) where {T,S}
-  consec_mul(get_indexed_data(A),B)
+  *(get_all_data(A),B)
 end
 
 function Base.:*(A::Adjoint{T,<:Snapshots{T,2}},B::Snapshots{S,2}) where {T,S}
-  consec_mul(adjoint(get_indexed_data(A.parent)),get_indexed_data(B))
+  *(adjoint(get_all_data(A.parent)),get_all_data(B))
 end
 
 function Base.:*(A::AbstractMatrix{T},B::Snapshots{S,2}) where {T,S}
-  consec_mul(A,get_indexed_data(B))
+  *(A,get_all_data(B))
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::Snapshots{S,2}) where {T,S}
-  consec_mul(A,get_indexed_data(B))
+  *(A,get_all_data(B))
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::Snapshots{T,2},B::Snapshots{S,2}) where {T,S}
-  consec_mul!(C,get_indexed_data(A),get_indexed_data(B))
+  mul!(C,get_all_data(A),get_all_data(B))
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::Snapshots{T,2},B::Adjoint{S,<:Snapshots}) where {T,S}
-  consec_mul!(C,get_indexed_data(A),adjoint(get_indexed_data(B.parent)))
+  mul!(C,get_all_data(A),adjoint(get_all_data(B.parent)))
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::Snapshots{T,2},B::AbstractMatrix{S}) where {T,S}
-  consec_mul!(C,get_indexed_data(A),B)
+  mul!(C,get_all_data(A),B)
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::Snapshots{T,2},B::Adjoint{T,<:AbstractMatrix{S}}) where {T,S}
-  consec_mul!(C,get_indexed_data(A),B)
+  mul!(C,get_all_data(A),B)
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::Adjoint{T,<:Snapshots{T,2}},B::Snapshots{S,2}) where {T,S}
-  consec_mul!(C,adjoint(get_indexed_data(A.parent)),get_indexed_data(B))
+  mul!(C,adjoint(get_all_data(A.parent)),get_all_data(B))
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::AbstractMatrix{T},B::Snapshots{S,2}) where {T,S}
-  consec_mul!(C,A,get_indexed_data(B))
+  mul!(C,A,get_all_data(B))
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::Adjoint{T,<:AbstractMatrix},B::Snapshots{S,2}) where {T,S}
-  consec_mul!(C,A,get_indexed_data(B))
-end
-
-consec_mul(A::AbstractArray,B::AbstractArray) = A*B
-consec_mul!(C::AbstractArray,A::AbstractArray,B::AbstractArray) = mul!(C,A,B)
-
-for T in (:ConsecutiveParamArray,:ConsecutiveParamSparseMatrix)
-  @eval begin
-    consec_mul(A::$T,B::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}}) where S = get_all_data(A)*B
-    consec_mul(A::Adjoint{S,<:$T},B::Union{<:AbstractArray,Adjoint{U,<:AbstractArray}}) where {S,U} = adjoint(get_all_data(A.parent))*B
-    consec_mul(A::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}},B::$T) where S = A*get_all_data(B)
-    consec_mul(A::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}},B::Adjoint{U,<:$T}) where {S,U} = A*adjoint(get_all_data(B.parent))
-    consec_mul!(C::AbstractArray,A::$T,B::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}}) where S = mul!(C,get_all_data(A),B)
-    consec_mul!(C::AbstractArray,A::Adjoint{S,<:$T},B::Union{<:AbstractArray,Adjoint{U,<:AbstractArray}}) where {S,U} = mul!(C,adjoint(get_all_data(A.parent)),B)
-    consec_mul!(C::AbstractArray,A::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}},B::$T) where S = mul!(C,A,get_all_data(B))
-    consec_mul!(C::AbstractArray,A::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}},B::Adjoint{U,<:$T}) where {S,U} = mul!(C,A,adjoint(get_all_data(B.parent)))
-  end
+  mul!(C,A,get_all_data(B))
 end

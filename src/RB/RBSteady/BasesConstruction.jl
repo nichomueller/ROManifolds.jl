@@ -226,7 +226,7 @@ function ttsvd(
   for d in 1:N-1
     cur_core,cur_remainder = ttsvd_loop(red_style[d],remainder)
     oldrank = size(cur_core,3)
-    remainder::Array{T,3} = reshape(cur_remainder,oldrank,size(A,d+1),:)
+    remainder = reshape(cur_remainder,oldrank,size(A,d+1),:)
     push!(cores,cur_core)
   end
   return cores,remainder
@@ -271,7 +271,7 @@ function steady_ttsvd(
   for d in 1:D
     cur_core,cur_remainder = ttsvd_loop(red_style[d],remainder,X[d])
     oldrank = size(cur_core,3)
-    remainder::Array{T,3} = reshape(cur_remainder,oldrank,size(A,d+1),:)
+    remainder = reshape(cur_remainder,oldrank,size(A,d+1),:)
     push!(cores,cur_core)
   end
 

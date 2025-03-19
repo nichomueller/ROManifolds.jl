@@ -9,7 +9,6 @@ Subtypes:
 - [`TransientGenericSnapshots`](@ref)
 - [`GenericSnapshots`](@ref)
 - [`TransientSnapshotsAtIndices`](@ref)
-- [`TransientReshapedSnapshots`](@ref)
 - [`TransientSnapshotsWithIC`](@ref)
 - [`ModeTransientSnapshots`](@ref)
 """
@@ -223,76 +222,6 @@ end
 function select_snapshots(s::TransientSnapshots{T,N},trange::Integer,prange::Integer) where {T,N}
   srange = select_snapshots(s,format_range(trange,num_times(s)),format_range(prange,num_params(s)))
   dropdims(srange;dims=(N-1,N))
-end
-
-"""
-    struct TransientReshapedSnapshots{T,N,N′,D,I,R,A<:TransientSnapshots{T,N′,D,I,R},B} <: TransientSnapshots{T,N,D,I,R,A}
-      snaps::A
-      size::NTuple{N,Int}
-      mi::B
-    end
-
-Represents a [`TransientSnapshots`](@ref) `snaps` whose size is resized to `size`. This struct
-is equivalent to `ReshapedArray`, and is only used to make sure the result
-of this operation is still a subtype of TransientSnapshots
-"""
-struct TransientReshapedSnapshots{T,N,N′,D,I,R,A<:TransientSnapshots{T,N′,D,I,R},B} <: TransientSnapshots{T,N,D,I,R,A}
-  snaps::A
-  size::NTuple{N,Int}
-  mi::B
-end
-
-Base.size(s::TransientReshapedSnapshots) = s.size
-
-function Base.reshape(s::TransientReshapedSnapshots,dims::Dims)
-  reshape(s.snaps,dims)
-end
-
-function Base.reshape(s::TransientSnapshots,dims::Dims)
-  n = length(s)
-  prod(dims) == n || DimensionMismatch()
-
-  strds = Base.front(Base.size_to_strides(map(length,axes(s))...,1))
-  strds1 = map(s->max(1,Int(s)),strds)
-  mi = map(Base.SignedMultiplicativeInverse,strds1)
-  TransientReshapedSnapshots(s,dims,reverse(mi))
-end
-
-function Base.getindex(
-  s::TransientReshapedSnapshots{T,N},
-  i::Vararg{Integer,N}
-  ) where {T,N}
-
-  @boundscheck checkbounds(s,i...)
-  ax = axes(s.snaps)
-  i′ = Base.offset_if_vec(Base._sub2ind(size(s),i...),ax)
-  i′′ = Base.ind2sub_rs(ax,s.mi,i′)
-  Base._unsafe_getindex_rs(s.snaps,i′′)
-end
-
-function Base.setindex!(
-  s::TransientReshapedSnapshots{T,N},
-  v,i::Vararg{Integer,N}
-  ) where {T,N}
-
-  @boundscheck checkbounds(s,i...)
-  ax = axes(s.snaps)
-  i′ = Base.offset_if_vec(Base._sub2ind(size(s),i...),ax)
-  s.snaps[Base.ind2sub_rs(ax,s.mi,i′)] = v
-  v
-end
-
-get_realization(s::TransientReshapedSnapshots) = get_realization(s.snaps)
-DofMaps.get_dof_map(s::TransientReshapedSnapshots) = get_dof_map(s.snaps)
-
-function get_param_data(s::TransientReshapedSnapshots)
-  v = get_param_data(s.snaps)
-  reshape(v.data,s.size)
-end
-
-function get_indexed_data(s::TransientReshapedSnapshots)
-  v = get_indexed_data(s.snaps)
-  reshape(v,s.size)
 end
 
 """

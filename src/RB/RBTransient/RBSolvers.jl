@@ -63,11 +63,10 @@ end
 function RBSteady.residual_snapshots(
   solver::RBSolver,
   odeop::ODEParamOperator,
-  s::AbstractSnapshots;
-  nparams=RBSteady.res_params(solver))
+  s::AbstractSnapshots)
 
   fesolver = get_fe_solver(solver)
-  sres = select_snapshots(s,nparams)
+  sres = select_snapshots(s,RBSteady.res_params(solver))
   us_res = get_param_data(sres)
   us0_res = get_initial_data(sres)
   r_res = get_realization(sres)
@@ -79,22 +78,20 @@ end
 function RBSteady.residual_snapshots(
   solver::RBSolver,
   op::ODEParamOperator{LinearNonlinearParamODE},
-  s::AbstractSnapshots;
-  kwargs...)
+  s::AbstractSnapshots)
 
-  res_lin = residual_snapshots(solver,get_linear_operator(op),s;kwargs...)
-  res_nlin = residual_snapshots(solver,get_nonlinear_operator(op),s;kwargs...)
+  res_lin = residual_snapshots(solver,get_linear_operator(op),s)
+  res_nlin = residual_snapshots(solver,get_nonlinear_operator(op),s)
   return (res_lin,res_nlin)
 end
 
 function RBSteady.jacobian_snapshots(
   solver::RBSolver,
   odeop::ODEParamOperator,
-  s::AbstractSnapshots;
-  nparams=RBSteady.jac_params(solver))
+  s::AbstractSnapshots)
 
   fesolver = get_fe_solver(solver)
-  sjac = select_snapshots(s,nparams)
+  sjac = select_snapshots(s,RBSteady.jac_params(solver))
   us_jac = get_param_data(sjac)
   us0_jac = get_initial_data(sjac)
   r_jac = get_realization(sjac)
@@ -112,11 +109,10 @@ end
 function RBSteady.jacobian_snapshots(
   solver::RBSolver,
   op::ODEParamOperator{LinearNonlinearParamODE},
-  s::AbstractSnapshots;
-  kwargs...)
+  s::AbstractSnapshots)
 
-  jac_lin = jacobian_snapshots(solver,get_linear_operator(op),s;kwargs...)
-  jac_nlin = jacobian_snapshots(solver,get_nonlinear_operator(op),s;kwargs...)
+  jac_lin = jacobian_snapshots(solver,get_linear_operator(op),s)
+  jac_nlin = jacobian_snapshots(solver,get_nonlinear_operator(op),s)
   return (jac_lin,jac_nlin)
 end
 
