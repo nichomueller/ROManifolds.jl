@@ -2,7 +2,8 @@ struct ExtensionFESpace{S<:SingleFieldFESpace,E<:Extension} <: SingleFieldFESpac
   space::S
   extension::E
   bg_space::SingleFieldFESpace
-  dof_to_bg_dofs::AbstractVector
+  fdof_to_bg_fdofs::AbstractVector
+  ddof_to_bg_ddofs::AbstractVector
 end
 
 function ExtensionFESpace(
@@ -10,8 +11,8 @@ function ExtensionFESpace(
   extension::Extension,
   bg_space::SingleFieldFESpace)
 
-  dof_to_bg_dofs = get_dof_to_bg_dof(bg_space,space)
-  ExtensionFESpace(space,extension,bg_space,dof_to_bg_dofs)
+  fdof_to_bg_fdofs,ddof_to_bg_ddofs = get_dof_to_bg_dof(bg_space,space)
+  ExtensionFESpace(space,extension,bg_space,fdof_to_bg_fdofs,ddof_to_bg_ddofs)
 end
 
 function ZeroExtensionFESpace(
@@ -123,7 +124,7 @@ end
 
 function Arrays.evaluate(f::ExtensionFESpace{S,UnEvalExtension{E}},args...) where {S,E}
   extension = f.extension(args...)
-  ExtensionFESpace(f.space,extension,f.bg_space,f.dof_to_bg_dofs)
+  ExtensionFESpace(f.space,extension,f.bg_space,f.fdof_to_bg_fdofs,f.ddof_to_bg_ddofs)
 end
 
 (space::ExtensionFESpace)(t) = evaluate(space,t)
@@ -377,34 +378,44 @@ function get_out_cells_to_outcut_cells(f::ExtensionFESpace)
   collect(lazy_map(Reindex(bg_outcut_cells),out_bg_cells))
 end
 
-function extend_incut_cell_vals(f::ExtensionFESpace,cell_vals)
+function extend_incut_cell_vals(f::ExtensionFESpace,incut_cell_vals)
   out_out_cells = get_out_cells_to_outcut_cells(f)
-  outcut_cell_vals = scatter_free_and_dirichlet_values(f.extension)
+  outcut_cell_vals = get_cell_dof_values(f.extension)
   out_cell_vals = lazy_map(Reindex(outcut_cell_vals),out_out_cells)
-  bg_cell_vals = lazy_append(cell_vals,out_cell_vals)
+  bg_cell_vals = lazy_append(incut_cell_vals,out_cell_vals)
   return bg_cell_vals
 end
 
-get_out_dof_to_bg_dofs(f::ExtensionFESpace) = get_out_dof_to_bg_dofs(f.extension)
-get_in_dof_to_bg_dofs(f::ExtensionFESpace) = f.dof_to_bg_dofs
+get_in_fdof_to_bg_fdofs(f::ExtensionFESpace) = f.fdof_to_bg_fdofs
+get_in_ddof_to_bg_ddofs(f::ExtensionFESpace) = f.ddof_to_bg_ddofs
+get_out_fdof_to_bg_fdofs(f::ExtensionFESpace) = get_out_fdof_to_bg_fdofs(f.extension)
+get_out_ddof_to_bg_ddofs(f::ExtensionFESpace) = get_out_ddof_to_bg_ddofs(f.extension)
 
 for f in (:get_incut_fe_space,:get_outcut_fe_space,:get_incut_cells_to_bg_cells,
     :get_outcut_cells_to_bg_cells,:get_cut_cells_to_bg_cells,:get_in_cells_to_bg_cells,
     :get_out_cells_to_bg_cells,:get_bg_cells_to_incut_cells,:get_in_cells_to_incut_cells,
-    :get_bg_cells_to_outcut_cells,:get_out_cells_to_outcut_cells,:extend_incut_cell_vals)
+    :get_bg_cells_to_outcut_cells,:get_out_cells_to_outcut_cells,:extend_incut_cell_vals,
+    :get_in_fdof_to_bg_fdofs,:get_in_ddof_to_bg_ddofs,:get_out_fdof_to_bg_fdofs,
+    :get_out_ddof_to_bg_ddofs)
   @eval begin
     $f(fs::SingleFieldFESpace,args...) = $f(get_ext_space(fs),args...)
   end
 end
 
-#TODO fix dirichlet dofs
 function _free_and_diri_bg_vals!(bg_fv,bg_dv,f::ExtensionFESpace,in_fv,in_dv)
   out_fv = get_free_dof_values(f.extension.values)
-  for (in_fdof,bg_fdof) in enumerate(f.dof_to_bg_dofs)
+  out_dv = get_dirichlet_dof_values(f.extension.values)
+  for (in_fdof,bg_fdof) in enumerate(f.fdof_to_bg_fdofs)
     bg_fv[bg_fdof] = in_fv[in_fdof]
   end
-  for (out_fdof,bg_fdof) in enumerate(f.extension.dof_to_bg_dofs)
+  for (out_fdof,bg_fdof) in enumerate(f.extension.fdof_to_bg_fdofs)
     bg_fv[bg_fdof] = out_fv[out_fdof]
+  end
+  for (in_ddof,bg_ddof) in enumerate(f.ddof_to_bg_ddofs)
+    bg_dv[bg_ddof] = in_dv[in_ddof]
+  end
+  for (out_ddof,bg_ddof) in enumerate(f.extension.ddof_to_bg_ddofs)
+    bg_dv[bg_ddof] = out_dv[out_ddof]
   end
 end
 
@@ -416,15 +427,25 @@ function _free_and_diri_bg_vals!(
   in_dv::ConsecutiveParamVector)
 
   out_fv = get_free_dof_values(f.extension.values)
+  out_dv = get_dirichlet_dof_values(f.extension.values)
   bg_fdata = get_all_data(bg_fv)
   in_fdata = get_all_data(in_fv)
   out_fdata = get_all_data(out_fv)
+  bg_ddata = get_all_data(bg_dv)
+  in_ddata = get_all_data(in_dv)
+  out_ddata = get_all_data(out_dv)
   for k in param_eachindex(bg_fv)
-    for (in_fdof,bg_fdof) in enumerate(f.dof_to_bg_dofs)
+    for (in_fdof,bg_fdof) in enumerate(f.fdof_to_bg_fdofs)
       bg_fdata[bg_fdof,k] = in_fdata[in_fdof,k]
     end
-    for (out_fdof,bg_fdof) in enumerate(f.extension.dof_to_bg_dofs)
+    for (out_fdof,bg_fdof) in enumerate(f.extension.fdof_to_bg_fdofs)
       bg_fdata[bg_fdof,k] = out_fdata[out_fdof,k]
+    end
+    for (in_ddof,bg_ddof) in enumerate(f.ddof_to_bg_ddofs)
+      bg_ddata[bg_ddof,k] = in_ddata[in_fdof,k]
+    end
+    for (out_ddof,bg_ddof) in enumerate(f.extension.ddof_to_bg_ddofs)
+      bg_ddata[bg_ddof,k] = out_ddata[out_ddof,k]
     end
   end
 end

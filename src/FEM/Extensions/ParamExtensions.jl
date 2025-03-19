@@ -7,30 +7,31 @@ ParamExtension() = ParamExtension(HarmonicExtension())
 struct UnEvalExtension{E} <: Extension{ParamExtension{E}}
   style::ParamExtension{E}
   space::SingleFieldFESpace
-  dof_to_bg_dofs::AbstractVector
+  fdof_to_bg_fdofs::AbstractVector
+  ddof_to_bg_ddofs::AbstractVector
   metadata
 end
 
 function Extension(
   style::ParamExtension,
   space::SingleFieldFESpace,
-  dof_to_bg_dofs::AbstractVector,
-  args...)
+  fdof_to_bg_fdofs::AbstractVector,
+  ddof_to_bg_ddofs::AbstractVector,
+  metadata...)
 
-  metadata = args
-  UnEvalExtension(style,space,dof_to_bg_dofs,metadata)
+  UnEvalExtension(style,space,fdof_to_bg_fdofs,ddof_to_bg_ddofs,metadata)
 end
 
 function Arrays.evaluate(ext::UnEvalExtension{ZeroExtension},args...)
-  space = ext.space(args...)
-  GenericExtension(ZeroExtension(),space,ext.dof_to_bg_dofs)
+  spaceμ = ext.space(args...)
+  Extension(ZeroExtension(),spaceμ,ext.fdof_to_bg_fdofs,ext.ddof_to_bg_ddofs)
 end
 
 function Arrays.evaluate(ext::UnEvalExtension{FunctionExtension},args...)
   f, = ext.metadata
-  space = ext.space(args...)
+  spaceμ = ext.space(args...)
   fμ = f(args...)
-  GenericExtension(FunctionExtension(),space,ext.dof_to_bg_dofs,fμ)
+  Extension(FunctionExtension(),spaceμ,ext.fdof_to_bg_fdofs,ext.ddof_to_bg_ddofs,fμ)
 end
 
 function Arrays.evaluate(ext::UnEvalExtension{HarmonicExtension},args...)
@@ -38,28 +39,13 @@ function Arrays.evaluate(ext::UnEvalExtension{HarmonicExtension},args...)
   spaceμ = parameterize(ext.space,args...)
   aμ = a
   lμ(v) = l(args...,v)
-
-  laplacian = assemble_matrix(aμ,spaceμ,spaceμ)
-  vector = assemble_vector(lμ,spaceμ)
-  factor = lu(testitem(laplacian))
-  values = similar(vector)
-  for i in param_eachindex(laplacian)
-    x = param_getindex(values,i)
-    b = param_getindex(vector,i)
-    ldiv!(x,factor,b)
-    if i < param_length(laplacian)
-      A = param_getindex(laplacian,i+1)
-      lu!(factor,A)
-    end
-  end
-
-  vh = FEFunction(spaceμ,values)
-  GenericExtension(HarmonicExtension(),laplacian,vector,vh,ext.dof_to_bg_dofs)
+  Extension(HarmonicExtension(),spaceμ,ext.fdof_to_bg_fdofs,ext.ddof_to_bg_ddofs,aμ,lμ)
 end
 
 (ext::UnEvalExtension)(::Nothing) = ext
 (ext::UnEvalExtension)(μ) = evaluate(ext,μ)
 (ext::UnEvalExtension)(μ,t) = evaluate(ext,μ,t)
 
-get_out_dof_to_bg_dofs(ext::UnEvalExtension) = ext.dof_to_bg_dofs
+get_out_fdof_to_bg_fdofs(ext::UnEvalExtension) = ext.fdof_to_bg_fdofs
+get_out_ddof_to_bg_ddofs(ext::UnEvalExtension) = ext.ddof_to_bg_ddofs
 FESpaces.get_fe_space(f::UnEvalExtension) = f.space
