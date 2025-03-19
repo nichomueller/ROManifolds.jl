@@ -1,7 +1,8 @@
 module Extensions
 
-using LinearAlgebra
 using BlockArrays
+using FillArrays
+using LinearAlgebra
 using SparseArrays
 
 using Gridap
@@ -21,6 +22,7 @@ using ROManifolds.ParamDataStructures
 using ROManifolds.ParamAlgebra
 using ROManifolds.ParamFESpaces
 using ROManifolds.ParamSteady
+using ROManifolds.ParamODEs
 
 export get_bg_dof_to_dof
 export get_dof_to_bg_dof
@@ -29,14 +31,12 @@ include("DofUtils.jl")
 include("ODofUtils.jl")
 
 export Extension
-export GenericExtension
 export ZeroExtension
 export FunctionExtension
 export HarmonicExtension
 include("ExtensionInterface.jl")
 
 export ParamExtension
-export UnEvalExtension
 include("ParamExtensions.jl")
 
 export ExternalFESpace
@@ -60,8 +60,14 @@ export extended_interpolate_dirichlet
 include("ExtensionFESpaces.jl")
 
 export ExtensionAssembler
-export InternalView
-export internal_view
+export ExtensionAssemblerInsertIn
+export ExtensionAssemblerInsertOut
+export ExtensionAssemblerInsertInOut
+export assemble_extended_vector
+export assemble_extended_matrix
 include("ExtensionAssemblers.jl")
+
+export ExtensionParamOperator
+include("ExtensionOperators.jl")
 
 end # module

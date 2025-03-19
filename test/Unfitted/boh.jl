@@ -1,10 +1,14 @@
 using Gridap
+using Gridap.Algebra
 using Gridap.Arrays
 using Gridap.FESpaces
 using GridapEmbedded
 using ROManifolds
+using ROManifolds.ParamAlgebra
+using ROManifolds.ParamDataStructures
 using ROManifolds.Extensions
 using ROManifolds.DofMaps
+using ROManifolds.RBSteady
 using SparseArrays
 using DrWatson
 using Test
@@ -77,24 +81,58 @@ hμ(μ) = ParamFunction(h,μ)
 g(μ) = x->μ[3]*x[1]-x[2]
 gμ(μ) = ParamFunction(g,μ)
 
-a(μ,(u,uo),(v,vo),dΩ,dΓ) = ∫(νμ(μ)*∇(v)⋅∇(u))dΩ + ∫( (γd/hd)*v*u  - v*(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))*u )dΓ
-l(μ,(v,vo),dΩ,dΓ,dΓn) = ∫(fμ(μ)⋅v)dΩ + ∫(hμ(μ)⋅v)dΓn + ∫( (γd/hd)*v*gμ(μ) - (n_Γ⋅∇(v))*gμ(μ) )dΓ
+a(μ,u,v,dΩ,dΓ) = ∫(νμ(μ)*∇(v)⋅∇(u))dΩ + ∫( (γd/hd)*v*u  - v*(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))*u )dΓ
+l(μ,v,dΩ,dΓ,dΓn) = ∫(fμ(μ)⋅v)dΩ + ∫(hμ(μ)⋅v)dΓn + ∫( (γd/hd)*v*gμ(μ) - (n_Γ⋅∇(v))*gμ(μ) )dΓ
 res(μ,u,v,dΩ,dΓ,dΓn) =  a(μ,u,v,dΩ,dΓ) - l(μ,v,dΩ,dΓ,dΓn)
 
 trian_a = (Ω,Γ)
 trian_res = (Ω,Γ,Γn)
 domains = FEDomains(trian_res,trian_a)
 
-aout(μ,u,v) = ∫(∇(v)⋅∇(u))dΩout
+aout(u,v) = ∫(∇(v)⋅∇(u))dΩout
 lout(μ,v) = ∫(∇(v)⋅∇(gμ(μ)))dΩout
 
-μ = realization(pspace;nparams=50)
-ext = HarmonicExtension(Voutagg,aout,lout,μ)
-
-Vext = Extensions.SingleFieldExtensionFESpace(ext,V,Vagg,Voutagg)
+Vext = ParamHarmonicExtensionFESpace(V,Vagg,Voutagg,aout,lout)
 Uext = ParamTrialFESpace(Vext,gμ)
 
 feop = LinearParamOperator(res,a,pspace,Uext,Vext,domains)
 
-bblocks = [LinearSystemBlock(),LinearSystemBlock()]
-solver = BlockDiagonalSolver(bblocks,[LUSolver(),LUSolver()])
+solver = LUSolver()
+
+μ = realization(pspace;nparams=50)
+u, = solve(solver,feop,μ)
+Uμ = Uext(μ)
+uext = extend_free_values(Uμ,u)
+
+dof_map = get_dof_map(Vext)
+fesnaps = Snapshots(uext,dof_map,μ)
+
+energy(u,v) = ∫(∇(v)⋅∇(u))dΩbg
+# X = assemble_matrix(energy,V,V)
+
+state_reduction = PODReduction(1e-4,energy;nparams=50)
+rbsolver = RBSolver(solver,state_reduction;nparams_res=50,nparams_jac=50)
+
+# basis = reduced_basis(state_reduction,fesnaps,X)
+
+red_trial,red_test = reduced_spaces(rbsolver,feop,fesnaps)
+
+sin = get_sparse_dof_map(Vext,Vext,Ω)
+sΓ = get_sparse_dof_map(Vext,Vext,Γ)
+sΩout = get_sparse_dof_map(Vext,Vext,Ωout)
+
+extop = ExtensionParamOperator(feop)
+Aallin = jacobian_snapshots(rbsolver,extop,fesnaps)
+assemallout = Extensions.ExtensionAssemblerInsertOut(Uμ,Uμ)
+Aallout = assemble_matrix(assemallout,Uμ.space.extension.matdata)
+Ainin = jacobian_snapshots(rbsolver,feop,fesnaps)
+
+ballin = residual_snapshots(rbsolver,extop,fesnaps)
+bin = residual_snapshots(rbsolver,feop,fesnaps)
+
+# jacs
+assem = ExtensionAssemblerOutValsNotInserted(Uμ,Vext)
+jacs = jacobian_snapshots(rbsolver,feop,fesnaps)
+
+dc = a(μ,get_trial_fe_basis(Uμ),get_fe_basis(Vext),dΩ,dΓ)
+matdata = ParamSteady.collect_cell_matrix_for_trian(Uμ,Vext,dc,Ω)

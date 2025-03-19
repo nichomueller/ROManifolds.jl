@@ -4,48 +4,66 @@ end
 
 ParamExtension() = ParamExtension(HarmonicExtension())
 
-struct UnEvalExtension{E} <: Extension{ParamExtension{E}}
-  style::ParamExtension{E}
-  space::SingleFieldFESpace
-  fdof_to_bg_fdofs::AbstractVector
-  ddof_to_bg_ddofs::AbstractVector
-  metadata
-end
-
 function Extension(
   style::ParamExtension,
   space::SingleFieldFESpace,
   fdof_to_bg_fdofs::AbstractVector,
   ddof_to_bg_ddofs::AbstractVector,
-  metadata...)
+  args...)
 
-  UnEvalExtension(style,space,fdof_to_bg_fdofs,ddof_to_bg_ddofs,metadata)
+  metadata = space,args...
+  matdata = nothing
+  vecdata = nothing
+  values = zero(space(nothing))
+  Extension(style,matdata,vecdata,values,fdof_to_bg_fdofs,ddof_to_bg_ddofs,metadata)
 end
 
-function Arrays.evaluate(ext::UnEvalExtension{ZeroExtension},args...)
-  spaceμ = ext.space(args...)
-  Extension(ZeroExtension(),spaceμ,ext.fdof_to_bg_fdofs,ext.ddof_to_bg_ddofs)
+function Arrays.evaluate!(cache,ext::Extension{ParamExtension{ZeroExtension}},args...)
+  space, = ext.matdata
+  spaceμ = space(args...)
+  zh = zero(spaceμ)
+
+  ext.matdata = _mass_data(spaceμ)
+  ext.vecdata = _interp_data(spaceμ,zh)
+  ext.values = zh
+
+  ext
 end
 
-function Arrays.evaluate(ext::UnEvalExtension{FunctionExtension},args...)
-  f, = ext.metadata
-  spaceμ = ext.space(args...)
+function Arrays.evaluate!(cache,ext::Extension{ParamExtension{FunctionExtension}},args...)
+  space,f = ext.metadata
+  spaceμ = space(args...)
   fμ = f(args...)
-  Extension(FunctionExtension(),spaceμ,ext.fdof_to_bg_fdofs,ext.ddof_to_bg_ddofs,fμ)
+
+  ext.matdata = _mass_data(spaceμ)
+  ext.vecdata = _interp_data(spaceμ,fh)
+  ext.values = zh
+
+  ext
 end
 
-function Arrays.evaluate(ext::UnEvalExtension{HarmonicExtension},args...)
-  a,l, = ext.metadata
-  spaceμ = parameterize(ext.space,args...)
+function Arrays.evaluate!(cache,ext::Extension{ParamExtension{HarmonicExtension}},args...)
+  space,a,l = ext.metadata
+  spaceμ = parameterize(space,args...)
   aμ = a
   lμ(v) = l(args...,v)
-  Extension(HarmonicExtension(),spaceμ,ext.fdof_to_bg_fdofs,ext.ddof_to_bg_ddofs,aμ,lμ)
+
+  matdata = _get_matdata(spaceμ,aμ)
+  vecdata = _get_vecdata(spaceμ,lμ)
+  assem = SparseMatrixAssembler(spaceμ,spaceμ)
+  A = assemble_matrix(assem,matdata)
+  b = assemble_vector(assem,vecdata)
+  u = zero_free_values(spaceμ)
+  solve!(u,LUSolver(),A,b)
+
+  ext.matdata = matdata
+  ext.vecdata = vecdata
+  ext.values = FEFunction(spaceμ,u)
+
+  ext
 end
 
-(ext::UnEvalExtension)(::Nothing) = ext
-(ext::UnEvalExtension)(μ) = evaluate(ext,μ)
-(ext::UnEvalExtension)(μ,t) = evaluate(ext,μ,t)
-
-get_out_fdof_to_bg_fdofs(ext::UnEvalExtension) = ext.fdof_to_bg_fdofs
-get_out_ddof_to_bg_ddofs(ext::UnEvalExtension) = ext.ddof_to_bg_ddofs
-FESpaces.get_fe_space(f::UnEvalExtension) = f.space
+(ext::Extension)(::Nothing) = ext
+(ext::Extension)(μ) = evaluate(ext,μ)
+(ext::Extension)(r::TransientRealization) = evaluate(ext,get_params(r),get_times(r))
+(ext::Extension)(μ,t) = evaluate(ext,μ,t)

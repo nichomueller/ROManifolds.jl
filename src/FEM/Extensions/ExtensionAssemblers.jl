@@ -1,107 +1,187 @@
-get_extension(f::SingleFieldFESpace) = @notimplemented
-get_extension(f::ExtensionFESpace) = f.extension
-get_extension(f::UnEvalTrialFESpace{<:ExtensionFESpace}) = get_extension(f.space)
-get_extension(f::SingleFieldParamFESpace{<:ExtensionFESpace}) = get_extension(f.space)
-get_extension(f::MultiFieldFESpace) = map(get_extension,f.spaces)
-
 FESpaces.num_rows(ext::Extension) = num_free_dofs(get_fe_space(ext))
 FESpaces.num_cols(ext::Extension) = num_free_dofs(get_fe_space(ext))
 
-struct ExtensionAssembler <: SparseMatrixAssembler
+abstract type OutValsStyle end
+struct InsertIn <: OutValsStyle end
+struct InsertOut <: OutValsStyle end
+struct InsertInOut <: OutValsStyle end
+
+struct ExtensionAssembler{S<:OutValsStyle} <: SparseMatrixAssembler
+  style::S
   assem::SparseMatrixAssembler
   extension::Extension
   trial_fdof_to_bg_fdofs::AbstractVector
   test_fdof_to_bg_fdofs::AbstractVector
 end
 
-function ExtensionAssembler(trial::FESpace,test::FESpace)
+function ExtensionAssembler(trial::FESpace,test::FESpace,style=InsertInOut())
   bg_trial = get_bg_fe_space(trial)
   bg_test = get_bg_fe_space(test)
   assem = SparseMatrixAssembler(bg_trial,bg_test)
   extension = get_extension(trial) # must be equal to the test extension
   trial_fdof_to_bg_fdofs = get_in_fdof_to_bg_fdofs(trial)
   test_fdof_to_bg_fdofs = get_in_fdof_to_bg_fdofs(test)
-  ExtensionAssembler(assem,extension,trial_fdof_to_bg_fdofs,test_fdof_to_bg_fdofs)
+  ExtensionAssembler(style,assem,extension,trial_fdof_to_bg_fdofs,test_fdof_to_bg_fdofs)
+end
+
+function ExtensionAssemblerInsertIn(trial::FESpace,test::FESpace,args...)
+  ExtensionAssembler(trial,test,InsertIn())
+end
+
+function ExtensionAssemblerInsertOut(trial::FESpace,test::FESpace,args...)
+  ExtensionAssembler(trial,test,InsertOut())
+end
+
+function ExtensionAssemblerInsertInOut(trial::FESpace,test::FESpace,args...)
+  ExtensionAssembler(trial,test,InsertInOut())
 end
 
 FESpaces.get_vector_type(a::ExtensionAssembler) = get_vector_type(a.assem)
 FESpaces.get_matrix_type(a::ExtensionAssembler) = get_matrix_type(a.assem)
-FESpaces.num_rows(a::ExtensionAssembler) = FESpaces.num_rows(a.assem) + FESpaces.num_rows(a.extension)
-FESpaces.num_cols(a::ExtensionAssembler) = FESpaces.num_cols(a.assem) + FESpaces.num_cols(a.extension)
-FESpaces.get_rows(a::ExtensionAssembler) = Base.OneTo(FESpaces.num_rows(a))
-FESpaces.get_cols(a::ExtensionAssembler) = Base.OneTo(FESpaces.num_cols(a))
+FESpaces.num_rows(a::ExtensionAssembler) = FESpaces.num_rows(a.assem)
+FESpaces.num_cols(a::ExtensionAssembler) = FESpaces.num_cols(a.assem)
+FESpaces.get_rows(a::ExtensionAssembler) = FESpaces.get_rows(a.assem)
+FESpaces.get_cols(a::ExtensionAssembler) = FESpaces.get_cols(a.assem)
 FESpaces.get_assembly_strategy(a::ExtensionAssembler) = FESpaces.get_assembly_strategy(a.assem)
 FESpaces.get_matrix_builder(a::ExtensionAssembler)= get_matrix_builder(a.assem)
 FESpaces.get_vector_builder(a::ExtensionAssembler) = get_vector_builder(a.assem)
 
-function extend_incut_vecdata(a::ExtensionAssembler,incut_vecdata)
+function extend_vecdata(a::ExtensionAssembler{InsertIn},incut_vecdata)
   cellvals,cellrows = incut_vecdata
-  out_cellvals,out_cellrows = a.extension.vecdata
-  parent_cellrows = map(rows -> ParentCellDofIds(rows,a.test_fdof_to_bg_fdofs),cellrows)
-  parent_out_cellrows = ParentCellDofIds(out_cellrows,a.test_fdof_to_bg_fdofs)
-  push!(cellvals,out_cellvals)
-  push!(parent_cellrows,parent_out_cellrows)
-  return (cellvals,parent_cellrows)
+  for k in eachindex(cellrows)
+    cellrows[k] = to_parent_ids(cellrows[k],a.test_fdof_to_bg_fdofs)
+  end
+  return (cellvals,cellrows)
 end
 
-function extend_incut_matdata(a::ExtensionAssembler,incut_matdata)
+function extend_matdata(a::ExtensionAssembler{InsertIn},incut_matdata)
+  cellvals,cellrows,cellcols = incut_matdata
+  for k in eachindex(cellrows)
+    cellrows[k] = to_parent_ids(cellrows[k],a.test_fdof_to_bg_fdofs)
+    cellcols[k] = to_parent_ids(cellcols[k],a.trial_fdof_to_bg_fdofs)
+  end
+  return (cellvals,cellrows,cellcols)
+end
+
+#TODO since the extension is mutable, I cannot overwrite cellrows. Think about
+# potential optimizations
+function extend_vecdata(a::ExtensionAssembler{InsertOut},incut_vecdata)
+  cellvals,out_cellrows = a.extension.vecdata
+  cellrows = Any[to_parent_ids(out_cellrows[k],a.extension.fdof_to_bg_fdofs) for k in eachindex(out_cellrows)]
+  return (cellvals,cellrows)
+end
+
+#TODO since the extension is mutable, I cannot overwrite cellrows/cellcols. Think about
+# potential optimizations
+function extend_matdata(a::ExtensionAssembler{InsertOut},incut_matdata)
+  cellvals,out_cellrows,out_cellcols = a.extension.matdata
+  cellrows = Any[to_parent_ids(out_cellrows[k],a.extension.fdof_to_bg_fdofs) for k in eachindex(out_cellrows)]
+  cellcols = Any[to_parent_ids(out_cellcols[k],a.extension.fdof_to_bg_fdofs) for k in eachindex(out_cellrows)]
+  return (cellvals,cellrows,cellcols)
+end
+
+function extend_vecdata(a::ExtensionAssembler{InsertInOut},incut_vecdata)
+  cellvals,cellrows = incut_vecdata
+  out_cellvals,out_cellrows = a.extension.vecdata
+  for k in eachindex(cellrows)
+    cellrows[k] = to_parent_ids(cellrows[k],a.test_fdof_to_bg_fdofs)
+  end
+  for (out_cellval,out_cellrow) in zip(out_cellvals,out_cellrows)
+    push!(cellvals,out_cellval)
+    push!(cellrows,to_parent_ids(out_cellrow,a.extension.fdof_to_bg_fdofs))
+  end
+  return (cellvals,cellrows)
+end
+
+function extend_matdata(a::ExtensionAssembler{InsertInOut},incut_matdata)
   cellvals,cellrows,cellcols = incut_matdata
   out_cellvals,out_cellrows,out_cellcols = a.extension.matdata
-  parent_cellrows = map(rows -> ParentCellDofIds(rows,a.test_fdof_to_bg_fdofs),cellrows)
-  parent_out_cellrows = ParentCellDofIds(out_cellrows,a.test_fdof_to_bg_fdofs)
-  parent_cellcols = map(cols -> ParentCellDofIds(cols,a.trial_fdof_to_bg_fdofs),cellcols)
-  parent_out_cellcols = ParentCellDofIds(out_cellcols,a.trial_fdof_to_bg_fdofs)
-  push!(cellvals,out_cellvals)
-  push!(parent_cellrows,parent_out_cellrows)
-  push!(parent_cellcols,parent_out_cellcols)
-  return (cellvals,parent_cellrows,parent_cellcols)
+  for k in eachindex(cellrows)
+    cellrows[k] = to_parent_ids(cellrows[k],a.test_fdof_to_bg_fdofs)
+    cellcols[k] = to_parent_ids(cellcols[k],a.trial_fdof_to_bg_fdofs)
+  end
+  for (out_cellval,out_cellrow,out_cellcol) in zip(out_cellvals,out_cellrows,out_cellcols)
+    push!(cellvals,out_cellval)
+    push!(cellrows,to_parent_ids(out_cellrow,a.extension.fdof_to_bg_fdofs))
+    push!(cellcols,to_parent_ids(out_cellcol,a.extension.fdof_to_bg_fdofs))
+  end
+  return (cellvals,cellrows,cellcols)
 end
 
 function FESpaces.allocate_vector(a::ExtensionAssembler,vecdata)
-  bg_vecdata = extend_incut_vecdata(a,vecdata)
+  bg_vecdata = extend_vecdata(a,vecdata)
   allocate_vector(a.assem,bg_vecdata)
 end
 
 function FESpaces.assemble_vector(a::ExtensionAssembler,vecdata)
-  bg_vecdata = extend_incut_vecdata(a,vecdata)
+  bg_vecdata = extend_vecdata(a,vecdata)
   assemble_vector(a.assem,bg_vecdata)
 end
 
 function FESpaces.assemble_vector!(b,a::ExtensionAssembler,vecdata)
-  bg_vecdata = extend_incut_vecdata(a,vecdata)
+  bg_vecdata = extend_vecdata(a,vecdata)
   assemble_vector!(b,a.assem,bg_vecdata)
   b
 end
 
 function FESpaces.assemble_vector_add!(b,a::ExtensionAssembler,vecdata)
-  bg_vecdata = extend_incut_vecdata(a,vecdata)
+  bg_vecdata = extend_vecdata(a,vecdata)
   assemble_vector_add!(b,a.assem,bg_vecdata)
   b
 end
 
 function FESpaces.allocate_matrix(a::ExtensionAssembler,matdata)
-  bg_matdata = extend_incut_matdata(a,matdata)
+  bg_matdata = extend_matdata(a,matdata)
   allocate_matrix(a.assem,bg_matdata)
 end
 
 function FESpaces.assemble_matrix(a::ExtensionAssembler,matdata)
-  bg_matdata = extend_incut_matdata(a,matdata)
+  bg_matdata = extend_matdata(a,matdata)
   assemble_matrix(a.assem,bg_matdata)
 end
 
 function FESpaces.assemble_matrix!(A,a::ExtensionAssembler,matdata)
-  bg_matdata = extend_incut_matdata(a,matdata)
+  bg_matdata = extend_matdata(a,matdata)
   assemble_matrix!(A,a.assem,bg_matdata)
   A
 end
 
 function FESpaces.assemble_matrix_add!(A,a::ExtensionAssembler,matdata)
-  bg_matdata = extend_incut_matdata(a,matdata)
+  bg_matdata = extend_matdata(a,matdata)
   assemble_matrix_add!(A,a.assem,bg_matdata)
   A
 end
 
+# function FESpaces.assemble_vector(ext::Extension)
+#   f = get_fe_space(ext)
+#   assem = SparseMatrixAssembler(f,f)
+#   assemble_vector(assem,ext.vecdata)
+# end
+
+# function assemble_extended_vector(ext::Extension)
+#   f = get_fe_space(ext)
+#   assem = ExtensionAssemblerInsertOut(f,f)
+#   assemble_vector(assem,ext.vecdata)
+# end
+
+# function FESpaces.assemble_matrix(ext::Extension)
+#   f = get_fe_space(ext)
+#   assem = SparseMatrixAssembler(f,f)
+#   assemble_matrix(assem,ext.matdata)
+# end
+
+# function assemble_extended_matrix(ext::Extension)
+#   f = get_fe_space(ext)
+#   assem = ExtensionAssemblerInsertOut(f,f)
+#   assemble_matrix(assem,ext.matdata)
+# end
+
 # utils
+
+function to_parent_ids(cellids,ids_to_parent_ids)
+  k = ParentCellDofIds(cellids,ids_to_parent_ids)
+  lazy_map(k,1:length(cellids))
+end
 
 struct ParentCellDofIds{A<:AbstractArray,I<:AbstractVector} <: Map
   cell_dof_ids::A
@@ -115,167 +195,36 @@ end
 function Arrays.evaluate!(c,k::ParentCellDofIds,i::Int)
   ids = getindex!(c,k.cell_dof_ids,i)
   for (j,idsj) in enumerate(ids)
-    ids[j] = k.ids_to_parent_ids[ids]
+    if idsj > 0
+      ids[j] = k.ids_to_parent_ids[idsj]
+    end
   end
   return ids
 end
 
-# function get_in_dof_to_bg_rows(a::ExtensionAssembler)
-#   setdiff(FESpaces.get_rows(a),a.extension.dof_to_bg_dofs)
-# end
+function ParamDataStructures.parameterize(a::ExtensionAssembler,r::AbstractRealization)
+  assem = parameterize(a.assem,r)
+  extension = a.extension(r)
+  ExtensionAssembler(a.style,assem,extension,a.trial_fdof_to_bg_fdofs,a.test_fdof_to_bg_fdofs)
+end
 
-# function get_out_dof_to_bg_rows(a::ExtensionAssembler)
-#   get_out_dof_to_bg_dofs(a.extension)
-# end
+function ParamSteady._assemble_matrix(f,U::FESpace,V::ExtensionFESpace)
+  ParamSteady._assemble_matrix(f,get_bg_fe_space(U),get_bg_fe_space(V))
+end
 
-# function get_in_dof_to_bg_cols(a::ExtensionAssembler)
-#   setdiff(FESpaces.get_cols(a),a.extension.dof_to_bg_dofs)
-# end
+function DofMaps.SparsityPattern(
+  U::SingleFieldFESpace,
+  V::ExtensionFESpace,
+  trian=DofMaps._get_common_domain(U,V)
+  )
 
-# function get_out_dof_to_bg_cols(a::ExtensionAssembler)
-#   get_out_dof_to_bg_dofs(a.extension)
-# end
-
-# function get_bg_dof_to_in_rows(a::ExtensionAssembler)
-#   in_bg_rows = get_in_dof_to_bg_rows(a)
-#   bg_in_rows = zeros(eltype(in_bg_rows),FESpaces.num_rows(a))
-#   for (row,bg_row) in enumerate(in_bg_rows)
-#     bg_in_rows[bg_row] = row
-#   end
-#   bg_in_rows
-# end
-
-# function get_bg_dof_to_out_rows(a::ExtensionAssembler)
-#   out_bg_rows = get_out_dof_to_bg_rows(a)
-#   bg_out_rows = zeros(eltype(out_bg_rows),FESpaces.num_rows(a))
-#   for (row,bg_row) in enumerate(out_bg_rows)
-#     bg_out_rows[bg_row] = row
-#   end
-#   bg_out_rows
-# end
-
-# function get_bg_dof_to_in_cols(a::ExtensionAssembler)
-#   in_bg_cols = get_in_dof_to_bg_cols(a)
-#   bg_in_cols = zeros(eltype(in_bg_cols),FESpaces.num_cols(a))
-#   for (col,bg_col) in enumerate(in_bg_cols)
-#     bg_in_cols[bg_col] = col
-#   end
-#   bg_in_cols
-# end
-
-# function get_bg_dof_to_out_cols(a::ExtensionAssembler)
-#   out_bg_cols = get_out_dof_to_bg_cols(a)
-#   bg_out_cols = zeros(eltype(out_bg_cols),FESpaces.num_cols(a))
-#   for (col,bg_col) in enumerate(out_bg_cols)
-#     bg_out_cols[bg_col] = col
-#   end
-#   bg_out_cols
-# end
-
-# function ordered_insert(
-#   A::AbstractVector,
-#   B::AbstractVector,
-#   row_B_to_row_AB::AbstractVector
-#   )
-
-#   AB = similar(A,(length(A)+length(B),))
-#   fill!(AB,zero(eltype(AB)))
-#   for (row_B,row_AB) in enumerate(row_B_to_row_AB)
-#     AB[row_AB] = B[row_B]
-#   end
-#   AB
-# end
-
-# function ordered_insert(
-#   A::ConsecutiveParamVector,
-#   B::ConsecutiveParamVector,
-#   row_B_to_row_AB::AbstractVector
-#   )
-
-#   @assert param_length(A) == param_length(B)
-#   plength = param_length(A)
-#   data_A = get_all_data(A)
-#   data_B = get_all_data(B)
-#   data_AB = similar(data_A,(size(data_A,1)+size(data_B,1),plength))
-#   fill!(data_AB,zero(eltype(data_AB)))
-#   for (row_B,row_AB) in enumerate(row_B_to_row_AB)
-#     for k in 1:plength
-#       data_AB[row_AB,k] = data_B[row_B,k]
-#     end
-#   end
-#   ConsecutiveParamArray(data_AB)
-# end
-
-# #TODO fix this!
-# function ordered_blockdiag(
-#   A::SparseMatrixCSC{Tv,Ti},
-#   B::SparseMatrixCSC{Tv,Ti},
-#   row_A_to_row_AB::AbstractVector,
-#   col_A_to_col_AB::AbstractVector,
-#   row_B_to_row_AB::AbstractVector,
-#   col_B_to_col_AB::AbstractVector
-#   ) where {Tv,Ti}
-
-#   row_AB = vcat(row_A_to_row_AB,row_B_to_row_AB)
-#   col_AB = vcat(col_A_to_col_AB,col_B_to_col_AB)
-#   AB = blockdiag(A,B)
-#   AB[sortperm(row_AB),sortperm(col_AB)]
-# end
-
-# #TODO fix this!
-# function ordered_blockdiag(
-#   A::ConsecutiveParamSparseMatrixCSC,
-#   B::ConsecutiveParamSparseMatrixCSC,
-#   args...
-#   )
-
-#   @assert param_length(A) == param_length(B)
-#   ParamArray(map(i -> ordered_blockdiag(param_getindex(A,i),param_getindex(B,i),args...),param_eachindex(A)))
-# end
-
-# internal_view(a::AbstractArray,i::AbstractVector...) = InternalView(a,i)
-
-# struct InternalView{T,N,A<:AbstractArray{T,N},I<:AbstractVector} <: AbstractArray{T,N}
-#   parent::A
-#   i_to_parent_i::NTuple{N,I}
-# end
-
-# Base.size(a::InternalView{T,N}) where {T,N} = ntuple(j->length(a.i_to_parent_i[j]),Val{N}())
-
-# function Base.getindex(a::InternalView{T,N},i::Vararg{Int,N}) where {T,N}
-#   a.parent[Base.reindex(a.i_to_parent_i,i)...]
-# end
-
-# function Base.setindex!(a::InternalView{T,N},v,i::Vararg{Int,N}) where {T,N}
-#   a.parent[Base.reindex(a.i_to_parent_i,i)...] = v
-# end
-
-# function Algebra.add_entry!(combine::Function,A::InternalView{T,1},v,i) where T
-#   parent = A.parent
-#   i_to_parent_i, = A.i_to_parent_i
-#   parent_i = i_to_parent_i[i]
-#   Algebra.add_entry!(combine,parent,v,parent_i)
-# end
-
-# function Algebra.add_entry!(combine::Function,A::InternalView{T,2},v,i,j) where T
-#   parent = A.parent
-#   i_to_parent_i,j_to_parent_j = A.i_to_parent_i
-#   parent_i = i_to_parent_i[i]
-#   parent_j = j_to_parent_j[j]
-#   Algebra.add_entry!(combine,parent,v,parent_i,parent_j)
-# end
-
-# Base.fill!(a::InternalView,v) = LinearAlgebra.fill!(a.parent,v)
-# LinearAlgebra.fillstored!(a::InternalView,v) = LinearAlgebra.fillstored!(a.parent,v)
-
-# const ParamInternalView{T,N,I<:AbstractVector} = InternalView{T,N,<:AbstractParamArray,I}
-
-# Base.size(a::ParamInternalView{T,N}) where {T,N} = size(a.parent)
-
-# function Base.getindex(a::ParamInternalView{T,N},i::Vararg{Int,N}) where {T,N}
-#   getindex(a.parent,i...)
-# end
-
-# function Base.setindex!(a::ParamInternalView{T,N},v,i::Vararg{Int,N}) where {T,N}
-#   setindex!(a.parent,v,i...)
-# end
+  a = ExtensionAssembler(U,V)
+  m1 = nz_counter(FESpaces.get_matrix_builder(a),(FESpaces.get_rows(a),FESpaces.get_cols(a)))
+  cellidsrows = to_parent_ids(get_cell_dof_ids(V,trian),a.test_fdof_to_bg_fdofs)
+  cellidscols = to_parent_ids(get_cell_dof_ids(U,trian),a.trial_fdof_to_bg_fdofs)
+  DofMaps.trivial_symbolic_loop_matrix!(m1,cellidsrows,cellidscols)
+  m2 = Algebra.nz_allocation(m1)
+  DofMaps.trivial_symbolic_loop_matrix!(m2,cellidsrows,cellidscols)
+  m3 = Algebra.create_from_nz(m2)
+  SparsityPattern(m3)
+end

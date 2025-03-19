@@ -122,7 +122,7 @@ function ParamHarmonicExtensionFESpace(
   ExtensionFESpace(int_space,ext,bg_space)
 end
 
-function Arrays.evaluate(f::ExtensionFESpace{S,UnEvalExtension{E}},args...) where {S,E}
+function Arrays.evaluate(f::ExtensionFESpace,args...)
   extension = f.extension(args...)
   ExtensionFESpace(f.space,extension,f.bg_space,f.fdof_to_bg_fdofs,f.ddof_to_bg_ddofs)
 end
@@ -141,14 +141,32 @@ end
 # extended interface
 
 get_ext_space(f::SingleFieldFESpace) = @abstractmethod
-get_ext_space(f::ExtensionFESpace) = f
-get_ext_space(f::SingleFieldParamFESpace{<:ExtensionFESpace}) = get_fe_space(f)
-
 get_bg_fe_space(f::SingleFieldFESpace) = @abstractmethod
-get_bg_fe_space(f::ExtensionFESpace) = f.bg_space
-get_bg_fe_space(f::SingleFieldParamFESpace{<:ExtensionFESpace}) = get_bg_fe_space(get_ext_space(f))
+get_extension(f::SingleFieldFESpace) = @notimplemented
 
-zero_bg_free_values(f::SingleFieldFESpace) = zero_bg_free_values(get_bg_fe_space(f))
+get_ext_space(f::ExtensionFESpace) = f
+get_bg_fe_space(f::ExtensionFESpace) = f.bg_space
+get_extension(f::ExtensionFESpace) = f.extension
+
+for F in (:get_ext_space,:get_bg_fe_space,:get_extension)
+  for T in (:SingleFieldParamFESpace,:UnEvalTrialFESpace,:TransientTrialFESpace,:TrialFESpace)
+    if !(F==:get_bg_fe_space && T==:SingleFieldParamFESpace)
+      @eval begin
+        $F(f::$T{<:ExtensionFESpace}) = $F(f.space)
+      end
+    end
+  end
+end
+
+function get_bg_fe_space(f::TrivialParamFESpace{<:ExtensionFESpace})
+  TrivialParamFESpace(get_bg_fe_space(f.space),f.plength)
+end
+
+function get_bg_fe_space(f::TrialParamFESpace{<:ExtensionFESpace})
+  TrialParamFESpace(get_bg_fe_space(f.space),f.dirichlet_values)
+end
+
+zero_bg_free_values(f::SingleFieldFESpace) = zero_free_values(get_bg_fe_space(f))
 zero_bg_dirichlet_values(f::SingleFieldFESpace) = zero_dirichlet_values(get_bg_fe_space(f))
 
 zero_bg_free_values(f::ExtensionFESpace) = zero_free_values(f.bg_space)
@@ -302,7 +320,7 @@ end
 
 function gather_extended_free_and_dirichlet_values!(bg_fv,bg_dv,f::SingleFieldFESpace,bg_cell_vals)
   bg_f = get_bg_fe_space(f)
-  gather_free_and_dirichlet_values!(bg_fv,bg_dv,bg_f,bg_cell_vals)
+  bg_vals_from_bg_cell_vals!(bg_fv,bg_dv,bg_f,bg_cell_vals)
 end
 
 function extend_free_values(f::SingleFieldFESpace,fv)
@@ -320,10 +338,7 @@ end
 function extend_free_and_dirichlet_values(f::SingleFieldFESpace,fv,dv)
   bg_fv = zero_bg_free_values(f)
   bg_dv = zero_bg_dirichlet_values(f)
-  #TODO this should work, but for some reason the final output is wrong
-  # bg_cell_vals = scatter_extended_free_and_dirichlet_values(f,fv,dv)
-  # FESpaces.gather_free_and_dirichlet_values!(bg_fv,bg_dv,bg_f,bg_cell_vals)
-  _free_and_diri_bg_vals!(bg_fv,bg_dv,get_ext_space(f),fv,dv)
+  _bg_vals_from_in_vals!(bg_fv,bg_dv,get_ext_space(f),fv,dv)
   return bg_fv,bg_dv
 end
 
@@ -402,7 +417,7 @@ for f in (:get_incut_fe_space,:get_outcut_fe_space,:get_incut_cells_to_bg_cells,
   end
 end
 
-function _free_and_diri_bg_vals!(bg_fv,bg_dv,f::ExtensionFESpace,in_fv,in_dv)
+function _bg_vals_from_in_vals!(bg_fv,bg_dv,f::ExtensionFESpace,in_fv,in_dv)
   out_fv = get_free_dof_values(f.extension.values)
   out_dv = get_dirichlet_dof_values(f.extension.values)
   for (in_fdof,bg_fdof) in enumerate(f.fdof_to_bg_fdofs)
@@ -419,7 +434,7 @@ function _free_and_diri_bg_vals!(bg_fv,bg_dv,f::ExtensionFESpace,in_fv,in_dv)
   end
 end
 
-function _free_and_diri_bg_vals!(
+function _bg_vals_from_in_vals!(
   bg_fv::ConsecutiveParamVector,
   bg_dv::ConsecutiveParamVector,
   f::ExtensionFESpace,
@@ -450,22 +465,45 @@ function _free_and_diri_bg_vals!(
   end
 end
 
+function bg_vals_from_bg_cell_vals!(bg_fv,bg_dv,f::ExtensionFESpace,bg_cv)
+  incut_cellids = get_cell_dof_ids(f)
+  out_cellids = get_cell_dof_ids(get_outcut_fe_space(f))
+
+  incut_cv,out_cv = _split_bg_cell_vals(bg_cv)
+  cache_incut_cv = array_cache(incut_cv)
+  cache_out_cv = array_cache(out_cv)
+
+  cache_incut_dofs = array_cache(incut_cellids)
+  cache_out_dofs = array_cache(out_cellids)
+
+  incut_bg_cells = 1:length(incut_cv)
+  out_bg_cells = 1:length(out_cv)
+
+  FESpaces._free_and_dirichlet_values_fill!(
+    bg_fv,bg_dv,cache_incut_cv,cache_incut_dofs,incut_cv,incut_cellids,incut_bg_cells)
+  FESpaces._free_and_dirichlet_values_fill!(
+    bg_fv,bg_dv,cache_out_cv,cache_out_dofs,out_cv,out_cellids,out_bg_cells)
+end
+
+function _split_bg_cell_vals(
+  f::ExtensionFESpace,
+  bg_cv::LazyArray{<:Fill{<:Broadcasting{<:PosNegReindex}}}
+  )
+
+  incut_cell = get_incut_cells_to_bg_cells(f)
+  out_cell = get_out_cells_to_bg_cells(f)
+  (lazy_map(Reindex(cv),incut_cell),lazy_map(Reindex(cv),out_cell))
+end
+
+function _split_bg_cell_vals(
+  f::ExtensionFESpace,
+  bg_cv::LazyArray{<:Fill{<:Reindex{<:AppendedArray}}}
+  )
+
+  app_vals = bg_cv.maps[1].values
+  (app_vals.a,app_vals.b)
+end
+
 function DofMaps.get_dof_map(f::ExtensionFESpace,args...)
   get_dof_map(get_bg_fe_space(f),args...)
-end
-
-function DofMaps.get_sparsity(
-  f::SingleFieldFESpace,
-  g::ExtensionFESpace,
-  trian=DofMaps._get_common_domain(f,g))
-
-  if trian == DofMaps._get_common_domain(f,g)
-    ExtendedSparsityPattern(f,g,trian)
-  else
-    SparsityPattern(get_bg_fe_space(f),get_bg_fe_space(g),trian)
-  end
-end
-
-function ExtendedSparsityPattern()
-  matrix = allocate_matrix(assem,)
 end

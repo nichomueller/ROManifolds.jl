@@ -3,15 +3,26 @@ struct ZeroExtension <: ExtensionStyle end
 struct FunctionExtension <: ExtensionStyle end
 struct HarmonicExtension <: ExtensionStyle end
 
-abstract type Extension{E<:ExtensionStyle} end
-
-struct GenericExtension{E<:ExtensionStyle} <: Extension{E}
+mutable struct Extension{E<:ExtensionStyle}
   style::E
   matdata
   vecdata
   values::FEFunction
   fdof_to_bg_fdofs::AbstractVector
   ddof_to_bg_ddofs::AbstractVector
+  metadata
+end
+
+function Extension(
+  style::ExtensionStyle,
+  matdata,
+  vecdata,
+  values::FEFunction,
+  fdof_to_bg_fdofs::AbstractVector,
+  ddof_to_bg_ddofs::AbstractVector
+  )
+
+  Extension(style,matdata,vecdata,values,fdof_to_bg_fdofs,ddof_to_bg_ddofs,nothing)
 end
 
 function Extension(
@@ -24,7 +35,7 @@ function Extension(
   zh = zero(space)
   matdata = _mass_data(space)
   vecdata = _interp_data(space,zh)
-  GenericExtension(style,matdata,vecdata,zh,fdof_to_bg_fdofs,ddof_to_bg_ddofs)
+  Extension(style,matdata,vecdata,zh,fdof_to_bg_fdofs,ddof_to_bg_ddofs)
 end
 
 function Extension(
@@ -38,7 +49,7 @@ function Extension(
   fh = interpolate_everywhere(f,space)
   matdata = _mass_data(space)
   vecdata = _interp_data(space,fh)
-  GenericExtension(style,matdata,vecdata,fh,fdof_to_bg_fdofs,ddof_to_bg_ddofs)
+  Extension(style,matdata,vecdata,fh,fdof_to_bg_fdofs,ddof_to_bg_ddofs)
 end
 
 function Extension(
@@ -58,7 +69,7 @@ function Extension(
   u = zero_free_values(space)
   solve!(u,LUSolver(),A,b)
   uh = FEFunction(space,u)
-  GenericExtension(style,matdata,vecdata,uh,fdof_to_bg_fdofs,ddof_to_bg_ddofs)
+  Extension(style,matdata,vecdata,uh,fdof_to_bg_fdofs,ddof_to_bg_ddofs)
 end
 
 function Extension(style::ExtensionStyle,bg_space::SingleFieldFESpace,space::SingleFieldFESpace,args...)
@@ -70,20 +81,23 @@ function Extension(style::ExtensionStyle,args...)
   @abstractmethod
 end
 
-FESpaces.get_fe_space(ext::GenericExtension) = ext.values.fe_space
+FESpaces.get_dirichlet_dof_values(f::SingleFieldFEFunction) = f.dirichlet_values
+FESpaces.get_dirichlet_dof_values(f::SingleFieldParamFEFunction) = f.dirichlet_values
 
-function FESpaces.get_cell_dof_values(ext::GenericExtension)
+FESpaces.get_fe_space(ext::Extension) = ext.values.fe_space
+
+function FESpaces.get_cell_dof_values(ext::Extension)
   get_cell_dof_values(ext.values)
 end
 
-function FESpaces.gather_free_and_dirichlet_values(ext::GenericExtension)
+function FESpaces.gather_free_and_dirichlet_values(ext::Extension)
   fv = get_free_dof_values(ext)
   dv = get_dirichlet_dof_values(ext)
   (fv,dv)
 end
 
-get_out_fdof_to_bg_fdofs(ext::GenericExtension) = ext.fdof_to_bg_fdofs
-get_out_ddof_to_bg_ddofs(ext::GenericExtension) = ext.ddof_to_bg_ddofs
+get_out_fdof_to_bg_fdofs(ext::Extension) = ext.fdof_to_bg_fdofs
+get_out_ddof_to_bg_ddofs(ext::Extension) = ext.ddof_to_bg_ddofs
 
 function _mass_data(space::SingleFieldFESpace)
   Ω = get_triangulation(space)
