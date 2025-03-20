@@ -99,31 +99,3 @@ julia> include("examples/NStokesTransientSTRB.jl")
 Solution - velocity          |  Solution - pressure        |  Convergence
 :-------------------------:|:-------------------------:|:-------------------------:
 <img src="docs/src/assets/results/nstokes_strb/plot/rbvel.gif" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/nstokes_strb/plot/rbpress.gif" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/nstokes_strb/results/convergence.png" alt="drawing" style="width:275px; height:250px;"/> 
-
-## How to cite ROManifolds
-
-In order to give credit to the `ROManifolds` contributors, we simply ask you to cite the references below in any publication in which you have made use of the `ROManifolds` project.
-
-```
-@article{MUELLER2024115767,
-  title = {Model order reduction with novel discrete empirical interpolation methods in space–time},
-  journal = {Journal of Computational and Applied Mathematics},
-  volume = {444},
-  pages = {115767},
-  year = {2024},
-  issn = {0377-0427},
-  doi = {https://doi.org/10.1016/j.cam.2024.115767},
-  url = {https://www.sciencedirect.com/science/article/pii/S0377042724000165},
-  author = {Nicholas Mueller and Santiago Badia},
-}
-
-@misc{mueller2024tensortrainreducedbasissolver,
-  title={A tensor-train reduced basis solver for parameterized partial differential equations}, 
-  author={Nicholas Mueller and Yiran Zhao and Santiago Badia and Tiangang Cui},
-  year={2024},
-  eprint={2412.14460},
-  archivePrefix={arXiv},
-  primaryClass={math.NA},
-  url={https://arxiv.org/abs/2412.14460}, 
-}
-```
