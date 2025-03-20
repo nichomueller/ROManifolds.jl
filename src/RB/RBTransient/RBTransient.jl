@@ -43,8 +43,6 @@ include("RBSolvers.jl")
 
 include("TTLinearAlgebra.jl")
 
-include("BasesConstruction.jl")
-
 include("GalerkinProjections.jl")
 
 export TransientProjection

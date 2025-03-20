@@ -26,72 +26,72 @@ get_realization(s::AbstractSnapshots) = @abstractmethod
 
 DofMaps.get_dof_map(s::AbstractSnapshots) = @abstractmethod
 
+num_params(s::AbstractSnapshots) = num_params(get_realization(s))
+
 """
-    abstract type Snapshots{T,N,D,I<:AbstractDofMap{D},R<:AbstractRealization,A}
+    abstract type Snapshots{T,N,I<:AbstractDofMap,R<:AbstractRealization,A}
       <: AbstractSnapshots{T,N} end
 
 Type representing a collection of parametric abstract arrays of eltype `T`,
-that are associated with a realization of type `R`. The (spatial)
-entries of any instance of `Snapshots` are indexed according to an index
-map of type `I`:AbstractDofMap{`D`}, where `D` encodes the spatial dimension. Note
-that, as opposed to subtypes of `AbstractParamArray`, which are arrays
-of arrays, subtypes of `Snapshots` are arrays of numbers.
+that are associated with a realization of type `R`. Unlike `AbstractParamArray`,
+which are arrays of arrays, subtypes of `Snapshots` are arrays of numbers.
 
 Subtypes:
 
 - [`SteadySnapshots`](@ref)
 - [`TransientSnapshots`](@ref)
 """
-abstract type Snapshots{T,N,D,I<:AbstractDofMap{D},R<:AbstractRealization,A} <: AbstractSnapshots{T,N} end
-
-"""
-    space_dofs(s::Snapshots{T,N,D}) where {T,N,D} -> NTuple{D,Integer}
-
-Returns the spatial size of the snapshots
-"""
-space_dofs(s::Snapshots) = size(get_dof_map(s))
-
-num_space_dofs(s::Snapshots) = length(get_dof_map(s))
-
-num_params(s::Snapshots) = num_params(get_realization(s))
+abstract type Snapshots{T,N,I<:AbstractDofMap,R<:AbstractRealization,A} <: AbstractSnapshots{T,N} end
 
 function Snapshots(s::AbstractArray,i::AbstractDofMap,r::AbstractRealization)
   @abstractmethod
 end
 
-function DofMaps.recast(a::AbstractArray,s::Snapshots)
-  return recast(a,get_dof_map(s))
+function Snapshots(s::AbstractParamArray,i::AbstractDofMap,r::AbstractRealization)
+  Snapshots(get_all_data(s),i,r)
 end
+
+get_all_data(s::Snapshots) = @abstractmethod
+
+get_param_data(s::Snapshots) = ConsecutiveParamArray(get_all_data(s))
+
+num_space_dofs(s::Snapshots) = length(get_dof_map(s))
 
 function Base.reshape(s::Snapshots,dims::Dims)
   reshape(get_all_data(s))
 end
 
 """
-    abstract type SteadySnapshots{T,N,D,I,A} <: Snapshots{T,N,D,I,<:Realization,A} end
-
-Spatial specialization of an `Snapshots`. The dimension `N` of a
-SteadySnapshots is equal to `D` + 1, where `D` represents the number of
-spatial axes, to which a parametric dimension is added.
-
-Subtypes:
-- [`GenericSnapshots`](@ref)
-- [`SnapshotsAtIndices`](@ref)
+    const SteadySnapshots{T,N,I,R<:Realization,A} = Snapshots{T,N,I,R,A}
 """
-abstract type SteadySnapshots{T,N,D,I,R<:Realization,A} <: Snapshots{T,N,D,I,R,A} end
+const SteadySnapshots{T,N,I,R<:Realization,A} = Snapshots{T,N,I,R,A}
+
+"""
+    space_dofs(s::SteadySnapshots{T,N}) where {T,N} -> NTuple{N-1,Integer}
+    space_dofs(s::TransientSnapshots{T,N}) where {T,N} -> NTuple{N-2,Integer}
+
+Returns the spatial size of the snapshots
+"""
+space_dofs(s::SteadySnapshots{T,N}) where {T,N} = size(get_all_data(s))[1:N-1]
 
 Base.size(s::SteadySnapshots) = (space_dofs(s)...,num_params(s))
 
+function select_snapshots(s::SteadySnapshots,prange)
+  drange = view(get_all_data(s),:,prange)
+  rrange = get_realization(s)[prange]
+  Snapshots(drange,get_dof_map(s),rrange)
+end
+
 """
-    struct GenericSnapshots{T,N,D,I,R,A} <: SteadySnapshots{T,N,D,I,R,A}
+    struct GenericSnapshots{T,N,I,R,A} <: Snapshots{T,N,I,R,A}
       data::A
       dof_map::I
       realization::R
     end
 
-Most standard implementation of a [`SteadySnapshots`](@ref)
+Most standard implementation of a [`Snapshots`](@ref)
 """
-struct GenericSnapshots{T,N,D,I,R,A} <: SteadySnapshots{T,N,D,I,R,A}
+struct GenericSnapshots{T,N,I,R,A} <: Snapshots{T,N,I,R,A}
   data::A
   dof_map::I
   realization::R
@@ -100,9 +100,9 @@ struct GenericSnapshots{T,N,D,I,R,A} <: SteadySnapshots{T,N,D,I,R,A}
     data::A,
     dof_map::I,
     realization::R
-    ) where {T,N,D,R,A<:AbstractParamArray{T,N},I<:AbstractDofMap{D}}
+    ) where {T,N,R,A<:AbstractArray{T,N},I<:AbstractDofMap}
 
-    new{T,D+1,D,I,R,A}(data,dof_map,realization)
+    new{T,N,I,R,A}(data,dof_map,realization)
   end
 end
 
@@ -110,139 +110,47 @@ function Snapshots(s::AbstractParamArray,i::AbstractDofMap,r::Realization)
   GenericSnapshots(s,i,r)
 end
 
-get_all_data(s::GenericSnapshots) = get_all_data(s.data)
-get_param_data(s::GenericSnapshots) = s.data
+get_all_data(s::GenericSnapshots) = s.data
 DofMaps.get_dof_map(s::GenericSnapshots) = s.dof_map
 get_realization(s::GenericSnapshots) = s.realization
 
-Base.@propagate_inbounds function Base.getindex(
-  s::GenericSnapshots{T,N},
-  i::Vararg{Integer,N}
-  ) where {T,N}
-
-  @boundscheck checkbounds(s,i...)
-  ispace...,iparam = i
-  ispace′ = s.dof_map[ispace...]
-  data = get_all_data(s)
-  ispace′ == 0 ? zero(eltype(s)) : data[ispace′,iparam]
+function Base.getindex(s::GenericSnapshots{T,N},i::Vararg{Integer,N}) where {T,N}
+  s.data[i...]
 end
 
-Base.@propagate_inbounds function Base.setindex!(
-  s::GenericSnapshots{T,N},
-  v,
-  i::Vararg{Integer,N}
-  ) where {T,N}
-
-  @boundscheck checkbounds(s,i...)
-  ispace...,iparam = i
-  ispace′ = s.dof_map[ispace...]
-  data = get_all_data(s)
-  ispace′ != 0 && (data[ispace′,iparam] = v)
-end
-
-"""
-    struct SnapshotsAtIndices{T,N,D,I,R,A<:SteadySnapshots{T,N,D,I,R},B} <: SteadySnapshots{T,N,D,I,R,A}
-      snaps::A
-      prange::B
-    end
-
-Represents a SteadySnapshots `snaps` whose parametric range is restricted
-to the indices in `prange`. This type essentially acts as a view for suptypes of
-SteadySnapshots, at every space location, on a selected number of
-parameter indices. An instance of SnapshotsAtIndices is created by calling the
-function `select_snapshots`
-"""
-struct SnapshotsAtIndices{T,N,D,I,R,A<:SteadySnapshots{T,N,D,I,R},B<:AbstractUnitRange{Int}} <: SteadySnapshots{T,N,D,I,R,A}
-  snaps::A
-  prange::B
-  function SnapshotsAtIndices(snaps::A,prange::B) where {T,N,D,I,R,A<:SteadySnapshots{T,N,D,I,R},B}
-    @assert 1 <= minimum(prange) <= maximum(prange) <= _num_all_params(snaps)
-    new{T,N,D,I,R,A,B}(snaps,prange)
-  end
-end
-
-function SnapshotsAtIndices(s::SnapshotsAtIndices,prange)
-  prange′ = s.prange[prange]
-  SnapshotsAtIndices(s.snaps,prange′)
-end
-
-param_indices(s::SnapshotsAtIndices) = s.prange
-num_params(s::SnapshotsAtIndices) = length(param_indices(s))
-get_all_data(s::SnapshotsAtIndices) = get_all_data(s.snaps)
-DofMaps.get_dof_map(s::SnapshotsAtIndices) = get_dof_map(s.snaps)
-
-_num_all_params(s::Snapshots) = num_params(s)
-_num_all_params(s::SnapshotsAtIndices) = _num_all_params(s.snaps)
-
-function get_param_data(s::SnapshotsAtIndices)
-  data = get_all_data(s)
-  v = view(data,:,param_indices(s))
-  ConsecutiveParamArray(v)
-end
-
-get_realization(s::SnapshotsAtIndices) = get_realization(s.snaps)[s.prange]
-
-Base.@propagate_inbounds function Base.getindex(
-  s::SnapshotsAtIndices{T,N},
-  i::Vararg{Integer,N}
-  ) where {T,N}
-
-  @boundscheck checkbounds(s,i...)
-  ispace...,iparam = i
-  iparam′ = getindex(param_indices(s),iparam)
-  getindex(s.snaps,ispace...,iparam′)
-end
-
-Base.@propagate_inbounds function Base.setindex!(
-  s::SnapshotsAtIndices{T,N},
-  v,
-  i::Vararg{Integer,N}
-  ) where {T,N}
-
-  @boundscheck checkbounds(s,i...)
-  ispace...,iparam = i
-  iparam′ = getindex(param_indices(s),iparam)
-  setindex!(s.snaps,v,ispace...,iparam′)
-end
-
-format_range(a::AbstractUnitRange,l::Int) = a
-format_range(a::Base.OneTo{Int},l::Int) = 1:a.stop
-format_range(a::Number,l::Int) = a:a
-format_range(a::Colon,l::Int) = 1:l
-
-"""
-    select_snapshots(s::SteadySnapshots,prange) -> SnapshotsAtIndices
-    select_snapshots(s::TransientSnapshots,trange,prange) -> TransientSnapshotsAtIndices
-
-Restricts the parametric range of `s` to the indices `prange` steady cases, to
-the indices `trange` and `prange` in transient cases, while leaving the spatial
-entries intact. The restriction operation is lazy.
-"""
-function select_snapshots(s::SteadySnapshots,prange)
-  prange = format_range(prange,num_params(s))
-  SnapshotsAtIndices(s,prange)
-end
-
-# trivial dimensions
-
-function select_snapshots(s::SteadySnapshots{T,N},prange::Integer) where {T,N}
-  srange = SnapshotsAtIndices(s,format_range(prange,num_params(s)))
-  dropdims(srange;dims=N)
+function Base.setindex!(s::GenericSnapshots{T,N},v,i::Vararg{Integer,N}) where {T,N}
+  s.data[i...] = v
 end
 
 # sparse interface
 
-const SimpleSparseSnapshots{T,N,D,I,R,A<:ParamSparseMatrix} = Snapshots{T,N,D,I,R,A}
-const CompositeSparseSnapshots{T,N,D,I,R,A<:SimpleSparseSnapshots} = Snapshots{T,N,D,I,R,A}
-const GenericSparseSnapshots{T,N,D,I,R,A<:CompositeSparseSnapshots} = Snapshots{T,N,D,I,R,A}
+"""
+"""
+const SparseSnapshots{T,N,I<:AbstractDofMap,R<:AbstractRealization,A<:ParamSparseMatrix} = Snapshots{T,N,I,R,A}
 
-"""
-"""
-const SparseSnapshots{T,N,D,I,R} = Union{
-  SimpleSparseSnapshots{T,N,D,I,R},
-  CompositeSparseSnapshots{T,N,D,I,R},
-  GenericSparseSnapshots{T,N,D,I,R}
-}
+function Snapshots(s::ParamSparseMatrix,i::SparseMatrixDofMap,r::Realization)
+  T = eltype(s)
+  i = get_dof_map(s)
+  data = get_all_data(s)
+  idata = zeros(T,size(i)...,num_params(r))
+  for ip in 1:num_params(r)
+    for k in CartesianIndices(i)
+      k′ = i[k]
+      if k′ > 0
+        idata[k.I...,ip] = data[k′,ip]
+      end
+    end
+  end
+  Snapshots(idata,i,r)
+end
+
+function get_param_data(s::SparseSnapshots)
+  @notimplemented "We do not keep the parametric data of snapshots of sparse matrices"
+end
+
+function DofMaps.recast(a::AbstractArray,s::SparseSnapshots)
+  return recast(a,get_dof_map(s))
+end
 
 # multi field interface
 
@@ -324,41 +232,19 @@ function get_param_data(s::BlockSnapshots)
   map(get_param_data,s.array) |> mortar
 end
 
-for f in (:select_snapshots,:(DofMaps.flatten))
-  @eval begin
-    function Arrays.return_cache(::typeof($f),s::BlockSnapshots,args...;kwargs...)
-      S = Snapshots
-      N = ndims(s)
-      block_cache = Array{S,N}(undef,size(s))
-      return block_cache
-    end
-
-    function $f(s::BlockSnapshots,args...;kwargs...)
-      array = return_cache($f,s,args...;kwargs...)
-      touched = s.touched
-      for i in eachindex(touched)
-        if touched[i]
-          array[i] = $f(s[i],args...;kwargs...)
-        end
-      end
-      return BlockSnapshots(array,touched)
-    end
-  end
-end
-
-function Arrays.return_cache(::typeof(change_dof_map),s::BlockSnapshots,i::AbstractArray{<:AbstractDofMap})
+function Arrays.return_cache(::typeof(select_snapshots),s::BlockSnapshots,args...)
   S = Snapshots
   N = ndims(s)
   block_cache = Array{S,N}(undef,size(s))
   return block_cache
 end
 
-function DofMaps.change_dof_map(s::BlockSnapshots,i::AbstractArray{<:AbstractDofMap})
-  array = return_cache(change_dof_map,s,i)
+function select_snapshots(s::BlockSnapshots,args...)
+  array = return_cache(select_snapshots,s,args...)
   touched = s.touched
-  for n in eachindex(touched)
-    if touched[n]
-      array[n] = change_dof_map(s[n],i[n])
+  for i in eachindex(touched)
+    if touched[i]
+      array[i] = select_snapshots(s[i],args...)
     end
   end
   return BlockSnapshots(array,touched)
