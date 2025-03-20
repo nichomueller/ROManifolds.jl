@@ -45,6 +45,8 @@ include("TTLinearAlgebra.jl")
 
 include("GalerkinProjections.jl")
 
+include("BasesConstruction.jl")
+
 export TransientProjection
 include("Projections.jl")
 

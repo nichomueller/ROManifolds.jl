@@ -29,8 +29,7 @@ DofMaps.get_dof_map(s::AbstractSnapshots) = @abstractmethod
 num_params(s::AbstractSnapshots) = num_params(get_realization(s))
 
 """
-    abstract type Snapshots{T,N,I<:AbstractDofMap,R<:AbstractRealization,A}
-      <: AbstractSnapshots{T,N} end
+    abstract type Snapshots{T,N,I,R,A} <: AbstractSnapshots{T,N} end
 
 Type representing a collection of parametric abstract arrays of eltype `T`,
 that are associated with a realization of type `R`. Unlike `AbstractParamArray`,
@@ -41,13 +40,13 @@ Subtypes:
 - [`SteadySnapshots`](@ref)
 - [`TransientSnapshots`](@ref)
 """
-abstract type Snapshots{T,N,I<:AbstractDofMap,R<:AbstractRealization,A} <: AbstractSnapshots{T,N} end
+abstract type Snapshots{T,N,I,R,A} <: AbstractSnapshots{T,N} end
 
 function Snapshots(s::AbstractArray,i::AbstractDofMap,r::AbstractRealization)
   @abstractmethod
 end
 
-function Snapshots(s::AbstractParamArray,i::AbstractDofMap,r::AbstractRealization)
+function Snapshots(s::AbstractParamArray,i::TrivialDofMap,r::AbstractRealization)
   Snapshots(get_all_data(s),i,r)
 end
 
@@ -58,7 +57,15 @@ get_param_data(s::Snapshots) = ConsecutiveParamArray(get_all_data(s))
 num_space_dofs(s::Snapshots) = length(get_dof_map(s))
 
 function Base.reshape(s::Snapshots,dims::Dims)
-  reshape(get_all_data(s))
+  reshape(get_all_data(s),dims...)
+end
+
+function select_snapshots(s::Snapshots,pindex)
+  if num_params(s)==length(pindex)
+    s
+  else
+    _select_snapshots(s,pindex)
+  end
 end
 
 """
@@ -76,11 +83,19 @@ space_dofs(s::SteadySnapshots{T,N}) where {T,N} = size(get_all_data(s))[1:N-1]
 
 Base.size(s::SteadySnapshots) = (space_dofs(s)...,num_params(s))
 
-function select_snapshots(s::SteadySnapshots,prange)
+function _select_snapshots(s::SteadySnapshots,pindex)
+  prange = _format_index(pindex)
   drange = view(get_all_data(s),:,prange)
   rrange = get_realization(s)[prange]
   Snapshots(drange,get_dof_map(s),rrange)
 end
+
+function param_getindex(s::SteadySnapshots{T,N},pindex) where {T,N}
+  view(get_all_data(s),_ncolons(Val{N-1}())...,pindex)
+end
+
+_format_index(i) = i
+_format_index(i::Number) = i:i
 
 """
     struct GenericSnapshots{T,N,I,R,A} <: Snapshots{T,N,I,R,A}
@@ -106,7 +121,7 @@ struct GenericSnapshots{T,N,I,R,A} <: Snapshots{T,N,I,R,A}
   end
 end
 
-function Snapshots(s::AbstractParamArray,i::AbstractDofMap,r::Realization)
+function Snapshots(s::AbstractArray{<:Number},i::TrivialDofMap,r::AbstractRealization)
   GenericSnapshots(s,i,r)
 end
 
@@ -122,16 +137,45 @@ function Base.setindex!(s::GenericSnapshots{T,N},v,i::Vararg{Integer,N}) where {
   s.data[i...] = v
 end
 
-# sparse interface
-
 """
-"""
-const SparseSnapshots{T,N,I<:AbstractDofMap,R<:AbstractRealization,A<:ParamSparseMatrix} = Snapshots{T,N,I,R,A}
+    struct ReshapedSnapshots{T,N,I,R,A,B} <: Snapshots{T,N,I,R,A}
+      data::A
+      param_data::B
+      dof_map::I
+      realization::R
+    end
 
-function Snapshots(s::ParamSparseMatrix,i::SparseMatrixDofMap,r::Realization)
-  T = eltype(s)
-  i = get_dof_map(s)
+Most standard implementation of a [`Snapshots`](@ref)
+"""
+struct ReshapedSnapshots{T,N,I,R,A,B} <: Snapshots{T,N,I,R,A}
+  data::A
+  param_data::B
+  dof_map::I
+  realization::R
+
+  function ReshapedSnapshots(
+    data::A,
+    param_data::B,
+    dof_map::I,
+    realization::R
+    ) where {T,N,R,A<:AbstractArray{T,N},B,I<:AbstractDofMap}
+
+    new{T,N,I,R,A,B}(data,param_data,dof_map,realization)
+  end
+end
+
+function Snapshots(s::AbstractParamArray,i::AbstractDofMap,r::AbstractRealization)
   data = get_all_data(s)
+  param_data = s
+  dims = (size(i)...,num_params(r))
+  idata = reshape(data,dims)
+  ReshapedSnapshots(idata,param_data,i,r)
+end
+
+function Snapshots(s::ParamSparseMatrix,i::SparseMatrixDofMap,r::AbstractRealization)
+  T = eltype2(s)
+  data = get_all_data(s)
+  param_data = s
   idata = zeros(T,size(i)...,num_params(r))
   for ip in 1:num_params(r)
     for k in CartesianIndices(i)
@@ -141,12 +185,44 @@ function Snapshots(s::ParamSparseMatrix,i::SparseMatrixDofMap,r::Realization)
       end
     end
   end
-  Snapshots(idata,i,r)
+  ReshapedSnapshots(idata,param_data,i,r)
 end
 
-function get_param_data(s::SparseSnapshots)
-  @notimplemented "We do not keep the parametric data of snapshots of sparse matrices"
+get_all_data(s::ReshapedSnapshots) = s.data
+get_param_data(s::ReshapedSnapshots) = s.param_data
+DofMaps.get_dof_map(s::ReshapedSnapshots) = s.dof_map
+get_realization(s::ReshapedSnapshots) = s.realization
+
+function _select_snapshots(s::ReshapedSnapshots{T,N},pindex) where {T,N}
+  prange = _format_index(pindex)
+  drange = view(get_all_data(s),_ncolons(Val{N-1}())...,prange)
+  pdrange = _get_param_data(s.param_data,prange)
+  rrange = get_realization(s)[prange]
+  ReshapedSnapshots(drange,pdrange,get_dof_map(s),rrange)
 end
+
+function _get_param_data(pdata::ConsecutiveParamVector,prange)
+  ConsecutiveParamArray(view(pdata.data,:,prange))
+end
+
+# in practice, when dealing with the Jacobian, the param data is never fetched
+function _get_param_data(pdata::ConsecutiveParamSparseMatrixCSC,prange)
+  pdata
+end
+
+function Base.getindex(s::ReshapedSnapshots{T,N},i::Vararg{Integer,N}) where {T,N}
+  s.data[i...]
+end
+
+function Base.setindex!(s::ReshapedSnapshots{T,N},v,i::Vararg{Integer,N}) where {T,N}
+  s.data[i...] = v
+end
+
+# sparse interface
+
+"""
+"""
+const SparseSnapshots{T,N,I<:AbstractSparseDofMap,R,A} = Snapshots{T,N,I,R,A}
 
 function DofMaps.recast(a::AbstractArray,s::SparseSnapshots)
   return recast(a,get_dof_map(s))
@@ -239,12 +315,12 @@ function Arrays.return_cache(::typeof(select_snapshots),s::BlockSnapshots,args..
   return block_cache
 end
 
-function select_snapshots(s::BlockSnapshots,args...)
-  array = return_cache(select_snapshots,s,args...)
+function select_snapshots(s::BlockSnapshots,pindex)
+  array = return_cache(select_snapshots,s,pindex)
   touched = s.touched
   for i in eachindex(touched)
     if touched[i]
-      array[i] = select_snapshots(s[i],args...)
+      array[i] = select_snapshots(s[i],pindex)
     end
   end
   return BlockSnapshots(array,touched)
@@ -258,24 +334,24 @@ function Snapshots(a::ArrayContribution,i::ArrayContribution,r::AbstractRealizat
   end
 end
 
-function select_snapshots(a::ArrayContribution,args...;kwargs...)
+function select_snapshots(a::ArrayContribution,pindex)
   contribution(a.trians) do trian
-    select_snapshots(a[trian],args...;kwargs...)
+    select_snapshots(a[trian],pindex)
   end
 end
 
 # linear algebra
 
 function Base.:*(A::Snapshots{T,2},B::Snapshots{S,2}) where {T,S}
-  *(get_all_data(A),get_all_data(B))
+  consec_mul(get_all_data(A),get_all_data(B))
 end
 
 function Base.:*(A::Snapshots{T,2},B::Adjoint{S,<:Snapshots}) where {T,S}
-  *(get_all_data(A),adjoint(get_all_data(B.parent)))
+  consec_mul(get_all_data(A),adjoint(get_all_data(B.parent)))
 end
 
 function Base.:*(A::Snapshots{T,2},B::AbstractMatrix{S}) where {T,S}
-  *(get_all_data(A),B)
+  consec_mul(get_all_data(A),B)
 end
 
 function Base.:*(A::Snapshots{T,2},B::Adjoint{T,<:AbstractMatrix{S}}) where {T,S}
@@ -283,41 +359,69 @@ function Base.:*(A::Snapshots{T,2},B::Adjoint{T,<:AbstractMatrix{S}}) where {T,S
 end
 
 function Base.:*(A::Adjoint{T,<:Snapshots{T,2}},B::Snapshots{S,2}) where {T,S}
-  *(adjoint(get_all_data(A.parent)),get_all_data(B))
+  consec_mul(adjoint(get_all_data(A.parent)),get_all_data(B))
 end
 
 function Base.:*(A::AbstractMatrix{T},B::Snapshots{S,2}) where {T,S}
-  *(A,get_all_data(B))
+  consec_mul(A,get_all_data(B))
 end
 
 function Base.:*(A::Adjoint{T,<:AbstractMatrix},B::Snapshots{S,2}) where {T,S}
-  *(A,get_all_data(B))
+  consec_mul(A,get_all_data(B))
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::Snapshots{T,2},B::Snapshots{S,2}) where {T,S}
-  mul!(C,get_all_data(A),get_all_data(B))
+  consec_mul!(C,get_all_data(A),get_all_data(B))
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::Snapshots{T,2},B::Adjoint{S,<:Snapshots}) where {T,S}
-  mul!(C,get_all_data(A),adjoint(get_all_data(B.parent)))
+  consec_mul!(C,get_all_data(A),adjoint(get_all_data(B.parent)))
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::Snapshots{T,2},B::AbstractMatrix{S}) where {T,S}
-  mul!(C,get_all_data(A),B)
+  consec_mul!(C,get_all_data(A),B)
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::Snapshots{T,2},B::Adjoint{T,<:AbstractMatrix{S}}) where {T,S}
-  mul!(C,get_all_data(A),B)
+  consec_mul!(C,get_all_data(A),B)
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::Adjoint{T,<:Snapshots{T,2}},B::Snapshots{S,2}) where {T,S}
-  mul!(C,adjoint(get_all_data(A.parent)),get_all_data(B))
+  consec_mul!(C,adjoint(get_all_data(A.parent)),get_all_data(B))
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::AbstractMatrix{T},B::Snapshots{S,2}) where {T,S}
-  mul!(C,A,get_all_data(B))
+  consec_mul!(C,A,get_all_data(B))
 end
 
 function LinearAlgebra.mul!(C::AbstractMatrix,A::Adjoint{T,<:AbstractMatrix},B::Snapshots{S,2}) where {T,S}
-  mul!(C,A,get_all_data(B))
+  consec_mul!(C,A,get_all_data(B))
+end
+
+consec_mul(A::AbstractArray,B::AbstractArray) = A*B
+consec_mul!(C::AbstractArray,A::AbstractArray,B::AbstractArray) = mul!(C,A,B)
+
+for T in (:ConsecutiveParamArray,:ConsecutiveParamSparseMatrix)
+  @eval begin
+    consec_mul(A::$T,B::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}}) where S = get_all_data(A)*B
+    consec_mul(A::Adjoint{S,<:$T},B::Union{<:AbstractArray,Adjoint{U,<:AbstractArray}}) where {S,U} = adjoint(get_all_data(A.parent))*B
+    consec_mul(A::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}},B::$T) where S = A*get_all_data(B)
+    consec_mul(A::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}},B::Adjoint{U,<:$T}) where {S,U} = A*adjoint(get_all_data(B.parent))
+    consec_mul!(C::AbstractArray,A::$T,B::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}}) where S = mul!(C,get_all_data(A),B)
+    consec_mul!(C::AbstractArray,A::Adjoint{S,<:$T},B::Union{<:AbstractArray,Adjoint{U,<:AbstractArray}}) where {S,U} = mul!(C,adjoint(get_all_data(A.parent)),B)
+    consec_mul!(C::AbstractArray,A::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}},B::$T) where S = mul!(C,A,get_all_data(B))
+    consec_mul!(C::AbstractArray,A::Union{<:AbstractArray,Adjoint{S,<:AbstractArray}},B::Adjoint{U,<:$T}) where {S,U} = mul!(C,A,adjoint(get_all_data(B.parent)))
+  end
+end
+
+function _adjoint(A::AbstractMatrix)
+  adjoint(A)
+end
+
+function _adjoint(A::SubArray{T,2}) where T
+  view(adjoint(A.parent),A.indices...)
+end
+
+function LinearAlgebra.adjoint(s::GenericSnapshots{T,2}) where T
+  _adjoint(get_all_data(s))
 end

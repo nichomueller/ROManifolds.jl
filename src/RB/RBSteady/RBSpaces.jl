@@ -245,16 +245,16 @@ function Arrays.evaluate(r::RBSpace,args...)
 end
 
 """
-    struct EvalRBSpace{A<:RBSpace,B<:AbstractRealization} <: RBSpace
-      subspace::A
+    struct EvalRBSpace{S,B<:AbstractRealization} <: RBSpace{S}
+      space::S
       realization::B
     end
 
 Conceptually this isn't needed, but it helps dispatching according to steady/transient
 cases
 """
-struct EvalRBSpace{S,A<:RBSpace{S},B<:AbstractRealization} <: RBSpace{S}
-  space::A
+struct EvalRBSpace{S,B<:AbstractRealization} <: RBSpace{S}
+  space::S
   realization::B
 end
 
