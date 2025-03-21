@@ -99,3 +99,19 @@ julia> include("examples/NStokesTransientSTRB.jl")
 Solution - velocity          |  Solution - pressure        |  Convergence
 :-------------------------:|:-------------------------:|:-------------------------:
 <img src="docs/src/assets/results/nstokes_strb/plot/rbvel.gif" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/nstokes_strb/plot/rbpress.gif" alt="drawing" style="width:275px; height:250px;"/>  |  <img src="docs/src/assets/results/nstokes_strb/results/convergence.png" alt="drawing" style="width:275px; height:250px;"/> 
+
+## How to cite ROManifolds
+
+In order to give credit to the `ROManifolds` contributors, we simply ask you to cite the references below in any publication in which you have made use of the `ROManifolds` project. 
+
+```
+@misc{mueller2025frameworkefficientreducedorder,
+    title={A framework for efficient reduced order modelling in the Julia programming language}, 
+    author={Nicholas Mueller and Santiago Badia},
+    year={2025},
+    eprint={2503.15994},
+    archivePrefix={arXiv},
+    primaryClass={math.NA},
+    url={https://arxiv.org/abs/2503.15994}, 
+}
+```
