@@ -46,10 +46,6 @@ function Snapshots(s::AbstractArray,i::AbstractDofMap,r::AbstractRealization)
   @abstractmethod
 end
 
-function Snapshots(s::AbstractParamArray,i::TrivialDofMap,r::AbstractRealization)
-  Snapshots(get_all_data(s),i,r)
-end
-
 get_all_data(s::Snapshots) = @abstractmethod
 
 get_param_data(s::Snapshots) = ConsecutiveParamArray(get_all_data(s))
@@ -83,6 +79,14 @@ space_dofs(s::SteadySnapshots{T,N}) where {T,N} = size(get_all_data(s))[1:N-1]
 
 Base.size(s::SteadySnapshots) = (space_dofs(s)...,num_params(s))
 
+function Snapshots(s::AbstractParamVector,i::TrivialDofMap,r::Realization)
+  Snapshots(get_all_data(s),i,r)
+end
+
+function Snapshots(s::ParamSparseMatrix,i::TrivialDofMap,r::Realization)
+  Snapshots(get_all_data(s),i,r)
+end
+
 function _select_snapshots(s::SteadySnapshots,pindex)
   prange = _format_index(pindex)
   drange = view(get_all_data(s),:,prange)
@@ -90,7 +94,7 @@ function _select_snapshots(s::SteadySnapshots,pindex)
   Snapshots(drange,get_dof_map(s),rrange)
 end
 
-function param_getindex(s::SteadySnapshots{T,N},pindex) where {T,N}
+function param_getindex(s::SteadySnapshots{T,N},pindex::Integer) where {T,N}
   view(get_all_data(s),_ncolons(Val{N-1}())...,pindex)
 end
 
@@ -164,7 +168,7 @@ struct ReshapedSnapshots{T,N,I,R,A,B} <: Snapshots{T,N,I,R,A}
   end
 end
 
-function Snapshots(s::AbstractParamArray,i::AbstractDofMap,r::AbstractRealization)
+function Snapshots(s::AbstractParamVector,i::AbstractDofMap,r::Realization)
   data = get_all_data(s)
   param_data = s
   dims = (size(i)...,num_params(r))
@@ -172,7 +176,7 @@ function Snapshots(s::AbstractParamArray,i::AbstractDofMap,r::AbstractRealizatio
   ReshapedSnapshots(idata,param_data,i,r)
 end
 
-function Snapshots(s::ParamSparseMatrix,i::SparseMatrixDofMap,r::AbstractRealization)
+function Snapshots(s::ParamSparseMatrix,i::SparseMatrixDofMap,r::Realization)
   T = eltype2(s)
   data = get_all_data(s)
   param_data = s

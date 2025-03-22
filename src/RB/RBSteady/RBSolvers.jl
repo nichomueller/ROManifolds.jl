@@ -168,7 +168,7 @@ function jacobian_snapshots(
   s::AbstractSnapshots)
 
   fesolver = get_fe_solver(solver)
-  sjac = select_snapshots(s,nparams=jac_params(solver))
+  sjac = select_snapshots(s,jac_params(solver))
   us_jac = get_param_data(sjac)
   r_jac = get_realization(sjac)
   A = jacobian(op,r_jac,us_jac)

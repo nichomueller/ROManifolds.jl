@@ -15,10 +15,11 @@ num_times(s::TransientSnapshots) = num_times(get_realization(s))
 
 Base.size(s::TransientSnapshots) = (space_dofs(s)...,num_params(s),num_times(s))
 
-function Snapshots(s::AbstractParamVector,i::TrivialDofMap,r::TransientRealization)
+function Snapshots(s::AbstractParamVector,i::AbstractDofMap,r::TransientRealization)
   data = get_all_data(s)
   data′ = reshape(data,:,num_params(r),num_times(r))
-  Snapshots(data′,i,r)
+  s′ = ConsecutiveParamArray(data′)
+  Snapshots(s′,i,r)
 end
 
 function Snapshots(s::AbstractParamMatrix,i::TrivialDofMap,r::TransientRealization)
@@ -42,7 +43,7 @@ function _select_snapshots(s::TransientSnapshots,pindex)
   Snapshots(drange,get_dof_map(s),rrange)
 end
 
-function param_getindex(s::TransientSnapshots{T,N},pindex,tindex) where {T,N}
+function param_getindex(s::TransientSnapshots{T,N},pindex::Integer,tindex::Integer) where {T,N}
   view(get_all_data(s),_ncolons(Val{N-2}())...,pindex,tindex)
 end
 
@@ -63,6 +64,13 @@ function Snapshots(s::AbstractParamMatrix,s0,i::AbstractDofMap,r::TransientReali
   initial_data = get_all_data(s0)
   snaps = Snapshots(s,i,r)
   TransientSnapshotsWithIC(initial_data,snaps)
+end
+
+function Snapshots(s::AbstractParamVector,s0,i::AbstractDofMap,r::TransientRealization)
+  data = get_all_data(s)
+  data′ = reshape(data,:,num_params(r),num_times(r))
+  s′ = ConsecutiveParamArray(data′)
+  Snapshots(s′,s0,i,r)
 end
 
 get_all_data(s::TransientSnapshotsWithIC) = get_all_data(s.snaps)
@@ -94,13 +102,6 @@ function Snapshots(s::AbstractParamMatrix,i::AbstractDofMap,r::TransientRealizat
   dims = (size(i)...,num_params(r),num_times(r))
   idata = reshape(data,dims)
   ReshapedSnapshots(idata,param_data,i,r)
-end
-
-function Snapshots(s::AbstractParamVector,i::AbstractDofMap,r::TransientRealization)
-  data = get_all_data(s)
-  data′ = reshape(data,:,num_params(r),num_times(r))
-  s′ = ConsecutiveParamArray(data′)
-  Snapshots(s′,i,r)
 end
 
 function Snapshots(s::ParamSparseMatrix,i::TrivialSparseMatrixDofMap,r::TransientRealization)
@@ -153,7 +154,7 @@ function Snapshots(
   data::BlockParamArray{T,N},
   data0::BlockParamArray,
   i::AbstractArray{<:AbstractDofMap},
-  r::AbstractRealization
+  r::TransientRealization
   ) where {T,N}
 
   block_values = blocks(data)
@@ -258,7 +259,7 @@ end
 function Snapshots(
   a::TupOfArrayContribution,
   i::TupOfArrayContribution,
-  r::AbstractRealization)
+  r::TransientRealization)
 
   map((a,i)->Snapshots(a,i,r),a,i)
 end
