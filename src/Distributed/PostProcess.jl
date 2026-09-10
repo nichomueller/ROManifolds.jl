@@ -1,24 +1,51 @@
 for T in (:DEIMHyperReduction,:SOPTHyperReduction,:HighDimDEIMHyperReduction,:HighDimSOPTHyperReduction)
-  for A in (:HRVecProjection,:HRMatProjection)
-    @eval begin
-      function RBSteady.check_interpolation(resjac,a::$A{<:$T},_fecache::AbstractArray{<:AbstractArray})
-        msg = "fecache mismatch at interpolation points"
-        fecache = reduce(+,map(get_all_data,local_views(_fecache)))
-        dofs = get_interpolation_dofs(get_interpolation(a))
-        data = similar(fecache)
-        map(local_views(resjac),local_views(dofs)) do rvals,rdofs
-          g2l = global_to_local(rdofs.index_parts)
-          if !isempty(rdofs.global_rows)
-            b = flatten(rvals)
-            for gri in rdofs.global_rows
-              lri = g2l[gri]
-              data[lri,:] .= b[lri,:]
-            end
-          end
+  @eval begin
+    function RBSteady.check_interpolation(
+      res,
+      a::HRVecProjection{<:$T},
+      _fecache::AbstractArray{<:AbstractArray}
+      )
+
+      msg = "fecache mismatch at interpolation points"
+      fecache = reduce(+,map(get_all_data,local_views(_fecache)))
+      dofs = get_interpolation_dofs(get_interpolation(a))
+      data = zero(fecache)
+      map(local_views(res),local_views(dofs)) do rvals,rdofs
+        isempty(rdofs.global_rows) && return
+        g2l = global_to_local(rdofs.index_parts)
+        b = flatten(rvals)
+        @views for (gri,i) in zip(rdofs.global_rows,rdofs.global_cols)
+          data[i,:] .= b[g2l[gri],:]
         end
-        @check isapprox(fecache,data;rtol=1e-8) msg
-        return true
       end
+      @check isapprox(fecache,data;rtol=1e-8) msg
+      return true
+    end
+
+    function RBSteady.check_interpolation(
+      jac,
+      a::HRMatProjection{<:$T},
+      _fecache::AbstractArray{<:AbstractArray}
+      )
+
+      msg = "fecache mismatch at interpolation points"
+      fecache = reduce(+,map(get_all_data,local_views(_fecache)))
+      dofs = get_interpolation_dofs(get_interpolation(a))
+      data = zero(fecache)
+      map(local_views(jac),local_views(dofs)) do jvals,rdofs
+        rrows,rcols = rdofs
+        isempty(rrows.global_rows) && return
+        sparsity = get_sparsity(get_dof_map(jvals))
+        lrows = _remap(rrows,global_to_local(rrows.index_parts))
+        lcols = _remap(rcols,global_to_local(rcols.index_parts))
+        nzinds = sparsify_split_indices(lrows,lcols,sparsity)
+        A = flatten(jvals)
+        @views for (nzi,i) in zip(nzinds,rrows.global_cols)
+          data[i,:] .= A[nzi,:]
+        end
+      end
+      @check isapprox(fecache,data;rtol=1e-8) msg
+      return true
     end
   end
 end

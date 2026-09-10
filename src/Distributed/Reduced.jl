@@ -61,6 +61,7 @@ Base.size(a::LocalDEIMIndices) = size(a.global_rows)
 Base.IndexStyle(::Type{<:LocalDEIMIndices}) = IndexLinear()
 Base.getindex(a::LocalDEIMIndices,i::Int) = getindex(a.global_rows,i)
 Base.setindex!(a::LocalDEIMIndices,v,i::Int) = setindex!(a.global_rows,v,i)
+Base.copy(a::LocalDEIMIndices) = LocalDEIMIndices(copy(a.global_rows),copy(a.global_cols),a.index_parts)
 
 function RBSteady._evaluate!(a,cellrows,rows::LocalDEIMIndices)
   fill!(a,zero(eltype(a)))
@@ -96,7 +97,7 @@ function RBSteady.DEIM(basis::GenericPMatrix)
   n = size(basis,2)
   I = zeros(Int,n)
   parts = partition(axes(basis,1))
-  Iparts = map(LocalDEIMIndices(parts),parts)
+  Iparts = map(LocalDEIMIndices,parts)
   basisI = zeros(T,n,n)
   res = GenericPArray{Vector{T}}(undef,parts)
   map(own_values(res),own_values(basis)) do ro,bo
@@ -125,7 +126,7 @@ function RBSteady.SOPT(basis::GenericPMatrix)
   n = size(basis,2)
   I = zeros(Int,n)  
   parts = partition(axes(basis,1))
-  Iparts = map(_ -> LocalDEIMIndices(),parts)
+  Iparts = map(LocalDEIMIndices,parts)
   basisI = zeros(T,n,n)
   res = GenericPArray{Vector{T}}(undef,parts)
   map(own_values(res),own_values(basis)) do ro,bo
@@ -217,10 +218,10 @@ function RBSteady.IntegrationDomain(
     local_views(rows),
     local_views(gids)
     ) do trian,test,rows,gids
-    _remap!(rows,global_to_local(gids))
-    domain = IntegrationDomain(trian,test,rows)
-    _remap!(rows,local_to_global(gids))
-    domain
+    lrows = _remap(rows,global_to_local(gids))
+    domain = IntegrationDomain(trian,test,lrows)
+    grows = _remap(lrows,local_to_global(gids))
+    GenericDomain(get_integration_cells(domain),get_cell_idofs(domain),grows)
   end
   DistributedIntegrationDomain(domains)
 end
@@ -244,12 +245,12 @@ function RBSteady.IntegrationDomain(
     local_views(rgids),
     local_views(cgids)
     ) do trian,trial,test,rows,cols,rgids,cgids
-    _remap!(rows,global_to_local(rgids))
-    _remap!(cols,global_to_local(cgids))
-    domain = IntegrationDomain(trian,trial,test,rows,cols)
-    _remap!(rows,local_to_global(rgids))
-    _remap!(cols,local_to_global(cgids))
-    domain
+    lrows = _remap(rows,global_to_local(rgids))
+    lcols = _remap(cols,global_to_local(cgids))
+    domain = IntegrationDomain(trian,trial,test,lrows,lcols)
+    grows = _remap(lrows,local_to_global(rgids))
+    gcols = _remap(lcols,local_to_global(cgids))
+    GenericDomain(get_integration_cells(domain),get_cell_idofs(domain),(grows,gcols))
   end
   DistributedIntegrationDomain(domains)
 end
@@ -313,12 +314,12 @@ function RBSteady.get_at_domain(s::DistributedSparseSnapshots,rowscols::Tuple)
     if !isempty(rows)
       sparsity = get_sparsity(get_dof_map(s))
       rc = sparsify_split_indices(rows,cols,sparsity)
-      LocalDEIMIndices(rc,rows.global_cols)
+      LocalDEIMIndices(rc,rows.global_cols,rows.index_parts)
     else
-      LocalDEIMIndices()
+      LocalDEIMIndices(rows.index_parts)
     end
   end
-  get_at_domain(s,inds)
+  get_at_domain(s.snaps,inds)
 end
 
 function RBSteady.get_at_domain(a::GenericPArray,rows::AbstractArray{<:LocalDEIMIndices})
@@ -331,7 +332,7 @@ function RBSteady.get_at_domain(a::GenericPArray,rows::AbstractArray{<:LocalDEIM
       for (gri,i) in zip(rows.global_rows,rows.global_cols)
         lri = g2l[gri]
         for k in axes(data,2)
-          datav[lri,k] = data[i,k]
+          datav[i,k] = data[lri,k]
         end
       end
     end
@@ -500,6 +501,12 @@ function _remap!(x,x_to_y)
   for (i,xi) in enumerate(x)
     x[i] = x_to_y[xi]
   end
+end
+
+function _remap(x,x_to_y)
+  x′ = copy(x)
+  _remap!(x′, x_to_y)
+  x′
 end
 
 function _best_s_opt_index(basis::GenericPMatrix,P,G,colnorms2,l)
