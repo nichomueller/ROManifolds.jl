@@ -4,8 +4,12 @@ using DrWatson
 using Gridap
 using Gridap.MultiField
 using GridapROMs
-
-include("../../examples/ExamplesInterface.jl")
+using GridapROMs.RBSteady
+using GridapROMs.RBTransient
+using GridapSolvers
+using Serialization
+using Test
+using Plots
 
 function main(
   method=:pod,compression=:global,hypred_strategy=:deim;

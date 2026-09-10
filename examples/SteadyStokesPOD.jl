@@ -1,6 +1,21 @@
 module SteadyStokesPOD
 
-include("ExamplesInterface.jl")
+using DrWatson
+using Gridap
+using Serialization
+using Test
+
+using GridapROMs
+using GridapROMs.DofMaps
+using GridapROMs.ParamDataStructures
+using GridapROMs.RBSteady
+using GridapROMs.RBTransient
+
+using GridapSolvers
+using GridapSolvers.LinearSolvers
+using GridapSolvers.NonlinearSolvers
+
+using Plots
 
 pdomain = (1,10,-1,5,1,2)
 pspace = ParamSpace(pdomain)

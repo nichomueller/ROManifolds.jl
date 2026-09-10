@@ -156,9 +156,11 @@ for f in (:DEIM,:SOPT)
       I,AI = $f(B)
       R′,C′ = map(local_views(I),local_values(A),flat_row_partition(B)) do I,A,rci
         _remap!(I,global_to_local(rci))
-        R′,C′ = recast_split_indices(I,testitem(A))
-        _remap!(R′,local_to_global(row_partition(rci)))
-        _remap!(C′,local_to_global(col_partition(rci)))
+        rr,cc = recast_split_indices(I,testitem(A))
+        _remap!(rr,local_to_global(row_partition(rci)))
+        _remap!(cc,local_to_global(col_partition(rci)))
+        R′ = LocalDEIMIndices(rr.global_rows,rr.global_cols,row_partition(rci))
+        C′ = LocalDEIMIndices(cc.global_rows,cc.global_cols,col_partition(rci))
         R′,C′
       end |> tuple_of_arrays
       return (R′,C′),AI
@@ -166,11 +168,15 @@ for f in (:DEIM,:SOPT)
   end
 end
 
-function DofMaps.recast_split_indices(sids::LocalDEIMIndices,a::SubSparseMatrix)
-  rids,cids = recast_split_indices(sids.global_rows,a)
-  r = LocalDEIMIndices(rids,sids.global_cols,sids.index_parts)
-  c = LocalDEIMIndices(cids,sids.global_cols,sids.index_parts)
-  (r,c)
+for T in (:AbstractSparseMatrix,:SubSparseMatrix)
+  @eval begin
+    function DofMaps.recast_split_indices(sids::LocalDEIMIndices,a::$T)
+      rids,cids = recast_split_indices(sids.global_rows,a)
+      r = LocalDEIMIndices(rids,copy(sids.global_cols),sids.index_parts)
+      c = LocalDEIMIndices(cids,copy(sids.global_cols),sids.index_parts)
+      (r,c)
+    end
+  end
 end
 
 function DofMaps.recast_split_indices(sids::AbstractArray,a::SubSparseMatrix)

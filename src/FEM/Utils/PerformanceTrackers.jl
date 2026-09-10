@@ -119,19 +119,11 @@ sqrtabs(x) = sqrt(x)
 sqrtabs(x::Complex) = sqrt(abs(x))
 
 induced_norm(v::AbstractVector) = norm(v)
-
-function induced_norm(A::AbstractMatrix)
-  s = 0.0
-  n = size(A,2)
-  for v = eachcol(A)
-    s += induced_norm(v)^2 / n
-  end
-  return sqrt(s)
-end
-
+induced_norm(A::AbstractMatrix) = mean(map(norm,eachcol(A)))
 induced_norm(A::AbstractArray) = induced_norm(reshape(A,:,size(A,ndims(A))))
 
-induced_norm(A::AbstractArray,norm_matrix::AbstractMatrix) = induced_norm(norm_matrix*A)
+induced_norm(v::AbstractVector,norm_matrix::AbstractMatrix) = sqrtabs(v'*(norm_matrix*v))
+induced_norm(A::AbstractMatrix,norm_matrix::AbstractMatrix) = sqrtabs(mean(diag(A'*(norm_matrix*A))))
 
 """
     compute_error(sol::AbstractArray,sol_approx::AbstractArray,args...) -> Number
@@ -141,7 +133,7 @@ norm. A different norm (usually represented by a sparse matrix) can be provided
 as an argument.
 """
 function compute_error(sol::AbstractArray,sol_approx::AbstractArray,args...)
-  induced_norm(sol,sol_approx,args...)
+  induced_norm(sol-sol_approx,args...)
 end
 
 """

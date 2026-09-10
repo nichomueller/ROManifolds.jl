@@ -1,6 +1,21 @@
 module HelmholtzPOD
 
-include("ExamplesInterface.jl")
+using DrWatson
+using Gridap
+using Serialization
+using Test
+
+using GridapROMs
+using GridapROMs.DofMaps
+using GridapROMs.ParamDataStructures
+using GridapROMs.RBSteady
+using GridapROMs.RBTransient
+
+using GridapSolvers
+using GridapSolvers.LinearSolvers
+using GridapSolvers.NonlinearSolvers
+
+using Plots
 
 using GridapGmsh
 using Gridap.Fields

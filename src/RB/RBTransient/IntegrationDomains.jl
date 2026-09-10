@@ -64,18 +64,6 @@ function get_iurowcol_to_irowcol(
   return Table(data,ptrs)
 end
 
-function get_max_offset(ptrs::Vector{<:Integer})
-  offsets = zeros(Int32,length(ptrs)-1)
-  for i in eachindex(offsets)
-    offsets[i] = ptrs[i+1]-ptrs[i]
-  end
-  return maximum(offsets)
-end
-
-function get_max_offset(a::Table)
-  get_max_offset(a.ptrs)
-end
-
 abstract type TransientIntegrationDomainStyle end
 struct KroneckerDomain <: TransientIntegrationDomainStyle end
 struct SequentialDomain <: TransientIntegrationDomainStyle end
@@ -106,7 +94,7 @@ get_domain_style(a::TransientIntegrationDomain) = a.domain_style
 
 function RBSteady.IntegrationDomain(
   proj_style,
-  trian::Triangulation,
+  trian,
   test::FESpace,
   rows::AbstractVector,
   indices_time::AbstractVector
@@ -119,7 +107,7 @@ end
 
 function RBSteady.IntegrationDomain(
   proj_style,
-  trian::Triangulation,
+  trian,
   trial::FESpace,
   test::FESpace,
   rows::AbstractVector,

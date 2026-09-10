@@ -16,7 +16,11 @@ import GridapROMs.Utils: Contribution,TupOfArrayContribution,get_domains_res,get
 import GridapROMs.ParamDataStructures: GenericSnapshots,TransientSnapshotsWithIC,GenericTransientRealisation,_get_params
 import GridapROMs.RBSteady: load_stats
 
-include("ExamplesInterface.jl")
+using GridapSolvers
+using GridapSolvers.LinearSolvers
+using GridapSolvers.NonlinearSolvers
+
+using Plots
 
 get_id(path::String) = split(path,"_")[end][1:end-4]
 
@@ -540,7 +544,7 @@ function main_snapshots(;
   end
 end
 
-function try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps,method=:pod)
+function GridapROMs.try_loading_reduced_operator(dir_tol,rbsolver,feop,fesnaps,method=:pod)
   try
     rbop = load_operator(dir_tol,feop)
     println("Load reduced operator at $dir_tol succeeded!")

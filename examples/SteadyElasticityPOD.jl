@@ -1,6 +1,21 @@
 module SteadyElasticityPOD
 
-include("ExamplesInterface.jl")
+using DrWatson
+using Gridap
+using Serialization
+using Test
+
+using GridapROMs
+using GridapROMs.DofMaps
+using GridapROMs.ParamDataStructures
+using GridapROMs.RBSteady
+using GridapROMs.RBTransient
+
+using GridapSolvers
+using GridapSolvers.LinearSolvers
+using GridapSolvers.NonlinearSolvers
+
+using Plots
 
 pdomain = (1e10,9*1e10,0.25,0.42,-4*1e5,4*1e5,-4*1e5,4*1e5,-4*1e5,4*1e5)
 pspace = ParamSpace(pdomain)

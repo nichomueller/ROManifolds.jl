@@ -62,7 +62,7 @@ end
   # known relative error: all columns scaled by factor 2
   sol_approx = 2 .* sol
   err2 = compute_error(sol,sol_approx)
-  @test err2 > 0.0
+  @test err2 ≈ mean(map(norm,eachcol(sol))) atol=1e-12
 end
 
 @testset "compute_relative_error" begin

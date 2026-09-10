@@ -299,7 +299,6 @@ export load_operator
 export load_results
 export load_stats
 export load_problem_snapshots
-export try_loading_reduced_operator
 export create_dir
 export SNAPSHOTS_LABEL
 export RESIDUALS_LABEL
