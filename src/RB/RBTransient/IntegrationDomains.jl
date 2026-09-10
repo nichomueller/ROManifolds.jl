@@ -93,7 +93,7 @@ const SequentialIntegrationDomain{Ti<:Integer} = TransientIntegrationDomain{Sequ
 get_domain_style(a::TransientIntegrationDomain) = a.domain_style
 
 function RBSteady.IntegrationDomain(
-  proj_style,
+  proj_style::Type{<:Projection},
   trian,
   test::FESpace,
   rows::AbstractVector,
@@ -106,7 +106,7 @@ function RBSteady.IntegrationDomain(
 end
 
 function RBSteady.IntegrationDomain(
-  proj_style,
+  proj_style::Type{<:Projection},
   trian,
   trial::FESpace,
   test::FESpace,

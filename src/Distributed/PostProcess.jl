@@ -1,11 +1,6 @@
 for T in (:DEIMHyperReduction,:SOPTHyperReduction,:HighDimDEIMHyperReduction,:HighDimSOPTHyperReduction)
   @eval begin
-    function RBSteady.check_interpolation(
-      res,
-      a::HRVecProjection{<:$T},
-      _fecache::AbstractArray{<:AbstractArray}
-      )
-
+    function RBSteady.check_interpolation(res::DistributedSnapshots,a::HRVecProjection{<:$T},_fecache)
       msg = "fecache mismatch at interpolation points"
       fecache = reduce(+,map(get_all_data,local_views(_fecache)))
       dofs = get_interpolation_dofs(get_interpolation(a))
@@ -22,12 +17,7 @@ for T in (:DEIMHyperReduction,:SOPTHyperReduction,:HighDimDEIMHyperReduction,:Hi
       return true
     end
 
-    function RBSteady.check_interpolation(
-      jac,
-      a::HRMatProjection{<:$T},
-      _fecache::AbstractArray{<:AbstractArray}
-      )
-
+    function RBSteady.check_interpolation(jac::DistributedSnapshots,a::HRMatProjection{<:$T},_fecache)
       msg = "fecache mismatch at interpolation points"
       fecache = reduce(+,map(get_all_data,local_views(_fecache)))
       dofs = get_interpolation_dofs(get_interpolation(a))

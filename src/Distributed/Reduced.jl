@@ -154,14 +154,30 @@ for f in (:DEIM,:SOPT)
     function RBSteady.$f(A::PSparseMatrix)
       B = get_all_data(A)
       I,AI = $f(B)
-      R′,C′ = map(local_views(I),local_values(A),flat_row_partition(B)) do I,A,rci
+      n̂ = size(AI,1)
+      grows,gcols,slots = map(local_views(I),local_values(A),flat_row_partition(B)) do I,A,rci
         _remap!(I,global_to_local(rci))
-        rr,cc = recast_split_indices(I,testitem(A))
-        _remap!(rr,local_to_global(row_partition(rci)))
-        _remap!(cc,local_to_global(col_partition(rci)))
-        R′ = LocalDEIMIndices(rr.global_rows,rr.global_cols,row_partition(rci))
-        C′ = LocalDEIMIndices(cc.global_rows,cc.global_cols,col_partition(rci))
-        R′,C′
+        r,c = recast_split_indices(I,testitem(A))
+        _remap!(r,local_to_global(row_partition(rci)))
+        _remap!(c,local_to_global(col_partition(rci)))
+        (r.global_rows,c.global_rows,copy(r.global_cols))
+      end |> tuple_of_arrays
+      # assemble the full per-slot (global row dof, global col dof) across ranks
+      op(a,b) = max.(a,b)
+      grows = reduce(op, map(loc) do (r,_,s)
+        v = zeros(Int,n̂); for k in eachindex(s); v[s[k]] = r[k]; end; v
+      end)
+      gcols = reduce(op, map(loc) do (_,c,s)
+        v = zeros(Int,n̂); for k in eachindex(s); v[s[k]] = c[k]; end; v
+      end)
+      # per rank: keep every slot whose row AND col dof is local (owned or ghost)
+      # -- i.e. every rank that has an owned cell able to contribute to A[row,col].
+      R′,C′ = map(flat_row_partition(B)) do rci
+        g2lr = global_to_local(row_partition(rci))
+        g2lc = global_to_local(col_partition(rci))
+        keep = [k for k in 1:n̂ if g2lr[grows[k]] > 0 && g2lc[gcols[k]] > 0]
+        (LocalDEIMIndices(grows[keep],collect(keep),row_partition(rci)),
+         LocalDEIMIndices(gcols[keep],collect(keep),col_partition(rci)))
       end |> tuple_of_arrays
       return (R′,C′),AI
     end
@@ -496,7 +512,7 @@ end
 function _push_parts!(a::AbstractArray{<:LocalDEIMIndices},I,l)
   gl = I[l]
   map(a) do a
-    if global_to_own(a.index_parts)[gl] > 0
+    if global_to_local(a.index_parts)[gl] > 0
       push!(a.global_rows,gl)
       push!(a.global_cols,l)
     end

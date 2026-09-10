@@ -205,7 +205,6 @@ tol=1e-4
 nparams=50
 nparams_res=floor(Int,nparams/3)
 nparams_jac=floor(Int,nparams/4)
-sketch=:sprn
 ncentroids=2
 
 method = method ∈ (:pod,:ttsvd) ? method : :pod
@@ -233,7 +232,7 @@ hμ(μ) = parameterise(h,μ)
 order = 1
 degree = 2*order
 
-state_reduction = Reduction(tol,H1();nparams,sketch,compression,ncentroids)
+state_reduction = Reduction(tol,H1();nparams,compression,ncentroids)
 
 snp = Ref{DistributedSnapshots}()
 op = Ref{ReducedOperator}()
@@ -328,17 +327,3 @@ X = proj.norm_matrix
 s = snp[]
 
 ϕ'*(X*ϕ)
-
-ϕ'*X*ϕ
-
-using GridapROMs.Utils
-using GridapROMs.ParamDataStructures
-using GridapROMs.RBSteady
-using BlockArrays
-v = rand(3)
-pv = parameterise(v,3)
-bpv = mortar([pv,pv])
-t = Triangulation(CartesianDiscreteModel((0,1,0,1),(8,8)))
-c = Contribution((bpv,bpv),(t,t))
-hr = HRParamArray(c,c,bpv)
-fill!(c,0.0)

@@ -510,20 +510,24 @@ For each triangulation in the HR contributions:
 Returns `(hr_error_res,hr_error_jac)` where each is a `Tuple` with one
 `Float64` per triangulation (mean relative error over parameters).
 """
-function hr_error(::GlobalRBSolver,op::ReducedOperator,res,jac,s)
-  μ = get_realisation(s)
-  u = get_param_data(s)
-  err_res = hr_error_res(op,res,μ,u)
-  err_jac = hr_error_jac(op,jac,μ,u)
+# `res` / `jac` are evaluated on a subset of `s`'s parameters (res_params /
+# jac_params); slice the linearisation state + realisation to match, otherwise
+# `check_interpolation` compares arrays with mismatched parameter counts.
+function hr_error(solver::GlobalRBSolver,op::ReducedOperator,res,jac,s)
+  s_res = select_snapshots(s,res_params(solver))
+  s_jac = select_snapshots(s,jac_params(solver))
+  err_res = hr_error_res(op,res,get_realisation(s_res),get_param_data(s_res))
+  err_jac = hr_error_jac(op,jac,get_realisation(s_jac),get_param_data(s_jac))
   return err_res,err_jac
 end
 
-function hr_error(::GlobalRBSolver,op::ReducedOperator{<:LinearParamEq},res,jac,s)
-  μ = get_realisation(s)
-  u = get_param_data(s)|> similar
-  fill!(u,zero(eltype2(u)))
-  err_res = hr_error_res(op,res,μ,u)
-  err_jac = hr_error_jac(op,jac,μ,u)
+function hr_error(solver::GlobalRBSolver,op::ReducedOperator{<:LinearParamEq},res,jac,s)
+  s_res = select_snapshots(s,res_params(solver))
+  s_jac = select_snapshots(s,jac_params(solver))
+  u_res = fill!(similar(get_param_data(s_res)),zero(eltype2(get_param_data(s_res))))
+  u_jac = fill!(similar(get_param_data(s_jac)),zero(eltype2(get_param_data(s_jac))))
+  err_res = hr_error_res(op,res,get_realisation(s_res),u_res)
+  err_jac = hr_error_jac(op,jac,get_realisation(s_jac),u_jac)
   return err_res,err_jac
 end
 
@@ -761,8 +765,8 @@ function check_interpolation(jac,a::HRMatProjection,fecache)
   return true
 end
 
-for S in (:HRVecProjection,:HRMatProjection), T in (:RBFHyperReduction,:TrivialHyperReduction)
-  @eval function check_interpolation(resjac,a::$S{<:$T},fecache)
+for A in (:HRVecProjection,:HRMatProjection), T in (:RBFHyperReduction,:TrivialHyperReduction)
+  @eval function check_interpolation(resjac,a::$A{<:$T},fecache)
     return true
   end
 end
