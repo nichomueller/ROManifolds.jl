@@ -154,30 +154,32 @@ for f in (:DEIM,:SOPT)
     function RBSteady.$f(A::PSparseMatrix)
       B = get_all_data(A)
       I,AI = $f(B)
-      n̂ = size(AI,1)
-      grows,gcols,slots = map(local_views(I),local_values(A),flat_row_partition(B)) do I,A,rci
+      n = size(AI,1)
+      r,c = map(local_views(I),local_values(A),flat_row_partition(B)) do I,A,rci
+        rcache = zeros(Int,n)
+        ccache = zeros(Int,n)
         _remap!(I,global_to_local(rci))
         r,c = recast_split_indices(I,testitem(A))
         _remap!(r,local_to_global(row_partition(rci)))
         _remap!(c,local_to_global(col_partition(rci)))
-        (r.global_rows,c.global_rows,copy(r.global_cols))
+        for (k,sk) in enumerate(r.global_cols)
+          rcache[sk] = r[k]
+          ccache[sk] = c[k]
+        end
+        (rcache,ccache)
       end |> tuple_of_arrays
-      # assemble the full per-slot (global row dof, global col dof) across ranks
-      op(a,b) = max.(a,b)
-      grows = reduce(op, map(loc) do (r,_,s)
-        v = zeros(Int,n̂); for k in eachindex(s); v[s[k]] = r[k]; end; v
-      end)
-      gcols = reduce(op, map(loc) do (_,c,s)
-        v = zeros(Int,n̂); for k in eachindex(s); v[s[k]] = c[k]; end; v
-      end)
-      # per rank: keep every slot whose row AND col dof is local (owned or ghost)
-      # -- i.e. every rank that has an owned cell able to contribute to A[row,col].
+      # assemble the full per-slot (global row & col dof) across ranks
+      op(a,b) = max.(a,b) # assign a DEIM index to only one rank, though it may appear on multiple ranks
+      grows = reduce(op,r)
+      gcols = reduce(op,c)
+      # per rank: keep every slot whose row AND col dof is local
       R′,C′ = map(flat_row_partition(B)) do rci
         g2lr = global_to_local(row_partition(rci))
         g2lc = global_to_local(col_partition(rci))
-        keep = [k for k in 1:n̂ if g2lr[grows[k]] > 0 && g2lc[gcols[k]] > 0]
-        (LocalDEIMIndices(grows[keep],collect(keep),row_partition(rci)),
-         LocalDEIMIndices(gcols[keep],collect(keep),col_partition(rci)))
+        ikeep,rkeep,ckeep = _keep_rows_and_cols(grows,gcols,g2lr,g2lc)
+        R′ = LocalDEIMIndices(rkeep,copy(ikeep),row_partition(rci))
+        C′ = LocalDEIMIndices(ckeep,copy(ikeep),col_partition(rci))
+        (R′,C′)
       end |> tuple_of_arrays
       return (R′,C′),AI
     end
@@ -529,6 +531,30 @@ function _remap(x,x_to_y)
   x′ = copy(x)
   _remap!(x′, x_to_y)
   x′
+end
+
+function _keep_rows_and_cols(rows,cols,rowmap,colmap)
+  @check length(rows) == length(cols)
+  @check length(rowmap) == length(colmap)
+  count = 0
+  for (r,c) in zip(rows,cols)
+    if !iszero(rowmap[r]) && !iszero(colmap[c])
+      count += 1
+    end
+  end
+  ikeep = zeros(Int,count)
+  rkeep = zeros(Int,count)
+  ckeep = zeros(Int,count)
+  count = 0
+  for (i,(r,c)) in enumerate(zip(rows,cols))
+    if !iszero(rowmap[r]) && !iszero(colmap[c])
+      count += 1
+      ikeep[count] = i
+      rkeep[count] = r
+      ckeep[count] = c
+    end
+  end
+  return ikeep,rkeep,ckeep
 end
 
 function _best_s_opt_index(basis::GenericPMatrix,P,G,colnorms2,l)

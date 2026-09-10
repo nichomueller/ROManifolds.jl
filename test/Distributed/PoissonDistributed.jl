@@ -195,6 +195,7 @@ using Gridap.FESpaces
 using GridapDistributed
 using GridapROMs.ParamAlgebra
 using GridapROMs.Distributed
+using GridapROMs.RBSteady
 using PartitionedArrays
 using Test
 
@@ -291,16 +292,17 @@ function main(distribute,parts)
     _why(e) = sprint(showerror,e;context=(:limit=>true,:displaysize=>(4,120)))
 
     try
-      perr = GridapROMs.RBSteady.projection_error(rbsolver,rbop,fesnaps)
+      perr = RBSteady.projection_error(rbsolver,rbop,fesnaps)
       println("diagnostic | projection error (basis + project/inv_project, no HR): ", perr)
     catch e
       println("diagnostic | projection_error unavailable (distributed): ", first(split(_why(e),'\n')))
     end
 
     try
-      res = residual_snapshots(rbsolver,feop,fesnaps)
-      jac = jacobian_snapshots(rbsolver,feop,fesnaps)
-      err_res,err_jac = GridapROMs.RBSteady.hr_error(rbsolver,rbop,res,jac,fesnaps)
+      rbsolverx = RBSteady.set_params(rbsolver;nparams=num_params(x))
+      res = residual_snapshots(rbsolverx,feop,x)
+      jac = jacobian_snapshots(rbsolverx,feop,x)
+      err_res,err_jac = RBSteady.hr_error(rbsolverx,rbop,res,jac,fesnaps)
       println("diagnostic | hr error residual (per trian): ", err_res)
       println("diagnostic | hr error jacobian (per trian): ", err_jac)
     catch e
@@ -319,11 +321,3 @@ end
 with_debug() do distribute
   main(distribute,(2,2))
 end
-
-rbop = op[]
-proj = rbop.test.subspace
-ϕ = get_basis(proj.projection)
-X = proj.norm_matrix
-s = snp[]
-
-ϕ'*(X*ϕ)

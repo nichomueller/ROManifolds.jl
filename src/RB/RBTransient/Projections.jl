@@ -484,11 +484,10 @@ function time_enrichment(basis_primal,basis_dual;tol=1e-2)
   while i ≤ size(basis_pd,2)
     basis_pd_start = view(basis_pd,:,1:i-1)
     basis_pd_i = view(basis_pd,:,i)
-    basis_d_i = view(basis_dual,:,i)
     proj = i == 1 ? zeros(T,size(basis_pd,1)) : orth_projection(basis_pd_i,basis_pd_start)
     dist = norm(basis_pd_i-proj)
     if dist ≤ tol
-      basis_primal,basis_pd = tenrich!(basis_primal,basis_pd,basis_d_i)
+      basis_primal,basis_pd = tenrich(basis_primal,basis_pd,basis_dual,i)
       i = 0
     else
       basis_pd_i .-= proj
@@ -499,11 +498,11 @@ function time_enrichment(basis_primal,basis_dual;tol=1e-2)
   return basis_primal
 end
 
-function tenrich!(basis_primal,basis_pd,v)
-  vnew = copy(v)
-  orth_complement!(vnew,basis_primal)
-  vnew /= norm(vnew)
-  hcat(basis_primal,vnew),vcat(basis_pd,vnew'*basis_dual)
+function tenrich(basis_primal,basis_pd,basis_dual,i)
+  vi = copy(view(basis_dual,:,i))
+  orth_complement!(vi,basis_primal)
+  vi ./= norm(vi)
+  hcat(basis_primal,vi),vcat(basis_pd,vi'*basis_dual)
 end
 
 # utils

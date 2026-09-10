@@ -374,10 +374,7 @@ function rom_diagnostics(
 
   sort!(offline_entries,by=e->e.tol,rev=true)
   sort!(online_entries,by=e->e.tol,rev=true)
-  RBDiagnostics(
-    _entries_to_dict(offline_entries),
-    _entries_to_dict(online_entries),
-  )
+  RBDiagnostics(_to_dict(offline_entries),_to_dict(online_entries))
 end
 
 function offline_diagnostics(op::ReducedOperator)
@@ -510,31 +507,26 @@ For each triangulation in the HR contributions:
 Returns `(hr_error_res,hr_error_jac)` where each is a `Tuple` with one
 `Float64` per triangulation (mean relative error over parameters).
 """
-# `res` / `jac` are evaluated on a subset of `s`'s parameters (res_params /
-# jac_params); slice the linearisation state + realisation to match, otherwise
-# `check_interpolation` compares arrays with mismatched parameter counts.
 function hr_error(solver::GlobalRBSolver,op::ReducedOperator,res,jac,s)
-  s_res = select_snapshots(s,res_params(solver))
-  s_jac = select_snapshots(s,jac_params(solver))
-  err_res = hr_error_res(op,res,get_realisation(s_res),get_param_data(s_res))
-  err_jac = hr_error_jac(op,jac,get_realisation(s_jac),get_param_data(s_jac))
+  μ = get_realisation(s)
+  u = get_param_data(s)
+  err_res = hr_error_res(op,res,μ,u)
+  err_jac = hr_error_jac(op,jac,μ,u)
   return err_res,err_jac
 end
 
 function hr_error(solver::GlobalRBSolver,op::ReducedOperator{<:LinearParamEq},res,jac,s)
-  s_res = select_snapshots(s,res_params(solver))
-  s_jac = select_snapshots(s,jac_params(solver))
-  u_res = fill!(similar(get_param_data(s_res)),zero(eltype2(get_param_data(s_res))))
-  u_jac = fill!(similar(get_param_data(s_jac)),zero(eltype2(get_param_data(s_jac))))
-  err_res = hr_error_res(op,res,get_realisation(s_res),u_res)
-  err_jac = hr_error_jac(op,jac,get_realisation(s_jac),u_jac)
+  μ = get_realisation(s)
+  u = get_param_data(s)|> similar
+  fill!(u,zero(eltype2(u)))
+  err_res = hr_error_res(op,res,μ,u)
+  err_jac = hr_error_jac(op,jac,μ,u)
   return err_res,err_jac
 end
 
 function hr_error(solver::LocalRBSolver,op::ReducedOperator,res,jac,s)
   μ = get_realisation(s)
   gsolver = change_context(solver)
-
   err_res,err_jac = map(enumerate(get_params(μ))) do (i,μi)
     opi = get_local(op,μi)
     si = select_snapshots(s,i)
@@ -542,7 +534,6 @@ function hr_error(solver::LocalRBSolver,op::ReducedOperator,res,jac,s)
     jaci = select_snapshots(jac,i)
     hr_error(gsolver,opi,resi,jaci,si)
   end |> tuple_of_arrays
-
   return _mean(err_res),_mean(err_jac)
 end
 
@@ -815,11 +806,11 @@ end
 _get(x,i...) = x[i...]
 _get(x::BlockParamArray,i) = x.data[i...]
 
-function _entries_to_dict(entries::AbstractVector{<:NamedTuple})
+function _to_dict(a::AbstractVector{<:NamedTuple})
   d = Dict{String,Any}()
-  isempty(entries) && return d
-  d["tols"] = map(e -> e.tol,entries)
-  _unpack!(d,"",map(e -> e.diagnostics,entries))
+  isempty(a) && return d
+  d["tols"] = map(x -> x.tol,a)
+  _unpack!(d,"",map(x -> x.diagnostics,a))
   return d
 end
 
