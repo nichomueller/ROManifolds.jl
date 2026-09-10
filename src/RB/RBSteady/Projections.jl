@@ -106,7 +106,7 @@ projection_type(a::Projection) = Vector{projection_eltype(a)}
 
 Returns the eltype of the projection `a`
 """
-projection_eltype(a::Projection) = eltype(get_basis(a))
+projection_eltype(a::Projection) = eltype2(get_basis(a))
 
 function Algebra.allocate_in_domain(a::Projection) 
   V = projection_type(a)

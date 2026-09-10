@@ -66,3 +66,12 @@ function ParamAlgebra.compatible_cache(a::HRParamArray,b::HRParamArray)
   hypred′ = compatible_cache(a.hypred,b.hypred)
   HRParamArray(a.fecache,a.coeff,hypred′)
 end
+
+# utils 
+
+function Base.fill!(a::Array{<:AbstractParamArray},b::Number)
+  for ai in a
+    fill!(ai,b)
+  end
+  a
+end

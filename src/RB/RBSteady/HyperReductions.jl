@@ -515,11 +515,11 @@ for T in (:AffineContribution,:BlockHRProjection)
 end
 
 function allocate_coefficient(a::BlockHRProjection)
-  map(allocate_coefficient,a.array) |> mortar
+  map(allocate_coefficient,a.array)
 end
 
 function allocate_coefficient(a::BlockHRProjection,r::AbstractRealisation)
-  map(b -> allocate_coefficient(b,r),a.array) |> mortar
+  map(b -> allocate_coefficient(b,r),a.array)
 end
 
 function allocate_hyper_reduction(a::BlockHRProjection)

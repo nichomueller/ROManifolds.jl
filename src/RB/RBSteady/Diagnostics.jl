@@ -627,13 +627,13 @@ function hr_error_res(
   test::MultiFieldRBSpace,
   res::BlockSnapshots,
   a::BlockHRProjection,
-  fecache::BlockParamVector,
+  fecache,
   hypred::BlockParamVector
   )
-  
+
   error = zeros(size(res))
   for i in eachindex(res)
-    error[i] = hr_error_res(test[i],res[i],a[i],fecache.data[i],hypred.data[i])
+    error[i] = hr_error_res(test[i],res[i],a[i],_get(fecache,i),hypred.data[i])
   end
   error
 end
@@ -643,13 +643,13 @@ function hr_error_jac(
   test::MultiFieldRBSpace,
   jac::BlockSnapshots,
   a::BlockHRProjection,
-  fecache::BlockParamMatrix,
+  fecache,
   hypred::BlockParamMatrix
   )
   
   error = zeros(size(jac))
   for i in axes(jac,1), j in axes(jac,2)
-    error[i,j] = hr_error_jac(trial[j],test[i],jac[i,j],a[i,j],fecache.data[i,j],hypred.data[i,j])
+    error[i,j] = hr_error_jac(trial[j],test[i],jac[i,j],a[i,j],_get(fecache,i,j),hypred.data[i,j])
   end
   error
 end
@@ -808,6 +808,9 @@ function set_params(rbsolver;kwargs...)
   jacobian_reduction = set_params(get_jacobian_reduction(rbsolver);kwargs...)
   RBSolver(fesolver,state_reduction,residual_reduction,jacobian_reduction)
 end
+
+_get(x,i...) = x[i...]
+_get(x::BlockParamArray,i) = x.data[i...]
 
 function _entries_to_dict(entries::AbstractVector{<:NamedTuple})
   d = Dict{String,Any}()

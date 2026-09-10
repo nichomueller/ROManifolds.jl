@@ -84,9 +84,9 @@ function copy_projection!(
 end
 
 function copy_projection!(
-  cache::BlockParamArray,
+  cache::AbstractArray{<:AbstractArray},
   proj_basis::AbstractArray{<:AbstractArray}
   )
 
-  map(copy_projection!,blocks(cache),proj_basis)
+  map(copy_projection!,cache,proj_basis)
 end

@@ -18,10 +18,10 @@ function contraction(
   coefficient::AbstractVector{S}
   ) where {T,S}
 
-  @check size(basis,2) == length(coefficient)
-  A = reshape(permutedims(basis,(1,3,2)),:,size(basis,2))
+  s1,s2,s3 = size(basis)
+  @check s2 == length(coefficient)
+  A = reshape(permutedims(basis,(1,3,2)),s1*s3,size(basis,2))
   v = A*coefficient
-  s1,s2 = size(basis,1),size(basis,3)
   M = reshape(v,s1,s2)
   return M
 end
@@ -33,10 +33,11 @@ function contraction!(
   α::Number=1,β::Number=0
   )
 
-  @check size(cache) == (size(basis,1),size(basis,3))
-  @check size(basis,2) == length(coefficient)
-  v = view(cache,:)
-  A = reshape(permutedims(basis,(1,3,2)),:,size(basis,2))
+  s1,s2,s3 = size(basis)
+  @check (size(cache,1) == s1 && size(cache,2) == s3)
+  @check s2 == length(coefficient)
+  v = vec(cache)
+  A = reshape(permutedims(basis,(1,3,2)),length(v),s2)
   mul!(v,A,coefficient,α,β)
   return
 end
