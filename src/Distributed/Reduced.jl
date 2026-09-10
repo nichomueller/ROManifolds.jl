@@ -49,31 +49,32 @@ end
 
 # integration domains
 
-struct LocalRows{T,Ti} <: AbstractVector{T}
-  rows::Vector{T}
-  inds::Vector{Ti}
+struct LocalDEIMIndices{Tr,Tc,A<:AbstractLocalIndices} <: AbstractVector{Tr}
+  global_rows::Vector{Tr}
+  global_cols::Vector{Tc}
+  index_parts::A
 end
 
-LocalRows() = LocalRows(Int[],Int[])
+LocalDEIMIndices(index_parts) = LocalDEIMIndices(Int[],Int[],index_parts)
 
-Base.size(a::LocalRows) = size(a.rows)
-Base.IndexStyle(::Type{<:LocalRows}) = IndexLinear()
-Base.getindex(a::LocalRows,i::Int) = getindex(a.rows,i)
-Base.setindex!(a::LocalRows,v,i::Int) = setindex!(a.rows,v,i)
+Base.size(a::LocalDEIMIndices) = size(a.global_rows)
+Base.IndexStyle(::Type{<:LocalDEIMIndices}) = IndexLinear()
+Base.getindex(a::LocalDEIMIndices,i::Int) = getindex(a.global_rows,i)
+Base.setindex!(a::LocalDEIMIndices,v,i::Int) = setindex!(a.global_rows,v,i)
 
-function RBSteady._evaluate!(a,cellrows,rows::LocalRows)
+function RBSteady._evaluate!(a,cellrows,rows::LocalDEIMIndices)
   fill!(a,zero(eltype(a)))
   for (irow,row) in enumerate(rows)
     for (icellrow,cellrow) in enumerate(cellrows)
       if row == cellrow
-        a[icellrow] = rows.inds[irow]
+        a[icellrow] = rows.global_cols[irow]
       end
     end
   end
   a
 end
 
-function RBSteady._evaluate!(a,cellrows,cellcols,rows::LocalRows,cols::LocalRows)
+function RBSteady._evaluate!(a,cellrows,cellcols,rows::LocalDEIMIndices,cols::LocalDEIMIndices)
   fill!(a,zero(eltype(a)))
   ncellrows = length(cellrows)
   for (irowcol,rowcol) in enumerate(zip(rows,cols))
@@ -82,7 +83,7 @@ function RBSteady._evaluate!(a,cellrows,cellcols,rows::LocalRows,cols::LocalRows
       for (icellcol,cellcol) in enumerate(cellcols)
         if row == cellrow && col == cellcol
           icellrowcol = icellrow + (icellcol-1)*ncellrows
-          a[icellrowcol] = rows.inds[irowcol]
+          a[icellrowcol] = rows.global_cols[irowcol]
         end
       end
     end
@@ -95,14 +96,14 @@ function RBSteady.DEIM(basis::GenericPMatrix)
   n = size(basis,2)
   I = zeros(Int,n)
   parts = partition(axes(basis,1))
-  Iloc = map(_ -> LocalRows(),parts)
+  Iparts = map(LocalDEIMIndices(parts),parts)
   basisI = zeros(T,n,n)
   res = GenericPArray{Vector{T}}(undef,parts)
   map(own_values(res),own_values(basis)) do ro,bo
     @. ro = bo[:,1]
   end
   I[1] = findrow(res)
-  _push_to_local!(Iloc,parts,I,1)
+  _push_parts!(Iparts,I,1)
   _from_submatrix!(basisI,basis,I,1)
   for l = 2:n
     PᵀU = view(basisI,1:l-1,1:l-1)
@@ -113,10 +114,10 @@ function RBSteady.DEIM(basis::GenericPMatrix)
       mul!(ro,view(bo,:,1:l-1),c,-1.0,1.0)
     end
     I[l] = findrow(res)
-    _push_to_local!(Iloc,parts,I,l)
+    _push_parts!(Iparts,I,l)
     _from_submatrix!(basisI,basis,I,l)
   end
-  return Iloc,basisI
+  return Iparts,basisI
 end
 
 function RBSteady.SOPT(basis::GenericPMatrix)
@@ -124,14 +125,14 @@ function RBSteady.SOPT(basis::GenericPMatrix)
   n = size(basis,2)
   I = zeros(Int,n)  
   parts = partition(axes(basis,1))
-  Iloc = map(_ -> LocalRows(),parts)
+  Iparts = map(_ -> LocalDEIMIndices(),parts)
   basisI = zeros(T,n,n)
   res = GenericPArray{Vector{T}}(undef,parts)
   map(own_values(res),own_values(basis)) do ro,bo
     @. ro = bo[:,1]
   end
   I[1] = findrow(res)
-  _push_to_local!(Iloc,parts,I,1)
+  _push_parts!(Iparts,I,1)
   _from_submatrix!(basisI,basis,I,1)
   for l in 2:n
     P = I[1:l-1]
@@ -141,10 +142,10 @@ function RBSteady.SOPT(basis::GenericPMatrix)
     Il = _best_s_opt_index(basis,P,G,colnorms2,l)
     @check Il > 0
     I[l] = Il
-    _push_to_local!(Iloc,parts,I,l)
+    _push_parts!(Iparts,I,l)
     _from_submatrix!(basisI,basis,I,l)
   end
-  return Iloc,basisI
+  return Iparts,basisI
 end
 
 for f in (:DEIM,:SOPT)
@@ -162,6 +163,13 @@ for f in (:DEIM,:SOPT)
       return (R′,C′),AI
     end
   end
+end
+
+function DofMaps.recast_split_indices(sids::LocalDEIMIndices,a::SubSparseMatrix)
+  rids,cids = recast_split_indices(sids.global_rows,a)
+  r = LocalDEIMIndices(rids,sids.global_cols,sids.index_parts)
+  c = LocalDEIMIndices(cids,sids.global_cols,sids.index_parts)
+  (r,c)
 end
 
 function DofMaps.recast_split_indices(sids::AbstractArray,a::SubSparseMatrix)
@@ -210,7 +218,9 @@ function RBSteady.IntegrationDomain(
     local_views(gids)
     ) do trian,test,rows,gids
     _remap!(rows,global_to_local(gids))
-    IntegrationDomain(trian,test,rows)
+    domain = IntegrationDomain(trian,test,rows)
+    _remap!(rows,local_to_global(gids))
+    domain
   end
   DistributedIntegrationDomain(domains)
 end
@@ -236,7 +246,10 @@ function RBSteady.IntegrationDomain(
     ) do trian,trial,test,rows,cols,rgids,cgids
     _remap!(rows,global_to_local(rgids))
     _remap!(cols,global_to_local(cgids))
-    IntegrationDomain(trian,trial,test,rows,cols)
+    domain = IntegrationDomain(trian,trial,test,rows,cols)
+    _remap!(rows,local_to_global(rgids))
+    _remap!(cols,local_to_global(cgids))
+    domain
   end
   DistributedIntegrationDomain(domains)
 end
@@ -296,32 +309,32 @@ end
 function RBSteady.get_at_domain(s::DistributedSparseSnapshots,rowscols::Tuple)
   rows,cols = rowscols
   inds = map(local_values(s),local_views(rows),local_views(cols)) do s,rows,cols
-    @check rows.inds == cols.inds
+    @check rows.global_cols == cols.global_cols
     if !isempty(rows)
       sparsity = get_sparsity(get_dof_map(s))
       rc = sparsify_split_indices(rows,cols,sparsity)
-      LocalRows(rc,rows.inds)
+      LocalDEIMIndices(rc,rows.global_cols)
     else
-      LocalRows()
+      LocalDEIMIndices()
     end
   end
   get_at_domain(s,inds)
 end
 
-function RBSteady.get_at_domain(a::GenericPArray,rows::AbstractArray{<:LocalRows})
+function RBSteady.get_at_domain(a::GenericPArray,rows::AbstractArray{<:LocalDEIMIndices})
   n = size(a,2)
   @check reduce(+,map(length,rows)) == n
   datav = zeros(eltype(a),n,n)
-  map(local_values(a),row_partition(a),local_views(rows)) do data,rparts,rows
-    _remap!(rows,global_to_local(rparts))
-    if !isempty(rows.rows)
-      for (vi,i) in zip(rows.rows,rows.inds)
+  map(local_values(a),local_views(rows)) do data,rows
+    g2l = global_to_local(rows.index_parts)
+    if !isempty(rows.global_rows)
+      for (gri,i) in zip(rows.global_rows,rows.global_cols)
+        lri = g2l[gri]
         for k in axes(data,2)
-          datav[vi,k] = data[i,k]
+          datav[lri,k] = data[i,k]
         end
       end
     end
-    _remap!(rows,local_to_global(rparts))
   end
   ConsecutiveParamArray(datav)
 end
@@ -473,13 +486,12 @@ function _from_submatrix!(aI,a,I,l)
   end
 end
 
-function _push_to_local!(Iloc::AbstractArray{<:LocalRows},row_parts,I,l)
+function _push_parts!(a::AbstractArray{<:LocalDEIMIndices},I,l)
   gl = I[l]
-  map(Iloc,row_parts) do li,ri
-    ol = global_to_own(ri)[gl]
-    if ol > 0
-      push!(li.rows,gl)
-      push!(li.inds,l)
+  map(a) do a
+    if global_to_own(a.index_parts)[gl] > 0
+      push!(a.global_rows,gl)
+      push!(a.global_cols,l)
     end
   end
 end

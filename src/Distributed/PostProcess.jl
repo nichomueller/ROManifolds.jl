@@ -7,9 +7,13 @@ for T in (:DEIMHyperReduction,:SOPTHyperReduction,:HighDimDEIMHyperReduction,:Hi
         dofs = get_interpolation_dofs(get_interpolation(a))
         data = similar(fecache)
         map(local_views(resjac),local_views(dofs)) do rvals,rdofs
-          b = flatten(rvals)
-          for (lr,gr) in zip(rdofs.rows,rdofs.inds)
-            lr > 0 && (@views data[gr,:] .= b[lr,:])
+          g2l = global_to_local(rdofs.index_parts)
+          if !isempty(rdofs.global_rows)
+            b = flatten(rvals)
+            for gri in rdofs.global_rows
+              lri = g2l[gri]
+              data[lri,:] .= b[lri,:]
+            end
           end
         end
         @check isapprox(fecache,data;rtol=1e-8) msg
