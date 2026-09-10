@@ -616,10 +616,9 @@ end
 
 function hr_error_jac(trial,test,jac,a,fecache,hypred)
   check_interpolation(jac,a,fecache)
-  μ = get_realisation(jac)
-  Â = get_basis(galerkin_projection(test,jac,trial))
-  Â = reshape(permutedims(Â,(1,3,2)),:,num_params(μ))
-  hrÂ = reshape(get_all_data(hypred),:,num_params(μ))
+  Â = galerkin_projection(test,jac,trial)
+  Â = permutedims(get_basis(Â),(1,3,2))
+  hrÂ = get_all_data(hypred)
   compute_relative_error(Â,hrÂ)
 end
 

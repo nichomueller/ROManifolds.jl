@@ -129,9 +129,9 @@ function induced_norm(A::AbstractMatrix)
   return sqrt(s)
 end
 
-induced_norm(A::AbstractArray) = induced_norm(reshape(A,size(A,1),size(A,2),:))
+induced_norm(A::AbstractArray) = induced_norm(reshape(A,:,size(A,ndims(A))))
 
-induced_norm(v::AbstractArray,norm_matrix::AbstractMatrix) = induced_norm(norm_matrix*v)
+induced_norm(A::AbstractArray,norm_matrix::AbstractMatrix) = induced_norm(norm_matrix*A)
 
 """
     compute_error(sol::AbstractArray,sol_approx::AbstractArray,args...) -> Number

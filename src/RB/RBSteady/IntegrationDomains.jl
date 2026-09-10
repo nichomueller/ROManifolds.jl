@@ -36,9 +36,8 @@ function SOPT(basis::AbstractMatrix{T}) where T
       U = basis[:,1:l]
       P = I[1:l-1]
       PᵀU = U[P,:]
-      G = PᵀU'*PᵀU
       colnorms2 = vec(sum(abs2,PᵀU;dims=1))
-      Il = _best_s_opt_index(U,P,G,colnorms2)
+      Il = _best_s_opt_index(U,P,colnorms2)
       @check Il > 0
       I[l] = Il
       basisI[l,:] = basis[Il,:]
@@ -280,17 +279,19 @@ get_integration_cells(t::ChildTriangulation) = t.cell_to_parent_cell
 
 findrow(v::AbstractVector) = last(findmax(abs,v))
 
-function _best_s_opt_index(U,P,G,colnorms2)
+function _best_s_opt_index(U,P,colnorms2)
   m,n = size(U)
   best_i = 0
   best_logS = -Inf
   @inbounds @views for l in 1:m
     l ∈ P && continue
     q = U[l,:]
-    logdet_plus = robust_logdet(G)
-    colnorms2_plus = colnorms2 .+ abs2.(G + q*q')
+    A = U[vcat(P,l),:]
+    G = A'*A
+    logdet = robust_logdet(G)
+    colnorms2 .+= abs2.(q)
     # S(A) in log form: (1/n)*( 0.5*logdet - 0.5*Σ log colnorms2 )
-    logS = (0.5/n)*(logdet_plus - sum(log,colnorms2_plus))
+    logS = (logdet - sum(log,colnorms2)) / (2*n)
     if logS > best_logS
       best_logS = logS
       best_i = l

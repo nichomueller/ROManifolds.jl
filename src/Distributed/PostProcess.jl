@@ -2,9 +2,11 @@ for T in (:DEIMHyperReduction,:SOPTHyperReduction,:HighDimDEIMHyperReduction,:Hi
   for (A,B) in zip((:PVector,:PSparseMatrix),(:HRVecProjection,:HRMatProjection))
     @eval begin
       function RBSteady.check_interpolation(resjac::$A,a::$B{<:$T},fecache::AbstractArray{<:AbstractArray})
-        map(local_views(resjac),local_views(a),local_views(fecache)) do resjac,a,fecache
+        msg = "fecache mismatch at interpolation points"
+        c = map(local_views(resjac),local_views(a),local_views(fecache)) do resjac,a,fecache
           check_interpolation(resjac,a,fecache)
-        end
+        end |> all 
+        @check c msg
       end
     end
   end
