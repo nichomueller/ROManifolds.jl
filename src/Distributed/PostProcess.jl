@@ -1,12 +1,19 @@
 for T in (:DEIMHyperReduction,:SOPTHyperReduction,:HighDimDEIMHyperReduction,:HighDimSOPTHyperReduction)
-  for (A,B) in zip((:PVector,:PSparseMatrix),(:HRVecProjection,:HRMatProjection))
+  for A in (:HRVecProjection,:HRMatProjection)
     @eval begin
-      function RBSteady.check_interpolation(resjac::$A,a::$B{<:$T},fecache::AbstractArray{<:AbstractArray})
+      function RBSteady.check_interpolation(resjac,a::$A{<:$T},_fecache::AbstractArray{<:AbstractArray})
         msg = "fecache mismatch at interpolation points"
-        c = map(local_views(resjac),local_views(a),local_views(fecache)) do resjac,a,fecache
-          check_interpolation(resjac,a,fecache)
-        end |> all 
-        @check c msg
+        fecache = reduce(+,map(get_all_data,local_views(_fecache)))
+        dofs = get_interpolation_dofs(get_interpolation(a))
+        data = similar(fecache)
+        map(local_views(resjac),local_views(dofs)) do rvals,rdofs
+          b = flatten(rvals)
+          for (lr,gr) in zip(rdofs.rows,rdofs.inds)
+            lr > 0 && (@views data[gr,:] .= b[lr,:])
+          end
+        end
+        @check isapprox(fecache,data;rtol=1e-8) msg
+        return true
       end
     end
   end

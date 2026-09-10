@@ -321,6 +321,7 @@ function RBSteady.get_at_domain(a::GenericPArray,rows::AbstractArray{<:LocalRows
         end
       end
     end
+    _remap!(rows,local_to_global(rparts))
   end
   ConsecutiveParamArray(datav)
 end

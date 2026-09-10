@@ -747,7 +747,7 @@ function check_interpolation(res,a::HRVecProjection,fecache)
   msg = "fecache mismatch at interpolation points"
   rows = get_interpolation_dofs(get_interpolation(a))
   bdata = flatten(res)
-  @check isapprox(get_all_data(fecache),bdata[rows,:];rtol=1e-8) msg
+  @check isapprox(get_all_data(fecache),view(bdata,rows,:);rtol=1e-8) msg
   return true
 end
 
@@ -757,7 +757,7 @@ function check_interpolation(jac,a::HRMatProjection,fecache)
   sparsity = get_sparsity(get_dof_map(jac))
   inds = sparsify_split_indices(rows,cols,sparsity)
   Adata = flatten(jac)
-  @check isapprox(get_all_data(fecache),Adata[inds,:];rtol=1e-8) msg
+  @check isapprox(get_all_data(fecache),view(Adata,inds,:);rtol=1e-8) msg
   return true
 end
 
