@@ -581,3 +581,8 @@ function _best_s_opt_index(basis::GenericPMatrix,P,G,colnorms2,l)
   return second(reduce(max,best_pairs,init=(-Inf=>0)))
 end
 
+function RBSteady._setup(U::DistributedMultiFieldRBSpace,u0::PVector)
+  map(local_views(U),local_values(u0)) do U,u0
+    RBSteady._setup(U,u0)
+  end |> mortar
+end

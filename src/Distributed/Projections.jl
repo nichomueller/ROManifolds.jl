@@ -164,6 +164,21 @@ function GridapDistributed.local_views(a::DistributedNormedProjection)
   end
 end
 
+function RBSteady.symcholesky(X::PSparseMatrix)
+  ls = CGSolver(JacobiLinearSolver();maxiter=100,atol=1e-14,rtol=1e-10)
+  ss = symbolic_setup(ls,X)
+  numerical_setup(ss,X)
+end
+
+function LinearAlgebra.ldiv!(S::GenericPMatrix,ns,A::GenericPMatrix)
+  for i in param_eachindex(S)
+    Si = param_getindex(S,i)
+    Ai = param_getindex(A,i)
+    solve!(Si,ns,Ai)
+    # consistent!(Si) |> wait
+  end
+end
+
 # utils 
 
 _distr_proj_type(red::Reduction) = _distr_proj_type(NormStyle(red),red)

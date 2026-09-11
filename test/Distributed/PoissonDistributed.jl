@@ -1,17 +1,19 @@
 module PoissonDistributed
 
-using Gridap
-using GridapROMs
 using DrWatson
+using Gridap
+using GridapDistributed
+using GridapROMs
+using GridapPETSc
+using PartitionedArrays
+using Test
+
 using Gridap.Algebra
 using Gridap.FESpaces
-using GridapDistributed
 using GridapROMs.ParamDataStructures
 using GridapROMs.ParamAlgebra
 using GridapROMs.Distributed
 using GridapROMs.RBSteady
-using PartitionedArrays
-using Test
 
 method=:pod
 compression=:global
@@ -70,7 +72,7 @@ function main(distribute,parts)
   test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=[1,3,7])
   trial = ParamTrialFESpace(test,gμ)
 
-  fesolver = PETScLinearSolver()
+  fesolver = LUSolver()#PETScLinearSolver()
   rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac,hypred_strategy)
 
   feop = LinearParamOperator(res,stiffness,pspace,trial,test,domains)

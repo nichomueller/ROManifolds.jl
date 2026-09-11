@@ -249,8 +249,8 @@ end
 function GridapROMs.plot_solutions(
   dir::String,
   rbop::ReducedOperator,
-  sol::BlockSnapshots,
-  sol_approx::BlockSnapshots;
+  sol::AbstractBlockSnapshots,
+  sol_approx::AbstractBlockSnapshots;
   kwargs...
   )
 

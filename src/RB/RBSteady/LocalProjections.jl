@@ -305,9 +305,9 @@ function _cluster(s::GenericSnapshots,inds::AbstractVector)
   GenericSnapshots(data,get_param_data(sinds),get_dof_map(sinds),get_realisation(sinds))
 end
 
-function _cluster(s::BlockSnapshots{N},inds::AbstractVector) where N
+function _cluster(s::AbstractBlockSnapshots,inds::AbstractVector)
   array = map(sj -> _cluster(sj,inds),blocks(s))
-  pdata = _cluster(s.param_data,inds)
+  pdata = _cluster(get_param_data(s),inds)
   return BlockSnapshots(array,pdata)
 end
 
