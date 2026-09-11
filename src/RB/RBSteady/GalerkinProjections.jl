@@ -30,14 +30,14 @@ function galerkin_projection(
 
   TS = promote_type(T,S)
   nleft = size(basis_left,2)
-  n = size(a,1)
+  n = param_length(a)
   nright = size(basis_right,2)
   proj_basis = zeros(TS,nleft,n,nright)
-
-  @inbounds for i = 1:n
-    @views proj_basis[:,i,:] = basis_left'*param_getindex(a,i)*basis_right
+  cache = zeros(TS,innersize(a,1),size(basis_right,2))
+  @inbounds @views for i = 1:n
+    mul!(cache,param_getindex(a,i),basis_right)
+    mul!(proj_basis[:,i,:],basis_left',cache)
   end
-
   return proj_basis
 end
 

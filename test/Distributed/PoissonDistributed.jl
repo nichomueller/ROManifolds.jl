@@ -193,6 +193,7 @@ using DrWatson
 using Gridap.Algebra
 using Gridap.FESpaces
 using GridapDistributed
+using GridapROMs.ParamDataStructures
 using GridapROMs.ParamAlgebra
 using GridapROMs.Distributed
 using GridapROMs.RBSteady
@@ -302,7 +303,7 @@ function main(distribute,parts)
       rbsolverx = RBSteady.set_params(rbsolver;nparams=num_params(x))
       res = residual_snapshots(rbsolverx,feop,x)
       jac = jacobian_snapshots(rbsolverx,feop,x)
-      err_res,err_jac = RBSteady.hr_error(rbsolverx,rbop,res,jac,fesnaps)
+      err_res,err_jac = RBSteady.hr_error(rbsolverx,rbop,res,jac,x)
       println("diagnostic | hr error residual (per trian): ", err_res)
       println("diagnostic | hr error jacobian (per trian): ", err_jac)
     catch e

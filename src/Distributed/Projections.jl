@@ -6,34 +6,21 @@ PartitionedArrays.own_values(a::DistributedProjection) = own_values(get_basis(a)
 PartitionedArrays.ghost_values(a::DistributedProjection) = ghost_values(get_basis(a))
 PartitionedArrays.consistent!(a::DistributedProjection) = consistent!(get_basis(a))
 
-function RBSteady.galerkin_projection(a::DistributedProjection,b::DistributedProjection)
-  lb̂ = map(own_values(a),own_values(b)) do ao,bo
-    galerkin_projection(ao,bo)
-  end
-  b̂ = reduce(+,lb̂)
-  return ReducedProjection(b̂)
-end
-
-function RBSteady.galerkin_projection(a::DistributedProjection,b::DistributedProjection,c::DistributedProjection,args...)
-  lb̂ = map(own_values(a),own_values(b),own_values(c)) do ao,bo,co
-    galerkin_projection(ao,bo,co,args...)
-  end
-  b̂ = reduce(+,lb̂)
-  return ReducedProjection(b̂)
-end
-
-function RBSteady.galerkin_projection(Φl::GenericPMatrix,b::PVector{<:AbstractParamVector})
+function RBSteady.galerkin_projection(Φl::GenericPMatrix,b::PVector)
   lb̂ = map(own_values(Φl),own_values(b)) do Φlo,bo
     galerkin_projection(Φlo,bo)
   end
-  reduce(+,lb̂)
+  return reduce(+,lb̂)
 end
 
 function RBSteady.galerkin_projection(Φl::GenericPMatrix,A::PSparseMatrix,Φr::GenericPMatrix)
-  lÂ = map(own_values(Φl),own_values(A),own_values(Φr)) do Φlo,Ao,Φro
-    galerkin_projection(Φlo,Ao,Φro)
-  end
-  reduce(+,lÂ)
+  TS = promote_type(eltype(Φl),eltype(Φr))
+  nleft = size(Φl,2)
+  n = getany(map(param_length,partition(A)))
+  nright = size(Φr,2)
+  Â = zeros(TS,nleft,n,nright)
+  _galerkin_mul!(Â,Φl,A,Φr)
+  return Â
 end
 
 row_partition(a::DistributedProjection) = row_partition(get_basis(a))
@@ -142,14 +129,18 @@ function RBSteady.union_bases(a::DistributedNormedProjection,b::AbstractArray,ar
   DistributedNormedProjection(projection′,a.norm_matrix)
 end
 
-function RBSteady.galerkin_projection(a::DistributedProjection,s::DistributedSnapshots)
-  b̂ = galerkin_projection(get_basis(a),get_param_data(s))
-  return ReducedProjection(b̂)
+function RBSteady.galerkin_projection(proj_left::DistributedNormedProjection,a::DistributedProjection)
+  galerkin_projection(get_projection(proj_left),get_projection(a))
 end
 
-function RBSteady.galerkin_projection(a::DistributedProjection,s::DistributedSnapshots,c::DistributedProjection,args...)
-  b̂ = galerkin_projection(get_basis(a),get_param_data(s),get_basis(c),args...)
-  return ReducedProjection(b̂)
+function RBSteady.galerkin_projection(
+  proj_left::DistributedNormedProjection,
+  a::DistributedProjection,
+  proj_right::DistributedNormedProjection,
+  args...
+  )
+
+  galerkin_projection(get_projection(proj_left),get_projection(a),get_projection(proj_right),args...)
 end
 
 for f in (:DEIM,:SOPT)
@@ -170,3 +161,41 @@ _distr_proj_type(red::Reduction) = _distr_proj_type(NormStyle(red),red)
 _distr_proj_type(::NormStyle,::Reduction) = @abstractmethod
 _distr_proj_type(::EuclideanNorm,::PODReduction) = DistributedPODProjection
 _distr_proj_type(::AssembleOperator,::DirectReduction) = DistributedNormedProjection
+
+function _galerkin_mul!(
+  d::AbstractArray{<:Number,3},
+  c::GenericPArray,
+  a::PSparseMatrix,
+  b::GenericPArray
+  )
+
+  @boundscheck @assert PartitionedArrays.matching_own_indices(axes(c,1),axes(a,1))
+  @boundscheck @assert PartitionedArrays.matching_own_indices(axes(a,2),axes(b,1))
+  if !PartitionedArrays.matching_ghost_indices(axes(a,2),axes(b,1))
+    b = _change_layout(b,partition(axes(a,2)))
+  end
+  # Start the exchange
+  t = consistent!(b)
+  # Meanwhile, process the owned block into a per-rank local buffer.
+  ld = map(own_values(c),own_values(a),own_values(b)) do co,aoo,bo
+    dl = zeros(eltype(d),size(d))
+    co1 = zeros(eltype(d),innersize(aoo)[1],size(bo,2))
+    @inbounds for i in param_eachindex(aoo)
+      mul!(co1,param_getindex(aoo,i),bo)
+      mul!(view(dl,:,i,:),co',co1)
+    end
+    dl
+  end
+  # Wait for the exchange to finish
+  wait(t)
+  # process the ghost block, accumulating onto the same per-rank buffer
+  map(ld,own_values(c),own_ghost_values(a),ghost_values(b)) do dl,co,aoh,bh
+    co1 = zeros(eltype(d),innersize(aoh)[1],size(bh,2))
+    @inbounds for i in param_eachindex(aoh)
+      mul!(co1,param_getindex(aoh,i),bh)
+      mul!(view(dl,:,i,:),co',co1,1,1)
+    end
+  end
+  copyto!(d,reduce(+,ld))
+  d
+end
