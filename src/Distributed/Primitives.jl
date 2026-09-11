@@ -140,7 +140,7 @@ function PartitionedArrays.allocate_gather_impl(
   ::Type{T}
   ) where T<:AbstractMatrix
 
-  l = map(innerlength,snd)
+  l = map(_innersize,snd)
   l_dest = gather(l;destination)
   S = eltype(T)
   function f(l,snd)
@@ -205,6 +205,46 @@ end
 
 for T in (:AbstractMatrix,:ConsecutiveParamVector,:ParamJaggedArray)
   @eval begin
+    function PartitionedArrays.gather_impl!(
+      rcv::MPIArray,
+      snd::MPIArray,
+      destination,
+      ::Type{<:$T}
+      )
+
+      @assert rcv.comm === snd.comm
+      @assert isa(rcv.item,ParamJaggedArray)
+      comm = snd.comm
+      sdata = _data(snd.item)
+      Tv = eltype(sdata)
+      plength = size(sdata,2)
+      rdata = rcv.item.data
+      rptrs = rcv.item.ptrs
+      counts = PartitionedArrays.ptrs_to_counts(rptrs)
+      if isa(destination,Integer)
+        root = destination-1
+        if MPI.Comm_rank(comm) == root
+          @assert length(rcv.item) == MPI.Comm_size(comm)
+          rdata[rptrs[destination]:rptrs[destination+1]-1,:] .= sdata
+          for k in 1:plength
+            MPI.Gatherv!(MPI.IN_PLACE,MPI.VBuffer(view(rdata,:,k),counts),root,comm)
+          end
+        else
+          for k in 1:plength
+            MPI.Gatherv!(convert(Vector{Tv},view(sdata,:,k)),nothing,root,comm)
+          end
+        end
+      else
+        @assert destination === :all
+        @assert length(rcv.item) == MPI.Comm_size(comm)
+        for k in 1:plength
+          sk = convert(Vector{Tv},view(sdata,:,k))
+          MPI.Allgatherv!(sk,MPI.VBuffer(view(rdata,:,k),counts),comm)
+        end
+      end
+      rcv
+    end
+
     function PartitionedArrays.exchange_impl!(rcv,snd,graph,::Type{<:$T})
       @assert PartitionedArrays.is_consistent(graph)
       @assert eltype(rcv) <: ParamJaggedArray
@@ -292,23 +332,64 @@ for T in (:AbstractMatrix,:ConsecutiveParamVector,:ParamJaggedArray)
   end
 end
 
+"""
+    _gather_reduce(op,a)
+
+Combine the per-rank items of `a` (a `PartitionedArrays` array whose items are
+themselves dense arrays, e.g. a `Φlᵀ*Φr` Gram matrix, a reduced Jacobian tensor, a
+DEIM row/col mask - computed independently per rank via `map`) into a single value
+identical on every rank, folding with `op` (`+`, `max.`, ...) - the array-valued
+analogue of `reduce(op,a)`.
+
+`Base.reduce(op,::MPIArray{T})` boxes each rank's item in a `Ref{T}` and dispatches
+to `MPI.Allreduce!`'s "single custom object" path, which requires `isbitstype(T)` -
+true for scalars, false for any `Array`, so it throws `ArgumentError: Type must be
+isbitstype` under real MPI even though it silently works under `DebugArray` (a plain
+sequential `Base.reduce`, no MPI involved). This instead uses `gather(a;destination=
+:all)` (itself extended for these array-valued payloads via `gather_impl!` in
+`Primitives.jl`) to collect every rank's item everywhere, then folds `op` locally -
+correct under both `DebugArray` and `MPIArray`, and it round-trips whatever
+container type `a`'s items are (e.g. `ConsecutiveParamVector`), not just plain
+`Array`s.
+
+`gather_impl!`/`ParamJaggedArray` are only extended for 2-D items (its raw storage
+is a plain `Matrix`). Higher-dimensional items (e.g. the `(n̂test,nmodes,n̂trial)`
+reduced Jacobian tensor) are reshaped to 2-D (collapsing every dimension past the
+first into one) before gathering and reshaped back after - `op` is applied
+elementwise, so this commutes with `reshape` for any `op` used here (`+`, `max.`).
+"""
+function _gather_reduce(op,a)
+  sz = size(getany(a))
+  if length(sz) <= 2
+    return _gather_reduce_2d(op,a)
+  end
+  a2 = map(x -> reshape(x,sz[1],:),a)
+  reshape(_gather_reduce_2d(op,a2),sz)
+end
+
+function _gather_reduce_2d(op,a)
+  g = gather(a;destination=:all)
+  vals = map(g) do g
+    acc = g[1]
+    for i in 2:length(g)
+      acc = op(acc,g[i])
+    end
+    acc
+  end
+  getany(vals)
+end
+
 # utils
 
+_data(a::AbstractMatrix) = a
+_data(a::ConsecutiveParamVector) = get_all_data(a)
+_data(a::ParamJaggedArray) = a.data
+
 _param_eachindex(a) = 1:_get_plength(a)
-
-_get_plength(a::AbstractMatrix) = size(a,2)
-_get_plength(a::AbstractParamArray) = param_length(a)
-_get_plength(a::ParamJaggedArray) = param_length(a)
-
-_innersize(a::AbstractMatrix) = size(a,1)
-_innersize(a::AbstractParamArray) = innersize(a)
-_innersize(a::ParamJaggedArray) = innersize(a)
-
-_getindex(a::AbstractMatrix,i,j) = a[i,j]
-_setindex!(a::AbstractMatrix,v,i,j) = (a[i,j] = v)
-
-_getindex(a::ConsecutiveParamVector,i,j) = a.data[i,j]
-_setindex!(a::ConsecutiveParamVector,v,i,j) = (a.data[i,j] = v)
+_get_plength(a) = size(_data(a),2)
+_innersize(a) = size(_data(a),1)
+_getindex(a,i,j) = getindex(_data(a),i,j)
+_setindex!(a,v,i,j) = setindex!(_data(a),v,i,j)
 
 function _getindex(a::OwnAndGhostParamVectors,i,j)
   n_own = innerlength(a.own_values)

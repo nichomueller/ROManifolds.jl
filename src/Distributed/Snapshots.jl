@@ -247,5 +247,16 @@ for S in (:AbstractMatrix,:PSparseMatrix,:GenericPMatrix,:DistributedSnapshots),
 end
 
 for op in (:+,:-)
-  @eval Base.$op(a::DistributedSnapshots,b::DistributedSnapshots) = $op(_getvals(a),_getvals(b))
+  @eval function Base.$op(a::DistributedSnapshots,b::DistributedSnapshots)
+    av,bv = _getvals(a),_getvals(b)
+    # `a`/`b` are typically compared here to evaluate an error norm (e.g.
+    # `compute_relative_error`): the online FOM solve keeps its snapshots'
+    # ghost-consistency internal to the solve, and a projection/reconstruction
+    # (`inv_project`) never needs to touch ghosts at all (it's a per-owned-row
+    # basis contraction), so neither is guaranteed ghost-consistent by the time
+    # they get here. Ensure both are before combining them.
+    consistent!(av) |> wait
+    consistent!(bv) |> wait
+    $op(av,bv)
+  end
 end

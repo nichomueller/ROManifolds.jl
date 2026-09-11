@@ -83,7 +83,7 @@ function main(distribute,parts)
   fesnaps, = solution_snapshots(rbsolver,feop)
   rbop = reduced_operator(rbsolver,feop,fesnaps)
 
-  μon = realisation(feop;nparams=10,sampling=:uniform)
+  μon = realisation(feop;nparams=10,start=nparams+1)
   x̂,rbstats = solve(rbsolver,rbop,μon)
   x,festats = solution_snapshots(rbsolver,feop,μon)
   perf = eval_performance(rbsolver,rbop,x,x̂,festats,rbstats)

@@ -10,7 +10,7 @@ function RBSteady.galerkin_projection(Φl::GenericPMatrix,b::PVector)
   lb̂ = map(own_values(Φl),own_values(b)) do Φlo,bo
     galerkin_projection(Φlo,bo)
   end
-  return _reduce_arrays(+,lb̂)
+  return _gather_reduce(+,lb̂)
 end
 
 function RBSteady.galerkin_projection(Φl::GenericPMatrix,A::PSparseMatrix,Φr::GenericPMatrix)
@@ -206,6 +206,6 @@ function _galerkin_mul!(
       mul!(view(dl,:,i,:),co',co1,1,1)
     end
   end
-  copyto!(d,_reduce_arrays(+,ld))
+  copyto!(d,_gather_reduce(+,ld))
   d
 end

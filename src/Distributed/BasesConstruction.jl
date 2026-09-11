@@ -113,7 +113,7 @@ function _get_R(A::GenericPMatrix,n)
     end
     R
   end
-  _reduce_arrays(+,parts;init=zeros(T,n,n))
+  _gather_reduce(+,parts)
 end
 
 function _swapcols!(A,j,j′)
@@ -233,7 +233,7 @@ function _reflector_apply!(A,τ,rows,cols)
     end
     w
   end
-  w = _reduce_arrays(+,partial_w;init=zeros(T,ncols))
+  w = _gather_reduce(+,partial_w)
   vAk = conj(τ) .* w
   map(own_values(A),row_partition(A)) do vals,row_idxs
     o2g = own_to_global(row_idxs)
@@ -281,7 +281,7 @@ function _reflector_apply_cross!(Q::GenericPMatrix,A::GenericPMatrix,τ,rows,col
     end
     w
   end
-  w = _reduce_arrays(+,partial_w;init=zeros(T,ncols))
+  w = _gather_reduce(+,partial_w)
   vAk = conj(τ) .* w
   map(own_values(Q),own_values(A),row_partition(Q)) do Qv,av,row_idxs
     o2g = own_to_global(row_idxs)

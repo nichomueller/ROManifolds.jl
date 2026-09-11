@@ -198,7 +198,8 @@ function Base.setindex!(a::ParamJaggedArray,v,i::Int)
   axis2 = 1:param_length(a)
   scale = a.ptrs[end]-1
   ids = range_1d(axis1,axis2,scale)
+  vd = _data(v)
   for (k,ki) in enumerate(ids)
-    a.data[ki] = v[k]
+    a.data[ki] = vd[k]
   end
 end
