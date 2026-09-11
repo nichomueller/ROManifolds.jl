@@ -170,8 +170,8 @@ for f in (:DEIM,:SOPT)
       end |> tuple_of_arrays
       # assemble the full per-slot (global row & col dof) across ranks
       op(a,b) = max.(a,b) # assign a DEIM index to only one rank, though it may appear on multiple ranks
-      grows = _gather_reduce(op,r)
-      gcols = _gather_reduce(op,c)
+      grows = reduce(op,r)
+      gcols = reduce(op,c)
       # per rank: keep every slot whose row AND col dof is local
       R′,C′ = map(flat_row_partition(B)) do rci
         g2lr = global_to_local(row_partition(rci))
@@ -393,7 +393,7 @@ function FESpaces.interpolate!(
 
   o = one(eltype2(b̂))
   interpolate!(_coeff,get_interpolation(a),x)
-  coeff = _gather_reduce(+,_coeff)
+  coeff = sreduce(_coeff)
   mul!(b̂,a,coeff,o,o)
   return b̂
 end
@@ -405,7 +405,7 @@ function FESpaces.interpolate!(
   x::AbstractArray{<:AbstractArray}
   )
 
-  coeff = _gather_reduce(+,_coeff)
+  coeff = sreduce(_coeff)
   o = one(eltype2(b̂))
   axpy!(o,coeff,b̂)
   return b̂
@@ -502,7 +502,7 @@ function _subfill!(a::AbstractMatrix,b::AbstractMatrix,ia,ib)
 end
 
 function _from_submatrix!(aI,a,I,l)
-  aIs = map(own_values(a),partition(axes(a,1))) do oa,ra
+  aI .+= map(own_values(a),partition(axes(a,1))) do oa,ra
     g2o = global_to_own(ra)
     c = similar(aI)
     fill!(c,zero(eltype(c)))
@@ -511,8 +511,7 @@ function _from_submatrix!(aI,a,I,l)
       or > 0 && _subfill!(c,oa,k,or)
     end
     c
-  end
-  aI .+= _gather_reduce(+,aIs)
+  end |> sreduce
 end
 
 function _push_parts!(a::AbstractArray{<:LocalDEIMIndices},I,l)

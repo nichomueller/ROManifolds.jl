@@ -2,9 +2,9 @@ for T in (:DEIMHyperReduction,:SOPTHyperReduction,:HighDimDEIMHyperReduction,:Hi
   @eval begin
     function RBSteady.check_interpolation(res::DistributedSnapshots,a::HRVecProjection{<:$T},_fecache)
       msg = "fecache mismatch at interpolation points"
-      fecache = _gather_reduce(+,map(get_all_data,local_views(_fecache)))
+      fecache = sreduce(map(get_all_data,local_views(_fecache)))
       dofs = get_interpolation_dofs(get_interpolation(a))
-      deltas = map(local_views(res),local_views(dofs)) do rvals,rdofs
+      data = map(local_views(res),local_views(dofs)) do rvals,rdofs
         delta = zero(fecache)
         isempty(rdofs.global_rows) && return delta
         g2l = global_to_local(rdofs.index_parts)
@@ -13,17 +13,16 @@ for T in (:DEIMHyperReduction,:SOPTHyperReduction,:HighDimDEIMHyperReduction,:Hi
           delta[i,:] .= b[g2l[gri],:]
         end
         delta
-      end
-      data = _gather_reduce(+,deltas)
+      end |> sreduce
       @check isapprox(fecache,data;rtol=1e-8) msg
       return true
     end
 
     function RBSteady.check_interpolation(jac::DistributedSnapshots,a::HRMatProjection{<:$T},_fecache)
       msg = "fecache mismatch at interpolation points"
-      fecache = _gather_reduce(+,map(get_all_data,local_views(_fecache)))
+      fecache = sreduce(map(get_all_data,local_views(_fecache)))
       dofs = get_interpolation_dofs(get_interpolation(a))
-      deltas = map(local_views(jac),local_views(dofs)) do jvals,rdofs
+      data = map(local_views(jac),local_views(dofs)) do jvals,rdofs
         delta = zero(fecache)
         rrows,rcols = rdofs
         isempty(rrows.global_rows) && return delta
@@ -36,8 +35,7 @@ for T in (:DEIMHyperReduction,:SOPTHyperReduction,:HighDimDEIMHyperReduction,:Hi
           delta[i,:] .= A[nzi,:]
         end
         delta
-      end
-      data = _gather_reduce(+,deltas)
+      end |> sreduce
       @check isapprox(fecache,data;rtol=1e-8) msg
       return true
     end

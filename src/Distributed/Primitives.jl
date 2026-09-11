@@ -332,56 +332,49 @@ for T in (:AbstractMatrix,:ConsecutiveParamVector,:ParamJaggedArray)
   end
 end
 
-"""
-    _gather_reduce(op,a)
-
-Combine the per-rank items of `a` (a `PartitionedArrays` array whose items are
-themselves dense arrays, e.g. a `Φlᵀ*Φr` Gram matrix, a reduced Jacobian tensor, a
-DEIM row/col mask - computed independently per rank via `map`) into a single value
-identical on every rank, folding with `op` (`+`, `max.`, ...) - the array-valued
-analogue of `reduce(op,a)`.
-
-`Base.reduce(op,::MPIArray{T})` boxes each rank's item in a `Ref{T}` and dispatches
-to `MPI.Allreduce!`'s "single custom object" path, which requires `isbitstype(T)` -
-true for scalars, false for any `Array`, so it throws `ArgumentError: Type must be
-isbitstype` under real MPI even though it silently works under `DebugArray` (a plain
-sequential `Base.reduce`, no MPI involved). This instead uses `gather(a;destination=
-:all)` (itself extended for these array-valued payloads via `gather_impl!` in
-`Primitives.jl`) to collect every rank's item everywhere, then folds `op` locally -
-correct under both `DebugArray` and `MPIArray`, and it round-trips whatever
-container type `a`'s items are (e.g. `ConsecutiveParamVector`), not just plain
-`Array`s.
-
-`gather_impl!`/`ParamJaggedArray` are only extended for 2-D items (its raw storage
-is a plain `Matrix`). Higher-dimensional items (e.g. the `(n̂test,nmodes,n̂trial)`
-reduced Jacobian tensor) are reshaped to 2-D (collapsing every dimension past the
-first into one) before gathering and reshaped back after - `op` is applied
-elementwise, so this commutes with `reshape` for any `op` used here (`+`, `max.`).
-"""
-function _gather_reduce(op,a)
-  sz = size(getany(a))
-  if length(sz) <= 2
-    return _gather_reduce_2d(op,a)
-  end
-  a2 = map(x -> reshape(x,sz[1],:),a)
-  reshape(_gather_reduce_2d(op,a2),sz)
-end
-
-function _gather_reduce_2d(op,a)
-  g = gather(a;destination=:all)
-  vals = map(g) do g
-    acc = g[1]
-    for i in 2:length(g)
-      acc = op(acc,g[i])
+for T in (:AbstractArray,:ConsecutiveParamVector)
+  @eval begin
+    function PartitionedArrays.reduction!(op,b::MPIArray,a::MPIArray{<:$T{<:Number}};destination=PartitionedArrays.MAIN,init=nothing)
+      @assert a.comm === b.comm
+      comm = a.comm
+      sdata = _data(a.item)
+      rdata = similar(sdata)
+      opr = MPI.Op(op,eltype(sdata))
+      if destination !== :all
+        root = destination-1
+        MPI.Reduce!(sdata,rdata,opr,root,comm)
+        if MPI.Comm_rank(comm) == root
+          init !== nothing && (rdata .= op.(rdata,init))
+          b.item = _rewrap(a.item,rdata)
+        end
+      else
+        MPI.Allreduce!(sdata,rdata,opr,comm)
+        init !== nothing && (rdata .= op.(rdata,init))
+        b.item = _rewrap(a.item,rdata)
+      end
+      b
     end
-    acc
   end
-  getany(vals)
 end
+
+function PartitionedArrays.reduction!(
+  op,
+  b::MPIArray,
+  a::MPIArray{<:ParamJaggedArray};
+  destination=PartitionedArrays.MAIN,
+  kwargs...
+  )
+
+  c = gather(a;destination)
+  map!(i->reduce(op,i;kwargs...),b,c)
+  b
+end
+
+sreduce(a) = reduce(+,a)
 
 # utils
 
-_data(a::AbstractMatrix) = a
+_data(a::AbstractArray{<:Number}) = a
 _data(a::ConsecutiveParamVector) = get_all_data(a)
 _data(a::ParamJaggedArray) = a.data
 
@@ -410,3 +403,6 @@ function _setindex!(a::OwnAndGhostParamVectors,v,i,j)
     a.own_values.data[k,j] = v
   end
 end
+
+_rewrap(a::AbstractArray,b) = b
+_rewrap(a::ConsecutiveParamArray,b) = ConsecutiveParamArray(b)

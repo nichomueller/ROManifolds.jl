@@ -70,13 +70,7 @@ function main(distribute,parts)
   test = TestFESpace(Ω,reffe;conformity=:H1,dirichlet_tags=[1,3,7])
   trial = ParamTrialFESpace(test,gμ)
 
-  # NOTE: temporarily using LUSolver() instead of PETScLinearSolver()/GAMG -
-  # this environment's PETSc_jll is linked against a different MPI build than
-  # the one MPI.jl loads (MPICH_jll), which corrupts MatCreateMPIAIJWithArrays'
-  # preallocation and crashes with a bogus "out of memory" error, reproducible
-  # with plain Gridap/GridapDistributed/GridapPETSc (no GridapROMs code
-  # involved). Switch back to PETScLinearSolver() once that's resolved.
-  fesolver = LUSolver()
+  fesolver = PETScLinearSolver()
   rbsolver = RBSolver(fesolver,state_reduction;nparams_res,nparams_jac,hypred_strategy)
 
   feop = LinearParamOperator(res,stiffness,pspace,trial,test,domains)

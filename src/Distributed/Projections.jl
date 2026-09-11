@@ -7,10 +7,9 @@ PartitionedArrays.ghost_values(a::DistributedProjection) = ghost_values(get_basi
 PartitionedArrays.consistent!(a::DistributedProjection) = consistent!(get_basis(a))
 
 function RBSteady.galerkin_projection(Φl::GenericPMatrix,b::PVector)
-  lb̂ = map(own_values(Φl),own_values(b)) do Φlo,bo
+  map(own_values(Φl),own_values(b)) do Φlo,bo
     galerkin_projection(Φlo,bo)
-  end
-  return _gather_reduce(+,lb̂)
+  end |> sreduce
 end
 
 function RBSteady.galerkin_projection(Φl::GenericPMatrix,A::PSparseMatrix,Φr::GenericPMatrix)
@@ -206,6 +205,6 @@ function _galerkin_mul!(
       mul!(view(dl,:,i,:),co',co1,1,1)
     end
   end
-  copyto!(d,_gather_reduce(+,ld))
+  copyto!(d,sreduce(ld))
   d
 end

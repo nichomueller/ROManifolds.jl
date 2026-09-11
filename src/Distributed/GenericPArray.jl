@@ -452,7 +452,6 @@ function LinearAlgebra.mul!(
   map(own_values(c),own_values(a)) do co,ao
     mul!(co,ao,b,α,β)
   end
-  consistent!(c) |> wait
   c
 end
 
@@ -498,10 +497,9 @@ function LinearAlgebra.mul!(
   )
 
   a = at.parent
-  G = map(own_values(a),own_values(b)) do ao,bo
+  r = map(own_values(a),own_values(b)) do ao,bo
     ao'*bo
-  end
-  r = _gather_reduce(+,G)
+  end |> sreduce
   if β == 0
     c .= α.*r
   else
@@ -519,10 +517,9 @@ function LinearAlgebra.mul!(
   )
 
   a = at.parent
-  G = map(own_values(a),own_values(b)) do ao,bo
+  r = map(own_values(a),own_values(b)) do ao,bo
     ao'*bo
-  end
-  r = _gather_reduce(+,G)
+  end |> sreduce
   if β == 0
     c .= α.*r
   else
@@ -540,10 +537,9 @@ function LinearAlgebra.mul!(
   )
   
   a = at.parent
-  G = map(own_values(a),own_values(b)) do ao,bo
+  r = map(own_values(a),own_values(b)) do ao,bo
     ao'*get_all_data(bo)
-  end
-  r = _gather_reduce(+,G)
+  end |> sreduce
   if β == 0
     copyto!(get_all_data(c),rmul!(r,α))
   else
