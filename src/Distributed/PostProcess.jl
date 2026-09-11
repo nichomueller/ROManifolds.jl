@@ -2,38 +2,42 @@ for T in (:DEIMHyperReduction,:SOPTHyperReduction,:HighDimDEIMHyperReduction,:Hi
   @eval begin
     function RBSteady.check_interpolation(res::DistributedSnapshots,a::HRVecProjection{<:$T},_fecache)
       msg = "fecache mismatch at interpolation points"
-      fecache = reduce(+,map(get_all_data,local_views(_fecache)))
+      fecache = _reduce_arrays(+,map(get_all_data,local_views(_fecache)))
       dofs = get_interpolation_dofs(get_interpolation(a))
-      data = zero(fecache)
-      map(local_views(res),local_views(dofs)) do rvals,rdofs
-        isempty(rdofs.global_rows) && return
+      deltas = map(local_views(res),local_views(dofs)) do rvals,rdofs
+        delta = zero(fecache)
+        isempty(rdofs.global_rows) && return delta
         g2l = global_to_local(rdofs.index_parts)
         b = flatten(rvals)
         @views for (gri,i) in zip(rdofs.global_rows,rdofs.global_cols)
-          data[i,:] .= b[g2l[gri],:]
+          delta[i,:] .= b[g2l[gri],:]
         end
+        delta
       end
+      data = _reduce_arrays(+,deltas)
       @check isapprox(fecache,data;rtol=1e-8) msg
       return true
     end
 
     function RBSteady.check_interpolation(jac::DistributedSnapshots,a::HRMatProjection{<:$T},_fecache)
       msg = "fecache mismatch at interpolation points"
-      fecache = reduce(+,map(get_all_data,local_views(_fecache)))
+      fecache = _reduce_arrays(+,map(get_all_data,local_views(_fecache)))
       dofs = get_interpolation_dofs(get_interpolation(a))
-      data = zero(fecache)
-      map(local_views(jac),local_views(dofs)) do jvals,rdofs
+      deltas = map(local_views(jac),local_views(dofs)) do jvals,rdofs
+        delta = zero(fecache)
         rrows,rcols = rdofs
-        isempty(rrows.global_rows) && return
+        isempty(rrows.global_rows) && return delta
         sparsity = get_sparsity(get_dof_map(jvals))
         lrows = _remap(rrows,global_to_local(rrows.index_parts))
         lcols = _remap(rcols,global_to_local(rcols.index_parts))
         nzinds = sparsify_split_indices(lrows,lcols,sparsity)
         A = flatten(jvals)
         @views for (nzi,i) in zip(nzinds,rrows.global_cols)
-          data[i,:] .= A[nzi,:]
+          delta[i,:] .= A[nzi,:]
         end
+        delta
       end
+      data = _reduce_arrays(+,deltas)
       @check isapprox(fecache,data;rtol=1e-8) msg
       return true
     end

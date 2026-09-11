@@ -10,7 +10,7 @@ function RBSteady.galerkin_projection(Φl::GenericPMatrix,b::PVector)
   lb̂ = map(own_values(Φl),own_values(b)) do Φlo,bo
     galerkin_projection(Φlo,bo)
   end
-  return reduce(+,lb̂)
+  return _reduce_arrays(+,lb̂)
 end
 
 function RBSteady.galerkin_projection(Φl::GenericPMatrix,A::PSparseMatrix,Φr::GenericPMatrix)
@@ -21,6 +21,16 @@ function RBSteady.galerkin_projection(Φl::GenericPMatrix,A::PSparseMatrix,Φr::
   Â = zeros(TS,nleft,n,nright)
   _galerkin_mul!(Â,Φl,A,Φr)
   return Â
+end
+
+function RBSteady.galerkin_projection(a::DistributedProjection,s::DistributedSnapshots)
+  b̂ = galerkin_projection(get_basis(a),get_param_data(s))
+  return ReducedProjection(b̂)
+end
+
+function RBSteady.galerkin_projection(a::DistributedProjection,s::DistributedSnapshots,c::DistributedProjection,args...)
+  b̂ = galerkin_projection(get_basis(a),get_param_data(s),get_basis(c),args...)
+  return ReducedProjection(b̂)
 end
 
 row_partition(a::DistributedProjection) = row_partition(get_basis(a))
@@ -130,7 +140,7 @@ function RBSteady.union_bases(a::DistributedNormedProjection,b::AbstractArray,ar
 end
 
 function RBSteady.galerkin_projection(proj_left::DistributedNormedProjection,a::DistributedProjection)
-  galerkin_projection(get_projection(proj_left),get_projection(a))
+  galerkin_projection(RBSteady.get_projection(proj_left),RBSteady.get_projection(a))
 end
 
 function RBSteady.galerkin_projection(
@@ -140,7 +150,7 @@ function RBSteady.galerkin_projection(
   args...
   )
 
-  galerkin_projection(get_projection(proj_left),get_projection(a),get_projection(proj_right),args...)
+  galerkin_projection(RBSteady.get_projection(proj_left),RBSteady.get_projection(a),RBSteady.get_projection(proj_right),args...)
 end
 
 for f in (:DEIM,:SOPT)
@@ -196,6 +206,6 @@ function _galerkin_mul!(
       mul!(view(dl,:,i,:),co',co1,1,1)
     end
   end
-  copyto!(d,reduce(+,ld))
+  copyto!(d,_reduce_arrays(+,ld))
   d
 end

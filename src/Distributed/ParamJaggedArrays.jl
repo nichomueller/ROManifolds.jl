@@ -102,6 +102,7 @@ for A in (:ConsecutiveParamVector,:AbstractMatrix)
   end
 end
 
+ParamDataStructures.innersize(a::ParamJaggedArray) = (size(a.data,1),)
 ParamDataStructures.param_length(a::ParamJaggedArray) = size(a.data,2)
 
 function ParamDataStructures.param_getindex(a::ParamJaggedArray{T},i::Integer) where T

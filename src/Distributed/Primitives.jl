@@ -58,8 +58,8 @@ function PartitionedArrays.assemble_impl!(
   buffer_snd = map(vector_partition,cache) do values,cache
     local_indices_snd = cache.local_indices_snd
     for (p,lid) in enumerate(local_indices_snd.data)
-      for i in _param_eachindex(values)
-        cache.buffer_snd.data[p,i] = _getindex(values,lid,i)
+      for k in _param_eachindex(values)
+        cache.buffer_snd.data[p,k] = _getindex(values,lid,k)
       end
     end
     cache.buffer_snd
@@ -75,9 +75,9 @@ function PartitionedArrays.assemble_impl!(
     map(vector_partition,cache) do values,cache
       local_indices_rcv = cache.local_indices_rcv
       for (p,lid) in enumerate(local_indices_rcv.data)
-        for i in _param_eachindex(values)
-          v = f(_getindex(values,lid,i),cache.buffer_rcv.data[p,i])
-          _setindex!(values,v,lid,i)
+        for k in _param_eachindex(values)
+          v = f(_getindex(values,lid,k),cache.buffer_rcv.data[p,k])
+          _setindex!(values,v,lid,k)
         end
       end
     end
@@ -212,7 +212,7 @@ for T in (:AbstractMatrix,:ConsecutiveParamVector,:ParamJaggedArray)
       rcv_ids = graph.rcv
       @assert length(rcv_ids) == length(rcv)
       @assert length(rcv_ids) == length(snd)
-      for rcv_id in 1:length(rcv_ids)
+      for rcv_id in eachindex(rcv_ids)
         for (i,snd_id) in enumerate(rcv_ids[rcv_id])
           snd_snd_id = JaggedArray(snd[snd_id])
           j = first(findall(k->k==rcv_id,snd_ids[snd_id]))
@@ -223,8 +223,8 @@ for T in (:AbstractMatrix,:ConsecutiveParamVector,:ParamJaggedArray)
           for p in 1:(ptrs_rcv[i+1]-ptrs_rcv[i])
             p_rcv = p+ptrs_rcv[i]-1
             p_snd = p+ptrs_snd[j]-1
-            for i in 1:plength
-              rcv[rcv_id].data[p_rcv,i] = snd_snd_id.data[p_snd,i]
+            for k in 1:plength
+              rcv[rcv_id].data[p_rcv,k] = snd_snd_id.data[p_snd,k]
             end
           end
         end
@@ -284,7 +284,7 @@ for T in (:AbstractMatrix,:ConsecutiveParamVector,:ParamJaggedArray)
 
       g = ExchangeGraph(graph.snd.items,graph.rcv.items)
       @async begin
-        yield()
+        sleep(0.2)
         PartitionedArrays.exchange_impl!(rcv.items,snd.items,g,$T) |> wait
         rcv
       end
@@ -299,6 +299,10 @@ _param_eachindex(a) = 1:_get_plength(a)
 _get_plength(a::AbstractMatrix) = size(a,2)
 _get_plength(a::AbstractParamArray) = param_length(a)
 _get_plength(a::ParamJaggedArray) = param_length(a)
+
+_innersize(a::AbstractMatrix) = size(a,1)
+_innersize(a::AbstractParamArray) = innersize(a)
+_innersize(a::ParamJaggedArray) = innersize(a)
 
 _getindex(a::AbstractMatrix,i,j) = a[i,j]
 _setindex!(a::AbstractMatrix,v,i,j) = (a[i,j] = v)

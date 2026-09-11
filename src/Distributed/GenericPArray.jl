@@ -299,6 +299,47 @@ function LinearAlgebra.norm(a::GenericPArray,p::Real=2)
   reduce(+,contibs;init=zero(eltype(contibs)))^(1/p)
 end
 
+"""
+    _reduce_arrays(op,a;init=nothing)
+
+Like `reduce(op,a)`, but for a `PartitionedArrays` array whose per-rank items are
+themselves dense `Array`s (e.g. a `Φlᵀ*Φr` Gram matrix, a reduced Jacobian tensor, a
+DEIM row/col mask), computed independently per rank via `map` and meant to be combined
+across ranks with `op` (`+`, `max.`, ...).
+
+`Base.reduce(op,::MPIArray{T})` boxes each rank's item in a `Ref{T}` and dispatches to
+`MPI.Allreduce!`'s "single custom object" path, which requires `isbitstype(T)` - true
+for scalars, false for any `Array` (heap-allocated, never isbits), so it throws
+`ArgumentError: Type must be isbitstype` under real MPI even though it silently works
+fine under `DebugArray` (a plain sequential `Base.reduce`, no MPI involved). This
+gathers the raw (isbits-element) buffers instead via `MPI.Allgather!` and folds `op`
+locally - semantically identical to `Base.reduce` (both apply `op` pairwise to whole
+per-rank arrays), just implemented so it also works for `MPIArray`.
+
+Per-rank items that are themselves an `AbstractParamArray` (e.g. `ConsecutiveParamVector`,
+a param array of DEIM coefficients) are unwrapped to their raw storage via `get_all_data`
+before gathering (MPI's buffer machinery needs a genuine dense `Array`, e.g. `strides`
+must be defined, which these wrapper types don't implement) and rewrapped via
+`ConsecutiveParamArray` afterwards.
+"""
+_reduce_arrays(op,a::PartitionedArrays.DebugArray;kwargs...) = reduce(op,a;kwargs...)
+
+function _reduce_arrays(op,a::PartitionedArrays.MPIArray;init=nothing)
+  mine = PartitionedArrays.getany(a)
+  isparam = mine isa ParamDataStructures.AbstractParamArray
+  raw = isparam ? get_all_data(mine) : mine
+  n = MPI.Comm_size(a.comm)
+  flat = vec(raw)
+  recvbuf = similar(flat,length(flat)*n)
+  MPI.Allgather!(flat,recvbuf,a.comm)
+  acc = init
+  for r in 0:n-1
+    piece = reshape(view(recvbuf,(r*length(flat)+1):((r+1)*length(flat))),size(raw))
+    acc = acc === nothing ? copy(piece) : op(acc,piece)
+  end
+  isparam ? ConsecutiveParamArray(acc) : acc
+end
+
 function Base.:*(a::PSparseMatrix,b::GenericPVector)
   Ta = eltype(a)
   Tb = eltype(b)
@@ -500,7 +541,7 @@ function LinearAlgebra.mul!(
   G = map(own_values(a),own_values(b)) do ao,bo
     ao'*bo
   end
-  r = reduce(+,G)
+  r = _reduce_arrays(+,G)
   if β == 0
     c .= α.*r
   else
@@ -521,7 +562,7 @@ function LinearAlgebra.mul!(
   G = map(own_values(a),own_values(b)) do ao,bo
     ao'*bo
   end
-  r = reduce(+,G)
+  r = _reduce_arrays(+,G)
   if β == 0
     c .= α.*r
   else
@@ -542,7 +583,7 @@ function LinearAlgebra.mul!(
   G = map(own_values(a),own_values(b)) do ao,bo
     ao'*get_all_data(bo)
   end
-  r = reduce(+,G)
+  r = _reduce_arrays(+,G)
   if β == 0
     copyto!(get_all_data(c),rmul!(r,α))
   else

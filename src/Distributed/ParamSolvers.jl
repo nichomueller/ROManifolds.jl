@@ -27,6 +27,13 @@ function Algebra.solve!(
     numerical_setup!(ns,Ai)
     solve!(xi,ns,bi)
   end
+  # `solve!(xi,ns,bi)` solves rank-local systems and does not itself guarantee
+  # ghost consistency across ranks (silently fine under `DebugArray`, where all
+  # "ranks" share one process's memory, but not under real MPI). Every downstream
+  # use of `x` (projections, error norms, further assembly) needs consistent
+  # ghost values, so synchronize once here rather than relying on callers to
+  # remember to.
+  consistent!(x) |> wait
 
   ns
 end
@@ -77,6 +84,9 @@ function Algebra._solve_nr!(
       solve!(dx,ns,bi)
       xi .+= dx
     end
+    # see the linear `solve!` above: `x` needs ghost-consistent values before
+    # `residual!` (and any other downstream use) reads it under real MPI.
+    consistent!(x) |> wait
 
     residual!(b,op,x)
     res  = norm(b)
